@@ -10,7 +10,7 @@ public final class SettingsStore {
     public private(set) var hasCompletedOnboarding: Bool
 
     public enum Change { case settings, agents, discovery }
-    /// The sync service observes persisted mutations, after translations and local state are updated.
+    /// Invoked after preferences are persisted and local state is updated.
     @ObservationIgnored public var onChange: ((Change) -> Void)?
 
     private let defaults: UserDefaults
