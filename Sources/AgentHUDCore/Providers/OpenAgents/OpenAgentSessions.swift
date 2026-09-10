@@ -134,16 +134,37 @@ enum OpenAgentParser {
         try jsonLines(data) { line, index in
             let type = line["type"].stringValue
             if modern {
+                if agent == "main", type == "context.append_loop_event",
+                   let turn = line["event"]["turnId"].countValue, let at = ProviderDate.milliseconds(line["time"]) {
+                    let turnID = String(turn)
+                    if let position = session.turns.firstIndex(where: { $0.turnID == turnID }) {
+                        let previous = session.turns[position]
+                        if previous.state == .running, RecordCoding.milliseconds(at) > previous.observedAtMs {
+                            session.turns[position] = .init(provider: "Kimi", sessionID: session.id, turnID: turnID,
+                                state: .running, startedAtMs: previous.startedAtMs, observedAtMs: RecordCoding.milliseconds(at))
+                        }
+                    } else if line["event"]["type"].stringValue == "step.begin" {
+                        session.turns.append(.init(provider: "Kimi", sessionID: session.id, turnID: turnID,
+                            state: .running, startedAtMs: RecordCoding.milliseconds(at), observedAtMs: RecordCoding.milliseconds(at)))
+                    }
+                    session.start = min(session.start ?? at, at); session.end = max(session.end ?? at, at)
+                    return
+                }
                 if type == "llm.request" { requestModel = concrete(line["model"].stringValue); return }
                 if type == "turn.ended", let turn = line["turnId"].countValue, let at = ProviderDate.milliseconds(line["time"]) {
                     let success = line["reason"].stringValue == "completed" && line["error"] == .null
-                    session.turns.append(.init(provider: "Kimi", sessionID: session.id, turnID: String(turn),
-                        state: success ? .completed : .ended, startedAtMs: nil, observedAtMs: RecordCoding.milliseconds(at)))
+                    let position = session.turns.firstIndex { $0.turnID == String(turn) }
+                    let start = position.flatMap { session.turns[$0].startedAtMs }
+                    if agent == "main" {
+                        let finished = SessionTurn(provider: "Kimi", sessionID: session.id, turnID: String(turn),
+                            state: success ? .completed : .ended, startedAtMs: start, observedAtMs: RecordCoding.milliseconds(at))
+                        if let position { session.turns[position] = finished } else { session.turns.append(finished) }
+                    }
                     session.end = max(session.end ?? at, at)
                     // Subagent ends cannot complete the parent conversation.
                     if success && agent == "main" {
                         session.completions.append(.init(sessionID: session.id, vendor: "Kimi", turnID: String(turn),
-                            task: session.title, model: requestModel ?? "Unknown", startedAt: nil, completedAt: at))
+                            task: session.title, model: requestModel ?? "Unknown", startedAt: start.map(RecordCoding.date), completedAt: at))
                     }
                     return
                 }

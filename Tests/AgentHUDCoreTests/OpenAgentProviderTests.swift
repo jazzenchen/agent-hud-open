@@ -161,6 +161,40 @@ final class OpenAgentProviderTests: XCTestCase {
         XCTAssertEqual(old.models.values.first, "Unknown")
     }
 
+    func testKimiLoopEventsReachRunningReportBeforeUsageAndRetainTurnIdentityAtEnd() async throws {
+        let start: Int64 = 1_788_800_000_000
+        let path = "/.kimi-code/sessions/work/session/agents/main/wire.jsonl"
+        let running = """
+        {"type":"context.append_loop_event","time":\(start),"event":{"type":"step.begin","turnId":0,"step":0}}
+        {"type":"context.append_loop_event","time":\(start + 1000),"event":{"type":"content.part","turnId":0,"step":0,"part":{"text":"private text"}}}
+        """
+        let item = try XCTUnwrap(OpenAgentParser.kimi(Data(running.utf8), path: path).first)
+        XCTAssertTrue(item.events.isEmpty)
+        let turn = try XCTUnwrap(item.turns.first)
+        XCTAssertEqual(turn.state, .running)
+        XCTAssertEqual(turn.startedAtMs, start)
+        XCTAssertEqual(turn.observedAtMs, start + 1000)
+        let provider = OpenAgentUsageProvider(credentials: { [] }, sessions: { _ in .init(sessions: [item]) },
+            fetchQuota: { _, _ in ProviderQuota() }, history: QuotaHistoryStore(fileURL: nil),
+            clock: { Date(timeIntervalSince1970: Double(start + 2000) / 1000) })
+        let report = try await provider.fetchUsage(agents: [], historyHours: 24)
+        XCTAssertEqual(report.turns, [turn])
+        XCTAssertEqual(report.sessions.first?.id, turn.sessionID)
+        XCTAssertEqual(report.sessions.first?.isLive, true)
+        XCTAssertEqual(report.consumers.first?.vendor, "Kimi")
+        for reason in ["completed", "cancelled", "error"] {
+            let ended = running + "\n" + #"{"type":"turn.ended","turnId":0,"reason":"REASON","time":1788800003000}"#.replacingOccurrences(of: "REASON", with: reason)
+            let final = try XCTUnwrap(OpenAgentParser.kimi(Data(ended.utf8), path: path).first)
+            XCTAssertEqual(final.turns.count, 1)
+            XCTAssertEqual(final.turns.first?.id, turn.id)
+            XCTAssertEqual(final.turns.first?.startedAtMs, start)
+            XCTAssertEqual(final.turns.first?.state, reason == "completed" ? .completed : .ended)
+            XCTAssertEqual(final.turns.first?.observedAtMs, start + 3000)
+        }
+        let child = try XCTUnwrap(OpenAgentParser.kimi(Data(running.utf8), path: path.replacingOccurrences(of: "/main/", with: "/child/")).first)
+        XCTAssertTrue(child.turns.isEmpty)
+    }
+
     func testPartialLastLineIsRetryableButInteriorCorruptionIsReported() throws {
         XCTAssertEqual(try OpenAgentParser.pi(Data((piLines() + "\n{unfinished").utf8), path: "/a").first?.events.count, 1)
         XCTAssertThrowsError(try OpenAgentParser.pi(Data((piLines() + "\n{broken}\n").utf8), path: "/a"))

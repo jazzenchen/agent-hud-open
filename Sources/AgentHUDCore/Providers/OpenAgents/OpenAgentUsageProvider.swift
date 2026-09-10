@@ -106,10 +106,17 @@ actor OpenAgentUsageProvider: UsageProvider {
             }
         }
         let live = local.sessions.compactMap { item -> LiveSession? in
-            guard let start = item.start, let end = item.end, end >= since, let last = item.events.max(by: { $0.timestamp < $1.timestamp }) else { return nil }
+            guard let start = item.start, let end = item.end, end >= since else { return nil }
+            let last = item.events.max(by: { $0.timestamp < $1.timestamp })
+            let agentID = last?.agentId ?? "\(item.client.rawValue)-model:Unknown"
+            if consumers[agentID] == nil {
+                consumers[agentID] = AgentDescriptor(id: agentID, vendor: item.client.name, model: "Unknown",
+                    source: L10n.text("本地会话", "Local session"), enabled: true)
+            }
+            let running = item.turns.last.map { $0.state == .running && now.timeIntervalSince1970 - Double($0.observedAtMs) / 1000 < 120 } ?? false
             let unique = UsageAggregation.usageUnion([item.events])
-            return LiveSession(id: item.id, agentId: last.agentId, task: item.title,
-                terminal: item.workspace.map { URL(fileURLWithPath: $0).lastPathComponent }, startedAt: start, endedAt: end,
+            return LiveSession(id: item.id, agentId: agentID, task: item.title,
+                terminal: item.workspace.map { URL(fileURLWithPath: $0).lastPathComponent }, startedAt: start, endedAt: running ? nil : end,
                 pctOfWindow: nil, tokensIn: unique.reduce(0) { $0 + $1.tokensIn }, tokensOut: unique.reduce(0) { $0 + $1.tokensOut },
                 client: item.client.name, transcriptPath: item.path, cacheReadTokens: unique.reduce(0) { $0 + $1.cacheReadTokens })
         }
