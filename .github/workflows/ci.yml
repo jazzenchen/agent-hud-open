@@ -1,0 +1,27 @@
+name: Source checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  macos:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - name: Check source boundaries
+        run: python3 scripts/check-source-boundaries.py
+      - name: Test
+        run: swift test
+      - name: Build application
+        run: scripts/build-app.sh release
+      - name: Verify local signature and resources
+        run: |
+          codesign --verify --deep --strict "build/Agent HUD Open.app"
+          test -f "build/Agent HUD Open.app/Contents/Resources/AgentHUDOpen_AgentHUDDesktop.bundle/claude.png"
+          test ! -e "build/Agent HUD Open.app/Contents/embedded.provisionprofile"

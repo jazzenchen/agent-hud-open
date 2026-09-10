@@ -11,6 +11,7 @@ Install Xcode or the Xcode Command Line Tools with a Swift 6 toolchain, then:
 ```sh
 git clone https://github.com/jazzenchen/agent-hud-open.git
 cd agent-hud-open
+make check
 make test
 make run
 ```
@@ -38,7 +39,7 @@ The application uses installed agent clients and, where needed, their configured
 
 ## Development
 
-See [the roadmap](docs/roadmap.md) for planned capabilities and their acceptance criteria.
+See [the roadmap](docs/roadmap.md) for capability milestones and acceptance criteria. Continuous integration checks source boundaries, runs unit tests, and builds the application; it does not publish binaries.
 
 ## License
 

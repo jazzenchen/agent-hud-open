@@ -2,10 +2,13 @@ APP := build/Agent HUD Open.app
 BIN := $(APP)/Contents/MacOS/Agent HUD Open
 SNAPSHOT_DIR ?= build/snapshots
 
-.PHONY: build test run demo snapshot clean
+.PHONY: build test check run demo snapshot clean
 
 build:
 	@scripts/build-app.sh debug
+
+check:
+	python3 scripts/check-source-boundaries.py
 
 test:
 	swift test
