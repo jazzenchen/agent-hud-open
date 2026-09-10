@@ -54,7 +54,52 @@ final class DeepSeekProviderTests: XCTestCase {
             XCTAssertFalse(transcript.isLive(now: now.addingTimeInterval(121), modifiedAt: now))
             try feed(&transcript, event("turn/end", seq: 1, data: ["turn": 1, "reason": ["kind": reason]]))
             XCTAssertFalse(transcript.isLive(now: now, modifiedAt: now), reason)
+            XCTAssertFalse(transcript.isLive(now: now, modifiedAt: now, processStarts: [now.addingTimeInterval(-60)]), reason)
         }
+    }
+
+    func testQuietOpenTurnLivesOnlyWithAProcessThatPredatesIt() throws {
+        var transcript = DeepSeekTranscript()
+        try feed(&transcript, header())
+        try feed(&transcript, event("turn/start", seq: 0, data: ["turn": 1]))
+        try feed(&transcript, event("tool/call", seq: 1, data: ["turn": 1, "step": 1, "name": "ask_question"]))
+        let later = now.addingTimeInterval(7200)
+        XCTAssertTrue(transcript.isLive(now: later, modifiedAt: now, processStarts: [now.addingTimeInterval(-60)]))
+        XCTAssertFalse(transcript.isLive(now: later, modifiedAt: now), "a stopped process must not keep a quiet turn alive")
+        XCTAssertFalse(transcript.isLive(now: later, modifiedAt: now, processStarts: [now.addingTimeInterval(60)]),
+                       "a restarted Harness must not adopt an abandoned turn")
+        try feed(&transcript, event("session/end-seed", seq: 2, data: [:]))
+        XCTAssertFalse(transcript.isLive(now: later, modifiedAt: now, processStarts: [now.addingTimeInterval(-60)]))
+    }
+
+    func testRuntimeProcessIDsExcludeFileDescriptorsAndInvalidValues() {
+        XCTAssertEqual(DeepSeekRuntime.processIDs("p42\nf21\np42\np73\np0\np-1\npinvalid\nn/profile/cordis.yml\n"), [42, 73])
+    }
+
+    func testProviderRefreshesProcessEvidenceForAnUnchangedQuietLog() async throws {
+        let dir = try temporaryDirectory(), now = now
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let root = dir.appendingPathComponent("sessions"), file = try logFile(root, id: "main")
+        try ([header(), event("turn/start", seq: 0, data: ["turn": 1]), model(seq: 1),
+              event("tool/call", seq: 2, data: ["turn": 1, "step": 1, "name": "ask_question"])].joined(separator: "\n") + "\n")
+            .write(to: file, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.modificationDate: now], ofItemAtPath: file.path)
+        actor Runtime {
+            var starts: [Date] = []
+            func set(_ value: [Date]) { starts = value }
+        }
+        let runtime = Runtime()
+        await runtime.set([now.addingTimeInterval(-60)])
+        let provider = DeepSeekUsageProvider(directory: dir, transcripts: DeepSeekTranscriptStore(root: root),
+            readProcessStarts: { await runtime.starts }, clock: { now.addingTimeInterval(7200) })
+        let waiting = try await provider.fetchUsage(agents: [], historyHours: 24)
+        XCTAssertTrue(try XCTUnwrap(waiting.sessions.first).isLive)
+        await runtime.set([])
+        let stopped = try await provider.fetchUsage(agents: [], historyHours: 24)
+        XCTAssertFalse(try XCTUnwrap(stopped.sessions.first).isLive)
+        await runtime.set([now.addingTimeInterval(60)])
+        let restarted = try await provider.fetchUsage(agents: [], historyHours: 24)
+        XCTAssertFalse(try XCTUnwrap(restarted.sessions.first).isLive)
     }
 
     func testIncrementalCacheRetriesPartialLineAndDeduplicatesCopiedSessions() async throws {

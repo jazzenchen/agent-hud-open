@@ -123,7 +123,11 @@ public struct DeepSeekTranscript: Codable, Sendable {
         }
     }
 
-    public func isLive(now: Date, modifiedAt: Date, freshness: TimeInterval = 120) -> Bool {
-        turnActive && lastActivityAt != nil && now.timeIntervalSince(modifiedAt) < freshness
+    public func isLive(now: Date, modifiedAt: Date, freshness: TimeInterval = 120,
+                       processStarts: [Date] = []) -> Bool {
+        guard turnActive, lastActivityAt != nil else { return false }
+        // Questions and long tools can leave an open turn quiet. A newer process cannot own an older turn.
+        if let turnStartedAt, processStarts.contains(where: { $0 <= turnStartedAt }) { return true }
+        return now.timeIntervalSince(modifiedAt) < freshness
     }
 }

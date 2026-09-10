@@ -6,13 +6,16 @@ public actor DeepSeekUsageProvider: UsageProvider {
     private let transcripts: DeepSeekTranscriptStore
     private let clock: @Sendable () -> Date
     private let readBalance: @Sendable () async throws -> DeepSeekBalance?
+    private let readProcessStarts: @Sendable () async -> [Date]
     private var lastBalance: (at: Date, result: Result<DeepSeekBalance?, UsageProviderError>)?
 
     public init(directory: URL, transcripts: DeepSeekTranscriptStore,
                 readBalance: @escaping @Sendable () async throws -> DeepSeekBalance? = { nil },
+                readProcessStarts: @escaping @Sendable () async -> [Date] = { [] },
                 clock: @escaping @Sendable () -> Date = { Date() }) {
         self.directory = directory; self.transcripts = transcripts; self.clock = clock
         self.readBalance = readBalance
+        self.readProcessStarts = readProcessStarts
     }
 
     public static func standard() -> DeepSeekUsageProvider {
@@ -20,7 +23,8 @@ public actor DeepSeekUsageProvider: UsageProvider {
         return DeepSeekUsageProvider(directory: directory, transcripts: DeepSeekTranscriptStore(
             root: directory.appendingPathComponent("sessions"),
             cacheURL: AppSupport.directory.appendingPathComponent("deepseek-transcripts-v1.json")),
-            readBalance: { try await DeepSeekBalanceClient(directory: directory).fetch() })
+            readBalance: { try await DeepSeekBalanceClient(directory: directory).fetch() },
+            readProcessStarts: { await DeepSeekRuntime.processStarts(directory: directory) })
     }
 
     private func balance(now: Date) async -> (DeepSeekBalance?, Date?, String?) {
@@ -39,7 +43,9 @@ public actor DeepSeekUsageProvider: UsageProvider {
         let now = clock(), weekAgo = now.addingTimeInterval(-7 * 86400)
         let cutoff = min(weekAgo, now.addingTimeInterval(-Double(historyHours) * 3600))
         async let balanceResult = balance(now: now)
+        async let processStartsResult = readProcessStarts()
         let indexed = await transcripts.index(since: cutoff)
+        let processStarts = await processStartsResult
         let (balance, balanceAt, balanceNotice) = await balanceResult
         let installed = DeepSeekLocator.isInstalled(directory: directory)
         let events = indexed.sessions.flatMap { $0.transcript.usage.map(\.event) }.filter { $0.timestamp >= cutoff && $0.timestamp <= now }
@@ -52,7 +58,7 @@ public actor DeepSeekUsageProvider: UsageProvider {
                                task: t.title ?? t.cwd.map { URL(fileURLWithPath: $0).lastPathComponent } ?? "DeepSeek Harness",
                                terminal: t.cwd.map { URL(fileURLWithPath: $0).lastPathComponent },
                                startedAt: t.startedAt ?? session.modifiedAt,
-                               endedAt: t.isLive(now: now, modifiedAt: session.modifiedAt) ? nil : (t.lastActivityAt ?? t.startedAt ?? session.modifiedAt),
+                               endedAt: t.isLive(now: now, modifiedAt: session.modifiedAt, processStarts: processStarts) ? nil : (t.lastActivityAt ?? t.startedAt ?? session.modifiedAt),
                                pctOfWindow: nil, tokensIn: t.usage.reduce(0) { $0 + $1.input }, tokensOut: t.usage.reduce(0) { $0 + $1.output },
                                client: "DeepSeek Harness", transcriptPath: session.path,
                                cacheReadTokens: t.usage.reduce(0) { $0 + $1.cachedInput })
