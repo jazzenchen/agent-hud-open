@@ -60,10 +60,10 @@ public final class DesktopApplication {
             self?.toggleGlow()
         }
         observeChanges({ [weak self] in
-            _ = self?.settings.settings.appearance
+            self?.settings.settings.appearance
         }, onChange: { [weak self] in self?.applyAppearance() })
         observeChanges({ [weak self] in
-            _ = self?.settings.settings.language
+            self?.settings.settings.language
         }, onChange: { [weak self] in
             guard let self else { return }
             self.statusItem?.refreshButton()
@@ -76,7 +76,7 @@ public final class DesktopApplication {
             if let error = self?.store.lastError { NSLog("[AgentHUD] refresh failed: %@", error) }
         })
         observeChanges({ [weak self] in
-            _ = self?.settings.settings.launchAtLogin
+            self?.settings.settings.launchAtLogin
         }, onChange: { [weak self] in
             guard let self else { return }
             LoginItem.set(self.settings.settings.launchAtLogin)

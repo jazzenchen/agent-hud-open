@@ -141,16 +141,18 @@ struct SliderRow: View {
     let step: Double
     let format: (Double) -> String
     let theme: Theme
+    @State private var pendingValue: Double?
 
     var body: some View {
+        let displayedValue = pendingValue ?? value
         HStack(spacing: 12) {
             Text(label).frame(width: 150, alignment: .leading)
-            Slider(value: $value, in: range, step: step)
+            Slider(value: Binding(get: { pendingValue ?? value }, set: { pendingValue = $0 }), in: range, step: step)
                 .tint(Color.accentColor)
                 .controlSize(.small)
                 .accessibilityLabel(label)
-                .accessibilityValue(format(value))
-            Text(format(value))
+                .accessibilityValue(format(displayedValue))
+            Text(format(displayedValue))
                 .font(.tabular(13))
                 .foregroundStyle(theme.secondary)
                 .frame(width: 60, alignment: .trailing)
@@ -158,6 +160,18 @@ struct SliderRow: View {
         .frame(minHeight: 30)
         .padding(.horizontal, 16)
         .padding(.vertical, 11)
+        .task(id: pendingValue) {
+            guard let next = pendingValue else { return }
+            // Keep dragging local to this row; apply only after input has settled.
+            do { try await Task.sleep(for: .milliseconds(300)) } catch { return }
+            value = next
+            pendingValue = nil
+        }
+        .onChange(of: value) { pendingValue = nil }
+        .onDisappear {
+            // Leaving the pane must not discard the user's final adjustment.
+            if let pendingValue { value = pendingValue; self.pendingValue = nil }
+        }
     }
 }
 

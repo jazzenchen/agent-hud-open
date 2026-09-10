@@ -12,6 +12,32 @@ struct GlowImage {
     let size: CGSize
 }
 
+/// Retain only this preview's current bitmap; brightness and breathing are opacity-only updates.
+@MainActor
+final class GlowImageCache {
+    private struct Key: Equatable {
+        let glow: GlowGeometry
+        let islandSize: CGSize
+        let islandRadius: CGFloat
+        let outwardOnly: Bool
+        let stops: [GradientStop]
+        let scale: CGFloat
+    }
+
+    private var cached: (key: Key, image: GlowImage)?
+
+    func render(glow: GlowGeometry, islandSize: CGSize, islandRadius: CGFloat,
+                outwardOnly: Bool, stops: [GradientStop], scale: CGFloat) -> GlowImage? {
+        let key = Key(glow: glow, islandSize: islandSize, islandRadius: islandRadius,
+                      outwardOnly: outwardOnly, stops: stops, scale: scale)
+        if let cached, cached.key == key { return cached.image }
+        guard let image = GlowRenderer.render(glow: glow, islandSize: islandSize, islandRadius: islandRadius,
+                                              outwardOnly: outwardOnly, stops: stops, scale: scale) else { return nil }
+        cached = (key, image)
+        return image
+    }
+}
+
 enum GlowRenderer {
     private static let ciContext = CIContext(options: [.useSoftwareRenderer: false])
 

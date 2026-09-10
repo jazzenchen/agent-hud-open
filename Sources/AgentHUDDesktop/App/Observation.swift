@@ -14,3 +14,15 @@ public func observeChanges(_ read: @escaping @MainActor () -> Void, onChange: @e
         }
     }
 }
+
+/// Observe a value within a larger observable property without reacting to unrelated field changes.
+@MainActor
+public func observeChanges<Value: Equatable>(_ read: @escaping @MainActor () -> Value, onChange: @escaping @MainActor () -> Void) {
+    var previous = read()
+    observeChanges({ _ = read() }, onChange: {
+        let next = read()
+        guard next != previous else { return }
+        previous = next
+        onChange()
+    })
+}

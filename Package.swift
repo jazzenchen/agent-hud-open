@@ -17,5 +17,6 @@ let package = Package(
         .executableTarget(name: "AgentHUDOpenApp", dependencies: ["AgentHUDDesktop", "AgentHUDCore"], swiftSettings: [.swiftLanguageMode(.v5)]),
         .testTarget(name: "AgentHUDSupportTests", dependencies: ["AgentHUDSupport"]),
         .testTarget(name: "AgentHUDCoreTests", dependencies: ["AgentHUDCore", "AgentHUDSupport"]),
+        .testTarget(name: "AgentHUDDesktopTests", dependencies: ["AgentHUDDesktop"]),
     ]
 )

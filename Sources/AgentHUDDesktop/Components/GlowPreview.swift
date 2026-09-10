@@ -5,6 +5,7 @@ import AgentHUDCore
 /// Breathing is computed from wall-clock time so it always reflects the current settings.
 struct GlowPreview: View {
     @Environment(\.displayScale) private var displayScale
+    @State private var imageCache = GlowImageCache()
     let appearance: GlowAppearance
     let settings: AgentHUDCore.Settings
     let islandSize: CGSize
@@ -22,7 +23,7 @@ struct GlowPreview: View {
             blur: settings.glowBlur * scale
         )
         // Render outside the timeline so breathing only changes the bitmap's opacity.
-        let rendered = appearance.hidden ? nil : GlowRenderer.render(
+        let rendered = appearance.hidden ? nil : imageCache.render(
             glow: glow, islandSize: islandSize, islandRadius: islandRadius,
             outwardOnly: settings.glowOutwardOnly, stops: appearance.stops, scale: displayScale
         )
