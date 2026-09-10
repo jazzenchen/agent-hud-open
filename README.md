@@ -1,12 +1,40 @@
-# Agent HUD Open
+<h1 align="center">Agent HUD Open</h1>
 
-A native macOS utility for agent activity, remaining usage, and local usage statistics.
+<p align="center">
+  <strong>Your agents, at a glance.</strong><br>
+  A native macOS utility for agent activity, remaining usage, and local usage statistics.
+</p>
 
-Requires macOS 14 or later and a Swift 6 toolchain. The project provides source code and local build tools. Prebuilt applications are not distributed here.
+<p align="center">
+  <a href="https://agenthud.app">Website</a> ·
+  <a href="#quick-start">Quick start</a> ·
+  <a href="#supported-clients">Supported clients</a> ·
+  <a href="#documentation">Documentation</a>
+</p>
 
-## Build and run
+<p align="center">
+  macOS 14+ &nbsp;·&nbsp; Swift 6 &nbsp;·&nbsp; Apache-2.0
+</p>
 
-Install Xcode or the Xcode Command Line Tools with a Swift 6 toolchain, then:
+<p align="center">
+  <img src="docs/videos/agent-hud-loop.gif" alt="Agent HUD notch glow breathing and expanded usage panel" width="800">
+</p>
+
+## At a glance
+
+- **Activity in your notch.** A breathing glow follows agent activity. Expand the panel to see quotas, token usage, and active sessions.
+- **Usage in context.** Track reset times, quota trends, model usage, and available API balances in one statistics window.
+- **Make it yours.** Choose visible agents, quota thresholds, glow appearance, language, and startup preferences.
+
+Press **⌘⌥H** to toggle the glow. The menu bar gives you quick access to usage and settings.
+
+<p align="center">
+  <img src="docs/screenshots/usage-statistics.webp" alt="Usage statistics with token charts, API balance, sessions, and an activity heatmap" width="680">
+</p>
+
+## Quick start
+
+**Requirements:** macOS 14 or later, plus Xcode or the Xcode Command Line Tools with a Swift 6 toolchain.
 
 ```sh
 git clone https://github.com/jazzenchen/agent-hud-open.git
@@ -16,11 +44,35 @@ make test
 make run
 ```
 
-`make build` creates `build/Agent HUD Open.app`. No developer account, signing identity, or provisioning profile is required. The app is signed ad-hoc for local use. Use `make demo` to preview with sample data, or `make snapshot` to render the interface to `build/snapshots`.
+This builds and opens `build/Agent HUD Open.app`. The app is signed ad-hoc for local use; no developer account, signing identity, or provisioning profile is required.
 
-The app runs in the menu bar and can display an expandable notch panel with a usage glow. Settings include agent visibility, quota thresholds, appearance, language, and local startup preferences. The statistics window shows active sessions, token usage, quota trends, and available API balances. Press **⌘⌥H** to toggle the glow.
+This repository distributes source code and local build tools. Prebuilt applications are not distributed here.
 
-## Modules
+## Supported clients
+
+**Claude Code** · **Codex Desktop / CLI** · **DeepSeek Harness** · **Antigravity** · **Cursor** · **Grok CLI** · **OpenCode** · **Kimi** · **GLM** · **Pi**
+
+Install and sign into the clients you want to monitor. Available activity, quota, and balance information depends on the client and account. See [session lifecycle coverage](docs/session-lifecycle.md) for support for running and terminal turns.
+
+### Data access
+
+No Agent HUD account is required. The app reads local agent activity and queries the corresponding providers for usage or balances where supported, using the installed clients' existing sign-in or configured credentials.
+
+See [data access](docs/data-access.md) for provider details, credential boundaries, and local storage.
+
+## Development
+
+| Command | Purpose |
+| --- | --- |
+| `make check` | Check source and package boundaries |
+| `make test` | Run unit tests |
+| `make build` | Build the locally signed macOS app |
+| `make demo` | Open settings with sample data |
+| `make snapshot` | Render the interface to `build/snapshots` |
+
+Continuous integration checks source boundaries, runs unit tests, builds the application, and verifies its signature and bundled resources. It does not publish binaries.
+
+### Modules
 
 | Product | Responsibility |
 | --- | --- |
@@ -29,19 +81,14 @@ The app runs in the menu bar and can display an expandable notch panel with a us
 | `AgentHUDDesktop` | Native menu bar, notch, settings, and statistics UI |
 | `AgentHUDOpen` | Standalone macOS executable |
 
-The libraries can also be consumed through Swift Package Manager. `DesktopApplication` accepts a `SettingsStore` and `UsageStore`; the host owns any additional services. See [architecture](docs/architecture.md).
+The libraries can also be consumed through Swift Package Manager. `DesktopApplication` accepts a `SettingsStore` and `UsageStore`; the host owns any additional services.
 
-## Data sources
+## Documentation
 
-Claude Code, Codex Desktop / CLI, DeepSeek Harness, Antigravity, Cursor, Grok CLI, OpenCode, Kimi, GLM, and Pi are supported. Available activity, quota, and balance information depends on the client and account.
-
-See [session lifecycle coverage](docs/session-lifecycle.md) for clients that expose running and terminal turns.
-
-The application uses installed agent clients and, where needed, their configured API keys or tokens to query the corresponding provider. It requires no Agent HUD account. See [data access](docs/data-access.md) for exact boundaries.
-
-## Development
-
-See [the roadmap](docs/roadmap.md) for capability milestones and acceptance criteria. Continuous integration checks source boundaries, runs unit tests, and builds the application; it does not publish binaries.
+- [Architecture](docs/architecture.md) — modules, host integration, and resource ownership.
+- [Data access](docs/data-access.md) — provider queries, credentials, and local storage.
+- [Session lifecycle](docs/session-lifecycle.md) — evidence for running and terminal turns.
+- [Roadmap](docs/roadmap.md) — capability milestones and acceptance criteria.
 
 ## License
 
