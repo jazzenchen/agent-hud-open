@@ -1,0 +1,29 @@
+# Swift and Xcode build products
+.build/
+.swiftpm/
+DerivedData/
+build/
+*.xcuserstate
+xcuserdata/
+
+# Local settings and credentials
+.env
+.env.*
+!.env.example
+*.local.*
+signing/
+*.p8
+*.p12
+*.pfx
+*.key
+*.pem
+*.mobileprovision
+*.provisionprofile
+
+# Local artifacts
+.DS_Store
+*.log
+*.xcarchive/
+*.dmg
+*.ipa
+tmp/
