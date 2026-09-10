@@ -18,7 +18,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             UserDefaults.standard.removePersistentDomain(forName: bundleID)
         }
         let defaults = options.demo ? UserDefaults(suiteName: "app.agenthud.open.demo")! : .standard
-        let settings = SettingsStore(defaults: defaults)
+        let settings = SettingsStore(defaults: defaults, defaultAgents: options.demo ? DemoData.agents : DefaultAgents.list)
         if let language = options.language { settings.update { $0.language = language } }
         L10n.setLanguage(settings.settings.language)
         let provider: any UsageProvider = options.demo ? DemoUsageProvider() : CombinedUsageProvider.standard()
