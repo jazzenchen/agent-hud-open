@@ -35,6 +35,8 @@ The libraries can also be consumed through Swift Package Manager. `DesktopApplic
 
 Claude Code, Codex Desktop / CLI, DeepSeek Harness, Antigravity, Cursor, Grok CLI, OpenCode, Kimi, GLM, and Pi are supported. Available activity, quota, and balance information depends on the client and account.
 
+See [session lifecycle coverage](docs/session-lifecycle.md) for clients that expose running and terminal turns.
+
 The application uses installed agent clients and, where needed, their configured API keys or tokens to query the corresponding provider. It requires no Agent HUD account. See [data access](docs/data-access.md) for exact boundaries.
 
 ## Development
