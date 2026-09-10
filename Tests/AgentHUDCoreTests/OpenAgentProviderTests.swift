@@ -165,8 +165,8 @@ final class OpenAgentProviderTests: XCTestCase {
         let start: Int64 = 1_788_800_000_000
         let path = "/.kimi-code/sessions/work/session/agents/main/wire.jsonl"
         let running = """
-        {"type":"context.append_loop_event","time":\(start),"event":{"type":"step.begin","turnId":0,"step":0}}
-        {"type":"context.append_loop_event","time":\(start + 1000),"event":{"type":"content.part","turnId":0,"step":0,"part":{"text":"private text"}}}
+        {"type":"context.append_loop_event","time":\(start),"event":{"type":"step.begin","turnId":"0","step":0}}
+        {"type":"context.append_loop_event","time":\(start + 1000),"event":{"type":"content.part","turnId":"0","step":0,"part":{"text":"private text"}}}
         """
         let item = try XCTUnwrap(OpenAgentParser.kimi(Data(running.utf8), path: path).first)
         XCTAssertTrue(item.events.isEmpty)

@@ -135,8 +135,7 @@ enum OpenAgentParser {
             let type = line["type"].stringValue
             if modern {
                 if agent == "main", type == "context.append_loop_event",
-                   let turn = line["event"]["turnId"].countValue, let at = ProviderDate.milliseconds(line["time"]) {
-                    let turnID = String(turn)
+                   let turnID = line["event"]["turnId"].stringValue, let at = ProviderDate.milliseconds(line["time"]) {
                     if let position = session.turns.firstIndex(where: { $0.turnID == turnID }) {
                         let previous = session.turns[position]
                         if previous.state == .running, RecordCoding.milliseconds(at) > previous.observedAtMs {
