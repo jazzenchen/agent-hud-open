@@ -76,6 +76,50 @@ final class DeepSeekProviderTests: XCTestCase {
         XCTAssertEqual(DeepSeekRuntime.processIDs("p42\nf21\np42\np73\np0\np-1\npinvalid\nn/profile/cordis.yml\n"), [42, 73])
     }
 
+    func testTurnObservationsFollowSourceEventsAndSurviveCacheReload() throws {
+        var transcript = DeepSeekTranscript()
+        try feed(&transcript, header())
+        try feed(&transcript, event("turn/start", seq: 0, data: ["turn": 1]))
+        let start = try XCTUnwrap(transcript.sessionTurns.first)
+        XCTAssertEqual(start.sessionID, "deepseek:main")
+        XCTAssertEqual(start.provider, "deepseek")
+        XCTAssertEqual(start.turnID, "1")
+        XCTAssertEqual(start.state, .running)
+        let later = now.addingTimeInterval(10)
+        try feed(&transcript, json(["type": "assistant/chunk", "seq": 1, "time": later.timeIntervalSince1970 * 1000,
+                                   "data": ["turn": 1, "chunk": ["type": "text-delta", "text": "private text"]]]))
+        XCTAssertEqual(transcript.sessionTurns.first?.observedAtMs, start.observedAtMs + 10_000)
+        let cached = try JSONEncoder().encode(transcript)
+        XCTAssertFalse(String(decoding: cached, as: UTF8.self).contains("private text"))
+        transcript = try JSONDecoder().decode(DeepSeekTranscript.self, from: cached)
+        try feed(&transcript, json(["type": "turn/end", "seq": 2, "time": later.addingTimeInterval(1).timeIntervalSince1970 * 1000,
+                                   "data": ["turn": 1, "reason": ["kind": "completed"]]]))
+        let finished = try XCTUnwrap(transcript.sessionTurns.first)
+        XCTAssertEqual(finished.id, start.id)
+        XCTAssertEqual(finished.state, .completed)
+        XCTAssertEqual(finished.startedAtMs, start.startedAtMs)
+        XCTAssertEqual(finished.observedAtMs, start.observedAtMs + 11_000)
+    }
+
+    func testPackedStreamingRefreshesOnlyItsRunningTurnWithoutCopyingText() throws {
+        for type in ["text-chunks", "reasoning-chunks", "tool-call-chunks"] {
+            var transcript = DeepSeekTranscript()
+            try feed(&transcript, header())
+            try feed(&transcript, event("turn/start", seq: 0, data: ["turn": 1]))
+            let start = try XCTUnwrap(transcript.sessionTurns.first)
+            try feed(&transcript, json(["type": type, "seq0": 1, "time0": now.timeIntervalSince1970 * 1000,
+                "data": ["turn": 1, "dt": [1000, 2000], "texts": ["private", "text", "chunks"], "args": ["private", "argument", "chunks"]]]))
+            XCTAssertEqual(transcript.sessionTurns.first?.observedAtMs, start.observedAtMs + 3000)
+            XCTAssertFalse(String(decoding: try JSONEncoder().encode(transcript), as: UTF8.self).contains("private"))
+            try feed(&transcript, json(["type": "turn/start", "seq": 4, "time": now.addingTimeInterval(4).timeIntervalSince1970 * 1000,
+                                       "data": ["turn": 2]]))
+            try feed(&transcript, json(["type": "turn/end", "seq": 5, "time": now.addingTimeInterval(5).timeIntervalSince1970 * 1000,
+                                       "data": ["turn": 1, "reason": ["kind": "completed"]]]))
+            XCTAssertEqual(transcript.sessionTurns.last?.turnID, "2")
+            XCTAssertEqual(transcript.sessionTurns.last?.state, .running)
+        }
+    }
+
     func testProviderRefreshesProcessEvidenceForAnUnchangedQuietLog() async throws {
         let dir = try temporaryDirectory(), now = now
         defer { try? FileManager.default.removeItem(at: dir) }

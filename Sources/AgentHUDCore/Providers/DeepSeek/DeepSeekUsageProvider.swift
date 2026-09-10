@@ -22,7 +22,7 @@ public actor DeepSeekUsageProvider: UsageProvider {
         let directory = DeepSeekLocator.dataDirectory
         return DeepSeekUsageProvider(directory: directory, transcripts: DeepSeekTranscriptStore(
             root: directory.appendingPathComponent("sessions"),
-            cacheURL: AppSupport.directory.appendingPathComponent("deepseek-transcripts-v1.json")),
+            cacheURL: AppSupport.directory.appendingPathComponent("deepseek-transcripts-v2.json")),
             readBalance: { try await DeepSeekBalanceClient(directory: directory).fetch() },
             readProcessStarts: { await DeepSeekRuntime.processStarts(directory: directory) })
     }
@@ -90,6 +90,7 @@ public actor DeepSeekUsageProvider: UsageProvider {
                            notice: notice.isEmpty ? nil : notice, discoveredAgents: installed ? discovered : [], consumers: consumers,
                            consumption: events, indexing: indexed.indexing,
                            sourceNotices: notice.isEmpty ? [:] : ["DeepSeek": notice], billing: installed ? [billing] : [],
-                           completions: indexed.sessions.flatMap { $0.transcript.completions ?? [] })
+                           completions: indexed.sessions.flatMap { $0.transcript.completions ?? [] },
+                           turns: indexed.sessions.flatMap { $0.transcript.sessionTurns })
     }
 }

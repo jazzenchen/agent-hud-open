@@ -1,3 +1,4 @@
+import AgentHUDSupport
 import Foundation
 
 /// Summary of Harness v0 session logs. Only metadata and token counters survive indexing.
@@ -27,8 +28,13 @@ public struct DeepSeekTranscript: Codable, Sendable {
     public private(set) var isSubagent = false
     public private(set) var usage: [Usage] = []
     private var seedLength = 0
-    private var turnActive = false
-    private var turnStartedAt: Date?
+    private struct Turn: Codable, Sendable {
+        let id: Int
+        let startedAt: Date?
+        var state: SessionTurn.State
+        var observedAt: Date
+    }
+    private var turns: [Turn]?
     public private(set) var completions: [SessionCompletion]?
     private var lastAttempt: Attempt?
 
@@ -41,7 +47,6 @@ public struct DeepSeekTranscript: Codable, Sendable {
     public init() {}
 
     public mutating func ingest(_ line: Data) throws {
-        // Packed text/reasoning/tool-call deltas have no accounting or lifecycle data.
         guard let object = try JSONSerialization.jsonObject(with: line) as? [String: Any],
               let type = object["type"] as? String else { return }
         if type == "session" {
@@ -55,6 +60,14 @@ public struct DeepSeekTranscript: Codable, Sendable {
             startedAt = Date(timeIntervalSince1970: created / 1000)
             isSubagent = object["origin"] as? String == "subagent" || (object["delegationDepth"] as? Int ?? 0) > 0
             seedLength = object["seedLength"] as? Int ?? 0
+            return
+        }
+        // Packed streaming rows carry source timestamps, without requiring their text to be retained.
+        if ["text-chunks", "reasoning-chunks", "tool-call-chunks"].contains(type) {
+            guard id != nil, let seq = object["seq0"] as? Int, let time = object["time0"] as? Double,
+                  let data = object["data"] as? [String: Any], let gaps = data["dt"] as? [Double],
+                  let turn = data["turn"] as? Int, seq + gaps.count >= seedLength else { return }
+            observeTurn(at: Date(timeIntervalSince1970: (time + gaps.reduce(0, +)) / 1000), id: turn)
             return
         }
         guard id != nil, let seq = object["seq"] as? Int,
@@ -72,22 +85,30 @@ public struct DeepSeekTranscript: Codable, Sendable {
         guard seq >= seedLength else { return }
         let timestamp = Date(timeIntervalSince1970: milliseconds / 1000)
         // A rename or seed marker must not make a finished task look active again.
-        if type != "session/title" && type != "session/end-seed" { lastActivityAt = timestamp }
+        if type != "session/title" && type != "session/end-seed" {
+            lastActivityAt = timestamp
+            observeTurn(at: timestamp, id: data["turn"] as? Int)
+        }
         switch type {
-        case "turn/start": turnActive = true; turnStartedAt = timestamp
+        case "turn/start":
+            if let turn = data["turn"] as? Int, !(turns ?? []).contains(where: { $0.id == turn }),
+               timestamp >= (turns?.last?.observedAt ?? .distantPast) {
+                turns = Array(((turns ?? []) + [Turn(id: turn, startedAt: timestamp, state: .running, observedAt: timestamp)]).suffix(32))
+            }
         case "step/start": requestedAt = timestamp
         case "turn/end":
-            turnActive = false
-            if !isSubagent, (data["reason"] as? [String: Any])?["kind"] as? String == "completed", let id {
+            guard let turn = data["turn"] as? Int else { break }
+            let completed = (data["reason"] as? [String: Any])?["kind"] as? String == "completed"
+            let finished = finishTurn(turn, state: completed ? .completed : .ended, at: timestamp)
+            if !isSubagent, completed, let id {
                 let completion = SessionCompletion(sessionID: "deepseek:\(id)", vendor: "DeepSeek", turnID: String(seq),
                     task: title ?? cwd.map { URL(fileURLWithPath: $0).lastPathComponent } ?? "DeepSeek Harness",
-                    model: model, startedAt: turnStartedAt, completedAt: timestamp)
+                    model: model, startedAt: finished?.startedAt, completedAt: timestamp)
                 if completions?.contains(where: { $0.id == completion.id }) != true {
                     completions = (completions ?? []) + [completion]
                 }
             }
-            turnStartedAt = nil
-        case "session/end-seed": turnActive = false; turnStartedAt = nil
+        case "session/end-seed": turns = nil
         case "session/title":
             if let text = data["title"] as? String { title = ClaudeTranscriptParser.title(from: text) }
         case "user/message":
@@ -123,11 +144,38 @@ public struct DeepSeekTranscript: Codable, Sendable {
         }
     }
 
+    public var sessionTurns: [SessionTurn] {
+        guard let id, !isSubagent else { return [] }
+        return (turns ?? []).map { turn in
+            SessionTurn(provider: "deepseek", sessionID: "deepseek:\(id)", turnID: String(turn.id), state: turn.state,
+                        startedAtMs: turn.startedAt.map(RecordCoding.milliseconds), observedAtMs: RecordCoding.milliseconds(turn.observedAt))
+        }
+    }
+
+    private mutating func observeTurn(at date: Date, id: Int?) {
+        guard let index = turns?.indices.last, turns?[index].state == .running,
+              id == nil || turns?[index].id == id, date > turns![index].observedAt else { return }
+        turns?[index].observedAt = date
+        lastActivityAt = max(lastActivityAt ?? date, date)
+    }
+
+    private mutating func finishTurn(_ id: Int, state: SessionTurn.State, at date: Date) -> Turn? {
+        if let index = turns?.lastIndex(where: { $0.id == id }) {
+            guard date >= turns![index].observedAt, turns?[index].state == .running else { return turns?[index] }
+            turns?[index].state = state; turns?[index].observedAt = date
+            return turns?[index]
+        }
+        guard turns?.last?.state != .running else { return nil }
+        let value = Turn(id: id, startedAt: nil, state: state, observedAt: date)
+        turns = Array(((turns ?? []) + [value]).suffix(32))
+        return value
+    }
+
     public func isLive(now: Date, modifiedAt: Date, freshness: TimeInterval = 120,
                        processStarts: [Date] = []) -> Bool {
-        guard turnActive, lastActivityAt != nil else { return false }
+        guard let turn = turns?.last, turn.state == .running, lastActivityAt != nil else { return false }
         // Questions and long tools can leave an open turn quiet. A newer process cannot own an older turn.
-        if let turnStartedAt, processStarts.contains(where: { $0 <= turnStartedAt }) { return true }
+        if let turnStartedAt = turn.startedAt, processStarts.contains(where: { $0 <= turnStartedAt }) { return true }
         return now.timeIntervalSince(modifiedAt) < freshness
     }
 }
