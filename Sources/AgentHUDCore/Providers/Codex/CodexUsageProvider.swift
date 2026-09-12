@@ -24,27 +24,32 @@ public actor CodexUsageProvider: UsageProvider {
            history: QuotaHistoryStore(fileURL: AppSupport.directory.appendingPathComponent("codex-quota-history.json")))
     }
 
-    private func quota(now: Date) async -> (CodexRateLimits?, Date, String?) {
+    public func refreshAccountUsage(historyHours: Int) async {
+        let now = clock()
         if lastQuota == nil || now.timeIntervalSince(lastQuota!.at) >= 120 {
             do {
                 let limits = try await readLimits()
                 lastQuota = (now, .success(limits))
                 await history.append(limits.rows.map { QuotaSample(agentId: $0.id, timestamp: now, remainingPct: $0.window.remainingPct) }, now: now)
             }
-            catch { lastQuota = (now, .failure(UsageProviderError(error.localizedDescription))) }
-        }
-        switch lastQuota!.result {
-        case .success(let limits): return (limits, lastQuota!.at, nil)
-        case .failure(let error): return (nil, lastQuota!.at, error.message)
+            catch {
+                if Task.isCancelled { return }
+                lastQuota = (now, .failure(UsageProviderError(error.localizedDescription)))
+            }
         }
     }
 
     public func fetchUsage(agents: [AgentDescriptor], historyHours: Int) async throws -> UsageReport {
         let now = clock(), calendar = Calendar.current
         let weekAgo = now.addingTimeInterval(-7 * 86400)
-        async let quotaResult = quota(now: now)
         let indexed = await transcripts.index(since: min(weekAgo, now.addingTimeInterval(-Double(historyHours) * 3600)))
-        let (limits, fetchedAt, failure) = await quotaResult
+        let limits: CodexRateLimits?, failure: String?
+        let fetchedAt = lastQuota?.at ?? now
+        switch lastQuota?.result {
+        case .success(let value): (limits, failure) = (value, nil)
+        case .failure(let error): (limits, failure) = (nil, error.message)
+        case nil: (limits, failure) = (nil, nil)
+        }
         let windows = limits?.rows ?? []
         let events = indexed.sessions.flatMap { $0.transcript.usage.map(\.event) }
         let models = Set(indexed.sessions.flatMap { $0.transcript.usage.map(\.model) }).sorted()
@@ -88,10 +93,10 @@ public actor CodexUsageProvider: UsageProvider {
                                endedAt: t.isLive(now: now, modifiedAt: session.modifiedAt) ? nil : (t.lastActivityAt ?? session.modifiedAt),
                                pctOfWindow: nil, tokensIn: t.usage.reduce(0) { $0 + $1.input },
                                tokensOut: t.usage.reduce(0) { $0 + $1.output }, client: t.client, transcriptPath: session.path,
-                               cacheReadTokens: t.usage.reduce(0) { $0 + $1.cachedInput })
+                               cacheReadTokens: t.usage.reduce(0) { $0 + $1.cachedInput }, observedAt: now)
         }
         let cutoff = min(weekAgo, now.addingTimeInterval(-Double(historyHours) * 3600))
-        let notice = failure ?? (windows.isEmpty ? L10n.text("当前账户暂无可用额度信息", "Usage limits are unavailable for this account") : nil)
+        let notice = failure ?? (limits != nil && windows.isEmpty ? L10n.text("当前账户暂无可用额度信息", "Usage limits are unavailable for this account") : nil)
         let consumerIds = Set(consumers.map(\.id) + sessions.map(\.agentId))
         let quotaIds = Set(["codex"] + windows.map(\.id) + agents.filter { $0.vendor == "Codex" }.map(\.id))
         let consumerIdsByQuota = Dictionary(uniqueKeysWithValues: quotaIds.map { ($0, consumerIds) })

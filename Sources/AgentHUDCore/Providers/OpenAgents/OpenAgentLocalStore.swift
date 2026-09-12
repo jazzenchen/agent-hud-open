@@ -26,7 +26,8 @@ actor OpenAgentLocalStore {
             candidates.append((url, source, signature, date))
         }
         for source in [OpenAgentSource.opencode, .kimi, .pi] {
-            let roots = source == .opencode ? [paths.openCode.appendingPathComponent("storage/message")] : paths.roots(for: source)
+            let roots = source == .opencode ? [paths.openCode.appendingPathComponent("storage/message")]
+                : paths.roots(for: source) + (source == .pi ? [paths.piTurns] : [])
             if source == .opencode { candidate(paths.openCode.appendingPathComponent("opencode.db"), source: source) }
             var visited = 0
             for root in roots where manager.fileExists(atPath: root.path) {
@@ -36,7 +37,8 @@ actor OpenAgentLocalStore {
                 for case let url as URL in enumerator {
                     visited += 1
                     if visited > 20000 { result.notices[source.name] = ProviderFailure.limit.message; break }
-                    let accepted = source == .opencode ? url.pathExtension == "json" : source == .kimi ? url.lastPathComponent == "wire.jsonl" : url.pathExtension == "jsonl"
+                    let accepted = source == .opencode ? url.pathExtension == "json" : source == .kimi ? url.lastPathComponent == "wire.jsonl"
+                        : url.pathExtension == "jsonl" || (root == paths.piTurns && url.pathExtension == "json")
                     if accepted { candidate(url, source: source) }
                 }
             }
@@ -60,7 +62,9 @@ actor OpenAgentLocalStore {
                     guard size <= 64 * 1024 * 1024 else { throw ProviderFailure.limit }
                     let data = try Data(contentsOf: url)
                     switch source {
-                    case .pi: sessions = try OpenAgentParser.pi(data, path: url.path)
+                    case .pi:
+                        sessions = url.pathExtension == "json" ? [try PiSessionObserver.read(data).session]
+                            : try OpenAgentParser.pi(data, path: url.path)
                     case .kimi: sessions = try OpenAgentParser.kimi(data, path: url.path)
                     case .opencode:
                         let value = try ProviderJSON.read(data)
@@ -89,10 +93,19 @@ actor OpenAgentLocalStore {
                     }
                 }
                 if var prior = grouped[item.id] {
+                    if (item.end ?? .distantPast) > (prior.end ?? .distantPast) {
+                        prior.title = item.title; prior.workspace = item.workspace ?? prior.workspace
+                        prior.currentModel = item.currentModel ?? prior.currentModel
+                        if !item.path.isEmpty { prior.path = item.path }
+                    }
                     prior.events = UsageAggregation.usageUnion([prior.events, item.events])
                     prior.models.merge(item.models, uniquingKeysWith: { old, _ in old })
                     prior.start = [prior.start, item.start].compactMap { $0 }.min()
                     prior.end = [prior.end, item.end].compactMap { $0 }.max()
+                    prior.turns = (prior.turns + item.turns).sorted { ($0.startedAtMs ?? $0.observedAtMs) < ($1.startedAtMs ?? $1.observedAtMs) }
+                    prior.completions += item.completions
+                    if prior.currentModel == nil { prior.currentModel = item.currentModel }
+                    if prior.path.isEmpty { prior.path = item.path }
                     grouped[item.id] = prior
                 } else { grouped[item.id] = item }
             }

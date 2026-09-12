@@ -12,7 +12,7 @@ Agent HUD Open reads agent activity and usage metadata on your Mac. It has no Ag
 | Antigravity | Local application process and conversation metadata | Running application's local language server |
 | Cursor | Local application database and session metadata | Official Cursor usage endpoints with the installed client's session token |
 | Grok CLI | Local session records and credential file | Official Grok CLI billing endpoint |
-| OpenCode, Kimi, GLM, Pi | Local JSON/SQLite session records and supported provider configuration | Official Kimi, GLM, and OpenCode Go quota endpoints where configured |
+| OpenCode, Kimi, GLM, Pi | Local JSON/SQLite session records and supported provider configuration; automatically prepared Pi lifecycle observer | Official Kimi, GLM, and OpenCode Go quota endpoints where configured |
 
 Some providers read agent API keys or tokens from their own configuration, environment variables, or local credential files. Credentials are used only for the corresponding provider's usage request. They are not included in reports or persisted to the HUD's caches. Custom endpoints are not assumed to share official billing accounts, and executable key resolvers are not run.
 
@@ -24,9 +24,13 @@ DeepSeek's open turns remain active during quiet tools or questions while a Node
 
 Preferences use the application's UserDefaults domain. Cached reports, quota observations, and session indexes are stored in `~/Library/Application Support/Agent HUD Open`. Local metadata can include session titles and workspace paths. Raw conversation bodies and authentication secrets are not copied into these caches.
 
-Quota requests are throttled independently from local activity polling. Missing or signed-out clients do not prevent other sources from reporting. A failed refresh retains the last successful readings; unavailable quotas are not inferred from token counts.
+Quota, balance, and account-wide usage requests run separately from local activity polling and retain their own request intervals. Missing or signed-out clients do not prevent other sources from reporting. Saved readings appear immediately after restart with their original observation times. A failed refresh keeps those readings and reports the failure. A completed credential scan retires expired, removed, or rejected OpenCode Go / Kimi / GLM quota rows, including cached rows and saved display settings. Unavailable quotas are not inferred from token counts.
+
+Kimi account identity is verified with the official `/coding/v1/me` response (`user_id`, `domain`, and `region`), separately for each deployment. An omitted or null `domain` uses the official parser's default of `0`. Only hashed credential-to-account associations are cached locally, so verified keys can share one quota pool across restarts. Failed identity lookups remain explicit and do not merge accounts based on matching quota values or reset times. JWT expiry may exclude an expired token; unverified JWT identity claims are never used to merge accounts.
 
 Optional completion hooks write a small local event record to identify finished sessions. They do not send notifications or upload data.
+
+The standalone host prepares available observers at startup. It reports a conflict if a completion hook already belongs to another installation. Running `AgentHUDOpen --install-completion-hook cursor` (or `antigravity`) explicitly selects this installation as the callback owner.
 
 ## Building
 

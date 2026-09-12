@@ -31,6 +31,9 @@ public struct Settings: Hashable, Codable, Sendable {
     public var showIslandQuota: Bool = true
     public var showIslandTokens: Bool = true
     public var showIslandSessions: Bool = true
+    /// Agent vendors whose live status is excluded from presentation, relay and completion reminders.
+    /// Collection, session history and token accounting are independent of this preference.
+    public private(set) var disabledLiveStatusSources: Set<String> = []
     public var pollInterval: PollInterval = .oneMinute
     public var launchAtLogin: Bool = true
     public var showMenuBarIcon: Bool = true
@@ -43,6 +46,7 @@ public struct Settings: Hashable, Codable, Sendable {
         case breathSeconds, breathAmplitude, glowRange, glowBlur, glowBrightness, glowOutwardOnly
         case hoverDelayMs, collapseDelayMs, showResetCountdown, pollInterval
         case showIslandQuota, showIslandTokens, showIslandSessions
+        case disabledLiveStatusSources
         case launchAtLogin, showMenuBarIcon, appearance, language
     }
 
@@ -61,6 +65,7 @@ public struct Settings: Hashable, Codable, Sendable {
         showIslandQuota = try c.decodeIfPresent(Bool.self, forKey: .showIslandQuota) ?? d.showIslandQuota
         showIslandTokens = try c.decodeIfPresent(Bool.self, forKey: .showIslandTokens) ?? d.showIslandTokens
         showIslandSessions = try c.decodeIfPresent(Bool.self, forKey: .showIslandSessions) ?? d.showIslandSessions
+        disabledLiveStatusSources = Set((try c.decodeIfPresent([String].self, forKey: .disabledLiveStatusSources) ?? []).map { $0.lowercased() })
         pollInterval = try c.decodeIfPresent(PollInterval.self, forKey: .pollInterval) ?? d.pollInterval
         launchAtLogin = try c.decodeIfPresent(Bool.self, forKey: .launchAtLogin) ?? d.launchAtLogin
         showMenuBarIcon = try c.decodeIfPresent(Bool.self, forKey: .showMenuBarIcon) ?? d.showMenuBarIcon
@@ -83,6 +88,7 @@ public struct Settings: Hashable, Codable, Sendable {
         try c.encode(showIslandQuota, forKey: .showIslandQuota)
         try c.encode(showIslandTokens, forKey: .showIslandTokens)
         try c.encode(showIslandSessions, forKey: .showIslandSessions)
+        try c.encode(disabledLiveStatusSources.sorted(), forKey: .disabledLiveStatusSources)
         try c.encode(launchAtLogin, forKey: .launchAtLogin)
         try c.encode(showMenuBarIcon, forKey: .showMenuBarIcon)
         try c.encode(appearance, forKey: .appearance)
@@ -102,4 +108,13 @@ public struct Settings: Hashable, Codable, Sendable {
 
     public var hoverDelay: TimeInterval { Double(hoverDelayMs) / 1000 }
     public var collapseDelay: TimeInterval { Double(collapseDelayMs) / 1000 }
+
+    public func liveStatusEnabled(for vendor: String) -> Bool {
+        !disabledLiveStatusSources.contains(vendor.lowercased())
+    }
+
+    public mutating func setLiveStatus(for vendor: String, enabled: Bool) {
+        if enabled { disabledLiveStatusSources.remove(vendor.lowercased()) }
+        else { disabledLiveStatusSources.insert(vendor.lowercased()) }
+    }
 }

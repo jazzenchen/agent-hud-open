@@ -8,6 +8,8 @@ actor CursorClient {
     let http: ProviderHTTP
     private var cached: (at: Date, account: String, since: Date, result: ProviderSessions)?
 
+    var savedSessions: ProviderSessions { cached?.result ?? ProviderSessions() }
+
     init(database: URL = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support/Cursor/User/globalStorage/state.vscdb"),
          http: ProviderHTTP = ProviderHTTP()) {
         self.database = database; self.http = http

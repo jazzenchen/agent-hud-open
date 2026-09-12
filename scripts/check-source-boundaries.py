@@ -10,12 +10,12 @@ paths = subprocess.check_output(
     ["git", "ls-files", "--cached", "--others", "--exclude-standard", "-z"], cwd=ROOT
 ).decode().split("\0")
 private_extensions = {".p8", ".p12", ".pfx", ".key", ".pem", ".mobileprovision", ".provisionprofile", ".entitlements"}
-private_directories = {"signing", "Licensing", "Sync", "AgentHUDServices"}
+private_directories = {"signing", "Sync", "AgentHUDServices"}
 service_patterns = [
     r"\bimport\s+(?:CloudKit|UserNotifications|AgentHUDServices)\b",
-    r"\b(?:CKContainer|CKDatabase|LicenseManager|LicenseConfiguration|LemonSqueezy|ICloudSync|LiveActivitySender|NotificationTracker)\b",
+    r"\b(?:CKContainer|CKDatabase|ICloudSync|LiveActivitySender|NotificationTracker)\b",
     r"com\.apple\.developer\.(?:icloud|aps|team-identifier)",
-    r"\b(?:DEVELOPMENT_TEAM|NOTARY_PROFILE|ICLOUD_PROVISIONING_PROFILE|AGENTHUD_LICENSE_REQUIRED)\b",
+    r"\b(?:DEVELOPMENT_TEAM|NOTARY_PROFILE|ICLOUD_PROVISIONING_PROFILE)\b",
     r"iCloud\.",
 ]
 secret_patterns = [
@@ -50,7 +50,7 @@ if re.search(r"\.package\s*\(", manifest):
 
 # Verify ignore rules without creating any secret-shaped files.
 ignored = [".env", "signing/local.env", "config/service.local.json", "AuthKey_example.p8", "certificate.p12",
-           "account.key", "development.mobileprovision", "build/Agent HUD Open.app/Contents/Info.plist", ".build/debug/AgentHUDOpen"]
+           "account.key", "development.mobileprovision", "build/Agent HUD Open.app/Contents/Info.plist", ".build/ignore-check/AgentHUDOpen"]
 result = subprocess.run(["git", "check-ignore", "--stdin"], cwd=ROOT,
                         input="\n".join(ignored)+"\n", text=True, capture_output=True)
 missing = set(ignored) - set(result.stdout.splitlines())

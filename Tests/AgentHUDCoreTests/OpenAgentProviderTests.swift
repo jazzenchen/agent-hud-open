@@ -177,7 +177,7 @@ final class OpenAgentProviderTests: XCTestCase {
         let provider = OpenAgentUsageProvider(credentials: { [] }, sessions: { _ in .init(sessions: [item]) },
             fetchQuota: { _, _ in ProviderQuota() }, history: QuotaHistoryStore(fileURL: nil),
             clock: { Date(timeIntervalSince1970: Double(start + 2000) / 1000) })
-        let report = try await provider.fetchUsage(agents: [], historyHours: 24)
+        let report = try await provider.fetchAccountAndLocalUsage(agents: [], historyHours: 24)
         XCTAssertEqual(report.turns, [turn])
         XCTAssertEqual(report.sessions.first?.id, turn.sessionID)
         XCTAssertEqual(report.sessions.first?.isLive, true)
@@ -266,12 +266,12 @@ final class OpenAgentProviderTests: XCTestCase {
             XCTAssertEqual(request.url?.path, "/coding/v1/me")
             XCTAssertEqual(request.httpMethod, "GET")
             XCTAssertNil(request.httpBody)
-            XCTAssertEqual(request.timeoutInterval, 2)
+            XCTAssertEqual(request.timeoutInterval, 8)
             return Data(#"{"user_id":"account-one","domain":1,"region":"REGION_CN","email":"never-persist@example.com"}"#.utf8)
         }))
-        let a = await client.identify(credential(key: "first"))
-        let b = await client.identify(credential(key: "second", client: "Pi"))
-        let global = await client.identify(credential(.kimiGlobal, key: "second"))
+        let a = try await client.identify(credential(key: "first"))
+        let b = try await client.identify(credential(key: "second", client: "Pi"))
+        let global = try await client.identify(credential(.kimiGlobal, key: "second"))
         XCTAssertEqual(a.pool, b.pool)
         XCTAssertEqual(a.pool.evidence, .account)
         XCTAssertNotEqual(a.pool, global.pool)
@@ -279,8 +279,10 @@ final class OpenAgentProviderTests: XCTestCase {
         XCTAssertFalse(encoded.contains("account-one"))
         XCTAssertFalse(encoded.contains("never-persist"))
         let failed = OpenAgentQuotaClient(http: ProviderHTTP(send: { _ in throw ProviderHTTPError(status: 404) }))
-        let fallback = await failed.identify(credential())
-        XCTAssertEqual(fallback.pool.evidence, .credential)
+        do {
+            _ = try await failed.identify(credential())
+            XCTFail("Identity failures must reach the provider rather than silently passing as identified")
+        } catch { XCTAssertEqual((error as? ProviderHTTPError)?.status, 404) }
     }
 
 
@@ -294,7 +296,7 @@ final class OpenAgentProviderTests: XCTestCase {
         }, history: QuotaHistoryStore(fileURL: nil), identify: { c in
             OpenAgentCredentials.credential(c.service, token: c.token, client: c.clients.sorted()[0], accountID: "proven-account")
         }, clock: { now })
-        let report = try await provider.fetchUsage(agents: [], historyHours: 168)
+        let report = try await provider.fetchAccountAndLocalUsage(agents: [], historyHours: 168)
         let count = await calls.count
         XCTAssertEqual(count, 1)
         XCTAssertEqual(report.snapshots.count, 1)
@@ -340,7 +342,7 @@ final class OpenAgentProviderTests: XCTestCase {
         let b = report(remaining: 70, at: now, client: "Kimi", eventID: "same")
         let c = report(remaining: 70, at: now, client: "OpenCode", eventID: "different")
         let provider = CombinedUsageProvider([.init("Pi", FixedProvider(report: a)), .init("Kimi", FixedProvider(report: b)), .init("OpenCode", FixedProvider(report: c))])
-        let result = try await provider.fetchUsage(agents: [], historyHours: 168)
+        let result = try await provider.fetchAccountAndLocalUsage(agents: [], historyHours: 168)
         XCTAssertEqual(result.snapshots.count, 1)
         XCTAssertEqual(result.snapshots[0].remainingPct, 70)
         XCTAssertEqual(result.discoveredAgents.count, 1)
@@ -375,8 +377,8 @@ final class OpenAgentProviderTests: XCTestCase {
             await calls.record()
             return .init(windows: [.init(id: c.pool.windowID("weekly"), label: "Weekly", remaining: 70)])
         }, history: QuotaHistoryStore(fileURL: nil), clock: { now })
-        let report = try await provider.fetchUsage(agents: [], historyHours: 168)
-        _ = try await provider.fetchUsage(agents: [], historyHours: 168)
+        let report = try await provider.fetchAccountAndLocalUsage(agents: [], historyHours: 168)
+        _ = try await provider.fetchAccountAndLocalUsage(agents: [], historyHours: 168)
         let count = await calls.count
         XCTAssertEqual(count, 1)
         XCTAssertEqual(report.snapshots.count, 1)

@@ -72,6 +72,22 @@ final class CompletionHooksTests: XCTestCase, @unchecked Sendable {
 
 
 
+    func testAutomaticInstallationDoesNotTakeOverAnotherHost() throws {
+        let home = try directory()
+        let first = home.appendingPathComponent("Agent HUD"), second = home.appendingPathComponent("Agent HUD Open")
+        for source in CompletionHooks.Source.allCases {
+            try CompletionHooks.configure(source, enabled: true, executable: first, home: home)
+            let file = source.configuration(home: home)
+            let original = try Data(contentsOf: file)
+            for enabled in [true, false] {
+                XCTAssertThrowsError(try CompletionHooks.configure(source, enabled: enabled, executable: second, home: home))
+                XCTAssertEqual(try Data(contentsOf: file), original)
+            }
+            try CompletionHooks.configure(source, enabled: true, executable: second, home: home, replacingExisting: true)
+            XCTAssertTrue(try String(contentsOf: file, encoding: .utf8).contains(second.path))
+        }
+    }
+
     func testInstallationPreservesOtherHooksAndCanBeRemoved() throws {
         let home = try directory(), executable = home.appendingPathComponent("Agent's HUD.app/Contents/MacOS/Agent HUD")
         for source in CompletionHooks.Source.allCases {

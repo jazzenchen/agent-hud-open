@@ -33,6 +33,11 @@ struct HoverPanelView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
+            if let error = store.lastError {
+                Text(L10n.text("刷新失败：", "Refresh failed: ") + error)
+                    .font(.ui(11)).foregroundStyle(theme.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             if let alert {
                 IslandAlertInlineView(alert: alert, onOpen: onOpenAlert).id(alert.id)
                     .padding(.bottom, 4)
@@ -109,7 +114,7 @@ struct HoverPanelView: View {
     private var sessionLine: some View {
         Button(action: onOpenStats) {
             let sessions = store.statsSessions
-            let liveCount = sessions.filter(\.isLive).count
+            let liveCount = sessions.filter(store.isSessionLive).count
             VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 8) {
                     Circle().fill(liveCount > 0 ? theme.status(.ok) : theme.tertiary).frame(width: 6, height: 6)

@@ -164,7 +164,7 @@ final class CodexProviderTests: XCTestCase {
         let contents = line(type: "session_meta", payload: ["id":"cli", "source":"cli", "cwd":"/project"]) + "\n" + line(payload: ["type":"task_started"]) + "\n"
         try contents.write(to: dir.appendingPathComponent("rollout-cli.jsonl"), atomically: true, encoding: .utf8)
         let provider = CodexUsageProvider(readLimits: { throw UsageProviderError("signed out") }, transcripts: CodexTranscriptStore(roots: [dir]), history: QuotaHistoryStore(fileURL: nil))
-        let report = try await provider.fetchUsage(agents: [], historyHours: 48)
+        let report = try await provider.fetchAccountAndLocalUsage(agents: [], historyHours: 48)
         XCTAssertEqual(report.sessions.first?.client, "CLI")
         let session = try XCTUnwrap(report.sessions.first)
         XCTAssertTrue(report.consumerIdsByQuota["codex"]?.contains(session.agentId) == true)
@@ -197,7 +197,7 @@ final class CodexProviderTests: XCTestCase {
         ], now: now)
         let provider = CodexUsageProvider(readLimits: { limits }, transcripts: CodexTranscriptStore(roots: [dir]),
                                           history: history, clock: { now })
-        let report = try await provider.fetchUsage(agents: [], historyHours: 24)
+        let report = try await provider.fetchAccountAndLocalUsage(agents: [], historyHours: 24)
         XCTAssertEqual(report.snapshot(for: "codex")?.windowDuration, 7 * 86400)
         XCTAssertEqual(report.snapshot(for: "codex:spark:primary")?.windowDuration, 5 * 3600)
         let weekly = try XCTUnwrap(report.insightsByAgent["codex"])

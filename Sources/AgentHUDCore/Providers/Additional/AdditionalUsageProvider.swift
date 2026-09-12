@@ -4,6 +4,7 @@ actor AdditionalUsageProvider: UsageProvider {
     let source: AdditionalSource
     private let readQuota: @Sendable () async throws -> ProviderQuota
     private let readSessions: @Sendable (Date) async -> ProviderSessions
+    private let refreshSessions: @Sendable (Int) async -> Void
     private let readCompletions: @Sendable (Date) throws -> [SessionCompletion]
     private let history: QuotaHistoryStore
     private let clock: @Sendable () -> Date
@@ -13,9 +14,11 @@ actor AdditionalUsageProvider: UsageProvider {
          readSessions: @escaping @Sendable (Date) async -> ProviderSessions,
          history: QuotaHistoryStore,
          readCompletions: @escaping @Sendable (Date) throws -> [SessionCompletion] = { _ in [] },
-         clock: @escaping @Sendable () -> Date = { Date() }) {
+         clock: @escaping @Sendable () -> Date = { Date() },
+         refreshSessions: @escaping @Sendable (Int) async -> Void = { _ in }) {
         self.source = source; self.readQuota = readQuota; self.readSessions = readSessions
         self.readCompletions = readCompletions
+        self.refreshSessions = refreshSessions
         self.history = history; self.clock = clock
     }
 
@@ -29,16 +32,22 @@ actor AdditionalUsageProvider: UsageProvider {
             case .grok: return try await GrokClient().fetch()
             }
         }, readSessions: { since in
-            if source == .cursor { return await cursor.sessions(since: since) }
+            if source == .cursor { return await cursor.savedSessions }
             return await local.index(since: since)
         }, history: QuotaHistoryStore(fileURL: persistHistory ? AppSupport.directory.appendingPathComponent("\(source.rawValue)-quota-history.json") : nil),
         readCompletions: { since in
             guard let hook = CompletionHooks.Source(rawValue: source.rawValue) else { return [] }
             return try CompletionHooks.read(source: hook, since: since)
+        }, refreshSessions: { hours in
+            if source == .cursor {
+                _ = await cursor.sessions(since: Date().addingTimeInterval(-Double(max(168, hours)) * 3600))
+            }
         })
     }
 
-    private func quota(now: Date) async -> (ProviderQuota, Date, String?) {
+    func refreshAccountUsage(historyHours: Int) async {
+        async let sessions: Void = refreshSessions(historyHours)
+        let now = clock()
         if lastQuota == nil || now.timeIntervalSince(lastQuota!.at) >= 120 {
             do {
                 let result = try await readQuota()
@@ -46,21 +55,24 @@ actor AdditionalUsageProvider: UsageProvider {
                 lastQuota = (now, .success(result))
                 await history.append(result.windows.map { .init(agentId: $0.id, timestamp: now, remainingPct: $0.remaining) }, now: now)
             } catch {
+                if Task.isCancelled { return }
                 lastQuota = (now, .failure(UsageProviderError(error.localizedDescription)))
             }
         }
-        switch lastQuota!.result {
-        case .success(let quota): return (quota, lastQuota!.at, quota.notice)
-        case .failure(let error): return (ProviderQuota(), lastQuota!.at, error.message)
-        }
+        await sessions
     }
 
     func fetchUsage(agents: [AgentDescriptor], historyHours: Int) async throws -> UsageReport {
         let now = clock(), weekAgo = now.addingTimeInterval(-7 * 86400)
         let since = min(weekAgo, now.addingTimeInterval(-Double(historyHours) * 3600))
-        async let fetchedQuota = quota(now: now)
         let local = await readSessions(since)
-        let (quota, observedAt, quotaNotice) = await fetchedQuota
+        let quota: ProviderQuota, quotaNotice: String?
+        let observedAt = lastQuota?.at ?? now
+        switch lastQuota?.result {
+        case .success(let value): (quota, quotaNotice) = (value, value.notice)
+        case .failure(let error): (quota, quotaNotice) = (ProviderQuota(), error.message)
+        case nil: (quota, quotaNotice) = (ProviderQuota(), nil)
+        }
         let allEvents = local.sessions.flatMap(\.events)
         let events = allEvents.filter { $0.timestamp >= since && $0.timestamp <= now }.map { $0.usage(source: source) }
         let consumers = Set(allEvents.map(\.model)).sorted().map {
@@ -78,7 +90,7 @@ actor AdditionalUsageProvider: UsageProvider {
                                startedAt: start, endedAt: isRunning ? nil : end, pctOfWindow: nil,
                                tokensIn: item.events.reduce(0) { $0 + $1.input }, tokensOut: item.events.reduce(0) { $0 + $1.output },
                                client: item.client, transcriptPath: item.path,
-                               cacheReadTokens: item.events.reduce(0) { $0 + $1.cacheRead }, accountWide: item.accountWide)
+                               cacheReadTokens: item.events.reduce(0) { $0 + $1.cacheRead }, accountWide: item.accountWide, observedAt: now)
         }
         let snapshots = quota.windows.map {
             UsageSnapshot(agentId: $0.id, remainingPct: $0.remaining, resetAt: $0.reset, windowDuration: $0.duration, updatedAt: observedAt)

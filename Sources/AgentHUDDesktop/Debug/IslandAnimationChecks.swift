@@ -64,7 +64,49 @@ enum IslandAnimationChecks {
         await settle(0.5)
         precondition(window.frame == controller.geometry.islandFrame, "Closing must finish at the notch frame")
         captureEndpoint("closed")
-        print("animation PASS: measured expansion, stable canvas, interrupted collapse, live resize and final collapse")
+        await checkTallGlowCanvas()
+        print("animation PASS: measured expansion, stable canvas, interrupted collapse, live resize, final collapse and unclipped tall-panel glow")
+    }
+
+    private static func checkTallGlowCanvas() async {
+        for screenHeight: CGFloat in [900, 1117, 1440] {
+            let screen = CGRect(x: -20000, y: -20000, width: 1728, height: screenHeight)
+            let geometry = NotchGeometry(screenFrame: screen, hasNotch: true,
+                rect: CGRect(x: screen.midX - 108, y: screen.maxY - 32, width: 216, height: 32),
+                cornerRadius: 12, backingScale: 2)
+            let controller = GlowWindowController(geometry: geometry)
+            defer { controller.panel.orderOut(nil) }
+            let canvas = controller.panel.frame
+            let maximum = Settings.glowSizeRange.upperBound
+
+            func update(height: CGFloat, animated: Bool) {
+                let island = geometry.expandedFrame(size: CGSize(width: NotchController.expandedWidth, height: height))
+                let glow = GlowGeometry.compute(islandWidth: island.width, islandHeight: island.height,
+                    islandRadius: NotchController.expandedRadius, range: maximum, blur: maximum)
+                controller.update(geometry: geometry, island: island, islandRadius: NotchController.expandedRadius,
+                    glow: glow, outwardOnly: true, appearance: .idle(), animated: animated)
+            }
+
+            func checkClipping() {
+                precondition(controller.panel.frame == canvas, "Glow canvas must stay fixed during expansion and collapse")
+                let host = controller.panel.contentView!
+                for layer in host.layer!.sublayers!.prefix(2) {
+                    let frame = (layer.presentation() ?? layer).frame
+                    // Only the portion above the display's top edge may be clipped.
+                    precondition(frame.minY >= host.bounds.minY - 0.01 && frame.minX >= host.bounds.minX
+                        && frame.maxX <= host.bounds.maxX, "Tall panels must retain the full bottom glow and shadow")
+                }
+            }
+
+            update(height: screenHeight - 80, animated: false)
+            checkClipping()
+            update(height: NotchController.defaultPanelHeight, animated: true)
+            await settle(0.1)
+            checkClipping()
+            update(height: screenHeight - 80, animated: true)
+            await settle(IslandAnimation.duration + 0.1)
+            checkClipping()
+        }
     }
 
     private static func settle(_ seconds: TimeInterval) async {

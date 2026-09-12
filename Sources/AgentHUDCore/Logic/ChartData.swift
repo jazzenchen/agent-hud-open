@@ -14,7 +14,7 @@ public struct TokenDimensions: OptionSet, Hashable, Sendable {
     public func count(input: Int, output: Int, cache: Int) -> Int {
         (contains(.input) ? input : 0) + (contains(.output) ? output : 0) + (contains(.cache) ? cache : 0)
     }
-    public func count(_ event: TranscriptSession.UsageEvent) -> Int {
+    public func count(_ event: UsageEvent) -> Int {
         count(input: event.tokensIn, output: event.tokensOut, cache: event.cacheReadTokens)
     }
 }
@@ -118,7 +118,7 @@ public enum ChartData {
 
     /// Bucket original events on local quarter-hour/hour boundaries within the exact, half-open range.
     /// Empty periods retain their position, and integer token counts are never rounded or interpolated.
-    public static func tokenBars(usage: [TranscriptSession.UsageEvent], agentIds: [String], range: StatsRange, bucketSize: TokenBucketSize = .hour1, now: Date, calendar: Calendar = .current, dimensions: TokenDimensions = .fresh) -> [TokenColumn] {
+    public static func tokenBars(usage: [UsageEvent], agentIds: [String], range: StatsRange, bucketSize: TokenBucketSize = .hour1, now: Date, calendar: Calendar = .current, dimensions: TokenDimensions = .fresh) -> [TokenColumn] {
         let interval = range.interval(endingAt: now)
         let duration = bucketSize.duration
         let periods: [DateInterval]

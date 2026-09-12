@@ -67,9 +67,9 @@ struct ProviderEvent: Hashable, Sendable {
     let input: Int
     let output: Int
     var cacheRead: Int = 0
-    var origin: TranscriptSession.UsageEvent.Origin? = nil
+    var origin: UsageEvent.Origin? = nil
 
-    func usage(source: AdditionalSource) -> TranscriptSession.UsageEvent {
+    func usage(source: AdditionalSource) -> UsageEvent {
         .init(timestamp: timestamp, agentId: "\(source.rawValue)-model:\(model)", tokensIn: input,
               tokensOut: output, cacheReadTokens: cacheRead, eventID: "\(source.rawValue):\(id)", origin: origin)
     }

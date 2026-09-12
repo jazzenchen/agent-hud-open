@@ -12,7 +12,7 @@ public enum UsageAnalytics {
     public static func hourlyHistory(
         agentId: String,
         quota: [QuotaSample],
-        usage: [TranscriptSession.UsageEvent],
+        usage: [UsageEvent],
         hours: Int,
         now: Date,
         calendar: Calendar,
@@ -47,7 +47,7 @@ public enum UsageAnalytics {
     }
 
     /// 7 × 24 grid (Mon → Sun) of token consumption since `since`.
-    public static func activityGrid(usage: [TranscriptSession.UsageEvent], since: Date, calendar: Calendar, dimensions: TokenDimensions = .fresh) -> ActivityGrid {
+    public static func activityGrid(usage: [UsageEvent], since: Date, calendar: Calendar, dimensions: TokenDimensions = .fresh) -> ActivityGrid {
         var cells = Array(repeating: Array(repeating: [String: Int](), count: 24), count: 7)
         for event in usage where event.timestamp >= since {
             let weekday = calendar.component(.weekday, from: event.timestamp) // 1 = Sunday
@@ -135,7 +135,7 @@ public enum UsageAnalytics {
     }
 
     /// Share of tokens per agent (sums to 1 when there is any usage).
-    public static func weeklyShare(usage: [TranscriptSession.UsageEvent]) -> [String: Double] {
+    public static func weeklyShare(usage: [UsageEvent]) -> [String: Double] {
         var totals: [String: Int] = [:]
         for event in usage { totals[event.agentId, default: 0] += event.total }
         let sum = totals.values.reduce(0, +)

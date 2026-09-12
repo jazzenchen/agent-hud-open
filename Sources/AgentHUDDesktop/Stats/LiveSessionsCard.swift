@@ -5,7 +5,6 @@ import AgentHUDCore
 struct LiveSessionsCard: View {
     let store: UsageStore
     let theme: Theme
-    private static let previewCount = 3
     @State private var showAll = false
     @State private var selectedSource: SessionSource?
 
@@ -20,11 +19,13 @@ struct LiveSessionsCard: View {
         store.statsSessions.filter { selectedSource == nil || store.sessionSource($0) == selectedSource }
     }
 
+    private var previewSessions: [LiveSession] { store.sessionPreview(from: filteredSessions) }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .firstTextBaseline) {
                 HStack(spacing: 8) {
-                    Circle().fill(filteredSessions.contains(where: \.isLive) ? theme.status(.ok) : theme.tertiary).frame(width: 7, height: 7)
+                    Circle().fill(filteredSessions.contains(where: store.isSessionLive) ? theme.status(.ok) : theme.tertiary).frame(width: 7, height: 7)
                     Text(L10n.text("会话", "Sessions")).font(.ui(13, .semibold))
                     Text(store.statsRange.recentLabel).font(.ui(11)).foregroundStyle(theme.secondary)
                 }
@@ -43,7 +44,7 @@ struct LiveSessionsCard: View {
             }
             header
             LazyVStack(spacing: 4) {
-                ForEach(showAll ? filteredSessions : Array(filteredSessions.prefix(Self.previewCount))) { session in
+                ForEach(showAll ? filteredSessions : previewSessions) { session in
                     SessionRow(session: session, store: store, theme: theme)
                 }
             }
@@ -52,11 +53,11 @@ struct LiveSessionsCard: View {
             }
             HStack {
                 Text(L10n.text(
-                    "\(filteredSessions.count) 个会话 · \(filteredSessions.filter(\.isLive).count) 个正在运行",
-                    "\(filteredSessions.count) sessions · \(filteredSessions.filter(\.isLive).count) running"
+                    "\(filteredSessions.count) 个会话 · \(filteredSessions.filter(store.isSessionLive).count) 个正在运行",
+                    "\(filteredSessions.count) sessions · \(filteredSessions.filter(store.isSessionLive).count) running"
                 ))
                 Spacer()
-                if filteredSessions.count > Self.previewCount {
+                if filteredSessions.count > previewSessions.count {
                     Button(showAll ? L10n.text("收起", "Show less") : L10n.text("查看全部 \(filteredSessions.count) 个会话", "All \(filteredSessions.count) sessions")) { showAll.toggle() }
                         .buttonStyle(.plain)
                 }
@@ -93,7 +94,7 @@ struct SessionRow: View {
     let theme: Theme
 
     var body: some View {
-        let dotColor = session.isLive ? AgentPalette.swiftUIColor(index: store.consumerPaletteIndex(session.agentId)) : theme.dotEnded
+        let dotColor = store.isSessionLive(session) ? AgentPalette.swiftUIColor(index: store.consumerPaletteIndex(session.agentId)) : theme.dotEnded
         HStack(spacing: 12) {
             Circle().fill(dotColor).frame(width: 8, height: 8)
             HStack(spacing: 5) {
@@ -114,8 +115,9 @@ struct SessionRow: View {
                     .lineLimit(1).truncationMode(.middle)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            Text(Countdown.sessionLabel(session, now: store.now))
+            Text(store.sessionStatusLabel(session))
                 .font(.tabular(12))
+                .lineLimit(1).minimumScaleFactor(0.8)
                 .foregroundStyle(theme.secondary)
                 .frame(width: 90, alignment: .leading)
             Text(quotaOrCost)

@@ -76,7 +76,7 @@ public struct UsageReport: Hashable, Codable, Sendable {
     /// Things that spend tokens (model families), as opposed to quota windows. Sessions and token charts key on these.
     public let consumers: [AgentDescriptor]
     /// Original token events keyed by consumer id, retaining timestamps for chart aggregation.
-    public let consumption: [TranscriptSession.UsageEvent]
+    public let consumption: [UsageEvent]
     /// A complete Claude transcript scan owns usage in this range through `generatedAt`.
     /// Nil for partial scans; only this Mac's archived Claude events in the covered range may be replaced.
     public let claudeConsumptionSince: Date?
@@ -87,6 +87,9 @@ public struct UsageReport: Hashable, Codable, Sendable {
     public let subscriptions: [String: String]
     /// Optional so previously saved reports remain readable.
     public let services: [AgentService]?
+    /// Authoritative pool inventory for each reporting provider. An empty set means no usable credentials.
+    /// Nil keeps older cached reports decodable; it does not assert that their credentials are still valid.
+    public let activeQuotaPoolIDs: [String: Set<String>]?
     public let sourceNotices: [String: String]
     /// Consumer ids covered by each quota row. Providers own the relationship between model and quota ids.
     public let consumerIdsByQuota: [String: Set<String>]
@@ -107,7 +110,7 @@ public struct UsageReport: Hashable, Codable, Sendable {
         discoveredAgents: [AgentDescriptor] = [],
         subscriptionType: String? = nil,
         consumers: [AgentDescriptor]? = nil,
-        consumption: [TranscriptSession.UsageEvent] = [],
+        consumption: [UsageEvent] = [],
         indexing: IndexProgress? = nil,
         insightsByAgent: [String: UsageInsights] = [:],
         subscriptions: [String: String] = [:],
@@ -119,9 +122,11 @@ public struct UsageReport: Hashable, Codable, Sendable {
         completions: [SessionCompletion] = [],
         claudeConsumptionSince: Date? = nil,
         turns: [SessionTurn] = [],
-        services: [AgentService]? = nil
+        services: [AgentService]? = nil,
+        activeQuotaPoolIDs: [String: Set<String>]? = nil
     ) {
         self.services = services
+        self.activeQuotaPoolIDs = activeQuotaPoolIDs
         self.claudeConsumptionSince = claudeConsumptionSince
         self.completions = completions
         self.turns = turns

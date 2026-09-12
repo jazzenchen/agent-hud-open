@@ -27,26 +27,30 @@ public actor DeepSeekUsageProvider: UsageProvider {
             readProcessStarts: { await DeepSeekRuntime.processStarts(directory: directory) })
     }
 
-    private func balance(now: Date) async -> (DeepSeekBalance?, Date?, String?) {
-        guard DeepSeekLocator.isInstalled(directory: directory) else { return (nil, nil, nil) }
+    public func refreshAccountUsage(historyHours: Int) async {
+        guard DeepSeekLocator.isInstalled(directory: directory) else { return }
+        let now = clock()
         if lastBalance == nil || now.timeIntervalSince(lastBalance!.at) >= 120 {
             do { lastBalance = (now, .success(try await readBalance())) }
-            catch { lastBalance = (now, .failure(UsageProviderError(error.localizedDescription))) }
-        }
-        switch lastBalance!.result {
-        case .success(let balance): return (balance, balance == nil ? nil : lastBalance!.at, nil)
-        case .failure(let error): return (nil, nil, error.message)
+            catch {
+                if Task.isCancelled { return }
+                lastBalance = (now, .failure(UsageProviderError(error.localizedDescription)))
+            }
         }
     }
 
     public func fetchUsage(agents: [AgentDescriptor], historyHours: Int) async throws -> UsageReport {
         let now = clock(), weekAgo = now.addingTimeInterval(-7 * 86400)
         let cutoff = min(weekAgo, now.addingTimeInterval(-Double(historyHours) * 3600))
-        async let balanceResult = balance(now: now)
         async let processStartsResult = readProcessStarts()
         let indexed = await transcripts.index(since: cutoff)
         let processStarts = await processStartsResult
-        let (balance, balanceAt, balanceNotice) = await balanceResult
+        let balance: DeepSeekBalance?, balanceAt: Date?, balanceNotice: String?
+        switch lastBalance?.result {
+        case .success(let value): (balance, balanceAt, balanceNotice) = (value, value == nil ? nil : lastBalance?.at, nil)
+        case .failure(let error): (balance, balanceAt, balanceNotice) = (nil, nil, error.message)
+        case nil: (balance, balanceAt, balanceNotice) = (nil, nil, nil)
+        }
         let installed = DeepSeekLocator.isInstalled(directory: directory)
         let events = indexed.sessions.flatMap { $0.transcript.usage.map(\.event) }.filter { $0.timestamp >= cutoff && $0.timestamp <= now }
         let models = Set(indexed.sessions.flatMap { [$0.transcript.model] + $0.transcript.usage.map(\.model) }).sorted()
@@ -61,7 +65,7 @@ public actor DeepSeekUsageProvider: UsageProvider {
                                endedAt: t.isLive(now: now, modifiedAt: session.modifiedAt, processStarts: processStarts) ? nil : (t.lastActivityAt ?? t.startedAt ?? session.modifiedAt),
                                pctOfWindow: nil, tokensIn: t.usage.reduce(0) { $0 + $1.input }, tokensOut: t.usage.reduce(0) { $0 + $1.output },
                                client: "DeepSeek Harness", transcriptPath: session.path,
-                               cacheReadTokens: t.usage.reduce(0) { $0 + $1.cachedInput })
+                               cacheReadTokens: t.usage.reduce(0) { $0 + $1.cachedInput }, observedAt: now)
         }.sorted { a, b in
             if a.isLive != b.isLive { return a.isLive }
             return (a.endedAt ?? a.startedAt) > (b.endedAt ?? b.startedAt)

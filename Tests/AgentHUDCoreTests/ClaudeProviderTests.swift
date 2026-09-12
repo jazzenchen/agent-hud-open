@@ -269,8 +269,8 @@ final class UsageAnalyticsTests: XCTestCase {
             QuotaSample(agentId: "a", timestamp: base.addingTimeInterval(2 * 3600 + 60), remainingPct: 100),
         ]
         let usage = [
-            TranscriptSession.UsageEvent(timestamp: base.addingTimeInterval(100), agentId: "a", tokensIn: 1000, tokensOut: 200),
-            TranscriptSession.UsageEvent(timestamp: base.addingTimeInterval(100), agentId: "b", tokensIn: 999, tokensOut: 0),
+            UsageEvent(timestamp: base.addingTimeInterval(100), agentId: "a", tokensIn: 1000, tokensOut: 200),
+            UsageEvent(timestamp: base.addingTimeInterval(100), agentId: "b", tokensIn: 999, tokensOut: 0),
         ]
         let history = UsageAnalytics.hourlyHistory(agentId: "a", quota: quota, usage: usage, hours: 5, now: now, calendar: calendar, fallbackRemaining: nil)
         XCTAssertEqual(history.count, 5)
@@ -297,8 +297,8 @@ final class UsageAnalyticsTests: XCTestCase {
     func testActivityGridNormalises() {
         let monday = DateParsing.iso8601("2026-08-31T02:00:00Z")! // Monday 10:00 CST
         let usage = [
-            TranscriptSession.UsageEvent(timestamp: monday, agentId: "a", tokensIn: 400, tokensOut: 100),
-            TranscriptSession.UsageEvent(timestamp: monday.addingTimeInterval(3600), agentId: "a", tokensIn: 200, tokensOut: 50),
+            UsageEvent(timestamp: monday, agentId: "a", tokensIn: 400, tokensOut: 100),
+            UsageEvent(timestamp: monday.addingTimeInterval(3600), agentId: "a", tokensIn: 200, tokensOut: 50),
         ]
         let grid = UsageAnalytics.activityGrid(usage: usage, since: .distantPast, calendar: calendar)
         XCTAssertEqual(grid.rows[0][10], 1)
@@ -311,7 +311,7 @@ final class UsageAnalyticsTests: XCTestCase {
 
     func testActivityGridRetainsEveryModelAndVersion() {
         let monday = DateParsing.iso8601("2026-08-31T02:00:00Z")!
-        let usage: [TranscriptSession.UsageEvent] = [
+        let usage: [UsageEvent] = [
             .init(timestamp: monday, agentId: "claude-model:opus-4-8", tokensIn: 80, tokensOut: 20),
             .init(timestamp: monday.addingTimeInterval(60), agentId: "claude-model:opus-4-8", tokensIn: 8, tokensOut: 2),
             .init(timestamp: monday, agentId: "claude-model:opus-5", tokensIn: 150, tokensOut: 50),
@@ -357,8 +357,8 @@ final class UsageAnalyticsTests: XCTestCase {
 
     func testWeeklyShare() {
         let usage = [
-            TranscriptSession.UsageEvent(timestamp: now, agentId: "a", tokensIn: 30, tokensOut: 0),
-            TranscriptSession.UsageEvent(timestamp: now, agentId: "b", tokensIn: 10, tokensOut: 0),
+            UsageEvent(timestamp: now, agentId: "a", tokensIn: 30, tokensOut: 0),
+            UsageEvent(timestamp: now, agentId: "b", tokensIn: 10, tokensOut: 0),
         ]
         let share = UsageAnalytics.weeklyShare(usage: usage)
         XCTAssertEqual(share["a"] ?? 0, 0.75, accuracy: 1e-9)
@@ -451,7 +451,7 @@ final class ClaudeCodeProviderTests: XCTestCase {
             history: history,
             clock: { now }
         )
-        let report = try await provider.fetchUsage(agents: DefaultAgents.list, historyHours: 48)
+        let report = try await provider.fetchAccountAndLocalUsage(agents: DefaultAgents.list, historyHours: 48)
         XCTAssertNil(report.notice)
         XCTAssertEqual(report.subscriptionType, "max")
 
@@ -506,7 +506,7 @@ final class ClaudeCodeProviderTests: XCTestCase {
                        "the weekly forecast includes readings older than the selected 48-hour statistics range")
         XCTAssertEqual(try XCTUnwrap(report.insightsByAgent["claude-weekly-opus"]?.burnRatePctPerHour), 51.0 / 48, accuracy: 1e-6)
         XCTAssertEqual(report.activity.rows.count, 7)
-        _ = try await provider.fetchUsage(agents: DefaultAgents.list, historyHours: 48)
+        _ = try await provider.fetchAccountAndLocalUsage(agents: DefaultAgents.list, historyHours: 48)
         let stored = await history.samples(agentId: ClaudeUsage.sessionRowId, since: .distantPast)
         XCTAssertEqual(stored.count, 2, "each engine observation appends one sample; a poll served from the cache does not")
     }
@@ -526,7 +526,7 @@ final class ClaudeCodeProviderTests: XCTestCase {
             history: QuotaHistoryStore(fileURL: nil),
             clock: { now }
         )
-        let report = try await provider.fetchUsage(agents: DefaultAgents.list, historyHours: 48)
+        let report = try await provider.fetchAccountAndLocalUsage(agents: DefaultAgents.list, historyHours: 48)
         XCTAssertNil(report.notice)
         XCTAssertEqual(report.subscriptionType, "max")
         XCTAssertEqual(report.discoveredAgents.map(\.id), ["claude-session", "claude-weekly"])
@@ -557,7 +557,7 @@ final class ClaudeCodeProviderTests: XCTestCase {
             engine: try fakeEngine(rateLimits: #"{"five_hour":{"utilization":10}}"#),
             transcripts: ClaudeTranscriptStore(root: root), history: QuotaHistoryStore(fileURL: nil), clock: { now }
         )
-        let report = try await provider.fetchUsage(agents: [], historyHours: 169)
+        let report = try await provider.fetchAccountAndLocalUsage(agents: [], historyHours: 169)
         XCTAssertEqual(report.sessions.count, 12, "the view controls how many sessions are expanded")
         XCTAssertEqual(report.sessions.first?.id, "session-0")
         XCTAssertEqual(report.sessions.last?.id, "session-11")
@@ -576,7 +576,7 @@ final class ClaudeCodeProviderTests: XCTestCase {
             history: QuotaHistoryStore(fileURL: nil),
             clock: { now }
         )
-        let report = try await provider.fetchUsage(agents: DefaultAgents.list, historyHours: 48)
+        let report = try await provider.fetchAccountAndLocalUsage(agents: DefaultAgents.list, historyHours: 48)
         XCTAssertEqual(report.notice, "当前登录方式没有订阅额度（API key 或第三方平台）")
         XCTAssertTrue(report.snapshots.isEmpty)
         XCTAssertEqual(report.sessions.map(\.id), ["k"], "sessions still come from local logs")
@@ -589,7 +589,7 @@ final class ClaudeCodeProviderTests: XCTestCase {
             history: QuotaHistoryStore(fileURL: nil)
         )
         do {
-            _ = try await provider.fetchUsage(agents: DefaultAgents.list, historyHours: 48)
+            _ = try await provider.fetchAccountAndLocalUsage(agents: DefaultAgents.list, historyHours: 48)
             XCTFail("expected failure")
         } catch let error as ClaudeDataError {
             XCTAssertEqual(error, .engineFailed("boom\n"))
@@ -605,7 +605,7 @@ final class ClaudeCodeProviderTests: XCTestCase {
             history: QuotaHistoryStore(fileURL: nil)
         )
         do {
-            _ = try await provider.fetchUsage(agents: DefaultAgents.list, historyHours: 48)
+            _ = try await provider.fetchAccountAndLocalUsage(agents: DefaultAgents.list, historyHours: 48)
             XCTFail("expected failure")
         } catch let error as ClaudeDataError {
             XCTAssertEqual(error, .engineNotFound)

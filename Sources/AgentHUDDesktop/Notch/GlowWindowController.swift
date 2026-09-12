@@ -3,7 +3,7 @@ import QuartzCore
 import AgentHUDCore
 
 /// Click-through window that hosts the glow bitmap and the expanded panel's drop shadow.
-/// The window itself is oversized and static; only the layers inside move.
+/// The canvas spans the display height and stays fixed during expansion; only the layers inside move.
 @MainActor
 final class GlowWindowController {
     let panel: NotchPanel
@@ -18,7 +18,7 @@ final class GlowWindowController {
     private var shadowPadding: CGFloat = 0
     private var breathKey = ""
 
-    static let panelSize = CGSize(width: 1000, height: 720)
+    static let panelWidth: CGFloat = 1000
 
     init(geometry: NotchGeometry) {
         panel = NotchPanel(frame: Self.panelFrame(for: geometry), level: .statusBar, acceptsMouse: false)
@@ -39,10 +39,10 @@ final class GlowWindowController {
 
     static func panelFrame(for geometry: NotchGeometry) -> CGRect {
         CGRect(
-            x: geometry.centerX - panelSize.width / 2,
-            y: geometry.top - panelSize.height,
-            width: panelSize.width,
-            height: panelSize.height
+            x: geometry.centerX - panelWidth / 2,
+            y: geometry.screenFrame.minY,
+            width: panelWidth,
+            height: geometry.screenFrame.height
         )
     }
 

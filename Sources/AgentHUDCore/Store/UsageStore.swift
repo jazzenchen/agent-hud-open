@@ -44,6 +44,7 @@ public final class UsageStore {
     private let accessAllowed: () -> Bool
     private var pollTask: Task<Void, Never>?
     private var clockTask: Task<Void, Never>?
+    private var accountTask: Task<Void, Never>?
 
     public init(provider: any UsageProvider, settings: SettingsStore, accessAllowed: @escaping () -> Bool = { true }) {
         self.provider = provider
@@ -64,7 +65,7 @@ public final class UsageStore {
                 // While local logs are still being indexed, poll quickly so each step lands on screen.
                 let settings = self.settings.settings
                 // Completion reminders tail local logs promptly; provider quota/balance queries retain their own caches.
-                let interval = !self.settings.enabledAgents.isEmpty ? min(5, settings.pollInterval.rawValue) : settings.pollInterval.rawValue
+                let interval = min(5, settings.pollInterval.rawValue)
                 let seconds = self.isIndexing ? 2 : interval
                 try? await Task.sleep(for: .seconds(seconds))
             }
@@ -80,6 +81,7 @@ public final class UsageStore {
     public func stop() {
         pollTask?.cancel()
         clockTask?.cancel()
+        accountTask?.cancel()
         pollTask = nil
         clockTask = nil
     }
@@ -88,12 +90,18 @@ public final class UsageStore {
         guard isAccessAllowed, !isRefreshing else { return }
         if let pausedUntil, pausedUntil > Date() { return }
         pausedUntil = nil
+        if accountTask == nil {
+            accountTask = Task { [weak self, provider] in
+                await provider.refreshAccountUsage(historyHours: Self.historyHours)
+                self?.accountTask = nil
+            }
+        }
         isRefreshing = true
         defer { isRefreshing = false }
         do {
             let fetched = try await provider.fetchUsage(agents: settings.agents, historyHours: Self.historyHours)
             guard isAccessAllowed, !Task.isCancelled else { return }
-            settings.mergeDiscovered(fetched.discoveredAgents)
+            settings.mergeDiscovered(fetched.discoveredAgents, activeQuotaPoolIDs: fetched.activeQuotaPoolIDs)
             report = fetched
             lastError = nil
         } catch {
@@ -133,7 +141,13 @@ public final class UsageStore {
 
     // MARK: Derived
 
-    public var enabledAgents: [AgentDescriptor] { settings.enabledAgents }
+    public var enabledAgents: [AgentDescriptor] {
+        settings.enabledAgents.filter { agent in
+            guard let pool = agent.billingPool, pool.product == .plan else { return true }
+            guard let report else { return false }
+            return report.activeQuotaPoolIDs?[pool.provider]?.contains(pool.id) ?? true
+        }
+    }
 
     public var rows: [AgentRow] {
         enabledAgents.filter { !$0.isAPIBilled }.enumerated().map { index, agent in
@@ -208,7 +222,14 @@ public final class UsageStore {
     /// The most consumed window, shown in the menu bar.
     public var maxUsedPct: Double? { rows.compactMap(\.usedPct).max() }
 
-    public var sessions: [LiveSession] { report?.sessions ?? [] }
+    public var sessions: [LiveSession] {
+        let sessions = report?.sessions ?? []
+        return sessions.sorted {
+            let left = isSessionLive($0), right = isSessionLive($1)
+            if left != right { return left }
+            return ($0.endedAt ?? $0.startedAt) > ($1.endedAt ?? $1.startedAt)
+        }
+    }
 
     public func sessionSource(_ session: LiveSession) -> SessionSource {
         let vendor = consumers.first { $0.id == session.agentId }?.vendor
@@ -231,7 +252,30 @@ public final class UsageStore {
         return sessions.filter { $0.startedAt <= interval.end && ($0.endedAt ?? now) >= interval.start }
     }
 
-    public var liveSessions: [LiveSession] { sessions.filter(\.isLive) }
+    public func liveStatusEnabled(for session: LiveSession) -> Bool {
+        settings.settings.liveStatusEnabled(for: sessionSource(session).vendor ?? "")
+    }
+
+    public func isSessionLive(_ session: LiveSession) -> Bool {
+        session.isLive(at: now) && liveStatusEnabled(for: session)
+    }
+
+    public func sessionStatusLabel(_ session: LiveSession) -> String {
+        guard liveStatusEnabled(for: session) else { return L10n.text("状态同步已关闭", "Live status off") }
+        if session.isLive && !session.isLive(at: now) { return L10n.text("状态待更新", "Status out of date") }
+        return Countdown.sessionLabel(session, now: now)
+    }
+
+    public var liveSessions: [LiveSession] { sessions.filter(isSessionLive) }
+
+    /// Keep every running session and the most recent session from each client visible.
+    public func sessionPreview(from sessions: [LiveSession]) -> [LiveSession] {
+        var seen = Set<SessionSource>()
+        return sessions.filter { session in
+            let first = seen.insert(sessionSource(session)).inserted
+            return isSessionLive(session) || first
+        }
+    }
 
     public var hasLiveSession: Bool { !liveSessions.isEmpty }
 

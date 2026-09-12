@@ -19,6 +19,14 @@ public struct CombinedUsageProvider: UsageProvider {
           + [Source("Open agents", OpenAgentUsageProvider.standard())])
     }
 
+    public func refreshAccountUsage(historyHours: Int) async {
+        await withTaskGroup(of: Void.self) { group in
+            for source in sources {
+                group.addTask { await source.provider.refreshAccountUsage(historyHours: historyHours) }
+            }
+        }
+    }
+
     public func fetchUsage(agents: [AgentDescriptor], historyHours: Int) async throws -> UsageReport {
         let results = await withTaskGroup(of: (Int, UsageReport?, String?).self) { group in
             for (index, source) in sources.enumerated() {
@@ -68,7 +76,10 @@ public struct CombinedUsageProvider: UsageProvider {
                            codexResetCreditsObservedAt: reports.first { $0.codexResetCredits != nil }?.codexResetCreditsObservedAt,
                            completions: reports.flatMap(\.completions),
                            claudeConsumptionSince: reports.compactMap(\.claudeConsumptionSince).min(),
-                           turns: reports.flatMap(\.turns), services: AgentService.merge(reports.map { $0.services ?? [] }))
+                           turns: reports.flatMap(\.turns), services: AgentService.merge(reports.map { $0.services ?? [] }),
+                           activeQuotaPoolIDs: reports.compactMap(\.activeQuotaPoolIDs).reduce(into: [String: Set<String>]()) {
+                               $0.merge($1, uniquingKeysWith: { $0.union($1) })
+                           })
     }
     static func mergeBilling(_ values: [APIBilling]) -> [APIBilling] {
         Dictionary(grouping: values, by: \.id).values.compactMap { observations in

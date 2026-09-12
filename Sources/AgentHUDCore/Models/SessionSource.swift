@@ -2,6 +2,11 @@ import Foundation
 
 /// Display grouping for provider-owned client metadata, independent of invocation mode.
 public struct SessionSource: Hashable, Sendable {
+    /// Execution clients, independent of billing services and the models used inside each client.
+    public static let agentVendors = ["Claude", "Codex", "DeepSeek"]
+        + AdditionalSource.allCases.map(\.vendor)
+        + OpenAgentSource.allCases.filter { $0 != .glm }.map(\.name)
+
     public let vendor: String?
     private let client: String?
 

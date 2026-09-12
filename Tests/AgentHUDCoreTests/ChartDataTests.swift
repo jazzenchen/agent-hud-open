@@ -16,7 +16,7 @@ final class ChartDataTests: XCTestCase {
         HistorySample(agentId: agent, hourStart: Date(timeIntervalSince1970: Double(hour) * 3600), remainingStart: start, remainingEnd: end, tokens: tokens)
     }
 
-    private func event(_ agent: String, seconds: Double, tokens: Int) -> TranscriptSession.UsageEvent {
+    private func event(_ agent: String, seconds: Double, tokens: Int) -> UsageEvent {
         .init(timestamp: Date(timeIntervalSince1970: seconds), agentId: agent, tokensIn: tokens, tokensOut: 0)
     }
 

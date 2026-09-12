@@ -33,6 +33,11 @@ struct StatsView: View {
 
     private func content(_ theme: Theme) -> some View {
         VStack(alignment: .leading, spacing: 12) {
+            if let error = store.lastError {
+                Text(L10n.text("刷新失败：", "Refresh failed: ") + error)
+                    .font(.ui(12)).foregroundStyle(theme.secondary)
+                    .textSelection(.enabled)
+            }
             UsageChartsCard(store: store, theme: theme)
             MetricCards(store: store, theme: theme)
             LiveSessionsCard(store: store, theme: theme)

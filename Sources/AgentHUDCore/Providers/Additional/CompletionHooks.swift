@@ -85,11 +85,17 @@ public enum CompletionHooks {
     }
 
     public static func configure(_ source: Source, enabled: Bool, executable: URL,
-                                 home: URL = FileManager.default.homeDirectoryForCurrentUser) throws {
+                                 home: URL = FileManager.default.homeDirectoryForCurrentUser,
+                                 replacingExisting: Bool = false) throws {
         var object = try configuration(source, home: home)
         let original = object
         let quoted = "'" + executable.path.replacingOccurrences(of: "'", with: "'\\''") + "'"
         let command = ProviderJSON.string(quoted + " --completion-hook " + source.rawValue)
+        let existing = source == .antigravity ? object["agent-hud"]?["Stop"].arrayValue ?? []
+            : (object["hooks"]?["stop"].arrayValue ?? []).filter(ownsCursorHandler)
+        if !replacingExisting && existing.contains(where: { $0["command"] != command }) {
+            throw UsageProviderError(L10n.text("完成回调由另一安装管理，请手动重新安装以切换", "Completion hook belongs to another installation; reinstall it explicitly to switch"))
+        }
         if source == .antigravity {
             object["agent-hud"] = enabled ? .object(["Stop": .array([.object([
                 "type": .string("command"), "command": command, "timeout": .integer(5)

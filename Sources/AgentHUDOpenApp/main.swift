@@ -25,6 +25,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if options.probe {
             Task { @MainActor in
                 do {
+                    await provider.refreshAccountUsage(historyHours: 48)
                     let report = try await provider.fetchUsage(agents: settings.agents, historyHours: 48)
                     print("Quota windows: \(report.snapshots.count); sessions: \(report.sessions.count); live: \(report.sessions.filter(\.isLive).count); billing accounts: \(report.billing.count)")
                     exit(0)
@@ -39,6 +40,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             : AppSupport.directory.appendingPathComponent("last-usage-report.json"))
         let store = UsageStore(provider: retained, settings: settings)
         if let report = retained.initialReport { store.replace(report: report) }
+        if !options.demo, let executable = Bundle.main.executableURL {
+            SessionObservers.configure(executable: executable)
+        }
         let desktop = DesktopApplication(options: options, settings: settings, store: store)
         self.desktop = desktop
         desktop.start()
@@ -46,6 +50,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
     func applicationWillTerminate(_ notification: Notification) { desktop?.stop() }
+}
+
+if CommandLine.arguments.contains("--install-pi-observer") {
+    do {
+        try PiSessionObserver.configure(enabled: true)
+        print("Pi session observer installed. Run /reload in existing Pi sessions.")
+        exit(0)
+    } catch {
+        FileHandle.standardError.write(Data("Could not install Pi session observer: \(error.localizedDescription)\n".utf8))
+        exit(1)
+    }
 }
 
 if CommandLine.arguments.contains("--probe-open-agents") {
@@ -71,7 +86,7 @@ if CommandLine.arguments.count == 3, CommandLine.arguments[1] == "--install-comp
    let source = CompletionHooks.Source(rawValue: CommandLine.arguments[2]) {
     do {
         try CompletionHooks.configure(source, enabled: true,
-            executable: URL(fileURLWithPath: CommandLine.arguments[0]).standardizedFileURL)
+            executable: URL(fileURLWithPath: CommandLine.arguments[0]).standardizedFileURL, replacingExisting: true)
         print("Completion hook installed: \(source.rawValue)")
         exit(0)
     } catch {

@@ -45,14 +45,22 @@ public struct ClaudeCodeProvider: UsageProvider {
         )
     }
 
+    public func refreshAccountUsage(historyHours: Int) async {
+        let now = clock()
+        do {
+            let (result, fetchedAt, fresh) = try await engineCache.fetch(client: engine, now: now, minimumInterval: Self.engineMinimumInterval)
+            if fresh {
+                await history.append(result.usage.rows.map {
+                    QuotaSample(agentId: $0.id, timestamp: fetchedAt, remainingPct: $0.window.remainingPct)
+                }, now: now)
+            }
+        } catch { /* The cached result carries the account error into the next local report. */ }
+    }
+
     public func fetchUsage(agents: [AgentDescriptor], historyHours: Int) async throws -> UsageReport {
         let now = clock()
         let weekAgo = now.addingTimeInterval(-7 * 86400)
         let cutoff = min(weekAgo, now.addingTimeInterval(-TimeInterval(historyHours) * 3600))
-
-        // 0. Kick off the engine query (a spawned process) while local logs are indexed.
-        let engineCache = engineCache
-        async let engineResult = engineCache.fetch(client: engine, now: now, minimumInterval: Self.engineMinimumInterval)
 
         // Local data: one cooperative indexing step (newest files first); the rest continues on later polls.
         let indexed = await transcripts.index(modifiedSince: cutoff)
@@ -70,17 +78,16 @@ public struct ClaudeCodeProvider: UsageProvider {
         var usage: ClaudeUsage?
         var notice: String?
         var updatedAt = now
-        var fresh = false
         do {
-            let (result, fetchedAt, isFresh) = try await engineResult
-            subscription = result.subscriptionType
-            updatedAt = fetchedAt
-            fresh = isFresh
-            if result.rateLimitsAvailable {
-                // Keep the engine's observation intact. A deadline passing is not a confirmed reset.
-                usage = result.usage
-            } else {
-                notice = ClaudeDataError.planLimitsUnavailable.errorDescription
+            if let (result, fetchedAt) = try await engineCache.reading() {
+                subscription = result.subscriptionType
+                updatedAt = fetchedAt
+                if result.rateLimitsAvailable {
+                    // Keep the engine's observation intact. A deadline passing is not a confirmed reset.
+                    usage = result.usage
+                } else {
+                    notice = ClaudeDataError.planLimitsUnavailable.errorDescription
+                }
             }
         } catch is CancellationError {
             throw CancellationError()
@@ -95,7 +102,6 @@ public struct ClaudeCodeProvider: UsageProvider {
         let windowRows = usage?.rows ?? []
         let discovered = windowRows.map(\.descriptor)
         var snapshots: [UsageSnapshot] = []
-        var newSamples: [QuotaSample] = []
         for row in windowRows {
             snapshots.append(UsageSnapshot(
                 agentId: row.id,
@@ -106,10 +112,7 @@ public struct ClaudeCodeProvider: UsageProvider {
                 weeklyResetAt: usage?.sevenDay?.resetsAt,
                 updatedAt: updatedAt
             ))
-            newSamples.append(QuotaSample(agentId: row.id, timestamp: updatedAt, remainingPct: row.window.remainingPct))
         }
-        // One sample per engine observation; the frequent completion polls reuse the cached reading.
-        if fresh { await history.append(newSamples, now: now) }
 
         // 3. Hourly history: remaining % per window row, tokens per consumer.
         let quotaSince = now.addingTimeInterval(-TimeInterval(historyHours + 1) * 3600)
@@ -155,7 +158,7 @@ public struct ClaudeCodeProvider: UsageProvider {
                 tokensOut: session.tokensOut,
                 client: ClaudeEntrypoint.clientLabel(session.entrypoint),
                 transcriptPath: session.path,
-                cacheReadTokens: session.cacheReadTokens
+                cacheReadTokens: session.cacheReadTokens, observedAt: now
             )
         }
 
@@ -226,14 +229,21 @@ public struct ClaudeCodeProvider: UsageProvider {
 actor EngineUsageCache {
     private var last: (at: Date, result: Result<ClaudeEngineUsage, any Error>)?
 
+    func reading() throws -> (ClaudeEngineUsage, Date)? {
+        guard let last else { return nil }
+        return (try last.result.get(), last.at)
+    }
+
     /// `fresh` is false when the reading comes from the cache rather than a new engine query.
     func fetch(client: ClaudeEngineUsageClient?, now: Date, minimumInterval: TimeInterval) async throws -> (ClaudeEngineUsage, Date, fresh: Bool) {
-        guard let client else { throw ClaudeDataError.engineNotFound }
         if let last, now.timeIntervalSince(last.at) < minimumInterval {
             return (try last.result.get(), last.at, false)
         }
         let result: Result<ClaudeEngineUsage, any Error>
-        do { result = .success(try await client.fetch()) }
+        do {
+            guard let client else { throw ClaudeDataError.engineNotFound }
+            result = .success(try await client.fetch())
+        }
         catch {
             try Task.checkCancellation()
             result = .failure(error)

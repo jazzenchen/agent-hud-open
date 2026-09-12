@@ -40,8 +40,69 @@ final class RetainedUsageProviderTests: XCTestCase {
         _ = try await first.fetchUsage(agents: [], historyHours: 24)
         let restarted = RetainedUsageProvider(provider: SequenceProvider([]), cacheURL: file)
         XCTAssertEqual(restarted.initialReport, good)
-        let offline = try await restarted.fetchUsage(agents: [], historyHours: 24)
-        XCTAssertEqual(offline, good)
+        do {
+            _ = try await restarted.fetchUsage(agents: [], historyHours: 24)
+            XCTFail("A cached report must not turn a failed refresh into success")
+        } catch { XCTAssertEqual(error.localizedDescription, "offline") }
+        XCTAssertEqual(restarted.initialReport, good)
+    }
+
+    func testOfflineRestartPreservesCachedPlansAndTokenHistory() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let file = directory.appendingPathComponent("report.json")
+        let pool = OpenAgentCredentials.credential(.kimi, token: "fixture-key", client: "Pi").pool
+        let id = pool.windowID("weekly")
+        let usage = UsageEvent(timestamp: now, agentId: "pi-model", tokensIn: 10, tokensOut: 20)
+        let saved = UsageReport(generatedAt: now, snapshots: [.init(agentId: id, remainingPct: 90, updatedAt: now)],
+            sessions: [], history: [], activity: .empty, insights: .empty,
+            discoveredAgents: [.init(id: id, vendor: "Kimi", model: "7d", source: "Pi", enabled: true, billingPool: pool)],
+            consumers: [.init(id: "pi-model", vendor: "Pi", model: "model", source: "local", enabled: true)],
+            consumption: [usage], subscriptions: [pool.id: "Allegretto"],
+            services: [.init(client: "Pi", provider: "Kimi", product: .plan, accountID: pool.id)])
+        try JSONEncoder().encode(saved).write(to: file)
+        let restarted = RetainedUsageProvider(provider: SequenceProvider([]), cacheURL: file)
+        XCTAssertEqual(restarted.initialReport, saved)
+    }
+
+    @MainActor
+    func testFailedRefreshKeepsVisibleReadingsAndExposesTheError() async {
+        let suite = "RetainedUsageTests.\(UUID())", defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let good = report(at: now, remaining: 64, balance: 12, credits: 2)
+        let provider = RetainedUsageProvider(provider: SequenceProvider([good]))
+        let store = UsageStore(provider: provider, settings: SettingsStore(defaults: defaults))
+        await store.refresh()
+        await store.refresh()
+        XCTAssertEqual(store.report, good)
+        XCTAssertEqual(store.lastError, "offline")
+        store.stop()
+    }
+
+    @MainActor
+    func testRetainedSessionDoesNotBecomeFreshWhenAnotherSourceUpdates() async throws {
+        let current = Date(), old = current.addingTimeInterval(-86400)
+        let agent = AgentDescriptor(id: "pi-model:test", vendor: "Pi", model: "test", source: "local", enabled: true)
+        let session = LiveSession(id: "pi:old", agentId: agent.id, task: "old task", terminal: nil,
+            startedAt: old, pctOfWindow: nil, tokensIn: 10, tokensOut: 2, observedAt: old)
+        let previous = UsageReport(generatedAt: old, snapshots: [], sessions: [session], history: [],
+            activity: .empty, insights: .empty, consumers: [agent])
+        let incoming = UsageReport(generatedAt: current, snapshots: [], sessions: [], history: [],
+            activity: .empty, insights: .empty, sourceNotices: ["Pi": "local read failed"])
+        let provider = RetainedUsageProvider(provider: SequenceProvider([previous, incoming]))
+        _ = try await provider.fetchUsage(agents: [], historyHours: 24)
+        let retained = try await provider.fetchUsage(agents: [], historyHours: 24)
+        XCTAssertEqual(retained.sessions, [session])
+        XCTAssertNil(retained.sessions.first?.endedAt, "Failure is not an observed completion")
+        XCTAssertEqual(try JSONDecoder().decode(UsageReport.self, from: JSONEncoder().encode(retained)).sessions, [session])
+        let suite = "StaleSessionTests.\(UUID())", defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let store = UsageStore(provider: provider, settings: SettingsStore(defaults: defaults))
+        store.replace(report: retained)
+        XCTAssertEqual(store.sessions.count, 1)
+        XCTAssertFalse(store.hasLiveSession)
+        XCTAssertEqual(store.sessionStatusLabel(session), L10n.text("状态待更新", "Status out of date"))
     }
 
     private func report(at date: Date, remaining: Double?, balance: Decimal?, credits: Int?) -> UsageReport {

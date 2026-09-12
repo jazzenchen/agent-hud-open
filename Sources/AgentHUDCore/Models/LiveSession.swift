@@ -8,6 +8,8 @@ public struct LiveSession: Hashable, Codable, Sendable, Identifiable {
     public let terminal: String?
     public let startedAt: Date
     public let endedAt: Date?
+    /// When the provider last checked this session's activity. Cache reads do not advance it.
+    public let observedAt: Date
     /// Share of the current quota window consumed by this session, in %.
     public let pctOfWindow: Double?
     public let tokensIn: Int
@@ -30,7 +32,8 @@ public struct LiveSession: Hashable, Codable, Sendable, Identifiable {
         client: String? = nil,
         transcriptPath: String? = nil,
         cacheReadTokens: Int = 0,
-        accountWide: Bool = false
+        accountWide: Bool = false,
+        observedAt: Date? = nil
     ) {
         self.id = id
         self.agentId = agentId
@@ -38,6 +41,7 @@ public struct LiveSession: Hashable, Codable, Sendable, Identifiable {
         self.terminal = terminal
         self.startedAt = startedAt
         self.endedAt = endedAt
+        self.observedAt = observedAt ?? endedAt ?? startedAt
         self.pctOfWindow = pctOfWindow
         self.tokensIn = tokensIn
         self.tokensOut = tokensOut
@@ -49,8 +53,12 @@ public struct LiveSession: Hashable, Codable, Sendable, Identifiable {
 
     public var isLive: Bool { endedAt == nil }
 
+    public func isLive(at now: Date) -> Bool {
+        isLive && now.timeIntervalSince(observedAt) < 120
+    }
+
     private enum CodingKeys: String, CodingKey {
-        case id, agentId, task, terminal, startedAt, endedAt, pctOfWindow, tokensIn, tokensOut, client, transcriptPath, cacheReadTokens, accountWide
+        case id, agentId, task, terminal, startedAt, endedAt, observedAt, pctOfWindow, tokensIn, tokensOut, client, transcriptPath, cacheReadTokens, accountWide
     }
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -61,7 +69,8 @@ public struct LiveSession: Hashable, Codable, Sendable, Identifiable {
             tokensOut: try c.decode(Int.self, forKey: .tokensOut), client: try c.decodeIfPresent(String.self, forKey: .client),
             transcriptPath: try c.decodeIfPresent(String.self, forKey: .transcriptPath),
             cacheReadTokens: try c.decodeIfPresent(Int.self, forKey: .cacheReadTokens) ?? 0,
-            accountWide: try c.decodeIfPresent(Bool.self, forKey: .accountWide) ?? false)
+            accountWide: try c.decodeIfPresent(Bool.self, forKey: .accountWide) ?? false,
+            observedAt: try c.decodeIfPresent(Date.self, forKey: .observedAt))
     }
 
     public func duration(now: Date) -> TimeInterval {

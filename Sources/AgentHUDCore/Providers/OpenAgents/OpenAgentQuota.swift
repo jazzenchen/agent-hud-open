@@ -12,21 +12,24 @@ struct OpenAgentQuotaClient: Sendable {
     }
     /// The official profile proves account identity across API keys and CLI OAuth tokens.
     /// Identity failure leaves credential-scoped quota available, without guessing a shared account.
-    func identify(_ credential: OpenAgentCredential) async -> OpenAgentCredential {
+    func identify(_ credential: OpenAgentCredential) async throws -> OpenAgentCredential {
         guard credential.service == .kimi || credential.service == .kimiGlobal else { return credential }
         var headers = credential.headers
         headers["Authorization"] = "Bearer \(credential.token)"
         let url = credential.endpoint.deletingLastPathComponent().appendingPathComponent("me")
-        guard let profile = try? await http.json(url, headers: headers, timeout: 2),
-              let account = profile["user_id"].stringValue, !account.isEmpty,
-              let domain = profile["domain"].countValue,
-              let region = profile["region"].stringValue, !region.isEmpty else { return credential }
+        let profile = try await http.json(url, headers: headers, timeout: 8)
+        // Live /me responses can omit domain; the official profile parser defaults it to 0.
+        let domain = profile["domain"] == .null ? 0
+            : profile["domain"].countValue ?? profile["domain"].stringValue.flatMap(Int.init)
+        guard let account = profile["user_id"].stringValue, !account.isEmpty,
+              let domain, domain >= 0,
+              let region = profile["region"].stringValue, !region.isEmpty else { throw ProviderFailure.format }
         let pool = credential.pool
         return .init(service: credential.service, token: credential.token,
             pool: BillingPool(provider: pool.provider, realm: pool.realm, product: pool.product,
                 scope: RecordCoding.hash([account, String(domain), region]), evidence: .account,
                 organization: pool.organization, project: pool.project, entitlement: pool.entitlement),
-            headers: credential.headers, clients: credential.clients)
+            headers: credential.headers, clients: credential.clients, expiresAt: credential.expiresAt)
     }
 
     static func numeric(_ value: ProviderJSON) -> Double? {

@@ -57,15 +57,15 @@ public enum DemoData {
     public static func sessions(now: Date) -> [LiveSession] {
         [
             LiveSession(id: "s1", agentId: "claude-opus", task: "fix auth bug in middleware", terminal: "iTerm",
-                        startedAt: now.addingTimeInterval(-27 * 60), pctOfWindow: 6.2, tokensIn: 48_000, tokensOut: 12_000, cacheReadTokens: 96_000),
+                        startedAt: now.addingTimeInterval(-27 * 60), pctOfWindow: 6.2, tokensIn: 48_000, tokensOut: 12_000, cacheReadTokens: 96_000, observedAt: now),
             LiveSession(id: "s2", agentId: "codex", task: "backend server endpoints", terminal: "Terminal",
-                        startedAt: now.addingTimeInterval(-64 * 60), pctOfWindow: 3.8, tokensIn: 31_000, tokensOut: 9_000, cacheReadTokens: 62_000),
+                        startedAt: now.addingTimeInterval(-64 * 60), pctOfWindow: 3.8, tokensIn: 31_000, tokensOut: 9_000, cacheReadTokens: 62_000, observedAt: now),
             LiveSession(id: "s3", agentId: "claude-sonnet", task: "optimize db queries", terminal: "Ghostty",
                         startedAt: now.addingTimeInterval(-140 * 60), endedAt: now.addingTimeInterval(-51 * 60),
                         pctOfWindow: 2.1, tokensIn: 19_000, tokensOut: 4_000, cacheReadTokens: 38_000),
             LiveSession(id: "s4", agentId: "chatgpt", task: L10n.text("桌面版 · 3 段对话", "Desktop · 3 conversations"), terminal: nil,
                         startedAt: now.addingTimeInterval(-200 * 60), endedAt: now.addingTimeInterval(-120 * 60),
-                        pctOfWindow: 4.5, tokensIn: 0, tokensOut: 0),
+                        pctOfWindow: 4.5, tokensIn: 0, tokensOut: 0, observedAt: now),
         ]
     }
 

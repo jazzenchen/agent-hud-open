@@ -22,9 +22,8 @@ struct TokenConsumptionChart: View {
 
     var body: some View {
         let columns = store.tokenColumns
-        let legendConsumers = store.consumers.enumerated().filter { index, _ in
-            columns.contains { $0.tokens[index] > 0 }
-        }.map(\.element)
+        let totals = store.consumers.indices.map { index in columns.reduce(0) { $0 + $1.tokens[index] } }
+        let legendConsumers = store.consumers.enumerated().filter { totals[$0.offset] > 0 }
         VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .firstTextBaseline) {
                 Text(L10n.text("Token 消耗", "Tokens"))
@@ -42,9 +41,9 @@ struct TokenConsumptionChart: View {
                 }
             }
             if !legendConsumers.isEmpty {
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 145), alignment: .leading)], alignment: .leading, spacing: 6) {
-                    ForEach(legendConsumers) { consumer in
-                        legendLabel(consumer)
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 190), alignment: .leading)], alignment: .leading, spacing: 6) {
+                    ForEach(legendConsumers, id: \.element.id) { index, consumer in
+                        legendLabel(consumer, tokens: totals[index])
                     }
                 }
                 .font(.ui(11))
@@ -71,15 +70,17 @@ struct TokenConsumptionChart: View {
         }
     }
 
-    private func legendLabel(_ consumer: AgentDescriptor) -> some View {
+    private func legendLabel(_ consumer: AgentDescriptor, tokens: Int) -> some View {
         HStack(spacing: 5) {
             Circle().fill(AgentPalette.swiftUIColor(index: store.consumerPaletteIndex(consumer.id))).frame(width: 7, height: 7)
             AgentLogo(vendor: consumer.vendor, size: 12)
             Text(L10n.modelLabel(consumer.model))
                 .lineLimit(1)
+            Spacer(minLength: 4)
+            Text(TokenFormat.short(tokens)).font(.tabular(11)).fixedSize()
         }
-        .accessibilityLabel(consumer.displayName)
-        .help(consumer.displayName)
+        .accessibilityLabel("\(consumer.displayName): \(tokens.formatted()) tokens")
+        .help("\(consumer.displayName): \(tokens.formatted()) tokens")
     }
 
     private var barColors: [Color] {

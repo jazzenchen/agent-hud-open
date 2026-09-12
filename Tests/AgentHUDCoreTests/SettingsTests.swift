@@ -272,7 +272,7 @@ final class UsageStoreTests: XCTestCase {
         let store = makeStore()
         let hour = Calendar.current.dateInterval(of: .hour, for: Date())!.start
         let consumption = [("claude-opus", 100), ("codex", 200), ("antigravity", 900)].map { id, tokens in
-            TranscriptSession.UsageEvent(timestamp: hour, agentId: id, tokensIn: tokens, tokensOut: 0)
+            UsageEvent(timestamp: hour, agentId: id, tokensIn: tokens, tokensOut: 0)
         }
         store.replace(report: UsageReport(generatedAt: Date(), snapshots: [], sessions: [], history: [],
             activity: .empty, insights: .empty, consumers: DemoData.agents, consumption: consumption))
@@ -387,7 +387,7 @@ final class UsageStoreTests: XCTestCase {
             LiveSession(id: id, agentId: "codex", task: id, terminal: nil,
                         startedAt: now.addingTimeInterval(-startedHoursAgo * 3600),
                         endedAt: endedHoursAgo.map { now.addingTimeInterval(-$0 * 3600) },
-                        pctOfWindow: nil, tokensIn: 0, tokensOut: 0)
+                        pctOfWindow: nil, tokensIn: 0, tokensOut: 0, observedAt: now)
         }
         store.replace(report: UsageReport(generatedAt: now, snapshots: [], sessions: [
             session("running", startedHoursAgo: 240),

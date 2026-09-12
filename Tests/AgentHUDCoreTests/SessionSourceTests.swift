@@ -2,6 +2,21 @@ import XCTest
 @testable import AgentHUDCore
 
 final class SessionSourceTests: XCTestCase {
+    @MainActor
+    func testPreviewIncludesPiBehindThreeClientsAndEveryRunningSession() {
+        let defaults = UserDefaults(suiteName: "AgentHUDPreviewTests.\(UUID())")!
+        let store = UsageStore(provider: DemoUsageProvider(), settings: SettingsStore(defaults: defaults))
+        let now = Date()
+        func session(_ id: String, _ source: String, live: Bool = false) -> LiveSession {
+            .init(id: id, agentId: "\(source.lowercased())-model:test", task: source, terminal: nil,
+                startedAt: now, endedAt: live ? nil : now, pctOfWindow: nil, tokensIn: 2262, tokensOut: 35, client: source)
+        }
+        let sessions = [session("claude", "Claude"), session("codex", "Codex"), session("dsh", "DeepSeek"),
+                        session("pi", "Pi"), session("old-pi", "Pi"), session("running-pi", "Pi", live: true)]
+        XCTAssertEqual(store.sessionPreview(from: sessions).map(\.id), ["claude", "codex", "dsh", "pi", "running-pi"])
+        XCTAssertEqual(store.sessionPreview(from: sessions.filter { $0.client == "Pi" }).map(\.id), ["pi", "running-pi"])
+    }
+
     func testCodexClientGroupsPreserveProviderAndUnknownSurface() {
         let cli = SessionSource(vendor: "Codex", client: "CLI")
         XCTAssertEqual(cli, SessionSource(vendor: "Codex", client: "CLI · exec"))

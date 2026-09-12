@@ -22,6 +22,7 @@ struct OpenAgentPaths: Sendable {
     let environment: [String: String]
     var openCode: URL { URL(fileURLWithPath: environment["XDG_DATA_HOME"] ?? home.appendingPathComponent(".local/share").path).appendingPathComponent("opencode") }
     var pi: URL { URL(fileURLWithPath: environment["PI_CODING_AGENT_DIR"] ?? home.appendingPathComponent(".pi/agent").path) }
+    var piTurns: URL { pi.appendingPathComponent("agent-hud/turns") }
     var kimi: URL { URL(fileURLWithPath: environment["KIMI_CODE_HOME"] ?? home.appendingPathComponent(".kimi-code").path) }
     func roots(for source: OpenAgentSource) -> [URL] {
         switch source {
@@ -39,18 +40,25 @@ struct OpenAgentSession: Sendable {
     var title: String
     var workspace: String?
     var path: String
-    var events: [TranscriptSession.UsageEvent] = []
+    var events: [UsageEvent] = []
     var models: [String: String] = [:]
+    var currentModel: (id: String, name: String, provider: String)?
     var start: Date?
     var end: Date?
     var turns: [SessionTurn] = []
     var completions: [SessionCompletion] = []
 
+    mutating func setModel(_ model: String, provider: String) {
+        let id = "\(client.rawValue)-model:" + RecordCoding.hash([provider, model])
+        models[id] = model
+        currentModel = (id, model, provider)
+    }
+
     mutating func add(id eventID: String, model: String, provider: String, at: Date, input: Int, output: Int,
                       cacheRead: Int, estimate: Decimal? = nil) throws {
         _ = try OpenAgentParser.sum(input, output, cacheRead)
-        let consumer = "\(client.rawValue)-model:" + RecordCoding.hash([provider, model])
-        models[consumer] = model
+        setModel(model, provider: provider)
+        let consumer = currentModel!.id
         events.append(.init(timestamp: at, agentId: consumer, tokensIn: input, tokensOut: output,
             cacheReadTokens: cacheRead, eventID: eventID,
             attribution: .init(client: client.name, providerID: provider, estimatedUSD: estimate)))
@@ -99,6 +107,10 @@ enum OpenAgentParser {
             }
             guard session != nil else { return }
             if type == "session_info", let name = line["name"].stringValue { session?.title = name; return }
+            if type == "model_change", let model = line["modelId"].stringValue, let provider = line["provider"].stringValue {
+                session?.setModel(model, provider: provider)
+                return
+            }
             let message = line["message"]
             guard type == "message", message["role"].stringValue == "assistant", message["usage"].objectValue != nil else { return }
             guard let at = ProviderDate.iso(line["timestamp"].stringValue) ?? ProviderDate.milliseconds(message["timestamp"]) else { throw ProviderFailure.format }

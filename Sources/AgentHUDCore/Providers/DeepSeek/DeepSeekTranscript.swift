@@ -12,7 +12,7 @@ public struct DeepSeekTranscript: Codable, Sendable {
         public let cachedInput: Int
         public let output: Int
 
-        public var event: TranscriptSession.UsageEvent {
+        public var event: UsageEvent {
             .init(timestamp: timestamp, agentId: "deepseek-model:\(model)", tokensIn: input, tokensOut: output, cacheReadTokens: cachedInput)
         }
     }

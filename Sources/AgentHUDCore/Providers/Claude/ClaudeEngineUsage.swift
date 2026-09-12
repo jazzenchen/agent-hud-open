@@ -105,9 +105,14 @@ public struct ClaudeEngineUsageClient: Sendable {
         let executable = executable
         let cwd = workingDirectory
         let timeout = timeout
-        return try await Task.detached(priority: .utility) {
+        let worker = Task.detached(priority: .utility) {
             try Self.run(executable: executable, cwd: cwd, timeout: timeout)
-        }.value
+        }
+        return try await withTaskCancellationHandler {
+            try await worker.value
+        } onCancel: {
+            worker.cancel()
+        }
     }
 
     private static func run(executable: URL, cwd: URL, timeout: TimeInterval) throws -> ClaudeEngineUsage {

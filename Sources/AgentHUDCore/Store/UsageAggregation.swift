@@ -19,7 +19,7 @@ public enum UsageAggregation {
     }
 
     /// Cache reads enrich an existing usage observation; they do not create another input/output event.
-    public static func usageUnion(_ sources: [[TranscriptSession.UsageEvent]]) -> [TranscriptSession.UsageEvent] {
+    public static func usageUnion(_ sources: [[UsageEvent]]) -> [UsageEvent] {
         var priorities: [String: Int] = [:]
         for event in sources.flatMap({ $0 }) {
             if let origin = event.origin { priorities[origin.group] = max(priorities[origin.group] ?? origin.priority, origin.priority) }
@@ -35,7 +35,7 @@ public enum UsageAggregation {
         let sources = [identified] + preferred.map { $0.filter { $0.eventID == nil } }
         struct Key: Hashable { let timestamp: Date; let agent: String; let input: Int; let output: Int; let attribution: UsageAttribution? }
         var positions: [Key: [Int]] = [:]
-        var result: [TranscriptSession.UsageEvent] = []
+        var result: [UsageEvent] = []
         for source in sources {
             let groups = Dictionary(grouping: source) { Key(timestamp: $0.timestamp, agent: $0.agentId, input: $0.tokensIn, output: $0.tokensOut, attribution: $0.attribution) }
             for (key, events) in groups {

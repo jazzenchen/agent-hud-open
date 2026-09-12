@@ -9,8 +9,14 @@ public struct AgentSettingsGroup: Identifiable, Equatable, Sendable {
     public let apiProviders: [String]
 
     public var displayedCount: Int { agents.filter(\.enabled).count }
+    public var hasLiveStatus: Bool { SessionSource.agentVendors.contains(id) }
 
     public static func make(sources: [SourceStatus], agents: [AgentDescriptor], report: UsageReport? = nil) -> [Self] {
+        let agents = agents.filter { agent in
+            guard let pool = agent.billingPool, pool.product == .plan,
+                  let active = report?.activeQuotaPoolIDs?[pool.provider] else { return true }
+            return active.contains(pool.id)
+        }
         func vendor(_ source: SourceStatus) -> String {
             source.id == "chatgpt" ? "ChatGPT" : source.name
         }

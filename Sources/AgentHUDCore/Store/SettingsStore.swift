@@ -86,10 +86,14 @@ public final class SettingsStore {
     /// Adds rows a provider discovered (in the order given) and refreshes model names of known rows.
     /// New rows for a vendor go right after that vendor's last existing row, or at the top when the vendor is new,
     /// so the user's manual order is preserved.
-    public func mergeDiscovered(_ discovered: [AgentDescriptor]) {
-        guard !discovered.isEmpty else { return }
+    public func mergeDiscovered(_ discovered: [AgentDescriptor], activeQuotaPoolIDs: [String: Set<String>]? = nil) {
+        guard !discovered.isEmpty || activeQuotaPoolIDs != nil else { return }
         let merged: [AgentDescriptor] = {
-            var list = agents
+            var list = agents.filter { agent in
+                guard let pool = agent.billingPool, pool.product == .plan,
+                      let active = activeQuotaPoolIDs?[pool.provider] else { return true }
+                return active.contains(pool.id)
+            }
             if discovered.contains(where: { $0.vendor == "DeepSeek" && $0.id.hasPrefix("deepseek-model:") }),
                let index = list.firstIndex(where: { $0.id == "deepseek" }) {
                 let placeholder = list.remove(at: index)

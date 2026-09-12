@@ -9,6 +9,8 @@ struct OpenAgentCredential: Sendable {
     let pool: BillingPool
     var headers: [String: String] = [:]
     var clients: Set<String> = []
+    var expiresAt: Date? = nil
+    func isUsable(at now: Date) -> Bool { expiresAt.map { $0 > now.addingTimeInterval(60) } ?? true }
     var endpoint: URL {
         switch service {
         case .kimi: URL(string: "https://api.kimi.com/coding/v1/usages")!
@@ -54,7 +56,7 @@ enum OpenAgentCredentials {
     }
     static func credential(_ service: OpenAgentCredential.Service, token: String, client: String,
                            accountID: String? = nil, organization: String? = nil, project: String? = nil,
-                           headers: [String: String] = [:]) -> OpenAgentCredential {
+                           headers: [String: String] = [:], expiresAt: Date? = nil) -> OpenAgentCredential {
         let isKimi = service == .kimi || service == .kimiGlobal
         let provider = isKimi ? "Kimi" : service == .go ? "OpenCode Go" : "GLM"
         let realm = service == .glmChina || service == .kimi ? "CN" : "International"
@@ -62,16 +64,29 @@ enum OpenAgentCredentials {
         let pool = BillingPool(provider: provider, realm: realm, product: .plan,
             scope: RecordCoding.hash([accountID ?? token]), evidence: accountID == nil ? .credential : .account,
             organization: organization.map { RecordCoding.hash([$0]) }, project: project.map { RecordCoding.hash([$0]) }, entitlement: product)
-        return .init(service: service, token: token, pool: pool, headers: headers, clients: [client])
+        let expiry = [expiresAt, isKimi ? tokenExpiry(token) : nil].compactMap { $0 }.min()
+        return .init(service: service, token: token, pool: pool, headers: headers, clients: [client], expiresAt: expiry)
+    }
+
+    /// JWT expiry can reject an expired token, but unverified claims never establish account identity.
+    private static func tokenExpiry(_ token: String) -> Date? {
+        let parts = token.split(separator: ".", omittingEmptySubsequences: false)
+        guard parts.count == 3 else { return nil }
+        var payload = parts[1].replacingOccurrences(of: "-", with: "+").replacingOccurrences(of: "_", with: "/")
+        payload += String(repeating: "=", count: (4 - payload.count % 4) % 4)
+        guard let data = Data(base64Encoded: payload), let json = try? ProviderJSON.read(data),
+              let expiry = json["exp"].numberValue else { return nil }
+        return Date(timeIntervalSince1970: expiry)
     }
     static func discover(home: URL = FileManager.default.homeDirectoryForCurrentUser,
                          environment env: [String: String] = ProcessInfo.processInfo.environment,
                          now: Date = Date()) -> [OpenAgentCredential] {
         let paths = OpenAgentPaths(home: home, environment: env)
         var found: [OpenAgentCredential] = []
-        func add(_ service: OpenAgentCredential.Service?, _ key: String?, _ client: String) {
+        func add(_ service: OpenAgentCredential.Service?, _ key: String?, _ client: String, expiresAt: Date? = nil) {
             guard let service, let key, !key.isEmpty else { return }
-            found.append(credential(service, token: key, client: client))
+            let value = credential(service, token: key, client: client, expiresAt: expiresAt)
+            if value.isUsable(at: now) { found.append(value) }
         }
         add(env["KIMI_CODE_BASE_URL"].map { service(provider: "", baseURL: $0) } ?? .kimi, env["KIMI_CODE_API_KEY"], "Kimi")
         add(.go, env["OPENCODE_GO_API_KEY"], "OpenCode")
@@ -116,7 +131,7 @@ enum OpenAgentCredentials {
                       env["KIMI_CODE_OAUTH_HOST"] == nil, env["KIMI_OAUTH_HOST"] == nil,
                       let token = auth["access"].stringValue, !token.isEmpty,
                       let expires = auth["expires"].numberValue, expires > (now.timeIntervalSince1970 + 60) * 1000 {
-                add(.kimi, token, "Pi")
+                add(.kimi, token, "Pi", expiresAt: Date(timeIntervalSince1970: expires / 1000))
             }
         }
         // Native slots are derived by the official OAuth toolkit. Region-specific credentials
@@ -136,7 +151,9 @@ enum OpenAgentCredentials {
                 if let device = try? String(contentsOf: paths.kimi.appendingPathComponent("device_id"), encoding: .utf8).trimmingCharacters(in: .whitespacesAndNewlines), !device.isEmpty {
                     headers["X-Msh-Device-Id"] = device
                 }
-                found.append(credential(service, token: token, client: "Kimi", headers: headers))
+                let value = credential(service, token: token, client: "Kimi", headers: headers,
+                    expiresAt: Date(timeIntervalSince1970: expiry))
+                if value.isUsable(at: now) { found.append(value) }
             }
         }
         return merge(found)
@@ -151,7 +168,11 @@ enum OpenAgentCredentials {
     static func merge(_ candidates: [OpenAgentCredential]) -> [OpenAgentCredential] {
         var values: [String: OpenAgentCredential] = [:]
         for candidate in candidates {
-            if var existing = values[candidate.pool.id] { existing.clients.formUnion(candidate.clients); values[candidate.pool.id] = existing }
+            if var existing = values[candidate.pool.id] {
+                existing.clients.formUnion(candidate.clients)
+                existing.expiresAt = [existing.expiresAt, candidate.expiresAt].compactMap { $0 }.min()
+                values[candidate.pool.id] = existing
+            }
             else { values[candidate.pool.id] = candidate }
         }
         return values.values.sorted { $0.pool.id < $1.pool.id }

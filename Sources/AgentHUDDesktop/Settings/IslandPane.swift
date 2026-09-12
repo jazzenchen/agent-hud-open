@@ -135,7 +135,7 @@ private enum IslandSampleData {
         let events = (0..<24).flatMap { hour in
             consumers.enumerated().map { index, consumer in
                 let count = amounts[(hour + index * 4) % amounts.count] * 1000
-                return TranscriptSession.UsageEvent(
+                return UsageEvent(
                     timestamp: interval.start.addingTimeInterval(Double(hour) * 3600 + 1800),
                     agentId: consumer.id, tokensIn: count * 4 / 5, tokensOut: count / 5
                 )

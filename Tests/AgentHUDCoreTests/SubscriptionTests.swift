@@ -64,7 +64,7 @@ final class SubscriptionTests: XCTestCase {
             engine: .init(executable: executable, workingDirectory: directory),
             transcripts: .init(roots: []), history: .init(fileURL: nil), accountProfileURL: profileURL
         )
-        let report = try await provider.fetchUsage(agents: [], historyHours: 1)
+        let report = try await provider.fetchAccountAndLocalUsage(agents: [], historyHours: 1)
         XCTAssertEqual(report.subscriptionType, "max")
         XCTAssertEqual(report.subscriptions["Claude"], "max_20x")
         XCTAssertEqual(report.snapshot(for: ClaudeUsage.sessionRowId)?.remainingPct, 79)

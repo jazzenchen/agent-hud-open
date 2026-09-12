@@ -110,11 +110,11 @@ final class ClaudeEngineTests: XCTestCase {
         let now = try XCTUnwrap(DateParsing.iso8601("2026-09-08T00:00:00Z"))
         let provider = ClaudeCodeProvider(engine: .init(executable: fake, workingDirectory: dir),
                                          transcripts: .init(roots: []), history: .init(fileURL: nil), clock: { now })
-        let report = try await provider.fetchUsage(agents: [], historyHours: 2)
+        let report = try await provider.fetchAccountAndLocalUsage(agents: [], historyHours: 2)
         let quota = try XCTUnwrap(report.snapshot(for: ClaudeUsage.sessionRowId))
         XCTAssertEqual(quota.remainingPct, 79, "A passed deadline must not fabricate full quota")
         XCTAssertLessThan(try XCTUnwrap(quota.resetAt), now)
-        let cached = try await provider.fetchUsage(agents: [], historyHours: 2)
+        let cached = try await provider.fetchAccountAndLocalUsage(agents: [], historyHours: 2)
         XCTAssertEqual(cached.snapshot(for: ClaudeUsage.sessionRowId), quota)
     }
 }

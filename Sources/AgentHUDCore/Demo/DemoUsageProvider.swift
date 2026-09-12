@@ -16,7 +16,7 @@ public struct DemoUsageProvider: UsageProvider {
         } ?? now
         let tokens = DemoSeries.hourlyTokens(agentCount: max(1, consumers.count), hours: historyHours)
         var history: [HistorySample] = []
-        var consumption: [TranscriptSession.UsageEvent] = []
+        var consumption: [UsageEvent] = []
         for (index, agent) in consumers.enumerated() {
             let candles = DemoSeries.series(count: historyHours, seed: DemoSeries.lineSeed(index: index))
             for (hour, candle) in candles.enumerated() {

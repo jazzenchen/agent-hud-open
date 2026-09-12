@@ -11,7 +11,7 @@ public struct CodexTranscript: Codable, Sendable {
         public let output: Int
         public let cachedInput: Int
 
-        public var event: TranscriptSession.UsageEvent {
+        public var event: UsageEvent {
             .init(timestamp: timestamp, agentId: "codex-model:\(model)", tokensIn: input, tokensOut: output, cacheReadTokens: cachedInput)
         }
     }

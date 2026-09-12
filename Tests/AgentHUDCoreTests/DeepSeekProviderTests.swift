@@ -136,13 +136,13 @@ final class DeepSeekProviderTests: XCTestCase {
         await runtime.set([now.addingTimeInterval(-60)])
         let provider = DeepSeekUsageProvider(directory: dir, transcripts: DeepSeekTranscriptStore(root: root),
             readProcessStarts: { await runtime.starts }, clock: { now.addingTimeInterval(7200) })
-        let waiting = try await provider.fetchUsage(agents: [], historyHours: 24)
+        let waiting = try await provider.fetchAccountAndLocalUsage(agents: [], historyHours: 24)
         XCTAssertTrue(try XCTUnwrap(waiting.sessions.first).isLive)
         await runtime.set([])
-        let stopped = try await provider.fetchUsage(agents: [], historyHours: 24)
+        let stopped = try await provider.fetchAccountAndLocalUsage(agents: [], historyHours: 24)
         XCTAssertFalse(try XCTUnwrap(stopped.sessions.first).isLive)
         await runtime.set([now.addingTimeInterval(60)])
-        let restarted = try await provider.fetchUsage(agents: [], historyHours: 24)
+        let restarted = try await provider.fetchAccountAndLocalUsage(agents: [], historyHours: 24)
         XCTAssertFalse(try XCTUnwrap(restarted.sessions.first).isLive)
     }
 
@@ -280,8 +280,8 @@ final class DeepSeekProviderTests: XCTestCase {
         let provider = DeepSeekUsageProvider(directory: dir, transcripts: DeepSeekTranscriptStore(root: root), readBalance: {
             await counter.increment(); return balance
         }, clock: { now })
-        let report = try await provider.fetchUsage(agents: [], historyHours: 169)
-        _ = try await provider.fetchUsage(agents: [], historyHours: 169)
+        let report = try await provider.fetchAccountAndLocalUsage(agents: [], historyHours: 169)
+        _ = try await provider.fetchAccountAndLocalUsage(agents: [], historyHours: 169)
         let calls = await counter.calls
         XCTAssertEqual(calls, 1)
         XCTAssertEqual(report.sessions.count, 1)
@@ -295,7 +295,7 @@ final class DeepSeekProviderTests: XCTestCase {
         XCTAssertTrue(report.discoveredAgents.allSatisfy { $0.id.hasPrefix("deepseek-model:") && $0.isAPIBilled })
         XCTAssertEqual(report.billing[0].balances[0].total, Decimal(string: "8.85"))
         XCTAssertEqual(report.billing[0].estimatedCost(currency: "CNY"), Decimal(string: "0.012414"))
-        let combined = try await CombinedUsageProvider([.init("DeepSeek", provider)]).fetchUsage(agents: [], historyHours: 169)
+        let combined = try await CombinedUsageProvider([.init("DeepSeek", provider)]).fetchAccountAndLocalUsage(agents: [], historyHours: 169)
         XCTAssertEqual(combined.billing, report.billing)
     }
 
@@ -307,7 +307,7 @@ final class DeepSeekProviderTests: XCTestCase {
         try ([header(), model(seq: 0, name: "future-model"), usage(seq: 1)].joined(separator: "\n") + "\n").write(to: file, atomically: true, encoding: .utf8)
         let provider = DeepSeekUsageProvider(directory: dir, transcripts: DeepSeekTranscriptStore(root: root),
                                             readBalance: { throw UsageProviderError("offline") }, clock: { now })
-        let report = try await provider.fetchUsage(agents: [], historyHours: 48)
+        let report = try await provider.fetchAccountAndLocalUsage(agents: [], historyHours: 48)
         XCTAssertEqual(report.sessions.count, 1)
         XCTAssertEqual(report.sourceNotices["DeepSeek"], "offline")
         XCTAssertTrue(report.billing[0].balances.isEmpty)
