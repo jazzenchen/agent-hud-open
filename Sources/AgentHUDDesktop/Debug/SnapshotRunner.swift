@@ -259,7 +259,7 @@ public enum SnapshotRunner {
             .init(id: "claude-code", name: "Claude", detail: L10n.text("额度、会话与用量统计", "Quota, sessions and usage"), state: .ready(plan: "max_20x")),
             .init(id: "codex-cli", name: "Codex", detail: L10n.text("额度、会话与用量统计", "Quota, sessions and usage"), state: .ready(plan: "prolite")),
             .init(id: "deepseek", name: "DeepSeek", detail: L10n.text("Harness 会话、API 余额与费用", "Harness sessions, API balance and costs"), state: .ready(plan: nil)),
-            .init(id: "antigravity", name: "Antigravity", detail: L10n.text("启动并登录 Antigravity 或 agy 后同步额度 · 部分本地会话无法读取，用量可能不完整", "Start and sign in to Antigravity or agy to sync quota. Some local sessions could not be read; usage may be incomplete."), state: .unavailable),
+            .init(id: "antigravity", name: "Antigravity", detail: L10n.text("启动并登录 Antigravity 或 agy 后读取额度 · 部分本地会话无法读取，用量可能不完整", "Start and sign in to Antigravity or agy to load quota. Some local sessions could not be read; usage may be incomplete."), state: .unavailable),
             .init(id: "cursor", name: "Cursor", detail: L10n.text("账户额度与跨设备用量", "Account quota and usage across devices"), state: .notDetected),
             .init(id: "grok", name: "Grok", detail: L10n.text("Grok CLI 额度与本地会话", "Grok CLI quota and local sessions"), state: .ready(plan: "X Premium")),
             .init(id: "opencode", name: "OpenCode", detail: "", state: .installed),

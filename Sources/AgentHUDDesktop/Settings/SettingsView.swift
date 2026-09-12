@@ -5,8 +5,8 @@ import Observation
 @MainActor
 @Observable
 final class SettingsNavigation {
-    var tab: SettingsTab
-    init(tab: SettingsTab = .display) { self.tab = tab }
+    var pageID: String
+    init(tab: SettingsTab = .display) { pageID = tab.id }
 }
 
 enum SettingsTab: String, CaseIterable, Identifiable {
@@ -59,16 +59,19 @@ struct SettingsView: View {
     let store: UsageStore
     var sourceStatuses: [SourceStatus]?
     var initiallyExpandedAgents: Set<String>
+    let additionalPages: [DesktopSettingsPage]
     @State private var navigation: SettingsNavigation
     @Environment(\.colorScheme) private var scheme
 
     init(settings: SettingsStore, store: UsageStore, initialTab: SettingsTab = .display,
          navigation: SettingsNavigation? = nil,
+         additionalPages: [DesktopSettingsPage] = [],
          sourceStatuses: [SourceStatus]? = nil, initiallyExpandedAgents: Set<String> = []) {
         self.settings = settings
         self.store = store
         self.sourceStatuses = sourceStatuses
         self.initiallyExpandedAgents = initiallyExpandedAgents
+        self.additionalPages = additionalPages
         _navigation = State(initialValue: navigation ?? SettingsNavigation(tab: initialTab))
     }
 
@@ -76,15 +79,17 @@ struct SettingsView: View {
         @Bindable var navigation = navigation
         let theme = Theme.forScheme(scheme)
         HStack(spacing: 0) {
-            SettingsSidebar(selection: $navigation.tab, theme: theme)
+            SettingsSidebar(selection: $navigation.pageID, additionalPages: additionalPages, theme: theme)
                 .frame(width: SettingsWindowLayout.sidebarWidth)
                 .layoutPriority(1)
             Rectangle().fill(theme.sidebarBorder).frame(width: 1)
             VStack(alignment: .leading, spacing: 0) {
                 VStack(alignment: .leading, spacing: 7) {
-                    Text(tab.label).font(.ui(24, .semibold))
-                    Text(tab.subtitle).font(.ui(12)).foregroundStyle(theme.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
+                    Text(pageTitle).font(.ui(24, .semibold))
+                    if !pageSubtitle.isEmpty {
+                        Text(pageSubtitle).font(.ui(12)).foregroundStyle(theme.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 24)
@@ -92,12 +97,12 @@ struct SettingsView: View {
 
                 ScrollView {
                     pane(theme)
-                        .frame(maxWidth: 640, alignment: .leading)
+                        .frame(maxWidth: additionalPage?.preferredContentWidth ?? 640, alignment: .leading)
                         .frame(maxWidth: .infinity, alignment: .center)
                         .padding(.horizontal, 20)
                         .padding(.bottom, 32)
                 }
-                .id(tab)
+                .id(navigation.pageID)
             }
             .frame(minWidth: 0, maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .clipped()
@@ -111,21 +116,29 @@ struct SettingsView: View {
         .id(settings.settings.language)
     }
 
-    private var tab: SettingsTab { navigation.tab }
+    private var tab: SettingsTab? { SettingsTab(rawValue: navigation.pageID) }
+    private var additionalPage: DesktopSettingsPage? { additionalPages.first { $0.id == navigation.pageID } }
+    private var pageTitle: String { tab?.label ?? additionalPage?.heading?() ?? additionalPage?.title() ?? "" }
+    private var pageSubtitle: String { tab?.subtitle ?? additionalPage?.subtitle() ?? "" }
 
     @ViewBuilder
     private func pane(_ theme: Theme) -> some View {
-        switch tab {
-        case .general: GeneralPane(settings: settings, theme: theme)
-        case .sources: SourcesPane(settings: settings, store: store, theme: theme, sources: sourceStatuses,
-                                   initiallyExpanded: initiallyExpandedAgents)
-        case .display: DisplayPane(settings: settings, store: store, theme: theme)
+        if let tab {
+            switch tab {
+            case .general: GeneralPane(settings: settings, theme: theme)
+            case .sources: SourcesPane(settings: settings, store: store, theme: theme, sources: sourceStatuses,
+                                       initiallyExpanded: initiallyExpandedAgents)
+            case .display: DisplayPane(settings: settings, store: store, theme: theme)
+            }
+        } else if let additionalPage {
+            additionalPage.content()
         }
     }
 }
 
 struct SettingsSidebar: View {
-    @Binding var selection: SettingsTab
+    @Binding var selection: String
+    let additionalPages: [DesktopSettingsPage]
     let theme: Theme
 
     var body: some View {
@@ -137,27 +150,10 @@ struct SettingsSidebar: View {
                 .padding(.horizontal, 12)
                 .padding(.bottom, 8)
             ForEach(SettingsTab.allCases) { tab in
-                let selected = tab == selection
-                Button { selection = tab } label: {
-                    HStack(spacing: 8) {
-                        Image(systemName: tab.symbol)
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundStyle(.white)
-                            .frame(width: 26, height: 26)
-                            .background(tab.color, in: RoundedRectangle(cornerRadius: 7))
-                        Text(tab.label).font(.ui(13, selected ? .semibold : .regular))
-                            .lineLimit(1)
-                        Spacer(minLength: 0)
-                    }
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 9)
-                    .background(selected ? Color.accentColor : .clear, in: RoundedRectangle(cornerRadius: 9))
-                    .foregroundStyle(selected ? .white : theme.sidebarText)
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityIdentifier("settings-tab-\(tab.slug)")
-                .accessibilityAddTraits(selected ? .isSelected : [])
+                pageButton(id: tab.id, title: tab.label, symbol: tab.symbol, color: tab.color)
+            }
+            ForEach(additionalPages) { page in
+                pageButton(id: page.id, title: page.title(), symbol: page.symbol, color: page.color)
             }
             Spacer()
             HStack(spacing: 10) {
@@ -175,6 +171,30 @@ struct SettingsSidebar: View {
         .padding(.bottom, 12)
         .frame(maxHeight: .infinity)
         .background(theme.sidebarBackground)
+    }
+
+    private func pageButton(id: String, title: String, symbol: String, color: Color) -> some View {
+        let selected = id == selection
+        return Button { selection = id } label: {
+            HStack(spacing: 8) {
+                Image(systemName: symbol)
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(.white)
+                    .frame(width: 26, height: 26)
+                    .background(color, in: RoundedRectangle(cornerRadius: 7))
+                Text(title).font(.ui(13, selected ? .semibold : .regular))
+                    .lineLimit(1)
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 9)
+            .background(selected ? Color.accentColor : .clear, in: RoundedRectangle(cornerRadius: 9))
+            .foregroundStyle(selected ? .white : theme.sidebarText)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("settings-tab-\(id)")
+        .accessibilityAddTraits(selected ? .isSelected : [])
     }
 }
 

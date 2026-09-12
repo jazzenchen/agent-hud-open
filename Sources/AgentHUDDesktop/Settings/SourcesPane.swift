@@ -139,7 +139,7 @@ private struct AgentLiveStatusSettings: View {
 
     var body: some View {
         SettingRow(label: L10n.text("实时状态", "Live status"),
-                   subtitle: L10n.text("同步会话状态与完成提醒", "Sync session status and completion reminders")) {
+                   subtitle: L10n.text("显示会话状态与完成提醒", "Show session status and completion reminders")) {
             Toggle(L10n.text("实时状态", "Live status"), isOn: Binding(get: {
                 settings.settings.liveStatusEnabled(for: vendor)
             }, set: { value in

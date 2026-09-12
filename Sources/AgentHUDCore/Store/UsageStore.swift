@@ -261,7 +261,7 @@ public final class UsageStore {
     }
 
     public func sessionStatusLabel(_ session: LiveSession) -> String {
-        guard liveStatusEnabled(for: session) else { return L10n.text("状态同步已关闭", "Live status off") }
+        guard liveStatusEnabled(for: session) else { return L10n.text("状态显示已关闭", "Live status off") }
         if session.isLive && !session.isLive(at: now) { return L10n.text("状态待更新", "Status out of date") }
         return Countdown.sessionLabel(session, now: now)
     }

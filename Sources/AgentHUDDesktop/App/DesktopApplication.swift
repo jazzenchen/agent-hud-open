@@ -19,18 +19,23 @@ public final class DesktopApplication {
     public let store: UsageStore
     private let options: DesktopLaunchOptions
     private let additionalMenuActions: [DesktopMenuAction]
+    private let additionalSettingsPages: [DesktopSettingsPage]
     private var notch: NotchController?
     private var statusItem: StatusItemController?
-    private lazy var settingsWindow = SettingsWindowController(settings: settings, store: store)
+    private lazy var settingsWindow = SettingsWindowController(
+        settings: settings, store: store, additionalPages: additionalSettingsPages
+    )
     private let statsWindow: StatsWindowController
     private let onboardingWindow: OnboardingWindowController
 
     public init(options: DesktopLaunchOptions, settings: SettingsStore, store: UsageStore,
-                additionalMenuActions: [DesktopMenuAction] = []) {
+                additionalMenuActions: [DesktopMenuAction] = [],
+                additionalSettingsPages: [DesktopSettingsPage] = []) {
         self.options = options
         self.settings = settings
         self.store = store
         self.additionalMenuActions = additionalMenuActions
+        self.additionalSettingsPages = additionalSettingsPages
         statsWindow = StatsWindowController(store: store)
         onboardingWindow = OnboardingWindowController(settings: settings, store: store,
             sources: options.demo ? { DemoData.sources } : { SourceDetector.detect() })
@@ -89,7 +94,7 @@ public final class DesktopApplication {
     }
 
     public func stop() { store.stop() }
-    public func showSettings() { settingsWindow.show() }
+    public func showSettings(pageID: String? = nil) { settingsWindow.show(pageID: pageID) }
     public func showStats() { statsWindow.show() }
     public func showOnboarding() { onboardingWindow.show() }
     public func toggleGlow() { store.glowHidden.toggle() }

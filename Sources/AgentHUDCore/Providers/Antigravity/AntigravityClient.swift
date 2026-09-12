@@ -18,7 +18,7 @@ struct AntigravityClient: Sendable {
         }.value
         guard !candidates.isEmpty else {
             return ProviderQuota(notice: AdditionalSource.antigravity.isInstalled()
-                ? L10n.text("启动并登录 Antigravity 或 agy 后同步额度", "Start and sign in to Antigravity or agy to sync quota") : nil)
+                ? L10n.text("启动并登录 Antigravity 或 agy 后读取额度", "Start and sign in to Antigravity or agy to load quota") : nil)
         }
         let deadline = Date().addingTimeInterval(20)
         var fallback: ProviderQuota?
