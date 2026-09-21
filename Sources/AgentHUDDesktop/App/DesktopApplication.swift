@@ -78,6 +78,14 @@ public final class DesktopApplication {
             guard let self else { return }
             LoginItem.set(self.settings.settings.launchAtLogin)
         })
+        // The host installs the handlers at launch; a change of mind while running applies at once, with the same
+        // executable the host gave them.
+        observeChanges({ [weak self] in
+            self?.settings.settings.clientHooks
+        }, onChange: { [weak self] in
+            guard let self, !self.options.demo, let executable = Bundle.main.executableURL else { return }
+            SessionObservers.configure(executable: executable, enabled: self.settings.settings.clientHooks)
+        })
         observeChanges({ [weak self] in
             _ = self?.store.report
             _ = self?.settings.agents

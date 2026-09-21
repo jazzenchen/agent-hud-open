@@ -48,6 +48,7 @@ The HUD sits at the top of every attached display, and each display carries its 
 - Hovering opens the queue: the oldest request open, the rest a line each. Any line can be opened, which closes the one before it, and the answers always act on the open one. Answering hands over to whichever has waited longest.
 - Deny and allow-once are always offered. A third answer appears only when the client supports rule updates and itself suggested a rule — the HUD echoes that suggestion back untouched rather than composing one. Codex, CodeBuddy, WorkBuddy, ZCode and Qwen Code offer only deny and allow-once; their shell commands, file edits and MCP tools use the same queue as Claude Code.
 - A request reaches the HUD only when the client itself was about to ask. A client whose hook runs before every tool call, or whose hook cannot approve, is not connected, because answering it would mean asking about calls the client would have allowed on its own. A question or a plan approval that a client routes through the same event stays in the client's own dialog.
+- Settings → General → Client hooks switches every handler Agent HUD keeps in the clients' own settings: approvals, Claude Code's notification hook, the stop hooks and Pi's observer. Switching it off asks first, naming what stops working — answering requests on the HUD, completion reminders from the clients that report them only through a stop hook, Claude Code's waiting state and Pi's running status; usage, quota and sessions are unaffected. Off, this installation's handlers are removed at once and never added back; a handler another installation added stays with it, and ZCode's hooks switch stays as it was.
 - Saying nothing is an answer the HUD can always give, and it is what a closed, paused or busy HUD gives: the client's own permission flow carries on as though no hook were installed. A hidden or paused glow silences events but never a request, which would otherwise leave a session waiting with nothing on screen to say why.
 
 ### The glow
@@ -74,8 +75,9 @@ The HUD sits at the top of every attached display, and each display carries its 
 | `screenGlow[…].range` / `blur` | 0–36 pt reach / 0–36 pt feather, for the blurred style | 14 pt / 8 pt |
 | `screenGlow[…].brightness` / `breathAmplitude` | 20–100% / how deep the breath dips | 90% / 60% |
 | `requiresOptionToOpen` | Hovering alone leaves the panel closed | `false` |
+| `clientHooks` | Keep Agent HUD's handlers in the clients' own settings | `true` |
 
-The approval hook is installed for each detected client at startup, alongside the notification and completion hooks; `--permission-hook <source>` is the handler it points back at. See [command line](command-line.md) and [data access](data-access.md).
+The approval hook is installed for each detected client at startup, alongside the notification and completion hooks, unless `clientHooks` is off; `--permission-hook <source>` is the handler it points back at. See [command line](command-line.md) and [data access](data-access.md).
 
 `Settings.placement(on:hasNotch:)` and `glow(on:)` answer what one display uses, falling back to the default when it has none of its own. Both are keyed by the string `ScreenIdentity.key(for:)` returns for a display.
 

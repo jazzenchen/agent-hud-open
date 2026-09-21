@@ -110,6 +110,8 @@ public enum AttentionHooks {
     public static func configure(_ source: Source, enabled: Bool, executable: URL,
                                  home: URL = FileManager.default.homeDirectoryForCurrentUser,
                                  replacingExisting: Bool = false) throws {
+        // Taking a handler out never leaves behind a file the client did not have.
+        guard enabled || FileManager.default.fileExists(atPath: source.configuration(home: home).path) else { return }
         let object = try configuration(source, home: home)
         let quoted = "'" + executable.path.replacingOccurrences(of: "'", with: "'\\''") + "'"
         let command = quoted + " --attention-hook " + source.rawValue

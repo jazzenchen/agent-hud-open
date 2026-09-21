@@ -46,7 +46,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let store = UsageStore(provider: retained, settings: settings)
         if let report = retained.initialReport { store.replace(report: report) }
         if !options.demo, let executable = Bundle.main.executableURL {
-            SessionObservers.configure(executable: executable)
+            SessionObservers.configure(executable: executable, enabled: settings.settings.clientHooks)
         }
         let desktop = DesktopApplication(options: options, settings: settings, store: store)
         self.desktop = desktop
