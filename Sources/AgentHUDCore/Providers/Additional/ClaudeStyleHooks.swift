@@ -8,8 +8,9 @@ enum ClaudeStyleHooks {
             .compactMap { $0["command"].stringValue }.filter { CompletionHooks.ownsCommand($0, source: source) }
     }
 
+    /// `timeout` is in the client's own unit: seconds for Claude Code's forks, milliseconds for Qwen Code.
     static func updating(_ configuration: [String: ProviderJSON], event: String, source: CompletionHooks.Source,
-                         command: String?) throws -> [String: ProviderJSON] {
+                         command: String?, timeout: Int = 5) throws -> [String: ProviderJSON] {
         var object = configuration
         guard object["hooks"] == nil || object["hooks"]?.objectValue != nil else { throw ProviderFailure.format }
         var hooks = object["hooks"]?.objectValue ?? [:]
@@ -23,7 +24,7 @@ enum ClaudeStyleHooks {
             return .object(fields)
         }
         if let command {
-            groups.append(.object(["hooks": .array([.object(["type": .string("command"), "command": .string(command), "timeout": .integer(5)])])]))
+            groups.append(.object(["hooks": .array([.object(["type": .string("command"), "command": .string(command), "timeout": .integer(Int64(timeout))])])]))
         }
         hooks[event] = groups.isEmpty ? nil : .array(groups)
         object["hooks"] = hooks.isEmpty && configuration["hooks"] == nil ? nil : .object(hooks)

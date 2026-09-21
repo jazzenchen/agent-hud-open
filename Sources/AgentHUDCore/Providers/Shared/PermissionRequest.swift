@@ -58,9 +58,9 @@ public struct PermissionRequest: Identifiable, Equatable, Sendable {
     public var badge: String {
         guard let toolName, !toolName.isEmpty else { return "TOOL" }
         if toolName.hasPrefix("mcp__") { return "MCP" }
-        switch toolName {
+        switch Self.kind(toolName) {
         case "Bash", "BashOutput", "KillShell": return "BASH"
-        case "Edit", "Write", "NotebookEdit": return "EDIT"
+        case "Edit", "MultiEdit", "Write", "NotebookEdit", "apply_patch": return "EDIT"
         case "Read": return "READ"
         case "Glob", "Grep": return "FIND"
         case "WebFetch", "WebSearch": return "WEB"
@@ -74,9 +74,9 @@ public struct PermissionRequest: Identifiable, Equatable, Sendable {
     public var symbol: String {
         guard let toolName, !toolName.isEmpty else { return "questionmark.circle" }
         if toolName.hasPrefix("mcp__") { return "puzzlepiece.extension.fill" }
-        switch toolName {
+        switch Self.kind(toolName) {
         case "Bash", "BashOutput", "KillShell": return "terminal.fill"
-        case "Edit", "NotebookEdit": return "pencil"
+        case "Edit", "MultiEdit", "NotebookEdit", "apply_patch": return "pencil"
         case "Write": return "square.and.pencil"
         case "Read": return "doc.text.fill"
         case "Glob", "Grep": return "magnifyingglass"
@@ -98,40 +98,55 @@ public struct PermissionRequest: Identifiable, Equatable, Sendable {
     /// that changes the whole permission mode is a different decision than the one being made here, and one that
     /// quietly does nothing unless the session was started to allow it.
     public var alwaysAllow: JSONValue? {
-        suggestions.first {
+        guard source.supportsPermissionUpdates else { return nil }
+        return suggestions.first {
             $0["type"].stringValue == "addRules" && $0["behavior"].stringValue == "allow"
                 && ($0["rules"].arrayValue?.isEmpty == false)
         }
     }
 
     static let detailLength = 2048
+    static let fileTools: Set<String> = ["Read", "Write", "Edit", "MultiEdit", "NotebookEdit"]
+
+    /// Qwen Code's names for the tools Claude Code has, whose inputs use the same keys; a call reads the same
+    /// whichever client makes it.
+    static let aliases = ["run_shell_command": "Bash", "edit": "Edit", "replace": "Edit", "write_file": "Write",
+                          "read_file": "Read", "glob": "Glob", "grep_search": "Grep", "search_file_content": "Grep",
+                          "web_fetch": "WebFetch", "web_search": "WebSearch", "agent": "Agent", "task": "Task"]
+    static func kind(_ tool: String) -> String { aliases[tool] ?? tool }
 
     /// Reads a client's hook payload. A payload without a session cannot be shown next to the session it belongs to,
-    /// and is refused rather than guessed at.
+    /// and is refused rather than guessed at; so is a call that asks the user something other than permission.
     static func parse(_ data: Data, source: PermissionHooks.Source, id: String, now: Date) throws -> PermissionRequest? {
         guard data.count <= 1024 * 1024 else { throw ProviderFailure.limit }
         let payload = try ProviderJSON.read(data)
         guard let session = payload["session_id"].stringValue, !session.isEmpty else { return nil }
         let tool = payload["tool_name"].stringValue
+        guard !source.unanswerableTools.contains(tool ?? "") else { return nil }
         let input = payload["tool_input"]
-        let file = ["Read", "Write", "Edit", "NotebookEdit"].contains(tool ?? "") ? trimmed(input["file_path"]) : nil
+        let kind = tool.map(kind)
+        let file = fileTools.contains(kind ?? "") ? trimmed(input["file_path"]) : nil
+        // A multi-edit is recognized by its first change, the same way a single edit is.
+        let change = kind == "MultiEdit" ? input["edits"].arrayValue?.first ?? .null : input
         return PermissionRequest(
             id: id, source: source, sessionID: session, toolName: tool,
-            summary: summary(tool: tool, input: input), detail: detail(tool: tool, input: input),
+            summary: summary(tool: kind, input: input), detail: detail(tool: kind, input: input),
             cwd: payload["cwd"].stringValue, path: file,
-            removed: lines(input["old_string"]), added: lines(input["new_string"] ?? input["content"]),
+            removed: lines(change["old_string"]), added: lines(change["new_string"] ?? change["content"]),
             suggestions: payload["permission_suggestions"].arrayValue ?? [], at: now
         )
     }
 
-    /// What the call is about, in the words the tool itself uses. Claude Code's own tool names are matched; anything
+    /// What the call is about, in the words the tool itself uses. Known hook tool names are matched; anything
     /// else falls back to the tool's name, which is all a request for an unknown tool can honestly say.
     static func summary(tool: String?, input: ProviderJSON) -> String {
         guard let tool, !tool.isEmpty else { return L10n.text("工具调用", "Tool call") }
         switch tool {
         case "Bash", "BashOutput", "KillShell":
             return trimmed(input["description"]) ?? trimmed(input["command"]) ?? tool
-        case "Read", "Write", "Edit", "NotebookEdit":
+        case "apply_patch":
+            return trimmed(input["description"]) ?? L10n.text("应用文件修改", "Apply file changes")
+        case "Read", "Write", "Edit", "MultiEdit", "NotebookEdit":
             return trimmed(input["file_path"]).map { ($0 as NSString).lastPathComponent } ?? tool
         case "Glob", "Grep":
             return trimmed(input["pattern"]) ?? tool
@@ -153,8 +168,8 @@ public struct PermissionRequest: Identifiable, Equatable, Sendable {
     static func detail(tool: String?, input: ProviderJSON) -> String? {
         let value: String?
         switch tool {
-        case "Bash": value = trimmed(input["command"])
-        case "Read", "Write", "Edit", "NotebookEdit": value = trimmed(input["file_path"])
+        case "Bash", "apply_patch": value = trimmed(input["command"])
+        case "Read", "Write", "Edit", "MultiEdit", "NotebookEdit": value = trimmed(input["file_path"])
         case "WebFetch": value = trimmed(input["url"])
         default: value = nil
         }
@@ -178,7 +193,8 @@ public struct PermissionRequest: Identifiable, Equatable, Sendable {
 
 /// What the user decided, in the shape the client reads it in.
 ///
-/// Every client here ships Claude Code's schema, so one answer serves all of them. Saying nothing is its own answer:
+/// The allow/deny answer is shared; permission-rule updates are available only on supporting clients.
+/// Saying nothing is its own answer:
 /// the client then does what it would have done without the hook, which is to ask in its own terminal.
 public enum PermissionDecision: Sendable, Equatable {
     case allow
@@ -191,9 +207,11 @@ public enum PermissionDecision: Sendable, Equatable {
         return "allow"
     }
 
-    public var response: Data {
+    public func response(for source: PermissionHooks.Source) -> Data {
         var decision: [String: JSONValue] = ["behavior": .string(behavior)]
         if case .allowAlways(let update) = self {
+            // Codex rejects updatedPermissions. Leave unsupported decisions to the client's own approval flow.
+            guard source.supportsPermissionUpdates else { return Self.noDecision }
             decision["updatedPermissions"] = .array([update])
         }
         let payload: [String: JSONValue] = [
@@ -228,7 +246,7 @@ public extension PermissionRequest {
                 ])],
                 at: now.addingTimeInterval(-38)),
             PermissionRequest(
-                id: "demo-build", source: .claude, vendor: "Codex", sessionID: "demo-2", toolName: "Bash",
+                id: "demo-build", source: .codex, sessionID: "demo-2", toolName: "Bash",
                 summary: L10n.text("打包鸿蒙版本", "Package the HarmonyOS build"), detail: "hvigorw assembleHap",
                 cwd: "~/Development/agent-hud-harmony", at: now.addingTimeInterval(-124)),
             PermissionRequest(

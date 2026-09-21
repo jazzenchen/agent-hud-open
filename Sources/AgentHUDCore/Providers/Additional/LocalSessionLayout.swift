@@ -38,6 +38,7 @@ extension AdditionalSource {
         case .zcode: ZCodeSessions.self
         case .codebuddy: CodeBuddySessions.self
         case .workbuddy: WorkBuddySessions.self
+        case .qwen: QwenSessions.self
         }
     }
 }

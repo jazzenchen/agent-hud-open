@@ -44,7 +44,7 @@ actor AdditionalUsageProvider: UsageProvider, LedgerRecording {
             case .cursor: return try await cursor.quota()
             case .grok: return try await GrokClient().fetch()
             case .copilot: return try await CopilotClient().fetch()
-            case .openclaw, .hermes, .zcode, .codebuddy, .workbuddy: return ProviderQuota()
+            case .openclaw, .hermes, .zcode, .codebuddy, .workbuddy, .qwen: return ProviderQuota()
             }
         }, readSessions: { since in
             if source == .cursor { return await cursor.savedSessions }

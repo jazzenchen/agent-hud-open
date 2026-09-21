@@ -21,6 +21,7 @@ Which clients expose running and terminal turns, which of them say they are wait
 | Antigravity | No | Through the `Stop` hook | Local records supply usage only. |
 | Cursor | No | Through the `stop` hook | Local records supply usage only. |
 | CodeBuddy | No | Through the `Stop` hook | Local records supply usage only. |
+| Qwen Code | No | Through the `Stop` hook | Transcripts record no turn end; a text-only answer is not one, because a hook or a follow-up can continue the turn. |
 | Hermes Agent, ZCode, WorkBuddy | No | No | Local records hold usage counters only. |
 | OpenCode | No | No | A persisted message end is not an agent end. |
 | GLM | n/a | n/a | Billing service; execution state belongs to the client using it. |
@@ -58,7 +59,7 @@ A transcript shows that a tool call is pending but not whether the client is run
 
 ### Completion hooks
 
-Antigravity, Cursor, GitHub Copilot CLI and CodeBuddy do not record finished turns locally, so their completions come from the clients' own stop hooks. `CompletionHooks` owns the configuration, the callback and the local record.
+Antigravity, Cursor, GitHub Copilot CLI, CodeBuddy and Qwen Code do not record finished turns locally, so their completions come from the clients' own stop hooks. `CompletionHooks` owns the configuration, the callback and the local record.
 
 | Source | Configuration | Accepted as a completion when |
 | --- | --- | --- |
@@ -66,8 +67,9 @@ Antigravity, Cursor, GitHub Copilot CLI and CodeBuddy do not record finished tur
 | Cursor | Handler appended to `hooks.stop` of a version-1 `~/.cursor/hooks.json`; only commands ending in ` --completion-hook cursor` are Agent HUD's | `hook_event_name` is `stop`, `status` is `completed`, and `conversation_id` and `generation_id` are present |
 | GitHub Copilot CLI | `bash` handler in `hooks.agentStop` of the version-1 user hook file `~/.copilot/hooks/agent-hud.json`, `timeoutSec` 5 | `stopReason` is `end_turn` and `sessionId` is present; the turn is the callback time |
 | CodeBuddy | Group appended to `hooks.Stop` of `~/.codebuddy/settings.json`; only commands ending in ` --completion-hook codebuddy` are Agent HUD's | `hook_event_name` is `Stop` and `session_id` is present; the turn is the transcript's last completed assistant `messageId` after the last user message, else the callback time |
+| Qwen Code | Group appended to `hooks.Stop` of `settings.json` in `$QWEN_HOME` (default `~/.qwen`), timeout 5000 ms; only commands ending in ` --completion-hook qwen` are Agent HUD's | `hook_event_name` is `Stop` and `session_id` is present; the turn is `prompt_id` (0.23.4 and later), else the callback time. A cancelled or failed turn runs no `Stop` |
 
-- The handler command is `'<executable path>' --completion-hook <source>` with a 5-second timeout. Other hooks in the file are preserved, and a file that already contains the identical configuration is not rewritten.
+- The handler command is `'<executable path>' --completion-hook <source>` with a 5-second timeout, written in the client's own unit. Other hooks in the file are preserved, and a file that already contains the identical configuration is not rewritten.
 - Automatic setup never replaces a handler that points at a different executable: the existing installation keeps the hook and the conflict is logged. Moving or reinstalling the application does not update the path; `--install-completion-hook <source>` takes ownership explicitly ([command line](command-line.md#adapter-commands)). Installing a hook never starts, restarts or interrupts the client and consumes no quota.
 - The handler reads the payload from standard input and writes one JSON record per completion to `turn-completions/<source>/<id>.json` in the data directory: id, `sessionID` (`<source>:<conversation id>`), vendor, task (vendor plus workspace folder name), model when the payload names one, and receipt time. No prompt, tool argument, credential or e-mail address is stored.
 - An existing record for the same id is left untouched, so repeated callbacks create no duplicates; records older than 30 days are deleted on the next write.

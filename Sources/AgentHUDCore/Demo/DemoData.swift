@@ -28,6 +28,7 @@ public enum DemoData {
         AgentDescriptor(id: "zcode", vendor: "ZCode", model: "CLI", source: L10n.sourceNotConnected, enabled: true),
         AgentDescriptor(id: "codebuddy", vendor: "CodeBuddy", model: "Agent", source: L10n.sourceNotConnected, enabled: true),
         AgentDescriptor(id: "workbuddy", vendor: "WorkBuddy", model: "Agent", source: L10n.sourceNotConnected, enabled: true),
+        AgentDescriptor(id: "qwen", vendor: "Qwen", model: "Code", source: L10n.sourceNotConnected, enabled: true),
         AgentDescriptor(id: "pi", vendor: "Pi", model: "Agent", source: L10n.sourceNotConnected, enabled: true),
     ]
 
@@ -51,6 +52,7 @@ public enum DemoData {
         "zcode": (29, 70 * 60, nil),
         "codebuddy": (88, 6 * 3600, nil),
         "workbuddy": (19, 45 * 60, nil),
+        "qwen": (47, 2 * 3600 + 30 * 60, nil),
         "pi": (60, 3 * 3600, nil),
     ]
 

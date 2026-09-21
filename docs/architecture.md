@@ -48,7 +48,7 @@ Agent HUD Open is a Swift package with three libraries and one executable. `Agen
 
 ### Session observers and hook ownership
 
-- `SessionObservers.configure(executable:)`, called after creating the store and before `start()`, installs the Pi observer when the Pi directory exists and the Antigravity, Cursor, GitHub Copilot CLI and CodeBuddy stop hooks when those clients are installed. Creating a `DesktopApplication` installs nothing.
+- `SessionObservers.configure(executable:)`, called after creating the store and before `start()`, installs the Pi observer when the Pi directory exists, the Antigravity, Cursor, GitHub Copilot CLI, CodeBuddy and Qwen Code stop hooks, Claude Code's notification hook and each detected client's approval hook when those clients are installed. Creating a `DesktopApplication` installs nothing.
 - A completion hook that points at another executable is preserved and the conflict is reported; `--install-completion-hook` transfers ownership explicitly ([completion hooks](session-lifecycle.md#completion-hooks)).
 
 ### Storage

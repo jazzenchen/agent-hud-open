@@ -117,10 +117,11 @@ enum TencentBuddySessions {
 
 enum CodeBuddySessions: LocalSessionLayout {
     static let installPaths = [".codebuddy/projects"]
-    static func roots(home: URL, environment: [String: String]) -> [URL] {
-        let base = environment["CODEBUDDY_CONFIG_DIR"].flatMap { $0.isEmpty ? nil : URL(fileURLWithPath: $0) } ?? home.appendingPathComponent(".codebuddy")
-        return [base.appendingPathComponent("projects")]
+    /// CodeBuddy Code's configuration and data folder: `CODEBUDDY_CONFIG_DIR`, else `~/.codebuddy`.
+    static func home(_ home: URL, environment: [String: String] = ProcessInfo.processInfo.environment) -> URL {
+        environment["CODEBUDDY_CONFIG_DIR"].flatMap { $0.isEmpty ? nil : URL(fileURLWithPath: $0) } ?? home.appendingPathComponent(".codebuddy")
     }
+    static func roots(home: URL, environment: [String: String]) -> [URL] { [self.home(home, environment: environment).appendingPathComponent("projects")] }
     static func accepts(_ url: URL) -> Bool { url.pathExtension == "jsonl" }
     static func skips(_ url: URL) -> Bool { url.lastPathComponent == "tool-results" }
     static func read(_ url: URL) throws -> ProviderSessions { try TencentBuddySessions.read(url, source: .codebuddy) }

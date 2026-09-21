@@ -6,7 +6,7 @@ Which client logos the application bundles, where each one came from, how it is 
 
 ## Lobe Icons
 
-Claude, OpenAI (shown as ChatGPT), Antigravity, DeepSeek, Grok, GitHub Copilot, OpenClaw, Hermes Agent, CodeBuddy and Qoder come from [Lobe Icons](https://github.com/lobehub/lobe-icons), package `@lobehub/icons-static-png` version `1.97.0`.
+Claude, OpenAI (shown as ChatGPT), Antigravity, DeepSeek, Grok, GitHub Copilot, OpenClaw, Hermes Agent, CodeBuddy, Qwen Code and Qoder come from [Lobe Icons](https://github.com/lobehub/lobe-icons), package `@lobehub/icons-static-png` version `1.97.0`.
 
 | Bundled file | Original file in the package |
 | --- | --- |
@@ -19,9 +19,10 @@ Claude, OpenAI (shown as ChatGPT), Antigravity, DeepSeek, Grok, GitHub Copilot, 
 | `openclaw.png` | `light/openclaw-color.png` |
 | `hermes.png` | `light/hermesagent.png` |
 | `codebuddy.png` | `light/codebuddy-color.png` |
+| `qwen.png` | `light/qwen-color.png` |
 | `qoder.png`, `qoder-dark.png` | `light/qoder-color.png`, `dark/qoder-color.png` |
 
-The PNG files are unchanged (640 × 640); only the names differ: the `-color` suffix is dropped, and `openai.png`, `githubcopilot.png` and `hermesagent.png` are stored as `chatgpt.png`, `copilot.png` and `hermes.png`. Codex rows reuse the ChatGPT artwork under their own name. Claude, Antigravity, DeepSeek, OpenClaw and CodeBuddy keep their source colors; the OpenAI mark is stored as shipped and tinted green (`#10A37F`) at render time for ChatGPT; the monochrome Grok, GitHub Copilot and Hermes Agent marks are rendered as template images, so they follow the foreground color in light and dark appearance. Qoder ships one file per background, because the light half of its mark is the background's own colour; the three Qoder builds share both files. The package's MIT license is bundled as `LobeIcons-LICENSE.txt`.
+The PNG files are unchanged (640 × 640); only the names differ: the `-color` suffix is dropped, and `openai.png`, `githubcopilot.png` and `hermesagent.png` are stored as `chatgpt.png`, `copilot.png` and `hermes.png`. Codex rows reuse the ChatGPT artwork under their own name. Claude, Antigravity, DeepSeek, OpenClaw, CodeBuddy and Qwen Code keep their source colors; the OpenAI mark is stored as shipped and tinted green (`#10A37F`) at render time for ChatGPT; the monochrome Grok, GitHub Copilot and Hermes Agent marks are rendered as template images, so they follow the foreground color in light and dark appearance. Qoder ships one file per background, because the light half of its mark is the background's own colour; the three Qoder builds share both files. The package's MIT license is bundled as `LobeIcons-LICENSE.txt`.
 
 ## Cursor, OpenCode, Kimi, GLM, Pi, ZCode and WorkBuddy
 
@@ -41,7 +42,7 @@ The bundled files are 256 × 256 transparent PNG renders of those SVGs, fitted a
 
 ## Rendering rules
 
-Every logo is drawn into a 16 × 16 point image. Grok, Cursor, Kimi, Pi, GitHub Copilot, Hermes Agent and ZCode are template images (monochrome, foreground-colored); Claude, ChatGPT (tinted), Antigravity, DeepSeek, GLM, OpenCode, OpenClaw, CodeBuddy, WorkBuddy and Qoder are drawn as original images. SwiftUI views and the status-item menu use the same images.
+Every logo is drawn into a 16 × 16 point image. Grok, Cursor, Kimi, Pi, GitHub Copilot, Hermes Agent and ZCode are template images (monochrome, foreground-colored); Claude, ChatGPT (tinted), Antigravity, DeepSeek, GLM, OpenCode, OpenClaw, CodeBuddy, WorkBuddy, Qwen Code and Qoder are drawn as original images. SwiftUI views and the status-item menu use the same images.
 
 ## Licenses and trademarks
 

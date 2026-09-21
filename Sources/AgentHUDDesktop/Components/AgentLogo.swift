@@ -9,7 +9,7 @@ enum AgentArtwork {
         ["Claude": "claude", "ChatGPT": "chatgpt", "Antigravity": "antigravity", "DeepSeek": "deepseek", "Grok": "grok",
          "Cursor": "cursor", "OpenCode": "opencode", "OpenCode-dark": "opencode-dark", "Kimi": "kimi", "GLM": "glm", "Pi": "pi",
          "GitHub Copilot": "copilot", "OpenClaw": "openclaw", "Hermes": "hermes", "ZCode": "zcode", "CodeBuddy": "codebuddy",
-         "WorkBuddy": "workbuddy", "Qoder": "qoder", "Qoder-dark": "qoder-dark"]
+         "WorkBuddy": "workbuddy", "Qwen": "qwen", "Qoder": "qoder", "Qoder-dark": "qoder-dark"]
 
     // A mark that is named here but not bundled must not take the app down with it: the vendor falls back to its
     // lettered badge instead, which is what a client whose artwork nobody has drawn yet already gets.

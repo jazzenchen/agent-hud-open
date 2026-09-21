@@ -81,6 +81,206 @@ final class PermissionHookTests: XCTestCase, @unchecked Sendable {
         XCTAssertEqual(try Data(contentsOf: settings), Data(#"{"hooks": "everything off"}"#.utf8))
     }
 
+    func testCodexCLIAndDesktopShareAnIdempotentHookWithoutChangingConfiguration() throws {
+        let home = try directory()
+        let root = home.appendingPathComponent(".codex")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        XCTAssertTrue(PermissionHooks.Source.codex.isInstalled(home: home))
+        let config = root.appendingPathComponent("config.toml")
+        let originalConfig = Data("[features]\nhooks = false\n".utf8)
+        try originalConfig.write(to: config)
+        let hooks = root.appendingPathComponent("hooks.json")
+        let original: [String: Any] = ["description": "My hooks", "hooks": [
+            "Stop": [["hooks": [["type": "command", "command": "echo done"]]]],
+            "PermissionRequest": [["matcher": "Bash", "hooks": [["type": "command", "command": "echo check"]]]],
+        ]]
+        try JSONSerialization.data(withJSONObject: original).write(to: hooks)
+        let executable = URL(fileURLWithPath: "/Applications/Agent HUD.app/Contents/MacOS/Agent HUD")
+        try PermissionHooks.configure(.codex, enabled: true, executable: executable, home: home)
+        let installed = try Data(contentsOf: hooks)
+        try PermissionHooks.configure(.codex, enabled: true, executable: executable, home: home)
+        XCTAssertEqual(try Data(contentsOf: hooks), installed, "repeated startup must not change hook trust hashes")
+        let object = try XCTUnwrap(try ProviderJSON.read(installed).objectValue)
+        XCTAssertEqual(PermissionHooks.commands(in: object, source: .codex),
+                       ["'\(executable.path)' --permission-hook codex"], "one handler serves both Codex clients")
+        XCTAssertTrue(PermissionHooks.isActive(.codex, home: home))
+        XCTAssertEqual(try Data(contentsOf: config), originalConfig, "a disabled hook feature stays disabled")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: root.appendingPathComponent("settings.json").path))
+
+        XCTAssertThrowsError(try PermissionHooks.configure(.codex, enabled: true,
+            executable: URL(fileURLWithPath: "/tmp/other-hud"), home: home))
+        XCTAssertEqual(try Data(contentsOf: hooks), installed, "another installation cannot take over the handler")
+        try PermissionHooks.configure(.codex, enabled: false, executable: executable, home: home)
+        XCTAssertEqual(try ProviderJSON.read(Data(contentsOf: hooks)),
+                       try ProviderJSON.read(JSONSerialization.data(withJSONObject: original)), "other hooks are preserved")
+    }
+
+    func testCodexHomeUsesTheSameResolverAsItsUsageProvider() throws {
+        let home = try directory()
+        let custom = home.appendingPathComponent("custom-codex", isDirectory: true)
+        XCTAssertEqual(CodexLocator.dataDirectory(home: home, environment: ["CODEX_HOME": custom.path]), custom)
+        for environment in [[:], ["CODEX_HOME": ""]] {
+            XCTAssertEqual(CodexLocator.dataDirectory(home: home, environment: environment),
+                           home.appendingPathComponent(".codex", isDirectory: true))
+        }
+        XCTAssertEqual(PermissionHooks.Source.codex.configuration(home: home),
+                       CodexLocator.dataDirectory(home: home).appendingPathComponent("hooks.json"))
+    }
+
+    func testCodexPatchAndShellRequestsShowTheOperationAndOnlySupportedAnswers() throws {
+        let patch = "*** Begin Patch\n*** Update File: README.md\n@@\n-old\n+new\n*** End Patch"
+        var body = payload(tool: "apply_patch", input: ["command": patch])
+        body["turn_id"] = "turn-1"
+        let rule: JSONValue = .object(["type": .string("addRules"), "behavior": .string("allow"),
+                                      "rules": .array([.object(["toolName": .string("Bash")])])])
+        body["permission_suggestions"] = try JSONSerialization.jsonObject(with: RecordCoding.encoder().encode([rule]))
+        let request = try XCTUnwrap(try PermissionRequest.parse(JSONSerialization.data(withJSONObject: body),
+                                                               source: .codex, id: "patch", now: now))
+        XCTAssertEqual(request.vendor, "Codex")
+        XCTAssertEqual(request.sessionID, "s")
+        XCTAssertEqual(request.detail, patch)
+        XCTAssertEqual(request.badge, "EDIT")
+        XCTAssertEqual(request.symbol, "pencil")
+        XCTAssertNil(request.alwaysAllow, "Codex does not support permission-rule updates, even if a payload offers one")
+        XCTAssertTrue(PermissionDecision.allowAlways(rule).response(for: .codex).isEmpty)
+        let claudeResponse = try ProviderJSON.read(PermissionDecision.allowAlways(rule).response(for: .claude))
+        XCTAssertEqual(claudeResponse["hookSpecificOutput"]["decision"]["updatedPermissions"].arrayValue,
+                       [rule], "Claude keeps its rule updates")
+
+        let shell = try XCTUnwrap(try PermissionRequest.parse(JSONSerialization.data(withJSONObject: payload()),
+                                                             source: .codex, id: "shell", now: now))
+        XCTAssertEqual(shell.summary, "Remove node_modules")
+        XCTAssertEqual(shell.detail, "rm -rf node_modules")
+        for decision in [PermissionDecision.allow, .deny] {
+            let response = try ProviderJSON.read(decision.response(for: .codex))
+            XCTAssertEqual(response["hookSpecificOutput"]["hookEventName"].stringValue, "PermissionRequest")
+            XCTAssertEqual(response["hookSpecificOutput"]["decision"].objectValue,
+                           ["behavior": .string(decision == .allow ? "allow" : "deny")])
+        }
+    }
+
+    func testCodeBuddyAndWorkBuddyAnswerOnceWithoutRuleUpdates() throws {
+        let home = try directory()
+        let executable = URL(fileURLWithPath: "/tmp/hud")
+        for (source, folder) in [(PermissionHooks.Source.codebuddy, ".codebuddy"), (.workbuddy, ".workbuddy")] {
+            try FileManager.default.createDirectory(at: home.appendingPathComponent(folder), withIntermediateDirectories: true)
+            XCTAssertFalse(source.isInstalled(home: home), "a settings folder alone can be the IDE extension's")
+            try FileManager.default.createDirectory(at: home.appendingPathComponent("\(folder)/projects"), withIntermediateDirectories: true)
+            XCTAssertTrue(source.isInstalled(home: home))
+            try PermissionHooks.configure(source, enabled: true, executable: executable, home: home)
+            let settings = try ProviderJSON.read(Data(contentsOf: home.appendingPathComponent("\(folder)/settings.json")))
+            let handler = settings["hooks"]["PermissionRequest"].arrayValue?.first?["hooks"].arrayValue?.first
+            XCTAssertEqual(handler?["command"].stringValue, "'/tmp/hud' --permission-hook \(source.rawValue)")
+            XCTAssertEqual(handler?["timeout"].numberValue, 86_400, "CodeBuddy counts hook timeouts in seconds")
+        }
+
+        let rule: JSONValue = .object(["type": .string("addRules"), "behavior": .string("allow"),
+                                      "rules": .array([.object(["toolName": .string("MultiEdit")])])])
+        var body = payload(tool: "MultiEdit", input: ["file_path": "/Users/me/agent-hud/README.md",
+                                                      "edits": [["old_string": "old", "new_string": "new"],
+                                                                ["old_string": "a", "new_string": "b"]]])
+        body["permission_suggestions"] = try JSONSerialization.jsonObject(with: RecordCoding.encoder().encode([rule]))
+        let request = try XCTUnwrap(try PermissionRequest.parse(JSONSerialization.data(withJSONObject: body),
+                                                               source: .workbuddy, id: "edit", now: now))
+        XCTAssertEqual(request.vendor, "WorkBuddy")
+        XCTAssertEqual(request.summary, "README.md")
+        XCTAssertEqual(request.badge, "EDIT")
+        XCTAssertEqual(request.path, "/Users/me/agent-hud/README.md")
+        XCTAssertEqual(request.removed, "old", "a multi-edit is recognized by its first change")
+        XCTAssertEqual(request.added, "new")
+        XCTAssertNil(request.alwaysAllow, "the engine offers rules but never applies one sent back")
+        XCTAssertTrue(PermissionDecision.allowAlways(rule).response(for: .codebuddy).isEmpty)
+        XCTAssertEqual(try ProviderJSON.read(PermissionDecision.allow.response(for: .codebuddy))["hookSpecificOutput"]["decision"].objectValue,
+                       ["behavior": .string("allow")])
+    }
+
+    func testZCodeNestsItsHookAndTurnsHooksOnOnlyWhenUnset() throws {
+        let home = try directory()
+        let root = home.appendingPathComponent(".zcode/cli")
+        XCTAssertFalse(PermissionHooks.Source.zcode.isInstalled(home: home))
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        XCTAssertTrue(PermissionHooks.Source.zcode.isInstalled(home: home))
+        let config = root.appendingPathComponent("config.json")
+        let original: [String: Any] = ["$schema": "https://zcode.z.ai/config.json",
+                                       "mcp": ["servers": ["linear": ["env": ["TOKEN": "secret"]]]],
+                                       "hooks": ["timeoutMs": 30000, "events": [
+                                           "Stop": [["hooks": [["type": "command", "command": "echo done"]]]]]]]
+        try JSONSerialization.data(withJSONObject: original).write(to: config)
+        try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: config.path)
+
+        let executable = URL(fileURLWithPath: "/Applications/Agent HUD.app/Contents/MacOS/Agent HUD")
+        try PermissionHooks.configure(.zcode, enabled: true, executable: executable, home: home)
+        XCTAssertTrue(PermissionHooks.isActive(.zcode, home: home))
+        let installed = try ProviderJSON.read(Data(contentsOf: config))
+        XCTAssertEqual(installed["mcp"]["servers"]["linear"]["env"]["TOKEN"].stringValue, "secret", "the rest of the file is kept")
+        XCTAssertEqual(installed["hooks"]["timeoutMs"].numberValue, 30000)
+        XCTAssertEqual(installed["hooks"]["enabled"], .bool(true), "ZCode runs no hook until hooks are switched on")
+        XCTAssertNil(installed["hooks"]["PermissionRequest"].arrayValue, "ZCode reads its events one level down")
+        let group = try XCTUnwrap(installed["hooks"]["events"]["PermissionRequest"].arrayValue?.first?.objectValue)
+        XCTAssertEqual(Set(group.keys), ["hooks"], "ZCode rejects an empty matcher and any key it does not know")
+        XCTAssertEqual(group["hooks"]?.arrayValue?.first?["timeout"].numberValue, 86_400)
+        XCTAssertEqual(installed["hooks"]["events"]["Stop"].arrayValue?.count, 1)
+        let mode = try FileManager.default.attributesOfItem(atPath: config.path)[.posixPermissions] as? NSNumber
+        XCTAssertEqual(mode?.intValue, 0o600, "a file that holds server credentials stays private")
+
+        try PermissionHooks.configure(.zcode, enabled: false, executable: executable, home: home)
+        let removed = try ProviderJSON.read(Data(contentsOf: config))
+        XCTAssertNil(removed["hooks"]["events"]["PermissionRequest"].arrayValue)
+        XCTAssertEqual(removed["hooks"]["events"]["Stop"].arrayValue?.count, 1)
+
+        var off = original
+        off["hooks"] = ["enabled": false]
+        try JSONSerialization.data(withJSONObject: off).write(to: config)
+        try PermissionHooks.configure(.zcode, enabled: true, executable: executable, home: home)
+        XCTAssertEqual(try ProviderJSON.read(Data(contentsOf: config))["hooks"]["enabled"], .bool(false),
+                       "hooks the user switched off stay off")
+
+        try Data(#"{"hooks": {"events": []}}"#.utf8).write(to: config)
+        XCTAssertThrowsError(try PermissionHooks.configure(.zcode, enabled: true, executable: executable, home: home),
+                             "a layout ZCode would reject is never rewritten")
+    }
+
+    func testZCodeQuestionsAndPlansStayInItsOwnDialog() throws {
+        for tool in ["AskUserQuestion", "ExitPlanMode"] {
+            XCTAssertNil(try PermissionRequest.parse(JSONSerialization.data(withJSONObject: payload(tool: tool, input: [:])),
+                                                     source: .zcode, id: tool, now: now))
+        }
+        let shell = try XCTUnwrap(try PermissionRequest.parse(JSONSerialization.data(withJSONObject: payload()),
+                                                             source: .zcode, id: "shell", now: now))
+        XCTAssertEqual(shell.vendor, "ZCode")
+        XCTAssertEqual(shell.detail, "rm -rf node_modules")
+        XCTAssertNil(shell.alwaysAllow)
+    }
+
+    func testQwenWaitsADayInMillisecondsAndItsToolsReadLikeClaudeCodes() throws {
+        let home = try directory()
+        try FileManager.default.createDirectory(at: home.appendingPathComponent(".qwen"), withIntermediateDirectories: true)
+        XCTAssertTrue(PermissionHooks.Source.qwen.isInstalled(home: home))
+        try PermissionHooks.configure(.qwen, enabled: true, executable: URL(fileURLWithPath: "/tmp/hud"), home: home)
+        let settings = try ProviderJSON.read(Data(contentsOf: home.appendingPathComponent(".qwen/settings.json")))
+        let handler = settings["hooks"]["PermissionRequest"].arrayValue?.first?["hooks"].arrayValue?.first
+        XCTAssertEqual(handler?["command"].stringValue, "'/tmp/hud' --permission-hook qwen")
+        XCTAssertEqual(handler?["timeout"].numberValue, 86_400_000, "Qwen reads 1000 or more as milliseconds on every version")
+
+        let shell = try XCTUnwrap(try PermissionRequest.parse(JSONSerialization.data(withJSONObject: payload(tool: "run_shell_command")),
+                                                             source: .qwen, id: "shell", now: now))
+        XCTAssertEqual(shell.vendor, "Qwen")
+        XCTAssertEqual(shell.toolName, "run_shell_command", "the client's own name is kept")
+        XCTAssertEqual([shell.badge, shell.symbol, shell.summary], ["BASH", "terminal.fill", "Remove node_modules"])
+        XCTAssertEqual(shell.detail, "rm -rf node_modules")
+
+        let edit = try XCTUnwrap(try PermissionRequest.parse(JSONSerialization.data(withJSONObject: payload(tool: "edit", input: [
+            "file_path": "/Users/me/agent-hud/README.md", "old_string": "old", "new_string": "new"])), source: .qwen, id: "edit", now: now))
+        XCTAssertEqual([edit.badge, edit.summary, edit.removed, edit.added], ["EDIT", "README.md", "old", "new"])
+        XCTAssertEqual(edit.path, "/Users/me/agent-hud/README.md")
+        XCTAssertNil(edit.alwaysAllow)
+
+        for tool in ["ask_user_question", "exit_plan_mode"] {
+            XCTAssertNil(try PermissionRequest.parse(JSONSerialization.data(withJSONObject: payload(tool: tool, input: [:])),
+                                                     source: .qwen, id: tool, now: now), "Qwen ignores an allow for \(tool)")
+        }
+    }
+
     func testTheRequestSaysWhatTheCallIsAbout() throws {
         let bash = try XCTUnwrap(try PermissionRequest.parse(
             JSONSerialization.data(withJSONObject: payload()), source: .claude, id: "1", now: now))
@@ -105,11 +305,11 @@ final class PermissionHookTests: XCTestCase, @unchecked Sendable {
     }
 
     func testTheAnswerIsTheOneTheClientReads() throws {
-        let allow = try XCTUnwrap(try ProviderJSON.read(PermissionDecision.allow.response).objectValue)
+        let allow = try XCTUnwrap(try ProviderJSON.read(PermissionDecision.allow.response(for: .claude)).objectValue)
         let output = try XCTUnwrap(allow["hookSpecificOutput"]?.objectValue)
         XCTAssertEqual(output["hookEventName"]?.stringValue, "PermissionRequest")
         XCTAssertEqual(output["decision"]?["behavior"].stringValue, "allow")
-        XCTAssertEqual(try ProviderJSON.read(PermissionDecision.deny.response)["hookSpecificOutput"]["decision"]["behavior"].stringValue,
+        XCTAssertEqual(try ProviderJSON.read(PermissionDecision.deny.response(for: .claude))["hookSpecificOutput"]["decision"]["behavior"].stringValue,
                        "deny")
         XCTAssertTrue(PermissionDecision.noDecision.isEmpty, "saying nothing leaves the client's own prompt alone")
     }
@@ -142,7 +342,7 @@ final class PermissionHookTests: XCTestCase, @unchecked Sendable {
             try await Task.sleep(for: .milliseconds(10))
             opened = connect(to: path)
         }
-        let descriptor = try XCTUnwrap(opened, "the HUD is listening")
+        let descriptor = try XCTUnwrap(opened, "the HUD is listening at \(path): \(String(cString: strerror(errno)))")
         var payload = body
         payload[PermissionHookClient.sourceKey] = source.rawValue
         let data = try JSONSerialization.data(withJSONObject: payload)
@@ -186,5 +386,37 @@ final class PermissionHookTests: XCTestCase, @unchecked Sendable {
         try await waitForPending(1, "the second request reaches the HUD")
         close(abandoned)
         try await waitForPending(0, "a request nobody is waiting for is no longer a question")
+
+        // Both Codex clients use the same source; answering one must leave the other client waiting.
+        let cli = try await ask(path, payload(session: "codex-cli"), source: .codex)
+        let desktop = try await ask(path, payload(session: "codex-desktop", tool: "apply_patch",
+                                                 input: ["command": "*** Begin Patch\n*** End Patch"]), source: .codex)
+        try await waitForPending(2, "CLI and Desktop share the queue")
+        let cliRequest = try XCTUnwrap(requests.pending.first { $0.sessionID == "codex-cli" })
+        let desktopRequest = try XCTUnwrap(requests.pending.first { $0.sessionID == "codex-desktop" })
+        XCTAssertEqual(cliRequest.vendor, "Codex")
+        XCTAssertEqual(desktopRequest.vendor, "Codex")
+        requests.resolve(desktopRequest.id, .deny)
+        let denied = recv(desktop, &buffer, buffer.count, 0)
+        close(desktop)
+        XCTAssertGreaterThan(denied, 0)
+        XCTAssertEqual(try ProviderJSON.read(Data(buffer[..<max(0, denied)]))["hookSpecificOutput"]["decision"]["behavior"].stringValue, "deny")
+        XCTAssertEqual(requests.pending.map(\.id), [cliRequest.id])
+        requests.resolve(cliRequest.id, .allow)
+        let allowed = recv(cli, &buffer, buffer.count, 0)
+        close(cli)
+        XCTAssertGreaterThan(allowed, 0)
+        XCTAssertEqual(try ProviderJSON.read(Data(buffer[..<max(0, allowed)]))["hookSpecificOutput"]["decision"]["behavior"].stringValue, "allow")
+
+        let cancelled = try await ask(path, payload(session: "codex-cancelled"), source: .codex)
+        try await waitForPending(1, "Codex can withdraw a waiting request")
+        close(cancelled)
+        try await waitForPending(0, "cancellation removes the Codex card")
+        let fallback = try await ask(path, payload(session: "codex-fallback"), source: .codex)
+        try await waitForPending(1, "the HUD can close while Codex waits")
+        requests.stop()
+        XCTAssertEqual(recv(fallback, &buffer, buffer.count, 0), 0, "no answer leaves Codex's native approval flow in charge")
+        close(fallback)
+        XCTAssertTrue(requests.pending.isEmpty)
     }
 }

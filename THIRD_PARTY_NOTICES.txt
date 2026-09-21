@@ -107,3 +107,12 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+Qwen Code
+Source: https://github.com/QwenLM/qwen-code/tree/557f36ba83bcf98bc031eefc94e60991289dc4f2
+Chat record and telemetry field names, token field meanings, runtime folder resolution, hook payloads and hook timeout units informed the Qwen Code parser and hooks.
+
+Copyright 2025 Google LLC
+Copyright 2025 Qwen
+
+Licensed under the Apache License, Version 2.0; the full text is this repository's LICENSE.

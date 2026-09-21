@@ -7,47 +7,98 @@ import Foundation
 /// output and acts on what it says, so a request can be approved from the HUD instead of the terminal. Saying nothing
 /// is always available and always safe: the client then behaves exactly as it would with no hook installed.
 public enum PermissionHooks {
-    /// Clients that ship Claude Code's hook schema unchanged, so one payload shape and one answer shape serve all of
-    /// them; they differ only in where their settings live. Each is offered only on a machine that has it.
+    /// Clients with the PermissionRequest hook contract: it runs only when the client is about to ask, and the client
+    /// reads Claude Code's allow/deny answer. Codex CLI and Desktop share one hooks file, WorkBuddy runs CodeBuddy
+    /// Code's engine, ZCode's desktop app and terminal share one engine and one configuration file, and Qwen Code
+    /// reads the answer unchanged; only Claude Code and the Qoder builds apply a permission-rule update sent back.
     public enum Source: String, CaseIterable, Sendable {
         case claude
+        case codex
         case qoder
         case qoderCN
         case qoderWork
+        case codebuddy
+        case workbuddy
+        case zcode
+        case qwen
 
         public var vendor: String {
             switch self {
             case .claude: return "Claude"
+            case .codex: return "Codex"
             case .qoder: return "Qoder"
             case .qoderCN: return "Qoder CN"
             case .qoderWork: return "QoderWork"
+            case .codebuddy: return "CodeBuddy"
+            case .workbuddy: return "WorkBuddy"
+            case .zcode: return "ZCode"
+            case .qwen: return "Qwen"
             }
         }
 
         var event: String { "PermissionRequest" }
-        /// Matched against the tool name; empty is every tool.
-        var matcher: String { "" }
+        /// A rule is echoed back only where the client both offers one and applies it. CodeBuddy Code offers
+        /// suggestions but never applies one sent back, ZCode applies a rule but never offers one, and Codex and
+        /// Qwen Code do neither.
+        var supportsPermissionUpdates: Bool {
+            switch self {
+            case .claude, .qoder, .qoderCN, .qoderWork: return true
+            case .codex, .codebuddy, .workbuddy, .zcode, .qwen: return false
+            }
+        }
+        /// Matched against the tool name; empty is every tool. ZCode rejects an empty matcher and runs a group without
+        /// one for every tool.
+        var matcher: String? { self == .zcode ? nil : "" }
+        /// Claude Code's layout keeps the event lists at `hooks.<Event>`; ZCode nests them at `hooks.events.<Event>`.
+        var nestsEvents: Bool { self == .zcode }
+        /// Calls that ask the user something other than permission. ZCode routes its question and its plan approval
+        /// through this event, and an answer without the user's reply fails the question or approves an unread plan;
+        /// Qwen Code ignores an allow for both. The HUD leaves them to the client's own dialog.
+        var unanswerableTools: Set<String> {
+            switch self {
+            case .zcode: return ["AskUserQuestion", "ExitPlanMode"]
+            case .qwen: return ["ask_user_question", "exit_plan_mode"]
+            default: return []
+            }
+        }
         /// How long the client waits for an answer. A request stays on the HUD until it is answered or the client
         /// withdraws it, so this only has to outlast a user who walked away. A client that cancels the hook first
         /// closes the connection, which takes the request off the HUD.
-        var timeout: Int { 86_400 }
+        /// Qwen Code reads a value of 1000 or more as milliseconds on every version, so its day is written that way.
+        var timeout: Int { self == .qwen ? 86_400_000 : 86_400 }
 
         var directory: String {
             switch self {
             case .claude: return ".claude"
+            case .codex: return ".codex"
             case .qoder: return ".qoder"
             case .qoderCN: return ".qoder-cn"
             case .qoderWork: return ".qoderwork"
+            case .codebuddy: return ".codebuddy"
+            case .workbuddy: return ".workbuddy"
+            case .zcode: return ".zcode/cli"
+            case .qwen: return ".qwen"
             }
         }
 
         func home(_ base: URL) -> URL {
+            if case .codex = self { return CodexLocator.dataDirectory(home: base) }
+            if case .codebuddy = self { return CodeBuddySessions.home(base) }
+            if case .qwen = self { return QwenSessions.home(base) }
             // Claude Code's configuration directory moves with CLAUDE_CONFIG_DIR; the forks have no such variable.
             if case .claude = self, let configured = ClaudeSubscription.configDirectory { return configured }
             return base.appendingPathComponent(directory, isDirectory: true)
         }
 
-        func configuration(home base: URL) -> URL { home(base).appendingPathComponent("settings.json") }
+        func configuration(home base: URL) -> URL {
+            let name: String
+            switch self {
+            case .codex: name = "hooks.json"
+            case .zcode: name = "config.json"
+            default: name = "settings.json"
+            }
+            return home(base).appendingPathComponent(name)
+        }
 
         /// Whether the client is here at all. A machine without it keeps its home untouched.
         public func isInstalled(home: URL = FileManager.default.homeDirectoryForCurrentUser,
@@ -56,8 +107,11 @@ public enum PermissionHooks {
             case .claude:
                 return ClaudeEngineLocator.find(home: home, fileManager: fileManager) != nil
                     || fileManager.fileExists(atPath: home.appendingPathComponent(".claude/projects").path)
-            case .qoder, .qoderCN, .qoderWork:
+            case .codex, .qoder, .qoderCN, .qoderWork, .zcode, .qwen:
                 return fileManager.fileExists(atPath: self.home(home).path)
+            // The session folder is what the usage provider reads; a settings folder alone can be the IDE extension's.
+            case .codebuddy, .workbuddy:
+                return fileManager.fileExists(atPath: self.home(home).appendingPathComponent("projects").path)
             }
         }
     }
@@ -84,7 +138,9 @@ public enum PermissionHooks {
     }
 
     static func commands(in configuration: [String: ProviderJSON], source: Source) -> [String] {
-        (configuration["hooks"]?[source.event].arrayValue ?? []).flatMap { $0["hooks"].arrayValue ?? [] }
+        let hooks = ProviderJSON.object(configuration)["hooks"]
+        let events = source.nestsEvents ? hooks["events"] : hooks
+        return (events[source.event].arrayValue ?? []).flatMap { $0["hooks"].arrayValue ?? [] }
             .compactMap { $0["command"].stringValue }.filter { ownsCommand($0, source: source) }
     }
 
@@ -104,16 +160,25 @@ public enum PermissionHooks {
         guard updated != object else { return }
         let url = source.configuration(home: home)
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        // A configuration file can hold server credentials; the rewrite keeps whatever access the client gave it.
+        let permissions = try? FileManager.default.attributesOfItem(atPath: url.path)[.posixPermissions]
         let encoder = JSONEncoder(); encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
         try encoder.encode(ProviderJSON.object(updated)).write(to: url, options: .atomic)
+        if let permissions { try FileManager.default.setAttributes([.posixPermissions: permissions], ofItemAtPath: url.path) }
     }
 
     static func updating(_ configuration: [String: ProviderJSON], source: Source, command: String?) throws -> [String: ProviderJSON] {
         var object = configuration
         guard object["hooks"] == nil || object["hooks"]?.objectValue != nil else { throw ProviderFailure.format }
         var hooks = object["hooks"]?.objectValue ?? [:]
-        guard hooks[source.event] == nil || hooks[source.event]?.arrayValue != nil else { throw ProviderFailure.format }
-        var groups = (hooks[source.event]?.arrayValue ?? []).compactMap { group -> ProviderJSON? in
+        if source.nestsEvents {
+            // ZCode drops its whole configuration over a malformed hooks section, so only its known shapes are edited.
+            guard hooks["events"] == nil || hooks["events"]?.objectValue != nil,
+                  hooks["enabled"] == nil || hooks["enabled"]?.boolValue != nil else { throw ProviderFailure.format }
+        }
+        var events = source.nestsEvents ? hooks["events"]?.objectValue ?? [:] : hooks
+        guard events[source.event] == nil || events[source.event]?.arrayValue != nil else { throw ProviderFailure.format }
+        var groups = (events[source.event]?.arrayValue ?? []).compactMap { group -> ProviderJSON? in
             guard var fields = group.objectValue, let handlers = fields["hooks"]?.arrayValue else { return group }
             let kept = handlers.filter { !ownsCommand($0["command"].stringValue, source: source) }
             if kept.count == handlers.count { return group }
@@ -122,11 +187,19 @@ public enum PermissionHooks {
             return .object(fields)
         }
         if let command {
-            groups.append(.object(["matcher": .string(source.matcher),
-                                   "hooks": .array([.object(["type": .string("command"), "command": .string(command),
-                                                             "timeout": .integer(Int64(source.timeout))])])]))
+            var group: [String: ProviderJSON] = ["hooks": .array([.object(["type": .string("command"), "command": .string(command),
+                                                                           "timeout": .integer(Int64(source.timeout))])])]
+            if let matcher = source.matcher { group["matcher"] = .string(matcher) }
+            groups.append(.object(group))
         }
-        hooks[source.event] = groups.isEmpty ? nil : .array(groups)
+        events[source.event] = groups.isEmpty ? nil : .array(groups)
+        if source.nestsEvents {
+            hooks["events"] = events.isEmpty ? nil : .object(events)
+            // ZCode runs no hook at all until this is set. A user who switched hooks off keeps them off.
+            if command != nil, hooks["enabled"] == nil { hooks["enabled"] = .bool(true) }
+        } else {
+            hooks = events
+        }
         object["hooks"] = hooks.isEmpty && configuration["hooks"] == nil ? nil : .object(hooks)
         return object
     }

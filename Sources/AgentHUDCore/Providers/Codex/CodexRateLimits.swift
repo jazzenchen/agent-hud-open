@@ -126,10 +126,14 @@ public struct CodexResetCredits: Codable, Hashable, Sendable {
 
 public enum CodexLocator {
     public static var dataDirectory: URL {
-        if let path = ProcessInfo.processInfo.environment["CODEX_HOME"], !path.isEmpty {
+        dataDirectory(home: FileManager.default.homeDirectoryForCurrentUser)
+    }
+
+    static func dataDirectory(home: URL, environment: [String: String] = ProcessInfo.processInfo.environment) -> URL {
+        if let path = environment["CODEX_HOME"], !path.isEmpty {
             return URL(fileURLWithPath: path, isDirectory: true)
         }
-        return FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".codex", isDirectory: true)
+        return home.appendingPathComponent(".codex", isDirectory: true)
     }
 
     public static func candidates(home: URL = FileManager.default.homeDirectoryForCurrentUser,

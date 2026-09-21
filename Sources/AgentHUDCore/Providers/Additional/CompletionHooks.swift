@@ -31,7 +31,7 @@ extension CompletionHookFormat {
 /// Explicit client stop callbacks. No credentials, prompts, or tool arguments are persisted.
 public enum CompletionHooks {
     public enum Source: String, CaseIterable, Sendable {
-        case antigravity, cursor, copilot, codebuddy
+        case antigravity, cursor, copilot, codebuddy, qwen
         var vendor: String { AdditionalSource(rawValue: rawValue)!.vendor }
         var format: any CompletionHookFormat.Type {
             switch self {
@@ -39,6 +39,7 @@ public enum CompletionHooks {
             case .cursor: CursorHookFormat.self
             case .copilot: CopilotHookFormat.self
             case .codebuddy: CodeBuddyHookFormat.self
+            case .qwen: QwenHookFormat.self
             }
         }
         func configuration(home: URL) -> URL { format.configuration(home: home) }

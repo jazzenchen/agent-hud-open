@@ -1,9 +1,10 @@
 import AgentHUDSupport
 import Foundation
 
-/// Claude Code style `Stop` handler in `~/.codebuddy/settings.json`; `Stop` takes no matcher and `timeout` is in seconds.
+/// Claude Code style `Stop` handler in `settings.json` of CodeBuddy Code's home; `Stop` takes no matcher and `timeout`
+/// is in seconds.
 enum CodeBuddyHookFormat: CompletionHookFormat {
-    static func configuration(home: URL) -> URL { home.appendingPathComponent(".codebuddy/settings.json") }
+    static func configuration(home: URL) -> URL { CodeBuddySessions.home(home).appendingPathComponent("settings.json") }
 
     /// `Stop` names no turn: the transcript's final assistant message identifies it, else the callback time does.
     /// `StopFailure` and other events are not completions.

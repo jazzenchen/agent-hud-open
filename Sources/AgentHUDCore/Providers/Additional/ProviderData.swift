@@ -3,7 +3,7 @@ import Foundation
 
 /// The additional integrations share reporting, while each owns its protocol and parser.
 public enum AdditionalSource: String, CaseIterable, Sendable {
-    case antigravity, cursor, grok, copilot, openclaw, hermes, zcode, codebuddy, workbuddy
+    case antigravity, cursor, grok, copilot, openclaw, hermes, zcode, codebuddy, workbuddy, qwen
 
     public var vendor: String {
         switch self {
@@ -16,6 +16,7 @@ public enum AdditionalSource: String, CaseIterable, Sendable {
         case .zcode: "ZCode"
         case .codebuddy: "CodeBuddy"
         case .workbuddy: "WorkBuddy"
+        case .qwen: "Qwen"
         }
     }
 
@@ -30,6 +31,7 @@ public enum AdditionalSource: String, CaseIterable, Sendable {
         case .zcode: L10n.text("ZCode 本地会话与用量", "ZCode local sessions and usage")
         case .codebuddy: L10n.text("CodeBuddy Code 本地会话与用量", "CodeBuddy Code local sessions and usage")
         case .workbuddy: L10n.text("WorkBuddy 本地会话与用量", "WorkBuddy local sessions and usage")
+        case .qwen: L10n.text("Qwen Code 本地会话与用量", "Qwen Code local sessions and usage")
         }
     }
 

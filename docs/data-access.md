@@ -16,7 +16,7 @@ Agent HUD Open reads agent activity and usage metadata on your Mac. It has no Ag
 | Grok CLI | Local session records and credential file | Official Grok CLI billing endpoint |
 | OpenCode, Kimi, GLM, Pi | Local JSON/SQLite session records and supported provider configuration; automatically prepared Pi lifecycle observer | Official Kimi, GLM, OpenCode Go, and Pi ChatGPT quota endpoints where configured |
 | GitHub Copilot CLI | Local session events and OpenTelemetry export files | GitHub Copilot quota endpoint with the GitHub CLI sign-in, only after consent in Settings |
-| OpenClaw, Hermes Agent, ZCode, CodeBuddy, WorkBuddy | Local session databases and transcripts | None |
+| OpenClaw, Hermes Agent, ZCode, CodeBuddy, WorkBuddy, Qwen Code | Local session databases and transcripts | None |
 
 Per-client fields, endpoints and stored data: [providers](providers.md). Token counts, percentages, alert levels, request intervals and reading retention: [usage semantics](usage-semantics.md).
 
@@ -38,7 +38,7 @@ Per-client fields, endpoints and stored data: [providers](providers.md). Token c
 - Saved readings appear immediately after a restart with their original observation times; a failed refresh keeps them and reports the failure. Unavailable quotas are never inferred from token counts.
 - Readings of an account a client is no longer signed in to stay until the account has not been seen for 30 days.
 - A completed credential scan retires expired, removed or rejected OpenCode Go, Kimi and GLM quota rows, including cached rows and saved display settings.
-- The approval hook adds one handler to a client's own settings file, leaving every other hook in it alone, and refuses to rewrite a layout it does not recognize. What it carries — the tool, its input, the folder and the client's own rule suggestions — is read in memory to draw the card and is never stored; the answer goes straight back to the client that asked ([approvals](hud.md#approvals)).
+- The approval hook adds one handler to a client's own settings or hooks file, leaving every other hook in it alone, and refuses to rewrite a layout it does not recognize. Codex CLI and Desktop share that handler; their hook trust and feature settings stay under Codex's control. ZCode runs no hook until its hooks switch is on, so an absent switch is set and one the user turned off is left off; a rewritten file keeps its permissions. What it carries — the tool, its input, the folder and the client's own rule suggestions — is read in memory to draw the card and is never stored; the answer goes straight back to the client that asked ([approvals](hud.md#approvals)).
 - Optional completion hooks write one small local record per finished turn (session and turn identity, model, workspace folder name and time) and nothing else; they send no notifications and upload nothing ([completion hooks](session-lifecycle.md#completion-hooks)).
 
 ## Related
