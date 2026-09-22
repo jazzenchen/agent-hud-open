@@ -1,3 +1,4 @@
+import AgentHUDSupport
 import Foundation
 
 /// A successful finished turn reported by a client's stop hook.
@@ -127,11 +128,13 @@ public enum CompletionHooks {
 enum AntigravityHookFormat: CompletionHookFormat {
     static func configuration(home: URL) -> URL { home.appendingPathComponent(".gemini/config/hooks.json") }
 
+    /// A turn finishes when the model answers without calling a tool. `executionNum` is 0 on every turn, so the callback
+    /// time identifies it.
     static func completion(_ payload: ProviderJSON, now: Date) -> CompletionHookEvent? {
-        guard payload["terminationReason"].stringValue == "model_stop", payload["fullyIdle"].boolValue == true,
-              payload["error"].stringValue?.isEmpty != false, let execution = payload["executionNum"].countValue,
+        guard payload["terminationReason"].stringValue == "NO_TOOL_CALL", payload["fullyIdle"].boolValue == true,
+              payload["error"].stringValue?.isEmpty != false,
               let conversation = payload["conversationId"].stringValue else { return nil }
-        return .init(session: conversation, turn: "execution-\(execution)",
+        return .init(session: conversation, turn: "stop-\(RecordCoding.milliseconds(now))",
                      workspace: payload["workspacePaths"].arrayValue?.first?.stringValue, model: payload["modelName"].stringValue)
     }
 

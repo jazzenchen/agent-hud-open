@@ -63,7 +63,7 @@ Antigravity, Cursor, GitHub Copilot CLI, CodeBuddy and Qwen Code do not record f
 
 | Source | Configuration | Accepted as a completion when |
 | --- | --- | --- |
-| Antigravity | `agent-hud` entry (`Stop` array) of `~/.gemini/config/hooks.json`; `GEMINI_CLI_HOME` overrides `~/.gemini` | `terminationReason` is `model_stop`, `fullyIdle` is true, `error` is absent or empty, and `executionNum` and `conversationId` are present |
+| Antigravity | `agent-hud` entry (`Stop` array) of `~/.gemini/config/hooks.json`; `GEMINI_CLI_HOME` overrides `~/.gemini` | `terminationReason` is `NO_TOOL_CALL` (the model answered without calling a tool), `fullyIdle` is true, `error` is absent or empty, and `conversationId` is present; `executionNum` is 0 on every turn, so the turn is the callback time |
 | Cursor | Handler appended to `hooks.stop` of a version-1 `~/.cursor/hooks.json`; only commands ending in ` --completion-hook cursor` are Agent HUD's | `hook_event_name` is `stop`, `status` is `completed`, and `conversation_id` and `generation_id` are present |
 | GitHub Copilot CLI | `bash` handler in `hooks.agentStop` of the version-1 user hook file `~/.copilot/hooks/agent-hud.json`, `timeoutSec` 5 | `stopReason` is `end_turn` and `sessionId` is present; the turn is the callback time |
 | CodeBuddy | Group appended to `hooks.Stop` of `~/.codebuddy/settings.json`; only commands ending in ` --completion-hook codebuddy` are Agent HUD's | `hook_event_name` is `Stop` and `session_id` is present; the turn is the transcript's last completed assistant `messageId` after the last user message, else the callback time |

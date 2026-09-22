@@ -53,20 +53,28 @@ final class CompletionHooksTests: XCTestCase, @unchecked Sendable {
         }
     }
 
-    func testAntigravityStopRequiresSuccessfulIdleLoop() throws {
-        var payload: [String: Any] = ["conversationId": "s", "executionNum": 1, "terminationReason": "model_stop", "fullyIdle": true]
-        let first = try XCTUnwrap(CompletionHooks.completion(source: .antigravity, payload: json(payload), now: now))
-        payload["executionNum"] = 2
-        let second = try XCTUnwrap(CompletionHooks.completion(source: .antigravity, payload: json(payload), now: now))
-        XCTAssertNotEqual(first.id, second.id)
+    func testAntigravityStopRecordsEveryFinishedTurn() throws {
+        let directory = try directory()
+        // The payload agy sends when a turn ends; `executionNum` stays 0 on every turn of a conversation.
+        var payload: [String: Any] = ["conversationId": "s", "executionNum": 0, "terminationReason": "NO_TOOL_CALL",
+            "fullyIdle": true, "error": "", "modelName": "gemini-test", "workspacePaths": ["/work/project"]]
+        let data = try JSONSerialization.data(withJSONObject: payload)
+        try CompletionHooks.record(source: .antigravity, data: data, now: now, directory: directory)
+        try CompletionHooks.record(source: .antigravity, data: data, now: now.addingTimeInterval(5), directory: directory)
+        let events = try CompletionHooks.read(source: .antigravity, since: now.addingTimeInterval(-1), directory: directory)
+            .sorted { $0.completedAt < $1.completedAt }
+        XCTAssertEqual(events.map(\.completedAt), [now, now.addingTimeInterval(5)])
+        XCTAssertEqual(events[0].sessionID, "antigravity:s")
+        XCTAssertEqual(events[0].model, "gemini-test")
+        XCTAssertEqual(events[0].task, "Antigravity · project")
         payload["fullyIdle"] = false
         XCTAssertNil(try CompletionHooks.completion(source: .antigravity, payload: json(payload), now: now))
         payload["fullyIdle"] = true
-        for reason in ["error", "max_steps_exceeded", "cancelled"] {
+        for reason in ["model_stop", "ERROR", "USER_CANCELED", "MAX_INVOCATIONS", "HALTED_STEP"] {
             payload["terminationReason"] = reason
             XCTAssertNil(try CompletionHooks.completion(source: .antigravity, payload: json(payload), now: now))
         }
-        payload["terminationReason"] = "model_stop"; payload["error"] = "failure"
+        payload["terminationReason"] = "NO_TOOL_CALL"; payload["error"] = "failure"
         XCTAssertNil(try CompletionHooks.completion(source: .antigravity, payload: json(payload), now: now))
     }
 
