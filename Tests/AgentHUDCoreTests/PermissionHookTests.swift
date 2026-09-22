@@ -304,6 +304,102 @@ final class PermissionHookTests: XCTestCase, @unchecked Sendable {
                      "a request that names no session cannot be shown beside one")
     }
 
+    private let questions: [[String: Any]] = [
+        ["question": "Push the 40 commits now?", "header": "Push",
+         "options": [["label": "Push", "description": "And update the PR"], ["label": "Wait"]], "multiSelect": false],
+        ["question": "Which pages report it?", "header": "Pages",
+         "options": [["label": "Channels"], ["label": "Documents"]], "multiSelect": true],
+    ]
+
+    func testAClaudeQuestionIsAnsweredWithTheUsersChoicesInsideItsOwnInput() throws {
+        let data = try JSONSerialization.data(withJSONObject: payload(tool: "AskUserQuestion",
+                                                                      input: ["questions": questions, "metadata": ["source": "x"]]))
+        let request = try XCTUnwrap(try PermissionRequest.parse(data, source: .claude, id: "q", now: now))
+        XCTAssertTrue(request.isQuestion)
+        XCTAssertEqual(request.questions.map(\.question), ["Push the 40 commits now?", "Which pages report it?"])
+        XCTAssertEqual(request.questions[0].options, [.init(label: "Push", description: "And update the PR"), .init(label: "Wait")])
+        XCTAssertEqual(request.questions.map(\.multiSelect), [false, true])
+        XCTAssertEqual([request.badge, request.summary], ["ASK", "Push the 40 commits now?"])
+
+        let answers = ["Push the 40 commits now?": "Push", "Which pages report it?": "Channels, Documents"]
+        let decision = try ProviderJSON.read(PermissionDecision.answer(answers).response(for: request))["hookSpecificOutput"]["decision"]
+        XCTAssertEqual(decision["behavior"].stringValue, "allow")
+        XCTAssertEqual(decision["updatedInput"]["questions"], try ProviderJSON.read(JSONSerialization.data(withJSONObject: questions)),
+                       "Claude Code reads the questions back beside their answers")
+        XCTAssertEqual(decision["updatedInput"]["metadata"]["source"].stringValue, "x", "the rest of the call is left as it was")
+        XCTAssertEqual(decision["updatedInput"]["answers"], .object(answers.mapValues { .string($0) }))
+        XCTAssertTrue(PermissionDecision.answer(answers).response(for: .claude).isEmpty, "answers need the question they answer")
+        let skipped = try ProviderJSON.read(PermissionDecision.answer([:]).response(for: request))["hookSpecificOutput"]["decision"]
+        XCTAssertEqual(skipped["behavior"].stringValue, "allow", "skipping every question is not a refusal")
+        XCTAssertEqual(skipped["updatedInput"]["answers"], .object([:]), "Claude Code reads it as the questions left open")
+        XCTAssertTrue(PermissionDecision.leave.response(for: request).isEmpty, "putting a card away says nothing")
+
+        let unreadable = [questions[0], ["question": "Anything else?", "options": []]]
+        XCTAssertNil(try PermissionRequest.parse(JSONSerialization.data(withJSONObject: payload(tool: "AskUserQuestion", input: ["questions": unreadable])),
+                                                 source: .claude, id: "u", now: now),
+                     "a question the HUD cannot offer answers for is left whole to Claude Code's own dialog")
+        for source in [PermissionHooks.Source.qoder, .codebuddy, .workbuddy] {
+            XCTAssertNil(try PermissionRequest.parse(data, source: source, id: "f", now: now), "\(source) is not known to read answers back")
+        }
+    }
+
+    func testAPlanIsShownToBeApprovedInClaudeCodeAndLeftToTheForksOwnDialog() throws {
+        let data = try JSONSerialization.data(withJSONObject: payload(tool: "ExitPlanMode", input: [
+            "plan": "## Ship the question card\n\n1. Parse the questions\n2. Send the answers back"]))
+        let plan = try XCTUnwrap(try PermissionRequest.parse(data, source: .claude, id: "p", now: now))
+        XCTAssertTrue(plan.isPlan)
+        XCTAssertFalse(plan.isQuestion)
+        XCTAssertEqual([plan.badge, plan.summary], ["PLAN", "Ship the question card"], "a plan is named by its title")
+        XCTAssertEqual(plan.detail?.hasPrefix("## Ship the question card\n\n1. Parse"), true, "and its opening lines are there to read")
+        for source in [PermissionHooks.Source.qoder, .codebuddy, .workbuddy] {
+            XCTAssertNil(try PermissionRequest.parse(data, source: source, id: "f", now: now), "\(source) keeps its plans in its own dialog")
+        }
+    }
+
+    func testACallAnsweredInTheClientShowsAsSettledInItsSessionRecord() throws {
+        func line(_ blocks: [[String: Any]]) throws -> Data {
+            try JSONSerialization.data(withJSONObject: ["type": "assistant", "message": ["role": "assistant", "content": blocks]])
+        }
+        func use(_ id: String, _ tool: String = "Bash", _ command: String = "git push") throws -> Data {
+            try line([["type": "tool_use", "id": id, "name": tool, "input": ["command": command]]])
+        }
+        func result(_ id: String) throws -> Data { try line([["type": "tool_result", "tool_use_id": id, "content": "ok"]]) }
+
+        var record = PermissionTranscript(tool: "Bash", input: .object(["command": .string("git push")]))
+        // What was already written: the same command approved an hour ago, then this call, still waiting.
+        for earlier in [try use("old"), try result("old"), try use("other", "Bash", "ls"), try use("now")] {
+            _ = record.read(earlier)
+        }
+        XCTAssertEqual(record.calls, ["now"], "an earlier call with its result is not the one waiting")
+        XCTAssertFalse(record.read(try result("other")), "another call's result settles nothing")
+        XCTAssertTrue(record.read(try result("now")))
+
+        // A question is written only once answered, together with its result.
+        let question: JSONValue = .object(["questions": .array([.object(["question": .string("Push?")])])])
+        var asked = PermissionTranscript(tool: "AskUserQuestion", input: question)
+        XCTAssertFalse(asked.read(try line([["type": "tool_use", "id": "q", "name": "AskUserQuestion", "input": ["questions": [["question": "Push?"]]]]])))
+        XCTAssertTrue(asked.read(try result("q")))
+    }
+
+    func testTheHookLetsGoOnceTheRecordShowsTheCallSettled() throws {
+        let transcript = try directory().appendingPathComponent("session.jsonl")
+        let use = #"{"type":"assistant","message":{"content":[{"type":"tool_use","id":"toolu_1","name":"Bash","input":{"command":"make"}}]}}"#
+        try Data((use + "\n").utf8).write(to: transcript)
+        let payload: JSONValue = .object(["transcript_path": .string(transcript.path), "tool_name": .string("Bash"),
+                                          "tool_input": .object(["command": .string("make")])])
+        let settled = expectation(description: "the call is settled")
+        let watch = try XCTUnwrap(PermissionTranscriptWatch(payload: payload) { settled.fulfill() })
+
+        let handle = try FileHandle(forWritingTo: transcript)
+        handle.seekToEndOfFile()
+        handle.write(Data(#"{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"toolu_1","content":"done"}]}}"#.utf8))
+        handle.write(Data("\n".utf8))
+        try handle.close()
+        wait(for: [settled], timeout: 5)
+        watch.stop()
+        XCTAssertNil(PermissionTranscriptWatch(payload: .object(["tool_name": .string("Bash")])) {}, "no record, nothing to follow")
+    }
+
     func testTheAnswerIsTheOneTheClientReads() throws {
         let allow = try XCTUnwrap(try ProviderJSON.read(PermissionDecision.allow.response(for: .claude)).objectValue)
         let output = try XCTUnwrap(allow["hookSpecificOutput"]?.objectValue)

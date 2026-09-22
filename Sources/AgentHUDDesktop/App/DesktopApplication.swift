@@ -124,6 +124,7 @@ public final class DesktopApplication {
         for id in shownRequests where !ids.contains(id) { notch?.withdraw(requestID: id) }
         for request in pending where !shownRequests.contains(request.id) { notch?.present(.permission(request)) }
         shownRequests = ids
+        QuestionDraft.keep(Set(ids))
         // A request that only joined or left the queue changes no card, but it does change how many are waiting.
         notch?.apply(animated: true)
     }

@@ -50,14 +50,16 @@ struct PermissionAlertCompactView: View {
             Color.clear.frame(width: cameraWidth)
             HStack(spacing: 7) {
                 PermissionSymbol(requestID: request.id)
-                Text(L10n.text("待批准", "Waiting")).font(.ui(12, .medium))
+                Text(request.isQuestion ? L10n.text("待回答", "Question")
+                     : request.isPlan ? L10n.text("计划待审", "Plan") : L10n.text("待批准", "Waiting"))
+                    .font(.ui(12, .medium))
                 WaitingCount(waiting: waiting)
             }.frame(width: IslandController.alertWingWidth, alignment: .trailing)
         }
         .foregroundStyle(PermissionColor.text)
         .padding(.horizontal, IslandController.alertSidePadding).frame(height: height)
         .accessibilityIdentifier("island-alert-permissionRequest")
-        .accessibilityLabel("\(request.vendor) · \(L10n.text("等待批准", "Needs approval")) · \(request.summary)"
+        .accessibilityLabel("\(request.vendor) · \(request.isQuestion ? L10n.text("在问你问题", "Asks a question") : request.isPlan ? L10n.text("有计划待审", "Has a plan to review") : L10n.text("等待批准", "Needs approval")) · \(request.summary)"
                             + (waiting > 1 ? " · " + L10n.text("共 \(waiting) 个", "\(waiting) waiting") : ""))
     }
 }
@@ -113,7 +115,9 @@ private struct PermissionOpenRow: View {
                         .lineLimit(1).truncationMode(.middle)
                 }
             }
-            if request.removed != nil || request.added != nil {
+            if request.isQuestion {
+                PermissionQuestionCard(request: request, onDecide: onDecide)
+            } else if request.removed != nil || request.added != nil {
                 PermissionDiff(removed: request.removed, added: request.added)
             } else if let detail = request.detail {
                 Text(detail)
@@ -123,7 +127,11 @@ private struct PermissionOpenRow: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .background(PermissionColor.inset, in: RoundedRectangle(cornerRadius: 7))
             }
-            PermissionButtons(request: request, onDecide: onDecide)
+            if request.isPlan {
+                PlanNotice(request: request, onDecide: onDecide)
+            } else if !request.isQuestion {
+                PermissionButtons(request: request, onDecide: onDecide)
+            }
         }
         .padding(10)
         .background(PermissionColor.surface, in: RoundedRectangle(cornerRadius: 10))
@@ -170,9 +178,12 @@ private struct PermissionRowHead: View {
                 .foregroundStyle(PermissionColor.signal)
                 .padding(.horizontal, 4).padding(.vertical, 1)
                 .background(PermissionColor.signal.opacity(0.14), in: RoundedRectangle(cornerRadius: 3))
-            Text(request.summary)
-                .font(.ui(11)).foregroundStyle(open ? PermissionColor.text.opacity(0.85) : PermissionColor.secondary)
-                .lineLimit(1)
+            // An open question shows itself in full below, one question at a time.
+            if !(open && request.isQuestion) {
+                Text(request.summary)
+                    .font(.ui(11)).foregroundStyle(open ? PermissionColor.text.opacity(0.85) : PermissionColor.secondary)
+                    .lineLimit(1)
+            }
             Spacer(minLength: 6)
             TimelineView(.periodic(from: .now, by: 1)) { context in
                 Text(PermissionRowHead.waited(request.at, now: context.date))
@@ -222,19 +233,65 @@ struct PermissionAlertInlineView: View {
     var waiting = 1
 
     var body: some View {
-        HStack(spacing: 10) {
-            PermissionSymbol(requestID: request.id)
-            VStack(alignment: .leading, spacing: 4) {
+        if request.isQuestion {
+            // A question cannot be answered from one line, so inside the panel it is the whole card.
+            VStack(alignment: .leading, spacing: 10) {
                 HStack(spacing: 6) {
-                    Text(L10n.text("\(request.vendor) 等待批准", "\(request.vendor) needs approval"))
-                        .font(.ui(12, .medium))
+                    PermissionSymbol(requestID: request.id)
+                    Text(L10n.text("\(request.vendor) 在问你", "\(request.vendor) asks")).font(.ui(12, .medium))
                     WaitingCount(waiting: waiting)
                 }
-                Text(request.summary).font(.ui(10)).foregroundStyle(PermissionColor.secondary).lineLimit(1)
-            }
-            Spacer(minLength: 10)
-            PermissionButtons(request: request, onDecide: onDecide, compact: true)
-        }.foregroundStyle(PermissionColor.text).padding(.vertical, 8)
+                PermissionQuestionCard(request: request, onDecide: onDecide)
+            }.foregroundStyle(PermissionColor.text).padding(.vertical, 8)
+        } else {
+            HStack(spacing: 10) {
+                PermissionSymbol(requestID: request.id)
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 6) {
+                        Text(request.isPlan ? L10n.text("\(request.vendor) 有计划待审", "\(request.vendor) has a plan to review")
+                                            : L10n.text("\(request.vendor) 等待批准", "\(request.vendor) needs approval"))
+                            .font(.ui(12, .medium))
+                        WaitingCount(waiting: waiting)
+                    }
+                    Text(request.summary).font(.ui(10)).foregroundStyle(PermissionColor.secondary).lineLimit(1)
+                }
+                Spacer(minLength: 10)
+                if request.isPlan {
+                    PlanNotice.dismiss(onDecide)
+                } else {
+                    PermissionButtons(request: request, onDecide: onDecide, compact: true)
+                }
+            }.foregroundStyle(PermissionColor.text).padding(.vertical, 8)
+        }
+    }
+}
+
+/// A plan is approved where it was written: the client offers choices about how to go on that an allow cannot carry,
+/// and a plan deserves more reading than a card can hold. The card says where to go and can be put away; putting it
+/// away answers nothing, and the client's own dialog is there either way.
+private struct PlanNotice: View {
+    let request: PermissionRequest
+    let onDecide: (PermissionDecision) -> Void
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Text(L10n.text("请到 \(request.vendor) 里审批这份计划", "Review this plan in \(request.vendor)"))
+                .font(.ui(11)).foregroundStyle(PermissionColor.secondary).lineLimit(1)
+            Spacer(minLength: 8)
+            Self.dismiss(onDecide)
+        }
+    }
+
+    static func dismiss(_ onDecide: @escaping (PermissionDecision) -> Void) -> some View {
+        Button { onDecide(.leave) } label: {
+            Text(L10n.text("知道了", "Dismiss")).font(.ui(11, .medium)).lineLimit(1)
+                .foregroundStyle(PermissionColor.secondary)
+                .padding(.horizontal, 9).frame(height: 22)
+                .overlay(RoundedRectangle(cornerRadius: 6).stroke(PermissionColor.border, lineWidth: 1))
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("island-permission-dismiss")
     }
 }
 

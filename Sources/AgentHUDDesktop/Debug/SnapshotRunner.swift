@@ -52,6 +52,12 @@ public enum SnapshotRunner {
             ("edit", PermissionRequest(id: "snapshot-edit", source: .claude, sessionID: "snapshot", toolName: "Edit",
                                        summary: "PermissionRequests.swift", detail: nil,
                                        cwd: "/Users/me/agent-hud-open", at: Date())),
+            ("question", snapshotQuestion()),
+            ("plan", PermissionRequest(id: "snapshot-plan", source: .claude, sessionID: "snapshot", toolName: "ExitPlanMode",
+                                       summary: L10n.text("在岛上回答 Claude 的提问", "Answer Claude's questions on the island"),
+                                       detail: L10n.text("## 在岛上回答 Claude 的提问\n\n1. 解析问题和选项\n2. 逐题作答，最后一起提交\n3. 在 Claude 里答完时撤下卡片",
+                                                         "## Answer Claude's questions on the island\n\n1. Read the questions and their options\n2. Answer one at a time, send them together\n3. Take the card down when Claude answers first"),
+                                       cwd: "/Users/me/agent-hud-open", at: Date())),
         ] {
             let alert = IslandAlert.permission(request)
             save("alert-permission-\(name)-compact", IslandScene(store: store, settings: settings, open: false, light: false, alert: alert), folder: folder, scheme: .dark)
@@ -346,6 +352,27 @@ public enum SnapshotRunner {
         save("settings-agents-provider-accounts-dark", SettingsView(settings: settings, store: store, initialTab: .sources,
             sourceStatuses: [.init(id: "codex-cli", name: "Codex", detail: "", state: .ready(plan: "pro"))], initiallyExpandedAgents: ["Codex"])
             .frame(width: 760, height: 800), folder: folder, scheme: .dark)
+    }
+
+    /// A question half answered: the first of two, one option picked, so the card shows what choosing looks like.
+    private static func snapshotQuestion() -> PermissionRequest {
+        let questions = [
+            PermissionQuestion(question: L10n.text("这 40 个提交现在推上去吗？推了之后 PR 的标题和正文也要改。",
+                                                   "Push the 40 commits now? The PR title and body need updating after."),
+                               header: L10n.text("推送", "Push"), options: [
+                .init(label: L10n.text("推，并改 PR", "Push and update the PR"),
+                      description: L10n.text("我在浏览器里改标题和正文，改完重新打开核对", "I edit the title and body, then reopen the page to check")),
+                .init(label: L10n.text("先别推", "Not yet"), description: L10n.text("等这项做完再一起推", "Wait until this is done")),
+            ]),
+            PermissionQuestion(question: L10n.text("没人管的通道在哪里报？", "Where should unattended channels be reported?"),
+                               options: [.init(label: L10n.text("通道页", "Channels page")),
+                                         .init(label: L10n.text("单据页", "Documents page"))], multiSelect: true),
+        ]
+        let request = PermissionRequest(id: "snapshot-question", source: .claude, sessionID: "snapshot", toolName: "AskUserQuestion",
+                                        summary: questions[0].question, detail: nil, cwd: "/Users/me/agent-hud-web",
+                                        questions: questions, at: Date())
+        QuestionDraft.draft(for: request.id).pick(0, of: 0, in: questions[0])
+        return request
     }
 
     private static func saveAgentSettings(settings: SettingsStore, store: UsageStore, folder: URL) {

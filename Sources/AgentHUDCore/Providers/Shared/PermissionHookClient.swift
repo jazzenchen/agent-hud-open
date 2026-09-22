@@ -7,7 +7,8 @@ import Foundation
 /// It hands the client's request to the running HUD and prints back whatever the user decided. Every failure — no HUD,
 /// a wedged HUD, a payload it cannot read — prints nothing, which leaves the client's own permission flow exactly as
 /// it would be with no hook installed. The wait itself is not bounded here: the client already set the limit it is
-/// willing to wait, and the HUD learns the request is over when this process goes away.
+/// willing to wait, and the HUD learns the request is over when this process goes away — which it also does on its
+/// own once the session record shows the user answered in the client instead.
 public enum PermissionHookClient {
     /// The field the hook adds so the HUD knows which client is asking; the client's own fields are left untouched.
     public static let sourceKey = "_agentHUDSource"
@@ -29,7 +30,14 @@ public enum PermissionHookClient {
         shutdown(socket, SHUT_WR)
         alarm(0)
 
+        // Answered in the client's own dialog, the call shows up settled in the session record while this hook is
+        // still waiting; leaving without an answer then takes the request off the HUD.
+        let watch = source.recordsCalls
+            ? (try? ProviderJSON.read(input)).flatMap { PermissionTranscriptWatch(payload: $0) { _exit(0) } }
+            : nil
         let response = readToEnd(socket)
+        // The HUD answered first; the answer is written whole.
+        watch?.stop()
         guard !response.isEmpty else { return }
         FileHandle.standardOutput.write(response)
     }

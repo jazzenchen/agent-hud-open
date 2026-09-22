@@ -53,14 +53,20 @@ public enum PermissionHooks {
         var nestsEvents: Bool { self == .zcode }
         /// Calls that ask the user something other than permission. ZCode routes its question and its plan approval
         /// through this event, and an answer without the user's reply fails the question or approves an unread plan;
-        /// Qwen Code ignores an allow for both. The HUD leaves them to the client's own dialog.
+        /// Qwen Code ignores an allow for both. Claude Code takes a question's answers back through this event and
+        /// shows its own plan dialog while the hook waits; its forks are not known to do either. The HUD leaves these to
+        /// the client's own dialog.
         var unanswerableTools: Set<String> {
             switch self {
             case .zcode: return ["AskUserQuestion", "ExitPlanMode"]
             case .qwen: return ["ask_user_question", "exit_plan_mode"]
-            default: return []
+            case .qoder, .qoderCN, .qoderWork, .codebuddy, .workbuddy: return ["AskUserQuestion", "ExitPlanMode"]
+            case .claude, .codex: return []
             }
         }
+        /// Whether the client writes Claude Code's session record, where a call answered in the client's own dialog
+        /// shows as that call's result.
+        var recordsCalls: Bool { self == .claude }
         /// How long the client waits for an answer: only the ceiling behind the HUD's own wait
         /// (`PermissionRequests.holdTime`), for a HUD that stopped answering. A client that cancels the hook first
         /// closes the connection, which takes the request off the HUD.

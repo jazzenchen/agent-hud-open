@@ -20,6 +20,8 @@ struct IslandRootView: View {
     var waitingRequests: [PermissionRequest] = []
     /// Brings one of the stacked requests to the front.
     var onSelectRequest: (String) -> Void = { _ in }
+    /// The user started or stopped typing an answer on the island.
+    var onTyping: @MainActor (Bool) -> Void = { _ in }
     var showsAlertDetails = false
     var presentationSize: CGSize? = nil
     var animatesGeometry = true
@@ -68,6 +70,7 @@ struct IslandRootView: View {
                         .frame(width: size.width, height: size.height)
                 }
                 content
+                    .environment(\.islandTyping, onTyping)
                     .mask(alignment: .top) { shape.frame(width: size.width, height: size.height) }
                 if let logoQueue, alert == nil {
                     LogoQueueView(config: logoQueue, light: lightBorder)

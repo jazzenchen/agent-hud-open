@@ -77,6 +77,37 @@ final class PermissionAlertTests: XCTestCase {
         try await Task.sleep(for: IslandAlertQueue.visibleDuration + .milliseconds(200))
         XCTAssertEqual(expired, 1)
     }
+
+    func testAQuestionIsAnsweredWithWhatWasChosenAndSkippedQuestionsAreLeftOut() {
+        let one = PermissionQuestion(question: "Push now?", options: [.init(label: "Push"), .init(label: "Wait")])
+        let many = PermissionQuestion(question: "Which pages?", options: [.init(label: "Channels"), .init(label: "Documents")],
+                                      multiSelect: true)
+        let draft = QuestionDraft()
+        XCTAssertEqual(draft.answers(for: [one, many]), [:])
+
+        draft.pick(1, of: 0, in: one)
+        draft.pick(0, of: 0, in: one)
+        XCTAssertEqual(draft.answer(0, of: one), "Push", "a single answer replaces the one before it")
+        draft.type("Push tomorrow", of: 0, in: one)
+        XCTAssertEqual(draft.answer(0, of: one), "Push tomorrow", "writing one's own answer sets the offered ones aside")
+        draft.type("  ", of: 0, in: one)
+        XCTAssertNil(draft.answer(0, of: one), "blank words are no answer")
+        draft.pick(1, of: 0, in: one)
+        draft.chooseOwn(of: 0, in: one)
+        XCTAssertNil(draft.answer(0, of: one), "going into the field sets the offered answer aside")
+        draft.pick(1, of: 0, in: one)
+
+        draft.pick(1, of: 1, in: many)
+        draft.pick(0, of: 1, in: many)
+        draft.type("Settings", of: 1, in: many)
+        XCTAssertEqual(draft.answers(for: [one, many]),
+                       ["Push now?": "Wait", "Which pages?": "Channels, Documents, Settings"],
+                       "several answers keep the order they were offered in, the user's own words last")
+        draft.pick(0, of: 1, in: many)
+        XCTAssertEqual(draft.answer(1, of: many), "Documents, Settings", "picking again takes it back")
+        draft.skip(1)
+        XCTAssertEqual(draft.answers(for: [one, many]), ["Push now?": "Wait"], "a skipped question is left out")
+    }
 }
 
 /// What counts as pointing at the HUD, which decides whether a waiting request can be answered at all.

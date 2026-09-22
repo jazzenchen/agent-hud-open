@@ -37,6 +37,8 @@ final class ScreenHUD {
     private var pointerInside = false
     /// Whether the hover currently counts as one that opens the panel; see `reevaluateHover`.
     private var hoverOpens = false
+    /// The user is typing into the island. It stays open under their hands, wherever the pointer goes, until they stop.
+    private var typing = false
     private var modifierWatch: Timer?
 
     var onOpenStats: (() -> Void)?
@@ -109,9 +111,9 @@ final class ScreenHUD {
         return alert ?? marks
     }
 
-    /// Hovering opens the panel, unless the user asked for Option as well.
+    /// Hovering opens the panel, unless the user asked for Option as well. Typing keeps it open either way.
     private func reevaluateHover() {
-        let opens = pointerInside
+        let opens = typing || pointerInside
             && (!settings.settings.requiresOptionToOpen || NSEvent.modifierFlags.contains(.option))
         guard opens != hoverOpens else { return }
         hoverOpens = opens
@@ -153,8 +155,10 @@ final class ScreenHUD {
     /// answered on the user's behalf — the card simply stops being a question.
     func withdraw(requestID: String) {
         let surface = alerts.current?.inUsagePanel
+        let wasShowing = activeAlert?.id == requestID
         let outcome = alerts.remove(id: requestID)
         guard outcome.removed else { return }
+        if wasShowing { stopTyping() }
         if let next = outcome.next {
             present(next, inUsagePanel: surface)
         } else if alerts.current == nil {
@@ -171,7 +175,20 @@ final class ScreenHUD {
     /// Hands the user's answer to the client that is waiting for it, and takes the card off the island.
     private func decideAlert(_ decision: PermissionDecision) {
         guard case .permission(let request)? = activeAlert else { return }
+        stopTyping()
         PermissionRequests.shared.resolve(request.id, decision)
+    }
+
+    private func setTyping(_ typing: Bool) {
+        guard self.typing != typing else { return }
+        self.typing = typing
+        reevaluateHover()
+    }
+
+    /// The card being typed into is gone: the keyboard goes back to the app it came from.
+    private func stopTyping() {
+        island.panel.releaseKeyboard()
+        setTyping(false)
     }
 
     private func dismissAlert() {
@@ -328,6 +345,7 @@ final class ScreenHUD {
             onDecideAlert: { [weak self] decision in self?.decideAlert(decision) },
             waitingRequests: PermissionRequests.shared.pending,
             onSelectRequest: { [weak self] id in self?.selectRequest(id) },
+            onTyping: { [weak self] typing in self?.setTyping(typing) },
             showsAlertDetails: showsAlertDetails,
             animatesGeometry: animated
         )

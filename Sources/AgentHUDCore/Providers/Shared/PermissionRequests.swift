@@ -143,11 +143,12 @@ public final class PermissionRequests {
 
     /// Hands the client the user's decision and lets it go.
     public func resolve(_ id: String, _ decision: PermissionDecision) {
+        guard decision != .leave else { return withdraw(id) }
         guard let request = request(id) else { return }
         pending.removeAll { $0.id == id }
         // The demo's requests have no client waiting behind them: taking the card away is the whole answer.
         guard let connection = waiting.removeValue(forKey: id) else { return }
-        connection.send(content: decision.response(for: request.source), completion: .contentProcessed { _ in
+        connection.send(content: decision.response(for: request), completion: .contentProcessed { _ in
             connection.cancel()
         })
     }
