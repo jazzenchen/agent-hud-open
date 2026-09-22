@@ -2,6 +2,10 @@
 
 Releases of Agent HUD Open. A version is a git tag `vX.Y.Z` on `main`; `CFBundleShortVersionString` in `scripts/build-app.sh` carries the same number. Each entry lists what changed for people using the application and, under **Host API**, what changed for applications that embed `AgentHUDCore` and `AgentHUDDesktop`. Dates are tag dates.
 
+## 0.4.20 — 2026-09-22
+
+- Antigravity completions are recorded. agy ends a finished turn with `terminationReason` `NO_TOOL_CALL`, not the `model_stop` its hook guide shows, so no Antigravity completion was ever recorded. Its `executionNum` is 0 on every turn, so the turn is the callback time, as for GitHub Copilot CLI.
+
 ## 0.4.19 — 2026-09-22
 
 - Codex CLI and Desktop, CodeBuddy (2.97 or later), WorkBuddy, ZCode and Qwen Code can be answered on the HUD, with deny and allow once. ZCode's `hooks.enabled` is set only when absent, and a rewritten ZCode configuration keeps its file permissions. A multi-edit shows its file and its first change.
