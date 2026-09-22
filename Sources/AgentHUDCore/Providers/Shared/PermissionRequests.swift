@@ -18,6 +18,12 @@ public final class PermissionRequests {
     public private(set) var pending: [PermissionRequest] = []
 
     @ObservationIgnored private var waiting: [String: NWConnection] = [:]
+    /// How long a request waits for an answer before it goes back to the client's own prompt. The client's hook
+    /// timeout stays far longer, as the ceiling for a HUD that stopped answering altogether; letting go here instead
+    /// means a new value applies at once, to requests already waiting too, without rewriting any client's settings.
+    @ObservationIgnored public var holdTime: TimeInterval = 600 {
+        didSet { for request in pending { scheduleExpiry(request) } }
+    }
     @ObservationIgnored private var listener: NWListener?
     @ObservationIgnored private var counter: UInt64 = 0
     @ObservationIgnored private var path = PermissionRequests.socketPath
@@ -110,6 +116,7 @@ public final class PermissionRequests {
         }
         waiting[id] = connection
         pending.append(request)
+        scheduleExpiry(request)
         // A client that gives up closes the socket. That is the only signal that a request stopped being a question,
         // and it arrives whether the user answered in the terminal, the hook timed out or the client was killed.
         connection.stateUpdateHandler = { state in
@@ -143,6 +150,20 @@ public final class PermissionRequests {
         connection.send(content: decision.response(for: request.source), completion: .contentProcessed { _ in
             connection.cancel()
         })
+    }
+
+    private func scheduleExpiry(_ request: PermissionRequest) {
+        let delay = max(0, request.at.addingTimeInterval(holdTime).timeIntervalSinceNow)
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [id = request.id] in
+            MainActor.assumeIsolated { PermissionRequests.shared.expire(id) }
+        }
+    }
+
+    /// A request nobody answered in time goes back unanswered, so the client asks in its own prompt. A timer set
+    /// under an earlier, longer wait finds the request still inside the current one and leaves it.
+    private func expire(_ id: String) {
+        guard let request = request(id), waiting[id] != nil, Date() >= request.at.addingTimeInterval(holdTime) else { return }
+        withdraw(id)
     }
 
     /// Takes a request off the HUD without answering it: the client goes on as if the HUD had never been there.

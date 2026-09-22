@@ -61,8 +61,8 @@ public enum PermissionHooks {
             default: return []
             }
         }
-        /// How long the client waits for an answer. A request stays on the HUD until it is answered or the client
-        /// withdraws it, so this only has to outlast a user who walked away. A client that cancels the hook first
+        /// How long the client waits for an answer: only the ceiling behind the HUD's own wait
+        /// (`PermissionRequests.holdTime`), for a HUD that stopped answering. A client that cancels the hook first
         /// closes the connection, which takes the request off the HUD.
         /// Qwen Code reads a value of 1000 or more as milliseconds on every version, so its day is written that way.
         var timeout: Int { self == .qwen ? 86_400_000 : 86_400 }

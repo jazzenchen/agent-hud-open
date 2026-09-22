@@ -44,7 +44,7 @@ The HUD sits at the top of every attached display, and each display carries its 
 ### Approvals
 
 - A client that stops to ask whether a tool may run reaches the HUD through a socket of its own, and the request lives only as long as that client waits for it. Answering resumes the client; the client giving up — answered in its terminal, timed out, killed — takes the request off the HUD by itself, and nothing is answered on anyone's behalf.
-- A request holds the island until it is settled, where an event of any other kind expires after a few seconds. News that arrives while a request waits is dropped rather than queued behind it; a second request waits its turn.
+- A request holds the island until it is settled, where an event of any other kind expires after a few seconds. Unanswered, it waits Settings → General → Wait for an answer — 10 minutes unless 1, 3, 5, 30 or 60 is chosen — and then goes back to the client's own prompt, answered by nobody. The hook timeout written into the client, a day, is only the ceiling behind that wait, so a new value applies at once, to requests already waiting too, without rewriting any client's settings. Quitting the application hands every waiting request back the same way, and a client that asks while it is not running goes straight to its own prompt. News that arrives while a request waits is dropped rather than queued behind it; a second request waits its turn.
 - Hovering opens the queue: the oldest request open, the rest a line each. Any line can be opened, which closes the one before it, and the answers always act on the open one. Answering hands over to whichever has waited longest.
 - Deny and allow-once are always offered. A third answer appears only when the client supports rule updates and itself suggested a rule — the HUD echoes that suggestion back untouched rather than composing one. Codex, CodeBuddy, WorkBuddy, ZCode and Qwen Code offer only deny and allow-once; their shell commands, file edits and MCP tools use the same queue as Claude Code.
 - A request reaches the HUD only when the client itself was about to ask. A client whose hook runs before every tool call, or whose hook cannot approve, is not connected, because answering it would mean asking about calls the client would have allowed on its own. A question or a plan approval that a client routes through the same event stays in the client's own dialog.
@@ -76,6 +76,7 @@ The HUD sits at the top of every attached display, and each display carries its 
 | `screenGlow[…].brightness` / `breathAmplitude` | 20–100% / how deep the breath dips | 90% / 60% |
 | `requiresOptionToOpen` | Hovering alone leaves the panel closed | `false` |
 | `clientHooks` | Keep Agent HUD's handlers in the clients' own settings | `true` |
+| `approvalWaitMinutes` | 1, 3, 5, 10, 30 or 60 minutes a permission request waits for an answer | 10 |
 
 The approval hook is installed for each detected client at startup, alongside the notification and completion hooks, unless `clientHooks` is off; `--permission-hook <source>` is the handler it points back at. See [command line](command-line.md) and [data access](data-access.md).
 

@@ -35,6 +35,19 @@ struct GeneralPane: View {
             }
             SettingsSection(title: L10n.text("客户端", "Clients"), theme: theme) {
                 ClientHooksSetting(settings: settings)
+                SettingsDivider(theme: theme)
+                SettingRow(label: L10n.text("等待回答", "Wait for an answer"),
+                           subtitle: L10n.text("到时没回答的权限请求交还客户端，由它自己询问。",
+                                               "After this, an unanswered permission request goes back to the client's own prompt.")) {
+                    Picker(L10n.text("等待回答", "Wait for an answer"), selection: settings.binding(\.approvalWaitMinutes)) {
+                        ForEach(Settings.approvalWaitChoices, id: \.self) { minutes in
+                            Text(L10n.text("\(minutes) 分钟", minutes == 1 ? "1 minute" : "\(minutes) minutes")).tag(minutes)
+                        }
+                    }
+                    .labelsHidden().pickerStyle(.menu)
+                    .accessibilityIdentifier("general-approval-wait")
+                }
+                .disabled(!settings.settings.clientHooks)
             }
         }
     }

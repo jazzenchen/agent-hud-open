@@ -78,6 +78,13 @@ public final class DesktopApplication {
             guard let self else { return }
             LoginItem.set(self.settings.settings.launchAtLogin)
         })
+        PermissionRequests.shared.holdTime = TimeInterval(settings.settings.approvalWaitMinutes * 60)
+        observeChanges({ [weak self] in
+            self?.settings.settings.approvalWaitMinutes
+        }, onChange: { [weak self] in
+            guard let self else { return }
+            PermissionRequests.shared.holdTime = TimeInterval(self.settings.settings.approvalWaitMinutes * 60)
+        })
         // The host installs the handlers at launch; a change of mind while running applies at once, with the same
         // executable the host gave them.
         observeChanges({ [weak self] in

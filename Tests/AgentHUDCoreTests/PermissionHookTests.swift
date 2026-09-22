@@ -359,6 +359,39 @@ final class PermissionHookTests: XCTestCase, @unchecked Sendable {
         XCTAssertEqual(PermissionRequests.shared.pending.count, count, message)
     }
 
+    func testTheWaitForAnAnswerIsTenMinutesUnlessChosen() throws {
+        XCTAssertEqual(Settings().approvalWaitMinutes, 10)
+        XCTAssertEqual(try JSONDecoder().decode(Settings.self, from: Data(#"{"approvalWaitMinutes":7}"#.utf8)).approvalWaitMinutes, 10,
+                       "only the offered choices are kept")
+        let chosen = Settings().with { $0.approvalWaitMinutes = 30 }
+        XCTAssertEqual(try JSONDecoder().decode(Settings.self, from: JSONEncoder().encode(chosen)).approvalWaitMinutes, 30)
+    }
+
+    @MainActor
+    func testAnUnansweredRequestGoesBackToTheClientWhenTheWaitRunsOut() async throws {
+        let path = try directory().appendingPathComponent("permission.sock").path
+        let requests = PermissionRequests.shared
+        requests.start(path: path)
+        addTeardownBlock { Task { @MainActor in requests.stop(); requests.holdTime = 600 } }
+
+        requests.holdTime = 0.3
+        let client = try await ask(path, payload())
+        try await waitForPending(1, "the request reaches the HUD")
+        try await waitForPending(0, "nobody answered in time")
+        var buffer = [UInt8](repeating: 0, count: 64)
+        XCTAssertEqual(recv(client, &buffer, buffer.count, 0), 0, "no answer: the client asks in its own prompt")
+        close(client)
+
+        // A shorter wait chosen while a request is already on the HUD applies to it too.
+        requests.holdTime = 600
+        let waiting = try await ask(path, payload(session: "t"))
+        try await waitForPending(1, "the second request reaches the HUD")
+        requests.holdTime = 0.2
+        try await waitForPending(0, "the new wait applies to a request already waiting")
+        XCTAssertEqual(recv(waiting, &buffer, buffer.count, 0), 0)
+        close(waiting)
+    }
+
     @MainActor
     func testAClientWaitsOnTheChannelUntilItIsAnsweredOrGivesUp() async throws {
         let path = try directory().appendingPathComponent("permission.sock").path
