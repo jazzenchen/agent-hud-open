@@ -2,6 +2,19 @@
 
 Releases of Agent HUD Open. A version is a git tag `vX.Y.Z` on `main`; `CFBundleShortVersionString` in `scripts/build-app.sh` carries the same number. Each entry lists what changed for people using the application and, under **Host API**, what changed for applications that embed `AgentHUDCore` and `AgentHUDDesktop`. Dates are tag dates.
 
+## 0.4.19 — 2026-09-22
+
+- Codex CLI and Desktop, CodeBuddy (2.97 or later), WorkBuddy, ZCode and Qwen Code can be answered on the HUD, with deny and allow once. ZCode's `hooks.enabled` is set only when absent, and a rewritten ZCode configuration keeps its file permissions. A multi-edit shows its file and its first change.
+- Qwen Code is a new client: usage from its `qwen-code.api_response` telemetry, counted once per line, with `/branch` copies skipped; completions through its Stop hook; no quota.
+- Settings → General → Client hooks, on by default, switches every handler Agent HUD keeps in the clients' own settings. Switching it off asks first and names what stops working, then removes this installation's handlers; start-up adds none back.
+- Settings → General → Wait for an answer, 10 minutes unless 1, 3, 5, 30 or 60 is chosen. An unanswered request then goes back to the client's own prompt. The HUD keeps the time itself, so no client's settings are rewritten and a new value applies to requests already waiting.
+- A question Claude Code asks is answered on the island: each question with its offered answers, several where it allows them, and a field for your own words, one question at a time and sent together after the last. Any question can be skipped, and Claude Code hears which were left open; nothing on a question card refuses the call.
+- The field is the only thing on the island that takes the keyboard, and only when clicked: a card that arrives never catches keys typed elsewhere. The keyboard goes back to the app in front when the answer is sent, Escape is pressed or another window is clicked, and the island stays open while it is being typed into.
+- A plan Claude Code asks to have approved is not answered on the island. The card names it, shows its opening lines and points to Claude Code, whose own dialog carries the choices about how to go on; it can be put away without an answer.
+- A request answered in Claude Code's own dialog, in the terminal or the desktop app, leaves the island as soon as the session record shows its result. Claude Code keeps its hook running after its own dialog is answered, so such a card used to stay until the wait ran out. An approved command's result is written when the command finishes, so its card stays until then.
+- Questions and plan approvals from Qoder, CodeBuddy, WorkBuddy, ZCode and Qwen Code stay in the client's own dialog: those clients ignore an answer sent back, act on one without the user's reply, or are not known to read one.
+- Host API: `SessionObservers.configure(executable:enabled:home:)` replaces `configure(executable:)`; hosts pass `Settings.clientHooks`. New: `Settings.clientHooks`, `Settings.approvalWaitMinutes`, `PermissionRequests.holdTime`, `PermissionQuestion`, `PermissionRequest.questions`, `isQuestion` and `isPlan`, `PermissionDecision.answer` and `.leave`, and `PermissionDecision.response(for: PermissionRequest)`, which `PermissionRequests.resolve` now uses.
+
 ## 0.4.18 — 2026-09-21
 
 - Answering the last request leaves the island as it was, instead of sliding the usage panel under a pointer that was aiming at a button. A request answered as a row inside the panel still leaves the panel where it was.
