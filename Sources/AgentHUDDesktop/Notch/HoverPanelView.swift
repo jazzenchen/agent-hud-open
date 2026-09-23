@@ -146,11 +146,12 @@ struct HoverPanelView: View {
     /// What is running right now: every running session, up to `sessionRowLimit` of them, and the rest as a count.
     /// The statistics window's range never applies here — that range belongs to the session card, which answers a
     /// different question. When nothing is running, the sessions that ended most recently take the same rows.
+    /// The header opens the statistics window's session list, a row that session's own page.
     private var sessionLine: some View {
-        Button(action: onOpenStats) {
-            let running = store.liveSessions
-            let shown = Array((running.isEmpty ? store.sessions : running).prefix(Self.sessionRowLimit))
-            VStack(alignment: .leading, spacing: 6) {
+        let running = store.liveSessions
+        let shown = Array((running.isEmpty ? store.sessions : running).prefix(Self.sessionRowLimit))
+        return VStack(alignment: .leading, spacing: 6) {
+            Button { open(session: nil) } label: {
                 HStack(spacing: 8) {
                     Circle().fill(running.isEmpty ? theme.tertiary : theme.status(.ok)).frame(width: 6, height: 6)
                     Text(L10n.text("活跃会话", "Active sessions")).foregroundStyle(theme.text)
@@ -160,11 +161,15 @@ struct HoverPanelView: View {
                          : L10n.text("\(running.count) 个运行中", "\(running.count) running"))
                         .foregroundStyle(theme.secondary)
                 }
-                if shown.isEmpty {
-                    Text(L10n.text("还没有会话", "No sessions yet"))
-                        .foregroundStyle(theme.secondary)
-                } else {
-                    ForEach(shown) { session in
+                .contentShape(Rectangle())
+            }
+            .help(L10n.text("查看会话列表", "Show sessions"))
+            if shown.isEmpty {
+                Text(L10n.text("还没有会话", "No sessions yet"))
+                    .foregroundStyle(theme.secondary)
+            } else {
+                ForEach(shown) { session in
+                    Button { open(session: session.id) } label: {
                         HStack(spacing: 8) {
                             Circle().fill(sessionDot(session)).frame(width: 6, height: 6)
                             Text("\(Self.shortTask(session.task)) · \(session.terminal ?? "—")")
@@ -175,19 +180,27 @@ struct HoverPanelView: View {
                                 .fixedSize()
                         }
                         .foregroundStyle(theme.secondary)
+                        .contentShape(Rectangle())
                     }
-                    if running.count > shown.count {
+                    .help(session.task)
+                }
+                if running.count > shown.count {
+                    Button { open(session: nil) } label: {
                         Text(L10n.text("还有 \(running.count - shown.count) 个", "+\(running.count - shown.count) more"))
                             .foregroundStyle(theme.secondary)
                     }
                 }
             }
-            .font(.ui(12))
-            .padding(.top, 8)
-            .topDivider(theme.divider)
         }
         .buttonStyle(.plain)
-        .help(L10n.text("查看会话列表", "Show sessions"))
+        .font(.ui(12))
+        .padding(.top, 8)
+        .topDivider(theme.divider)
+    }
+
+    private func open(session id: String?) {
+        store.focusedSessionID = id
+        onOpenStats()
     }
 
     /// A running session wears its agent's colour, one blocked on the user the warning colour, and an ended one grey.
@@ -207,7 +220,7 @@ struct HoverPanelView: View {
             .help(L10n.text("设置", "Settings"))
             .accessibilityLabel(L10n.text("设置", "Settings"))
             Spacer()
-            Button(action: onOpenStats) {
+            Button { open(session: nil) } label: {
                 Image(systemName: "chart.bar.xaxis")
                     .frame(width: 28, height: 28)
                     .contentShape(Rectangle())

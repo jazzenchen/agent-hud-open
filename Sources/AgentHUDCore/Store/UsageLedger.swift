@@ -213,6 +213,72 @@ public actor UsageLedger {
         return result
     }
 
+    /// What each requested session spent, by model and 15-minute period. Sessions without recorded events are left out.
+    public func sessionUsage(_ requests: [SessionUsageRequest]) throws -> [String: SessionUsage] {
+        var result: [String: SessionUsage] = [:]
+        for request in requests {
+            var own: [Int64] = [], callLog: [Int64] = [], subagents: Set<Int64> = []
+            for key in Set(request.keys) {
+                try storage.connection.query("SELECT id FROM contribution WHERE key = ?", [.text(key)]) { row in
+                    own.append(row.int(0))
+                    if key == request.callLog { callLog.append(row.int(0)) }
+                }
+            }
+            if let prefix = request.subagentPrefix, let last = prefix.unicodeScalars.last,
+               let next = Unicode.Scalar(last.value + 1) {
+                // Every key that starts with the prefix sorts at or after it and before the prefix with its last character raised.
+                let end = String(prefix.unicodeScalars.dropLast()) + String(next)
+                try storage.connection.query("SELECT id FROM contribution WHERE key >= ? AND key < ?", [.text(prefix), .text(end)]) {
+                    subagents.insert($0.int(0))
+                }
+            }
+            let ids = own + subagents
+            guard !ids.isEmpty else { continue }
+            let list = "(" + ids.map { _ in "?" }.joined(separator: ", ") + ")"
+            struct Slot: Hashable { let start: Int64; let agent: String }
+            var models: [String: SessionUsage.Tokens] = [:], periods: [Slot: SessionUsage.Tokens] = [:]
+            var spent: SessionUsage.Tokens?, calls = 0
+            try storage.connection.query("""
+                SELECT contribution_id, timestamp_ms / ? * ?, agent, SUM(tokens_in), SUM(tokens_out), SUM(cache_read), COUNT(*)
+                FROM usage_event WHERE contribution_id IN \(list) GROUP BY 1, 2, 3
+                """, [.integer(Self.bucketMilliseconds), .integer(Self.bucketMilliseconds)] + ids.map { .integer($0) }) { row in
+                let tokens = SessionUsage.Tokens(tokensIn: Int(row.int(3)), tokensOut: Int(row.int(4)), cacheReadTokens: Int(row.int(5)))
+                let agent = storage.agentName(row.int(2))
+                models[agent, default: .init()] += tokens
+                periods[Slot(start: row.int(1), agent: agent), default: .init()] += tokens
+                if subagents.contains(row.int(0)) { spent = (spent ?? .init()) + tokens }
+                calls += Int(row.int(6))
+            }
+            guard calls > 0 else { continue }
+            var context: Int?
+            if !callLog.isEmpty {
+                try storage.connection.query("""
+                    SELECT tokens_in + cache_read FROM usage_event WHERE contribution_id IN (\(callLog.map { _ in "?" }.joined(separator: ", ")))
+                    ORDER BY timestamp_ms DESC LIMIT 1
+                    """, callLog.map { .integer($0) }) { context = Int($0.int(0)) }
+            }
+            var priced: Int64 = 0, amounts: [String: (Int64, Int64)] = [:]
+            try storage.connection.query("""
+                SELECT currency, SUM(amount_pico), COUNT(*) FROM cost_amount WHERE contribution_id IN \(list) GROUP BY currency
+                """, ids.map { .integer($0) }) { row in
+                let currency = row.text(0) ?? ""
+                if currency.isEmpty { priced = row.int(2) } else { amounts[currency] = (row.int(1), row.int(2)) }
+            }
+            let costs = amounts.filter { $0.value.1 == priced }.mapValues(LedgerWriter.decimal)
+            result[request.sessionID] = SessionUsage(
+                models: models.map { SessionUsage.Model(agentId: $0.key, tokens: $0.value) }.sorted {
+                    let left = $0.tokens.tokensIn + $0.tokens.tokensOut, right = $1.tokens.tokensIn + $1.tokens.tokensOut
+                    return left == right ? $0.agentId < $1.agentId : left > right
+                },
+                periods: periods.keys.sorted { ($0.start, $0.agent) < ($1.start, $1.agent) }.map {
+                    SessionUsage.Period(start: RecordCoding.date($0.start), agentId: $0.agent, tokens: periods[$0]!)
+                },
+                subagents: spent, calls: calls, contextTokens: context,
+                costs: priced > 0 && !costs.isEmpty ? costs : nil)
+        }
+        return result
+    }
+
     public func samples(scope: String, windowID: String, since: Date) throws -> [QuotaSample] {
         var result: [QuotaSample] = []
         try storage.connection.query("""
@@ -293,6 +359,10 @@ final class LedgerStorage {
                     PRAGMA user_version = 1;
                     """)
             }
+        }
+        if version < 2 {
+            // A session's contributions are found by key alone: its log path or id, and the paths under its directory.
+            try connection.execute("CREATE INDEX IF NOT EXISTS contribution_key ON contribution (key); PRAGMA user_version = 2;")
         }
         try connection.query("SELECT id, name FROM agent") { row in
             let id = row.int(0), name = row.text(1) ?? ""

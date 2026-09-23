@@ -52,6 +52,8 @@ public actor RetainedUsageProvider: UsageProvider {
 
 extension UsageReport {
     /// Turns and completions only matter as they happen, and a restart never reports earlier ones, so the copy leaves them out.
+    /// Session breakdowns are read from the ledger again by the first pass, so the copy that is rewritten every few minutes
+    /// does not carry a week of them.
     var restartCopy: UsageReport {
         UsageReport(generatedAt: generatedAt, snapshots: snapshots, sessions: sessions,
                     notice: notice, discoveredAgents: discoveredAgents, consumers: consumers, usage: usage,
@@ -120,7 +122,17 @@ extension UsageReport {
                 service.product != .plan || activeQuotaPoolIDs?[service.provider] == nil
             }, services ?? []]),
             activeQuotaPoolIDs: (previous.activeQuotaPoolIDs ?? [:]).merging(activeQuotaPoolIDs ?? [:], uniquingKeysWith: { _, new in new }),
-            accounts: accounts)
+            accounts: accounts,
+            sessionUsage: Self.retainedSessionUsage(sessionUsage, previous: previous.sessionUsage, sessions: retainedSessions))
+    }
+
+    /// Sessions kept from a failed source keep the breakdown they had.
+    private static func retainedSessionUsage(_ current: [String: SessionUsage]?, previous: [String: SessionUsage]?,
+                                             sessions: [LiveSession]) -> [String: SessionUsage]? {
+        guard let previous else { return current }
+        var merged = current ?? [:]
+        for session in sessions where merged[session.id] == nil { merged[session.id] = previous[session.id] }
+        return merged
     }
 
     /// A provider's reported list replaces its current accounts; accounts it no longer reports become last readings.

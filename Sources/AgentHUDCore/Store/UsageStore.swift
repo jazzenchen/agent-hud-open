@@ -108,7 +108,10 @@ public final class UsageStore {
     public var tokenDimensions: TokenDimensions = .fresh
     /// Keep every selectable range ready, including the partial hour at the start of the rolling window.
     public static var historyHours: Int { StatsRange.days7.hours + 1 }
+    /// The quota window the statistics window points out, set by whatever opened it.
     public var selectedQuotaId: String?
+    /// The session the statistics window shows in place of its overview; nil shows the overview.
+    public var focusedSessionID: String?
     public var glowHidden = false
     /// Advances every few seconds so countdowns re-render.
     public internal(set) var now = Date()
@@ -421,6 +424,32 @@ public final class UsageStore {
     }
 
     public var liveSessions: [LiveSession] { sessions.filter(isSessionLive) }
+
+    /// The focused session while this Mac still reports it.
+    public var focusedSession: LiveSession? {
+        focusedSessionID.flatMap { id in sessions.first { $0.id == id } }
+    }
+
+    public func sessionUsage(_ session: LiveSession) -> SessionUsage? { report?.sessionUsage?[session.id] }
+
+    /// What the agent last said in the session's newest turn that carries a message.
+    public func sessionMessage(_ session: LiveSession) -> String? {
+        let vendor = sessionSource(session).vendor?.lowercased()
+        return report?.turns.last {
+            $0.sessionID == session.id && $0.message != nil && (vendor == nil || $0.provider.lowercased() == vendor)
+        }?.message
+    }
+
+    /// The session's tokens on a time axis from its first period to its last activity, with one stack per model.
+    public func sessionColumns(_ session: LiveSession, usage: SessionUsage) -> (columns: [TokenColumn], interval: DateInterval, agentIds: [String]) {
+        let agentIds = usage.models.map(\.agentId)
+        let start = min(session.startedAt, usage.periods.first?.start ?? session.startedAt)
+        let end = max(usage.periods.last.map { $0.start.addingTimeInterval(UsageBucket.duration) } ?? start, session.endedAt ?? dataDate)
+        let interval = DateInterval(start: start, end: max(end, start.addingTimeInterval(UsageBucket.duration)))
+        let columns = ChartData.tokenBars(usage: usage.periods.map(\.bucket), agentIds: agentIds, interval: interval,
+                                          bucketSize: ChartData.bucketSize(spanning: interval.duration), dimensions: tokenDimensions)
+        return (columns, interval, agentIds)
+    }
 
     /// Keep every running session and the most recent session from each client visible.
     public func sessionPreview(from sessions: [LiveSession]) -> [LiveSession] {

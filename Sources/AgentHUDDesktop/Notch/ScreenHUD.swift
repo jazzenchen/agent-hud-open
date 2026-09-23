@@ -218,10 +218,16 @@ final class ScreenHUD {
         !wasInUsagePanel || !pointerInside
     }
 
+    /// Opens the statistics window on what the card was about: a finished turn's session, or a quota event's window.
     private func openAlert() {
         guard let alert = activeAlert else { return }
-        if case .quota(let event) = alert, store.rows.contains(where: { $0.id == event.agent.id }) {
+        store.focusedSessionID = nil
+        switch alert {
+        case .quota(let event) where store.rows.contains(where: { $0.id == event.agent.id }):
             store.selectedQuotaId = event.agent.id
+        case .completion(let event) where store.sessions.contains(where: { $0.id == event.sessionID }):
+            store.focusedSessionID = event.sessionID
+        default: break
         }
         dismissAlert()
         onOpenStats?()

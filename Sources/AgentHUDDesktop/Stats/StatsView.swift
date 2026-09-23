@@ -17,7 +17,19 @@ struct StatsView: View {
                     Color.clear.preference(key: StatsIdealHeightKey.self, value: proxy.size.height)
                 })
             if scrollable {
-                ScrollView { content(theme) }
+                ScrollViewReader { proxy in
+                    ScrollView { content(theme) }
+                        .onChange(of: store.selectedQuotaId, initial: true) { _, id in
+                            guard let id, let vendor = quotaVendor(id) else { return }
+                            withAnimation { proxy.scrollTo(MetricCards.anchor(vendor), anchor: .center) }
+                            // The tile is pointed out for a moment; it keeps showing the window afterwards.
+                            Task {
+                                try? await Task.sleep(for: .seconds(2.5))
+                                if store.selectedQuotaId == id { withAnimation { store.selectedQuotaId = nil } }
+                            }
+                        }
+                        .onChange(of: store.focusedSessionID) { _, _ in proxy.scrollTo(Self.top, anchor: .top) }
+                }
             } else {
                 content(theme)
             }
@@ -31,26 +43,24 @@ struct StatsView: View {
         }
     }
 
+    private static let top = "stats-top"
+
+    private func quotaVendor(_ id: String) -> String? {
+        store.rowGroups.first { $0.rows.contains { $0.id == id } }?.vendor
+    }
+
     private func content(_ theme: Theme) -> some View {
         VStack(alignment: .leading, spacing: 12) {
+            Color.clear.frame(height: 0).id(Self.top)
             if let error = store.lastError {
                 Text(L10n.text("刷新失败：", "Refresh failed: ") + error)
                     .font(.ui(12)).foregroundStyle(theme.secondary)
                     .textSelection(.enabled)
             }
-            UsageChartsCard(store: store, theme: theme)
-            MetricCards(store: store, theme: theme)
-            LiveSessionsCard(store: store, theme: theme)
-            ViewThatFits(in: .horizontal) {
-                HStack(alignment: .top, spacing: 12) {
-                    WeeklyTokenShareCard(store: store, theme: theme).frame(minWidth: 380)
-                    HeatmapCard(grid: store.statsActivity, consumers: store.consumers, theme: theme).frame(minWidth: 420)
-                }
-                .fixedSize(horizontal: false, vertical: true)
-                VStack(spacing: 12) {
-                    WeeklyTokenShareCard(store: store, theme: theme)
-                    HeatmapCard(grid: store.statsActivity, consumers: store.consumers, theme: theme)
-                }
+            if let session = store.focusedSession {
+                SessionDetailView(session: session, store: store, theme: theme)
+            } else {
+                overview(theme)
             }
         }
         .padding(EdgeInsets(top: 8, leading: 22, bottom: 12, trailing: 22))
@@ -60,10 +70,39 @@ struct StatsView: View {
         })
     }
 
+    @ViewBuilder
+    private func overview(_ theme: Theme) -> some View {
+        UsageChartsCard(store: store, theme: theme)
+        MetricCards(store: store, theme: theme)
+        LiveSessionsCard(store: store, theme: theme)
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .top, spacing: 12) {
+                WeeklyTokenShareCard(store: store, theme: theme).frame(minWidth: 380)
+                HeatmapCard(grid: store.statsActivity, consumers: store.consumers, theme: theme).frame(minWidth: 420)
+            }
+            .fixedSize(horizontal: false, vertical: true)
+            VStack(spacing: 12) {
+                WeeklyTokenShareCard(store: store, theme: theme)
+                HeatmapCard(grid: store.statsActivity, consumers: store.consumers, theme: theme)
+            }
+        }
+    }
+
     private func controls(_ theme: Theme) -> some View {
         HStack(spacing: 12) {
             // Leave room for the native traffic lights.
             Color.clear.frame(width: 54, height: 12)
+            if store.focusedSession != nil {
+                Button {
+                    store.focusedSessionID = nil
+                } label: {
+                    Label(L10n.text("用量统计", "Usage statistics"), systemImage: "chevron.left")
+                }
+                .buttonStyle(.plain)
+                .font(.ui(12, .semibold))
+                .keyboardShortcut("[", modifiers: .command)
+                .help(L10n.text("回到用量统计", "Back to usage statistics"))
+            }
             HStack(spacing: 10) {
                 ForEach(TokenDimensions.choices, id: \.value) { choice in
                     Toggle(choice.label, isOn: Binding(
@@ -76,16 +115,19 @@ struct StatsView: View {
                 }
             }
             Spacer(minLength: 12)
-            SegmentedPills(
-                options: TokenBucketSize.allCases.map { SegmentOption(value: $0, label: $0.label) },
-                selection: Binding(get: { store.tokenBucketSize }, set: { store.tokenBucketSize = $0 }),
-                theme: theme
-            )
-            SegmentedPills(
-                options: StatsRange.allCases.map { SegmentOption(value: $0, label: $0.label) },
-                selection: Binding(get: { store.statsRange }, set: { store.setStatsRange($0) }),
-                theme: theme
-            )
+            // A session's own span sets its chart, so the range and column width belong to the overview.
+            if store.focusedSession == nil {
+                SegmentedPills(
+                    options: TokenBucketSize.allCases.map { SegmentOption(value: $0, label: $0.label) },
+                    selection: Binding(get: { store.tokenBucketSize }, set: { store.tokenBucketSize = $0 }),
+                    theme: theme
+                )
+                SegmentedPills(
+                    options: StatsRange.allCases.map { SegmentOption(value: $0, label: $0.label) },
+                    selection: Binding(get: { store.statsRange }, set: { store.setStatsRange($0) }),
+                    theme: theme
+                )
+            }
         }
         .padding(EdgeInsets(top: 10, leading: 22, bottom: 10, trailing: 22))
         .background(theme.windowBackground)

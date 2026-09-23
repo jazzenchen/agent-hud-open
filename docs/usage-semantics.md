@@ -26,6 +26,7 @@ The three dimensions (`TokenDimensions`) are additive and never overlap. Charts,
 - A missing reading is "—", not 0; zero is shown only when the service reported zero.
 - Tokens are never converted into quota, and an unavailable quota is never inferred from token counts. Claude Code's session share is its share of the tokens in the current 5 h window times the window's utilization; every other client shows "—".
 - One API response is counted once whatever the log layout; copies of one event from two files or two Macs merge, and distinct requests with identical counts are kept. Bar buckets are 15 min, 30 min, 1 h or 1 d on local quarter-hour, hour or calendar-day boundaries inside the exact half-open range; empty buckets keep their position and counts stay integers.
+- A session's breakdown (`SessionUsage`) is read from the ledger: its own log, or its id for sources read whole, plus every log under the directory named like its log (sub-agents), by model and 15-minute period, with the number of calls. Its totals therefore exceed the session row, which leaves sub-agents out. The context figure is the latest call's input with cache reads, given only for logs that record every call. A finished session is read again only when its counts move; a running one on every pass.
 
 ### Alert levels
 
@@ -88,6 +89,7 @@ Reads never run in parallel: the usage store runs one pass of source reads or on
 | Alert tracker, added usage resets, island events, forecast, reading age | `Sources/AgentHUDCore/Logic/QuotaAlerts.swift`, `ResetCreditGrants.swift`, `IslandEvents.swift`, `QuotaForecast.swift` |
 | Event union, analytics, history retention | `Sources/AgentHUDCore/Store/UsageAggregation.swift`, `QuotaHistoryStore.swift`, `Sources/AgentHUDCore/Logic/UsageAnalytics.swift` |
 | Session liveness, retained readings | `Sources/AgentHUDCore/Models/LiveSession.swift`, `Sources/AgentHUDCore/Providers/RetainedUsageProvider.swift` |
+| Session breakdown | `Sources/AgentHUDCore/Models/SessionUsage.swift`, `Store/UsageLedger.swift`, `Providers/CombinedUsageProvider.swift` |
 | Accounts, current and previous readings, settings migration | `Sources/AgentHUDCore/Models/ProviderAccount.swift`, `Sources/AgentHUDCore/Providers/RetainedUsageProvider.swift`, `Sources/AgentHUDCore/Store/SettingsStore.swift` |
 
 ## Related

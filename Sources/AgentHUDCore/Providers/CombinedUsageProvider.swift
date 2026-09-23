@@ -22,6 +22,19 @@ public struct CombinedUsageProvider: UsageProvider {
         func entry(_ vendor: String) -> Entry? { entries[vendor] }
         func store(_ entry: Entry, for vendor: String) { entries[vendor] = entry }
         func reports() -> [String: UsageReport] { entries.compactMapValues { try? $0.result.get() } }
+
+        /// Each session's breakdown with the counts it was read at, valid while the ledger keeps the writes it was read from.
+        struct Breakdown: Sendable {
+            let counts: [Int]
+            let usage: SessionUsage?
+        }
+        private var breakdowns: [String: Breakdown] = [:]
+        private var breakdownGeneration: Int?
+        func breakdowns(generation: Int) -> [String: Breakdown] {
+            if breakdownGeneration != generation { breakdowns = [:]; breakdownGeneration = generation }
+            return breakdowns
+        }
+        func storeBreakdowns(_ values: [String: Breakdown]) { breakdowns = values }
     }
 
     private let vendors: [Source]
@@ -99,9 +112,11 @@ public struct CombinedUsageProvider: UsageProvider {
         // The ledger holds every recorded source, including one whose refresh just failed; other providers report periods themselves.
         let usage = ((try? await ledger.buckets(since: min(weekAgo, now.addingTimeInterval(-Double(historyHours) * 3600)))) ?? [])
             + results.filter { !(vendors[$0.0].provider is any LedgerRecording) }.flatMap { $0.1?.usage ?? [] }
+        let sessions = reports.flatMap(\.sessions)
+        let sessionUsage = await breakdowns(of: sessions)
         let progress = reports.compactMap(\.indexing)
         return UsageReport(generatedAt: now, snapshots: Dictionary(grouping: reports.flatMap(\.snapshots), by: \.agentId).values.compactMap { $0.max { $0.updatedAt < $1.updatedAt } }.sorted { $0.agentId < $1.agentId },
-                           sessions: reports.flatMap(\.sessions).sorted { a, b in
+                           sessions: sessions.sorted { a, b in
                                if a.isLive != b.isLive { return a.isLive }
                                return (a.endedAt ?? a.startedAt) > (b.endedAt ?? b.startedAt)
                            },
@@ -122,7 +137,31 @@ public struct CombinedUsageProvider: UsageProvider {
                            accounts: reports.compactMap(\.accounts).reduce(into: [String: [AccountObservation]]()) {
                                $0.merge($1, uniquingKeysWith: +)
                            },
-                           forgottenAccountProviders: reports.compactMap(\.forgottenAccountProviders).reduce(nil) { ($0 ?? []).union($1) })
+                           forgottenAccountProviders: reports.compactMap(\.forgottenAccountProviders).reduce(nil) { ($0 ?? []).union($1) },
+                           sessionUsage: sessionUsage)
+    }
+
+    /// Where each session's tokens went. A finished session is read again only when its counts move; a running one on
+    /// every pass, since its sub-agents spend without its own log changing.
+    private func breakdowns(of sessions: [LiveSession]) async -> [String: SessionUsage] {
+        let known = await results.breakdowns(generation: await ledger.generation)
+        var kept: [String: Results.Breakdown] = [:], requests: [SessionUsageRequest] = []
+        for session in sessions {
+            let counts = [session.tokensIn, session.tokensOut, session.cacheReadTokens]
+            if !session.isLive, let breakdown = known[session.id], breakdown.counts == counts {
+                kept[session.id] = breakdown
+            } else {
+                requests.append(SessionUsageRequest(session))
+            }
+        }
+        if !requests.isEmpty, let read = try? await ledger.sessionUsage(requests) {
+            let counts = Dictionary(sessions.map { ($0.id, [$0.tokensIn, $0.tokensOut, $0.cacheReadTokens]) }, uniquingKeysWith: { first, _ in first })
+            for request in requests { kept[request.sessionID] = .init(counts: counts[request.sessionID] ?? [], usage: read[request.sessionID]) }
+        } else {
+            for request in requests { kept[request.sessionID] = known[request.sessionID] }
+        }
+        await results.storeBreakdowns(kept)
+        return kept.compactMapValues(\.usage)
     }
     /// Each vendor's checks come from its last result, so a quiet vendor is read again only when its activity ages.
     public func sourceChecks() async -> [String: [Date]] {

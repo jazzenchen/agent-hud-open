@@ -81,6 +81,8 @@ public struct UsageReport: Hashable, Codable, Sendable {
     public let codexResetCredits: CodexResetCredits?
     /// Time of the successful account/rateLimits/read, including responses without quota windows.
     public let codexResetCreditsObservedAt: Date?
+    /// Where each session's tokens went, by session id. Optional so previously saved reports remain readable.
+    public let sessionUsage: [String: SessionUsage]?
 
     public init(
         generatedAt: Date,
@@ -103,8 +105,10 @@ public struct UsageReport: Hashable, Codable, Sendable {
         services: [AgentService]? = nil,
         activeQuotaPoolIDs: [String: Set<String>]? = nil,
         accounts: [String: [AccountObservation]]? = nil,
-        forgottenAccountProviders: Set<String>? = nil
+        forgottenAccountProviders: Set<String>? = nil,
+        sessionUsage: [String: SessionUsage]? = nil
     ) {
+        self.sessionUsage = sessionUsage
         self.accounts = accounts
         self.forgottenAccountProviders = forgottenAccountProviders
         self.services = services

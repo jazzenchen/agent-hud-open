@@ -38,6 +38,7 @@ The HUD sits at the top of every attached display, and each display carries its 
 - A collapsed queue takes no mouse events, so clicks reach the menu bar and whatever window is under it; the pointer is followed by an event monitor instead.
 - Hovering opens the panel, inward from the edge the HUD sits on. Hovering can be asked to take Option as well, which leaves an accidental pass over the HUD closed.
 - An event is shown once, on the display the pointer is on: repeating it on every screen would mean dismissing the same thing several times.
+- Clicking an event opens the statistics window on what it is about: a completed turn on its session's page, a quota event on its window's tile, pointed out for a moment. A session row of the panel opens that session's page; its heading and the chart button open the overview.
 - A queue's glow is a backdrop, never a rim: once the panel opens or an event widens the island, the field stops rather than following the new shape around. Only a notch is rimmed.
 - The marks ride over the panel while it is open, so opening the HUD never makes the agents disappear.
 

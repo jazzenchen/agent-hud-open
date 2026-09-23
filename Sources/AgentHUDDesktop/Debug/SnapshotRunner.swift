@@ -163,6 +163,11 @@ public enum SnapshotRunner {
         save("onboarding-light", OnboardingView(settings: settings, store: store, sources: DemoData.sources, onFinish: {}), folder: folder, scheme: .light)
         save("stats-dark", StatsView(store: store, scrollable: false).frame(width: 760), folder: folder, scheme: .dark)
         save("stats-light", StatsView(store: store, scrollable: false).frame(width: 760), folder: folder, scheme: .light)
+        // A session's own page, as a completion or a session row opens it.
+        store.focusedSessionID = "s1"
+        save("stats-session-dark", StatsView(store: store, scrollable: false).frame(width: 760), folder: folder, scheme: .dark)
+        save("stats-session-light", StatsView(store: store, scrollable: false).frame(width: 760), folder: folder, scheme: .light)
+        store.focusedSessionID = nil
         let dashboardAgents = settings.agents
         settings.updateAgents { $0.filter { ["Claude", "Codex", "DeepSeek"].contains($0.vendor) } }
         let dashboardStore = UsageStore(provider: DemoUsageProvider(), settings: settings)

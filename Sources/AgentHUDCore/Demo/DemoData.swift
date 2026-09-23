@@ -105,6 +105,31 @@ public enum DemoData {
         ]
     }
 
+    /// Each demo session's tokens spread over its 15-minute periods, heavier toward the end, with a sub-agent on Claude.
+    public static func sessionUsage(now: Date) -> [String: SessionUsage] {
+        var result: [String: SessionUsage] = [:]
+        for session in sessions(now: now) where session.hasTokenCounts {
+            let end = session.endedAt ?? now, step = UsageBucket.duration
+            let first = (session.startedAt.timeIntervalSinceReferenceDate / step).rounded(.down) * step
+            let starts = stride(from: first, through: end.timeIntervalSinceReferenceDate, by: step).map { Date(timeIntervalSinceReferenceDate: $0) }
+            let weights = starts.indices.map { Double($0 + 2) }, sum = weights.reduce(0, +)
+            let share = { (value: Int, index: Int) in Int(Double(value) * weights[index] / sum) }
+            // A Claude session hands every third period to a sub-agent on the other Claude model.
+            let helper = session.agentId.hasPrefix("claude") ? (session.agentId == "claude-sonnet" ? "claude-opus" : "claude-sonnet") : nil
+            let periods = starts.indices.map { index in
+                SessionUsage.Period(start: starts[index], agentId: helper != nil && index % 3 == 1 ? helper! : session.agentId,
+                                    tokens: .init(tokensIn: share(session.tokensIn, index), tokensOut: share(session.tokensOut, index),
+                                                  cacheReadTokens: share(session.cacheReadTokens, index)))
+            }
+            let models = Dictionary(grouping: periods, by: \.agentId).map { agentId, periods in
+                SessionUsage.Model(agentId: agentId, tokens: periods.reduce(SessionUsage.Tokens()) { $0 + $1.tokens })
+            }.sorted { $0.tokens.tokensIn + $0.tokens.tokensOut > $1.tokens.tokensIn + $1.tokens.tokensOut }
+            result[session.id] = SessionUsage(models: models, periods: periods, subagents: models.first { $0.agentId == helper }?.tokens,
+                                              calls: periods.count * 9, contextTokens: session.cacheReadTokens / 3 + 12_000)
+        }
+        return result
+    }
+
     public static func insights(now: Date, calendar: Calendar = .current) -> UsageInsights {
         // "周二 16:10" of the current week.
         var components = calendar.dateComponents([.yearForWeekOfYear, .weekOfYear], from: now)

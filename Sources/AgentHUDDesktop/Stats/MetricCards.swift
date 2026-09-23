@@ -10,12 +10,17 @@ struct MetricCards: View {
         LazyVGrid(columns: [GridItem(.adaptive(minimum: 250), spacing: 12, alignment: .top)], spacing: 12) {
             ForEach(store.rowGroups, id: \.vendor) { group in
                 AgentQuotaTile(store: store, vendor: group.vendor, rows: group.rows, theme: theme)
+                    .id(Self.anchor(group.vendor))
             }
             ForEach(store.report?.billing ?? []) { billing in
                 APIBillingSummary(billing: billing, store: store, theme: theme)
             }
         }
     }
+}
+
+extension MetricCards {
+    static func anchor(_ vendor: String) -> String { "quota-" + vendor }
 }
 
 private struct AgentQuotaTile: View {
@@ -82,7 +87,14 @@ private struct AgentQuotaTile: View {
         }
         .frame(maxWidth: .infinity, minHeight: 86, alignment: .topLeading)
         .card(theme, padding: EdgeInsets(top: 12, leading: 14, bottom: 12, trailing: 14))
+        .overlay(RoundedRectangle(cornerRadius: 10).stroke(theme.status(.ok), lineWidth: 2).opacity(isPointedOut ? 1 : 0))
+        .onChange(of: store.selectedQuotaId, initial: true) { _, id in
+            if let id, rows.contains(where: { $0.id == id }) { selectedRowID = id }
+        }
     }
+
+    /// Whatever opened the window asked for one of this tile's windows.
+    private var isPointedOut: Bool { store.selectedQuotaId.map { id in rows.contains { $0.id == id } } ?? false }
 
     private func capHitsDescription(_ insights: UsageInsights) -> String {
         guard insights.weeklyCapHits > 0 else { return L10n.text("本周尚未触顶", "No cap hit this week") }

@@ -74,7 +74,12 @@ public enum ChartData {
     /// so the period holding the range's start or the current moment counts whole.
     /// Empty periods retain their position, and integer token counts are never rounded or interpolated.
     public static func tokenBars(usage: [UsageBucket], agentIds: [String], range: StatsRange, bucketSize: TokenBucketSize = .hour1, now: Date, calendar: Calendar = .current, dimensions: TokenDimensions = .fresh) -> [TokenColumn] {
-        let interval = range.interval(endingAt: now)
+        tokenBars(usage: usage, agentIds: agentIds, interval: range.interval(endingAt: now), bucketSize: bucketSize, calendar: calendar,
+                  dimensions: dimensions)
+    }
+
+    public static func tokenBars(usage: [UsageBucket], agentIds: [String], interval: DateInterval, bucketSize: TokenBucketSize,
+                                 calendar: Calendar = .current, dimensions: TokenDimensions = .fresh) -> [TokenColumn] {
         let periods = periods(interval: interval, bucketSize: bucketSize, calendar: calendar)
         let dayIndices = bucketSize == .day1
             ? Dictionary(uniqueKeysWithValues: periods.enumerated().map { ($0.element.start, $0.offset) }) : [:]
@@ -109,6 +114,11 @@ public enum ChartData {
         let firstBucket = firstHour.addingTimeInterval(floor(interval.start.timeIntervalSince(firstHour) / duration) * duration)
         let count = Int(ceil(interval.end.timeIntervalSince(firstBucket) / duration))
         return (0..<count).map { DateInterval(start: firstBucket.addingTimeInterval(Double($0) * duration), duration: duration) }
+    }
+
+    /// The column width that keeps a span at no more than about a hundred columns: quarter hours for a day, hours for four.
+    public static func bucketSize(spanning duration: TimeInterval) -> TokenBucketSize {
+        duration <= 86400 ? .minutes15 : duration <= 4 * 86400 ? .hour1 : .day1
     }
 
     /// Hit-test whole time buckets, including empty ones and the chart's rightmost edge.

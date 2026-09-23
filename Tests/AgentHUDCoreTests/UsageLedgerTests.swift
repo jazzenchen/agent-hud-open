@@ -72,6 +72,38 @@ final class UsageLedgerTests: XCTestCase, @unchecked Sendable {
         XCTAssertEqual(buckets.map(\.tokensIn), [15], "removing the uncounted copy changes nothing")
     }
 
+    func testSessionUsageJoinsSubagentLogsAndReadsTheLatestPrompt() async throws {
+        let ledger = UsageLedger.inMemory()
+        try await ledger.write { writer in
+            try writer.upsert(source: "claude", contribution: "p/s1.jsonl", events: [
+                self.event("m1", minute: 1, input: 100, output: 10, cache: 900),
+                self.event("m2", minute: 20, input: 30, output: 5, cache: 1_000),
+            ])
+            try writer.upsert(source: "claude", contribution: "p/s1/subagents/agent-a.jsonl",
+                              events: [self.event("a1", minute: 18, agent: "claude-model:haiku", input: 40, output: 4)])
+            // A sibling session whose path shares the prefix text but not the directory.
+            try writer.upsert(source: "claude", contribution: "p/s10.jsonl", events: [self.event("x", minute: 2, input: 999)])
+            try writer.upsert(source: "hermes", contribution: "h1", events: [self.event("h", minute: 3, agent: "hermes-model:m", input: 7)])
+        }
+        let usage = try await ledger.sessionUsage([
+            SessionUsageRequest(sessionID: "s1", keys: ["p/s1.jsonl", "s1"], subagentPrefix: "p/s1/", callLog: "p/s1.jsonl"),
+            SessionUsageRequest(sessionID: "h1", keys: ["h1"]),
+            SessionUsageRequest(sessionID: "gone", keys: ["nothing"]),
+        ])
+        let s1 = try XCTUnwrap(usage["s1"])
+        XCTAssertEqual(s1.models.map(\.agentId), ["claude-model:opus", "claude-model:haiku"])
+        XCTAssertEqual(s1.total, .init(tokensIn: 170, tokensOut: 19, cacheReadTokens: 1_900))
+        XCTAssertEqual(s1.subagents, .init(tokensIn: 40, tokensOut: 4))
+        XCTAssertEqual(s1.periods.map(\.start), [base, base.addingTimeInterval(900), base.addingTimeInterval(900)])
+        XCTAssertEqual(s1.periods.map(\.agentId), ["claude-model:opus", "claude-model:haiku", "claude-model:opus"])
+        XCTAssertEqual(s1.periods.map(\.tokens.tokensIn), [100, 40, 30])
+        XCTAssertEqual(s1.calls, 3)
+        XCTAssertEqual(s1.contextTokens, 1_030, "the latest call of the session's own log, fresh input plus cache reads")
+        XCTAssertNil(usage["h1"]?.contextTokens, "a source read whole does not record each call")
+        XCTAssertEqual(usage["h1"]?.total.tokensIn, 7)
+        XCTAssertNil(usage["gone"])
+    }
+
     func testWindowedReplacementKeepsOlderEvents() async throws {
         let ledger = UsageLedger.inMemory(), since = base.addingTimeInterval(3600)
         try await ledger.write { try $0.replace(source: "hermes", contribution: "s", events: [

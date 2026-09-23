@@ -92,6 +92,7 @@ struct SessionRow: View {
     let session: LiveSession
     let store: UsageStore
     let theme: Theme
+    @State private var hovered = false
 
     var body: some View {
         let dotColor = store.isSessionWaiting(session) ? theme.status(.warning)
@@ -137,7 +138,12 @@ struct SessionRow: View {
         }
         .font(.ui(12))
         .padding(EdgeInsets(top: 4, leading: 10, bottom: 4, trailing: 10))
-        .background(RoundedRectangle(cornerRadius: 7).fill(theme.sessionRowBackground))
+        .background(RoundedRectangle(cornerRadius: 7).fill(hovered ? theme.track : theme.sessionRowBackground))
+        .contentShape(Rectangle())
+        .onHover { hovered = $0 }
+        .onTapGesture { store.focusedSessionID = session.id }
+        .accessibilityAddTraits(.isButton)
+        .accessibilityAction { store.focusedSessionID = session.id }
         .help([session.task, store.sessionSource(session).name, session.terminal].compactMap { $0 }.joined(separator: " · "))
         .contextMenu {
             if let path = session.transcriptPath {
