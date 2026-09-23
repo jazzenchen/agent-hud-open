@@ -48,9 +48,7 @@ struct IslandPane: View {
                 AgentLogo(vendor: "Claude", size: 12)
                 Text("Claude").fontWeight(.semibold)
                 Spacer()
-                if settings.settings.showResetCountdown {
-                    Text(L10n.text("重置", "Resets"))
-                }
+                IslandQuotaMetricPicker(selection: .constant(.quota), theme: .island)
             }
             .font(.ui(11)).foregroundStyle(Theme.island.secondary)
             HStack(spacing: 10) {

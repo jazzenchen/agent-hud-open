@@ -35,7 +35,9 @@ public struct DemoUsageProvider: UsageProvider {
             sessions: DemoData.sessions(now: now),
             consumers: consumers,
             usage: usage,
+            insightsByAgent: Dictionary(uniqueKeysWithValues: consumers.map { ($0.id, DemoData.insights(now: now)) }),
             subscriptions: ["Claude": "max_20x", "Codex": "prolite"],
+            consumerIdsByQuota: Dictionary(uniqueKeysWithValues: consumers.map { ($0.id, Set([$0.id])) }),
             codexResetCredits: DemoData.codexResetCredits(now: now)
         )
     }

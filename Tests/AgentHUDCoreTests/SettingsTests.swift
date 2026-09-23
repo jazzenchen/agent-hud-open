@@ -406,6 +406,25 @@ final class UsageStoreTests: XCTestCase {
                       "hiding the reset column does not hide the hover forecast")
     }
 
+    func testQuotaTokenRateUsesOnlyMappedConsumersInTheObservedCurrentCycle() throws {
+        let store = makeStore()
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let snapshot = UsageSnapshot(agentId: "claude-weekly", remainingPct: 60,
+                                     resetAt: now.addingTimeInterval(2 * 3600), windowDuration: 5 * 3600,
+                                     updatedAt: now)
+        store.replace(report: UsageReport(generatedAt: now, snapshots: [snapshot], sessions: [], usage: [
+            UsageBucket(start: now.addingTimeInterval(-2 * 3600), agentId: "claude-model:opus", tokensIn: 24_000, tokensOut: 6_000),
+            UsageBucket(start: now.addingTimeInterval(-3600), agentId: "claude-model:sonnet", tokensIn: 8_000, tokensOut: 2_000),
+            UsageBucket(start: now.addingTimeInterval(-1800), agentId: "codex-model:gpt", tokensIn: 100_000, tokensOut: 0),
+            UsageBucket(start: now.addingTimeInterval(900), agentId: "claude-model:opus", tokensIn: 50_000, tokensOut: 0),
+        ], consumerIdsByQuota: ["claude-weekly": ["claude-model:opus", "claude-model:sonnet"]]))
+        store.now = now
+
+        XCTAssertEqual(try XCTUnwrap(store.quotaTokensPerHour(for: "claude-weekly")), 20_000,
+                       "40k mapped tokens over the two locally observed hours")
+        XCTAssertNil(store.quotaTokensPerHour(for: "missing"))
+    }
+
     func testDisablingAgentDropsItFromGlow() async {
         let store = makeStore()
         await store.refresh()

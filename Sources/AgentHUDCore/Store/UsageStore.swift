@@ -270,6 +270,22 @@ public final class UsageStore {
         return QuotaForecast.hint(snapshot: snapshot, insights: report.insightsByAgent[agentId], now: now)
     }
 
+    /// Tokens per hour over the observed part of this quota window's current cycle. This is the same reading sent to
+    /// the phone: token history before the local ledger begins is not guessed at.
+    public func quotaTokensPerHour(for agentId: String) -> Double? {
+        guard let report, let snapshot = report.snapshot(for: agentId),
+              let consumers = report.consumerIdsByQuota[agentId], !consumers.isEmpty,
+              let cycle = snapshot.cycle, let oldest = report.usage.first?.start else { return nil }
+        let start = max(cycle.start, oldest)
+        let hours = now.timeIntervalSince(start) / 3600
+        guard hours > 0 else { return nil }
+        let tokens = report.usage.reduce(0) { total, bucket in
+            consumers.contains(bucket.agentId) && bucket.start >= start && bucket.start < now
+                ? total + bucket.total : total
+        }
+        return (Double(tokens) / hours).rounded()
+    }
+
     /// Account cards shown in the island and menu follow the agent switches.
     public var enabledBilling: [APIBilling] {
         let vendors = Set(enabledAgents.map(\.vendor))
