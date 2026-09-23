@@ -403,12 +403,12 @@ struct ModelUsageRow: View {
     @State private var isHovered = false
 
     var body: some View {
-        if let forecastHint {
+        if let displayedForecastHint {
             content
-                .background(IslandHoverPopover(content: QuotaForecastDetails(agent: row.agent, hint: forecastHint),
+                .background(IslandHoverPopover(content: QuotaForecastDetails(agent: row.agent, hint: displayedForecastHint),
                                                isHovered: $isHovered))
                 .accessibilityElement(children: .combine)
-                .accessibilityHint(forecastHint)
+                .accessibilityHint(displayedForecastHint)
                 .onDisappear { isHovered = false }
         } else {
             content
@@ -483,7 +483,7 @@ struct ModelUsageRow: View {
             return row.resetLabel(now: now)
         case .burnRate:
             if row.usedPct == 100 { return L10n.text("已耗尽", "Exhausted") }
-            if exhaustsBeforeReset != nil { return forecastHint ?? L10n.text("预计耗尽", "May run out") }
+            if let exhaustionTimeLabel { return exhaustionTimeLabel }
             if let projected = projectedAtReset {
                 return L10n.text("重置时 \(Int(projected.rounded()))%", "\(Int(projected.rounded()))% by reset")
             }
@@ -499,6 +499,19 @@ struct ModelUsageRow: View {
         guard let interval = insights?.timeToExhaust, interval > 0, interval.isFinite else { return nil }
         let date = now.addingTimeInterval(interval)
         return row.resetAt.map { date < $0 ? date : nil } ?? date
+    }
+
+    private var exhaustionTimeLabel: String? {
+        guard let date = exhaustsBeforeReset else { return nil }
+        if date.timeIntervalSince(now) < 7 * 86400 { return ChartData.weekdayTime(date) }
+        return date.formatted(Date.FormatStyle().month(.abbreviated).day()
+            .hour(.twoDigits(amPM: .omitted)).minute(.twoDigits)
+            .locale(Locale(identifier: L10n.resolved == .zhHans ? "zh_CN" : "en_GB")))
+    }
+
+    private var displayedForecastHint: String? {
+        guard metric == .burnRate, let exhaustionTimeLabel else { return forecastHint }
+        return L10n.text("预计耗尽：\(exhaustionTimeLabel)", "Exhausts \(exhaustionTimeLabel)")
     }
 
     /// Used by the reset at the existing burn rate; the UI does not invent a second forecast.
