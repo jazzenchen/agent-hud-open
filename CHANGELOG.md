@@ -2,6 +2,14 @@
 
 Releases of Agent HUD Open. A version is a git tag `vX.Y.Z` on `main`; `CFBundleShortVersionString` in `scripts/build-app.sh` carries the same number. Each entry lists what changed for people using the application and, under **Host API**, what changed for applications that embed `AgentHUDCore` and `AgentHUDDesktop`. Dates are tag dates.
 
+## 0.4.21 — 2026-09-23
+
+- Each session has its own page in the statistics window: agent, client, project, state and duration; its tokens with sub-agents included, the cache hit rate, the input of its latest call, its calls and its quota share or estimated cost; its tokens over its own span, stacked by model; its models; and the agent's last reply. A row of the session card, a session row of the panel and a completed turn on the island open it, and the back button returns to the overview.
+- A session's tokens on its page include the logs of its sub-agents, which Claude Code keeps in the directory named after the session's log. The session list still counts the session's own log only.
+- A quota event on the island opens the statistics window on its window's tile, scrolled into view and outlined for a moment; it used to open the window without pointing anywhere.
+- Each provider in the panel has a button that switches its rows between quota, burn rate and token rate. Quota is the default. Burn rate shows the points used per hour and the use projected at the reset, or the date and time the window runs out before it; token rate shows tokens per hour and per day over the part of the current cycle this Mac observed.
+- Host API: `SessionUsage`, `SessionUsageRequest`, `UsageReport.sessionUsage` and `UsageLedger.sessionUsage(_:)`; `UsageStore.focusedSessionID`, `focusedSession`, `sessionUsage(_:)`, `sessionMessage(_:)`, `sessionColumns(_:usage:)` and `quotaTokensPerHour(for:)`; `ChartData.tokenBars(usage:agentIds:interval:bucketSize:calendar:dimensions:)` and `ChartData.bucketSize(spanning:)`. The usage ledger adds an index on contribution keys the first time this version opens it.
+
 ## 0.4.20 — 2026-09-22
 
 - Antigravity completions are recorded. agy ends a finished turn with `terminationReason` `NO_TOOL_CALL`, not the `model_stop` its hook guide shows, so no Antigravity completion was ever recorded. Its `executionNum` is 0 on every turn, so the turn is the callback time, as for GitHub Copilot CLI.
