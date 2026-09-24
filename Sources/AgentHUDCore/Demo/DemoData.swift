@@ -99,17 +99,18 @@ public enum DemoData {
             return .init(tokensIn: total.tokensIn - helper.tokensIn, tokensOut: total.tokensOut - helper.tokensOut,
                          cacheReadTokens: total.cacheReadTokens - helper.cacheReadTokens)
         }
-        let s1 = own("s1"), s2 = own("s2"), s3 = own("s3")
+        let s1 = own("s1"), s2 = own("s2"), s3 = own("s3"), home = FileManager.default.homeDirectoryForCurrentUser.path
         return [
-            LiveSession(id: "s1", agentId: "claude-opus", task: "fix auth bug in middleware", terminal: "iTerm",
+            LiveSession(id: "s1", agentId: "claude-opus", task: "fix auth bug in middleware", terminal: "api-gateway",
                         startedAt: now.addingTimeInterval(-27 * 60), pctOfWindow: 6.2, tokensIn: s1.tokensIn, tokensOut: s1.tokensOut,
-                        cacheReadTokens: s1.cacheReadTokens, observedAt: now),
-            LiveSession(id: "s2", agentId: "codex", task: "backend server endpoints", terminal: "Terminal",
+                        cacheReadTokens: s1.cacheReadTokens, observedAt: now, workingDirectory: home + "/work/api-gateway"),
+            LiveSession(id: "s2", agentId: "codex", task: "backend server endpoints", terminal: "hud-ios",
                         startedAt: now.addingTimeInterval(-64 * 60), pctOfWindow: 3.8, tokensIn: s2.tokensIn, tokensOut: s2.tokensOut,
-                        cacheReadTokens: s2.cacheReadTokens, observedAt: now),
-            LiveSession(id: "s3", agentId: "claude-sonnet", task: "optimize db queries", terminal: "Ghostty",
+                        cacheReadTokens: s2.cacheReadTokens, observedAt: now, workingDirectory: home + "/work/hud-ios"),
+            LiveSession(id: "s3", agentId: "claude-sonnet", task: "optimize db queries", terminal: "etl",
                         startedAt: now.addingTimeInterval(-140 * 60), endedAt: now.addingTimeInterval(-51 * 60),
-                        pctOfWindow: 2.1, tokensIn: s3.tokensIn, tokensOut: s3.tokensOut, cacheReadTokens: s3.cacheReadTokens),
+                        pctOfWindow: 2.1, tokensIn: s3.tokensIn, tokensOut: s3.tokensOut, cacheReadTokens: s3.cacheReadTokens,
+                        workingDirectory: home + "/data/etl"),
             LiveSession(id: "s4", agentId: "chatgpt", task: L10n.text("桌面版 · 3 段对话", "Desktop · 3 conversations"), terminal: nil,
                         startedAt: now.addingTimeInterval(-200 * 60), endedAt: now.addingTimeInterval(-120 * 60),
                         pctOfWindow: 4.5, tokensIn: 0, tokensOut: 0, observedAt: now),

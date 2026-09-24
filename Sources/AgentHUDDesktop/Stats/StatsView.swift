@@ -2,17 +2,18 @@ import AppKit
 import SwiftUI
 import AgentHUDCore
 
-/// Usage statistics that fill the available window width.
+/// Usage statistics that fill the available window width, on two pages: token charts, and sessions.
 struct StatsView: View {
     let store: UsageStore
     var scrollable = true
     var onIdealHeightChange: ((CGFloat) -> Void)?
     @Environment(\.colorScheme) private var scheme
+    @State private var sessionSource: SessionSource?
 
     var body: some View {
         let theme = Theme.forScheme(scheme)
         VStack(spacing: 0) {
-            controls(theme)
+            header(theme)
                 .background(GeometryReader { proxy in
                     Color.clear.preference(key: StatsIdealHeightKey.self, value: proxy.size.height)
                 })
@@ -29,6 +30,10 @@ struct StatsView: View {
                             }
                         }
                         .onChange(of: store.focusedSessionID) { _, _ in proxy.scrollTo(Self.top, anchor: .top) }
+                        // A quota window being pointed out scrolls to its tile instead.
+                        .onChange(of: store.statsTab) { _, _ in
+                            if store.selectedQuotaId == nil { proxy.scrollTo(Self.top, anchor: .top) }
+                        }
                 }
             } else {
                 content(theme)
@@ -57,10 +62,15 @@ struct StatsView: View {
                     .font(.ui(12)).foregroundStyle(theme.secondary)
                     .textSelection(.enabled)
             }
-            if let session = store.focusedSession {
-                SessionDetailView(session: session, store: store, theme: theme)
-            } else {
-                overview(theme)
+            switch store.statsTab {
+            case .tokens:
+                tokens(theme)
+            case .sessions:
+                if let session = store.focusedSession {
+                    SessionDetailView(session: session, store: store, theme: theme)
+                } else {
+                    SessionList(store: store, theme: theme, source: sessionSource)
+                }
             }
         }
         .padding(EdgeInsets(top: 8, leading: 22, bottom: 12, trailing: 22))
@@ -71,10 +81,9 @@ struct StatsView: View {
     }
 
     @ViewBuilder
-    private func overview(_ theme: Theme) -> some View {
+    private func tokens(_ theme: Theme) -> some View {
         UsageChartsCard(store: store, theme: theme)
         MetricCards(store: store, theme: theme)
-        LiveSessionsCard(store: store, theme: theme)
         ViewThatFits(in: .horizontal) {
             HStack(alignment: .top, spacing: 12) {
                 WeeklyTokenShareCard(store: store, theme: theme).frame(minWidth: 380)
@@ -88,25 +97,31 @@ struct StatsView: View {
         }
     }
 
+    /// The pages sit in the title bar, centred between the traffic lights and the edge; the row below holds the controls
+    /// of the page on screen.
+    private func header(_ theme: Theme) -> some View {
+        VStack(spacing: 8) {
+            Picker(L10n.text("页面", "Page"), selection: Binding(get: { store.statsTab }, set: { store.statsTab = $0 })) {
+                ForEach([StatsTab.tokens, .sessions], id: \.self) { Text($0.label).tag($0) }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .fixedSize()
+            .frame(maxWidth: .infinity)
+            .accessibilityIdentifier("stats-tab")
+            controls(theme).frame(height: 28)
+        }
+        .padding(EdgeInsets(top: 8, leading: 22, bottom: 10, trailing: 22))
+        .background(theme.windowBackground)
+        .overlay(alignment: .bottom) { Rectangle().fill(theme.divider).frame(height: 1) }
+    }
+
     private func controls(_ theme: Theme) -> some View {
         HStack(spacing: 12) {
-            // Leave room for the native traffic lights.
-            Color.clear.frame(width: 54, height: 12)
-            if store.focusedSession != nil {
-                Button {
-                    store.focusedSessionID = nil
-                } label: {
-                    Label(L10n.text("用量统计", "Usage statistics"), systemImage: "chevron.left")
-                }
-                .buttonStyle(.plain)
-                .font(.ui(12, .semibold))
-                .keyboardShortcut("[", modifiers: .command)
-                .help(L10n.text("回到用量统计", "Back to usage statistics"))
-            }
-            // A session's page shows every kind and its own span, so the kinds, range and column width belong to the overview.
-            if store.focusedSession == nil { dimensions }
-            Spacer(minLength: 12)
-            if store.focusedSession == nil {
+            switch store.statsTab {
+            case .tokens:
+                dimensions
+                Spacer(minLength: 12)
                 SegmentedPills(
                     options: TokenBucketSize.allCases.map { SegmentOption(value: $0, label: $0.label) },
                     selection: Binding(get: { store.tokenBucketSize }, set: { store.tokenBucketSize = $0 }),
@@ -117,17 +132,58 @@ struct StatsView: View {
                     selection: Binding(get: { store.statsRange }, set: { store.setStatsRange($0) }),
                     theme: theme
                 )
+            // A session's page shows every kind, so the kinds menu belongs to the list.
+            case .sessions where store.focusedSession != nil:
+                Button {
+                    store.focusedSessionID = nil
+                } label: {
+                    Label(L10n.text("全部会话", "All sessions"), systemImage: "chevron.left")
+                }
+                .buttonStyle(.plain)
+                .font(.ui(12, .semibold))
+                .keyboardShortcut("[", modifiers: .command)
+                .help(L10n.text("回到会话列表", "Back to the session list"))
+                Spacer(minLength: 12)
+            case .sessions:
+                dimensions
+                Spacer(minLength: 12)
+                sessionCount(theme)
+                SelectionMenu(
+                    title: L10n.text("会话来源", "Session source"),
+                    options: [SegmentOption(value: Optional<SessionSource>.none, label: L10n.text("全部来源", "All sources"))]
+                        + sessionSources.map { SegmentOption(value: Optional($0), label: $0.name) },
+                    selection: $sessionSource,
+                    theme: theme,
+                    width: 185
+                )
+                .accessibilityIdentifier("session-source-filter")
             }
         }
-        .padding(EdgeInsets(top: 10, leading: 22, bottom: 10, trailing: 22))
-        .background(theme.windowBackground)
-        .overlay(alignment: .bottom) { Rectangle().fill(theme.divider).frame(height: 1) }
+    }
+
+    private var sessionSources: [SessionSource] {
+        Array(Set(store.statsSessions.map(store.sessionSource))).sorted {
+            if $0.vendor != $1.vendor { return ($0.vendor ?? "") < ($1.vendor ?? "") }
+            return $0.name.localizedStandardCompare($1.name) == .orderedAscending
+        }
+    }
+
+    private func sessionCount(_ theme: Theme) -> some View {
+        let sessions = store.statsSessions.filter { sessionSource == nil || store.sessionSource($0) == sessionSource }
+        let running = sessions.filter(store.isSessionLive).count
+        return HStack(spacing: 6) {
+            Circle().fill(running > 0 ? theme.status(.ok) : theme.tertiary).frame(width: 6, height: 6)
+            Text(L10n.text("近 7 天 \(sessions.count) 个 · \(running) 个运行中",
+                           "\(sessions.count) in 7 days · \(running) running"))
+        }
+        .font(.ui(11))
+        .foregroundStyle(theme.secondary)
     }
 
     /// Which token kinds the charts count: what calls added, everything, or any kinds picked one by one.
     private var dimensions: some View {
         Menu {
-            Toggle(L10n.text("新增 Token（不含缓存读取）", "New tokens (no cache reads)"), isOn: Binding(
+            Toggle(L10n.text("不含缓存读取", "Excluding cache reads"), isOn: Binding(
                 get: { store.tokenDimensions == .fresh }, set: { if $0 { store.tokenDimensions = .fresh } }))
             Toggle(L10n.text("全部 Token", "All tokens"), isOn: Binding(
                 get: { store.tokenDimensions == .all }, set: { if $0 { store.tokenDimensions = .all } }))

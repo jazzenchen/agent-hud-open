@@ -160,7 +160,7 @@ public actor CodexUsageProvider: UsageProvider, LedgerRecording {
                                endedAt: t.isLive(now: now, modifiedAt: session.modifiedAt) ? nil : (t.lastActivityAt ?? session.modifiedAt),
                                pctOfWindow: nil, tokensIn: t.inputTokens,
                                tokensOut: t.outputTokens, client: t.client, transcriptPath: session.path,
-                               cacheReadTokens: t.cachedInputTokens, observedAt: now)
+                               cacheReadTokens: t.cachedInputTokens, observedAt: now, workingDirectory: t.cwd)
         }
         var notices = Dictionary(uniqueKeysWithValues: selected.compactMap { source, reading -> (String, String)? in
             failures[source].map { (reading.limits.providerAccount(home: source).id, $0) }

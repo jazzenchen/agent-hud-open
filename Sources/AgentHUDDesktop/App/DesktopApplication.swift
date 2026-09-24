@@ -133,10 +133,11 @@ public final class DesktopApplication {
         Task { await store.refreshAccounts() }
         statsWindow.show()
     }
-    /// The statistics window on its overview, whatever session page it showed last: the menu's rows are about quotas and
-    /// balances, and a session page opened from the HUD outlives its window.
+    /// The statistics window on its Tokens page: the menu's rows are about quotas and balances. A session page opened
+    /// from the HUD outlives its window, so the Sessions page starts from its list again.
     public func showStatsOverview() {
         store.focusedSessionID = nil
+        store.statsTab = .tokens
         showStats()
     }
     public func showOnboarding() { onboardingWindow.show() }

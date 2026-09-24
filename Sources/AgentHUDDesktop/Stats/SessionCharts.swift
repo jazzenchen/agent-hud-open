@@ -209,7 +209,7 @@ struct SessionBarDetail: View {
                          bar.calls > 0 ? L10n.text("\(bar.calls) 次调用", bar.calls == 1 ? "1 call" : "\(bar.calls) calls") : nil,
                          bar.compacted ? L10n.text("已压缩", "Compacted") : nil].compactMap { $0 }
             if !facts.isEmpty { Text(facts.joined(separator: " · ")).font(.ui(10)).foregroundStyle(theme.secondary) }
-            Text(L10n.text("新增 ", "New ") + bar.kinds.new.formatted()).font(.tabular(13, .semibold))
+            Text(bar.kinds.new.formatted() + L10n.text(" 不含缓存读取", " excl. cache reads")).font(.tabular(13, .semibold))
             ForEach(TokenKind.allCases.filter { bar.kinds[$0] > 0 }, id: \.self) { kind in
                 HStack(spacing: 6) {
                     RoundedRectangle(cornerRadius: 2).fill(theme.kind(kind)).frame(width: 7, height: 7)

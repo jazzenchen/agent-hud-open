@@ -3,18 +3,35 @@ import XCTest
 
 final class SessionSourceTests: XCTestCase {
     @MainActor
-    func testPreviewIncludesPiBehindThreeClientsAndEveryRunningSession() {
-        let defaults = UserDefaults(suiteName: "AgentHUDPreviewTests.\(UUID())")!
+    func testSessionsGroupUnderTheDayTheyLastDidSomethingOn() {
+        let defaults = UserDefaults(suiteName: "AgentHUDSessionDayTests.\(UUID())")!
         let store = UsageStore(provider: DemoUsageProvider(), settings: SettingsStore(defaults: defaults))
-        let now = Date()
-        func session(_ id: String, _ source: String, live: Bool = false) -> LiveSession {
-            .init(id: id, agentId: "\(source.lowercased())-model:test", task: source, terminal: nil,
-                startedAt: now, endedAt: live ? nil : now, pctOfWindow: nil, tokensIn: 2262, tokensOut: 35, client: source)
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "Asia/Shanghai")!
+        let noon = calendar.date(from: DateComponents(year: 2026, month: 9, day: 24, hour: 12))!
+        func session(_ id: String, started: TimeInterval, ended: TimeInterval?) -> LiveSession {
+            .init(id: id, agentId: "claude-model:test", task: id, terminal: nil, startedAt: noon.addingTimeInterval(started * 3600),
+                  endedAt: ended.map { noon.addingTimeInterval($0 * 3600) }, pctOfWindow: nil, tokensIn: 1, tokensOut: 1,
+                  observedAt: noon.addingTimeInterval(1800))
         }
-        let sessions = [session("claude", "Claude"), session("codex", "Codex"), session("dsh", "DeepSeek"),
-                        session("pi", "Pi"), session("old-pi", "Pi"), session("running-pi", "Pi", live: true)]
-        XCTAssertEqual(store.sessionPreview(from: sessions).map(\.id), ["claude", "codex", "dsh", "pi", "running-pi"])
-        XCTAssertEqual(store.sessionPreview(from: sessions.filter { $0.client == "Pi" }).map(\.id), ["pi", "running-pi"])
+        // One still running, one that began last night and ended after midnight, one from yesterday evening.
+        let sessions = [session("running", started: -1, ended: nil), session("overnight", started: -14, ended: -11),
+                        session("yesterday", started: -20, ended: -16)]
+        let days = store.sessionsByDay(sessions, calendar: calendar)
+        XCTAssertEqual(days.map(\.day), [calendar.startOfDay(for: noon), calendar.startOfDay(for: noon.addingTimeInterval(-86400))])
+        XCTAssertEqual(days.map { $0.sessions.map(\.id) }, [["running", "overnight"], ["yesterday"]])
+    }
+
+    @MainActor
+    func testPointingAtAQuotaOrASessionTurnsTheStatisticsPage() {
+        let defaults = UserDefaults(suiteName: "AgentHUDStatsTabTests.\(UUID())")!
+        let store = UsageStore(provider: DemoUsageProvider(), settings: SettingsStore(defaults: defaults))
+        store.focusedSessionID = "s1"
+        XCTAssertEqual(store.statsTab, .sessions)
+        store.focusedSessionID = nil
+        XCTAssertEqual(store.statsTab, .sessions, "going back to the list stays on Sessions")
+        store.selectedQuotaId = "claude"
+        XCTAssertEqual(store.statsTab, .tokens)
     }
 
     func testCodexClientGroupsPreserveProviderAndUnknownSurface() {

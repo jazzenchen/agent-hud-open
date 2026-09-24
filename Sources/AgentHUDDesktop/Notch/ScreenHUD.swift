@@ -227,7 +227,7 @@ final class ScreenHUD {
             store.selectedQuotaId = event.agent.id
         case .completion(let event) where store.sessions.contains(where: { $0.id == event.sessionID }):
             store.focusedSessionID = event.sessionID
-        default: break
+        default: store.statsTab = .tokens
         }
         dismissAlert()
         handOff { onOpenStats?() }

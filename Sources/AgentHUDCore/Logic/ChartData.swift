@@ -16,7 +16,7 @@ public struct TokenDimensions: OptionSet, Hashable, Sendable {
     public static var choices: [(value: Self, label: String)] { TokenKind.allCases.map { ($0.dimension, $0.label) } }
     public var label: String {
         switch self {
-        case .fresh: L10n.text("新增", "New")
+        case .fresh: L10n.text("不含缓存读取", "Excl. cache reads")
         case .all: L10n.text("全部", "All")
         default: Self.choices.filter { contains($0.value) }.map(\.label).joined(separator: " + ")
         }
@@ -31,6 +31,18 @@ public struct TokenDimensions: OptionSet, Hashable, Sendable {
     }
     public func count(_ event: UsageEvent) -> Int { count(event.kinds) }
     public func count(_ bucket: UsageBucket) -> Int { count(bucket.kinds) }
+}
+
+/// The statistics window's two pages: token charts, and the session list with each session's page.
+public enum StatsTab: Hashable, Sendable {
+    case tokens, sessions
+
+    public var label: String {
+        switch self {
+        case .tokens: L10n.text("Token", "Tokens")
+        case .sessions: L10n.text("会话", "Sessions")
+        }
+    }
 }
 
 public enum StatsRange: Int, CaseIterable, Sendable, Hashable {

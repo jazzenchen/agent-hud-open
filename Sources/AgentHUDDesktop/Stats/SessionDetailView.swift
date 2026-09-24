@@ -60,7 +60,7 @@ struct SessionDetailView: View {
 
     /// Project, start time and how long the session has run.
     private var details: String {
-        [session.accountWide ? L10n.text("账户 · 跨设备", "Account · across devices") : session.terminal,
+        [session.accountWide ? L10n.text("账户 · 跨设备", "Account · across devices") : session.displayPath,
          L10n.text("开始于 ", "Started ") + ChartData.weekdayTime(session.startedAt),
          L10n.text("时长 ", "Duration ") + Countdown.format(session.duration(now: store.now))]
             .compactMap { $0 }.joined(separator: " · ")
@@ -69,11 +69,11 @@ struct SessionDetailView: View {
     // MARK: Figures
 
     private func figures(_ usage: SessionUsage?) -> some View {
-        let total = usage?.total.kinds ?? TokenKinds(tokensIn: session.tokensIn, tokensOut: session.tokensOut, cacheRead: session.cacheReadTokens)
+        let total = store.sessionTokens(session)
         var items: [(title: String, value: String, note: String, help: String)] = [
             (L10n.text("Token", "Tokens"), total.isEmpty ? "—" : TokenFormat.short(total.total),
              usage?.subagents.map { L10n.text("含子 agent ", "Sub-agents ") + TokenFormat.short($0.kinds.total) }
-                ?? L10n.text("新增 ", "New ") + TokenFormat.short(total.new),
+                ?? L10n.text("不含缓存读取 ", "Excl. cache reads ") + TokenFormat.short(total.new),
              L10n.text("五类合计，含缓存读取", "All five kinds, cache reads included")),
         ]
         if let cost {

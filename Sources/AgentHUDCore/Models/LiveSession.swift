@@ -18,6 +18,8 @@ public struct LiveSession: Hashable, Codable, Sendable, Identifiable {
     public let client: String?
     public let transcriptPath: String?
     public let accountWide: Bool
+    /// The directory the session works in; `terminal` names its last component.
+    public let workingDirectory: String?
 
     public init(
         id: String,
@@ -33,7 +35,8 @@ public struct LiveSession: Hashable, Codable, Sendable, Identifiable {
         transcriptPath: String? = nil,
         cacheReadTokens: Int = 0,
         accountWide: Bool = false,
-        observedAt: Date? = nil
+        observedAt: Date? = nil,
+        workingDirectory: String? = nil
     ) {
         self.id = id
         self.agentId = agentId
@@ -49,6 +52,7 @@ public struct LiveSession: Hashable, Codable, Sendable, Identifiable {
         self.client = client
         self.transcriptPath = transcriptPath
         self.accountWide = accountWide
+        self.workingDirectory = workingDirectory
     }
 
     /// Whether the source that read this session said a turn was still in flight. The log's own silence does not end
@@ -63,6 +67,7 @@ public struct LiveSession: Hashable, Codable, Sendable, Identifiable {
 
     private enum CodingKeys: String, CodingKey {
         case id, agentId, task, terminal, startedAt, endedAt, observedAt, pctOfWindow, tokensIn, tokensOut, client, transcriptPath, cacheReadTokens, accountWide
+        case workingDirectory
     }
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -74,7 +79,16 @@ public struct LiveSession: Hashable, Codable, Sendable, Identifiable {
             transcriptPath: try c.decodeIfPresent(String.self, forKey: .transcriptPath),
             cacheReadTokens: try c.decodeIfPresent(Int.self, forKey: .cacheReadTokens) ?? 0,
             accountWide: try c.decodeIfPresent(Bool.self, forKey: .accountWide) ?? false,
-            observedAt: try c.decodeIfPresent(Date.self, forKey: .observedAt))
+            observedAt: try c.decodeIfPresent(Date.self, forKey: .observedAt),
+            workingDirectory: try c.decodeIfPresent(String.self, forKey: .workingDirectory))
+    }
+
+    /// The working directory with the home folder written as `~`, or the project's name where only that is known.
+    public var displayPath: String? {
+        guard let workingDirectory else { return terminal }
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        if workingDirectory == home { return "~" }
+        return workingDirectory.hasPrefix(home + "/") ? "~" + workingDirectory.dropFirst(home.count) : workingDirectory
     }
 
     /// When this session last did something, given the newest turn event its source reported for it. A source that

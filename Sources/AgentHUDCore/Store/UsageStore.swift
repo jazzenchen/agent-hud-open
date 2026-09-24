@@ -108,10 +108,12 @@ public final class UsageStore {
     public var tokenDimensions: TokenDimensions = .fresh
     /// Keep every selectable range ready, including the partial hour at the start of the rolling window.
     public static var historyHours: Int { StatsRange.days7.hours + 1 }
+    /// The statistics window's page. Pointing out a quota window turns to Tokens, focusing a session to Sessions.
+    public var statsTab: StatsTab = .tokens
     /// The quota window the statistics window points out, set by whatever opened it.
-    public var selectedQuotaId: String?
-    /// The session the statistics window shows in place of its overview; nil shows the overview.
-    public var focusedSessionID: String?
+    public var selectedQuotaId: String? { didSet { if selectedQuotaId != nil { statsTab = .tokens } } }
+    /// The session the Sessions page shows in place of its list; nil shows the list.
+    public var focusedSessionID: String? { didSet { if focusedSessionID != nil { statsTab = .sessions } } }
     public var glowHidden = false
     /// Advances every few seconds so countdowns re-render.
     public internal(set) var now = Date()
@@ -440,6 +442,13 @@ public final class UsageStore {
         }?.message
     }
 
+    /// Every token the session and its sub-agents spent, by kind: its breakdown, or its log's counts, which do not split
+    /// cache writes and reasoning apart.
+    public func sessionTokens(_ session: LiveSession) -> TokenKinds {
+        sessionUsage(session)?.total.kinds
+            ?? TokenKinds(tokensIn: session.tokensIn, tokensOut: session.tokensOut, cacheRead: session.cacheReadTokens)
+    }
+
     /// The session's own tokens by kind, as the session list counts them: its breakdown without the sub-agents' part,
     /// or its log's counts, which do not split cache writes and reasoning apart.
     public func sessionOwnTokens(_ session: LiveSession) -> TokenKinds {
@@ -449,13 +458,16 @@ public final class UsageStore {
         return usage.total.kinds - (usage.subagents?.kinds ?? TokenKinds())
     }
 
-    /// Keep every running session and the most recent session from each client visible.
-    public func sessionPreview(from sessions: [LiveSession]) -> [LiveSession] {
-        var seen = Set<SessionSource>()
-        return sessions.filter { session in
-            let first = seen.insert(sessionSource(session)).inserted
-            return isSessionLive(session) || first
+    /// Sessions under the local day they last did something on, in the order given; the newest day first.
+    public func sessionsByDay(_ sessions: [LiveSession], calendar: Calendar = .current) -> [(day: Date, sessions: [LiveSession])] {
+        let events = lastTurnEvents
+        var days: [(day: Date, sessions: [LiveSession])] = []
+        for session in sessions {
+            let day = calendar.startOfDay(for: session.lastEvent(turnAt: events[session.id]))
+            if let index = days.firstIndex(where: { $0.day == day }) { days[index].sessions.append(session) }
+            else { days.append((day, [session])) }
         }
+        return days.sorted { $0.day > $1.day }
     }
 
     public var hasLiveSession: Bool { !liveSessions.isEmpty }

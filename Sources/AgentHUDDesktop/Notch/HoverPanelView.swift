@@ -146,12 +146,12 @@ struct HoverPanelView: View {
     /// What is running right now: every running session, up to `sessionRowLimit` of them, and the rest as a count.
     /// The statistics window's range never applies here — that range belongs to the session card, which answers a
     /// different question. When nothing is running, the sessions that ended most recently take the same rows.
-    /// The header opens the statistics window's session list, a row that session's own page.
+    /// The header opens the statistics window's Sessions page, a row that session's own page.
     private var sessionLine: some View {
         let running = store.liveSessions
         let shown = Array((running.isEmpty ? store.sessions : running).prefix(Self.sessionRowLimit))
         return VStack(alignment: .leading, spacing: 6) {
-            Button { open(session: nil) } label: {
+            Button { openSessions() } label: {
                 HStack(spacing: 8) {
                     Circle().fill(running.isEmpty ? theme.tertiary : theme.status(.ok)).frame(width: 6, height: 6)
                     Text(L10n.text("活跃会话", "Active sessions")).foregroundStyle(theme.text)
@@ -169,7 +169,7 @@ struct HoverPanelView: View {
                     .foregroundStyle(theme.secondary)
             } else {
                 ForEach(shown) { session in
-                    Button { open(session: session.id) } label: {
+                    Button { openSessions(session.id) } label: {
                         HStack(spacing: 8) {
                             Circle().fill(sessionDot(session)).frame(width: 6, height: 6)
                             Text("\(Self.shortTask(session.task)) · \(session.terminal ?? "—")")
@@ -185,7 +185,7 @@ struct HoverPanelView: View {
                     .help(session.task)
                 }
                 if running.count > shown.count {
-                    Button { open(session: nil) } label: {
+                    Button { openSessions() } label: {
                         Text(L10n.text("还有 \(running.count - shown.count) 个", "+\(running.count - shown.count) more"))
                             .foregroundStyle(theme.secondary)
                     }
@@ -198,8 +198,10 @@ struct HoverPanelView: View {
         .topDivider(theme.divider)
     }
 
-    private func open(session id: String?) {
+    /// The statistics window on its Sessions page: the list, or one session's page.
+    private func openSessions(_ id: String? = nil) {
         store.focusedSessionID = id
+        store.statsTab = .sessions
         onOpenStats()
     }
 
@@ -220,7 +222,11 @@ struct HoverPanelView: View {
             .help(L10n.text("设置", "Settings"))
             .accessibilityLabel(L10n.text("设置", "Settings"))
             Spacer()
-            Button { open(session: nil) } label: {
+            Button {
+                store.focusedSessionID = nil
+                store.statsTab = .tokens
+                onOpenStats()
+            } label: {
                 Image(systemName: "chart.bar.xaxis")
                     .frame(width: 28, height: 28)
                     .contentShape(Rectangle())
