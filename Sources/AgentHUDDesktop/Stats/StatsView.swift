@@ -97,10 +97,10 @@ struct StatsView: View {
         }
     }
 
-    /// The pages sit in the title bar, centred between the traffic lights and the edge; the row below holds the controls
-    /// of the page on screen.
+    /// The pages sit in the title bar, centred on the window and level with the traffic lights; the row below holds the
+    /// controls of the page on screen.
     private func header(_ theme: Theme) -> some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 12) {
             Picker(L10n.text("页面", "Page"), selection: Binding(get: { store.statsTab }, set: { store.statsTab = $0 })) {
                 ForEach([StatsTab.tokens, .sessions], id: \.self) { Text($0.label).tag($0) }
             }
@@ -111,7 +111,7 @@ struct StatsView: View {
             .accessibilityIdentifier("stats-tab")
             controls(theme).frame(height: 28)
         }
-        .padding(EdgeInsets(top: 8, leading: 22, bottom: 10, trailing: 22))
+        .padding(EdgeInsets(top: 4, leading: 22, bottom: 10, trailing: 22))
         .background(theme.windowBackground)
         .overlay(alignment: .bottom) { Rectangle().fill(theme.divider).frame(height: 1) }
     }
