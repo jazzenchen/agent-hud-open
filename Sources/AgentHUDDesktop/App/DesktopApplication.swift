@@ -49,7 +49,7 @@ public final class DesktopApplication {
         statusItem.actions = MenuActions(
             toggleGlow: { [weak self] in self?.toggleGlow() },
             openSettings: { [weak self] in self?.showSettings() },
-            openStats: { [weak self] in self?.showStats() },
+            openStats: { [weak self] in self?.showStatsOverview() },
             quit: { NSApp.terminate(nil) }
         )
         self.statusItem = statusItem
@@ -132,6 +132,12 @@ public final class DesktopApplication {
     public func showStats() {
         Task { await store.refreshAccounts() }
         statsWindow.show()
+    }
+    /// The statistics window on its overview, whatever session page it showed last: the menu's rows are about quotas and
+    /// balances, and a session page opened from the HUD outlives its window.
+    public func showStatsOverview() {
+        store.focusedSessionID = nil
+        showStats()
     }
     public func showOnboarding() { onboardingWindow.show() }
     public func toggleGlow() { store.glowHidden.toggle() }
