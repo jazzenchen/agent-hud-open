@@ -123,7 +123,8 @@ struct SessionRow: View {
                 .foregroundStyle(theme.secondary)
                 .frame(width: 90, alignment: .leading)
             Text(quotaOrCost)
-                .help(L10n.text("套餐显示额度占比；API 显示本会话费用估算", "Plans show quota share; APIs show the estimated session cost"))
+                .help(L10n.text("API 账户显示本会话费用估算；套餐显示本会话占当前 5 小时窗口的份额，没有份额时显示按 API 价估算的费用",
+                                "APIs show the estimated session cost; plans show the session's share of the current 5-hour window, or without one what it would cost at API prices"))
                 .font(.tabular(10, .semibold))
                 .lineLimit(1)
                 .minimumScaleFactor(0.75)
@@ -154,10 +155,8 @@ struct SessionRow: View {
     }
 
     private var quotaOrCost: String {
-        if let billing = store.report?.billing.first(where: { $0.sessionCosts[session.id] != nil }) {
-            return billing.estimatedCost(currency: billing.currency, sessionId: session.id)
-                .map { "≈" + MoneyFormat.amount($0, currency: billing.currency, estimated: true) } ?? "—"
-        }
-        return session.pctOfWindow.map(TokenFormat.percent1) ?? "—"
+        let money = store.sessionMoney(session)
+        if case .listPrice? = money, let share = session.pctOfWindow { return TokenFormat.percent1(share) }
+        return money?.text ?? session.pctOfWindow.map(TokenFormat.percent1) ?? "—"
     }
 }

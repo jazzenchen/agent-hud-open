@@ -111,14 +111,15 @@ struct SessionDetailView: View {
 
     /// Priced accounts show their estimated cost; other sessions what their calls would cost at the API's list price.
     private var cost: (value: String, note: String, help: String)? {
-        if let billing = store.report?.billing.first(where: { $0.sessionCosts[session.id] != nil }),
-           let cost = billing.estimatedCost(currency: billing.currency, sessionId: session.id) {
-            return (MoneyFormat.amount(cost, currency: billing.currency, estimated: true), L10n.text("本会话", "This session"),
-                    L10n.text("按账户价格估算的本会话费用", "This session's cost at the account's prices"))
+        switch store.sessionMoney(session) {
+        case .listPrice?:
+            return (store.sessionMoney(session)!.text, L10n.text("按 API 价", "At API prices"),
+                    L10n.text("同样的调用按厂商 API 公开价计算的费用，不是实际扣费", "What the same calls cost at the vendor's API list price; not a charge"))
+        case let money?:
+            return (money.text, L10n.text("本会话", "This session"), L10n.text("按账户价格估算的本会话费用", "This session's cost at the account's prices"))
+        case nil:
+            return nil
         }
-        guard let cost = store.sessionUsage(session)?.listCost else { return nil }
-        return ("≈" + MoneyFormat.amount(cost, currency: "USD"), L10n.text("按 API 价", "At API prices"),
-                L10n.text("同样的调用按厂商 API 公开价计算的费用，不是实际扣费", "What the same calls cost at the vendor's API list price; not a charge"))
     }
 
     // MARK: Tokens
@@ -138,8 +139,7 @@ struct SessionDetailView: View {
                     }
                 }
                 Spacer(minLength: 8)
-                Text(inspectedText(bars, byTurn: byTurn) ?? L10n.text("悬停查看每一根柱子", "Hover a bar for details"))
-                    .lineLimit(1).truncationMode(.middle)
+                Text(L10n.text("悬停查看每一根柱子", "Hover a bar for details"))
             }
             .font(.ui(10))
             .foregroundStyle(theme.secondary)
@@ -159,19 +159,6 @@ struct SessionDetailView: View {
             }
         }
         .card(theme, padding: EdgeInsets(top: 12, leading: 14, bottom: 12, trailing: 14))
-    }
-
-    /// The bar under the pointer: which turn or period, when, and what it added.
-    private func inspectedText(_ bars: [SessionBar], byTurn: Bool) -> String? {
-        guard let index = inspected, bars.indices.contains(index) else { return nil }
-        let bar = bars[index]
-        var parts = [byTurn ? "T\(bar.id)" : nil, ChartData.weekdayTime(bar.start),
-                     L10n.text("新增 ", "New ") + TokenFormat.short(bar.kinds.new)].compactMap { $0 }
-        if byTurn { parts.insert(Countdown.format(max(0, bar.end.timeIntervalSince(bar.start))), at: 2) }
-        if bar.calls > 0 { parts.append(L10n.text("\(bar.calls) 次调用", bar.calls == 1 ? "1 call" : "\(bar.calls) calls")) }
-        if let context = bar.context { parts.append(L10n.text("上下文 ", "Context ") + TokenFormat.short(context)) }
-        if bar.compacted { parts.append(L10n.text("已压缩", "Compacted")) }
-        return parts.joined(separator: " · ")
     }
 
     // MARK: Kinds
@@ -254,5 +241,33 @@ struct SessionDetailView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .card(theme, padding: EdgeInsets(top: 12, leading: 14, bottom: 12, trailing: 14))
+    }
+}
+
+/// A session's money, as its row and its page both show it; always an estimate.
+enum SessionMoney {
+    /// A priced account's own estimate, in the currency its balance is in.
+    case account(Decimal, currency: String)
+    /// A priced account with no estimate in that currency.
+    case accountUnknown
+    /// What the calls would cost at the vendors' API list prices, in US dollars.
+    case listPrice(Decimal)
+
+    var text: String {
+        switch self {
+        case .account(let amount, let currency): "≈" + MoneyFormat.amount(amount, currency: currency, estimated: true)
+        case .accountUnknown: "—"
+        case .listPrice(let amount): "≈" + MoneyFormat.amount(amount, currency: "USD")
+        }
+    }
+}
+
+extension UsageStore {
+    func sessionMoney(_ session: LiveSession) -> SessionMoney? {
+        if let billing = report?.billing.first(where: { $0.sessionCosts[session.id] != nil }) {
+            return billing.estimatedCost(currency: billing.currency, sessionId: session.id).map { .account($0, currency: billing.currency) }
+                ?? .accountUnknown
+        }
+        return sessionUsage(session)?.listCost.map(SessionMoney.listPrice)
     }
 }

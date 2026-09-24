@@ -152,7 +152,8 @@ public struct ClaudeCodeProvider: UsageProvider, LedgerRecording {
                 terminal: session.cwd.map { URL(fileURLWithPath: $0).lastPathComponent },
                 startedAt: session.startedAt,
                 endedAt: live ? nil : session.lastActivityAt,
-                pctOfWindow: share * utilization,
+                // A session that spent nothing in the current window has no share of it, rather than a share of zero.
+                pctOfWindow: share > 0 ? share * utilization : nil,
                 tokensIn: session.tokensIn,
                 tokensOut: session.tokensOut,
                 client: ClaudeEntrypoint.clientLabel(session.entrypoint),

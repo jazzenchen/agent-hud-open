@@ -57,6 +57,18 @@ struct SessionChartLayout {
         }
     }
 
+    /// The span a bar's hover light covers: its whole slot between turns, or a little more than a period's bar.
+    func column(_ index: Int) -> ClosedRange<CGFloat> {
+        switch axis {
+        case .turn:
+            let slot = width / CGFloat(max(1, bars.count))
+            return CGFloat(index) * slot...CGFloat(index + 1) * slot
+        case .time:
+            let frame = frame(index), half = max(frame.width, 10) / 2
+            return max(0, frame.center - half)...min(width, frame.center + half)
+        }
+    }
+
     func index(at x: CGFloat) -> Int? {
         guard !bars.isEmpty, width > 0 else { return nil }
         switch axis {
@@ -90,9 +102,12 @@ func niceStep(_ peak: Int, count: Int = 3) -> Int {
     return max(1, Int(multiple * power))
 }
 
-/// The new tokens of each bar, stacked by kind; cache reads are drawn apart as the context.
+/// The new tokens of each bar, stacked by kind; cache reads are drawn apart as the context. The bar under the pointer gets
+/// its whole column lit and a card with its details, so a turn that added almost nothing is as easy to inspect as any other.
 struct SessionBarsChart: View {
     static let stacked: [TokenKind] = [.cacheWrite, .input, .reasoning, .output]
+    /// A bar with tokens is never drawn lower than this.
+    static let minimumHeight: CGFloat = 2
 
     let bars: [SessionBar]
     let axis: SessionChartAxis
@@ -112,25 +127,34 @@ struct SessionBarsChart: View {
             ZStack(alignment: .topLeading) {
                 Canvas { context, _ in
                     let scale = (height - 6) / CGFloat(top)
+                    if let index = inspected, bars.indices.contains(index) {
+                        let column = layout.column(index)
+                        context.fill(Path(CGRect(x: column.lowerBound, y: 0, width: column.upperBound - column.lowerBound, height: height)),
+                                     with: .color(theme.text.opacity(0.08)))
+                        let center = layout.frame(index).center
+                        context.fill(Path(CGRect(x: center - 0.5, y: 0, width: 1, height: height)), with: .color(theme.secondary.opacity(0.5)))
+                    }
                     for value in stride(from: 0, through: top, by: step) {
                         let y = height - CGFloat(value) * scale
                         context.stroke(Path { $0.move(to: CGPoint(x: 0, y: y)); $0.addLine(to: CGPoint(x: plot, y: y)) },
                                        with: .color(value == 0 ? theme.divider : theme.divider.opacity(0.6)), lineWidth: 1)
                     }
-                    for (index, bar) in bars.enumerated() {
+                    for (index, bar) in bars.enumerated() where bar.kinds.new > 0 {
                         let frame = layout.frame(index)
+                        // A small bar keeps its proportions but reaches the minimum height.
+                        let barScale = max(scale, Self.minimumHeight / CGFloat(bar.kinds.new))
                         var y = height
                         var barContext = context
                         barContext.opacity = inspected == nil || inspected == index ? 1 : 0.5
                         for kind in Self.stacked where bar.kinds[kind] > 0 {
-                            let h = CGFloat(bar.kinds[kind]) * scale
+                            let h = CGFloat(bar.kinds[kind]) * barScale
                             y -= h
                             barContext.fill(Path(CGRect(x: frame.x, y: y + 0.4, width: frame.width, height: max(0.6, h - 0.8))),
                                             with: .color(theme.kind(kind)))
                         }
                     }
                     if running, let last = bars.indices.last {
-                        let frame = layout.frame(last), h = CGFloat(bars[last].kinds.new) * scale
+                        let frame = layout.frame(last), h = max(Self.minimumHeight, CGFloat(bars[last].kinds.new) * scale)
                         context.stroke(Path(roundedRect: CGRect(x: frame.x - 1.5, y: height - h - 1.5, width: frame.width + 3, height: h + 1.5),
                                             cornerRadius: 1.5), with: .color(theme.text.opacity(0.9)), lineWidth: 1)
                     }
@@ -153,10 +177,57 @@ struct SessionBarsChart: View {
                 case .ended: inspected = nil
                 }
             }
+            .overlay(alignment: .topLeading) {
+                if let index = inspected, bars.indices.contains(index) {
+                    let width: CGFloat = 230, center = layout.frame(index).center
+                    let preferred = center < plot / 2 ? center + 14 : center - width - 14
+                    SessionBarDetail(bar: bars[index], byTurn: axis == .turn, theme: theme)
+                        .frame(width: width)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .offset(x: max(0, min(preferred, plot - width)), y: 4)
+                        .allowsHitTesting(false)
+                }
+            }
         }
         .frame(height: height + 18)
+        .zIndex(1)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(L10n.text("每轮 Token 图表", "Tokens per turn chart"))
+    }
+}
+
+/// What one bar holds: which turn or period, when and for how long, its calls, each kind it added and its context.
+struct SessionBarDetail: View {
+    let bar: SessionBar
+    let byTurn: Bool
+    let theme: Theme
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text((byTurn ? "T\(bar.id) · " : "") + ChartData.weekdayTime(bar.start)).font(.ui(11, .semibold))
+            let facts = [byTurn ? Countdown.format(max(0, bar.end.timeIntervalSince(bar.start))) : nil,
+                         bar.calls > 0 ? L10n.text("\(bar.calls) 次调用", bar.calls == 1 ? "1 call" : "\(bar.calls) calls") : nil,
+                         bar.compacted ? L10n.text("已压缩", "Compacted") : nil].compactMap { $0 }
+            if !facts.isEmpty { Text(facts.joined(separator: " · ")).font(.ui(10)).foregroundStyle(theme.secondary) }
+            Text(L10n.text("新增 ", "New ") + bar.kinds.new.formatted()).font(.tabular(13, .semibold))
+            ForEach(TokenKind.allCases.filter { bar.kinds[$0] > 0 }, id: \.self) { kind in
+                HStack(spacing: 6) {
+                    RoundedRectangle(cornerRadius: 2).fill(theme.kind(kind)).frame(width: 7, height: 7)
+                    Text(kind.label)
+                    Spacer(minLength: 6)
+                    Text(bar.kinds[kind].formatted()).font(.tabular(11))
+                }.font(.ui(11))
+            }
+            if let context = bar.context {
+                Text(L10n.text("上下文 ", "Context ") + TokenFormat.short(context)).font(.ui(10)).foregroundStyle(theme.secondary)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(10)
+        .foregroundStyle(theme.text)
+        .background(RoundedRectangle(cornerRadius: 8).fill(theme.windowBackground))
+        .overlay(RoundedRectangle(cornerRadius: 8).stroke(theme.cardBorder))
+        .shadow(color: .black.opacity(0.2), radius: 6, y: 2)
     }
 }
 
