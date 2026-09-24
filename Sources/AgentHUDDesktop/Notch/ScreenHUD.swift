@@ -230,7 +230,15 @@ final class ScreenHUD {
         default: break
         }
         dismissAlert()
-        onOpenStats?()
+        handOff { onOpenStats?() }
+    }
+
+    /// A click that opens another window takes the HUD down first: the panel floats above every window and stays open
+    /// while the pointer rests on it, so the window it opened would appear underneath it. The pointer has to leave and
+    /// come back to open it again.
+    private func handOff(_ open: () -> Void) {
+        forceCollapse()
+        open()
     }
 
     private var config: HoverMachine.Config {
@@ -344,8 +352,8 @@ final class ScreenHUD {
             collapsedTopRadius: NotchGeometry.collapsedTopRadius,
             collapsedBottomRadius: geometry.cornerRadius,
             lightBorder: systemIsLight,
-            onOpenStats: { [weak self] in self?.onOpenStats?() },
-            onOpenSettings: { [weak self] in self?.onOpenSettings?() },
+            onOpenStats: { [weak self] in self?.handOff { self?.onOpenStats?() } },
+            onOpenSettings: { [weak self] in self?.handOff { self?.onOpenSettings?() } },
             alert: activeAlert,
             onOpenAlert: { [weak self] in self?.openAlert() },
             onDecideAlert: { [weak self] decision in self?.decideAlert(decision) },
