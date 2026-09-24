@@ -240,6 +240,16 @@ final class PermissionHookTests: XCTestCase, @unchecked Sendable {
                              "a layout ZCode would reject is never rewritten")
     }
 
+    func testARequestNamesItsSessionAsTheClientsSessionsAreReported() throws {
+        let expected: [(PermissionHooks.Source, String)] = [(.claude, "s"), (.codex, "s"), (.codebuddy, "codebuddy:s"),
+                                                            (.workbuddy, "workbuddy:s"), (.zcode, "zcode:s"), (.qwen, "qwen:s")]
+        for (source, id) in expected {
+            let request = try XCTUnwrap(try PermissionRequest.parse(JSONSerialization.data(withJSONObject: payload()),
+                                                                   source: source, id: "request", now: now))
+            XCTAssertEqual(request.sessionID, id, "\(source) files its sessions under \(id)")
+        }
+    }
+
     func testZCodeQuestionsAndPlansStayInItsOwnDialog() throws {
         for tool in ["AskUserQuestion", "ExitPlanMode"] {
             XCTAssertNil(try PermissionRequest.parse(JSONSerialization.data(withJSONObject: payload(tool: tool, input: [:])),

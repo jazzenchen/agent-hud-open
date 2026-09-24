@@ -37,6 +37,15 @@ public enum PermissionHooks {
         }
 
         var event: String { "PermissionRequest" }
+        /// The id this client's sessions carry in reports, so a request stands beside its session everywhere. The providers
+        /// that read CodeBuddy, WorkBuddy, ZCode and Qwen Code prefix their ids with the client; Claude Code and Codex keep
+        /// the client's own, and the Qoder builds report no sessions.
+        func sessionID(_ raw: String) -> String {
+            switch self {
+            case .codebuddy, .workbuddy, .zcode, .qwen: return "\(rawValue):\(raw)"
+            case .claude, .codex, .qoder, .qoderCN, .qoderWork: return raw
+            }
+        }
         /// A rule is echoed back only where the client both offers one and applies it. CodeBuddy Code offers
         /// suggestions but never applies one sent back, ZCode applies a rule but never offers one, and Codex and
         /// Qwen Code do neither.

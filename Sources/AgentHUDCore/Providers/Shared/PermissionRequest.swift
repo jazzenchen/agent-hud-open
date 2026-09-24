@@ -149,7 +149,7 @@ public struct PermissionRequest: Identifiable, Equatable, Sendable {
         // A multi-edit is recognized by its first change, the same way a single edit is.
         let change = kind == "MultiEdit" ? input["edits"].arrayValue?.first ?? .null : input
         return PermissionRequest(
-            id: id, source: source, sessionID: session, toolName: tool,
+            id: id, source: source, sessionID: source.sessionID(session), toolName: tool,
             summary: questions.first?.question ?? summary(tool: kind, input: input), detail: detail(tool: kind, input: input),
             cwd: payload["cwd"].stringValue, path: file,
             removed: lines(change["old_string"]), added: lines(change["new_string"] ?? change["content"]),
