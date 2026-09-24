@@ -141,8 +141,10 @@ extension UsageReport {
         guard accounts != nil || previous.accounts != nil || forgottenAccountProviders != nil else { return nil }
         var merged = previous.accounts ?? [:]
         for (provider, current) in accounts ?? [:] {
-            let ids = Set(current.map(\.id))
-            merged[provider] = current + (previous.accounts?[provider] ?? []).filter { !ids.contains($0.id) }.map { $0.with(isCurrent: false) }
+            let ids = Set(current.map(\.id)), aliases = Set(current.flatMap { $0.aliases ?? [] })
+            merged[provider] = current + (previous.accounts?[provider] ?? []).filter {
+                !ids.contains($0.id) && !aliases.contains($0.account.id)
+            }.map { $0.with(isCurrent: false) }
         }
         for provider in forgottenAccountProviders ?? [] {
             merged[provider] = []

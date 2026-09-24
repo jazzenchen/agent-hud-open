@@ -1,3 +1,4 @@
+import AgentHUDSupport
 import Foundation
 
 public actor CodexUsageProvider: UsageProvider, LedgerRecording {
@@ -16,13 +17,22 @@ public actor CodexUsageProvider: UsageProvider, LedgerRecording {
     }
     private var readings: [String: Reading] = [:]
     private var failures: [String: String] = [:]
+    /// The email each home's workspace last came with, by home and workspace hash, kept across launches: the email is
+    /// part of the account's key, and `account/read` can answer too late for a reading to carry it.
+    private var emails: [String: String] = [:]
+    private let identityCacheURL: URL?
 
     public init(readLimits: @escaping @Sendable () async throws -> CodexRateLimits,
                 transcripts: CodexTranscriptStore, history: QuotaHistoryStore, home: String = "",
                 clock: @escaping @Sendable () -> Date = { Date() },
-                readPiLimits: @escaping @Sendable () async throws -> CodexRateLimits? = { nil }, piHome: String = "pi") {
+                readPiLimits: @escaping @Sendable () async throws -> CodexRateLimits? = { nil }, piHome: String = "pi",
+                identityCacheURL: URL? = nil) {
         self.readLimits = readLimits; self.transcripts = transcripts; self.history = history; self.home = home; self.clock = clock
-        self.readPiLimits = readPiLimits; self.piHome = piHome
+        self.readPiLimits = readPiLimits; self.piHome = piHome; self.identityCacheURL = identityCacheURL
+        if let data = identityCacheURL.flatMap({ try? Data(contentsOf: $0) }),
+           let saved = try? JSONDecoder().decode([String: String].self, from: data) {
+            emails = saved
+        }
     }
 
     public static func standard(ledger: UsageLedger) -> CodexUsageProvider {
@@ -37,7 +47,8 @@ public actor CodexUsageProvider: UsageProvider, LedgerRecording {
            history: QuotaHistoryStore(ledger: ledger, scope: "codex", importing: AppSupport.directory.appendingPathComponent("codex-quota-history.json")),
            home: ClientHome.key(directory, defaultDirectory: FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".codex", isDirectory: true)),
            readPiLimits: { try await pi.fetch() },
-           piHome: "pi:" + ClientHome.key(pi.directory, defaultDirectory: FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".pi/agent")))
+           piHome: "pi:" + ClientHome.key(pi.directory, defaultDirectory: FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".pi/agent")),
+           identityCacheURL: AppSupport.directory.appendingPathComponent("codex-identities.json"))
     }
 
     public nonisolated var watchedDirectories: [URL]? { transcripts.roots }
@@ -60,7 +71,7 @@ public actor CodexUsageProvider: UsageProvider, LedgerRecording {
 
     private func read(home: String, fetch: @Sendable () async throws -> CodexRateLimits?) async {
         do {
-            if let limits = try await fetch() { readings[home] = Reading(limits: limits, at: clock()) }
+            if let limits = try await fetch() { readings[home] = Reading(limits: identified(limits, home: home), at: clock()) }
             else { readings[home] = nil }
             failures[home] = nil
         } catch {
@@ -68,6 +79,32 @@ public actor CodexUsageProvider: UsageProvider, LedgerRecording {
             let message = error.localizedDescription
             failures[home] = message
         }
+    }
+
+    /// A reading whose `account/read` did not answer takes the email its workspace last came with on this home, so the
+    /// account keeps its key instead of reappearing under a second one without the email.
+    private func identified(_ limits: CodexRateLimits, home: String) -> CodexRateLimits {
+        guard let workspace = limits.accountId?.trimmingCharacters(in: .whitespacesAndNewlines), !workspace.isEmpty else { return limits }
+        let key = home + "/" + RecordCoding.hash([workspace])
+        if let email = limits.account?.email, !email.isEmpty {
+            if emails[key] != email {
+                emails[key] = email
+                saveEmails()
+            }
+            return limits
+        }
+        guard limits.account == nil, let email = emails[key] else { return limits }
+        var filled = limits
+        filled.account = .init(type: "chatgpt", email: email, planType: nil)
+        return filled
+    }
+
+    private func saveEmails() {
+        guard let identityCacheURL else { return }
+        do {
+            try FileManager.default.createDirectory(at: identityCacheURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try JSONEncoder().encode(emails).write(to: identityCacheURL, options: .atomic)
+        } catch { NSLog("[AgentHUD] Codex identity cache write failed: %@", error.localizedDescription) }
     }
 
     private var accountReadings: [(String, Reading)] {
@@ -144,7 +181,8 @@ public actor CodexUsageProvider: UsageProvider, LedgerRecording {
         let observations = selected.map { source, reading in
             AccountObservation(account: reading.limits.providerAccount(home: source), home: source,
                 label: reading.limits.account?.email, plan: reading.limits.plan, observedAt: reading.at,
-                quotaNotice: failures[source], resetCredits: reading.limits.rateLimitResetCredits)
+                quotaNotice: failures[source], resetCredits: reading.limits.rateLimitResetCredits,
+                aliases: reading.limits.keyWithoutEmail.map { [$0] })
         }
         return UsageReport(generatedAt: now, snapshots: snapshots, sessions: sessions,
                            notice: notice, discoveredAgents: windows.map { $0.row.descriptor }, consumers: consumers,

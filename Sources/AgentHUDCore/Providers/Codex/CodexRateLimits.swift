@@ -69,6 +69,13 @@ public struct CodexRateLimits: Decodable, Sendable {
             ?? .unresolved(provider: "Codex", home: home)
     }
 
+    /// The key the same account got from a reading without its email, as when `account/read` answered too late. Nil
+    /// unless this reading has both the email and the workspace.
+    public var keyWithoutEmail: String? {
+        guard account?.email?.isEmpty == false else { return nil }
+        return ProviderAccount.identified(provider: "Codex", user: nil, workspace: accountId)?.id
+    }
+
     /// Window rows keyed by their own window id (`codex`, `codex:<limit>:<slot>`); providers scope them to the account.
     public func rows(home: String) -> [Row] {
         let account = providerAccount(home: home)

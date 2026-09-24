@@ -50,6 +50,51 @@ final class ProviderAccountTests: XCTestCase {
         XCTAssertNil(switched.codexResetCredits, "earned resets belong to the account that reported them")
     }
 
+    func testACodexReadingWithoutItsEmailKeepsItsAccountAcrossLaunches() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("agenthud-codex-identity-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let json = #"{"accountId":"workspace-1","rateLimitsByLimitId":{"codex":{"primary":{"usedPercent":10,"windowDurationMins":300}}},"account":{"type":"chatgpt","email":"A@Example.com","planType":"prolite"}}"#
+        let signedIn = try JSONDecoder().decode(CodexRateLimits.self, from: Data(json.utf8))
+        var late = signedIn
+        late.account = nil  // account/read answered after the grace
+        final class Readings: @unchecked Sendable {
+            var queue: [CodexRateLimits]
+            var now: Date
+            init(_ queue: [CodexRateLimits], now: Date) { self.queue = queue; self.now = now }
+        }
+        let cache = directory.appendingPathComponent("codex-identities.json")
+        func provider(_ readings: Readings) -> CodexUsageProvider {
+            CodexUsageProvider(readLimits: { readings.queue.removeFirst() }, transcripts: CodexTranscriptStore(roots: [directory]),
+                               history: QuotaHistoryStore(), clock: { readings.now }, identityCacheURL: cache)
+        }
+        let readings = Readings([signedIn, late], now: now)
+        let running = provider(readings)
+        let first = try await running.fetchAccountAndLocalUsage(agents: [], historyHours: 1)
+        XCTAssertEqual(first.accounts?["Codex"]?.map(\.account), [accountA])
+        XCTAssertEqual(first.accounts?["Codex"]?.first?.aliases, [ProviderAccount.identified(provider: "Codex", user: nil, workspace: "workspace-1")!.id])
+        readings.now = now.addingTimeInterval(UsageRefresh.accountRequestSpacing)
+        let second = try await running.fetchAccountAndLocalUsage(agents: [], historyHours: 1)
+        XCTAssertEqual(second.accounts?["Codex"]?.map(\.account), [accountA], "a late account/read does not file the account again")
+        XCTAssertEqual(second.accounts?["Codex"]?.first?.label, "A@Example.com")
+        let relaunched = try await provider(Readings([late], now: now)).fetchAccountAndLocalUsage(agents: [], historyHours: 1)
+        XCTAssertEqual(relaunched.accounts?["Codex"]?.map(\.account), [accountA], "the first reading after a launch keeps it too")
+    }
+
+    func testAnAccountReadWithItsEmailRetiresTheKeyItHadWithoutIt() async throws {
+        let withoutEmail = ProviderAccount.identified(provider: "Codex", user: nil, workspace: "workspace-1")!
+        let later = now.addingTimeInterval(120)
+        let complete = UsageReport(generatedAt: later, snapshots: [.init(agentId: accountA.windowID("codex"), remainingPct: 59, updatedAt: later)],
+                                   sessions: [], discoveredAgents: [descriptor(accountA)],
+                                   accounts: ["Codex": [AccountObservation(account: accountA, label: "a@example.com", observedAt: later,
+                                                                           aliases: [withoutEmail.id])]])
+        let provider = RetainedUsageProvider(provider: Sequence([report(account: withoutEmail, remaining: 60, at: now, credits: nil), complete]))
+        _ = try await provider.fetchUsage(agents: [], historyHours: 24)
+        let merged = try await provider.fetchUsage(agents: [], historyHours: 24)
+        XCTAssertEqual(merged.accounts?["Codex"]?.map(\.account), [accountA], "the key read without the email was the same account")
+        XCTAssertNil(merged.snapshot(for: withoutEmail.windowID("codex")), "its last reading leaves with it")
+    }
+
     @MainActor
     func testSettingsAndQuotaSectionsShareOneSummaryPerAccountAcrossClientHomes() throws {
         let otherWorkspace = ProviderAccount.identified(provider: "Codex", user: "a@example.com", workspace: "workspace-2")!
