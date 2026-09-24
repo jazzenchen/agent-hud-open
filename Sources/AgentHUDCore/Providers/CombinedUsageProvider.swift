@@ -30,11 +30,13 @@ public struct CombinedUsageProvider: UsageProvider {
         }
         private var breakdowns: [String: Breakdown] = [:]
         private var breakdownGeneration: Int?
-        func breakdowns(generation: Int) -> [String: Breakdown] {
-            if breakdownGeneration != generation { breakdowns = [:]; breakdownGeneration = generation }
-            return breakdowns
+        /// The ledger's write mark when the breakdowns were read.
+        private var breakdownMark = 0
+        func breakdowns(generation: Int) -> (values: [String: Breakdown], mark: Int) {
+            if breakdownGeneration != generation { breakdowns = [:]; breakdownGeneration = generation; breakdownMark = 0 }
+            return (breakdowns, breakdownMark)
         }
-        func storeBreakdowns(_ values: [String: Breakdown]) { breakdowns = values }
+        func storeBreakdowns(_ values: [String: Breakdown], mark: Int) { breakdowns = values; breakdownMark = mark }
     }
 
     private let vendors: [Source]
@@ -114,8 +116,7 @@ public struct CombinedUsageProvider: UsageProvider {
             + results.filter { !(vendors[$0.0].provider is any LedgerRecording) }.flatMap { $0.1?.usage ?? [] }
         let sessions = reports.flatMap(\.sessions)
         let progress = reports.compactMap(\.indexing)
-        // While logs are still being read, a finished session's breakdown can change without its counts moving.
-        let sessionUsage = await breakdowns(of: sessions, reusing: progress.isEmpty)
+        let sessionUsage = await breakdowns(of: sessions)
         return UsageReport(generatedAt: now, snapshots: Dictionary(grouping: reports.flatMap(\.snapshots), by: \.agentId).values.compactMap { $0.max { $0.updatedAt < $1.updatedAt } }.sorted { $0.agentId < $1.agentId },
                            sessions: sessions.sorted { a, b in
                                if a.isLive != b.isLive { return a.isLive }
@@ -142,26 +143,30 @@ public struct CombinedUsageProvider: UsageProvider {
                            sessionUsage: sessionUsage)
     }
 
-    /// Where each session's tokens went. A finished session is read again only when its counts move; a running one on
-    /// every pass, since its sub-agents spend without its own log changing.
-    private func breakdowns(of sessions: [LiveSession], reusing: Bool) async -> [String: SessionUsage] {
-        let known = await results.breakdowns(generation: await ledger.generation)
+    /// Where each session's tokens went. A session is read again when its counts move or when the ledger has written any
+    /// log it is made of since its breakdown was read: sub-agents spend without the session's own log changing, and a
+    /// source can record a session's events a pass or more after first reporting it.
+    private func breakdowns(of sessions: [LiveSession]) async -> [String: SessionUsage] {
+        let (known, mark) = await results.breakdowns(generation: await ledger.generation)
+        let changed = await ledger.changedKeys(after: mark), now = await ledger.writeMark
         var kept: [String: Results.Breakdown] = [:], requests: [SessionUsageRequest] = []
         for session in sessions {
-            let counts = [session.tokensIn, session.tokensOut, session.cacheReadTokens]
-            if reusing, !session.isLive, let breakdown = known[session.id], breakdown.counts == counts {
+            let counts = [session.tokensIn, session.tokensOut, session.cacheReadTokens], request = SessionUsageRequest(session)
+            if let breakdown = known[session.id], breakdown.counts == counts, !request.touches(changed) {
                 kept[session.id] = breakdown
             } else {
-                requests.append(SessionUsageRequest(session))
+                requests.append(request)
             }
         }
         if !requests.isEmpty, let read = try? await ledger.sessionUsage(requests) {
             let counts = Dictionary(sessions.map { ($0.id, [$0.tokensIn, $0.tokensOut, $0.cacheReadTokens]) }, uniquingKeysWith: { first, _ in first })
             for request in requests { kept[request.sessionID] = .init(counts: counts[request.sessionID] ?? [], usage: read[request.sessionID]) }
+            await results.storeBreakdowns(kept, mark: now)
         } else {
+            // Nothing could be read: keep what was known, and the mark it was read at, so the next pass reads it again.
             for request in requests { kept[request.sessionID] = known[request.sessionID] }
+            await results.storeBreakdowns(kept, mark: requests.isEmpty ? now : mark)
         }
-        await results.storeBreakdowns(kept)
         return kept.compactMapValues(\.usage)
     }
     /// Each vendor's checks come from its last result, so a quiet vendor is read again only when its activity ages.

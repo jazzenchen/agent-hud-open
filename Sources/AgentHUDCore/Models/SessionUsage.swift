@@ -154,6 +154,13 @@ public struct SessionUsageRequest: Hashable, Sendable {
         self.sessionID = sessionID; self.keys = keys; self.subagentPrefix = subagentPrefix; self.callLog = callLog
     }
 
+    /// Whether any of `keys` is one of the session's logs or lies where its sub-agents' logs do.
+    func touches(_ keys: Set<String>) -> Bool {
+        guard !keys.isEmpty else { return false }
+        if self.keys.contains(where: keys.contains) { return true }
+        return subagentPrefix.map { prefix in keys.contains { $0.hasPrefix(prefix) } } ?? false
+    }
+
     /// Logs read line by line contribute under their path, sources read whole under the session id. A log `x.jsonl`
     /// keeps its sub-agents' logs in the directory `x/`.
     public init(_ session: LiveSession) {

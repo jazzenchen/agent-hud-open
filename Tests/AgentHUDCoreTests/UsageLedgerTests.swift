@@ -161,6 +161,29 @@ final class UsageLedgerTests: XCTestCase, @unchecked Sendable {
         XCTAssertEqual(reread?.turns.map(\.start), [], "the removed log's prompts went with it")
     }
 
+    func testAFinishedSessionsBreakdownFollowsLogsWrittenAfterItWasRead() async throws {
+        let ledger = UsageLedger.inMemory()
+        let parent = LiveSession(id: "s1", agentId: "claude-model:opus", task: "Task", terminal: nil, startedAt: base,
+                                 endedAt: base.addingTimeInterval(600), pctOfWindow: nil, tokensIn: 100, tokensOut: 10, transcriptPath: "p/s1.jsonl")
+        let whole = LiveSession(id: "w1", agentId: "hermes-model:m", task: "Task", terminal: nil, startedAt: base,
+                                endedAt: base.addingTimeInterval(600), pctOfWindow: nil, tokensIn: 7, tokensOut: 0)
+        let provider = CombinedUsageProvider([.init("A", Reporting(sessions: [parent, whole]))], ledger: ledger)
+        try await ledger.write { try $0.upsert(source: "claude", contribution: "p/s1.jsonl", events: [self.event("m1", minute: 1, input: 100, output: 10)]) }
+        let first = try await provider.fetchUsage(agents: [], historyHours: 24)
+        XCTAssertEqual(first.sessionUsage?["s1"]?.total.tokensIn, 100)
+        XCTAssertNil(first.sessionUsage?["w1"], "the source has not recorded the session yet")
+        // Neither session's counts move: a sub-agent's log and a whole-file source's events arrive a pass later.
+        try await ledger.write { writer in
+            try writer.upsert(source: "claude", contribution: "p/s1/subagents/agent-a.jsonl",
+                              events: [self.event("a1", minute: 2, agent: "claude-model:haiku", input: 40, output: 4)])
+            try writer.replace(source: "hermes", contribution: "w1", events: [self.event("h", minute: 3, agent: "hermes-model:m", input: 7)])
+        }
+        let second = try await provider.fetchUsage(agents: [], historyHours: 24)
+        XCTAssertEqual(second.sessionUsage?["s1"]?.total.tokensIn, 140)
+        XCTAssertEqual(second.sessionUsage?["s1"]?.subagents?.tokensIn, 40)
+        XCTAssertEqual(second.sessionUsage?["w1"]?.total.tokensIn, 7)
+    }
+
     func testWindowedReplacementKeepsOlderEvents() async throws {
         let ledger = UsageLedger.inMemory(), since = base.addingTimeInterval(3600)
         try await ledger.write { try $0.replace(source: "hermes", contribution: "s", events: [
@@ -245,5 +268,13 @@ final class UsageLedgerTests: XCTestCase, @unchecked Sendable {
         XCTAssertEqual(buckets.map(\.tokensIn), [7])
         let samples = try await reopened.samples(scope: "codex", windowID: "codex", since: .distantPast)
         XCTAssertEqual(samples.map(\.remainingPct), [40])
+    }
+}
+
+/// A source that reports the same sessions on every pass.
+private struct Reporting: UsageProvider {
+    let sessions: [LiveSession]
+    func fetchUsage(agents: [AgentDescriptor], historyHours: Int) throws -> UsageReport {
+        UsageReport(generatedAt: sessions.map(\.observedAt).max() ?? Date(), snapshots: [], sessions: sessions)
     }
 }

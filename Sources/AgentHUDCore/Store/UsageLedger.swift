@@ -65,6 +65,13 @@ public actor UsageLedger {
     private var expiredAt: Date?
     /// Changes when a failed pass rolled back writes that providers may already reflect in memory.
     public private(set) var generation = 0
+    /// Grows with every change to a contribution; `changedKeys(after:)` names what changed since a mark taken earlier.
+    public var writeMark: Int { storage.writes }
+
+    /// The contribution keys changed since `mark`, as far back as this run of the ledger.
+    public func changedKeys(after mark: Int) -> Set<String> {
+        Set(storage.touched.lazy.filter { $0.value > mark }.map(\.key))
+    }
 
     /// - expires: deletes rows older than `retention`, and ignores such rows on write. Fixtures with fixed dates keep everything.
     public init(url: URL?, expires: Bool = false) throws {
@@ -341,6 +348,13 @@ public struct CostBucket: Hashable, Codable, Sendable {
 final class LedgerStorage {
     let connection: SQLiteConnection
     let retention: TimeInterval?
+    /// The write count at each contribution key's latest change, for readers that keep what they read.
+    private(set) var touched: [String: Int] = [:]
+    private(set) var writes = 0
+    func touch(_ key: String) {
+        writes += 1
+        touched[key] = writes
+    }
     private var agents: [String: Int64] = [:]
     private var names: [Int64: String] = [:]
 
@@ -482,6 +496,7 @@ public struct LedgerWriter {
     /// recorded stay as they are.
     public func addMarks(source: String, contribution: String, account: String? = nil, marks: [UsageLedger.Mark]) throws {
         guard !marks.isEmpty else { return }
+        storage.touch(contribution)
         let id = try contributionID(source: source, key: contribution, account: account), cutoff = cutoff()
         for mark in marks where RecordCoding.milliseconds(mark.timestamp) >= cutoff {
             try storage.connection.run("INSERT OR IGNORE INTO session_mark (contribution_id, at_ms, kind) VALUES (?, ?, ?)",
@@ -494,6 +509,7 @@ public struct LedgerWriter {
     public func upsert(source: String, contribution: String, account: String? = nil, counted: Bool? = nil, events: [UsageLedger.Event]) throws {
         if let counted { try setCounted(source: source, contribution: contribution, account: account, counted: counted) }
         guard !events.isEmpty else { return }
+        storage.touch(contribution)
         let id = try contributionID(source: source, key: contribution, account: account)
         try storage.connection.run("UPDATE contribution SET digest = NULL WHERE id = ?", [.integer(id.id)])
         let cutoff = cutoff(), billed = try hasCosts(id)
@@ -514,6 +530,7 @@ public struct LedgerWriter {
             stored = (row.int(0), row.text(1) ?? "", row.isNull(2) ? nil : row.int(2))
         }
         if let stored, stored.digest == digest { return }
+        storage.touch(contribution)
         if let stored {
             if since == nil || stored.account != (account ?? "") {
                 try remove(source: source, contribution: contribution)
@@ -541,6 +558,7 @@ public struct LedgerWriter {
     public func setCounted(source: String, contribution: String, account: String? = nil, counted: Bool) throws {
         let id = try contributionID(source: source, key: contribution, account: account)
         guard id.counted != counted else { return }
+        storage.touch(contribution)
         try applyTotals(of: id, sign: counted ? 1 : -1)
         try storage.connection.run("UPDATE contribution SET counted = ? WHERE id = ?", [.integer(counted ? 1 : 0), .integer(id.id)])
     }
@@ -551,6 +569,7 @@ public struct LedgerWriter {
             found = ContributionID(id: row.int(0), source: source, account: row.text(1) ?? "", counted: row.int(2) != 0)
         }
         guard let found else { return }
+        storage.touch(contribution)
         if found.counted { try applyTotals(of: found, sign: -1) }
         try storage.connection.run("DELETE FROM usage_event WHERE contribution_id = ?", [.integer(found.id)])
         try storage.connection.run("DELETE FROM cost_amount WHERE contribution_id = ?", [.integer(found.id)])
