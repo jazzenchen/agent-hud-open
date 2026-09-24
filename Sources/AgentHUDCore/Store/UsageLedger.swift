@@ -254,13 +254,12 @@ public actor UsageLedger {
             }
             let ids = own + subagents
             guard !ids.isEmpty else { continue }
-            let list = "(" + ids.map { _ in "?" }.joined(separator: ", ") + ")"
             // Only the session's own log marks its turns; a sub-agent's prompts are steps of the turn that started it.
             var prompts: [Date] = [], compactions: [Date] = []
             if !own.isEmpty {
                 try storage.connection.query("""
-                    SELECT at_ms, kind FROM session_mark WHERE contribution_id IN (\(own.map { _ in "?" }.joined(separator: ", ")))
-                    """, own.map { .integer($0) }) { row in
+                    SELECT at_ms, kind FROM session_mark WHERE contribution_id IN (SELECT value FROM json_each(?))
+                    """, [Self.idList(own)]) { row in
                     switch UsageLedger.Mark.Kind(rawValue: Int(row.int(1))) {
                     case .prompt: prompts.append(RecordCoding.date(row.int(0)))
                     case .compaction: compactions.append(RecordCoding.date(row.int(0)))
@@ -272,8 +271,8 @@ public actor UsageLedger {
             var latestAgent: Int64?
             try storage.connection.query("""
                 SELECT contribution_id, timestamp_ms, agent, tokens_in, tokens_out, cache_read, cache_write, reasoning, context_window
-                FROM usage_event WHERE contribution_id IN \(list) ORDER BY timestamp_ms
-                """, ids.map { .integer($0) }) { row in
+                FROM usage_event WHERE contribution_id IN (SELECT value FROM json_each(?)) ORDER BY timestamp_ms
+                """, [Self.idList(ids)]) { row in
                 let contribution = row.int(0), isOwn = !subagents.contains(contribution)
                 if isOwn { latestAgent = row.int(2) }
                 builder.add(.init(timestamp: RecordCoding.date(row.int(1)), agentId: storage.agentName(row.int(2)),
@@ -284,8 +283,9 @@ public actor UsageLedger {
             guard !builder.isEmpty else { continue }
             var priced: Int64 = 0, amounts: [String: (Int64, Int64)] = [:]
             try storage.connection.query("""
-                SELECT currency, SUM(amount_pico), COUNT(*) FROM cost_amount WHERE contribution_id IN \(list) GROUP BY currency
-                """, ids.map { .integer($0) }) { row in
+                SELECT currency, SUM(amount_pico), COUNT(*) FROM cost_amount
+                WHERE contribution_id IN (SELECT value FROM json_each(?)) GROUP BY currency
+                """, [Self.idList(ids)]) { row in
                 let currency = row.text(0) ?? ""
                 if currency.isEmpty { priced = row.int(2) } else { amounts[currency] = (row.int(1), row.int(2)) }
             }
@@ -296,6 +296,13 @@ public actor UsageLedger {
             }
         }
         return result
+    }
+
+    /// Row ids as one JSON parameter for `IN (SELECT value FROM json_each(?))`. The connection keeps every statement it
+    /// prepares, by its text, for as long as it lives; one text serves any number of ids, where an `IN (?, …)` list
+    /// would add statements for every length a session with a growing number of sub-agents passes through.
+    private static func idList(_ ids: some Sequence<Int64>) -> SQLiteConnection.Value {
+        .text("[" + ids.map(String.init).joined(separator: ",") + "]")
     }
 
     public func samples(scope: String, windowID: String, since: Date) throws -> [QuotaSample] {
