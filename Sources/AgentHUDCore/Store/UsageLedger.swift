@@ -259,6 +259,9 @@ public actor UsageLedger {
                     subagents.insert($0.int(0))
                 }
             }
+            for key in Set(request.subagentKeys) {
+                try storage.connection.query("SELECT id FROM contribution WHERE key = ?", [.text(key)]) { subagents.insert($0.int(0)) }
+            }
             let ids = own + subagents
             guard !ids.isEmpty else { continue }
             // Only the session's own log marks its turns; a sub-agent's prompts are steps of the turn that started it.

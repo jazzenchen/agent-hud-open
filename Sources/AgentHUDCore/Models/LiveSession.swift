@@ -20,6 +20,8 @@ public struct LiveSession: Hashable, Codable, Sendable, Identifiable {
     public let accountWide: Bool
     /// The directory the session works in; `terminal` names its last component.
     public let workingDirectory: String?
+    /// Logs of the sub-agents this session started that do not lie under its own log's directory, such as Codex's.
+    public let subagentTranscripts: [String]?
 
     public init(
         id: String,
@@ -36,7 +38,8 @@ public struct LiveSession: Hashable, Codable, Sendable, Identifiable {
         cacheReadTokens: Int = 0,
         accountWide: Bool = false,
         observedAt: Date? = nil,
-        workingDirectory: String? = nil
+        workingDirectory: String? = nil,
+        subagentTranscripts: [String]? = nil
     ) {
         self.id = id
         self.agentId = agentId
@@ -53,6 +56,7 @@ public struct LiveSession: Hashable, Codable, Sendable, Identifiable {
         self.transcriptPath = transcriptPath
         self.accountWide = accountWide
         self.workingDirectory = workingDirectory
+        self.subagentTranscripts = subagentTranscripts.flatMap { $0.isEmpty ? nil : $0 }
     }
 
     /// Whether the source that read this session said a turn was still in flight. The log's own silence does not end
@@ -67,7 +71,7 @@ public struct LiveSession: Hashable, Codable, Sendable, Identifiable {
 
     private enum CodingKeys: String, CodingKey {
         case id, agentId, task, terminal, startedAt, endedAt, observedAt, pctOfWindow, tokensIn, tokensOut, client, transcriptPath, cacheReadTokens, accountWide
-        case workingDirectory
+        case workingDirectory, subagentTranscripts
     }
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -80,7 +84,8 @@ public struct LiveSession: Hashable, Codable, Sendable, Identifiable {
             cacheReadTokens: try c.decodeIfPresent(Int.self, forKey: .cacheReadTokens) ?? 0,
             accountWide: try c.decodeIfPresent(Bool.self, forKey: .accountWide) ?? false,
             observedAt: try c.decodeIfPresent(Date.self, forKey: .observedAt),
-            workingDirectory: try c.decodeIfPresent(String.self, forKey: .workingDirectory))
+            workingDirectory: try c.decodeIfPresent(String.self, forKey: .workingDirectory),
+            subagentTranscripts: try c.decodeIfPresent([String].self, forKey: .subagentTranscripts))
     }
 
     /// The working directory with the home folder written as `~`, or the project's name where only that is known.

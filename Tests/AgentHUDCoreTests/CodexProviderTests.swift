@@ -319,6 +319,27 @@ final class CodexProviderTests: XCTestCase {
         XCTAssertEqual(CodexLocator.find(home: dir, applications: apps, path: ""), desktop)
     }
 
+    func testASessionNamesTheRolloutsOfItsSpawnedAgentsAndGuardians() async throws {
+        let dir = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let rollouts: [String: [String: Any]] = [
+            "rollout-parent.jsonl": ["id": "parent", "source": "cli"],
+            "rollout-child.jsonl": ["id": "child", "source": ["subagent": ["thread_spawn": ["parent_thread_id": "parent"]]]],
+            "rollout-guardian.jsonl": ["id": "guardian", "parent_thread_id": "child", "source": ["subagent": ["other": "guardian"]]],
+            "rollout-other.jsonl": ["id": "other", "source": "cli"],
+        ]
+        for (name, meta) in rollouts {
+            try (line(type: "session_meta", payload: meta) + "\n").write(to: dir.appendingPathComponent(name), atomically: true, encoding: .utf8)
+        }
+        let provider = CodexUsageProvider(readLimits: { throw UsageProviderError("signed out") }, transcripts: CodexTranscriptStore(roots: [dir]), history: QuotaHistoryStore())
+        let report = try await provider.fetchAccountAndLocalUsage(agents: DefaultAgents.list, historyHours: 48)
+        let sessions = Dictionary(uniqueKeysWithValues: report.sessions.map { ($0.id, $0) })
+        XCTAssertEqual(Set(sessions.keys), ["parent", "other"], "sub-agents are not sessions of their own")
+        XCTAssertEqual(sessions["parent"]?.subagentTranscripts?.map { URL(fileURLWithPath: $0).lastPathComponent },
+                       ["rollout-child.jsonl", "rollout-guardian.jsonl"], "a guardian of the spawned agent is below the session too")
+        XCTAssertNil(sessions["other"]?.subagentTranscripts)
+    }
+
     func testQuotaFailureKeepsLocalSessions() async throws {
         let dir = try temporaryDirectory()
         defer { try? FileManager.default.removeItem(at: dir) }

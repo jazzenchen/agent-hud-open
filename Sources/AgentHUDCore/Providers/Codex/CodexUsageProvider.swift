@@ -147,6 +147,22 @@ public actor CodexUsageProvider: UsageProvider, LedgerRecording {
                                             weeklyCapHits: caps.hits, weeklyWaitTotal: caps.totalWait,
                                             weeklyWaitLongest: caps.longestWait, weeklyWaitLongestAt: caps.longestAt)
         }
+        // Spawned agents and guardians keep rollouts of their own that name the thread that started them; a session's
+        // breakdown takes every rollout below it.
+        var children: [String: [(id: String?, path: String)]] = [:]
+        for session in indexed.sessions where session.transcript.isSubagent {
+            if let parent = session.transcript.parentThreadID { children[parent, default: []].append((session.transcript.id, session.path)) }
+        }
+        func descendants(of id: String) -> [String] {
+            var paths: [String] = [], queue = [id], seen: Set<String> = [id]
+            while let next = queue.popLast() {
+                for child in children[next] ?? [] {
+                    paths.append(child.path)
+                    if let childID = child.id, seen.insert(childID).inserted { queue.append(childID) }
+                }
+            }
+            return paths.sorted()
+        }
         let sessions = indexed.sessions.filter { !$0.transcript.isSubagent }.sorted { a, b in
             let al = a.transcript.isLive(now: now, modifiedAt: a.modifiedAt), bl = b.transcript.isLive(now: now, modifiedAt: b.modifiedAt)
             if al != bl { return al }
@@ -160,7 +176,8 @@ public actor CodexUsageProvider: UsageProvider, LedgerRecording {
                                endedAt: t.isLive(now: now, modifiedAt: session.modifiedAt) ? nil : (t.lastActivityAt ?? session.modifiedAt),
                                pctOfWindow: nil, tokensIn: t.inputTokens,
                                tokensOut: t.outputTokens, client: t.client, transcriptPath: session.path,
-                               cacheReadTokens: t.cachedInputTokens, observedAt: now, workingDirectory: t.cwd)
+                               cacheReadTokens: t.cachedInputTokens, observedAt: now, workingDirectory: t.cwd,
+                               subagentTranscripts: descendants(of: t.id!))
         }
         var notices = Dictionary(uniqueKeysWithValues: selected.compactMap { source, reading -> (String, String)? in
             failures[source].map { (reading.limits.providerAccount(home: source).id, $0) }

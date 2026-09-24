@@ -27,6 +27,8 @@ public struct CodexTranscript: Codable, Sendable {
     public private(set) var client = "Codex"
     public private(set) var isSubagent = false
     public private(set) var isInternal = false
+    /// The thread that started this rollout's sub-agent: a spawned agent names it in its source, a guardian beside it.
+    public private(set) var parentThreadID: String?
     public private(set) var startedAt: Date?
     public private(set) var lastActivityAt: Date?
     public private(set) var task: String?
@@ -80,6 +82,8 @@ public struct CodexTranscript: Codable, Sendable {
             isSubagent = (payload["source"] as? [String: Any])?["subagent"] != nil
             if let subagent = (payload["source"] as? [String: Any])?["subagent"] as? [String: Any] {
                 isInternal = subagent["other"] as? String == "guardian"
+                parentThreadID = payload["parent_thread_id"] as? String
+                    ?? (subagent["thread_spawn"] as? [String: Any])?["parent_thread_id"] as? String
             }
             // CLI launched from Desktop can inherit its originator; the rollout's source is authoritative.
             if source == "cli" { client = "CLI" }
@@ -309,8 +313,9 @@ public actor CodexTranscriptStore {
 enum CodexRollouts: TailLog {
     static let source = "codex"
     static let summaryKey = "transcript"
-    /// 3: cache writes, reasoning, context windows, turn starts and compactions.
-    static let version = 3
+    /// 3: cache writes, reasoning, context windows, turn starts and compactions. 4: sub-agents name the thread that
+    /// started them.
+    static let version = 4
 
     static func summary(for url: URL) -> CodexTranscript { CodexTranscript() }
 

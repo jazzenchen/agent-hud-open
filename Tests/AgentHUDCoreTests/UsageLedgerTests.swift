@@ -161,6 +161,19 @@ final class UsageLedgerTests: XCTestCase, @unchecked Sendable {
         XCTAssertEqual(reread?.turns.map(\.start), [], "the removed log's prompts went with it")
     }
 
+    func testSessionUsageTakesSubagentLogsNamedOneByOne() async throws {
+        let ledger = UsageLedger.inMemory()
+        try await ledger.write { writer in
+            try writer.upsert(source: "codex", contribution: "r/parent.jsonl", events: [self.event("p", minute: 1, agent: "codex-model:gpt-5", input: 100)])
+            try writer.upsert(source: "codex", contribution: "r/child.jsonl", events: [self.event("c", minute: 2, agent: "codex-model:gpt-5", input: 30)])
+        }
+        let usage = try await ledger.sessionUsage([SessionUsageRequest(sessionID: "parent", keys: ["r/parent.jsonl"], subagentKeys: ["r/child.jsonl"],
+                                                                        callLog: "r/parent.jsonl")])
+        XCTAssertEqual(usage["parent"]?.total.tokensIn, 130)
+        XCTAssertEqual(usage["parent"]?.subagents?.tokensIn, 30)
+        XCTAssertEqual(usage["parent"]?.contextTokens, 100, "the context is the session's own latest call")
+    }
+
     func testAFinishedSessionsBreakdownFollowsLogsWrittenAfterItWasRead() async throws {
         let ledger = UsageLedger.inMemory()
         let parent = LiveSession(id: "s1", agentId: "claude-model:opus", task: "Task", terminal: nil, startedAt: base,

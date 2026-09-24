@@ -147,29 +147,33 @@ public struct SessionUsageRequest: Hashable, Sendable {
     public let sessionID: String
     public let keys: [String]
     public let subagentPrefix: String?
+    /// Sub-agents' logs named one by one, for clients that keep them apart from the session's own log.
+    public let subagentKeys: [String]
     /// The key of a log that records every model call, one event each, so its latest event tells the context size.
     public let callLog: String?
 
-    public init(sessionID: String, keys: [String], subagentPrefix: String? = nil, callLog: String? = nil) {
-        self.sessionID = sessionID; self.keys = keys; self.subagentPrefix = subagentPrefix; self.callLog = callLog
+    public init(sessionID: String, keys: [String], subagentPrefix: String? = nil, subagentKeys: [String] = [], callLog: String? = nil) {
+        self.sessionID = sessionID; self.keys = keys; self.subagentPrefix = subagentPrefix; self.subagentKeys = subagentKeys
+        self.callLog = callLog
     }
 
     /// Whether any of `keys` is one of the session's logs or lies where its sub-agents' logs do.
     func touches(_ keys: Set<String>) -> Bool {
         guard !keys.isEmpty else { return false }
-        if self.keys.contains(where: keys.contains) { return true }
+        if self.keys.contains(where: keys.contains) || subagentKeys.contains(where: keys.contains) { return true }
         return subagentPrefix.map { prefix in keys.contains { $0.hasPrefix(prefix) } } ?? false
     }
 
     /// Logs read line by line contribute under their path, sources read whole under the session id. A log `x.jsonl`
     /// keeps its sub-agents' logs in the directory `x/`.
     public init(_ session: LiveSession) {
+        let named = session.subagentTranscripts ?? []
         guard let path = session.transcriptPath else {
-            self.init(sessionID: session.id, keys: [session.id])
+            self.init(sessionID: session.id, keys: [session.id], subagentKeys: named)
             return
         }
         let directory = path.hasSuffix(".jsonl") ? String(path.dropLast(".jsonl".count)) + "/" : nil
-        self.init(sessionID: session.id, keys: [path, session.id], subagentPrefix: directory, callLog: path)
+        self.init(sessionID: session.id, keys: [path, session.id], subagentPrefix: directory, subagentKeys: named, callLog: path)
     }
 }
 
