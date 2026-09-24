@@ -60,7 +60,7 @@ extension UsageReport {
                     indexing: indexing, insightsByAgent: insightsByAgent, subscriptions: subscriptions, sourceNotices: sourceNotices,
                     consumerIdsByQuota: consumerIdsByQuota, billing: billing, codexResetCredits: codexResetCredits,
                     codexResetCreditsObservedAt: codexResetCreditsObservedAt, services: services, activeQuotaPoolIDs: activeQuotaPoolIDs,
-                    accounts: accounts, forgottenAccountProviders: forgottenAccountProviders)
+                    accounts: accounts, forgottenAccountProviders: forgottenAccountProviders, periods: periods)
     }
 
     /// An absent reading is not a zero or a confirmed reset. Keep its original observation time.
@@ -123,7 +123,9 @@ extension UsageReport {
             }, services ?? []]),
             activeQuotaPoolIDs: (previous.activeQuotaPoolIDs ?? [:]).merging(activeQuotaPoolIDs ?? [:], uniquingKeysWith: { _, new in new }),
             accounts: accounts,
-            sessionUsage: Self.retainedSessionUsage(sessionUsage, previous: previous.sessionUsage, sessions: retainedSessions))
+            sessionUsage: Self.retainedSessionUsage(sessionUsage, previous: previous.sessionUsage, sessions: retainedSessions),
+            // Like `usage`, the periods come from the ledger, which keeps what a failed refresh recorded before.
+            periods: periods)
     }
 
     /// Sessions kept from a failed source keep the breakdown they had.

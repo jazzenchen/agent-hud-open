@@ -29,6 +29,13 @@ public struct DemoUsageProvider: UsageProvider {
                 }
             }
         }
+        var periods = UsagePeriods()
+        periods.add(usage, endingAt: now)
+        // The demo covers a week; thirty days at the same pace fill the month.
+        periods.tokens[.days30] = periods.tokens[.days7]?.mapValues { week in
+            TokenKinds(cacheWrite: week.cacheWrite * 30 / 7, input: week.input * 30 / 7, reasoning: week.reasoning * 30 / 7,
+                       output: week.output * 30 / 7, cacheRead: week.cacheRead * 30 / 7)
+        }
         return UsageReport(
             generatedAt: now,
             snapshots: DemoData.snapshots(now: now),
@@ -39,7 +46,8 @@ public struct DemoUsageProvider: UsageProvider {
             subscriptions: ["Claude": "max_20x", "Codex": "prolite"],
             consumerIdsByQuota: Dictionary(uniqueKeysWithValues: consumers.map { ($0.id, Set([$0.id])) }),
             codexResetCredits: DemoData.codexResetCredits(now: now),
-            sessionUsage: DemoData.sessionUsage(now: now)
+            sessionUsage: DemoData.sessionUsage(now: now),
+            periods: periods
         )
     }
 }

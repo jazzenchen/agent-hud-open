@@ -24,6 +24,12 @@ public struct TokenDimensions: OptionSet, Hashable, Sendable {
     public func count(_ kinds: TokenKinds) -> Int {
         TokenKind.allCases.reduce(0) { $0 + (contains($1.dimension) ? kinds[$1] : 0) }
     }
+    /// The selected kinds of `kinds`, the others zero.
+    public func masking(_ kinds: TokenKinds) -> TokenKinds {
+        TokenKinds(cacheWrite: contains(.cacheWrite) ? kinds.cacheWrite : 0, input: contains(.input) ? kinds.input : 0,
+                   reasoning: contains(.reasoning) ? kinds.reasoning : 0, output: contains(.output) ? kinds.output : 0,
+                   cacheRead: contains(.cacheRead) ? kinds.cacheRead : 0)
+    }
     /// For counts without a split: input that includes cache writes, output that includes reasoning.
     public func count(input: Int, output: Int, cache: Int) -> Int {
         (isDisjoint(with: [.input, .cacheWrite]) ? 0 : input) + (isDisjoint(with: [.output, .reasoning]) ? 0 : output)

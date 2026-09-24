@@ -35,9 +35,17 @@ struct TokenConsumptionChart: View {
                         .font(.tabular(12))
                         .foregroundStyle(theme.secondary)
                 } else {
-                    Text(TokenFormat.short(columns.reduce(0) { $0 + $1.total }))
-                        .font(.tabular(20, .semibold))
-                        .help(L10n.text("所选时间与维度的 Token 总量", "Total tokens for the selected range and dimensions"))
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text(TokenFormat.short(columns.reduce(0) { $0 + $1.total }))
+                            .font(.tabular(20, .semibold))
+                            .help(L10n.text("所选时间与种类的 Token 总量", "Total tokens for the selected range and kinds"))
+                        if let cost = ModelCatalog.cost(of: store.statsTokensByModel.mapValues(store.tokenDimensions.masking)) {
+                            Text(L10n.text("按 API 价 ", "At API prices ") + "≈" + MoneyFormat.amount(cost.amount, currency: "USD"))
+                                .font(.tabular(11))
+                                .foregroundStyle(theme.secondary)
+                                .help(costHelp(unpriced: cost.unpriced))
+                        }
+                    }
                 }
             }
             if !legendConsumers.isEmpty {
@@ -68,6 +76,14 @@ struct TokenConsumptionChart: View {
             .foregroundStyle(theme.secondary)
             .padding(.horizontal, context == .stats ? 12 : 6)
         }
+    }
+
+    private func costHelp(unpriced: [String]) -> String {
+        let note = L10n.text("所选种类按厂商 API 公开价折合；选「全部 Token」即这些调用的总价",
+                             "The selected kinds at the vendors' API list prices; with all tokens selected, what the calls would cost")
+        guard !unpriced.isEmpty else { return note }
+        return note + "\n" + L10n.text("没有公开价、未计入：", "Not counted, no list price: ")
+            + unpriced.map(store.consumerName).joined(separator: L10n.text("、", ", "))
     }
 
     private func legendLabel(_ consumer: AgentDescriptor, tokens: Int) -> some View {

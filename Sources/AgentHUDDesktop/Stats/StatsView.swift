@@ -84,17 +84,8 @@ struct StatsView: View {
     private func tokens(_ theme: Theme) -> some View {
         UsageChartsCard(store: store, theme: theme)
         MetricCards(store: store, theme: theme)
-        ViewThatFits(in: .horizontal) {
-            HStack(alignment: .top, spacing: 12) {
-                WeeklyTokenShareCard(store: store, theme: theme).frame(minWidth: 380)
-                HeatmapCard(grid: store.statsActivity, consumers: store.consumers, theme: theme).frame(minWidth: 420)
-            }
-            .fixedSize(horizontal: false, vertical: true)
-            VStack(spacing: 12) {
-                WeeklyTokenShareCard(store: store, theme: theme)
-                HeatmapCard(grid: store.statsActivity, consumers: store.consumers, theme: theme)
-            }
-        }
+        UsagePeriodsCard(store: store, theme: theme)
+        HeatmapCard(grid: store.statsActivity, consumers: store.consumers, theme: theme)
     }
 
     /// The pages sit in the title bar, centred on the window and level with the traffic lights; the row below holds the

@@ -58,7 +58,7 @@ final class CombinedProviderTests: XCTestCase {
     }
 
     @MainActor
-    func testWeeklyShareCombinesRawTokensAcrossVendors() async throws {
+    func testPeriodsAndActivityCombineRawTokensAcrossVendors() async throws {
         let provider = CombinedUsageProvider([.init("Claude", Source(report: report("claude", tokens: 100))),
                                               .init("Codex", Source(report: report("codex", tokens: 300)))])
         let combined = try await provider.fetchAccountAndLocalUsage(agents: [], historyHours: 48)
@@ -67,7 +67,9 @@ final class CombinedProviderTests: XCTestCase {
         defer { defaults.removePersistentDomain(forName: suite) }
         let store = UsageStore(provider: provider, settings: SettingsStore(defaults: defaults))
         store.replace(report: combined)
-        XCTAssertEqual(store.weeklyTokenShare, ["claude": 0.25, "codex": 0.75])
+        XCTAssertEqual(combined.periods?.tokens[.days7]?.mapValues(\.total), ["claude": 100, "codex": 300],
+                       "usage a source reports itself joins the ledger's periods")
+        XCTAssertEqual(combined.periods?.tokens[.days30], combined.periods?.tokens[.days7])
         XCTAssertEqual(store.statsActivity.rows.flatMap { $0 }.filter { $0 > 0 }, [1])
         XCTAssertEqual(store.statsActivity.tokens.flatMap { $0 }.filter { $0 > 0 }, [400], "hover totals include every vendor")
         XCTAssertEqual(store.statsActivity.tokensByModel.flatMap { $0 }.filter { !$0.isEmpty }, [["claude": 100, "codex": 300]])

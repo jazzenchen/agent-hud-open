@@ -191,6 +191,23 @@ public actor UsageLedger {
         return result.sorted { ($0.start, $0.account ?? "", $0.agentId) < ($1.start, $1.account ?? "", $1.agentId) }
     }
 
+    /// Every model's tokens in each period ending at `now`, counted from the buckets as `buckets(since:)` returns them.
+    public func periods(endingAt now: Date, calendar: Calendar = .current) throws -> UsagePeriods {
+        var periods = UsagePeriods()
+        for period in UsagePeriods.Period.allCases {
+            let start = RecordCoding.milliseconds(period.start(endingAt: now, calendar: calendar)) / Self.bucketMilliseconds * Self.bucketMilliseconds
+            try storage.connection.query("""
+                SELECT agent, SUM(tokens_in), SUM(tokens_out), SUM(cache_read), SUM(cache_write), SUM(reasoning)
+                FROM usage_bucket WHERE start_ms >= ? GROUP BY agent
+                """, [.integer(start)]) { row in
+                periods.tokens[period, default: [:]][storage.agentName(row.int(0)), default: TokenKinds()] += TokenKinds(
+                    tokensIn: Int(row.int(1)), tokensOut: Int(row.int(2)), cacheRead: Int(row.int(3)),
+                    cacheWrite: Int(row.int(4)), reasoning: Int(row.int(5)))
+            }
+        }
+        return periods
+    }
+
     /// Cost buckets by billing account; a currency missing from `amounts` had an unpriced event in that bucket.
     public func costBuckets(since: Date) throws -> [String: [CostBucket]] {
         let start = RecordCoding.milliseconds(since) / Self.bucketMilliseconds * Self.bucketMilliseconds

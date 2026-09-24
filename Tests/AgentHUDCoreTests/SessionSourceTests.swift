@@ -3,7 +3,7 @@ import XCTest
 
 final class SessionSourceTests: XCTestCase {
     @MainActor
-    func testSessionsGroupUnderTheDayTheyLastDidSomethingOn() {
+    func testSessionsGroupUnderTheDayTheyStarted() {
         let defaults = UserDefaults(suiteName: "AgentHUDSessionDayTests.\(UUID())")!
         let store = UsageStore(provider: DemoUsageProvider(), settings: SettingsStore(defaults: defaults))
         var calendar = Calendar(identifier: .gregorian)
@@ -19,7 +19,8 @@ final class SessionSourceTests: XCTestCase {
                         session("yesterday", started: -20, ended: -16)]
         let days = store.sessionsByDay(sessions, calendar: calendar)
         XCTAssertEqual(days.map(\.day), [calendar.startOfDay(for: noon), calendar.startOfDay(for: noon.addingTimeInterval(-86400))])
-        XCTAssertEqual(days.map { $0.sessions.map(\.id) }, [["running", "overnight"], ["yesterday"]])
+        XCTAssertEqual(days.map { $0.sessions.map(\.id) }, [["running"], ["overnight", "yesterday"]],
+                       "a session that ran past midnight stays with the day it began")
     }
 
     @MainActor

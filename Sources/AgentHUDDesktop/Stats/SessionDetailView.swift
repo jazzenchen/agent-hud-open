@@ -89,6 +89,9 @@ struct SessionDetailView: View {
         items.append((L10n.text("上下文", "Context"), context(usage), usage?.contextWindow.map { L10n.text("共 ", "Of ") + TokenFormat.short($0) }
                         ?? L10n.text("最近一次调用", "Latest call"),
                       L10n.text("最近一次模型调用的输入：新输入、缓存写入与缓存读取", "The latest model call's input: fresh, cache writes and cache reads")))
+        items.append((L10n.text("缓存命中", "Cache hits"), total.cacheHitRate.map { TokenFormat.percent($0 * 100) } ?? "—",
+                      L10n.text("提示读自缓存", "Of prompts, from cache"),
+                      L10n.text("缓存读取占全部提示的比例：新输入、缓存写入与缓存读取", "Cache reads as a share of every prompt: fresh input, cache writes and cache reads")))
         return HStack(alignment: .top, spacing: 0) {
             ForEach(Array(items.enumerated()), id: \.offset) { index, item in
                 VStack(spacing: 4) {
@@ -191,7 +194,14 @@ struct SessionDetailView: View {
     private func models(_ usage: SessionUsage) -> some View {
         let total = max(1, usage.total.kinds.total)
         return VStack(alignment: .leading, spacing: 8) {
-            Text(L10n.text("模型", "Models")).font(.ui(13, .semibold))
+            HStack(spacing: 8) {
+                Text(L10n.text("模型", "Models")).font(.ui(13, .semibold))
+                Spacer()
+                Text(L10n.text("缓存命中", "Cache hits")).frame(width: 60, alignment: .trailing)
+                Text(L10n.text("占比", "Share")).frame(width: 44, alignment: .trailing)
+                Text("Token").frame(width: 60, alignment: .trailing)
+            }
+            .font(.ui(10)).foregroundStyle(theme.secondary)
             ForEach(usage.models, id: \.agentId) { model in
                 let count = model.tokens.kinds.total
                 let agent = descriptor(model.agentId)
@@ -207,6 +217,8 @@ struct SessionDetailView: View {
                         }
                     }
                     .frame(height: 5)
+                    Text(model.tokens.kinds.cacheHitRate.map { TokenFormat.percent($0 * 100) } ?? "—").font(.tabular(11))
+                        .foregroundStyle(theme.secondary).frame(width: 60, alignment: .trailing)
                     Text(share(count, of: total)).font(.tabular(11)).foregroundStyle(theme.secondary)
                         .frame(width: 44, alignment: .trailing)
                     Text(TokenFormat.short(count)).font(.tabular(11)).frame(width: 60, alignment: .trailing)

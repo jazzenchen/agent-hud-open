@@ -88,7 +88,26 @@ public enum ModelCatalog {
     public static func cost(agentId: String, kinds: TokenKinds) -> Decimal? {
         guard let model = model(for: agentId) else { return nil }
         let prompt = kinds.input + kinds.cacheWrite + kinds.cacheRead
-        let rates = model.longContextAbove.map { prompt > $0 } == true ? model.longRates ?? model.rates : model.rates
+        return price(kinds, at: model.longContextAbove.map { prompt > $0 } == true ? model.longRates ?? model.rates : model.rates)
+    }
+
+    /// What calls counted together would cost at list price. A sum says nothing of any one call's prompt, so it is priced
+    /// at the base rates; nil when the model has none.
+    public static func cost(agentId: String, summed kinds: TokenKinds) -> Decimal? {
+        model(for: agentId).map { price(kinds, at: $0.rates) }
+    }
+
+    /// What each model's counted tokens would cost at list price together, with the models that have tokens but no price;
+    /// nil when none of them has one.
+    public static func cost(of tokens: [String: TokenKinds]) -> (amount: Decimal, unpriced: [String])? {
+        var amount: Decimal = 0, priced = false, unpriced: [String] = []
+        for (agentId, kinds) in tokens where !kinds.isEmpty {
+            if let cost = cost(agentId: agentId, summed: kinds) { amount += cost; priced = true } else { unpriced.append(agentId) }
+        }
+        return priced ? (amount, unpriced.sorted()) : nil
+    }
+
+    private static func price(_ kinds: TokenKinds, at rates: Rates) -> Decimal {
         let micro = Decimal(kinds.input) * rates.input + Decimal(kinds.cacheWrite) * rates.cacheWrite
             + Decimal(kinds.cacheRead) * rates.cacheRead + Decimal(kinds.output + kinds.reasoning) * rates.output
         return micro / 1_000_000

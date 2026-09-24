@@ -31,6 +31,22 @@ final class UsageLedgerTests: XCTestCase, @unchecked Sendable {
         _ = now
     }
 
+    func testPeriodsSumEachModelSinceMidnightAndOverSevenAndThirtyDays() async throws {
+        let ledger = UsageLedger.inMemory()
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC")!
+        try await ledger.write { try $0.upsert(source: "claude", contribution: "a.jsonl", events: [
+            self.event("today", minute: 0, input: 100), self.event("last-night", minute: -600, input: 20),
+            self.event("last-week", minute: -14_400, agent: "codex-model:gpt", input: 5),
+            self.event("last-month", minute: -57_600, input: 1_000),
+        ]) }
+        // `base` is 08:00 UTC, so the day began eight hours before it.
+        let periods = try await ledger.periods(endingAt: base.addingTimeInterval(2 * 3600), calendar: calendar)
+        XCTAssertEqual(periods.tokens[.today], ["claude-model:opus": TokenKinds(input: 100)])
+        XCTAssertEqual(periods.tokens[.days7], ["claude-model:opus": TokenKinds(input: 120)])
+        XCTAssertEqual(periods.tokens[.days30], ["claude-model:opus": TokenKinds(input: 120), "codex-model:gpt": TokenKinds(input: 5)])
+    }
+
     func testReplacingAContributionOnlyWritesChanges() async throws {
         let ledger = UsageLedger.inMemory()
         let first = [event("e1", minute: 2, agent: "copilot-model:gpt", input: 10), event("e2", minute: 3, agent: "copilot-model:gpt", input: 5)]

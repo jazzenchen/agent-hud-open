@@ -458,12 +458,12 @@ public final class UsageStore {
         return usage.total.kinds - (usage.subagents?.kinds ?? TokenKinds())
     }
 
-    /// Sessions under the local day they last did something on, in the order given; the newest day first.
+    /// Sessions under the local day they started on, in the order given; the newest day first. A session keeps its day
+    /// however long it runs, so a day's sessions and their totals do not move as they carry on.
     public func sessionsByDay(_ sessions: [LiveSession], calendar: Calendar = .current) -> [(day: Date, sessions: [LiveSession])] {
-        let events = lastTurnEvents
         var days: [(day: Date, sessions: [LiveSession])] = []
         for session in sessions {
-            let day = calendar.startOfDay(for: session.lastEvent(turnAt: events[session.id]))
+            let day = calendar.startOfDay(for: session.startedAt)
             if let index = days.firstIndex(where: { $0.day == day }) { days[index].sessions.append(session) }
             else { days.append((day, [session])) }
         }
@@ -506,14 +506,20 @@ public final class UsageStore {
             since: dataDate.addingTimeInterval(-7 * 86400), calendar: .current, dimensions: tokenDimensions)
     }
 
-    public var weeklyTokenShare: [String: Double] {
-        var totals: [String: Int] = [:]
-        let week = DateInterval(start: dataDate.addingTimeInterval(-7 * 86400), end: dataDate)
-        for bucket in report?.usage ?? [] where bucket.overlaps(week) {
-            totals[bucket.agentId, default: 0] += tokenDimensions.count(bucket)
+    /// Each model's tokens in the charted range, counted as the chart counts them.
+    public var statsTokensByModel: [String: TokenKinds] {
+        let interval = statsInterval, ids = Set(consumers.map(\.id))
+        var tokens: [String: TokenKinds] = [:]
+        for bucket in report?.usage ?? [] where ids.contains(bucket.agentId) && bucket.overlaps(interval) {
+            tokens[bucket.agentId, default: TokenKinds()] += bucket.kinds
         }
-        let total = totals.values.reduce(0, +)
-        return total > 0 ? totals.mapValues { Double($0) / Double(total) } : [:]
+        return tokens
+    }
+
+    /// Each model's tokens in a period, for the models the charts show.
+    public func periodTokens(_ period: UsagePeriods.Period) -> [String: TokenKinds] {
+        let ids = Set(consumers.map(\.id))
+        return (report?.periods?.tokens[period] ?? [:]).filter { ids.contains($0.key) && !$0.value.isEmpty }
     }
 
     /// Quota switches do not change token-chart colors.

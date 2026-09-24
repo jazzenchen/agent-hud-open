@@ -1,12 +1,14 @@
 import SwiftUI
 import AgentHUDCore
 
-/// The Sessions page: every session of the last seven days under the day it last did something on, newest first,
-/// below today's totals.
+/// The Sessions page: every session of the last seven days under the day it started on, newest first, below today's
+/// totals. Today and any day with a session still running are open; the other days fold to their totals until clicked.
 struct SessionList: View {
     let store: UsageStore
     let theme: Theme
     let source: SessionSource?
+    /// Days the user opened or closed against how they start.
+    @State private var flipped: Set<Date> = []
 
     var body: some View {
         let sessions = store.statsSessions.filter { source == nil || store.sessionSource($0) == source }
@@ -17,19 +19,20 @@ struct SessionList: View {
                 SessionsTodayCard(sessions: first.sessions, store: store, theme: theme)
             }
             ForEach(days, id: \.day) { day in
+                let running = day.sessions.filter(store.isSessionLive).count
+                let open = (day.day == today || running > 0) != flipped.contains(day.day)
                 VStack(alignment: .leading, spacing: 6) {
-                    HStack(alignment: .firstTextBaseline, spacing: 6) {
-                        Text(Self.title(day.day, today: today, calendar: calendar)).font(.ui(13, .semibold))
-                        Text("\(day.sessions.count)").font(.tabular(11)).foregroundStyle(theme.secondary)
-                    }
-                    header
-                    LazyVStack(spacing: 4) {
-                        ForEach(day.sessions) { session in
-                            SessionRow(session: session, store: store, theme: theme)
+                    dayHeader(day.day, sessions: day.sessions, running: running, open: open, today: today, calendar: calendar)
+                    if open {
+                        header
+                        LazyVStack(spacing: 4) {
+                            ForEach(day.sessions) { session in
+                                SessionRow(session: session, store: store, theme: theme)
+                            }
                         }
                     }
                 }
-                .card(theme, padding: EdgeInsets(top: 10, leading: 14, bottom: 10, trailing: 14))
+                .card(theme, padding: EdgeInsets(top: 10, leading: 14, bottom: open ? 10 : 8, trailing: 14))
             }
             if sessions.isEmpty {
                 Text(L10n.text("近 7 天没有会话", "No sessions in the last 7 days"))
@@ -38,6 +41,41 @@ struct SessionList: View {
                     .card(theme)
             }
         }
+    }
+
+    /// The day's name and count, and while it is folded what its sessions spent; a click folds or opens it.
+    private func dayHeader(_ day: Date, sessions: [LiveSession], running: Int, open: Bool, today: Date, calendar: Calendar) -> some View {
+        Button {
+            withAnimation(.easeOut(duration: 0.15)) { flipped.formSymmetricDifference([day]) }
+        } label: {
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundStyle(theme.secondary)
+                    .rotationEffect(.degrees(open ? 90 : 0))
+                    .frame(width: 10)
+                Text(Self.title(day, today: today, calendar: calendar)).font(.ui(13, .semibold))
+                Text("\(sessions.count)").font(.tabular(11)).foregroundStyle(theme.secondary)
+                if running > 0 {
+                    Text(L10n.text("\(running) 个运行中", "\(running) running")).font(.ui(11)).foregroundStyle(theme.status(.ok))
+                }
+                Spacer(minLength: 8)
+                if !open {
+                    if let costs = SessionsTodayCard.costs(sessions, store: store) {
+                        Text(costs).font(.tabular(11)).foregroundStyle(theme.secondary)
+                    }
+                    Text(sessions.contains(where: \.hasTokenCounts)
+                         ? TokenFormat.short(sessions.reduce(0) { $0 + store.tokenDimensions.count(store.sessionOwnTokens($1)) }) : "—")
+                        .font(.tabular(11))
+                        .frame(minWidth: 50, alignment: .trailing)
+                        .help("Token · " + store.tokenDimensions.label)
+                }
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(Self.title(day, today: today, calendar: calendar))
+        .accessibilityValue(open ? L10n.text("已展开", "Expanded") : L10n.text("已折叠", "Collapsed"))
     }
 
     /// Today, yesterday, then the weekday and date.
@@ -128,8 +166,10 @@ struct SessionsTodayCard: View {
         .help("\(kind.label) \(kinds[kind].formatted())")
     }
 
+    private var costs: String? { Self.costs(sessions, store: store) }
+
     /// Priced accounts' estimates and, for the rest, what their calls would cost at API list prices, added up per currency.
-    private var costs: String? {
+    static func costs(_ sessions: [LiveSession], store: UsageStore) -> String? {
         var sums: [String: Decimal] = [:]
         for session in sessions {
             switch store.sessionMoney(session) {
@@ -184,9 +224,14 @@ struct SessionRow: View {
                 Text(store.sessionStatusLabel(session))
                     .font(.tabular(12))
                     .lineLimit(1).minimumScaleFactor(0.8)
-                if let turns = store.sessionUsage(session)?.turnCount, turns > 0 {
-                    Text(L10n.text("\(turns) 轮", turns == 1 ? "1 turn" : "\(turns) turns")).font(.tabular(10))
+                let usage = store.sessionUsage(session)
+                HStack(spacing: 6) {
+                    if let turns = usage?.turnCount, turns > 0 {
+                        Text(L10n.text("\(turns) 轮", turns == 1 ? "1 turn" : "\(turns) turns"))
+                    }
+                    if let usage, let fill = usage.contextFill { contextGauge(fill, usage) }
                 }
+                .font(.tabular(10))
             }
             .foregroundStyle(theme.secondary)
             .frame(width: 112, alignment: .leading)
@@ -220,6 +265,17 @@ struct SessionRow: View {
                 }
             }
         }
+    }
+
+    /// How full the context of the session's latest call was, against its window.
+    private func contextGauge(_ fill: Double, _ usage: SessionUsage) -> some View {
+        HStack(spacing: 3) {
+            Capsule().fill(theme.track).frame(width: 22, height: 3).overlay(alignment: .leading) {
+                Capsule().fill(fill >= 0.8 ? theme.status(.warning) : theme.secondary).frame(width: 22 * min(1, fill), height: 3)
+            }
+            Text(TokenFormat.percent(fill * 100))
+        }
+        .help(L10n.text("上下文 ", "Context ") + [usage.contextTokens, usage.contextWindow].compactMap { $0.map(TokenFormat.short) }.joined(separator: " / "))
     }
 
     private var quotaOrCost: String {

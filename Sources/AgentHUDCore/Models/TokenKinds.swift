@@ -28,7 +28,7 @@ public enum TokenKind: Int, CaseIterable, Hashable, Sendable {
 }
 
 /// Token counts by kind.
-public struct TokenKinds: Hashable, Sendable {
+public struct TokenKinds: Hashable, Codable, Sendable {
     public var cacheWrite: Int
     public var input: Int
     public var reasoning: Int
@@ -59,6 +59,13 @@ public struct TokenKinds: Hashable, Sendable {
     /// What the calls added rather than read back from the cache.
     public var new: Int { total - cacheRead }
     public var isEmpty: Bool { total == 0 }
+
+    /// The share of the prompts read back from the cache: cache reads against fresh input, cache writes and cache reads.
+    /// nil where nothing was cached, since a log that does not count its cache says nothing about hits.
+    public var cacheHitRate: Double? {
+        guard cacheRead + cacheWrite > 0 else { return nil }
+        return Double(cacheRead) / Double(input + cacheWrite + cacheRead)
+    }
 
     public static func + (lhs: Self, rhs: Self) -> Self {
         Self(cacheWrite: lhs.cacheWrite + rhs.cacheWrite, input: lhs.input + rhs.input, reasoning: lhs.reasoning + rhs.reasoning,

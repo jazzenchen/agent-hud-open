@@ -83,6 +83,8 @@ public struct UsageReport: Hashable, Codable, Sendable {
     public let codexResetCreditsObservedAt: Date?
     /// Where each session's tokens went, by session id. Optional so previously saved reports remain readable.
     public let sessionUsage: [String: SessionUsage]?
+    /// Every model's tokens today and over the last seven and thirty days; `usage` covers only the charts' week.
+    public let periods: UsagePeriods?
 
     public init(
         generatedAt: Date,
@@ -106,9 +108,11 @@ public struct UsageReport: Hashable, Codable, Sendable {
         activeQuotaPoolIDs: [String: Set<String>]? = nil,
         accounts: [String: [AccountObservation]]? = nil,
         forgottenAccountProviders: Set<String>? = nil,
-        sessionUsage: [String: SessionUsage]? = nil
+        sessionUsage: [String: SessionUsage]? = nil,
+        periods: UsagePeriods? = nil
     ) {
         self.sessionUsage = sessionUsage
+        self.periods = periods
         self.accounts = accounts
         self.forgottenAccountProviders = forgottenAccountProviders
         self.services = services

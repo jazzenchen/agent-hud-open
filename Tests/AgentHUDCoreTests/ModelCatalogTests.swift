@@ -17,6 +17,20 @@ final class ModelCatalogTests: XCTestCase {
                        Decimal(string: "20.25"))
     }
 
+    func testSummedCountsArePricedAtBaseRatesWithTheUnpricedModelsNamed() throws {
+        // Two 200K prompts add up past 272K, yet neither was a long one.
+        let astra = TokenKinds(input: 400_000, output: 1_000)
+        XCTAssertEqual(ModelCatalog.cost(agentId: "codex-model:gpt-6-astra", summed: astra), Decimal(string: "4.05"))
+        let cost = try XCTUnwrap(ModelCatalog.cost(of: ["codex-model:gpt-6-astra": astra, "cursor-model:auto": TokenKinds(input: 5),
+                                                        "claude-model:claude-next": TokenKinds()]))
+        XCTAssertEqual(cost.amount, Decimal(string: "4.05"))
+        XCTAssertEqual(cost.unpriced, ["cursor-model:auto"], "a model without tokens is not named")
+        XCTAssertNil(ModelCatalog.cost(of: ["cursor-model:auto": TokenKinds(input: 5)]))
+        XCTAssertEqual(TokenDimensions.fresh.masking(TokenKinds(input: 1, cacheRead: 9)), TokenKinds(input: 1))
+        XCTAssertEqual(TokenKinds(cacheWrite: 10, input: 10, cacheRead: 80).cacheHitRate, 0.8)
+        XCTAssertNil(TokenKinds(input: 10, output: 5).cacheHitRate, "a log that counts no cache says nothing about hits")
+    }
+
     func testContextWindowsComeFromTheLogThenTheCatalogThenWhatTheModelHeld() {
         XCTAssertEqual(ModelCatalog.contextWindow(agentId: "codex-model:gpt-6-astra", reported: 258_400, largestSeen: nil), 258_400)
         XCTAssertEqual(ModelCatalog.contextWindow(agentId: "claude-model:claude-haiku-4-5", reported: nil, largestSeen: 150_000), 200_000)

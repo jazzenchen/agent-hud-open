@@ -112,8 +112,10 @@ public struct CombinedUsageProvider: UsageProvider {
         let now = reports.map(\.generatedAt).max() ?? Date()
         let weekAgo = now.addingTimeInterval(-7 * 86400)
         // The ledger holds every recorded source, including one whose refresh just failed; other providers report periods themselves.
-        let usage = ((try? await ledger.buckets(since: min(weekAgo, now.addingTimeInterval(-Double(historyHours) * 3600)))) ?? [])
-            + results.filter { !(vendors[$0.0].provider is any LedgerRecording) }.flatMap { $0.1?.usage ?? [] }
+        let reported = results.filter { !(vendors[$0.0].provider is any LedgerRecording) }.flatMap { $0.1?.usage ?? [] }
+        let usage = ((try? await ledger.buckets(since: min(weekAgo, now.addingTimeInterval(-Double(historyHours) * 3600)))) ?? []) + reported
+        var periods = (try? await ledger.periods(endingAt: now)) ?? UsagePeriods()
+        periods.add(reported, endingAt: now)
         let sessions = reports.flatMap(\.sessions)
         let progress = reports.compactMap(\.indexing)
         let sessionUsage = await breakdowns(of: sessions)
@@ -140,7 +142,7 @@ public struct CombinedUsageProvider: UsageProvider {
                                $0.merge($1, uniquingKeysWith: +)
                            },
                            forgottenAccountProviders: reports.compactMap(\.forgottenAccountProviders).reduce(nil) { ($0 ?? []).union($1) },
-                           sessionUsage: sessionUsage)
+                           sessionUsage: sessionUsage, periods: periods)
     }
 
     /// Where each session's tokens went. A session is read again when its counts move or when the ledger has written any
