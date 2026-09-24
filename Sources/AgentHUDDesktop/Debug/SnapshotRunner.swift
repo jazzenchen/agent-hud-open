@@ -187,7 +187,7 @@ public enum SnapshotRunner {
         save("stats-dashboard-daily-dark", StatsView(store: dashboardStore).frame(width: 960, height: 900), folder: folder, scheme: .dark)
         await saveAdaptiveDashboard(store: dashboardStore, folder: folder)
         settings.updateAgents { _ in dashboardAgents }
-        store.tokenDimensions = .cache
+        store.tokenDimensions = .cacheRead
         save("stats-cache-dark", StatsView(store: store, scrollable: false).frame(width: 760), folder: folder, scheme: .dark)
         store.tokenDimensions = .all
         save("stats-all-tokens-light", StatsView(store: store, scrollable: false).frame(width: 760), folder: folder, scheme: .light)

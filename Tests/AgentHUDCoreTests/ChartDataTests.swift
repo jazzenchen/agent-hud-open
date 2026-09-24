@@ -106,8 +106,10 @@ final class ChartDataTests: XCTestCase {
         let lessCache = UsageEvent(timestamp: old.timestamp, agentId: old.agentId, tokensIn: 100, tokensOut: 20, cacheReadTokens: 100)
         XCTAssertEqual(UsageAggregation.usageUnion([[old, old], [enriched, lessCache], [lessCache, enriched]]).map(\.cacheReadTokens), [100, 800])
         let usage = [UsageBucket(start: Date(timeIntervalSince1970: (enriched.timestamp.timeIntervalSince1970 / 900).rounded(.down) * 900),
-                                 agentId: enriched.agentId, tokensIn: 100, tokensOut: 20, cacheReadTokens: 800)]
-        for (dimensions, expected) in [(TokenDimensions.input, 100), (.output, 20), (.cache, 800), (.fresh, 120), (.all, 920)] {
+                                 agentId: enriched.agentId, tokensIn: 100, tokensOut: 20, cacheReadTokens: 800, cacheWriteTokens: 30, reasoningTokens: 5)]
+        // Input keeps its cache writes and output its reasoning, so each kind counts once however they are combined.
+        for (dimensions, expected) in [(TokenDimensions.input, 70), (.cacheWrite, 30), (.reasoning, 5), (.output, 15), (.cacheRead, 800),
+                                       ([.input, .cacheWrite], 100), (.fresh, 120), (.all, 920)] {
             let columns = ChartData.tokenBars(usage: usage, agentIds: [old.agentId], range: .hours5,
                 now: now, dimensions: dimensions)
             XCTAssertEqual(columns.reduce(0) { $0 + $1.total }, expected)

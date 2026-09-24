@@ -46,7 +46,8 @@ enum ZCodeSessions: LocalSessionLayout {
             session.startedAt = min(session.startedAt ?? started, started)
             session.lastActivity = max(session.lastActivity ?? date, date)
             session.events.append(.init(id: rowID, model: ReadOnlySQLite.text(row, 2) ?? "Unknown", timestamp: date,
-                                        input: tokens.input, output: tokens.output, cacheRead: tokens.cache))
+                                        input: tokens.input, output: tokens.output, cacheRead: tokens.cache,
+                                        cacheWrite: counts[4] ?? 0, reasoning: counts[2] ?? 0))
             sessions[id] = session
         }
         let notices = [incomplete ? L10n.text("部分 ZCode 用量记录缺少时间或计数无法核对，未计入统计", "Some ZCode usage records lack a time or have inconsistent counts and were excluded") : nil,

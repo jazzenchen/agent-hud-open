@@ -389,9 +389,9 @@ public final class UsageStore {
     public var dataDate: Date { max(report?.generatedAt ?? now, checkedAt ?? .distantPast) }
     public var statsInterval: DateInterval { statsRange.interval(endingAt: dataDate) }
 
-    /// Include sessions active during the selected range, including ones that started before it.
+    /// Sessions active in the last seven days, including ones that started before them, whatever range the charts show.
     public var statsSessions: [LiveSession] {
-        let interval = statsInterval
+        let interval = StatsRange.days7.interval(endingAt: dataDate)
         return sessions.filter { $0.startedAt <= interval.end && ($0.endedAt ?? now) >= interval.start }
     }
 
@@ -440,15 +440,13 @@ public final class UsageStore {
         }?.message
     }
 
-    /// The session's tokens on a time axis from its first period to its last activity, with one stack per model.
-    public func sessionColumns(_ session: LiveSession, usage: SessionUsage) -> (columns: [TokenColumn], interval: DateInterval, agentIds: [String]) {
-        let agentIds = usage.models.map(\.agentId)
-        let start = min(session.startedAt, usage.periods.first?.start ?? session.startedAt)
-        let end = max(usage.periods.last.map { $0.start.addingTimeInterval(UsageBucket.duration) } ?? start, session.endedAt ?? dataDate)
-        let interval = DateInterval(start: start, end: max(end, start.addingTimeInterval(UsageBucket.duration)))
-        let columns = ChartData.tokenBars(usage: usage.periods.map(\.bucket), agentIds: agentIds, interval: interval,
-                                          bucketSize: ChartData.bucketSize(spanning: interval.duration), dimensions: tokenDimensions)
-        return (columns, interval, agentIds)
+    /// The session's own tokens by kind, as the session list counts them: its breakdown without the sub-agents' part,
+    /// or its log's counts, which do not split cache writes and reasoning apart.
+    public func sessionOwnTokens(_ session: LiveSession) -> TokenKinds {
+        guard let usage = sessionUsage(session) else {
+            return TokenKinds(tokensIn: session.tokensIn, tokensOut: session.tokensOut, cacheRead: session.cacheReadTokens)
+        }
+        return usage.total.kinds - (usage.subagents?.kinds ?? TokenKinds())
     }
 
     /// Keep every running session and the most recent session from each client visible.

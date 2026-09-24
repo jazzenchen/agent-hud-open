@@ -54,13 +54,14 @@ struct OpenAgentSession: Sendable {
         currentModel = (id, model, provider)
     }
 
+    /// - input, output: including `cacheWrite` and `reasoning`.
     mutating func add(id eventID: String, model: String, provider: String, at: Date, input: Int, output: Int,
-                      cacheRead: Int, estimate: Decimal? = nil) throws {
+                      cacheRead: Int, cacheWrite: Int = 0, reasoning: Int = 0, estimate: Decimal? = nil) throws {
         _ = try TokenCount.sum(input, output, cacheRead)
         setModel(model, provider: provider)
         let consumer = currentModel!.id
         events.append(.init(timestamp: at, agentId: consumer, tokensIn: input, tokensOut: output,
-            cacheReadTokens: cacheRead, eventID: eventID,
+            cacheReadTokens: cacheRead, cacheWriteTokens: cacheWrite, reasoningTokens: reasoning, eventID: eventID,
             attribution: .init(client: client.name, providerID: provider, estimatedUSD: estimate)))
         start = min(start ?? at, at); end = max(end ?? at, at)
     }
@@ -118,7 +119,7 @@ enum OpenAgentParser {
                 identity = "pi:entry:" + RecordCoding.hash([entry, String(RecordCoding.milliseconds(at)), provider, model])
             } else { identity = "\(session!.id):line:\(index)" }
             try session?.add(id: identity, model: model, provider: provider, at: at, input: try TokenCount.sum(input, write),
-                         output: output, cacheRead: read, estimate: decimal(usage["cost"]["total"]))
+                         output: output, cacheRead: read, cacheWrite: write, estimate: decimal(usage["cost"]["total"]))
             // An assistant stop is not agent_settled; retries, tools and queued followups can still run.
         }
         return session.map { [$0] } ?? []
@@ -176,7 +177,7 @@ enum OpenAgentParser {
                 let input = try usage["inputOther"].optionalCounter(), read = try usage["inputCacheRead"].optionalCounter()
                 let write = try usage["inputCacheCreation"].optionalCounter(), output = try usage["output"].optionalCounter()
                 try session.add(id: "\(session.id):usage:\(index)", model: concrete(line["model"].stringValue) ?? requestModel ?? "Unknown",
-                    provider: "kimi-code", at: at, input: try TokenCount.sum(input, write), output: output, cacheRead: read)
+                    provider: "kimi-code", at: at, input: try TokenCount.sum(input, write), output: output, cacheRead: read, cacheWrite: write)
             } else {
                 let message = line["message"], payload = message["payload"]
                 guard message["type"].stringValue == "StatusUpdate", payload["token_usage"].objectValue != nil else { return }
@@ -187,7 +188,7 @@ enum OpenAgentParser {
                 let id = "\(session.id):" + (payload["message_id"].stringValue ?? "line:\(index)")
                 let old = keyed[id].map { session.events[$0] }
                 try session.add(id: id, model: "Unknown", provider: "Unknown", at: old?.timestamp ?? at,
-                    input: try TokenCount.sum(input, write), output: output, cacheRead: read)
+                    input: try TokenCount.sum(input, write), output: output, cacheRead: read, cacheWrite: write)
                 if let position = keyed[id] {
                     let latest = session.events.removeLast()
                     if latest.total >= session.events[position].total { session.events[position] = latest }
@@ -210,7 +211,8 @@ enum OpenAgentParser {
         var session = OpenAgentSession(id: "opencode:\(sessionID)", client: .opencode, title: title ?? "OpenCode",
             workspace: workspace ?? value["path"]["root"].stringValue, path: path)
         try session.add(id: "opencode:\(id)", model: model, provider: provider, at: at,
-                    input: try TokenCount.sum(input, write), output: try TokenCount.sum(output, tokens["reasoning"].optionalCounter()), cacheRead: read, estimate: decimal(value["cost"]))
+                    input: try TokenCount.sum(input, write), output: try TokenCount.sum(output, tokens["reasoning"].optionalCounter()), cacheRead: read,
+                    cacheWrite: write, reasoning: try tokens["reasoning"].optionalCounter(), estimate: decimal(value["cost"]))
         session.end = ProviderDate.milliseconds(value["time"]["completed"]) ?? at
         return session
     }

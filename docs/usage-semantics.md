@@ -6,13 +6,15 @@ How Agent HUD Open counts tokens, names quota windows, colors readings, spaces a
 
 ## Model
 
-| Dimension | Contains | Excludes |
-| --- | --- | --- |
-| In | Fresh input: prompt tokens plus cache writes | Cache reads |
-| Out | Output tokens; reasoning or thinking is already part of the output count and is never added a second time | — |
-| Cache | Cache reads only | — |
+| Kind | Contains |
+| --- | --- |
+| Cache write | Prompt tokens written to the prompt cache |
+| Input | The other new prompt tokens |
+| Reasoning | Output spent reasoning or thinking |
+| Output | The other output |
+| Cache read | Prompt tokens read back from the cache |
 
-The three dimensions (`TokenDimensions`) are additive and never overlap. Charts, the heat map, model shares and session rows follow the selected dimensions; the default is In + Out (`fresh`), and `all` adds Cache. Records written before the Cache dimension existed decode with zero cache reads. The panel's per-session token figure is In + Out of that session. A quota window is one row per window the service reports, with that window's own reset time and period; a reading is the last value of a window, balance or reset-credit count together with its observation time. An account is whose quota a window describes, identified by the provider's own user and workspace ids; a window's row id is the account id followed by the provider's window name (`account:<hash>/codex`).
+The five kinds (`TokenKind`, selected as `TokenDimensions`) are additive and never overlap. Logs count cache writes inside input and reasoning inside output; a log that does not tell them apart puts everything in input and output, and so do events recorded before the ledger split them, until their logs are read again. Charts, the heat map, model shares and session rows follow the selected kinds; the default is every kind but cache reads (`fresh`, shown as New), and `all` adds cache reads. The panel's per-session token figure is that session's new tokens, and the statistics window lists the sessions active in the last seven days whatever range its charts show. A quota window is one row per window the service reports, with that window's own reset time and period; a reading is the last value of a window, balance or reset-credit count together with its observation time. An account is whose quota a window describes, identified by the provider's own user and workspace ids; a window's row id is the account id followed by the provider's window name (`account:<hash>/codex`).
 
 ## Rules
 
@@ -26,7 +28,10 @@ The three dimensions (`TokenDimensions`) are additive and never overlap. Charts,
 - A missing reading is "—", not 0; zero is shown only when the service reported zero.
 - Tokens are never converted into quota, and an unavailable quota is never inferred from token counts. Claude Code's session share is its share of the tokens in the current 5 h window times the window's utilization; every other client shows "—".
 - One API response is counted once whatever the log layout; copies of one event from two files or two Macs merge, and distinct requests with identical counts are kept. Bar buckets are 15 min, 30 min, 1 h or 1 d on local quarter-hour, hour or calendar-day boundaries inside the exact half-open range; empty buckets keep their position and counts stay integers.
-- A session's breakdown (`SessionUsage`) is read from the ledger: its own log, or its id for sources read whole, plus every log under the directory named like its log (sub-agents), by model and 15-minute period, with the number of calls. Its totals therefore exceed the session row, which leaves sub-agents out. The context figure is the latest call's input with cache reads, given only for logs that record every call. A finished session is read again only when its counts move; a running one on every pass.
+- A session's breakdown (`SessionUsage`) is read from the ledger: its own log, or its id for sources read whole, plus every log under the directory named like its log (sub-agents), by kind, model, 15-minute period and turn, with the number of calls. Its totals therefore exceed the session row, which leaves sub-agents out. A finished session is read again only when its counts move, a running one on every pass, and every session on every pass while logs are still being read.
+- A turn is a prompt in the session's own log and every call, sub-agents' included, until the next prompt; calls before the first prompt form a turn of their own, a prompt no call followed forms none, and a turn notes whether the client compacted the conversation during it. Claude Code, Codex and DeepSeek Harness logs mark their prompts; sessions of other clients have no turns. A breakdown keeps the newest 200 turns and counts all of them.
+- The context is a call's input with cache writes and cache reads: the session's is its latest call's, a turn's its last call's, given only for logs that record every call. The context window is the one the log reports with the call (Codex), else the model's published window; a Claude model runs with 200K or 1M, so one missing from the catalog counts as 200K until this Mac has seen it hold more.
+- A session's list price (`ModelCatalog`) is what its calls would cost at Anthropic's and OpenAI's published API prices, for Claude Code's and Codex's models: input, cache writes at the one-hour rate Claude Code writes with, cache reads, and output with reasoning, at OpenAI's long-context rates for prompts over 272K tokens. It is an estimate, not a charge; a call whose model has no list price leaves the session without one.
 
 ### Alert levels
 
@@ -84,7 +89,8 @@ Reads never run in parallel: the usage store runs one pass of source reads or on
 
 | Concept | Code |
 | --- | --- |
-| Token dimensions, bar buckets | `Sources/AgentHUDCore/Logic/ChartData.swift` |
+| Token kinds and dimensions, bar buckets | `Sources/AgentHUDCore/Models/TokenKinds.swift`, `Sources/AgentHUDCore/Logic/ChartData.swift` |
+| List prices, context windows | `Sources/AgentHUDCore/Models/ModelCatalog.swift` |
 | Alert levels, status colors | `Sources/AgentHUDCore/Models/AgentThresholds.swift`, `Sources/AgentHUDCore/Logic/StatusLevel.swift` |
 | Alert tracker, added usage resets, island events, forecast, reading age | `Sources/AgentHUDCore/Logic/QuotaAlerts.swift`, `ResetCreditGrants.swift`, `IslandEvents.swift`, `QuotaForecast.swift` |
 | Event union, analytics, history retention | `Sources/AgentHUDCore/Store/UsageAggregation.swift`, `QuotaHistoryStore.swift`, `Sources/AgentHUDCore/Logic/UsageAnalytics.swift` |

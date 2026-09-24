@@ -27,7 +27,7 @@ struct LiveSessionsCard: View {
                 HStack(spacing: 8) {
                     Circle().fill(filteredSessions.contains(where: store.isSessionLive) ? theme.status(.ok) : theme.tertiary).frame(width: 7, height: 7)
                     Text(L10n.text("会话", "Sessions")).font(.ui(13, .semibold))
-                    Text(store.statsRange.recentLabel).font(.ui(11)).foregroundStyle(theme.secondary)
+                    Text(StatsRange.days7.recentLabel).font(.ui(11)).foregroundStyle(theme.secondary)
                 }
                 Spacer()
                 SelectionMenu(
@@ -40,7 +40,6 @@ struct LiveSessionsCard: View {
                 )
                 .accessibilityIdentifier("session-source-filter")
                 .onChange(of: selectedSource) { _, _ in showAll = false }
-                .onChange(of: store.statsRange) { _, _ in showAll = false }
             }
             header
             LazyVStack(spacing: 4) {
@@ -49,7 +48,7 @@ struct LiveSessionsCard: View {
                 }
             }
             if filteredSessions.isEmpty {
-                Text(L10n.text("此时间窗口内没有会话", "No sessions in this range")).font(.ui(12)).foregroundStyle(theme.secondary).padding(.horizontal, 10)
+                Text(L10n.text("近 7 天没有会话", "No sessions in the last 7 days")).font(.ui(12)).foregroundStyle(theme.secondary).padding(.horizontal, 10)
             }
             HStack {
                 Text(L10n.text(
@@ -129,9 +128,9 @@ struct SessionRow: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.75)
                 .frame(width: 70, alignment: .trailing)
-            Text(session.hasTokenCounts ? TokenFormat.short(store.tokenDimensions.count(input: session.tokensIn, output: session.tokensOut,
-                                                                                       cache: session.cacheReadTokens)) : "—")
-                .help("In \(session.tokensIn.formatted()) · Out \(session.tokensOut.formatted()) · Cache \(session.cacheReadTokens.formatted())")
+            let tokens = store.sessionOwnTokens(session)
+            Text(session.hasTokenCounts ? TokenFormat.short(store.tokenDimensions.count(tokens)) : "—")
+                .help(TokenKind.allCases.map { "\($0.label) \(tokens[$0].formatted())" }.joined(separator: " · "))
                 .font(.tabular(10))
                 .foregroundStyle(theme.secondary)
                 .frame(width: 130, alignment: .trailing)

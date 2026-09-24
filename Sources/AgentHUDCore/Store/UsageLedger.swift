@@ -31,16 +31,33 @@ public actor UsageLedger {
         public let tokensIn: Int
         public let tokensOut: Int
         public let cacheReadTokens: Int
+        /// The part of `tokensIn` written to the prompt cache, where the log tells it apart.
+        public let cacheWriteTokens: Int
+        /// The part of `tokensOut` spent reasoning, where the log tells it apart.
+        public let reasoningTokens: Int
+        /// The context window the client reported for this call.
+        public let contextWindow: Int?
         /// Estimated price by currency; nil for events that belong to no priced account.
         public let costs: [String: Decimal]?
         public let billingID: String?
 
         public init(key: String, timestamp: Date, agentId: String, tokensIn: Int, tokensOut: Int, cacheReadTokens: Int = 0,
+                    cacheWriteTokens: Int = 0, reasoningTokens: Int = 0, contextWindow: Int? = nil,
                     billingID: String? = nil, costs: [String: Decimal]? = nil) {
             self.key = key; self.timestamp = timestamp; self.agentId = agentId
             self.tokensIn = tokensIn; self.tokensOut = tokensOut; self.cacheReadTokens = cacheReadTokens
+            self.cacheWriteTokens = min(max(0, cacheWriteTokens), tokensIn); self.reasoningTokens = min(max(0, reasoningTokens), tokensOut)
+            self.contextWindow = contextWindow.flatMap { $0 > 0 ? $0 : nil }
             self.billingID = billingID; self.costs = costs
         }
+    }
+
+    /// A moment in a session's log that shapes its turns: a prompt starts one, a compaction shrinks the context.
+    public struct Mark: Hashable, Codable, Sendable {
+        public enum Kind: Int, Codable, Sendable { case prompt = 0, compaction = 1 }
+        public let timestamp: Date
+        public let kind: Kind
+        public init(_ kind: Kind, at timestamp: Date) { self.kind = kind; self.timestamp = timestamp }
     }
 
     private let storage: LedgerStorage
@@ -134,10 +151,12 @@ public actor UsageLedger {
             try connection.run("DELETE FROM usage_bucket WHERE start_ms < ?", [.integer(cutoff)])
             try connection.run("DELETE FROM cost_amount WHERE timestamp_ms < ?", [.integer(cutoff)])
             try connection.run("DELETE FROM cost_bucket WHERE start_ms < ?", [.integer(cutoff)])
+            try connection.run("DELETE FROM session_mark WHERE at_ms < ?", [.integer(cutoff)])
             try connection.run("DELETE FROM quota_sample WHERE observed_at < ?", [.real(samples)])
             try connection.run("""
                 DELETE FROM contribution WHERE NOT EXISTS (SELECT 1 FROM usage_event WHERE contribution_id = contribution.id)
                 AND NOT EXISTS (SELECT 1 FROM cost_amount WHERE contribution_id = contribution.id)
+                AND NOT EXISTS (SELECT 1 FROM session_mark WHERE contribution_id = contribution.id)
                 """)
         }
     }
@@ -154,11 +173,12 @@ public actor UsageLedger {
         var result: [UsageBucket] = []
         let start = RecordCoding.milliseconds(since) / Self.bucketMilliseconds * Self.bucketMilliseconds
         try storage.connection.query("""
-            SELECT start_ms, account, agent, SUM(tokens_in), SUM(tokens_out), SUM(cache_read) FROM usage_bucket
-            WHERE start_ms >= ? AND (? IS NULL OR source = ?) GROUP BY start_ms, account, agent
+            SELECT start_ms, account, agent, SUM(tokens_in), SUM(tokens_out), SUM(cache_read), SUM(cache_write), SUM(reasoning)
+            FROM usage_bucket WHERE start_ms >= ? AND (? IS NULL OR source = ?) GROUP BY start_ms, account, agent
             """, [.integer(start), .nullable(source), .nullable(source)]) { row in
             result.append(UsageBucket(start: RecordCoding.date(row.int(0)), agentId: storage.agentName(row.int(2)),
                 tokensIn: Int(row.int(3)), tokensOut: Int(row.int(4)), cacheReadTokens: Int(row.int(5)),
+                cacheWriteTokens: Int(row.int(6)), reasoningTokens: Int(row.int(7)),
                 account: row.text(1).flatMap { $0.isEmpty ? nil : $0 }))
         }
         return result.sorted { ($0.start, $0.account ?? "", $0.agentId) < ($1.start, $1.account ?? "", $1.agentId) }
@@ -213,15 +233,15 @@ public actor UsageLedger {
         return result
     }
 
-    /// What each requested session spent, by model and 15-minute period. Sessions without recorded events are left out.
+    /// What each requested session spent, by model, 15-minute period and turn. Sessions without recorded events are left out.
     public func sessionUsage(_ requests: [SessionUsageRequest]) throws -> [String: SessionUsage] {
         var result: [String: SessionUsage] = [:]
         for request in requests {
-            var own: [Int64] = [], callLog: [Int64] = [], subagents: Set<Int64> = []
+            var own: [Int64] = [], callLog: Set<Int64> = [], subagents: Set<Int64> = []
             for key in Set(request.keys) {
                 try storage.connection.query("SELECT id FROM contribution WHERE key = ?", [.text(key)]) { row in
                     own.append(row.int(0))
-                    if key == request.callLog { callLog.append(row.int(0)) }
+                    if key == request.callLog { callLog.insert(row.int(0)) }
                 }
             }
             if let prefix = request.subagentPrefix, let last = prefix.unicodeScalars.last,
@@ -235,28 +255,33 @@ public actor UsageLedger {
             let ids = own + subagents
             guard !ids.isEmpty else { continue }
             let list = "(" + ids.map { _ in "?" }.joined(separator: ", ") + ")"
-            struct Slot: Hashable { let start: Int64; let agent: String }
-            var models: [String: SessionUsage.Tokens] = [:], periods: [Slot: SessionUsage.Tokens] = [:]
-            var spent: SessionUsage.Tokens?, calls = 0
-            try storage.connection.query("""
-                SELECT contribution_id, timestamp_ms / ? * ?, agent, SUM(tokens_in), SUM(tokens_out), SUM(cache_read), COUNT(*)
-                FROM usage_event WHERE contribution_id IN \(list) GROUP BY 1, 2, 3
-                """, [.integer(Self.bucketMilliseconds), .integer(Self.bucketMilliseconds)] + ids.map { .integer($0) }) { row in
-                let tokens = SessionUsage.Tokens(tokensIn: Int(row.int(3)), tokensOut: Int(row.int(4)), cacheReadTokens: Int(row.int(5)))
-                let agent = storage.agentName(row.int(2))
-                models[agent, default: .init()] += tokens
-                periods[Slot(start: row.int(1), agent: agent), default: .init()] += tokens
-                if subagents.contains(row.int(0)) { spent = (spent ?? .init()) + tokens }
-                calls += Int(row.int(6))
-            }
-            guard calls > 0 else { continue }
-            var context: Int?
-            if !callLog.isEmpty {
+            // Only the session's own log marks its turns; a sub-agent's prompts are steps of the turn that started it.
+            var prompts: [Date] = [], compactions: [Date] = []
+            if !own.isEmpty {
                 try storage.connection.query("""
-                    SELECT tokens_in + cache_read FROM usage_event WHERE contribution_id IN (\(callLog.map { _ in "?" }.joined(separator: ", ")))
-                    ORDER BY timestamp_ms DESC LIMIT 1
-                    """, callLog.map { .integer($0) }) { context = Int($0.int(0)) }
+                    SELECT at_ms, kind FROM session_mark WHERE contribution_id IN (\(own.map { _ in "?" }.joined(separator: ", ")))
+                    """, own.map { .integer($0) }) { row in
+                    switch UsageLedger.Mark.Kind(rawValue: Int(row.int(1))) {
+                    case .prompt: prompts.append(RecordCoding.date(row.int(0)))
+                    case .compaction: compactions.append(RecordCoding.date(row.int(0)))
+                    case nil: break
+                    }
+                }
             }
+            var builder = SessionUsageBuilder(prompts: prompts, compactions: compactions)
+            var latestAgent: Int64?
+            try storage.connection.query("""
+                SELECT contribution_id, timestamp_ms, agent, tokens_in, tokens_out, cache_read, cache_write, reasoning, context_window
+                FROM usage_event WHERE contribution_id IN \(list) ORDER BY timestamp_ms
+                """, ids.map { .integer($0) }) { row in
+                let contribution = row.int(0), isOwn = !subagents.contains(contribution)
+                if isOwn { latestAgent = row.int(2) }
+                builder.add(.init(timestamp: RecordCoding.date(row.int(1)), agentId: storage.agentName(row.int(2)),
+                    tokens: .init(tokensIn: Int(row.int(3)), tokensOut: Int(row.int(4)), cacheReadTokens: Int(row.int(5)),
+                                  cacheWriteTokens: Int(row.int(6)), reasoningTokens: Int(row.int(7))),
+                    own: isOwn, callLog: callLog.contains(contribution), contextWindow: row.int(8) > 0 ? Int(row.int(8)) : nil))
+            }
+            guard !builder.isEmpty else { continue }
             var priced: Int64 = 0, amounts: [String: (Int64, Int64)] = [:]
             try storage.connection.query("""
                 SELECT currency, SUM(amount_pico), COUNT(*) FROM cost_amount WHERE contribution_id IN \(list) GROUP BY currency
@@ -265,16 +290,10 @@ public actor UsageLedger {
                 if currency.isEmpty { priced = row.int(2) } else { amounts[currency] = (row.int(1), row.int(2)) }
             }
             let costs = amounts.filter { $0.value.1 == priced }.mapValues(LedgerWriter.decimal)
-            result[request.sessionID] = SessionUsage(
-                models: models.map { SessionUsage.Model(agentId: $0.key, tokens: $0.value) }.sorted {
-                    let left = $0.tokens.tokensIn + $0.tokens.tokensOut, right = $1.tokens.tokensIn + $1.tokens.tokensOut
-                    return left == right ? $0.agentId < $1.agentId : left > right
-                },
-                periods: periods.keys.sorted { ($0.start, $0.agent) < ($1.start, $1.agent) }.map {
-                    SessionUsage.Period(start: RecordCoding.date($0.start), agentId: $0.agent, tokens: periods[$0]!)
-                },
-                subagents: spent, calls: calls, contextTokens: context,
-                costs: priced > 0 && !costs.isEmpty ? costs : nil)
+            let largest = latestAgent.flatMap { storage.largestContext[$0] }.map(Int.init)
+            result[request.sessionID] = builder.build(costs: priced > 0 && !costs.isEmpty ? costs : nil) { agentId, reported in
+                ModelCatalog.contextWindow(agentId: agentId, reported: reported, largestSeen: largest)
+            }
         }
         return result
     }
@@ -364,11 +383,43 @@ final class LedgerStorage {
             // A session's contributions are found by key alone: its log path or id, and the paths under its directory.
             try connection.execute("CREATE INDEX IF NOT EXISTS contribution_key ON contribution (key); PRAGMA user_version = 2;")
         }
+        if version < 3 {
+            // Cache writes and reasoning are parts of the input and output already counted; logs read again fill them in.
+            try connection.transaction {
+                try connection.execute("""
+                    ALTER TABLE usage_event ADD COLUMN cache_write INTEGER NOT NULL DEFAULT 0;
+                    ALTER TABLE usage_event ADD COLUMN reasoning INTEGER NOT NULL DEFAULT 0;
+                    ALTER TABLE usage_event ADD COLUMN context_window INTEGER NOT NULL DEFAULT 0;
+                    ALTER TABLE usage_bucket ADD COLUMN cache_write INTEGER NOT NULL DEFAULT 0;
+                    ALTER TABLE usage_bucket ADD COLUMN reasoning INTEGER NOT NULL DEFAULT 0;
+                    CREATE TABLE IF NOT EXISTS session_mark (
+                        contribution_id INTEGER NOT NULL, at_ms INTEGER NOT NULL, kind INTEGER NOT NULL,
+                        PRIMARY KEY (contribution_id, at_ms, kind)) WITHOUT ROWID;
+                    CREATE INDEX IF NOT EXISTS session_mark_time ON session_mark (at_ms);
+                    CREATE TABLE IF NOT EXISTS model_context (agent INTEGER PRIMARY KEY, largest INTEGER NOT NULL);
+                    INSERT OR REPLACE INTO model_context (agent, largest) SELECT agent, MAX(tokens_in + cache_read) FROM usage_event GROUP BY agent;
+                    PRAGMA user_version = 3;
+                    """)
+            }
+        }
         try connection.query("SELECT id, name FROM agent") { row in
             let id = row.int(0), name = row.text(1) ?? ""
             agents[name] = id
             names[id] = name
         }
+        try connection.query("SELECT agent, largest FROM model_context") { largestContext[$0.int(0)] = $0.int(1) }
+    }
+
+    /// The largest prompt each consumer was seen with, which tells a model's context window where no log states it.
+    private(set) var largestContext: [Int64: Int64] = [:]
+
+    func noteContext(agent: Int64, tokens: Int64) throws {
+        guard tokens > largestContext[agent] ?? 0 else { return }
+        try connection.run("""
+            INSERT INTO model_context (agent, largest) VALUES (?, ?)
+            ON CONFLICT (agent) DO UPDATE SET largest = MAX(largest, excluded.largest)
+            """, [.integer(agent), .integer(tokens)])
+        largestContext[agent] = tokens
     }
 
     func agentID(_ name: String) throws -> Int64 {
@@ -387,11 +438,13 @@ final class LedgerStorage {
     func reset() {
         agents = [:]
         names = [:]
+        largestContext = [:]
         try? connection.query("SELECT id, name FROM agent") { row in
             let id = row.int(0), name = row.text(1) ?? ""
             agents[name] = id
             names[id] = name
         }
+        try? connection.query("SELECT agent, largest FROM model_context") { largestContext[$0.int(0)] = $0.int(1) }
     }
 }
 
@@ -416,6 +469,17 @@ public struct LedgerWriter {
 
     public func removeFile(source: String, path: String) throws {
         try storage.connection.run("DELETE FROM source_file WHERE source = ? AND path = ?", [.text(source), .text(path)])
+    }
+
+    /// Records where a contribution's turns start and where its client compacted the conversation; marks already
+    /// recorded stay as they are.
+    public func addMarks(source: String, contribution: String, account: String? = nil, marks: [UsageLedger.Mark]) throws {
+        guard !marks.isEmpty else { return }
+        let id = try contributionID(source: source, key: contribution, account: account), cutoff = cutoff()
+        for mark in marks where RecordCoding.milliseconds(mark.timestamp) >= cutoff {
+            try storage.connection.run("INSERT OR IGNORE INTO session_mark (contribution_id, at_ms, kind) VALUES (?, ?, ?)",
+                [.integer(id.id), .integer(RecordCoding.milliseconds(mark.timestamp)), .integer(Int64(mark.kind.rawValue))])
+        }
     }
 
     /// Adds events or corrects events with the same key; other events of the contribution stay.
@@ -456,6 +520,7 @@ public struct LedgerWriter {
             try storage.connection.run("""
                 DELETE FROM contribution WHERE source = ? AND key = ? AND NOT EXISTS (SELECT 1 FROM usage_event WHERE contribution_id = contribution.id)
                 AND NOT EXISTS (SELECT 1 FROM cost_amount WHERE contribution_id = contribution.id)
+                AND NOT EXISTS (SELECT 1 FROM session_mark WHERE contribution_id = contribution.id)
                 """, [.text(source), .text(contribution)])
             try storage.connection.run("UPDATE contribution SET digest = ? WHERE source = ? AND key = ?", [.integer(digest), .text(source), .text(contribution)])
             return
@@ -482,6 +547,7 @@ public struct LedgerWriter {
         if found.counted { try applyTotals(of: found, sign: -1) }
         try storage.connection.run("DELETE FROM usage_event WHERE contribution_id = ?", [.integer(found.id)])
         try storage.connection.run("DELETE FROM cost_amount WHERE contribution_id = ?", [.integer(found.id)])
+        try storage.connection.run("DELETE FROM session_mark WHERE contribution_id = ?", [.integer(found.id)])
         try storage.connection.run("DELETE FROM contribution WHERE id = ?", [.integer(found.id)])
     }
 
@@ -490,20 +556,21 @@ public struct LedgerWriter {
         if found.counted { try applyTotals(of: found, sign: -1, since: since) }
         try storage.connection.run("DELETE FROM usage_event WHERE contribution_id = ? AND timestamp_ms >= ?", [.integer(found.id), .integer(since)])
         try storage.connection.run("DELETE FROM cost_amount WHERE contribution_id = ? AND timestamp_ms >= ?", [.integer(found.id), .integer(since)])
+        try storage.connection.run("DELETE FROM session_mark WHERE contribution_id = ? AND at_ms >= ?", [.integer(found.id), .integer(since)])
     }
 
     /// Adds (`sign` 1) or subtracts (-1) what a contribution holds from `since` on to the usage and cost buckets.
     private func applyTotals(of found: ContributionID, sign: Int64, since: Int64 = .min) throws {
-        var usage: [(Int64, Int64, Int64, Int64, Int64)] = []
+        var usage: [(start: Int64, agent: Int64, tokens: StoredTokens)] = []
         try storage.connection.query("""
-            SELECT timestamp_ms / ? * ?, agent, SUM(tokens_in), SUM(tokens_out), SUM(cache_read) FROM usage_event
-            WHERE contribution_id = ? AND timestamp_ms >= ? GROUP BY 1, 2
+            SELECT timestamp_ms / ? * ?, agent, SUM(tokens_in), SUM(tokens_out), SUM(cache_read), SUM(cache_write), SUM(reasoning)
+            FROM usage_event WHERE contribution_id = ? AND timestamp_ms >= ? GROUP BY 1, 2
             """, [.integer(UsageLedger.bucketMilliseconds), .integer(UsageLedger.bucketMilliseconds), .integer(found.id), .integer(since)]) { row in
-            usage.append((row.int(0), row.int(1), row.int(2), row.int(3), row.int(4)))
+            usage.append((row.int(0), row.int(1), StoredTokens(tokensIn: row.int(2), tokensOut: row.int(3), cacheRead: row.int(4),
+                                                             cacheWrite: row.int(5), reasoning: row.int(6))))
         }
-        for (start, agent, tokensIn, tokensOut, cacheRead) in usage {
-            try addUsage(start: start, source: found.source, account: found.account, agent: agent,
-                         tokensIn: sign * tokensIn, tokensOut: sign * tokensOut, cacheRead: sign * cacheRead)
+        for entry in usage {
+            try addUsage(start: entry.start, source: found.source, account: found.account, agent: entry.agent, tokens: entry.tokens.scaled(sign))
         }
         var costs: [(String, Int64, String, Int64, Int64)] = []
         try storage.connection.query("""
@@ -557,32 +624,54 @@ public struct LedgerWriter {
         return found!
     }
 
+    /// One stored event's counts, in the ledger's integers.
+    struct StoredTokens: Equatable {
+        var tokensIn: Int64, tokensOut: Int64, cacheRead: Int64, cacheWrite: Int64, reasoning: Int64
+
+        func scaled(_ sign: Int64) -> StoredTokens {
+            StoredTokens(tokensIn: sign * tokensIn, tokensOut: sign * tokensOut, cacheRead: sign * cacheRead,
+                         cacheWrite: sign * cacheWrite, reasoning: sign * reasoning)
+        }
+        var isZero: Bool { self == StoredTokens(tokensIn: 0, tokensOut: 0, cacheRead: 0, cacheWrite: 0, reasoning: 0) }
+    }
+
+    private struct StoredEvent: Equatable {
+        let timestamp: Int64, agent: Int64, tokens: StoredTokens, window: Int64
+    }
+
     private func write(_ event: UsageLedger.Event, contribution: ContributionID, billed: Bool) throws {
         let key = Self.eventKey(event.key), timestamp = RecordCoding.milliseconds(event.timestamp)
         let agent = try storage.agentID(event.agentId)
-        var old: (timestamp: Int64, agent: Int64, tokensIn: Int64, tokensOut: Int64, cacheRead: Int64)?
+        var old: StoredEvent?
         try storage.connection.query("""
-            SELECT timestamp_ms, agent, tokens_in, tokens_out, cache_read FROM usage_event WHERE contribution_id = ? AND event = ?
+            SELECT timestamp_ms, agent, tokens_in, tokens_out, cache_read, cache_write, reasoning, context_window
+            FROM usage_event WHERE contribution_id = ? AND event = ?
             """, [.integer(contribution.id), .integer(key)]) { row in
-            old = (row.int(0), row.int(1), row.int(2), row.int(3), row.int(4))
+            old = StoredEvent(timestamp: row.int(0), agent: row.int(1), tokens: StoredTokens(tokensIn: row.int(2), tokensOut: row.int(3),
+                              cacheRead: row.int(4), cacheWrite: row.int(5), reasoning: row.int(6)), window: row.int(7))
         }
-        let values = (timestamp, agent, Int64(event.tokensIn), Int64(event.tokensOut), Int64(event.cacheReadTokens))
+        let values = StoredEvent(timestamp: timestamp, agent: agent, tokens: StoredTokens(tokensIn: Int64(event.tokensIn),
+            tokensOut: Int64(event.tokensOut), cacheRead: Int64(event.cacheReadTokens), cacheWrite: Int64(event.cacheWriteTokens),
+            reasoning: Int64(event.reasoningTokens)), window: Int64(event.contextWindow ?? 0))
         if let old, old == values {
             // Usage is unchanged; costs may still be new for an event first seen without a price.
         } else {
             if let old, contribution.counted {
                 try addUsage(start: Self.bucket(old.timestamp), source: contribution.source, account: contribution.account, agent: old.agent,
-                             tokensIn: -old.tokensIn, tokensOut: -old.tokensOut, cacheRead: -old.cacheRead)
+                             tokens: old.tokens.scaled(-1))
             }
             try storage.connection.run("""
-                INSERT OR REPLACE INTO usage_event (contribution_id, event, timestamp_ms, agent, tokens_in, tokens_out, cache_read)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                INSERT OR REPLACE INTO usage_event (contribution_id, event, timestamp_ms, agent, tokens_in, tokens_out, cache_read,
+                    cache_write, reasoning, context_window)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, [.integer(contribution.id), .integer(key), .integer(timestamp), .integer(agent),
-                      .integer(values.2), .integer(values.3), .integer(values.4)])
+                      .integer(values.tokens.tokensIn), .integer(values.tokens.tokensOut), .integer(values.tokens.cacheRead),
+                      .integer(values.tokens.cacheWrite), .integer(values.tokens.reasoning), .integer(values.window)])
             if contribution.counted {
                 try addUsage(start: Self.bucket(timestamp), source: contribution.source, account: contribution.account, agent: agent,
-                             tokensIn: values.2, tokensOut: values.3, cacheRead: values.4)
+                             tokens: values.tokens)
             }
+            try storage.noteContext(agent: agent, tokens: values.tokens.tokensIn + values.tokens.cacheRead)
         }
         if billed || event.billingID != nil { try writeCosts(event, key: key, timestamp: timestamp, contribution: contribution) }
     }
@@ -619,14 +708,17 @@ public struct LedgerWriter {
         }
     }
 
-    private func addUsage(start: Int64, source: String, account: String, agent: Int64, tokensIn: Int64, tokensOut: Int64, cacheRead: Int64) throws {
-        guard tokensIn != 0 || tokensOut != 0 || cacheRead != 0 else { return }
+    private func addUsage(start: Int64, source: String, account: String, agent: Int64, tokens: StoredTokens) throws {
+        guard !tokens.isZero else { return }
         try storage.connection.run("""
-            INSERT INTO usage_bucket (start_ms, source, account, agent, tokens_in, tokens_out, cache_read) VALUES (?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO usage_bucket (start_ms, source, account, agent, tokens_in, tokens_out, cache_read, cache_write, reasoning)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT (start_ms, source, account, agent) DO UPDATE SET tokens_in = tokens_in + excluded.tokens_in,
-                tokens_out = tokens_out + excluded.tokens_out, cache_read = cache_read + excluded.cache_read
-            """, [.integer(start), .text(source), .text(account), .integer(agent), .integer(tokensIn), .integer(tokensOut), .integer(cacheRead)])
-        if tokensIn < 0 || tokensOut < 0 || cacheRead < 0 {
+                tokens_out = tokens_out + excluded.tokens_out, cache_read = cache_read + excluded.cache_read,
+                cache_write = cache_write + excluded.cache_write, reasoning = reasoning + excluded.reasoning
+            """, [.integer(start), .text(source), .text(account), .integer(agent), .integer(tokens.tokensIn), .integer(tokens.tokensOut),
+                  .integer(tokens.cacheRead), .integer(tokens.cacheWrite), .integer(tokens.reasoning)])
+        if tokens.tokensIn < 0 || tokens.tokensOut < 0 || tokens.cacheRead < 0 {
             try storage.connection.run("""
                 DELETE FROM usage_bucket WHERE start_ms = ? AND source = ? AND account = ? AND agent = ?
                 AND tokens_in = 0 AND tokens_out = 0 AND cache_read = 0
@@ -677,6 +769,7 @@ public struct LedgerWriter {
         for event in events {
             text += "\u{1}\(event.key)\u{2}\(RecordCoding.milliseconds(event.timestamp))\u{2}\(event.agentId)\u{2}\(event.tokensIn)"
                 + "\u{2}\(event.tokensOut)\u{2}\(event.cacheReadTokens)\u{2}\(event.billingID ?? "")"
+                + "\u{2}\(event.cacheWriteTokens)\u{2}\(event.reasoningTokens)\u{2}\(event.contextWindow ?? 0)"
             for currency in (event.costs ?? [:]).keys.sorted() { text += "\u{3}\(currency)=\(event.costs![currency]!)" }
         }
         return eventKey(text)

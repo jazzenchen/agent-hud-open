@@ -73,7 +73,8 @@ enum HermesSessions: LocalSessionLayout {
             guard try TokenCount.sum(input, output, read, write) > 0 else { return }
             // Input excludes cache reads and writes; reasoning is already inside output.
             sessions[id]?.events.append(ProviderEvent(id: "usage:" + RecordCoding.hash([id] + key), model: key[0],
-                timestamp: rows ? seconds(row, 25) ?? started : started, input: try TokenCount.sum(input, write), output: output, cacheRead: read))
+                timestamp: rows ? seconds(row, 25) ?? started : started, input: try TokenCount.sum(input, write), output: output, cacheRead: read,
+                cacheWrite: write))
         }
         return ProviderSessions(sessions: sessions.keys.sorted().compactMap { sessions[$0] })
     }

@@ -109,11 +109,14 @@ struct ProviderEvent: Hashable, Sendable {
     let input: Int
     let output: Int
     var cacheRead: Int = 0
+    /// The part of `input` written to the cache and the part of `output` spent reasoning.
+    var cacheWrite: Int = 0
+    var reasoning: Int = 0
     var origin: UsageEvent.Origin? = nil
 
     func usage(source: AdditionalSource) -> UsageEvent {
-        .init(timestamp: timestamp, agentId: "\(source.rawValue)-model:\(model)", tokensIn: input,
-              tokensOut: output, cacheReadTokens: cacheRead, eventID: "\(source.rawValue):\(id)", origin: origin)
+        .init(timestamp: timestamp, agentId: "\(source.rawValue)-model:\(model)", tokensIn: input, tokensOut: output, cacheReadTokens: cacheRead,
+              cacheWriteTokens: cacheWrite, reasoningTokens: reasoning, eventID: "\(source.rawValue):\(id)", origin: origin)
     }
 }
 

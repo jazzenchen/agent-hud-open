@@ -91,41 +91,93 @@ public enum DemoData {
     }
 
     public static func sessions(now: Date) -> [LiveSession] {
-        [
+        let usage = sessionUsage(now: now)
+        /// The session's own counts: its breakdown without the sub-agent.
+        func own(_ id: String) -> SessionUsage.Tokens {
+            guard let usage = usage[id] else { return .init() }
+            let total = usage.total, helper = usage.subagents ?? .init()
+            return .init(tokensIn: total.tokensIn - helper.tokensIn, tokensOut: total.tokensOut - helper.tokensOut,
+                         cacheReadTokens: total.cacheReadTokens - helper.cacheReadTokens)
+        }
+        let s1 = own("s1"), s2 = own("s2"), s3 = own("s3")
+        return [
             LiveSession(id: "s1", agentId: "claude-opus", task: "fix auth bug in middleware", terminal: "iTerm",
-                        startedAt: now.addingTimeInterval(-27 * 60), pctOfWindow: 6.2, tokensIn: 48_000, tokensOut: 12_000, cacheReadTokens: 96_000, observedAt: now),
+                        startedAt: now.addingTimeInterval(-27 * 60), pctOfWindow: 6.2, tokensIn: s1.tokensIn, tokensOut: s1.tokensOut,
+                        cacheReadTokens: s1.cacheReadTokens, observedAt: now),
             LiveSession(id: "s2", agentId: "codex", task: "backend server endpoints", terminal: "Terminal",
-                        startedAt: now.addingTimeInterval(-64 * 60), pctOfWindow: 3.8, tokensIn: 31_000, tokensOut: 9_000, cacheReadTokens: 62_000, observedAt: now),
+                        startedAt: now.addingTimeInterval(-64 * 60), pctOfWindow: 3.8, tokensIn: s2.tokensIn, tokensOut: s2.tokensOut,
+                        cacheReadTokens: s2.cacheReadTokens, observedAt: now),
             LiveSession(id: "s3", agentId: "claude-sonnet", task: "optimize db queries", terminal: "Ghostty",
                         startedAt: now.addingTimeInterval(-140 * 60), endedAt: now.addingTimeInterval(-51 * 60),
-                        pctOfWindow: 2.1, tokensIn: 19_000, tokensOut: 4_000, cacheReadTokens: 38_000),
+                        pctOfWindow: 2.1, tokensIn: s3.tokensIn, tokensOut: s3.tokensOut, cacheReadTokens: s3.cacheReadTokens),
             LiveSession(id: "s4", agentId: "chatgpt", task: L10n.text("桌面版 · 3 段对话", "Desktop · 3 conversations"), terminal: nil,
                         startedAt: now.addingTimeInterval(-200 * 60), endedAt: now.addingTimeInterval(-120 * 60),
                         pctOfWindow: 4.5, tokensIn: 0, tokensOut: 0, observedAt: now),
         ]
     }
 
-    /// Each demo session's tokens spread over its 15-minute periods, heavier toward the end, with a sub-agent on Claude.
+    /// The demo sessions' turns: now and then a large paste, cache writes that carry the previous turn forward,
+    /// reasoning on about half of them, and a compaction once the context nears its window. Claude sessions hand every
+    /// fourth turn's work partly to a sub-agent on the other Claude model.
     public static func sessionUsage(now: Date) -> [String: SessionUsage] {
+        let plans: [(id: String, agent: String, helper: String?, priced: String, minutes: (Double, Double), turns: Int, seed: Int)] = [
+            ("s1", "claude-opus", "claude-sonnet", "claude-model:claude-opus-5", (-27, 0), 26, 7),
+            ("s2", "codex", nil, "codex-model:gpt-5.6-sol", (-64, 0), 17, 19),
+            ("s3", "claude-sonnet", "claude-opus", "claude-model:claude-sonnet-5", (-140, -51), 30, 51),
+        ]
+        let window = 200_000
         var result: [String: SessionUsage] = [:]
-        for session in sessions(now: now) where session.hasTokenCounts {
-            let end = session.endedAt ?? now, step = UsageBucket.duration
-            let first = (session.startedAt.timeIntervalSinceReferenceDate / step).rounded(.down) * step
-            let starts = stride(from: first, through: end.timeIntervalSinceReferenceDate, by: step).map { Date(timeIntervalSinceReferenceDate: $0) }
-            let weights = starts.indices.map { Double($0 + 2) }, sum = weights.reduce(0, +)
-            let share = { (value: Int, index: Int) in Int(Double(value) * weights[index] / sum) }
-            // A Claude session hands every third period to a sub-agent on the other Claude model.
-            let helper = session.agentId.hasPrefix("claude") ? (session.agentId == "claude-sonnet" ? "claude-opus" : "claude-sonnet") : nil
-            let periods = starts.indices.map { index in
-                SessionUsage.Period(start: starts[index], agentId: helper != nil && index % 3 == 1 ? helper! : session.agentId,
-                                    tokens: .init(tokensIn: share(session.tokensIn, index), tokensOut: share(session.tokensOut, index),
-                                                  cacheReadTokens: share(session.cacheReadTokens, index)))
+        for plan in plans {
+            var state = UInt64(plan.seed * 9973 + 1)
+            func random() -> Double {
+                state = state * 16807 % 2_147_483_647
+                return Double(state) / 2_147_483_647
             }
-            let models = Dictionary(grouping: periods, by: \.agentId).map { agentId, periods in
-                SessionUsage.Model(agentId: agentId, tokens: periods.reduce(SessionUsage.Tokens()) { $0 + $1.tokens })
-            }.sorted { $0.tokens.tokensIn + $0.tokens.tokensOut > $1.tokens.tokensIn + $1.tokens.tokensOut }
-            result[session.id] = SessionUsage(models: models, periods: periods, subagents: models.first { $0.agentId == helper }?.tokens,
-                                              calls: periods.count * 9, contextTokens: session.cacheReadTokens / 3 + 12_000)
+            let start = now.addingTimeInterval(plan.minutes.0 * 60), span = (plan.minutes.1 - plan.minutes.0) * 60
+            var context = 0, carry = 12_000, calls = 0, cost: Decimal = 0
+            var turns: [SessionUsage.Turn] = [], models: [String: SessionUsage.Tokens] = [:], periods: [Date: [String: SessionUsage.Tokens]] = [:]
+            var helperTokens: SessionUsage.Tokens?
+            for index in 0..<plan.turns {
+                let input = Int(random() < 0.18 ? 7_000 + random() * 16_000 : 150 + random() * 1_800)
+                let output = Int(250 + random() * random() * 4_200)
+                let reasoning = random() < 0.55 ? Int(400 + random() * 5_000) : 0
+                var write = carry, compacted = false
+                if context + write + input > window * 82 / 100 { compacted = true; context = 0; write = 26_000 }
+                let tokens = SessionUsage.Tokens(tokensIn: input + write, tokensOut: output + reasoning, cacheReadTokens: context,
+                                                 cacheWriteTokens: write, reasoningTokens: reasoning)
+                let turnStart = start.addingTimeInterval(span * (Double(index) + random() * 0.4) / Double(plan.turns))
+                let turnEnd = min(now, turnStart.addingTimeInterval(20 + random() * 150))
+                let turnCalls = 3 + Int(random() * 12)
+                turns.append(.init(start: turnStart, end: turnEnd, tokens: tokens, calls: turnCalls, contextTokens: context + write + input,
+                                   compacted: compacted))
+                calls += turnCalls
+                cost += ModelCatalog.cost(agentId: plan.priced, kinds: tokens.kinds) ?? 0
+                let period = Date(timeIntervalSince1970: (turnStart.timeIntervalSince1970 / UsageBucket.duration).rounded(.down) * UsageBucket.duration)
+                if let helper = plan.helper, index % 4 == 1 {
+                    let part = SessionUsage.Tokens(tokensIn: tokens.tokensIn * 2 / 5, tokensOut: tokens.tokensOut * 2 / 5,
+                                                   cacheReadTokens: tokens.cacheReadTokens * 2 / 5, cacheWriteTokens: tokens.cacheWriteTokens * 2 / 5,
+                                                   reasoningTokens: tokens.reasoningTokens * 2 / 5)
+                    let rest = SessionUsage.Tokens(tokensIn: tokens.tokensIn - part.tokensIn, tokensOut: tokens.tokensOut - part.tokensOut,
+                                                   cacheReadTokens: tokens.cacheReadTokens - part.cacheReadTokens,
+                                                   cacheWriteTokens: tokens.cacheWriteTokens - part.cacheWriteTokens,
+                                                   reasoningTokens: tokens.reasoningTokens - part.reasoningTokens)
+                    models[helper, default: .init()] += part
+                    periods[period, default: [:]][helper, default: .init()] += part
+                    helperTokens = (helperTokens ?? .init()) + part
+                    models[plan.agent, default: .init()] += rest
+                    periods[period, default: [:]][plan.agent, default: .init()] += rest
+                } else {
+                    models[plan.agent, default: .init()] += tokens
+                    periods[period, default: [:]][plan.agent, default: .init()] += tokens
+                }
+                context += write
+                carry = input + output
+            }
+            result[plan.id] = SessionUsage(
+                models: models.map { SessionUsage.Model(agentId: $0.key, tokens: $0.value) }.sorted { $0.tokens.tokensIn > $1.tokens.tokensIn },
+                periods: periods.keys.sorted().flatMap { start in periods[start]!.keys.sorted().map { SessionUsage.Period(start: start, agentId: $0, tokens: periods[start]![$0]!) } },
+                subagents: helperTokens, calls: calls, contextTokens: turns.last?.contextTokens, turns: turns, contextWindow: window,
+                listCost: cost)
         }
         return result
     }

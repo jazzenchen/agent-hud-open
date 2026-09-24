@@ -28,7 +28,8 @@ enum SessionContributions {
                     key = "\(content)#\(ordinal)"
                 }
                 return UsageLedger.Event(key: key, timestamp: event.timestamp, agentId: event.agentId, tokensIn: event.tokensIn,
-                                         tokensOut: event.tokensOut, cacheReadTokens: event.cacheReadTokens)
+                                         tokensOut: event.tokensOut, cacheReadTokens: event.cacheReadTokens,
+                                         cacheWriteTokens: event.cacheWriteTokens, reasoningTokens: event.reasoningTokens)
             }
         }
         return result

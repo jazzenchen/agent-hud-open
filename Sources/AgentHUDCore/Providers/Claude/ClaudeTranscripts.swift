@@ -14,6 +14,8 @@ public struct TranscriptEvent: Hashable, Sendable {
     public let cacheCreationTokens: Int
     public let cacheReadTokens: Int
     public let outputTokens: Int
+    /// The part of `outputTokens` spent thinking, which current builds record per message.
+    public let thinkingTokens: Int
     /// First text of a user message (used for the session title); nil for other lines.
     public let text: String?
     public let sessionId: String?
@@ -25,16 +27,20 @@ public struct TranscriptEvent: Hashable, Sendable {
     public let stopReason: String?
     /// Sub-agent traffic that older Claude Code builds wrote into the parent transcript.
     public let isSidechain: Bool
-    /// A user line that starts a turn: typed or queued input, not a tool result, command output or injected context.
+    /// A user line that starts a turn: typed or queued input, not a tool result, command output, injected context or the
+    /// summary a compaction leaves.
     public let isPrompt: Bool
+    /// The boundary Claude Code writes where it compacted the conversation.
+    public let isCompaction: Bool
     /// Surface that wrote the line, from the `entrypoint` current builds stamp on every message ("cli",
     /// "claude-desktop", "claude-vscode", "sdk-ts"); nil for older builds.
     public let entrypoint: String?
 
     public init(
         timestamp: Date, role: Role, model: String?, inputTokens: Int, cacheCreationTokens: Int, cacheReadTokens: Int,
-        outputTokens: Int, text: String?, sessionId: String?, cwd: String?, messageId: String? = nil, requestId: String? = nil,
-        stopReason: String? = nil, isSidechain: Bool = false, isPrompt: Bool = false, entrypoint: String? = nil
+        outputTokens: Int, thinkingTokens: Int = 0, text: String?, sessionId: String?, cwd: String?, messageId: String? = nil,
+        requestId: String? = nil, stopReason: String? = nil, isSidechain: Bool = false, isPrompt: Bool = false,
+        isCompaction: Bool = false, entrypoint: String? = nil
     ) {
         self.timestamp = timestamp
         self.role = role
@@ -43,6 +49,7 @@ public struct TranscriptEvent: Hashable, Sendable {
         self.cacheCreationTokens = cacheCreationTokens
         self.cacheReadTokens = cacheReadTokens
         self.outputTokens = outputTokens
+        self.thinkingTokens = thinkingTokens
         self.text = text
         self.sessionId = sessionId
         self.cwd = cwd
@@ -51,6 +58,7 @@ public struct TranscriptEvent: Hashable, Sendable {
         self.stopReason = stopReason
         self.isSidechain = isSidechain
         self.isPrompt = isPrompt
+        self.isCompaction = isCompaction
         self.entrypoint = entrypoint
     }
 
@@ -97,6 +105,8 @@ public enum ClaudeTranscriptParser {
             }
         }
         let isMeta = object["isMeta"] as? Bool ?? false
+        let isSummary = object["isCompactSummary"] as? Bool ?? false
+        let details = usage?["output_tokens_details"] as? [String: Any]
         return TranscriptEvent(
             timestamp: timestamp,
             role: role,
@@ -105,6 +115,7 @@ public enum ClaudeTranscriptParser {
             cacheCreationTokens: count("cache_creation_input_tokens"),
             cacheReadTokens: count("cache_read_input_tokens"),
             outputTokens: count("output_tokens"),
+            thinkingTokens: (details?["thinking_tokens"] as? Int) ?? 0,
             text: text,
             sessionId: object["sessionId"] as? String,
             cwd: object["cwd"] as? String,
@@ -112,7 +123,8 @@ public enum ClaudeTranscriptParser {
             requestId: object["requestId"] as? String,
             stopReason: role == .assistant ? message?["stop_reason"] as? String : nil,
             isSidechain: object["isSidechain"] as? Bool ?? false,
-            isPrompt: role == .user && !isMeta && !isToolResult,
+            isPrompt: role == .user && !isMeta && !isToolResult && !isSummary,
+            isCompaction: object["type"] as? String == "system" && object["subtype"] as? String == "compact_boundary",
             entrypoint: object["entrypoint"] as? String
         )
     }
@@ -212,6 +224,8 @@ public struct TranscriptAccumulator: Hashable, Sendable, Codable {
     }
     private var currentTurn: Turn?
     private var completions: [SessionCompletion]?
+    /// Prompts and compactions read since the store last took them.
+    private var marks: [UsageLedger.Mark] = []
 
     /// A response that neither requests a tool nor was cut off ends the turn and returns control to the user.
     /// Interruptions leave no such line; API errors are synthetic messages without one.
@@ -239,9 +253,11 @@ public struct TranscriptAccumulator: Hashable, Sendable, Codable {
                 task = SessionTitle.from(text)
             }
             if !isSubagent, !event.isSidechain {
+                if event.isCompaction { marks.append(.init(.compaction, at: event.timestamp)) }
                 if event.isPrompt {
                     // Claude Code records an interruption as a user line; that turn is over without a completion.
                     let interrupted = event.text?.hasPrefix("[Request interrupted") == true
+                    if !interrupted { marks.append(.init(.prompt, at: event.timestamp)) }
                     if event.timestamp >= (currentTurn?.observedAt ?? .distantPast) {
                         currentTurn = Turn(startedAt: interrupted ? currentTurn?.startedAt : event.timestamp,
                             state: interrupted ? .ended : .running, observedAt: event.timestamp)
@@ -292,12 +308,19 @@ public struct TranscriptAccumulator: Hashable, Sendable, Codable {
                 modelsSeen[model] = event.timestamp
             }
             added.append(UsageLedger.Event(key: key, timestamp: event.timestamp, agentId: mapped, tokensIn: event.tokensIn,
-                                           tokensOut: event.outputTokens, cacheReadTokens: event.cacheReadTokens))
+                                           tokensOut: event.outputTokens, cacheReadTokens: event.cacheReadTokens,
+                                           cacheWriteTokens: event.cacheCreationTokens, reasoningTokens: event.thinkingTokens))
         }
         return added
     }
 
     public var isEmpty: Bool { startedAt == nil }
+
+    /// Hands over the prompts and compactions read since the last call.
+    public mutating func drainMarks() -> [UsageLedger.Mark] {
+        defer { marks = [] }
+        return marks
+    }
 
     private mutating func recordCompletion(_ event: TranscriptEvent) {
         let fileName = URL(fileURLWithPath: path).deletingPathExtension().lastPathComponent

@@ -184,7 +184,8 @@ actor CursorClient {
             let identity = RecordCoding.hash([account, conversation ?? "", String(RecordCoding.milliseconds(date)), model,
                 String(input), String(output), String(cache), String(write)])
             let ordinal = occurrences[identity, default: 0]; occurrences[identity] = ordinal + 1
-            let event = ProviderEvent(id: "\(identity):\(ordinal)", model: model, timestamp: date, input: input + write, output: output, cacheRead: cache)
+            let event = ProviderEvent(id: "\(identity):\(ordinal)", model: model, timestamp: date, input: input + write, output: output, cacheRead: cache,
+                                      cacheWrite: write)
             // ID-less events remain unassigned; do not invent a multi-request conversation from their timestamps.
             let id = "cursor-account:\(account):\(conversation ?? "unassigned-" + identity + "-" + String(ordinal))"
             if sessions[id] == nil {

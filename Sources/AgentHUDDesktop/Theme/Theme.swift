@@ -70,6 +70,17 @@ struct Theme {
         Color(StatusPalette.textColor(for: level, light: isLight))
     }
 
+    /// One hue per token kind, lighter on the dark chrome.
+    func kind(_ kind: TokenKind) -> Color {
+        switch kind {
+        case .cacheWrite: Color(hex: isLight ? 0x9470cd : 0xb699eb)
+        case .input: Color(hex: isLight ? 0x398ad6 : 0x6db0f4)
+        case .reasoning: Color(hex: isLight ? 0xc35f92 : 0xe38ab5)
+        case .output: Color(hex: isLight ? 0xc26e12 : 0xe29858)
+        case .cacheRead: Color(hex: isLight ? 0x00a091 : 0x31c3b5)
+        }
+    }
+
     static let dark = Theme(
         isLight: false,
         windowBackground: Color(hex: 0x282828),

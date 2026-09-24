@@ -60,7 +60,8 @@ public actor DeepSeekTranscriptStore {
 enum HarnessLogs: TailLog {
     static let source = "deepseek"
     static let summaryKey = "transcript"
-    static let version = 1
+    /// 2: cache writes, reasoning and turn starts.
+    static let version = 2
 
     static func summary(for url: URL) -> DeepSeekTranscript { DeepSeekTranscript() }
 
@@ -71,6 +72,8 @@ enum HarnessLogs: TailLog {
         for line in lines.split(separator: 0x0A) { try transcript.ingest(line) }
         return transcript.drainUsage()
     }
+
+    static func drainMarks(_ transcript: inout DeepSeekTranscript) -> [UsageLedger.Mark] { transcript.drainMarks() }
 
     static func group(_ transcript: DeepSeekTranscript) -> String? { transcript.id ?? "" }
 }

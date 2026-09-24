@@ -10,9 +10,15 @@ public struct CodexTranscript: Codable, Sendable {
         public let input: Int
         public let output: Int
         public let cachedInput: Int
+        /// The part of `input` written to the cache and the part of `output` spent reasoning.
+        public var cacheWrite = 0
+        public var reasoning = 0
+        /// The model's context window as the rollout states it.
+        public var contextWindow: Int? = nil
 
         public var event: UsageEvent {
-            .init(timestamp: timestamp, agentId: "codex-model:\(model)", tokensIn: input, tokensOut: output, cacheReadTokens: cachedInput)
+            .init(timestamp: timestamp, agentId: "codex-model:\(model)", tokensIn: input, tokensOut: output, cacheReadTokens: cachedInput,
+                  cacheWriteTokens: cacheWrite, reasoningTokens: reasoning)
         }
     }
 
@@ -50,7 +56,11 @@ public struct CodexTranscript: Codable, Sendable {
     private var totalInput = 0
     private var totalCached = 0
     private var totalOutput = 0
+    private var totalWrite = 0
+    private var totalReasoning = 0
     private var hasTotals = false
+    /// Turn starts and compactions read since the store last took them.
+    private var marks: [UsageLedger.Mark] = []
 
     public init() {}
 
@@ -82,25 +92,36 @@ public struct CodexTranscript: Codable, Sendable {
             if let value = payload["model"] as? String { model = value }
             return
         }
-        guard type == "event_msg", let kind = payload["type"] as? String else { return }
         // Forks copy earlier history. Read its cumulative baseline but do not count it again.
         let inherited = timestamp < (startedAt ?? .distantPast)
+        if type == "compacted" {
+            if !inherited { marks.append(.init(.compaction, at: timestamp)) }
+            return
+        }
+        guard type == "event_msg", let kind = payload["type"] as? String else { return }
         if kind == "token_count" {
             guard let info = payload["info"] as? [String: Any],
                   let totals = info["total_token_usage"] as? [String: Any],
                   let input = totals["input_tokens"] as? Int,
                   let output = totals["output_tokens"] as? Int else { return }
             let cached = totals["cached_input_tokens"] as? Int ?? 0
+            let written = totals["cache_write_input_tokens"] as? Int ?? 0
+            let reasoned = totals["reasoning_output_tokens"] as? Int ?? 0
             let last = info["last_token_usage"] as? [String: Any]
             let reset = input < totalInput || output < totalOutput || cached < totalCached
             let inputDelta = hasTotals && !reset ? input - totalInput : (last?["input_tokens"] as? Int ?? input)
             let cachedDelta = hasTotals && !reset ? cached - totalCached : (last?["cached_input_tokens"] as? Int ?? cached)
             let outputDelta = hasTotals && !reset ? output - totalOutput : (last?["output_tokens"] as? Int ?? output)
-            totalInput = input; totalCached = cached; totalOutput = output; hasTotals = true
+            let writeDelta = hasTotals && !reset ? written - totalWrite : (last?["cache_write_input_tokens"] as? Int ?? written)
+            let reasoningDelta = hasTotals && !reset ? reasoned - totalReasoning : (last?["reasoning_output_tokens"] as? Int ?? reasoned)
+            totalInput = input; totalCached = cached; totalOutput = output; totalWrite = written; totalReasoning = reasoned; hasTotals = true
             guard !inherited, inputDelta > 0 || outputDelta > 0 else { return }
-            // Cached input is already included in input_tokens; reasoning is already in output_tokens.
-            let sample = Usage(timestamp: timestamp, model: model, input: max(0, inputDelta - cachedDelta), output: max(0, outputDelta),
+            // Cached input and cache writes are part of input_tokens; reasoning is part of output_tokens.
+            var sample = Usage(timestamp: timestamp, model: model, input: max(0, inputDelta - cachedDelta), output: max(0, outputDelta),
                                cachedInput: max(0, cachedDelta))
+            sample.cacheWrite = max(0, writeDelta)
+            sample.reasoning = max(0, reasoningDelta)
+            sample.contextWindow = info["model_context_window"] as? Int
             usage.append(sample)
             inputTokens += sample.input
             outputTokens += sample.output
@@ -111,6 +132,7 @@ public struct CodexTranscript: Codable, Sendable {
             switch kind {
             case "task_started":
                 lastActivityAt = max(lastActivityAt ?? timestamp, timestamp)
+                marks.append(.init(.prompt, at: timestamp))
                 let turnID = payload["turn_id"] as? String
                 if !(turns ?? []).contains(where: { $0.id == turnID && (turnID != nil || ($0.state == .running && $0.startedAt == timestamp)) }),
                    timestamp >= (turns?.last?.startedAt ?? .distantPast) {
@@ -164,8 +186,15 @@ public struct CodexTranscript: Codable, Sendable {
         }
         return usage.enumerated().map { offset, sample in
             UsageLedger.Event(key: "u\(recordedUsage + offset)", timestamp: sample.timestamp, agentId: "codex-model:\(sample.model)",
-                              tokensIn: sample.input, tokensOut: sample.output, cacheReadTokens: sample.cachedInput)
+                              tokensIn: sample.input, tokensOut: sample.output, cacheReadTokens: sample.cachedInput,
+                              cacheWriteTokens: sample.cacheWrite, reasoningTokens: sample.reasoning, contextWindow: sample.contextWindow)
         }
+    }
+
+    /// Hands over the turn starts and compactions read since the last call.
+    mutating func drainMarks() -> [UsageLedger.Mark] {
+        defer { marks = [] }
+        return marks
     }
 
     /// Running means the newest turn is still going. A quiet rollout does not end it: one tool call can take minutes
@@ -204,7 +233,7 @@ public struct CodexTranscript: Codable, Sendable {
         return value
     }
 
-    private static let envelopes = ["\"session_meta\"", "\"turn_context\"", "\"event_msg\""].map { Data($0.utf8) }
+    private static let envelopes = ["\"session_meta\"", "\"turn_context\"", "\"event_msg\"", "\"type\":\"compacted\""].map { Data($0.utf8) }
 }
 
 /// Cooperative tail reader over the usage ledger. A partially written final line is retried on the next poll.
@@ -280,7 +309,8 @@ public actor CodexTranscriptStore {
 enum CodexRollouts: TailLog {
     static let source = "codex"
     static let summaryKey = "transcript"
-    static let version = 2
+    /// 3: cache writes, reasoning, context windows, turn starts and compactions.
+    static let version = 3
 
     static func summary(for url: URL) -> CodexTranscript { CodexTranscript() }
 
@@ -288,6 +318,8 @@ enum CodexRollouts: TailLog {
         for line in lines.split(separator: 0x0A) { transcript.ingest(line) }
         return transcript.drainUsage()
     }
+
+    static func drainMarks(_ transcript: inout CodexTranscript) -> [UsageLedger.Mark] { transcript.drainMarks() }
 
     static func group(_ transcript: CodexTranscript) -> String? { transcript.id ?? "" }
 }

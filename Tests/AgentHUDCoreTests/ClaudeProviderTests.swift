@@ -43,6 +43,31 @@ final class ClaudeTranscriptTests: XCTestCase {
         XCTAssertNil(events[0].entrypoint, "lines from builds without the field stay unlabelled")
     }
 
+    func testReadsThinkingCompactionsAndTurnStarts() throws {
+        let prompt = #"{"isSidechain":false,"sessionId":"s-c","type":"user","message":{"role":"user","content":"refactor the parser"},"timestamp":"2026-09-07T06:00:00.000Z"}"#
+        let answer = #"{"isSidechain":false,"sessionId":"s-c","type":"assistant","message":{"id":"msg_c1","role":"assistant","model":"claude-opus-5","content":[{"type":"text","text":"done"}],"stop_reason":"end_turn","usage":{"input_tokens":20,"cache_creation_input_tokens":500,"cache_read_input_tokens":9000,"output_tokens":400,"output_tokens_details":{"thinking_tokens":150}}},"timestamp":"2026-09-07T06:00:30.000Z"}"#
+        let boundary = #"{"parentUuid":null,"logicalParentUuid":"x","isSidechain":false,"type":"system","subtype":"compact_boundary","content":"Conversation compacted","level":"info","compactMetadata":{"trigger":"auto","preTokens":999580},"timestamp":"2026-09-07T06:05:00.000Z","sessionId":"s-c"}"#
+        let summary = #"{"isSidechain":false,"sessionId":"s-c","type":"user","message":{"role":"user","content":"This session is being continued from a previous conversation."},"isCompactSummary":true,"isVisibleInTranscriptOnly":true,"timestamp":"2026-09-07T06:05:01.000Z"}"#
+        let interrupted = #"{"isSidechain":false,"sessionId":"s-c","type":"user","message":{"role":"user","content":[{"type":"text","text":"[Request interrupted by user]"}]},"timestamp":"2026-09-07T06:06:00.000Z"}"#
+        let lines = [prompt, answer, boundary, summary, interrupted].joined(separator: "\n") + "\n"
+        let fast = FastTranscriptParser.parse(Data(lines.utf8)), slow = ClaudeTranscriptParser.parse(lines)
+        XCTAssertEqual(fast.map(\.isPrompt), [true, false, false, false, true], "a compaction's summary is not typed input")
+        XCTAssertEqual(fast.map(\.isPrompt), slow.map(\.isPrompt))
+        XCTAssertEqual(fast.map(\.isCompaction), [false, false, true, false, false])
+        XCTAssertEqual(fast.map(\.isCompaction), slow.map(\.isCompaction))
+        XCTAssertEqual([fast[1].thinkingTokens, slow[1].thinkingTokens], [150, 150])
+        var accumulator = TranscriptAccumulator(path: "/p/s-c.jsonl", isSubagent: false)
+        let events = accumulator.ingest(fast)
+        XCTAssertEqual(events.map(\.cacheWriteTokens), [500])
+        XCTAssertEqual(events.map(\.reasoningTokens), [150])
+        XCTAssertEqual(accumulator.drainMarks(), [.init(.prompt, at: fast[0].timestamp), .init(.compaction, at: fast[2].timestamp)],
+                       "an interruption ends a turn without starting one")
+        XCTAssertEqual(accumulator.drainMarks(), [], "marks are handed over once")
+        var subagent = TranscriptAccumulator(path: "/p/s-c/subagents/agent-a.jsonl", isSubagent: true)
+        subagent.ingest(fast)
+        XCTAssertEqual(subagent.drainMarks(), [], "a sub-agent's prompts are steps of its parent's turn")
+    }
+
     func testTitleRules() {
         XCTAssertEqual(SessionTitle.from("  fix auth bug\nmore"), "fix auth bug")
         XCTAssertNil(SessionTitle.from("<command-name>/clear</command-name>"))

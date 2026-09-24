@@ -117,6 +117,27 @@ final class CodexProviderTests: XCTestCase {
         XCTAssertNil(try JSONDecoder().decode(CodexTranscript.self, from: JSONSerialization.data(withJSONObject: oldCache)).completions)
     }
 
+    func testReadsReasoningCacheWritesWindowsTurnStartsAndCompactions() {
+        var transcript = CodexTranscript()
+        let lines = [
+            #"{"timestamp":"2026-09-07T06:00:00.000Z","type":"session_meta","payload":{"id":"c-1","timestamp":"2026-09-07T06:00:00.000Z","cwd":"/p","source":"cli"}}"#,
+            #"{"timestamp":"2026-09-07T06:00:01.000Z","type":"turn_context","payload":{"model":"gpt-6-astra"}}"#,
+            #"{"timestamp":"2026-09-07T06:00:02.000Z","type":"event_msg","payload":{"type":"task_started","turn_id":"t1","model_context_window":258400}}"#,
+            #"{"timestamp":"2026-09-07T06:00:10.000Z","type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":30000,"cached_input_tokens":20000,"cache_write_input_tokens":4000,"output_tokens":500,"reasoning_output_tokens":200},"last_token_usage":{"input_tokens":30000,"cached_input_tokens":20000,"cache_write_input_tokens":4000,"output_tokens":500,"reasoning_output_tokens":200},"model_context_window":258400}}}"#,
+            #"{"timestamp":"2026-09-07T06:00:20.000Z","type":"compacted","payload":{"message":"","replacement_history":[]}}"#,
+            #"{"timestamp":"2026-09-07T06:00:30.000Z","type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":42000,"cached_input_tokens":28000,"cache_write_input_tokens":4000,"output_tokens":800,"reasoning_output_tokens":260},"model_context_window":258400}}}"#,
+        ]
+        for line in lines { transcript.ingest(Data(line.utf8)) }
+        let events = transcript.drainUsage()
+        XCTAssertEqual(events.map(\.tokensIn), [10_000, 4_000], "cached input is counted apart; cache writes stay in input")
+        XCTAssertEqual(events.map(\.cacheReadTokens), [20_000, 8_000])
+        XCTAssertEqual(events.map(\.cacheWriteTokens), [4_000, 0])
+        XCTAssertEqual(events.map(\.reasoningTokens), [200, 60])
+        XCTAssertEqual(events.map(\.tokensOut), [500, 300])
+        XCTAssertEqual(events.map(\.contextWindow), [258_400, 258_400])
+        XCTAssertEqual(transcript.drainMarks().map(\.kind), [.prompt, .compaction])
+    }
+
     func testSubagentsNeverProduceUserFacingCompletions() {
         let start = Date(timeIntervalSince1970: 1_788_850_000)
         var t = CodexTranscript()

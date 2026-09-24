@@ -104,6 +104,63 @@ final class UsageLedgerTests: XCTestCase, @unchecked Sendable {
         XCTAssertNil(usage["gone"])
     }
 
+    private func call(_ key: String, _ minute: Double, agent: String = "claude-model:claude-opus-5", input: Int, write: Int = 0, output: Int,
+                      reasoning: Int = 0, cache: Int = 0) -> UsageLedger.Event {
+        UsageLedger.Event(key: key, timestamp: base.addingTimeInterval(minute * 60), agentId: agent, tokensIn: input, tokensOut: output,
+                          cacheReadTokens: cache, cacheWriteTokens: write, reasoningTokens: reasoning)
+    }
+
+    private func at(_ seconds: Double) -> Date { base.addingTimeInterval(seconds) }
+
+    func testSessionUsageSplitsKindsIntoTurnsWithContextAndListPrice() async throws {
+        let ledger = UsageLedger.inMemory()
+        try await ledger.write { writer in
+            try writer.upsert(source: "claude", contribution: "p/s.jsonl", events: [
+                self.call("m0", 0.5, input: 10, output: 5),
+                self.call("m1", 1, input: 1_000, write: 800, output: 300, reasoning: 100, cache: 5_000),
+                self.call("m2", 2, input: 200, write: 150, output: 50, cache: 6_000),
+                self.call("m3", 11, input: 400, write: 300, output: 90, reasoning: 40, cache: 2_000),
+            ])
+            try writer.addMarks(source: "claude", contribution: "p/s.jsonl", marks: [
+                .init(.prompt, at: self.at(60)), .init(.prompt, at: self.at(600)), .init(.prompt, at: self.at(700)), .init(.compaction, at: self.at(630)),
+            ])
+            // A sub-agent's own prompt starts no turn of the session; its call joins the turn running at the time.
+            try writer.upsert(source: "claude", contribution: "p/s/subagents/agent-a.jsonl", events: [
+                self.call("a1", 1.5, agent: "claude-model:claude-haiku-4-5-20251001", input: 70, write: 20, output: 7, cache: 900),
+            ])
+            try writer.addMarks(source: "claude", contribution: "p/s/subagents/agent-a.jsonl", marks: [.init(.prompt, at: self.at(85))])
+        }
+        let read = try await ledger.sessionUsage([
+            SessionUsageRequest(sessionID: "s", keys: ["p/s.jsonl", "s"], subagentPrefix: "p/s/", callLog: "p/s.jsonl"),
+        ])
+        let usage = try XCTUnwrap(read["s"])
+        XCTAssertEqual(usage.turns.map(\.start), [self.at(30), self.at(60), self.at(600)], "calls before the first prompt form a turn of their own")
+        XCTAssertEqual(usage.turnCount, 3, "a prompt no call followed adds no turn")
+        XCTAssertEqual(usage.turns.map(\.calls), [1, 3, 1])
+        XCTAssertEqual(usage.turns[1].tokens.kinds, TokenKinds(cacheWrite: 970, input: 300, reasoning: 100, output: 257, cacheRead: 11_900))
+        XCTAssertEqual(usage.turns.map(\.contextTokens), [10, 6_200, 2_400], "a turn's context is its own log's last call")
+        XCTAssertEqual(usage.turns.map(\.compacted), [false, false, true])
+        XCTAssertEqual(usage.total.kinds.reasoning, 140)
+        XCTAssertEqual(usage.contextWindow, 1_000_000, "the published window of the model the session's own log called last")
+        // Opus 5: $5 input, $10 one-hour cache writes, $0.50 cache reads, $25 output. Haiku 4.5: $1, $2, $0.10, $5.
+        XCTAssertEqual(usage.listCost, Decimal(string: "0.03214"))
+        let buckets = try await ledger.buckets(since: base)
+        XCTAssertEqual(buckets.reduce(0) { $0 + $1.cacheWriteTokens }, 1_270)
+        XCTAssertEqual(buckets.reduce(0) { $0 + $1.reasoningTokens }, 140)
+
+        // A model without a list price leaves the estimate unknown; a removed log takes its marks along.
+        try await ledger.write { writer in
+            try writer.upsert(source: "claude", contribution: "p/s.jsonl", events: [self.call("m4", 12, agent: "claude-model:claude-next", input: 1, output: 1)])
+        }
+        let unpriced = try await ledger.sessionUsage([SessionUsageRequest(sessionID: "s", keys: ["p/s.jsonl"])])["s"]
+        XCTAssertNil(unpriced?.listCost)
+        XCTAssertEqual(unpriced?.contextWindow, 200_000, "an unlisted Claude model runs with 200K until one of its calls held more")
+        try await ledger.write { try $0.remove(source: "claude", contribution: "p/s.jsonl") }
+        try await ledger.write { try $0.upsert(source: "claude", contribution: "p/s.jsonl", events: [self.call("m5", 13, input: 1, output: 1)]) }
+        let reread = try await ledger.sessionUsage([SessionUsageRequest(sessionID: "s", keys: ["p/s.jsonl"])])["s"]
+        XCTAssertEqual(reread?.turns.map(\.start), [], "the removed log's prompts went with it")
+    }
+
     func testWindowedReplacementKeepsOlderEvents() async throws {
         let ledger = UsageLedger.inMemory(), since = base.addingTimeInterval(3600)
         try await ledger.write { try $0.replace(source: "hermes", contribution: "s", events: [

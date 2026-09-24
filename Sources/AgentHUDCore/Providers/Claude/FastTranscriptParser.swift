@@ -22,6 +22,8 @@ public enum FastTranscriptParser {
     private static let userMarker = Array("\"type\":\"user\"".utf8)
     private static let sidechainMarker = Array("\"isSidechain\":true".utf8)
     private static let metaMarker = Array("\"isMeta\":true".utf8)
+    private static let summaryMarker = Array("\"isCompactSummary\":true".utf8)
+    private static let compactionMarker = Array("\"subtype\":\"compact_boundary\"".utf8)
     private static let stopReasonKey = Array("\"stop_reason\":".utf8)
     private static let usageKey = Array("\"usage\":{".utf8)
     private static let modelKey = Array("\"model\":\"".utf8)
@@ -82,7 +84,7 @@ public enum FastTranscriptParser {
         } else {
             role = .other
         }
-        var input = 0, cacheCreation = 0, cacheRead = 0, output = 0
+        var input = 0, cacheCreation = 0, cacheRead = 0, output = 0, thinking = 0
         var model: String?
         var messageId: String?
         var requestId: String?
@@ -93,6 +95,7 @@ public enum FastTranscriptParser {
                 cacheCreation = count(usage["cache_creation_input_tokens"])
                 cacheRead = count(usage["cache_read_input_tokens"])
                 output = count(usage["output_tokens"])
+                thinking = count((usage["output_tokens_details"] as? [String: Any])?["thinking_tokens"])
             }
             model = value(after: modelKey, in: head)
             messageId = value(after: messageIdKey, in: head) ?? value(after: fallbackIdKey, in: head).map { "msg_" + $0 }
@@ -105,7 +108,7 @@ public enum FastTranscriptParser {
         if role == .user, find(toolResultMarker, in: head) == nil {
             text = value(after: contentStringKey, in: line, keyIn: head) ?? value(after: contentTextKey, in: line, keyIn: head)
             // Command output, attachments and compaction summaries are user lines flagged after their content.
-            isPrompt = find(metaMarker, in: line, backwards: true) == nil
+            isPrompt = find(metaMarker, in: line, backwards: true) == nil && find(summaryMarker, in: line, backwards: true) == nil
         } else if role == .assistant {
             // A visible answer. A thinking or tool-use block is a different type and never matches this key.
             text = value(after: contentTextKey, in: line, keyIn: head, limit: messageLength)
@@ -122,6 +125,7 @@ public enum FastTranscriptParser {
             cacheCreationTokens: cacheCreation,
             cacheReadTokens: cacheRead,
             outputTokens: output,
+            thinkingTokens: thinking,
             text: text,
             sessionId: value(after: sessionIdKey, in: head),
             cwd: value(after: cwdKey, in: head),
@@ -130,6 +134,7 @@ public enum FastTranscriptParser {
             stopReason: stopReason,
             isSidechain: find(sidechainMarker, in: head) != nil,
             isPrompt: isPrompt,
+            isCompaction: role == .other && find(compactionMarker, in: head) != nil,
             entrypoint: entrypoint
         )
     }

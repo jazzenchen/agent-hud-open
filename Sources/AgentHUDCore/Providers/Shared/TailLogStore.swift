@@ -15,6 +15,8 @@ protocol TailLog {
     static func contents(of url: URL) async throws -> Data?
     /// Reads one or more complete lines, each ending in a newline, and returns the usage they added.
     static func ingest(_ lines: Data, into summary: inout Summary) throws -> [UsageLedger.Event]
+    /// The prompts and compactions read since the last call.
+    static func drainMarks(_ summary: inout Summary) -> [UsageLedger.Mark]
     /// Runs once a read of the log ends.
     static func finishRead(_ summary: inout Summary, now: Date)
     /// The session of a log that can be copied to several places, where only the newest copy counts; "" for such a log
@@ -24,6 +26,7 @@ protocol TailLog {
 
 extension TailLog {
     static func contents(of url: URL) async throws -> Data? { nil }
+    static func drainMarks(_ summary: inout Summary) -> [UsageLedger.Mark] { [] }
     static func finishRead(_ summary: inout Summary, now: Date) {}
     static func group(_ summary: Summary) -> String? { nil }
 }
@@ -105,7 +108,7 @@ final class TailLogStore<Log: TailLog> {
         }
 
         // Always make progress on the newest log, then keep going while the budget lasts.
-        var updates: [String: (entry: Entry, events: [UsageLedger.Event], reset: Bool)] = [:]
+        var updates: [String: (entry: Entry, events: [UsageLedger.Event], marks: [UsageLedger.Mark], reset: Bool)] = [:]
         for (index, log) in changing.sorted(by: { $0.file.modified > $1.file.modified }).enumerated() {
             if index > 0, Date() >= deadline {
                 pass.pending += changing.count - index
@@ -130,8 +133,8 @@ final class TailLogStore<Log: TailLog> {
         for path in removed { nextGroups[path] = nil; nextModified[path] = nil }
         let counted = LedgerCopies.counted(touched: Set(updates.keys).union(removed), previous: groups, members: nextGroups, modified: nextModified)
         let writes = updates.map { path, update in
-            (path: path, reset: update.reset, events: update.events, counted: nextGroups[path].map { _ in counted[path] ?? false },
-             state: Self.state(update.entry))
+            (path: path, reset: update.reset, events: update.events, marks: update.marks,
+             counted: nextGroups[path].map { _ in counted[path] ?? false }, state: Self.state(update.entry))
         }
         let source = Log.source, written = Set(updates.keys)
         do {
@@ -139,6 +142,7 @@ final class TailLogStore<Log: TailLog> {
                 for write in writes {
                     if write.reset { try writer.remove(source: source, contribution: write.path) }
                     try writer.upsert(source: source, contribution: write.path, counted: write.counted, events: write.events)
+                    try writer.addMarks(source: source, contribution: write.path, marks: write.marks)
                     try writer.setFile(source: source, path: write.path, state: write.state)
                 }
                 for path in removed {
@@ -165,11 +169,11 @@ final class TailLogStore<Log: TailLog> {
     /// Reads what the log gained since its entry, or all of it once rewritten. Each read ingests at least one chunk.
     private func read(_ path: String, file: LogFiles.File, deadline: Date, pass: inout Pass,
                       isolation: isolated (any Actor)? = #isolation) async throws
-        -> (entry: Entry, events: [UsageLedger.Event], reset: Bool) {
+        -> (entry: Entry, events: [UsageLedger.Event], marks: [UsageLedger.Mark], reset: Bool) {
         let url = URL(fileURLWithPath: path), previous = entry(path)
         let contents = try await Log.contents(of: url)
         var entry = Entry(modified: file.modified, size: file.size, summary: Log.summary(for: url))
-        var events: [UsageLedger.Event] = [], reset = false
+        var events: [UsageLedger.Event] = [], marks: [UsageLedger.Mark] = [], reset = false
         if let previous {
             if file.size < previous.size || (file.size == previous.size && !LedgerCopies.same(previous.modified, file.modified))
                 || (contents?.count ?? file.size) < previous.offset {
@@ -188,6 +192,7 @@ final class TailLogStore<Log: TailLog> {
                 let limit = min(entry.committed, entry.offset + Self.chunkSize)
                 let end = contents[(limit - 1)..<entry.committed].firstIndex(of: 0x0A)! + 1
                 events += try Log.ingest(contents[entry.offset..<end], into: &entry.summary)
+                marks += Log.drainMarks(&entry.summary)
                 entry.offset = end
             } while Date() < deadline
         } else {
@@ -201,6 +206,7 @@ final class TailLogStore<Log: TailLog> {
                 carry.append(chunk)
                 guard let newline = carry.lastIndex(of: 0x0A) else { continue }
                 events += try Log.ingest(carry[...newline], into: &entry.summary)
+                marks += Log.drainMarks(&entry.summary)
                 entry.offset += newline + 1
                 carry = Data(carry[(newline + 1)...])
             } while Date() < deadline
@@ -208,7 +214,7 @@ final class TailLogStore<Log: TailLog> {
             entry.committed = entry.offset + carry.count >= file.size ? entry.offset : file.size
         }
         Log.finishRead(&entry.summary, now: Date())
-        return (entry, events, reset)
+        return (entry, events, marks, reset)
     }
 
     private static func state(_ entry: Entry) -> UsageLedger.FileState {

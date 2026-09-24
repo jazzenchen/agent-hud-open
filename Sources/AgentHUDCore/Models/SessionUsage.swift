@@ -1,28 +1,45 @@
 import Foundation
 
-/// Where one session's tokens went, as the usage ledger recorded them: by model, by 15-minute period, and the part
-/// its sub-agents spent. It covers what this Mac read of the session within the ledger's retention.
+/// Where one session's tokens went, as the usage ledger recorded them: by model, by 15-minute period, by turn, and the
+/// part its sub-agents spent. It covers what this Mac read of the session within the ledger's retention.
 public struct SessionUsage: Hashable, Codable, Sendable {
     public struct Tokens: Hashable, Codable, Sendable {
         public var tokensIn: Int
         public var tokensOut: Int
         public var cacheReadTokens: Int
+        /// The part of `tokensIn` written to the prompt cache.
+        public var cacheWriteTokens: Int
+        /// The part of `tokensOut` spent reasoning.
+        public var reasoningTokens: Int
 
-        public init(tokensIn: Int = 0, tokensOut: Int = 0, cacheReadTokens: Int = 0) {
+        public init(tokensIn: Int = 0, tokensOut: Int = 0, cacheReadTokens: Int = 0, cacheWriteTokens: Int = 0, reasoningTokens: Int = 0) {
             self.tokensIn = tokensIn; self.tokensOut = tokensOut; self.cacheReadTokens = cacheReadTokens
+            self.cacheWriteTokens = cacheWriteTokens; self.reasoningTokens = reasoningTokens
+        }
+
+        private enum CodingKeys: String, CodingKey { case tokensIn, tokensOut, cacheReadTokens, cacheWriteTokens, reasoningTokens }
+
+        public init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            self.init(tokensIn: try c.decode(Int.self, forKey: .tokensIn), tokensOut: try c.decode(Int.self, forKey: .tokensOut),
+                      cacheReadTokens: try c.decode(Int.self, forKey: .cacheReadTokens),
+                      cacheWriteTokens: try c.decodeIfPresent(Int.self, forKey: .cacheWriteTokens) ?? 0,
+                      reasoningTokens: try c.decodeIfPresent(Int.self, forKey: .reasoningTokens) ?? 0)
         }
 
         public static func + (lhs: Self, rhs: Self) -> Self {
             Tokens(tokensIn: lhs.tokensIn + rhs.tokensIn, tokensOut: lhs.tokensOut + rhs.tokensOut,
-                   cacheReadTokens: lhs.cacheReadTokens + rhs.cacheReadTokens)
+                   cacheReadTokens: lhs.cacheReadTokens + rhs.cacheReadTokens,
+                   cacheWriteTokens: lhs.cacheWriteTokens + rhs.cacheWriteTokens, reasoningTokens: lhs.reasoningTokens + rhs.reasoningTokens)
         }
 
         public static func += (lhs: inout Self, rhs: Self) { lhs = lhs + rhs }
 
         public var isEmpty: Bool { tokensIn == 0 && tokensOut == 0 && cacheReadTokens == 0 }
-        public func count(_ dimensions: TokenDimensions) -> Int {
-            dimensions.count(input: tokensIn, output: tokensOut, cache: cacheReadTokens)
+        public var kinds: TokenKinds {
+            TokenKinds(tokensIn: tokensIn, tokensOut: tokensOut, cacheRead: cacheReadTokens, cacheWrite: cacheWriteTokens, reasoning: reasoningTokens)
         }
+        public func count(_ dimensions: TokenDimensions) -> Int { dimensions.count(kinds) }
     }
 
     public struct Model: Hashable, Codable, Sendable {
@@ -39,9 +56,32 @@ public struct SessionUsage: Hashable, Codable, Sendable {
         public init(start: Date, agentId: String, tokens: Tokens) { self.start = start; self.agentId = agentId; self.tokens = tokens }
 
         public var bucket: UsageBucket {
-            UsageBucket(start: start, agentId: agentId, tokensIn: tokens.tokensIn, tokensOut: tokens.tokensOut, cacheReadTokens: tokens.cacheReadTokens)
+            UsageBucket(start: start, agentId: agentId, tokensIn: tokens.tokensIn, tokensOut: tokens.tokensOut, cacheReadTokens: tokens.cacheReadTokens,
+                        cacheWriteTokens: tokens.cacheWriteTokens, reasoningTokens: tokens.reasoningTokens)
         }
     }
+
+    /// One prompt and the model calls it led to, sub-agents' included, until the next prompt.
+    public struct Turn: Hashable, Codable, Sendable {
+        /// The prompt's time; for calls logged before any prompt, the first of them.
+        public let start: Date
+        /// The last call.
+        public let end: Date
+        public let tokens: Tokens
+        public let calls: Int
+        /// The prompt of the turn's last call in the session's own log: the context the turn ended with.
+        public let contextTokens: Int?
+        /// The client compacted the conversation during the turn.
+        public let compacted: Bool
+
+        public init(start: Date, end: Date, tokens: Tokens, calls: Int, contextTokens: Int? = nil, compacted: Bool = false) {
+            self.start = start; self.end = end; self.tokens = tokens; self.calls = calls
+            self.contextTokens = contextTokens; self.compacted = compacted
+        }
+    }
+
+    /// The newest turns kept in a breakdown; `turnCount` still counts the older ones.
+    public static let turnLimit = 200
 
     /// Every model the session and its sub-agents called, the largest first.
     public let models: [Model]
@@ -56,11 +96,35 @@ public struct SessionUsage: Hashable, Codable, Sendable {
     public let contextTokens: Int?
     /// Estimated price by currency, for sessions of a priced account; a currency is missing when any call had no price in it.
     public let costs: [String: Decimal]?
+    /// The newest turns with calls, oldest first; empty for a log that does not mark its prompts.
+    public let turns: [Turn]
+    /// Turns with calls, including those older than `turns` keeps.
+    public let turnCount: Int
+    /// The context window of the session's latest call.
+    public let contextWindow: Int?
+    /// What the calls would have cost at the vendors' API list prices, in US dollars; nil when a call's model has no list price.
+    public let listCost: Decimal?
 
     public init(models: [Model], periods: [Period], subagents: Tokens? = nil, calls: Int, contextTokens: Int? = nil,
-                costs: [String: Decimal]? = nil) {
+                costs: [String: Decimal]? = nil, turns: [Turn] = [], turnCount: Int? = nil, contextWindow: Int? = nil, listCost: Decimal? = nil) {
         self.models = models; self.periods = periods; self.subagents = subagents
         self.calls = calls; self.contextTokens = contextTokens; self.costs = costs
+        self.turns = turns; self.turnCount = turnCount ?? turns.count; self.contextWindow = contextWindow; self.listCost = listCost
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case models, periods, subagents, calls, contextTokens, costs, turns, turnCount, contextWindow, listCost
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let turns = try c.decodeIfPresent([Turn].self, forKey: .turns) ?? []
+        self.init(models: try c.decode([Model].self, forKey: .models), periods: try c.decode([Period].self, forKey: .periods),
+                  subagents: try c.decodeIfPresent(Tokens.self, forKey: .subagents), calls: try c.decode(Int.self, forKey: .calls),
+                  contextTokens: try c.decodeIfPresent(Int.self, forKey: .contextTokens),
+                  costs: try c.decodeIfPresent([String: Decimal].self, forKey: .costs), turns: turns,
+                  turnCount: try c.decodeIfPresent(Int.self, forKey: .turnCount), contextWindow: try c.decodeIfPresent(Int.self, forKey: .contextWindow),
+                  listCost: try c.decodeIfPresent(Decimal.self, forKey: .listCost))
     }
 
     public var total: Tokens { models.reduce(Tokens()) { $0 + $1.tokens } }
@@ -69,6 +133,12 @@ public struct SessionUsage: Hashable, Codable, Sendable {
     public var cacheHitRate: Double? {
         let total = total, prompt = total.tokensIn + total.cacheReadTokens
         return prompt > 0 ? Double(total.cacheReadTokens) / Double(prompt) : nil
+    }
+
+    /// How full the context of the latest call was, 0…1; nil without both sizes.
+    public var contextFill: Double? {
+        guard let contextTokens, let contextWindow, contextWindow > 0 else { return nil }
+        return Double(contextTokens) / Double(contextWindow)
     }
 }
 
@@ -93,5 +163,89 @@ public struct SessionUsageRequest: Hashable, Sendable {
         }
         let directory = path.hasSuffix(".jsonl") ? String(path.dropLast(".jsonl".count)) + "/" : nil
         self.init(sessionID: session.id, keys: [path, session.id], subagentPrefix: directory, callLog: path)
+    }
+}
+
+/// Folds one session's calls, in time order, into its breakdown. Calls go to the turn of the latest prompt at or
+/// before them, sub-agents' calls included; calls before the first prompt form a turn of their own.
+struct SessionUsageBuilder {
+    struct Call {
+        let timestamp: Date
+        let agentId: String
+        let tokens: SessionUsage.Tokens
+        /// The session's own log rather than a sub-agent's.
+        let own: Bool
+        /// A log that records every call, so its prompt is the session's context.
+        let callLog: Bool
+        let contextWindow: Int?
+    }
+
+    private let prompts: [Date]
+    private let compactions: [Date]
+    private var models: [String: SessionUsage.Tokens] = [:]
+    private var periods: [Date: [String: SessionUsage.Tokens]] = [:]
+    private var subagents: SessionUsage.Tokens?
+    private var calls = 0
+    private var context: Int?
+    private var window: Int?
+    private var latestAgent: String?
+    private var listCost: Decimal? = 0
+    private var turns: [Int: (start: Date, end: Date, tokens: SessionUsage.Tokens, calls: Int, context: Int?)] = [:]
+    private var promptIndex = -1
+
+    /// - prompts, compactions: the session's own marks.
+    init(prompts: [Date], compactions: [Date]) {
+        self.prompts = prompts.sorted()
+        self.compactions = compactions
+    }
+
+    var isEmpty: Bool { calls == 0 }
+    var latestModel: String? { latestAgent }
+
+    /// Calls must arrive oldest first.
+    mutating func add(_ call: Call) {
+        let tokens = call.tokens
+        calls += 1
+        models[call.agentId, default: .init()] += tokens
+        let period = Date(timeIntervalSince1970: (call.timestamp.timeIntervalSince1970 / UsageBucket.duration).rounded(.down) * UsageBucket.duration)
+        periods[period, default: [:]][call.agentId, default: .init()] += tokens
+        if !call.own { subagents = (subagents ?? .init()) + tokens }
+        let prompt = tokens.tokensIn + tokens.cacheReadTokens
+        if call.callLog { context = prompt }
+        if call.own {
+            latestAgent = call.agentId
+            if let reported = call.contextWindow { window = reported }
+        }
+        if let cost = listCost { listCost = ModelCatalog.cost(agentId: call.agentId, kinds: tokens.kinds).map { cost + $0 } }
+        guard !prompts.isEmpty else { return }
+        while promptIndex + 1 < prompts.count, prompts[promptIndex + 1] <= call.timestamp { promptIndex += 1 }
+        var turn = turns[promptIndex]
+            ?? (start: promptIndex >= 0 ? prompts[promptIndex] : call.timestamp, end: call.timestamp, tokens: .init(), calls: 0, context: nil)
+        turn.end = max(turn.end, call.timestamp)
+        turn.tokens += tokens
+        turn.calls += 1
+        if call.callLog { turn.context = prompt }
+        turns[promptIndex] = turn
+    }
+
+    /// - window: the context window of the latest model given what the client reported, or nil.
+    func build(costs: [String: Decimal]?, window resolve: (_ agentId: String, _ reported: Int?) -> Int?) -> SessionUsage {
+        let compacted = Set(compactions.map { date in (prompts.lastIndex { $0 <= date } ?? -1) })
+        let all = turns.keys.sorted().map { index in
+            let turn = turns[index]!
+            return SessionUsage.Turn(start: turn.start, end: turn.end, tokens: turn.tokens, calls: turn.calls, contextTokens: turn.context,
+                                     compacted: compacted.contains(index))
+        }
+        return SessionUsage(
+            models: models.map { SessionUsage.Model(agentId: $0.key, tokens: $0.value) }.sorted {
+                let left = $0.tokens.tokensIn + $0.tokens.tokensOut, right = $1.tokens.tokensIn + $1.tokens.tokensOut
+                return left == right ? $0.agentId < $1.agentId : left > right
+            },
+            periods: periods.keys.sorted().flatMap { start in
+                periods[start]!.keys.sorted().map { SessionUsage.Period(start: start, agentId: $0, tokens: periods[start]![$0]!) }
+            },
+            subagents: subagents, calls: calls, contextTokens: context, costs: costs,
+            turns: Array(all.suffix(SessionUsage.turnLimit)), turnCount: all.count,
+            contextWindow: latestAgent.flatMap { resolve($0, window) }, listCost: listCost)
     }
 }

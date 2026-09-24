@@ -23,14 +23,15 @@ enum TencentBuddySessions {
             guard kind == "function_call" || (kind == "message" && json["role"].stringValue == "assistant"),
                   json["status"] == .null || json["status"].stringValue == "completed",
                   let usage = [json["message"]["usage"], provider["usage"], provider["rawUsage"]].first(where: { $0.objectValue != nil }) else { return }
-            let counted: (input: Int, output: Int, cache: Int)?
+            let counted: (input: Int, output: Int, cache: Int, write: Int, reasoning: Int)?
             do { counted = try self.tokens(usage) } catch { incomplete = true; return }
             guard let tokens = counted else { return }
             guard let date else { incomplete = true; return }
             // One response can be written on both its message and its function call line.
             let key = nonEmpty(provider["messageId"]).map { "message:\($0)" } ?? nonEmpty(provider["traceId"]).map { "trace:\($0)" }
                 ?? nonEmpty(json["id"]).map { "\(raw):item:\($0)" } ?? "\(raw):\(stem):line-\(line)"
-            let event = ProviderEvent(id: key, model: model(json) ?? "Unknown", timestamp: date, input: tokens.input, output: tokens.output, cacheRead: tokens.cache)
+            let event = ProviderEvent(id: key, model: model(json) ?? "Unknown", timestamp: date, input: tokens.input, output: tokens.output,
+                                      cacheRead: tokens.cache, cacheWrite: tokens.write, reasoning: tokens.reasoning)
             if let previous = events[id]?[key], previous.input + previous.output + previous.cacheRead > event.input + event.output + event.cacheRead { return }
             events[id, default: [:]][key] = event
         }
@@ -42,7 +43,8 @@ enum TencentBuddySessions {
 
     /// A reported total equal to input + output, or cached tokens nested in the input details, proves that input holds cache
     /// reads and output holds reasoning; otherwise the counts are additive. In keeps cache writes; Cache is cache reads only.
-    static func tokens(_ usage: ProviderJSON) throws -> (input: Int, output: Int, cache: Int)? {
+    /// Fresh input keeps its cache writes and output its reasoning; both are also returned on their own.
+    static func tokens(_ usage: ProviderJSON) throws -> (input: Int, output: Int, cache: Int, write: Int, reasoning: Int)? {
         func counts(_ keys: [String]) throws -> [Int] { try keys.compactMap { usage[$0] == .null ? nil : try usage[$0].optionalCounter() } }
         func positive(_ keys: [String]) throws -> Int? { let values = try counts(keys); return values.first { $0 > 0 } ?? values.first }
         func nested(_ keys: [String], _ field: String) throws -> Int? {
@@ -67,7 +69,7 @@ enum TencentBuddySessions {
             fresh = input - cache
         } else { fresh = try TokenCount.sum(input, write) }
         let out = inclusive ? output : try TokenCount.sum(output, reasoning)
-        return try TokenCount.sum(fresh, out, cache) > 0 ? (fresh, out, cache) : nil
+        return try TokenCount.sum(fresh, out, cache) > 0 ? (fresh, out, cache, min(write, fresh), min(reasoning, out)) : nil
     }
 
     static func model(_ json: ProviderJSON) -> String? {

@@ -29,7 +29,8 @@ public enum UsageAggregation {
                         let index = positions[key]![ordinal]
                         if event.cacheReadTokens > result[index].cacheReadTokens {
                             result[index] = .init(timestamp: event.timestamp, agentId: event.agentId, tokensIn: event.tokensIn,
-                                tokensOut: event.tokensOut, cacheReadTokens: event.cacheReadTokens, eventID: result[index].eventID ?? event.eventID,
+                                tokensOut: event.tokensOut, cacheReadTokens: event.cacheReadTokens, cacheWriteTokens: event.cacheWriteTokens,
+                                reasoningTokens: event.reasoningTokens, eventID: result[index].eventID ?? event.eventID,
                                 origin: result[index].origin ?? event.origin, attribution: result[index].attribution ?? event.attribution)
                         }
                     } else {

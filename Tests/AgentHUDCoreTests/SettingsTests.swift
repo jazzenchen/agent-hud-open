@@ -471,7 +471,7 @@ final class UsageStoreTests: XCTestCase {
         XCTAssertTrue(store.subscriptions.isEmpty)
     }
 
-    func testActiveSessionsFollowSelectedRangeIncludingLongRunningSessions() {
+    func testSessionListCoversTheLastWeekWhateverTheChartRange() {
         let store = makeStore()
         let now = Date()
         func session(_ id: String, startedHoursAgo: Double, endedHoursAgo: Double? = nil) -> LiveSession {
@@ -488,15 +488,9 @@ final class UsageStoreTests: XCTestCase {
             session("older", startedHoursAgo: 240, endedHoursAgo: 200),
             session("future", startedHoursAgo: -24),
         ]))
-        XCTAssertEqual(store.statsRange, .hours24)
-        XCTAssertEqual(store.statsSessions.map(\.id), ["running", "recent", "today"])
-        store.setStatsRange(.hours5)
-        XCTAssertEqual(store.statsSessions.map(\.id), ["running", "recent"])
-        store.setStatsRange(.hours24)
-        XCTAssertEqual(store.statsSessions.map(\.id), ["running", "recent", "today"])
-        store.setStatsRange(.days7)
-        XCTAssertEqual(store.statsSessions.map(\.id), ["running", "recent", "today", "week"])
-        store.setStatsRange(.hours5)
-        XCTAssertEqual(store.statsSessions.map(\.id), ["running", "recent"])
+        for range in StatsRange.allCases {
+            store.setStatsRange(range)
+            XCTAssertEqual(store.statsSessions.map(\.id), ["running", "recent", "today", "week"], "\(range)")
+        }
     }
 }

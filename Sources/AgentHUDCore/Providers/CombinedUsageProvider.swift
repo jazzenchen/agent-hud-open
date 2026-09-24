@@ -113,8 +113,9 @@ public struct CombinedUsageProvider: UsageProvider {
         let usage = ((try? await ledger.buckets(since: min(weekAgo, now.addingTimeInterval(-Double(historyHours) * 3600)))) ?? [])
             + results.filter { !(vendors[$0.0].provider is any LedgerRecording) }.flatMap { $0.1?.usage ?? [] }
         let sessions = reports.flatMap(\.sessions)
-        let sessionUsage = await breakdowns(of: sessions)
         let progress = reports.compactMap(\.indexing)
+        // While logs are still being read, a finished session's breakdown can change without its counts moving.
+        let sessionUsage = await breakdowns(of: sessions, reusing: progress.isEmpty)
         return UsageReport(generatedAt: now, snapshots: Dictionary(grouping: reports.flatMap(\.snapshots), by: \.agentId).values.compactMap { $0.max { $0.updatedAt < $1.updatedAt } }.sorted { $0.agentId < $1.agentId },
                            sessions: sessions.sorted { a, b in
                                if a.isLive != b.isLive { return a.isLive }
@@ -143,12 +144,12 @@ public struct CombinedUsageProvider: UsageProvider {
 
     /// Where each session's tokens went. A finished session is read again only when its counts move; a running one on
     /// every pass, since its sub-agents spend without its own log changing.
-    private func breakdowns(of sessions: [LiveSession]) async -> [String: SessionUsage] {
+    private func breakdowns(of sessions: [LiveSession], reusing: Bool) async -> [String: SessionUsage] {
         let known = await results.breakdowns(generation: await ledger.generation)
         var kept: [String: Results.Breakdown] = [:], requests: [SessionUsageRequest] = []
         for session in sessions {
             let counts = [session.tokensIn, session.tokensOut, session.cacheReadTokens]
-            if !session.isLive, let breakdown = known[session.id], breakdown.counts == counts {
+            if reusing, !session.isLive, let breakdown = known[session.id], breakdown.counts == counts {
                 kept[session.id] = breakdown
             } else {
                 requests.append(SessionUsageRequest(session))

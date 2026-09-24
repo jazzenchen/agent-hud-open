@@ -2,19 +2,23 @@ import AppKit
 import SwiftUI
 import AgentHUDCore
 
-/// One session in the statistics window: what it is, where its tokens went and what the agent last said.
+/// One session in the statistics window: what it is, where its tokens went turn by turn, and what the agent last said.
 struct SessionDetailView: View {
     let session: LiveSession
     let store: UsageStore
     let theme: Theme
+    @State private var inspected: Int?
 
     var body: some View {
         let usage = store.sessionUsage(session)
         VStack(alignment: .leading, spacing: 12) {
             header
             figures(usage)
-            if let usage, !usage.periods.isEmpty { timeline(usage) }
-            if let usage, !usage.models.isEmpty { models(usage) }
+            if let usage {
+                tokens(usage)
+                kinds(usage)
+                if usage.models.count > 1 { models(usage) }
+            }
             if let message = store.sessionMessage(session) { lastMessage(message) }
         }
     }
@@ -65,90 +69,144 @@ struct SessionDetailView: View {
     // MARK: Figures
 
     private func figures(_ usage: SessionUsage?) -> some View {
-        let total = usage?.total ?? .init(tokensIn: session.tokensIn, tokensOut: session.tokensOut, cacheReadTokens: session.cacheReadTokens)
-        let dimensions = store.tokenDimensions
-        return LazyVGrid(columns: [GridItem(.adaptive(minimum: 120), spacing: 12, alignment: .top)], spacing: 12) {
-            figure("Token · " + dimensions.label, total.isEmpty ? "—" : TokenFormat.short(total.count(dimensions)),
-                   note: usage?.subagents.map { L10n.text("含子 agent ", "Sub-agents ") + TokenFormat.short($0.count(dimensions)) }
-                       ?? "In \(TokenFormat.short(total.tokensIn)) · Out \(TokenFormat.short(total.tokensOut))",
-                   help: "In \(total.tokensIn.formatted()) · Out \(total.tokensOut.formatted()) · Cache \(total.cacheReadTokens.formatted())")
-            figure(L10n.text("缓存命中", "Cache hits"), usage?.cacheHitRate.map { TokenFormat.percent($0 * 100) } ?? "—",
-                   note: L10n.text("读取 ", "Read ") + TokenFormat.short(total.cacheReadTokens),
-                   help: L10n.text("缓存读取占输入的比例", "Cache reads as a share of all input"))
-            figure(L10n.text("上下文", "Context"), usage?.contextTokens.map(TokenFormat.short) ?? "—",
-                   note: L10n.text("最近一次调用", "Latest call"),
-                   help: L10n.text("最近一次模型调用的输入：新输入、缓存写入与缓存读取", "The latest model call's input: fresh, cache writes and cache reads"))
-            figure(L10n.text("调用", "Calls"), usage.map { $0.calls.formatted() } ?? "—",
-                   note: usage.map { L10n.text("\($0.models.count) 个模型", $0.models.count == 1 ? "1 model" : "\($0.models.count) models") } ?? "",
-                   help: L10n.text("本机记录的模型调用次数", "Model calls this Mac recorded"))
-            if let share = quotaOrCost {
-                figure(share.title, share.value, note: share.note, help: share.note)
+        let total = usage?.total.kinds ?? TokenKinds(tokensIn: session.tokensIn, tokensOut: session.tokensOut, cacheRead: session.cacheReadTokens)
+        var items: [(title: String, value: String, note: String, help: String)] = [
+            (L10n.text("Token", "Tokens"), total.isEmpty ? "—" : TokenFormat.short(total.total),
+             usage?.subagents.map { L10n.text("含子 agent ", "Sub-agents ") + TokenFormat.short($0.kinds.total) }
+                ?? L10n.text("新增 ", "New ") + TokenFormat.short(total.new),
+             L10n.text("五类合计，含缓存读取", "All five kinds, cache reads included")),
+        ]
+        if let cost {
+            items.append((L10n.text("费用", "Cost"), cost.value, cost.note, cost.help))
+        }
+        if let share = session.pctOfWindow {
+            items.append((L10n.text("额度占比", "Quota share"), TokenFormat.percent1(share), L10n.text("占当前窗口", "Of the current window"),
+                          L10n.text("本会话用掉的当前额度窗口", "What this session used of the current quota window")))
+        }
+        items.append((L10n.text("轮次", "Turns"), usage.flatMap { $0.turnCount > 0 ? $0.turnCount.formatted() : nil } ?? "—",
+                      usage.map { L10n.text("\($0.calls) 次调用", $0.calls == 1 ? "1 call" : "\($0.calls.formatted()) calls") } ?? "",
+                      L10n.text("每个 prompt 开始一轮", "Each prompt starts a turn")))
+        items.append((L10n.text("上下文", "Context"), context(usage), usage?.contextWindow.map { L10n.text("共 ", "Of ") + TokenFormat.short($0) }
+                        ?? L10n.text("最近一次调用", "Latest call"),
+                      L10n.text("最近一次模型调用的输入：新输入、缓存写入与缓存读取", "The latest model call's input: fresh, cache writes and cache reads")))
+        return HStack(alignment: .top, spacing: 0) {
+            ForEach(Array(items.enumerated()), id: \.offset) { index, item in
+                VStack(spacing: 4) {
+                    Text(item.title).font(.ui(10)).foregroundStyle(theme.secondary).lineLimit(1)
+                    Text(item.value).font(.tabular(17, .semibold)).lineLimit(1).minimumScaleFactor(0.7)
+                    Text(item.note).font(.ui(10)).foregroundStyle(theme.secondary).lineLimit(1).minimumScaleFactor(0.8)
+                }
+                .frame(maxWidth: .infinity)
+                .help(item.help)
+                if index < items.count - 1 { Rectangle().fill(theme.divider).frame(width: 1, height: 34).padding(.top, 6) }
             }
         }
+        .card(theme, padding: EdgeInsets(top: 10, leading: 8, bottom: 10, trailing: 8))
     }
 
-    private func figure(_ title: String, _ value: String, note: String, help: String) -> some View {
-        VStack(alignment: .leading, spacing: 5) {
-            Text(title).font(.ui(10)).foregroundStyle(theme.secondary).lineLimit(1)
-            Text(value).font(.tabular(18, .semibold)).lineLimit(1).minimumScaleFactor(0.7)
-            Text(note).font(.ui(10)).foregroundStyle(theme.secondary).lineLimit(1)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .card(theme, padding: EdgeInsets(top: 10, leading: 12, bottom: 10, trailing: 12))
-        .help(help)
+    private func context(_ usage: SessionUsage?) -> String {
+        if let fill = usage?.contextFill { return TokenFormat.percent(fill * 100) }
+        return usage?.contextTokens.map(TokenFormat.short) ?? "—"
     }
 
-    /// Plans show the session's share of its quota window; priced accounts the estimated cost.
-    private var quotaOrCost: (title: String, value: String, note: String)? {
+    /// Priced accounts show their estimated cost; other sessions what their calls would cost at the API's list price.
+    private var cost: (value: String, note: String, help: String)? {
         if let billing = store.report?.billing.first(where: { $0.sessionCosts[session.id] != nil }),
            let cost = billing.estimatedCost(currency: billing.currency, sessionId: session.id) {
-            return (L10n.text("费用估算", "Estimated cost"), MoneyFormat.amount(cost, currency: billing.currency, estimated: true),
-                    L10n.text("本会话", "This session"))
+            return (MoneyFormat.amount(cost, currency: billing.currency, estimated: true), L10n.text("本会话", "This session"),
+                    L10n.text("按账户价格估算的本会话费用", "This session's cost at the account's prices"))
         }
-        return session.pctOfWindow.map {
-            (L10n.text("额度占比", "Quota share"), TokenFormat.percent1($0), L10n.text("占当前窗口", "Of the current window"))
-        }
+        guard let cost = store.sessionUsage(session)?.listCost else { return nil }
+        return ("≈" + MoneyFormat.amount(cost, currency: "USD"), L10n.text("按 API 价", "At API prices"),
+                L10n.text("同样的调用按厂商 API 公开价计算的费用，不是实际扣费", "What the same calls cost at the vendor's API list price; not a charge"))
     }
 
-    // MARK: Timeline
+    // MARK: Tokens
 
-    private func timeline(_ usage: SessionUsage) -> some View {
-        let chart = store.sessionColumns(session, usage: usage)
-        let consumers = chart.agentIds.map(descriptor)
-        let colors = chart.agentIds.map { AgentPalette.swiftUIColor(index: store.consumerPaletteIndex($0)) }
-        return VStack(alignment: .leading, spacing: 6) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(L10n.text("Token 消耗", "Tokens over time")).font(.ui(13, .semibold))
-                Spacer()
-                Text(ChartData.bucketSize(spanning: chart.interval.duration).label).font(.ui(11)).foregroundStyle(theme.secondary)
-            }
-            TokenBarsChart(columns: chart.columns, interval: chart.interval, colors: colors, consumers: consumers, theme: theme)
-                .id([store.tokenDimensions.rawValue, chart.columns.count])
-                .frame(height: 100)
-                .padding(.horizontal, 12)
-                .padding(.top, 12)
-                .zIndex(1)
-            HStack {
-                Text(ChartData.weekdayTime(chart.interval.start))
-                Spacer()
-                Text(session.isLive ? L10n.text("现在", "Now") : ChartData.weekdayTime(chart.interval.end))
+    private func tokens(_ usage: SessionUsage) -> some View {
+        let byTurn = !usage.turns.isEmpty
+        let bars = byTurn ? SessionBar.turns(usage) : SessionBar.periods(usage)
+        let shown = SessionBarsChart.stacked.filter { kind in bars.contains { $0.kinds[kind] > 0 } }
+        let hasContext = bars.contains { $0.context != nil }
+        return VStack(alignment: .leading, spacing: 8) {
+            Text(byTurn ? L10n.text("每轮 Token", "Tokens per turn") : L10n.text("Token 消耗", "Tokens over time")).font(.ui(13, .semibold))
+            HStack(spacing: 12) {
+                ForEach(shown, id: \.self) { kind in
+                    HStack(spacing: 5) {
+                        RoundedRectangle(cornerRadius: 2).fill(theme.kind(kind)).frame(width: 7, height: 7)
+                        Text(kind.label)
+                    }
+                }
+                Spacer(minLength: 8)
+                Text(inspectedText(bars, byTurn: byTurn) ?? L10n.text("悬停查看每一根柱子", "Hover a bar for details"))
+                    .lineLimit(1).truncationMode(.middle)
             }
             .font(.ui(10))
             .foregroundStyle(theme.secondary)
-            .padding(.horizontal, 12)
+            SessionBarsChart(bars: bars, axis: byTurn ? .turn : .time, running: byTurn && store.isSessionLive(session), theme: theme,
+                             inspected: $inspected)
+            if hasContext {
+                HStack(alignment: .firstTextBaseline) {
+                    Text(L10n.text("上下文窗口", "Context window")).font(.ui(12, .semibold))
+                    Spacer()
+                    Text(L10n.text("缓存读取 + 新输入", "Cache read + new input")
+                         + (usage.contextWindow.map { L10n.text(" · 上限 ", " · limit ") + TokenFormat.short($0) } ?? ""))
+                        .font(.ui(10)).foregroundStyle(theme.secondary)
+                }
+                .padding(.top, 8)
+                .topDivider(theme.divider)
+                ContextWindowChart(bars: bars, axis: byTurn ? .turn : .time, window: usage.contextWindow, theme: theme)
+            }
         }
         .card(theme, padding: EdgeInsets(top: 12, leading: 14, bottom: 12, trailing: 14))
+    }
+
+    /// The bar under the pointer: which turn or period, when, and what it added.
+    private func inspectedText(_ bars: [SessionBar], byTurn: Bool) -> String? {
+        guard let index = inspected, bars.indices.contains(index) else { return nil }
+        let bar = bars[index]
+        var parts = [byTurn ? "T\(bar.id)" : nil, ChartData.weekdayTime(bar.start),
+                     L10n.text("新增 ", "New ") + TokenFormat.short(bar.kinds.new)].compactMap { $0 }
+        if byTurn { parts.insert(Countdown.format(max(0, bar.end.timeIntervalSince(bar.start))), at: 2) }
+        if bar.calls > 0 { parts.append(L10n.text("\(bar.calls) 次调用", bar.calls == 1 ? "1 call" : "\(bar.calls) calls")) }
+        if let context = bar.context { parts.append(L10n.text("上下文 ", "Context ") + TokenFormat.short(context)) }
+        if bar.compacted { parts.append(L10n.text("已压缩", "Compacted")) }
+        return parts.joined(separator: " · ")
+    }
+
+    // MARK: Kinds
+
+    private func kinds(_ usage: SessionUsage) -> some View {
+        let total = usage.total.kinds, sum = max(1, total.total)
+        return VStack(spacing: 0) {
+            ForEach(Array(TokenKind.allCases.filter { total[$0] > 0 }.enumerated()), id: \.element) { index, kind in
+                HStack(spacing: 10) {
+                    RoundedRectangle(cornerRadius: 2.5).fill(theme.kind(kind)).frame(width: 9, height: 9)
+                    Text(kind.label).font(.ui(12))
+                    Spacer()
+                    Text(TokenFormat.short(total[kind])).font(.tabular(12, .semibold)).help(total[kind].formatted())
+                    Text(share(total[kind], of: sum)).font(.tabular(11)).foregroundStyle(theme.secondary).frame(width: 40, alignment: .trailing)
+                }
+                .padding(.vertical, 7)
+                .overlay(alignment: .top) { if index > 0 { Rectangle().fill(theme.divider).frame(height: 1) } }
+            }
+        }
+        .card(theme, padding: EdgeInsets(top: 3, leading: 14, bottom: 3, trailing: 14))
+    }
+
+    private func share(_ value: Int, of total: Int) -> String {
+        let fraction = Double(value) / Double(total)
+        return fraction < 0.01 ? "<1%" : TokenFormat.percent(fraction * 100)
     }
 
     // MARK: Models
 
     private func models(_ usage: SessionUsage) -> some View {
-        let dimensions = store.tokenDimensions
-        let total = max(1, usage.total.count(dimensions))
+        let total = max(1, usage.total.kinds.total)
         return VStack(alignment: .leading, spacing: 8) {
             Text(L10n.text("模型", "Models")).font(.ui(13, .semibold))
             ForEach(usage.models, id: \.agentId) { model in
-                let count = model.tokens.count(dimensions)
+                let count = model.tokens.kinds.total
                 let agent = descriptor(model.agentId)
                 HStack(spacing: 8) {
                     Circle().fill(AgentPalette.swiftUIColor(index: store.consumerPaletteIndex(model.agentId))).frame(width: 7, height: 7)
@@ -162,16 +220,16 @@ struct SessionDetailView: View {
                         }
                     }
                     .frame(height: 5)
-                    Text(TokenFormat.percent(Double(count) / Double(total) * 100)).font(.tabular(11)).foregroundStyle(theme.secondary)
+                    Text(share(count, of: total)).font(.tabular(11)).foregroundStyle(theme.secondary)
                         .frame(width: 44, alignment: .trailing)
                     Text(TokenFormat.short(count)).font(.tabular(11)).frame(width: 60, alignment: .trailing)
                 }
                 .font(.ui(12))
-                .help("In \(model.tokens.tokensIn.formatted()) · Out \(model.tokens.tokensOut.formatted()) · Cache \(model.tokens.cacheReadTokens.formatted())")
+                .help(TokenKind.allCases.map { "\($0.label) \(model.tokens.kinds[$0].formatted())" }.joined(separator: " · "))
             }
             if let subagents = usage.subagents {
-                Text(L10n.text("其中子 agent \(TokenFormat.short(subagents.count(dimensions)))，会话列表的合计不含这部分",
-                               "Sub-agents spent \(TokenFormat.short(subagents.count(dimensions))) of this; the session list leaves them out"))
+                Text(L10n.text("其中子 agent \(TokenFormat.short(subagents.kinds.total))，会话列表的合计不含这部分",
+                               "Sub-agents spent \(TokenFormat.short(subagents.kinds.total)) of this; the session list leaves them out"))
                     .font(.ui(10)).foregroundStyle(theme.secondary)
             }
         }

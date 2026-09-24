@@ -78,7 +78,7 @@ enum OpenClawSessions: LocalSessionLayout {
             guard seen.insert(identity).inserted else { return nil }
             // Input excludes cache reads and writes; reasoning is already inside output.
             return ProviderEvent(id: identity, model: name ?? model ?? "Unknown", timestamp: at,
-                                 input: try TokenCount.sum(input, write), output: output, cacheRead: read)
+                                 input: try TokenCount.sum(input, write), output: output, cacheRead: read, cacheWrite: write)
         }
     }
 

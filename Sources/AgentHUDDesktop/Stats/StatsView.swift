@@ -103,19 +103,9 @@ struct StatsView: View {
                 .keyboardShortcut("[", modifiers: .command)
                 .help(L10n.text("回到用量统计", "Back to usage statistics"))
             }
-            HStack(spacing: 10) {
-                ForEach(TokenDimensions.choices, id: \.value) { choice in
-                    Toggle(choice.label, isOn: Binding(
-                        get: { store.tokenDimensions.contains(choice.value) },
-                        set: { if $0 { store.tokenDimensions.insert(choice.value) } else { store.tokenDimensions.remove(choice.value) } }
-                    ))
-                    .toggleStyle(.checkbox)
-                    .controlSize(.small)
-                    .accessibilityLabel(L10n.text("统计维度 \(choice.label)", "Token dimension \(choice.label)"))
-                }
-            }
+            // A session's page shows every kind and its own span, so the kinds, range and column width belong to the overview.
+            if store.focusedSession == nil { dimensions }
             Spacer(minLength: 12)
-            // A session's own span sets its chart, so the range and column width belong to the overview.
             if store.focusedSession == nil {
                 SegmentedPills(
                     options: TokenBucketSize.allCases.map { SegmentOption(value: $0, label: $0.label) },
@@ -132,6 +122,31 @@ struct StatsView: View {
         .padding(EdgeInsets(top: 10, leading: 22, bottom: 10, trailing: 22))
         .background(theme.windowBackground)
         .overlay(alignment: .bottom) { Rectangle().fill(theme.divider).frame(height: 1) }
+    }
+
+    /// Which token kinds the charts count: what calls added, everything, or any kinds picked one by one.
+    private var dimensions: some View {
+        Menu {
+            Toggle(L10n.text("新增 Token（不含缓存读取）", "New tokens (no cache reads)"), isOn: Binding(
+                get: { store.tokenDimensions == .fresh }, set: { if $0 { store.tokenDimensions = .fresh } }))
+            Toggle(L10n.text("全部 Token", "All tokens"), isOn: Binding(
+                get: { store.tokenDimensions == .all }, set: { if $0 { store.tokenDimensions = .all } }))
+            Divider()
+            ForEach(TokenDimensions.choices, id: \.value) { choice in
+                Toggle(choice.label, isOn: Binding(
+                    get: { store.tokenDimensions.contains(choice.value) },
+                    set: { selected in
+                        if selected { store.tokenDimensions.insert(choice.value) }
+                        // At least one kind stays counted.
+                        else if store.tokenDimensions != choice.value { store.tokenDimensions.remove(choice.value) }
+                    }))
+            }
+        } label: {
+            Text("Token · " + store.tokenDimensions.label).font(.ui(12))
+        }
+        .menuStyle(.borderlessButton)
+        .fixedSize()
+        .accessibilityLabel(L10n.text("统计的 Token 种类", "Token kinds counted"))
     }
 
 }

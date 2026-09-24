@@ -11,9 +11,13 @@ public struct DeepSeekTranscript: Codable, Sendable {
         public let input: Int
         public let cachedInput: Int
         public let output: Int
+        /// The part of `input` written to the cache and the part of `output` spent reasoning.
+        public var cacheWrite = 0
+        public var reasoning = 0
 
         public var event: UsageEvent {
-            .init(timestamp: timestamp, agentId: "deepseek-model:\(model)", tokensIn: input, tokensOut: output, cacheReadTokens: cachedInput)
+            .init(timestamp: timestamp, agentId: "deepseek-model:\(model)", tokensIn: input, tokensOut: output, cacheReadTokens: cachedInput,
+                  cacheWriteTokens: cacheWrite, reasoningTokens: reasoning)
         }
     }
 
@@ -37,6 +41,8 @@ public struct DeepSeekTranscript: Codable, Sendable {
     public private(set) var models: Set<String> = []
     private var attempts = 0
     private var seedLength = 0
+    /// Turn starts read since the store last took them.
+    private var marks: [UsageLedger.Mark] = []
     private struct Turn: Codable, Sendable {
         let id: Int
         let startedAt: Date?
@@ -107,6 +113,7 @@ public struct DeepSeekTranscript: Codable, Sendable {
         }
         switch type {
         case "turn/start":
+            if !isSubagent { marks.append(.init(.prompt, at: timestamp)) }
             if let turn = data["turn"] as? Int, !(turns ?? []).contains(where: { $0.id == turn }),
                timestamp >= (turns?.last?.observedAt ?? .distantPast) {
                 turns = Array(((turns ?? []) + [Turn(id: turn, startedAt: timestamp, state: .running, observedAt: timestamp)]).suffix(32))
@@ -145,9 +152,11 @@ public struct DeepSeekTranscript: Codable, Sendable {
                   let turn = data["turn"] as? Int, let step = data["step"] as? Int else { return }
             // Harness already excludes cache hits from inputTokens. Match HUD's fresh-input convention.
             // Reasoning is included in outputTokens; chunks and their final message report one attempt.
-            let sample = Usage(timestamp: timestamp, requestedAt: requestedAt ?? timestamp, provider: provider, model: model,
-                               input: input + max(0, counters["cacheWriteTokens"] as? Int ?? 0),
-                               cachedInput: max(0, counters["cacheReadTokens"] as? Int ?? 0), output: output)
+            let written = max(0, counters["cacheWriteTokens"] as? Int ?? 0)
+            var sample = Usage(timestamp: timestamp, requestedAt: requestedAt ?? timestamp, provider: provider, model: model,
+                               input: input + written, cachedInput: max(0, counters["cacheReadTokens"] as? Int ?? 0), output: output)
+            sample.cacheWrite = written
+            sample.reasoning = max(0, counters["reasoningTokens"] as? Int ?? 0)
             if type != "assistant/attempt", var previous = lastAttempt, previous.turn == turn, previous.step == step {
                 count(previous.sample, sign: -1)
                 previous.sample = sample
@@ -185,8 +194,15 @@ public struct DeepSeekTranscript: Codable, Sendable {
             })
             return UsageLedger.Event(key: key, timestamp: sample.timestamp, agentId: "deepseek-model:\(sample.model)",
                                      tokensIn: sample.input, tokensOut: sample.output, cacheReadTokens: sample.cachedInput,
+                                     cacheWriteTokens: sample.cacheWrite, reasoningTokens: sample.reasoning,
                                      billingID: "DeepSeek", costs: costs)
         }
+    }
+
+    /// Hands over the turn starts read since the last call.
+    mutating func drainMarks() -> [UsageLedger.Mark] {
+        defer { marks = [] }
+        return marks
     }
 
     public var sessionTurns: [SessionTurn] {

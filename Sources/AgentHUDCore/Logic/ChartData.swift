@@ -1,25 +1,36 @@
 import Foundation
 
-/// Independent, additive token dimensions. Input includes cache writes, but never cache reads.
+/// Independent, additive token kinds (`TokenKind`): input and output without the cache writes and reasoning counted
+/// separately, and cache reads.
 public struct TokenDimensions: OptionSet, Hashable, Sendable {
     public let rawValue: Int
     public init(rawValue: Int) { self.rawValue = rawValue }
     public static let input = Self(rawValue: 1)
     public static let output = Self(rawValue: 2)
-    public static let cache = Self(rawValue: 4)
-    public static let fresh: Self = [.input, .output]
-    public static let all: Self = [.input, .output, .cache]
-    public static let choices: [(value: Self, label: String)] = [(.input, "In"), (.output, "Out"), (.cache, "Cache")]
-    public var label: String { Self.choices.filter { contains($0.value) }.map(\.label).joined(separator: " + ") }
+    public static let cacheRead = Self(rawValue: 4)
+    public static let cacheWrite = Self(rawValue: 8)
+    public static let reasoning = Self(rawValue: 16)
+    /// What calls added: everything but cache reads.
+    public static let fresh: Self = [.cacheWrite, .input, .reasoning, .output]
+    public static let all: Self = [.cacheWrite, .input, .reasoning, .output, .cacheRead]
+    public static var choices: [(value: Self, label: String)] { TokenKind.allCases.map { ($0.dimension, $0.label) } }
+    public var label: String {
+        switch self {
+        case .fresh: L10n.text("新增", "New")
+        case .all: L10n.text("全部", "All")
+        default: Self.choices.filter { contains($0.value) }.map(\.label).joined(separator: " + ")
+        }
+    }
+    public func count(_ kinds: TokenKinds) -> Int {
+        TokenKind.allCases.reduce(0) { $0 + (contains($1.dimension) ? kinds[$1] : 0) }
+    }
+    /// For counts without a split: input that includes cache writes, output that includes reasoning.
     public func count(input: Int, output: Int, cache: Int) -> Int {
-        (contains(.input) ? input : 0) + (contains(.output) ? output : 0) + (contains(.cache) ? cache : 0)
+        (isDisjoint(with: [.input, .cacheWrite]) ? 0 : input) + (isDisjoint(with: [.output, .reasoning]) ? 0 : output)
+            + (contains(.cacheRead) ? cache : 0)
     }
-    public func count(_ event: UsageEvent) -> Int {
-        count(input: event.tokensIn, output: event.tokensOut, cache: event.cacheReadTokens)
-    }
-    public func count(_ bucket: UsageBucket) -> Int {
-        count(input: bucket.tokensIn, output: bucket.tokensOut, cache: bucket.cacheReadTokens)
-    }
+    public func count(_ event: UsageEvent) -> Int { count(event.kinds) }
+    public func count(_ bucket: UsageBucket) -> Int { count(bucket.kinds) }
 }
 
 public enum StatsRange: Int, CaseIterable, Sendable, Hashable {
