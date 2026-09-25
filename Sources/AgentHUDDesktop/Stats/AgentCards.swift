@@ -2,14 +2,15 @@ import SwiftUI
 import AgentHUDCore
 
 /// A card per agent for the charted range: its share of the tokens and how they ran over the range, each kind, what they
-/// would cost at API list prices and where that went, then its models and sessions. A menu picks the agents; until picked,
-/// the ones Settings shows.
+/// would cost at API list prices and where that went, then its models and sessions. The agents this Mac has are picked in
+/// a menu, until then the ones Settings shows, and appear in Settings' order.
 struct AgentCards: View {
     let store: UsageStore
     let theme: Theme
     @State private var picking = false
-    /// Cards to a row; a row is as tall as its tallest card.
-    static let columns = 3
+    /// The local sources found, looked for again with each report.
+    @State private var sources: [SourceStatus] = []
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// Models and sessions named on a card at most.
     static let listed = 3
 
@@ -17,36 +18,34 @@ struct AgentCards: View {
         let usage = store.agentUsage, shown = store.shownAgents, dimensions = store.tokenDimensions
         let byVendor = Dictionary(usage.map { ($0.vendor, $0) }, uniquingKeysWith: { first, _ in first })
         let total = usage.reduce(0) { $0 + dimensions.count($1.tokens) }
-        // Agents with tokens in the range, the most first, then shown agents without any.
-        let vendors = usage.map(\.vendor) + shown.subtracting(usage.map(\.vendor)).sorted()
+        let vendors = detected(usage)
+        let cards = (vendors + shown.subtracting(vendors).sorted()).filter(shown.contains)
+        let perRow = Dictionary(uniqueKeysWithValues: Self.rows(cards).flatMap { row in row.map { ($0, row.count) } })
         VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Text(L10n.text("各 Agent", "By agent")).font(.ui(13, .semibold))
                 Spacer()
                 Button { picking.toggle() } label: {
                     HStack(spacing: 4) {
-                        Text(L10n.text("显示 \(vendors.filter(shown.contains).count) 个", "\(vendors.filter(shown.contains).count) shown"))
+                        Text(L10n.text("显示 \(cards.count) 个", "\(cards.count) shown"))
                         Image(systemName: "chevron.down").font(.ui(9, .semibold))
                     }
                 }
                 .buttonStyle(.plain)
                 .font(.ui(11))
                 .foregroundStyle(theme.secondary)
-                .popover(isPresented: $picking, arrowEdge: .bottom) { picker(vendors, usage: byVendor, total: total) }
+                .popover(isPresented: $picking, arrowEdge: .bottom) { picker(vendors, usage: byVendor) }
             }
-            let cards = vendors.filter(shown.contains)
-            VStack(spacing: 12) {
-                ForEach(stride(from: 0, to: cards.count, by: Self.columns).map { Array(cards[$0..<min($0 + Self.columns, cards.count)]) }, id: \.self) { row in
-                    HStack(alignment: .top, spacing: 12) {
-                        ForEach(row, id: \.self) { vendor in
-                            AgentCard(vendor: vendor, usage: byVendor[vendor], total: total, store: store, theme: theme).id(Self.anchor(vendor))
-                        }
-                        ForEach(row.count..<Self.columns, id: \.self) { _ in Color.clear.frame(maxWidth: .infinity, maxHeight: 0) }
-                    }
-                    .fixedSize(horizontal: false, vertical: true)
+            // Each card keeps its place by agent, so picking one fades it in or out and slides the rest into their rows.
+            CardRows(spacing: 12) {
+                ForEach(cards, id: \.self) { vendor in
+                    AgentCard(vendor: vendor, usage: byVendor[vendor], total: total, perRow: perRow[vendor] ?? 1, store: store, theme: theme)
+                        .id(Self.anchor(vendor))
+                        .transition(.opacity)
                 }
             }
         }
+        .task(id: store.report?.generatedAt) { sources = SourceDetector.detect() }
         .onChange(of: store.selectedQuotaId, initial: true) { _, id in
             // A quota event points at its agent's card, which shows even if it was not picked.
             guard let id, let vendor = store.rowGroups.first(where: { $0.rows.contains { $0.id == id } })?.vendor,
@@ -57,13 +56,48 @@ struct AgentCards: View {
 
     static func anchor(_ vendor: String) -> String { "agent-" + vendor }
 
-    private func picker(_ vendors: [String], usage: [String: AgentUsage], total: Int) -> some View {
+    /// Three cards to a row, and two to each of the last two rows where three would leave one alone; a row's cards share
+    /// its width.
+    static func rows<T>(_ cards: [T]) -> [[T]] {
+        var sizes = Array(repeating: 3, count: cards.count / 3)
+        switch cards.count % 3 {
+        case 2: sizes.append(2)
+        case 1 where sizes.isEmpty: sizes.append(1)
+        case 1: sizes.removeLast(); sizes += [2, 2]
+        default: break
+        }
+        var start = 0
+        return sizes.map { size in
+            defer { start += size }
+            return Array(cards[start..<start + size])
+        }
+    }
+
+    /// The agents this Mac has, in the order Settings lists them: a local source found, a quota window read, or tokens in
+    /// the ledger. Supported agents it does not have are left out.
+    private func detected(_ usage: [AgentUsage]) -> [String] {
+        let used = Set(store.consumers.map(\.vendor))
+        let groups = AgentSettingsGroup.make(sources: SourceDetector.resolve(sources, report: store.report),
+                                             agents: store.settings.agents, report: store.report)
+        let found = groups.filter { group in
+            let installed = group.source.map { source in
+                switch source.state {
+                case .notDetected, .needsAuthorization: false
+                case .ready, .installed, .unavailable: true
+                }
+            } ?? false
+            return installed || used.contains(group.id) || group.agents.contains(where: \.connected)
+        }.map(\.id)
+        return found + usage.map(\.vendor).filter { !found.contains($0) }
+    }
+
+    private func picker(_ vendors: [String], usage: [String: AgentUsage]) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             ForEach(vendors, id: \.self) { vendor in
                 Toggle(isOn: Binding(get: { store.shownAgents.contains(vendor) }, set: { on in
                     var picked = store.shownAgents
                     if on { picked.insert(vendor) } else { picked.remove(vendor) }
-                    store.pickedAgents = picked
+                    pick(picked)
                 })) {
                     HStack(spacing: 6) {
                         AgentLogo(vendor: vendor, size: 12)
@@ -76,13 +110,49 @@ struct AgentCards: View {
                 .toggleStyle(.checkbox)
             }
             if store.pickedAgents != nil {
-                Button(L10n.text("恢复为设置里的 agent", "Back to the agents in Settings")) { store.pickedAgents = nil }
+                Button(L10n.text("恢复为设置里的 agent", "Back to the agents in Settings")) { pick(nil) }
                     .buttonStyle(.link).font(.ui(11)).padding(.top, 2)
             }
         }
         .font(.ui(12))
         .padding(14)
         .frame(minWidth: 240)
+    }
+
+    private func pick(_ vendors: Set<String>?) {
+        withAnimation(reduceMotion ? nil : .easeOut(duration: 0.15)) { store.pickedAgents = vendors }
+    }
+}
+
+/// Cards in the rows `AgentCards.rows` makes of them: a row's cards share its width and take its tallest card's height.
+private struct CardRows: Layout {
+    var spacing: CGFloat
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let width = proposal.width ?? 900, heights = rowHeights(width: width, subviews: subviews)
+        return CGSize(width: width, height: heights.reduce(0, +) + spacing * CGFloat(max(0, heights.count - 1)))
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        var y = bounds.minY
+        for (row, height) in zip(AgentCards.rows(Array(subviews.indices)), rowHeights(width: bounds.width, subviews: subviews)) {
+            let width = cardWidth(bounds.width, row.count)
+            for (column, index) in row.enumerated() {
+                subviews[index].place(at: CGPoint(x: bounds.minX + CGFloat(column) * (width + spacing), y: y), anchor: .topLeading,
+                                      proposal: ProposedViewSize(width: width, height: height))
+            }
+            y += height + spacing
+        }
+    }
+
+    private func rowHeights(width: CGFloat, subviews: Subviews) -> [CGFloat] {
+        AgentCards.rows(Array(subviews.indices)).map { row in
+            row.map { subviews[$0].sizeThatFits(ProposedViewSize(width: cardWidth(width, row.count), height: nil)).height }.max() ?? 0
+        }
+    }
+
+    private func cardWidth(_ width: CGFloat, _ count: Int) -> CGFloat {
+        (width - spacing * CGFloat(count - 1)) / CGFloat(count)
     }
 }
 
@@ -91,6 +161,9 @@ private struct AgentCard: View {
     let usage: AgentUsage?
     /// Every agent's tokens of the selected kinds in the range, for this one's share.
     let total: Int
+    /// Cards in this one's row: a wider card lays its kinds out in more columns, and one alone in its row puts its
+    /// sessions beside its models.
+    let perRow: Int
     let store: UsageStore
     let theme: Theme
     @State private var showsBilling = false
@@ -111,19 +184,31 @@ private struct AgentCard: View {
                         Text(dimensions.label).font(.ui(11)).foregroundStyle(theme.secondary)
                     }
                     Spacer(minLength: 6)
-                    Sparkline(values: store.agentSeries(vendor), color: accent).frame(maxWidth: 110).frame(height: 28)
+                    Sparkline(values: store.agentSeries(vendor), color: accent).frame(maxWidth: CGFloat(330 / perRow)).frame(height: 28)
                 }
                 kinds(usage)
                 if let note = moneyNote(usage) { Text(note).font(.ui(11)).foregroundStyle(theme.secondary).lineLimit(1) }
                 if let billing { balance(billing) }
-                models(usage)
-                Rectangle().fill(theme.divider).frame(height: 1)
-                sessions(usage, count: count)
+                if perRow == 1 {
+                    HStack(alignment: .top, spacing: 16) {
+                        models(usage)
+                        Rectangle().fill(theme.divider).frame(width: 1)
+                        sessions(usage, count: count)
+                    }
+                } else {
+                    models(usage)
+                    Rectangle().fill(theme.divider).frame(height: 1)
+                    sessions(usage, count: count)
+                }
             } else {
-                // Nothing in the range: the agent is named, and an API account still shows its balance.
+                // Nothing in the range: the agent is named, and an API account still shows its balance, in whatever height
+                // its row gives it.
                 header(share: nil)
-                Text(L10n.text("此时段没有用量", "No usage in this range")).foregroundStyle(theme.secondary)
-                if let billing { balance(billing) }
+                VStack(spacing: 6) {
+                    Text(L10n.text("此时段没有用量", "No usage in this range")).foregroundStyle(theme.secondary)
+                    if let billing { balance(billing) }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
         .font(.ui(12))
@@ -158,18 +243,19 @@ private struct AgentCard: View {
             (L10n.text("缓存读", "Cache read"), value(kinds.cacheRead)),
             (L10n.text("费用", "Cost"), usage.cost?.text ?? "—"),
         ]
+        let columns = 6 / perRow
         return Grid(alignment: .leading, horizontalSpacing: 14, verticalSpacing: 6) {
-            ForEach(0..<3, id: \.self) { row in
+            ForEach(0..<cells.count / columns, id: \.self) { row in
                 GridRow {
-                    ForEach(0..<2, id: \.self) { column in
-                        let cell = cells[row * 2 + column]
+                    ForEach(0..<columns, id: \.self) { column in
+                        let cell = cells[row * columns + column]
                         HStack(spacing: 6) {
                             Text(cell.0).font(.ui(11)).foregroundStyle(theme.secondary).lineLimit(1)
                             Spacer(minLength: 0)
                             Text(cell.1).font(.tabular(13, .semibold)).lineLimit(1).minimumScaleFactor(0.8)
                         }
                         .frame(maxWidth: .infinity)
-                        .help(row == 2 && column == 1 ? L10n.text("按厂商 API 公开价折合，含缓存读取", "At the vendors' API list prices, cache reads included") : "")
+                        .help(row * columns + column == cells.count - 1 ? L10n.text("按厂商 API 公开价折合，含缓存读取", "At the vendors' API list prices, cache reads included") : "")
                     }
                 }
             }

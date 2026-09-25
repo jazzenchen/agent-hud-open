@@ -106,7 +106,7 @@ public final class UsageStore {
     public private(set) var statsRange: StatsRange = .hours24
     public var tokenBucketSize: TokenBucketSize = .hour1
     public var tokenDimensions: TokenDimensions = .fresh
-    /// The agents whose cards the Tokens page shows, once picked there; until then the ones Settings shows.
+    /// The agents whose cards the Tokens page shows, once picked there; until then the ones Settings shows that this Mac has.
     public var pickedAgents: Set<String>?
     /// Keep every selectable range ready, including the partial hour at the start of the rolling window.
     public static var historyHours: Int { StatsRange.days7.hours + 1 }
@@ -553,8 +553,8 @@ public final class UsageStore {
                             bucketSize: tokenBucketSize, now: dataDate, dimensions: tokenDimensions).map(\.total)
     }
 
-    /// The agents the Tokens page shows cards for: the ones picked there, or the vendors Settings shows.
-    public var shownAgents: Set<String> { pickedAgents ?? Set(enabledAgents.map(\.vendor)) }
+    /// The agents the Tokens page shows cards for: the ones picked there, or the vendors Settings shows that this Mac has.
+    public var shownAgents: Set<String> { pickedAgents ?? Set(enabledAgents.filter(\.connected).map(\.vendor)) }
 
     /// What the charted tokens of the selected kinds would cost at list price, counted as the chart counts them, each
     /// model on its client's platform and DeepSeek's peak hours at its peak rates.
