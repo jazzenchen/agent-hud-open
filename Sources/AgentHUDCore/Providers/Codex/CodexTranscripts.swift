@@ -274,6 +274,8 @@ public actor CodexTranscriptStore {
                              indexURL: directory.appendingPathComponent("session_index.jsonl"), ledger: ledger, watchesChanges: true)
     }
 
+    public func fileChanges(_ paths: Set<String>?) { logs.noteChanges(paths) }
+
     /// Codex's 15-minute token totals from the period holding `since`.
     public func usage(since: Date) async -> [UsageBucket] {
         (try? await ledger.buckets(since: since, source: CodexRollouts.source)) ?? []

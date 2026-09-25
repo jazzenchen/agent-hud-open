@@ -52,6 +52,7 @@ public actor CodexUsageProvider: UsageProvider, LedgerRecording {
     }
 
     public nonisolated var watchedDirectories: [URL]? { transcripts.roots }
+    public func fileChanges(_ paths: Set<String>?) async { await transcripts.fileChanges(paths) }
     // Pi and other clients can spend the same account without writing Codex rollouts.
     public nonisolated var seesLocalWork: Bool { false }
 

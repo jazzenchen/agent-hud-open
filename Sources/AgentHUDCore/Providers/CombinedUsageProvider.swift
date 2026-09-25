@@ -77,6 +77,10 @@ public struct CombinedUsageProvider: UsageProvider {
         vendors.map { UsageSource(name: $0.vendor, directories: $0.provider.watchedDirectories, accountSteps: $0.provider.accountRefreshSteps) }
     }
 
+    public func fileChanges(_ paths: Set<String>?) async {
+        for source in vendors { await source.provider.fileChanges(paths) }
+    }
+
     public func fetchUsage(agents: [AgentDescriptor], historyHours: Int) async throws -> UsageReport {
         try await fetchUsage(agents: agents, historyHours: historyHours, sources: nil)
     }

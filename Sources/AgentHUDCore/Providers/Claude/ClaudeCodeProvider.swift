@@ -49,6 +49,7 @@ public struct ClaudeCodeProvider: UsageProvider, LedgerRecording {
     }
 
     public var watchedDirectories: [URL]? { transcripts.roots + [AttentionHooks.directory] }
+    public func fileChanges(_ paths: Set<String>?) async { await transcripts.fileChanges(paths) }
 
     private func account(for reading: EngineUsageCache.Reading) -> ProviderAccount {
         reading.identity?.account ?? .unresolved(provider: "Claude", home: home)

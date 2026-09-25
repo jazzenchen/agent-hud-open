@@ -32,6 +32,10 @@ public protocol UsageProvider: Sendable {
     /// Reads the named sources again and keeps every other source's last result; nil reads every source.
     func fetchUsage(agents: [AgentDescriptor], historyHours: Int, sources: Set<String>?) async throws -> UsageReport
 
+    /// File paths observed by the collector before a read. Nil means its watch lost events, so a file-backed source
+    /// must enumerate again. Providers without an incremental file index ignore this.
+    func fileChanges(_ paths: Set<String>?) async
+
     /// When each source's last result changes with time alone, such as a live session that stops being live after a quiet
     /// interval. The collector reads a source again when one of its times passes; a source without times is left alone.
     func sourceChecks() async -> [String: [Date]]
@@ -74,6 +78,7 @@ extension UsageProvider {
     public func fetchUsage(agents: [AgentDescriptor], historyHours: Int, sources: Set<String>?) async throws -> UsageReport {
         try await fetchUsage(agents: agents, historyHours: historyHours)
     }
+    public func fileChanges(_ paths: Set<String>?) async {}
     public func sourceChecks() async -> [String: [Date]] { [:] }
     public func accountChecks(since: [String: Date], now: Date) async -> [String: Date] { [:] }
     public var seesLocalWork: Bool { true }

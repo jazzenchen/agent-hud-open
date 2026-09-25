@@ -21,9 +21,13 @@ final class LogFiles {
     private let limit: Int
     private let skips: (URL) -> Bool
     private let accepts: (URL) -> Bool
-    private let monitor: FileChangeMonitor?
+    private var monitor: FileChangeMonitor?
     private(set) var files: [String: File] = [:]
     private var scannedAt: Date?
+    /// The outer collector's event paths. Once it supplies them, it owns the watch for this listing; its paths must
+    /// reach the index even when this listing's independent FSEvents stream has not delivered the same event yet.
+    private var usesExternalChanges = false
+    private var reportedPaths: Set<String>? = []
 
     /// - limit: entries a full listing visits before it stops.
     /// - skips: an entry the listing neither accepts nor descends into.
@@ -36,12 +40,35 @@ final class LogFiles {
         monitor = watchesChanges ? FileChangeMonitor(directories: roots) : nil
     }
 
+    /// Called before a collection read with paths from the collector's watch. Nil means events were dropped and a full
+    /// listing is required. Repeated signals accumulate until the next read.
+    func noteChanges(_ paths: Set<String>?) {
+        usesExternalChanges = true
+        monitor = nil
+        if let paths, reportedPaths != nil { reportedPaths?.formUnion(paths.filter { canonical($0) != nil }) }
+        else { reportedPaths = nil }
+    }
+
     /// Brings `files` up to date.
     @discardableResult
     func refresh(now: Date) -> Gaps {
-        monitor?.update()
-        let changed = monitor?.consumePaths()
+        let changed: Set<String>?
+        if usesExternalChanges {
+            changed = reportedPaths
+            reportedPaths = []
+        } else {
+            monitor?.update()
+            changed = monitor?.consumePaths()
+        }
         if let changed, let scannedAt, now.timeIntervalSince(scannedAt) < Self.fullScanInterval {
+            // FSEvents can name a directory when it is created or removed. Its children cannot be inferred from that
+            // one path; enumerate once so new rollouts and deleted subtrees are both reflected.
+            if changed.contains(where: { path in
+                guard let path = canonical(path) else { return false }
+                var directory: ObjCBool = false
+                return (FileManager.default.fileExists(atPath: path, isDirectory: &directory) && directory.boolValue)
+                    || files.keys.contains(where: { $0.hasPrefix(path + "/") })
+            }) { return scan(now: now) }
             for path in changed.compactMap(canonical) {
                 let url = URL(fileURLWithPath: path)
                 guard accepts(url) else { continue }
@@ -96,9 +123,11 @@ final class LogFiles {
     /// Change events can name a root by its resolved path; files are keyed as the listing names them.
     private func canonical(_ path: String) -> String? {
         for root in roots {
-            if path.hasPrefix(root.path + "/") { return path }
+            if path == root.path || path.hasPrefix(root.path + "/") { return path }
             let resolved = root.resolvingSymlinksInPath().path
-            if resolved != root.path, path.hasPrefix(resolved + "/") { return root.path + path.dropFirst(resolved.count) }
+            if resolved != root.path, path == resolved || path.hasPrefix(resolved + "/") {
+                return root.path + path.dropFirst(resolved.count)
+            }
         }
         return nil
     }

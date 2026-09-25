@@ -219,6 +219,20 @@ final class UsageRefreshTests: XCTestCase, @unchecked Sendable {
         XCTAssertFalse(monitor.consumeChanges())
     }
 
+    func testMissingWatchRootPollsUntilItAppears() throws {
+        let parent = FileManager.default.temporaryDirectory.appendingPathComponent("agenthud-watch-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: parent, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: parent) }
+        let missing = parent.appendingPathComponent("sessions")
+        let monitor = FileChangeMonitor(directories: [missing])
+        XCTAssertFalse(monitor.isWatching)
+        XCTAssertNil(monitor.consumePaths(), "without a stream, callers must reconcile on each poll")
+        try FileManager.default.createDirectory(at: missing, withIntermediateDirectories: true)
+        monitor.update()
+        XCTAssertTrue(monitor.isWatching)
+        XCTAssertNil(monitor.consumePaths(), "starting the watch calls for one full listing")
+    }
+
     func testAccountResultAppearsOnNextLocalPollWithItsObservationTime() async throws {
         let now = Date(timeIntervalSince1970: 1_800_000_000)
         let gate = AsyncStream<Void>.makeStream()

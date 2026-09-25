@@ -85,9 +85,8 @@ final class UsageCollector {
                     do { try await Task.sleep(for: .seconds(pause)) } catch { return }
                     continuation.yield()
                 }
-                let woke = await wakes.next()
+                guard await wakes.next() != nil else { timer.cancel(); return }
                 timer.cancel()
-                if woke == nil { return }
             }
         }
     }
@@ -103,6 +102,8 @@ final class UsageCollector {
     }
 
     func refresh() async {
+        // An explicit refresh is also a request to reconcile files even if a directory event is still in flight.
+        await provider.fileChanges(nil)
         needsFetch = true
         _ = await collect(force: true)
         wake?.yield()
@@ -174,6 +175,7 @@ final class UsageCollector {
             }.flatMap { source in source.accountSteps.map { (source.name, $0) } }
         }
         await gatherSignals(at: started)
+        if changes?.isWatching == false { await provider.fileChanges(nil) }
         let spacing = force ? 0 : fetchedAt.map { UsageRefresh.readSpacing - started.timeIntervalSince($0) } ?? 0
         if needsFetch || !signalled.isEmpty {
             if spacing <= 0 {
@@ -204,7 +206,15 @@ final class UsageCollector {
             needsFetch = true
         }
         if let changes, changes.isWatching {
-            if let paths = changes.consumePaths() { signalled.formUnion(owners(of: paths)) } else { needsFetch = true }
+            if let paths = changes.consumePaths() {
+                if !paths.isEmpty {
+                    await provider.fileChanges(paths)
+                    signalled.formUnion(owners(of: paths))
+                }
+            } else {
+                await provider.fileChanges(nil)
+                needsFetch = true
+            }
         }
         for source in polledSources where readAt[source].map({ date.timeIntervalSince($0) >= UsageRefresh.pollInterval }) ?? true {
             signalled.insert(source)

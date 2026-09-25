@@ -76,6 +76,34 @@ final class CodexProviderTests: XCTestCase {
         }
     }
 
+    func testCollectorPathUpdatesCodexIndexBeforeItsOwnFileWatchDelivers() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("codex-paths-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let file = directory.appendingPathComponent("rollout-test.jsonl")
+        let store = CodexTranscriptStore(roots: [directory], watchesChanges: true)
+        let initial = await store.index(since: .distantPast)
+        XCTAssertTrue(initial.sessions.isEmpty)
+
+        let meta = #"{"timestamp":"2026-09-25T02:00:00Z","type":"session_meta","payload":{"id":"s","cwd":"/project","source":"cli"}}"#
+        let started = #"{"timestamp":"2026-09-25T02:00:01Z","type":"event_msg","payload":{"type":"task_started","turn_id":"t1"}}"#
+        let completed = #"{"timestamp":"2026-09-25T02:00:02Z","type":"event_msg","payload":{"type":"task_complete","turn_id":"t1"}}"#
+        try Data((meta + "\n" + started + "\n").utf8).write(to: file)
+        await store.fileChanges([directory.path])
+        let running = await store.index(since: .distantPast)
+        XCTAssertEqual(running.sessions.first?.transcript.sessionTurns.last?.state, .running,
+                       "a directory event from the outer collector discovers a new rollout immediately")
+
+        let handle = try FileHandle(forWritingTo: file)
+        try handle.seekToEnd()
+        try handle.write(contentsOf: Data((completed + "\n").utf8))
+        try handle.close()
+        await store.fileChanges([file.path])
+        let done = await store.index(since: .distantPast)
+        XCTAssertEqual(done.sessions.first?.transcript.sessionTurns.last?.state, .completed,
+                       "the collector's path reaches the index even before its own watcher reports the append")
+    }
+
     func testForkHistoryIsDeduplicatedButInternalModelUsageIsIncluded() {
         var t = CodexTranscript()
         ingest(&t, type: "session_meta", payload: ["id":"child", "timestamp":"2026-09-07T09:00:00Z", "source":["subagent":["thread_spawn":["parent_thread_id":"parent"]]]])

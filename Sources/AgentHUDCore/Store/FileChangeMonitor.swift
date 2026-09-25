@@ -34,8 +34,8 @@ final class FileChangeMonitor {
         update()
     }
 
-    /// False when the event stream could not be created, so changes cannot be seen and sources must be read on a schedule.
-    var isWatching: Bool { watched != nil }
+    /// False when no watched directory exists or the stream could not be created, so sources must be read on a schedule.
+    var isWatching: Bool { watched.map { !$0.isEmpty } ?? false }
 
     deinit { stopStream() }
 
@@ -94,7 +94,7 @@ final class FileChangeMonitor {
             state.paths = []
             return changed
         }
-        return changed || watched == nil
+        return changed || !isWatching
     }
 
     /// Files reported since the previous call, or nil when a full scan is needed: the first call, dropped events,
@@ -106,7 +106,7 @@ final class FileChangeMonitor {
             state.paths = []
             return paths
         }
-        return watched == nil ? nil : paths
+        return isWatching ? paths : nil
     }
 
     private func stopStream() {

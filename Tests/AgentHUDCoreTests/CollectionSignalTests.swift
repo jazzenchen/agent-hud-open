@@ -7,11 +7,13 @@ final class CollectionSignalTests: XCTestCase, @unchecked Sendable {
         nonisolated let watchedDirectories: [URL]?
         private let sessions: [LiveSession]
         private(set) var fetches = 0
+        private(set) var changedPaths: [Set<String>?] = []
         init(directory: URL?, sessions: [LiveSession] = []) {
             watchedDirectories = directory.map { [$0] }
             self.sessions = sessions
         }
         nonisolated var accountRefreshSteps: [AccountRefreshStep] { [] }
+        func fileChanges(_ paths: Set<String>?) async { changedPaths.append(paths) }
         func fetchUsage(agents: [AgentDescriptor], historyHours: Int) async throws -> UsageReport {
             fetches += 1
             return UsageReport(generatedAt: Date(), snapshots: [], sessions: sessions)
@@ -58,9 +60,14 @@ final class CollectionSignalTests: XCTestCase, @unchecked Sendable {
         XCTAssertTrue(initial, "the first pass reads every source")
         XCTAssertNotNil(store.report)
         try await Task.sleep(for: .seconds(1.5))
-        try Data("{}\n".utf8).write(to: first.appendingPathComponent("session.jsonl"))
+        let changedFile = first.appendingPathComponent("session.jsonl")
+        try Data("{}\n".utf8).write(to: changedFile)
         let read = try await wait { await a.fetches >= 2 }
         XCTAssertTrue(read, "a change under A's directory reads A")
+        let signalled = await a.changedPaths
+        XCTAssertTrue(signalled.contains { paths in
+            paths?.contains(where: { $0.hasSuffix("/session.jsonl") }) == true
+        }, "the collector hands the affected path to the source before it reads")
         let others = await b.fetches
         XCTAssertEqual(others, 1, "B keeps its last result")
     }

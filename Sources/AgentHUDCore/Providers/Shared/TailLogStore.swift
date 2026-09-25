@@ -79,6 +79,8 @@ final class TailLogStore<Log: TailLog> {
         files = LogFiles(roots: roots, watchesChanges: watchesChanges, accepts: accepts)
     }
 
+    func noteChanges(_ paths: Set<String>?) { files.noteChanges(paths) }
+
     func entry(_ path: String) -> Entry? {
         if let entry = entries[path] { return entry }
         guard let file = stored.removeValue(forKey: path), let entry = Self.entry(file) else { return nil }

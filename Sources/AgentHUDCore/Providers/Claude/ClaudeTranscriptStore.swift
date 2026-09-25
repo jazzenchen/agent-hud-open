@@ -48,6 +48,8 @@ public actor ClaudeTranscriptStore {
         self.init(roots: [root])
     }
 
+    public func fileChanges(_ paths: Set<String>?) { logs.noteChanges(paths) }
+
     /// Sessions whose transcript file was modified at or after `cutoff`. Blocks until the index is complete.
     public func sessions(modifiedSince cutoff: Date) async -> [TranscriptSession] {
         await index(modifiedSince: cutoff, timeBudget: .infinity).sessions
