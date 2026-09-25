@@ -9,6 +9,8 @@ struct StatsView: View {
     var onIdealHeightChange: ((CGFloat) -> Void)?
     @Environment(\.colorScheme) private var scheme
     @State private var sessionSource: SessionSource?
+    /// The Sessions page lists only the sessions active in the last day, without days.
+    @State private var activeOnly = false
 
     var body: some View {
         let theme = Theme.forScheme(scheme)
@@ -69,7 +71,7 @@ struct StatsView: View {
                 if let session = store.focusedSession {
                     SessionDetailView(session: session, store: store, theme: theme)
                 } else {
-                    SessionList(store: store, theme: theme, source: sessionSource)
+                    SessionList(store: store, theme: theme, source: sessionSource, activeOnly: activeOnly)
                 }
             }
         }
@@ -123,7 +125,6 @@ struct StatsView: View {
                     selection: Binding(get: { store.statsRange }, set: { store.setStatsRange($0) }),
                     theme: theme
                 )
-            // A session's page shows every kind, so the kinds menu belongs to the list.
             case .sessions where store.focusedSession != nil:
                 Button {
                     store.focusedSessionID = nil
@@ -136,7 +137,12 @@ struct StatsView: View {
                 .help(L10n.text("回到会话列表", "Back to the session list"))
                 Spacer(minLength: 12)
             case .sessions:
-                dimensions
+                Toggle(L10n.text("只看活跃", "Active only"), isOn: $activeOnly.animation(.easeOut(duration: 0.15)))
+                    .toggleStyle(.switch)
+                    .controlSize(.mini)
+                    .font(.ui(12))
+                    .help(L10n.text("只列近 24 小时有活动的会话，不按日期分组", "Only the sessions active in the last 24 hours, without days"))
+                    .accessibilityIdentifier("sessions-active-only")
                 Spacer(minLength: 12)
                 sessionCount(theme)
                 SelectionMenu(
@@ -160,12 +166,12 @@ struct StatsView: View {
     }
 
     private func sessionCount(_ theme: Theme) -> some View {
-        let sessions = store.statsSessions.filter { sessionSource == nil || store.sessionSource($0) == sessionSource }
+        let sessions = store.listedSessions(source: sessionSource, activeOnly: activeOnly)
         let running = sessions.filter(store.isSessionLive).count
         return HStack(spacing: 6) {
             Circle().fill(running > 0 ? theme.status(.ok) : theme.tertiary).frame(width: 6, height: 6)
-            Text(L10n.text("近 7 天 \(sessions.count) 个 · \(running) 个运行中",
-                           "\(sessions.count) in 7 days · \(running) running"))
+            Text(activeOnly ? L10n.text("近 24 小时 \(sessions.count) 个 · \(running) 个运行中", "\(sessions.count) in 24 hours · \(running) running")
+                            : L10n.text("近 7 天 \(sessions.count) 个 · \(running) 个运行中", "\(sessions.count) in 7 days · \(running) running"))
         }
         .font(.ui(11))
         .foregroundStyle(theme.secondary)

@@ -1,41 +1,52 @@
+import AppKit
 import SwiftUI
 import AgentHUDCore
 
 /// The Sessions page: every session of the last seven days under the day it started on, newest first, below today's
 /// totals. Today and any day with a session still running are open; the other days fold to their totals until clicked.
+/// Sessions that started before the seven days share one Earlier group. Active only drops the days: it lists the sessions
+/// active in the last day, newest activity first. Each session reads as it does in the phone's list.
 struct SessionList: View {
     let store: UsageStore
     let theme: Theme
     let source: SessionSource?
+    let activeOnly: Bool
     /// Days the user opened or closed against how they start.
     @State private var flipped: Set<Date> = []
 
     var body: some View {
-        let sessions = store.statsSessions.filter { source == nil || store.sessionSource($0) == source }
-        let days = store.sessionsByDay(sessions)
+        let sessions = store.listedSessions(source: source, activeOnly: activeOnly)
         let calendar = Calendar.current, today = calendar.startOfDay(for: store.now)
-        VStack(alignment: .leading, spacing: 12) {
-            if let first = days.first, first.day == today {
-                SessionsTodayCard(sessions: first.sessions, store: store, theme: theme)
+        let started = sessions.filter { $0.startedAt >= today }
+        VStack(alignment: .leading, spacing: 0) {
+            if !started.isEmpty {
+                SessionsTodayCard(sessions: started, store: store, theme: theme).padding(.bottom, 18)
             }
-            ForEach(days, id: \.day) { day in
-                let running = day.sessions.filter(store.isSessionLive).count
-                let open = (day.day == today || running > 0) != flipped.contains(day.day)
-                VStack(alignment: .leading, spacing: 6) {
-                    dayHeader(day.day, sessions: day.sessions, running: running, open: open, today: today, calendar: calendar)
-                    if open {
-                        header
-                        LazyVStack(spacing: 4) {
-                            ForEach(day.sessions) { session in
-                                SessionRow(session: session, store: store, theme: theme)
-                            }
-                        }
+            if activeOnly {
+                if !sessions.isEmpty {
+                    HStack(alignment: .firstTextBaseline) {
+                        Text(L10n.text("近 24 小时", "Last 24 hours")).font(.ui(13, .semibold)).foregroundStyle(theme.text)
+                        Spacer(minLength: 8)
+                        Text(L10n.text("每轮 Token", "Tokens per turn")).font(.ui(11))
                     }
+                    .foregroundStyle(theme.secondary)
+                    .padding(.horizontal, 14)
+                    .padding(.bottom, 6)
+                    cards(sessions)
                 }
-                .card(theme, padding: EdgeInsets(top: 10, leading: 14, bottom: open ? 10 : 8, trailing: 14))
+            } else {
+                let groups = Self.groups(sessions, store: store, today: today, calendar: calendar)
+                ForEach(Array(groups.enumerated()), id: \.element.day) { index, group in
+                    let running = group.sessions.filter(store.isSessionLive).count
+                    let open = (group.day == today || running > 0) != flipped.contains(group.day)
+                    dayHeader(group.day, sessions: group.sessions, running: running, open: open, notesTurns: index == 0,
+                              today: today, calendar: calendar)
+                    if open { cards(group.sessions) }
+                }
             }
             if sessions.isEmpty {
-                Text(L10n.text("近 7 天没有会话", "No sessions in the last 7 days"))
+                Text(activeOnly ? L10n.text("近 24 小时没有活跃的会话", "No sessions active in the last 24 hours")
+                                : L10n.text("近 7 天没有会话", "No sessions in the last 7 days"))
                     .font(.ui(12)).foregroundStyle(theme.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .card(theme)
@@ -43,64 +54,80 @@ struct SessionList: View {
         }
     }
 
+    /// The named days, newest first, then Earlier, keyed by the distant past, for the sessions that started before them.
+    static func groups(_ sessions: [LiveSession], store: UsageStore, today: Date, calendar: Calendar) -> [(day: Date, sessions: [LiveSession])] {
+        let first = calendar.date(byAdding: .day, value: -6, to: today)!
+        let earlier = sessions.filter { $0.startedAt < first }
+        return store.sessionsByDay(sessions.filter { $0.startedAt >= first }, calendar: calendar)
+            + (earlier.isEmpty ? [] : [(day: Date.distantPast, sessions: earlier)])
+    }
+
+    /// Sessions in one card, each opening its page.
+    private func cards(_ sessions: [LiveSession]) -> some View {
+        LazyVStack(spacing: 0) {
+            ForEach(Array(sessions.enumerated()), id: \.element.id) { position, session in
+                SessionCard(session: session, store: store, theme: theme)
+                    .overlay(alignment: .top) { if position > 0 { Rectangle().fill(theme.divider).frame(height: 1) } }
+            }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .card(theme, padding: EdgeInsets())
+        .padding(.bottom, 18)
+    }
+
     /// The day's name and count, and while it is folded what its sessions spent; a click folds or opens it.
-    private func dayHeader(_ day: Date, sessions: [LiveSession], running: Int, open: Bool, today: Date, calendar: Calendar) -> some View {
+    private func dayHeader(_ day: Date, sessions: [LiveSession], running: Int, open: Bool, notesTurns: Bool, today: Date,
+                           calendar: Calendar) -> some View {
         Button {
             withAnimation(.easeOut(duration: 0.15)) { flipped.formSymmetricDifference([day]) }
         } label: {
             HStack(alignment: .firstTextBaseline, spacing: 6) {
                 Image(systemName: "chevron.right")
                     .font(.system(size: 9, weight: .semibold))
-                    .foregroundStyle(theme.secondary)
                     .rotationEffect(.degrees(open ? 90 : 0))
                     .frame(width: 10)
-                Text(Self.title(day, today: today, calendar: calendar)).font(.ui(13, .semibold))
-                Text("\(sessions.count)").font(.tabular(11)).foregroundStyle(theme.secondary)
+                Text(Self.title(day, today: today, calendar: calendar)).font(.ui(13, .semibold)).foregroundStyle(theme.text)
+                Text("\(sessions.count)").font(.tabular(11))
                 if running > 0 {
                     Text(L10n.text("\(running) 个运行中", "\(running) running")).font(.ui(11)).foregroundStyle(theme.status(.ok))
                 }
                 Spacer(minLength: 8)
                 if !open {
                     if let costs = SessionsTodayCard.costs(sessions, store: store) {
-                        Text(costs).font(.tabular(11)).foregroundStyle(theme.secondary)
+                        Text(costs).font(.tabular(11))
                     }
-                    Text(sessions.contains(where: \.hasTokenCounts)
-                         ? TokenFormat.short(sessions.reduce(0) { $0 + store.tokenDimensions.count(store.sessionOwnTokens($1)) }) : "—")
-                        .font(.tabular(11))
-                        .frame(minWidth: 50, alignment: .trailing)
-                        .help("Token · " + store.tokenDimensions.label)
+                    let tokens = sessions.reduce(0) { $0 + store.sessionTokens($1).total }
+                    Text(tokens > 0 ? TokenFormat.short(tokens) : "—")
+                        .font(.tabular(11, .semibold)).foregroundStyle(theme.text)
+                        .frame(minWidth: 44, alignment: .trailing)
+                } else if notesTurns {
+                    Text(L10n.text("每轮 Token", "Tokens per turn")).font(.ui(11))
+                }
+            }
+            .foregroundStyle(theme.secondary)
+            .padding(.horizontal, 14)
+            .padding(.vertical, open ? 0 : 9)
+            .background {
+                if !open {
+                    RoundedRectangle(cornerRadius: 10).fill(theme.card)
+                        .overlay(RoundedRectangle(cornerRadius: 10).stroke(theme.cardBorder, lineWidth: 1))
                 }
             }
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .padding(.bottom, open ? 6 : 8)
         .accessibilityLabel(Self.title(day, today: today, calendar: calendar))
         .accessibilityValue(open ? L10n.text("已展开", "Expanded") : L10n.text("已折叠", "Collapsed"))
     }
 
-    /// Today, yesterday, then the weekday and date.
+    /// Today, yesterday, then the weekday and date; Earlier for the sessions that started before the named days.
     static func title(_ day: Date, today: Date, calendar: Calendar) -> String {
         if day == today { return L10n.text("今天", "Today") }
         if day == calendar.date(byAdding: .day, value: -1, to: today) { return L10n.text("昨天", "Yesterday") }
+        if day == .distantPast { return L10n.text("更早", "Earlier") }
         return day.formatted(.dateTime.weekday(.wide).month(.wide).day()
             .locale(Locale(identifier: L10n.resolved == .zhHans ? "zh_CN" : "en_GB")))
-    }
-
-    private var header: some View {
-        HStack(spacing: 12) {
-            Color.clear.frame(width: 8, height: 1)
-            Text("Agent").frame(width: 130, alignment: .leading)
-            Text(L10n.text("任务 · 项目", "Task · project")).frame(maxWidth: .infinity, alignment: .leading)
-            Text(L10n.text("状态 · 轮次", "Status · turns")).frame(width: 112, alignment: .leading)
-            Text(L10n.text("额度 / 费用", "Quota / cost")).frame(width: 70, alignment: .trailing)
-            Text("Token · " + store.tokenDimensions.label)
-                .lineLimit(1).minimumScaleFactor(0.8)
-                .frame(width: 130, alignment: .trailing)
-                .help(L10n.text("Token 为会话本身的累计，不含子 agent", "Tokens are the session's own totals, sub-agents not included"))
-        }
-        .font(.ui(10))
-        .foregroundStyle(theme.secondary)
-        .padding(.horizontal, 10)
     }
 }
 
@@ -183,78 +210,65 @@ struct SessionsTodayCard: View {
     }
 }
 
-struct SessionRow: View {
+/// One session as the phone lists it: its state, title and tokens with sub-agents'; model, project and cost; each recent
+/// turn's new tokens; its state, turns and how long the turn has run or how long ago it was active, and how full its
+/// context is. A click opens its page.
+struct SessionCard: View {
     let session: LiveSession
     let store: UsageStore
     let theme: Theme
     @State private var hovered = false
 
     var body: some View {
-        let dotColor = store.isSessionWaiting(session) ? theme.status(.warning)
-            : store.isSessionLive(session) ? AgentPalette.swiftUIColor(index: store.consumerPaletteIndex(session.agentId))
-            : theme.dotEnded
-        HStack(spacing: 12) {
-            Circle().fill(dotColor).frame(width: 8, height: 8)
-            VStack(alignment: .leading, spacing: 3) {
-                HStack(spacing: 5) {
-                    if let agent = store.consumers.first(where: { $0.id == session.agentId }) ?? store.rows.first(where: { $0.id == session.agentId })?.agent {
-                        AgentLogo(vendor: agent.vendor, size: 14)
-                    }
-                    Text(store.consumerName(session.agentId))
-                }
-                .font(.ui(12, .semibold))
-                Text(store.sessionSource(session).name).font(.ui(10)).foregroundStyle(theme.secondary)
+        let usage = store.sessionUsage(session), tokens = store.sessionTokens(session)
+        let waiting = store.isSessionWaiting(session), running = !waiting && store.isSessionLive(session)
+        let dot = waiting ? theme.status(.warning) : running ? theme.status(.ok) : theme.dotEnded
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 8) {
+                Circle().fill(dot).frame(width: 7, height: 7)
+                    .background(Circle().fill(dot.opacity(running ? 0.22 : 0)).frame(width: 13, height: 13))
+                Text(session.task).font(.ui(13, .semibold)).lineLimit(1)
+                Spacer(minLength: 8)
+                Text(tokens.total > 0 ? TokenFormat.short(tokens.total) : "—")
+                    .font(.tabular(13, .semibold))
+                    .help(TokenKind.allCases.map { "\($0.label) \(tokens[$0].formatted())" }.joined(separator: " · "))
             }
-            .lineLimit(1)
-            .frame(width: 130, alignment: .leading)
-            VStack(alignment: .leading, spacing: 3) {
-                Text(session.task).foregroundStyle(theme.text)
-                    .lineLimit(1).truncationMode(.tail)
-                if session.accountWide {
-                    Text(L10n.text("账户 · 跨设备", "Account · across devices")).font(.ui(10)).foregroundStyle(theme.secondary)
-                } else if let path = session.displayPath {
-                    Label(path, systemImage: "folder").labelStyle(.titleAndIcon)
-                        .font(.ui(10)).foregroundStyle(theme.secondary)
-                        .lineLimit(1).truncationMode(.middle)
-                        .help(session.workingDirectory ?? path)
-                }
+            HStack(spacing: 8) {
+                Text(place).lineLimit(1).truncationMode(.middle)
+                Spacer(minLength: 8)
+                if let cost { Text(cost).font(.tabular(11)) }
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            VStack(alignment: .leading, spacing: 3) {
-                Text(store.sessionStatusLabel(session))
-                    .font(.tabular(12))
-                    .lineLimit(1).minimumScaleFactor(0.8)
-                let usage = store.sessionUsage(session)
-                HStack(spacing: 6) {
-                    if let turns = usage?.turnCount, turns > 0 {
-                        Text(L10n.text("\(turns) 轮", turns == 1 ? "1 turn" : "\(turns) turns"))
-                    }
-                    if let usage, let fill = usage.contextFill { contextGauge(fill, usage) }
-                }
-                .font(.tabular(10))
-            }
+            .font(.ui(11))
             .foregroundStyle(theme.secondary)
-            .frame(width: 112, alignment: .leading)
-            Text(quotaOrCost)
-                .help(L10n.text("API 账户显示本会话费用估算；套餐显示本会话占当前 5 小时窗口的份额，没有份额时显示按 API 价估算的费用",
-                                "APIs show the estimated session cost; plans show the session's share of the current 5-hour window, or without one what it would cost at API prices"))
-                .font(.tabular(10, .semibold))
-                .lineLimit(1)
-                .minimumScaleFactor(0.75)
-                .frame(width: 70, alignment: .trailing)
-            let tokens = store.sessionOwnTokens(session)
-            Text(session.hasTokenCounts ? TokenFormat.short(store.tokenDimensions.count(tokens)) : "—")
-                .help(TokenKind.allCases.map { "\($0.label) \(tokens[$0].formatted())" }.joined(separator: " · "))
-                .font(.tabular(10))
-                .foregroundStyle(theme.secondary)
-                .frame(width: 130, alignment: .trailing)
+            .padding(.leading, 15)
+            if let usage {
+                TurnSparkline(usage: usage, theme: theme).frame(height: 22).padding(.leading, 15).padding(.top, 2)
+            }
+            HStack(spacing: 8) {
+                Text(status(usage, waiting: waiting, running: running)).lineLimit(1).frame(maxWidth: .infinity, alignment: .leading)
+                if let usage, let context = usage.contextTokens {
+                    Text(L10n.text("上下文", "Context"))
+                    if let fill = usage.contextFill {
+                        Capsule().fill(theme.track).frame(width: 36, height: 4).overlay(alignment: .leading) {
+                            Capsule().fill(fill >= 0.8 ? theme.status(.warning) : theme.secondary).frame(width: 36 * min(1, fill), height: 4)
+                        }
+                        Text(TokenFormat.percent(fill * 100)).font(.tabular(11)).foregroundStyle(theme.text)
+                            .frame(minWidth: 30, alignment: .trailing)
+                    } else {
+                        Text(TokenFormat.short(context)).font(.tabular(11)).foregroundStyle(theme.text)
+                    }
+                }
+            }
+            .font(.ui(11))
+            .foregroundStyle(theme.secondary)
+            .padding(.leading, 15)
         }
-        .font(.ui(12))
-        .padding(EdgeInsets(top: 4, leading: 10, bottom: 4, trailing: 10))
-        .background(RoundedRectangle(cornerRadius: 7).fill(hovered ? theme.track : theme.sessionRowBackground))
+        .padding(EdgeInsets(top: 10, leading: 14, bottom: 9, trailing: 14))
+        .background(hovered ? theme.sessionRowBackground : Color.clear)
         .contentShape(Rectangle())
         .onHover { hovered = $0 }
         .onTapGesture { store.focusedSessionID = session.id }
+        .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isButton)
         .accessibilityAction { store.focusedSessionID = session.id }
         .help([session.task, store.sessionSource(session).name, session.displayPath].compactMap { $0 }.joined(separator: " · "))
@@ -267,20 +281,100 @@ struct SessionRow: View {
         }
     }
 
-    /// How full the context of the session's latest call was, against its window.
-    private func contextGauge(_ fill: Double, _ usage: SessionUsage) -> some View {
-        HStack(spacing: 3) {
-            Capsule().fill(theme.track).frame(width: 22, height: 3).overlay(alignment: .leading) {
-                Capsule().fill(fill >= 0.8 ? theme.status(.warning) : theme.secondary).frame(width: 22 * min(1, fill), height: 3)
-            }
-            Text(TokenFormat.percent(fill * 100))
-        }
-        .help(L10n.text("上下文 ", "Context ") + [usage.contextTokens, usage.contextWindow].compactMap { $0.map(TokenFormat.short) }.joined(separator: " / "))
+    /// The model and the project, else the client; an account-wide session says so.
+    private var place: String {
+        ([store.consumerName(session.agentId), (session.accountWide ? nil : session.displayPath) ?? store.sessionSource(session).name]
+            + (session.accountWide ? [L10n.text("账户 · 跨设备", "Account · across devices")] : [])).joined(separator: " · ")
     }
 
-    private var quotaOrCost: String {
-        let money = store.sessionMoney(session)
-        if case .listPrice? = money, let share = session.pctOfWindow { return TokenFormat.percent1(share) }
-        return money?.text ?? session.pctOfWindow.map(TokenFormat.percent1) ?? "—"
+    /// A priced account's estimate, else what the calls would cost at API list prices.
+    private var cost: String? {
+        guard let money = store.sessionMoney(session) else { return nil }
+        if case .accountUnknown = money { return nil }
+        return money.text
     }
+
+    /// The state as the phone is told it, the turns, and how long the turn in flight has run or how long ago the session
+    /// was last active. Without live status there is no state.
+    private func status(_ usage: SessionUsage?, waiting: Bool, running: Bool) -> String {
+        let state = waiting ? L10n.text("等待批准", "Needs approval") : running ? L10n.text("运行中", "Running")
+            : store.liveStatusEnabled(for: session) ? L10n.text("等你回复", "Waiting for you") : nil
+        let turns = usage.flatMap { $0.turnCount > 0 ? L10n.text("\($0.turnCount) 轮", $0.turnCount == 1 ? "1 turn" : "\($0.turnCount) turns") : nil }
+        let elapsed = waiting || running ? Countdown.format(store.now.timeIntervalSince(store.sessionTurnStart(session)))
+            : Self.age(store.now.timeIntervalSince(store.sessionLastActivity(session)))
+        return [state, turns, elapsed].compactMap { $0 }.joined(separator: " · ")
+    }
+
+    /// How long ago, as the phone says it: in seconds, minutes, hours, then days.
+    static func age(_ interval: TimeInterval) -> String {
+        let seconds = max(0, Int(interval))
+        let value = seconds < 60 ? "\(seconds)s" : seconds < 3600 ? "\(seconds / 60)m" : seconds < 86400 ? "\(seconds / 3600)h" : "\(seconds / 86400)d"
+        return L10n.text("\(value) 前", "\(value) ago")
+    }
+}
+
+/// Each recent turn's new tokens as a small stacked bar, or each period's for a log that marks no prompts.
+struct TurnSparkline: View {
+    let usage: SessionUsage
+    let theme: Theme
+    /// Enough turns to keep each bar a few points wide.
+    static let limit = 64
+
+    var body: some View {
+        let bars = Array((usage.turns.isEmpty ? SessionBar.periods(usage) : SessionBar.turns(usage)).suffix(Self.limit))
+        let peak = max(1, bars.map(\.kinds.new).max() ?? 0)
+        Canvas { context, size in
+            guard !bars.isEmpty else { return }
+            // At least a dozen slots, and on a wide card as many as keep a bar about as wide as on the phone.
+            let slot = size.width / CGFloat(max(bars.count, 12, Int(size.width / 28)))
+            let width = max(slot - 2, 2), scale = (size.height - 1) / CGFloat(peak)
+            for (index, bar) in bars.enumerated() where bar.kinds.new > 0 {
+                // A turn that added almost nothing still shows as a stub.
+                let barScale = max(scale, 1.5 / CGFloat(bar.kinds.new))
+                var y = size.height
+                for kind in SessionBarsChart.stacked where bar.kinds[kind] > 0 {
+                    let height = CGFloat(bar.kinds[kind]) * barScale
+                    y -= height
+                    context.fill(Path(CGRect(x: CGFloat(index) * slot + (slot - width) / 2, y: y + 0.4, width: width, height: max(0.6, height - 0.8))),
+                                 with: .color(theme.kind(kind)))
+                }
+            }
+            context.fill(Path(CGRect(x: 0, y: size.height - 0.5, width: size.width, height: 0.5)), with: .color(theme.divider))
+        }
+        .accessibilityHidden(true)
+    }
+}
+
+extension UsageStore {
+    /// The list's sessions, from one source or all: the last seven days', or with `activeOnly` those running or active
+    /// in the last day. Newest activity first.
+    func listedSessions(source: SessionSource?, activeOnly: Bool) -> [LiveSession] {
+        let sessions = statsSessions.filter { source == nil || sessionSource($0) == source }
+        guard activeOnly else { return sessions }
+        let since = now.addingTimeInterval(-86_400), events = turnEvents
+        return sessions.filter { isSessionLive($0) || $0.lastEvent(turnAt: events[$0.id]) >= since }
+    }
+
+    /// When the session last did something, dated as its record for the phone is: its newest turn event, else its end.
+    func sessionLastActivity(_ session: LiveSession) -> Date {
+        session.lastEvent(turnAt: report?.turns.filter { $0.sessionID == session.id }.map(\.observedAtMs).max().map(Self.date))
+    }
+
+    /// When the turn in flight began, as the phone is told: the newest turn's start while it runs, else the session's.
+    func sessionTurnStart(_ session: LiveSession) -> Date {
+        let vendor = sessionSource(session).vendor?.lowercased()
+        guard let turn = report?.turns.last(where: { $0.sessionID == session.id && (vendor == nil || $0.provider.lowercased() == vendor) }),
+              turn.state == .running || turn.state == .waitingForApproval else { return session.startedAt }
+        return Self.date(turn.startedAtMs ?? turn.observedAtMs)
+    }
+
+    /// Each session's newest turn event.
+    private var turnEvents: [String: Date] {
+        (report?.turns ?? []).reduce(into: [:]) { events, turn in
+            let at = Self.date(turn.observedAtMs)
+            if at > events[turn.sessionID] ?? .distantPast { events[turn.sessionID] = at }
+        }
+    }
+
+    private static func date(_ milliseconds: Int64) -> Date { Date(timeIntervalSince1970: Double(milliseconds) / 1000) }
 }
