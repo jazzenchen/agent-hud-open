@@ -119,7 +119,8 @@ public enum DemoData {
 
     /// The demo sessions' turns: now and then a large paste, cache writes that carry the previous turn forward,
     /// reasoning on about half of them, and a compaction once the context nears its window. Claude sessions hand every
-    /// fourth turn's work partly to a sub-agent on the other Claude model.
+    /// fourth turn's work partly to a sub-agent on the other Claude model, and two thirds of the way in come back after
+    /// their cache lapsed, writing the whole context again.
     public static func sessionUsage(now: Date) -> [String: SessionUsage] {
         let plans: [(id: String, agent: String, helper: String?, priced: String, minutes: (Double, Double), turns: Int, seed: Int)] = [
             ("s1", "claude-opus", "claude-sonnet", "claude-model:claude-opus-5", (-27, 0), 26, 7),
@@ -142,22 +143,27 @@ public enum DemoData {
                 let input = Int(random() < 0.18 ? 7_000 + random() * 16_000 : 150 + random() * 1_800)
                 let output = Int(250 + random() * random() * 4_200)
                 let reasoning = random() < 0.55 ? Int(400 + random() * 5_000) : 0
-                var write = carry, compacted = false
-                if context + write + input > window * 82 / 100 { compacted = true; context = 0; write = 26_000 }
-                let tokens = SessionUsage.Tokens(tokensIn: input + write, tokensOut: output + reasoning, cacheReadTokens: context,
+                var write = carry, read = context, compacted = false, peak: Int?
+                if context + write + input > window * 82 / 100 {
+                    compacted = true; peak = context + write + input; read = 0; write = 26_000
+                }
+                let lapsed = plan.helper != nil && index == plan.turns * 2 / 3 && !compacted
+                if lapsed { write += read; read = 0 }
+                let tokens = SessionUsage.Tokens(tokensIn: input + write, tokensOut: output + reasoning, cacheReadTokens: read,
                                                  cacheWriteTokens: write, reasoningTokens: reasoning)
                 let turnStart = start.addingTimeInterval(span * (Double(index) + random() * 0.4) / Double(plan.turns))
                 let turnEnd = min(now, turnStart.addingTimeInterval(20 + random() * 150))
                 let turnCalls = 3 + Int(random() * 12)
-                turns.append(.init(start: turnStart, end: turnEnd, tokens: tokens, calls: turnCalls, contextTokens: context + write + input,
-                                   compacted: compacted))
+                let turnCost = ModelCatalog.cost(agentId: plan.priced, kinds: tokens.kinds) ?? 0
+                let helping = plan.helper != nil && index % 4 == 1 && !lapsed
+                turns.append(.init(start: turnStart, end: turnEnd, tokens: tokens, calls: turnCalls, contextTokens: read + write + input,
+                                   compacted: compacted, subagents: helping ? Self.part(of: tokens) : nil, peakContextTokens: peak,
+                                   recachedTokens: lapsed ? input + write : nil, listCost: turnCost))
                 calls += turnCalls
-                cost += ModelCatalog.cost(agentId: plan.priced, kinds: tokens.kinds) ?? 0
+                cost += turnCost
                 let period = Date(timeIntervalSince1970: (turnStart.timeIntervalSince1970 / UsageBucket.duration).rounded(.down) * UsageBucket.duration)
-                if let helper = plan.helper, index % 4 == 1 {
-                    let part = SessionUsage.Tokens(tokensIn: tokens.tokensIn * 2 / 5, tokensOut: tokens.tokensOut * 2 / 5,
-                                                   cacheReadTokens: tokens.cacheReadTokens * 2 / 5, cacheWriteTokens: tokens.cacheWriteTokens * 2 / 5,
-                                                   reasoningTokens: tokens.reasoningTokens * 2 / 5)
+                if let helper = plan.helper, helping {
+                    let part = Self.part(of: tokens)
                     let rest = SessionUsage.Tokens(tokensIn: tokens.tokensIn - part.tokensIn, tokensOut: tokens.tokensOut - part.tokensOut,
                                                    cacheReadTokens: tokens.cacheReadTokens - part.cacheReadTokens,
                                                    cacheWriteTokens: tokens.cacheWriteTokens - part.cacheWriteTokens,
@@ -171,7 +177,7 @@ public enum DemoData {
                     models[plan.agent, default: .init()] += tokens
                     periods[period, default: [:]][plan.agent, default: .init()] += tokens
                 }
-                context += write
+                context = read + write
                 carry = input + output
             }
             result[plan.id] = SessionUsage(
@@ -181,6 +187,12 @@ public enum DemoData {
                 listCost: cost)
         }
         return result
+    }
+
+    /// The share of a turn its sub-agent spent.
+    private static func part(of tokens: SessionUsage.Tokens) -> SessionUsage.Tokens {
+        SessionUsage.Tokens(tokensIn: tokens.tokensIn * 2 / 5, tokensOut: tokens.tokensOut * 2 / 5, cacheReadTokens: tokens.cacheReadTokens * 2 / 5,
+                            cacheWriteTokens: tokens.cacheWriteTokens * 2 / 5, reasoningTokens: tokens.reasoningTokens * 2 / 5)
     }
 
     public static func insights(now: Date, calendar: Calendar = .current) -> UsageInsights {

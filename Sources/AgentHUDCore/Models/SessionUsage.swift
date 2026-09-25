@@ -73,10 +73,22 @@ public struct SessionUsage: Hashable, Codable, Sendable {
         public let contextTokens: Int?
         /// The client compacted the conversation during the turn.
         public let compacted: Bool
+        /// What sub-agents spent in the turn; already part of `tokens`. Nil when none ran.
+        public let subagents: Tokens?
+        /// The largest prompt of the turn's calls in the session's own log, when it was above the context the turn ended with.
+        public let peakContextTokens: Int?
+        /// Prompt tokens the session's own log sent again because the cache no longer held them: its cache lapsed or the
+        /// model changed. Nil when no call did.
+        public let recachedTokens: Int?
+        /// What the turn's calls would cost at the vendors' API list prices, in the unit of the session's `listCost`; nil
+        /// when a call's model has no list price.
+        public let listCost: Decimal?
 
-        public init(start: Date, end: Date, tokens: Tokens, calls: Int, contextTokens: Int? = nil, compacted: Bool = false) {
+        public init(start: Date, end: Date, tokens: Tokens, calls: Int, contextTokens: Int? = nil, compacted: Bool = false,
+                    subagents: Tokens? = nil, peakContextTokens: Int? = nil, recachedTokens: Int? = nil, listCost: Decimal? = nil) {
             self.start = start; self.end = end; self.tokens = tokens; self.calls = calls
             self.contextTokens = contextTokens; self.compacted = compacted
+            self.subagents = subagents; self.peakContextTokens = peakContextTokens; self.recachedTokens = recachedTokens; self.listCost = listCost
         }
     }
 
@@ -178,7 +190,10 @@ public struct SessionUsageRequest: Hashable, Sendable {
 }
 
 /// Folds one session's calls, in time order, into its breakdown. Calls go to the turn of the latest prompt at or
-/// before them, sub-agents' calls included; calls before the first prompt form a turn of their own.
+/// before them, sub-agents' calls included; calls before the first prompt form a turn of their own. A call in the
+/// session's own log that reads back less than half of the previous call's prompt from the cache and sends at least
+/// half of it again re-cached that prompt: the cache had lapsed or the model changed. A compaction shrinks the prompt
+/// instead, so it re-caches nothing.
 struct SessionUsageBuilder {
     struct Call {
         let timestamp: Date
@@ -201,7 +216,16 @@ struct SessionUsageBuilder {
     private var window: Int?
     private var latestAgent: String?
     private var listCost: Decimal? = 0
-    private var turns: [Int: (start: Date, end: Date, tokens: SessionUsage.Tokens, calls: Int, context: Int?)] = [:]
+    /// The prompt of the latest call in the session's own log.
+    private var previousPrompt: Int?
+    private struct TurnSums {
+        var start: Date, end: Date
+        var tokens = SessionUsage.Tokens(), calls = 0
+        var subagents: SessionUsage.Tokens?
+        var context: Int?, peak = 0, recached = 0
+        var listCost: Decimal? = 0
+    }
+    private var turns: [Int: TurnSums] = [:]
     private var promptIndex = -1
 
     /// - prompts, compactions: the session's own marks.
@@ -222,20 +246,31 @@ struct SessionUsageBuilder {
         periods[period, default: [:]][call.agentId, default: .init()] += tokens
         if !call.own { subagents = (subagents ?? .init()) + tokens }
         let prompt = tokens.tokensIn + tokens.cacheReadTokens
-        if call.callLog { context = prompt }
+        var recached = 0
+        if call.callLog {
+            if let previous = previousPrompt, tokens.cacheReadTokens * 2 < previous, tokens.tokensIn * 2 >= previous { recached = tokens.tokensIn }
+            previousPrompt = prompt
+            context = prompt
+        }
         if call.own {
             latestAgent = call.agentId
             if let reported = call.contextWindow { window = reported }
         }
-        if let cost = listCost { listCost = ModelCatalog.cost(agentId: call.agentId, kinds: tokens.kinds).map { cost + $0 } }
+        let cost = ModelCatalog.cost(agentId: call.agentId, kinds: tokens.kinds)
+        listCost = listCost.flatMap { sum in cost.map { sum + $0 } }
         guard !prompts.isEmpty else { return }
         while promptIndex + 1 < prompts.count, prompts[promptIndex + 1] <= call.timestamp { promptIndex += 1 }
-        var turn = turns[promptIndex]
-            ?? (start: promptIndex >= 0 ? prompts[promptIndex] : call.timestamp, end: call.timestamp, tokens: .init(), calls: 0, context: nil)
+        var turn = turns[promptIndex] ?? TurnSums(start: promptIndex >= 0 ? prompts[promptIndex] : call.timestamp, end: call.timestamp)
         turn.end = max(turn.end, call.timestamp)
         turn.tokens += tokens
         turn.calls += 1
-        if call.callLog { turn.context = prompt }
+        if !call.own { turn.subagents = (turn.subagents ?? .init()) + tokens }
+        if call.callLog {
+            turn.context = prompt
+            turn.peak = max(turn.peak, prompt)
+        }
+        turn.recached += recached
+        turn.listCost = turn.listCost.flatMap { sum in cost.map { sum + $0 } }
         turns[promptIndex] = turn
     }
 
@@ -245,7 +280,9 @@ struct SessionUsageBuilder {
         let all = turns.keys.sorted().map { index in
             let turn = turns[index]!
             return SessionUsage.Turn(start: turn.start, end: turn.end, tokens: turn.tokens, calls: turn.calls, contextTokens: turn.context,
-                                     compacted: compacted.contains(index))
+                                     compacted: compacted.contains(index), subagents: turn.subagents,
+                                     peakContextTokens: turn.context.flatMap { turn.peak > $0 ? turn.peak : nil },
+                                     recachedTokens: turn.recached > 0 ? turn.recached : nil, listCost: turn.listCost)
         }
         return SessionUsage(
             models: models.map { SessionUsage.Model(agentId: $0.key, tokens: $0.value) }.sorted {

@@ -156,6 +156,8 @@ final class UsageLedgerTests: XCTestCase, @unchecked Sendable {
         XCTAssertEqual(usage.turns[1].tokens.kinds, TokenKinds(cacheWrite: 970, input: 300, reasoning: 100, output: 257, cacheRead: 11_900))
         XCTAssertEqual(usage.turns.map(\.contextTokens), [10, 6_200, 2_400], "a turn's context is its own log's last call")
         XCTAssertEqual(usage.turns.map(\.compacted), [false, false, true])
+        XCTAssertEqual(usage.turns.map(\.subagents), [nil, .init(tokensIn: 70, tokensOut: 7, cacheReadTokens: 900, cacheWriteTokens: 20), nil])
+        XCTAssertEqual(usage.turns.map(\.listCost), ["0.000175", "0.025215", "0.00675"].map { Decimal(string: $0) }, "the turns add up to the session")
         XCTAssertEqual(usage.total.kinds.reasoning, 140)
         XCTAssertEqual(usage.contextWindow, 1_000_000, "the published window of the model the session's own log called last")
         // Opus 5: $5 input, $10 one-hour cache writes, $0.50 cache reads, $25 output. Haiku 4.5: $1, $2, $0.10, $5.
@@ -175,6 +177,33 @@ final class UsageLedgerTests: XCTestCase, @unchecked Sendable {
         try await ledger.write { try $0.upsert(source: "claude", contribution: "p/s.jsonl", events: [self.call("m5", 13, input: 1, output: 1)]) }
         let reread = try await ledger.sessionUsage([SessionUsageRequest(sessionID: "s", keys: ["p/s.jsonl"])])["s"]
         XCTAssertEqual(reread?.turns.map(\.start), [], "the removed log's prompts went with it")
+    }
+
+    func testSessionUsageMarksContextSentAgainAndThePeakBeforeACompaction() async throws {
+        let ledger = UsageLedger.inMemory()
+        try await ledger.write { writer in
+            try writer.upsert(source: "claude", contribution: "p/r.jsonl", events: [
+                self.call("r1", 1, input: 1_000, write: 1_000, output: 10),
+                self.call("r2", 2, input: 200, write: 200, output: 10, cache: 1_000),
+                // Back after the cache lapsed: the whole prompt is written again.
+                self.call("r3", 70, input: 1_300, write: 1_250, output: 10),
+                self.call("r4", 71, input: 100, write: 100, output: 10, cache: 1_300),
+                // A compaction shrinks the prompt, which sends nothing again.
+                self.call("r5", 72, input: 300, write: 300, output: 10),
+                // Another model reads none of the cache.
+                self.call("r6", 90, agent: "claude-model:claude-sonnet-5", input: 700, write: 700, output: 10),
+            ])
+            try writer.addMarks(source: "claude", contribution: "p/r.jsonl", marks: [
+                .init(.prompt, at: self.at(60)), .init(.prompt, at: self.at(70 * 60)), .init(.compaction, at: self.at(71.5 * 60)),
+                .init(.prompt, at: self.at(90 * 60)),
+            ])
+        }
+        let read = try await ledger.sessionUsage([SessionUsageRequest(sessionID: "r", keys: ["p/r.jsonl"], callLog: "p/r.jsonl")])
+        let usage = try XCTUnwrap(read["r"])
+        XCTAssertEqual(usage.turns.map(\.recachedTokens), [nil, 1_300, 700])
+        XCTAssertEqual(usage.turns.map(\.contextTokens), [1_200, 300, 700])
+        XCTAssertEqual(usage.turns.map(\.peakContextTokens), [nil, 1_400, nil], "the turn reached 1,400 before its compaction")
+        XCTAssertEqual(usage.turns.map(\.compacted), [false, true, false])
     }
 
     func testSessionUsageTakesSubagentLogsNamedOneByOne() async throws {

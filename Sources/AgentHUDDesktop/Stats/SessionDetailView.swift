@@ -8,6 +8,7 @@ struct SessionDetailView: View {
     let store: UsageStore
     let theme: Theme
     @State private var inspected: Int?
+    @State private var measure = SessionBarMeasure.tokens
 
     var body: some View {
         let usage = store.sessionUsage(session)
@@ -130,10 +131,23 @@ struct SessionDetailView: View {
     private func tokens(_ usage: SessionUsage) -> some View {
         let byTurn = !usage.turns.isEmpty
         let bars = byTurn ? SessionBar.turns(usage) : SessionBar.periods(usage)
-        let shown = SessionBarsChart.stacked.filter { kind in bars.contains { $0.kinds[kind] > 0 } }
+        // Cost bars only when every turn has a list price, so no turn looks free.
+        let priced = byTurn && bars.allSatisfy { $0.cost != nil }
+        let measure = priced ? self.measure : .tokens
+        let shown = measure == .cost ? [] : SessionBarsChart.stacked.filter { kind in bars.contains { $0.kinds[kind] > 0 } }
         let hasContext = bars.contains { $0.context != nil }
         return VStack(alignment: .leading, spacing: 8) {
-            Text(byTurn ? L10n.text("每轮 Token", "Tokens per turn") : L10n.text("Token 消耗", "Tokens over time")).font(.ui(13, .semibold))
+            HStack {
+                Text(!byTurn ? L10n.text("Token 消耗", "Tokens over time")
+                     : measure == .cost ? L10n.text("每轮费用", "Cost per turn") : L10n.text("每轮 Token", "Tokens per turn"))
+                    .font(.ui(13, .semibold))
+                Spacer(minLength: 8)
+                if priced {
+                    SegmentedPills(options: [SegmentOption(value: SessionBarMeasure.tokens, label: "Token"),
+                                             SegmentOption(value: .cost, label: L10n.text("费用", "Cost"))],
+                                   selection: $measure, theme: theme)
+                }
+            }
             HStack(spacing: 12) {
                 ForEach(shown, id: \.self) { kind in
                     HStack(spacing: 5) {
@@ -141,13 +155,32 @@ struct SessionDetailView: View {
                         Text(kind.label)
                     }
                 }
+                if measure == .cost {
+                    HStack(spacing: 5) {
+                        RoundedRectangle(cornerRadius: 2).fill(theme.text.opacity(0.6)).frame(width: 7, height: 7)
+                        Text(L10n.text("按 API 价，含缓存读取", "At API prices, cache reads included"))
+                    }
+                } else if bars.contains(where: { $0.subagents != nil }) {
+                    HStack(spacing: 5) {
+                        RoundedRectangle(cornerRadius: 2).fill(theme.text.opacity(SessionBarsChart.subagentOpacity)).frame(width: 7, height: 7)
+                        Text(L10n.text("淡色为子 agent", "Faded: sub-agents"))
+                    }
+                }
+                if bars.contains(where: { $0.recached != nil }) {
+                    HStack(spacing: 5) {
+                        Circle().stroke(theme.text.opacity(0.85), lineWidth: 1.2).frame(width: 6, height: 6)
+                        Text(L10n.text("缓存重写", "Cache rewrite"))
+                    }
+                    .help(L10n.text("缓存已失效（多半是空闲超过缓存时长）或换了模型，这一轮把上下文重新发送了一遍",
+                                    "The cache had lapsed, usually after sitting idle, or the model changed, so the turn sent its context again"))
+                }
                 Spacer(minLength: 8)
                 Text(L10n.text("悬停查看每一根柱子", "Hover a bar for details"))
             }
             .font(.ui(10))
             .foregroundStyle(theme.secondary)
-            SessionBarsChart(bars: bars, axis: byTurn ? .turn : .time, running: byTurn && store.isSessionLive(session), theme: theme,
-                             inspected: $inspected)
+            SessionBarsChart(bars: bars, axis: byTurn ? .turn : .time, measure: measure, running: byTurn && store.isSessionLive(session),
+                             theme: theme, inspected: $inspected)
             if hasContext {
                 HStack(alignment: .firstTextBaseline) {
                     Text(L10n.text("上下文窗口", "Context window")).font(.ui(12, .semibold))
