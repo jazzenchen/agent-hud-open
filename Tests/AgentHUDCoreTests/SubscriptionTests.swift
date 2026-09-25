@@ -20,7 +20,7 @@ final class SubscriptionTests: XCTestCase {
     }
 
     func testMissingSubscriptionsDoNotShowABadge() {
-        let states: [SourceStatus.State] = [.ready(plan: nil), .ready(plan: ""), .installed, .notDetected, .unavailable, .needsAuthorization]
+        let states: [SourceStatus.State] = [.ready(plan: nil), .ready(plan: ""), .installed, .notDetected, .unavailable]
         for state in states {
             XCTAssertNil(SourceStatus(id: "deepseek", name: "DeepSeek", detail: "", state: state).planLabel)
         }

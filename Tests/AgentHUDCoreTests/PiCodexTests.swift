@@ -11,7 +11,7 @@ final class PiCodexTests: XCTestCase {
         let native = try JSONDecoder().decode(CodexRateLimits.self, from: Data(#"{"accountId":"workspace","account":{"email":"a@example.com"},"rateLimitsByLimitId":{"codex":{"primary":{"usedPercent":20,"windowDurationMins":300,"resetsAt":1800018000}}}}"#.utf8))
         XCTAssertEqual(limits.providerAccount(home: "pi"), native.providerAccount(home: ""))
         XCTAssertEqual(limits.rows(home: "pi").first?.id, native.rows(home: "").first?.id)
-        XCTAssertEqual(limits.rows.map(\.label), ["5h", "Weekly", "gpt-reserve · Weekly"])
+        XCTAssertEqual(limits.rows.map(\.label), ["5h", "Weekly", "Luna Reserve · Weekly"])
         XCTAssertEqual(limits.rows.first?.window.remainingPct, 80)
         XCTAssertEqual(limits.rateLimitResetCredits?.availableCount, 2)
         XCTAssertThrowsError(try PiCodexClient.parse(Data(Self.payload.utf8), expectedAccount: "another-workspace"))

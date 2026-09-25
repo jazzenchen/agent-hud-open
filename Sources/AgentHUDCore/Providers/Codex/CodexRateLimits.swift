@@ -95,7 +95,7 @@ public struct CodexRateLimits: Decodable, Sendable {
                 case .some(let minutes) where minutes > 0: period = "\(minutes)m"
                 default: period = L10n.text(slot == "primary" ? "主额度" : "次额度", slot.capitalized)
                 }
-                let name = id == "codex" ? nil : (bucket.limitName ?? id)
+                let name = id == "codex" ? nil : VendorCatalog.window(bucket.limitName ?? id, vendor: "Codex")
                 // The shared primary window keeps the old placeholder's id as its window key, preserving preferences.
                 let rowId = id == "codex" && slot == "primary" ? "codex" : "codex:\(id):\(slot)"
                 return Row(id: rowId, label: name.map { "\($0) · \(period)" } ?? period, window: window, weekly: weekly)
@@ -143,21 +143,37 @@ public enum CodexLocator {
         return home.appendingPathComponent(".codex", isDirectory: true)
     }
 
+    /// Prefer the self-contained Desktop engine; GUI PATH often cannot run npm's node shim. The app is looked for under
+    /// its known names, then wherever Launch Services has it under its bundle ID, whatever it is called now.
     public static func candidates(home: URL = FileManager.default.homeDirectoryForCurrentUser,
                                   applications: URL = URL(fileURLWithPath: "/Applications"),
-                                  path: String = ProcessInfo.processInfo.environment["PATH"] ?? "") -> [URL] {
-        // Prefer the self-contained Desktop engine; GUI PATH often cannot run npm's node shim.
-        let desktop = [applications, home.appendingPathComponent("Applications")].flatMap { root in
-            ["Codex.app", "ChatGPT.app"].map { root.appendingPathComponent("\($0)/Contents/Resources/codex") }
-        }
-        let cli = [home.appendingPathComponent(".bun/bin/codex"), home.appendingPathComponent(".local/bin/codex"),
-                   URL(fileURLWithPath: "/opt/homebrew/bin/codex"), URL(fileURLWithPath: "/usr/local/bin/codex")]
-        return desktop + cli + path.split(separator: ":").map { URL(fileURLWithPath: String($0)).appendingPathComponent("codex") }
+                                  path: String = ProcessInfo.processInfo.environment["PATH"] ?? "",
+                                  registered: [URL] = VendorCatalog.applications("Codex")) -> [URL] {
+        desktop(home: home, applications: applications) + registered.map(engine(in:)) + cli(home: home, path: path)
     }
 
+    /// The same order as `candidates`, asking Launch Services only when no app sits under a known name.
     public static func find(home: URL = FileManager.default.homeDirectoryForCurrentUser,
                             applications: URL = URL(fileURLWithPath: "/Applications"),
-                            path: String = ProcessInfo.processInfo.environment["PATH"] ?? "") -> URL? {
-        candidates(home: home, applications: applications, path: path).first { FileManager.default.isExecutableFile(atPath: $0.path) }
+                            path: String = ProcessInfo.processInfo.environment["PATH"] ?? "",
+                            registered: @autoclosure () -> [URL] = VendorCatalog.applications("Codex")) -> URL? {
+        let runnable = { (url: URL) in FileManager.default.isExecutableFile(atPath: url.path) }
+        return desktop(home: home, applications: applications).first(where: runnable)
+            ?? registered().map(engine(in:)).first(where: runnable)
+            ?? cli(home: home, path: path).first(where: runnable)
+    }
+
+    private static func engine(in app: URL) -> URL { app.appendingPathComponent("Contents/Resources/codex") }
+
+    private static func desktop(home: URL, applications: URL) -> [URL] {
+        [applications, home.appendingPathComponent("Applications")].flatMap { root in
+            ["Codex.app", "ChatGPT.app"].map { engine(in: root.appendingPathComponent($0)) }
+        }
+    }
+
+    private static func cli(home: URL, path: String) -> [URL] {
+        [home.appendingPathComponent(".bun/bin/codex"), home.appendingPathComponent(".local/bin/codex"),
+         URL(fileURLWithPath: "/opt/homebrew/bin/codex"), URL(fileURLWithPath: "/usr/local/bin/codex")]
+            + path.split(separator: ":").map { URL(fileURLWithPath: String($0)).appendingPathComponent("codex") }
     }
 }

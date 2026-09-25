@@ -44,6 +44,8 @@ public struct DemoUsageProvider: UsageProvider {
             generatedAt: now,
             snapshots: DemoData.snapshots(now: now),
             sessions: DemoData.sessions(now: now),
+            // The demo reports the rows it was given, as a provider reports the rows it read.
+            discoveredAgents: agents,
             consumers: consumers,
             usage: usage,
             insightsByAgent: Dictionary(uniqueKeysWithValues: consumers.map { ($0.id, DemoData.insights(now: now)) }),

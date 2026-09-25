@@ -217,7 +217,7 @@ extension View {
 enum AgentNaming {
     /// "Claude · Opus" when the vendor has several models, otherwise just the vendor.
     static func compact(_ agent: AgentDescriptor, among agents: [AgentDescriptor]) -> String {
-        sharesVendor(agent, among: agents) ? "\(agent.displayVendor) · \(L10n.shortModelLabel(agent.model))" : agent.displayVendor
+        sharesVendor(agent, among: agents) ? "\(agent.vendorName) · \(L10n.shortModelLabel(agent.model))" : agent.vendorName
     }
 
     /// Legend label: "Opus" / "Sonnet" / "ChatGPT".

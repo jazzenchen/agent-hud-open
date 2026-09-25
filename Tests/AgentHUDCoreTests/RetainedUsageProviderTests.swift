@@ -39,12 +39,12 @@ final class RetainedUsageProviderTests: XCTestCase {
         let first = RetainedUsageProvider(provider: SequenceProvider([good]), cacheURL: file)
         _ = try await first.fetchUsage(agents: [], historyHours: 24)
         let restarted = RetainedUsageProvider(provider: SequenceProvider([]), cacheURL: file)
-        XCTAssertEqual(restarted.initialReport, good)
+        XCTAssertEqual(restarted.initialReport, good.startingRowClocks())
         do {
             _ = try await restarted.fetchUsage(agents: [], historyHours: 24)
             XCTFail("A cached report must not turn a failed refresh into success")
         } catch { XCTAssertEqual(error.localizedDescription, "offline") }
-        XCTAssertEqual(restarted.initialReport, good)
+        XCTAssertEqual(restarted.initialReport, good.startingRowClocks())
     }
 
     func testRestartCopyIsRewrittenAtMostOncePerInterval() async throws {
@@ -105,7 +105,7 @@ final class RetainedUsageProviderTests: XCTestCase {
         let store = UsageStore(provider: provider, settings: SettingsStore(defaults: defaults))
         await store.refresh()
         await store.refresh()
-        XCTAssertEqual(store.report, good)
+        XCTAssertEqual(store.report, good.startingRowClocks())
         XCTAssertEqual(store.lastError, "offline")
         store.stop()
     }
@@ -133,6 +133,46 @@ final class RetainedUsageProviderTests: XCTestCase {
         XCTAssertEqual(store.sessions.count, 1)
         XCTAssertFalse(store.hasLiveSession)
         XCTAssertEqual(store.sessionStatusLabel(session), L10n.text("状态待更新", "Status out of date"))
+    }
+
+    func testARowUnseenForTheRetentionPeriodRetiresWithItsReading() async throws {
+        let kept = AgentDescriptor(id: "kept", vendor: "Antigravity", model: "Gemini", source: "", enabled: true)
+        let gone = AgentDescriptor(id: "gone", vendor: "Antigravity", model: "Claude", source: "", enabled: true)
+        func pass(_ date: Date, _ rows: [AgentDescriptor]) -> UsageReport {
+            UsageReport(generatedAt: date, snapshots: rows.map { .init(agentId: $0.id, remainingPct: 50, updatedAt: date) },
+                        sessions: [], discoveredAgents: rows)
+        }
+        let retention = QuotaHistoryStore.retention
+        let provider = RetainedUsageProvider(provider: SequenceProvider([
+            pass(now, [kept, gone]), pass(now.addingTimeInterval(retention - 60), [kept]), pass(now.addingTimeInterval(retention + 60), [kept]),
+        ]))
+        let first = try await provider.fetchUsage(agents: [], historyHours: 24)
+        XCTAssertEqual(first.rowSeenAt, ["kept": now, "gone": now])
+        let within = try await provider.fetchUsage(agents: [], historyHours: 24)
+        XCTAssertEqual(within.discoveredAgents.map(\.id), ["kept", "gone"], "a row missing for less than the retention period stays")
+        XCTAssertEqual(within.rowSeenAt?["gone"], now)
+        XCTAssertNotNil(within.snapshot(for: "gone"))
+        let after = try await provider.fetchUsage(agents: [], historyHours: 24)
+        XCTAssertEqual(after.discoveredAgents.map(\.id), ["kept"])
+        XCTAssertNil(after.snapshot(for: "gone"))
+        XCTAssertEqual(after.rowSeenAt, ["kept": now.addingTimeInterval(retention + 60)])
+    }
+
+    func testRowsFromAReportThatKeptNoSightingsStartTheirClockAtTheNextPass() async throws {
+        let old = AgentDescriptor(id: "old", vendor: "Antigravity", model: "Gemini", source: "", enabled: true)
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let file = directory.appendingPathComponent("report.json")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let saved = UsageReport(generatedAt: now.addingTimeInterval(-90 * 86400), snapshots: [], sessions: [], discoveredAgents: [old])
+        try JSONEncoder().encode(saved).write(to: file)
+        let later = now
+        let provider = RetainedUsageProvider(provider: SequenceProvider([
+            UsageReport(generatedAt: later, snapshots: [], sessions: [], discoveredAgents: []),
+        ]), cacheURL: file)
+        let report = try await provider.fetchUsage(agents: [], historyHours: 24)
+        XCTAssertEqual(report.discoveredAgents.map(\.id), ["old"], "an upgrade does not retire rows it never timed")
+        XCTAssertEqual(report.rowSeenAt, ["old": later])
     }
 
     private func report(at date: Date, remaining: Double?, balance: Decimal?, credits: Int?) -> UsageReport {

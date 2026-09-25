@@ -65,6 +65,8 @@ Agent HUD Open is a Swift package with three libraries and one executable. `Agen
 - Tests need no credentials or network; the only probe that touches installed clients is opt-in.
 - Isolated sources: a missing, signed-out or failing client never hides another.
 - No invented lifecycle: inactivity is never a completion, and a passed reset deadline is not a confirmed reset.
+- Observed rows only: rows, groups and first-launch entries come from what providers report or find on the Mac, never from a built-in list of placeholders.
+- Names apart from ids: vendor ids key settings, the ledger, accounts and sync records and never change; `VendorCatalog` holds the names shown, and a value it does not name is shown as written, never filed under another.
 - Resources and notices: the root `THIRD_PARTY_NOTICES.txt` and the bundled copy stay byte-identical, and source comments cite the file.
 - Source boundaries: `make check` rejects signing material, private service directories and imports, secret-shaped strings, external package dependencies and missing ignore rules.
 
@@ -100,6 +102,7 @@ Agent HUD Open is a Swift package with three libraries and one executable. `Agen
 | Provider protocol, combination, retention, observers | `Sources/AgentHUDCore/Providers/UsageProvider.swift`, `CombinedUsageProvider.swift`, `RetainedUsageProvider.swift`, `SessionObservers.swift` |
 | Per-client providers | `Sources/AgentHUDCore/Providers/<Client>/` |
 | Models and calculations | `Sources/AgentHUDCore/Models/`, `Sources/AgentHUDCore/Logic/` |
+| Vendor names, client and window names, app bundle IDs | `Sources/AgentHUDCore/Models/VendorCatalog.swift` |
 | Collection pipeline, signals and hooks; change sets | `Sources/AgentHUDCore/Store/UsageCollector.swift`, `FileChangeMonitor.swift`; `Sources/AgentHUDCore/Models/UsageChanges.swift` |
 | Stores and data directory | `Sources/AgentHUDCore/Store/UsageStore.swift`, `SettingsStore.swift`, `QuotaHistoryStore.swift`, `AppSupport.swift` |
 | Application object, launch options, host pages | `Sources/AgentHUDDesktop/App/DesktopApplication.swift`, `LaunchOptions.swift`, `Settings/DesktopSettingsPage.swift` |

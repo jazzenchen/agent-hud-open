@@ -8,8 +8,8 @@ public enum DemoData {
         AgentDescriptor(id: "claude-sonnet", vendor: "Claude", model: "Sonnet 4.5", source: L10n.sourceClaudeSessions, enabled: true),
         AgentDescriptor(id: "chatgpt", vendor: "ChatGPT", model: "GPT‑5 Plus", source: L10n.sourceBrowserAuth, enabled: true),
         AgentDescriptor(id: "codex", vendor: "Codex", model: "CLI", source: L10n.sourceCodexAppServer, enabled: true),
-        AgentDescriptor(id: "antigravity", vendor: "Antigravity", model: "Agent", source: L10n.sourceNotConnected, enabled: false, connected: false),
-        AgentDescriptor(id: "deepseek", vendor: "DeepSeek", model: "Harness", source: L10n.sourceNotConnected, enabled: false, connected: false),
+        AgentDescriptor(id: "antigravity", vendor: "Antigravity", model: "Agent", source: L10n.sourceNotConnected, enabled: false),
+        AgentDescriptor(id: "deepseek", vendor: "DeepSeek", model: "Harness", source: L10n.sourceNotConnected, enabled: false),
     ]
 
     /// Every vendor the app ships artwork for, all switched on. `agents` is the small set the tests and

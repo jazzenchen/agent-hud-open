@@ -249,20 +249,6 @@ final class AdditionalProviderTests: XCTestCase, @unchecked Sendable {
         XCTAssertEqual(kinds, [0])
     }
 
-    @MainActor
-    func testAntigravityPlaceholderMigratesWithoutLosingPreferences() {
-        let name = "AdditionalProviderTests.\(UUID().uuidString)", defaults = UserDefaults(suiteName: name)!
-        defer { defaults.removePersistentDomain(forName: name) }
-        let placeholder = AgentDescriptor(id: "antigravity", vendor: "Antigravity", model: "Agent", source: L10n.sourceNotConnected,
-            enabled: true, connected: false)
-        let settings = SettingsStore(defaults: defaults, defaultAgents: [placeholder])
-        let windows = ["one", "two"].map { AgentDescriptor(id: "antigravity:\($0)", vendor: "Antigravity", model: $0,
-            source: L10n.sourceAdditionalUsage, enabled: false) }
-        settings.mergeDiscovered(windows); settings.mergeDiscovered(windows)
-        XCTAssertEqual(settings.agents.count, 2)
-        XCTAssertTrue(settings.agents.allSatisfy { $0.enabled && $0.connected })
-    }
-
     func testAdditionalProviderCachesQuotaAndStillReportsLocalUsageWhenSignedOut() async throws {
         let now = now, history = QuotaHistoryStore()
         let provider = AdditionalUsageProvider(source: .grok, readQuota: { ProviderQuota(windows: [.init(id: "grok", label: "Credits", remaining: 80)]) },

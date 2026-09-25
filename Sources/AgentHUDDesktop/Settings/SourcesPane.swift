@@ -95,7 +95,7 @@ struct AgentSettingsCard: View {
                     AgentLogo(vendor: group.id, size: 26)
                     VStack(alignment: .leading, spacing: 5) {
                         HStack(spacing: 7) {
-                            Text(group.id).font(.ui(14, .semibold))
+                            Text(VendorCatalog.name(group.id)).font(.ui(14, .semibold))
                                 .fixedSize(horizontal: false, vertical: true)
                         }
                         ForEach(group.plans, id: \.self) { plan in

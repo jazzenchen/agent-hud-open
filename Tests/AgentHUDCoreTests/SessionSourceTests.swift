@@ -55,6 +55,7 @@ final class SessionSourceTests: XCTestCase {
         XCTAssertEqual(ClaudeEntrypoint.clientLabel("claude-vscode"), "Claude Code IDE extension")
         XCTAssertEqual(ClaudeEntrypoint.clientLabel("sdk-ts"), "Claude Agent SDK")
         XCTAssertEqual(ClaudeEntrypoint.clientLabel(nil), "Claude Code", "older builds never wrote the field")
+        XCTAssertEqual(ClaudeEntrypoint.clientLabel("claude-jetbrains"), "claude-jetbrains", "a surface the catalog does not name is shown as written")
         XCTAssertEqual(SessionSource(vendor: "Claude", client: "Claude Code Desktop").name, "Claude Code Desktop")
         XCTAssertNotEqual(SessionSource(vendor: "Claude", client: "Claude Code Desktop"), SessionSource(vendor: "Claude", client: "Claude Code CLI"))
         XCTAssertEqual(SessionSource(vendor: "Claude", client: "Claude Code"), SessionSource(vendor: "Claude", client: nil),

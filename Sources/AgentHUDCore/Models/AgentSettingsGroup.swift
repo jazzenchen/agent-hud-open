@@ -13,21 +13,21 @@ public struct AgentSettingsGroup: Identifiable, Equatable, Sendable {
     public var displayedCount: Int { agents.filter(\.enabled).count }
     public var hasLiveStatus: Bool { SessionSource.agentVendors.contains(id) }
 
+    /// One group per vendor with something to set: rows a provider reported within the retention period, a service,
+    /// or a client found on this Mac. A client that is neither installed nor reporting has no group.
     public static func make(sources: [SourceStatus], agents: [AgentDescriptor], report: UsageReport? = nil) -> [Self] {
-        let agents = agents.filter { agent in
+        let agents = (report?.visibleRows(agents) ?? agents).filter { agent in
             guard let pool = agent.billingPool, pool.product == .plan,
                   let active = report?.activeQuotaPoolIDs?[pool.provider] else { return true }
             return active.contains(pool.id)
         }
-        func vendor(_ source: SourceStatus) -> String {
-            source.id == "chatgpt" ? "ChatGPT" : source.name
-        }
         let existing = agents.agentGroups
         var ids = existing.map(\.id)
-        for id in sources.map(vendor) + agents.map(\.vendor) + (report?.services ?? []).map(\.client)
+        let found = sources.filter { $0.state != .notDetected }.map(\.name)
+        for id in found + agents.map(\.vendor) + (report?.services ?? []).map(\.client)
             where !ids.contains(id) { ids.append(id) }
         return ids.map { id in
-            let source = sources.first { vendor($0) == id }
+            let source = sources.first { $0.name == id }
             let windows = existing.first { $0.id == id }?.agents ?? []
             let services = (report?.services ?? []).filter { $0.client == id }
             // Observations retain client-home history; display one summary per account, as quota rows do.

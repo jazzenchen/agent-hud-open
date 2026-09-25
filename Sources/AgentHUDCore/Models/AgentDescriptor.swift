@@ -41,8 +41,11 @@ public struct AgentDescriptor: Hashable, Codable, Sendable, Identifiable {
         return id
     }
 
+    /// The vendor this row is grouped under: the API provider for API-billed rows. An id, not a name to show.
     public var displayVendor: String { billingPool?.product == .api ? billingPool!.provider : vendor }
-    public var displayName: String { "\(displayVendor) · \(L10n.modelLabel(model))" }
+    /// The group's name as shown, from the vendor catalog.
+    public var vendorName: String { VendorCatalog.name(displayVendor) }
+    public var displayName: String { "\(vendorName) · \(L10n.modelLabel(model))" }
 
     /// DeepSeek exposes API balance and costs instead of subscription quota windows.
     public var isAPIBilled: Bool {

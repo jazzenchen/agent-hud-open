@@ -72,7 +72,7 @@ final class LiveStatusTests: XCTestCase {
 
     func testLiveStatusBelongsToClientsRegardlessOfQuotaWindows() {
         let names = SessionSource.agentVendors + ["GLM", "Anthropic", "ChatGPT"]
-        let sources = names.map { SourceStatus(id: $0.lowercased(), name: $0, detail: "", state: .notDetected) }
+        let sources = names.map { SourceStatus(id: $0.lowercased(), name: $0, detail: "", state: .installed) }
         let groups = AgentSettingsGroup.make(sources: sources, agents: [])
         XCTAssertEqual(Set(groups.filter(\.hasLiveStatus).map(\.id)), Set(SessionSource.agentVendors))
         XCTAssertTrue(groups.allSatisfy { $0.agents.isEmpty })

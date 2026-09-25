@@ -86,6 +86,7 @@ Reads never run in parallel: the usage store runs one pass of source reads or on
 - The last successful reading is kept with its observation time; a failed refresh keeps it and exposes the failure, and a restart restores it before the first poll.
 - When a window's reset time has passed, the row keeps the last reading and its time. A reset is confirmed only by a new reading whose reset time moved forward or that shows the window full again; until then alert evaluation treats the deadline as pending and the row displays “Pending update”. Historical accounts show no live countdown. A successful Codex response replaces that account's complete window inventory, removing omitted windows; failures retain the old inventory.
 - Kimi, GLM and OpenCode Go rows are retired — readings, cached rows and display settings — once a completed credential scan finds their credentials expired, removed or rejected; a temporary network failure retires nothing.
+- A row no provider has reported for 30 days retires with its reading, whatever stopped it: a client uninstalled, a window the service dropped, a vendor no longer read. Until a provider reports a row it is not shown anywhere, and its stored display switch and position wait for it.
 - Quota histories keep 30 days.
 - A running session leaves the running indicator 120 s after its last source observation and stays in history without an invented end time.
 

@@ -85,6 +85,9 @@ public struct UsageReport: Hashable, Codable, Sendable {
     public let sessionUsage: [String: SessionUsage]?
     /// Every model's tokens today and over the last seven and thirty days; `usage` covers only the charts' week.
     public let periods: UsagePeriods?
+    /// When a provider last reported each row of `discoveredAgents`, in reports kept across passes; a single read and the
+    /// demo have none. Rows it does not list are not shown, and a row unseen for the retention period leaves the report.
+    public let rowSeenAt: [String: Date]?
 
     public init(
         generatedAt: Date,
@@ -109,10 +112,12 @@ public struct UsageReport: Hashable, Codable, Sendable {
         accounts: [String: [AccountObservation]]? = nil,
         forgottenAccountProviders: Set<String>? = nil,
         sessionUsage: [String: SessionUsage]? = nil,
-        periods: UsagePeriods? = nil
+        periods: UsagePeriods? = nil,
+        rowSeenAt: [String: Date]? = nil
     ) {
         self.sessionUsage = sessionUsage
         self.periods = periods
+        self.rowSeenAt = rowSeenAt
         self.accounts = accounts
         self.forgottenAccountProviders = forgottenAccountProviders
         self.services = services
@@ -138,5 +143,12 @@ public struct UsageReport: Hashable, Codable, Sendable {
 
     public func snapshot(for agentId: String) -> UsageSnapshot? {
         snapshots.first { $0.agentId == agentId }
+    }
+
+    /// The rows of `agents` a provider reported within the retention period. A report that keeps no sighting times
+    /// (a single read, the demo) shows them all.
+    public func visibleRows(_ agents: [AgentDescriptor]) -> [AgentDescriptor] {
+        guard let rowSeenAt else { return agents }
+        return agents.filter { rowSeenAt[$0.id] != nil }
     }
 }

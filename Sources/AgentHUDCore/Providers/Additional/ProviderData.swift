@@ -53,6 +53,7 @@ public enum AdditionalSource: String, CaseIterable, Sendable {
         }
         return paths.contains { FileManager.default.fileExists(atPath: home.appendingPathComponent($0).path) }
             || FileManager.default.fileExists(atPath: "/Applications/\(vendor).app")
+            || !VendorCatalog.applications(vendor).isEmpty
     }
 }
 

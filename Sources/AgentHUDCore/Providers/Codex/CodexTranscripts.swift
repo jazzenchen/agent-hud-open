@@ -85,10 +85,14 @@ public struct CodexTranscript: Codable, Sendable {
                 parentThreadID = payload["parent_thread_id"] as? String
                     ?? (subagent["thread_spawn"] as? [String: Any])?["parent_thread_id"] as? String
             }
-            // CLI launched from Desktop can inherit its originator; the rollout's source is authoritative.
+            // CLI launched from Desktop can inherit its originator; the rollout's source is authoritative. Otherwise the
+            // originator names the client, and one the vendor catalog does not name is shown as written.
             if source == "cli" { client = "CLI" }
             else if source == "exec" { client = "CLI · exec" }
-            else if origin == "Codex Desktop" { client = "Desktop" }
+            else if let origin, !origin.isEmpty {
+                if let named = VendorCatalog.client(origin, vendor: "Codex") { client = named }
+                else { client = origin; VendorCatalog.noteUnnamed(origin, kind: "Codex client") }
+            }
             else if source == "vscode" { client = "IDE" }
             return
         }

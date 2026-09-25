@@ -82,7 +82,7 @@ struct AgentCards: View {
         let found = groups.filter { group in
             let installed = group.source.map { source in
                 switch source.state {
-                case .notDetected, .needsAuthorization: false
+                case .notDetected: false
                 case .ready, .installed, .unavailable: true
                 }
             } ?? false
@@ -101,7 +101,7 @@ struct AgentCards: View {
                 })) {
                     HStack(spacing: 6) {
                         AgentLogo(vendor: vendor, size: 12)
-                        Text(vendor)
+                        Text(VendorCatalog.name(vendor))
                         Spacer(minLength: 16)
                         Text(usage[vendor].map { TokenFormat.short(store.tokenDimensions.count($0.tokens)) } ?? "—")
                             .font(.tabular(11)).foregroundStyle(theme.secondary)
@@ -222,7 +222,7 @@ private struct AgentCard: View {
             AgentLogo(vendor: vendor, size: 14)
                 .frame(width: 26, height: 26)
                 .background(RoundedRectangle(cornerRadius: 6).fill(accent.opacity(0.18)))
-            Text(vendor).font(.ui(13, .semibold)).lineLimit(1)
+            Text(VendorCatalog.name(vendor)).font(.ui(13, .semibold)).lineLimit(1)
             Spacer(minLength: 4)
             if let share {
                 Text(L10n.text("占 ", "") + share)

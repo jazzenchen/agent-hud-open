@@ -14,7 +14,7 @@ struct QuotaAlertCompactView: View {
             HStack(spacing: 0) {
                 HStack(spacing: 8) {
                     AgentLogo(vendor: alert.agent.vendor, size: 17)
-                    Text(alert.agent.displayVendor)
+                    Text(alert.agent.vendorName)
                         .font(.ui(13, .semibold)).foregroundStyle(.white).lineLimit(1)
                 }
                 .frame(width: IslandController.alertWingWidth, alignment: .leading)
@@ -48,7 +48,7 @@ struct QuotaAlertDetailView: View {
             HStack(spacing: 9) {
                 AgentLogo(vendor: alert.agent.vendor, size: 22)
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(alert.agent.displayVendor).font(.ui(13, .semibold)).foregroundStyle(.white)
+                    Text(alert.agent.vendorName).font(.ui(13, .semibold)).foregroundStyle(.white)
                     Text(L10n.modelLabel(alert.agent.model)).font(.ui(10)).foregroundStyle(.white.opacity(0.42))
                 }
                 Spacer(minLength: 8)

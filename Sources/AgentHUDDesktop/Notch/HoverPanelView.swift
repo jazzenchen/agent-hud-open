@@ -265,7 +265,7 @@ private struct ProviderQuotaBlock: View {
             HStack(spacing: 6) {
                 AgentLogo(vendor: vendor, size: 14)
                     .frame(width: IslandRowLayout.inset * 2 + IslandRowLayout.markerWidth)
-                Text(vendor)
+                Text(VendorCatalog.name(vendor))
                     .font(IslandRowLayout.headingFont)
                     .foregroundStyle(theme.text)
                 if store.isLoading {
@@ -548,7 +548,7 @@ struct ModelUsageRow: View {
     private var nameText: Text {
         let label = L10n.modelLabel(row.agent.model)
         if showVendor {
-            return Text(row.agent.displayVendor).fontWeight(.semibold) + Text(" · \(label)").foregroundColor(theme.secondary)
+            return Text(row.agent.vendorName).fontWeight(.semibold) + Text(" · \(label)").foregroundColor(theme.secondary)
         }
         return Text(label).fontWeight(.semibold)
     }

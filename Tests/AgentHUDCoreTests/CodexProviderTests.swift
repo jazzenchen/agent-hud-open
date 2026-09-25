@@ -330,6 +330,27 @@ final class CodexProviderTests: XCTestCase {
                        "initialize\ninitialized\naccount/rateLimits/read\naccount/read\n")
     }
 
+    func testClientsTheCatalogDoesNotNameAreShownAsWritten() {
+        for (origin, source, expected) in [("codex_work_desktop", "vscode", "codex_work_desktop"), ("vibearound", "vscode", "vibearound"),
+                                           ("codex_vscode", "vscode", "IDE"), ("Codex Desktop", "vscode", "Desktop")] {
+            var t = CodexTranscript()
+            ingest(&t, type: "session_meta", payload: ["id":"session", "cwd":"/project", "source":source, "originator":origin])
+            XCTAssertEqual(t.client, expected, "\(origin) from \(source)")
+        }
+        var legacy = CodexTranscript()
+        ingest(&legacy, type: "session_meta", payload: ["id":"session", "cwd":"/project", "source":"vscode"])
+        XCTAssertEqual(legacy.client, "IDE", "rollouts without an originator keep the extension's name")
+        XCTAssertTrue(VendorCatalog.unnamed["Codex client"]?.contains("codex_work_desktop") == true)
+    }
+
+    func testWindowNamesComeFromTheCatalogOrTheService() throws {
+        let limits = try decode(#"{"rateLimitsByLimitId":{"codex":{"primary":{"usedPercent":3,"windowDurationMins":300}},"base_model_inference":{"limitName":"gpt-reserve","primary":{"usedPercent":0,"windowDurationMins":10080}},"codex_next":{"limitName":"Next Model","primary":{"usedPercent":5,"windowDurationMins":10080}}}}"#)
+        let labels = Dictionary(uniqueKeysWithValues: limits.rows.map { ($0.id, $0.label) })
+        XCTAssertEqual(labels["codex"], "5h")
+        XCTAssertEqual(labels["codex:base_model_inference:primary"], "Luna Reserve · Weekly", "the name OpenAI's own client shows")
+        XCTAssertEqual(labels["codex:codex_next:primary"], "Next Model · Weekly", "a window the catalog does not name keeps the service's name")
+    }
+
     func testLocatorWorksWithoutDesktopOrWithoutCLI() throws {
         let dir = try temporaryDirectory()
         defer { try? FileManager.default.removeItem(at: dir) }
@@ -338,13 +359,30 @@ final class CodexProviderTests: XCTestCase {
         try FileManager.default.createDirectory(at: cli.deletingLastPathComponent(), withIntermediateDirectories: true)
         try "#!/bin/sh\n".write(to: cli, atomically: true, encoding: .utf8)
         try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: cli.path)
-        XCTAssertEqual(CodexLocator.find(home: dir, applications: apps, path: ""), cli)
+        XCTAssertEqual(CodexLocator.find(home: dir, applications: apps, path: "", registered: []), cli)
         try FileManager.default.removeItem(at: cli)
         let desktop = apps.appendingPathComponent("Codex.app/Contents/Resources/codex")
         try FileManager.default.createDirectory(at: desktop.deletingLastPathComponent(), withIntermediateDirectories: true)
         try "#!/bin/sh\n".write(to: desktop, atomically: true, encoding: .utf8)
         try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: desktop.path)
-        XCTAssertEqual(CodexLocator.find(home: dir, applications: apps, path: ""), desktop)
+        XCTAssertEqual(CodexLocator.find(home: dir, applications: apps, path: "", registered: []), desktop)
+    }
+
+    func testLocatorFindsTheAppUnderItsBundleIDWhateverItIsCalled() throws {
+        let dir = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let renamed = dir.appendingPathComponent("Elsewhere/Renamed.app")
+        let engine = renamed.appendingPathComponent("Contents/Resources/codex")
+        try FileManager.default.createDirectory(at: engine.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try "#!/bin/sh\n".write(to: engine, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: engine.path)
+        let cli = dir.appendingPathComponent(".bun/bin/codex")
+        try FileManager.default.createDirectory(at: cli.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try "#!/bin/sh\n".write(to: cli, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: cli.path)
+        let apps = dir.appendingPathComponent("Applications")
+        XCTAssertEqual(CodexLocator.find(home: dir, applications: apps, path: "", registered: [renamed]), engine,
+                       "the app's own engine is preferred to the CLI even under a name the locator does not know")
     }
 
     func testASessionNamesTheRolloutsOfItsSpawnedAgentsAndGuardians() async throws {
@@ -360,7 +398,7 @@ final class CodexProviderTests: XCTestCase {
             try (line(type: "session_meta", payload: meta) + "\n").write(to: dir.appendingPathComponent(name), atomically: true, encoding: .utf8)
         }
         let provider = CodexUsageProvider(readLimits: { throw UsageProviderError("signed out") }, transcripts: CodexTranscriptStore(roots: [dir]), history: QuotaHistoryStore())
-        let report = try await provider.fetchAccountAndLocalUsage(agents: DefaultAgents.list, historyHours: 48)
+        let report = try await provider.fetchAccountAndLocalUsage(agents: [], historyHours: 48)
         let sessions = Dictionary(uniqueKeysWithValues: report.sessions.map { ($0.id, $0) })
         XCTAssertEqual(Set(sessions.keys), ["parent", "other"], "sub-agents are not sessions of their own")
         XCTAssertEqual(sessions["parent"]?.subagentTranscripts?.map { URL(fileURLWithPath: $0).lastPathComponent },
@@ -374,7 +412,8 @@ final class CodexProviderTests: XCTestCase {
         let contents = line(type: "session_meta", payload: ["id":"cli", "source":"cli", "cwd":"/project"]) + "\n" + line(payload: ["type":"task_started"]) + "\n"
         try contents.write(to: dir.appendingPathComponent("rollout-cli.jsonl"), atomically: true, encoding: .utf8)
         let provider = CodexUsageProvider(readLimits: { throw UsageProviderError("signed out") }, transcripts: CodexTranscriptStore(roots: [dir]), history: QuotaHistoryStore())
-        let report = try await provider.fetchAccountAndLocalUsage(agents: DefaultAgents.list, historyHours: 48)
+        let known = AgentDescriptor(id: "codex", vendor: "Codex", model: "5h", source: L10n.sourceCodexAppServer, enabled: true)
+        let report = try await provider.fetchAccountAndLocalUsage(agents: [known], historyHours: 48)
         XCTAssertEqual(report.sessions.first?.client, "CLI")
         let session = try XCTUnwrap(report.sessions.first)
         XCTAssertTrue(report.consumerIdsByQuota["codex"]?.contains(session.agentId) == true)

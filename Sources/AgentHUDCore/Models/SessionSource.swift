@@ -29,11 +29,11 @@ public struct SessionSource: Hashable, Sendable {
 
     public var name: String {
         switch (vendor, client) {
-        case ("Codex", "Desktop"): return "Codex Desktop"
-        case ("Codex", "CLI"): return "Codex CLI"
-        case ("Codex", "IDE"): return "Codex IDE extension"
+        case ("Codex", "Desktop"): return VendorCatalog.name("Codex") + " Desktop"
+        case ("Codex", "CLI"): return VendorCatalog.name("Codex") + " CLI"
+        case ("Codex", "IDE"): return VendorCatalog.name("Codex") + " IDE extension"
         case ("Claude", nil): return ClaudeEntrypoint.defaultLabel
-        default: return client ?? vendor ?? L10n.text("未知来源", "Unknown source")
+        default: return client ?? vendor.map(VendorCatalog.name) ?? L10n.text("未知来源", "Unknown source")
         }
     }
 

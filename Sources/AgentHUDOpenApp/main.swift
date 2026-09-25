@@ -23,7 +23,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
         let defaults = options.demo ? UserDefaults(suiteName: demoSuite)! : .standard
-        let settings = SettingsStore(defaults: defaults, defaultAgents: options.demo ? DemoData.everyAgent : DefaultAgents.list)
+        let settings = SettingsStore(defaults: defaults, defaultAgents: options.demo ? DemoData.everyAgent : [])
         if let language = options.language { settings.update { $0.language = language } }
         L10n.setLanguage(settings.settings.language)
         let ledger: UsageLedger? = options.demo ? nil : .open()
@@ -34,6 +34,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     await provider.refreshAccountUsage(historyHours: 48)
                     let report = try await provider.fetchUsage(agents: settings.agents, historyHours: 48)
                     print("Quota windows: \(report.snapshots.count); sessions: \(report.sessions.count); live: \(report.sessions.filter(\.isLive).count); billing accounts: \(report.billing.count)")
+                    for (kind, values) in VendorCatalog.unnamed.sorted(by: { $0.key < $1.key }) {
+                        print("Unnamed \(kind): \(values.sorted().joined(separator: ", "))")
+                    }
                     exit(0)
                 } catch {
                     FileHandle.standardError.write(Data("Usage probe failed: \(error.localizedDescription)\n".utf8))

@@ -145,17 +145,16 @@ public enum ClaudeModelMapper {
 /// Which Claude Code surface drives a session, from the transcript's `entrypoint` (`CLAUDE_CODE_ENTRYPOINT`).
 /// The label is stored as the session's client, so synced peers and the iOS app show it without knowing the ids.
 public enum ClaudeEntrypoint {
-    /// Builds before the field existed, and ids this build does not know.
+    /// Builds before the field existed.
     public static let defaultLabel = "Claude Code"
 
+    /// Named surfaces come from the vendor catalog; an id it does not name is shown as written.
     public static func clientLabel(_ entrypoint: String?) -> String {
-        switch entrypoint {
-        case "cli": return "Claude Code CLI"
-        case "claude-desktop": return "Claude Code Desktop"
-        case "claude-vscode": return "Claude Code IDE extension"
-        case let sdk? where sdk.hasPrefix("sdk-"): return "Claude Agent SDK"
-        default: return defaultLabel
-        }
+        guard let entrypoint, !entrypoint.isEmpty else { return defaultLabel }
+        if let named = VendorCatalog.client(entrypoint, vendor: "Claude") { return named }
+        if entrypoint.hasPrefix("sdk-") { return "Claude Agent SDK" }
+        VendorCatalog.noteUnnamed(entrypoint, kind: "Claude client")
+        return entrypoint
     }
 }
 

@@ -254,8 +254,13 @@ public final class UsageStore {
 
     // MARK: Derived
 
+    /// Rows a provider reported within the retention period, in the user's order. Settings keep the switch and place
+    /// of a row that stopped being reported, so it comes back as it was; until then it is not shown anywhere.
+    public var visibleAgents: [AgentDescriptor] { report?.visibleRows(settings.agents) ?? settings.agents }
+
     public var enabledAgents: [AgentDescriptor] {
-        settings.enabledAgents.filter { agent in
+        visibleAgents.filter { agent in
+            guard agent.enabled else { return false }
             guard let pool = agent.billingPool, pool.product == .plan else { return true }
             guard let report else { return false }
             return report.activeQuotaPoolIDs?[pool.provider]?.contains(pool.id) ?? true

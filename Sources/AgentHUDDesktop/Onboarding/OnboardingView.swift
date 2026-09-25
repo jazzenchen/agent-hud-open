@@ -10,9 +10,9 @@ struct OnboardingView: View {
     let onFinish: () -> Void
     @Environment(\.colorScheme) private var scheme
 
-    /// Once the first poll has answered, the Claude Code row shows the real plan ("已就绪 · Max").
+    /// Clients found on this Mac. Once the first poll has answered, the Claude Code row shows the real plan ("已就绪 · Max").
     private var resolvedSources: [SourceStatus] {
-        SourceDetector.resolve(sources, report: store.report)
+        SourceDetector.resolve(sources, report: store.report).filter { $0.state != .notDetected }
     }
 
     var body: some View {
@@ -70,10 +70,10 @@ struct SourceRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            AgentLogo(vendor: source.id == "chatgpt" ? "ChatGPT" : source.name, size: 20)
+            AgentLogo(vendor: source.name, size: 20)
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 8) {
-                    Text(source.name).font(.ui(13, .semibold))
+                    Text(VendorCatalog.name(source.name)).font(.ui(13, .semibold))
                     if let plan = source.planLabel {
                         PlanBadge(plan: plan, theme: theme)
                     }

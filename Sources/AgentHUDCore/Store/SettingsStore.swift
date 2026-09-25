@@ -23,7 +23,8 @@ public final class SettingsStore {
         public static let onboarding = "onboarding.completed.v1"
     }
 
-    public init(defaults: UserDefaults = .standard, defaultAgents: [AgentDescriptor] = DefaultAgents.list) {
+    /// Rows come from providers; `defaultAgents` seeds a store for the demo and tests.
+    public init(defaults: UserDefaults = .standard, defaultAgents: [AgentDescriptor] = []) {
         self.defaults = defaults
         let decoder = JSONDecoder()
         if let data = defaults.data(forKey: Keys.settings), let stored = try? decoder.decode(Settings.self, from: data) {
@@ -32,13 +33,8 @@ public final class SettingsStore {
             settings = Settings()
         }
         if let data = defaults.data(forKey: Keys.agents), let stored = try? decoder.decode([AgentDescriptor].self, from: data), !stored.isEmpty {
-            // Only observed subscriptions belong in the agent catalog.
-            agents = stored.map { agent in
-                guard agent.id == "chatgpt", agent.vendor == "ChatGPT", agent.model == "Plus",
-                      agent.source == L10n.sourceBrowserAuth else { return agent }
-                return AgentDescriptor(id: agent.id, vendor: agent.vendor, model: "ChatGPT", source: agent.source,
-                    enabled: agent.enabled, connected: agent.connected, billingPool: agent.billingPool)
-            }.groupedAgentOrder
+            // Only seeded placeholders are unconnected: a provider reports the rows it reads, connected.
+            agents = stored.filter(\.connected).groupedAgentOrder
         } else {
             agents = defaultAgents.groupedAgentOrder
         }
@@ -84,8 +80,9 @@ public final class SettingsStore {
     }
 
     /// Adds rows a provider discovered (in the order given) and refreshes model names of known rows.
-    /// New rows for a vendor go right after that vendor's last existing row, or at the top when the vendor is new,
-    /// so the user's manual order is preserved.
+    /// New rows for a vendor go right after that vendor's last existing row; vendors new to the list go to the top in
+    /// the order the providers gave them, switched off when the vendor catalog starts them hidden. The user's manual
+    /// order is preserved.
     /// Account rows: the first identified account takes over an unscoped row's position and switch, a further account's
     /// window inherits the switch of the same window on another account, and rows of accounts absent from a provider's
     /// inventory are removed.
@@ -121,20 +118,13 @@ public final class SettingsStore {
                     .map { $0.with(enabled: placeholder.enabled) }
                 list.insert(contentsOf: replacements, at: index)
             }
-            // Replace the old disconnected Antigravity placeholder when real quota buckets arrive.
-            if discovered.contains(where: { $0.vendor == "Antigravity" && $0.windowKey.hasPrefix("antigravity:") }),
-               let index = list.firstIndex(where: { $0.id == "antigravity" && $0.source == L10n.sourceNotConnected }) {
-                let placeholder = list.remove(at: index)
-                let replacements = discovered.filter { found in found.vendor == "Antigravity" && !list.contains(where: { $0.id == found.id }) }.map {
-                    $0.with(enabled: placeholder.enabled)
-                }
-                list.insert(contentsOf: replacements, at: index)
-            }
             // Unscoped rows of a provider that now identifies accounts have been taken over or no longer exist.
             list.removeAll { agent in
                 agent.account == nil && agent.billingPool == nil && accounts?[agent.vendor]?.isEmpty == false
                     && !discovered.contains { $0.id == agent.id }
             }
+            let listed = Set(list.map(\.vendor))
+            var arriving: [AgentDescriptor] = []
             for found in discovered {
                 if let index = list.firstIndex(where: { $0.id == found.id }) {
                     let existing = list[index]
@@ -147,9 +137,14 @@ public final class SettingsStore {
                     }
                     continue
                 }
+                guard listed.contains(found.vendor) else {
+                    arriving.append(VendorCatalog.startsHidden(found.vendor) ? found.with(enabled: false) : found)
+                    continue
+                }
                 let anchor = list.lastIndex { $0.vendor == found.vendor }
                 list.insert(found, at: anchor.map { $0 + 1 } ?? 0)
             }
+            list.insert(contentsOf: arriving, at: 0)
             return list
         }()
         saveAgents(merged, change: .discovery)

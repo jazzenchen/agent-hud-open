@@ -611,7 +611,7 @@ final class ClaudeCodeProviderTests: XCTestCase {
             history: history,
             clock: { now }
         )
-        let report = try await provider.fetchAccountAndLocalUsage(agents: DefaultAgents.list, historyHours: 48)
+        let report = try await provider.fetchAccountAndLocalUsage(agents: [], historyHours: 48)
         XCTAssertNil(report.notice)
         XCTAssertEqual(report.subscriptions, ["Claude": "max"])
 
@@ -659,7 +659,7 @@ final class ClaudeCodeProviderTests: XCTestCase {
         XCTAssertEqual(try XCTUnwrap(report.insightsByAgent[account.windowID("claude-weekly")]?.burnRatePctPerHour), 39.0 / 120, accuracy: 1e-6,
                        "the weekly forecast includes readings older than the selected 48-hour statistics range")
         XCTAssertEqual(try XCTUnwrap(report.insightsByAgent[account.windowID("claude-weekly-opus")]?.burnRatePctPerHour), 51.0 / 48, accuracy: 1e-6)
-        _ = try await provider.fetchAccountAndLocalUsage(agents: DefaultAgents.list, historyHours: 48)
+        _ = try await provider.fetchAccountAndLocalUsage(agents: [], historyHours: 48)
         let stored = await history.samples(agentId: account.windowID(ClaudeUsage.sessionRowId), since: .distantPast)
         XCTAssertEqual(stored.count, 2, "each engine observation appends one sample; a poll served from the cache does not")
     }
@@ -679,7 +679,7 @@ final class ClaudeCodeProviderTests: XCTestCase {
             history: QuotaHistoryStore(),
             clock: { now }
         )
-        let report = try await provider.fetchAccountAndLocalUsage(agents: DefaultAgents.list, historyHours: 48)
+        let report = try await provider.fetchAccountAndLocalUsage(agents: [], historyHours: 48)
         XCTAssertNil(report.notice)
         XCTAssertEqual(report.subscriptions, ["Claude": "max"])
         let account = ProviderAccount.unresolved(provider: "Claude", home: "")
@@ -730,7 +730,7 @@ final class ClaudeCodeProviderTests: XCTestCase {
             history: QuotaHistoryStore(),
             clock: { now }
         )
-        let report = try await provider.fetchAccountAndLocalUsage(agents: DefaultAgents.list, historyHours: 48)
+        let report = try await provider.fetchAccountAndLocalUsage(agents: [], historyHours: 48)
         XCTAssertEqual(report.notice, "当前登录方式没有订阅额度（API key 或第三方平台）")
         XCTAssertTrue(report.snapshots.isEmpty)
         XCTAssertEqual(report.sessions.map(\.id), ["k"], "sessions still come from local logs")
@@ -743,7 +743,7 @@ final class ClaudeCodeProviderTests: XCTestCase {
             history: QuotaHistoryStore()
         )
         do {
-            _ = try await provider.fetchAccountAndLocalUsage(agents: DefaultAgents.list, historyHours: 48)
+            _ = try await provider.fetchAccountAndLocalUsage(agents: [], historyHours: 48)
             XCTFail("expected failure")
         } catch let error as ClaudeDataError {
             XCTAssertEqual(error, .engineFailed("boom\n"))
@@ -759,7 +759,7 @@ final class ClaudeCodeProviderTests: XCTestCase {
             history: QuotaHistoryStore()
         )
         do {
-            _ = try await provider.fetchAccountAndLocalUsage(agents: DefaultAgents.list, historyHours: 48)
+            _ = try await provider.fetchAccountAndLocalUsage(agents: [], historyHours: 48)
             XCTFail("expected failure")
         } catch let error as ClaudeDataError {
             XCTAssertEqual(error, .engineNotFound)
