@@ -149,9 +149,10 @@ func niceStep(_ peak: Int, count: Int = 3) -> Int {
 }
 
 /// The new tokens of each bar, stacked by kind with the sub-agents' part faded on top, or what each turn's calls would
-/// cost at list prices; cache reads are drawn apart as the context. A ring above a bar marks a turn that sent its context
-/// again because the cache no longer held it. The bar under the pointer gets its whole column lit and a card with its
-/// details, so a turn that added almost nothing is as easy to inspect as any other.
+/// cost at list prices; cache reads are drawn apart as the context. Above a bar, an arrow marks a turn or call that sent
+/// its context again because the cache no longer held it, and a stack of layers a turn that sub-agents helped with. The
+/// bar under the pointer gets its whole column lit and a card with its details, so a turn that added almost nothing is as
+/// easy to inspect as any other.
 struct SessionBarsChart: View {
     static let stacked: [TokenKind] = [.cacheWrite, .input, .reasoning, .output]
     /// A bar with tokens is never drawn lower than this.
@@ -171,8 +172,42 @@ struct SessionBarsChart: View {
     var onSelect: ((Int) -> Void)? = nil
     private let axisWidth: CGFloat = 36
     private let height: CGFloat = 150
-    /// Room above the tallest bar for its ring.
-    private let headroom: CGFloat = 12
+
+    /// Room above the tallest bar for its mark.
+    private let headroom: CGFloat = 13
+
+    /// The marks above bars.
+    enum Marker: Hashable { case resent, subagents }
+
+    static let resentSymbol = "arrow.clockwise"
+    static let subagentsSymbol = "square.stack.3d.up.fill"
+    /// Cost bars are one colour, softened to sit with the kinds' hues.
+    static func costColor(_ theme: Theme) -> Color { theme.status(.ok).opacity(0.8) }
+
+
+    /// One mark stands centred above its bar. With both, the stack sits behind to the left and the arrow in front to the
+    /// right, with a thin gap cut out of the stack around it.
+    static func drawMarks(resent: Bool, helped: Bool, arrow: GraphicsContext.ResolvedSymbol, stack: GraphicsContext.ResolvedSymbol,
+                          at point: CGPoint, in context: inout GraphicsContext) {
+        switch (resent, helped) {
+        case (true, true):
+            let back = CGPoint(x: point.x - 1.8, y: point.y), front = CGPoint(x: point.x + 1.8, y: point.y)
+            // Symbols ignore blend modes, so the gap is a clip: the stack keeps out of the arrow and a ring around it.
+            var behind = context
+            behind.clipToLayer(options: .inverse) { clip in
+                clip.draw(arrow, at: front, anchor: .bottom)
+                for step in 0..<12 {
+                    let angle = Double(step) / 12 * 2 * .pi
+                    clip.draw(arrow, at: CGPoint(x: front.x + 1.1 * cos(angle), y: front.y + 1.1 * sin(angle)), anchor: .bottom)
+                }
+            }
+            behind.draw(stack, at: back, anchor: .bottom)
+            context.draw(arrow, at: front, anchor: .bottom)
+        case (true, false): context.draw(arrow, at: point, anchor: .bottom)
+        case (false, true): context.draw(stack, at: point, anchor: .bottom)
+        case (false, false): break
+        }
+    }
 
     var body: some View {
         let values = bars.map { $0.value(measure) }
@@ -222,11 +257,11 @@ struct SessionBarsChart: View {
                                 for kind in Self.stacked where part[kind] > 0 { stack(part[kind], theme.kind(kind).opacity(opacity)) }
                             }
                         case .cost:
-                            stack(values[index], theme.text.opacity(0.6))
+                            stack(values[index], Self.costColor(theme))
                         }
-                        if bar.recached != nil {
-                            barContext.stroke(Path(ellipseIn: CGRect(x: frame.center - 3, y: y - 9, width: 6, height: 6)),
-                                              with: .color(theme.text.opacity(0.85)), lineWidth: 1.2)
+                        if let arrow = context.resolveSymbol(id: Marker.resent), let stack = context.resolveSymbol(id: Marker.subagents) {
+                            Self.drawMarks(resent: bar.recached != nil, helped: axis == .turn && bar.subagents != nil, arrow: arrow,
+                                           stack: stack, at: CGPoint(x: frame.center, y: y - 2), in: &barContext)
                         }
                     }
                     if running, let last = bars.indices.last {
@@ -234,6 +269,10 @@ struct SessionBarsChart: View {
                         context.stroke(Path(roundedRect: CGRect(x: frame.x - 1.5, y: height - h - 1.5, width: frame.width + 3, height: h + 1.5),
                                             cornerRadius: 1.5), with: .color(theme.text.opacity(0.9)), lineWidth: 1)
                     }
+                } symbols: {
+                    Image(systemName: Self.resentSymbol).font(.system(size: 8, weight: .bold)).foregroundStyle(theme.status(.warning))
+                        .tag(Marker.resent)
+                    Image(systemName: Self.subagentsSymbol).font(.system(size: 8)).foregroundStyle(theme.secondary).tag(Marker.subagents)
                 }
                 .frame(width: plot, height: height)
                 ForEach(Array(stride(from: 0, through: top, by: step)), id: \.self) { value in
@@ -344,7 +383,7 @@ struct SessionBarDetail: View {
         return [bar.call.flatMap { $0.received.isEmpty ? nil : L10n.text("读入 \(names($0.received)) 的结果", "Read in \(names($0.received)) results") },
                 bar.call.flatMap { $0.tools.isEmpty ? nil : L10n.text("发起 ", "Asked for ") + names($0.tools) },
                 bar.call == nil ? bar.subagents.map { L10n.text("子 agent 新增 ", "Sub-agents added ") + TokenFormat.short($0.new) } : nil,
-                bar.recached.map { L10n.text("缓存重写 ", "Cache rewrite ") + TokenFormat.short($0) },
+                bar.recached.map { L10n.text("缓存过期，重发 \(TokenFormat.short($0))", "Cache expired, \(TokenFormat.short($0)) sent again") },
                 bar.context.map { L10n.text("上下文 ", "Context ") + TokenFormat.short($0)
                     + (bar.peakContext.map { L10n.text(" · 轮中最高 ", " · peak ") + TokenFormat.short($0) } ?? "") }].compactMap { $0 }
     }

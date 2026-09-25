@@ -141,6 +141,7 @@ struct SessionDetailView: View {
         let measure = priced ? self.measure : .tokens
         let shown = measure == .cost ? [] : SessionBarsChart.stacked.filter { kind in bars.contains { $0.kinds[kind] > 0 } }
         let hasContext = bars.contains { $0.context != nil }
+        let helped = byTurn && bars.contains { $0.subagents != nil }, resent = bars.contains { $0.recached != nil }
         return VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Text(!byTurn ? L10n.text("Token 消耗", "Tokens over time")
@@ -162,22 +163,9 @@ struct SessionDetailView: View {
                 }
                 if measure == .cost {
                     HStack(spacing: 5) {
-                        RoundedRectangle(cornerRadius: 2).fill(theme.text.opacity(0.6)).frame(width: 7, height: 7)
+                        RoundedRectangle(cornerRadius: 2).fill(SessionBarsChart.costColor(theme)).frame(width: 7, height: 7)
                         Text(L10n.text("按 API 价，含缓存读取", "At API prices, cache reads included"))
                     }
-                } else if bars.contains(where: { $0.subagents != nil }) {
-                    HStack(spacing: 5) {
-                        RoundedRectangle(cornerRadius: 2).fill(theme.text.opacity(SessionBarsChart.subagentOpacity)).frame(width: 7, height: 7)
-                        Text(L10n.text("淡色为子 agent", "Faded: sub-agents"))
-                    }
-                }
-                if bars.contains(where: { $0.recached != nil }) {
-                    HStack(spacing: 5) {
-                        Circle().stroke(theme.text.opacity(0.85), lineWidth: 1.2).frame(width: 6, height: 6)
-                        Text(L10n.text("缓存重写", "Cache rewrite"))
-                    }
-                    .help(L10n.text("缓存已失效（多半是空闲超过缓存时长）或换了模型，这一轮把上下文重新发送了一遍",
-                                    "The cache had lapsed, usually after sitting idle, or the model changed, so the turn sent its context again"))
                 }
                 Spacer(minLength: 8)
                 Text(byTurn ? L10n.text("悬停看一轮，点击看它的每次调用", "Hover a turn; click for its calls")
@@ -185,6 +173,29 @@ struct SessionDetailView: View {
             }
             .font(.ui(10))
             .foregroundStyle(theme.secondary)
+            // The marks above bars get a line of their own.
+            if helped || resent {
+                HStack(spacing: 12) {
+                    if helped {
+                        HStack(spacing: 4) {
+                            Image(systemName: SessionBarsChart.subagentsSymbol).font(.system(size: 8))
+                            Text(measure == .cost ? L10n.text("子 agent 参与", "Sub-agents helped")
+                                 : L10n.text("子 agent 参与，淡色为其部分", "Sub-agents helped, their part faded"))
+                        }
+                    }
+                    if resent {
+                        HStack(spacing: 4) {
+                            Image(systemName: SessionBarsChart.resentSymbol).font(.system(size: 8, weight: .bold))
+                                .foregroundStyle(theme.status(.warning))
+                            Text(L10n.text("缓存过期，上下文重发", "Cache expired, context sent again"))
+                        }
+                        .help(L10n.text("缓存已失效（多半是空闲超过缓存时长）或换了模型，这一轮把上下文重新发送了一遍",
+                                        "The cache had lapsed, usually after sitting idle, or the model changed, so the turn sent its context again"))
+                    }
+                }
+                .font(.ui(10))
+                .foregroundStyle(theme.secondary)
+            }
             SessionBarsChart(bars: bars, axis: byTurn ? .turn : .time, measure: measure, running: byTurn && store.isSessionLive(session),
                              theme: theme, inspected: $inspected, selected: byTurn ? store.focusedTurn : nil,
                              onSelect: byTurn ? { index in store.focusedTurn = store.focusedTurn == index ? nil : index } : nil)
