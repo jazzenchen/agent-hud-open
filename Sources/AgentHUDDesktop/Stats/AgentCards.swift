@@ -58,7 +58,7 @@ struct AgentCards: View {
 
     /// Three cards to a row, and two to each of the last two rows where three would leave one alone; a row's cards share
     /// its width.
-    static func rows<T>(_ cards: [T]) -> [[T]] {
+    nonisolated static func rows<T>(_ cards: [T]) -> [[T]] {
         var sizes = Array(repeating: 3, count: cards.count / 3)
         switch cards.count % 3 {
         case 2: sizes.append(2)
