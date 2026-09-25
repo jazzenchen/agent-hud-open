@@ -382,8 +382,8 @@ final class DeepSeekProviderTests: XCTestCase {
         }
         let sample = DeepSeekTranscript.Usage(timestamp: now, requestedAt: now, provider: "deepseek-official",
                                              model: "deepseek-v4-flash", input: 8086, cachedInput: 0, output: 58)
-        XCTAssertEqual(DeepSeekPricing.estimate(sample, currency: "CNY"), Decimal(string: "0.01239"))
-        XCTAssertEqual(DeepSeekPricing.estimate(sample, currency: "USD"), Decimal(string: "0.0018172"))
+        XCTAssertEqual(DeepSeekPricing.estimate(sample, currency: "CNY"), Decimal(string: "0.008318"))
+        XCTAssertEqual(DeepSeekPricing.estimate(sample, currency: "USD"), Decimal(string: "0.0012477"))
         XCTAssertNil(DeepSeekPricing.estimate(sample, currency: "EUR"))
         let peak = DeepSeekTranscript.Usage(timestamp: now, requestedAt: formatter.date(from: "2026-09-07T03:59:59Z")!,
                                            provider: "deepseek-official", model: "deepseek-v4-pro", input: 1_000_000, cachedInput: 1_000_000, output: 1_000_000)
@@ -414,14 +414,14 @@ final class DeepSeekProviderTests: XCTestCase {
         XCTAssertEqual(report.sessions[0].tokensIn, 8086)
         let recorded = await transcripts.usage(since: .distantPast)
         XCTAssertEqual(recorded.reduce(0) { $0 + $1.tokensIn }, 8096, "sub-agent usage counts")
-        XCTAssertEqual(report.billing[0].sessionCosts["deepseek:main"]?["CNY"], Decimal(string: "0.01239"))
+        XCTAssertEqual(report.billing[0].sessionCosts["deepseek:main"]?["CNY"], Decimal(string: "0.008318"))
         XCTAssertTrue(report.snapshots.isEmpty)
         XCTAssertTrue(report.consumerIdsByQuota.isEmpty)
         XCTAssertEqual(report.discoveredAgents[0].source, L10n.sourceDeepSeekSessions)
         XCTAssertEqual(report.discoveredAgents.map(\.id), report.consumers.map(\.id))
         XCTAssertTrue(report.discoveredAgents.allSatisfy { $0.id.hasPrefix("deepseek-model:") && $0.isAPIBilled })
         XCTAssertEqual(report.billing[0].balances[0].total, Decimal(string: "8.85"))
-        XCTAssertEqual(report.billing[0].estimatedCost(currency: "CNY"), Decimal(string: "0.012414"))
+        XCTAssertEqual(report.billing[0].estimatedCost(currency: "CNY"), Decimal(string: "0.008336"))
         let combined = try await CombinedUsageProvider([.init("DeepSeek", provider)]).fetchAccountAndLocalUsage(agents: [], historyHours: 169)
         XCTAssertEqual(combined.billing, report.billing)
     }

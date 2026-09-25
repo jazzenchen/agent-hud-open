@@ -256,7 +256,7 @@ struct SessionUsageBuilder {
             latestAgent = call.agentId
             if let reported = call.contextWindow { window = reported }
         }
-        let cost = ModelCatalog.cost(agentId: call.agentId, kinds: tokens.kinds)
+        let cost = ModelCatalog.cost(agentId: call.agentId, kinds: tokens.kinds)?.amount
         listCost = listCost.flatMap { sum in cost.map { sum + $0 } }
         guard !prompts.isEmpty else { return }
         while promptIndex + 1 < prompts.count, prompts[promptIndex + 1] <= call.timestamp { promptIndex += 1 }

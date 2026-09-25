@@ -41,7 +41,7 @@ struct UsagePeriodsCard: View {
             }
             HStack(spacing: 4) {
                 if let cost {
-                    Text("≈" + MoneyFormat.amount(cost.amount, currency: "USD"))
+                    Text(cost.text)
                         .help(L10n.text("所选种类按厂商 API 公开价折合", "The selected kinds at the vendors' API list prices")
                               + (cost.unpriced.isEmpty ? "" : "\n" + L10n.text("没有公开价、未计入：", "Not counted, no list price: ")
                                  + cost.unpriced.map(store.consumerName).joined(separator: L10n.text("、", ", "))))

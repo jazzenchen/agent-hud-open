@@ -40,7 +40,7 @@ struct TokenConsumptionChart: View {
                             .font(.tabular(20, .semibold))
                             .help(L10n.text("所选时间与种类的 Token 总量", "Total tokens for the selected range and kinds"))
                         if let cost = ModelCatalog.cost(of: store.statsTokensByModel.mapValues(store.tokenDimensions.masking)) {
-                            Text(L10n.text("按 API 价 ", "At API prices ") + "≈" + MoneyFormat.amount(cost.amount, currency: "USD"))
+                            Text(L10n.text("按 API 价 ", "At API prices ") + cost.text)
                                 .font(.tabular(11))
                                 .foregroundStyle(theme.secondary)
                                 .help(costHelp(unpriced: cost.unpriced))

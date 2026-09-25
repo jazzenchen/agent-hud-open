@@ -154,7 +154,7 @@ public enum DemoData {
                 let turnStart = start.addingTimeInterval(span * (Double(index) + random() * 0.4) / Double(plan.turns))
                 let turnEnd = min(now, turnStart.addingTimeInterval(20 + random() * 150))
                 let turnCalls = 3 + Int(random() * 12)
-                let turnCost = ModelCatalog.cost(agentId: plan.priced, kinds: tokens.kinds) ?? 0
+                let turnCost = ModelCatalog.cost(agentId: plan.priced, kinds: tokens.kinds)?.amount ?? 0
                 let helping = plan.helper != nil && index % 4 == 1 && !lapsed
                 turns.append(.init(start: turnStart, end: turnEnd, tokens: tokens, calls: turnCalls, contextTokens: read + write + input,
                                    compacted: compacted, subagents: helping ? Self.part(of: tokens) : nil, peakContextTokens: peak,
