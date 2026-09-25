@@ -8,6 +8,7 @@ struct SessionDetailView: View {
     let store: UsageStore
     let theme: Theme
     @State private var inspected: Int?
+    @State private var inspectedCall: Int?
     @State private var measure = SessionBarMeasure.tokens
 
     var body: some View {
@@ -17,6 +18,10 @@ struct SessionDetailView: View {
             figures(usage)
             if let usage {
                 tokens(usage)
+                if let index = store.focusedTurn, !usage.turns.isEmpty {
+                    let bars = SessionBar.turns(usage)
+                    if bars.indices.contains(index) { turnCalls(usage, bar: bars[index]) }
+                }
                 kinds(usage)
                 if usage.models.count > 1 { models(usage) }
             }
@@ -175,12 +180,14 @@ struct SessionDetailView: View {
                                     "The cache had lapsed, usually after sitting idle, or the model changed, so the turn sent its context again"))
                 }
                 Spacer(minLength: 8)
-                Text(L10n.text("悬停查看每一根柱子", "Hover a bar for details"))
+                Text(byTurn ? L10n.text("悬停看一轮，点击看它的每次调用", "Hover a turn; click for its calls")
+                     : L10n.text("悬停查看每一根柱子", "Hover a bar for details"))
             }
             .font(.ui(10))
             .foregroundStyle(theme.secondary)
             SessionBarsChart(bars: bars, axis: byTurn ? .turn : .time, measure: measure, running: byTurn && store.isSessionLive(session),
-                             theme: theme, inspected: $inspected)
+                             theme: theme, inspected: $inspected, selected: byTurn ? store.focusedTurn : nil,
+                             onSelect: byTurn ? { index in store.focusedTurn = store.focusedTurn == index ? nil : index } : nil)
             if hasContext {
                 HStack(alignment: .firstTextBaseline) {
                     Text(L10n.text("上下文窗口", "Context window")).font(.ui(12, .semibold))
@@ -195,6 +202,60 @@ struct SessionDetailView: View {
             }
         }
         .card(theme, padding: EdgeInsets(top: 12, leading: 14, bottom: 12, trailing: 14))
+    }
+
+    // MARK: A turn's calls
+
+    /// The picked turn's calls, one bar each, with the context the session's own calls read; they load when the turn is picked.
+    private func turnCalls(_ usage: SessionUsage, bar: SessionBar) -> some View {
+        let calls = store.focusedTurnCalls
+        let bars = calls.map { SessionBar.forCalls($0, model: store.consumerName) } ?? []
+        let measure = bars.allSatisfy({ $0.cost != nil }) ? self.measure : .tokens
+        return VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(L10n.text("T\(bar.id) 的每次调用", "T\(bar.id) call by call")).font(.ui(13, .semibold))
+                Spacer(minLength: 8)
+                Button { store.focusedTurn = nil } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(theme.secondary) }
+                    .buttonStyle(.plain)
+                    .help(L10n.text("收起", "Close"))
+            }
+            if let calls, !calls.isEmpty {
+                Text(summary(calls)).font(.ui(10)).foregroundStyle(theme.secondary)
+                SessionBarsChart(bars: bars, axis: .call, measure: measure, running: false, theme: theme, inspected: $inspectedCall)
+                if bars.contains(where: { $0.context != nil }) {
+                    Text(L10n.text("每次调用读入的上下文", "Context each call read"))
+                        .font(.ui(12, .semibold))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.top, 8)
+                        .topDivider(theme.divider)
+                    ContextWindowChart(bars: bars, axis: .call, window: usage.contextWindow, theme: theme)
+                }
+            } else {
+                Text(calls == nil ? L10n.text("正在读取这一轮的调用…", "Reading this turn's calls…")
+                     : L10n.text("用量库里没有这一轮的调用", "The usage ledger holds no calls of this turn"))
+                    .font(.ui(11)).foregroundStyle(theme.secondary)
+            }
+        }
+        .card(theme, padding: EdgeInsets(top: 12, leading: 14, bottom: 12, trailing: 14))
+        .task(id: TurnKey(session: session.id, turn: store.focusedTurn)) { await store.loadFocusedTurnCalls() }
+    }
+
+    private struct TurnKey: Hashable { let session: String; let turn: Int? }
+
+    /// How many calls and whose, how long, the price, and the call that added the most.
+    private func summary(_ calls: [TurnCall]) -> String {
+        let subagentCalls = calls.filter { !$0.own }, logs = Set(subagentCalls.map(\.log)).count
+        let largest = calls.max { $0.tokens.kinds.new < $1.tokens.kinds.new }, added = calls.reduce(0) { $0 + $1.tokens.kinds.new }
+        let prices = calls.compactMap(\.listCost)
+        return [L10n.text("\(calls.count) 次调用", calls.count == 1 ? "1 call" : "\(calls.count) calls"),
+                subagentCalls.isEmpty ? nil : L10n.text("其中子 agent \(subagentCalls.count) 次（\(logs) 个）",
+                                                        "\(subagentCalls.count) by \(logs == 1 ? "a sub-agent" : "\(logs) sub-agents")"),
+                calls.count > 1 ? Countdown.format(max(0, calls.last!.timestamp.timeIntervalSince(calls[0].timestamp))) : nil,
+                prices.count == calls.count ? "≈" + MoneyFormat.amount(prices.reduce(0, +), currency: "USD") : nil,
+                largest.flatMap { call in added > 0 && calls.count > 1
+                    ? L10n.text("新增最多的一次 \(TokenFormat.short(call.tokens.kinds.new))，占 \(Int((Double(call.tokens.kinds.new) / Double(added) * 100).rounded()))%",
+                                "Largest call added \(TokenFormat.short(call.tokens.kinds.new)), \(Int((Double(call.tokens.kinds.new) / Double(added) * 100).rounded()))%")
+                    : nil }].compactMap { $0 }.joined(separator: " · ")
     }
 
     // MARK: Kinds

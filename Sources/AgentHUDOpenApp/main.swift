@@ -26,7 +26,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let settings = SettingsStore(defaults: defaults, defaultAgents: options.demo ? DemoData.everyAgent : DefaultAgents.list)
         if let language = options.language { settings.update { $0.language = language } }
         L10n.setLanguage(settings.settings.language)
-        let provider: any UsageProvider = options.demo ? DemoUsageProvider() : CombinedUsageProvider.standard()
+        let ledger: UsageLedger? = options.demo ? nil : .open()
+        let provider: any UsageProvider = ledger.map { CombinedUsageProvider.standard(ledger: $0) } ?? DemoUsageProvider()
         if options.probe {
             Task { @MainActor in
                 do {
@@ -44,6 +45,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let retained = RetainedUsageProvider(provider: provider, cacheURL: options.demo ? nil
             : AppSupport.directory.appendingPathComponent("last-usage-report.json"))
         let store = UsageStore(provider: retained, settings: settings)
+        store.ledger = ledger
         if let report = retained.initialReport { store.replace(report: report) }
         if !options.demo, let executable = Bundle.main.executableURL {
             SessionObservers.configure(executable: executable, enabled: settings.settings.clientHooks)

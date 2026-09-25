@@ -237,6 +237,13 @@ struct SessionUsageBuilder {
     var isEmpty: Bool { calls == 0 }
     var latestModel: String? { latestAgent }
 
+    /// What a call in the session's own log sent again after `previous`, the prompt of the call before it: its whole
+    /// input when it read back less than half of that prompt from the cache and sent at least half of it again.
+    static func recached(_ tokens: SessionUsage.Tokens, after previous: Int?) -> Int {
+        guard let previous, tokens.cacheReadTokens * 2 < previous, tokens.tokensIn * 2 >= previous else { return 0 }
+        return tokens.tokensIn
+    }
+
     /// Calls must arrive oldest first.
     mutating func add(_ call: Call) {
         let tokens = call.tokens
@@ -248,7 +255,7 @@ struct SessionUsageBuilder {
         let prompt = tokens.tokensIn + tokens.cacheReadTokens
         var recached = 0
         if call.callLog {
-            if let previous = previousPrompt, tokens.cacheReadTokens * 2 < previous, tokens.tokensIn * 2 >= previous { recached = tokens.tokensIn }
+            recached = Self.recached(tokens, after: previousPrompt)
             previousPrompt = prompt
             context = prompt
         }

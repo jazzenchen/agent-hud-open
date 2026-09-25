@@ -220,6 +220,33 @@ final class UsageLedgerTests: XCTestCase, @unchecked Sendable {
         XCTAssertEqual(usage.turns.map(\.compacted), [false, true, false])
     }
 
+    func testTurnCallsListATurnsCallsWithTheirContextCacheAndPrice() async throws {
+        let ledger = UsageLedger.inMemory()
+        try await ledger.write { writer in
+            try writer.upsert(source: "claude", contribution: "p/s.jsonl", events: [
+                self.call("m1", 1, input: 1_000, write: 800, output: 300, reasoning: 100, cache: 5_000),
+                self.call("m2", 2, input: 200, write: 150, output: 50, cache: 6_000),
+                // Back after the cache lapsed: the call before the turn tells that the whole prompt was written again.
+                self.call("m3", 70, input: 6_300, write: 6_300, output: 10),
+            ])
+            try writer.addMarks(source: "claude", contribution: "p/s.jsonl", marks: [.init(.prompt, at: self.at(60)), .init(.prompt, at: self.at(70 * 60))])
+            try writer.upsert(source: "claude", contribution: "p/s/subagents/agent-a.jsonl", events: [
+                self.call("a1", 1.5, agent: "claude-model:claude-haiku-4-5-20251001", input: 70, write: 20, output: 7, cache: 900),
+            ])
+        }
+        let request = SessionUsageRequest(sessionID: "s", keys: ["p/s.jsonl"], subagentPrefix: "p/s/", callLog: "p/s.jsonl")
+        let read = try await ledger.sessionUsage([request])
+        let turns = try XCTUnwrap(read["s"]).turns
+        let first = try await ledger.turnCalls(request, from: turns[0].start, through: turns[0].end)
+        XCTAssertEqual(first.map(\.own), [true, false, true])
+        XCTAssertEqual(first.map(\.log), ["p/s.jsonl", "p/s/subagents/agent-a.jsonl", "p/s.jsonl"])
+        XCTAssertEqual(first.map(\.context), [6_000, nil, 6_200], "only the log that records every call tells the context")
+        XCTAssertEqual(first.map(\.listCost), ["0.019", "0.000215", "0.006"].map { Decimal(string: $0) })
+        XCTAssertEqual(first.reduce(SessionUsage.Tokens()) { $0 + $1.tokens }, turns[0].tokens, "a turn's calls add up to it")
+        let second = try await ledger.turnCalls(request, from: turns[1].start, through: turns[1].end)
+        XCTAssertEqual(second.map(\.recached), [6_300])
+    }
+
     func testSessionUsageTakesSubagentLogsNamedOneByOne() async throws {
         let ledger = UsageLedger.inMemory()
         try await ledger.write { writer in

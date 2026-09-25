@@ -1,3 +1,4 @@
+import AgentHUDSupport
 import Foundation
 
 /// The agents, sessions and figures shown in the design handoff.
@@ -117,16 +118,21 @@ public enum DemoData {
         ]
     }
 
-    /// The demo sessions' turns: now and then a large paste, cache writes that carry the previous turn forward,
-    /// reasoning on about half of them, and a compaction once the context nears its window. Claude sessions hand every
-    /// fourth turn's work partly to a sub-agent on the other Claude model, and two thirds of the way in come back after
-    /// their cache lapsed, writing the whole context again.
+    private typealias Plan = (id: String, agent: String, helper: String?, priced: String, minutes: (Double, Double), turns: Int, seed: Int)
+
+    /// Each demo session's model, the other Claude model a Claude session hands work to, the model that prices its calls,
+    /// when it ran in minutes from now, its turns and a seed.
+    private static let plans: [Plan] = [
+        ("s1", "claude-opus", "claude-sonnet", "claude-model:claude-opus-5", (-27, 0), 26, 7),
+        ("s2", "codex", nil, "codex-model:gpt-5.6-sol", (-64, 0), 17, 19),
+        ("s3", "claude-sonnet", "claude-opus", "claude-model:claude-sonnet-5", (-140, -51), 30, 51),
+    ]
+
+    /// The demo sessions' turns, each the sum of its calls: now and then a large paste, cache writes that carry the
+    /// previous turn forward, reasoning on about half of them, and a compaction once the context nears its window. Claude
+    /// sessions hand every fourth turn's work partly to a sub-agent on the other Claude model, and two thirds of the way in
+    /// come back after their cache lapsed, writing the whole context again.
     public static func sessionUsage(now: Date) -> [String: SessionUsage] {
-        let plans: [(id: String, agent: String, helper: String?, priced: String, minutes: (Double, Double), turns: Int, seed: Int)] = [
-            ("s1", "claude-opus", "claude-sonnet", "claude-model:claude-opus-5", (-27, 0), 26, 7),
-            ("s2", "codex", nil, "codex-model:gpt-5.6-sol", (-64, 0), 17, 19),
-            ("s3", "claude-sonnet", "claude-opus", "claude-model:claude-sonnet-5", (-140, -51), 30, 51),
-        ]
         let window = 200_000
         var result: [String: SessionUsage] = [:]
         for plan in plans {
@@ -149,33 +155,32 @@ public enum DemoData {
                 }
                 let lapsed = plan.helper != nil && index == plan.turns * 2 / 3 && !compacted
                 if lapsed { write += read; read = 0 }
-                let tokens = SessionUsage.Tokens(tokensIn: input + write, tokensOut: output + reasoning, cacheReadTokens: read,
-                                                 cacheWriteTokens: write, reasoningTokens: reasoning)
+                let added = SessionUsage.Tokens(tokensIn: input + write, tokensOut: output + reasoning, cacheReadTokens: 0,
+                                                cacheWriteTokens: write, reasoningTokens: reasoning)
                 let turnStart = start.addingTimeInterval(span * (Double(index) + random() * 0.4) / Double(plan.turns))
                 let turnEnd = min(now, turnStart.addingTimeInterval(20 + random() * 150))
-                let turnCalls = 3 + Int(random() * 12)
-                let turnCost = ModelCatalog.cost(agentId: plan.priced, kinds: tokens.kinds)?.amount ?? 0
                 let helping = plan.helper != nil && index % 4 == 1 && !lapsed
-                turns.append(.init(start: turnStart, end: turnEnd, tokens: tokens, calls: turnCalls, contextTokens: read + write + input,
-                                   compacted: compacted, subagents: helping ? Self.part(of: tokens) : nil, peakContextTokens: peak,
-                                   recachedTokens: lapsed ? input + write : nil, listCost: turnCost))
-                calls += turnCalls
+                let outline = SessionUsage.Turn(start: turnStart, end: turnEnd, tokens: added, calls: 3 + Int(random() * 12),
+                                                contextTokens: read + write + input, compacted: compacted,
+                                                subagents: helping ? Self.part(of: added) : nil, peakContextTokens: peak,
+                                                recachedTokens: lapsed ? input + write : nil)
+                let turnCalls = Self.calls(of: outline, plan: plan)
+                let own = turnCalls.filter(\.own).reduce(SessionUsage.Tokens()) { $0 + $1.tokens }
+                let helper = turnCalls.filter { !$0.own }.reduce(SessionUsage.Tokens()) { $0 + $1.tokens }
+                let turnCost = turnCalls.reduce(Decimal(0)) { $0 + ($1.listCost ?? 0) }
+                let recached = turnCalls.compactMap(\.recached).reduce(0, +)
+                turns.append(.init(start: turnStart, end: turnEnd, tokens: own + helper, calls: turnCalls.count,
+                                   contextTokens: outline.contextTokens, compacted: compacted, subagents: helping ? helper : nil,
+                                   peakContextTokens: peak, recachedTokens: recached > 0 ? recached : nil, listCost: turnCost))
+                calls += turnCalls.count
                 cost += turnCost
                 let period = Date(timeIntervalSince1970: (turnStart.timeIntervalSince1970 / UsageBucket.duration).rounded(.down) * UsageBucket.duration)
-                if let helper = plan.helper, helping {
-                    let part = Self.part(of: tokens)
-                    let rest = SessionUsage.Tokens(tokensIn: tokens.tokensIn - part.tokensIn, tokensOut: tokens.tokensOut - part.tokensOut,
-                                                   cacheReadTokens: tokens.cacheReadTokens - part.cacheReadTokens,
-                                                   cacheWriteTokens: tokens.cacheWriteTokens - part.cacheWriteTokens,
-                                                   reasoningTokens: tokens.reasoningTokens - part.reasoningTokens)
-                    models[helper, default: .init()] += part
-                    periods[period, default: [:]][helper, default: .init()] += part
-                    helperTokens = (helperTokens ?? .init()) + part
-                    models[plan.agent, default: .init()] += rest
-                    periods[period, default: [:]][plan.agent, default: .init()] += rest
-                } else {
-                    models[plan.agent, default: .init()] += tokens
-                    periods[period, default: [:]][plan.agent, default: .init()] += tokens
+                models[plan.agent, default: .init()] += own
+                periods[period, default: [:]][plan.agent, default: .init()] += own
+                if let name = plan.helper, helping {
+                    models[name, default: .init()] += helper
+                    periods[period, default: [:]][name, default: .init()] += helper
+                    helperTokens = (helperTokens ?? .init()) + helper
                 }
                 context = read + write
                 carry = input + output
@@ -187,6 +192,86 @@ public enum DemoData {
                 listCost: cost)
         }
         return result
+    }
+
+    /// A demo turn's calls, as the session page lays them out.
+    public static func turnCalls(session: String, turn: SessionUsage.Turn) -> [TurnCall] {
+        plans.first { $0.id == session }.map { calls(of: turn, plan: $0) } ?? []
+    }
+
+    /// A turn's calls, decided by what the turn added rather than by its cache reads or price, which are the calls' sums.
+    /// The session's own calls read a context that grows to where the turn ended: a re-cached turn first writes it all
+    /// again, a compacted one first reads its peak. One call reads in a large tool result; a sub-agent's calls follow the
+    /// call that handed it work.
+    private static func calls(of turn: SessionUsage.Turn, plan: Plan) -> [TurnCall] {
+        var state = UInt64(RecordCoding.milliseconds(turn.start) % 2_147_483_646 + 1)
+        func random() -> Double {
+            state = state * 16807 % 2_147_483_647
+            return Double(state) / 2_147_483_647
+        }
+        func split(_ total: Int, _ weights: [Double]) -> [Int] {
+            let sum = weights.reduce(0, +)
+            var parts = weights.map { Int(Double(max(0, total)) * $0 / sum) }
+            if !parts.isEmpty { parts[parts.count - 1] += max(0, total) - parts.reduce(0, +) }
+            return parts
+        }
+        let sub = turn.subagents ?? .init(), all = turn.tokens
+        let subCount = turn.subagents == nil ? 0 : max(1, turn.calls / 3), ownCount = max(2, turn.calls - subCount)
+        let ownWrite = all.cacheWriteTokens - sub.cacheWriteTokens
+        let ownFresh = all.tokensIn - all.cacheWriteTokens - (sub.tokensIn - sub.cacheWriteTokens)
+        let burst = 1 + Int(random() * Double(ownCount - 1)), handoff = max(0, min(ownCount - 2, burst))
+        var inWeights = (0..<ownCount).map { _ in 0.3 + random() }
+        inWeights[burst] += 4
+        if turn.recachedTokens != nil { inWeights[0] += 1_000 }
+        let outWeights = (0..<ownCount).map { _ in 0.2 + random() }
+        var writes = split(ownWrite, inWeights)
+        if turn.compacted { writes = [0] + split(ownWrite, Array(inWeights.dropFirst())) }
+        let fresh = split(ownFresh, inWeights)
+        let thoughts = split(all.reasoningTokens - sub.reasoningTokens, outWeights)
+        let outputs = split(all.tokensOut - all.reasoningTokens - (sub.tokensOut - sub.reasoningTokens), outWeights)
+        let tools = [["Grep"], ["Edit"], ["Bash"], ["Read"], ["Edit"]]
+        let source = plan.agent == "codex" ? "codex" : "claude"
+        let times = { (position: Int, count: Int) -> Date in
+            turn.start.addingTimeInterval(2 + max(0, turn.end.timeIntervalSince(turn.start) - 2) * Double(position) / Double(max(1, count - 1)))
+        }
+        func call(_ agentId: String, own: Bool, _ tokens: SessionUsage.Tokens, context: Int?, recached: Int?, tools: [String]) -> TurnCall {
+            TurnCall(timestamp: .distantPast, agentId: agentId, tokens: tokens, own: own,
+                     log: own ? "demo/\(plan.id).jsonl" : "demo/\(plan.id)/subagent.jsonl", source: source, context: context,
+                     recached: recached, listCost: ModelCatalog.cost(agentId: plan.priced, kinds: tokens.kinds)?.amount, tools: tools)
+        }
+        var result: [TurnCall] = [], prompt = 0
+        for index in 0..<ownCount {
+            let read: Int
+            if index == 0, turn.recachedTokens != nil { read = 0 }
+            else if index == 0, turn.compacted, let peak = turn.peakContextTokens { read = max(0, peak - fresh[0]) }
+            else if index == 0 { read = max(0, (turn.contextTokens ?? 0) - ownWrite - ownFresh) }
+            else if index == 1, turn.compacted { read = 0 }
+            else { read = prompt }
+            let tokens = SessionUsage.Tokens(tokensIn: writes[index] + fresh[index], tokensOut: outputs[index] + thoughts[index],
+                                             cacheReadTokens: read, cacheWriteTokens: writes[index], reasoningTokens: thoughts[index])
+            prompt = read + writes[index] + fresh[index]
+            let asked = index == ownCount - 1 ? [] : index == handoff && subCount > 0 ? ["Task"] : index == burst - 1 ? ["Read"]
+                : index == 0 ? ["Read", "Read"] : tools[index % tools.count]
+            result.append(call(plan.agent, own: true, tokens, context: prompt,
+                               recached: index == 0 && turn.recachedTokens != nil ? tokens.tokensIn : nil, tools: asked))
+            guard index == handoff, subCount > 0 else { continue }
+            let subWrites = split(sub.cacheWriteTokens, Array(repeating: 1, count: subCount))
+            let subFresh = split(sub.tokensIn - sub.cacheWriteTokens, Array(repeating: 1, count: subCount))
+            let subThoughts = split(sub.reasoningTokens, Array(repeating: 1, count: subCount))
+            let subOutputs = split(sub.tokensOut - sub.reasoningTokens, Array(repeating: 1, count: subCount))
+            var subPrompt = 0
+            for part in 0..<subCount {
+                let tokens = SessionUsage.Tokens(tokensIn: subWrites[part] + subFresh[part], tokensOut: subOutputs[part] + subThoughts[part],
+                                                 cacheReadTokens: subPrompt, cacheWriteTokens: subWrites[part], reasoningTokens: subThoughts[part])
+                subPrompt += subWrites[part] + subFresh[part] + 9_000
+                result.append(call(plan.helper ?? plan.agent, own: false, tokens, context: nil, recached: nil,
+                                   tools: part == subCount - 1 ? [] : [["Read"], ["Grep"], ["Glob"]][part % 3]))
+            }
+        }
+        return result.enumerated().map { position, call in
+            TurnCall(timestamp: times(position, result.count), agentId: call.agentId, tokens: call.tokens, own: call.own, log: call.log,
+                     source: call.source, context: call.context, recached: call.recached, listCost: call.listCost, tools: call.tools)
+        }
     }
 
     /// The share of a turn its sub-agent spent.

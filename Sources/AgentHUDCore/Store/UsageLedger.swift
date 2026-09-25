@@ -268,24 +268,7 @@ public actor UsageLedger {
     public func sessionUsage(_ requests: [SessionUsageRequest]) throws -> [String: SessionUsage] {
         var result: [String: SessionUsage] = [:]
         for request in requests {
-            var own: [Int64] = [], callLog: Set<Int64> = [], subagents: Set<Int64> = []
-            for key in Set(request.keys) {
-                try storage.connection.query("SELECT id FROM contribution WHERE key = ?", [.text(key)]) { row in
-                    own.append(row.int(0))
-                    if key == request.callLog { callLog.insert(row.int(0)) }
-                }
-            }
-            if let prefix = request.subagentPrefix, let last = prefix.unicodeScalars.last,
-               let next = Unicode.Scalar(last.value + 1) {
-                // Every key that starts with the prefix sorts at or after it and before the prefix with its last character raised.
-                let end = String(prefix.unicodeScalars.dropLast()) + String(next)
-                try storage.connection.query("SELECT id FROM contribution WHERE key >= ? AND key < ?", [.text(prefix), .text(end)]) {
-                    subagents.insert($0.int(0))
-                }
-            }
-            for key in Set(request.subagentKeys) {
-                try storage.connection.query("SELECT id FROM contribution WHERE key = ?", [.text(key)]) { subagents.insert($0.int(0)) }
-            }
+            let (own, callLog, subagents) = try contributions(of: request)
             let ids = own + subagents
             guard !ids.isEmpty else { continue }
             // Only the session's own log marks its turns; a sub-agent's prompts are steps of the turn that started it.
@@ -330,6 +313,68 @@ public actor UsageLedger {
             }
         }
         return result
+    }
+
+    /// One turn's calls, oldest first: every call of the session and its sub-agents from `start` through `end`, the span
+    /// a turn of `sessionUsage` covers.
+    public func turnCalls(_ request: SessionUsageRequest, from start: Date, through end: Date) throws -> [TurnCall] {
+        let (own, callLog, subagents) = try contributions(of: request)
+        let ids = own + subagents
+        guard !ids.isEmpty else { return [] }
+        let from = RecordCoding.milliseconds(start), through = RecordCoding.milliseconds(end)
+        // The call before the turn tells whether its first call found the prompt in the cache.
+        var previous: Int?
+        if !callLog.isEmpty {
+            try storage.connection.query("""
+                SELECT tokens_in + cache_read FROM usage_event WHERE contribution_id IN (SELECT value FROM json_each(?)) AND timestamp_ms < ?
+                ORDER BY timestamp_ms DESC LIMIT 1
+                """, [Self.idList(Array(callLog)), .integer(from)]) { previous = Int($0.int(0)) }
+        }
+        var calls: [TurnCall] = []
+        try storage.connection.query("""
+            SELECT e.contribution_id, c.source, c.key, e.timestamp_ms, e.agent, e.tokens_in, e.tokens_out, e.cache_read, e.cache_write,
+                   e.reasoning
+            FROM usage_event e JOIN contribution c ON c.id = e.contribution_id
+            WHERE e.contribution_id IN (SELECT value FROM json_each(?)) AND e.timestamp_ms BETWEEN ? AND ? ORDER BY e.timestamp_ms
+            """, [Self.idList(ids), .integer(from), .integer(through)]) { row in
+            let contribution = row.int(0), agentId = storage.agentName(row.int(4))
+            let tokens = SessionUsage.Tokens(tokensIn: Int(row.int(5)), tokensOut: Int(row.int(6)), cacheReadTokens: Int(row.int(7)),
+                                             cacheWriteTokens: Int(row.int(8)), reasoningTokens: Int(row.int(9)))
+            var context: Int?, recached: Int?
+            if callLog.contains(contribution) {
+                let sent = SessionUsageBuilder.recached(tokens, after: previous)
+                recached = sent > 0 ? sent : nil
+                context = tokens.tokensIn + tokens.cacheReadTokens
+                previous = context
+            }
+            calls.append(TurnCall(timestamp: RecordCoding.date(row.int(3)), agentId: agentId, tokens: tokens, own: !subagents.contains(contribution),
+                                  log: row.text(2) ?? "", source: row.text(1) ?? "", context: context, recached: recached,
+                                  listCost: ModelCatalog.cost(agentId: agentId, kinds: tokens.kinds)?.amount))
+        }
+        return calls
+    }
+
+    /// The contributions that hold a session: its own logs, among them the one that records every call, and its sub-agents' logs.
+    private func contributions(of request: SessionUsageRequest) throws -> (own: [Int64], callLog: Set<Int64>, subagents: Set<Int64>) {
+        var own: [Int64] = [], callLog: Set<Int64> = [], subagents: Set<Int64> = []
+        for key in Set(request.keys) {
+            try storage.connection.query("SELECT id FROM contribution WHERE key = ?", [.text(key)]) { row in
+                own.append(row.int(0))
+                if key == request.callLog { callLog.insert(row.int(0)) }
+            }
+        }
+        if let prefix = request.subagentPrefix, let last = prefix.unicodeScalars.last,
+           let next = Unicode.Scalar(last.value + 1) {
+            // Every key that starts with the prefix sorts at or after it and before the prefix with its last character raised.
+            let end = String(prefix.unicodeScalars.dropLast()) + String(next)
+            try storage.connection.query("SELECT id FROM contribution WHERE key >= ? AND key < ?", [.text(prefix), .text(end)]) {
+                subagents.insert($0.int(0))
+            }
+        }
+        for key in Set(request.subagentKeys) {
+            try storage.connection.query("SELECT id FROM contribution WHERE key = ?", [.text(key)]) { subagents.insert($0.int(0)) }
+        }
+        return (own, callLog, subagents)
     }
 
     /// Row ids as one JSON parameter for `IN (SELECT value FROM json_each(?))`. The connection keeps every statement it

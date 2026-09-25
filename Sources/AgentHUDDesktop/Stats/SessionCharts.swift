@@ -1,7 +1,7 @@
 import SwiftUI
 import AgentHUDCore
 
-/// One bar of a session chart: a turn, or a 15-minute period for a log that does not mark its prompts.
+/// One bar of a session chart: a turn, a 15-minute period for a log that does not mark its prompts, or one call of a turn.
 struct SessionBar: Identifiable {
     let id: Int
     let start: Date
@@ -18,6 +18,32 @@ struct SessionBar: Identifiable {
     var recached: Int? = nil
     /// What the turn would cost at the API's list prices.
     var cost: Decimal? = nil
+    /// For a call's bar: the model's name, which sub-agent made it (nil for the session's own log), the tools it asked
+    /// for, the tools whose results it read in, and how long after the previous call it started.
+    var call: CallFacts? = nil
+
+    struct CallFacts {
+        let model: String
+        let subagent: Int?
+        let tools: [String]
+        let received: [String]
+        let gap: TimeInterval?
+    }
+
+    /// A turn's calls, one bar each. A call reads in the results of the tools the previous call in its log asked for.
+    static func forCalls(_ calls: [TurnCall], model: (String) -> String) -> [SessionBar] {
+        var previous: [String: TurnCall] = [:], subagents: [String: Int] = [:]
+        return calls.enumerated().map { index, call in
+            defer { previous[call.log] = call }
+            let before = previous[call.log]
+            if !call.own, subagents[call.log] == nil { subagents[call.log] = subagents.count + 1 }
+            return SessionBar(id: index + 1, start: call.timestamp, end: call.timestamp, kinds: call.tokens.kinds, calls: 1,
+                              context: call.context, compacted: false, subagents: call.own ? nil : call.tokens.kinds, recached: call.recached,
+                              cost: call.listCost,
+                              call: CallFacts(model: model(call.agentId), subagent: call.own ? nil : subagents[call.log], tools: call.tools,
+                                              received: before?.tools ?? [], gap: before.map { call.timestamp.timeIntervalSince($0.timestamp) }))
+        }
+    }
 
     static func turns(_ usage: SessionUsage) -> [SessionBar] {
         let skipped = usage.turnCount - usage.turns.count
@@ -46,8 +72,8 @@ struct SessionBar: Identifiable {
     }
 }
 
-/// Turns stand side by side; 15-minute periods, for a log that does not mark its prompts, sit at their times.
-enum SessionChartAxis: Hashable { case turn, time }
+/// Turns, or a turn's calls, stand side by side; 15-minute periods, for a log that does not mark its prompts, sit at their times.
+enum SessionChartAxis: Hashable { case turn, call, time }
 
 /// What the bars measure: the tokens each turn added, or what its calls would cost at list prices.
 enum SessionBarMeasure: Hashable { case tokens, cost }
@@ -66,7 +92,7 @@ struct SessionChartLayout {
     func frame(_ index: Int) -> (x: CGFloat, width: CGFloat, center: CGFloat) {
         guard !bars.isEmpty else { return (0, 0, 0) }
         switch axis {
-        case .turn:
+        case .turn, .call:
             let slot = width / CGFloat(bars.count), bar = max(1, slot * 0.64)
             return (CGFloat(index) * slot + (slot - bar) / 2, bar, CGFloat(index) * slot + slot / 2)
         case .time:
@@ -80,7 +106,7 @@ struct SessionChartLayout {
     /// The span a bar's hover light covers: its whole slot between turns, or a little more than a period's bar.
     func column(_ index: Int) -> ClosedRange<CGFloat> {
         switch axis {
-        case .turn:
+        case .turn, .call:
             let slot = width / CGFloat(max(1, bars.count))
             return CGFloat(index) * slot...CGFloat(index + 1) * slot
         case .time:
@@ -92,18 +118,18 @@ struct SessionChartLayout {
     func index(at x: CGFloat) -> Int? {
         guard !bars.isEmpty, width > 0 else { return nil }
         switch axis {
-        case .turn: return min(bars.count - 1, max(0, Int(x / (width / CGFloat(bars.count)))))
+        case .turn, .call: return min(bars.count - 1, max(0, Int(x / (width / CGFloat(bars.count)))))
         case .time: return bars.indices.min { abs(frame($0).center - x) < abs(frame($1).center - x) }
         }
     }
 
-    /// Three or four labels: turn numbers, or clock times.
+    /// Three or four labels: turn or call numbers, or clock times.
     func ticks() -> [(x: CGFloat, label: String)] {
         guard let first = bars.first, let last = bars.last else { return [] }
         switch axis {
-        case .turn:
+        case .turn, .call:
             let positions = Array(Set([0, (bars.count - 1) / 3, 2 * (bars.count - 1) / 3, bars.count - 1])).sorted()
-            return positions.map { (frame($0).center, "T\(bars[$0].id)") }
+            return positions.map { (frame($0).center, (axis == .call ? "#" : "T") + "\(bars[$0].id)") }
         case .time:
             let span = span
             let formatter = Date.FormatStyle(date: .omitted, time: .shortened)
@@ -140,6 +166,9 @@ struct SessionBarsChart: View {
     let running: Bool
     let theme: Theme
     @Binding var inspected: Int?
+    /// The bar whose calls are laid out, kept lit; a click on a bar picks it when `onSelect` is set.
+    var selected: Int? = nil
+    var onSelect: ((Int) -> Void)? = nil
     private let axisWidth: CGFloat = 36
     private let height: CGFloat = 150
     /// Room above the tallest bar for its ring.
@@ -155,6 +184,13 @@ struct SessionBarsChart: View {
             ZStack(alignment: .topLeading) {
                 Canvas { context, _ in
                     let scale = (height - headroom) / CGFloat(top)
+                    if let index = selected, bars.indices.contains(index) {
+                        let column = layout.column(index)
+                        context.fill(Path(CGRect(x: column.lowerBound, y: 0, width: column.upperBound - column.lowerBound, height: height)),
+                                     with: .color(theme.text.opacity(0.1)))
+                        context.fill(Path(CGRect(x: column.lowerBound, y: height - 1.5, width: column.upperBound - column.lowerBound, height: 1.5)),
+                                     with: .color(theme.text.opacity(0.7)))
+                    }
                     if let index = inspected, bars.indices.contains(index) {
                         let column = layout.column(index)
                         context.fill(Path(CGRect(x: column.lowerBound, y: 0, width: column.upperBound - column.lowerBound, height: height)),
@@ -217,11 +253,14 @@ struct SessionBarsChart: View {
                 case .ended: inspected = nil
                 }
             }
+            .onTapGesture(coordinateSpace: .local) { point in
+                if let onSelect, point.x <= plot, let index = layout.index(at: point.x) { onSelect(index) }
+            }
             .overlay(alignment: .topLeading) {
                 if let index = inspected, bars.indices.contains(index) {
                     let width: CGFloat = 230, center = layout.frame(index).center
                     let preferred = center < plot / 2 ? center + 14 : center - width - 14
-                    SessionBarDetail(bar: bars[index], byTurn: axis == .turn, measure: measure, theme: theme)
+                    SessionBarDetail(bar: bars[index], axis: axis, measure: measure, theme: theme)
                         .frame(width: width)
                         .fixedSize(horizontal: false, vertical: true)
                         .offset(x: max(0, min(preferred, plot - width)), y: 4)
@@ -232,7 +271,8 @@ struct SessionBarsChart: View {
         .frame(height: height + 18)
         .zIndex(1)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(measure == .cost ? L10n.text("每轮费用图表", "Cost per turn chart") : L10n.text("每轮 Token 图表", "Tokens per turn chart"))
+        .accessibilityLabel(axis == .call ? L10n.text("每次调用图表", "Calls chart")
+                            : measure == .cost ? L10n.text("每轮费用图表", "Cost per turn chart") : L10n.text("每轮 Token 图表", "Tokens per turn chart"))
     }
 
     private func label(_ value: Int) -> String {
@@ -243,23 +283,21 @@ struct SessionBarsChart: View {
     }
 }
 
-/// What one bar holds: which turn or period, when and for how long, its calls, each kind it added, what it would cost,
-/// the sub-agents' part, a context sent again and the context it reached.
+/// What one bar holds: which turn, period or call, when and for how long, its calls, each kind it added, what it would
+/// cost, the sub-agents' part, a context sent again and the context it reached. A call's card names its model and log,
+/// the tools it asked for, the tools whose results it read in and the pause before it.
 struct SessionBarDetail: View {
     let bar: SessionBar
-    let byTurn: Bool
+    let axis: SessionChartAxis
     let measure: SessionBarMeasure
     let theme: Theme
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text((byTurn ? "T\(bar.id) · " : "") + ChartData.weekdayTime(bar.start)).font(.ui(11, .semibold))
-            let facts = [byTurn ? Countdown.format(max(0, bar.end.timeIntervalSince(bar.start))) : nil,
-                         bar.calls > 0 ? L10n.text("\(bar.calls) 次调用", bar.calls == 1 ? "1 call" : "\(bar.calls) calls") : nil,
-                         bar.compacted ? L10n.text("已压缩", "Compacted") : nil].compactMap { $0 }
+            Text(title).font(.ui(11, .semibold))
             if !facts.isEmpty { Text(facts.joined(separator: " · ")).font(.ui(10)).foregroundStyle(theme.secondary) }
             let tokens = bar.kinds.new.formatted() + L10n.text(" 不含缓存读取", " excl. cache reads")
-            let cost = bar.cost.map { "≈" + MoneyFormat.amount($0, currency: "USD") + L10n.text(" 按 API 价", " at API prices") }
+            let cost = bar.cost.map { "≈" + MoneyFormat.amount($0, currency: "USD", estimated: axis == .call) + L10n.text(" 按 API 价", " at API prices") }
             Text(measure == .cost ? cost ?? tokens : tokens).font(.tabular(13, .semibold))
             let other = measure == .cost ? (cost == nil ? nil : tokens) : cost
             if let other { Text(other).font(.ui(10)).foregroundStyle(theme.secondary) }
@@ -271,11 +309,7 @@ struct SessionBarDetail: View {
                     Text(bar.kinds[kind].formatted()).font(.tabular(11))
                 }.font(.ui(11))
             }
-            let notes = [bar.subagents.map { L10n.text("子 agent 新增 ", "Sub-agents added ") + TokenFormat.short($0.new) },
-                         bar.recached.map { L10n.text("缓存重写 ", "Cache rewrite ") + TokenFormat.short($0) },
-                         bar.context.map { L10n.text("上下文 ", "Context ") + TokenFormat.short($0)
-                             + (bar.peakContext.map { L10n.text(" · 轮中最高 ", " · peak ") + TokenFormat.short($0) } ?? "") }]
-            ForEach(Array(notes.compactMap { $0 }.enumerated()), id: \.offset) { _, note in
+            ForEach(Array(notes.enumerated()), id: \.offset) { _, note in
                 Text(note).font(.ui(10)).foregroundStyle(theme.secondary)
             }
         }
@@ -285,6 +319,39 @@ struct SessionBarDetail: View {
         .background(RoundedRectangle(cornerRadius: 8).fill(theme.windowBackground))
         .overlay(RoundedRectangle(cornerRadius: 8).stroke(theme.cardBorder))
         .shadow(color: .black.opacity(0.2), radius: 6, y: 2)
+    }
+
+    private var title: String {
+        switch axis {
+        case .turn: "T\(bar.id) · " + ChartData.weekdayTime(bar.start)
+        case .call: "#\(bar.id) · " + bar.start.formatted(date: .omitted, time: .standard)
+        case .time: ChartData.weekdayTime(bar.start)
+        }
+    }
+
+    private var facts: [String] {
+        if let call = bar.call {
+            return [call.model, call.subagent.map { L10n.text("子 agent \($0)", "Sub-agent \($0)") } ?? L10n.text("会话自己", "Session's own"),
+                    call.gap.map { L10n.text("距上一次 ", "After ") + Countdown.format(max(0, $0)) }].compactMap { $0 }
+        }
+        return [axis == .turn ? Countdown.format(max(0, bar.end.timeIntervalSince(bar.start))) : nil,
+                bar.calls > 0 ? L10n.text("\(bar.calls) 次调用", bar.calls == 1 ? "1 call" : "\(bar.calls) calls") : nil,
+                bar.compacted ? L10n.text("已压缩", "Compacted") : nil].compactMap { $0 }
+    }
+
+    private var notes: [String] {
+        let names = { (tools: [String]) in tools.map(Self.toolName).joined(separator: L10n.text("、", ", ")) }
+        return [bar.call.flatMap { $0.received.isEmpty ? nil : L10n.text("读入 \(names($0.received)) 的结果", "Read in \(names($0.received)) results") },
+                bar.call.flatMap { $0.tools.isEmpty ? nil : L10n.text("发起 ", "Asked for ") + names($0.tools) },
+                bar.call == nil ? bar.subagents.map { L10n.text("子 agent 新增 ", "Sub-agents added ") + TokenFormat.short($0.new) } : nil,
+                bar.recached.map { L10n.text("缓存重写 ", "Cache rewrite ") + TokenFormat.short($0) },
+                bar.context.map { L10n.text("上下文 ", "Context ") + TokenFormat.short($0)
+                    + (bar.peakContext.map { L10n.text(" · 轮中最高 ", " · peak ") + TokenFormat.short($0) } ?? "") }].compactMap { $0 }
+    }
+
+    /// An MCP tool by its own name, without its server's.
+    static func toolName(_ name: String) -> String {
+        name.hasPrefix("mcp__") ? name.components(separatedBy: "__").last ?? name : name
     }
 }
 

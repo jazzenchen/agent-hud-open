@@ -170,6 +170,13 @@ public enum SnapshotRunner {
         store.focusedSessionID = "s1"
         save("stats-session-dark", StatsView(store: store, scrollable: false).frame(width: 760), folder: folder, scheme: .dark)
         save("stats-session-light", StatsView(store: store, scrollable: false).frame(width: 760), folder: folder, scheme: .light)
+        // A turn picked for its calls: one that handed work to a sub-agent, and the one that wrote its context again.
+        for (name, turn) in [("stats-session-calls", 21), ("stats-session-recached", 17)] {
+            store.focusedTurn = turn
+            await store.loadFocusedTurnCalls()
+            save("\(name)-dark", StatsView(store: store, scrollable: false).frame(width: 760), folder: folder, scheme: .dark)
+        }
+        store.focusedTurn = nil
         store.focusedSessionID = nil
         store.statsTab = .tokens
         let dashboardAgents = settings.agents

@@ -113,7 +113,18 @@ public final class UsageStore {
     /// The quota window the statistics window points out, set by whatever opened it.
     public var selectedQuotaId: String? { didSet { if selectedQuotaId != nil { statsTab = .tokens } } }
     /// The session the Sessions page shows in place of its list; nil shows the list.
-    public var focusedSessionID: String? { didSet { if focusedSessionID != nil { statsTab = .sessions } } }
+    public var focusedSessionID: String? {
+        didSet {
+            if focusedSessionID != nil { statsTab = .sessions }
+            if focusedSessionID != oldValue { focusedTurn = nil }
+        }
+    }
+    /// The focused session's turn whose calls its page lays out, by its place in the session's breakdown.
+    public var focusedTurn: Int? { didSet { if focusedTurn != oldValue { focusedTurnCalls = nil } } }
+    /// The focused turn's calls once read, with the tools their logs name.
+    public internal(set) var focusedTurnCalls: [TurnCall]?
+    /// Where turns' calls are read from; without a ledger (the demo) the demo's calls stand in.
+    @ObservationIgnored public var ledger: UsageLedger?
     public var glowHidden = false
     /// Advances every few seconds so countdowns re-render.
     public internal(set) var now = Date()
@@ -433,6 +444,23 @@ public final class UsageStore {
     }
 
     public func sessionUsage(_ session: LiveSession) -> SessionUsage? { report?.sessionUsage?[session.id] }
+
+    /// Reads the focused turn's calls from the ledger, and the tools they asked for from their logs, once per focus.
+    public func loadFocusedTurnCalls() async {
+        guard focusedTurnCalls == nil, let session = focusedSession, let index = focusedTurn,
+              let turns = sessionUsage(session)?.turns, turns.indices.contains(index) else { return }
+        let turn = turns[index]
+        let calls: [TurnCall]
+        if let ledger {
+            let read = (try? await ledger.turnCalls(SessionUsageRequest(session), from: turn.start, through: turn.end)) ?? []
+            calls = await Task.detached(priority: .userInitiated) { CallTools.attach(to: read) }.value
+        } else {
+            calls = DemoData.turnCalls(session: session.id, turn: turn)
+        }
+        // The focus may have moved while the calls were read.
+        guard focusedSession?.id == session.id, focusedTurn == index else { return }
+        focusedTurnCalls = calls
+    }
 
     /// What the agent last said in the session's newest turn that carries a message.
     public func sessionMessage(_ session: LiveSession) -> String? {
