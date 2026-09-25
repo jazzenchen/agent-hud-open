@@ -33,10 +33,12 @@ final class DemoUsageProviderTests: XCTestCase {
         XCTAssertEqual(report.snapshot(for: "codex")?.remainingPct, 7)
     }
 
-    func testDifferentRangesProduceDifferentLengths() async throws {
+    func testTheDemoFillsTheMonthTheChartsCanShow() async throws {
         let short = try await DemoUsageProvider().fetchUsage(agents: DemoData.agents, historyHours: 48)
         let long = try await DemoUsageProvider().fetchUsage(agents: DemoData.agents, historyHours: 168)
         func earliest(_ report: UsageReport) -> Date? { report.usage.filter { $0.agentId == "codex" }.map(\.start).min() }
-        XCTAssertLessThan(try XCTUnwrap(earliest(long)), try XCTUnwrap(earliest(short)))
+        let month = try XCTUnwrap(earliest(short))
+        XCTAssertEqual(month, try XCTUnwrap(earliest(long)), "whatever the history, the demo reaches back a month")
+        XCTAssertEqual(short.generatedAt.timeIntervalSince(month) / 3600, Double(StatsRange.days30.hours), accuracy: 2)
     }
 }

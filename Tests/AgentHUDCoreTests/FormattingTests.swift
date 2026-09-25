@@ -63,6 +63,7 @@ final class TokenFormatTests: XCTestCase {
         XCTAssertEqual(TokenFormat.short(950), "950")
         XCTAssertEqual(TokenFormat.short(2_400_000), "2.4M")
         XCTAssertEqual(TokenFormat.short(84_000), "84k")
+        XCTAssertEqual(TokenFormat.short(5_036_000_000), "5.0B")
     }
 
     func testInOut() {

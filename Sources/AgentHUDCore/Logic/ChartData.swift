@@ -55,16 +55,21 @@ public enum StatsRange: Int, CaseIterable, Sendable, Hashable {
     case hours5 = 5
     case hours24 = 24
     case days7 = 168
+    case days30 = 720
 
     public var label: String {
         switch self {
         case .hours5: return L10n.text("5 小时", "5 h")
         case .hours24: return L10n.text("24 小时", "24 h")
         case .days7: return L10n.text("7 天", "7 days")
+        case .days30: return L10n.text("30 天", "30 days")
         }
     }
 
     public var hours: Int { rawValue }
+
+    /// The chart's buckets for the range: a month only by day.
+    public var bucketSizes: [TokenBucketSize] { self == .days30 ? [.day1] : TokenBucketSize.allCases }
 
     public var recentLabel: String { L10n.text("近 \(label)", "Last \(label)") }
 

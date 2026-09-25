@@ -167,8 +167,9 @@ final class ChartDataTests: XCTestCase {
     }
 
     func testStatsRangeLabels() {
-        XCTAssertEqual(StatsRange.allCases.map(\.label), ["5 小时", "24 小时", "7 天"])
-        XCTAssertEqual(StatsRange.allCases.map(\.hours), [5, 24, 168])
+        XCTAssertEqual(StatsRange.allCases.map(\.label), ["5 小时", "24 小时", "7 天", "30 天"])
+        XCTAssertEqual(StatsRange.allCases.map(\.hours), [5, 24, 168, 720])
+        XCTAssertEqual(StatsRange.days30.bucketSizes, [.day1], "a month is charted by day")
         let now = Date()
         for range in StatsRange.allCases {
             XCTAssertEqual(range.interval(endingAt: now).duration, Double(range.hours) * 3600)

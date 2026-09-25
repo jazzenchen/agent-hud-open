@@ -1,9 +1,10 @@
 import Foundation
 
 public enum TokenFormat {
-    /// 48_000 → "48k", 1_250 → "1.3k", 950 → "950", 2_400_000 → "2.4M".
+    /// 48_000 → "48k", 1_250 → "1.3k", 950 → "950", 2_400_000 → "2.4M", 5_040_000_000 → "5.0B".
     public static func short(_ tokens: Int) -> String {
         let value = Double(tokens)
+        if value >= 1_000_000_000 { return trim(value / 1_000_000_000) + "B" }
         if value >= 1_000_000 { return trim(value / 1_000_000) + "M" }
         if value >= 1_000 { return trim(value / 1_000) + "k" }
         return "\(tokens)"

@@ -101,6 +101,40 @@ enum AgentArtwork {
         let isDark = dark ?? (NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua)
         return images[canonical(vendor, light: !isDark)]
     }
+
+    @MainActor private static var accents: [String: NSColor?] = [:]
+
+    /// The colour a vendor's mark is mostly drawn in: the average of its commonest saturated hue, so a many-coloured
+    /// mark gives one of its colours rather than a blend of them. nil for monochrome marks and vendors without one.
+    @MainActor
+    static func accent(for vendor: String) -> NSColor? {
+        if let hit = accents[vendor] { return hit }
+        var accent: NSColor?
+        if let image = original(for: vendor), !image.isTemplate,
+           let context = CGContext(data: nil, width: 32, height: 32, bitsPerComponent: 8, bytesPerRow: 128,
+                                   space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) {
+            NSGraphicsContext.current = NSGraphicsContext(cgContext: context, flipped: false)
+            image.draw(in: CGRect(x: 0, y: 0, width: 32, height: 32))
+            NSGraphicsContext.current = nil
+            var hues = [(count: Int, red: Double, green: Double, blue: Double)](repeating: (0, 0, 0, 0), count: 12)
+            if let pixels = context.data?.assumingMemoryBound(to: UInt8.self) {
+                for offset in stride(from: 0, to: 32 * 32 * 4, by: 4) where pixels[offset + 3] > 128 {
+                    let alpha = Double(pixels[offset + 3])
+                    let red = Double(pixels[offset]) / alpha, green = Double(pixels[offset + 1]) / alpha, blue = Double(pixels[offset + 2]) / alpha
+                    let color = NSColor(srgbRed: red, green: green, blue: blue, alpha: 1)
+                    guard color.saturationComponent > 0.35, color.brightnessComponent > 0.3 else { continue }
+                    let bin = min(11, Int(color.hueComponent * 12))
+                    hues[bin].count += 1; hues[bin].red += red; hues[bin].green += green; hues[bin].blue += blue
+                }
+            }
+            if let top = hues.max(by: { $0.count < $1.count }), top.count > 0 {
+                let count = Double(top.count)
+                accent = NSColor(srgbRed: top.red / count, green: top.green / count, blue: top.blue / count, alpha: 1)
+            }
+        }
+        accents[vendor] = accent
+        return accent
+    }
 }
 
 struct AgentLogo: View {

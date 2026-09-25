@@ -110,10 +110,12 @@ public struct CombinedUsageProvider: UsageProvider {
         }
         guard !reports.isEmpty else { throw UsageProviderError(notices.keys.sorted().map { "\($0): \(notices[$0]!)" }.joined(separator: " · ")) }
         let now = reports.map(\.generatedAt).max() ?? Date()
-        let weekAgo = now.addingTimeInterval(-7 * 86400)
-        // The ledger holds every recorded source, including one whose refresh just failed; other providers report periods themselves.
+        // The ledger holds every recorded source, including one whose refresh just failed; other providers report periods
+        // themselves. The report carries all the ledger keeps, for the month the charts can show; providers still read
+        // `historyHours` of their own logs.
         let reported = results.filter { !(vendors[$0.0].provider is any LedgerRecording) }.flatMap { $0.1?.usage ?? [] }
-        let usage = ((try? await ledger.buckets(since: min(weekAgo, now.addingTimeInterval(-Double(historyHours) * 3600)))) ?? []) + reported
+        let since = min(now.addingTimeInterval(-UsageLedger.retention), now.addingTimeInterval(-Double(historyHours) * 3600))
+        let usage = ((try? await ledger.buckets(since: since)) ?? []) + reported
         var periods = (try? await ledger.periods(endingAt: now)) ?? UsagePeriods()
         periods.add(reported, endingAt: now)
         let sessions = reports.flatMap(\.sessions)

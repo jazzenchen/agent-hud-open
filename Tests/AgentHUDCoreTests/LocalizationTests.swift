@@ -70,9 +70,9 @@ final class LocalizationTests: XCTestCase {
 
     func testLocalizedFormattersSwitchLanguage() {
         L10n.setLanguage(.en)
-        XCTAssertEqual(StatsRange.allCases.map(\.label), ["5 h", "24 h", "7 days"])
+        XCTAssertEqual(StatsRange.allCases.map(\.label), ["5 h", "24 h", "7 days", "30 days"])
         L10n.setLanguage(.zhHans)
-        XCTAssertEqual(StatsRange.allCases.map(\.label), ["5 小时", "24 小时", "7 天"])
+        XCTAssertEqual(StatsRange.allCases.map(\.label), ["5 小时", "24 小时", "7 天", "30 天"])
     }
 
     func testLanguageSettingRoundTripsThroughJSON() throws {

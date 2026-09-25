@@ -106,6 +106,8 @@ public final class UsageStore {
     public private(set) var statsRange: StatsRange = .hours24
     public var tokenBucketSize: TokenBucketSize = .hour1
     public var tokenDimensions: TokenDimensions = .fresh
+    /// The agents whose cards the Tokens page shows, once picked there; until then the ones Settings shows.
+    public var pickedAgents: Set<String>?
     /// Keep every selectable range ready, including the partial hour at the start of the rolling window.
     public static var historyHours: Int { StatsRange.days7.hours + 1 }
     /// The statistics window's page. Pointing out a quota window turns to Tokens, focusing a session to Sessions.
@@ -247,6 +249,7 @@ public final class UsageStore {
     public func setStatsRange(_ range: StatsRange) {
         guard range != statsRange else { return }
         statsRange = range
+        if !range.bucketSizes.contains(tokenBucketSize) { tokenBucketSize = range.bucketSizes.last ?? .day1 }
     }
 
     // MARK: Derived
@@ -536,6 +539,22 @@ public final class UsageStore {
 
     /// The platform each model's calls are priced on: the one its client reaches.
     public var priceRegions: PriceRegions { PriceRegions(report: report) }
+
+    /// What each agent spent in the charted range, the most tokens of the selected kinds first.
+    public var agentUsage: [AgentUsage] {
+        AgentUsage.build(usage: report?.usage ?? [], consumers: consumers, sessions: sessions, breakdowns: report?.sessionUsage ?? [:],
+                         vendor: { self.sessionSource($0).vendor }, interval: statsInterval, dimensions: tokenDimensions,
+                         region: priceRegions.region(for:))
+    }
+
+    /// An agent's tokens of the selected kinds in each of the chart's buckets.
+    public func agentSeries(_ vendor: String) -> [Int] {
+        ChartData.tokenBars(usage: report?.usage ?? [], agentIds: consumers.filter { $0.vendor == vendor }.map(\.id), range: statsRange,
+                            bucketSize: tokenBucketSize, now: dataDate, dimensions: tokenDimensions).map(\.total)
+    }
+
+    /// The agents the Tokens page shows cards for: the ones picked there, or the vendors Settings shows.
+    public var shownAgents: Set<String> { pickedAgents ?? Set(enabledAgents.map(\.vendor)) }
 
     /// What the charted tokens of the selected kinds would cost at list price, counted as the chart counts them, each
     /// model on its client's platform and DeepSeek's peak hours at its peak rates.

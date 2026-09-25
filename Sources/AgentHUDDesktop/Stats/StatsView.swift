@@ -24,7 +24,7 @@ struct StatsView: View {
                     ScrollView { content(theme) }
                         .onChange(of: store.selectedQuotaId, initial: true) { _, id in
                             guard let id, let vendor = quotaVendor(id) else { return }
-                            withAnimation { proxy.scrollTo(MetricCards.anchor(vendor), anchor: .center) }
+                            withAnimation { proxy.scrollTo(AgentCards.anchor(vendor), anchor: .center) }
                             // The tile is pointed out for a moment; it keeps showing the window afterwards.
                             Task {
                                 try? await Task.sleep(for: .seconds(2.5))
@@ -85,7 +85,7 @@ struct StatsView: View {
     @ViewBuilder
     private func tokens(_ theme: Theme) -> some View {
         UsageChartsCard(store: store, theme: theme)
-        MetricCards(store: store, theme: theme)
+        AgentCards(store: store, theme: theme)
         UsagePeriodsCard(store: store, theme: theme)
         HeatmapCard(grid: store.statsActivity, consumers: store.consumers, theme: theme)
     }
@@ -115,11 +115,13 @@ struct StatsView: View {
             case .tokens:
                 dimensions
                 Spacer(minLength: 12)
-                SegmentedPills(
-                    options: TokenBucketSize.allCases.map { SegmentOption(value: $0, label: $0.label) },
-                    selection: Binding(get: { store.tokenBucketSize }, set: { store.tokenBucketSize = $0 }),
-                    theme: theme
-                )
+                if store.statsRange.bucketSizes.count > 1 {
+                    SegmentedPills(
+                        options: store.statsRange.bucketSizes.map { SegmentOption(value: $0, label: $0.label) },
+                        selection: Binding(get: { store.tokenBucketSize }, set: { store.tokenBucketSize = $0 }),
+                        theme: theme
+                    )
+                }
                 SegmentedPills(
                     options: StatsRange.allCases.map { SegmentOption(value: $0, label: $0.label) },
                     selection: Binding(get: { store.statsRange }, set: { store.setStatsRange($0) }),

@@ -188,7 +188,10 @@ public enum SnapshotRunner {
             usage: dashboardReport.usage,
             insightsByAgent: Dictionary(uniqueKeysWithValues: dashboardReport.snapshots.map { ($0.agentId, DemoData.insights(now: dashboardReport.generatedAt)) }),
             subscriptions: dashboardReport.subscriptions,
-            billing: [DemoData.deepSeekBilling(now: dashboardReport.generatedAt)]))
+            billing: [DemoData.deepSeekBilling(now: dashboardReport.generatedAt)],
+            sessionUsage: dashboardReport.sessionUsage, periods: dashboardReport.periods))
+        // DeepSeek is off in Settings; picking it shows an API account's card.
+        dashboardStore.pickedAgents = ["Claude", "Codex", "DeepSeek"]
         save("stats-dashboard-dark", StatsView(store: dashboardStore).frame(width: 960, height: 900), folder: folder, scheme: .dark)
         save("stats-dashboard-light", StatsView(store: dashboardStore).frame(width: 760, height: 700), folder: folder, scheme: .light)
         save("stats-dashboard-bottom-dark", StatsView(store: dashboardStore).frame(width: 960, height: 640), folder: folder, scheme: .dark, scrollToBottom: true)
@@ -224,7 +227,7 @@ public enum SnapshotRunner {
         for range in StatsRange.allCases {
             store.setStatsRange(range)
             save("stats-\(range.hours)h-dark", StatsView(store: store, scrollable: false).frame(width: 760), folder: folder, scheme: .dark)
-            for bucket in TokenBucketSize.allCases {
+            for bucket in range.bucketSizes {
                 store.tokenBucketSize = bucket
                 save("stats-\(range.hours)h-\(bucket.rawValue)m-dark", StatsView(store: store, scrollable: false).frame(width: 760), folder: folder, scheme: .dark)
             }

@@ -16,7 +16,16 @@ public struct DemoUsageProvider: UsageProvider {
         } ?? now
         let tokens = DemoSeries.hourlyTokens(agentCount: max(1, consumers.count), hours: historyHours)
         var usage: [UsageBucket] = []
+        // The weeks before the history fill the month the charts can show, an hour to a bucket, from a series of their own
+        // so the recent week looks the same whatever the month holds.
+        let earlier = max(0, StatsRange.days30.hours - historyHours)
+        let older = DemoSeries.hourlyTokens(agentCount: max(1, consumers.count), hours: earlier, seed: 5)
         for (index, agent) in consumers.enumerated() {
+            for hour in 0..<earlier {
+                let total = older[hour][index] * 1_000
+                usage.append(.init(start: hourStart.addingTimeInterval(TimeInterval(hour - earlier - historyHours + 1) * 3600), agentId: agent.id,
+                                   tokensIn: total * 4 / 5, tokensOut: total - total * 4 / 5, cacheReadTokens: total * 2))
+            }
             for hour in 0..<historyHours {
                 let start = hourStart.addingTimeInterval(TimeInterval(hour - historyHours + 1) * 3600)
                 // Demo usage fills every quarter hour so every chart granularity is populated.
@@ -31,11 +40,6 @@ public struct DemoUsageProvider: UsageProvider {
         }
         var periods = UsagePeriods()
         periods.add(usage, endingAt: now)
-        // The demo covers a week; thirty days at the same pace fill the month.
-        periods.tokens[.days30] = periods.tokens[.days7]?.mapValues { week in
-            TokenKinds(cacheWrite: week.cacheWrite * 30 / 7, input: week.input * 30 / 7, reasoning: week.reasoning * 30 / 7,
-                       output: week.output * 30 / 7, cacheRead: week.cacheRead * 30 / 7)
-        }
         return UsageReport(
             generatedAt: now,
             snapshots: DemoData.snapshots(now: now),
