@@ -199,7 +199,8 @@ actor OpenAgentUsageProvider: UsageProvider, LedgerRecording {
             }
             if result.isActive {
                 services += result.credential.clients.sorted().map {
-                    AgentService(client: $0, provider: pool.provider, product: .plan, accountID: pool.id)
+                    AgentService(client: $0, provider: pool.provider, product: .plan, accountID: pool.id,
+                                 region: pool.realm == "CN" ? .china : pool.realm == "International" ? .international : nil)
                 }
             }
             guard let quota = result.quota else { continue }

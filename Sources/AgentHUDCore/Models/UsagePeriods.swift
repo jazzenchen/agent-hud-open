@@ -25,9 +25,20 @@ public struct UsagePeriods: Hashable, Codable, Sendable {
 
     /// Each period's tokens by model id.
     public var tokens: [Period: [String: TokenKinds]]
+    /// The part of `tokens` counted in DeepSeek's peak hours, for the models it bills at peak rates.
+    public var peak: [Period: [String: TokenKinds]]
 
-    public init(tokens: [Period: [String: TokenKinds]] = [:]) {
+    public init(tokens: [Period: [String: TokenKinds]] = [:], peak: [Period: [String: TokenKinds]] = [:]) {
         self.tokens = tokens
+        self.peak = peak
+    }
+
+    private enum CodingKeys: String, CodingKey { case tokens, peak }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(tokens: try c.decode([Period: [String: TokenKinds]].self, forKey: .tokens),
+                  peak: try c.decodeIfPresent([Period: [String: TokenKinds]].self, forKey: .peak) ?? [:])
     }
 
     /// Adds 15-minute buckets to the periods they fall in; like the charts, a bucket counts whole when the period starts
@@ -37,6 +48,9 @@ public struct UsagePeriods: Hashable, Codable, Sendable {
             let start = period.start(endingAt: now, calendar: calendar)
             for bucket in buckets where bucket.start.addingTimeInterval(UsageBucket.duration) > start && bucket.start < now {
                 tokens[period, default: [:]][bucket.agentId, default: TokenKinds()] += bucket.kinds
+                if ModelCatalog.model(for: bucket.agentId)?.peakHours == true, ModelCatalog.isPeak(bucket.start) {
+                    peak[period, default: [:]][bucket.agentId, default: TokenKinds()] += bucket.kinds
+                }
             }
         }
     }

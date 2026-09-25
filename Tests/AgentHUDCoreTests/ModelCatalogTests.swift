@@ -75,6 +75,25 @@ final class ModelCatalogTests: XCTestCase {
         XCTAssertTrue(cost.text.hasPrefix("≈$"), cost.text)
     }
 
+    func testCallsArePricedOnThePlatformTheirClientReaches() {
+        let deepSeek = APIBilling(vendor: "DeepSeek", balances: [.init(currency: "CNY", total: 8, granted: 0, toppedUp: 8)],
+                                  isAvailable: true, updatedAt: nil, costs: [], notice: nil)
+        let regions = PriceRegions(services: [
+            AgentService(client: "Claude", provider: "GLM", product: .plan, region: .china),
+            AgentService(client: "OpenCode", provider: "GLM", product: .api, region: .international),
+            AgentService(client: "Pi", provider: "Kimi", product: .plan, region: .china),
+            AgentService(client: "Pi", provider: "Moonshot", product: .api, region: .international),
+            AgentService(client: "OpenCode", provider: "Anthropic", product: .api),
+        ], billing: [deepSeek])
+        XCTAssertEqual(regions.region(for: "claude-model:glm-5.1"), .china, "Claude Code signed in to BigModel's plan")
+        XCTAssertEqual(regions.region(for: "opencode-model:glm-5.1"), .international)
+        XCTAssertEqual(regions.region(for: "glm-model:glm-5.1"), .international, "clients that disagree name no platform for others")
+        XCTAssertEqual(regions.region(for: "pi-model:kimi-k3"), .international, "one client on both platforms is priced abroad")
+        XCTAssertEqual(regions.region(for: "claude-model:deepseek-v4-pro"), .china, "a yuan account bills DeepSeek in yuan")
+        XCTAssertEqual(regions.region(for: "claude-model:claude-opus-5"), .international)
+        XCTAssertEqual(regions.region(for: "cursor-model:auto"), .international)
+    }
+
     func testContextWindowsComeFromTheLogThenTheCatalogThenWhatTheModelHeld() {
         XCTAssertEqual(ModelCatalog.contextWindow(agentId: "codex-model:gpt-6-astra", reported: 258_400, largestSeen: nil), 258_400)
         XCTAssertEqual(ModelCatalog.contextWindow(agentId: "claude-model:claude-haiku-4-5", reported: nil, largestSeen: 150_000), 200_000)

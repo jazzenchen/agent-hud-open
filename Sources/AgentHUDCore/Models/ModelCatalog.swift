@@ -132,11 +132,15 @@ public enum ModelCatalog {
     /// DeepSeek's peak hours: 9:00–12:00 and 14:00–18:00 Beijing time, Monday to Friday. Its Chinese public holidays are
     /// off-peak too; the catalog does not know them, so they count as peak.
     public static func isPeak(_ date: Date) -> Bool {
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = TimeZone(secondsFromGMT: 8 * 3600)!
-        let day = calendar.component(.weekday, from: date), hour = calendar.component(.hour, from: date)
+        let day = beijing.component(.weekday, from: date), hour = beijing.component(.hour, from: date)
         return (2...6).contains(day) && ((9..<12).contains(hour) || (14..<18).contains(hour))
     }
+
+    private static let beijing: Calendar = {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 8 * 3600)!
+        return calendar
+    }()
 
     /// The context window a call ran in: what the client reported, else the published window. Claude Code does not
     /// report it, and a Claude model runs with 200K or 1M, so a model this Mac has seen hold more than 200K counts as 1M.

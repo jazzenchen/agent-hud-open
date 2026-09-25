@@ -13,7 +13,7 @@ final class OpenAgentProviderTests: XCTestCase {
                   to: home.appendingPathComponent(".pi/agent/auth.json"))
         let actual = AgentAPIServiceDiscovery.discover(home: home, environment: [:])
         XCTAssertEqual(Set(actual), [.init(client: "OpenCode", provider: "Anthropic", product: .api),
-                                     .init(client: "OpenCode", provider: "GLM", product: .api),
+                                     .init(client: "OpenCode", provider: "GLM", product: .api, region: .international),
                                      .init(client: "Pi", provider: "OpenAI", product: .api)])
         let encoded = String(decoding: try JSONEncoder().encode(actual), as: UTF8.self)
         XCTAssertFalse(encoded.contains("fixture"))

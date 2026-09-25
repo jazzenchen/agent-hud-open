@@ -31,7 +31,7 @@ struct UsagePeriodsCard: View {
         let tokens = store.periodTokens(period), dimensions = store.tokenDimensions
         let counts = tokens.mapValues(dimensions.count), total = counts.values.reduce(0, +)
         let ranked = store.consumers.filter { (counts[$0.id] ?? 0) > 0 }.sorted { counts[$0.id]! > counts[$1.id]! }
-        let cost = ModelCatalog.cost(of: tokens.mapValues(dimensions.masking))
+        let cost = store.periodListCost(period)
         let hits = tokens.values.reduce(TokenKinds(), +).cacheHitRate
         return VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .firstTextBaseline) {

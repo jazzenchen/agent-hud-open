@@ -47,6 +47,20 @@ final class UsageLedgerTests: XCTestCase, @unchecked Sendable {
         XCTAssertEqual(periods.tokens[.days30], ["claude-model:opus": TokenKinds(input: 120), "codex-model:gpt": TokenKinds(input: 5)])
     }
 
+    func testPeriodsSetDeepSeeksPeakHoursApart() async throws {
+        let ledger = UsageLedger.inMemory()
+        // `base` is a Friday, 16:00 in Beijing and inside the afternoon peak; four hours later it is off-peak.
+        try await ledger.write { try $0.upsert(source: "claude", contribution: "d.jsonl", events: [
+            self.event("busy", minute: 0, agent: "claude-model:deepseek-v4-pro", input: 100),
+            self.event("quiet", minute: 240, agent: "claude-model:deepseek-v4-pro", input: 50),
+            self.event("other", minute: 0, input: 7),
+        ]) }
+        let periods = try await ledger.periods(endingAt: base.addingTimeInterval(5 * 3600))
+        XCTAssertEqual(periods.tokens[.days7]?["claude-model:deepseek-v4-pro"], TokenKinds(input: 150))
+        XCTAssertEqual(periods.peak[.days7], ["claude-model:deepseek-v4-pro": TokenKinds(input: 100)], "only a model billed by the hour is split")
+        XCTAssertTrue(ModelCatalog.isPeak(base))
+    }
+
     func testReplacingAContributionOnlyWritesChanges() async throws {
         let ledger = UsageLedger.inMemory()
         let first = [event("e1", minute: 2, agent: "copilot-model:gpt", input: 10), event("e2", minute: 3, agent: "copilot-model:gpt", input: 5)]

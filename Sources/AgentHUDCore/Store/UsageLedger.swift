@@ -191,18 +191,25 @@ public actor UsageLedger {
         return result.sorted { ($0.start, $0.account ?? "", $0.agentId) < ($1.start, $1.account ?? "", $1.agentId) }
     }
 
-    /// Every model's tokens in each period ending at `now`, counted from the buckets as `buckets(since:)` returns them.
+    /// Every model's tokens in each period ending at `now`, counted from the buckets as `buckets(since:)` returns them,
+    /// with the part in DeepSeek's peak hours (`ModelCatalog.isPeak`, weekdays 9–12 and 14–18 Beijing time) apart.
     public func periods(endingAt now: Date, calendar: Calendar = .current) throws -> UsagePeriods {
         var periods = UsagePeriods()
         for period in UsagePeriods.Period.allCases {
             let start = RecordCoding.milliseconds(period.start(endingAt: now, calendar: calendar)) / Self.bucketMilliseconds * Self.bucketMilliseconds
             try storage.connection.query("""
-                SELECT agent, SUM(tokens_in), SUM(tokens_out), SUM(cache_read), SUM(cache_write), SUM(reasoning)
-                FROM usage_bucket WHERE start_ms >= ? GROUP BY agent
+                SELECT agent, SUM(tokens_in), SUM(tokens_out), SUM(cache_read), SUM(cache_write), SUM(reasoning),
+                       CAST(strftime('%w', start_ms / 1000, 'unixepoch', '+8 hours') AS INTEGER) BETWEEN 1 AND 5
+                       AND CAST(strftime('%H', start_ms / 1000, 'unixepoch', '+8 hours') AS INTEGER) IN (9, 10, 11, 14, 15, 16, 17) AS peak
+                FROM usage_bucket WHERE start_ms >= ? GROUP BY agent, peak
                 """, [.integer(start)]) { row in
-                periods.tokens[period, default: [:]][storage.agentName(row.int(0)), default: TokenKinds()] += TokenKinds(
-                    tokensIn: Int(row.int(1)), tokensOut: Int(row.int(2)), cacheRead: Int(row.int(3)),
-                    cacheWrite: Int(row.int(4)), reasoning: Int(row.int(5)))
+                let agent = storage.agentName(row.int(0))
+                let kinds = TokenKinds(tokensIn: Int(row.int(1)), tokensOut: Int(row.int(2)), cacheRead: Int(row.int(3)),
+                                       cacheWrite: Int(row.int(4)), reasoning: Int(row.int(5)))
+                periods.tokens[period, default: [:]][agent, default: TokenKinds()] += kinds
+                if row.int(6) == 1, ModelCatalog.model(for: agent)?.peakHours == true {
+                    periods.peak[period, default: [:]][agent, default: TokenKinds()] += kinds
+                }
             }
         }
         return periods

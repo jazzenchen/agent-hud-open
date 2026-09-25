@@ -16,6 +16,7 @@ enum AgentAPIServiceDiscovery {
             case "api.mistral.ai": return "Mistral"
             case "api.moonshot.cn", "api.moonshot.ai": return "Moonshot"
             case "api.z.ai", "open.bigmodel.cn": return "GLM"
+            case "dashscope.aliyuncs.com", "dashscope-intl.aliyuncs.com": return "Qwen"
             default: return nil
             }
         }
@@ -34,6 +35,22 @@ enum AgentAPIServiceDiscovery {
         }
     }
 
+    /// The platform an endpoint belongs to, for vendors whose China and international prices differ; nil elsewhere.
+    static func region(_ id: String, baseURL: String?) -> ModelCatalog.Region? {
+        if let host = baseURL.flatMap(URL.init(string:))?.host?.lowercased() {
+            switch host {
+            case "api.moonshot.cn", "open.bigmodel.cn", "dashscope.aliyuncs.com": return .china
+            case "api.moonshot.ai", "api.z.ai", "dashscope-intl.aliyuncs.com": return .international
+            default: return nil
+            }
+        }
+        switch id {
+        case "moonshotai-cn", "zhipuai": return .china
+        case "moonshotai", "zai": return .international
+        default: return nil
+        }
+    }
+
     static func discover(home: URL = FileManager.default.homeDirectoryForCurrentUser,
                          environment env: [String: String] = ProcessInfo.processInfo.environment) -> [AgentService] {
         let paths = OpenAgentPaths(home: home, environment: env)
@@ -42,7 +59,7 @@ enum AgentAPIServiceDiscovery {
             guard let key, !key.isEmpty, !key.hasPrefix("!"),
                   OpenAgentCredentials.service(provider: id, baseURL: base, client: client) == nil,
                   let provider = provider(id, baseURL: base) else { return }
-            services.append(.init(client: client.name, provider: provider, product: .api))
+            services.append(.init(client: client.name, provider: provider, product: .api, region: region(id, baseURL: base)))
         }
 
         let configRoot = URL(fileURLWithPath: env["XDG_CONFIG_HOME"] ?? home.appendingPathComponent(".config").path)
@@ -68,7 +85,7 @@ enum AgentAPIServiceDiscovery {
         if let key, !key.isEmpty,
            OpenAgentCredentials.service(provider: "", baseURL: base) == nil,
            let provider = provider("anthropic", baseURL: base) {
-            services.append(.init(client: "Claude", provider: provider, product: .api))
+            services.append(.init(client: "Claude", provider: provider, product: .api, region: region("anthropic", baseURL: base)))
         }
         return AgentService.merge([services])
     }

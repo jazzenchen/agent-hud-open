@@ -506,14 +506,29 @@ public final class UsageStore {
             since: dataDate.addingTimeInterval(-7 * 86400), calendar: .current, dimensions: tokenDimensions)
     }
 
-    /// Each model's tokens in the charted range, counted as the chart counts them.
-    public var statsTokensByModel: [String: TokenKinds] {
-        let interval = statsInterval, ids = Set(consumers.map(\.id))
-        var tokens: [String: TokenKinds] = [:]
+    /// The platform each model's calls are priced on: the one its client reaches.
+    public var priceRegions: PriceRegions { PriceRegions(report: report) }
+
+    /// What the charted tokens of the selected kinds would cost at list price, counted as the chart counts them, each
+    /// model on its client's platform and DeepSeek's peak hours at its peak rates.
+    public var statsListCost: ModelCatalog.ListCost? {
+        let interval = statsInterval, ids = Set(consumers.map(\.id)), dimensions = tokenDimensions
+        var tokens: [String: TokenKinds] = [:], peak: [String: TokenKinds] = [:], peakRated: [String: Bool] = [:]
         for bucket in report?.usage ?? [] where ids.contains(bucket.agentId) && bucket.overlaps(interval) {
-            tokens[bucket.agentId, default: TokenKinds()] += bucket.kinds
+            let kinds = dimensions.masking(bucket.kinds)
+            tokens[bucket.agentId, default: TokenKinds()] += kinds
+            let rated = peakRated[bucket.agentId] ?? (ModelCatalog.model(for: bucket.agentId)?.peakHours == true)
+            peakRated[bucket.agentId] = rated
+            if rated, ModelCatalog.isPeak(bucket.start) { peak[bucket.agentId, default: TokenKinds()] += kinds }
         }
-        return tokens
+        return ModelCatalog.cost(of: tokens, peak: peak, region: priceRegions.region)
+    }
+
+    /// What a period's tokens of the selected kinds would cost at list price.
+    public func periodListCost(_ period: UsagePeriods.Period) -> ModelCatalog.ListCost? {
+        let dimensions = tokenDimensions
+        return ModelCatalog.cost(of: periodTokens(period).mapValues(dimensions.masking),
+                                 peak: (report?.periods?.peak[period] ?? [:]).mapValues(dimensions.masking), region: priceRegions.region)
     }
 
     /// Each model's tokens in a period, for the models the charts show.
