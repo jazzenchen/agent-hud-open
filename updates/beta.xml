@@ -1,0 +1,17 @@
+<?xml version='1.0' encoding='utf-8'?>
+<rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
+  <channel>
+    <title>Agent HUD</title>
+    <item>
+      <title>0.4.29</title>
+      <pubDate>Wed, 30 Sep 2026 17:58:10 +0000</pubDate>
+      <link>https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.4.29</link>
+      <sparkle:version>450</sparkle:version>
+      <sparkle:shortVersionString>0.4.29</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+      <sparkle:informationalUpdate />
+      <description>Agent HUD 0.4.29 supports the App Store iPhone app 1.3. This Mac release predates in-app updates; download it from the release page.</description>
+    </item>
+  </channel>
+</rss>
