@@ -2,6 +2,11 @@
 
 Releases of Agent HUD Open. A version is a git tag `vX.Y.Z` or `vX.Y.Z-beta.N` on `main`; `CFBundleShortVersionString` in `scripts/build-app.sh` carries the three-part numeric version `X.Y.Z`. Each entry lists what changed for people using the application and, under **Host API**, what changed for applications that embed `AgentHUDCore` and `AgentHUDDesktop`. Dates are tag dates.
 
+## 0.4.32 — 2026-10-03
+
+- The distributed Mac application's Subscription page uses clearer account requirements, activation status and license-removal explanations.
+- Agent HUD Open and the Host API are unchanged from 0.4.31.
+
 ## 0.4.31 — 2026-10-03
 
 - Turn notifications say New reply and use a blue speech bubble, distinguishing them from quota recovery and warnings.
