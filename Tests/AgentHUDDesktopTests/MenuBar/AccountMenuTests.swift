@@ -5,6 +5,32 @@ import XCTest
 
 final class AccountMenuTests: XCTestCase {
     @MainActor
+    func testHostActionsUseMenuRowsWithoutReplacingCustomViewsOrTargets() throws {
+        let suite = "AccountMenuTests.\(UUID().uuidString)", defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let settings = SettingsStore(defaults: defaults, defaultAgents: [])
+        let store = UsageStore(provider: DemoUsageProvider(), settings: settings)
+        let target = NSResponder()
+        let update = NSMenuItem(title: "New Version…", action: #selector(NSResponder.selectAll(_:)), keyEquivalent: "u")
+        update.target = target
+        update.isEnabled = false
+        let custom = NSMenuItem(title: "Custom", action: nil, keyEquivalent: "")
+        let view = NSView(frame: NSRect(x: 0, y: 0, width: 250, height: 24))
+        custom.view = view
+        let separator = NSMenuItem.separator()
+        let controller = StatusItemController(store: store, settings: settings, additionalMenuItems: { [update, separator, custom] })
+        let menu = NSMenu()
+        controller.menuNeedsUpdate(menu)
+        XCTAssertNotNil(update.view)
+        XCTAssertTrue(update.target === target)
+        XCTAssertEqual(update.action, #selector(NSResponder.selectAll(_:)))
+        XCTAssertEqual(update.keyEquivalent, "u")
+        XCTAssertFalse(update.isEnabled)
+        XCTAssertTrue(custom.view === view)
+        XCTAssertNil(separator.view)
+    }
+
+    @MainActor
     func testHostMenuItemsAreRebuiltWithTheirEnabledStateBetweenSettingsAndQuit() throws {
         let suite = "AccountMenuTests.\(UUID().uuidString)", defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite); L10n.setLanguage(.system) }

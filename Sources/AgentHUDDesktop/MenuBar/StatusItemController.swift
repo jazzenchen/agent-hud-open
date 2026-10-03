@@ -124,7 +124,10 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         ))
         menu.addItem(.separator())
         menu.addItem(action(L10n.text("设置…", "Settings…"), key: ",", modifiers: [.command], selector: #selector(openSettings)))
-        for item in additionalMenuItems() { menu.addItem(item) }
+        for item in additionalMenuItems() {
+            if item.view == nil, !item.isSeparatorItem { setActionView(item) }
+            menu.addItem(item)
+        }
         menu.addItem(action(L10n.text("退出", "Quit"), key: "q", modifiers: [.command], selector: #selector(quit)))
     }
 
@@ -167,14 +170,18 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         let item = NSMenuItem(title: title, action: selector, keyEquivalent: key)
         item.keyEquivalentModifierMask = modifiers
         item.target = self
+        setActionView(item)
+        return item
+    }
+
+    private func setActionView(_ item: NSMenuItem) {
         let modifierSymbols: [(NSEvent.ModifierFlags, String)] = [
             (.control, "⌃"), (.option, "⌥"), (.shift, "⇧"), (.command, "⌘"),
         ]
         let shortcut = modifierSymbols.filter { item.keyEquivalentModifierMask.contains($0.0) }
             .map(\.1).joined() + item.keyEquivalent.uppercased()
-        item.view = MenuRowView(title: title, value: shortcut, image: nil,
+        item.view = MenuRowView(title: item.title, value: shortcut, image: item.image,
                                 font: .menuFont(ofSize: 13), minimumWidth: Self.menuWidth)
-        return item
     }
 
     // MARK: Selectors
