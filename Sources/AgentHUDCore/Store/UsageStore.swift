@@ -20,7 +20,7 @@ public final class UsageStore {
     public internal(set) var statsRange: StatsRange = .hours24
     public var tokenBucketSize: TokenBucketSize = .hour1
     public var tokenDimensions: TokenDimensions = .fresh
-    /// The agents whose cards the Tokens page shows, once picked there; until then the ones Settings shows that this Mac has.
+    /// Explicitly picked token cards; nil shows recorded clients and clients connected to monitored services.
     public var pickedAgents: Set<String>?
     /// Keep every selectable range ready, including the partial hour at the start of the rolling window.
     public static var historyHours: Int { StatsRange.days7.hours + 1 }

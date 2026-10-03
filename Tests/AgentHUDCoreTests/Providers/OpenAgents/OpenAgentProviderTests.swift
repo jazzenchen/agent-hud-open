@@ -115,12 +115,18 @@ final class OpenAgentProviderTests: XCTestCase {
         XCTAssertEqual(fallback.windows.map(\.id), [earlier.windows[0].id])
     }
 
-    func testGoFractionsArePercentAndMonthlyHasNoFabricatedPeriod() throws {
-        let root = try json(#"{"usage":{"rolling":{"percent":0.5,"resetInSec":60},"weekly":{"percent":1},"monthly":{"percent":20}}}"#)
+    func testGoOfficialUsageReadsResetTimestampsWithoutChangingPercentagesOrPeriods() throws {
+        let root = try json(#"""
+        {"usage":{
+          "rolling":{"status":"ok","percent":0.5,"resetsAt":"2026-09-07T16:54:20.000Z"},
+          "weekly":{"status":"ok","percent":1,"resetsAt":"2026-09-14T16:53:20.000Z"},
+          "monthly":{"status":"ok","percent":20,"resetsAt":"2026-10-07T16:53:20.000Z"}
+        }}
+        """#)
         let result = try OpenAgentQuotaClient.parse(root, credential: credential(.go), now: now)
         XCTAssertEqual(result.windows.map(\.remaining), [99.5, 99, 80])
-        XCTAssertEqual(result.windows[0].reset, now.addingTimeInterval(60))
-        XCTAssertNil(result.windows[2].duration)
+        XCTAssertEqual(result.windows.map(\.reset), [60, 604800, 2592000].map { now.addingTimeInterval($0) })
+        XCTAssertEqual(result.windows.map(\.duration), [18000, 604800, nil])
     }
 
     func testGLMRegionsAndMCPStaySeparateAndInvalidResetIsOmitted() throws {

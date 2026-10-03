@@ -95,8 +95,25 @@ public extension UsageStore {
                             bucketSize: tokenBucketSize, now: dataDate, dimensions: tokenDimensions).map(\.total)
     }
 
-    /// The agents the Tokens page shows cards for: the ones picked there, or the vendors Settings shows that this Mac has.
-    var shownAgents: Set<String> { pickedAgents ?? Set(enabledAgents.filter(\.connected).map(\.vendor)) }
+    /// Token cards name execution clients, independently of the services whose quota windows they share.
+    /// Until picked explicitly, show recorded clients, configured API clients and clients of the enabled quota rows.
+    var shownAgents: Set<String> {
+        pickedAgents ?? Set(consumers.map(\.vendor)
+            + (report?.services ?? []).filter { $0.product == .api }.map(\.client)
+            + enabledAgents.filter(\.connected).flatMap { tokenCardVendors(for: $0) })
+    }
+
+    /// A quota event reveals the clients connected to that exact billing pool, without assigning its historical tokens.
+    func tokenCardVendors(for quotaID: String) -> [String] {
+        guard let agent = visibleAgents.first(where: { $0.id == quotaID }) else { return [] }
+        return tokenCardVendors(for: agent)
+    }
+
+    private func tokenCardVendors(for agent: AgentDescriptor) -> [String] {
+        guard let pool = agent.billingPool else { return [agent.vendor] }
+        let clients = (report?.services ?? []).filter { $0.accountID == pool.id && $0.product == pool.product }.map(\.client)
+        return clients.isEmpty ? [agent.vendor] : Set(clients).sorted()
+    }
 
     /// What the charted tokens of the selected kinds would cost at list price, counted as the chart counts them, each
     /// model on its client's platform and DeepSeek's peak hours at its peak rates.

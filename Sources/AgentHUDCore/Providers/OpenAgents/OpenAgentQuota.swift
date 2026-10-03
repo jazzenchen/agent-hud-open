@@ -93,8 +93,7 @@ struct OpenAgentQuotaClient: Sendable {
                 let value = root["usage"][key]
                 guard value != .null else { continue }
                 guard let percent = numeric(value["percent"]) else { throw ProviderFailure.format }
-                let reset = numeric(value["resetInSec"]).flatMap { $0 <= 253402300799 - now.timeIntervalSince1970 ? now.addingTimeInterval($0) : nil }
-                    ?? DateParsing.internet(value["resetTime"].stringValue)
+                let reset = DateParsing.internet(value["resetsAt"].stringValue)
                 // Direct API percentage is 0...100: 0.5 means 0.5%, never 50%.
                 try add(key, names[key]!, percent, reset: reset, duration: key == "rolling" ? 5 * 3600 : key == "weekly" ? 7 * 86400 : nil)
             }

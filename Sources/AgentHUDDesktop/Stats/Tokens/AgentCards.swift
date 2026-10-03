@@ -3,7 +3,7 @@ import AgentHUDCore
 
 /// A card per agent for the charted range: its share of the tokens and how they ran over the range, each kind, what they
 /// would cost at API list prices and where that went, then its models and sessions. The agents this Mac has are picked in
-/// a menu, until then the ones Settings shows, and appear in Settings' order.
+/// a menu, until then recorded clients and clients of monitored services, and appear in Settings' order.
 struct AgentCards: View {
     let store: UsageStore
     let theme: Theme
@@ -47,10 +47,11 @@ struct AgentCards: View {
         }
         .task(id: store.report?.generatedAt) { sources = SourceDetector.detect() }
         .onChange(of: store.selectedQuotaId, initial: true) { _, id in
-            // A quota event points at its agent's card, which shows even if it was not picked.
-            guard let id, let vendor = store.rowGroups.first(where: { $0.rows.contains { $0.id == id } })?.vendor,
-                  !store.shownAgents.contains(vendor) else { return }
-            store.pickedAgents = store.shownAgents.union([vendor])
+            // A shared quota reveals each connected client's card, even if it was not picked.
+            guard let id else { return }
+            let clients = Set(store.tokenCardVendors(for: id))
+            guard !clients.isSubset(of: store.shownAgents) else { return }
+            store.pickedAgents = store.shownAgents.union(clients)
         }
     }
 
@@ -77,18 +78,21 @@ struct AgentCards: View {
     /// the ledger. Supported agents it does not have are left out.
     private func detected(_ usage: [AgentUsage]) -> [String] {
         let used = Set(store.consumers.map(\.vendor))
+        let configured = Set((store.report?.services ?? []).map(\.client))
         let groups = AgentSettingsGroup.make(sources: SourceDetector.resolve(sources, report: store.report),
                                              agents: store.settings.agents, report: store.report)
-        let found = groups.filter { group in
+        let found = groups.flatMap { group -> [String] in
             let installed = group.source.map { source in
                 switch source.state {
                 case .notDetected: false
                 case .ready, .installed, .unavailable: true
                 }
             } ?? false
-            return installed || used.contains(group.id) || group.agents.contains(where: \.connected)
-        }.map(\.id)
-        return found + usage.map(\.vendor).filter { !found.contains($0) }
+            let local = installed || used.contains(group.id) || configured.contains(group.id) ? [group.id] : []
+            return local + group.agents.filter(\.connected).flatMap { store.tokenCardVendors(for: $0.id) }
+        }
+        var seen = Set<String>()
+        return (found + usage.map(\.vendor)).filter { seen.insert($0).inserted }
     }
 
     private func picker(_ vendors: [String], usage: [String: AgentUsage]) -> some View {
@@ -110,7 +114,7 @@ struct AgentCards: View {
                 .toggleStyle(.checkbox)
             }
             if store.pickedAgents != nil {
-                Button(L10n.text("恢复为设置里的 agent", "Back to the agents in Settings")) { pick(nil) }
+                Button(L10n.text("恢复默认选择", "Back to default selection")) { pick(nil) }
                     .buttonStyle(.link).font(.ui(11)).padding(.top, 2)
             }
         }
@@ -348,7 +352,7 @@ private struct AgentCard: View {
     /// Whatever opened the window pointed at one of this agent's quota windows.
     private var isPointedOut: Bool {
         guard let id = store.selectedQuotaId else { return false }
-        return store.rowGroups.first { $0.rows.contains { $0.id == id } }?.vendor == vendor
+        return store.tokenCardVendors(for: id).contains(vendor)
     }
 
     /// An API account's balance and its own estimate for the range, with the pricing details a click away.

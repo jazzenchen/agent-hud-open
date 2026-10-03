@@ -23,7 +23,7 @@ struct StatsView: View {
                 ScrollViewReader { proxy in
                     ScrollView { content(theme) }
                         .onChange(of: store.selectedQuotaId, initial: true) { _, id in
-                            guard let id, let vendor = quotaVendor(id) else { return }
+                            guard let id, let vendor = store.tokenCardVendors(for: id).first else { return }
                             withAnimation { proxy.scrollTo(AgentCards.anchor(vendor), anchor: .center) }
                             // The tile is pointed out for a moment; it keeps showing the window afterwards.
                             Task {
@@ -51,10 +51,6 @@ struct StatsView: View {
     }
 
     private static let top = "stats-top"
-
-    private func quotaVendor(_ id: String) -> String? {
-        store.rowGroups.first { $0.rows.contains { $0.id == id } }?.vendor
-    }
 
     private func content(_ theme: Theme) -> some View {
         VStack(alignment: .leading, spacing: 12) {
