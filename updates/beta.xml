@@ -3,16 +3,16 @@
   <channel>
     <title>Agent HUD</title>
     <item>
-      <title>0.4.33</title>
-      <pubDate>Sat, 03 Oct 2026 02:34:33 +0800</pubDate>
-      <link>https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.4.33-beta.1</link>
+      <title>0.4.34</title>
+      <pubDate>Sat, 03 Oct 2026 19:12:54 +0800</pubDate>
+      <link>https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.4.34-beta.1</link>
       <sparkle:channel>beta</sparkle:channel>
-      <sparkle:minimumAutoupdateVersion>457</sparkle:minimumAutoupdateVersion>
-      <sparkle:version>457</sparkle:version>
-      <sparkle:shortVersionString>0.4.33-beta.1</sparkle:shortVersionString>
+      <sparkle:minimumAutoupdateVersion>458</sparkle:minimumAutoupdateVersion>
+      <sparkle:version>458</sparkle:version>
+      <sparkle:shortVersionString>0.4.34-beta.1</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
       <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-      <description sparkle:format="markdown"># Agent HUD 0.4.33-beta.1
+      <description sparkle:format="markdown"># Agent HUD 0.4.34-beta.1
 
 ## Compatibility
 
@@ -26,11 +26,12 @@ Requires an Apple Silicon Mac running macOS 14 or later.
 
 ## Changes
 
-- Opt in to Beta updates in Updates settings.
-- See the required iPhone version before installing an update.
-- Keep release-only updates by default; each Beta installation requires confirmation.
+- Include recorded OpenCode, Pi and other client usage in token statistics.
+- Keep manual client selections across refreshes and show cards with historical usage.
+- Open the relevant client statistics from shared quota alerts.
+- Use the reported reset time for OpenCode Go quota countdowns.
 </description>
-      <enclosure url="https://github.com/jazzenchen/agent-hud-open/releases/download/v0.4.33-beta.1/Agent-HUD-0.4.33-beta.1-arm64.dmg" length="11455191" type="application/octet-stream" sparkle:edSignature="SWU9VJlCdgkxFUwubuFwuFMngFbZlXSJGkaLTAviK4uaDDCRIQibQtUuA790d+GIaz+Uaj+dGseGcwjWvUgWBA==" />
+      <enclosure url="https://github.com/jazzenchen/agent-hud-open/releases/download/v0.4.34-beta.1/Agent-HUD-0.4.34-beta.1-arm64.dmg" length="11457441" type="application/octet-stream" sparkle:edSignature="Z7WZbvFK4bLMcrBTqOoB1S6MMcW5h2Xfs576nASuFIItbY3KOI27X45LfCbQ77+rlEcuPGqle9jdpXRC/agaDg==" />
       <agenthudMacOnly>false</agenthudMacOnly>
       <agenthudMinimumIOSVersion>1.4</agenthudMinimumIOSVersion>
     </item>
