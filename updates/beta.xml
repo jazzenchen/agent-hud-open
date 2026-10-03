@@ -4,15 +4,15 @@
     <title>Agent HUD</title>
     <item>
       <title>0.4.34</title>
-      <pubDate>Sat, 03 Oct 2026 21:07:54 +0800</pubDate>
-      <link>https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.4.34-beta.2</link>
+      <pubDate>Sat, 03 Oct 2026 22:25:32 +0800</pubDate>
+      <link>https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.4.34-beta.3</link>
       <sparkle:channel>beta</sparkle:channel>
-      <sparkle:minimumAutoupdateVersion>459</sparkle:minimumAutoupdateVersion>
-      <sparkle:version>459</sparkle:version>
-      <sparkle:shortVersionString>0.4.34-beta.2</sparkle:shortVersionString>
+      <sparkle:minimumAutoupdateVersion>462</sparkle:minimumAutoupdateVersion>
+      <sparkle:version>462</sparkle:version>
+      <sparkle:shortVersionString>0.4.34-beta.3</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
       <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-      <description sparkle:format="markdown"># Agent HUD 0.4.34-beta.2
+      <description sparkle:format="markdown"># Agent HUD 0.4.34-beta.3
 
 ## Compatibility
 
@@ -26,10 +26,11 @@ Requires an Apple Silicon Mac running macOS 14 or later.
 
 ## Changes
 
-- Automatic update checks now show a visible reminder without taking keyboard focus from your work.
-- Update dialogs follow the app's language setting, including when the language changes while a dialog is open.
+- Available updates appear as a blue download button beside Stats in the HUD and a New Version entry below Settings in the menu. Both are hidden when there is no available update.
+- Background checks stay quiet. Open the update window from either entry; choosing Later keeps the reminder available until the update is installed or skipped.
+- Update dialogs and entry labels follow the app language.
 </description>
-      <enclosure url="https://github.com/jazzenchen/agent-hud-open/releases/download/v0.4.34-beta.2/Agent-HUD-0.4.34-beta.2-arm64.dmg" length="11493864" type="application/octet-stream" sparkle:edSignature="S+wJJUciXrSL1Exl3xw/GT91GLUsYCLxcg0GTiKXYrm0wjDaZkBCXzRbbWvQoalMn2jJ6pTWjhcIv2LNhmcjAA==" />
+      <enclosure url="https://github.com/jazzenchen/agent-hud-open/releases/download/v0.4.34-beta.3/Agent-HUD-0.4.34-beta.3-arm64.dmg" length="11500430" type="application/octet-stream" sparkle:edSignature="w9XSg0v5DbwimgfZI//UanCbQkHqQSZddN5RSQ2Q8GF2sr/T5lopbrMAKkHz4KOwSls9LeT6hRKtLJpg5kvNCQ==" />
       <agenthudMacOnly>false</agenthudMacOnly>
       <agenthudMinimumIOSVersion>1.4</agenthudMinimumIOSVersion>
     </item>
