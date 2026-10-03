@@ -15,6 +15,7 @@ struct HoverPanelView: View {
     let store: UsageStore
     let onOpenStats: () -> Void
     var onOpenSettings: () -> Void = {}
+    var additionalHUDControls: @MainActor () -> AnyView = { AnyView(EmptyView()) }
     var alert: IslandAlert? = nil
     var onOpenAlert: () -> Void = {}
     var onDecideAlert: (PermissionDecision) -> Void = { _ in }
@@ -169,6 +170,7 @@ struct HoverPanelView: View {
             .help(L10n.text("设置", "Settings"))
             .accessibilityLabel(L10n.text("设置", "Settings"))
             Spacer()
+            additionalHUDControls()
             Button {
                 store.focusedSessionID = nil
                 store.statsTab = .tokens

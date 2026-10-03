@@ -1,5 +1,6 @@
 import AppKit
 import AgentHUDCore
+import SwiftUI
 
 /// One screen's HUD: its glow window, its island window and its own hover state machine.
 ///
@@ -20,6 +21,7 @@ final class ScreenHUD {
     let key: String
     private let store: UsageStore
     private let settings: SettingsStore
+    private let additionalHUDControls: @MainActor (@escaping @MainActor () -> Void) -> AnyView
     private(set) var geometry: NotchGeometry
     /// Set by the coordinator, which watches the system appearance once for every screen.
     var systemIsLight = SystemAppearance.isLight
@@ -46,10 +48,12 @@ final class ScreenHUD {
     /// Asks for a request another screen holds: the waiting list names every request, wherever it arrived.
     var onClaimRequest: ((String) -> Void)?
 
-    init(key: String, screen: NSScreen?, store: UsageStore, settings: SettingsStore) {
+    init(key: String, screen: NSScreen?, store: UsageStore, settings: SettingsStore,
+         additionalHUDControls: @escaping @MainActor (@escaping @MainActor () -> Void) -> AnyView = { _ in AnyView(EmptyView()) }) {
         self.key = key
         self.store = store
         self.settings = settings
+        self.additionalHUDControls = additionalHUDControls
         // The stored placement decides notch or queue before the first frame, so the HUD never flashes
         // the wrong shape on launch.
         let placement = screen.map { ScreenIdentity.placement(for: $0, in: settings.settings) }
@@ -380,6 +384,10 @@ final class ScreenHUD {
             lightBorder: systemIsLight,
             onOpenStats: { [weak self] in self?.handOff { self?.onOpenStats?() } },
             onOpenSettings: { [weak self] in self?.handOff { self?.onOpenSettings?() } },
+            additionalHUDControls: { [weak self] in
+                guard let self else { return AnyView(EmptyView()) }
+                return self.additionalHUDControls { [weak self] in self?.forceCollapse() }
+            },
             alert: activeAlert,
             onOpenAlert: { [weak self] in self?.openAlert() },
             onDecideAlert: { [weak self] decision in self?.decideAlert(decision) },
@@ -501,4 +509,3 @@ final class ScreenHUD {
         island.setRootView(root)
     }
 }
-

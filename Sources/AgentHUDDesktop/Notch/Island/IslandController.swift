@@ -1,5 +1,6 @@
 import AppKit
 import AgentHUDCore
+import SwiftUI
 
 /// Owns one `ScreenHUD` per display and everything they share.
 ///
@@ -17,6 +18,7 @@ final class IslandController {
 
     private let store: UsageStore
     private let settings: SettingsStore
+    private let additionalHUDControls: @MainActor (@escaping @MainActor () -> Void) -> AnyView
     private(set) var huds: [String: ScreenHUD] = [:]
     /// Display order, so the primary HUD is stable rather than whatever the dictionary yields.
     private var order: [String] = []
@@ -27,9 +29,11 @@ final class IslandController {
     var onOpenStats: (() -> Void)? { didSet { huds.values.forEach { $0.onOpenStats = onOpenStats } } }
     var onOpenSettings: (() -> Void)? { didSet { huds.values.forEach { $0.onOpenSettings = onOpenSettings } } }
 
-    init(store: UsageStore, settings: SettingsStore) {
+    init(store: UsageStore, settings: SettingsStore,
+         additionalHUDControls: @escaping @MainActor (@escaping @MainActor () -> Void) -> AnyView = { _ in AnyView(EmptyView()) }) {
         self.store = store
         self.settings = settings
+        self.additionalHUDControls = additionalHUDControls
         rebuild()
 
         observers.append(NotificationCenter.default.addObserver(
@@ -92,7 +96,7 @@ final class IslandController {
         }
         for (index, key) in keys.enumerated() where huds[key] == nil {
             let hud = ScreenHUD(key: key, screen: screens.indices.contains(index) ? screens[index] : nil,
-                                store: store, settings: settings)
+                                store: store, settings: settings, additionalHUDControls: additionalHUDControls)
             hud.systemIsLight = systemIsLight
             hud.onOpenStats = { [weak self] in self?.onOpenStats?() }
             hud.onOpenSettings = { [weak self] in self?.onOpenSettings?() }

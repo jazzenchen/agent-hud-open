@@ -11,6 +11,7 @@ struct IslandRootView: View {
     let lightBorder: Bool
     let onOpenStats: () -> Void
     var onOpenSettings: () -> Void = {}
+    var additionalHUDControls: @MainActor () -> AnyView = { AnyView(EmptyView()) }
     var alert: IslandAlert? = nil
     var onOpenAlert: () -> Void = {}
     /// The user's answer to a request waiting on the island; the alert's own id says which request it answers.
@@ -104,6 +105,7 @@ struct IslandRootView: View {
                 .transition(detailTransition)
         } else if isOpen, let store {
             HoverPanelView(store: store, onOpenStats: onOpenStats, onOpenSettings: onOpenSettings,
+                           additionalHUDControls: additionalHUDControls,
                            alert: alert, onOpenAlert: onOpenAlert, onDecideAlert: onDecideAlert,
                            waitingRequests: waitingRequests)
                 .frame(width: IslandController.expandedWidth, alignment: .top)
