@@ -236,10 +236,17 @@ struct GrokClient: Sendable {
         guard let object = value.objectValue else { return nil }
         if object.isEmpty { return 0 }
         guard let cents = object["val"] else { return nil }
-        return dollars(cents: cents)
+        guard let amount = signedDollars(cents: cents) else { return nil }
+        // The official CLI credit bar displays the magnitude of signed accounting cents.
+        // https://github.com/xai-org/grok-build/blob/2bdd1d6a6369de0e8c68132ea4539e9abd9e14a8/crates/codegen/xai-grok-pager/src/views/credit_bar.rs
+        return amount < 0 ? -amount : amount
     }
 
     static func dollars(cents value: ProviderJSON) -> Decimal? {
+        signedDollars(cents: value).flatMap { $0 >= 0 ? $0 : nil }
+    }
+
+    private static func signedDollars(cents value: ProviderJSON) -> Decimal? {
         let cents: Int64?
         switch value {
         case .integer(let amount): cents = amount
@@ -247,7 +254,7 @@ struct GrokClient: Sendable {
         case .number(let amount): cents = Int64(exactly: amount)
         default: cents = nil
         }
-        guard let cents, cents >= 0 else { return nil }
+        guard let cents else { return nil }
         return Decimal(cents) / 100
     }
 }

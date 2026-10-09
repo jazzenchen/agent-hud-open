@@ -4,6 +4,19 @@ import XCTest
 @testable import AgentHUDCore
 
 final class GrokWalletQuotaTests: XCTestCase {
+    private var previousLanguage = AppLanguage.system
+
+    override func setUp() {
+        super.setUp()
+        previousLanguage = L10n.language
+        L10n.setLanguage(.en)
+    }
+
+    override func tearDown() {
+        L10n.setLanguage(previousLanguage)
+        super.tearDown()
+    }
+
     private func json(_ text: String) throws -> ProviderJSON { try .read(Data(text.utf8)) }
 
     func testUnifiedBillingWithZeroWalletsKeepsWeeklyUsageUnknown() throws {
@@ -31,8 +44,17 @@ final class GrokWalletQuotaTests: XCTestCase {
         XCTAssertNil(quota.sourceInfo)
     }
 
+    func testSignedCLIAccountingAmountsKeepTheirPositiveDollarValues() throws {
+        let quota = try GrokClient.parse(json(#"{"config":{"creditUsagePercent":12.5,"prepaidBalance":{"val":-500},"onDemandCap":{"val":"-5000"},"onDemandUsed":{"val":-300}}}"#))
+        XCTAssertEqual(quota.wallets, [AccountWallet(kind: .prepaid, balance: 5), AccountWallet(kind: .onDemand, used: 3, limit: 50)])
+        XCTAssertEqual(quota.windows.map(\.remaining), [87.5, 94])
+        let minimum = try GrokClient.parse(json(#"{"config":{"prepaidBalance":{"val":"-9223372036854775808"}}}"#))
+        XCTAssertEqual(minimum.wallets.first?.balance, Decimal(string: "92233720368547758.08"))
+        XCTAssertNil(GrokClient.dollars(cents: .integer(-500)), "the Bot's nonnegative cache fields have a separate contract")
+    }
+
     func testMissingAndMalformedWalletsDoNotBecomeZeroOrDiscardQuota() throws {
-        for wallet in ["null", "42", #"{"val":null}"#, #"{"val":true}"#, #"{"val":-1}"#,
+        for wallet in ["null", "42", #"{"val":null}"#, #"{"val":true}"#,
                        #"{"val":1.5}"#, #"{"val":"invalid"}"#, #"{"unexpected":0}"#] {
             let quota = try GrokClient.parse(json("{\"config\":{\"creditUsagePercent\":25,\"prepaidBalance\":\(wallet),\"onDemandCap\":\(wallet),\"onDemandUsed\":\(wallet)}}"))
             XCTAssertEqual(quota.windows.map(\.remaining), [75], wallet)
