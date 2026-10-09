@@ -114,6 +114,12 @@ struct ProviderQuotaBlock: View {
                                   isLoading: store.isLoading)
                         .opacity(section.isCurrent ? 1 : 0.55)
                 }
+                if let wallets = section.account?.wallets {
+                    ForEach(wallets) { wallet in
+                        AccountWalletRow(wallet: wallet)
+                            .opacity(section.isCurrent ? 1 : 0.55)
+                    }
+                }
                 // Earned resets belong to the signed-in Codex account.
                 if section.isCurrent, section.rows.contains(where: { $0.agent.vendor == "Codex" }),
                    let resets = store.report?.resetCredits(for: section.id) {
@@ -144,6 +150,13 @@ struct AccountSectionHeader: View {
                 if let plan = account.planLabel {
                     Text(plan).foregroundStyle(theme.secondary)
                 }
+                if let sourceDetails {
+                    Image(systemName: "info.circle")
+                        .foregroundStyle(theme.tertiary)
+                        .help(sourceDetails)
+                        .accessibilityLabel(L10n.text("读数来源", "Reading source"))
+                        .accessibilityHint(sourceDetails)
+                }
                 Spacer(minLength: 8)
                 Text(label)
                     .foregroundStyle(theme.tertiary)
@@ -166,6 +179,13 @@ struct AccountSectionHeader: View {
         .padding(.horizontal, IslandRowLayout.inset)
         .padding(.top, 2)
         .accessibilityElement(children: .combine)
+    }
+
+    private var sourceDetails: String? {
+        guard let info = account.sourceInfo else { return nil }
+        let date = account.observedAt.formatted(Date.FormatStyle().month(.abbreviated).day()
+            .hour().minute().second().locale(L10n.dateLocale))
+        return info + "\n" + L10n.text("读取时间：\(date)", "Read at: \(date)")
     }
 }
 

@@ -81,10 +81,15 @@ public struct AccountObservation: Hashable, Codable, Sendable, Identifiable {
     /// The provider explicitly listed every enabled quota window for this account, using account-scoped row ids.
     /// Nil is an incremental or failed reading; an empty set explicitly confirms that no windows remain.
     public let quotaWindowIDs: Set<String>?
+    /// Reported account money, with each wallet's own reading time. Nil when this source reports no wallet values.
+    public let wallets: [AccountWallet]?
+    /// Informational provenance of a successful reading, shown in source details rather than as a warning.
+    public let sourceInfo: String?
 
     public init(account: ProviderAccount, home: String = "", client: String? = nil, label: String? = nil, plan: String? = nil,
                 observedAt: Date, isCurrent: Bool = true, quotaNotice: String? = nil, readingIssue: ReadingIssue? = nil,
-                resetCredits: CodexResetCredits? = nil, aliases: [String]? = nil, quotaWindowIDs: Set<String>? = nil) {
+                resetCredits: CodexResetCredits? = nil, aliases: [String]? = nil, quotaWindowIDs: Set<String>? = nil,
+                wallets: [AccountWallet]? = nil, sourceInfo: String? = nil) {
         self.account = account
         self.home = home
         self.client = client ?? (account.provider == "Codex" && home.hasPrefix("pi:") ? "Pi" : account.provider)
@@ -97,6 +102,8 @@ public struct AccountObservation: Hashable, Codable, Sendable, Identifiable {
         self.resetCredits = resetCredits
         self.aliases = aliases.flatMap { $0.isEmpty ? nil : $0 }
         self.quotaWindowIDs = quotaWindowIDs
+        self.wallets = wallets.flatMap { $0.isEmpty ? nil : $0 }
+        self.sourceInfo = sourceInfo
     }
 
     public var id: String { account.id + "@" + home }
@@ -104,11 +111,12 @@ public struct AccountObservation: Hashable, Codable, Sendable, Identifiable {
     public func with(isCurrent: Bool) -> AccountObservation {
         AccountObservation(account: account, home: home, client: client, label: label, plan: plan, observedAt: observedAt,
                            isCurrent: isCurrent, quotaNotice: quotaNotice, readingIssue: readingIssue, resetCredits: resetCredits,
-                           aliases: aliases, quotaWindowIDs: quotaWindowIDs)
+                           aliases: aliases, quotaWindowIDs: quotaWindowIDs, wallets: wallets, sourceInfo: sourceInfo)
     }
 
     private enum CodingKeys: String, CodingKey {
         case account, home, client, label, plan, observedAt, isCurrent, quotaNotice, readingIssue, resetCredits, aliases, quotaWindowIDs
+        case wallets, sourceInfo
     }
 
     public init(from decoder: any Decoder) throws {
@@ -121,7 +129,9 @@ public struct AccountObservation: Hashable, Codable, Sendable, Identifiable {
             readingIssue: try values.decodeIfPresent(ReadingIssue.self, forKey: .readingIssue),
             resetCredits: try values.decodeIfPresent(CodexResetCredits.self, forKey: .resetCredits),
             aliases: try values.decodeIfPresent([String].self, forKey: .aliases),
-            quotaWindowIDs: try values.decodeIfPresent(Set<String>.self, forKey: .quotaWindowIDs))
+            quotaWindowIDs: try values.decodeIfPresent(Set<String>.self, forKey: .quotaWindowIDs),
+            wallets: try values.decodeIfPresent([AccountWallet].self, forKey: .wallets),
+            sourceInfo: try values.decodeIfPresent(String.self, forKey: .sourceInfo))
     }
 
     /// The account's email or name, else a short form of its id.

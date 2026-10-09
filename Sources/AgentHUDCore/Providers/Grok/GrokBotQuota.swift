@@ -49,25 +49,36 @@ enum GrokBotQuota {
               let readAt = ProviderDate.milliseconds(value["reading"]["readAtMs"]), readAt <= now, expires > readAt,
               now.timeIntervalSince(readAt) < 86400 else { return nil }
         let usage = value["reading"]["usage"]
-        guard let used = usage["percentUsed"].numberValue, used >= 0,
-              usage["hasNonZeroIncludedLimit"].boolValue == true,
+        guard usage["hasNonZeroIncludedLimit"].boolValue == true,
               let trial = usage["isSandTrial"].boolValue,
               usage["isTeamSeat"].boolValue != true else { return nil }
+        let used = usage["percentUsed"].numberValue.flatMap { $0 >= 0 ? $0 : nil }
         let reset = ProviderDate.milliseconds(usage["nextResetMs"])
         guard usage.objectValue?["nextResetMs"] == .null || reset != nil else { return nil }
         // A Bot slot may be an auth id or an email fallback. It cannot establish equality with a CLI user id.
         var quota = ProviderQuota(windows: [.init(id: "grok", label: trial ? L10n.text("试用额度", "Trial usage limit")
-            : L10n.text("每周用量额度", "Weekly usage limit"), remaining: QuotaMath.remaining(usedPercent: used), reset: reset,
+            : L10n.text("每周用量额度", "Weekly usage limit"), remaining: used.map(QuotaMath.remaining(usedPercent:)), reset: reset,
             duration: trial ? nil : TimeInterval(7 * 86400), shortLabel: trial ? L10n.text("试用", "Trial") : WindowNames.Period.week.shortName)],
             plan: usage["grokPlanLabel"].stringValue,
-            displayNotice: L10n.text("额度来自 Grok Bot 缓存；在 Bot 中刷新可更新读数", "Quota from Grok Bot cache; refresh in Bot to update"),
             account: .unresolved(provider: "Grok", home: "grok-bot:" + RecordCoding.hash([accountSlot])),
             label: "Grok Bot", observedAt: readAt, client: "Grok Bot")
-        if let cap = usage["onDemand"]["limitCents"].numberValue, cap > 0,
-           let extra = usage["onDemand"]["usedCents"].numberValue, extra >= 0 {
-            quota.windows.append(.init(id: "grok:extra", label: L10n.text("额外用量", "Extra usage"),
-                remaining: QuotaMath.remaining(usedPercent: extra / cap * 100), reset: reset,
-                shortLabel: L10n.text("额外用量", "Extra")))
+        quota.sourceInfo = L10n.text("额度来自 Grok Bot 缓存；在 Bot 中刷新可更新读数", "Quota from Grok Bot cache; refresh in Bot to update")
+        if used == nil {
+            quota.displayNotice = L10n.text("Grok Bot 未提供已用额度，请在 Bot 中刷新", "Grok Bot did not report used credits; refresh in Bot")
+        }
+        let cap = GrokClient.dollars(cents: usage["onDemand"]["limitCents"])
+        let extra = GrokClient.dollars(cents: usage["onDemand"]["usedCents"])
+        if cap != nil || extra != nil {
+            quota.wallets.append(AccountWallet(kind: .onDemand, used: extra, limit: cap, observedAt: readAt))
+        }
+        if let wallet = quota.wallets.first {
+            if wallet.limit == 0 {
+                quota.quotaWindowIDs = Set(quota.windows.map(\.id))
+            } else {
+                quota.windows.append(.init(id: "grok:extra", label: L10n.text("额外用量", "Extra usage"),
+                    remaining: wallet.usedPercent.map(QuotaMath.remaining(usedPercent:)), reset: reset,
+                    shortLabel: L10n.text("额外用量", "Extra"), observedAt: wallet.observedAt))
+            }
         }
         return quota
     }

@@ -86,8 +86,8 @@ extension UsageReport {
         }
         let retiredPoolIDs = Set(previous.discoveredAgents.filter { !isActive($0) }.compactMap { $0.billingPool?.id })
         let cutoff = generatedAt.addingTimeInterval(-QuotaHistoryStore.retention)
-        // Only a provider's explicit, sound complete inventory retires omitted windows. Missing values in a present
-        // window keep their last reading, and a failed read or an account switched away keeps every last reading.
+        // Only a provider's explicit, sound complete inventory retires omitted windows. A window without a new snapshot
+        // keeps its last reading; a snapshot with an unknown value replaces it. Failed reads keep every last reading.
         let inventories = completeQuotaWindowInventories
         let accounts = mergedAccounts(from: previous, retiredPoolIDs: retiredPoolIDs, cutoff: cutoff)
         // Every row a provider reports is seen now; rows from a report that kept no times start their clock now.

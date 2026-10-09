@@ -151,7 +151,9 @@ actor OpenAgentUsageProvider: UsageProvider, LedgerRecording {
         if Task.isCancelled { return }
         for result in results {
             if result.at != old[result.credential.pool.id]?.at, let quota = result.quota {
-                await history.append(quota.windows.map { .init(agentId: $0.id, timestamp: result.at, remainingPct: $0.remaining) }, now: now)
+                await history.append(quota.windows.compactMap { window in
+                    window.remaining.map { QuotaSample(agentId: window.id, timestamp: result.at, remainingPct: $0) }
+                }, now: now)
             }
         }
         cached = Dictionary(uniqueKeysWithValues: results.map { ($0.credential.pool.id, $0) })

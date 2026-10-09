@@ -3,8 +3,8 @@ import Foundation
 /// Latest quota reading for one agent.
 public struct UsageSnapshot: Hashable, Codable, Sendable {
     public let agentId: String
-    /// Remaining % of this quota window.
-    public let remainingPct: Double
+    /// Remaining % of this quota window; nil when the source reports the window without a quota value.
+    public let remainingPct: Double?
     /// Remaining % of the weekly (7d) window, when the source reports one.
     public let weeklyRemainingPct: Double?
     public let resetAt: Date?
@@ -15,7 +15,7 @@ public struct UsageSnapshot: Hashable, Codable, Sendable {
 
     public init(
         agentId: String,
-        remainingPct: Double,
+        remainingPct: Double?,
         weeklyRemainingPct: Double? = nil,
         resetAt: Date? = nil,
         windowDuration: TimeInterval? = nil,

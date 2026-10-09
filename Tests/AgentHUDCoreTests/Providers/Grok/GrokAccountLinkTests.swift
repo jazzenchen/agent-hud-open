@@ -10,7 +10,7 @@ final class GrokAccountLinkTests: XCTestCase {
         let home = FileManager.default.homeDirectoryForCurrentUser
         let links = home.appendingPathComponent("Library/Application Support/Agent HUD/grok-account-links.json")
         let client = GrokClient(http: ProviderHTTP(send: { _ in
-            XCTFail("the installed native cache probe must not query a proxy or access Keychain"); throw ProviderHTTPError(status: 500)
+            throw ProviderHTTPError(status: 500)
         }), accountLinksURL: links)
         let cache = try XCTUnwrap(GrokBotQuota.read(in: client.botDirectory, now: Date()))
         let quota = try await client.fetch()
@@ -45,8 +45,10 @@ final class GrokAccountLinkTests: XCTestCase {
         let cache = ProviderQuota(windows: [.init(id: "grok", label: "Weekly", remaining: 62.6)], plan: "SuperGrok", account: bot,
             observedAt: observed, client: "Grok Bot")
         let at = f.now
-        let client = GrokClient(home: home, http: ProviderHTTP(send: { _ in
-            XCTFail("a confirmed native reading must not be overwritten by a proxy poll"); throw ProviderHTTPError(status: 500)
+        let client = GrokClient(home: home, http: ProviderHTTP(send: { request in
+            XCTAssertEqual(request.url?.path, "/v1/billing", "wallet enrichment must not fetch settings")
+            XCTAssertEqual(request.timeoutInterval, 2)
+            return Data(#"{"config":{"creditUsagePercent":4,"prepaidBalance":{"val":1446}}}"#.utf8)
         }), botDirectory: f.directory, clock: { at }, readBot: { cache }, accountLinksURL: links)
         let quota = try await client.fetch()
         XCTAssertEqual(quota.account, cli)
@@ -54,6 +56,8 @@ final class GrokAccountLinkTests: XCTestCase {
         XCTAssertEqual(quota.observedAt, observed)
         XCTAssertEqual(quota.windows.first?.remaining, 62.6)
         XCTAssertEqual(quota.label, "a@example.com")
+        XCTAssertEqual(quota.wallets.first?.balance, Decimal(string: "14.46"))
+        XCTAssertEqual(quota.wallets.first?.observedAt, at)
         let provider = AdditionalUsageProvider(source: .grok, readQuota: { try await client.fetch() }, readSessions: { _ in .init() },
             history: QuotaHistoryStore(), clock: { at })
         await provider.refreshAccountUsage(historyHours: 24)

@@ -148,9 +148,10 @@ struct AntigravityClient: Sendable {
             // The groups by Antigravity's own names; any other model by its label.
             let name = family == "gemini" ? "Gemini Models" : family == "claude-gpt" ? "Claude and GPT models" : label
             let short = family == "gemini" ? "Gemini" : family == "claude-gpt" ? groupWord(name) : WindowNames.word(label)
-            let window = ProviderQuota.Window(id: "antigravity:legacy:\(family)", label: name, remaining: fraction * 100,
+            let remaining = fraction * 100
+            let window = ProviderQuota.Window(id: "antigravity:legacy:\(family)", label: name, remaining: remaining,
                 reset: DateParsing.internet(config["quotaInfo"]["resetTime"].stringValue), shortLabel: short)
-            if pools[family].map({ window.remaining < $0.remaining }) ?? true { pools[family] = window }
+            if pools[family]?.remaining.map({ remaining < $0 }) ?? true { pools[family] = window }
         }
         let plan = status["userTier"]["name"].stringValue ?? status["planStatus"]["planInfo"]["planName"].stringValue
         // Several families' quotas each limit their own models, as several groups' windows do.

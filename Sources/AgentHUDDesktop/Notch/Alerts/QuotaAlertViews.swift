@@ -73,7 +73,7 @@ struct QuotaAlertDetailView: View {
                     Text(copy.used)
                 }
                 .font(.ui(10)).foregroundStyle(.white.opacity(0.42))
-                ProgressTrack(fraction: max(0, 100 - alert.snapshot.remainingPct) / 100,
+                ProgressTrack(fraction: (copy.usedPct ?? 0) / 100,
                               fill: copy.accent, track: .white.opacity(0.12)).frame(height: 4)
                 if !alert.otherExhaustedWindows.isEmpty {
                     Text(copy.otherLimits).font(.ui(10)).foregroundStyle(copy.accent)
@@ -165,26 +165,29 @@ private struct QuotaEventSymbol: View {
 private struct QuotaAlertCopy {
     let alert: QuotaAlert
     var accent: Color { Color(IslandAlert.quota(alert).accent) }
-    var used: String { TokenFormat.percent(max(0, 100 - alert.snapshot.remainingPct)) }
-    var remaining: String { TokenFormat.percent(alert.snapshot.remainingPct) }
+    var usedPct: Double? { alert.snapshot.remainingPct.map { max(0, 100 - $0) } }
+    var used: String { usedPct.map(TokenFormat.percent) ?? "N/A" }
+    var remaining: String { alert.snapshot.remainingPct.map(TokenFormat.percent) ?? "N/A" }
     var exhaustion: String {
-        guard let duration = alert.timeToExhaust else { return "—" }
+        guard alert.snapshot.remainingPct != nil, let duration = alert.timeToExhaust else { return "—" }
         return Countdown.compact(max(60, ceil(duration / 60) * 60))
     }
     var reset: String { Countdown.resetLabelCompact(alert.snapshot.resetAt, now: alert.snapshot.updatedAt) }
     var compactTitle: String {
+        guard let remaining = alert.snapshot.remainingPct else { return L10n.text("额度不可用", "Quota unavailable") }
         if alert.kind == .reset { return L10n.text("已重置", "Reset") }
-        if alert.snapshot.remainingPct <= AlertPolicy.exhaustedRemaining { return L10n.text("已耗尽", "Empty") }
+        if remaining <= AlertPolicy.exhaustedRemaining { return L10n.text("已耗尽", "Empty") }
         if alert.timeToExhaust != nil { return L10n.text("\(exhaustion) 后耗尽", "\(exhaustion) left") }
         return L10n.text("即将耗尽", "Running low")
     }
     var title: String {
+        guard let remaining = alert.snapshot.remainingPct else { return L10n.text("额度暂不可用。", "Quota is unavailable.") }
         if alert.kind == .reset {
             return alert.otherExhaustedWindows.isEmpty
                 ? L10n.text("此窗口额度已重置。", "This quota window has reset.")
                 : L10n.text("此窗口已重置，其他窗口仍有限制。", "This window has reset; other limits still apply.")
         }
-        if alert.snapshot.remainingPct <= AlertPolicy.exhaustedRemaining {
+        if remaining <= AlertPolicy.exhaustedRemaining {
             return L10n.text("当前窗口额度已耗尽，等待重置。", "This window is empty. Waiting for reset.")
         }
         if alert.timeToExhaust != nil {
