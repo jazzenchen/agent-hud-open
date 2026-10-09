@@ -137,7 +137,7 @@ struct QuotaRowMetrics {
     func value(_ metric: IslandQuotaMetric) -> String? {
         switch metric {
         case .quota:
-            row.usedPct.map(TokenFormat.percent)
+            row.usedPct.map(TokenFormat.percent) ?? row.missingQuotaLabel
         case .burnRate:
             insights?.burnRatePctPerHour.map { String(format: "%.1f%%/h", $0) }
         case .tokens:
@@ -146,7 +146,9 @@ struct QuotaRowMetrics {
     }
 
     func detail(_ metric: IslandQuotaMetric, isLoading: Bool) -> String {
-        guard row.usedPct != nil else { return isLoading ? "—" : row.missingQuotaLabel }
+        guard row.usedPct != nil else {
+            return metric == .quota && !isLoading ? row.resetLabel(now: now) : "—"
+        }
         switch metric {
         case .quota:
             return row.resetLabel(now: now)

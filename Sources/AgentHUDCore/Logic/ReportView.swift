@@ -84,7 +84,7 @@ public struct ReportView: Sendable {
             return AgentRow(
                 agent: agent,
                 remainingPct: snapshot?.remainingPct,
-                level: assessment.showsLevel ? snapshot.map { AlertPolicy.quotaLevel(remaining: $0.remainingPct) } : nil,
+                level: assessment.showsLevel ? snapshot.flatMap(\.remainingPct).map { AlertPolicy.quotaLevel(remaining: $0) } : nil,
                 resetAt: snapshot?.resetAt,
                 weeklyRemainingPct: snapshot?.weeklyRemainingPct,
                 paletteIndex: index,

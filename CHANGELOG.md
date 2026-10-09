@@ -4,6 +4,11 @@ Releases of Agent HUD Open. A version is a git tag `vX.Y.Z` or `vX.Y.Z-beta.N` o
 
 ## Unreleased
 
+- Grok subscription windows remain visible as N/A when usage is unavailable, retaining their reset time without inventing a percentage, forecast or alert. An explicit unavailable reading replaces a previous numeric value.
+- Grok accounts show prepaid balances and on-demand spending amounts, including known zero-dollar values. Confirmed CLI/Bot accounts can supplement native subscription readings with wallet data; each reading keeps its own observation time.
+- Healthy Grok Bot cache provenance and its reading time appear in an information tooltip rather than a permanent notice.
+- Host API: `UsageSnapshot.remainingPct` is optional for an explicitly unavailable value, and `ReadingAssessment.hasValue` excludes it from numeric status and events. `AccountObservation.wallets` carries `AccountWallet` money readings; `sourceInfo` carries informational provenance. Older saved reports remain readable.
+
 ## 0.4.39-beta.2 — 2026-10-09
 
 - Requires Agent HUD for iPhone 1.5 or later for iPhone and Apple Watch viewing. Use the corresponding TestFlight build while 1.5 is awaiting App Store review.

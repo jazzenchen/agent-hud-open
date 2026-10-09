@@ -36,8 +36,8 @@ final class ReadingStatusTests: XCTestCase {
                             // The row's level, however old the reading.
                             let level = report.isCurrent(agent) && quotaNotice == nil
                                 && (snapshot.resetAt ?? .distantFuture) > now && snapshot.updatedAt <= now
-                                ? AlertPolicy.quotaLevel(remaining: snapshot.remainingPct) : nil
-                            XCTAssertEqual(window.showsLevel ? AlertPolicy.quotaLevel(remaining: snapshot.remainingPct) : nil, level, name)
+                                ? AlertPolicy.quotaLevel(remaining: remaining) : nil
+                            XCTAssertEqual(window.showsLevel ? AlertPolicy.quotaLevel(remaining: remaining) : nil, level, name)
                             // The quota alerts' baseline, before their own checks of the reset, a full window and a newer reading.
                             let alerts = report.isCurrent(agent) && quotaNotice == nil && snapshot.updatedAt <= now
                                 && now.timeIntervalSince(snapshot.updatedAt) < 1800 && !(snapshot.resetAt.map { $0 <= now } ?? false)

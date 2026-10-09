@@ -107,7 +107,9 @@ actor AdditionalUsageProvider: UsageProvider, LedgerRecording {
             let observedAt = result.observedAt ?? now
             lastQuota = (observedAt, .success(result))
             if result.forgetAccounts { await history.removeAll() }
-            await history.append(result.scopedWindows(source).map { .init(agentId: $0.id, timestamp: observedAt, remainingPct: $0.remaining) }, now: now)
+            await history.append(result.scopedWindows(source).compactMap { window in
+                window.remaining.map { .init(agentId: window.id, timestamp: window.observedAt ?? observedAt, remainingPct: $0) }
+            }, now: now)
         } catch {
             if Task.isCancelled { return }
             lastQuota = (now, .failure(UsageProviderError(error.localizedDescription)))
@@ -172,7 +174,8 @@ actor AdditionalUsageProvider: UsageProvider, LedgerRecording {
                                workingDirectory: item.workspace, lastActivityAt: end, navigationTarget: item.navigationTarget)
         }
         let snapshots = windows.map {
-            UsageSnapshot(agentId: $0.id, remainingPct: $0.remaining, resetAt: $0.reset, windowDuration: $0.duration, updatedAt: observedAt)
+            UsageSnapshot(agentId: $0.id, remainingPct: $0.remaining, resetAt: $0.reset, windowDuration: $0.duration,
+                          updatedAt: $0.observedAt ?? observedAt)
         }
         var insights: [String: UsageInsights] = [:]
         for snapshot in snapshots {
@@ -192,7 +195,8 @@ actor AdditionalUsageProvider: UsageProvider, LedgerRecording {
         if quota.isSignedIn {
             accounts = [source.vendor: [AccountObservation(account: account, client: quota.client, label: quota.label,
                 plan: quota.plan, observedAt: observedAt, aliases: quota.accountAliases,
-                quotaWindowIDs: quota.quotaWindowIDs.map { Set($0.map(account.windowID)) })]]
+                quotaWindowIDs: quota.quotaWindowIDs.map { Set($0.map(account.windowID)) },
+                wallets: quota.wallets.map { $0.observed(at: $0.observedAt ?? observedAt) }, sourceInfo: quota.sourceInfo)]]
         } else if quota.signedOut, quotaNotice == nil {
             // A successful signed-out/absent client read confirms that previously retained accounts are no longer current.
             accounts = [source.vendor: []]

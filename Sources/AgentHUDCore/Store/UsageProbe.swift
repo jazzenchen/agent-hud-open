@@ -46,7 +46,8 @@ public enum UsageProbe {
         for snapshot in report.snapshots {
             let reset = snapshot.resetAt.map { Countdown.until($0, now: now) } ?? "-"
             let weekly = snapshot.weeklyRemainingPct.map { "\(Int($0))%" } ?? "-"
-            print("  \(snapshot.agentId): used \(Int(100 - snapshot.remainingPct))%, reset \(reset), weekly remaining \(weekly)")
+            let used = snapshot.remainingPct.map { "\(Int(100 - $0))%" } ?? "N/A"
+            print("  \(snapshot.agentId): used \(used), reset \(reset), weekly remaining \(weekly)")
         }
         let clients = Dictionary(grouping: report.sessions, by: { $0.client ?? "unknown" }).mapValues(\.count)
         print("Session clients: \(clients.sorted { $0.key < $1.key }.map { "\($0.key) \($0.value)" }.joined(separator: ", "))")

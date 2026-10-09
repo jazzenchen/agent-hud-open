@@ -38,11 +38,11 @@ public enum QuotaMath {
     /// since `historyStart(for:now:)`. The burn rate takes the readings of the current cycle; cap hits are counted over
     /// the last week. Without a reading there is no burn rate, only cap hits.
     public static func insights(snapshot: UsageSnapshot?, samples: [QuotaSample], now: Date) -> UsageInsights {
-        let burn = UsageAnalytics.burnRate(samples: samples, cycle: snapshot?.cycle, now: now)
+        let burn = snapshot?.remainingPct == nil ? nil : UsageAnalytics.burnRate(samples: samples, cycle: snapshot?.cycle, now: now)
         let week = now.addingTimeInterval(-AlertPolicy.insightsLookback)
         let caps = UsageAnalytics.capStats(samples: samples.filter { $0.timestamp >= week }, now: now)
         return UsageInsights(burnRatePctPerHour: burn?.pctPerHour,
-                             timeToExhaust: snapshot.flatMap { burn?.timeToExhaust(remainingPct: $0.remainingPct) },
+                             timeToExhaust: snapshot.flatMap(\.remainingPct).flatMap { burn?.timeToExhaust(remainingPct: $0) },
                              weeklyCapHits: caps.hits, weeklyWaitTotal: caps.totalWait,
                              weeklyWaitLongest: caps.longestWait, weeklyWaitLongestAt: caps.longestAt)
     }
@@ -50,7 +50,8 @@ public enum QuotaMath {
     /// The window's outlook at `now`.
     public static func outlook(snapshot: UsageSnapshot, insights: UsageInsights?, now: Date) -> QuotaOutlook {
         guard snapshot.resetAt != nil else { return .untimed }
-        if snapshot.remainingPct <= AlertPolicy.exhaustedRemaining { return .exhausted }
+        guard let remaining = snapshot.remainingPct else { return .noEstimate }
+        if remaining <= AlertPolicy.exhaustedRemaining { return .exhausted }
         guard snapshot.cycle != nil else { return .noEstimate }
         if insights?.burnRatePctPerHour == 0 { return .noUsage }
         guard let exhaustion = exhaustion(insights: insights, resetAt: snapshot.resetAt, now: now) else { return .insufficientData }

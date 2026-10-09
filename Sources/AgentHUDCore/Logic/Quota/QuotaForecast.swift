@@ -8,7 +8,8 @@ public enum QuotaForecast {
     /// The text of the window's outlook. A window that runs out only after its reset says what it will have used by
     /// then, as its island row does.
     public static func hint(snapshot: UsageSnapshot, insights: UsageInsights?, now: Date) -> String? {
-        let used = max(0, min(100, 100 - snapshot.remainingPct))
+        guard let remaining = snapshot.remainingPct else { return nil }
+        let used = max(0, min(100, 100 - remaining))
         return text(of: QuotaMath.outlook(snapshot: snapshot, insights: insights, now: now),
                     projectedUsedAtReset: QuotaMath.projectedUsedAtReset(usedPct: used, insights: insights, resetAt: snapshot.resetAt, now: now))
     }

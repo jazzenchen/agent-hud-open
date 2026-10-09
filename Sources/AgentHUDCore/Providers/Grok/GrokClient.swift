@@ -17,7 +17,30 @@ struct GrokClient: Sendable {
         catch { try Self.propagateCancellation(error); cached = nil; cacheError = error }
         // A native client's reading is already observed. Polling the CLI proxy must not overwrite it with a
         // different backend's older allowance merely by attaching the HTTP request's completion time.
-        if let cached, let linked = linkedBot(cached) { return linked }
+        if let cached, var linked = linkedBot(cached) {
+            // The native cache has no prepaid wallet. A verified CLI identity can enrich money facts,
+            // but its older subscription reading must never replace the native allowance.
+            do {
+                if var cli = try await fetchCLIWalletQuota(for: linked.account) {
+                    let cliWallets = cli.wallets
+                    let wallets = Self.mergingWallets(linked.wallets, with: cliWallets)
+                    let nativeExtra = linked.windows.first(where: { $0.id == "grok:extra" })
+                    let cliExtra = cli.windows.first(where: { $0.id == "grok:extra" })
+                    if linked.windows.first(where: { $0.id == "grok" })?.remaining == nil,
+                       cli.windows.first(where: { $0.id == "grok" })?.remaining != nil {
+                        cli.wallets = wallets
+                        cli.accountAliases = linked.accountAliases
+                        Self.replaceExtraWindow(in: &cli, wallets: wallets, cliWallets: cliWallets,
+                            nativeWindow: nativeExtra, cliWindow: cliExtra)
+                        return cli
+                    }
+                    linked.wallets = wallets
+                    Self.replaceExtraWindow(in: &linked, wallets: wallets, cliWallets: cliWallets,
+                        nativeWindow: nativeExtra, cliWindow: cliExtra)
+                }
+            } catch { try Self.propagateCancellation(error) }
+            return linked
+        }
         let cli: ProviderQuota
         do {
             cli = try await fetchCLI()
@@ -54,18 +77,9 @@ struct GrokClient: Sendable {
         let url = home.appendingPathComponent("auth.json")
         guard let json = try? ProviderFiles.json(url) else { throw ProviderFailure.login("Grok CLI") }
         let entry = try Self.credential(json, now: clock())
+        var quota = try await fetchBilling(entry)
         guard let token = entry["key"].stringValue else { throw ProviderFailure.login("Grok CLI") }
         let headers = ["Authorization": "Bearer \(token)", "x-xai-token-auth": "xai-grok-cli"]
-        let response = try await http.json(URL(string: "https://cli-chat-proxy.grok.com/v1/billing?format=credits")!, headers: headers)
-        var quota = try Self.parse(response)
-        quota.observedAt = clock()
-        quota.client = "Grok CLI"
-        quota.account = Self.account(entry)
-        if let id = quota.account?.id, let links = try? ProviderFiles.json(accountLinksURL) {
-            let aliases = links.objectValue?.filter { $0.value.stringValue == id }.map(\.key) ?? []
-            quota.accountAliases = aliases.isEmpty ? nil : aliases
-        }
-        quota.label = entry["email"].stringValue
         do {
             let settings = try await http.json(URL(string: "https://cli-chat-proxy.grok.com/v1/settings")!, headers: headers, timeout: 2)
             quota.plan = settings["subscription_tier_display"].stringValue ?? quota.plan
@@ -73,6 +87,58 @@ struct GrokClient: Sendable {
             try Self.propagateCancellation(error)
         }
         return quota
+    }
+
+    private func fetchCLIWalletQuota(for account: ProviderAccount?) async throws -> ProviderQuota? {
+        guard let account,
+              let json = try? ProviderFiles.json(home.appendingPathComponent("auth.json")),
+              let entry = try? Self.credential(json, now: clock()),
+              Self.account(entry) == account else { return nil }
+        return try await fetchBilling(entry, timeout: 2)
+    }
+
+    private func fetchBilling(_ entry: ProviderJSON, timeout: TimeInterval = 12) async throws -> ProviderQuota {
+        guard let token = entry["key"].stringValue else { throw ProviderFailure.login("Grok CLI") }
+        let response = try await http.json(URL(string: "https://cli-chat-proxy.grok.com/v1/billing?format=credits")!,
+            headers: ["Authorization": "Bearer \(token)", "x-xai-token-auth": "xai-grok-cli"], timeout: timeout)
+        let observedAt = clock()
+        var quota = try Self.parse(response)
+        quota.wallets = quota.wallets.map { $0.observed(at: observedAt) }
+        quota.observedAt = observedAt
+        quota.account = Self.account(entry)
+        if let id = quota.account?.id, let links = try? ProviderFiles.json(accountLinksURL) {
+            let aliases = links.objectValue?.filter { $0.value.stringValue == id }.map(\.key) ?? []
+            quota.accountAliases = aliases.isEmpty ? nil : aliases
+        }
+        quota.label = entry["email"].stringValue
+        quota.client = "Grok CLI"
+        return quota
+    }
+
+    private static func mergingWallets(_ native: [AccountWallet], with cli: [AccountWallet]) -> [AccountWallet] {
+        var wallets = native
+        for wallet in cli {
+            if let index = wallets.firstIndex(where: { $0.kind == wallet.kind && $0.currency == wallet.currency }) {
+                let current = wallets[index]
+                if (wallet.observedAt ?? .distantPast) >= (current.observedAt ?? .distantPast) { wallets[index] = wallet }
+            } else { wallets.append(wallet) }
+        }
+        return wallets
+    }
+
+    private static func replaceExtraWindow(in quota: inout ProviderQuota, wallets: [AccountWallet], cliWallets: [AccountWallet],
+                                           nativeWindow: ProviderQuota.Window?, cliWindow: ProviderQuota.Window?) {
+        quota.windows.removeAll { $0.id == "grok:extra" }
+        guard let wallet = wallets.first(where: { $0.kind == .onDemand }) else { return }
+        if wallet.limit == 0 {
+            quota.quotaWindowIDs = Set(quota.windows.map(\.id))
+            return
+        }
+        let source = cliWallets.contains(wallet) ? cliWindow : nativeWindow
+        quota.windows.append(.init(id: "grok:extra", label: L10n.text("额外用量", "Extra usage"),
+            remaining: wallet.usedPercent.map(QuotaMath.remaining(usedPercent:)), reset: source?.reset, duration: source?.duration,
+            shortLabel: L10n.text("额外用量", "Extra"), observedAt: wallet.observedAt))
+        if quota.quotaWindowIDs != nil { quota.quotaWindowIDs = Set(quota.windows.map(\.id)) }
     }
 
     private static func propagateCancellation(_ error: any Error) throws {
@@ -130,26 +196,58 @@ struct GrokClient: Sendable {
         let end = DateParsing.internet(period["end"].stringValue) ?? DateParsing.internet(config["billingPeriodEnd"].stringValue)
         let duration = ProviderDate.period(start: start, end: end)
         var quota = ProviderQuota()
-        if let used = config["creditUsagePercent"].numberValue, used >= 0 {
-            // xAI's weekly usage limit, which its billing service can also report by the month.
-            let label: String, short: String
-            switch period["type"].stringValue {
-            case "USAGE_PERIOD_TYPE_WEEKLY": (label, short) = (L10n.text("每周用量额度", "Weekly usage limit"), WindowNames.Period.week.shortName)
-            case "USAGE_PERIOD_TYPE_MONTHLY": (label, short) = (L10n.text("每月用量额度", "Monthly usage limit"), WindowNames.Period.month.shortName)
-            default: (label, short) = (L10n.text("用量额度", "Usage limit"), L10n.text("用量", "Usage"))
-            }
-            quota.windows.append(.init(id: "grok", label: label, remaining: QuotaMath.remaining(usedPercent: used), reset: end, duration: duration,
-                                       shortLabel: short))
-        } else {
+        // xAI's weekly usage limit, which its billing service can also report by the month.
+        let label: String, short: String
+        switch period["type"].stringValue {
+        case "USAGE_PERIOD_TYPE_WEEKLY": (label, short) = (L10n.text("每周用量额度", "Weekly usage limit"), WindowNames.Period.week.shortName)
+        case "USAGE_PERIOD_TYPE_MONTHLY": (label, short) = (L10n.text("每月用量额度", "Monthly usage limit"), WindowNames.Period.month.shortName)
+        default: (label, short) = (L10n.text("用量额度", "Usage limit"), L10n.text("用量", "Usage"))
+        }
+        let used = config["creditUsagePercent"].numberValue.flatMap { $0 >= 0 ? $0 : nil }
+        quota.windows.append(.init(id: "grok", label: label, remaining: used.map(QuotaMath.remaining(usedPercent:)), reset: end,
+            duration: duration, shortLabel: short))
+        if used == nil {
             quota.displayNotice = L10n.text("Grok 已连接，但服务未返回已用额度", "Grok is connected, but used credits were not reported")
         }
+        if let balance = typedDollars(config["prepaidBalance"]) {
+            quota.wallets.append(AccountWallet(kind: .prepaid, balance: balance))
+        }
+        let cap = typedDollars(config["onDemandCap"]), extra = typedDollars(config["onDemandUsed"])
+        if cap != nil || extra != nil {
+            quota.wallets.append(AccountWallet(kind: .onDemand, used: extra, limit: cap))
+        }
         // Extra spending is a distinct budget, never a substitute for subscription consumption.
-        if let cap = config["onDemandCap"]["val"].numberValue, cap > 0,
-           let used = config["onDemandUsed"]["val"].numberValue, used >= 0 {
-            quota.windows.append(.init(id: "grok:extra", label: L10n.text("额外用量", "Extra usage"),
-                remaining: QuotaMath.remaining(usedPercent: used / cap * 100), reset: end, duration: duration,
-                shortLabel: L10n.text("额外用量", "Extra")))
+        if let wallet = quota.wallets.first(where: { $0.kind == .onDemand }) {
+            if wallet.limit == 0 {
+                quota.quotaWindowIDs = Set(quota.windows.map(\.id))
+            } else {
+                quota.windows.append(.init(id: "grok:extra", label: L10n.text("额外用量", "Extra usage"),
+                    remaining: wallet.usedPercent.map(QuotaMath.remaining(usedPercent:)), reset: end, duration: duration,
+                    shortLabel: L10n.text("额外用量", "Extra")))
+            }
         }
         return quota
+    }
+
+    /// xAI's official billing contract defines `Cent.val` as integer USD cents; an existing
+    /// empty Cent object represents the omitted proto3 zero scalar, not missing wallet data.
+    /// https://github.com/xai-org/grok-build/blob/2bdd1d6a6369de0e8c68132ea4539e9abd9e14a8/crates/codegen/xai-grok-shell/src/extensions/billing.rs
+    private static func typedDollars(_ value: ProviderJSON) -> Decimal? {
+        guard let object = value.objectValue else { return nil }
+        if object.isEmpty { return 0 }
+        guard let cents = object["val"] else { return nil }
+        return dollars(cents: cents)
+    }
+
+    static func dollars(cents value: ProviderJSON) -> Decimal? {
+        let cents: Int64?
+        switch value {
+        case .integer(let amount): cents = amount
+        case .string(let text): cents = Int64(text)
+        case .number(let amount): cents = Int64(exactly: amount)
+        default: cents = nil
+        }
+        guard let cents, cents >= 0 else { return nil }
+        return Decimal(cents) / 100
     }
 }

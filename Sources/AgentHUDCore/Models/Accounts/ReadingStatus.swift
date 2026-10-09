@@ -68,6 +68,8 @@ public struct ReadingAssessment: Hashable, Sendable {
     public let isCurrentAccount: Bool
     /// When the reading was taken; nil when there is none.
     public let observedAt: Date?
+    /// The source reported a numeric value for this reading.
+    public let hasValue: Bool
     /// At least `AlertPolicy.maximumReadingAge` old.
     public let isStale: Bool
     /// Taken after the time it is judged at.
@@ -75,20 +77,21 @@ public struct ReadingAssessment: Hashable, Sendable {
     /// The window's reset time has passed, and no reading has confirmed the reset yet.
     public let isResetPending: Bool
 
-    init(status: ReadingStatus, isCurrentAccount: Bool, observedAt: Date?, resetAt: Date? = nil, now: Date) {
+    init(status: ReadingStatus, isCurrentAccount: Bool, observedAt: Date?, resetAt: Date? = nil, hasValue: Bool = true, now: Date) {
         self.status = status
         self.isCurrentAccount = isCurrentAccount
         self.observedAt = observedAt
+        self.hasValue = hasValue
         isStale = observedAt.map { now.timeIntervalSince($0) >= AlertPolicy.maximumReadingAge } ?? false
         isFromFuture = observedAt.map { $0 > now } ?? false
         isResetPending = resetAt.map { $0 <= now } ?? false
     }
 
-    /// The reading gives its window a status level: it is normal, of the current account, not taken in the future, and
+    /// The reading gives its window a status level: it has a value, is normal, of the current account, not taken in the future, and
     /// its reset has not passed. It keeps the level however old it grows, since collection reads a client again only
     /// when its work or a reset makes a new reading worth taking.
     public var showsLevel: Bool {
-        status.isNormal && isCurrentAccount && observedAt != nil && !isFromFuture && !isResetPending
+        hasValue && status.isNormal && isCurrentAccount && observedAt != nil && !isFromFuture && !isResetPending
     }
 
     /// The reading can confirm an event, such as a quota alert, added reset credits or a balance crossing: it shows a
@@ -138,7 +141,7 @@ public extension UsageReport {
         case .window(let agent):
             let snapshot = snapshot(for: agent.id)
             return ReadingAssessment(status: status, isCurrentAccount: isCurrent(agent), observedAt: snapshot?.updatedAt,
-                                     resetAt: snapshot?.resetAt, now: now)
+                                     resetAt: snapshot?.resetAt, hasValue: snapshot?.remainingPct != nil, now: now)
         case .account(let observation):
             return ReadingAssessment(status: status, isCurrentAccount: observation.isCurrent, observedAt: observation.observedAt, now: now)
         case .balance(let billing):

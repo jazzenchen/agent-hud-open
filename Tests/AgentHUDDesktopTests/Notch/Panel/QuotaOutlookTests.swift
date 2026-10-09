@@ -134,6 +134,33 @@ final class QuotaOutlookTests: XCTestCase {
         }
     }
 
+    /// An explicit unknown reading is distinct from both known zero usage and a row awaiting its first reading.
+    @MainActor
+    func testUnknownQuotaShowsNAWhileKnownZeroAndInitialRowsKeepTheirMeaning() throws {
+        let suite = "QuotaOutlookTests.unknown.\(UUID().uuidString)", defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let agent = AgentDescriptor(id: "grok", vendor: "Grok", model: "Weekly usage limit", source: "Test", enabled: true)
+        let store = UsageStore(provider: DemoUsageProvider(), settings: SettingsStore(defaults: defaults, defaultAgents: [agent]))
+        store.replace(report: UsageReport(generatedAt: now,
+            snapshots: [.init(agentId: agent.id, remainingPct: nil, resetAt: now.addingTimeInterval(2 * hour), updatedAt: now)],
+            sessions: [], discoveredAgents: [agent],
+            insightsByAgent: [agent.id: .init(burnRatePctPerHour: 10, timeToExhaust: hour, weeklyCapHits: 0,
+                weeklyWaitTotal: 0, weeklyWaitLongest: 0, weeklyWaitLongestAt: nil)]))
+        store.now = now
+        let unknown = try metrics(agent.id, in: store)
+        XCTAssertEqual(IslandQuotaMetric.allCases.map { unknown.value($0) }, ["N/A", nil, nil])
+        XCTAssertEqual(unknown.detail(.quota, isLoading: false), "2h 00m")
+        XCTAssertNil(unknown.row.usedPct)
+        XCTAssertNil(unknown.row.level)
+        XCTAssertNil(unknown.projectedAtReset)
+
+        store.replace(report: UsageReport(generatedAt: now,
+            snapshots: [.init(agentId: agent.id, remainingPct: 100, updatedAt: now)], sessions: [], discoveredAgents: [agent]))
+        XCTAssertEqual(try metrics(agent.id, in: store).value(.quota), "0%")
+        store.replace(report: UsageReport(generatedAt: now, snapshots: [], sessions: [], discoveredAgents: [agent]))
+        XCTAssertEqual(try metrics(agent.id, in: store).value(.quota), "—")
+    }
+
     /// A store showing `windows` at `now`, each counting the tokens of one model spent before, around and after now.
     @MainActor
     private func withStore(_ windows: [Window], quotaNotices: [String: String] = [:], _ body: (UsageStore) throws -> Void) throws {

@@ -133,9 +133,12 @@ final class AdditionalProviderTests: XCTestCase, @unchecked Sendable {
         let quota = try GrokClient.parse(json(#"{"config":{"creditUsagePercent":12.5,"currentPeriod":{"start":"2026-09-01T00:00:00Z","end":"2026-09-08T00:00:00Z","type":"USAGE_PERIOD_TYPE_WEEKLY"},"onDemandCap":{"val":20},"onDemandUsed":{"val":3}}}"#))
         XCTAssertEqual(quota.windows.map(\.remaining), [87.5, 85])
         XCTAssertEqual(quota.windows[0].duration, 604800)
-        XCTAssertTrue(try GrokClient.parse(json(#"{"config":{}}"#)).windows.isEmpty)
+        let unknown = try GrokClient.parse(json(#"{"config":{}}"#))
+        XCTAssertEqual(unknown.windows.map(\.id), ["grok"])
+        XCTAssertNil(unknown.windows[0].remaining)
         let extraOnly = try GrokClient.parse(json(#"{"config":{"onDemandCap":{"val":20},"onDemandUsed":{"val":3}}}"#))
-        XCTAssertEqual(extraOnly.windows.map(\.id), ["grok:extra"])
+        XCTAssertEqual(extraOnly.windows.map(\.id), ["grok", "grok:extra"])
+        XCTAssertNil(extraOnly.windows[0].remaining)
         XCTAssertNil(extraOnly.notice, "a subscription share the service left out is no failed read")
         XCTAssertNotNil(extraOnly.displayNotice)
     }
@@ -157,7 +160,8 @@ final class AdditionalProviderTests: XCTestCase, @unchecked Sendable {
         let store = UsageStore(provider: DemoUsageProvider(), settings: SettingsStore(defaults: defaults, defaultAgents: report.discoveredAgents))
         store.replace(report: report)
         store.now = now
-        XCTAssertEqual(store.rows.map(\.level), [.warning], "the extra budget read keeps its level")
+        XCTAssertEqual(store.rows.last?.level, .warning, "the extra budget read keeps its level")
+        XCTAssertNil(store.rows.first?.remainingPct, "the omitted subscription percentage stays unknown")
     }
 
     func testGrokAuthUsesOnlySupportedNonexpiredIssuer() throws {

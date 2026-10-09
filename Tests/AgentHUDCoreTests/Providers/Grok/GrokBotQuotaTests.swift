@@ -6,12 +6,13 @@ final class GrokBotQuotaTests: XCTestCase {
         let f = try fixture()
         try writeQuota(f)
         let quota = try XCTUnwrap(GrokBotQuota.read(in: f.directory, now: f.now))
-        XCTAssertEqual(quota.windows[0].remaining, 99.329611, accuracy: 0.000001)
+        XCTAssertEqual(try XCTUnwrap(quota.windows[0].remaining), 99.329611, accuracy: 0.000001)
         XCTAssertEqual(quota.plan, "SuperGrok")
         XCTAssertEqual(quota.observedAt, f.now.addingTimeInterval(-3600))
         XCTAssertEqual(quota.client, "Grok Bot")
         XCTAssertNil(quota.notice)
-        XCTAssertNotNil(quota.displayNotice)
+        XCTAssertNil(quota.displayNotice)
+        XCTAssertNotNil(quota.sourceInfo)
     }
 
     func testAccountSwitchSignOutExpiryAndUnsupportedTeamCannotReuseCache() throws {
@@ -33,7 +34,40 @@ final class GrokBotQuotaTests: XCTestCase {
         let quota = try XCTUnwrap(GrokBotQuota.read(in: f.directory, now: f.now))
         XCTAssertEqual(quota.windows.map(\.id), ["grok", "grok:extra"])
         XCTAssertEqual(quota.windows[1].remaining, 75)
+        XCTAssertEqual(quota.wallets.first?.used, Decimal(string: "2.50"))
+        XCTAssertEqual(quota.wallets.first?.limit, 10)
+        XCTAssertEqual(quota.wallets.first?.observedAt, quota.observedAt)
         XCTAssertNil(GrokBotQuota.read(in: f.directory, now: f.now.addingTimeInterval(-7200)))
+    }
+
+    func testZeroWalletSurvivesMissingSubscriptionPercent() throws {
+        let f = try fixture()
+        var usage: [String: Any] = ["nextResetMs": NSNull(), "isSandTrial": false,
+            "hasNonZeroIncludedLimit": true, "isTeamSeat": false,
+            "onDemand": ["usedCents": 0, "limitCents": 0]]
+        func parse() throws -> ProviderQuota? {
+            let value: [String: Any] = ["kind": "present", "selectedTeamId": NSNull(),
+                "expiresAtMs": f.now.addingTimeInterval(3600).timeIntervalSince1970 * 1000,
+                "reading": ["readAtMs": f.now.timeIntervalSince1970 * 1000, "usage": usage]]
+            return GrokBotQuota.parse(try ProviderJSON.read(JSONSerialization.data(withJSONObject: value)), accountSlot: f.account, now: f.now)
+        }
+        let quota = try XCTUnwrap(parse())
+        XCTAssertEqual(quota.windows.map(\.id), ["grok"])
+        XCTAssertNil(quota.windows[0].remaining)
+        XCTAssertEqual(quota.wallets.first?.used, 0)
+        XCTAssertEqual(quota.wallets.first?.limit, 0)
+        XCTAssertNil(quota.wallets.first?.usedPercent)
+        XCTAssertEqual(quota.quotaWindowIDs, ["grok"])
+        XCTAssertNotNil(quota.displayNotice)
+        for extra in [["limitCents": 1000], ["usedCents": 125]] {
+            usage["onDemand"] = extra
+            let partial = try XCTUnwrap(parse())
+            XCTAssertEqual(partial.windows.map(\.id), ["grok", "grok:extra"])
+            XCTAssertEqual(partial.windows.map(\.remaining), [nil, nil])
+            XCTAssertEqual(partial.windows[1].observedAt, f.now)
+        }
+        usage["hasNonZeroIncludedLimit"] = false
+        XCTAssertNil(try parse(), "a wallet does not establish an included subscription limit")
     }
 
     func testFailedCLIUsesBotCacheAndUnlinkedCLIKeepsItsAccount() async throws {

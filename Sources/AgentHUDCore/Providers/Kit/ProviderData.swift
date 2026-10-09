@@ -62,15 +62,19 @@ struct ProviderQuota: Sendable {
         let id: String
         /// The window's full name in the vendor's words.
         let label: String
-        let remaining: Double
+        /// Nil is an explicitly reported unavailable value, distinct from a read that failed or omitted the window.
+        let remaining: Double?
         var reset: Date? = nil
         var duration: TimeInterval? = nil
         /// The window's short name (`WindowNames`); nil shows its full name.
         var shortLabel: String? = nil
         /// False for a window scoped to a subset of the plan's models or features (`AgentDescriptor.allModels`).
         var allModels = true
+        /// A merged window keeps its source's own time rather than the account's other reading time.
+        var observedAt: Date? = nil
     }
     var windows: [Window] = []
+    var wallets: [AccountWallet] = []
     /// Explicit complete inventory, separate from readable values so an enabled bucket without a value remains present.
     /// These ids are scoped to the account when the provider builds its report; nil makes no completeness claim.
     var quotaWindowIDs: Set<String>? = nil
@@ -80,6 +84,7 @@ struct ProviderQuota: Sendable {
     var notice: String? = nil
     /// Something the answer left out, shown under the client beside the windows it did give; it holds nothing back.
     var displayNotice: String? = nil
+    var sourceInfo: String? = nil
     /// The signed-in account the quota belongs to; nil when the service answered without naming it.
     var account: ProviderAccount? = nil
     /// Earlier keys for this same account, retired after its identity is confirmed.
@@ -108,7 +113,7 @@ struct ProviderQuota: Sendable {
         let account = resolvedAccount(source)
         return zip(windows, WindowNames.distinct(windows.map(\.shortLabel))).map { window, short in
             Window(id: account.windowID(window.id), label: window.label, remaining: window.remaining, reset: window.reset,
-                   duration: window.duration, shortLabel: short, allModels: window.allModels)
+                   duration: window.duration, shortLabel: short, allModels: window.allModels, observedAt: window.observedAt)
         }
     }
 }

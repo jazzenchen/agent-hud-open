@@ -195,6 +195,7 @@ public enum SnapshotRunner {
             save("settings-\(tab.slug)-small-dark", SettingsView(settings: settings, store: store, initialTab: tab).frame(width: SettingsWindowLayout.minimum.width, height: SettingsWindowLayout.minimum.height), folder: folder, scheme: .dark)
         }
         saveAgentSettings(settings: settings, store: store, folder: folder)
+        saveGrokQuota(settings: settings, store: store, folder: folder)
         save("settings-display-bottom-dark", SettingsView(settings: settings, store: store, initialTab: .display).frame(width: SettingsWindowLayout.size.width, height: SettingsWindowLayout.size.height), folder: folder, scheme: .dark, scrollToBottom: true)
         save("settings-display-small-bottom-dark", SettingsView(settings: settings, store: store, initialTab: .display).frame(width: SettingsWindowLayout.minimum.width, height: SettingsWindowLayout.minimum.height), folder: folder, scheme: .dark, scrollToBottom: true)
         let sampleWidth = SettingsWindowLayout.size.width - SettingsWindowLayout.sidebarWidth - 1
@@ -453,6 +454,47 @@ public enum SnapshotRunner {
         save("settings-agents-provider-accounts-dark", SettingsView(settings: settings, store: store, initialTab: .sources,
             sourceStatuses: [.init(id: "codex-cli", name: "Codex", detail: "", state: .ready(plan: "pro"))], initialProviderID: "Codex")
             .frame(width: SettingsWindowLayout.size.width, height: SettingsWindowLayout.size.height), folder: folder, scheme: .dark)
+    }
+
+    /// Missing subscription values and wallet zeros stay distinct from a valid native quota and spending budget.
+    private static func saveGrokQuota(settings: SettingsStore, store: UsageStore, folder: URL) {
+        if let prefix = ProcessInfo.processInfo.environment["AGENTHUD_SNAPSHOT_PREFIX"],
+           !"quota-grok".hasPrefix(prefix) && !prefix.hasPrefix("quota-grok") { return }
+        let originalAgents = settings.agents, preferences = settings.settings, originalReport = store.report
+        defer {
+            settings.updateAgents { _ in originalAgents }
+            settings.update { $0 = preferences }
+            if let originalReport { store.replace(report: originalReport) }
+        }
+        let now = Date(), nativeAt = now.addingTimeInterval(-3600), walletAt = now.addingTimeInterval(-120)
+        let account = ProviderAccount.identified(provider: "Grok", user: "snapshot-grok", workspace: nil)!
+        let weekly = AgentDescriptor(id: account.windowID("grok"), vendor: "Grok", model: L10n.text("每周用量额度", "Weekly usage limit"),
+            shortModel: WindowNames.Period.week.shortName, source: L10n.sourceAdditionalUsage, enabled: true, account: account)
+        let extra = AgentDescriptor(id: account.windowID("grok:extra"), vendor: "Grok", model: L10n.text("额外用量", "Extra usage"),
+            shortModel: L10n.text("额外用量", "Extra"), source: L10n.sourceAdditionalUsage, enabled: true, account: account)
+        let reset = now.addingTimeInterval(4 * 86400)
+        settings.update { $0.showIslandQuota = true; $0.showIslandTokens = false; $0.showIslandSessions = false; $0.showResetCountdown = true }
+        settings.updateAgents { _ in [weekly] }
+        store.replace(report: UsageReport(generatedAt: now,
+            snapshots: [.init(agentId: weekly.id, remainingPct: nil, resetAt: reset, windowDuration: 7 * 86400, updatedAt: now)],
+            sessions: [], discoveredAgents: [weekly],
+            sourceNotices: ["Grok": L10n.text("Grok 已连接，但服务未返回已用额度", "Grok is connected, but used credits were not reported")],
+            quotaNotices: [:], readingIssues: [:], accounts: ["Grok": [
+                .init(account: account, client: "Grok CLI", label: "me@example.com", plan: "SuperGrok", observedAt: now,
+                    wallets: [.init(kind: .prepaid, balance: 0, observedAt: now), .init(kind: .onDemand, used: 0, limit: 0, observedAt: now)]),
+            ]]))
+        save("quota-grok-unknown-zero-wallets", IslandScene(store: store, settings: settings, open: true, light: false), folder: folder, scheme: .dark)
+        settings.updateAgents { _ in [weekly, extra] }
+        store.replace(report: UsageReport(generatedAt: now, snapshots: [
+            .init(agentId: weekly.id, remainingPct: 99.329611, resetAt: reset, windowDuration: 7 * 86400, updatedAt: nativeAt),
+            .init(agentId: extra.id, remainingPct: 75, resetAt: reset, windowDuration: 7 * 86400, updatedAt: walletAt),
+        ], sessions: [], discoveredAgents: [weekly, extra], quotaNotices: [:], readingIssues: [:], accounts: ["Grok": [
+            .init(account: account, client: "Grok Bot", label: "me@example.com", plan: "SuperGrok", observedAt: nativeAt,
+                wallets: [.init(kind: .prepaid, balance: Decimal(string: "12.50"), observedAt: walletAt),
+                          .init(kind: .onDemand, used: Decimal(string: "2.50"), limit: 10, observedAt: walletAt)],
+                sourceInfo: L10n.text("额度来自 Grok Bot 缓存；在 Bot 中刷新可更新读数", "Quota from Grok Bot cache; refresh in Bot to update")),
+        ]]))
+        save("quota-grok-native-wallets", IslandScene(store: store, settings: settings, open: true, light: false), folder: folder, scheme: .dark)
     }
 
     /// A question half answered: the first of two, one option picked, so the card shows what choosing looks like.
