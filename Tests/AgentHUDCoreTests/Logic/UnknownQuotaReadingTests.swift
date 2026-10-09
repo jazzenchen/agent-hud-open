@@ -105,7 +105,7 @@ final class UnknownQuotaReadingTests: XCTestCase {
     private func report(remaining: Double?, elapsed: TimeInterval = 0) -> UsageReport {
         let at = now.addingTimeInterval(elapsed)
         return UsageReport(generatedAt: at, snapshots: [UsageSnapshot(agentId: agent.id, remainingPct: remaining,
-            resetAt: now.addingTimeInterval(3 * 3600), windowDuration: 5 * 3600, updatedAt: at)], sessions: [], discoveredAgents: [agent],
+            resetAt: now.addingTimeInterval(3 * 3600), windowDuration: TimeInterval(5 * 3600), updatedAt: at)], sessions: [], discoveredAgents: [agent],
             insightsByAgent: [agent.id: UsageInsights(burnRatePctPerHour: 20, timeToExhaust: 1200, weeklyCapHits: 0,
                 weeklyWaitTotal: 0, weeklyWaitLongest: 0, weeklyWaitLongestAt: nil)])
     }

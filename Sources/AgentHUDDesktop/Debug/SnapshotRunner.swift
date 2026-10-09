@@ -476,7 +476,7 @@ public enum SnapshotRunner {
         settings.update { $0.showIslandQuota = true; $0.showIslandTokens = false; $0.showIslandSessions = false; $0.showResetCountdown = true }
         settings.updateAgents { _ in [weekly] }
         store.replace(report: UsageReport(generatedAt: now,
-            snapshots: [.init(agentId: weekly.id, remainingPct: nil, resetAt: reset, windowDuration: 7 * 86400, updatedAt: now)],
+            snapshots: [.init(agentId: weekly.id, remainingPct: nil, resetAt: reset, windowDuration: TimeInterval(7 * 86400), updatedAt: now)],
             sessions: [], discoveredAgents: [weekly],
             sourceNotices: ["Grok": L10n.text("Grok 已连接，但服务未返回已用额度", "Grok is connected, but used credits were not reported")],
             quotaNotices: [:], readingIssues: [:], accounts: ["Grok": [
@@ -486,8 +486,8 @@ public enum SnapshotRunner {
         save("quota-grok-unknown-zero-wallets", IslandScene(store: store, settings: settings, open: true, light: false), folder: folder, scheme: .dark)
         settings.updateAgents { _ in [weekly, extra] }
         store.replace(report: UsageReport(generatedAt: now, snapshots: [
-            .init(agentId: weekly.id, remainingPct: 99.329611, resetAt: reset, windowDuration: 7 * 86400, updatedAt: nativeAt),
-            .init(agentId: extra.id, remainingPct: 75, resetAt: reset, windowDuration: 7 * 86400, updatedAt: walletAt),
+            .init(agentId: weekly.id, remainingPct: 99.329611, resetAt: reset, windowDuration: TimeInterval(7 * 86400), updatedAt: nativeAt),
+            .init(agentId: extra.id, remainingPct: 75, resetAt: reset, windowDuration: TimeInterval(7 * 86400), updatedAt: walletAt),
         ], sessions: [], discoveredAgents: [weekly, extra], quotaNotices: [:], readingIssues: [:], accounts: ["Grok": [
             .init(account: account, client: "Grok Bot", label: "me@example.com", plan: "SuperGrok", observedAt: nativeAt,
                 wallets: [.init(kind: .prepaid, balance: Decimal(string: "12.50"), observedAt: walletAt),
