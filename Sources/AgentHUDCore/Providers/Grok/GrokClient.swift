@@ -7,6 +7,8 @@ struct GrokClient: Sendable {
     var botDirectory = GrokBotSessions.roots(home: FileManager.default.homeDirectoryForCurrentUser, environment: [:])[0]
     var clock: @Sendable () -> Date = { Date() }
     var readBot: (@Sendable () async throws -> ProviderQuota?)? = nil
+    /// Has the CLI renew its expired sign-in (`GrokCLIRenewal`); nil runs the installed CLI.
+    var renewCLI: (@Sendable () async -> Bool)? = nil
     /// User-confirmed links between the Bot cache slot and the CLI account. Stored ids contain no credentials.
     var accountLinksURL = AppSupport.directory.appendingPathComponent("grok-account-links.json")
 
@@ -74,9 +76,7 @@ struct GrokClient: Sendable {
 
     private func fetchCLI() async throws -> ProviderQuota {
         guard FileManager.default.fileExists(atPath: home.path) else { return ProviderQuota(signedOut: true) }
-        let url = home.appendingPathComponent("auth.json")
-        guard let json = try? ProviderFiles.json(url) else { throw ProviderFailure.login("Grok CLI") }
-        let entry = try Self.credential(json, now: clock())
+        let entry = try await renewedCredential()
         var quota = try await fetchBilling(entry)
         guard let token = entry["key"].stringValue else { throw ProviderFailure.login("Grok CLI") }
         let headers = ["Authorization": "Bearer \(token)", "x-xai-token-auth": "xai-grok-cli"]
@@ -87,6 +87,21 @@ struct GrokClient: Sendable {
             try Self.propagateCancellation(error)
         }
         return quota
+    }
+
+    /// The CLI's sign-in. Once its token has expired the CLI is asked to renew it, and the file is read again.
+    private func renewedCredential() async throws -> ProviderJSON {
+        let url = home.appendingPathComponent("auth.json")
+        guard let json = try? ProviderFiles.json(url) else { throw ProviderFailure.login("Grok CLI") }
+        do {
+            return try Self.credential(json, now: clock())
+        } catch {
+            guard GrokCLIRenewal.isRenewable(Self.loginEntries(json), now: clock()) else { throw error }
+            let renewed = if let renewCLI { await renewCLI() } else { await GrokCLIRenewal.renew(grokHome: home, now: clock()) }
+            try Task.checkCancellation()
+            guard renewed, let json = try? ProviderFiles.json(url) else { throw error }
+            return try Self.credential(json, now: clock())
+        }
     }
 
     private func fetchCLIWalletQuota(for account: ProviderAccount?) async throws -> ProviderQuota? {
@@ -158,7 +173,7 @@ struct GrokClient: Sendable {
         return selected
     }
 
-    private static func loginEntries(_ json: ProviderJSON) -> [ProviderJSON] {
+    static func loginEntries(_ json: ProviderJSON) -> [ProviderJSON] {
         (json.objectValue ?? [:]).filter { key, _ in
             key.hasPrefix("https://auth.x.ai::") || key == "https://accounts.x.ai/sign-in"
         }.sorted { lhs, rhs in
