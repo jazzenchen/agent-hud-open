@@ -194,17 +194,20 @@ actor CursorClient {
 
     /// The names Cursor keeps on this Mac for the conversations the events name, read when the events are: an IDE
     /// composer's in its header, an agent CLI chat's or ACP session's in its `meta.json`. A conversation that ran on
-    /// another machine or in the cloud keeps its placeholder.
+    /// another machine or in the cloud keeps its placeholder. A composer whose header says it was archived is too.
     func named(_ result: ProviderSessions, account: String) -> ProviderSessions {
         let prefix = "cursor-account:\(account):"
         let conversations = result.sessions.map { String($0.id.dropFirst(prefix.count)) }.filter { !$0.hasPrefix("unassigned-") }
         guard !conversations.isEmpty else { return result }
-        var titles: [String: String] = [:]
+        var titles: [String: String] = [:], archived = Set<String>()
         if let reader = try? ReadOnlySQLite(database), let list = try? JSONSerialization.data(withJSONObject: conversations) {
-            // Only the name leaves the database; a header's other fields and the composers' contents are never read.
-            try? reader.rows("SELECT composerId, json_extract(value, '$.name') FROM composerHeaders WHERE composerId IN (SELECT value FROM json_each(?))",
+            // Only the name and the archive flag leave the database; a header's other fields and the composers' contents
+            // are never read.
+            try? reader.rows("SELECT composerId, json_extract(value, '$.name'), json_extract(value, '$.isArchived') FROM composerHeaders WHERE composerId IN (SELECT value FROM json_each(?))",
                              strings: [String(decoding: list, as: UTF8.self)]) { row in
-                if let id = ReadOnlySQLite.text(row, 0), let title = SessionTitle.named(ReadOnlySQLite.text(row, 1)) { titles[id] = title }
+                guard let id = ReadOnlySQLite.text(row, 0) else { return }
+                if let title = SessionTitle.named(ReadOnlySQLite.text(row, 1)) { titles[id] = title }
+                if ReadOnlySQLite.text(row, 2) == "1" { archived.insert(id) }
             }
         }
         let chats = (try? FileManager.default.contentsOfDirectory(at: agentFolder.appendingPathComponent("chats"), includingPropertiesForKeys: nil)) ?? []
@@ -218,7 +221,13 @@ actor CursorClient {
             }
         }
         var result = result
-        result.sessions = result.sessions.map { var item = $0; if let title = titles[String(item.id.dropFirst(prefix.count))] { item.title = title }; return item }
+        result.sessions = result.sessions.map {
+            var item = $0
+            let id = String(item.id.dropFirst(prefix.count))
+            if let title = titles[id] { item.title = title }
+            item.archived = archived.contains(id)
+            return item
+        }
         return result
     }
 

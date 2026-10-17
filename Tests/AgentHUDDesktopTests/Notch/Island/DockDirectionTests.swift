@@ -8,12 +8,10 @@ import XCTest
 /// a card's attention goes on top, and with motion reduced or bots off a mark wears its sign still.
 @MainActor
 final class DockDirectionTests: XCTestCase {
-    private func queue(_ items: [LogoQueueItem], bots: Bool = true, resumes: Bool = false) -> LogoQueueConfig {
+    private func queue(_ items: [LogoQueueItem], bots: Bool = true) -> LogoQueueConfig {
         var settings = Settings()
         settings.botLogos = bots
-        var config = LogoQueueConfig(items: items, placement: ScreenPlacement(mode: .logos), settings: settings)
-        config.resumes = resumes
-        return config
+        return LogoQueueConfig(items: items, placement: ScreenPlacement(mode: .logos), settings: settings)
     }
 
     private func hosted() -> (LogoQueueLayerView, NSWindow) {
@@ -143,40 +141,38 @@ final class DockDirectionTests: XCTestCase {
         }.count, 0)
     }
 
-    func testADockBackFromUnderACardTakesUpItsLooksAndARequestsMarkTurnsToItsCard() throws {
+    func testEveryDockStaysUpBesideARequestsCardAndTheSendersMarkTurnsToIt() throws {
         _ = NSApplication.shared
         let screen = try XCTUnwrap(NSScreen.main)
         let key = ScreenIdentity.key(for: screen)
-        let settings = try settings(ScreenPlacement(mode: .logos, edge: .right, separatesAgents: true), key: key)
-        let store = store(settings)
-        let directions = MarkDirections(startedAt: Date(), clock: { Date() })
-        directions.read(store.queueMarks)
-        let hud = ScreenHUD(key: key, screen: screen, store: store, settings: settings,
-                            mouseLocation: { CGPoint(x: -10_000, y: -10_000) }, directions: directions)
-        defer { hud.close() }
-        let first = try XCTUnwrap(hud.island.rootView.logoQueue?.items.first)
-        XCTAssertEqual(first.state, directions.current[AgentArtwork.markKey(first.vendor)]?.state, "the dock is fed")
-        XCTAssertEqual(hud.island.rootView.logoQueue?.resumes, false)
-
         let request = PermissionRequest(id: "direction", source: .claude, sessionID: "direction", toolName: "Bash",
                                         summary: "ls", detail: "ls", cwd: "/tmp", at: Date())
-        hud.present(.permission(request))
-        let marks = try XCTUnwrap(hud.island.rootView.logoQueue?.items)
-        let claude = try XCTUnwrap(marks.first { AgentArtwork.markKey($0.vendor) == "Claude" })
-        XCTAssertEqual(claude.attention, .facesCard(.left), "the card opens on the dock's inner side, to the left")
-        XCTAssertTrue(marks.filter { $0.id != claude.id }.allSatisfy { $0.attention == .none })
-        hud.withdraw(requestID: request.id)
-        XCTAssertNil(hud.island.rootView.alert)
-        XCTAssertEqual(hud.island.rootView.logoQueue?.resumes, false, "a separated dock stays up beside its card")
+        for placement in [ScreenPlacement(mode: .logos, edge: .right, separatesAgents: true),
+                          ScreenPlacement(mode: .logos, edge: .bottom)] {
+            let name = "\(placement.edge) separated: \(placement.separatesAgents)"
+            let settings = try settings(placement, key: key)
+            let store = store(settings)
+            let directions = MarkDirections(startedAt: Date(), clock: { Date() })
+            directions.read(store.queueMarks)
+            let hud = ScreenHUD(key: key, screen: screen, store: store, settings: settings,
+                                mouseLocation: { CGPoint(x: -10_000, y: -10_000) }, directions: directions)
+            defer { hud.close() }
+            let first = try XCTUnwrap(hud.island.rootView.logoQueue?.items.first)
+            XCTAssertEqual(first.state, directions.current[AgentArtwork.markKey(first.vendor)]?.state, "\(name): the dock is fed")
 
-        // A dock that gives the card its place comes back with its bots out.
-        let joined = try self.settings(ScreenPlacement(mode: .logos, edge: .bottom), key: key)
-        let shared = ScreenHUD(key: key, screen: screen, store: self.store(joined), settings: joined,
-                               mouseLocation: { CGPoint(x: -10_000, y: -10_000) }, directions: directions)
-        defer { shared.close() }
-        shared.present(.permission(request))
-        shared.withdraw(requestID: request.id)
-        XCTAssertNil(shared.island.rootView.alert)
-        XCTAssertEqual(shared.island.rootView.logoQueue?.resumes, true)
+            hud.present(.permission(request))
+            XCTAssertEqual(hud.island.rootView.focusVendor.map(AgentArtwork.markKey), "Claude",
+                           "\(name): the card comes out of its sender's mark")
+            let marks = try XCTUnwrap(hud.island.rootView.logoQueue?.items, "\(name): the dock stays up")
+            let claude = try XCTUnwrap(marks.first { AgentArtwork.markKey($0.vendor) == "Claude" })
+            XCTAssertEqual(claude.attention, .facesCard(BotFacing(cardFrom: placement.edge)), name)
+            if placement.edge == .right {
+                XCTAssertEqual(claude.attention, .facesCard(.left), "the card opens on the dock's inner side, to the left")
+            }
+            XCTAssertTrue(marks.filter { $0.id != claude.id }.allSatisfy { $0.attention == .none }, name)
+            hud.withdraw(requestID: request.id)
+            XCTAssertNil(hud.island.rootView.alert, name)
+            XCTAssertNil(hud.island.rootView.focusVendor, name)
+        }
     }
 }

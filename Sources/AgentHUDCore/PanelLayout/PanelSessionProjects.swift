@@ -54,7 +54,7 @@ extension PanelLayout {
             }
             let named = offered.filter { $0.path != nil && $0.title == entry }
             let message = named.isEmpty
-                ? "\"\(entry)\" is no project's id from get_panel's sessions.offeredProjects, nor a path inside one. \(listed)"
+                ? "\"\(entry)\" is no project's id from get_hud's sessions.offeredProjects, nor a path inside one. \(listed)"
                 : "\"\(entry)\" is a project's name, not its id. Name it by its id: \(quoted(named.map(\.id)))."
             issues.append(PanelLayoutIssue(path: "sessions.projects[\(index)]", message: message))
         }

@@ -4,8 +4,8 @@ import XCTest
 @testable import AgentHUDCore
 @testable import AgentHUDDesktop
 
-/// Settings → Experimental as drawn: its rendered controls dimmed while the switch is off, except Remove, and usable
-/// once it is on; the switch writes the setting; and a host's rows below Agent HUD's own.
+/// Settings → Experimental as drawn: its clients menu dimmed while the switch is off, unless a client has the server to
+/// take out, and usable once it is on; the switch writes the setting; and a host's rows below Agent HUD's own.
 @MainActor
 final class ExperimentalPaneTests: XCTestCase {
     override func tearDown() {
@@ -22,7 +22,8 @@ final class ExperimentalPaneTests: XCTestCase {
         private var visible: [NSView] { views(in: hosting).filter { !$0.isHiddenOrHasHiddenAncestor } }
 
         var toggle: NSSwitch? { visible.compactMap { $0 as? NSSwitch }.first }
-        var picker: NSPopUpButton? { visible.compactMap { $0 as? NSPopUpButton }.first }
+        /// The clients menu, which AppKit draws as a pull-down button.
+        var menu: NSPopUpButton? { visible.compactMap { $0 as? NSPopUpButton }.first }
     }
 
     private func page(_ settings: SettingsStore, _ setup: MCPClientSetup, sections: [DesktopSettingsSection] = []) throws -> Page {
@@ -61,44 +62,45 @@ final class ExperimentalPaneTests: XCTestCase {
         return settings
     }
 
-    func testTheRowsAreDimmedWhileTheSwitchIsOffAndUsableOnceItIsOn() async throws {
+    func testTheMenuIsDimmedWhileTheSwitchIsOffAndUsableOnceItIsOn() async throws {
         let settings = try settings()
         let mac = FakeClientMac(installed: [.claudeCode: URL(fileURLWithPath: "/usr/local/bin/claude")])
         let setup = MCPClientSetup(environment: mac.environment)
         let page = try page(settings, setup)
-        await settle(page) { page.toggle != nil && page.picker != nil }
+        await settle(page) { page.toggle != nil && page.menu != nil }
         let toggle = try XCTUnwrap(page.toggle, "the switch is drawn")
-        let picker = try XCTUnwrap(page.picker, "the client picker is drawn")
+        let menu = try XCTUnwrap(page.menu, "the clients menu is drawn")
         XCTAssertEqual(toggle.state, .off, "off until a person turns it on")
-        XCTAssertFalse(picker.isEnabled)
-        XCTAssertEqual(picker.itemTitles, ["Claude Code", "Other"])
-        // SwiftUI draws the row's buttons itself, so the model says what they offer; the picker is AppKit's.
-        XCTAssertEqual(setup.controls(toolsOn: false), .init(picker: false, action: false, copyCommand: false, hint: false))
+        XCTAssertFalse(menu.isEnabled)
+        // SwiftUI fills the menu only as it opens, so the model says what it offers.
+        XCTAssertTrue(menu.pullsDown)
+        XCTAssertEqual(setup.clients, [.claudeCode])
+        XCTAssertEqual(setup.title, "Not added to a client yet")
 
         toggle.performClick(nil)
-        await settle(page) { settings.settings.agentTools && page.picker?.isEnabled == true }
-        XCTAssertTrue(settings.settings.agentTools, "the switch writes the setting")
+        await settle(page) { settings.settings.hudTools && page.menu?.isEnabled == true }
+        XCTAssertTrue(settings.settings.hudTools, "the switch writes the setting")
         XCTAssertEqual(page.toggle?.state, .on)
-        XCTAssertEqual(page.picker?.isEnabled, true)
-        XCTAssertEqual(setup.controls(toolsOn: settings.settings.agentTools), .init(picker: true, action: true, copyCommand: true, hint: true))
-        XCTAssertEqual(setup.action, .add)
+        XCTAssertEqual(page.menu?.isEnabled, true)
+        XCTAssertTrue(setup.canPick(.claudeCode, toolsOn: settings.settings.hudTools))
 
-        settings.update { $0.agentTools = false }
-        await settle(page) { page.picker?.isEnabled == false }
-        XCTAssertEqual(page.picker?.isEnabled, false, "dimmed again with the switch")
+        settings.update { $0.hudTools = false }
+        await settle(page) { page.menu?.isEnabled == false }
+        XCTAssertEqual(page.menu?.isEnabled, false, "dimmed again with the switch")
         XCTAssertTrue(mac.runs.isEmpty, "nothing ran on its own")
     }
 
-    func testRemoveStaysAvailableWhileTheSwitchIsOff() async throws {
+    func testAClientWithTheServerCanStillBeUncheckedWhileTheSwitchIsOff() async throws {
         let settings = try settings()
         let mac = FakeClientMac(installed: [.claudeCode: URL(fileURLWithPath: "/usr/local/bin/claude")], servers: [.claudeCode])
         let setup = MCPClientSetup(environment: mac.environment)
         let page = try page(settings, setup)
-        await settle(page) { page.picker != nil }
-        XCTAssertFalse(settings.settings.agentTools)
-        XCTAssertEqual(page.picker?.isEnabled, true, "the picker Remove needs")
-        XCTAssertEqual(setup.action, .remove)
-        XCTAssertTrue(setup.controls(toolsOn: false).action, "Remove itself")
+        await settle(page) { page.menu != nil }
+        XCTAssertFalse(settings.settings.hudTools)
+        XCTAssertEqual(page.menu?.isEnabled, true, "the menu its check mark is in")
+        XCTAssertEqual(setup.title, "Added to Claude Code")
+        XCTAssertEqual(setup.action(for: .claudeCode), .remove(.claudeCode))
+        XCTAssertTrue(setup.canPick(.claudeCode, toolsOn: false))
     }
 
     func testAHostsRowsFollowAgentHUDsOwnAndAHostPageOfTheSameNameJoinsThem() throws {

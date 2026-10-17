@@ -33,7 +33,9 @@ actor AdditionalLocalStore {
                     if let old = events[event.id], old != event { failed = true }
                     else { events[event.id] = event }
                 }
-                previous.events = events.values.sorted { $0.timestamp < $1.timestamp }; byID[item.id] = previous
+                previous.events = events.values.sorted { $0.timestamp < $1.timestamp }
+                previous.archived = previous.archived && item.archived
+                byID[item.id] = previous
             } else { byID[item.id] = item }
         }
         let notices = ([failed ? ProviderFailure.local.message : nil, mergeNotice] + pass.files.map(\.parsed.notice)).compactMap { $0 }

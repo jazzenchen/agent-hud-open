@@ -194,7 +194,10 @@ public struct ClaudeCodeProvider: UsageProvider, LedgerRecording {
             }
         }
         // Origin hooks can arrive while ledger reads suspend this fetch. Use the latest source for both reports.
-        let desktopTargets = await desktopSessions?.targets(sessionIDs: Set(candidates.map { $0.session.id })) ?? [:]
+        let desktop = await desktopSessions?.index(sessionIDs: Set(candidates.map { $0.session.id })) ?? .init()
+        let desktopTargets = desktop.targets
+        // A session the desktop app archived keeps its usage and leaves the list.
+        let shown = candidates.filter { !desktop.archived.contains($0.session.id) }
         let origins = sessionOriginsDirectory.map { ClaudeSessionOrigins.read(directory: $0) } ?? [:]
         func desktopTarget(for id: String, host: ClaudeSessionOrigins.Host) -> SessionNavigationTarget? {
             switch (host, desktopTargets[id]) {
@@ -223,7 +226,7 @@ public struct ClaudeCodeProvider: UsageProvider, LedgerRecording {
             }
             return ClaudeSessionOrigins.desktopHost(session.entrypoint).flatMap { desktopTarget(for: session.id, host: $0) }
         }
-        let listed = candidates.map { session, evidence, reading -> LiveSession in
+        let listed = shown.map { session, evidence, reading -> LiveSession in
             let live = reading.inFlight
             let share = windowTotal > 0 ? Double(windowTokens[session.path] ?? 0) / Double(windowTotal) : 0
             let agentId = session.dominantAgentId
@@ -268,7 +271,7 @@ public struct ClaudeCodeProvider: UsageProvider, LedgerRecording {
                     return completion
                 }
             },
-            turns: candidates.compactMap(\.reading.turn),
+            turns: shown.compactMap(\.reading.turn),
             // A confirmed login without plan limits has no current subscription account and retires earlier quota rows.
             accounts: reading.map { reading in
                 ["Claude": usage == nil ? [] : [AccountObservation(account: self.account(for: reading), home: home,

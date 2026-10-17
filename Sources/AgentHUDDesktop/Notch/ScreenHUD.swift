@@ -40,7 +40,7 @@ final class ScreenHUD {
     var drawsGlassStandIn = false
     /// What the director says each mark shows, shared by every screen; nil marks show plain work while their agents work.
     private let directions: MarkDirections?
-    /// What this screen's dock remembers across the cards that hide it.
+    /// What this screen's dock remembers of the events its marks were handed.
     private var dock = DockMemory()
     let glow: GlowWindowController
     let island: IslandWindowController
@@ -56,9 +56,11 @@ final class ScreenHUD {
     var panelHolds: PanelHolds { settings.panelLayout.holds }
     /// Set once the display is gone and the HUD's windows are off screen; a hold opens nothing then.
     private(set) var isClosed = false
-    /// A separated dock's cards move inside a window that waits for them: it takes in the old place and the new one
-    /// at once, and shrinks to the new one when this fires.
+    /// A detached card moves inside a window that waits for it: it takes in the old place and the new one at once, and
+    /// shrinks to the new one when this fires.
     private var cardSettle: Task<Void, Never>?
+    /// The last pass showed a detached card, whose way back into its dock moves as its way out did.
+    private var cardWasDetached = false
     /// One owner for the next surface's measurements and bitmaps, including opening and collapse.
     private var materialPreparation: MaterialPreparation? {
         didSet { oldValue?.task?.cancel() }
@@ -114,12 +116,16 @@ final class ScreenHUD {
         var key: String { AgentArtwork.markKey(vendor) }
     }
 
-    /// The marks an agent's own card can open from; none unless this dock separates its agents.
-    var agentMarks: [AgentMark] {
-        guard placement.separatesAgents, geometry.mode.isDocked else { return [] }
+    /// Every mark on a dock, which an event's card grows out of whether or not the dock separates its agents. None on
+    /// the notch, which draws no marks.
+    var dockMarks: [AgentMark] {
+        guard geometry.mode.isDocked else { return [] }
         let centres = simpleMeter?.markCentres ?? logoQueue?.markCentres ?? []
         return Self.agentMarks(centres: centres, strip: geometry.rect, edge: geometry.edge)
     }
+
+    /// The marks hovering opens an agent's own card from; none unless this dock separates its agents.
+    var agentMarks: [AgentMark] { placement.separatesAgents ? dockMarks : [] }
 
     /// Puts each mark's place along its strip on screen. A side strip is read top to bottom, while the
     /// screen's own coordinates run upward.
@@ -134,16 +140,27 @@ final class ScreenHUD {
         return marks.min { abs($0.anchor - along) < abs($1.anchor - along) }
     }
 
-    /// The agent the card is for: the sender of the event on show, otherwise the hovered mark. Nil shows
-    /// the whole HUD, which is also what an event from an agent with no mark here gets.
+    /// The agent the card is for: the sender of the event on show, otherwise the hovered mark. Nil shows the whole HUD.
+    ///
+    /// A dock never gives its marks up to an event, as the notch's island gives itself up: the event's card grows out
+    /// of its sender's mark, and every mark stays. Only an event the open usage panel holds as one of its rows has no
+    /// card of its own.
     private var focus: AgentMark? {
         guard previewPlacement == nil else { return nil }
-        let marks = agentMarks
         if let alert = activeAlert {
-            let key = AgentArtwork.markKey(alert.vendor)
-            return marks.first { $0.key == key }
+            guard geometry.mode.isDocked, !(machine.isOpen && alerts.current?.inUsagePanel == true) else { return nil }
+            return eventMark(for: alert)
         }
-        return marks.first { $0.key == hoveredMark }
+        return agentMarks.first { $0.key == hoveredMark }
+    }
+
+    /// Where `alert`'s card grows from on a dock: its sender's mark, or the middle of the dock for an agent with no
+    /// mark here.
+    private func eventMark(for alert: IslandAlert) -> AgentMark {
+        let key = AgentArtwork.markKey(alert.vendor)
+        if let mark = dockMarks.first(where: { $0.key == key }) { return mark }
+        let strip = geometry.rect
+        return AgentMark(vendor: alert.vendor, anchor: geometry.edge.isHorizontal ? strip.midX : strip.midY)
     }
 
     /// A click on a mark, or on its peek, opens that agent's whole panel. It is the person's choice, so it ends a hold.
@@ -500,7 +517,7 @@ final class ScreenHUD {
             transition(machine.reduce(.pointerEntered(at: Date()), config: config))
         }
         // A request cannot be answered from a peek, so on a separated dock it opens as its whole card.
-        if case .permission = alert, focus != nil, !machine.isOpen { forceOpen() }
+        if case .permission = alert, let focus, agentMarks.contains(focus), !machine.isOpen { forceOpen() }
         apply(animated: true)
         island.show()
     }
@@ -1057,7 +1074,7 @@ final class ScreenHUD {
                 root.simpleMeter?.items[index].attention = facing
             }
         }
-        handOutCues(to: &root, docked: root.alert == nil || focus != nil)
+        handOutCues(to: &root)
         root.focusVendor = focus?.vendor
         root.peek = focus.map(peek)
         root.pinned = pinned
@@ -1069,11 +1086,8 @@ final class ScreenHUD {
         return root
     }
 
-    /// Hands the dock's marks their events, through what the dock remembers: a card that hides the dock is remembered,
-    /// and a dock back from under one has its bots take up their looks at once and plays what it missed as `DockMemory`
-    /// says.
-    private func handOutCues(to root: inout IslandRootView, docked: Bool) {
-        guard docked else { return dock.hide() }
+    /// Hands the dock's marks their events, through what the dock remembers (`DockMemory`).
+    private func handOutCues(to root: inout IslandRootView) {
         let now = store.clock()
         if let items = root.logoQueue?.items {
             root.logoQueue?.items = items.map { item in
@@ -1089,8 +1103,6 @@ final class ScreenHUD {
                 return item
             }
         }
-        root.logoQueue?.resumes = dock.returns
-        root.simpleMeter?.resumes = dock.returns
     }
 
     /// Run during the existing hover delay without touching the visible windows or their current glow.
@@ -1159,13 +1171,17 @@ final class ScreenHUD {
         let open = machine.isOpen
         let previousGeometry = geometry
         geometry = resolveGeometry()
-        // A changed edge replaces the coordinate system; it is a repositioning, not an expansion.
-        // A separated dock's card moves on its own, inside a window that holds both ends of the move.
+        // A changed edge replaces the coordinate system; it is a repositioning, not an expansion. A detached card moves
+        // on its own, inside a window that holds both ends of the move: always on a separated dock, and on any dock
+        // while an event's card comes out of its mark, stands beside it or goes back in.
         let reducesMotion = reduceMotion()
-        let cardMoves = !agentMarks.isEmpty && previewPlacement == nil && geometry.edge == previousGeometry.edge
+        let detached = focus != nil
+        let cardsMove = !agentMarks.isEmpty || detached || cardWasDetached || cardSettle != nil
+        cardWasDetached = detached
+        let cardMoves = cardsMove && previewPlacement == nil && geometry.edge == previousGeometry.edge
             && geometry.mode == previousGeometry.mode && geometry.screenFrame == previousGeometry.screenFrame
             && !reducesMotion
-        let animated = animated && geometry.edge == previousGeometry.edge && agentMarks.isEmpty
+        let animated = animated && geometry.edge == previousGeometry.edge && !cardsMove
             && geometry.mode == previousGeometry.mode && geometry.screenFrame == previousGeometry.screenFrame
             && !reducesMotion
         var root = makeRoot(open: open, animated: animated)
@@ -1200,17 +1216,10 @@ final class ScreenHUD {
             alertHoverFloor = pointerInside ? max(alertHoverFloor, windowFrame.height) : 0
             let held = ScreenHUD.heldWindowHeight(card: windowFrame.height, floor: alertHoverFloor,
                                                   pointerInside: pointerInside)
-            if focus != nil {
-                // The canvas already spans the card and the marks; only the surface under the pointer grows.
-                windowFrame.origin.y -= held - windowFrame.height
-                windowFrame.size.height = held
-                windowFrame = windowFrame.intersection(geometry.screenFrame)
-            } else if geometry.mode.isDocked {
-                windowFrame = geometry.expandedFrame(size: CGSize(width: windowFrame.width, height: held))
-            } else {
-                windowFrame.origin.y -= held - windowFrame.height
-                windowFrame.size.height = held
-            }
+            // On a dock the canvas already spans the card and the marks; only the surface under the pointer grows.
+            windowFrame.origin.y -= held - windowFrame.height
+            windowFrame.size.height = held
+            if focus != nil { windowFrame = windowFrame.intersection(geometry.screenFrame) }
         } else {
             alertHoverFloor = 0
         }
@@ -1345,8 +1354,9 @@ final class ScreenHUD {
                                            screen: geometry.screenFrame)
         let windowFrame = cardFrame.union(geometry.islandFrame).intersection(geometry.screenFrame).integral
         // The marks have not moved, so whatever glows behind them goes on doing so, and the Simple panel keeps its
-        // shadow beside the card's.
+        // shadow beside the card's: its own on a separated dock, the island's at rest on any other.
         let marks = surface(open: false, height: height, parked: true)
+        let panel = marks.shells.dock ?? (geometry.mode == .simple ? marks.shells.surface : nil)
         let full = open && (pinned || alerts.current?.inUsagePanel == false)
         let card = HUDShell(frame: cardFrame, radius: Self.detachedRadius(height: cardFrame.height, full: full,
                                                                           bubble: peek.style == .bubble && activeAlert == nil),
@@ -1354,7 +1364,7 @@ final class ScreenHUD {
         return Surface(windowFrame: windowFrame, cardFrame: cardFrame, expanded: true, glowIsland: marks.glowIsland,
                        glowRadius: marks.glowRadius, glowFlare: marks.glowFlare, glowGeometry: marks.glowGeometry,
                        glowSettings: marks.glowSettings, backdrop: marks.backdrop, drawsGlow: marks.drawsGlow,
-                       shells: HUDShells(surface: card, dock: marks.shells.dock))
+                       shells: HUDShells(surface: card, dock: panel))
     }
 
     /// How round a detached card is, as `IslandRootView` draws it: a full card keeps a card's corner, a peek bubble a
@@ -1424,11 +1434,10 @@ final class ScreenHUD {
     /// `parked` asks for the collapsed surface whatever is showing: the marks' own, which a detached card keeps.
     private func surface(open: Bool, height: CGFloat, parked: Bool = false) -> Surface {
         let expanded = (open || activeAlert != nil) && previewPlacement == nil && !parked
+        // On a dock an event's card always stands beside a mark (`focus`); only the notch grows wings for one.
         if let focus, expanded { return detachedSurface(open: open, height: height, focus: focus) }
-        let compactSize = geometry.mode.isDocked
-            ? IslandRootView.dockCompactSize(edge: geometry.edge, collapsedSize: geometry.rect.size, scale: stripScale, wings: compactWings)
-            : CGSize(width: geometry.rect.width + 2 * (IslandController.alertWingWidth + IslandController.alertSidePadding),
-                     height: max(38, geometry.rect.height))
+        let compactSize = CGSize(width: geometry.rect.width + 2 * (IslandController.alertWingWidth + IslandController.alertSidePadding),
+                                 height: max(38, geometry.rect.height))
         let size = open
             ? (alerts.current?.inUsagePanel == false
                 ? CGSize(width: activeAlert?.detailWidth ?? IslandController.alertDetailWidth,

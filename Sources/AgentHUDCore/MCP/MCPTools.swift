@@ -7,12 +7,12 @@ import AgentHUDSupport
 /// its arguments is the running application's business; only the names and the shapes are known here.
 public enum MCPTools {
     /// The tools' names, as a client calls them and as the application is handed them.
-    public static let getPanel = "get_panel"
-    public static let getPanelImage = "get_panel_image"
-    public static let setPanelLayout = "set_panel_layout"
-    public static let discardPanelDraft = "discard_panel_draft"
-    public static let finishPanelEdit = "finish_panel_edit"
-    static let names = [getPanel, getPanelImage, setPanelLayout, discardPanelDraft, finishPanelEdit]
+    public static let getHUD = "get_hud"
+    public static let getHUDScreenshot = "get_hud_screenshot"
+    public static let draftHUD = "draft_hud"
+    public static let discardHUDDraft = "discard_hud_draft"
+    public static let finishHUDEdit = "finish_hud_edit"
+    static let names = [getHUD, getHUDScreenshot, draftHUD, discardHUDDraft, finishHUDEdit]
 
     /// What a client's model is told about the server before it has called anything.
     static let instructions = """
@@ -20,12 +20,12 @@ public enum MCPTools {
         These tools read what its hover panel shows and rearrange it, for every screen or for one, \
         restyle one screen's resting HUD, and change an app setting the user asks for by name. \
         A change is a draft until the user presses Save in the panel. \
-        A layout edit holds the panel open for two minutes; call finish_panel_edit when you are done.
+        A layout edit holds the panel open for two minutes; call finish_hud_edit when you are done.
         """
 
     /// The app's own settings are told so that an agent can foresee what its draft does beyond the HUD, as the app draws
     /// them now, an app draft included, and with the rule that they are changed only on the user's word.
-    private static let getPanelDescription = """
+    private static let getHUDDescription = """
         Read what the Agent HUD hover panel shows now: its blocks (one per agent or API provider), each block's \
         accounts, with the id a layout names one by, its email or name and its plan, and its rows in the order shown \
         with their latest readings, and each API balance with runsOutAt, when it runs out at the pace the balance \
@@ -47,36 +47,36 @@ public enum MCPTools {
 
     /// Pictures are drawn off screen, where no desktop shows through glass, so a glass HUD is drawn as a stand-in, the
     /// same for every glass style. What an agent's own panel is and when a screen has one is the agent argument's to say.
-    private static let getPanelImageDescription = """
+    private static let getHUDScreenshotDescription = """
         Show a picture of the Agent HUD hover panel as the layout in effect draws it, a draft included, account names \
         masked, session titles left out, or with agent one agent's own panel, or with show 'hud' a screen's resting \
-        HUD; glass is one stand-in. Use it to check a change; get_panel reads it as data.
+        HUD; glass is one stand-in. Use it to check a change; get_hud reads it as data.
         """
 
-    private static let setPanelLayoutDescription = """
+    private static let draftHUDDescription = """
         Propose a layout for the Agent HUD hover panel: its blocks, their rows' order and the accounts each shows, its \
         sections and reset countdowns, which are also the switches of Settings' Expanded panel, its session rows, \
         token chart and style, its width included, and the screen's resting HUD: which agents it shows and, for one \
         screen, its mode, edge, sizes, appearance, material, glass style and glow. Send the whole layout you want; \
         anything left out uses the default, and a HUD style field left out stays as saved. A call with only hud style \
-        fields leaves the layout as it is. What the layout from get_panel holds for a block, a row, an account, an \
+        fields leaves the layout as it is. What the layout from get_hud holds for a block, a row, an account, an \
         agent, a project or a model not listed now can be sent back as it is. It shows at once as an unsaved draft: the \
         user keeps it with Save in the panel, and it is dropped when Agent HUD restarts. Pass from 'default' to propose \
         the built-in layout instead, 'previous' for the last saved one, for a screen with the resting HUD style that went \
         with it, or 'shared' to have a screen use the shared layout again; hud.reset proposes a screen's default HUD \
         style. A layout edit holds the panel open on screen for two minutes from the call, and a call with only hud \
-        style fields closes it so the HUD shows; call finish_panel_edit when you are done. app changes the whole app's \
+        style fields closes it so the HUD shows; call finish_hud_edit when you are done. app changes the whole app's \
         own settings, its appearance, matchScreen, botLogos, showMenuBarIcon and hover, for every screen, as a draft the \
         same Save keeps: name it only when the user explicitly asks for one of those settings, never as a side effect \
         of arranging the panel. A call that leaves app out leaves them as they are, and a call with only app changes \
         them alone and opens nothing.
         """
 
-    private static let discardPanelDraftDescription = "Drop the unsaved draft so the Agent HUD panel returns to the saved "
+    private static let discardHUDDraftDescription = "Drop the unsaved draft so the Agent HUD panel returns to the saved "
         + "layout and, for a screen, its resting HUD to its saved style; a draft of the app's own settings stays. Like a "
         + "layout edit it holds the panel open, unless it drops a HUD style alone."
 
-    private static let finishPanelEditDescription = "Say your edit of the Agent HUD panel is done, so the panel an edit "
+    private static let finishHUDEditDescription = "Say your edit of the Agent HUD panel is done, so the panel an edit "
         + "held open closes unless the user's pointer is on it. Drafts stay as they are, waiting for the user's Save."
 
     /// What the look's fields leave as it is: the row of a hardware notch, which the island is one with.
@@ -84,31 +84,31 @@ public enum MCPTools {
         + "glass; the panel and the cards it opens into take the look."
 
     /// What every tool takes to name the layout it acts on.
-    private static let screenDescription = "A screen key from get_panel for that screen's own layout; 'all', the default, "
+    private static let screenDescription = "A screen key from get_hud for that screen's own layout; 'all', the default, "
         + "for the shared layout the other screens use."
 
     /// The definitions `tools/list` returns.
     static let definitions: [JSONValue] = [
-        tool(getPanel, getPanelDescription, input: object(["screen": described("string", screenDescription)]), changes: false),
-        tool(getPanelImage, getPanelImageDescription, input: object([
+        tool(getHUD, getHUDDescription, input: object(["screen": described("string", screenDescription)]), changes: false),
+        tool(getHUDScreenshot, getHUDScreenshotDescription, input: object([
             "screen": described("string", screenDescription),
             "show": text("What to draw: the hover panel, the default, or the screen's resting HUD, which needs a screen key.",
                          oneOf: ["panel", "hud"]),
-            "agent": described("string", "An agent by name from that screen's shows in get_panel, or by its block's key, to "
+            "agent": described("string", "An agent by name from that screen's shows in get_hud, or by its block's key, to "
                                + "draw its own panel instead of the whole one: the card a click on its mark opens beside "
                                + "it, agentPanelWidth wide, on a dynamic or simple HUD with separateAgents on. Needs a "
                                + "screen key; not with show 'hud'."),
         ]), changes: false),
-        tool(setPanelLayout, setPanelLayoutDescription, input: layout, changes: true),
-        tool(discardPanelDraft, discardPanelDraftDescription, input: object(["screen": described("string", screenDescription)]),
+        tool(draftHUD, draftHUDDescription, input: layout, changes: true),
+        tool(discardHUDDraft, discardHUDDraftDescription, input: object(["screen": described("string", screenDescription)]),
              changes: true),
-        tool(finishPanelEdit, finishPanelEditDescription, input: object([
-            "screen": described("string", "A screen key from get_panel to let go of that screen's panel; 'all', the default, "
+        tool(finishHUDEdit, finishHUDEditDescription, input: object([
+            "screen": described("string", "A screen key from get_hud to let go of that screen's panel; 'all', the default, "
                                 + "for every screen's."),
         ]), changes: true),
     ]
 
-    /// What `set_panel_layout` takes: every property optional, and no others.
+    /// What `draft_hud` takes: every property optional, and no others.
     private static var layout: JSONValue {
         let key: JSONValue = .object(["type": .string("string")])
         let section = text("One of the panel's sections.", oneOf: ["blocks", "tokens", "sessions"])
@@ -122,10 +122,10 @@ public enum MCPTools {
                              + "that pace; its chart offers cost alone. One means no picker; none means all its widget "
                              + "offers.", of: measure),
             "hidden": described("boolean", "True hides the block."),
-            "hiddenRows": list("Keys of the block's rows to hide, from get_panel.", of: key),
-            "rows": list("Keys of the block's rows, from get_panel, in the order to show them; rows left out keep their "
+            "hiddenRows": list("Keys of the block's rows to hide, from get_hud.", of: key),
+            "rows": list("Keys of the block's rows, from get_hud, in the order to show them; rows left out keep their "
                          + "order after them.", of: key),
-            "accounts": list("Ids of the accounts to show, from the block's accounts in get_panel; none for every account. "
+            "accounts": list("Ids of the accounts to show, from the block's accounts in get_hud; none for every account. "
                              + "A list of every account the block has now still hides one that joins later.", of: key),
             "countdown": described("boolean", "Whether this quota block shows its reset times, whatever the layout's "
                                    + "countdown says; the layout's if left out."),
@@ -141,7 +141,7 @@ public enum MCPTools {
         let blocks: [String: JSONValue] = [
             "type": .string("object"),
             "additionalProperties": block,
-            "description": .string("What differs from the default for each block, by block key from get_panel."),
+            "description": .string("What differs from the default for each block, by block key from get_hud."),
         ]
         let style = object([
             "spacing": text("Room between sections, blocks and rows; regular if left out.", oneOf: ["compact", "regular", "roomy"]),
@@ -160,9 +160,9 @@ public enum MCPTools {
                          + "for approval ahead of those running, then the others by their last activity; date lists "
                          + "every session by its last activity, newest first, whatever its state.",
                          oneOf: PanelSessionSort.allCases.map(\.rawValue)),
-            "agents": list("Only these agents' sessions, names from get_panel's sessions.offeredAgents; none for every "
+            "agents": list("Only these agents' sessions, names from get_hud's sessions.offeredAgents; none for every "
                            + "agent.", of: key),
-            "projects": list("Only these projects' sessions, ids from get_panel's sessions.offeredProjects: a "
+            "projects": list("Only these projects' sessions, ids from get_hud's sessions.offeredProjects: a "
                              + "project's folder written with ~, a Git repository's worktrees counted as one project, "
                              + "or unassigned for sessions with no folder. A path, absolute or with ~, inside a project "
                              + "or a worktree of it names that project, so your own working directory names the "
@@ -173,15 +173,15 @@ public enum MCPTools {
         let tokens = object([
             "period": text("What the token chart shows when the panel opens: the last 24 hours, 7 days or 30 days; day if "
                            + "left out.", oneOf: PanelTokenPeriod.allCases.map(\.rawValue)),
-            "agents": list("Only these agents' tokens, names from get_panel's tokens.offeredAgents; none for every "
+            "agents": list("Only these agents' tokens, names from get_hud's tokens.offeredAgents; none for every "
                            + "agent.", of: key),
-            "models": list("Only these models' tokens, ids from get_panel's tokens.offeredModels, of the agents named if "
+            "models": list("Only these models' tokens, ids from get_hud's tokens.offeredModels, of the agents named if "
                            + "any are; none for every model.", of: key),
         ], description: "The token chart's period, agents and models.")
         let hud = object([
-            "agents": list("Agents it shows, in order, by name from get_panel's screens; none shows every agent. The menu "
+            "agents": list("Agents it shows, in order, by name from get_hud's screens; none shows every agent. The menu "
                            + "bar follows it where the layout is drawn: the menu opened on that screen, and the status "
-                           + "item's figure and colours on the first screen get_panel lists.", of: key),
+                           + "item's figure and colours on the first screen get_hud lists.", of: key),
             "mode": text("For one screen only, as is every field but agents. notch needs a screen with a notch.",
                          oneOf: HUDMode.allCases.map(\.agentName)),
             "edge": text("Dynamic or simple: the edge it is parked on.", oneOf: HUDEdge.allCases.map(\.rawValue)),
@@ -192,6 +192,7 @@ public enum MCPTools {
             "edgeDistance": number("Dynamic: logos' distance from the edge in points,", .edgeDistance),
             "showLogos": described("boolean", "Dynamic: false leaves the backdrop alone."),
             "simpleSize": number("Simple: ring diameter in points,", .simpleSize),
+            "simpleGap": number("Simple: gap between agents, as a share of a ring,", .simpleGap),
             "ringWidth": number("Simple: ring stroke in points,", .ringWidth),
             "showRings": described("boolean", "Simple: a ring round each mark."),
             "showNumbers": described("boolean", "Simple: the percentage beside each mark."),
@@ -212,7 +213,7 @@ public enum MCPTools {
                                       + "draws less of its fill, all of it at 0; Solid, Clear and Regular draw three "
                                       + "fifths of it, 0.6 at 1, and Material all of it; "
                                       + "\(bounds(HUDStyle.Field.transparency.range)) It sets the transparency of "
-                                      + "the material the HUD would have; get_panel lists what each keeps as "
+                                      + "the material the HUD would have; get_hud lists what each keeps as "
                                       + "solidTransparency and glassTransparency."),
             "solidTransparency": kept("solid's"),
             "glassTransparency": kept("glass's"),
@@ -256,16 +257,16 @@ public enum MCPTools {
                 "delayMs": described("integer", "How long hovering waits before it opens the panel, in " + delay),
                 "collapseDelayMs": described("integer", "How long the panel stays after the pointer leaves it, in " + delay),
             ], description: "Hover behavior, for every screen."),
-            "language": described("string", "Read only, as get_panel lists it; only Settings changes the Language."),
-            "writtenIn": described("string", "Read only, as get_panel lists it."),
-        ], description: "The whole app's own settings, for every screen whatever screen is named, as get_panel lists them "
+            "language": described("string", "Read only, as get_hud lists it; only Settings changes the Language."),
+            "writtenIn": described("string", "Read only, as get_hud lists it."),
+        ], description: "The whole app's own settings, for every screen whatever screen is named, as get_hud lists them "
             + "under app. Name app only when the user explicitly asks for one of these settings, never as a side effect of "
             + "arranging the panel. It is a draft until the user presses Save in the panel; a field left out stays as "
             + "saved, so an app that sets nothing drops the draft.")
         return object([
             "screen": described("string", screenDescription),
             "blocks": .object(blocks),
-            "order": list("Block keys from get_panel, in the order the panel shows them.", of: key),
+            "order": list("Block keys from get_hud, in the order the panel shows them.", of: key),
             "sections": list("The panel's sections, in the order it shows them.", of: section),
             "hiddenSections": list("The panel's sections to hide; Settings' Session list, Quota details and Token usage "
                                    + "switch sessions, blocks and tokens.", of: section),
@@ -279,7 +280,7 @@ public enum MCPTools {
             "from": text("Propose the built-in layout, the last saved one, or for a screen the shared layout, instead of "
                          + "the one described here. Only 'previous' brings a screen's HUD style with it.",
                          oneOf: ["default", "previous", "shared"]),
-            "revision": described("integer", "The revision get_panel returned; when given and no longer current the call is refused."),
+            "revision": described("integer", "The revision get_hud returned; when given and no longer current the call is refused."),
         ])
     }
 
@@ -318,10 +319,10 @@ public enum MCPTools {
         described("number", description + " " + bounds(field.range, step: field.step))
     }
 
-    /// A transparency a screen keeps for one material, which get_panel lists and no proposal sets
+    /// A transparency a screen keeps for one material, which get_hud lists and no proposal sets
     /// (`HUDStyle.KeptTransparency`).
     private static func kept(_ material: String) -> JSONValue {
-        described("number", "Read only: \(material) transparency as get_panel lists it, which can be sent back as "
+        described("number", "Read only: \(material) transparency as get_hud lists it, which can be sent back as "
                   + "listed; transparency sets the material's own.")
     }
 

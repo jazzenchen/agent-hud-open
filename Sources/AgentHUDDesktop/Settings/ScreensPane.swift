@@ -147,8 +147,8 @@ struct ScreensPane: View {
                 SettingsDivider(theme: theme)
                 SettingsToggleRow(
                     label: L10n.text("按 agent 分开", "Separate agents"),
-                    subtitle: L10n.text("悬停某个标志只展开该 agent 的面板；请求和提醒从发出它的 agent 的标志旁展开，其他标志保持不动。",
-                                        "Hovering a mark opens that agent's own panel. Requests and reminders open beside the mark of the agent that sent them, and the other marks stay."),
+                    subtitle: L10n.text("悬停某个标志只展开该 agent 的面板，不再展开全部 agent 的面板。",
+                                        "Hovering a mark opens that agent's own panel instead of the panel for every agent."),
                     isOn: binding(\.separatesAgents)
                 )
             }
@@ -187,6 +187,11 @@ struct ScreensPane: View {
                 SliderRow(label: L10n.text("大小", "Size"), value: binding(\.simpleSize),
                           range: ScreenPlacement.simpleSizeRange, step: 1,
                           format: { String(format: "%.0f pt", $0) }, theme: theme)
+                SettingsDivider(theme: theme)
+                let ring = placement.simpleSize
+                SliderRow(label: L10n.text("Logo 间距", "Logo spacing"), value: binding(\.simpleGapScale),
+                          range: ScreenPlacement.gapScaleRange, step: 0.05,
+                          format: { String(format: "%.0f pt", $0 * ring) }, theme: theme)
                 SettingsDivider(theme: theme)
                 SettingsToggleRow(
                     label: L10n.text("显示圆环", "Show rings"),

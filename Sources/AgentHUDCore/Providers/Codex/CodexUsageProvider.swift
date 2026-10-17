@@ -205,8 +205,9 @@ public actor CodexUsageProvider: UsageProvider, LedgerRecording {
         let weekAgo = now.addingTimeInterval(-AlertPolicy.insightsLookback)
         let indexed = await transcripts.index(since: min(weekAgo, now.addingTimeInterval(-Double(historyHours) * 3600)))
         // Tokens and models come from every rollout of `historyHours`; sessions only from those active in the session
-        // window. Spawned agents and guardians keep rollouts of their own that name the thread that started them; a
-        // session reported takes every rollout below it, whenever that was last written, and so does its breakdown.
+        // window that Codex did not archive. Spawned agents and guardians keep rollouts of their own that name the thread
+        // that started them; a session reported takes every rollout below it, whenever that was last written, and so
+        // does its breakdown.
         let sessionStart = SessionWindow.start(at: now)
         var children: [String: [CodexTranscriptStore.Session]] = [:]
         for session in indexed.sessions where session.transcript.isSubagent {
@@ -222,7 +223,7 @@ public actor CodexUsageProvider: UsageProvider, LedgerRecording {
             }
             return found
         }
-        let recent = indexed.sessions.filter { ($0.transcript.lastEventAt ?? $0.modifiedAt) >= sessionStart }
+        let recent = indexed.sessions.filter { !$0.archived && ($0.transcript.lastEventAt ?? $0.modifiedAt) >= sessionStart }
         let roots = recent.filter { !$0.transcript.isSubagent && !$0.transcript.isInternal }
         var reportedPaths = Set(recent.map(\.path))
         for root in roots { reportedPaths.formUnion(descendants(of: root.transcript.id!).map(\.path)) }

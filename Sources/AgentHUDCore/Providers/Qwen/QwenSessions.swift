@@ -32,12 +32,15 @@ enum QwenSessions: LocalSessionLayout {
 
     static func read(_ url: URL) throws -> ProviderSessions {
         let stem = url.deletingPathExtension().lastPathComponent
+        // A chat Qwen archived lies in `chats/archive`.
+        let archived = url.deletingLastPathComponent().lastPathComponent == "archive"
         var sessions: [String: ProviderSession] = [:], events: [String: [String: ProviderEvent]] = [:]
         var titled: Set<String> = [], incomplete = false
         try ProviderFiles.lines(url) { json, line in
             let raw = nonEmpty(json["sessionId"]) ?? stem
             let id = "qwen:\(raw)", date = DateParsing.internet(json["timestamp"].stringValue)
-            var session = sessions[id] ?? ProviderSession(id: id, title: "Qwen · \(raw.prefix(8))", path: url.path, client: "Qwen Code")
+            var session = sessions[id] ?? ProviderSession(id: id, title: "Qwen · \(raw.prefix(8))", path: url.path, client: "Qwen Code",
+                                                          archived: archived)
             if session.workspace == nil, let cwd = nonEmpty(json["cwd"]) {
                 session.workspace = cwd
                 if !titled.contains(id) { session.title = URL(fileURLWithPath: cwd).lastPathComponent }

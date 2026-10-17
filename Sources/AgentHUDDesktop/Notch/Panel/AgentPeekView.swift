@@ -32,9 +32,10 @@ struct AgentPeek: Equatable {
     private static let rowHeight: CGFloat = 18
     private static var labelFont: NSFont { .systemFont(ofSize: 12) }
     private static var valueFont: NSFont { .monospacedDigitSystemFont(ofSize: 12, weight: .semibold) }
-    /// The line's lengths, all from the one scale: its text, the gap inside a pair and between pairs, its end
-    /// padding and its height, which is a compact reminder's.
-    var lineFont: CGFloat { (12 * max(1, scale)).rounded() }
+    /// The line's lengths, all from the one scale: its text, which is every word a dock writes
+    /// (`IslandRootView.dockText`), the gap inside a pair and between pairs, its end padding and its height, which is a
+    /// compact reminder's.
+    var lineFont: CGFloat { IslandRootView.dockText(scale: scale) }
     var linePairGap: CGFloat { (5 * max(1, scale)).rounded() }
     var lineSpacing: CGFloat { (12 * max(1, scale)).rounded() }
     var linePadding: CGFloat { (12 * max(1, scale)).rounded() }

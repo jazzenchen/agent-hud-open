@@ -5,7 +5,7 @@ import XCTest
 
 /// What the tools read and take of the options a layout sets beside its widgets: a block's measures, countdown,
 /// columns and ring size, and the panel's style.
-final class PanelToolsOptionsTests: PanelToolsCase {
+final class HUDToolsOptionsTests: HUDToolsCase {
     /// The countdown, the columns, the ring size and the style are read as strictly as the rest: a misspelt or
     /// mistyped value is refused with its path and what is accepted, and so is one the block has nothing to set for.
     func testTheNewOptionsAreReadStrictly() throws {
@@ -41,7 +41,7 @@ final class PanelToolsOptionsTests: PanelToolsCase {
 
     /// What a proposal sets for the countdown, the cells and the whole panel is drawn and told back.
     func testTheNewOptionsAreProposedAndToldBack() throws {
-        let panel = try result(MCPTools.setPanelLayout, [
+        let panel = try result(MCPTools.draftHUD, [
             "blocks": .object(["Claude": .object(["widget": .string("ring"), "columns": .integer(2), "ringSize": .string("large"),
                                                   "countdown": .bool(false), "measures": .array([.string("cost")])]),
                                "Codex": .object(["widget": .string("number"), "columns": .number(6)])]),
@@ -63,7 +63,7 @@ final class PanelToolsOptionsTests: PanelToolsCase {
         XCTAssertEqual(codex["countdown"], .bool(true))
 
         // The layout's own countdown is Settings' Reset countdown: off, the blocks that set none of their own show none.
-        let off = try result(MCPTools.setPanelLayout, ["countdown": .bool(false),
+        let off = try result(MCPTools.draftHUD, ["countdown": .bool(false),
                                                        "blocks": .object(["Claude": .object(["countdown": .bool(true)])])])
         XCTAssertEqual(off["countdown"], .bool(false))
         XCTAssertEqual(try block("Codex", in: off)["countdown"], .bool(false))

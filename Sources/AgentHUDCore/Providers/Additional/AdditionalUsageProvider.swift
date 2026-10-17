@@ -145,11 +145,12 @@ actor AdditionalUsageProvider: UsageProvider, LedgerRecording {
             }
         }
         // Tokens and models come from every session of `historyHours`; sessions, their turns and completions, and the
-        // completion hooks' records only from those active in the session window. A billed Grok Bot run comes whatever
-        // its age, for its bot's tree; the merge keeps it only under a listed bot or while it is recent itself.
+        // completion hooks' records only from those active in the session window that the client did not archive. A
+        // billed Grok Bot run comes whatever its age, for its bot's tree; the merge keeps it only under a listed bot or
+        // while it is recent itself.
         let sessionStart = SessionWindow.start(at: now)
         var listed = local.sessions.filter {
-            $0.lastSeen.map { $0 >= sessionStart } == true || GrokBotUsage.billedSubagentID($0.id) != nil
+            !$0.archived && ($0.lastSeen.map { $0 >= sessionStart } == true || GrokBotUsage.billedSubagentID($0.id) != nil)
         }
         var hookCompletions: [SessionCompletion] = [], hookNotice: String?
         do { hookCompletions = try readCompletions(sessionStart) }

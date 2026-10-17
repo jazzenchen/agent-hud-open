@@ -133,6 +133,10 @@ struct ProviderSession: Sendable {
     var navigationTarget: SessionNavigationTarget? = nil
     /// What the session's log says its turn is busy with, from a reader whose log records each tool call.
     var activity: SessionActivity? = nil
+    /// Whether the client archived or deleted the session while keeping its record, such as an OpenClaw `.reset.` or
+    /// `.deleted.` transcript or a chat in Qwen's `chats/archive`: its usage counts and it is left out of the session list.
+    /// A session read from several records is archived only when every one says so.
+    var archived = false
 
     /// When the session last did something: its last activity, else its newest event.
     var lastSeen: Date? { lastActivity ?? events.map(\.timestamp).max() }

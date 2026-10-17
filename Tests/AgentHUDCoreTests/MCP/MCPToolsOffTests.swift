@@ -13,7 +13,7 @@ final class MCPToolsOffTests: XCTestCase, @unchecked Sendable {
         return url
     }
 
-    private let request = MCPToolRequest(tool: MCPTools.getPanel)
+    private let request = MCPToolRequest(tool: MCPTools.getHUD)
 
     func testAnUnservedSocketIsOffWhileTheApplicationHoldsTheLockAndNotRunningOtherwise() throws {
         let directory = try directory()
@@ -89,7 +89,7 @@ final class MCPToolsOffTests: XCTestCase, @unchecked Sendable {
 
     func testTheServerTellsTheAgentWhereToTurnTheToolsOn() throws {
         let probe = MCPServerProbe(answer: .off)
-        let line = #"{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"get_panel","arguments":{}}}"#
+        let line = #"{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"get_hud","arguments":{}}}"#
         let response = try probe.response(to: line)
         XCTAssertEqual(response["result"].blockText, "Agent HUD's agent tools are off. Turn them on in Settings › Experimental.")
         XCTAssertEqual(response["result"]["isError"], .bool(true))

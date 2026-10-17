@@ -67,8 +67,8 @@ struct ClawdPerformer: Sendable {
         apply(from: before, at: now)
     }
 
-    /// Takes up `next` as a Clawd already showing it would be: a mark built again while Clawd was out, as a dock is when
-    /// it comes back after a card hid it, starts its look's loop with no intro. Anything else is told as `set` tells it.
+    /// Takes up `next` as a Clawd already showing it would be: a mark built again while Clawd was out, as a dock's are
+    /// when it is laid out again, starts its look's loop with no intro. Anything else is told as `set` tells it.
     mutating func resume(_ next: BotState, at now: TimeInterval) {
         set(next, at: now)
         guard onStage, next.facing == nil || !next.look.isAttention, let look = Self.look(for: next) else { return }

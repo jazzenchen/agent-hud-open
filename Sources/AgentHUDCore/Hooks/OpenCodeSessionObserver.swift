@@ -2,7 +2,8 @@ import AgentHUDSupport
 import Foundation
 
 /// OpenCode's stored messages carry no agent end, so a plugin Agent HUD keeps in OpenCode's global plugin directory
-/// records each turn that ends in a final answer. It reports completions only: usage still comes from OpenCode's store.
+/// records each turn that ends in a final answer, and drops a session's records when OpenCode deletes it. It reports
+/// completions only: usage still comes from OpenCode's store.
 /// OpenCode 1.0 reads only `plugin/`, later releases `plugins/` as well, so the file goes in `plugin/`.
 public enum OpenCodeSessionObserver {
     private static func file(_ paths: OpenAgentPaths) -> ObserverFile {
@@ -80,7 +81,7 @@ public enum OpenCodeSessionObserver {
     // leaves the process, and nothing it does can fail a turn.
     static let script = #"""
     // Agent HUD OpenCode session observer
-    import { mkdirSync, writeFileSync, renameSync, readdirSync, statSync, unlinkSync } from "node:fs";
+    import { mkdirSync, writeFileSync, renameSync, readdirSync, readFileSync, statSync, unlinkSync } from "node:fs";
     import { homedir } from "node:os";
     import { join } from "node:path";
     import { createHash } from "node:crypto";
@@ -100,6 +101,18 @@ public enum OpenCodeSessionObserver {
         let value = sessions.get(id);
         if (!value) sessions.set(id, value = {});
         return value;
+      }
+
+      // A session deleted in OpenCode takes its records along, so it leaves Agent HUD's list as it left OpenCode's.
+      function forget(id) {
+        try {
+          for (const name of readdirSync(directory)) {
+            if (!/^[a-f0-9]{64}\.json$/.test(name)) continue;
+            try {
+              if (JSON.parse(readFileSync(join(directory, name), "utf8")).sessionID === "opencode:" + id) unlinkSync(join(directory, name));
+            } catch { /* A record that cannot be read is pruned with the week's. */ }
+          }
+        } catch { /* There are no records yet. */ }
       }
 
       function navigationTarget() {
@@ -144,7 +157,7 @@ public enum OpenCodeSessionObserver {
                 if (info.id) Object.assign(session(info.id), { child: !!info.parentID, title: info.title, directory: info.directory });
                 break;
               case "session.deleted":
-                if (info.id) sessions.delete(info.id);
+                if (info.id) { sessions.delete(info.id); forget(info.id); }
                 break;
               case "message.updated": {
                 // OpenCode updates earlier messages too, so the newest prompt and reply go by when they were created. The

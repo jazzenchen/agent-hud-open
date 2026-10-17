@@ -46,8 +46,8 @@ final class ClawdActor {
 
     /// - showing: whether the mark is shown in `layer` now, by the drawn bot. Otherwise what can be seen of it is its logo,
     ///   from which Clawd fades in.
-    /// - resumes: the mark was out before this actor was built for it, as a dock's are when it comes back after a card
-    ///   hid it: it shows as it was, with nothing to fade from.
+    /// - resumes: the mark was out before this actor was built for it, as a dock's are when it is laid out again with
+    ///   bots on: it shows as it was, with nothing to fade from.
     init(sheet: ClawdSheet, form: BotForm, staysBot: Bool, arrivesAfter: TimeInterval, seed: UInt64, in layer: CALayer,
          showing: Bool, resumes: Bool = false) {
         performer = ClawdPerformer(sheet: sheet, staysBot: staysBot, arrivesAfter: arrivesAfter, seed: seed)

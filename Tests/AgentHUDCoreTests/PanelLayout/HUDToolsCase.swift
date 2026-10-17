@@ -6,7 +6,7 @@ import XCTest
 /// What the tool tests share: the sample's panel, with Claude and Codex quota blocks and DeepSeek's balance, over
 /// settings of their own, and the tools answering from it.
 @MainActor
-class PanelToolsCase: XCTestCase {
+class HUDToolsCase: XCTestCase {
     let suite = "app.agenthud.tests.panel-tools.\(UUID().uuidString)"
     var changes = 0
     /// The sample's store over settings of its own, made when a test first reaches for either.
@@ -22,7 +22,7 @@ class PanelToolsCase: XCTestCase {
     }()
     var settings: SettingsStore { store.settings }
     /// Revisions counted from 0, so that the tests can name them; the application's own start from a drawn number.
-    lazy var tools = PanelTools(store: store, launch: 0)
+    lazy var tools = HUDTools(store: store, launch: 0)
 
     override func setUp() {
         super.setUp()
@@ -46,7 +46,7 @@ class PanelToolsCase: XCTestCase {
 
     func refusal(_ arguments: [String: JSONValue], line: UInt = #line) throws -> String {
         let before = (layout.revision, layout.draft)
-        guard case .failure(let sentence) = tools.answer(MCPToolRequest(tool: MCPTools.setPanelLayout, arguments: arguments)) else {
+        guard case .failure(let sentence) = tools.answer(MCPToolRequest(tool: MCPTools.draftHUD, arguments: arguments)) else {
             XCTFail("the proposal was taken", line: line)
             throw CancellationError()
         }

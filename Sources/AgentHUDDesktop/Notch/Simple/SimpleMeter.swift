@@ -101,12 +101,12 @@ struct SimpleMeterConfig: Equatable {
     var ringWidth: CGFloat
     var showsRings: Bool
     var showsNumbers: Bool
+    /// Between two agents, as a share of a ring (`ScreenPlacement.simpleGapScale`).
+    var gapScale: CGFloat
     /// Marks turn into bots while their agents work, as a logo queue's do: Settings' `botLogos`, on screen and in an
     /// agent's picture of the resting HUD (`HUDPictureRenderer`). Left out, it is off, for a panel that is only measured
     /// or drawn still in a snapshot.
     var bots: Bool
-    /// The panel comes back after a card hid it: its bots take up their looks at once (`DockMemory`).
-    var resumes = false
 
     init(items: [SimpleMeterItem], placement: ScreenPlacement, bots: Bool = false) {
         self.items = items
@@ -115,6 +115,7 @@ struct SimpleMeterConfig: Equatable {
         ringWidth = placement.ringWidth
         showsRings = placement.showsRings
         showsNumbers = placement.showsNumbers
+        gapScale = placement.simpleGapScale
         self.bots = bots
     }
 
@@ -122,11 +123,13 @@ struct SimpleMeterConfig: Equatable {
     var logo: CGFloat { (size * (showsRings ? 0.55 : 0.68)).rounded() }
     /// The square a mark takes, ring included.
     var mark: CGFloat { showsRings ? size : logo }
-    var fontSize: CGFloat { max(9, (size * 0.59).rounded()) }
+    /// The numbers are written as everything the dock grows out of itself is, a reminder's words and the hover line:
+    /// `IslandRootView.dockText` at the panel's scale, so the three read at one size beside any ring.
+    var fontSize: CGFloat { IslandRootView.dockText(scale: size / IslandRootView.dockCompactHeight) }
     /// Between a mark and its number.
     var labelSpacing: CGFloat { (size * 0.23).rounded() }
     /// Between two agents along the panel.
-    var itemGap: CGFloat { (size * (showsNumbers || !edge.isHorizontal ? 0.45 : 0.32)).rounded() }
+    var itemGap: CGFloat { (size * gapScale * (showsNumbers || !edge.isHorizontal ? 1 : 0.7)).rounded() }
 
     private var font: NSFont { .monospacedDigitSystemFont(ofSize: fontSize, weight: .regular) }
 

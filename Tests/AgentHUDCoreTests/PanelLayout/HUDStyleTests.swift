@@ -66,7 +66,7 @@ final class HUDStyleTests: XCTestCase {
         XCTAssertEqual(HUDMode(agentName: "dynamic"), .logos)
         XCTAssertNil(HUDMode(agentName: "logos"), "the settings' own name is not an agent's")
         XCTAssertEqual(HUDStyle.names, ["mode", "edge", "position", "logoSize", "logoGap", "edgeDistance", "showLogos", "simpleSize",
-                                        "ringWidth", "showRings", "showNumbers", "separateAgents", "appearance",
+                                        "simpleGap", "ringWidth", "showRings", "showNumbers", "separateAgents", "appearance",
                                         "material", "glassStyle", "transparency", "glow"])
         XCTAssertEqual(style.json["glassStyle"], .string("regular"), "the glass style keeps the settings' own name")
         XCTAssertEqual(style.json["glow"]?["idleSpeed"], .number(10.5))
@@ -194,7 +194,7 @@ final class HUDStyleTests: XCTestCase {
     }
 
     /// The transparency a screen keeps for each material is no style field: a style reads none, and a hud may give one
-    /// only as a number from 0 to 1, the slider's, whose value the proposal weighs (`PanelTools.StyleProposal`).
+    /// only as a number from 0 to 1, the slider's, whose value the proposal weighs (`HUDTools.StyleProposal`).
     func testTheKeptTransparenciesAreReadOnly() {
         XCTAssertEqual(HUDStyle.KeptTransparency.allCases.map(\.rawValue), ["solidTransparency", "glassTransparency"])
         XCTAssertFalse(HUDStyle.names.contains("solidTransparency"))
@@ -244,7 +244,7 @@ final class HUDStyleTests: XCTestCase {
         let ranges: [(String, ClosedRange<Double>)] = [
             ("position", 0...1), ("logoSize", ScreenPlacement.logoSizeRange), ("logoGap", ScreenPlacement.gapScaleRange),
             ("edgeDistance", ScreenPlacement.logoEdgeDistanceRange), ("simpleSize", ScreenPlacement.simpleSizeRange),
-            ("ringWidth", ScreenPlacement.ringWidthRange), ("transparency", ScreenPlacement.glassTransparencyRange),
+            ("simpleGap", ScreenPlacement.gapScaleRange), ("ringWidth", ScreenPlacement.ringWidthRange), ("transparency", ScreenPlacement.glassTransparencyRange),
         ]
         for (name, range) in ranges {
             XCTAssertEqual(HUDStyle.misreadings(ofField: name, .number(range.lowerBound)), [], name)
@@ -255,7 +255,7 @@ final class HUDStyleTests: XCTestCase {
             XCTAssertEqual(HUDStyle.misreadings(ofField: name, .string("12")), [sentence], "a number written as text")
             XCTAssertEqual(HUDStyle(json: [name: .number(range.upperBound + 1)]), HUDStyle(), "nothing out of range is read")
         }
-        XCTAssertEqual(HUDStyle.misreadings(ofField: "logoSize", .number(37)), ["hud.logoSize is a number from 12 to 36."])
+        XCTAssertEqual(HUDStyle.misreadings(ofField: "logoSize", .number(61)), ["hud.logoSize is a number from 20 to 60."])
         XCTAssertEqual(HUDStyle.misreadings(ofField: "logoGap", .number(0.05)), ["hud.logoGap is a number from 0.1 to 0.6."])
         XCTAssertEqual(ScreenPlacement.glassTransparencyRange, ScreenPlacement.solidTransparencyRange,
                        "one range for glass and solid")
@@ -343,9 +343,9 @@ final class HUDStyleTests: XCTestCase {
         XCTAssertNil(HUDStyle.misreadings(ofField: "background", .string("blue")), "a key that names no field is the caller's")
         XCTAssertEqual(PanelLayout.misreadings(of: .object(["hud": .object(["background": .string("blue")])])),
                        ["hud has no property \"background\"; the hud takes agents, mode, edge, position, logoSize, logoGap, "
-                        + "edgeDistance, showLogos, simpleSize, ringWidth, showRings, showNumbers, separateAgents, "
+                        + "edgeDistance, showLogos, simpleSize, simpleGap, ringWidth, showRings, showNumbers, separateAgents, "
                         + "appearance, material, glassStyle, transparency, glow and reset, and solidTransparency and "
-                        + "glassTransparency as get_panel lists them."])
+                        + "glassTransparency as get_hud lists them."])
         XCTAssertEqual(HUDStyle.misreadings(ofField: "reset", .string("yes")), ["hud.reset is true or false."])
         XCTAssertEqual(HUDStyle.misreadings(ofField: "reset", .bool(false)), [])
         XCTAssertEqual(HUDStyle.misreadings(ofField: "reset", .null), [])

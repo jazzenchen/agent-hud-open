@@ -89,7 +89,7 @@ final class ClaudeSessionNavigationTests: XCTestCase, @unchecked Sendable {
         XCTAssertEqual(report.sessions.first { $0.id == "code-cli" }?.navigationTarget, .claudeDesktopSession(id: codeID))
         try JSONSerialization.data(withJSONObject: ["sessionId": codeID, "cliSessionId": "code-cli", "isArchived": true]).write(to: codeMetadata, options: .atomic)
         report = try await provider.fetchUsage(agents: [], historyHours: 24)
-        XCTAssertNil(report.sessions.first { $0.id == "code-cli" }?.navigationTarget)
+        XCTAssertEqual(report.sessions.map(\.id), ["cowork-cli"], "a session the desktop app archived leaves the list")
         XCTAssertNil(report.completions.first { $0.sessionID == "code-cli" }?.navigationTarget)
         try JSONSerialization.data(withJSONObject: ["sessionId": codeID, "cliSessionId": "code-cli", "isArchived": false]).write(to: codeMetadata, options: .atomic)
         func newerTranscript(_ entrypoint: String, after: TimeInterval) throws {

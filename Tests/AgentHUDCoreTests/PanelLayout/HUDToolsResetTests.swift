@@ -6,7 +6,7 @@ import XCTest
 /// The defaults an agent proposes for one screen, apart as a person resets them: from "default" proposes the default
 /// layout alone, and hud.reset the screen's default style, a draft drawn over its settings that a person's Save keeps.
 /// No tool writes the settings.
-final class PanelToolsResetTests: PanelToolsCase {
+final class HUDToolsResetTests: HUDToolsCase {
     private let builtIn = PanelScreen(key: "BUILT-IN-UUID", name: "Built-in display", mode: .notch, edge: .top, hasNotch: true,
                                       agents: ["Claude", "Codex", "DeepSeek"],
                                       otherModes: [.logos: ["Claude", "Codex", "Cursor"], .simple: ["Claude", "Codex", "Kimi"]],
@@ -16,9 +16,9 @@ final class PanelToolsResetTests: PanelToolsCase {
                                      otherModes: [.logos: ["Claude", "Codex", "Cursor"]],
                                      systemIsLight: false, reducesTransparency: false)
 
-    private lazy var screenTools = PanelTools(store: store, launch: 0, screens: { [unowned self] in [builtIn, second] })
+    private lazy var screenTools = HUDTools(store: store, launch: 0, screens: { [unowned self] in [builtIn, second] })
 
-    private func call(_ arguments: [String: JSONValue], tool: String = MCPTools.setPanelLayout,
+    private func call(_ arguments: [String: JSONValue], tool: String = MCPTools.draftHUD,
                       line: UInt = #line) throws -> [String: JSONValue] {
         guard case .result(let result, _) = screenTools.answer(MCPToolRequest(tool: tool, arguments: arguments)) else {
             XCTFail("\(tool) was refused", line: line)
@@ -29,7 +29,7 @@ final class PanelToolsResetTests: PanelToolsCase {
 
     private func refused(_ arguments: [String: JSONValue], line: UInt = #line) throws -> String {
         let before = (layout.revision, settings.settings)
-        guard case .failure(let sentence) = screenTools.answer(MCPToolRequest(tool: MCPTools.setPanelLayout, arguments: arguments)) else {
+        guard case .failure(let sentence) = screenTools.answer(MCPToolRequest(tool: MCPTools.draftHUD, arguments: arguments)) else {
             XCTFail("the proposal was taken", line: line)
             throw CancellationError()
         }
@@ -167,7 +167,7 @@ final class PanelToolsResetTests: PanelToolsCase {
 
     /// hud.reset of a screen that differs from the defaults only in what no style field names, here the transparency it
     /// keeps for glass while its HUD is solid, is a draft as Reset to Default in Settings would change it: drawn as the
-    /// defaults, listing no field, with a note that says it brings back what no hud field sets. get_panel lists the
+    /// defaults, listing no field, with a note that says it brings back what no hud field sets. get_hud lists the
     /// transparency it brings back; the draft read back, or the style listed, sent back keeps it, and Save writes it as
     /// that reset does.
     func testHUDResetBringsBackWhatNoStyleFieldNames() throws {

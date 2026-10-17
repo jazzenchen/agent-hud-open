@@ -3,8 +3,8 @@ import SwiftUI
 import AgentHUDCore
 
 /// Settings → Experimental: what is still being tested. Agent HUD's own rows let agents arrange the HUD over MCP, in
-/// three rows: the switch, off by default, the client to add the server to, and what to ask once it is in. A host's
-/// rows follow below.
+/// two rows: the switch, off by default, and the clients that have the server, with a menu that adds it to a client
+/// or takes it out again and what to ask once it is in. A host's rows follow below.
 struct ExperimentalPane: View {
     let settings: SettingsStore
     let theme: Theme
@@ -19,28 +19,18 @@ struct ExperimentalPane: View {
     }
 
     var body: some View {
-        let toolsOn = settings.settings.agentTools
-        let controls = setup.controls(toolsOn: toolsOn)
+        let toolsOn = settings.settings.hudTools
         VStack(alignment: .leading, spacing: 28) {
             SettingsSection(title: L10n.text("Agent 工具", "Agent tools"), theme: theme) {
-                SettingRow(label: L10n.text("允许 agent 调整 HUD", "Let agents arrange the HUD"),
-                           subtitle: L10n.text("agent 通过 MCP 读取面板和 HUD，起草新布局，由你保存。",
-                                               "Agents read the panel and HUD over MCP and draft new layouts for you to save.")) {
-                    Toggle(L10n.text("允许 agent 调整 HUD", "Let agents arrange the HUD"), isOn: settings.binding(\.agentTools))
+                SettingRow(label: L10n.text("允许 Agent 调整 HUD", "Let agents arrange the HUD"),
+                           subtitle: L10n.text("Agent 可以帮你重排面板、改 HUD 样式。改动先是草稿，你在面板里点“保存”才生效。",
+                                               "Agents can rearrange the panel and restyle the HUD. A change stays a draft until you press Save in the panel.")) {
+                    Toggle(L10n.text("允许 Agent 调整 HUD", "Let agents arrange the HUD"), isOn: settings.binding(\.hudTools))
                         .labelsHidden().toggleStyle(.switch).controlSize(.small)
-                        .accessibilityIdentifier("experimental-agent-tools")
+                        .accessibilityIdentifier("experimental-hud-tools")
                 }
                 SettingsDivider(theme: theme)
-                installRow(controls, toolsOn: toolsOn)
-                SettingsDivider(theme: theme)
-                Text(setup.hint)
-                    .font(.ui(12))
-                    .foregroundStyle(controls.hint ? theme.secondary : theme.secondary.opacity(0.5))
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 12)
-                    .accessibilityIdentifier("experimental-agent-tools-hint")
+                clientsRow(toolsOn: toolsOn)
             }
             ForEach(additions) { $0.content() }
         }
@@ -49,49 +39,52 @@ struct ExperimentalPane: View {
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in setup.refresh() }
     }
 
-    private func installRow(_ controls: MCPClientSetup.Controls, toolsOn: Bool) -> some View {
-        HStack(spacing: 16) {
+    private func clientsRow(toolsOn: Bool) -> some View {
+        let controls = setup.controls(toolsOn: toolsOn)
+        return HStack(spacing: 16) {
             VStack(alignment: .leading, spacing: 4) {
-                Text(L10n.text("客户端", "Client"))
-                    .foregroundStyle(toolsOn ? theme.text : theme.secondary)
-                HStack(spacing: 8) {
-                    Text(setup.status)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1).truncationMode(.middle)
-                        .help(setup.status)
+                Text(setup.title)
+                    .foregroundStyle(toolsOn || !setup.added.isEmpty ? theme.text : theme.secondary)
+                    .accessibilityIdentifier("experimental-agent-tools-title")
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text(setup.detail(toolsOn: toolsOn))
+                        .foregroundStyle(theme.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                         .accessibilityIdentifier("experimental-agent-tools-status")
-                    // The command the button runs, for a person who would rather run it in a terminal.
-                    if setup.commandLine != nil {
-                        Button(L10n.text("拷贝命令", "Copy command")) { setup.copyCommand() }
+                    // The command that failed, for a person who would rather run it in a terminal.
+                    if let commandLine = setup.failedCommandLine {
+                        Button(L10n.text("拷贝命令", "Copy command")) { setup.copyFailedCommand() }
                             .buttonStyle(.plain)
-                            .foregroundStyle(controls.copyCommand ? theme.accentText : theme.secondary.opacity(0.5))
-                            .underline(controls.copyCommand && theme.isSeeThrough)
-                            .disabled(!controls.copyCommand)
-                            .help(setup.commandLine ?? "")
+                            .foregroundStyle(theme.accentText)
+                            .underline(theme.isSeeThrough)
+                            .help(commandLine)
                             .accessibilityIdentifier("experimental-agent-tools-copy")
                     }
                 }
                 .font(.ui(11))
             }
             Spacer(minLength: 0)
-            HStack(spacing: 8) {
-                Picker(L10n.text("客户端", "Client"), selection: $setup.choice) {
-                    ForEach(setup.choices, id: \.self) { choice in
-                        Text(MCPClientSetup.label(choice)).tag(choice)
-                    }
+            Menu(MCPClientSetup.menuTitle) {
+                ForEach(setup.clients, id: \.self) { client in
+                    Toggle(client.name, isOn: Binding(get: { setup.added.contains(client) }, set: { _ in pick(client) }))
+                        .disabled(!setup.canPick(client, toolsOn: toolsOn))
                 }
-                .labelsHidden().pickerStyle(.menu).fixedSize()
-                .disabled(!controls.picker)
-                .accessibilityIdentifier("experimental-agent-tools-client")
-                Button(setup.buttonTitle) { Task { await setup.perform() } }
-                    .controlSize(.small)
-                    .disabled(!controls.action)
-                    .accessibilityIdentifier("experimental-agent-tools-action")
+                if !setup.clients.isEmpty { Divider() }
+                Button(MCPClientSetup.copySettingsTitle) { Task { await setup.perform(.copySettings) } }
+                    .disabled(!controls.copySettings)
             }
             .fixedSize()
+            .disabled(!controls.menu)
+            .accessibilityIdentifier("experimental-agent-tools-client")
         }
         .frame(minHeight: 30)
         .padding(.horizontal, 16)
         .padding(.vertical, 11)
+    }
+
+    /// Adds the server to a client without it, or takes it out of one that has it.
+    private func pick(_ client: MCPClient) {
+        guard let action = setup.action(for: client) else { return }
+        Task { await setup.perform(action) }
     }
 }

@@ -116,8 +116,9 @@ struct ListedFiles: Sendable {
 
 /// The ledger write of readers that parse whole files or account records: one contribution per session, replaced from
 /// the start of the reading window once the index is complete and something changed. The sessions of a stored file
-/// that is missing from the listing leave the ledger unless a listed file still holds them. After a rolled-back pass the
-/// stored files are read again and every session is written again.
+/// that is missing from the listing, deleted in its client, keep their usage in the ledger until it expires; a file that
+/// holds one of them later replaces it as any read does. After a rolled-back pass the stored files are read again and
+/// every session is written again.
 final class SessionLedger {
     let source: String
     private let ledger: UsageLedger
@@ -167,8 +168,6 @@ final class SessionLedger {
         }
         let contributions = unchanged ? [:] : SessionContributions.canonical(current)
         for path in missing { next[path] = nil }
-        let kept = Set(next.values.flatMap(\.sessions)).union(current.map(\.id))
-        let leaving = Set(missing.flatMap { stored[$0]?.sessions ?? [] }).subtracting(kept)
         let source = source, writes = changed.map { ($0, next[$0]) }, firstReads = firstRead
         do {
             try await ledger.write { writer in
@@ -184,7 +183,6 @@ final class SessionLedger {
                     else { try writer.removeFile(source: source, path: path) }
                 }
                 for path in missing { try writer.removeFile(source: source, path: path) }
-                for session in leaving { try writer.remove(source: source, contribution: session) }
             }
             stored = next.filter { !$0.value.isEmpty }
             if !unchanged { recorded = revision.map { ($0, account, window) } }

@@ -4,7 +4,7 @@ import XCTest
 final class ScreenPlacementTests: XCTestCase {
     func testLogoSizeAndEdgeDistanceBoundsAreIndependentOfSpacing() throws {
         for (size, distance, expectedSize, expectedDistance) in [
-            (30.0, 0.0, 30.0, 0.0), (36, 20, 36, 20), (100, 100, 36, 20), (-1, -1, 12, 0)
+            (30.0, 0.0, 30.0, 0.0), (36, 20, 36, 20), (60, 20, 60, 20), (100, 100, 60, 20), (12, 0, 20, 0), (-1, -1, 20, 0)
         ] {
             let data = try JSONEncoder().encode(["logoSize": size, "logoEdgeDistance": distance, "gapScale": 0.35])
             let placement = try JSONDecoder().decode(ScreenPlacement.self, from: data)
@@ -37,10 +37,11 @@ final class ScreenPlacementTests: XCTestCase {
 
     func testSimpleModeSettingsDecodeWithinTheirBoundsAndDefaultWhenAbsent() throws {
         let saved = try JSONDecoder().decode(ScreenPlacement.self, from: Data(
-            #"{"mode":"simple","edge":"left","simpleSize":100,"ringWidth":0.2,"showsRings":false}"#.utf8))
+            #"{"mode":"simple","edge":"left","simpleSize":100,"simpleGapScale":0.9,"ringWidth":0.2,"showsRings":false}"#.utf8))
         XCTAssertEqual(saved.mode, .simple)
         XCTAssertEqual(saved.edge, .left)
-        XCTAssertEqual(saved.simpleSize, 50)
+        XCTAssertEqual(saved.simpleSize, 60)
+        XCTAssertEqual(saved.simpleGapScale, 0.6)
         XCTAssertEqual(saved.ringWidth, 1)
         XCTAssertFalse(saved.showsRings)
         XCTAssertTrue(saved.showsNumbers)
@@ -50,6 +51,7 @@ final class ScreenPlacementTests: XCTestCase {
 
         let older = try JSONDecoder().decode(ScreenPlacement.self, from: Data(#"{"mode":"logos","logoSize":24}"#.utf8))
         XCTAssertEqual(older.simpleSize, 22)
+        XCTAssertEqual(older.simpleGapScale, 0.45, "A placement saved before the Simple panel's spacing keeps the gap it had")
         XCTAssertEqual(older.ringWidth, 1.5)
         XCTAssertTrue(older.showsRings)
         XCTAssertTrue(older.showsNumbers)

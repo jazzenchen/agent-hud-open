@@ -16,7 +16,9 @@ struct IslandAlertCompactView: View {
 
     /// A length at the scale of the dock this reminder grows from.
     private func s(_ value: CGFloat) -> CGFloat { (value * scale).rounded() }
-    /// The size of its words or of the symbol beside them, from their size beside the notch: a size smaller on a dock.
+    /// The size of its name or status, from their size beside the notch: on a dock, the size of every word a dock writes.
+    private func w(_ value: CGFloat) -> CGFloat { s(CompactWings.words(value, onDock: wings != nil)) }
+    /// The size of the symbol beside its status, from its size beside the notch: a size smaller on a dock.
     private func t(_ value: CGFloat) -> CGFloat { s(CompactWings.size(value, onDock: wings != nil)) }
 
     var body: some View {
@@ -33,13 +35,13 @@ struct IslandAlertCompactView: View {
                 HStack(spacing: 0) {
                     HStack(spacing: s(8)) {
                         ReminderMarkView(vendor: event.agentVendor, size: s(17), mark: .reply(event))
-                        Text(event.agentVendor).font(.ui(t(13), .semibold)).lineLimit(1)
+                        Text(event.agentVendor).font(.ui(w(13), .semibold)).lineLimit(1)
                     }.frame(width: wings?.leading ?? s(IslandController.alertWingWidth), alignment: .leading)
                     Color.clear.frame(width: wings?.gap ?? cameraWidth)
                     HStack(spacing: s(7)) {
                         TurnEndedSymbol(size: t(16))
                         Text(Self.replyStatus)
-                            .font(.ui(t(12), .medium)).foregroundStyle(alert.accentText(theme))
+                            .font(.ui(w(12), .medium)).foregroundStyle(alert.accentText(theme))
                     }.frame(width: wings?.trailing ?? s(IslandController.alertWingWidth), alignment: .trailing)
                 }
                 .foregroundStyle(theme.alertText)

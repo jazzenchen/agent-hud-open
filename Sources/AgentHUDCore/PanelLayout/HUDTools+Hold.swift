@@ -3,9 +3,9 @@ import Foundation
 
 /// How the tools hold a screen's panel open while an agent edits it (`PanelHolds`): each edit of a layout, and each drop
 /// of a draft, starts or renews the hold on the screen whose panel draws it, a call that changes a screen's resting HUD
-/// alone closes that panel for now, `finish_panel_edit` lets go, and `get_panel` tells which screens are held and for
+/// alone closes that panel for now, `finish_hud_edit` lets go, and `get_hud` tells which screens are held and for
 /// how long. A hold is held for an attached screen only, which has a panel to open.
-extension PanelTools {
+extension HUDTools {
     var holds: PanelHolds { layout.holds }
 
     /// The attached screen whose panel an edit of `scope`'s layout holds open: the screen's own; for the shared layout,
@@ -48,14 +48,14 @@ extension PanelTools {
         return store.enabledBilling.first { $0.panelBlockKey == touched }?.vendor ?? touched
     }
 
-    /// What `get_panel` tells of the hold on a screen: whether one is on, and while it is, the whole seconds it has left
+    /// What `get_hud` tells of the hold on a screen: whether one is on, and while it is, the whole seconds it has left
     /// and whether a call that restyled the resting HUD alone closed the panel for now.
     func holdListing(_ key: String) -> [String: JSONValue] {
         guard let hold = holds.hold(on: key), let left = holds.remaining(on: key) else { return ["held": .bool(false)] }
         return ["held": .bool(true), "holdSecondsLeft": .integer(Int64(left.rounded(.up))), "holdPaused": .bool(hold.paused)]
     }
 
-    /// `finish_panel_edit`: ends the hold on a screen, or with "all" on every screen, and returns the panel with a note
+    /// `finish_hud_edit`: ends the hold on a screen, or with "all" on every screen, and returns the panel with a note
     /// that says which panels it let go of and whether a draft still waits.
     func finish(_ scope: PanelLayoutScope, among attached: [PanelScreen]) -> [String: JSONValue] {
         var note: String

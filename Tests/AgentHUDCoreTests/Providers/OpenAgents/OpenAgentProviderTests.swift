@@ -379,6 +379,29 @@ final class OpenAgentProviderTests: XCTestCase {
         XCTAssertEqual(try OpenAgentParser.openCodeSQLite(url, since: Date(timeIntervalSince1970: 1_788_800_010_000.0 / 1000)).count, 500)
     }
 
+    func testAnOpenCodeSessionItArchivedKeepsItsUsageAndLeavesTheSessionList() async throws {
+        let url = try temp().appendingPathComponent("opencode.db")
+        var db: OpaquePointer?
+        XCTAssertEqual(sqlite3_open(url.path, &db), SQLITE_OK)
+        func sql(_ text: String) { XCTAssertEqual(sqlite3_exec(db, text, nil, nil, nil), SQLITE_OK) }
+        sql("CREATE TABLE session(id TEXT PRIMARY KEY, title TEXT, directory TEXT, time_archived INTEGER)")
+        sql("CREATE TABLE message(id TEXT PRIMARY KEY, session_id TEXT, data TEXT)")
+        sql("INSERT INTO session VALUES ('open', 'Open task', '/workspace', NULL), ('shelved', 'Shelved task', '/workspace', 1788800001000)")
+        for (id, session) in [("m1", "open"), ("m2", "shelved")] {
+            sql(#"INSERT INTO message VALUES ('\#(id)', '\#(session)', '{"role":"assistant","modelID":"model","providerID":"p","time":{"created":1788800000000,"completed":1788800001000},"tokens":{"input":10,"output":1}}')"#)
+        }
+        sqlite3_close(db)
+        let sessions = try OpenAgentParser.openCodeSQLite(url)
+        XCTAssertEqual(Dictionary(uniqueKeysWithValues: sessions.map { ($0.id, $0.archived) }), ["opencode:open": false, "opencode:shelved": true])
+        let ledger = UsageLedger.inMemory(), now = Date(timeIntervalSince1970: 1_788_800_100)
+        let provider = OpenAgentUsageProvider(credentials: { [] }, sessions: { _ in .init(sessions: sessions) },
+                                              fetchQuota: { _, _ in ProviderQuota() }, history: QuotaHistoryStore(), clock: { now }, ledger: ledger)
+        let report = try await provider.fetchUsage(agents: [], historyHours: 24)
+        XCTAssertEqual(report.sessions.map(\.id), ["opencode:open"], "a session OpenCode archived leaves the list")
+        let recorded = try await ledger.buckets(since: .distantPast)
+        XCTAssertEqual(recorded.reduce(0) { $0 + $1.tokensIn }, 20, "and its usage still counts")
+    }
+
     func testTitlesComeFromWhatEachClientKeeps() throws {
         // OpenCode keeps its placeholder name when the title call fails.
         let reply = #"{"role":"assistant","modelID":"m","providerID":"p","time":{"created":1788800000000},"tokens":{"input":1,"output":1},"path":{"root":"/work/app"}}"#

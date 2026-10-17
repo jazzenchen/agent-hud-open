@@ -5,7 +5,7 @@ import XCTest
 
 /// The tools' screen argument, over the sample's panel and two attached screens the host lists: the Mac's own display
 /// beside its notch, and a second one with a Dynamic dock.
-final class PanelToolsScreensTests: PanelToolsCase {
+final class HUDToolsScreensTests: HUDToolsCase {
     private let builtIn = PanelScreen(key: "BUILT-IN-UUID", name: "Built-in display", mode: .notch, edge: .top, hasNotch: true,
                                       agents: ["Claude", "Codex", "DeepSeek"],
                                       systemIsLight: false, reducesTransparency: false)
@@ -15,7 +15,7 @@ final class PanelToolsScreensTests: PanelToolsCase {
     /// The scopes the renderer was asked to draw or measure, in order.
     private var asked: [PanelLayoutScope] = []
 
-    private lazy var screenTools = PanelTools(store: store, launch: 0, screens: { [unowned self] in [builtIn, second] },
+    private lazy var screenTools = HUDTools(store: store, launch: 0, screens: { [unowned self] in [builtIn, second] },
                                               picture: { [unowned self] scope in
         asked.append(scope)
         return PanelPicture(png: Data([0x89]), width: 540, fit: PanelFit(height: 600, maximumHeight: 1_000), scale: 2)
@@ -52,7 +52,7 @@ final class PanelToolsScreensTests: PanelToolsCase {
     // MARK: Reading
 
     func testThePanelListsTheAttachedScreensByRole() throws {
-        let panel = try call(MCPTools.getPanel)
+        let panel = try call(MCPTools.getHUD)
         XCTAssertEqual(panel["screen"], .string("all"), "without a screen, the shared layout")
         XCTAssertNil(panel["usesSharedLayout"])
         XCTAssertEqual(panel["height"], .integer(700), "measured as the main display draws the shared layout")
@@ -75,7 +75,7 @@ final class PanelToolsScreensTests: PanelToolsCase {
         layout.propose(.own(PanelLayout(hiddenSections: [.tokens], hud: PanelLayout.HUD(agents: ["Cursor", "Claude"]))),
                        for: "SECOND-UUID")
         layout.save(.screen("SECOND-UUID"))
-        let panel = try call(MCPTools.getPanel, ["screen": .string("SECOND-UUID")])
+        let panel = try call(MCPTools.getHUD, ["screen": .string("SECOND-UUID")])
         XCTAssertEqual(panel["screen"], .string("SECOND-UUID"))
         XCTAssertEqual(panel["usesSharedLayout"], .bool(false))
         XCTAssertEqual(panel["layout"], .object(["hiddenSections": .array([.string("tokens")]), "hud": hud(["Cursor", "Claude"])]))
@@ -86,7 +86,7 @@ final class PanelToolsScreensTests: PanelToolsCase {
         XCTAssertEqual(dock["layout"], .string("own"))
         XCTAssertEqual(dock["shows"], .array([.string("Cursor"), .string("Claude")]), "narrowed and in the list's order")
 
-        let other = try call(MCPTools.getPanel, ["screen": .string("BUILT-IN-UUID")])
+        let other = try call(MCPTools.getHUD, ["screen": .string("BUILT-IN-UUID")])
         XCTAssertEqual(other["usesSharedLayout"], .bool(true))
         XCTAssertEqual(other["layout"], .object([:]), "the other screen draws the shared layout")
         XCTAssertEqual(asked, [.screen("SECOND-UUID"), .screen("BUILT-IN-UUID")])
@@ -96,39 +96,39 @@ final class PanelToolsScreensTests: PanelToolsCase {
     /// it separates them now: 100 points narrower than the panel its layout gives, a draft's included, and never below
     /// 440.
     func testAScreenTellsTheWidthOfAnAgentsOwnPanel() throws {
-        XCTAssertEqual(screens(try call(MCPTools.getPanel)).map { $0["agentPanelWidth"] }, [.integer(440), .integer(440)],
+        XCTAssertEqual(screens(try call(MCPTools.getHUD)).map { $0["agentPanelWidth"] }, [.integer(440), .integer(440)],
                        "at the default 540")
-        _ = try call(MCPTools.setPanelLayout, ["screen": .string("SECOND-UUID"), "style": .object(["width": .integer(700)])])
-        var listed = screens(try call(MCPTools.getPanel))
+        _ = try call(MCPTools.draftHUD, ["screen": .string("SECOND-UUID"), "style": .object(["width": .integer(700)])])
+        var listed = screens(try call(MCPTools.getHUD))
         XCTAssertEqual(listed.map { $0["width"] }, [.integer(540), .integer(700)])
         XCTAssertEqual(listed.map { $0["agentPanelWidth"] }, [.integer(440), .integer(600)], "the draft's width less 100")
-        _ = try call(MCPTools.setPanelLayout, ["style": .object(["width": .integer(480)])])
-        listed = screens(try call(MCPTools.getPanel))
+        _ = try call(MCPTools.draftHUD, ["style": .object(["width": .integer(480)])])
+        listed = screens(try call(MCPTools.getHUD))
         XCTAssertEqual(listed.map { $0["width"] }, [.integer(480), .integer(700)], "the shared draft, and the screen's own")
         XCTAssertEqual(listed.map { $0["agentPanelWidth"] }, [.integer(440), .integer(600)], "never below 440")
     }
 
     /// A screen named by key: attached, or away with a layout of its own; anything else is refused with the screens
     /// that are attached, by key and role.
-    func testAScreenIsNamedByAKeyGetPanelGave() throws {
-        let unknown = try refused(MCPTools.setPanelLayout, ["screen": .string("Studio Display"), "order": .array([.string("Codex")])])
+    func testAScreenIsNamedByAKeyGetHUDGave() throws {
+        let unknown = try refused(MCPTools.draftHUD, ["screen": .string("Studio Display"), "order": .array([.string("Codex")])])
         XCTAssertEqual(unknown, "Nothing was changed. No screen has the key \"Studio Display\". The screens attached now: "
                        + "\"BUILT-IN-UUID\" (Built-in display), \"SECOND-UUID\" (Display 2). Use \"all\" for the shared layout.")
-        XCTAssertTrue(try refused(MCPTools.getPanel, ["screen": .integer(2)]).hasPrefix("screen is a screen key"))
-        XCTAssertTrue(try refused(MCPTools.discardPanelDraft, ["screen": .string("gone")]).hasPrefix("Nothing was changed. No screen"))
+        XCTAssertTrue(try refused(MCPTools.getHUD, ["screen": .integer(2)]).hasPrefix("screen is a screen key"))
+        XCTAssertTrue(try refused(MCPTools.discardHUDDraft, ["screen": .string("gone")]).hasPrefix("Nothing was changed. No screen"))
 
         layout.propose(.own(PanelLayout(order: ["Codex"])), for: "AWAY-UUID")
         layout.save(.screen("AWAY-UUID"))
-        let away = try call(MCPTools.getPanel, ["screen": .string("AWAY-UUID")])
+        let away = try call(MCPTools.getHUD, ["screen": .string("AWAY-UUID")])
         XCTAssertEqual(away["layout"], .object(["order": .array([.string("Codex")])]), "a screen that is away keeps its layout")
         XCTAssertFalse(screens(away).contains { $0["key"] == .string("AWAY-UUID") }, "and is not listed as attached")
-        XCTAssertEqual(try call(MCPTools.getPanel, ["screen": .string("all")])["screen"], .string("all"))
+        XCTAssertEqual(try call(MCPTools.getHUD, ["screen": .string("all")])["screen"], .string("all"))
     }
 
     // MARK: Proposing
 
     func testAProposalForAScreenIsThatScreensDraftAndLeavesTheShared() throws {
-        let panel = try call(MCPTools.setPanelLayout, ["screen": .string("SECOND-UUID"), "hud": hud(["Codex", "Claude"]),
+        let panel = try call(MCPTools.draftHUD, ["screen": .string("SECOND-UUID"), "hud": hud(["Codex", "Claude"]),
                                                        "order": .array([.string("Codex")])])
         XCTAssertEqual(layout.draft(of: "SECOND-UUID"), .own(PanelLayout(order: ["Codex"], hud: PanelLayout.HUD(agents: ["Codex", "Claude"]))))
         XCTAssertFalse(layout.hasDraft, "the shared layout has no draft")
@@ -143,27 +143,27 @@ final class PanelToolsScreensTests: PanelToolsCase {
         XCTAssertEqual(listed.first?["unsaved"], .bool(false))
         XCTAssertEqual(changes, 0, "a proposal writes no settings")
 
-        let shared = try call(MCPTools.setPanelLayout, ["hiddenSections": .array([.string("sessions")])])
+        let shared = try call(MCPTools.draftHUD, ["hiddenSections": .array([.string("sessions")])])
         XCTAssertTrue(shared["note"]?.stringValue?.hasSuffix("Screens with a layout of their own do not show it: \"Display 2\".") == true,
                       "\(shared["note"] ?? .null)")
         XCTAssertEqual(screens(shared).first?["unsaved"], .bool(true), "a shared draft shows on every screen that uses it")
     }
 
     func testAScreenCanBeProposedTheSharedLayoutAgain() throws {
-        XCTAssertTrue(try refused(MCPTools.setPanelLayout, ["screen": .string("SECOND-UUID"), "from": .string("previous")])
+        XCTAssertTrue(try refused(MCPTools.draftHUD, ["screen": .string("SECOND-UUID"), "from": .string("previous")])
             .contains("\"Display 2\" has no previous saved layout"))
         layout.propose(.own(PanelLayout(order: ["Codex"])), for: "SECOND-UUID")
         layout.save(.screen("SECOND-UUID"))
-        let panel = try call(MCPTools.setPanelLayout, ["screen": .string("SECOND-UUID"), "from": .string("shared")])
+        let panel = try call(MCPTools.draftHUD, ["screen": .string("SECOND-UUID"), "from": .string("shared")])
         XCTAssertEqual(layout.draft(of: "SECOND-UUID"), .shared)
         XCTAssertEqual(panel["layout"], .object([:]), "it draws the shared layout at once")
         XCTAssertEqual(panel["usesSharedLayout"], .bool(true))
         XCTAssertTrue(panel["note"]?.stringValue?.contains("an unsaved draft that uses the shared layout") == true)
-        XCTAssertEqual(try call(MCPTools.setPanelLayout, ["screen": .string("SECOND-UUID"), "from": .string("default")])["layout"],
+        XCTAssertEqual(try call(MCPTools.draftHUD, ["screen": .string("SECOND-UUID"), "from": .string("default")])["layout"],
                        .object([:]))
         XCTAssertEqual(layout.draft(of: "SECOND-UUID"), .own(PanelLayout()), "the default view, as the screen's own")
 
-        _ = try call(MCPTools.discardPanelDraft, ["screen": .string("SECOND-UUID")])
+        _ = try call(MCPTools.discardHUDDraft, ["screen": .string("SECOND-UUID")])
         XCTAssertNil(layout.draft(of: "SECOND-UUID"))
         XCTAssertEqual(layout.ownLayout(of: "SECOND-UUID"), PanelLayout(order: ["Codex"]), "discarding saves nothing")
     }
@@ -173,7 +173,7 @@ final class PanelToolsScreensTests: PanelToolsCase {
         layout.propose(.own(PanelLayout(blocks: ["Codex": PanelLayout.Block(widget: .ring)], hud: PanelLayout.HUD(agents: ["Codex"]))),
                        for: "SECOND-UUID")
         layout.save(.screen("SECOND-UUID"))
-        let spelled = try call(MCPTools.setPanelLayout, [
+        let spelled = try call(MCPTools.draftHUD, [
             "screen": .string("SECOND-UUID"), "hud": hud(["Codex"]),
             "blocks": .object(["Codex": .object(["widget": .string("ring"), "columns": .integer(4)]),
                                "Claude": .object(["widget": .string("bar")])]),
@@ -183,16 +183,16 @@ final class PanelToolsScreensTests: PanelToolsCase {
         XCTAssertEqual(spelled["note"], .string("This is what \"Display 2\" already has saved, so there is no draft for it."))
     }
 
-    /// The layout get_panel returned for a screen that draws the shared layout, sent back for that screen, changes
+    /// The layout get_hud returned for a screen that draws the shared layout, sent back for that screen, changes
     /// nothing: it is the shared layout the screen already uses, not a copy of its own. Nor does a screen's draft to use
     /// the shared layout turn into one, and a screen whose saved choice is the shared layout drops a draft of its own.
     func testSendingBackWhatAScreenThatUsesTheSharedLayoutReadsChangesNothing() throws {
         func sendBack(_ screen: String) throws {
-            let read = try call(MCPTools.getPanel, ["screen": .string(screen)])
+            let read = try call(MCPTools.getHUD, ["screen": .string(screen)])
             var arguments = try XCTUnwrap(read["layout"]?.objectValue)
             arguments["screen"] = .string(screen)
             arguments["revision"] = read["revision"]
-            _ = try call(MCPTools.setPanelLayout, arguments)
+            _ = try call(MCPTools.draftHUD, arguments)
         }
         layout.propose(PanelLayout(order: ["Codex"], hud: PanelLayout.HUD(agents: ["Codex"])))
         layout.save()
@@ -217,21 +217,21 @@ final class PanelToolsScreensTests: PanelToolsCase {
         XCTAssertEqual(layout.revision, revision)
 
         layout.propose(.own(PanelLayout(order: ["Claude"])), for: "BUILT-IN-UUID")
-        let back = try call(MCPTools.setPanelLayout, ["screen": .string("BUILT-IN-UUID"), "hiddenSections": .array([.string("tokens")])])
+        let back = try call(MCPTools.draftHUD, ["screen": .string("BUILT-IN-UUID"), "hiddenSections": .array([.string("tokens")])])
         XCTAssertNil(layout.draft(of: "BUILT-IN-UUID"), "what the screen's saved choice draws leaves no draft of its own")
         XCTAssertEqual(back["usesSharedLayout"], .bool(true))
 
-        _ = try call(MCPTools.setPanelLayout, ["screen": .string("SECOND-UUID"), "hiddenSections": .array([.string("tokens")])])
+        _ = try call(MCPTools.draftHUD, ["screen": .string("SECOND-UUID"), "hiddenSections": .array([.string("tokens")])])
         XCTAssertEqual(layout.draft(of: "SECOND-UUID"), .shared, "the shared layout's draft, sent for a screen that uses it")
-        _ = try call(MCPTools.setPanelLayout, ["screen": .string("SECOND-UUID"), "order": .array([.string("Cursor")])])
+        _ = try call(MCPTools.draftHUD, ["screen": .string("SECOND-UUID"), "order": .array([.string("Cursor")])])
         XCTAssertNil(layout.draft(of: "SECOND-UUID"), "its own saved layout, spelled out")
-        _ = try call(MCPTools.setPanelLayout, ["screen": .string("SECOND-UUID"), "hiddenSections": .array([.string("tokens")])])
+        _ = try call(MCPTools.draftHUD, ["screen": .string("SECOND-UUID"), "hiddenSections": .array([.string("tokens")])])
         XCTAssertEqual(layout.draft(of: "SECOND-UUID"), .own(PanelLayout(hiddenSections: [.tokens])),
                        "a screen with a layout of its own is sent a copy of the shared one as its own")
 
         layout.discard()
         layout.useShared("SECOND-UUID")
-        _ = try call(MCPTools.setPanelLayout, ["screen": .string("SECOND-UUID"), "order": .array([.string("Codex")]),
+        _ = try call(MCPTools.draftHUD, ["screen": .string("SECOND-UUID"), "order": .array([.string("Codex")]),
                                                "hud": hud(["Codex"])])
         XCTAssertNil(layout.draft(of: "SECOND-UUID"), "the saved shared layout, sent for a screen that now uses it")
     }
@@ -241,17 +241,17 @@ final class PanelToolsScreensTests: PanelToolsCase {
     func testTheNotesSayWhichScreensKeepADraft() throws {
         layout.propose(.own(PanelLayout(order: ["Cursor"])), for: "SECOND-UUID")
         layout.propose(PanelLayout(order: ["Codex"]))
-        let dropped = try call(MCPTools.discardPanelDraft)
+        let dropped = try call(MCPTools.discardHUDDraft)
         XCTAssertFalse(layout.hasDraft)
         XCTAssertEqual(layout.draft(of: "SECOND-UUID"), .own(PanelLayout(order: ["Cursor"])), "the screen's own draft stays")
         XCTAssertEqual(dropped["note"], .string("The shared layout has no draft now. Screens with a draft of their own keep it: "
                                                 + "\"Display 2\"; drop one with that screen's key."))
-        _ = try call(MCPTools.discardPanelDraft, ["screen": .string("SECOND-UUID")])
-        XCTAssertEqual(try call(MCPTools.discardPanelDraft)["note"], .string("There is no draft now. The panel shows the saved layout."))
+        _ = try call(MCPTools.discardHUDDraft, ["screen": .string("SECOND-UUID")])
+        XCTAssertEqual(try call(MCPTools.discardHUDDraft)["note"], .string("There is no draft now. The panel shows the saved layout."))
 
         layout.propose(.own(PanelLayout(order: ["Codex"])), for: "AWAY-UUID")
         layout.save(.screen("AWAY-UUID"))
-        let away = try call(MCPTools.setPanelLayout, ["screen": .string("AWAY-UUID"), "order": .array([.string("Claude")])])
+        let away = try call(MCPTools.draftHUD, ["screen": .string("AWAY-UUID"), "order": .array([.string("Claude")])])
         XCTAssertEqual(away["note"], .string("Kept for the screen \"AWAY-UUID\", which is not attached now, as an unsaved draft "
                                              + "of its own. It shows in that display's panel if it returns before Agent HUD "
                                              + "restarts, which drops it; the user keeps it with Save in that panel."))
@@ -260,25 +260,25 @@ final class PanelToolsScreensTests: PanelToolsCase {
     /// A screen's list may name only the agents that screen's resting HUD can show now; the shared layout's, those any
     /// attached screen can. What the layout already lists may come back with it.
     func testTheHUDsAgentsAreCheckedAgainstWhatTheScreenCanShow() throws {
-        let cursor = try refused(MCPTools.setPanelLayout, ["screen": .string("BUILT-IN-UUID"), "hud": hud(["Claude", "Cursor"])])
+        let cursor = try refused(MCPTools.draftHUD, ["screen": .string("BUILT-IN-UUID"), "hud": hud(["Claude", "Cursor"])])
         XCTAssertEqual(cursor, "Nothing was changed. hud.agents[1]: \"Cursor\" is not an agent the resting HUD of "
                        + "\"Built-in display\" can show now. It can show: \"Claude\", \"Codex\", \"DeepSeek\".")
-        _ = try call(MCPTools.setPanelLayout, ["screen": .string("SECOND-UUID"), "hud": hud(["Cursor"])])
-        _ = try call(MCPTools.setPanelLayout, ["hud": hud(["Cursor", "DeepSeek", "ChatGPT"])])
-        XCTAssertTrue(try refused(MCPTools.setPanelLayout, ["hud": hud(["Pi"])]).contains("any attached screen's resting HUD"))
+        _ = try call(MCPTools.draftHUD, ["screen": .string("SECOND-UUID"), "hud": hud(["Cursor"])])
+        _ = try call(MCPTools.draftHUD, ["hud": hud(["Cursor", "DeepSeek", "ChatGPT"])])
+        XCTAssertTrue(try refused(MCPTools.draftHUD, ["hud": hud(["Pi"])]).contains("any attached screen's resting HUD"))
 
         layout.propose(.own(PanelLayout(hud: PanelLayout.HUD(agents: ["Kimi", "Claude"]))), for: "BUILT-IN-UUID")
         layout.save(.screen("BUILT-IN-UUID"))
-        let kept = try call(MCPTools.setPanelLayout, ["screen": .string("BUILT-IN-UUID"), "hud": hud(["Claude", "Kimi"])])
+        let kept = try call(MCPTools.draftHUD, ["screen": .string("BUILT-IN-UUID"), "hud": hud(["Claude", "Kimi"])])
         XCTAssertEqual(kept["unsaved"], .bool(true), "Kimi is away now, and the layout holds it")
-        XCTAssertTrue(try refused(MCPTools.setPanelLayout, ["screen": .string("BUILT-IN-UUID"), "hud": hud(["Hermes"])])
+        XCTAssertTrue(try refused(MCPTools.draftHUD, ["screen": .string("BUILT-IN-UUID"), "hud": hud(["Hermes"])])
             .contains("hud.agents[0]"))
     }
 
     func testThePictureIsOfTheScreenAsked() throws {
         layout.propose(.own(PanelLayout(order: ["Codex"])), for: "SECOND-UUID")
         guard case .result(let result, let images) = screenTools.answer(MCPToolRequest(
-            tool: MCPTools.getPanelImage, arguments: ["screen": .string("SECOND-UUID")])) else { return XCTFail("refused") }
+            tool: MCPTools.getHUDScreenshot, arguments: ["screen": .string("SECOND-UUID")])) else { return XCTFail("refused") }
         XCTAssertEqual(asked, [.screen("SECOND-UUID")])
         XCTAssertEqual(images.count, 1)
         XCTAssertEqual(result["screen"], .string("SECOND-UUID"))
@@ -290,9 +290,9 @@ final class PanelToolsScreensTests: PanelToolsCase {
     /// Screens are named by role: what an agent reads of them names no display by the name its owner gave it, and no
     /// account, which only the blocks name.
     func testWhatIsReadOfTheScreensNamesNoOneAndNoAccount() throws {
-        let listing = try call(MCPTools.getPanel)["screens"] ?? .null
+        let listing = try call(MCPTools.getHUD)["screens"] ?? .null
         let text = String(decoding: try RecordCoding.encoder().encode(listing), as: UTF8.self)
-        for listed in screens(try call(MCPTools.getPanel)) {
+        for listed in screens(try call(MCPTools.getHUD)) {
             XCTAssertEqual(listed.keys.sorted(), ["agentPanelWidth", "agents", "edge", "hasNotch", "held", "hud", "key",
                                                   "layout", "look", "mode", "name", "shows", "styleUnsaved", "unsaved",
                                                   "width"])

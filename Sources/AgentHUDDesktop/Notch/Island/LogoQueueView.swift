@@ -91,8 +91,6 @@ struct LogoQueueConfig: Equatable {
     var workingSeconds: Double
     /// Working agents stay bots; idle agents occasionally become bots for a few seconds.
     var bots: Bool
-    /// The dock comes back after a card hid it: its bots, built again, take up their looks at once (`DockMemory`).
-    var resumes = false
 
     init(items: [LogoQueueItem], placement: ScreenPlacement, settings: AgentHUDCore.Settings) {
         self.items = items
@@ -200,14 +198,14 @@ final class LogoQueueLayerView: NSView {
             || applied?.config.logo != config.logo
             || applied?.config.bots != config.bots || applied?.config.workingSeconds != config.workingSeconds
         let regrounded = applied.map { $0.light != light } ?? false
-        // Bots built again while bots were out pick up where they were, as a dock back from under a card does.
+        // Bots built again while bots were out pick up where they were.
         let botsWereOut = applied.map { $0.config.bots && $0.animates } ?? false
         applied = (config, light, scale, animates, previewsMotion)
         if reshaped || regrounded {
             // Marks drawn again for another ground alone fade into it, as the surface behind them moves to its new
             // colours. A queue that changes otherwise is laid out again at once, as it always has been.
             if regrounded, !reshaped, animates, let layer { IslandAnimation.fadeLook(of: layer) }
-            build(config: config, light: light, scale: scale, awake: config.resumes || botsWereOut && config.bots)
+            build(config: config, light: light, scale: scale, awake: botsWereOut && config.bots)
         }
         matchDisplay()
         position(config: config)

@@ -1,15 +1,15 @@
 import AgentHUDSupport
 import Foundation
 
-extension PanelTools {
+extension HUDTools {
     /// The style part of a proposal: the style fields of its `hud`, checked against the one screen they are for. A
     /// screen's style belongs to that screen alone, so the shared layout takes none, and only an attached screen has a
     /// resting HUD to draw one on. A proposal is whole: a field it leaves out is what the screen has saved. A field set
-    /// to what the screen has saved changes nothing and is no issue, so the style `get_panel` lists can be sent back,
+    /// to what the screen has saved changes nothing and is no issue, so the style `get_hud` lists can be sent back,
     /// and the style a waiting draft lists asks nothing new, so a draft's style read back can be sent back too, a
     /// version of the screen it brings back included. `reset` true asks for the screen's default style whole, as the
     /// HUD style's Reset to Default gives it, in place of every other style field. A transparency the screen keeps for
-    /// a material (`HUDStyle.KeptTransparency`), which `get_panel` lists beside the style, sets nothing: it is taken
+    /// a material (`HUDStyle.KeptTransparency`), which `get_hud` lists beside the style, sets nothing: it is taken
     /// where it repeats what the screen keeps now or would keep under the proposal, so the style listed can be sent
     /// back whole, and refused otherwise, since `transparency` is what sets the material's own.
     @MainActor
@@ -32,7 +32,7 @@ extension PanelTools {
         /// Settings keeps it; nil where it sets none or the HUD would be glass.
         let keptForGlass: HUDGlassStyle?
 
-        init(hud fields: [String: JSONValue], scope: PanelLayoutScope, among attached: [PanelScreen], tools: PanelTools) {
+        init(hud fields: [String: JSONValue], scope: PanelLayoutScope, among attached: [PanelScreen], tools: HUDTools) {
             let fieldsGiven = HUDStyle.names.filter { Self.sets($0, fields[$0]) }.map { "hud.\($0)" }
             resets = fields[HUDStyle.resetName] == .bool(true)
             let given = fieldsGiven + (resets ? ["hud.\(HUDStyle.resetName)"] : [])
@@ -48,10 +48,10 @@ extension PanelTools {
                 mode = nil
                 placedClear = false
                 keptForGlass = nil
-                let listed = "\(keptPaths) \(repeats) what get_panel lists for one screen's resting HUD, so the "
+                let listed = "\(keptPaths) \(repeats) what get_hud lists for one screen's resting HUD, so the "
                     + "proposal needs that screen's key."
                 let named = "\(paths) \(sets) the resting HUD of one screen, so the proposal needs that screen's key; "
-                    + "with screen \"all\" the hud takes agents alone. \(PanelTools.attachedList(attached))"
+                    + "with screen \"all\" the hud takes agents alone. \(HUDTools.attachedList(attached))"
                 reasons = (given.isEmpty ? [] : [named]) + (kept.isEmpty ? [] : [listed])
                 return
             }
@@ -62,7 +62,7 @@ extension PanelTools {
                 placedClear = false
                 keptForGlass = nil
                 let name = tools.name(of: key, among: attached)
-                let listed = "\(keptPaths) \(repeats) what get_panel lists for an attached screen's resting HUD, and "
+                let listed = "\(keptPaths) \(repeats) what get_hud lists for an attached screen's resting HUD, and "
                     + "\(name) has none."
                 reasons = (given.isEmpty ? [] : ["\(paths) \(sets) the resting HUD of an attached screen, and \(name) "
                     + "has none to draw it on."]) + (kept.isEmpty ? [] : [listed])
@@ -105,7 +105,7 @@ extension PanelTools {
                       number != kept.value(in: now), number != kept.value(in: after) else { continue }
                 let keeps = HUDStyle.written(kept.value(in: now)), material = after.material.rawValue
                 found.append("hud.\(kept.rawValue) is read only: \(name) keeps \(keeps) for \(kept.material.rawValue), "
-                             + "as get_panel lists it, and hud.transparency sets the transparency of the material its "
+                             + "as get_hud lists it, and hud.transparency sets the transparency of the material its "
                              + "HUD would have, \"\(material)\". Leave it out, or give it as listed.")
             }
             reasons = found

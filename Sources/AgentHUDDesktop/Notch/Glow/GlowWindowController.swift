@@ -517,9 +517,12 @@ final class GlowWindowController {
 
     /// Gives the shells their shadows, or takes them away. A shadow that appears fades in where its shell is, one that
     /// goes fades out where it was, and one already showing follows its shell when `animates`. A detached card's goes
-    /// at once as the card goes back into its dock (`cardLeaves`) and leaves the surface no shell: the card's shadow is
-    /// cut out where the card was, and fading there it would show that place round the card as it shrinks. A change of
-    /// look still cross-fades it. The dock's new shadow fades in over its old one when `fadesDock`.
+    /// at once as the card goes back into its dock (`cardLeaves`): the card's shadow is cut out where the card was, and
+    /// fading there it would show that place round the card as it shrinks. A shell that moves between the surface and
+    /// the dock, as a Simple panel that does not separate its agents does when a card comes out of it and goes back,
+    /// keeps its shadow where it stands: it passes from one layer to the other at once, so the panel never has two
+    /// shadows nor one that slides in from the card. A change of look still cross-fades it. The dock's new shadow fades
+    /// in over its old one when `fadesDock`.
     private func updateShells(_ shells: HUDShells, look: HUDLook, geometry: NotchGeometry, frame: CGRect,
                               prepared: PreparedImages?, animates: Bool, cardLeaves: Bool = false,
                               fadesDock: Bool = false) {
@@ -532,10 +535,12 @@ final class GlowWindowController {
             dockShadowKey = installShellShadow(key, in: dockShadowLayer, holding: dockShadowKey, prepared: nil,
                                                fades: fadesDock)
         }
+        let passes = shells.dock != nil && shells.dock == placedShells?.surface
+            || shells.surface != nil && shells.surface == placedShells?.dock
         place(shellShadowLayer, under: shells.surface, was: placedShells?.surface, geometry: geometry, frame: frame,
-              animates: animates && !(cardLeaves && shells.surface == nil))
+              animates: animates && !cardLeaves && !passes)
         place(dockShadowLayer, under: shells.dock, was: placedShells?.dock, geometry: geometry, frame: frame,
-              animates: animates)
+              animates: animates && !passes)
         placedShells = shells
     }
 

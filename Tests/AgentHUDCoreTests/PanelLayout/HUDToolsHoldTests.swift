@@ -5,10 +5,10 @@ import XCTest
 
 /// The hold an agent's edit puts on a screen's panel: started or renewed for two minutes by each edit of a layout and
 /// each drop of a draft, on the screen whose panel draws it, paused by a call that restyles the resting HUD alone, ended
-/// by its time, by finish_panel_edit and by a person's choice, and read back in get_panel. The holds run on a clock the
+/// by its time, by finish_hud_edit and by a person's choice, and read back in get_hud. The holds run on a clock the
 /// tests move, with waits that end when it gets there, so the two minutes pass without waiting, and they write no
 /// settings and count no revision.
-final class PanelToolsHoldTests: PanelToolsCase {
+final class HUDToolsHoldTests: HUDToolsCase {
     private let builtIn = PanelScreen(key: "BUILT-IN-UUID", name: "Built-in display", mode: .notch, edge: .top, hasNotch: true,
                                       agents: ["Claude", "Codex", "DeepSeek"],
                                       systemIsLight: false, reducesTransparency: false)
@@ -20,7 +20,7 @@ final class PanelToolsHoldTests: PanelToolsCase {
     /// The holds' waits, each until a time on the test's clock.
     private var waits: [(until: Date, resume: CheckedContinuation<Void, Never>)] = []
 
-    private lazy var screenTools = PanelTools(store: store, launch: 0, screens: { [unowned self] in attached })
+    private lazy var screenTools = HUDTools(store: store, launch: 0, screens: { [unowned self] in attached })
 
     override func setUp() {
         super.setUp()
@@ -89,7 +89,7 @@ final class PanelToolsHoldTests: PanelToolsCase {
     private func edit(_ key: String?, _ blocks: [String: JSONValue] = [:], line: UInt = #line) throws -> [String: JSONValue] {
         var arguments: [String: JSONValue] = blocks.isEmpty ? ["order": .array([.string("Codex")])] : ["blocks": .object(blocks)]
         if let key { arguments["screen"] = .string(key) }
-        return try call(MCPTools.setPanelLayout, arguments, line: line)
+        return try call(MCPTools.draftHUD, arguments, line: line)
     }
 
     private func listing(_ key: String, in panel: [String: JSONValue]) throws -> [String: JSONValue] {
@@ -103,7 +103,7 @@ final class PanelToolsHoldTests: PanelToolsCase {
     /// A layout edit for a screen holds that screen's panel for two minutes, says so in every screen's listing, and
     /// changes no setting and no revision.
     func testALayoutEditHoldsItsScreensPanelForTwoMinutes() throws {
-        let before = try call(MCPTools.getPanel)
+        let before = try call(MCPTools.getHUD)
         for key in [builtIn.key, second.key] {
             XCTAssertEqual(try listing(key, in: before)["held"], .bool(false))
             XCTAssertNil(try listing(key, in: before)["holdSecondsLeft"])
@@ -121,28 +121,28 @@ final class PanelToolsHoldTests: PanelToolsCase {
         XCTAssertEqual(try listing(builtIn.key, in: panel)["held"], .bool(false), "the other screen is not held")
 
         let revision = layout.revision
-        _ = try call(MCPTools.finishPanelEdit)
+        _ = try call(MCPTools.finishHUDEdit)
         _ = try edit(second.key)
         XCTAssertEqual(layout.revision, revision, "holding and letting go count no revision; the same edit again changes nothing")
         XCTAssertEqual(held, [second.key], "an edit that changes nothing is still an edit, and holds")
         XCTAssertEqual(changes, 0, "and nothing writes a setting")
     }
 
-    /// Each edit renews the hold for two minutes from then; two minutes without one end it, which get_panel reads, and
+    /// Each edit renews the hold for two minutes from then; two minutes without one end it, which get_hud reads, and
     /// the hold that ran out is gone once its time is swept, not only hidden by the clock.
     func testAnEditRenewsTheHoldAndTwoMinutesWithoutOneEndIt() throws {
         try edit(second.key)
         now += 90
-        XCTAssertEqual(try listing(second.key, in: try call(MCPTools.getPanel))["holdSecondsLeft"], .integer(30))
+        XCTAssertEqual(try listing(second.key, in: try call(MCPTools.getHUD))["holdSecondsLeft"], .integer(30))
         try edit(second.key, ["Claude": ring])
         XCTAssertEqual(holds.remaining(on: second.key), 120, "renewed from the second edit")
 
         now += 119.5
-        XCTAssertEqual(try listing(second.key, in: try call(MCPTools.getPanel))["holdSecondsLeft"], .integer(1),
+        XCTAssertEqual(try listing(second.key, in: try call(MCPTools.getHUD))["holdSecondsLeft"], .integer(1),
                        "whole seconds, rounded up")
         now += 0.5
         XCTAssertNil(holds.hold(on: second.key), "two minutes after the last edit")
-        let panel = try call(MCPTools.getPanel)
+        let panel = try call(MCPTools.getHUD)
         XCTAssertEqual(try listing(second.key, in: panel)["held"], .bool(false))
         XCTAssertNil(try listing(second.key, in: panel)["holdSecondsLeft"])
 
@@ -170,13 +170,13 @@ final class PanelToolsHoldTests: PanelToolsCase {
     /// A proposal from a version holds as an edit does; a refused proposal holds nothing, and neither does an edit for a
     /// screen that is not attached, which has no panel.
     func testOnlyAnEditThatWasMadeOfAnAttachedScreenHolds() throws {
-        let sentence = try refused(MCPTools.setPanelLayout, ["screen": .string(second.key), "order": .string("Codex")])
+        let sentence = try refused(MCPTools.draftHUD, ["screen": .string(second.key), "order": .string("Codex")])
         XCTAssertTrue(sentence.hasPrefix("Nothing was changed."), sentence)
         XCTAssertTrue(held.isEmpty)
 
-        _ = try call(MCPTools.setPanelLayout, ["screen": .string(builtIn.key), "from": .string("default")])
+        _ = try call(MCPTools.draftHUD, ["screen": .string(builtIn.key), "from": .string("default")])
         XCTAssertEqual(held, [builtIn.key], "from proposes a layout too")
-        _ = try call(MCPTools.finishPanelEdit)
+        _ = try call(MCPTools.finishHUDEdit)
 
         layout.propose(.own(PanelLayout(order: ["Codex"])), for: "AWAY-UUID")
         _ = try edit("AWAY-UUID", ["Claude": ring])
@@ -188,20 +188,20 @@ final class PanelToolsHoldTests: PanelToolsCase {
     func testAnEditOfTheSharedLayoutHoldsThePanelOfTheScreenThePersonIsAt() throws {
         try edit(nil)
         XCTAssertEqual(held, [second.key], "the pointer's screen")
-        _ = try call(MCPTools.finishPanelEdit)
+        _ = try call(MCPTools.finishHUDEdit)
 
         attached = [builtIn, PanelScreen(key: second.key, name: second.name, mode: .logos, edge: .right, hasNotch: false,
                                          agents: second.agents, systemIsLight: false, reducesTransparency: false)]
         try edit(nil, ["Claude": ring])
         XCTAssertEqual(held, [builtIn.key], "where no screen has the pointer, the main display")
-        _ = try call(MCPTools.finishPanelEdit)
+        _ = try call(MCPTools.finishHUDEdit)
 
         attached = [builtIn, second]
         layout.propose(.own(PanelLayout(hiddenSections: [.tokens])), for: second.key)
         layout.save(.screen(second.key))
         try edit(nil, ["Claude": .object(["widget": .string("number")])])
         XCTAssertEqual(held, [builtIn.key], "the pointer's screen draws a layout of its own, so the first that draws the shared")
-        _ = try call(MCPTools.finishPanelEdit)
+        _ = try call(MCPTools.finishHUDEdit)
 
         layout.propose(.own(PanelLayout(hiddenSections: [.tokens])), for: builtIn.key)
         layout.save(.screen(builtIn.key))
@@ -215,42 +215,42 @@ final class PanelToolsHoldTests: PanelToolsCase {
 
     // MARK: Ending
 
-    /// finish_panel_edit lets go of one screen's panel, or with "all" or no screen of every one, and says which; a
+    /// finish_hud_edit lets go of one screen's panel, or with "all" or no screen of every one, and says which; a
     /// screen that was not held changes nothing, and a call it cannot read is refused with nothing changed. Drafts stay.
     func testFinishingLetsGoOfOneScreenOrOfEvery() throws {
         try edit(second.key)
         try edit(builtIn.key)
-        let one = try call(MCPTools.finishPanelEdit, ["screen": .string(second.key)])
+        let one = try call(MCPTools.finishHUDEdit, ["screen": .string(second.key)])
         XCTAssertEqual(held, [builtIn.key])
         XCTAssertEqual(one["note"], .string("The panel on \"Display 2\" is no longer held open: it closes unless the user's "
                                             + "pointer is on it. The draft waits for the user to press Save in the panel."))
         XCTAssertEqual(try listing(second.key, in: one)["held"], .bool(false))
         XCTAssertEqual(one["screen"], .string(second.key), "it answers with that screen's panel")
         XCTAssertTrue(layout.hasDraft(on: second.key), "the draft stays")
-        XCTAssertEqual(try call(MCPTools.finishPanelEdit, ["screen": .string(second.key)])["note"],
+        XCTAssertEqual(try call(MCPTools.finishHUDEdit, ["screen": .string(second.key)])["note"],
                        .string("The panel on \"Display 2\" was not held open, so nothing changed. The draft waits for the "
                                + "user to press Save in the panel."))
 
-        XCTAssertTrue(try refused(MCPTools.finishPanelEdit, ["screen": .string("GONE")]).hasPrefix("Nothing was changed. No screen"))
-        XCTAssertEqual(try refused(MCPTools.finishPanelEdit, ["screen": .string("all"), "done": .bool(true)]),
-                       "Nothing was changed. finish_panel_edit takes only screen. Unknown: \"done\".")
+        XCTAssertTrue(try refused(MCPTools.finishHUDEdit, ["screen": .string("GONE")]).hasPrefix("Nothing was changed. No screen"))
+        XCTAssertEqual(try refused(MCPTools.finishHUDEdit, ["screen": .string("all"), "done": .bool(true)]),
+                       "Nothing was changed. finish_hud_edit takes only screen. Unknown: \"done\".")
         XCTAssertEqual(held, [builtIn.key], "a refusal lets go of nothing")
 
         try edit(second.key, ["Claude": ring])
-        let every = try call(MCPTools.finishPanelEdit)
+        let every = try call(MCPTools.finishHUDEdit)
         XCTAssertTrue(held.isEmpty)
         XCTAssertEqual(every["screen"], .string("all"))
         XCTAssertEqual(every["note"], .string("No panel is held open now: the panels on \"Built-in display\", \"Display 2\" "
                                               + "close unless the user's pointer is on them. Drafts wait for the user to "
                                               + "press Save in the panel."))
         try edit(second.key)
-        _ = try call(MCPTools.finishPanelEdit, ["screen": .string("all")])
+        _ = try call(MCPTools.finishHUDEdit, ["screen": .string("all")])
         XCTAssertTrue(held.isEmpty, "\"all\" is every screen")
-        XCTAssertEqual(try call(MCPTools.finishPanelEdit)["note"], .string("No panel was held open, so nothing changed. "
+        XCTAssertEqual(try call(MCPTools.finishHUDEdit)["note"], .string("No panel was held open, so nothing changed. "
                                                                            + "Drafts wait for the user to press Save in the panel."))
         layout.discard(.screen(second.key))
         layout.discard(.screen(builtIn.key))
-        XCTAssertEqual(try call(MCPTools.finishPanelEdit)["note"], .string("No panel was held open, so nothing changed."))
+        XCTAssertEqual(try call(MCPTools.finishHUDEdit)["note"], .string("No panel was held open, so nothing changed."))
         XCTAssertEqual(changes, 0)
     }
 
@@ -259,31 +259,31 @@ final class PanelToolsHoldTests: PanelToolsCase {
     /// call with only hud style fields does.
     func testDiscardingADraftHoldsItsPanelAsAnEditDoes() throws {
         layout.propose(.own(PanelLayout(order: ["Codex"])), for: builtIn.key)
-        _ = try call(MCPTools.discardPanelDraft, ["screen": .string(builtIn.key)])
+        _ = try call(MCPTools.discardHUDDraft, ["screen": .string(builtIn.key)])
         XCTAssertEqual(held, [builtIn.key], "the drop starts a hold")
         XCTAssertEqual(holds.hold(on: builtIn.key)?.agent, "Claude", "the first block whose place the drop changed")
 
         now += 60
         layout.propose(PanelLayout(hiddenSections: [.tokens]))
-        _ = try call(MCPTools.discardPanelDraft)
+        _ = try call(MCPTools.discardHUDDraft)
         XCTAssertEqual(held, [builtIn.key, second.key], "the shared draft's drop holds the pointer's screen")
         XCTAssertEqual(holds.remaining(on: second.key), 120)
         XCTAssertEqual(holds.remaining(on: builtIn.key), 60, "and leaves the other's as it was")
 
-        _ = try call(MCPTools.setPanelLayout, ["screen": .string(second.key), "hud": .object(["logoSize": .integer(30)])])
+        _ = try call(MCPTools.draftHUD, ["screen": .string(second.key), "hud": .object(["logoSize": .integer(30)])])
         XCTAssertEqual(holds.hold(on: second.key)?.paused, true)
         try edit(second.key, ["Claude": ring])
         XCTAssertEqual(holds.hold(on: second.key)?.paused, false)
         layout.discard(.screen(second.key))
-        _ = try call(MCPTools.setPanelLayout, ["screen": .string(second.key), "hud": .object(["logoSize": .integer(32)])])
+        _ = try call(MCPTools.draftHUD, ["screen": .string(second.key), "hud": .object(["logoSize": .integer(32)])])
         XCTAssertEqual(holds.hold(on: second.key)?.paused, true, "a style alone closes it")
         try edit(second.key, ["Claude": ring])
-        _ = try call(MCPTools.setPanelLayout, ["screen": .string(second.key), "hud": .object(["logoSize": .integer(32)]),
+        _ = try call(MCPTools.draftHUD, ["screen": .string(second.key), "hud": .object(["logoSize": .integer(32)]),
                                                "blocks": .object(["Claude": ring])])
         XCTAssertEqual(holds.hold(on: second.key)?.paused, false, "a style beside a layout keeps it open")
         layout.discard(.screen(second.key))
         layout.proposeStyle(HUDStyle(logoSize: 30), for: second.key, hasNotch: false)
-        _ = try call(MCPTools.discardPanelDraft, ["screen": .string(second.key)])
+        _ = try call(MCPTools.discardHUDDraft, ["screen": .string(second.key)])
         XCTAssertNil(layout.styleDraft(of: second.key))
         XCTAssertEqual(holds.hold(on: second.key)?.paused, true, "the style's drop alone closes it too, so the HUD shows")
         XCTAssertEqual(changes, 0)
@@ -293,12 +293,12 @@ final class PanelToolsHoldTests: PanelToolsCase {
     /// renewing it, and starts none; the next layout edit opens it again for two minutes.
     func testAStyleAloneClosesTheHeldPanelUntilTheNextLayoutEdit() throws {
         let style: [String: JSONValue] = ["screen": .string(second.key), "hud": .object(["logoSize": .integer(30)])]
-        _ = try call(MCPTools.setPanelLayout, style)
+        _ = try call(MCPTools.draftHUD, style)
         XCTAssertTrue(held.isEmpty, "the style alone opens nothing")
 
         try edit(second.key)
         now += 30
-        let paused = try call(MCPTools.setPanelLayout, style.merging(["hud": .object(["logoSize": .integer(32)])]) { $1 })
+        let paused = try call(MCPTools.draftHUD, style.merging(["hud": .object(["logoSize": .integer(32)])]) { $1 })
         XCTAssertEqual(holds.hold(on: second.key)?.paused, true)
         XCTAssertEqual(holds.remaining(on: second.key), 90, "not renewed")
         XCTAssertEqual(try listing(second.key, in: paused)["holdPaused"], .bool(true))
@@ -314,21 +314,21 @@ final class PanelToolsHoldTests: PanelToolsCase {
     /// no block names none, and a renewal keeps the agent named before.
     func testTheHoldNamesTheFirstAgentTheEditTouches() throws {
         let key = second.key
-        _ = try call(MCPTools.setPanelLayout, ["screen": .string(key), "style": .object(["spacing": .string("compact")])])
+        _ = try call(MCPTools.draftHUD, ["screen": .string(key), "style": .object(["spacing": .string("compact")])])
         XCTAssertNil(holds.hold(on: key)?.agent, "the style alone touches no agent")
         XCTAssertEqual(held, [key], "and holds all the same")
 
         let hidden: JSONValue = .object(["hidden": .bool(true)])
-        _ = try call(MCPTools.setPanelLayout, ["screen": .string(key), "blocks": .object(["api:DeepSeek": hidden])])
+        _ = try call(MCPTools.draftHUD, ["screen": .string(key), "blocks": .object(["api:DeepSeek": hidden])])
         XCTAssertEqual(holds.hold(on: key)?.agent, "DeepSeek")
-        _ = try call(MCPTools.setPanelLayout, ["screen": .string(key), "blocks": .object(["api:DeepSeek": hidden]),
+        _ = try call(MCPTools.draftHUD, ["screen": .string(key), "blocks": .object(["api:DeepSeek": hidden]),
                                                "style": .object(["spacing": .string("roomy")])])
         XCTAssertEqual(holds.hold(on: key)?.agent, "DeepSeek", "a renewal that touches no block keeps the agent")
 
-        _ = try call(MCPTools.setPanelLayout, ["screen": .string(key), "blocks": .object(["api:DeepSeek": hidden]),
+        _ = try call(MCPTools.draftHUD, ["screen": .string(key), "blocks": .object(["api:DeepSeek": hidden]),
                                                "order": .array([.string("Codex")])])
         XCTAssertEqual(holds.hold(on: key)?.agent, "Codex", "Codex moved first, and Claude after it")
-        _ = try call(MCPTools.setPanelLayout, ["screen": .string(key), "order": .array([.string("Codex")]),
+        _ = try call(MCPTools.draftHUD, ["screen": .string(key), "order": .array([.string("Codex")]),
                                                "blocks": .object(["api:DeepSeek": hidden, "Claude": ring])])
         XCTAssertEqual(holds.hold(on: key)?.agent, "Claude")
     }
@@ -338,18 +338,18 @@ final class PanelToolsHoldTests: PanelToolsCase {
     /// touches it too.
     func testHidingABlockTouchesItsOwnAgentNotTheOnesAfterIt() throws {
         let key = second.key
-        let first = try XCTUnwrap(blocks(try call(MCPTools.getPanel, ["screen": .string(key)])).first)
+        let first = try XCTUnwrap(blocks(try call(MCPTools.getHUD, ["screen": .string(key)])).first)
         XCTAssertEqual(first["key"], .string("Claude"), "the sample's first block")
 
-        _ = try call(MCPTools.setPanelLayout, ["screen": .string(key),
+        _ = try call(MCPTools.draftHUD, ["screen": .string(key),
                                                "blocks": .object(["Claude": .object(["hidden": .bool(true)])])])
         XCTAssertEqual(holds.hold(on: key)?.agent, "Claude", "Codex moved up into its place, and is not touched")
-        _ = try call(MCPTools.setPanelLayout, ["screen": .string(key), "order": .array([])])
+        _ = try call(MCPTools.draftHUD, ["screen": .string(key), "order": .array([])])
         XCTAssertEqual(holds.hold(on: key)?.agent, "Claude", "shown again")
 
         let rows = (first["rows"]?.arrayValue ?? []).compactMap { $0["key"] }
         XCTAssertGreaterThan(rows.count, 1)
-        let panel = try call(MCPTools.setPanelLayout, ["screen": .string(key),
+        let panel = try call(MCPTools.draftHUD, ["screen": .string(key),
                                                        "blocks": .object(["Claude": .object(["hiddenRows": .array(rows)])])])
         XCTAssertEqual(try block("Claude", in: panel)["shown"], .bool(false), "every row hidden leaves the block out")
         XCTAssertEqual(holds.hold(on: key)?.agent, "Claude")
@@ -360,7 +360,7 @@ final class PanelToolsHoldTests: PanelToolsCase {
     /// for a screen.
     func testAStyleAloneForEveryScreenHoldsNoPanel() throws {
         for hud: JSONValue in [.object(["reset": .bool(false)]), .object(["glow": .object([:])])] {
-            let panel = try call(MCPTools.setPanelLayout, ["screen": .string("all"), "hud": hud])
+            let panel = try call(MCPTools.draftHUD, ["screen": .string("all"), "hud": hud])
             XCTAssertTrue(held.isEmpty, "\(hud) opens no panel")
             XCTAssertEqual(panel["note"]?.stringValue?.hasSuffix(
                 "The shared layout is unchanged: a call with only hud style fields leaves the layout as it is."), true)
@@ -368,7 +368,7 @@ final class PanelToolsHoldTests: PanelToolsCase {
         try edit(nil)
         XCTAssertEqual(held, [second.key])
         now += 30
-        _ = try call(MCPTools.setPanelLayout, ["hud": .object(["reset": .bool(false)])])
+        _ = try call(MCPTools.draftHUD, ["hud": .object(["reset": .bool(false)])])
         XCTAssertEqual(holds.hold(on: second.key)?.paused, true, "the panel an edit of the shared layout holds closes")
         XCTAssertEqual(holds.remaining(on: second.key), 90, "not renewed")
         XCTAssertEqual(changes, 0)

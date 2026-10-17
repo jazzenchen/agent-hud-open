@@ -105,8 +105,8 @@ final class PanelLayoutFiltersTests: XCTestCase {
         let listed = "Projects with sessions now: \(PanelLayout.quoted(offered.map(\.id)))."
         XCTAssertEqual(match.issues.map(\.message), [
             "\"plain\" is a project's name, not its id. Name it by its id: \"\(plain.id)\".",
-            "\"/agent-hud-tests/other\" is no project's id from get_panel's sessions.offeredProjects, nor a path inside one. \(listed)",
-            "\"relative/path\" is no project's id from get_panel's sessions.offeredProjects, nor a path inside one. \(listed)",
+            "\"/agent-hud-tests/other\" is no project's id from get_hud's sessions.offeredProjects, nor a path inside one. \(listed)",
+            "\"relative/path\" is no project's id from get_hud's sessions.offeredProjects, nor a path inside one. \(listed)",
         ])
     }
 
@@ -115,11 +115,11 @@ final class PanelLayoutFiltersTests: XCTestCase {
         let match = PanelLayout.projectMatch(.array([.string("~/work/alpha/Sources"), .string("unassigned")]),
                                              among: [.directory(home + "/work/alpha")])
         XCTAssertEqual(match.ids, ["~/work/alpha"], "a path written with ~ names the project too")
-        XCTAssertEqual(match.issues.map(\.message), ["\"unassigned\" is no project's id from get_panel's "
+        XCTAssertEqual(match.issues.map(\.message), ["\"unassigned\" is no project's id from get_hud's "
                                                     + "sessions.offeredProjects, nor a path inside one. Projects with sessions now: "
                                                     + "\"~/work/alpha\"."])
         XCTAssertEqual(PanelLayout.projectMatch(.array([.string("/work/x")]), among: []).issues.map(\.message),
-                       ["\"/work/x\" is no project's id from get_panel's sessions.offeredProjects, nor a path inside one. "
+                       ["\"/work/x\" is no project's id from get_hud's sessions.offeredProjects, nor a path inside one. "
                         + "No project has a session now."])
 
         // Saved while it had sessions; a layout that was read can be sent back with it, and a path inside it names it.

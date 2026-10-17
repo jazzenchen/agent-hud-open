@@ -6,7 +6,7 @@ extension HUDStyle {
     /// (`KeptTransparency`), as sentences: a value of the wrong type or out of its range, a mode, edge, appearance,
     /// material, glass style, glow style or effect this build does not know, or a property the glow does not have. Nil
     /// for a key that names no style field, which the caller words. A value given as null is not given. Whether a kept
-    /// transparency repeats what the screen keeps is the proposal's to tell (`PanelTools.StyleProposal`).
+    /// transparency repeats what the screen keeps is the proposal's to tell (`HUDTools.StyleProposal`).
     static func misreadings(ofField name: String, _ value: JSONValue) -> [String]? {
         if name == "glow" { return glowMisreadings(value) }
         if name == resetName { return value == .null || value.boolValue != nil ? [] : ["hud.\(name) is true or false."] }
@@ -35,7 +35,7 @@ extension HUDStyle {
                 ? ["\(path) is one of \(PanelLayout.quoted(HUDGlassStyle.allCases.map(\.rawValue)))."] : []
         case .showLogos, .showRings, .showNumbers, .separateAgents:
             return value.boolValue == nil ? ["\(path) is true or false."] : []
-        case .position, .logoSize, .logoGap, .edgeDistance, .simpleSize, .ringWidth, .transparency:
+        case .position, .logoSize, .logoGap, .edgeDistance, .simpleSize, .simpleGap, .ringWidth, .transparency:
             return number(value, at: path, within: field.range)
         }
     }
@@ -162,7 +162,7 @@ extension HUDStyle {
     /// The style as a screen saved with `placement` on a display with a notch would take it, as Settings' own change of
     /// mode does: a dock that leaves the notch for the top edge, where it has never been moved from the centre, starts
     /// at the top left, clear of the hardware. A position given as the saved centre is no position, so the style
-    /// `get_panel` lists, sent back with a new mode, is placed as Settings places it.
+    /// `get_hud` lists, sent back with a new mode, is placed as Settings places it.
     func placedClearOfTheNotch(from placement: ScreenPlacement, hasNotch: Bool) -> HUDStyle {
         guard hasNotch, mode?.isDocked == true, placement.mode == .notch, (position ?? placement.offset) == placement.offset,
               (edge ?? placement.edge) == .top, placement.offset == 0.5 else { return self }

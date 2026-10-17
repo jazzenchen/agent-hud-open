@@ -21,11 +21,15 @@ struct CompactWings: Equatable {
     var padding: CGFloat
     var width: CGFloat { leading + gap + trailing + 2 * padding }
 
-    /// A size of a reminder's words or of the symbol beside them, in points before a dock's scale, from the size it has
-    /// beside the notch, where the name is the cards' 13 and the status 12. On a dock it is a size smaller, so words
-    /// and symbol sit in the pill, which keeps a mark's height, with room above and below them. The agent's mark keeps
-    /// its size.
-    static func size(_ beside: CGFloat, onDock: Bool) -> CGFloat { onDock ? beside - 1 : beside }
+    /// The size of a reminder's name or status, in points before a dock's scale, from the size it has beside the notch,
+    /// where the name is the cards' 13 and the status 12. On a dock both are `IslandRootView.dockTextSize`, the size of
+    /// everything a dock writes, so the pill reads as the Simple panel's numbers and its hover line do.
+    static func words(_ beside: CGFloat, onDock: Bool) -> CGFloat { onDock ? IslandRootView.dockTextSize : beside }
+    /// The size of the symbol beside a status, from its size beside the notch: on a dock as much smaller as the status
+    /// is. The agent's mark keeps its size.
+    static func size(_ beside: CGFloat, onDock: Bool) -> CGFloat {
+        onDock ? beside - (12 - IslandRootView.dockTextSize) : beside
+    }
 
     /// The halves of `alert`'s reminder on a dock set to `scale`, each measured from its text and no wider than a
     /// wing, so the pill is placed before anything is drawn. The lengths are the ones the reminders' views use.
@@ -40,28 +44,29 @@ struct CompactWings: Equatable {
                 .withSymbolConfiguration(.init(pointSize: size, weight: .semibold))?.size.width
             return ceil(drawn ?? size * 1.4)
         }
+        func w(_ value: CGFloat) -> CGFloat { s(Self.words(value, onDock: true)) }
         func t(_ value: CGFloat) -> CGFloat { s(Self.size(value, onDock: true)) }
-        let name = NSFont.systemFont(ofSize: t(13), weight: .semibold)
+        let name = NSFont.systemFont(ofSize: w(13), weight: .semibold)
         let who: String, what: String, mark: CGFloat, status: NSFont
         var count: CGFloat = 0
         switch alert {
         case .completion(let event):
             who = event.agentVendor; what = IslandAlertCompactView.replyStatus; mark = symbol("text.bubble", t(16))
-            status = .systemFont(ofSize: t(12), weight: .medium)
+            status = .systemFont(ofSize: w(12), weight: .medium)
         case .permission(let request):
             who = request.project ?? request.vendor; what = PermissionAlertCompactView.status(of: request)
             mark = symbol("hand.raised.fill", t(14))
-            status = .systemFont(ofSize: t(12), weight: .medium)
+            status = .systemFont(ofSize: w(12), weight: .medium)
             if waiting > 1 {
                 count = s(7) + width("×\(waiting)", .monospacedDigitSystemFont(ofSize: s(10), weight: .semibold)) + 2 * s(5)
             }
         case .quota(let event):
             // These two symbols sit in a frame of their own, two points over their size.
             who = event.agent.vendorName; what = QuotaAlertCompactView.status(of: event); mark = t(12) + 2
-            status = .monospacedDigitSystemFont(ofSize: t(12), weight: .medium)
+            status = .monospacedDigitSystemFont(ofSize: w(12), weight: .medium)
         case .resetCredits(let grant):
             who = grant.account.account.provider; what = ResetCreditAlertCompactView.status(of: grant); mark = t(12) + 2
-            status = .monospacedDigitSystemFont(ofSize: t(12), weight: .medium)
+            status = .monospacedDigitSystemFont(ofSize: w(12), weight: .medium)
         }
         let wing = s(IslandController.alertWingWidth)
         // A point to spare each: a width measured here and one laid out by SwiftUI can differ by a fraction.
@@ -141,11 +146,12 @@ struct IslandRootView: View {
     /// over whatever is behind them. Kept apart from `logoQueue`, which only says whether marks are drawn —
     /// hiding them leaves the backdrop alone and must not bring the silhouette back.
     var hidesSilhouette = false
-    /// Set on a dock that separates its agents. The marks then stay where they are whatever the card does:
-    /// the Simple panel draws its own capsule instead of lending it to the card, and nothing replaces them.
+    /// Set on a dock that separates its agents: hovering a mark opens that agent's own card, and the Simple panel draws
+    /// its own capsule instead of lending it to a card.
     var separatesAgents = false
-    /// The one agent the card is for right now: the hovered mark's, or the sender of the event on show.
-    /// Its card is detached: it floats beside the mark instead of growing out of the screen edge.
+    /// The one agent the card is for right now: the hovered mark's on a dock that separates its agents, or, on any
+    /// dock, the sender of the event on show. Its card is detached: it floats beside the mark instead of growing out of
+    /// the screen edge, and the dock stays as it is at rest.
     var focusVendor: String? = nil
     /// What hovering shows of that agent before a click opens its whole panel.
     var peek: AgentPeek? = nil
@@ -277,6 +283,12 @@ struct IslandRootView: View {
     /// A compact reminder on a dock is a slim pill, as tall as the Simple panel's hover line: 26 pt for a 17 pt mark
     /// and 13 pt text, where the notch's own height made it 48.
     nonisolated static let dockCompactHeight: CGFloat = 26
+    /// The size of every word a dock writes, in points before its scale: a reminder's name and status in its pill, the
+    /// Simple panel's numbers and the line it grows on hover. One size for all, so they read as one piece, three steps
+    /// under the 12 the notch's reminders and cards are written at.
+    nonisolated static let dockTextSize: CGFloat = 9
+    /// `dockTextSize` on a dock set to `scale`, never smaller than at the default, rounded as a dock's lengths are.
+    nonisolated static func dockText(scale: CGFloat) -> CGFloat { (dockTextSize * max(1, scale)).rounded() }
     /// Above and below the pill's row. The row already keeps its own padding at each end, so the card adds none.
     static let dockCompactInsets = EdgeInsets(top: 3, leading: 0, bottom: 3, trailing: 0)
     /// This screen's `dockScale`. A compact reminder is the dock growing an arm, as the Simple panel's line is,
@@ -285,8 +297,8 @@ struct IslandRootView: View {
 
     /// How much larger than at its default a dock writes what it grows out of itself: enough for a compact
     /// reminder's pill and the hover line to be as tall as one of the dock's marks, a Simple panel's ring or a
-    /// Dynamic dock's logo. Never below 1, so beside a mark shorter than the default pill nothing is written
-    /// smaller than it was. The notch has no size to follow and keeps 1.
+    /// Dynamic dock's logo. Never below 1, so beside a mark shorter than the default pill nothing is written smaller
+    /// than it was. The notch has no size to follow and keeps 1.
     nonisolated static func dockScale(mode: HUDMode, placement: ScreenPlacement) -> CGFloat {
         switch mode {
         case .simple: max(1, CGFloat(placement.simpleSize) / dockCompactHeight)
@@ -343,24 +355,28 @@ struct IslandRootView: View {
         GeometryReader { proxy in
             let bounds = proxy.size
             let visible = isOpen || alert != nil
-            let size = visible ? (presentationFrame?.size ?? presentationSize ?? bounds) : collapsedSize
+            // The island's own silhouette grows into what is showing, unless that is a card beside one of the dock's
+            // marks: the dock then stays as it is at rest, and the card is a piece of its own.
+            let grown = visible && !detached
+            let size = grown ? (presentationFrame?.size ?? presentationSize ?? bounds) : collapsedSize
             // Simple mode has one floating frame. Collapsed it is the capsule the figures sit in; opening
             // enlarges that same frame into the panel, so nothing fades in over it and nothing is swapped.
             let shape = simpleMeter.map { meter in
                 IslandShape(
-                    topRadius: visible ? Self.expandedTopRadius : 0,
-                    bottomRadius: isOpen ? Self.expandedBottomRadius : (alert == nil ? meter.cornerRadius : 16),
+                    topRadius: grown ? Self.expandedTopRadius : 0,
+                    bottomRadius: !grown ? meter.cornerRadius : isOpen ? Self.expandedBottomRadius : 16,
                     edge: edge, lift: SimpleMeterConfig.edgeMargin
                 )
             } ?? IslandShape(
-                topRadius: isOpen ? Self.expandedTopRadius : collapsedTopRadius,
-                bottomRadius: isOpen ? Self.expandedBottomRadius : max(collapsedBottomRadius, alert == nil ? 0 : 14),
+                topRadius: isOpen && grown ? Self.expandedTopRadius : collapsedTopRadius,
+                bottomRadius: isOpen && grown ? Self.expandedBottomRadius
+                    : max(collapsedBottomRadius, alert == nil || !grown ? 0 : 14),
                 edge: edge
             )
             // A collapsed logo queue is the marks alone: no silhouette behind them, so they read as agents
             // sitting on the desktop rather than as a bar. The silhouette comes back the moment the panel
-            // opens or an event needs somewhere to be shown — but never because the marks were hidden.
-            let bare = hidesSilhouette && !visible && (!floats || separatesAgents)
+            // opens — but never because the marks were hidden.
+            let bare = hidesSilhouette && !grown && (!floats || separatesAgents)
             let surface = ZStack(alignment: surfaceAlignment) {
                 // Keep one shape alive through collapse so it can shrink before becoming transparent. A silhouette that
                 // grows out of the screen edge stands on it; a floating one stands on nothing.
@@ -388,10 +404,13 @@ struct IslandRootView: View {
                     .animation(lookAnimation, value: look)
                     .frame(width: size.width, height: size.height)
                     .opacity(bare ? 0 : 1)
-                content
-                    .environment(\.islandTyping, onTyping)
-                    .animation(lookAnimation, value: look)
-                    .mask(alignment: surfaceAlignment) { shape.frame(width: size.width, height: size.height) }
+                // A card beside a mark holds what the island would; the dock at rest holds nothing of it.
+                if !detached {
+                    content
+                        .environment(\.islandTyping, onTyping)
+                        .animation(lookAnimation, value: look)
+                        .mask(alignment: surfaceAlignment) { shape.frame(width: size.width, height: size.height) }
+                }
                 }
             let joinsGlass = joinsPanelGlass(standIn: standsInForGlass)
             ZStack(alignment: .topLeading) {
@@ -404,9 +423,34 @@ struct IslandRootView: View {
                     }
                 }
                 .animation(lookAnimation, value: look)
+                // The island's own silhouette: at rest, grown into the panel, or at rest on its strip while a card
+                // stands beside one of its marks. A dock that separates its agents shows it only grown.
+                if !separatesAgents || grown {
+                    // The native canvas changes immediately. Only the card's size and its position
+                    // along the parked edge interpolate; the contact edge stays on that canvas.
+                    if let place = detached ? logoQueueFrame ?? presentationFrame : presentationFrame {
+                        let offset = (hidesSilhouette ? edge : .top).isHorizontal
+                            ? CGSize(width: place.midX - bounds.width / 2, height: 0)
+                            : CGSize(width: 0, height: place.midY - bounds.height / 2)
+                        surface
+                            .frame(width: place.width, height: place.height, alignment: surfaceAlignment)
+                            .offset(offset)
+                            .animation(geometryAnimation, value: place)
+                            .transaction(value: place) { transaction in
+                                if animatesGeometry {
+                                    transaction.addAnimationCompletion(criteria: .removed, onGeometryCompletion)
+                                }
+                            }
+                            .frame(width: bounds.width, height: bounds.height, alignment: surfaceAlignment)
+                    } else {
+                        surface
+                            .animation(geometryAnimation, value: size)
+                            .frame(width: bounds.width, height: bounds.height, alignment: surfaceAlignment)
+                    }
+                }
                 // The card's place in the view outlives the card: one that arrives with its own container has
                 // nothing to grow out of.
-                if separatesAgents, detached || !visible {
+                if hidesSilhouette, !grown {
                     // The card belongs to a mark: it grows out of the dock beside it, slides along the dock from
                     // one agent to the next, and widens into the whole panel on a click.
                     ZStack(alignment: .topLeading) {
@@ -434,33 +478,14 @@ struct IslandRootView: View {
                     .frame(width: bounds.width, height: bounds.height, alignment: .topLeading)
                     // A full card never reaches the panel, so the cut can stay while a line is on its way out.
                     .mask { outsidePanel(bounds) }
-                } else if let presentationFrame {
-                    // The native canvas changes immediately. Only the card's size and its position
-                    // along the parked edge interpolate; the contact edge stays on that canvas.
-                    let offset = (hidesSilhouette ? edge : .top).isHorizontal
-                        ? CGSize(width: presentationFrame.midX - bounds.width / 2, height: 0)
-                        : CGSize(width: 0, height: presentationFrame.midY - bounds.height / 2)
-                    surface
-                        .frame(width: presentationFrame.width, height: presentationFrame.height,
-                               alignment: surfaceAlignment)
-                        .offset(offset)
-                        .animation(geometryAnimation, value: presentationFrame)
-                        .transaction(value: presentationFrame) { transaction in
-                            if animatesGeometry {
-                                transaction.addAnimationCompletion(criteria: .removed, onGeometryCompletion)
-                            }
-                        }
-                        .frame(width: bounds.width, height: bounds.height, alignment: surfaceAlignment)
-                } else {
-                    surface
-                        .animation(geometryAnimation, value: size)
-                        .frame(width: bounds.width, height: bounds.height, alignment: surfaceAlignment)
                 }
-                if let logoQueue, alert == nil || focusVendor != nil {
+                // A dock never hides its marks, whatever it shows: a card stands beside them, and the panel grown out
+                // of the dock leaves them their band.
+                if let logoQueue {
                     // Marks with no surface behind them, bare or beside a card of their own, stand on the
                     // wallpaper whatever the look, and are drawn for it as they always were; only marks on a light
                     // surface take its dark ink.
-                    let onSurface = !bare && !(separatesAgents && (detached || !visible))
+                    let onSurface = !bare && !(separatesAgents && !grown)
                     let light = look.appearance == .light && onSurface
                     if let logoQueueFrame {
                         LogoQueueView(config: logoQueue, light: light)
@@ -476,7 +501,7 @@ struct IslandRootView: View {
                             .transaction { $0.animation = nil }
                     }
                 }
-                if let simpleMeter, alert == nil || focusVendor != nil {
+                if let simpleMeter {
                     let strip = logoQueueFrame ?? CGRect(x: 0, y: logoQueueInset, width: size.width, height: logoQueueHeight)
                     // The figures stay put as the island moves, and move to a new look's colours with the panel
                     // behind them.
@@ -564,7 +589,6 @@ struct IslandRootView: View {
                     .environment(\.compactWings, wings)
                     .padding(.vertical, row.inset)
                     .frame(width: wings.width)
-                    .offset(floats && !detached ? liftCentring : .zero)
                     .id(alert.id)
                     .transition(detailTransition)
             } else {
@@ -594,8 +618,7 @@ struct IslandRootView: View {
     /// - wings: the reminder's own halves, which make the pill as long as what it says; without them it is two full
     ///   wings long, the most a reminder can be.
     static func dockCompactSize(edge: HUDEdge, collapsedSize: CGSize, scale: CGFloat = 1, wings: CompactWings? = nil) -> CGSize {
-        // Events replace the marks, so their row needs no queue clearance. The window adds the
-        // contact shoulders along its parked edge once, outside this compact content core.
+        // The pill stands beside its sender's mark, so its row needs no queue clearance.
         let scale = max(1, scale), row = dockCompactRow(scale: scale)
         // Each length is rounded as the row's own views round it, so the two agree to the point.
         let textWidth = wings?.width
@@ -610,18 +633,6 @@ struct IslandRootView: View {
 
     /// Simple mode's silhouette floats off its edge instead of flaring into it.
     private var floats: Bool { simpleMeter != nil }
-
-    /// A floating silhouette gives up `edgeMargin` on its edge side; a row centred in the card moves half of
-    /// that inward to sit centred in what is left.
-    private var liftCentring: CGSize {
-        let half = SimpleMeterConfig.edgeMargin / 2
-        switch edge {
-        case .top: return CGSize(width: 0, height: half)
-        case .bottom: return CGSize(width: 0, height: -half)
-        case .left: return CGSize(width: half, height: 0)
-        case .right: return CGSize(width: -half, height: 0)
-        }
-    }
 
     /// Side flares live above and below the content core. The fixed-height usage panel stays upright,
     /// centred between those shoulders, and the reported natural height still describes only the core.

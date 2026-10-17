@@ -9,7 +9,7 @@ final class AgentToolsChannel {
     enum Mode: Equatable {
         /// A demo without `--demo-tools`, which leaves the socket to the real copy.
         case never
-        /// While `Settings.agentTools` is on.
+        /// While `Settings.hudTools` is on.
         case whileSwitchedOn
         /// A demo started with `--demo-tools`.
         case always
@@ -31,7 +31,7 @@ final class AgentToolsChannel {
         stopped = false
         apply()
         guard mode == .whileSwitchedOn else { return }
-        trackChanges({ [weak self] in self?.settings.settings.agentTools }, onChange: { [weak self] in self?.apply() })
+        trackChanges({ [weak self] in self?.settings.settings.hudTools }, onChange: { [weak self] in self?.apply() })
     }
 
     /// Closes the channel for good, as the application quits.
@@ -43,7 +43,7 @@ final class AgentToolsChannel {
     private var serves: Bool {
         switch mode {
         case .never: return false
-        case .whileSwitchedOn: return settings.settings.agentTools
+        case .whileSwitchedOn: return settings.settings.hudTools
         case .always: return true
         }
     }

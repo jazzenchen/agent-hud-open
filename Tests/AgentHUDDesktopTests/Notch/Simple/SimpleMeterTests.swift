@@ -105,6 +105,27 @@ final class SimpleMeterTests: XCTestCase {
         XCTAssertEqual(empty.panelSize.height, SimpleMeterConfig.emptyRun, "A panel with no quota row keeps something to grab")
     }
 
+    func testTheGapBetweenAgentsIsItsOwnShareOfARing() {
+        let items = [SimpleMeterItem(vendor: "Claude", usedPct: 62, level: .ok),
+                     SimpleMeterItem(vendor: "Codex", usedPct: 100, level: .critical)]
+        func config(_ edge: HUDEdge, size: Double = 40, gap: Double? = nil, numbers: Bool = true) -> SimpleMeterConfig {
+            var placement = ScreenPlacement(mode: .simple, edge: edge, simpleSize: size, showsNumbers: numbers)
+            if let gap { placement.simpleGapScale = gap }
+            return SimpleMeterConfig(items: items, placement: placement)
+        }
+        XCTAssertEqual(config(.top).itemGap, 18, "0.45 of a ring at first, the gap the panel always had")
+        XCTAssertEqual(config(.right).itemGap, 18)
+        XCTAssertEqual(config(.top, numbers: false).itemGap, 13, "Marks alone in a row sit at 70 % of it")
+        XCTAssertEqual(config(.top, gap: 0.1).itemGap, 4)
+        XCTAssertEqual(config(.right, gap: 0.6).itemGap, 24)
+        XCTAssertEqual(config(.top, gap: 0.6, numbers: false).itemGap, 17)
+        let tight = config(.right, gap: 0.1), loose = config(.right, gap: 0.6)
+        XCTAssertEqual(loose.panelSize.height - tight.panelSize.height, 24 - 4, "One gap between two agents")
+        XCTAssertEqual(loose.panelSize.width, tight.panelSize.width)
+        XCTAssertEqual(config(.right, size: 60).panelSize.height, config(.right, size: 60).insets.top + 2 * 60 + 27
+                       + config(.right, size: 60).insets.bottom, "A ring reaches 60 pt")
+    }
+
     func testDraggingASimplePanelKeepsItSimpleAndOnlyTheNotchBecomesADock() {
         let screen = CGRect(x: 0, y: 0, width: 1440, height: 900)
         let point = CGPoint(x: screen.maxX - 4, y: 420)

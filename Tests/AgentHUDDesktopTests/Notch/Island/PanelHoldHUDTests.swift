@@ -19,7 +19,7 @@ final class PanelHoldHUDTests: XCTestCase {
         let settings: SettingsStore
         let key: String
         let hud: ScreenHUD
-        let tools: PanelTools
+        let tools: HUDTools
         let reads: ReadCount
         let pointer: Pointer
         let screen: NSScreen
@@ -41,7 +41,7 @@ final class PanelHoldHUDTests: XCTestCase {
 
         /// An edit of the screen's own layout: Codex's block first, or the blocks as `blocks` sets them.
         func edit(_ blocks: [String: JSONValue] = [:], line: UInt = #line) throws {
-            try call(MCPTools.setPanelLayout, blocks.isEmpty ? ["order": .array([.string("Codex")])] : ["blocks": .object(blocks)],
+            try call(MCPTools.draftHUD, blocks.isEmpty ? ["order": .array([.string("Codex")])] : ["blocks": .object(blocks)],
                      line: line)
         }
 
@@ -150,7 +150,7 @@ final class PanelHoldHUDTests: XCTestCase {
         let pointer = Pointer()
         let hud = ScreenHUD(key: key, screen: screen, store: store, settings: settings, mouseLocation: { pointer.point },
                             reduceMotion: { reduceMotion })
-        let tools = PanelTools(store: store, screens: {
+        let tools = HUDTools(store: store, screens: {
             [PanelScreen(key: key, name: "Main display", mode: placement.mode, edge: placement.edge,
                          hasNotch: ScreenIdentity.hasNotch(screen), agents: [], systemIsLight: false,
                          reducesTransparency: false, hasPointer: true)]
@@ -202,7 +202,7 @@ final class PanelHoldHUDTests: XCTestCase {
             XCTAssertEqual(f.reads.refreshes, 0, name)
             XCTAssertEqual(f.reads.fetches, 0, name)
 
-            try f.call(MCPTools.finishPanelEdit)
+            try f.call(MCPTools.finishHUDEdit)
             poll("\(name): finishing closes it") { !f.isOpen }
             f.hud.forceOpen()
             poll("\(name): the hover's opening reads the accounts") { f.reads.fetches > 0 }
@@ -210,7 +210,7 @@ final class PanelHoldHUDTests: XCTestCase {
         }
     }
 
-    /// The hold runs out by itself two minutes after the last edit, and the panel closes; finish_panel_edit closes it at
+    /// The hold runs out by itself two minutes after the last edit, and the panel closes; finish_hud_edit closes it at
     /// once.
     func testAHeldPanelClosesWhenTheHoldRunsOutOrTheAgentFinishes() throws {
         let f = try make(ScreenPlacement(mode: .notch))
@@ -227,7 +227,7 @@ final class PanelHoldHUDTests: XCTestCase {
 
         try f.edit(["Claude": ring])
         poll("the next edit holds it again") { f.isOpen }
-        try f.call(MCPTools.finishPanelEdit, ["screen": .string("all")])
+        try f.call(MCPTools.finishHUDEdit, ["screen": .string("all")])
         poll("finishing closes it") { !f.isOpen }
         XCTAssertNil(f.holds.hold(on: f.key))
         XCTAssertEqual(f.reads.refreshes, 0)
@@ -323,7 +323,7 @@ final class PanelHoldHUDTests: XCTestCase {
             try f.edit()
             poll("\(name): the hold opens the panel") { f.isOpen }
             let panel = f.hud.hoverRegion
-            try f.call(MCPTools.finishPanelEdit)
+            try f.call(MCPTools.finishHUDEdit)
             poll("\(name): finishing closes it") { !f.isOpen }
             let resting = CGPoint(x: panel.midX, y: panel.midY)
             f.pointer.point = resting
@@ -340,7 +340,7 @@ final class PanelHoldHUDTests: XCTestCase {
             turn()
             XCTAssertTrue(f.hud.isHeldOpen, "\(name): and the panel open")
 
-            try f.call(MCPTools.setPanelLayout, ["hud": .object(["transparency": .number(0.2)])])
+            try f.call(MCPTools.draftHUD, ["hud": .object(["transparency": .number(0.2)])])
             poll("\(name): the style closes it") { !f.isOpen }
             f.pointer.point = resting
             f.hud.samplePointer()
@@ -397,13 +397,13 @@ final class PanelHoldHUDTests: XCTestCase {
     func testAStyleAloneClosesTheHeldPanelUntilTheNextLayoutEdit() throws {
         let f = try make(ScreenPlacement(mode: .notch))
         defer { f.close() }
-        try f.call(MCPTools.setPanelLayout, ["hud": .object(["glow": .object(["brightness": .number(0.5)])])])
+        try f.call(MCPTools.draftHUD, ["hud": .object(["glow": .object(["brightness": .number(0.5)])])])
         turn()
         XCTAssertFalse(f.isOpen, "a style alone opens nothing")
 
         try f.edit()
         poll("the hold opens the panel") { f.isOpen }
-        try f.call(MCPTools.setPanelLayout, ["hud": .object(["glow": .object(["brightness": .number(0.6)])])])
+        try f.call(MCPTools.draftHUD, ["hud": .object(["glow": .object(["brightness": .number(0.6)])])])
         poll("the style closes it, so the HUD shows") { !f.isOpen }
         XCTAssertEqual(f.holds.hold(on: f.key)?.paused, true)
         try f.edit(["Claude": ring])
@@ -426,15 +426,15 @@ final class PanelHoldHUDTests: XCTestCase {
             XCTAssertNotEqual(AgentArtwork.markKey(first), AgentArtwork.markKey("Codex"), "\(name): the sample's first mark is another agent")
 
             let blocks: JSONValue = .object(["Codex": ring])
-            try f.call(MCPTools.setPanelLayout, ["blocks": blocks])
+            try f.call(MCPTools.draftHUD, ["blocks": blocks])
             poll("\(name): the hold opens a card") { f.isOpen }
             XCTAssertEqual(root().focusVendor.map(AgentArtwork.markKey), AgentArtwork.markKey("Codex"), name)
             XCTAssertTrue(root().pinned, "\(name): the agent's whole card, not a peek")
 
-            try f.call(MCPTools.finishPanelEdit)
+            try f.call(MCPTools.finishHUDEdit)
             poll("\(name): finishing closes it") { !f.isOpen }
             // The same blocks, so no agent's block changes: only the spacing.
-            try f.call(MCPTools.setPanelLayout, ["blocks": blocks, "style": .object(["spacing": .string("compact")])])
+            try f.call(MCPTools.draftHUD, ["blocks": blocks, "style": .object(["spacing": .string("compact")])])
             poll("\(name): an edit that touches no agent opens a card") { f.isOpen }
             XCTAssertEqual(root().focusVendor.map(AgentArtwork.markKey), AgentArtwork.markKey(first), name)
             XCTAssertTrue(root().pinned, name)
@@ -468,7 +468,7 @@ final class PanelHoldHUDTests: XCTestCase {
                 XCTAssertEqual(f.hud.glowShells?.surface?.frame, f.hud.island.rootView.cardScreenFrame, "\(name): under the card")
             }
 
-            try f.call(MCPTools.finishPanelEdit)
+            try f.call(MCPTools.finishHUDEdit)
             poll("\(name): finishing closes the card") { !f.isOpen }
             XCTAssertNil(f.hud.glowShells?.surface, "\(name): gone with the card")
             XCTAssertNotNil(f.hud.glowShells?.dock, name)

@@ -16,7 +16,9 @@ struct ResetCreditAlertCompactView: View {
 
     /// A length at the scale of the dock this reminder grows from.
     private func s(_ value: CGFloat) -> CGFloat { (value * scale).rounded() }
-    /// The size of its words or of the symbol beside them, from their size beside the notch: a size smaller on a dock.
+    /// The size of its name or status, from their size beside the notch: on a dock, the size of every word a dock writes.
+    private func w(_ value: CGFloat) -> CGFloat { s(CompactWings.words(value, onDock: wings != nil)) }
+    /// The size of the symbol beside its status, from its size beside the notch: a size smaller on a dock.
     private func t(_ value: CGFloat) -> CGFloat { s(CompactWings.size(value, onDock: wings != nil)) }
 
     var body: some View {
@@ -26,14 +28,14 @@ struct ResetCreditAlertCompactView: View {
                 HStack(spacing: s(8)) {
                     ReminderMarkView(vendor: grant.account.account.provider, size: s(17), mark: .credit)
                     Text(grant.account.account.provider)
-                        .font(.ui(t(13), .semibold)).foregroundStyle(theme.alertText).lineLimit(1)
+                        .font(.ui(w(13), .semibold)).foregroundStyle(theme.alertText).lineLimit(1)
                 }
                 .frame(width: wings?.leading ?? s(IslandController.alertWingWidth), alignment: .leading)
                 Color.clear.frame(width: wings?.gap ?? cameraWidth)
                 HStack(spacing: s(7)) {
                     ResetCreditSymbol(grant: grant, size: t(12))
                     Text(copy.compactTitle)
-                        .font(.tabular(t(12), .medium)).foregroundStyle(theme.alertInk(0.92)).lineLimit(1)
+                        .font(.tabular(w(12), .medium)).foregroundStyle(theme.alertInk(0.92)).lineLimit(1)
                 }
                 .frame(width: wings?.trailing ?? s(IslandController.alertWingWidth), alignment: .trailing)
             }

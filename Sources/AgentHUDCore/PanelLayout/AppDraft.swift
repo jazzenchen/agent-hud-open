@@ -10,7 +10,7 @@ import Foundation
 /// drops that field first. A field is set only when the person asks an agent for that setting, never as a side effect of
 /// arranging the panel, which the tools' descriptions tell an agent.
 ///
-/// It is written in an agent's words, as `get_panel` reads it under `app` and `set_panel_layout` takes it: `matchScreen`
+/// It is written in an agent's words, as `get_hud` reads it under `app` and `draft_hud` takes it: `matchScreen`
 /// is `appearanceFollowsScreen`, and under `hover`, `pressOptionToOpen` is `requiresOptionToOpen`, `openAtTopEdge`
 /// `openImmediatelyAtTop` and `delayMs` `hoverDelayMs`, while `appearance`, `botLogos`, `showMenuBarIcon` and
 /// `collapseDelayMs` keep their names. The language is none of them: it is changed in Settings alone.
@@ -60,7 +60,7 @@ public struct AppDraft: Hashable, Sendable {
         }
     }
 
-    /// Every field an agent can set, as `settings` has it: the app's settings in effect, as `get_panel` lists them.
+    /// Every field an agent can set, as `settings` has it: the app's settings in effect, as `get_hud` lists them.
     init(every settings: Settings) {
         self.init(appearance: settings.appearance, matchScreen: settings.appearanceFollowsScreen,
                   botLogos: settings.botLogos, showMenuBarIcon: settings.showMenuBarIcon,
@@ -100,7 +100,7 @@ extension AppDraft {
             }
         }
 
-        /// Where `set_panel_layout` takes it and `get_panel` lists it, as a sentence names it: `app.botLogos`,
+        /// Where `draft_hud` takes it and `get_hud` lists it, as a sentence names it: `app.botLogos`,
         /// `app.hover.delayMs`.
         var path: String { "app." + (isHover ? "hover." : "") + rawValue }
 
@@ -129,7 +129,7 @@ extension AppDraft {
         }
     }
 
-    /// What `get_panel` lists under `app` beside the fields, which no proposal sets: the language chosen and the one the
+    /// What `get_hud` lists under `app` beside the fields, which no proposal sets: the language chosen and the one the
     /// panel's names are written in. A proposal may give each as it was listed, so the app listed can be sent back whole.
     static let readOnly = ["language", "writtenIn"]
 
@@ -200,7 +200,7 @@ extension AppDraft {
 extension AppDraft {
     /// What reading an app as an agent sent it would forgive, as sentences: a value of the wrong kind, an appearance this
     /// build does not know, or a property the app or its hover does not have. Whether the read-only language repeats
-    /// what is listed is the proposal's to tell (`PanelTools.AppProposal`). A value given as null is not given.
+    /// what is listed is the proposal's to tell (`HUDTools.AppProposal`). A value given as null is not given.
     static func misreadings(of value: JSONValue) -> [String] {
         if value == .null { return [] }
         guard let app = value.objectValue else { return ["app is an object."] }
@@ -215,7 +215,7 @@ extension AppDraft {
             if readOnly.contains(property) { continue }
             guard let field = Field(rawValue: property), !field.isHover else {
                 var sentence = "app has no property \"\(property)\"; the app takes \(HUDStyle.listed(named)), and "
-                    + "\(HUDStyle.listed(readOnly)) as get_panel lists them."
+                    + "\(HUDStyle.listed(readOnly)) as get_hud lists them."
                 if let field = Field(rawValue: property) { sentence += " Hover behavior's \(property) is \(field.path)." }
                 found.append(sentence)
                 continue

@@ -18,7 +18,7 @@ struct PanelHoldState: Equatable {
 /// readings the store holds. It opens as `forceOpen()` does, so the island grows, a detached card's shadow waits for the
 /// card and the glass joins as they do for a hover. A call that restyled the resting HUD alone pauses the hold and closes
 /// the panel, so the HUD shows; the next layout edit opens it again. When the hold ends, by its time, by the agent's
-/// `finish_panel_edit`, or by a person taking over, the panel closes as a hovered one does once the pointer has left it,
+/// `finish_hud_edit`, or by a person taking over, the panel closes as a hovered one does once the pointer has left it,
 /// unless the pointer is on it, and from then on it is a hovered panel.
 ///
 /// A person takes over, which ends the hold at once, by pressing Save or Discard in the panel or any of Settings' layout

@@ -25,7 +25,7 @@ final class MCPServerTests: XCTestCase {
                        + "These tools read what its hover panel shows and rearrange it, for every screen or for one, "
                        + "restyle one screen's resting HUD, and change an app setting the user asks for by name. "
                        + "A change is a draft until the user presses Save in the panel. "
-                       + "A layout edit holds the panel open for two minutes; call finish_panel_edit when you are done.")
+                       + "A layout edit holds the panel open for two minutes; call finish_hud_edit when you are done.")
         XCTAssertEqual(result.objectValue?.keys.sorted(), ["capabilities", "instructions", "protocolVersion", "serverInfo"],
                        "a handshake client gets the result its revision defines and nothing else")
     }
@@ -43,7 +43,7 @@ final class MCPServerTests: XCTestCase {
                      #"{"jsonrpc":"2.0","method":"notifications/cancelled","params":{"requestId":1,"reason":"gave up"}}"#,
                      #"{"jsonrpc":"2.0","method":"notifications/roots/list_changed"}"#,
                      #"{"jsonrpc":"2.0","method":"somebody/elses","params":{"x":1}}"#,
-                     #"{"jsonrpc":"2.0","method":"tools/call","params":{"name":"get_panel"}}"#] {
+                     #"{"jsonrpc":"2.0","method":"tools/call","params":{"name":"get_hud"}}"#] {
             XCTAssertEqual(probe.server.lines(for: line), [], line)
         }
         XCTAssertTrue(probe.calls.isEmpty, "a tool call nobody waits on is not made")

@@ -223,20 +223,21 @@ final class AdditionalProviderTests: XCTestCase, @unchecked Sendable {
         let url = try authDB(), agent = try directory()
         try database(url) { db in
             try sql(db, "CREATE TABLE composerHeaders (composerId TEXT PRIMARY KEY, value TEXT)")
-            try sql(db, #"INSERT INTO composerHeaders VALUES ('ide', '{"name":"Codebase tour"}'), ('empty', '{}')"#)
+            try sql(db, #"INSERT INTO composerHeaders VALUES ('ide', '{"name":"Codebase tour"}'), ('empty', '{}'), ('shelved', '{"name":"Old plan","isArchived":true}')"#)
         }
         for (folder, id, title) in [("acp-sessions", "acp", "Feishu round one"), ("chats/0cc175b9", "cli", "New Agent")] {
             let meta = agent.appendingPathComponent("\(folder)/\(id)/meta.json")
             try FileManager.default.createDirectory(at: meta.deletingLastPathComponent(), withIntermediateDirectories: true)
             try #"{"schemaVersion":1,"title":"\#(title)"}"#.write(to: meta, atomically: true, encoding: .utf8)
         }
-        let rows = try ["ide", "empty", "acp", "cli", "elsewhere"].map {
+        let rows = try ["ide", "empty", "acp", "cli", "elsewhere", "shelved"].map {
             try json(#"{"timestamp":"1788800000000","conversationId":"\#($0)","model":"m","tokenUsage":{"inputTokens":1,"outputTokens":1}}"#)
         }
         let parsed = try CursorClient.parseEvents(rows, account: "a")
         let named = await CursorClient(database: url, agentFolder: agent).named(parsed, account: "a")
-        XCTAssertEqual(named.sessions.map(\.title), ["Feishu round one", "Cursor · cli", "Cursor · elsewher", "Cursor · empty", "Codebase tour"],
+        XCTAssertEqual(named.sessions.map(\.title), ["Feishu round one", "Cursor · cli", "Cursor · elsewher", "Cursor · empty", "Codebase tour", "Old plan"],
                        "a chat still called New Agent, or run elsewhere, keeps its placeholder")
+        XCTAssertEqual(named.sessions.filter(\.archived).map(\.title), ["Old plan"], "a composer Cursor archived is archived")
     }
 
     private actor Requests {

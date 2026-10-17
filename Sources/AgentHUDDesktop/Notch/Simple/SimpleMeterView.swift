@@ -62,8 +62,7 @@ struct SimpleMeterView: View {
                         .rotationEffect(.degrees(-90))
                 }
                 // With bots off the mark is its logo, wearing a waiting request's or a badge's sign still.
-                BotMark(vendor: item.vendor, size: config.logo, state: item.shown, cue: item.cue, staysBot: false,
-                        resumes: config.resumes)
+                BotMark(vendor: item.vendor, size: config.logo, state: item.shown, cue: item.cue, staysBot: false)
                     .environment(\.botLogos, botLogos && config.bots)
             }
             .frame(width: config.mark, height: config.mark)

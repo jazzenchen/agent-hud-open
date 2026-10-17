@@ -24,8 +24,8 @@ struct HUDShells: Equatable, Sendable {
     /// The island, the panel or reminder it has grown into, or a detached card; nothing while a dock that separates
     /// its agents shows only its marks.
     let surface: HUDShell?
-    /// The Simple panel of a dock that separates its agents. It stays where it is, and its shadow with it, while a
-    /// card comes and goes beside it.
+    /// The Simple panel beside a detached card, or at rest on a dock that separates its agents. It stays where it is,
+    /// and its shadow with it, while a card comes and goes beside it.
     let dock: HUDShell?
 }
 

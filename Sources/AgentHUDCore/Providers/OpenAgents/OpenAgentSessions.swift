@@ -53,6 +53,9 @@ struct OpenAgentSession: Sendable {
     var completions: [SessionCompletion] = []
     /// A missing target in the latest observer reading clears an older terminal destination.
     var navigation: NavigationObservation?
+    /// Whether the client archived the session; only OpenCode's database says so (`time_archived`). Its usage counts, and
+    /// it is left out of the session list.
+    var archived = false
 
     struct NavigationObservation: Sendable {
         let observedAt: Date
@@ -292,7 +295,9 @@ enum OpenAgentParser {
         let fields = ["role", "time", "tokens", "modelID", "providerID", "model", "path"]
             .map { "'\($0)', json_extract(m.data, '$.\($0)')" }.joined(separator: ", ")
         func read(_ messages: String, titles table: String?, where filter: String) throws {
-            let metadata = table == nil ? "NULL, NULL" : "s.title, s.directory"
+            var archivable = false
+            if let table { try db.rows("SELECT name FROM pragma_table_info('\(table)')") { row in archivable = archivable || ReadOnlySQLite.text(row, 0) == "time_archived" } }
+            let metadata = table == nil ? "NULL, NULL, NULL" : "s.title, s.directory, \(archivable ? "s.time_archived" : "NULL")"
             let join = table.map { "LEFT JOIN \($0) s ON s.id = m.session_id" } ?? ""
             var last: String?, count = 0
             repeat {
@@ -302,8 +307,9 @@ enum OpenAgentParser {
                     guard let id = ReadOnlySQLite.text(row, 0), let sid = ReadOnlySQLite.text(row, 1), let raw = ReadOnlySQLite.text(row, 2) else { throw ProviderFailure.format }
                     count += 1
                     last = id
-                    if let item = try openCodeMessage(ProviderJSON.read(Data(raw.utf8)), id: id, sessionID: sid, path: url.path,
+                    if var item = try openCodeMessage(ProviderJSON.read(Data(raw.utf8)), id: id, sessionID: sid, path: url.path,
                         title: ReadOnlySQLite.text(row, 3), workspace: ReadOnlySQLite.text(row, 4), assistant: messages == "session_message") {
+                        item.archived = ReadOnlySQLite.text(row, 5) != nil
                         sessions.append(item)
                     }
                 }

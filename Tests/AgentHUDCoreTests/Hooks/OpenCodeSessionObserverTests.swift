@@ -233,6 +233,11 @@ final class OpenCodeSessionObserverTests: XCTestCase, @unchecked Sendable {
         const queued = rows().filter(r => r.sessionID === 'opencode:ses_b');
         assert.deepEqual(queued.map(r => [r.turnID, r.workspace]), [['msg_33', '/work/fallback']]);
         assert.equal(JSON.stringify(rows()).includes('private prompt'), false);
+        // A session deleted in OpenCode takes its records along; the others stay.
+        const kept = rows().length - queued.length;
+        await emit('session.deleted', { info: { id: 'ses_b' } });
+        assert.equal(rows().filter(r => r.sessionID === 'opencode:ses_b').length, 0);
+        assert.equal(rows().length, kept);
 
         for (const [index, [program, id, tmux, expected]] of [
           ['iTerm.app', 'w7t2p0:exact-terminal', '', { kind: 'iTermSession', id: 'w7t2p0:exact-terminal' }],

@@ -11,7 +11,8 @@ import Foundation
 ///    waited longest. It shows at once.
 /// 2. Claude compacting a conversation on its own. It shows at once, and the work after it too.
 /// 3. Work, as one session does it, the owner: the session shown keeps the mark for as long as it works, and when it
-///    stops the session whose log wrote last takes over. Work shows at once. A new look of the same session shows only
+///    stops the session whose log wrote last takes over. While it thinks, a session that uses a tool takes over, so the
+///    mark shows the agent at work whenever any of its sessions is. Work shows at once. A new look of the same session shows only
 ///    once two reads at least `confirmation` apart want it, and not before the one shown has held for `hold`; looks that
 ///    keep changing hold for `guardedHold` instead.
 /// 4. No news: a session in flight by evidence too old to vouch for, and none working.

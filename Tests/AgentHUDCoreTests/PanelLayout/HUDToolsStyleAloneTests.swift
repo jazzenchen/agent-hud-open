@@ -6,7 +6,7 @@ import XCTest
 /// A call that gives one screen's style alone, beside its screen and revision, changes that style and nothing else: the
 /// screen's layout, saved or as a draft, its own or the shared one, stays as it is, and the note says so. A call that
 /// names a layout field still proposes the whole layout with the style beside it. No tool writes the settings.
-final class PanelToolsStyleAloneTests: PanelToolsCase {
+final class HUDToolsStyleAloneTests: HUDToolsCase {
     private let builtIn = PanelScreen(key: "BUILT-IN-UUID", name: "Built-in display", mode: .notch, edge: .top, hasNotch: true,
                                       agents: ["Claude", "Codex", "DeepSeek"],
                                       otherModes: [.logos: ["Claude", "Codex", "Cursor"], .simple: ["Claude", "Codex", "Kimi"]],
@@ -18,10 +18,10 @@ final class PanelToolsStyleAloneTests: PanelToolsCase {
     private let unchanged = " The layout of the panel on \"Display 2\" is unchanged: a call with only hud style fields leaves "
         + "the layout as it is."
 
-    private lazy var screenTools = PanelTools(store: store, launch: 0, screens: { [unowned self] in [builtIn, second] })
+    private lazy var screenTools = HUDTools(store: store, launch: 0, screens: { [unowned self] in [builtIn, second] })
 
     private func call(_ arguments: [String: JSONValue], line: UInt = #line) throws -> [String: JSONValue] {
-        let request = MCPToolRequest(tool: MCPTools.setPanelLayout, arguments: arguments)
+        let request = MCPToolRequest(tool: MCPTools.draftHUD, arguments: arguments)
         guard case .result(let result, _) = screenTools.answer(request) else {
             XCTFail("the proposal was refused", line: line)
             throw CancellationError()

@@ -3,12 +3,12 @@ import Foundation
 import XCTest
 @testable import AgentHUDCore
 
-/// The app's own settings under `set_panel_layout`'s `app`: a draft held beside the screens' drafts and drawn over the
+/// The app's own settings under `draft_hud`'s `app`: a draft held beside the screens' drafts and drawn over the
 /// settings at once for every screen, whatever screen the call names, kept by the Save in any panel's bar and dropped by
 /// its Discard, by a relaunch and, a field at a time, by a person's own change of that setting in Settings. A proposal is
 /// whole, refused whole with every reason, and one that leaves the app out leaves its draft as it is. A call with only
 /// app leaves every layout and style, and every hold, as they are. No tool writes the settings.
-final class PanelToolsAppTests: PanelToolsCase {
+final class HUDToolsAppTests: HUDToolsCase {
     private let builtIn = PanelScreen(key: "BUILT-IN-UUID", name: "Built-in display", mode: .notch, edge: .top, hasNotch: true,
                                       agents: ["Claude", "Codex", "DeepSeek"],
                                       systemIsLight: false, reducesTransparency: false)
@@ -23,7 +23,7 @@ final class PanelToolsAppTests: PanelToolsCase {
         + "user changes that setting in Settings."
     private let alone = " A call with only app leaves every layout and every screen's HUD style as it is."
 
-    private lazy var screenTools = PanelTools(store: store, launch: 0, screens: { [unowned self] in [builtIn, second] })
+    private lazy var screenTools = HUDTools(store: store, launch: 0, screens: { [unowned self] in [builtIn, second] })
 
     override func setUp() {
         super.setUp()
@@ -40,7 +40,7 @@ final class PanelToolsAppTests: PanelToolsCase {
     }
 
     private func call(_ arguments: [String: JSONValue], line: UInt = #line) throws -> [String: JSONValue] {
-        try call(MCPTools.setPanelLayout, arguments, line: line)
+        try call(MCPTools.draftHUD, arguments, line: line)
     }
 
     private func call(_ tool: String, _ arguments: [String: JSONValue], line: UInt = #line) throws -> [String: JSONValue] {
@@ -53,7 +53,7 @@ final class PanelToolsAppTests: PanelToolsCase {
 
     private func refused(_ arguments: [String: JSONValue], line: UInt = #line) throws -> String {
         let before = (layout.revision, layout.appDraft, settings.settings)
-        guard case .failure(let sentence) = screenTools.answer(MCPToolRequest(tool: MCPTools.setPanelLayout,
+        guard case .failure(let sentence) = screenTools.answer(MCPToolRequest(tool: MCPTools.draftHUD,
                                                                              arguments: arguments)) else {
             XCTFail("the proposal was taken", line: line)
             throw CancellationError()
@@ -70,7 +70,7 @@ final class PanelToolsAppTests: PanelToolsCase {
     // MARK: A draft drawn at once
 
     /// An app proposal is the app's draft: drawn over the settings at once wherever the app reads them, read back by
-    /// get_panel as the app draws it with appUnsaved, and shown in the bar of every screen's panel, while the settings,
+    /// get_hud as the app draws it with appUnsaved, and shown in the bar of every screen's panel, while the settings,
     /// the layouts and the styles stay as they are and nothing is written.
     func testAnAppProposalIsADraftDrawnOverTheSettings() throws {
         changes = 0
@@ -100,7 +100,7 @@ final class PanelToolsAppTests: PanelToolsCase {
         XCTAssertTrue(layout.hasDraft(on: key), "every screen's panel has the bar, with Save and Discard")
         XCTAssertTrue(layout.hasDraft(on: "screen:any"))
         XCTAssertTrue(layout.hasDraft(on: nil))
-        let screens = (try call(MCPTools.getPanel, [:])["screens"]?.arrayValue ?? []).compactMap(\.objectValue)
+        let screens = (try call(MCPTools.getHUD, [:])["screens"]?.arrayValue ?? []).compactMap(\.objectValue)
         XCTAssertEqual(screens.map { $0["unsaved"] }, [.bool(true), .bool(true)])
         XCTAssertEqual(screens.map { $0["styleUnsaved"] }, [.bool(false), .bool(false)])
 
@@ -112,12 +112,12 @@ final class PanelToolsAppTests: PanelToolsCase {
     }
 
     /// A proposal is whole: a field it leaves out is what is saved, so a new one replaces the draft and one that sets
-    /// nothing drops it. A field set to what is saved changes nothing, so the app get_panel lists, the read-only language
+    /// nothing drops it. A field set to what is saved changes nothing, so the app get_hud lists, the read-only language
     /// included, sent back, keeps the draft as it is, and the app as saved leaves none.
     func testAnAppProposalIsWholeAndTheListedAppCanBeSentBack() throws {
         _ = try call(["app": .object(["botLogos": .bool(false)])])
         XCTAssertEqual(layout.appDraft, AppDraft(botLogos: false))
-        let listed = try XCTUnwrap(try call(MCPTools.getPanel, [:])["app"])
+        let listed = try XCTUnwrap(try call(MCPTools.getHUD, [:])["app"])
         let revision = layout.revision
         XCTAssertEqual(try call(["app": listed])["app"], listed)
         XCTAssertEqual(layout.appDraft, AppDraft(botLogos: false), "the draft as it was")
@@ -140,7 +140,7 @@ final class PanelToolsAppTests: PanelToolsCase {
     }
 
     /// The app's draft is the person's to keep: a call that leaves the app out, a layout, a style, from or a drop, leaves
-    /// it as it is, and discard_panel_draft says so.
+    /// it as it is, and discard_hud_draft says so.
     func testACallThatLeavesTheAppOutLeavesItsDraft() throws {
         _ = try call(["app": .object(["botLogos": .bool(false)])])
         let layoutAndStyle = try call(["screen": .string(key), "hiddenSections": .array([.string("tokens")]),
@@ -149,15 +149,15 @@ final class PanelToolsAppTests: PanelToolsCase {
         XCTAssertFalse(note(layoutAndStyle).contains("app's own settings"), note(layoutAndStyle))
         _ = try call(["from": .string("default")])
         XCTAssertEqual(layout.appDraft, AppDraft(botLogos: false))
-        let dropped = try call(MCPTools.discardPanelDraft, ["screen": .string(key)])
+        let dropped = try call(MCPTools.discardHUDDraft, ["screen": .string(key)])
         XCTAssertEqual(layout.appDraft, AppDraft(botLogos: false))
         XCTAssertTrue(note(dropped).hasSuffix(" The app's own settings keep their unsaved draft, which only "
-                                              + "set_panel_layout's app changes: an app that sets nothing drops it."),
+                                              + "draft_hud's app changes: an app that sets nothing drops it."),
                       note(dropped))
         XCTAssertEqual(dropped["unsaved"], .bool(true), "the screen's bar still shows the app's draft")
-        _ = try call(MCPTools.discardPanelDraft, [:])
+        _ = try call(MCPTools.discardHUDDraft, [:])
         XCTAssertEqual(layout.appDraft, AppDraft(botLogos: false))
-        let finished = try call(MCPTools.finishPanelEdit, [:])
+        let finished = try call(MCPTools.finishHUDEdit, [:])
         XCTAssertTrue(note(finished).hasSuffix(" Drafts wait for the user to press Save in the panel."), note(finished))
     }
 
@@ -199,9 +199,9 @@ final class PanelToolsAppTests: PanelToolsCase {
         for reason in [
             "No block has the key \"Zed\"",
             "app has no property \"theme\"; the app takes appearance, matchScreen, botLogos, showMenuBarIcon and hover, "
-                + "and language and writtenIn as get_panel lists them.",
+                + "and language and writtenIn as get_hud lists them.",
             "app has no property \"delayMs\"; the app takes appearance, matchScreen, botLogos, showMenuBarIcon and hover, "
-                + "and language and writtenIn as get_panel lists them. Hover behavior's delayMs is app.hover.delayMs.",
+                + "and language and writtenIn as get_hud lists them. Hover behavior's delayMs is app.hover.delayMs.",
             "app.botLogos is true or false.",
             "app.appearance is one of \"system\", \"dark\", \"light\".",
             "app.hover has no property \"speed\"; the hover takes pressOptionToOpen, openAtTopEdge, delayMs and "
@@ -212,8 +212,8 @@ final class PanelToolsAppTests: PanelToolsCase {
             "app.hover.collapseDelayMs: collapseDelayMs is a whole number of milliseconds from 0 to 1500 in steps of 50, "
                 + "as Settings sets it, which 1600 is not.",
             "app.language is read only: it is the Language chosen in Settings, which only Settings changes, \"system\" as "
-                + "get_panel lists it. Leave it out, or give it as listed.",
-            "app.writtenIn is read only: it is the language the panel's names are written in now, \"en\" as get_panel "
+                + "get_hud lists it. Leave it out, or give it as listed.",
+            "app.writtenIn is read only: it is the language the panel's names are written in now, \"en\" as get_hud "
                 + "lists it. Leave it out, or give it as listed.",
         ] {
             XCTAssertTrue(sentence.contains(reason), "\(reason)\n\(sentence)")
@@ -247,14 +247,14 @@ final class PanelToolsAppTests: PanelToolsCase {
         XCTAssertEqual(changes, 0)
     }
 
-    /// The settings read a delay as it was written, so one saved outside Settings' range or between its steps, as get_panel
+    /// The settings read a delay as it was written, so one saved outside Settings' range or between its steps, as get_hud
     /// lists it, can be sent back and changes nothing.
     func testADelaySavedOffItsStepsCanBeSentBack() throws {
         settings.update {
             $0.hoverDelayMs = 425
             $0.collapseDelayMs = 2_000
         }
-        let listed = try XCTUnwrap(try call(MCPTools.getPanel, [:])["app"])
+        let listed = try XCTUnwrap(try call(MCPTools.getHUD, [:])["app"])
         XCTAssertEqual(listed["hover"]["delayMs"], .integer(425))
         XCTAssertEqual(listed["hover"]["collapseDelayMs"], .integer(2_000))
         _ = try call(["app": listed])
@@ -320,13 +320,13 @@ final class PanelToolsAppTests: PanelToolsCase {
     }
 
     /// A person who turns Match screen on leaves the windows to their screen's look, which Settings greys the Appearance
-    /// out for, so the draft's appearance goes with it: get_panel never lists an app that a proposal would refuse, and the
+    /// out for, so the draft's appearance goes with it: get_hud never lists an app that a proposal would refuse, and the
     /// app listed, sent back, is taken.
     func testMatchScreenTurnedOnInSettingsDropsTheDraftsAppearance() throws {
         _ = try call(["app": .object(["appearance": .string("dark"), "botLogos": .bool(false)])])
         settings.updateSetting(\.appearanceFollowsScreen) { $0.appearanceFollowsScreen = true }
         XCTAssertEqual(layout.appDraft, AppDraft(botLogos: false))
-        let listed = try XCTUnwrap(try call(MCPTools.getPanel, [:])["app"])
+        let listed = try XCTUnwrap(try call(MCPTools.getHUD, [:])["app"])
         XCTAssertEqual(listed["appearance"], .string("system"))
         XCTAssertEqual(listed["matchScreen"], .bool(true))
         _ = try call(["app": listed])

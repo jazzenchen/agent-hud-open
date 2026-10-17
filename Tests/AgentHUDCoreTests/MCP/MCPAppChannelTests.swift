@@ -73,12 +73,12 @@ final class MCPAppChannelTests: XCTestCase {
         addTeardownBlock { await channel.stop() }
         let path = channel.path
 
-        let read = MCPToolRequest(tool: "get_panel")
+        let read = MCPToolRequest(tool: "get_hud")
         let answered = await call(read, at: path)
         XCTAssertEqual(answered, .reply(reply))
 
-        reply = .failure("The layout changed since revision 3. Call get_panel and send the layout again.")
-        let layout = MCPToolRequest(tool: "set_panel_layout", arguments: [
+        reply = .failure("The layout changed since revision 3. Call get_hud and send the layout again.")
+        let layout = MCPToolRequest(tool: "draft_hud", arguments: [
             "order": .array([.string("codex"), .string("claude")]), "revision": .integer(3),
             "blocks": .object(["claude": .object(["widget": .string("ring"), "hidden": .bool(false)])]),
         ])
@@ -105,7 +105,7 @@ final class MCPAppChannelTests: XCTestCase {
         let channel = MCPAppChannel(directory: try directory()) { _ in reply }
         XCTAssertTrue(channel.start())
         addTeardownBlock { await channel.stop() }
-        let answered = await call(MCPToolRequest(tool: MCPTools.getPanelImage), at: channel.path)
+        let answered = await call(MCPToolRequest(tool: MCPTools.getHUDScreenshot), at: channel.path)
         XCTAssertEqual(answered, .reply(reply))
         XCTAssertLessThanOrEqual(MCPToolRequest.sizeLimit, 1024 * 1024, "only replies carry pictures; a request is no larger than it was")
     }
@@ -119,7 +119,7 @@ final class MCPAppChannelTests: XCTestCase {
         XCTAssertFalse(second.start(), "what another copy of the application opened beside the first one finds")
         XCTAssertFalse(second.isListening)
         second.stop()
-        let answered = await call(MCPToolRequest(tool: "get_panel"), at: first.path)
+        let answered = await call(MCPToolRequest(tool: "get_hud"), at: first.path)
         XCTAssertEqual(answered, .reply(.result(["served": .string("first")])), "stopping the second removed nothing")
     }
 
@@ -132,15 +132,15 @@ final class MCPAppChannelTests: XCTestCase {
         XCTAssertTrue(channel.start())
         addTeardownBlock { await channel.stop() }
         let path = channel.path
-        let first = await call(MCPToolRequest(tool: "get_panel"), at: path)
+        let first = await call(MCPToolRequest(tool: "get_hud"), at: path)
         XCTAssertEqual(first, .reply(.result([:])), "the channel is up")
 
         let unreadable = ["not json": "The request is not a JSON object.",
-                          #"["get_panel"]"#: "The request is not a JSON object.",
-                          #"{"tool":"get_panel","arguments":{"#: "The request is not a JSON object.",
+                          #"["get_hud"]"#: "The request is not a JSON object.",
+                          #"{"tool":"get_hud","arguments":{"#: "The request is not a JSON object.",
                           #"{"arguments":{}}"#: "The request names no tool.",
                           #"{"tool":7}"#: "The request names no tool.",
-                          #"{"tool":"get_panel","arguments":[1]}"#: "The request's arguments are not a JSON object."]
+                          #"{"tool":"get_hud","arguments":[1]}"#: "The request's arguments are not a JSON object."]
         for (message, reason) in unreadable {
             let returned = await exchange(Data(message.utf8), at: path)
             let answer = try XCTUnwrap(returned, message)
@@ -154,19 +154,19 @@ final class MCPAppChannelTests: XCTestCase {
         var received: [MCPToolRequest] = []
         let channel = MCPAppChannel(directory: try directory()) { request in
             received.append(request)
-            return request.tool == MCPTools.getPanel ? .result(["revision": .integer(7)]) : .failure("There is no draft to drop.")
+            return request.tool == MCPTools.getHUD ? .result(["revision": .integer(7)]) : .failure("There is no draft to drop.")
         }
         XCTAssertTrue(channel.start())
         addTeardownBlock { await channel.stop() }
         let path = channel.path
-        let first = await call(MCPToolRequest(tool: "get_panel"), at: path)
+        let first = await call(MCPToolRequest(tool: "get_hud"), at: path)
         XCTAssertEqual(first, .reply(.result(["revision": .integer(7)])), "the channel is up")
         received.removeAll()
 
         let input = [#"{"jsonrpc":"2.0","id":0,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{}}}"#,
                      #"{"jsonrpc":"2.0","method":"notifications/initialized"}"#,
-                     #"{"jsonrpc":"2.0","id":"read","method":"tools/call","params":{"name":"get_panel","arguments":{}}}"#,
-                     #"{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"discard_panel_draft"}}"#].joined(separator: "\n") + "\n"
+                     #"{"jsonrpc":"2.0","id":"read","method":"tools/call","params":{"name":"get_hud","arguments":{}}}"#,
+                     #"{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"discard_hud_draft"}}"#].joined(separator: "\n") + "\n"
         // The process as a client runs it, with this test's socket in place of the data directory's.
         let written = await Task.detached { () -> String in
             var inbound: [Int32] = [0, 0], outbound: [Int32] = [0, 0]
@@ -187,12 +187,12 @@ final class MCPAppChannelTests: XCTestCase {
         XCTAssertEqual(messages[1]["result"]["isError"], .bool(false))
         XCTAssertEqual(messages[2]["result"].blockText, "There is no draft to drop.")
         XCTAssertEqual(messages[2]["result"]["isError"], .bool(true))
-        XCTAssertEqual(received, [MCPToolRequest(tool: "get_panel"), MCPToolRequest(tool: "discard_panel_draft")])
+        XCTAssertEqual(received, [MCPToolRequest(tool: "get_hud"), MCPToolRequest(tool: "discard_hud_draft")])
     }
 
     func testWithNoApplicationServingTheSocketACallSaysNotRunning() throws {
         let path = MCPAppChannel.socketPath(in: try directory())
-        let request = MCPToolRequest(tool: "get_panel")
+        let request = MCPToolRequest(tool: "get_hud")
         XCTAssertEqual(MCPAppClient.call(request, socket: path), .notRunning, "no socket")
         try Data().write(to: URL(fileURLWithPath: path))
         XCTAssertEqual(MCPAppClient.call(request, socket: path), .notRunning, "a file that is no socket")
@@ -210,7 +210,7 @@ final class MCPAppChannelTests: XCTestCase {
         let wedged = try bareSocket(at: path, listening: true)
         defer { close(wedged) }
         let started = Date()
-        XCTAssertEqual(MCPAppClient.call(MCPToolRequest(tool: "get_panel"), socket: path, timeout: 0.2), .unanswered)
+        XCTAssertEqual(MCPAppClient.call(MCPToolRequest(tool: "get_hud"), socket: path, timeout: 0.2), .unanswered)
         XCTAssertLessThan(Date().timeIntervalSince(started), 5, "the wait ends with the time allowed, here a fifth of a second")
         XCTAssertEqual(MCPAppClient.timeout, 10)
     }
@@ -220,18 +220,18 @@ final class MCPAppChannelTests: XCTestCase {
         let listening = try bareSocket(at: path, listening: true)
         defer { close(listening) }
         let rows = JSONValue.array([.string(String(repeating: "x", count: MCPToolRequest.sizeLimit))])
-        let large = MCPToolRequest(tool: "set_panel_layout", arguments: ["order": rows])
+        let large = MCPToolRequest(tool: "draft_hud", arguments: ["order": rows])
         XCTAssertEqual(MCPAppClient.call(large, socket: path, timeout: 0.2),
                        .reply(.failure("The call is larger than Agent HUD reads. Send less in one call.")),
                        "the application would drop it unanswered, so the process says why itself")
     }
 
     func testRequestsAndRepliesReadBackWhatWasWritten() throws {
-        let request = MCPToolRequest(tool: "set_panel_layout", arguments: ["from": .string("previous"), "revision": .integer(9)])
+        let request = MCPToolRequest(tool: "draft_hud", arguments: ["from": .string("previous"), "revision": .integer(9)])
         XCTAssertEqual(try JSONValue.parse(request.message),
-                       .object(["tool": .string("set_panel_layout"), "arguments": .object(["from": .string("previous"), "revision": .integer(9)])]))
+                       .object(["tool": .string("draft_hud"), "arguments": .object(["from": .string("previous"), "revision": .integer(9)])]))
         XCTAssertEqual(try MCPToolRequest.read(request.message), request)
-        XCTAssertEqual(try MCPToolRequest.read(Data(#"{"tool":"get_panel"}"#.utf8)), MCPToolRequest(tool: "get_panel"))
+        XCTAssertEqual(try MCPToolRequest.read(Data(#"{"tool":"get_hud"}"#.utf8)), MCPToolRequest(tool: "get_hud"))
 
         let result = MCPToolReply.result(["revision": .integer(9), "draft": .bool(true)])
         XCTAssertEqual(try JSONValue.parse(result.message), .object(["ok": .bool(true), "result": .object(["revision": .integer(9), "draft": .bool(true)])]))

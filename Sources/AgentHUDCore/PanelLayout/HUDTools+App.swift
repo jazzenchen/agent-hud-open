@@ -1,16 +1,16 @@
 import AgentHUDSupport
 import Foundation
 
-/// What the tools read and propose of the app's own settings (`AppDraft`): `get_panel` lists them under `app` as the app
-/// draws them now, the app's draft included, with `appUnsaved` beside them, and `set_panel_layout` takes them under the
+/// What the tools read and propose of the app's own settings (`AppDraft`): `get_hud` lists them under `app` as the app
+/// draws them now, the app's draft included, with `appUnsaved` beside them, and `draft_hud` takes them under the
 /// same `app`, whatever screen the call names, since they hold for every screen.
-extension PanelTools {
+extension HUDTools {
     /// The app part of a proposal: the app's settings it names under `app`. A call that names no app leaves the app's
     /// draft as it is, since an agent changes these settings only when the person asks for one, never while it arranges
     /// the panel. One that names it is whole: a field it leaves out is what the app has saved, so an app that gives
-    /// nothing drops the draft, and the app `get_panel` lists, a draft's fields included, sent back, keeps the draft as it
+    /// nothing drops the draft, and the app `get_hud` lists, a draft's fields included, sent back, keeps the draft as it
     /// is. A field set to what is saved changes nothing and is no issue, a delay saved outside Settings' range included.
-    /// The language and the language the panel's names are written in, which `get_panel` lists beside the fields, set
+    /// The language and the language the panel's names are written in, which `get_hud` lists beside the fields, set
     /// nothing: each is taken where it repeats what is listed, and refused otherwise.
     @MainActor
     struct AppProposal {
@@ -21,7 +21,7 @@ extension PanelTools {
         /// Why the app cannot be drawn as asked, as sentences, what the reading would forgive included.
         let reasons: [String]
 
-        init(app value: JSONValue?, tools: PanelTools) {
+        init(app value: JSONValue?, tools: HUDTools) {
             guard let value, value != .null else {
                 given = false
                 reduced = AppDraft()
@@ -40,7 +40,7 @@ extension PanelTools {
                 let what = name == "language" ? "the Language chosen in Settings, which only Settings changes"
                     : "the language the panel's names are written in now"
                 found.append("app.\(name) is read only: it is \(what), \(listed[name].map(Self.written) ?? "none") as "
-                             + "get_panel lists it. Leave it out, or give it as listed.")
+                             + "get_hud lists it. Leave it out, or give it as listed.")
             }
             reasons = found
         }
@@ -48,7 +48,7 @@ extension PanelTools {
         private static func written(_ value: JSONValue) -> String { value.stringValue.map { "\"\($0)\"" } ?? "none" }
     }
 
-    /// What `get_panel` lists of the app under `app`: every field as the app draws it now, the app's draft included, in an
+    /// What `get_hud` lists of the app under `app`: every field as the app draws it now, the app's draft included, in an
     /// agent's words (`AppDraft`), and beside them the language chosen and the one the panel's names are written in,
     /// which no proposal sets.
     func appListing() -> [String: JSONValue] {

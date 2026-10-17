@@ -209,12 +209,15 @@ final class JoinedGlassTests: XCTestCase {
         }
     }
 
-    /// The island grown over the panel for an event from an agent with no mark here is no detached card: its shadow
-    /// fades out as the island collapses, as it always has, on a Simple dock and a Dynamic one.
-    func testTheIslandGrownForAnAgentWithNoMarkStillFadesItsShadowOut() throws {
+    /// An event from an agent with no mark here is a card like any other's, out of the middle of the dock, separated or
+    /// not: its shadow waits for it to arrive, the Simple panel keeps its own beside it, and the card's goes at once
+    /// when the card goes back, on a Simple dock and a Dynamic one.
+    func testACardForAnAgentWithNoMarkComesOutOfTheDocksMiddleWithItsShadow() throws {
         for placement in [ScreenPlacement(mode: .simple, edge: .right, separatesAgents: true, appearance: .light),
-                          ScreenPlacement(mode: .logos, edge: .bottom, separatesAgents: true, appearance: .light)] {
-            let name = "\(placement.mode)"
+                          ScreenPlacement(mode: .simple, edge: .left, appearance: .light),
+                          ScreenPlacement(mode: .logos, edge: .bottom, separatesAgents: true, appearance: .light),
+                          ScreenPlacement(mode: .logos, edge: .top, appearance: .light)] {
+            let name = "\(placement.mode) \(placement.edge)"
             let (hud, close) = try hud(placement, agents: ["Cursor", "Codex"]) { CGPoint(x: -10_000, y: -10_000) }
             defer { close() }
             RunLoop.main.run(until: Date().addingTimeInterval(0.05))
@@ -222,17 +225,34 @@ final class JoinedGlassTests: XCTestCase {
                                                       task: "New reply", model: "test", startedAt: nil,
                                                       completedAt: Date())))
             XCTAssertNotNil(hud.island.rootView.alert, name)
-            XCTAssertNil(hud.island.rootView.focusVendor, "\(name): no mark here")
-            XCTAssertNotNil(hud.glowShells?.surface, "\(name): the grown island's shadow is there at once")
-            XCTAssertEqual(surfaceShadow(of: hud, settlesAt: 1).opacity, 1, name)
+            XCTAssertEqual(hud.island.rootView.focusVendor, "Claude", "\(name): out of the dock's middle")
+            XCTAssertNil(hud.glowShells?.surface, "\(name): the card's shadow waits for it")
+            if placement.mode == .simple { XCTAssertNotNil(hud.glowShells?.dock, "\(name): the panel keeps its shadow") }
+            let card = try XCTUnwrap(hud.island.rootView.cardScreenFrame, name)
+            let panel = hud.glowShells?.dock
+            wait { hud.glowShells?.surface != nil }
+            XCTAssertEqual(hud.glowShells?.surface?.frame, card, "\(name): then stands under it")
             RunLoop.main.run(until: Date().addingTimeInterval(IslandAnimation.duration + 0.2))
 
-            hud.glow.shellShadowLayer.removeAllAnimations()
+            for layer in [hud.glow.shellShadowLayer, hud.glow.dockShadowLayer] { layer.removeAllAnimations() }
             hud.dismissCompletionAlert()
             XCTAssertNil(hud.island.rootView.alert, name)
-            XCTAssertNil(hud.glowShells?.surface, name)
-            let shadow = surfaceShadow(of: hud, settlesAt: 0)
-            XCTAssertNotNil(shadow.animation(forKey: "opacity"), "\(name): the shadow fades out")
+            if placement.mode == .simple && !placement.separatesAgents {
+                // The panel is the island again, and takes its own shadow back where it stands.
+                XCTAssertEqual(hud.glowShells?.surface, panel, name)
+                XCTAssertNil(hud.glowShells?.dock, name)
+                let docked = hud.glow.dockShadowLayer
+                wait { docked.opacity == 0 }
+                XCTAssertNil(docked.animation(forKey: "opacity"), "\(name): never two shadows under the panel")
+                let shadow = surfaceShadow(of: hud, settlesAt: 1)
+                XCTAssertNil(shadow.animation(forKey: "position"), "\(name): nothing slides in from the card")
+                XCTAssertNil(shadow.animation(forKey: "opacity"), name)
+            } else {
+                XCTAssertTrue(hud.glowShells?.surface?.bare ?? true, "\(name): the card's shadow is gone")
+                let shadow = surfaceShadow(of: hud, settlesAt: 0)
+                XCTAssertEqual(shadow.opacity, 0, name)
+                XCTAssertNil(shadow.animation(forKey: "opacity"), "\(name): at once")
+            }
         }
     }
 

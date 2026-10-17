@@ -25,9 +25,18 @@ public actor ClaudeDesktopSessions {
     }
 
     /// Only the requested native session IDs can become destinations. Conflicting active tab mappings are left unresolved.
-    public func targets(sessionIDs: Set<String>) -> [String: SessionNavigationTarget] {
-        guard !sessionIDs.isEmpty else { return [:] }
-        var files: [String: Cached] = [:], matches: [String: Set<SessionNavigationTarget>] = [:]
+    public func targets(sessionIDs: Set<String>) -> [String: SessionNavigationTarget] { index(sessionIDs: sessionIDs).targets }
+
+    /// The requested native sessions the desktop app opens in a tab, and those it archived: every tab that holds one is
+    /// archived. An archived session has no destination.
+    public struct Index: Sendable {
+        public var targets: [String: SessionNavigationTarget] = [:]
+        public var archived: Set<String> = []
+    }
+
+    public func index(sessionIDs: Set<String>) -> Index {
+        guard !sessionIDs.isEmpty else { return Index() }
+        var files: [String: Cached] = [:], matches: [String: Set<SessionNavigationTarget>] = [:], tabs: [String: (all: Int, archived: Int)] = [:]
         for location in locations {
             for file in Self.metadataFiles(roots: [location.url]) {
                 guard let values = try? file.resourceValues(forKeys: [.contentModificationDateKey, .fileSizeKey, .isRegularFileKey, .isSymbolicLinkKey]),
@@ -38,16 +47,19 @@ public actor ClaudeDesktopSessions {
                 if let previous = cache[file.path], previous.stamp == stamp { cached = previous }
                 else { cached = Cached(stamp: stamp, metadata: Self.read(file)) }
                 files[file.path] = cached
-                guard let metadata = cached.metadata, metadata.isArchived != true, sessionIDs.contains(metadata.cliSessionId),
+                guard let metadata = cached.metadata, sessionIDs.contains(metadata.cliSessionId),
                       Self.isLocalID(metadata.sessionId), file.deletingPathExtension().lastPathComponent == metadata.sessionId else { continue }
+                let archived = metadata.isArchived == true
+                tabs[metadata.cliSessionId, default: (0, 0)].all += 1
+                if archived { tabs[metadata.cliSessionId, default: (0, 0)].archived += 1; continue }
                 let target: SessionNavigationTarget = location.cowork ? .claudeCoworkSession(id: metadata.sessionId) : .claudeDesktopSession(id: metadata.sessionId)
                 matches[metadata.cliSessionId, default: []].insert(target)
             }
         }
         cache = files
-        return matches.reduce(into: [:]) { result, match in
-            if match.value.count == 1, let target = match.value.first { result[match.key] = target }
-        }
+        var index = Index(archived: Set(tabs.filter { $0.value.archived == $0.value.all }.keys))
+        for (id, targets) in matches where targets.count == 1 { index.targets[id] = targets.first }
+        return index
     }
 
     private static func read(_ file: URL) -> Metadata? {

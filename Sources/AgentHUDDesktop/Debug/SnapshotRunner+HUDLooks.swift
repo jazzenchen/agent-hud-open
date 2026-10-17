@@ -15,11 +15,12 @@ extension SnapshotRunner {
     ]
 
     /// The HUD in each look, every state drawn from the same scene with only the look differing: the open panel in the
-    /// default layout; the panel with ring, number and chart widgets and blocks half a line wide; a request to run Bash; a
-    /// question; a finished turn; a window that ran out; usage resets added; the Simple panel with its bots; a Dynamic
-    /// dock's marks, a single-colour one among them; one agent's peek on a dock that separates its agents; and the panel
-    /// with an unsaved layout's bar. The open panel and the dock are drawn again over a white desktop, with the hairline
-    /// a light desktop gives the island, and over a black one, where a light or glass look is likeliest to fail.
+    /// default layout; the panel with ring, number and chart widgets and blocks half a line wide; under its sender's
+    /// mark, a request to run Bash, a question, a finished turn, a window that ran out and usage resets added; the
+    /// Simple panel with its bots; a Dynamic dock's marks, a single-colour one among them; one agent's peek on a dock
+    /// that separates its agents; and the panel with an unsaved layout's bar. The open panel and the dock are drawn
+    /// again over a white desktop, with the hairline a light desktop gives the island, and over a black one, where a
+    /// light or glass look is likeliest to fail.
     ///
     /// Each HUD hangs from the top edge of a Dynamic dock or floats as a Simple panel, never from a hardware notch, where
     /// the island keeps the standard look whatever the screen's. They are drawn from a settings store of their own.
@@ -169,7 +170,8 @@ extension SnapshotRunner {
 }
 
 /// One still of a Dynamic dock on a top edge, the island as the screen builds it (`ScreenHUD.makeRoot`): its marks
-/// alone at rest, or a card grown out of the dock with them over it, the panel, an alert's card or an agent's peek.
+/// alone at rest, the panel grown out of the dock with them over it, or a card under one of them, an event's or an
+/// agent's peek.
 @MainActor
 struct HUDLookDock {
     let store: UsageStore
@@ -197,20 +199,24 @@ struct HUDLookDock {
     private var panelWidth: CGFloat { CGFloat(settings.panelLayout.effective(for: nil).style.panelWidth) }
     private var peek: AgentPeek? { peekVendor.map { AgentPeek.make(vendor: $0, store: store) } }
 
-    /// The card's core width: an alert's card, the whole panel, or nothing but the strip at rest.
-    private var cardWidth: CGFloat {
-        if !open { return queue.size.width }
-        if let peek { return peek.size.width }
-        return alert?.detailWidth ?? panelWidth
+    /// The agent whose card floats under its mark: an event's sender, or the agent whose peek is shown.
+    private var cardVendor: String? { open ? alert?.vendor ?? peekVendor : nil }
+
+    /// The card under a mark: a peek, or an event's card at its natural height.
+    private var cardSize: CGSize? {
+        guard open else { return nil }
+        if let alert { return CGSize(width: alert.detailWidth, height: cardHeight) }
+        return peek?.size
     }
 
-    /// The canvas the island is drawn in: the card with its shoulders, and the strip, whichever is larger.
+    /// The canvas the island is drawn in: the strip with a card under it, or the panel with its shoulders and the
+    /// strip, whichever is larger.
     var canvas: CGSize {
         let strip = queue.size
-        if let peek, open {
-            return CGSize(width: max(strip.width, peek.size.width) + 2 * flare, height: strip.height + 6 + peek.size.height)
+        if let card = cardSize {
+            return CGSize(width: max(strip.width, card.width) + 2 * flare, height: strip.height + 6 + card.height)
         }
-        return CGSize(width: max(strip.width, cardWidth) + 2 * flare, height: max(strip.height, open ? cardHeight : 0))
+        return CGSize(width: max(strip.width, open ? panelWidth : 0) + 2 * flare, height: max(strip.height, open ? cardHeight : 0))
     }
 
     /// The card's natural height, measured as the island measures it before it opens.
@@ -235,9 +241,9 @@ struct HUDLookDock {
         root.separatesAgents = placement.separatesAgents
         root.edge = .top
         root.animatesGeometry = false
-        if let peekVendor, open {
-            root.focusVendor = peekVendor
-            root.peek = peek
+        if let cardVendor {
+            root.focusVendor = cardVendor
+            root.peek = alert == nil ? peek : nil
         }
         return root
     }
@@ -249,15 +255,15 @@ struct HUDLookDock {
         let stripFrame = CGRect(x: (canvas.width - strip.width) / 2, y: 0, width: strip.width, height: strip.height)
         root.logoQueueFrame = stripFrame
         root.presentationSize = canvas
-        if let peek, open {
-            // Under its agent's mark, held inside the canvas.
-            let centre = queue.markCentres.first { AgentArtwork.markKey($0.vendor) == AgentArtwork.markKey(peek.vendor) }?.along
+        if let card = cardSize, let vendor = cardVendor {
+            // Under its agent's mark, or the middle of the dock for an agent with none, held inside the canvas.
+            let centre = queue.markCentres.first { AgentArtwork.markKey($0.vendor) == AgentArtwork.markKey(vendor) }?.along
                 ?? strip.width / 2
-            let x = min(max(0, stripFrame.minX + centre - peek.size.width / 2), canvas.width - peek.size.width)
-            root.presentationFrame = CGRect(x: x, y: strip.height + 6, width: peek.size.width, height: peek.size.height)
+            let x = min(max(0, stripFrame.minX + centre - card.width / 2), canvas.width - card.width)
+            root.presentationFrame = CGRect(x: x, y: strip.height + 6, width: card.width, height: card.height)
             root.cardScreenFrame = root.presentationFrame
         } else if open {
-            let width = cardWidth + 2 * flare
+            let width = panelWidth + 2 * flare
             root.presentationFrame = CGRect(x: (canvas.width - width) / 2, y: 0, width: width, height: canvas.height)
         } else {
             root.presentationFrame = stripFrame

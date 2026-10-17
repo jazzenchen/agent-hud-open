@@ -25,7 +25,7 @@ private struct PictureRedaction: ViewModifier {
 }
 
 /// The hover panel drawn off screen for an agent that checks how a layout looks, and measured the same way for
-/// `get_panel`: one screen's whole panel as the layout in effect there draws it, a draft included, at the width the
+/// `get_hud`: one screen's whole panel as the layout in effect there draws it, a draft included, at the width the
 /// island gives it and with that display's insets and look, on the island's card with its rounded corners. The shared
 /// layout is drawn with the main display's insets and look. Given an agent, it draws that agent's own panel instead,
 /// the card a click on the agent's mark opens beside it on a dock that separates its agents: at the layout's

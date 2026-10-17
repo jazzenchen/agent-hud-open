@@ -38,7 +38,7 @@ final class AgentToolsChannelTests: XCTestCase {
 
     /// What a client's call gets, made as the `--mcp` process makes it, off the main actor the channel answers on.
     private func call(_ path: String) async -> MCPAppClient.Answer {
-        await Task.detached { MCPAppClient.call(MCPToolRequest(tool: MCPTools.getPanel), socket: path, timeout: 5) }.value
+        await Task.detached { MCPAppClient.call(MCPToolRequest(tool: MCPTools.getHUD), socket: path, timeout: 5) }.value
     }
 
     func testTheChannelOpensAndClosesWithTheSwitch() async throws {
@@ -52,7 +52,7 @@ final class AgentToolsChannelTests: XCTestCase {
         let closed = await call(channel.path)
         XCTAssertEqual(closed, .notRunning)
 
-        settings.update { $0.agentTools = true }
+        settings.update { $0.hudTools = true }
         await until { channel.isListening }
         XCTAssertTrue(channel.isListening)
         var answer = MCPAppClient.Answer.notRunning
@@ -62,22 +62,22 @@ final class AgentToolsChannelTests: XCTestCase {
         }
         XCTAssertEqual(answer, .reply(.result(["revision": .integer(2)])))
 
-        settings.update { $0.agentTools = false }
+        settings.update { $0.hudTools = false }
         await until { !channel.isListening }
         XCTAssertFalse(channel.isListening)
         XCTAssertFalse(FileManager.default.fileExists(atPath: channel.path), "the socket goes with the switch")
         let after = await call(channel.path)
         XCTAssertEqual(after, .notRunning)
 
-        settings.update { $0.agentTools = true }
+        settings.update { $0.hudTools = true }
         await until { channel.isListening }
         XCTAssertTrue(channel.isListening, "and comes back with it")
         tools.stop()
         XCTAssertFalse(channel.isListening)
         let control = try control(settings)
-        settings.update { $0.agentTools = false }
+        settings.update { $0.hudTools = false }
         await until { !control.isListening }
-        settings.update { $0.agentTools = true }
+        settings.update { $0.hudTools = true }
         await until { control.isListening }
         XCTAssertTrue(control.isListening)
         XCTAssertFalse(channel.isListening, "a channel stopped as the application quits stays closed")
@@ -89,12 +89,12 @@ final class AgentToolsChannelTests: XCTestCase {
         let tools = AgentToolsChannel(channel: channel, settings: settings, mode: .always)
         addTeardownBlock { await tools.stop() }
         tools.start()
-        XCTAssertFalse(settings.settings.agentTools)
+        XCTAssertFalse(settings.settings.hudTools)
         XCTAssertTrue(channel.isListening)
         let control = try control(settings)
-        settings.update { $0.agentTools = true }
+        settings.update { $0.hudTools = true }
         await until { control.isListening }
-        settings.update { $0.agentTools = false }
+        settings.update { $0.hudTools = false }
         await until { !control.isListening }
         XCTAssertFalse(control.isListening)
         XCTAssertTrue(channel.isListening)
@@ -102,16 +102,16 @@ final class AgentToolsChannelTests: XCTestCase {
 
     func testADemoWithoutToolsNeverServes() async throws {
         let settings = try settings()
-        settings.update { $0.agentTools = true }
+        settings.update { $0.hudTools = true }
         let channel = MCPAppChannel(directory: try directory()) { _ in .result([:]) }
         let tools = AgentToolsChannel(channel: channel, settings: settings, mode: .never)
         addTeardownBlock { await tools.stop() }
         tools.start()
         XCTAssertFalse(channel.isListening, "a demo leaves the socket to the real copy, whatever its own switch says")
         let control = try control(settings)
-        settings.update { $0.agentTools = false }
+        settings.update { $0.hudTools = false }
         await until { !control.isListening }
-        settings.update { $0.agentTools = true }
+        settings.update { $0.hudTools = true }
         await until { control.isListening }
         XCTAssertTrue(control.isListening)
         XCTAssertFalse(channel.isListening, "nor after the switch moves")

@@ -55,7 +55,8 @@ final class FakeClientMac: @unchecked Sendable {
     func setServers(_ servers: Set<MCPClient>) { lock.withLock { _servers = servers } }
 }
 
-/// The install row on Settings → Experimental: what it offers, the command each button runs, and what it says after.
+/// The clients row on Settings → Experimental: which clients it says have the server, what picking one in its menu
+/// runs, and what it says after.
 @MainActor
 final class MCPClientSetupTests: XCTestCase {
     private let claude = URL(fileURLWithPath: "/Users/me/.local/bin/claude")
@@ -78,135 +79,127 @@ final class MCPClientSetupTests: XCTestCase {
         return setup
     }
 
-    func testTheClientsOfThisMacThenOther() {
-        let both = setup(FakeClientMac(installed: [.codex: codex, .claudeCode: claude]))
-        XCTAssertEqual(both.choices, [.client(.claudeCode), .client(.codex), .other])
-        XCTAssertEqual(both.choice, .client(.claudeCode), "the first client, where none has the server")
-        XCTAssertEqual(both.choices.map(MCPClientSetup.label), ["Claude Code", "Codex", "Other"])
+    func testTheRowNamesEveryClientThatHasTheServerAndSaysWhatToDoNext() {
+        let neither = setup(FakeClientMac(installed: [.codex: codex, .claudeCode: claude]))
+        XCTAssertEqual(neither.clients, [.claudeCode, .codex], "the menu's order, whatever order they were found in")
+        XCTAssertEqual(neither.title, "Not added to a client yet")
+        XCTAssertEqual(neither.detail(toolsOn: true), "Pick a client from the menu to add it.")
+        XCTAssertEqual(neither.detail(toolsOn: false), "Turn on the switch above, then pick a client to add it to.")
 
         let codexHasIt = setup(FakeClientMac(installed: [.codex: codex, .claudeCode: claude], servers: [.codex]))
-        XCTAssertEqual(codexHasIt.choice, .client(.codex), "the first client that has the server, so Remove is at hand")
+        XCTAssertEqual(codexHasIt.title, "Added to Codex")
+        XCTAssertEqual(codexHasIt.detail(toolsOn: true), "Start a new Codex session and ask it to change the HUD.")
+        XCTAssertEqual(codexHasIt.detail(toolsOn: false), "Turn on the switch above so agents can use it.")
+
+        let both = setup(FakeClientMac(installed: [.codex: codex, .claudeCode: claude], servers: [.codex, .claudeCode]))
+        XCTAssertEqual(both.title, "Added to Claude Code and Codex")
+        XCTAssertEqual(both.detail(toolsOn: true), "Start a new session and ask it to change the HUD.")
 
         let none = setup(FakeClientMac(installed: [:]))
-        XCTAssertEqual(none.choices, [.other])
-        XCTAssertEqual(none.choice, .other)
+        XCTAssertEqual(none.clients, [])
+        XCTAssertEqual(none.detail(toolsOn: true), "No Claude Code or Codex on this Mac. Copy the settings for another client.")
 
-        let mac = FakeClientMac(installed: [.claudeCode: claude, .codex: codex])
-        let chosen = setup(mac)
-        chosen.choice = .client(.codex)
-        chosen.refresh()
-        XCTAssertEqual(chosen.choice, .client(.codex), "a look again keeps what a person chose")
+        let mac = FakeClientMac(installed: [.claudeCode: claude, .codex: codex], servers: [.codex])
+        let gone = setup(mac)
         mac.installed = [.claudeCode: claude]
-        chosen.refresh()
-        XCTAssertEqual(chosen.choice, .client(.claudeCode), "a client that is gone is chosen no more")
+        gone.refresh()
+        XCTAssertEqual(gone.clients, [.claudeCode], "a client that is gone leaves the menu")
+        XCTAssertEqual(gone.title, "Not added to a client yet")
     }
 
-    func testAddAndRemoveRunTheClientsOwnCommandAndTheStatusReadsItsConfigurationAfter() async {
+    func testPickingAClientRunsItsOwnCommandAndTheRowReadsItsConfigurationAfter() async {
         let mac = FakeClientMac(installed: [.claudeCode: claude, .codex: codex])
         let setup = setup(mac)
-        XCTAssertEqual(setup.status, "Not added yet")
-        XCTAssertEqual(setup.action, .add)
-        XCTAssertEqual(setup.buttonTitle, "Add")
-        XCTAssertEqual(setup.hint, "Then start a new Claude Code session and ask it to rearrange the HUD.")
+        XCTAssertEqual(setup.action(for: .claudeCode), .add(.claudeCode))
 
-        await setup.perform()
+        await setup.perform(.add(.claudeCode))
         XCTAssertEqual(mac.runs.map(\.0), [claude])
         XCTAssertEqual(mac.runs.last?.1, ["mcp", "add", "--scope", "user", "agent-hud", "--", executable, "--mcp"])
-        XCTAssertEqual(setup.status, "Added to Claude Code")
-        XCTAssertEqual(setup.action, .remove)
-        XCTAssertEqual(setup.buttonTitle, "Remove")
+        XCTAssertEqual(setup.title, "Added to Claude Code")
+        XCTAssertEqual(setup.action(for: .claudeCode), .remove(.claudeCode), "checked now, so picking it again removes it")
 
-        await setup.perform()
-        XCTAssertEqual(mac.runs.last?.1, ["mcp", "remove", "--scope", "user", "agent-hud"])
-        XCTAssertEqual(setup.status, "Not added yet")
-
-        setup.choice = .client(.codex)
-        await setup.perform()
+        await setup.perform(.add(.codex))
         XCTAssertEqual(mac.runs.last?.0, codex)
         XCTAssertEqual(mac.runs.last?.1, ["mcp", "add", "agent-hud", "--", executable, "--mcp"])
-        XCTAssertEqual(setup.status, "Added to Codex")
-        await setup.perform()
+        XCTAssertEqual(setup.title, "Added to Claude Code and Codex")
+
+        await setup.perform(.remove(.claudeCode))
+        XCTAssertEqual(mac.runs.last?.1, ["mcp", "remove", "--scope", "user", "agent-hud"])
+        await setup.perform(.remove(.codex))
         XCTAssertEqual(mac.runs.last?.1, ["mcp", "remove", "agent-hud"])
-        XCTAssertEqual(mac.runs.count, 4, "one command a press, nothing on its own")
+        XCTAssertEqual(setup.title, "Not added to a client yet")
+
+        await setup.perform(.remove(.codex))
+        await setup.perform(.add(.claudeCode))
+        await setup.perform(.add(.claudeCode))
+        XCTAssertEqual(mac.runs.count, 5, "one command a pick, nothing on its own, and nothing the client's state rules out")
         XCTAssertTrue(mac.copied.isEmpty)
     }
 
-    func testAFailureIsShownInOneLineUntilTheChoiceChanges() async {
-        let mac = FakeClientMac(installed: [.claudeCode: claude, .codex: codex])
+    func testAFailureNamesTheClientAndOffersTheCommandForATerminal() async {
+        let mac = FakeClientMac(installed: [.claudeCode: claude, .codex: codex], servers: [.codex])
         let setup = setup(mac)
+        XCTAssertNil(setup.failedCommandLine, "no command to copy until one fails")
         mac.result = MCPCommandResult(status: 1, output: "\nerror: user config is locked\n    at write (cli.js:1:1)\n")
-        await setup.perform()
-        XCTAssertEqual(setup.status, "Couldn't add: error: user config is locked")
-        XCTAssertEqual(setup.action, .add, "nothing was added")
+        await setup.perform(.add(.claudeCode))
+        XCTAssertEqual(setup.detail(toolsOn: true), "Couldn't add to Claude Code: error: user config is locked")
+        XCTAssertEqual(setup.title, "Added to Codex", "nothing was added")
+        XCTAssertEqual(setup.failedCommandLine, "claude mcp add --scope user agent-hud -- '\(executable)' --mcp")
 
         mac.result = MCPCommandResult(status: nil)
-        await setup.perform()
-        XCTAssertEqual(setup.status, "Couldn't add: It did not finish in 15 seconds")
+        await setup.perform(.remove(.codex))
+        XCTAssertEqual(setup.detail(toolsOn: true), "Couldn't remove from Codex: It did not finish in 15 seconds")
+        XCTAssertEqual(setup.failedCommandLine, "codex mcp remove agent-hud")
 
         mac.result = MCPCommandResult(status: 0)
         mac.takesEffect = false
-        await setup.perform()
-        XCTAssertEqual(setup.status, "Couldn't add: Claude Code's settings did not change",
+        await setup.perform(.add(.claudeCode))
+        XCTAssertEqual(setup.detail(toolsOn: true), "Couldn't add to Claude Code: Claude Code's settings did not change",
                        "a command that says it worked is held to the configuration")
 
-        setup.choice = .client(.codex)
-        XCTAssertEqual(setup.status, "Not added yet", "another choice starts afresh")
+        setup.copyFailedCommand()
+        XCTAssertEqual(mac.copied, ["claude mcp add --scope user agent-hud -- '\(executable)' --mcp"])
+        XCTAssertEqual(setup.detail(toolsOn: true), "Command copied. Paste it into Terminal.")
+        XCTAssertEqual(mac.runs.count, 3, "copying runs nothing")
+
+        // The person runs it in a terminal and comes back: the row reads the configuration again.
+        setup.refresh()
+        XCTAssertEqual(setup.detail(toolsOn: true), "Command copied. Paste it into Terminal.", "nothing changed yet")
+        mac.setServers([.codex, .claudeCode])
+        setup.refresh()
+        XCTAssertEqual(setup.title, "Added to Claude Code and Codex")
+        XCTAssertEqual(setup.detail(toolsOn: true), "Start a new session and ask it to change the HUD.")
+        XCTAssertNil(setup.failedCommandLine)
     }
 
     func testWhileACommandRunsTheRowWaitsForIt() async {
         let mac = FakeClientMac(installed: [.claudeCode: claude])
         mac.holding = true
         let setup = setup(mac)
-        let pressed = Task { await setup.perform() }
+        let picked = Task { await setup.perform(.add(.claudeCode)) }
         for _ in 0..<500 where setup.running == nil { try? await Task.sleep(for: .milliseconds(5)) }
-        XCTAssertEqual(setup.running, .add)
-        XCTAssertEqual(setup.status, "Adding to Claude Code…")
-        XCTAssertEqual(setup.controls(toolsOn: true), .init(picker: false, action: false, copyCommand: false, hint: true))
-        await setup.perform()
+        XCTAssertEqual(setup.running, .add(.claudeCode))
+        XCTAssertEqual(setup.detail(toolsOn: true), "Adding to Claude Code…")
+        XCTAssertEqual(setup.controls(toolsOn: true), .init(menu: false, add: false, remove: false, copySettings: false))
+        await setup.perform(.add(.claudeCode))
+        await setup.perform(.copySettings)
         mac.release()
-        await pressed.value
-        XCTAssertEqual(mac.runs.count, 1, "a second press while one runs does nothing")
-        XCTAssertEqual(setup.status, "Added to Claude Code")
+        await picked.value
+        XCTAssertEqual(mac.runs.count, 1, "a second pick while one runs does nothing")
+        XCTAssertTrue(mac.copied.isEmpty)
+        XCTAssertEqual(setup.title, "Added to Claude Code")
     }
 
-    func testOtherCopiesTheServersSettingsAsJSON() async throws {
+    func testCopySettingsGivesTheServersSettingsAsJSON() async throws {
         let mac = FakeClientMac(installed: [.claudeCode: claude])
         let setup = setup(mac)
-        setup.choice = .other
-        XCTAssertEqual(setup.action, .copySettings)
-        XCTAssertEqual(setup.buttonTitle, "Copy settings")
-        XCTAssertNil(setup.commandLine, "Other has no command")
-        XCTAssertEqual(setup.status, "Copy the settings into any client that runs MCP servers.")
-        XCTAssertEqual(setup.hint, "Then start a new session in your client and ask it to rearrange the HUD.")
-        await setup.perform()
+        await setup.perform(.copySettings)
         XCTAssertEqual(mac.copied, [MCPClient.settingsJSON(executable: executable)])
         let copied = try JSONSerialization.jsonObject(with: Data(mac.copied[0].utf8)) as? [String: [String: [String: Any]]]
         XCTAssertEqual(copied?["mcpServers"]?["agent-hud"]?["command"] as? String, executable)
         XCTAssertEqual(copied?["mcpServers"]?["agent-hud"]?["args"] as? [String], ["--mcp"])
-        XCTAssertEqual(setup.status, "Settings copied. Paste them into your client's MCP settings.")
-        XCTAssertTrue(mac.runs.isEmpty)
-    }
-
-    func testCopyCommandCopiesWhatTheButtonWouldRun() async {
-        let mac = FakeClientMac(installed: [.claudeCode: claude, .codex: codex], servers: [.codex])
-        let setup = setup(mac)
-        setup.choice = .client(.claudeCode)
-        setup.copyCommand()
-        XCTAssertEqual(mac.copied.last, "claude mcp add --scope user agent-hud -- '\(executable)' --mcp")
-        XCTAssertEqual(setup.status, "Command copied. Paste it into Terminal.")
-        setup.choice = .client(.codex)
-        setup.copyCommand()
-        XCTAssertEqual(mac.copied.last, "codex mcp remove agent-hud")
-        XCTAssertTrue(mac.runs.isEmpty, "copying runs nothing")
-
-        // The person runs it in a terminal and comes back: the row reads the configuration again.
-        setup.refresh()
-        XCTAssertEqual(setup.status, "Command copied. Paste it into Terminal.", "nothing changed yet")
-        mac.setServers([])
-        setup.refresh()
-        XCTAssertEqual(setup.choice, .client(.codex), "the choice stays")
-        XCTAssertEqual(setup.status, "Not added yet")
-        XCTAssertEqual(setup.action, .add)
+        XCTAssertEqual(setup.detail(toolsOn: true), "Settings copied. Paste them into your client's MCP settings.")
+        XCTAssertNil(setup.failedCommandLine)
         XCTAssertTrue(mac.runs.isEmpty)
     }
 
@@ -216,43 +209,34 @@ final class MCPClientSetupTests: XCTestCase {
             let mac = FakeClientMac(installed: [.claudeCode: claude, .codex: codex], servers: [.codex],
                                     executable: URL(fileURLWithPath: path))
             let setup = setup(mac)
-            setup.choice = .client(.claudeCode)
-            XCTAssertNil(setup.action, path)
-            XCTAssertEqual(setup.status, "Move Agent HUD to Applications first.")
-            XCTAssertNil(setup.commandLine)
-            XCTAssertFalse(setup.controls(toolsOn: true).action)
-            XCTAssertFalse(setup.controls(toolsOn: true).copyCommand)
-            await setup.perform()
-            setup.copyCommand()
-            setup.choice = .other
-            XCTAssertNil(setup.action, "nor are its settings copied")
-            XCTAssertEqual(setup.status, "Move Agent HUD to Applications first.")
-            await setup.perform()
+            XCTAssertNil(setup.action(for: .claudeCode), path)
+            XCTAssertEqual(setup.detail(toolsOn: true), "Move Agent HUD to Applications first.")
+            XCTAssertFalse(setup.canPick(.claudeCode, toolsOn: true))
+            XCTAssertFalse(setup.controls(toolsOn: true).copySettings, "nor are its settings copied")
+            await setup.perform(.add(.claudeCode))
+            await setup.perform(.copySettings)
             XCTAssertTrue(mac.runs.isEmpty, path)
             XCTAssertTrue(mac.copied.isEmpty, path)
 
-            setup.choice = .client(.codex)
-            XCTAssertEqual(setup.action, .remove, "what was added before can still be removed")
-            await setup.perform()
+            XCTAssertEqual(setup.action(for: .codex), .remove(.codex), "what was added before can still be removed")
+            XCTAssertTrue(setup.canPick(.codex, toolsOn: true))
+            await setup.perform(.remove(.codex))
             XCTAssertEqual(mac.runs.map(\.1), [["mcp", "remove", "agent-hud"]])
         }
     }
 
-    /// While the switch is off the rows are dimmed and only Remove, with the picker it needs, stays available.
-    func testTheRowsFollowTheSwitchExceptRemove() {
-        let mac = FakeClientMac(installed: [.claudeCode: claude, .codex: codex])
-        let setup = setup(mac)
-        XCTAssertEqual(setup.controls(toolsOn: true), .init(picker: true, action: true, copyCommand: true, hint: true))
-        XCTAssertEqual(setup.controls(toolsOn: false), .init(picker: false, action: false, copyCommand: false, hint: false))
-        setup.choice = .other
-        XCTAssertEqual(setup.controls(toolsOn: true), .init(picker: true, action: true, copyCommand: false, hint: true))
-        XCTAssertEqual(setup.controls(toolsOn: false), .init(picker: false, action: false, copyCommand: false, hint: false))
+    /// While the switch is off the row is dimmed and only a checked client, with the menu it needs, can be picked.
+    func testTheRowFollowsTheSwitchExceptRemove() {
+        let neither = setup(FakeClientMac(installed: [.claudeCode: claude, .codex: codex]))
+        XCTAssertEqual(neither.controls(toolsOn: true), .init(menu: true, add: true, remove: true, copySettings: true))
+        XCTAssertEqual(neither.controls(toolsOn: false), .init(menu: false, add: false, remove: true, copySettings: false))
+        XCTAssertTrue(neither.canPick(.claudeCode, toolsOn: true))
+        XCTAssertFalse(neither.canPick(.claudeCode, toolsOn: false))
 
-        let added = self.setup(FakeClientMac(installed: [.claudeCode: claude, .codex: codex], servers: [.codex]))
-        XCTAssertEqual(added.choice, .client(.codex))
-        XCTAssertEqual(added.controls(toolsOn: false), .init(picker: true, action: true, copyCommand: true, hint: false))
-        added.choice = .client(.claudeCode)
-        XCTAssertEqual(added.controls(toolsOn: false), .init(picker: true, action: false, copyCommand: false, hint: false),
-                       "the picker stays so Codex can be chosen again; Add waits for the switch")
+        let codexHasIt = setup(FakeClientMac(installed: [.claudeCode: claude, .codex: codex], servers: [.codex]))
+        XCTAssertEqual(codexHasIt.controls(toolsOn: false), .init(menu: true, add: false, remove: true, copySettings: false),
+                       "the menu stays so Codex can be unchecked; adding waits for the switch")
+        XCTAssertTrue(codexHasIt.canPick(.codex, toolsOn: false))
+        XCTAssertFalse(codexHasIt.canPick(.claudeCode, toolsOn: false))
     }
 }

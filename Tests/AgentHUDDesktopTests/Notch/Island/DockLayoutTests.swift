@@ -54,6 +54,29 @@ final class DockLayoutTests: XCTestCase {
     }
 
     @MainActor
+    func testADockWritesAReminderTheNumbersAndTheHoverLineAtOneSize() {
+        let sizes = ScreenPlacement.simpleSizeRange
+        for ring in stride(from: sizes.lowerBound, through: sizes.upperBound, by: 1) {
+            let placement = ScreenPlacement(mode: .simple, edge: .right, simpleSize: ring)
+            let scale = IslandRootView.dockScale(mode: .simple, placement: placement)
+            let text = IslandRootView.dockText(scale: scale)
+            XCTAssertEqual(SimpleMeterConfig(items: [], placement: placement).fontSize, text, "A \(ring) pt ring's numbers")
+            var line = AgentPeek(vendor: "Claude", lines: [], running: 0, style: .line)
+            line.scale = scale
+            XCTAssertEqual(line.lineFont, text, "A \(ring) pt ring's hover line")
+            // A reminder's views write its name and status at the dock's scale, as `s(_:)` rounds it.
+            for beside: CGFloat in [13, 12] {
+                XCTAssertEqual((CompactWings.words(beside, onDock: true) * scale).rounded(), text, "A \(ring) pt ring's reminder")
+            }
+        }
+        XCTAssertEqual(IslandRootView.dockText(scale: 1), 9)
+        XCTAssertEqual(IslandRootView.dockText(scale: IslandRootView.dockScale(mode: .simple, placement: ScreenPlacement(mode: .simple, simpleSize: 50))), 17)
+        // Beside the notch a reminder keeps the cards' sizes.
+        XCTAssertEqual(CompactWings.words(13, onDock: false), 13)
+        XCTAssertEqual(CompactWings.words(12, onDock: false), 12)
+    }
+
+    @MainActor
     func testCompactDockEventsUseOneThinRowInsideTheirContactShoulders() async throws {
         _ = NSApplication.shared
         let alert = IslandAlert.completion(SessionCompletion(

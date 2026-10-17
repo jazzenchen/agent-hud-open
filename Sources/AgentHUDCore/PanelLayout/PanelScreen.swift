@@ -1,6 +1,6 @@
 import Foundation
 
-/// One attached display as the host tells the MCP tools of it (`PanelTools`). It is named by its role, never by its
+/// One attached display as the host tells the MCP tools of it (`HUDTools`). It is named by its role, never by its
 /// system name, which can be a personal device name, and it says nothing of whose agents or accounts it shows.
 public struct PanelScreen: Equatable, Sendable {
     /// The display's key, under which its placement, glow and own layout are kept.

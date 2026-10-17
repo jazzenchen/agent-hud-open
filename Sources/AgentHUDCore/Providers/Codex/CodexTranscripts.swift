@@ -491,6 +491,9 @@ public actor CodexTranscriptStore {
         public let modifiedAt: Date
         public let path: String
         public let title: String?
+        /// Whether Codex archived the thread: its rollout, the copy that counts, lies in `archived_sessions`. Its usage
+        /// counts as any other's; it is left out of the session list.
+        public var archived = false
     }
 
     public struct Result: Sendable {
@@ -513,9 +516,13 @@ public actor CodexTranscriptStore {
     }
 
     public static func standard(directory: URL = CodexLocator.dataDirectory, ledger: UsageLedger = .inMemory()) -> CodexTranscriptStore {
-        CodexTranscriptStore(roots: [directory.appendingPathComponent("sessions"), directory.appendingPathComponent("archived_sessions")],
+        CodexTranscriptStore(roots: [directory.appendingPathComponent("sessions"), directory.appendingPathComponent(archiveFolder)],
                              indexURL: directory.appendingPathComponent("session_index.jsonl"), ledger: ledger, watchesChanges: true)
     }
+
+    /// The folder, beside `sessions`, Codex moves the rollouts of the threads it archives into, flat, sub-agents' with
+    /// their parent's; unarchiving moves them back.
+    static let archiveFolder = "archived_sessions"
 
     public func fileChanges(_ paths: Set<String>?) { logs.noteChanges(paths) }
 
@@ -531,7 +538,8 @@ public actor CodexTranscriptStore {
         var sessions: [String: Session] = [:]
         for log in pass.logs.sorted(by: { $0.file.modified > $1.file.modified }) {
             guard let entry = logs.entry(log.path), let id = entry.summary.id, sessions[id] == nil else { continue }
-            sessions[id] = Session(transcript: entry.summary, modifiedAt: log.file.modified, path: log.path, title: titles[id])
+            sessions[id] = Session(transcript: entry.summary, modifiedAt: log.file.modified, path: log.path, title: titles[id],
+                                   archived: URL(fileURLWithPath: log.path).deletingLastPathComponent().lastPathComponent == Self.archiveFolder)
         }
         return Result(sessions: Array(sessions.values),
                       indexing: pass.pending > 0 ? IndexProgress(done: pass.logs.count - pass.pending, total: pass.logs.count) : nil)

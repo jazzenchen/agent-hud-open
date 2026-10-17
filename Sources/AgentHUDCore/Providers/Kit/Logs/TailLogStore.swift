@@ -7,8 +7,10 @@ import Foundation
 /// growing, is read again as a log seen for the first time is, and replaces what it recorded at once. One whose stored
 /// state has another version is read again too, even when it is older than the cutoff, while the ledger still holds its
 /// usage; what that version recorded counts on until this read has covered the same times (`CarriedUsage`). A stored
-/// log missing from the listing leaves the ledger; one that is listed keeps its contribution even when it cannot be
-/// read, and is tried again once its pause is over (`FailedReads`). A log its client compressed where it lies is the same
+/// log missing from the listing, deleted in its client or moved away, keeps its usage in the ledger until it expires,
+/// unless another copy of it is listed and read, which then counts in its place; a copy read later takes its place too
+/// (`UsageLedger.FileState.gone`). One that is listed keeps its contribution even when it cannot be read, and is tried
+/// again once its pause is over (`FailedReads`). A log its client compressed where it lies is the same
 /// log under another name (`CompressedLogs`): its state and contribution move to that name without a read, and it is
 /// read from its start, through its decoded text, only where the ledger does not hold all of it.
 final class TailLogStore<Log: TailLog> {
@@ -67,6 +69,8 @@ final class TailLogStore<Log: TailLog> {
     /// Sessions and modification times of grouped logs, for choosing the copy that counts.
     private var groups: [String: String] = [:]
     private var modified: [String: Date] = [:]
+    /// Logs that left the listing whose usage the ledger keeps, with their groups ("" for none).
+    private var gone: [String: String] = [:]
     private var loadedGeneration: Int?
     private var failed = FailedReads()
     /// How long a poll reads history, apart from what logs gained: a small share of the processor while history lasts.
@@ -101,7 +105,9 @@ final class TailLogStore<Log: TailLog> {
         // Stored states are read once, and again after a failed pass rolled back what this store had written.
         let generation = await ledger.generation
         if loadedGeneration != generation {
-            stored = (try? await ledger.fileStates(source: Log.source)) ?? [:]
+            let states = (try? await ledger.fileStates(source: Log.source)) ?? [:]
+            gone = states.filter(\.value.isGone).mapValues { $0.group ?? "" }
+            stored = states.filter { !$0.value.isGone }
             entries = [:]
             // Only the version and position are decoded, and only of logs recent enough to matter.
             let recent = stored.filter { (LedgerCopies.signature($0.value.signature)?.modified ?? .distantPast) >= retained }
@@ -184,6 +190,20 @@ final class TailLogStore<Log: TailLog> {
             nextModified[path] = nextGroups[path] == nil ? nil : update.entry.modified
         }
         for path in removed { nextGroups[path] = nil; nextModified[path] = nil }
+        // A log that left keeps its usage unless a copy of it that was read is listed, one of the same session or under
+        // the same name (`Log.copyName`), and counts in its place: a newer copy also leaves an older one out of the
+        // listing. A kept log gives way to such a copy read later, and one listed again is read as new and replaces
+        // what it kept.
+        let listedGroups = Set(nextGroups.values.filter { !$0.isEmpty })
+        let listedNames = Set(listing.keys.filter { updates[$0] != nil || entries[$0] != nil || stored[$0] != nil }.compactMap(Log.copyName))
+        func copied(_ path: String, group: String) -> Bool {
+            (!group.isEmpty && listedGroups.contains(group)) || Log.copyName(path).map(listedNames.contains) == true
+        }
+        let kept = Dictionary(uniqueKeysWithValues: removed.compactMap { path -> (String, String)? in
+            let group = groups[path] ?? ""
+            return copied(path, group: group) ? nil : (path, group)
+        })
+        let superseded = Set(gone.filter { path, group in updates[path] != nil || copied(path, group: group) }.keys)
         let counted = LedgerCopies.counted(touched: Set(updates.keys).union(removed), previous: groups, members: nextGroups, modified: nextModified)
         let writes = updates.map { path, update in
             (path: path, reset: update.reset, replaced: replaced[path] ?? [], events: update.events, marks: update.marks,
@@ -196,6 +216,10 @@ final class TailLogStore<Log: TailLog> {
                     try writer.rename(source: source, contribution: move.from, to: move.to)
                     try writer.renameFile(source: source, path: move.from, to: move.to)
                 }
+                for path in superseded {
+                    try writer.remove(source: source, contribution: path)
+                    try writer.removeFile(source: source, path: path)
+                }
                 for write in writes {
                     if write.reset { try writer.remove(source: source, contribution: write.path) }
                     for times in write.replaced { try writer.removeUsage(source: source, contribution: write.path, at: times) }
@@ -204,8 +228,12 @@ final class TailLogStore<Log: TailLog> {
                     try writer.setFile(source: source, path: write.path, state: write.state)
                 }
                 for path in removed {
-                    try writer.remove(source: source, contribution: path)
-                    try writer.removeFile(source: source, path: path)
+                    if let group = kept[path] {
+                        try writer.setFile(source: source, path: path, state: .gone(group: group.isEmpty ? nil : group))
+                    } else {
+                        try writer.remove(source: source, contribution: path)
+                        try writer.removeFile(source: source, path: path)
+                    }
                 }
                 for (path, value) in counted where !written.contains(path) {
                     try writer.setCounted(source: source, contribution: path, counted: value)
@@ -213,6 +241,8 @@ final class TailLogStore<Log: TailLog> {
             }
             for (path, update) in updates { entries[path] = update.entry }
             for path in removed { entries[path] = nil; stored[path] = nil }
+            for path in superseded { gone[path] = nil }
+            gone.merge(kept) { _, new in new }
             for path in written.union(removed) { outdated[path] = nil }
             unfinished.subtract(written.union(removed))
             groups = nextGroups

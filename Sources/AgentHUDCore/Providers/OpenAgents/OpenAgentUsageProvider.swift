@@ -185,8 +185,9 @@ actor OpenAgentUsageProvider: UsageProvider, LedgerRecording {
                     billingPool: event.attribution?.pool)
             }
         }
-        // Tokens and models come from every session of `historyHours`; sessions only from those active in the session window.
-        let listed = local.sessions.filter { $0.end.map { $0 >= SessionWindow.start(at: now) } == true }
+        // Tokens and models come from every session of `historyHours`; sessions only from those active in the session window
+        // that the client did not archive.
+        let listed = local.sessions.filter { !$0.archived && $0.end.map { $0 >= SessionWindow.start(at: now) } == true }
         let live = listed.compactMap { item -> LiveSession? in
             guard let start = item.start, let end = item.end else { return nil }
             let last = item.events.max(by: { $0.timestamp < $1.timestamp })

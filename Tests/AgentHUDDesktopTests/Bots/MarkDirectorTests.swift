@@ -125,6 +125,26 @@ final class MarkDirectorTests: XCTestCase {
         XCTAssertEqual(look(director), .tool(.edit))
     }
 
+    func testWhileTheSessionShownThinksOneThatUsesAToolTakesOver() {
+        // "a" read a file long ago and thinks, with a sub-agent at work; "c" thinks too, which takes nothing over.
+        let thinking = session("a", activity: activity([("read", .read, 0, 1)], line: .thinking, subagents: 19), observed: 20)
+        let alsoThinking = session("c", activity: activity(line: .thinking), observed: 15)
+        var director = director(reading: [mark([thinking, alsoThinking])], at: 20)
+        XCTAssertEqual(look(director), .thinking)
+        XCTAssertEqual(state(director)?.subagents, true)
+        // "b" runs a command: it takes the mark at once, with its own look and without "a"'s sub-agents.
+        read(&director, [mark([thinking, alsoThinking, commanding("b", opened: 21, observed: 21)])], at: 22)
+        XCTAssertEqual(look(director), .tool(.command), "The agent shows at work while any of its sessions is")
+        XCTAssertEqual(state(director)?.subagents, false)
+        // Once "b" thinks too it keeps the mark, until "a" uses a tool again.
+        let doneCommanding = session("b", activity: activity([("call", .shell, 21, 23)], line: .thinking), observed: 23)
+        XCTAssertEqual(MarkDirector.want(of: mark([thinking, doneCommanding]), owner: "b", at: at(40)).owner, "b")
+        let editing = editing("a", opened: 41)
+        let want = MarkDirector.want(of: mark([editing, doneCommanding]), owner: "b", at: at(42))
+        XCTAssertEqual(want.owner, "a")
+        XCTAssertEqual(want.look, .tool(.edit))
+    }
+
     func testANewOwnerIsTheSessionWhoseLogWroteLastThenWhoseTurnBeganLastThenByID() {
         let older = commanding("a", observed: 4), newer = editing("b", opened: 1, observed: 6)
         XCTAssertEqual(MarkDirector.owner(among: [older, newer], keeping: nil)?.sessionID, "b")
@@ -408,7 +428,7 @@ final class MarkDirectorTests: XCTestCase {
     }
 }
 
-/// Which events a dock hands its marks across the cards that hide it.
+/// Which events a dock hands its marks, among them ones that fired before a mark could play them.
 final class DockMemoryTests: XCTestCase {
     private let now = Date(timeIntervalSinceReferenceDate: 800_000_000)
 
@@ -420,10 +440,8 @@ final class DockMemoryTests: XCTestCase {
         XCTAssertNil(memory.cue(for: "Claude", nil, badge: nil, at: now))
     }
 
-    func testAFailureMissedUnderACardPlaysOnceWhileItsBadgeStands() {
+    func testAMissedFailurePlaysOnceWhileItsBadgeStands() {
         var memory = DockMemory()
-        memory.hide()
-        XCTAssertTrue(memory.returns)
         let failed = BotCue(event: .failed, at: now)
         let later = now.addingTimeInterval(40)
         let replay = memory.cue(for: "Claude", failed, badge: .failed, at: later)
@@ -434,7 +452,7 @@ final class DockMemoryTests: XCTestCase {
         XCTAssertEqual(memory.cue(for: "Codex", limit, badge: .limited, at: later), BotCue(event: .limitHit, at: later))
     }
 
-    func testAStartMissedUnderACardIsOverAndSoIsAFailureWhoseBadgeWentOff() {
+    func testAMissedStartIsOverAndSoIsAFailureWhoseBadgeWentOff() {
         var memory = DockMemory()
         let start = BotCue(event: .start, at: now), failed = BotCue(event: .failed, at: now)
         let later = now.addingTimeInterval(40)

@@ -202,7 +202,7 @@ final class ScreenLayoutHUDTests: XCTestCase {
     // MARK: A dock that separates its agents
 
     /// On a dock that separates its agents the marks follow the list, and so does what hovering one opens. An event
-    /// from an agent the screen does not show has no mark here, so it gets the whole HUD.
+    /// from an agent the screen does not show has no mark here, so its card comes out of the middle of the dock.
     func testASeparatedDocksMarksFocusAndPeeksFollowTheList() throws {
         let (store, settings, key, screen) = try make(.logos, separates: true)
         keep(PanelLayout(hud: PanelLayout.HUD(agents: ["Cursor", "Codex"])), for: key, in: settings)
@@ -225,7 +225,7 @@ final class ScreenLayoutHUDTests: XCTestCase {
         dock.present(.completion(SessionCompletion(sessionID: "hidden", vendor: "Claude", turnID: "reply", task: "New reply",
                                                    model: "test", startedAt: nil, completedAt: Date())))
         XCTAssertNotNil(dock.island.rootView.alert, "an agent the screen does not show still reaches it")
-        XCTAssertNil(dock.island.rootView.focusVendor, "with no mark here, it gets the whole HUD")
+        XCTAssertEqual(dock.island.rootView.focusVendor, "Claude", "with no mark here, its card comes out of the dock's middle")
     }
 }
 

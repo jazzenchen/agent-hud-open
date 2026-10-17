@@ -499,6 +499,43 @@ final class CodexProviderTests: XCTestCase {
         XCTAssertEqual(moved.map(\.tokensIn), [300], "the remaining copy takes over when the original is gone")
     }
 
+    func testAnArchivedOrDeletedThreadKeepsItsUsageAndLeavesTheSessionList() async throws {
+        let dir = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let live = dir.appendingPathComponent("sessions/2026/09/09"), archive = dir.appendingPathComponent("archived_sessions")
+        for folder in [live, archive] { try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true) }
+        let now = Date(timeIntervalSince1970: 1_789_000_000)
+        for (id, input) in [("open", 500), ("shelved", 300)] {
+            let rows = [line(type: "session_meta", payload: ["id": id, "source": "cli"], at: now.ISO8601Format()),
+                        line(payload: ["type": "token_count", "info": ["total_token_usage": ["input_tokens": input, "cached_input_tokens": 0, "output_tokens": 10]]],
+                             at: now.ISO8601Format())]
+            try (rows.joined(separator: "\n") + "\n").write(to: live.appendingPathComponent("rollout-\(id).jsonl"), atomically: true, encoding: .utf8)
+        }
+        let ledger = UsageLedger.inMemory()
+        let store = CodexTranscriptStore(roots: [dir.appendingPathComponent("sessions"), archive], ledger: ledger)
+        let provider = CodexUsageProvider(readLimits: { throw UsageProviderError("signed out") }, transcripts: store,
+                                          history: QuotaHistoryStore(), clock: { now.addingTimeInterval(10) })
+        func tokens() async throws -> Int { try await ledger.buckets(since: .distantPast).reduce(0) { $0 + $1.tokensIn } }
+        var report = try await provider.fetchUsage(agents: [], historyHours: 24)
+        XCTAssertEqual(Set(report.sessions.map(\.id)), ["open", "shelved"])
+        var total = try await tokens()
+        XCTAssertEqual(total, 800)
+
+        // Codex archives a thread by moving its rollout.
+        try FileManager.default.moveItem(at: live.appendingPathComponent("rollout-shelved.jsonl"), to: archive.appendingPathComponent("rollout-shelved.jsonl"))
+        report = try await provider.fetchUsage(agents: [], historyHours: 24)
+        XCTAssertEqual(report.sessions.map(\.id), ["open"], "an archived thread leaves the list")
+        total = try await tokens()
+        XCTAssertEqual(total, 800, "and its usage still counts, once")
+
+        // A rollout deleted outright leaves the list and keeps its usage too.
+        try FileManager.default.removeItem(at: live.appendingPathComponent("rollout-open.jsonl"))
+        report = try await provider.fetchUsage(agents: [], historyHours: 24)
+        XCTAssertEqual(report.sessions.map(\.id), [])
+        total = try await tokens()
+        XCTAssertEqual(total, 800)
+    }
+
     func testRestartDoesNotReadAnUnchangedRolloutAgain() async throws {
         let dir = try temporaryDirectory()
         defer { try? FileManager.default.removeItem(at: dir) }

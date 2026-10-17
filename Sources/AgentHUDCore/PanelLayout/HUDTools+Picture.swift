@@ -1,9 +1,9 @@
 import AgentHUDSupport
 import Foundation
 
-/// What `get_panel_image` tells an agent: a picture of a screen's hover panel, of one agent's own panel there, or of its
-/// resting HUD.
-extension PanelTools {
+/// What `get_hud_screenshot` tells an agent: a picture of a screen's hover panel, of one agent's own panel there, or
+/// of its resting HUD.
+extension HUDTools {
     // MARK: The panel
 
     /// The picture with what it shows: which screen and layout and its revision, the panel's size in points, whether it
@@ -12,10 +12,10 @@ extension PanelTools {
     func image(_ scope: PanelLayoutScope, among attached: [PanelScreen]) -> MCPToolReply {
         guard let picture else {
             return .failure("This copy of Agent HUD cannot draw the panel, so there is no picture of it here. "
-                            + "get_panel reads the same panel as data.")
+                            + "get_hud reads the same panel as data.")
         }
         guard let drawn = picture(scope) else {
-            return .failure("The panel's picture could not be drawn. Try again, or read the panel with get_panel.")
+            return .failure("The panel's picture could not be drawn. Try again, or read the panel with get_hud.")
         }
         var note: String
         var display = "The main display"
@@ -106,11 +106,11 @@ extension PanelTools {
     /// A picture of one agent's own panel on an attached screen whose dock separates its agents, the card a click on the
     /// agent's mark opens beside it, at the screen's `agentPanelWidth`, as the layout in effect there draws it, a draft
     /// and its bar included: what the whole panel's picture says, with the agent as the screen lists it. The agent is
-    /// named as `get_panel` names it: as the screen's `shows` lists it, matched by the mark it is drawn with, or by its
+    /// named as `get_hud` names it: as the screen's `shows` lists it, matched by the mark it is drawn with, or by its
     /// block's key, an API balance's standing for the vendor its accounts name.
     func agentImage(_ scope: PanelLayoutScope, agent given: JSONValue, among attached: [PanelScreen]) -> MCPToolReply {
         guard let asked = given.stringValue, !asked.isEmpty else {
-            return .failure("agent is an agent's name from that screen's shows in get_panel, or its block's key.")
+            return .failure("agent is an agent's name from that screen's shows in get_hud, or its block's key.")
         }
         guard case .screen(let key) = scope else {
             return .failure("agent draws one agent's own panel on a screen whose dock separates its agents, so it needs "
@@ -136,10 +136,10 @@ extension PanelTools {
         }
         guard let agentPicture else {
             return .failure("This copy of Agent HUD cannot draw an agent's own panel, so there is no picture of it here. "
-                            + "get_panel reads the panel as data.")
+                            + "get_hud reads the panel as data.")
         }
         guard let drawn = agentPicture(key, agent) else {
-            return .failure("The agent's own panel could not be drawn. Try again, or read the panel with get_panel.")
+            return .failure("The agent's own panel could not be drawn. Try again, or read the panel with get_hud.")
         }
         var note = "\"\(agent)\"'s own panel on \"\(screen.name)\", the card a click on its mark opens beside it, as "
             + "\(drawing(key)) draws it" + barNote(key)
@@ -183,10 +183,10 @@ extension PanelTools {
         }
         guard let hud else {
             return .failure("This copy of Agent HUD cannot draw a resting HUD, so there is no picture of it here. "
-                            + "get_panel reads its style as data.")
+                            + "get_hud reads its style as data.")
         }
         guard let drawn = hud(key) else {
-            return .failure("The resting HUD's picture could not be drawn. Try again, or read its style with get_panel.")
+            return .failure("The resting HUD's picture could not be drawn. Try again, or read its style with get_hud.")
         }
         let placement = store.settings.effectivePlacement(on: key, hasNotch: screen.hasNotch)
         let draft = layout.hasStyleDraft(key)

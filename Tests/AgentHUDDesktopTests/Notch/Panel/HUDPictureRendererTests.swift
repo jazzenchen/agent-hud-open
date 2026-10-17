@@ -5,7 +5,7 @@ import XCTest
 @testable import AgentHUDCore
 @testable import AgentHUDDesktop
 
-/// A screen's resting HUD drawn off screen for an agent, as `get_panel_image` returns it with show "hud": the island
+/// A screen's resting HUD drawn off screen for an agent, as `get_hud_screenshot` returns it with show "hud": the island
 /// with its glow, a Dynamic dock's marks over their backdrop, a Simple panel, each as the screen draws it now with any
 /// style draft, read back from its pixels.
 @MainActor
@@ -213,10 +213,10 @@ final class HUDPictureRendererTests: XCTestCase {
                                  agents: ScreenAgents.available(store: store, mode: .notch),
                                  systemIsLight: false, reducesTransparency: false)
         let renderer = renderer()
-        let tools = PanelTools(store: store, screens: { [screen] }, hud: { _ in renderer.picture() })
+        let tools = HUDTools(store: store, screens: { [screen] }, hud: { _ in renderer.picture() })
         layout.proposeStyle(HUDStyle(glow: HUDStyle.Glow(effect: .ripple)), for: key, hasNotch: true)
         guard case .result(let said, let images) = tools.answer(MCPToolRequest(
-            tool: MCPTools.getPanelImage, arguments: ["screen": .string(key), "show": .string("hud")])) else {
+            tool: MCPTools.getHUDScreenshot, arguments: ["screen": .string(key), "show": .string("hud")])) else {
             return XCTFail("the resting HUD was refused")
         }
         XCTAssertEqual(images.count, 1)
@@ -229,7 +229,7 @@ final class HUDPictureRendererTests: XCTestCase {
         XCTAssertTrue(note.hasPrefix("The resting HUD of \"Built-in display\" as it looks now, with its unsaved style draft: "
                                      + "the island at its notch"), note)
         XCTAssertTrue(note.contains(", with its glow."), note)
-        guard case .failure(let refusal) = tools.answer(MCPToolRequest(tool: MCPTools.getPanelImage,
+        guard case .failure(let refusal) = tools.answer(MCPToolRequest(tool: MCPTools.getHUDScreenshot,
                                                                        arguments: ["show": .string("hud")])) else {
             return XCTFail("the shared layout has no resting HUD")
         }

@@ -192,7 +192,7 @@ public final class DesktopApplication {
                                           look: self.store.settings.restingLook(on: key),
                                           metrics: ScreenMetrics(screen: display)).picture()
             }
-            let tools = PanelTools(store: store, screens: { [weak self] in self?.notch?.panelScreens ?? [] },
+            let tools = HUDTools(store: store, screens: { [weak self] in self?.notch?.panelScreens ?? [] },
                                    picture: { renderer($0, nil)?.picture() }, fit: { renderer($0, nil)?.fit() }, hud: hud,
                                    agentPicture: { renderer(.screen($0), $1)?.picture() })
             let channel = AgentToolsChannel(channel: MCPAppChannel { tools.answer($0) }, settings: settings, mode: options.toolChannel)

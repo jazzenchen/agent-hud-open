@@ -92,6 +92,8 @@ actor OpenAgentLocalStore {
                     prior.completions += item.completions
                     if prior.currentModel == nil { prior.currentModel = item.currentModel }
                     if prior.path.isEmpty { prior.path = item.path }
+                    // Only the database tells an archived session; its other records never do.
+                    prior.archived = prior.archived || item.archived
                     grouped[item.id] = prior
                 } else { grouped[item.id] = item }
             }

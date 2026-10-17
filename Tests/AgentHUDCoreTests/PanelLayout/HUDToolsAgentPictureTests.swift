@@ -3,11 +3,11 @@ import Foundation
 import XCTest
 @testable import AgentHUDCore
 
-/// One agent's own panel through `get_panel_image`: the card a click on its mark opens beside it on a dock that
-/// separates its agents, named as `get_panel` names the agent, drawn by the host with any draft, and refused, with how
+/// One agent's own panel through `get_hud_screenshot`: the card a click on its mark opens beside it on a dock that
+/// separates its agents, named as `get_hud` names the agent, drawn by the host with any draft, and refused, with how
 /// to get one, for a screen whose HUD gives no agent a panel of its own or an agent it shows no mark for. The drawing
 /// is the host's, so here it is a fake that answers with what a test gives it.
-final class PanelToolsAgentPictureTests: PanelToolsCase {
+final class HUDToolsAgentPictureTests: HUDToolsCase {
     private let png = Data([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x03, 0x04])
     private var reducesTransparency = false
     /// The screens and agents the host was asked to draw an agent's own panel for, in order.
@@ -33,7 +33,7 @@ final class PanelToolsAgentPictureTests: PanelToolsCase {
                            reducesTransparency: reducesTransparency)
     }
 
-    private lazy var screenTools = PanelTools(store: store, launch: 0, screens: { [unowned self] in [builtIn, second] },
+    private lazy var screenTools = HUDTools(store: store, launch: 0, screens: { [unowned self] in [builtIn, second] },
                                               picture: { [unowned self] _ in
         asked.append("the whole panel")
         return drawn
@@ -50,9 +50,9 @@ final class PanelToolsAgentPictureTests: PanelToolsCase {
     }
 
     private func picture(_ arguments: [String: JSONValue], line: UInt = #line) throws -> (result: [String: JSONValue], images: [MCPImage]) {
-        guard case .result(let result, let images) = screenTools.answer(MCPToolRequest(tool: MCPTools.getPanelImage,
+        guard case .result(let result, let images) = screenTools.answer(MCPToolRequest(tool: MCPTools.getHUDScreenshot,
                                                                                         arguments: arguments)) else {
-            XCTFail("get_panel_image was refused", line: line)
+            XCTFail("get_hud_screenshot was refused", line: line)
             throw CancellationError()
         }
         return (result, images)
@@ -60,7 +60,7 @@ final class PanelToolsAgentPictureTests: PanelToolsCase {
 
     private func refused(_ arguments: [String: JSONValue], line: UInt = #line) throws -> String {
         let before = (layout.revision, layout.draft, settings.settings)
-        guard case .failure(let sentence) = screenTools.answer(MCPToolRequest(tool: MCPTools.getPanelImage, arguments: arguments)) else {
+        guard case .failure(let sentence) = screenTools.answer(MCPToolRequest(tool: MCPTools.getHUDScreenshot, arguments: arguments)) else {
             XCTFail("the call was taken", line: line)
             throw CancellationError()
         }
@@ -108,12 +108,12 @@ final class PanelToolsAgentPictureTests: PanelToolsCase {
         XCTAssertEqual(asked, ["the whole panel"])
     }
 
-    /// The agent is named as get_panel names it: by the screen's shows, matched by the mark it is drawn with, so a name
+    /// The agent is named as get_hud names it: by the screen's shows, matched by the mark it is drawn with, so a name
     /// that shares a mark names it too, or by its block's key, an API balance's naming its vendor; the answer names it as
     /// the screen lists it.
-    func testAnAgentIsNamedAsGetPanelNamesIt() throws {
+    func testAnAgentIsNamedAsGetHUDNamesIt() throws {
         dock(.simple)
-        guard case .result(let panel, _) = screenTools.answer(MCPToolRequest(tool: MCPTools.getPanel)) else { return XCTFail() }
+        guard case .result(let panel, _) = screenTools.answer(MCPToolRequest(tool: MCPTools.getHUD)) else { return XCTFail() }
         let listed = try XCTUnwrap(panel["screens"]?.arrayValue?.last?.objectValue)
         XCTAssertEqual(listed["shows"], .array(["Claude", "Codex", "DeepSeek"].map(JSONValue.string)))
         XCTAssertEqual(blocks(panel).map { $0["key"] }, [.string("Claude"), .string("Codex"), .string("api:DeepSeek")])
@@ -130,8 +130,8 @@ final class PanelToolsAgentPictureTests: PanelToolsCase {
     /// it is unsaved, and a dock that separates its agents only in a style draft has them drawn so, which the note says.
     func testAnAgentsOwnPanelIsDrawnWithAWaitingDraft() throws {
         dock(separates: false)
-        _ = try result(MCPTools.getPanel)
-        guard case .result = screenTools.answer(MCPToolRequest(tool: MCPTools.setPanelLayout, arguments: [
+        _ = try result(MCPTools.getHUD)
+        guard case .result = screenTools.answer(MCPToolRequest(tool: MCPTools.draftHUD, arguments: [
             "screen": .string("SECOND-UUID"), "hud": .object(["separateAgents": .bool(true)]),
         ])) else { return XCTFail("the style was refused") }
         let styled = try picture(agent("Claude")).result
@@ -143,7 +143,7 @@ final class PanelToolsAgentPictureTests: PanelToolsCase {
                                                + "client's notice drawn as grey bars. The dock separates its agents only in "
                                                + "the unsaved style draft."))
 
-        guard case .result = screenTools.answer(MCPToolRequest(tool: MCPTools.setPanelLayout, arguments: [
+        guard case .result = screenTools.answer(MCPToolRequest(tool: MCPTools.draftHUD, arguments: [
             "screen": .string("SECOND-UUID"), "order": .array([.string("Codex")]), "hud": .object(["separateAgents": .bool(true)]),
         ])) else { return XCTFail("the layout was refused") }
         let both = try XCTUnwrap(try picture(agent("Codex")).result["note"]?.stringValue)
@@ -173,10 +173,10 @@ final class PanelToolsAgentPictureTests: PanelToolsCase {
                                      + "reading's reason or client's notice drawn as grey bars. That display opens it at most "
                                      + "1360 points tall, so a person scrolls to see the rest; the picture shows all of it. It "
                                      + "is drawn at 1.6 pixels a point instead of 2 to stay within 2400 pixels tall. "
-                                     + PanelTools.glassStandIn), note)
+                                     + HUDTools.glassStandIn), note)
 
         reducesTransparency = true
-        XCTAssertFalse(try picture(agent("Claude")).result["note"]?.stringValue?.contains(PanelTools.glassStandIn) == true,
+        XCTAssertFalse(try picture(agent("Claude")).result["note"]?.stringValue?.contains(HUDTools.glassStandIn) == true,
                        "Reduce Transparency draws it solid")
     }
 
@@ -216,7 +216,7 @@ final class PanelToolsAgentPictureTests: PanelToolsCase {
         XCTAssertEqual(try refused(agent("Codex")),
                        "\"Codex\" has no mark on the resting HUD of \"Display 2\" now, so it has no panel of its own there. "
                        + "It shows: \"Cursor\", \"Claude\".", "the draft's list is the one drawn")
-        XCTAssertEqual(try refused(agent("claude")).prefix(9), "\"claude\" ", "a name is matched as get_panel writes it")
+        XCTAssertEqual(try refused(agent("claude")).prefix(9), "\"claude\" ", "a name is matched as get_hud writes it")
         XCTAssertEqual(asked, [])
     }
 
@@ -234,26 +234,26 @@ final class PanelToolsAgentPictureTests: PanelToolsCase {
             .hasPrefix("The screen \"AWAY-UUID\", which is not attached now, has no agent's own panel to draw. The screens"))
         for name: JSONValue in [.string(""), .integer(1), .array([.string("Claude")])] {
             XCTAssertEqual(try refused(["screen": .string("SECOND-UUID"), "agent": name]),
-                           "agent is an agent's name from that screen's shows in get_panel, or its block's key.")
+                           "agent is an agent's name from that screen's shows in get_hud, or its block's key.")
         }
         XCTAssertEqual(try refused(["screen": .string("SECOND-UUID"), "agent": .string("Claude"), "show": .string("hud")]),
                        "show \"hud\" draws a screen's resting HUD, and agent one agent's own panel, so they are not given "
                        + "together: leave out show, or agent.")
         XCTAssertEqual(asked, [])
-        guard case .result = screenTools.answer(MCPToolRequest(tool: MCPTools.getPanelImage, arguments: [
+        guard case .result = screenTools.answer(MCPToolRequest(tool: MCPTools.getHUDScreenshot, arguments: [
             "screen": .string("SECOND-UUID"), "agent": .string("Claude"), "show": .string("panel"),
         ])) else { return XCTFail("an agent's own panel is a panel") }
     }
 
     func testWithoutARendererAnAgentsOwnPanelIsRefused() throws {
         dock()
-        let tools = PanelTools(store: store, launch: 0, screens: { [unowned self] in [builtIn, second] })
-        XCTAssertEqual(tools.answer(MCPToolRequest(tool: MCPTools.getPanelImage, arguments: agent("Claude"))),
+        let tools = HUDTools(store: store, launch: 0, screens: { [unowned self] in [builtIn, second] })
+        XCTAssertEqual(tools.answer(MCPToolRequest(tool: MCPTools.getHUDScreenshot, arguments: agent("Claude"))),
                        .failure("This copy of Agent HUD cannot draw an agent's own panel, so there is no picture of it here. "
-                                + "get_panel reads the panel as data."))
+                                + "get_hud reads the panel as data."))
         drawn = nil
         XCTAssertEqual(try refused(agent("Claude")),
-                       "The agent's own panel could not be drawn. Try again, or read the panel with get_panel.")
+                       "The agent's own panel could not be drawn. Try again, or read the panel with get_hud.")
         XCTAssertEqual(asked, ["SECOND-UUID Claude"])
     }
 }

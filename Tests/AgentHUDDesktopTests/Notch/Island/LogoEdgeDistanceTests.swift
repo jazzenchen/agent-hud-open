@@ -12,7 +12,7 @@ final class LogoEdgeDistanceTests: XCTestCase {
         for edge in HUDEdge.allCases {
             for scale in [CGFloat(1), 2] {
                 let view = LogoQueueLayerView()
-                for size in [12.0, 20, 30, 36] {
+                for size in [20.0, 30, 36, 60] {
                     for distance in [0.0, 2, 20] {
                         let placement = ScreenPlacement(edge: edge, offset: 0.35, logoSize: size,
                                                         logoEdgeDistance: distance, gapScale: 0.35)

@@ -12,9 +12,16 @@ extension MarkDirector {
         if let session = Self.owner(among: mark.sessions.filter { $0.compacting(at: now) }, keeping: owner) {
             return Want(look: .compacting, owner: session.sessionID, subagents: session.subagents)
         }
-        if let session = Self.owner(among: mark.sessions.filter(\.isInFlight), keeping: owner) {
-            return Want(look: look(of: session, at: now), owner: session.sessionID, subagents: session.subagents,
-                        holds: holds(session, at: now))
+        let inFlight = mark.sessions.filter(\.isInFlight)
+        if var session = Self.owner(among: inFlight, keeping: owner) {
+            var shown = look(of: session, at: now)
+            // While the session shown thinks, one that uses a tool takes the mark over: the agent shows at work whenever
+            // any of its sessions is.
+            if shown == .thinking, let tooling = Self.owner(among: inFlight.filter { usesTool($0, at: now) }, keeping: nil) {
+                session = tooling
+                shown = look(of: tooling, at: now)
+            }
+            return Want(look: shown, owner: session.sessionID, subagents: session.subagents, holds: holds(session, at: now))
         }
         // A vendor at work with no session to say how shows plain work.
         if mark.isWorking { return Want(look: .plain) }
@@ -38,7 +45,8 @@ extension MarkDirector {
     }
 
     /// The session whose work the mark shows, of those `working`: the one it shows already while it is among them, else
-    /// the one whose log wrote last, then the one whose turn began last, then the first by id.
+    /// the one whose log wrote last, then the one whose turn began last, then the first by id. A thinking one gives way to
+    /// one that uses a tool (`want(of:owner:at:)`).
     static func owner(among working: [SessionLiveFacts], keeping current: String?) -> SessionLiveFacts? {
         if let current, let kept = working.first(where: { $0.sessionID == current }) { return kept }
         return working.min { lhs, rhs in
@@ -66,6 +74,12 @@ extension MarkDirector {
         if session.hasOpenCall { return .tool(tool) }
         if let seen = session.toolSeenAt, now.timeIntervalSince(seen) < thinkingAfter { return .tool(tool) }
         return .thinking
+    }
+
+    /// Whether a working session shows a tool's look at `now`.
+    static func usesTool(_ session: SessionLiveFacts, at now: Date) -> Bool {
+        if case .tool = look(of: session, at: now) { return true }
+        return false
     }
 
     /// Whether a session's thinking holds still: it retries a failed request, or its log has been quiet for

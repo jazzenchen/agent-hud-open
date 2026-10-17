@@ -419,12 +419,12 @@ final class PanelPictureRendererTests: XCTestCase {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         addTeardownBlock { try? FileManager.default.removeItem(at: directory) }
         let renderer = renderer
-        let tools = PanelTools(store: store, picture: { _ in renderer.picture() }, fit: { _ in renderer.fit() })
+        let tools = HUDTools(store: store, picture: { _ in renderer.picture() }, fit: { _ in renderer.fit() })
         let channel = MCPAppChannel(directory: directory) { tools.answer($0) }
         XCTAssertTrue(channel.start())
         addTeardownBlock { await channel.stop() }
         let path = channel.path
-        let line = #"{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"get_panel_image","arguments":{}}}"#
+        let line = #"{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"get_hud_screenshot","arguments":{}}}"#
 
         var content: [JSONValue] = []
         for _ in 0..<300 {

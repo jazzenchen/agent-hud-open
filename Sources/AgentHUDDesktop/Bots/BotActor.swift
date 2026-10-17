@@ -50,7 +50,8 @@ final class BotActor {
     /// - arrivesAfter: seconds a staying bot keeps its logo before it turns into the bot.
     /// - seed: the bot's random acts, fixed only to replay them in a test.
     /// - sprites: where Claude's mark finds Clawd's sprites.
-    /// - awake: the bot was already out where this one is built, as a dock's are when it comes back after a card hid it.
+    /// - awake: the bot was already out where this one is built, as a dock's are when it is laid out again with bots
+    ///   on.
     ///   Its first look is taken up at its loop's start, with no morph from the logo and no intro.
     init(form: BotForm, staysBot: Bool, period: TimeInterval, arrivesAfter: TimeInterval = 0,
          seed: UInt64 = UInt64.random(in: 0...UInt64.max), sprites: ClawdSprites = .shared, awake: Bool = false) {
@@ -377,8 +378,6 @@ struct BotMark: View {
     /// The newest event, played once if it is still fresh when the mark is told of it.
     var cue: BotCue? = nil
     var staysBot = true
-    /// The mark was showing its bot before this view was made, as a dock's are when it comes back after a card hid it.
-    var resumes = false
     @Environment(\.botLogos) private var botLogos
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.hudLook) private var look
@@ -387,20 +386,17 @@ struct BotMark: View {
         self.init(vendor: vendor, size: size, state: phase.state, staysBot: staysBot)
     }
 
-    init(vendor: String, size: CGFloat = 17, state: BotState, cue: BotCue? = nil, staysBot: Bool = true,
-         resumes: Bool = false) {
+    init(vendor: String, size: CGFloat = 17, state: BotState, cue: BotCue? = nil, staysBot: Bool = true) {
         self.vendor = vendor
         self.size = size
         self.state = state
         self.cue = cue
         self.staysBot = staysBot
-        self.resumes = resumes
     }
 
     var body: some View {
         if botLogos, !reduceMotion, BotForm.form(for: vendor, ground: look.appearance) != nil {
-            BotStage(vendor: vendor, size: size, state: state, cue: cue, staysBot: staysBot, resumes: resumes,
-                     ground: look.appearance)
+            BotStage(vendor: vendor, size: size, state: state, cue: cue, staysBot: staysBot, ground: look.appearance)
                 .frame(width: size, height: size)
                 .accessibilityHidden(true)
         } else {
@@ -441,7 +437,6 @@ private struct BotStage: NSViewRepresentable {
     let state: BotState
     let cue: BotCue?
     let staysBot: Bool
-    let resumes: Bool
     let ground: HUDLook.Appearance
     @Environment(\.displayScale) private var displayScale
 
@@ -449,7 +444,7 @@ private struct BotStage: NSViewRepresentable {
 
     func updateNSView(_ view: BotStageView, context: Context) {
         view.show(vendor: vendor, size: size, scale: displayScale, state: state, cue: cue, staysBot: staysBot,
-                  resumes: resumes, ground: ground)
+                  ground: ground)
     }
 
     static func dismantleNSView(_ view: BotStageView, coordinator: ()) { BotClock.shared.drop(view) }
@@ -480,13 +475,10 @@ final class BotStageView: NSView {
         show(vendor: vendor, size: size, scale: scale, state: phase.state, staysBot: staysBot, ground: ground)
     }
 
-    /// - resumes: the mark was showing its bot before this stage was built, as a dock's are when it comes back after a
-    ///   card hid it: a new bot takes up its look at once, with no morph and no intro.
     func show(vendor: String, size: CGFloat, scale: CGFloat, state: BotState, cue: BotCue? = nil, staysBot: Bool = true,
-              resumes: Bool = false, ground: HUDLook.Appearance) {
+              ground: HUDLook.Appearance) {
         if vendor != self.vendor || staysBot != self.staysBot || ground != self.ground || actor == nil {
-            // Only the first bot of a stage picks up where the mark was; one built again for another ground fades in.
-            let awake = resumes && actor == nil
+            // One built again for another ground fades in.
             if actor != nil, vendor == self.vendor, staysBot == self.staysBot, let layer {
                 IslandAnimation.fadeLook(of: layer)
             }
@@ -495,8 +487,7 @@ final class BotStageView: NSView {
             self.ground = ground
             actor?.layer.removeFromSuperlayer()
             actor = BotForm.form(for: vendor, ground: ground).map {
-                let actor = BotActor(form: $0, staysBot: staysBot, period: 3, arrivesAfter: staysBot ? BotMark.arrival : 0,
-                                     awake: awake)
+                let actor = BotActor(form: $0, staysBot: staysBot, period: 3, arrivesAfter: staysBot ? BotMark.arrival : 0)
                 // Nothing else draws this mark, so the actor draws its logo too.
                 actor.restsHidden = false
                 return actor

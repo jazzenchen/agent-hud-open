@@ -215,14 +215,14 @@ final class ScreenStyleHUDTests: XCTestCase {
     }
 
     /// A proposal's answer measures the panel as its screen will show it: with the insets of the mode and edge the draft
-    /// gives, before the HUD has re-applied it, the same height `get_panel` reads once it has.
+    /// gives, before the HUD has re-applied it, the same height `get_hud` reads once it has.
     func testAProposalIsMeasuredWithTheInsetsItsDraftGives() throws {
         let (store, settings, key, screen) = try make(ScreenPlacement(mode: .simple, edge: .left))
         let controller = IslandController(store: store, settings: settings)
         defer { controller.rebuild(keys: [], screens: []) }
         controller.rebuild(keys: [key], screens: [screen])
         let hud = try XCTUnwrap(controller.huds[key])
-        let tools = PanelTools(store: store, screens: { controller.panelScreens }, fit: { scope in
+        let tools = HUDTools(store: store, screens: { controller.panelScreens }, fit: { scope in
             PanelPictureRenderer(store: store, display: controller.panelDisplay(for: scope.screenKey), screen: scope.screenKey).fit()
         })
         func height(_ tool: String, _ arguments: [String: JSONValue]) throws -> JSONValue? {
@@ -232,13 +232,13 @@ final class ScreenStyleHUDTests: XCTestCase {
             }
             return result["height"]
         }
-        let before = try height(MCPTools.getPanel, ["screen": .string(key)])
-        let proposed = try height(MCPTools.setPanelLayout, ["screen": .string(key), "hud": .object([
+        let before = try height(MCPTools.getHUD, ["screen": .string(key)])
+        let proposed = try height(MCPTools.draftHUD, ["screen": .string(key), "hud": .object([
             "mode": .string("dynamic"), "edge": .string("top"), "logoSize": .integer(36), "edgeDistance": .integer(20),
         ])])
         XCTAssertNotEqual(proposed, before, "a dock on the top edge keeps its strip clear above the content")
         poll("the HUD re-applies the draft") { hud.geometry.mode == .logos && hud.geometry.edge == .top }
-        XCTAssertEqual(proposed, try height(MCPTools.getPanel, ["screen": .string(key)]))
+        XCTAssertEqual(proposed, try height(MCPTools.getHUD, ["screen": .string(key)]))
     }
 
     /// One agent's own panel on a dock that separates its agents is 100 points narrower, and never below 440.

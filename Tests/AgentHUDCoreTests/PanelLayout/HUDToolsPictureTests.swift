@@ -4,9 +4,9 @@ import XCTest
 @testable import AgentHUDCore
 
 /// What the tools tell an agent about the panel's look: its picture, which the application draws, and its height,
-/// which `get_panel` reads beside the blocks. The drawing and the measuring are the host's, so here they are fakes
+/// which `get_hud` reads beside the blocks. The drawing and the measuring are the host's, so here they are fakes
 /// that answer with what a test gives them.
-final class PanelToolsPictureTests: PanelToolsCase {
+final class HUDToolsPictureTests: HUDToolsCase {
     private let png = Data([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x01, 0x02])
     private var drawn = 0
     private var measured = 0
@@ -14,8 +14,8 @@ final class PanelToolsPictureTests: PanelToolsCase {
     private var scopes: [PanelLayoutScope] = []
 
     /// The tools with a renderer that draws `picture` and a measurer that finds `fit`, counting how often each runs.
-    private func tools(picture: PanelPicture?, fit: PanelFit? = nil) -> PanelTools {
-        PanelTools(store: store, launch: 0, picture: { [unowned self] scope in
+    private func tools(picture: PanelPicture?, fit: PanelFit? = nil) -> HUDTools {
+        HUDTools(store: store, launch: 0, picture: { [unowned self] scope in
             drawn += 1
             scopes.append(scope)
             return picture
@@ -30,9 +30,9 @@ final class PanelToolsPictureTests: PanelToolsCase {
         PanelPicture(png: png, width: 540, fit: PanelFit(height: height, maximumHeight: maximum), scale: scale)
     }
 
-    private func answer(_ tools: PanelTools, _ arguments: [String: JSONValue] = [:]) throws -> (result: [String: JSONValue], images: [MCPImage]) {
-        guard case .result(let result, let images) = tools.answer(MCPToolRequest(tool: MCPTools.getPanelImage, arguments: arguments)) else {
-            XCTFail("get_panel_image was refused")
+    private func answer(_ tools: HUDTools, _ arguments: [String: JSONValue] = [:]) throws -> (result: [String: JSONValue], images: [MCPImage]) {
+        guard case .result(let result, let images) = tools.answer(MCPToolRequest(tool: MCPTools.getHUDScreenshot, arguments: arguments)) else {
+            XCTFail("get_hud_screenshot was refused")
             throw CancellationError()
         }
         return (result, images)
@@ -88,12 +88,12 @@ final class PanelToolsPictureTests: PanelToolsCase {
 
     func testThePictureToolTakesOnlyAScreenWhatToShowAndAnAgent() {
         let tools = tools(picture: picture(height: 741))
-        XCTAssertEqual(tools.answer(MCPToolRequest(tool: MCPTools.getPanelImage, arguments: ["scale": .integer(1), "block": .string("Claude")])),
-                       .failure("get_panel_image takes only screen, show and agent. Unknown: \"block\", \"scale\"."))
-        XCTAssertEqual(tools.answer(MCPToolRequest(tool: MCPTools.getPanelImage, arguments: ["show": .string("glow")])),
+        XCTAssertEqual(tools.answer(MCPToolRequest(tool: MCPTools.getHUDScreenshot, arguments: ["scale": .integer(1), "block": .string("Claude")])),
+                       .failure("get_hud_screenshot takes only screen, show and agent. Unknown: \"block\", \"scale\"."))
+        XCTAssertEqual(tools.answer(MCPToolRequest(tool: MCPTools.getHUDScreenshot, arguments: ["show": .string("glow")])),
                        .failure("show is \"panel\", the default, or \"hud\"."))
         XCTAssertEqual(drawn, 0, "nothing is drawn for a refused call")
-        guard case .result = tools.answer(MCPToolRequest(tool: MCPTools.getPanelImage, arguments: ["show": .string("panel")])) else {
+        guard case .result = tools.answer(MCPToolRequest(tool: MCPTools.getHUDScreenshot, arguments: ["show": .string("panel")])) else {
             return XCTFail("show panel is the panel")
         }
         XCTAssertEqual(drawn, 1)
@@ -137,11 +137,11 @@ final class PanelToolsPictureTests: PanelToolsCase {
     }
 
     func testWithoutARendererThePictureIsRefused() {
-        XCTAssertEqual(PanelTools(store: store, launch: 0).answer(MCPToolRequest(tool: MCPTools.getPanelImage)),
+        XCTAssertEqual(HUDTools(store: store, launch: 0).answer(MCPToolRequest(tool: MCPTools.getHUDScreenshot)),
                        .failure("This copy of Agent HUD cannot draw the panel, so there is no picture of it here. "
-                                + "get_panel reads the same panel as data."))
-        XCTAssertEqual(tools(picture: nil).answer(MCPToolRequest(tool: MCPTools.getPanelImage)),
-                       .failure("The panel's picture could not be drawn. Try again, or read the panel with get_panel."))
+                                + "get_hud reads the same panel as data."))
+        XCTAssertEqual(tools(picture: nil).answer(MCPToolRequest(tool: MCPTools.getHUDScreenshot)),
+                       .failure("The panel's picture could not be drawn. Try again, or read the panel with get_hud."))
         XCTAssertEqual(drawn, 1)
     }
 
@@ -149,32 +149,32 @@ final class PanelToolsPictureTests: PanelToolsCase {
 
     func testThePanelIsReadWithItsHeightAndWhetherItScrolls() throws {
         let tools = tools(picture: nil, fit: PanelFit(height: 741, maximumHeight: 902))
-        guard case .result(let panel, let images) = tools.answer(MCPToolRequest(tool: MCPTools.getPanel)) else {
-            return XCTFail("get_panel was refused")
+        guard case .result(let panel, let images) = tools.answer(MCPToolRequest(tool: MCPTools.getHUD)) else {
+            return XCTFail("get_hud was refused")
         }
         XCTAssertEqual(panel["height"], .integer(741))
         XCTAssertEqual(panel["scrolls"], .bool(false))
-        XCTAssertTrue(images.isEmpty, "get_panel draws nothing")
+        XCTAssertTrue(images.isEmpty, "get_hud draws nothing")
         XCTAssertEqual(drawn, 0)
         XCTAssertEqual(measured, 1)
         XCTAssertEqual(scopes, [.shared], "the shared layout, measured on the main display")
 
-        guard case .result(let proposed, _) = tools.answer(MCPToolRequest(tool: MCPTools.setPanelLayout,
+        guard case .result(let proposed, _) = tools.answer(MCPToolRequest(tool: MCPTools.draftHUD,
                                                                           arguments: ["order": .array([.string("Codex")])])) else {
             return XCTFail("the proposal was refused")
         }
         XCTAssertEqual(proposed["height"], .integer(741), "a proposal's answer is the panel read again, its height included")
         let tall = self.tools(picture: nil, fit: PanelFit(height: 1_400, maximumHeight: 1_360))
-        guard case .result(let scrolling, _) = tall.answer(MCPToolRequest(tool: MCPTools.getPanel)) else { return XCTFail() }
+        guard case .result(let scrolling, _) = tall.answer(MCPToolRequest(tool: MCPTools.getHUD)) else { return XCTFail() }
         XCTAssertEqual(scrolling["scrolls"], .bool(true))
     }
 
     func testWithoutAMeasurerTheHeightIsLeftOut() throws {
-        let panel = try result(MCPTools.getPanel)
+        let panel = try result(MCPTools.getHUD)
         XCTAssertNil(panel["height"])
         XCTAssertNil(panel["scrolls"])
         let unmeasured = tools(picture: nil, fit: nil)
-        guard case .result(let read, _) = unmeasured.answer(MCPToolRequest(tool: MCPTools.getPanel)) else { return XCTFail() }
+        guard case .result(let read, _) = unmeasured.answer(MCPToolRequest(tool: MCPTools.getHUD)) else { return XCTFail() }
         XCTAssertNil(read["height"], "a measurer that finds nothing leaves the fields out too")
         XCTAssertNil(read["scrolls"])
     }

@@ -148,7 +148,7 @@ final class MCPStdioTests: XCTestCase {
         let input = [#"{"jsonrpc":"2.0","id":0,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{}}}"#,
                      #"{"jsonrpc":"2.0","method":"notifications/initialized"}"#,
                      "",
-                     #"{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"get_panel","arguments":{}}}"#,
+                     #"{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"get_hud","arguments":{}}}"#,
                      "not json",
                      #"{"jsonrpc":"2.0","id":"last","method":"ping"}"#].joined(separator: "\n")
         let (status, lines) = try run(input, probe: probe)
@@ -158,7 +158,7 @@ final class MCPStdioTests: XCTestCase {
                        "one response per request, in the order they came; the last line needs no line end")
         XCTAssertEqual(messages[1]["result"].blockText, #"{"revision":1}"#)
         XCTAssertEqual(messages[2]["error"]["code"], .integer(-32700))
-        XCTAssertEqual(probe.calls, [MCPToolRequest(tool: "get_panel")])
+        XCTAssertEqual(probe.calls, [MCPToolRequest(tool: "get_hud")])
     }
 
     func testInputThatEndsAtOnceEndsTheProcessWithNothingWritten() throws {
@@ -174,7 +174,7 @@ final class MCPStdioTests: XCTestCase {
         // The process ignores the signal a closed pipe raises; here only this descriptor does.
         XCTAssertEqual(fcntl(outbound.write, F_SETNOSIGPIPE, 1), 0)
         close(outbound.read)
-        let bytes = Array((#"{"jsonrpc":"2.0","id":1,"method":"ping"}"# + "\n" + #"{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"get_panel"}}"# + "\n").utf8)
+        let bytes = Array((#"{"jsonrpc":"2.0","id":1,"method":"ping"}"# + "\n" + #"{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"get_hud"}}"# + "\n").utf8)
         XCTAssertEqual(write(inbound.write, bytes, bytes.count), bytes.count)
         defer { close(inbound.write); close(inbound.read); close(outbound.write) }
         let probe = MCPServerProbe()

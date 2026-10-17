@@ -33,7 +33,8 @@ enum OpenClawSessions: LocalSessionLayout {
     static func accepts(_ url: URL) -> Bool {
         let name = url.lastPathComponent, folder = url.deletingLastPathComponent().lastPathComponent
         if folder == "agent" { return name == "openclaw-agent.sqlite" }
-        // Plain reset and deleted archives keep usage reclaimed from SQLite; zstd archives are skipped.
+        // Plain reset and deleted archives keep usage reclaimed from SQLite, and their sessions are archived; zstd
+        // archives are skipped.
         return folder == "sessions" && (name.hasSuffix(".jsonl")
             || [".jsonl.reset.", ".jsonl.deleted."].contains { name.contains($0) } && !name.hasSuffix(".zst") && !name.hasSuffix(".tmp"))
     }
@@ -90,6 +91,8 @@ enum OpenClawSessions: LocalSessionLayout {
         let name = url.lastPathComponent, raw = String(name[..<(name.range(of: ".jsonl")?.lowerBound ?? name.endIndex)])
         let agent = url.deletingLastPathComponent().deletingLastPathComponent().lastPathComponent
         var session = ProviderSession(id: "openclaw:\(raw)", title: "OpenClaw · \(agent)", path: url.path, client: "OpenClaw")
+        // A reset or a delete renames the transcript and drops the session from OpenClaw's own list.
+        session.archived = name != raw + ".jsonl"
         var usage = Usage()
         try ProviderFiles.lines(url, markers: transcriptMarkers) { entry, line in
             if entry["type"].stringValue == "session" {

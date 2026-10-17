@@ -41,7 +41,7 @@ final class LedgerFileStoreTests: XCTestCase, @unchecked Sendable {
         try await ledger.buckets(since: .distantPast, source: source).reduce(0) { $0 + $1.tokensIn }
     }
 
-    func testMissingLogLeavesTheLedgerWhileAListedUnreadableLogStays() async throws {
+    func testAMissingLogKeepsItsUsageAndAListedUnreadableLogStays() async throws {
         let root = try directory(), ledger = UsageLedger.inMemory()
         let kept = root.appendingPathComponent("kept.log"), gone = root.appendingPathComponent("gone.log")
         try "a 10\n".write(to: kept, atomically: true, encoding: .utf8)
@@ -57,9 +57,23 @@ final class LedgerFileStoreTests: XCTestCase, @unchecked Sendable {
         let pass = await store.index(since: .distantPast, timeBudget: 5)
         XCTAssertEqual(pass.failures.count, 1)
         total = try await tokens(ledger)
-        XCTAssertEqual(total, 10, "the deleted log leaves; the unreadable one keeps what it recorded")
-        let files = try await ledger.fileStates(source: Requests.source)
-        XCTAssertEqual(files.keys.map { URL(fileURLWithPath: $0).lastPathComponent }, ["kept.log"])
+        XCTAssertEqual(total, 15, "the deleted log keeps its usage; the unreadable one keeps what it recorded")
+        var files = try await ledger.fileStates(source: Requests.source)
+        XCTAssertEqual(Set(files.keys.map { URL(fileURLWithPath: $0).lastPathComponent }), ["kept.log", "gone.log"])
+        XCTAssertEqual(files.filter(\.value.isGone).keys.map { URL(fileURLWithPath: $0).lastPathComponent }, ["gone.log"],
+                       "only that it left is stored")
+
+        // Listed again, it is read as new and replaces what it kept.
+        try "b 5\nd 2\n".write(to: gone, atomically: true, encoding: .utf8)
+        _ = await store.index(since: .distantPast, timeBudget: 5)
+        total = try await tokens(ledger)
+        XCTAssertEqual(total, 17)
+        // Kept once more, it goes when its usage expires.
+        try FileManager.default.removeItem(at: gone)
+        _ = await store.index(since: .distantPast, timeBudget: 5)
+        try await ledger.expire(now: Self.base.addingTimeInterval(UsageLedger.retention + 86400))
+        files = try await ledger.fileStates(source: Requests.source)
+        XCTAssertFalse(files.keys.contains { $0.hasSuffix("/gone.log") })
     }
 
     func testALogOfAnotherStateVersionIsReadAgainAndReplacesItsUsage() async throws {
@@ -175,7 +189,7 @@ final class LedgerFileStoreTests: XCTestCase, @unchecked Sendable {
         XCTAssertEqual(recorded, [firstPeriod: 100, period: 50], "a restart reads on from the totals the ledger kept")
     }
 
-    func testSessionsOfAMissingFileLeaveUnlessAListedFileHoldsThemAndRollbacksAreWrittenAgain() async throws {
+    func testSessionsOfAMissingFileKeepTheirUsageAndRollbacksAreWrittenAgain() async throws {
         let ledger = UsageLedger.inMemory(), recorder = SessionLedger(source: "fixture", ledger: ledger), window = Date(timeIntervalSince1970: 0)
         func session(_ id: String, _ tokens: Int) -> (id: String, events: [UsageEvent]) {
             (id, [UsageEvent(timestamp: Self.base, agentId: "fixture-model:m", tokensIn: tokens, tokensOut: 0, eventID: id)])
@@ -188,16 +202,16 @@ final class LedgerFileStoreTests: XCTestCase, @unchecked Sendable {
         // `/a` was deleted; `/b` is still listed but has no parse at hand, as after a restart with an unreadable file.
         await recorder.record(files: ListedFiles(paths: ["/b"]), revision: 2, window: window) { [] }
         total = try await tokens(ledger)
-        XCTAssertEqual(total, 5)
+        XCTAssertEqual(total, 15, "a deleted file's sessions keep their usage")
         await ledger.beginPass()
         let added = ListedFiles(paths: ["/b", "/c"], sessions: ["/c": ["s3"]])
         await recorder.record(files: added, revision: 3, window: window) { [session("s3", 7)] }
         await ledger.rollBackPass()
         await recorder.record(files: added, revision: 3, window: window) { [session("s3", 7)] }
         total = try await tokens(ledger)
-        XCTAssertEqual(total, 12, "what the rolled-back pass wrote is written again")
+        XCTAssertEqual(total, 22, "what the rolled-back pass wrote is written again")
         await recorder.record(files: ListedFiles(paths: []), revision: 3, window: window) { [] }
         total = try await tokens(ledger)
-        XCTAssertEqual(total, 0)
+        XCTAssertEqual(total, 22)
     }
 }

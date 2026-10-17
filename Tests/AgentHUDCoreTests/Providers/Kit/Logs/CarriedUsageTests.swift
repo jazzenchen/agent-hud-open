@@ -231,7 +231,7 @@ final class CarriedUsageTests: XCTestCase, @unchecked Sendable {
         XCTAssertNil(store.entry(path)?.carried, "and then nothing of the earlier version is left")
     }
 
-    func testAMissingLogTakesTheEarlierUsageWithIt() async throws {
+    func testAMissingLogKeepsWhatItHeldTheEarlierUsageIncluded() async throws {
         let (root, url) = try log(lines()), ledger = try UsageLedger(url: nil, expires: true)
         let store = TailLogStore<Current>(roots: [root], ledger: ledger, watchesChanges: false) { _ in true }
         let (path, before, _) = try await reread(root, in: ledger, with: store, pages: 0)
@@ -243,7 +243,7 @@ final class CarriedUsageTests: XCTestCase, @unchecked Sendable {
         _ = await store.index(since: .distantPast, timeBudget: 5)
         let figures = try await figures(ledger, path: path)
         XCTAssertFalse(before.buckets.isEmpty)
-        XCTAssertEqual(figures, Figures(buckets: [], breakdown: nil, window: nil), "the log leaves the ledger, the earlier version's usage included")
+        XCTAssertEqual(figures.buckets, before.buckets, "a deleted log keeps its usage, the earlier version's included")
     }
 
     func testALogRewrittenSinceTheEarlierReadReplacesItsUsageAtOnce() async throws {

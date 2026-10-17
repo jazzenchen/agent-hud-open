@@ -77,6 +77,20 @@ final class QwenProviderTests: XCTestCase, @unchecked Sendable {
         XCTAssertEqual(session.title, "Login fix", "a title the session was given beats its first prompt")
     }
 
+    func testAnArchivedChatKeepsItsUsageAndLeavesTheSessionList() async throws {
+        let projects = try directory().appendingPathComponent("projects")
+        try write([try json(response("r1", input: 100, output: 10))], to: projects.appendingPathComponent("-Users-alice-repo/chats/s1.jsonl"))
+        try write([try json(response("r2", input: 200, output: 20, extra: ["sessionId": "s2"]))],
+                  to: projects.appendingPathComponent("-Users-alice-repo/chats/archive/s2.jsonl"))
+        let ledger = UsageLedger.inMemory(), now = now
+        let report = try await AdditionalUsageProvider(source: .qwen, readQuota: { ProviderQuota() }, readSessions: { since in
+            await AdditionalLocalStore(source: .qwen, roots: [projects]).index(since: since)
+        }, history: QuotaHistoryStore(ledger: .inMemory()), clock: { now }, ledger: ledger).fetchUsage(agents: [], historyHours: 24)
+        XCTAssertEqual(report.sessions.map(\.id), ["qwen:s1"], "a chat Qwen archived leaves the list")
+        let tokens = try await ledger.buckets(since: .distantPast).reduce(0) { $0 + $1.tokensIn }
+        XCTAssertEqual(tokens, 300, "and its usage still counts")
+    }
+
     func testOnlyChatTranscriptsUnderTheRuntimeFolderAreRead() throws {
         let home = URL(fileURLWithPath: "/Users/alice")
         XCTAssertEqual(QwenSessions.roots(home: home, environment: [:]), [home.appendingPathComponent(".qwen/projects")])

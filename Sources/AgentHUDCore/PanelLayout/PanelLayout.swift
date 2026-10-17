@@ -132,7 +132,7 @@ public struct PanelLayout: Hashable, Codable, Sendable {
         /// The order of the block's rows, by row key: those named come first, in that order, and the others keep their
         /// order after them. Empty for the rows' own order.
         public var rows: [String]
-        /// The accounts whose rows or balances the block shows, by the id `get_panel` gives each; empty for every account.
+        /// The accounts whose rows or balances the block shows, by the id `get_hud` gives each; empty for every account.
         /// Rows that belong to no account, which no id names, are left out by any.
         public var accounts: [String]
         /// Whether a quota block shows its reset times; nil for the layout's `countdown`, which this overrides.

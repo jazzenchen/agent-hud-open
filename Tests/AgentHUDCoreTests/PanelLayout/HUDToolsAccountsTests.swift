@@ -6,14 +6,14 @@ import XCTest
 /// What the tools say and take of a block's rows and accounts, and of the Expanded panel's switches, over the sample
 /// with a second Claude account, Work, signed in from another home with the session and the week.
 @MainActor
-final class PanelToolsAccountsTests: XCTestCase {
+final class HUDToolsAccountsTests: XCTestCase {
     private static let work = ProviderAccount.identified(provider: "Claude", user: "demo-claude-work", workspace: nil)!
 
     /// The sample's store with Work beside Personal, over settings of its own.
     private lazy var store: UsageStore = {
         let suite = "app.agenthud.tests.panel-accounts.\(UUID().uuidString)"
         addTeardownBlock { UserDefaults.standard.removePersistentDomain(forName: suite) }
-        let work = PanelToolsAccountsTests.work
+        let work = HUDToolsAccountsTests.work
         let workRows = DemoData.claudeRows.prefix(2).map {
             AgentDescriptor(id: work.windowID($0.windowKey), vendor: $0.vendor, model: $0.model, shortModel: $0.shortModel,
                             source: $0.source, enabled: true, account: work)
@@ -37,7 +37,7 @@ final class PanelToolsAccountsTests: XCTestCase {
         return store
     }()
     private var layout: PanelLayoutStore { store.settings.panelLayout }
-    private lazy var tools = PanelTools(store: store, launch: 0)
+    private lazy var tools = HUDTools(store: store, launch: 0)
 
     override func setUp() {
         super.setUp()
@@ -59,7 +59,7 @@ final class PanelToolsAccountsTests: XCTestCase {
 
     private func refusal(_ arguments: [String: JSONValue], line: UInt = #line) throws -> String {
         let revision = layout.revision
-        guard case .failure(let sentence) = tools.answer(MCPToolRequest(tool: MCPTools.setPanelLayout, arguments: arguments)) else {
+        guard case .failure(let sentence) = tools.answer(MCPToolRequest(tool: MCPTools.draftHUD, arguments: arguments)) else {
             XCTFail("the proposal was taken", line: line)
             throw CancellationError()
         }
@@ -83,7 +83,7 @@ final class PanelToolsAccountsTests: XCTestCase {
     /// email or name and its plan, and its rows account by account, each with its account.
     func testABlockListsItsAccountsAndItsRowsAccountByAccount() throws {
         let personal = DemoData.claudeAccount.id, work = Self.work.id
-        let block = try claude(try result(MCPTools.getPanel))
+        let block = try claude(try result(MCPTools.getHUD))
         XCTAssertEqual(block["accounts"], .array([
             .object(["id": .string(personal), "name": .string("Personal"), "plan": .string("Max x20"), "current": .bool(true),
                      "shown": .bool(true)]),
@@ -100,21 +100,21 @@ final class PanelToolsAccountsTests: XCTestCase {
     /// layout that was read, sent back, changes nothing.
     func testAProposalChoosesTheAccountsABlockShows() throws {
         let work = Self.work.id
-        let panel = try result(MCPTools.setPanelLayout, claudeChange(["accounts": .array([.string(work)])]))
+        let panel = try result(MCPTools.draftHUD, claudeChange(["accounts": .array([.string(work)])]))
         XCTAssertEqual(layout.draft, PanelLayout(blocks: ["Claude": PanelLayout.Block(accounts: [work])]))
         let block = try claude(panel)
         XCTAssertEqual((block["accounts"]?.arrayValue ?? []).compactMap { $0.objectValue?["shown"] }, [.bool(false), .bool(true)])
         XCTAssertEqual(rows(block).map { $0["shown"] }, [.bool(false), .bool(false), .bool(false), .bool(true), .bool(true)])
-        let read = try result(MCPTools.getPanel)
+        let read = try result(MCPTools.getHUD)
         let revision = layout.revision
-        _ = try result(MCPTools.setPanelLayout, read["layout"]?.objectValue ?? [:])
+        _ = try result(MCPTools.draftHUD, read["layout"]?.objectValue ?? [:])
         XCTAssertEqual(layout.revision, revision, "the layout that was read, sent back, keeps the draft as it is")
 
         let every = [DemoData.claudeAccount.id, work].sorted()
-        _ = try result(MCPTools.setPanelLayout, claudeChange(["accounts": .array(every.map(JSONValue.string))]))
+        _ = try result(MCPTools.draftHUD, claudeChange(["accounts": .array(every.map(JSONValue.string))]))
         XCTAssertEqual(layout.draft, PanelLayout(blocks: ["Claude": PanelLayout.Block(accounts: every)]),
                        "every account the block has now still leaves out one that joins later")
-        _ = try result(MCPTools.setPanelLayout, claudeChange(["accounts": .array([])]))
+        _ = try result(MCPTools.draftHUD, claudeChange(["accounts": .array([])]))
         XCTAssertNil(layout.draft, "no account named is every account, the saved layout")
     }
 
@@ -127,9 +127,9 @@ final class PanelToolsAccountsTests: XCTestCase {
         store.settings.setAccount(id: DemoData.claudeAccount.id, visible: false)
         XCTAssertEqual(store.view.panelBlocks.first { $0.key == "Claude" }?.accounts.map(\.id), [work],
                        "Personal is switched off in Settings, so Work is all the block has now")
-        var arguments = try XCTUnwrap(try result(MCPTools.getPanel)["layout"]?.objectValue)
+        var arguments = try XCTUnwrap(try result(MCPTools.getHUD)["layout"]?.objectValue)
         arguments["style"] = .object(["width": .integer(600)])
-        _ = try result(MCPTools.setPanelLayout, arguments)
+        _ = try result(MCPTools.draftHUD, arguments)
         XCTAssertEqual(layout.draft, PanelLayout(blocks: ["Claude": PanelLayout.Block(accounts: [work])],
                                                  style: PanelStyle(width: 600)))
     }
@@ -140,7 +140,7 @@ final class PanelToolsAccountsTests: XCTestCase {
                                         + "\"\(DemoData.claudeAccount.id)\" (Personal), \"\(Self.work.id)\" (jazzen@work.example)."),
                       sentence)
         let misread = try refusal(claudeChange(["accounts": .string(Self.work.id)]))
-        XCTAssertTrue(misread.contains("blocks.Claude.accounts is a list of account ids from get_panel."), misread)
+        XCTAssertTrue(misread.contains("blocks.Claude.accounts is a list of account ids from get_hud."), misread)
         let balance = try refusal(["blocks": .object(["api:DeepSeek": .object(["accounts": .array([.string("pool:none")])])])])
         XCTAssertTrue(balance.contains("\"api:DeepSeek\" has no account \"pool:none\". Its accounts: \"DeepSeek\" (DeepSeek · API)."),
                       balance)
@@ -148,8 +148,8 @@ final class PanelToolsAccountsTests: XCTestCase {
 
     // MARK: The order of rows
 
-    func testAProposalOrdersABlocksRowsAndGetPanelReadsThemInThatOrder() throws {
-        let panel = try result(MCPTools.setPanelLayout, claudeChange(["rows": .array([.string("claude-weekly-fable"),
+    func testAProposalOrdersABlocksRowsAndGetHUDReadsThemInThatOrder() throws {
+        let panel = try result(MCPTools.draftHUD, claudeChange(["rows": .array([.string("claude-weekly-fable"),
                                                                                        .string("claude-weekly")])]))
         XCTAssertEqual(layout.draft, PanelLayout(blocks: ["Claude": PanelLayout.Block(rows: ["claude-weekly-fable", "claude-weekly"])]))
         XCTAssertEqual(rows(try claude(panel)).map { $0["key"]?.stringValue }, [
@@ -161,7 +161,7 @@ final class PanelToolsAccountsTests: XCTestCase {
                                        + "\"claude-weekly\", \"claude-weekly-fable\"."), refused)
         let misread = try refusal(claudeChange(["rows": .array([.integer(1)])]))
         XCTAssertTrue(misread.contains("blocks.Claude.rows is a list of row keys."), misread)
-        _ = try result(MCPTools.setPanelLayout, claudeChange(["rows": .array([.string("claude-session"), .string("claude-weekly")])]))
+        _ = try result(MCPTools.draftHUD, claudeChange(["rows": .array([.string("claude-session"), .string("claude-weekly")])]))
         XCTAssertNil(layout.draft, "the rows' own order is the saved layout")
     }
 
@@ -171,13 +171,13 @@ final class PanelToolsAccountsTests: XCTestCase {
     /// its own, and Reset to Default and Revert to Previous reach them like the rest of the layout.
     func testTheSwitchesAreLayoutFieldsAnAgentDrafts() throws {
         layout.setSwitches { $0.tokenUsage = false; $0.resetCountdown = false }
-        let read = try result(MCPTools.getPanel)
+        let read = try result(MCPTools.getHUD)
         XCTAssertEqual(read["layout"], .object(["hiddenSections": .array([.string("tokens")]), "countdown": .bool(false)]))
         XCTAssertEqual(read["countdown"], .bool(false))
         XCTAssertEqual(try claude(read)["countdown"], .bool(false))
         XCTAssertNil(read["countdownOnInSettings"])
 
-        let shown = try result(MCPTools.setPanelLayout, [:])
+        let shown = try result(MCPTools.draftHUD, [:])
         XCTAssertEqual(layout.draft, PanelLayout(), "a proposal is whole: what it leaves out is the default view's")
         XCTAssertEqual(shown["countdown"], .bool(true))
         XCTAssertEqual((shown["sections"]?.arrayValue ?? []).compactMap { $0.objectValue?["shown"] },
@@ -197,23 +197,23 @@ final class PanelToolsAccountsTests: XCTestCase {
     /// A block's own countdown is kept as written, the one the layout has now included, so it holds whichever way the
     /// person turns Settings' Reset countdown later.
     func testABlocksOwnCountdownHoldsWhenTheSwitchTurns() throws {
-        _ = try result(MCPTools.setPanelLayout, claudeChange(["countdown": .bool(true)]))
+        _ = try result(MCPTools.draftHUD, claudeChange(["countdown": .bool(true)]))
         XCTAssertEqual(layout.draft, PanelLayout(blocks: ["Claude": PanelLayout.Block(countdown: true)]))
         layout.save()
         layout.setSwitches { $0.resetCountdown = false }
-        let read = try result(MCPTools.getPanel)
+        let read = try result(MCPTools.getHUD)
         XCTAssertEqual(read["countdown"], .bool(false))
         XCTAssertEqual(try claude(read)["countdown"], .bool(true), "Claude's reset times still show")
         let revision = layout.revision
-        _ = try result(MCPTools.setPanelLayout, read["layout"]?.objectValue ?? [:])
+        _ = try result(MCPTools.draftHUD, read["layout"]?.objectValue ?? [:])
         XCTAssertEqual(layout.revision, revision, "the layout that was read, sent back, is the saved one")
     }
 
     func testAScreensOwnLayoutKeepsItsOwnSwitches() throws {
         let screen = PanelScreen(key: "SECOND-UUID", name: "Display 2", mode: .logos, edge: .right, hasNotch: false,
                                  agents: ["Claude", "Codex"], systemIsLight: false, reducesTransparency: false)
-        let screenTools = PanelTools(store: store, launch: 0, screens: { [screen] })
-        guard case .result(let own, _) = screenTools.answer(MCPToolRequest(tool: MCPTools.setPanelLayout, arguments: [
+        let screenTools = HUDTools(store: store, launch: 0, screens: { [screen] })
+        guard case .result(let own, _) = screenTools.answer(MCPToolRequest(tool: MCPTools.draftHUD, arguments: [
             "screen": .string(screen.key), "hiddenSections": .array([.string("sessions")]),
         ])) else { return XCTFail("refused") }
         XCTAssertEqual(own["layout"], .object(["hiddenSections": .array([.string("sessions")])]))

@@ -26,7 +26,7 @@ public enum SessionProject: Hashable, Sendable {
     /// The id of the sessions of no folder, which no folder written with ~ or from the root is.
     static let unassignedID = "unassigned"
 
-    /// How the hover panel's layout names the project (`PanelLayout.Sessions.projects`) and `get_panel` gives it: its
+    /// How the hover panel's layout names the project (`PanelLayout.Sessions.projects`) and `get_hud` gives it: its
     /// folder written with ~, as `label` writes it, the same in every language; `unassigned` for the sessions of none.
     public var id: String {
         path.map { ($0 as NSString).abbreviatingWithTildeInPath } ?? Self.unassignedID

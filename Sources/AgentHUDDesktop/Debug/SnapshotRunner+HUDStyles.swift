@@ -5,11 +5,11 @@ import AgentHUDCore
 #if DEBUG
 /// The stills of an agent's style drafts and of the panel's widths, named `panel-layout-…`.
 extension SnapshotRunner {
-    /// A screen's resting HUD under an agent's style draft, drawn as `get_panel_image` draws it with show "hud": a notch
-    /// turned into a Simple panel, a Dynamic dock with larger logos, and the notch's glow in another style; that screen's
-    /// panel with the bar that says the style waits; the panel at the narrowest and the widest width a layout sets; and
-    /// the Display page of Settings while the first display has a style draft, and before and after a person resets its
-    /// HUD style. They are drawn from a settings store of their own.
+    /// A screen's resting HUD under an agent's style draft, drawn as `get_hud_screenshot` draws it with show "hud": a
+    /// notch turned into a Simple panel, a Dynamic dock with larger logos, and the notch's glow in another style; that
+    /// screen's panel with the bar that says the style waits; the panel at the narrowest and the widest width a layout
+    /// sets; and the Display page of Settings while the first display has a style draft, and before and after a person
+    /// resets its HUD style. They are drawn from a settings store of their own.
     static func saveHUDStyles(preferences: AgentHUDCore.Settings, folder: URL) {
         let suite = "app.agenthud.open.snapshot.layout-styles"
         let defaults = UserDefaults(suiteName: suite)!

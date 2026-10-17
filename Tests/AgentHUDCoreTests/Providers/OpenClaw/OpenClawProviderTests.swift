@@ -120,6 +120,7 @@ final class OpenClawProviderTests: XCTestCase, @unchecked Sendable {
         for folder in [sessions, codex] { try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true) }
         try (copy + "\n").write(to: sessions.appendingPathComponent("s1.jsonl"), atomically: true, encoding: .utf8)
         try (assistant("r1", usage: #"{"input":1,"output":2}"#) + "\n").write(to: sessions.appendingPathComponent("s0.jsonl.reset.2026-09-13T00-00-00.000Z"), atomically: true, encoding: .utf8)
+        try (copy + "\n").write(to: sessions.appendingPathComponent("s1.jsonl.reset.2026-09-12T00-00-00.000Z"), atomically: true, encoding: .utf8)
         try Data([0x28, 0xb5, 0x2f, 0xfd]).write(to: sessions.appendingPathComponent("s2.jsonl.deleted.2026-09-13T00-00-00.000Z.zst"))
         try (assistant("codex") + "\n").write(to: codex.appendingPathComponent("rollout-1.jsonl"), atomically: true, encoding: .utf8)
         let result = await AdditionalLocalStore(source: .openclaw, roots: [root.appendingPathComponent("agents")]).index(since: now.addingTimeInterval(-3600))
@@ -128,6 +129,8 @@ final class OpenClawProviderTests: XCTestCase, @unchecked Sendable {
         XCTAssertEqual(result.sessions[1].events.count, 1)
         XCTAssertEqual(result.sessions[1].title, "Fixture s1")
         XCTAssertEqual(result.sessions[1].completions.count, 1)
+        XCTAssertEqual(result.sessions.map(\.archived), [true, false],
+                       "a session known only from a reset or deleted transcript is archived; one OpenClaw still holds is not")
     }
 
     func testRootsFollowStateDirectoryProfilesAndLegacyName() throws {

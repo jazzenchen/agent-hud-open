@@ -242,8 +242,8 @@ struct BotMotion: Sendable {
         pending = (next, now)
     }
 
-    /// Takes up the look as a bot that is already up: a mark built again while its bot was out, as a dock is when it
-    /// comes back after a card hid it, starts its look where the loop begins, with no morph from the logo, no hop and
+    /// Takes up the look as a bot that is already up: a mark built again while its bot was out, as a dock's are when
+    /// it is laid out again, starts its look where the loop begins, with no morph from the logo, no hop and
     /// no blend from a pose it never had. A look the logo rests in is left as it is.
     mutating func resume(at now: TimeInterval) {
         guard look.isWorking || look.isAttention else { return }

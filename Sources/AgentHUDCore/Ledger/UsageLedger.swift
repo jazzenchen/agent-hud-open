@@ -21,6 +21,12 @@ public actor UsageLedger {
         public init(signature: String, state: Data? = nil, group: String? = nil) {
             self.signature = signature; self.state = state; self.group = group
         }
+
+        /// A log that left its folder, deleted in its client or moved away, whose usage the ledger keeps: only its group
+        /// is stored, so a copy of the same session found later takes its place. It goes when its usage expires.
+        public static func gone(group: String?) -> FileState { FileState(signature: goneSignature, group: group) }
+        public var isGone: Bool { signature == Self.goneSignature }
+        static let goneSignature = "gone"
     }
 
     /// One token observation after the provider resolved duplicates; `key` is unique within its contribution.
@@ -179,6 +185,10 @@ public actor UsageLedger {
                 AND NOT EXISTS (SELECT 1 FROM cost_amount WHERE contribution_id = contribution.id)
                 AND NOT EXISTS (SELECT 1 FROM session_mark WHERE contribution_id = contribution.id)
                 """)
+            try connection.run("""
+                DELETE FROM source_file WHERE signature = ?
+                AND NOT EXISTS (SELECT 1 FROM contribution WHERE contribution.source = source_file.source AND contribution.key = source_file.path)
+                """, [.text(FileState.goneSignature)])
         }
     }
 

@@ -1,8 +1,8 @@
 import AgentHUDSupport
 import Foundation
 
-/// What `get_panel` tells an agent, and what every tool but `get_panel_image` answers with.
-extension PanelTools {
+/// What `get_hud` tells an agent, and what every tool but `get_hud_screenshot` answers with.
+extension HUDTools {
     // MARK: Reading
 
     /// The screen argument that names a scope.
