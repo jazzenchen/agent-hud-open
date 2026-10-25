@@ -92,11 +92,29 @@ fn install(
         &plugin::install_arguments(folder),
         home,
         COMMAND_TIME,
-    )?;
+    )
+    .map_err(install_error)?;
     if !plugin::installed_from(claude_config, folder) {
         return Err("Claude Code still runs the plugin from another folder".into());
     }
     Ok(())
+}
+
+/// A Claude Code too old for `plugin install --marketplace` only says the
+/// option is unknown; say what fixes it, keeping its words.
+fn install_error(error: String) -> String {
+    if error.contains("unknown option") && error.contains("--marketplace") {
+        let message = agent_hud_runtime::l10n::text(
+            "Claude Code 版本太旧，无法识别 --marketplace。请先在终端运行 claude update 升级，再点安装。",
+            concat!(
+                "This Claude Code is too old to recognize --marketplace. ",
+                "Run claude update in a terminal to upgrade, then click Install again."
+            ),
+        );
+        format!("{message} ({error})")
+    } else {
+        error
+    }
 }
 
 /// At launch: when the user installed the plugin from another folder, such
@@ -218,6 +236,30 @@ pub async fn native_claude_plugin(
     })
     .await
     .map_err(|e| e.to_string())?
+}
+
+#[cfg(test)]
+mod error_tests {
+    use super::install_error;
+
+    #[test]
+    fn unknown_marketplace_option_explains_how_to_upgrade() {
+        let error = "error: unknown option '--marketplace'";
+        let message = install_error(error.into());
+        assert!(message.contains("claude update"));
+        assert!(message.ends_with(&format!("({error})")));
+    }
+
+    #[test]
+    fn other_install_errors_are_unchanged() {
+        for error in [
+            "error: unknown option '--scope'",
+            "error: --marketplace folder does not exist",
+            "error: permission denied",
+        ] {
+            assert_eq!(install_error(error.into()), error);
+        }
+    }
 }
 
 #[cfg(all(test, unix))]
