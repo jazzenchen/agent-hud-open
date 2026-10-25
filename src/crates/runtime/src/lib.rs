@@ -11,6 +11,7 @@ mod demo;
 mod log_reminders;
 #[cfg(test)]
 mod tests;
+pub use agent_hud_core::conversation_feed;
 pub use agent_hud_core::demo::DemoScript;
 pub use agent_hud_core::l10n;
 pub use agent_hud_core::projects;
@@ -186,6 +187,10 @@ impl Runtime {
     /// questions to be answered in its window.
     pub fn set_session_replies(&mut self, replies: Option<Arc<dyn replies::SessionReplies>>) {
         self.core.set_session_replies(replies);
+    }
+    /// The store that keeps conversations (`conversation_feed`).
+    pub fn set_conversation_sink(&mut self, sink: Option<conversation_feed::Sink>) {
+        self.core.set_conversation_sink(sink);
     }
     /// Configure/stop this independent owner outside the desktop Backend lock.
     /// It uses the core's existing Requests; it never creates another Runtime.

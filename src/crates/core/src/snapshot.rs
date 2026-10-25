@@ -57,6 +57,11 @@ impl crate::AgentHudCore {
         }
         self.finish_indexing_run();
         let remaining = self.waiting_reads();
+        // The conversation store's missing spans wait until the logs are
+        // indexed, so they never slow the first reads.
+        if remaining == 0 {
+            self.catch_up_conversations();
+        }
         // Claude Desktop's archive and tabs are read every pass, as Open does,
         // so archiving a session there needs no log change to show.
         if self.claude_desktop.index.refresh(&self.provider_roots) {

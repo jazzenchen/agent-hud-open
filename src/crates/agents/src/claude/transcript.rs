@@ -1,6 +1,7 @@
 //! Claude Code transcript usage and live activity reducer.
 use crate::{
     number,
+    transcript::items::{self, Items, LineItem},
     transcript::live::{
         last_paragraph, newer, timestamp, Activity, Call, DesktopAsk, DesktopAskOption, LiveLog,
         Turn, Work,
@@ -92,6 +93,80 @@ pub static TURNS: Turns = Turns {
     },
     // A tool result is a user line too, and never a prompt.
     may_name: |line| has(line, b"\"user\"") && !has(line, b"\"tool_use_id\""),
+};
+
+/// The rows of a Claude message line: its prompt, reply, tool calls and
+/// tool results. Lines with no message are not Claude's to show.
+pub fn message_items(value: &Value, offset: u64) -> Option<Vec<LineItem>> {
+    let item = value.get("message").filter(|item| item.is_object())?;
+    let prompt = claude_prompt(value) && !interrupted(value);
+    let mut items = items::message(value, item, offset, prompt);
+    items.extend(narrations(value, item, offset));
+    Some(items)
+}
+
+/// The agent's words the Claude desktop app logs as narration blocks (see
+/// `narration`): text the user saw, kept in a thinking-shaped block.
+fn narrations(value: &Value, item: &Value, offset: u64) -> Vec<LineItem> {
+    let Some(blocks) = item["content"].as_array() else {
+        return Vec::new();
+    };
+    let id = value["uuid"]
+        .as_str()
+        .map(str::to_owned)
+        .unwrap_or_else(|| format!("o{offset}"));
+    let line = items::Line::of(value, false);
+    blocks
+        .iter()
+        .enumerate()
+        .filter_map(|(index, block)| {
+            let words = narration(block).filter(|words| !words.trim().is_empty())?;
+            Some(line.item(
+                format!("{id}:n{index}"),
+                "assistant",
+                json!(words),
+                None,
+                &Value::Null,
+            ))
+        })
+        .collect()
+}
+
+/// Words the user typed while a turn ran, which Claude Code hands the model
+/// at its next step: an attachment in that turn, not a prompt of its own.
+pub fn queued_words(value: &Value, offset: u64) -> Option<LineItem> {
+    let attachment = &value["attachment"];
+    if value["type"] != "attachment" || attachment["type"] != "queued_command" {
+        return None;
+    }
+    let words = attachment["prompt"]
+        .as_str()
+        .filter(|s| !s.trim().is_empty())?;
+    let id = value["uuid"]
+        .as_str()
+        .map(str::to_owned)
+        .unwrap_or_else(|| format!("o{offset}"));
+    Some(items::Line::of(value, true).item(
+        id,
+        "user",
+        serde_json::json!(words),
+        None,
+        &Value::Null,
+    ))
+}
+
+/// A Claude page shows its message lines and the words typed into a running
+/// turn; copies of a request show nothing.
+pub static ITEMS: Items = Items {
+    read: |value, offset| {
+        if request_copy(value) {
+            return Vec::new();
+        }
+        if let Some(words) = queued_words(value, offset) {
+            return vec![words];
+        }
+        message_items(value, offset).unwrap_or_default()
+    },
 };
 
 pub fn uuid(value: &str) -> bool {
@@ -1388,6 +1463,34 @@ mod tests {
         };
         assert_eq!(reset(json!(1_792_000_000)), Some(1_792_000_000_000));
         assert_eq!(reset(json!(1_792_000_000_000_i64)), Some(1_792_000_000_000));
+    }
+
+    #[test]
+    fn a_narration_is_an_item_of_the_agents_text() {
+        use base64::Engine;
+        let message = |kind: &str| {
+            let inner = [&[0x42, kind.len() as u8][..], kind.as_bytes()].concat();
+            let middle = [&[0x0a, inner.len() as u8][..], &inner].concat();
+            [&[0x12, middle.len() as u8][..], &middle].concat()
+        };
+        let signature =
+            |kind: &str| base64::engine::general_purpose::STANDARD_NO_PAD.encode(message(kind));
+        let line = |kind: &str, words: &str| json!({"type":"assistant","uuid":"a1","timestamp":"2026-10-25T14:48:37Z","message":{"role":"assistant","id":"m1","content":[{"type":"thinking","thinking":words,"signature":signature(kind)}]}});
+        let said = (ITEMS.read)(
+            &line("narration", "I've pulled up the last seven turns."),
+            0,
+        );
+        assert_eq!(said.len(), 1, "{said:?}");
+        assert_eq!(said[0].role, items::LineRole::Assistant);
+        assert_eq!(said[0].kind, items::LineKind::Text);
+        assert_eq!(
+            said[0].text.as_deref(),
+            Some("I've pulled up the last seven turns.")
+        );
+        assert!(
+            (ITEMS.read)(&line("thinking", "private reasoning"), 0).is_empty(),
+            "reasoning is no text"
+        );
     }
 
     #[test]

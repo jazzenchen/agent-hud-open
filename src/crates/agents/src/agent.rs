@@ -31,6 +31,9 @@ pub struct Agent {
     /// Which lines of its transcript start its turns, when it states its
     /// own rule; others are read with `transcript::turns::SHARED`.
     pub turns: Option<&'static crate::transcript::turns::Turns>,
+    /// What each line of its transcript shows in a page of messages, when it
+    /// states its own rule; others are read with `transcript::items::SHARED`.
+    pub items: Option<&'static crate::transcript::items::Items>,
     /// Where the engine reads its sessions, on each OS.
     pub sources: PerOs<&'static [Source]>,
     /// How Agent HUD tells it is installed, configured or used here.

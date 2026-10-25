@@ -81,6 +81,7 @@ pub(crate) fn read_lines(
     requests: &requests::Requests,
     errors: &mut Vec<String>,
     archive: bool,
+    mut conversation: Option<&mut crate::conversation_collect::Gathered>,
 ) -> std::io::Result<()> {
     let mut page = 2 * 1024 * 1024u64;
     log.waiting_for_more = false;
@@ -115,7 +116,19 @@ pub(crate) fn read_lines(
         };
         match serde_json::from_slice::<Value>(&bytes) {
             Ok(value) => {
+                let before = conversation
+                    .is_some()
+                    .then(|| crate::conversation_collect::before(log));
                 log.parse(&value);
+                if let (Some(facts), Some(before)) = (conversation.as_deref_mut(), &before) {
+                    crate::conversation_collect::line(
+                        log,
+                        &value,
+                        log.meter_line_start,
+                        before,
+                        facts,
+                    );
+                }
                 if log.source == "codex" && value["type"] == "turn_context" {
                     if let Some(turn) = value["payload"]["turn_id"].as_str() {
                         let now = Utc::now().timestamp_millis();
@@ -674,6 +687,14 @@ impl AgentHudCore {
             if log.offset == 0 {
                 log.read_kept_name();
             }
+            // What this read holds of the session's conversation, for the
+            // store that keeps it; none is gathered without one.
+            let mut conversation = (self.conversation_sink.is_some() && source != "codex-index")
+                .then(|| crate::conversation_collect::Gathered {
+                    facts: Vec::new(),
+                    awaiting: self.conversation_awaiting.get(&path).cloned(),
+                });
+            let line_start = log.offset;
             let result = (|| -> std::io::Result<()> {
                 if archive {
                     if !self
@@ -689,6 +710,7 @@ impl AgentHudCore {
                         &self.requests,
                         &mut errors,
                         true,
+                        conversation.as_mut(),
                     )?;
                     self.archives.position(log.offset);
                 } else {
@@ -701,6 +723,7 @@ impl AgentHudCore {
                         &self.requests,
                         &mut errors,
                         false,
+                        conversation.as_mut(),
                     )?;
                 }
                 Ok(())
@@ -879,6 +902,17 @@ impl AgentHudCore {
             let Some(facts_changed) = committed else {
                 continue;
             };
+            if let (Some(sink), Some(gathered)) = (self.conversation_sink.clone(), conversation) {
+                match gathered.awaiting {
+                    Some(turn) => self.conversation_awaiting.insert(path.clone(), turn),
+                    None => self.conversation_awaiting.remove(&path),
+                };
+                if let Err(error) =
+                    self.deliver_conversation(sink, &path, &log, line_start, gathered.facts)
+                {
+                    errors.push(error);
+                }
+            }
             if let Some(old_vpath) = adopted_vpath {
                 self.logs.remove(&old_vpath);
                 self.parser_cache.remove(&old_vpath);

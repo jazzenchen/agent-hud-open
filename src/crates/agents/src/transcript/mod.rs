@@ -3,6 +3,7 @@
 //! and the records a database source yields. Each client's parser lives in its
 //! own folder (`<client>/transcript.rs`).
 pub mod carried_usage;
+pub mod items;
 pub mod kept_names;
 pub mod live;
 pub mod log;
