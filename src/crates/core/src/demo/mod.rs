@@ -262,6 +262,7 @@ impl AgentHudCore {
             &self.requests,
             &mut errors,
             false,
+            None,
         )
         .map_err(|error| error.to_string())?;
         if let Some(error) = errors.first() {

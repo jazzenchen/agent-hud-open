@@ -1,6 +1,7 @@
 //! Codex transcript usage and live activity reducer.
 use crate::{
     number,
+    transcript::items::{self, Items, Line, LineItem, ToolCall},
     transcript::live::{last_paragraph, newer, timestamp, Activity, Call, LiveLog, Turn, Work},
     transcript::metering,
     Log, Usage,
@@ -492,6 +493,71 @@ const CONTEXT_OPENINGS: [&str; 7] = [
     "<recommended_plugins>",
     "<skill>",
 ];
+
+/// The rows of a Codex `response_item` line: a message's text, a tool call
+/// or what it returned. Other lines are not response items.
+pub fn response_items(value: &Value, offset: u64) -> Option<Vec<LineItem>> {
+    if value["type"] != "response_item" {
+        return None;
+    }
+    let payload = &value["payload"];
+    let line = Line::of(value, user_words(value));
+    let id = payload["id"]
+        .as_str()
+        .map(str::to_owned)
+        .unwrap_or_else(|| format!("o{offset}"));
+    let mut rows = Vec::new();
+    match payload["type"].as_str() {
+        Some("message") => {
+            let text = payload["content"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .filter(|v| matches!(v["type"].as_str(), Some("input_text" | "output_text")))
+                .filter_map(|v| v["text"].as_str())
+                .collect::<Vec<_>>()
+                .join("\n");
+            if !text.is_empty() {
+                let role = payload["role"].as_str().unwrap_or("assistant");
+                rows.push(line.item(id, role, json!(text), None, &Value::Null));
+            }
+        }
+        Some("function_call" | "custom_tool_call") => rows.push(line.item(
+            id,
+            "assistant",
+            Value::Null,
+            Some(ToolCall::new(
+                &payload["call_id"],
+                &payload["name"],
+                payload.get("arguments").or_else(|| payload.get("input")),
+            )),
+            &payload["call_id"],
+        )),
+        Some("function_call_output" | "custom_tool_call_output") => rows.push(line.item(
+            id,
+            "tool",
+            payload["output"].clone(),
+            None,
+            &payload["call_id"],
+        )),
+        _ => {}
+    }
+    Some(rows)
+}
+
+/// A Codex page shows its response items, and the bare messages of rollouts
+/// written before items were wrapped; `event_msg` lines and the rest show
+/// nothing.
+pub static ITEMS: Items = Items {
+    read: |value, offset| {
+        response_items(value, offset)
+            .or_else(|| {
+                (value["type"] == "message" && !value["message"].is_object())
+                    .then(|| items::message(value, value, offset, user_words(value)))
+            })
+            .unwrap_or_default()
+    },
+};
 
 /// Codex names its turn on most lines (`turn_id`) and says once when it began
 /// (`task_started`).

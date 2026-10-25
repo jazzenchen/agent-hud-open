@@ -16,6 +16,9 @@ mod billing_metrics;
 mod clients;
 mod compressed;
 mod conversation;
+mod conversation_catchup;
+mod conversation_collect;
+pub mod conversation_feed;
 mod data_version;
 mod database;
 pub mod demo;
@@ -45,6 +48,7 @@ mod window_shares;
 pub use accounts::AccountProjection;
 pub(crate) use agent_hud_agents::claude::jobs as claude_jobs;
 pub use agent_hud_agents::grok::cache as grok_cache;
+#[cfg(test)]
 pub(crate) use agent_hud_agents::transcript::live as live_facts;
 pub use agent_hud_agents::{naming, protobuf};
 pub(crate) use agent_hud_agents::{
@@ -130,6 +134,16 @@ pub struct AgentHudCore {
     claude_desktop: crate::clients::claude_desktop::ClaudeDesktop,
     /// The host's way into a session (`replies`); None in the public build.
     session_replies: Option<std::sync::Arc<dyn replies::SessionReplies>>,
+    /// The store that keeps conversations (`conversation_feed`); None in the
+    /// public build, which keeps none.
+    conversation_sink: Option<conversation_feed::Sink>,
+    /// Where the store's knowledge of each log ends, read from it once and
+    /// moved on by each delivery; and the spans it lacks, to read again.
+    conversation_positions: Option<HashMap<PathBuf, u64>>,
+    conversation_gaps: BTreeMap<PathBuf, (u64, u64)>,
+    /// Each log's turn that started without the user's words, until its
+    /// first prompt line names them (`conversation_collect::Gathered`).
+    conversation_awaiting: HashMap<PathBuf, String>,
     workbuddy_metering: agent_hud_agents::buddy::transcript::WorkBuddyMeteringReading,
     /// What each listed session's row shows of its breakdown, until its logs move.
     session_rows: session_breakdown::SessionRows,
@@ -230,6 +244,10 @@ impl AgentHudCore {
             render: Default::default(),
             claude_desktop: Default::default(),
             session_replies: None,
+            conversation_sink: None,
+            conversation_positions: None,
+            conversation_gaps: BTreeMap::new(),
+            conversation_awaiting: HashMap::new(),
             workbuddy_metering: Default::default(),
             session_rows: Default::default(),
         }
@@ -372,6 +390,14 @@ impl AgentHudCore {
         replies: Option<std::sync::Arc<dyn replies::SessionReplies>>,
     ) {
         self.session_replies = replies;
+    }
+
+    /// The store that keeps conversations; from the next collection pass,
+    /// each log read hands it what it holds of them.
+    pub fn set_conversation_sink(&mut self, sink: Option<conversation_feed::Sink>) {
+        self.conversation_sink = sink;
+        self.conversation_positions = None;
+        self.conversation_gaps.clear();
     }
 
     pub fn ingest_hook_events(&mut self, events: Vec<agent_hud_agents::HookEvent>) {

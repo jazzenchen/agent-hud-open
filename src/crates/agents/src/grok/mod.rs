@@ -54,6 +54,7 @@ pub static CLI: Agent = Agent {
     program: None,
     replies: None,
     turns: None,
+    items: None,
     sources: crate::everywhere(&CLI_SOURCES),
     discovery: &CLI_DISCOVERY,
 };
@@ -68,6 +69,7 @@ pub static BOT: Agent = Agent {
     program: None,
     replies: None,
     turns: None,
+    items: None,
     sources: PerOs {
         macos: Support::Verified(&BOT_SOURCES),
         windows: Support::Unsupported("Grok Bot's cache location on Windows is not known yet"),

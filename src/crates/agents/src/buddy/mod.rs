@@ -62,6 +62,7 @@ pub static CODEBUDDY: Agent = Agent {
     program: None,
     replies: None,
     turns: None,
+    items: None,
     sources: crate::everywhere(&CODEBUDDY_SOURCES),
     discovery: &CODEBUDDY_DISCOVERY,
 };
@@ -76,6 +77,7 @@ pub static WORKBUDDY: Agent = Agent {
     program: None,
     replies: None,
     turns: None,
+    items: None,
     sources: crate::everywhere(&WORKBUDDY_SOURCES),
     discovery: &WORKBUDDY_DISCOVERY,
 };

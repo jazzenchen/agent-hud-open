@@ -27,6 +27,7 @@ pub static AGENT: Agent = Agent {
     program: None,
     replies: None,
     turns: None,
+    items: None,
     sources: crate::everywhere(&[]),
     discovery: &DISCOVERY,
 };

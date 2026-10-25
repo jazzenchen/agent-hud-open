@@ -79,6 +79,12 @@ pub trait ProductExtension: Send + Sync + 'static {
     fn session_replies(&self) -> Option<Arc<dyn SessionReplies>> {
         None
     }
+    /// The product's store for conversations: each collection pass hands it
+    /// the turns and items it read. Asked once, after `start`; None (the
+    /// default) keeps no conversation.
+    fn conversation_sink(&self) -> Option<agent_hud_runtime::conversation_feed::Sink> {
+        None
+    }
     /// Where the product keeps Agent HUD's Claude Code plugin: the folder the
     /// plugin shares with the app, and the plugin's files. A product that
     /// leaves its own messages through the plugin names its folder here, so

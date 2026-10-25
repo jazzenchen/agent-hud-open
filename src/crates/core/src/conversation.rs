@@ -2,6 +2,7 @@
 //! selected session and never stored in ingestion checkpoints or snapshots.
 use super::*;
 use crate::l10n;
+use agent_hud_agents::transcript::items::{self, LineItem};
 use agent_hud_agents::transcript::turns::{self, TurnStart, Turns};
 /// The turn a page's messages belong to where the page begins: the turn read
 /// last before `cursor` in `path`. Which lines name a turn is the client's
@@ -36,12 +37,14 @@ impl Context {
     /// it, the line of the same turn that says when it began. Only lines the
     /// client says may name a turn are decoded; a turn that began more than
     /// `RECOVER_LIMIT` back stays unnamed.
-    fn recover(&mut self, turns: &Turns, path: &Path, end: u64) {
+    /// Returns where the line that starts that turn begins, when it was found.
+    fn recover(&mut self, turns: &Turns, path: &Path, end: u64) -> Option<u64> {
         let Ok(mut file) = File::open(path) else {
-            return;
+            return None;
         };
         let mut found: Option<TurnStart> = None;
-        let mut settle = |line: &[u8]| -> bool {
+        let mut begins: Option<u64> = None;
+        let mut settle = |line: &[u8], at: u64| -> bool {
             if line.is_empty() || line.len() > MAX_LINE || !(turns.may_name)(line) {
                 return false;
             }
@@ -55,10 +58,16 @@ impl Context {
                 None => {
                     let settled = start.whole || start.started.is_some();
                     found = Some(start);
+                    if settled {
+                        begins = Some(at);
+                    }
                     settled
                 }
                 Some(seen) if !start.whole && start.turn == seen.turn => {
                     seen.started = start.started;
+                    if seen.started.is_some() {
+                        begins = Some(at);
+                    }
                     seen.started.is_some()
                 }
                 Some(_) => true,
@@ -77,14 +86,14 @@ impl Context {
             if file.seek(SeekFrom::Start(position)).is_err()
                 || std::io::Read::read_exact(&mut file, &mut chunk).is_err()
             {
-                return;
+                return None;
             }
             let mut stop = chunk.len();
             while let Some(newline) = chunk[..stop].iter().rposition(|b| *b == b'\n') {
                 if !oversized {
                     let mut line = chunk[newline + 1..stop].to_vec();
                     line.extend_from_slice(&rest);
-                    if settle(&line) {
+                    if settle(&line, position + newline as u64 + 1) {
                         done = true;
                         break;
                     }
@@ -106,13 +115,20 @@ impl Context {
             }
         }
         if !done && position == 0 && !oversized {
-            settle(&rest);
+            settle(&rest, 0);
         }
         if let Some(found) = found {
             self.turn_id = found.turn;
             self.started = found.started;
         }
+        begins
     }
+}
+/// Where the line that starts the turn holding the line at `end` begins in
+/// `path`, by `source`'s own rule; None when no such line lies within
+/// `RECOVER_LIMIT` before it.
+pub(crate) fn turn_start_before(source: &str, path: &Path, end: u64) -> Option<u64> {
+    Context::default().recover(turns::of(source), path, end)
 }
 /// How far back a page looks for the turn it begins in, and in what steps.
 const RECOVER_LIMIT: u64 = 128 * 1024 * 1024;
@@ -151,255 +167,14 @@ impl Contexts {
         }
     }
 }
-fn text_value(value: Value) -> Value {
-    match value {
-        Value::Null => Value::Null,
-        Value::String(text) => Value::String(text),
-        Value::Array(items) => {
-            let parts = items
-                .into_iter()
-                .filter_map(|item| match item {
-                    Value::Null => None,
-                    Value::String(text) => (!text.is_empty()).then_some(text),
-                    Value::Object(mut map) => {
-                        if let Some(text) = map.get("text").and_then(Value::as_str) {
-                            return (!text.is_empty()).then(|| text.to_owned());
-                        }
-                        if let Some(content) = map.remove("content") {
-                            if let Value::String(text) = text_value(content) {
-                                return (!text.is_empty()).then_some(text);
-                            }
-                        }
-                        if map.get("type").and_then(Value::as_str) == Some("image") {
-                            return Some("[image]".to_owned());
-                        }
-                        if let Some(name) = map.get("tool_name").and_then(Value::as_str) {
-                            return Some(format!("[tool: {name}]"));
-                        }
-                        serde_json::to_string(&Value::Object(map)).ok()
-                    }
-                    other => serde_json::to_string(&other).ok(),
-                })
-                .collect::<Vec<_>>();
-            if parts.is_empty() {
-                Value::Null
-            } else {
-                Value::String(parts.join("\n"))
-            }
-        }
-        other => serde_json::to_string(&other)
-            .map(Value::String)
-            .unwrap_or(Value::Null),
-    }
-}
-fn message(value: &Value, offset: u64) -> Vec<Value> {
-    if live_facts::request_copy(value) {
-        return Vec::new();
-    }
-    let timestamp = value
-        .get("timestamp")
-        .or_else(|| value.get("time"))
-        .and_then(|v| {
-            if let Some(s) = v.as_str() {
-                Some(Value::String(s.to_owned()))
-            } else if let Some(ms) = v.as_i64() {
-                chrono::DateTime::from_timestamp_millis(ms).map(|dt| Value::String(dt.to_rfc3339()))
-            } else {
-                None
-            }
-        })
-        .unwrap_or(Value::Null);
-    let mut rows = Vec::new();
-    let mut push = |id: String,
-                    parent: Value,
-                    role: &str,
-                    text: Value,
-                    tool: Value,
-                    call: Value| {
-        let text = text_value(text);
-        rows.push(json!({"id":id,"parentId":parent,"role":role,"text":text,"timestamp":timestamp,"toolCallId":call,"toolCall":tool}));
-    };
-    if value["type"] == "response_item" {
-        let payload = &value["payload"];
-        let id = payload["id"]
-            .as_str()
-            .map(str::to_owned)
-            .unwrap_or_else(|| format!("o{offset}"));
-        match payload["type"].as_str() {
-            Some("message") => {
-                let text = payload["content"]
-                    .as_array()
-                    .into_iter()
-                    .flatten()
-                    .filter(|v| matches!(v["type"].as_str(), Some("input_text" | "output_text")))
-                    .filter_map(|v| v["text"].as_str())
-                    .collect::<Vec<_>>()
-                    .join("\n");
-                if !text.is_empty() {
-                    push(
-                        id,
-                        Value::Null,
-                        payload["role"].as_str().unwrap_or("assistant"),
-                        json!(text),
-                        Value::Null,
-                        Value::Null,
-                    );
-                }
-            }
-            Some("function_call" | "custom_tool_call") => push(
-                id,
-                Value::Null,
-                "assistant",
-                Value::Null,
-                json!({"id":payload["call_id"],"name":payload["name"],"arguments":payload.get("arguments").or_else(||payload.get("input"))}),
-                payload["call_id"].clone(),
-            ),
-            Some("function_call_output" | "custom_tool_call_output") => push(
-                id,
-                Value::Null,
-                "tool",
-                payload["output"].clone(),
-                Value::Null,
-                payload["call_id"].clone(),
-            ),
-            _ => {}
-        }
-    } else if matches!(
-        value["type"].as_str(),
-        Some("user/message" | "assistant/message")
-    ) {
-        let role = if value["type"] == "user/message" {
-            "user"
-        } else {
-            "assistant"
-        };
-        let content = &value["data"]["content"];
-        let text = content
-            .as_str()
-            .map(str::to_owned)
-            .or_else(|| {
-                content.as_array().map(|parts| {
-                    parts
-                        .iter()
-                        .filter_map(|v| v["text"].as_str())
-                        .collect::<Vec<_>>()
-                        .join("\n")
-                })
-            })
-            .unwrap_or_default();
-        if !text.is_empty() {
-            push(
-                format!("o{offset}"),
-                Value::Null,
-                role,
-                json!(text),
-                Value::Null,
-                Value::Null,
-            );
-        }
-    } else if matches!(
-        value["type"].as_str(),
-        Some("user.message" | "assistant.message")
-    ) {
-        let role = if value["type"] == "user.message" {
-            "user"
-        } else {
-            "assistant"
-        };
-        let data = &value["data"];
-        if let Some(text) = data["content"]
-            .as_str()
-            .or_else(|| data["text"].as_str())
-            .filter(|s| !s.is_empty())
-        {
-            let id = value["id"]
-                .as_str()
-                .map(str::to_owned)
-                .unwrap_or_else(|| format!("o{offset}"));
-            push(id, Value::Null, role, json!(text), Value::Null, Value::Null);
-        }
-    } else {
-        let item = if value["message"].is_object() {
-            &value["message"]
-        } else if matches!(
-            value["type"].as_str(),
-            Some("user" | "assistant" | "message")
-        ) {
-            value
-        } else {
-            return rows;
-        };
-        let role = item["role"]
-            .as_str()
-            .or_else(|| value["role"].as_str())
-            .or_else(|| value["type"].as_str())
-            .unwrap_or("");
-        if !matches!(role, "user" | "assistant" | "tool" | "toolResult") {
-            return rows;
-        }
-        let id = value["uuid"]
-            .as_str()
-            .or_else(|| item["id"].as_str())
-            .or_else(|| value["id"].as_str())
-            .map(str::to_owned)
-            .unwrap_or_else(|| format!("o{offset}"));
-        let parent = value
-            .get("parentUuid")
-            .or_else(|| value.get("parentId"))
-            .cloned()
-            .unwrap_or(Value::Null);
-        if let Some(text) = item["content"].as_str() {
-            push(
-                id,
-                parent,
-                role,
-                json!(text),
-                Value::Null,
-                item["toolCallId"].clone(),
-            );
-        } else if let Some(blocks) = item["content"].as_array() {
-            for (index, block) in blocks.iter().enumerate() {
-                let key = format!("{id}:{index}");
-                match block["type"].as_str() {
-                    Some("text" | "input_text" | "output_text") => push(
-                        key,
-                        parent.clone(),
-                        role,
-                        block["text"].clone(),
-                        Value::Null,
-                        Value::Null,
-                    ),
-                    Some("tool_use" | "toolCall") => push(
-                        key,
-                        parent.clone(),
-                        "assistant",
-                        Value::Null,
-                        json!({"id":block["id"],"name":block["name"],"arguments":block.get("input").or_else(||block.get("arguments"))}),
-                        block["id"].clone(),
-                    ),
-                    Some("tool_result") => push(
-                        key,
-                        parent.clone(),
-                        "tool",
-                        block["content"].clone(),
-                        Value::Null,
-                        block["tool_use_id"].clone(),
-                    ),
-                    _ => {}
-                }
-            }
-        } else if let Some(parts) = item["parts"].as_array() {
-            let text = parts
-                .iter()
-                .filter_map(|part| part["text"].as_str())
-                .collect::<Vec<_>>()
-                .join("\n");
-            if !text.is_empty() {
-                push(id, parent, role, json!(text), Value::Null, Value::Null);
-            }
-        }
-    }
-    rows
+/// A row of a page as the apps read it.
+fn row(item: LineItem) -> Value {
+    // A call that names no tool shows no name.
+    let tool = item.tool.map(|tool| {
+        let name = (!tool.name.is_empty()).then_some(tool.name);
+        json!({"id":tool.id,"name":name,"arguments":tool.arguments})
+    });
+    json!({"id":item.id,"parentId":item.parent,"role":item.role.as_str(),"text":item.text,"timestamp":item.timestamp,"toolCallId":item.tool_call_id,"toolCall":tool,"isPrompt":item.is_prompt})
 }
 pub(super) fn page(
     path: &Path,
@@ -439,6 +214,7 @@ pub(super) fn page(
     let remembered = (!tail).then(|| contexts.take(path, cursor)).flatten();
     let look_back = remembered.is_none() && !archive;
     let rule = turns::of(source);
+    let reader_items = items::of(source);
     let mut context = remembered.unwrap_or_else(|| Context {
         path: path.into(),
         cursor,
@@ -510,23 +286,12 @@ pub(super) fn page(
         }
         if let Ok(value) = serde_json::from_slice::<Value>(&bytes) {
             context.read(rule, &value);
-            let mut entries = message(&value, start);
-            for entry in &mut entries {
+            for item in (reader_items.read)(&value, start) {
+                let mut entry = row(item);
                 entry["turnId"] = json!(context.turn_id);
                 entry["turnStartedAt"] = json!(context.started);
-                // The user's own words: neither the context a client hands the
-                // model nor its note of an interruption.
-                entry["isPrompt"] = json!(
-                    entry["role"] == "user"
-                        && if value["message"].is_object() {
-                            live_facts::claude_prompt(&value)
-                                && !agent_hud_agents::claude::transcript::interrupted(&value)
-                        } else {
-                            agent_hud_agents::codex::transcript::user_words(&value)
-                        }
-                );
+                messages.push(entry);
             }
-            messages.extend(entries);
             if tail && messages.len() > limit {
                 messages.drain(..messages.len() - limit);
             }

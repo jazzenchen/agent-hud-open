@@ -307,6 +307,18 @@ impl Service {
                 .runtime
                 .set_session_replies(Some(replies));
         }
+        // Before the first collection pass too, so the first reads already
+        // reach the product's conversation store.
+        if let Some(sink) = extension
+            .as_ref()
+            .and_then(|product| product.conversation_sink())
+        {
+            backend
+                .lock()
+                .map_err(|_| "Runtime lock is unavailable")?
+                .runtime
+                .set_conversation_sink(Some(sink));
+        }
         let stopped = Arc::new(AtomicBool::new(false));
         let worker_backend = Arc::clone(&backend);
         let worker_stopped = Arc::clone(&stopped);
