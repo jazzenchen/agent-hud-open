@@ -85,10 +85,19 @@ pub(super) fn status(_identifier: &str) -> Result<Value, String> {
 pub(super) fn cli_candidates(home: &Path, command: &str, dirs: Vec<PathBuf>) -> Vec<PathBuf> {
     let mut candidates = vec![];
     if command == "codex" {
-        candidates.extend([
-            PathBuf::from("/Applications/Codex.app/Contents/Resources/codex"),
-            home.join("Applications/Codex.app/Contents/Resources/codex"),
-        ]);
+        // The app's own command line, where the engine looks for it too
+        // (platform `engine_candidates`): Codex.app, or the ChatGPT app that
+        // carries Codex inside it.
+        for root in [PathBuf::from("/Applications"), home.join("Applications")] {
+            for app in ["Codex.app", "ChatGPT.app"] {
+                for tail in [
+                    "Contents/Resources/codex-cli/bin/codex",
+                    "Contents/Resources/codex",
+                ] {
+                    candidates.push(root.join(app).join(tail));
+                }
+            }
+        }
     }
     candidates.extend(dirs.into_iter().map(|dir| dir.join(command)));
     candidates
@@ -97,4 +106,28 @@ pub(super) fn cli_candidates(home: &Path, command: &str, dirs: Vec<PathBuf>) -> 
 pub(super) fn private_output(options: &mut std::fs::OpenOptions) {
     use std::os::unix::fs::OpenOptionsExt;
     options.mode(0o600);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn codex_is_found_in_the_chatgpt_app_too() {
+        let home = Path::new("/Users/alice");
+        let dir = PathBuf::from("/opt/homebrew/bin");
+        let candidates = cli_candidates(home, "codex", vec![dir.clone()]);
+        for path in [
+            PathBuf::from("/Applications/Codex.app/Contents/Resources/codex"),
+            PathBuf::from("/Applications/ChatGPT.app/Contents/Resources/codex-cli/bin/codex"),
+            home.join("Applications/ChatGPT.app/Contents/Resources/codex-cli/bin/codex"),
+        ] {
+            assert!(candidates.contains(&path), "{path:?} is not a candidate");
+        }
+        assert_eq!(candidates.last(), Some(&dir.join("codex")));
+        assert_eq!(
+            cli_candidates(home, "claude", vec![dir.clone()]),
+            [dir.join("claude")]
+        );
+    }
 }
