@@ -108,8 +108,8 @@ const hostSchema = (
   },
 });
 /** The agent session that called, as its client names it and never as an argument the
- * agent writes: Codex in each call's `_meta`, Claude Code in the environment it starts
- * this relay with. */
+ * agent writes: Codex and Antigravity in each call's `_meta`, Claude Code in the
+ * environment it starts this relay with. */
 const caller = (meta: Record<string, unknown> | undefined) => {
   const turn = meta?.["x-codex-turn-metadata"] as
     Record<string, unknown> | undefined;
@@ -120,6 +120,9 @@ const caller = (meta: Record<string, unknown> | undefined) => {
       sessionId: thread,
       turnId: typeof turn?.turn_id === "string" ? turn.turn_id : null,
     };
+  const cascade = meta?.["antigravity.google/conversation_id"];
+  if (typeof cascade === "string" && cascade)
+    return { client: "antigravity", sessionId: cascade, turnId: null };
   const session = process.env.CLAUDE_CODE_SESSION_ID;
   return session
     ? { client: "claude", sessionId: session, turnId: null }
