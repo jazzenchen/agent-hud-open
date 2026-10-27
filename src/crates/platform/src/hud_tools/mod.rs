@@ -233,7 +233,7 @@ fn antigravity(places: &Places) -> PathBuf {
 const LIMIT: u64 = 4 * 1024 * 1024;
 
 /// A settings file's text, None when it does not exist.
-fn read(path: &Path) -> Result<Option<String>, String> {
+pub(crate) fn read(path: &Path) -> Result<Option<String>, String> {
     match fs::metadata(path) {
         Ok(metadata) if metadata.len() > LIMIT => {
             return Err(format!("{} is too large to edit", path.display()))

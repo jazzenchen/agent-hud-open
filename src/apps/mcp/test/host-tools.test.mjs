@@ -176,15 +176,21 @@ test("an Antigravity caller comes from the conversation_id in the call's _meta",
   }
 });
 
-test("without a caller the host is told so, and without the app there are no host tools", async () => {
+test("without a caller the host is told so, with the process that started the relay, and without the app there are no host tools", async () => {
   const fake = engine("nobody", [tool]);
   const client = await connect(fake.file);
   try {
     await client.callTool({ name: "some_tool", arguments: { text: "hi" } });
-    assert.equal(
-      fake.requests().find((request) => request.method === "host_tool").params
-        .caller,
-      null,
+    // DeepSeek Harness names no caller: the app looks it up by the relay's
+    // parent, the Harness host whose Agent HUD plugin noted the call.
+    assert.deepEqual(
+      fake.requests().find((request) => request.method === "host_tool").params,
+      {
+        name: "some_tool",
+        arguments: { text: "hi" },
+        caller: null,
+        parent: process.pid,
+      },
     );
   } finally {
     await client.close();

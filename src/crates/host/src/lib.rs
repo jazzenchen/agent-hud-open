@@ -15,6 +15,7 @@ mod capture;
 mod claude_plugin;
 mod cli;
 mod coordinator;
+mod deepseek_plugin;
 mod demo;
 pub mod extension;
 mod hud;
@@ -886,6 +887,7 @@ pub fn run_with_options(
             presentation_request,
             mcp_clients::native_mcp_clients,
             claude_plugin::native_claude_plugin,
+            deepseek_plugin::native_deepseek_plugin,
             picture::picture_payload,
             picture::picture_complete,
             picture::picture_resize,
@@ -916,7 +918,9 @@ pub fn run_with_options(
                     .as_ref()
                     .and_then(|product| product.claude_plugin_paths()),
             )?);
+            app.manage(deepseek_plugin::DeepSeekPlugin::new()?);
             claude_plugin::repair_on_launch(app.handle());
+            deepseek_plugin::repair_on_launch(app.handle());
             mcp_clients::repair_on_launch(app.handle());
             app.manage(picture::Pictures::default());
             let directory = agent_hud_runtime::local_tools_directory()?;

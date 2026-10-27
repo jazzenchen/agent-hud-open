@@ -66,10 +66,13 @@ export interface PluginInput {
   justInstalled: boolean;
 }
 
-/** A plugin a client loads per session, such as Agent HUD's Claude Code plugin. */
+/** A plugin a client loads per session, such as Agent HUD's Claude Code
+ * plugin. `live`: the client loads it into what is already running by itself,
+ * as DeepSeek Harness does, so the next step is only to open it. */
 export function pluginRow(
   input: PluginInput,
   client = "Claude Code",
+  live = false,
 ): RowState {
   const base: Pick<RowState, "busy" | "menu" | "next"> = {
     busy: null,
@@ -108,8 +111,16 @@ export function pluginRow(
     menu: [
       { id: "remove", label: ["Remove plugin", "移除插件"], destructive: true },
     ],
-    next:
-      !loaded || input.justInstalled
+    next: live
+      ? loaded
+        ? null
+        : {
+            words: [
+              `${client} loads it by itself within a few seconds, open sessions included. Open ${client} to use it.`,
+              `${client} 会在几秒内自动加载，已经打开的会话也一样。打开 ${client} 即可使用。`,
+            ],
+          }
+      : !loaded || input.justInstalled
         ? {
             words: [
               `New ${client} sessions load it when they start. In a session that's already open, run ${reloadCommand}.`,
