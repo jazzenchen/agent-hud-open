@@ -75,6 +75,7 @@ stubs are the list of open work for that operating system.
 | LAN listener and files | `crates/lan/src/os/mod.rs` | `os/unix.rs`, `os/windows.rs` | `wake_pair`, `wait`, `addresses`, `protect_directory`, `private_file` |
 | LAN credential store | `crates/lan/src/credentials.rs` | `credentials/keychain_macos.rs`, `credentials/credential_windows.rs` | `SecretStore`: login Keychain / current-user Windows Credential Manager |
 | LAN TLS identity | `crates/lan/src/identity.rs` | `identity/macos.rs`, `identity/windows.rs`, `identity/linux.rs` | `load` |
+| Phone sharing | `crates/share/src/share/os/mod.rs` | `os/macos.rs`, `os/windows.rs`, `os/linux.rs` | `computer_name`, `secrets` (Linux has no grant store yet, so sharing stays off there) |
 | HUD windows | `crates/host/src/hud/mod.rs` | `hud/macos.rs`, `hud/windows.rs`, `hud/linux.rs`; `hud/generic.rs` holds Tauri-only pieces a host may re-export | listed at the selector |
 | App shell | `crates/host/src/shell/mod.rs` | `shell/macos.rs`, `shell/windows.rs`, `shell/linux.rs` | `install`, `window_opened`, `windows_changed`, `reopened`, `statistics_chrome`, `system_prefers_chinese`, `alert` (Linux prints to standard error until a dialog exists before Tauri starts) |
 | System settings | `crates/host/src/system/mod.rs` | `system/macos.rs`, `system/windows.rs`, `system/linux.rs` | login item, `cli_candidates`, `private_output` |

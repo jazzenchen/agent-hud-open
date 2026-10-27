@@ -20,6 +20,7 @@ import {
   Download,
   Monitor,
   MoreHorizontal,
+  Network,
   Plug,
   Puzzle,
   Settings2,
@@ -147,6 +148,15 @@ const pages = [
       "The relays your agents go through: who uses each, what it has left, and what kind it is.",
   },
   {
+    // What paired phones read: quota and token usage, never sessions.
+    id: "local-network",
+    label: "Local Network",
+    icon: Network,
+    color: "#5e5ce6",
+    description:
+      "Share this computer's quota and token usage with paired phones.",
+  },
+  {
     id: "prices",
     label: "Prices",
     icon: Coins,
@@ -177,6 +187,7 @@ const chinesePages: Record<string, [string, string]> = {
     "Agent HUD 为编程智能体添加的功能，都在这台 Mac 上运行。",
   ],
   relays: ["中转站", "智能体经过的中转站：谁在用、还剩多少、是哪一类。"],
+  "local-network": ["局域网", "与已配对的手机共享本机的额度和 token 用量。"],
   prices: ["价格", "每个模型按什么价格算、价格从哪里来，不对时可以自己改。"],
   display: ["显示", "自定义灵动岛光晕与面板内容，更改自动生效。"],
   updates: ["更新", "管理 Agent HUD 更新与 Beta 参与设置。"],
@@ -837,6 +848,7 @@ function AppContent({
                       {(page === "general" ||
                         page === "prices" ||
                         page === "relays" ||
+                        page === "local-network" ||
                         page === "display" ||
                         page === "agents" ||
                         page === "agent-plugins") && (

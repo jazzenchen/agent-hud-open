@@ -73,6 +73,12 @@ pub trait ProductExtension: Send + Sync + 'static {
         false
     }
     fn observe_snapshot(&self, _snapshot: Arc<Value>) {}
+    /// Whether the product runs its own sharing with paired phones. While it
+    /// does, the host's own (quota readings and token usage) stays off and
+    /// the product's page takes the Local Network page's place.
+    fn shares_with_phones(&self) -> bool {
+        false
+    }
     /// The product's own way to send words into a client session as its
     /// user's next message. Asked once, after `start`; None (the default)
     /// answers through Agent HUD's Claude Code plugin.

@@ -18,6 +18,7 @@ base64.workspace = true
 toml = "=1.1.8"
 serde.workspace = true
 agent-hud-runtime.workspace = true
+agent-hud-share.workspace = true
 agent-hud-hud.workspace = true
 
 [target.'cfg(target_os = "macos")'.dependencies]

@@ -25,6 +25,7 @@ agent-hud-l10n = { path = "src/crates/l10n" }
 agent-hud-lan = { path = "src/crates/lan" }
 agent-hud-platform = { path = "src/crates/platform" }
 agent-hud-runtime = { path = "src/crates/runtime" }
+agent-hud-share = { path = "src/crates/share" }
 
 base64 = "=0.22.1"
 chrono = { version = "0.4", default-features = false, features = ["clock", "serde"] }
