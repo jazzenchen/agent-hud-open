@@ -1365,3 +1365,53 @@ a:focus-visible {
 .session-share-row:hover {
   background: color-mix(in srgb, currentColor 5%, transparent);
 }
+.loading-state {
+  min-height: 260px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 40px 20px;
+  text-align: center;
+  color: var(--muted-foreground);
+  animation: loading-state-in 240ms ease-out 120ms both;
+}
+.loading-state-spinner {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid color-mix(in srgb, var(--muted-foreground) 22%, transparent);
+  border-top-color: var(--muted-foreground);
+  animation: agent-plugins-spin 0.8s linear infinite;
+}
+.loading-state-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--muted-foreground) 12%, transparent);
+}
+.loading-state-label {
+  margin: 0;
+  font-size: 13px;
+}
+.loading-state-detail {
+  margin: -4px 0 4px;
+  max-width: 360px;
+  font-size: 12px;
+  opacity: 0.8;
+  overflow-wrap: anywhere;
+}
+@keyframes loading-state-in {
+  from {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .loading-state,
+  .loading-state-spinner {
+    animation: none;
+  }
+}

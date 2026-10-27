@@ -1,6 +1,7 @@
 import type { PanelLayout, SourcePreferences } from "@agent-hud/protocol";
 import type { NativeHUDMonitor } from "./lib/use-hud-geometry";
 import SourcesSettings from "./SourcesSettings";
+import { LoadingState } from "./LoadingState";
 import {
   AgentPluginsPane,
   type AgentPluginItem,
@@ -57,9 +58,7 @@ export default function SettingsPane({
         onSelectScreen={selectScreen}
       />
     ) : (
-      <div className="connection-placeholder">
-        {chinese ? "正在读取显示器…" : "Reading displays…"}
-      </div>
+      <LoadingState label={chinese ? "正在读取显示器…" : "Reading displays…"} />
     );
   if (page === "agents")
     return (

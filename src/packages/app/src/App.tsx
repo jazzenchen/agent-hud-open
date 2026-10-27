@@ -22,7 +22,6 @@ import {
   MoreHorizontal,
   Plug,
   Puzzle,
-  RefreshCw,
   Settings2,
   Waypoints,
 } from "lucide-react";
@@ -62,6 +61,7 @@ import appIcon from "./assets/app-icon.png";
 import { snapshotLanguage } from "@agent-hud/ui/format";
 import type { AgentPluginItem } from "./settings/AgentPluginsPane";
 import { SettingsNavigation } from "./settings/SettingsNavigation";
+import { LoadingState } from "./LoadingState";
 
 export type {
   AgentPluginContext,
@@ -710,10 +710,21 @@ function AppContent({
               </Suspense>
             </ViewErrorBoundary>
           ) : (
-            <div className="connection-placeholder">
-              {error ||
-                (chinese ? "正在读取本地活动…" : "Reading local activity…")}
-            </div>
+            <LoadingState
+              label={
+                error
+                  ? chinese
+                    ? "无法读取本机活动"
+                    : "Couldn’t read local activity"
+                  : chinese
+                    ? "正在读取本机活动…"
+                    : "Reading local activity…"
+              }
+              failed={!!error}
+              detail={error}
+              retryLabel={chinese ? "重试" : "Retry"}
+              onRetry={() => void refresh()}
+            />
           )}
           <Toaster theme={theme} />
         </div>
@@ -804,24 +815,20 @@ function AppContent({
                     </Alert>
                   )}
                   {!settingsProps ? (
-                    <div className="connection-placeholder">
-                      {loading
-                        ? chinese
-                          ? "正在读取本机活动…"
-                          : "Reading local activity…"
-                        : chinese
-                          ? "数据服务不可用。"
-                          : "The runtime is unavailable."}
-                      <Button
-                        variant="outline"
-                        onClick={() => {
-                          void refresh();
-                        }}
-                      >
-                        <RefreshCw size={14} />
-                        {chinese ? "重试" : "Retry"}
-                      </Button>
-                    </div>
+                    <LoadingState
+                      label={
+                        loading
+                          ? chinese
+                            ? "正在读取本机活动…"
+                            : "Reading local activity…"
+                          : chinese
+                            ? "数据服务不可用"
+                            : "The runtime is unavailable"
+                      }
+                      failed={!loading}
+                      retryLabel={chinese ? "重试" : "Retry"}
+                      onRetry={() => void refresh()}
+                    />
                   ) : (
                     <Suspense fallback={null}>
                       {extensionPages
