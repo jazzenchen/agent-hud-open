@@ -61,7 +61,7 @@ pub static AGENT: Agent = Agent {
     program: None,
     replies: None,
     turns: Some(&transcript::TURNS),
-    items: None,
+    items: Some(&transcript::ITEMS),
     sources: crate::everywhere(&SOURCES),
     discovery: &DISCOVERY,
 };
