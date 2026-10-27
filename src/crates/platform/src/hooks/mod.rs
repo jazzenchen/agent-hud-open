@@ -34,6 +34,7 @@ pub use agent_hud_agents::windows_hook_handler;
 pub use entry::{entry, handle_with_io};
 pub use inbox::{record_delivery, record_event};
 pub use install::{apply_plan, install_plan, InstallContext, InstallPlan};
+pub(crate) use install::{target as settings_target, write_contents as write_settings};
 pub use statusline::account_reports;
 
 pub const PAYLOAD_LIMIT: usize = 1024 * 1024;

@@ -917,6 +917,7 @@ pub fn run_with_options(
                     .and_then(|product| product.claude_plugin_paths()),
             )?);
             claude_plugin::repair_on_launch(app.handle());
+            mcp_clients::repair_on_launch(app.handle());
             app.manage(picture::Pictures::default());
             let directory = agent_hud_runtime::local_tools_directory()?;
             let demo_data = directory.join("demo-run");

@@ -18,6 +18,7 @@ pub use agent_hud_core::projects;
 pub use agent_hud_core::replies;
 pub use agent_hud_platform::claude_plugin;
 pub use agent_hud_platform::hooks;
+pub use agent_hud_platform::hud_tools;
 pub use agent_hud_platform::instance;
 pub use agent_hud_platform::local_tools;
 pub use agent_hud_platform::CollectionGate;

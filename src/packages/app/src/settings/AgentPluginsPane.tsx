@@ -87,6 +87,7 @@ export interface MCPClientsStatus {
     name: string;
     available: boolean;
     installed: boolean;
+    /** The client's own command that adds the server; null when Agent HUD edits its settings file. */
     command: string | null;
   }[];
 }
@@ -120,9 +121,13 @@ const nativePlugin: ClaudePluginService = async (action) => {
   return invoke<ClaudePluginStatus>("native_claude_plugin", { action });
 };
 
+/** The clients the host can give HUD tools to (hud_tools::CLIENTS). */
 const knownClients = [
   { id: "claudeCode", name: "Claude Code", logo: "claude" },
   { id: "codex", name: "Codex", logo: "codex" },
+  { id: "cursor", name: "Cursor", logo: "cursor" },
+  { id: "deepseek", name: "DeepSeek Harness", logo: "deepseek" },
+  { id: "antigravity", name: "Antigravity", logo: "antigravity" },
 ];
 
 let cachedStatus: MCPClientsStatus | null = null;

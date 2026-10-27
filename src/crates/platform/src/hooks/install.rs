@@ -75,7 +75,7 @@ fn configuration(context: &InstallContext, source: &str, relative: &str) -> Path
         })
         .unwrap_or_else(|| context.home.join(relative))
 }
-pub(super) fn target(path: &Path) -> Result<PathBuf, String> {
+pub(crate) fn target(path: &Path) -> Result<PathBuf, String> {
     let mut path = path.to_owned();
     for _ in 0..32 {
         match fs::read_link(&path) {
@@ -202,7 +202,7 @@ pub fn apply_plan(plan: &InstallPlan) -> Result<bool, String> {
 
 /// Atomic settings replacement shared by reversible explicit installers.
 /// The caller checks its plan immediately before writing or removing the file.
-pub(super) fn write_contents(path: &Path, bytes: Option<&[u8]>) -> Result<(), String> {
+pub(crate) fn write_contents(path: &Path, bytes: Option<&[u8]>) -> Result<(), String> {
     let Some(bytes) = bytes else {
         return match fs::remove_file(path) {
             Ok(()) => Ok(()),

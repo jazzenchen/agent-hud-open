@@ -10,6 +10,7 @@ mod accounts;
 pub mod claude_plugin;
 pub mod clients;
 pub mod hooks;
+pub mod hud_tools;
 pub mod json_text;
 #[cfg(windows)]
 pub mod local_ipc;
