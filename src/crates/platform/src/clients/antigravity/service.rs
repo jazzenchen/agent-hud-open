@@ -264,6 +264,9 @@ impl Service {
                     "Antigravity local service request failed",
                 )
             })?;
+        if !response.status().is_success() {
+            return Err(service_error(response));
+        }
         crate::accounts::http::response_json(response, "Antigravity")
     }
     fn cached(&self) -> Vec<Endpoint> {
@@ -425,13 +428,38 @@ pub fn call(method: &str, params: &Value) -> Result<Value, String> {
             state.complete = false;
         }
     }
+    let mut last = None;
     for endpoint in service.discover(true, false)? {
-        if let Ok(value) = service.send(&endpoint, method, params) {
-            return Ok(value);
+        match service.send(&endpoint, method, params) {
+            Ok(value) => return Ok(value),
+            Err(error) => last = Some(error),
         }
     }
-    Err(l10n::text(
-        "没有已登录且正在运行的 Antigravity 服务",
-        "No authenticated already-running Antigravity service is available",
-    ))
+    // A service that answered with its own error is reachable; say what it said.
+    Err(last.unwrap_or_else(|| {
+        l10n::text(
+            "没有已登录且正在运行的 Antigravity 服务",
+            "No authenticated already-running Antigravity service is available",
+        )
+    }))
+}
+
+/// The service's own Connect error (`{"code","message"}`), limited in size.
+/// These come from the loopback service and hold no credentials.
+fn service_error(response: reqwest::blocking::Response) -> String {
+    use std::io::Read;
+    let status = response.status().as_u16();
+    let mut bytes = Vec::new();
+    let _ = response.take(4096).read_to_end(&mut bytes);
+    let message = serde_json::from_slice::<Value>(&bytes)
+        .ok()
+        .and_then(|body| body["message"].as_str().map(str::to_owned))
+        .filter(|text| !text.is_empty());
+    match message {
+        Some(text) => format!(
+            "Antigravity: {}",
+            text.chars().take(300).collect::<String>()
+        ),
+        None => format!("Antigravity local service returned HTTP {status}"),
+    }
 }
