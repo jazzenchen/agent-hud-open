@@ -1,11 +1,13 @@
-//! Grok Bot's personal quota, from the cache the Bot keeps itself. When the
-//! Bot read it stays the observation time: reading the file now does not
-//! make old data fresh. Its tokens come from Cursor's servers (`usage.rs`).
+//! Grok Bot's personal quota: from Cursor's servers when Cursor is signed in
+//! to the Bot's account (`weekly.rs`), else from the cache the Bot keeps
+//! itself. For the cache, when the Bot read it stays the observation time:
+//! reading the file now does not make old data fresh. Its tokens come from
+//! Cursor's servers (`usage.rs`).
 use super::cache as bot;
 use crate::account::{legacy_unresolved, locate, status, Host, Reading};
 use crate::naming::window_names;
 use crate::{l10n, Location, PerOs, Support};
-use serde_json::json;
+use serde_json::{json, Value};
 
 /// Grok Bot's desktop cache, where it is known.
 pub const CACHE_LOCATION: Location = Location::app_data(&["Grok Bot"], "sand-client-persistence");
@@ -39,19 +41,28 @@ pub fn read(host: &dyn Host) -> Result<Reading, String> {
     };
     let now = chrono::Utc::now().timestamp_millis();
     let tokens = super::usage::read(host, &directory, &slot, now);
-    match (quota(host, &directory, &slot, now), tokens) {
+    let quota = match super::weekly::read(host, &slot, now) {
+        Ok(Some(usage)) => quota(&usage, &slot, now),
+        Ok(None) => cached(host, &directory, &slot, now),
+        // The servers failed: the Bot's own cache, with the reason.
+        Err(why) => match cached(host, &directory, &slot, now) {
+            Ok(mut r) => {
+                r.notice = Some(joined(r.notice.take(), why));
+                Ok(r)
+            }
+            Err(_) => Err(why),
+        },
+    };
+    match (quota, tokens) {
         (Ok(mut r), Ok(records)) => {
             r.session_records = records;
             Ok(r)
         }
         (Ok(mut r), Err(why)) => {
-            r.notice = Some(match r.notice.take() {
-                Some(notice) => format!("{notice} · {why}"),
-                None => why,
-            });
+            r.notice = Some(joined(r.notice.take(), why));
             Ok(r)
         }
-        // A stale quota cache does not hold the tokens back: the bots run
+        // A missing quota does not hold the tokens back: the bots run
         // whether or not the Bot was opened today.
         (Err(why), Ok(records)) if !records.is_empty() => {
             let mut r = Reading::empty("grok-bot");
@@ -63,39 +74,79 @@ pub fn read(host: &dyn Host) -> Result<Reading, String> {
     }
 }
 
-/// The weekly quota the Bot's cache holds for `slot`.
-fn quota(
+/// `notice` and then `why`, each said once.
+fn joined(notice: Option<String>, why: String) -> String {
+    match notice {
+        Some(notice) if notice.split(" · ").any(|part| part == why) => notice,
+        Some(notice) => format!("{notice} · {why}"),
+        None => why,
+    }
+}
+
+/// The plan name Grok Bot keeps when it has none to show; the Bot itself
+/// never shows it.
+const NO_PLAN_NAME: &str = "Grok Bot Plan";
+
+/// The weekly quota the Bot's cache holds for `slot`, while the Bot's own
+/// expiry (a day after it read it) has not passed.
+fn cached(
     host: &dyn Host,
     directory: &std::path::Path,
     slot: &str,
     now: i64,
 ) -> Result<Reading, String> {
-    let mut r = Reading::empty("grok-bot");
     let value = bot::value_through(host, directory, &bot::quota_key(slot), 2).ok_or_else(|| {
         l10n::text(
             "Grok Bot 缓存额度不可用，请在 Bot 中刷新",
             "Grok Bot cached quota is unavailable; refresh in Bot",
         )
     })?;
+    if value["kind"] != "present" || !value["selectedTeamId"].is_null() {
+        return Err(no_personal_quota());
+    }
     let (expires, observed) = (
         value["expiresAtMs"].as_i64(),
         value["reading"]["readAtMs"].as_i64(),
     );
-    let u = &value["reading"]["usage"];
-    if value["kind"] != "present"
-        || !value["selectedTeamId"].is_null()
-        || expires.is_none_or(|e| e <= now)
-        || observed.is_none_or(|at| at > now || now - at >= 86_400_000)
-        || expires <= observed
-        || u["hasNonZeroIncludedLimit"] != true
+    let Some(observed) = observed.filter(|at| {
+        *at <= now && now - at < 86_400_000 && expires.is_some_and(|e| e > now && e > *at)
+    }) else {
+        return Err(l10n::text(
+            "Grok Bot 缓存的额度已超过一天，打开 Grok Bot 即可刷新",
+            "Grok Bot's cached quota is more than a day old; open Grok Bot to refresh it.",
+        ));
+    };
+    let mut r = quota(&value["reading"]["usage"], slot, observed)?;
+    r.notice = Some(l10n::text(
+        "额度来自 Grok Bot 缓存；在 Bot 中刷新可更新读数",
+        "Quota from Grok Bot cache; refresh in Bot to update",
+    ));
+    if bot::account_through(host, directory).as_deref() != Some(slot) {
+        return Err(l10n::text(
+            "读取缓存期间 Grok Bot 账户发生了变化",
+            "Grok Bot account changed while reading its cache",
+        ));
+    }
+    Ok(r)
+}
+
+fn no_personal_quota() -> String {
+    l10n::text(
+        "Grok Bot 在当前账户或团队下没有个人周额度",
+        "Grok Bot has no personal weekly limit for this account or team.",
+    )
+}
+
+/// The quota of Grok Bot's weekly `usage` (as its cache keeps it, or as
+/// `weekly` reads it from the servers) for `slot`, read at `observed`.
+fn quota(u: &Value, slot: &str, observed: i64) -> Result<Reading, String> {
+    if u["hasNonZeroIncludedLimit"] != true
         || !u["isSandTrial"].is_boolean()
         || u["isTeamSeat"] == true
     {
-        return Err(l10n::text(
-            "Grok Bot 的个人额度缓存已过期，或在当前团队选择下不可用",
-            "Grok Bot personal quota cache is expired or unavailable for this team selection",
-        ));
+        return Err(no_personal_quota());
     }
+    let mut r = Reading::empty("grok-bot");
     // The Swift app's account for this Bot slot; its rows are that app's `grok` windows.
     let id = legacy_unresolved("Grok", &format!("grok-bot:{}", bot::hash(&[slot])));
     let used = u["percentUsed"]
@@ -109,27 +160,23 @@ fn quota(
             "Grok Bot cache reset time is invalid",
         ));
     }
+    let observed = iso(observed);
     let trial = u["isSandTrial"] == true;
-    r.quotas.push(json!({"id":format!("{id}/grok"),"vendor":"grok-bot","accountId":id,"legacyWindowId":format!("{id}/grok"),"name":if trial{"Trial usage limit"}else{"Weekly usage limit"},"shortLabel":if trial{"Trial".to_owned()}else{window_names::Period::Week.short_name()},"usedPercent":used,"resetAt":reset,"windowDurationSeconds":if trial{None}else{Some(604800)},"allModels":true,"observedAt":observed.and_then(iso),"status":used.map(status).unwrap_or("unknown")}));
+    r.quotas.push(json!({"id":format!("{id}/grok"),"vendor":"grok-bot","accountId":id,"legacyWindowId":format!("{id}/grok"),"name":if trial{"Trial usage limit"}else{"Weekly usage limit"},"shortLabel":if trial{"Trial".to_owned()}else{window_names::Period::Week.short_name()},"usedPercent":used,"resetAt":reset,"windowDurationSeconds":if trial{None}else{Some(604800)},"allModels":true,"observedAt":observed,"status":used.map(status).unwrap_or("unknown")}));
     let cap = u["onDemand"]["limitCents"].as_f64();
     let extra = u["onDemand"]["usedCents"].as_f64();
     if cap.is_some_and(|n| n > 0.) {
         let used = cap.zip(extra).map(|(c, e)| (e / c * 100.).clamp(0., 100.));
-        r.quotas.push(json!({"id":format!("{id}/grok:extra"),"vendor":"grok-bot","accountId":id,"legacyWindowId":format!("{id}/grok:extra"),"name":"Extra usage","shortLabel":"Extra","usedPercent":used,"resetAt":reset,"allModels":true,"observedAt":observed.and_then(iso),"status":used.map(status).unwrap_or("unknown")}));
+        r.quotas.push(json!({"id":format!("{id}/grok:extra"),"vendor":"grok-bot","accountId":id,"legacyWindowId":format!("{id}/grok:extra"),"name":"Extra usage","shortLabel":"Extra","usedPercent":used,"resetAt":reset,"allModels":true,"observedAt":observed,"status":used.map(status).unwrap_or("unknown")}));
     }
+    // A merged (SuperGrok) account goes by its merged plan, as the Bot shows it.
+    let plan = u["unifiedPlanName"]
+        .as_str()
+        .or_else(|| u["grokPlanLabel"].as_str().filter(|p| *p != NO_PLAN_NAME))
+        .filter(|p| !p.is_empty());
     r.account = Some(
-        json!({"id":id,"provider":"grok-bot","identity":"unresolved","plan":u["grokPlanLabel"],"checkedAt":observed.and_then(iso)}),
+        json!({"id":id,"provider":"grok-bot","identity":"unresolved","plan":plan,"checkedAt":observed}),
     );
-    r.notice = Some(l10n::text(
-        "额度来自 Grok Bot 缓存；在 Bot 中刷新可更新读数",
-        "Quota from Grok Bot cache; refresh in Bot to update",
-    ));
-    if bot::account_through(host, directory).as_deref() != Some(slot) {
-        return Err(l10n::text(
-            "读取缓存期间 Grok Bot 账户发生了变化",
-            "Grok Bot account changed while reading its cache",
-        ));
-    }
     Ok(r)
 }
 

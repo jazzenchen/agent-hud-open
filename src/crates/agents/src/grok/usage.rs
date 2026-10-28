@@ -174,7 +174,12 @@ mod tests {
     const ME: &str = "https://api2.cursor.sh/aiserver.v1.DashboardService/GetMe";
     const SPEND: &str =
         "https://api2.cursor.sh/aiserver.v1.DashboardService/GetDailySpendByCategory";
+    const WEEKLY: &str = "https://api2.cursor.sh/aiserver.v1.DashboardService/GetSandUsageStatus";
+    const PERIOD: &str =
+        "https://api2.cursor.sh/aiserver.v1.DashboardService/GetCurrentPeriodUsage";
     const DAY: i64 = 1_792_972_800_000;
+    /// The Bot's slot when Cursor is signed in to the same account.
+    const SAME: &str = "auth0|user_123";
 
     fn entry(key: &str, schema: u64, value: Value) -> (String, String) {
         let file = bot::path(DIR.as_ref(), key);
@@ -194,12 +199,23 @@ mod tests {
         )
     }
 
-    /// Grok Bot signed in as slot-1 with two bots, Cursor signed in, and
-    /// the servers answering `spend` and, when given, `quota` in the cache.
+    /// Grok Bot signed in as slot-1 with two bots, Cursor signed in to
+    /// another account, and the servers answering `spend` and, when given,
+    /// `quota` in the cache.
     fn host(dir: &tempfile::TempDir, spend: Value, quota: Option<Value>) -> FakeHost {
-        let (account_file, account) = entry(bot::ACCOUNT_KEY, 1, json!("slot-1"));
+        host_as(dir, "slot-1", spend, quota)
+    }
+
+    /// `host`, with Grok Bot signed in as `slot`.
+    fn host_as(
+        dir: &tempfile::TempDir,
+        slot: &str,
+        spend: Value,
+        quota: Option<Value>,
+    ) -> FakeHost {
+        let (account_file, account) = entry(bot::ACCOUNT_KEY, 1, json!(slot));
         let (roster_file, roster) = entry(
-            &bot::roster_key("slot-1"),
+            &bot::roster_key(slot),
             4,
             json!({"rows": [{"id": "bot-a", "title": "SEO"}, {"id": "bot-b", "title": "Sego"}]}),
         );
@@ -218,7 +234,7 @@ mod tests {
             .answer(ME, Ok(json!({"userId": 123})))
             .answer(SPEND, Ok(spend));
         if let Some(quota) = quota {
-            let (quota_file, quota) = entry(&bot::quota_key("slot-1"), 2, quota);
+            let (quota_file, quota) = entry(&bot::quota_key(slot), 2, quota);
             host = host.file(&quota_file, &quota);
         }
         host.databases.insert(CURSOR_DB.into(), state);
@@ -329,5 +345,84 @@ mod tests {
         // Without tokens the expired cache is the error it was.
         let dir = tempfile::tempdir().unwrap();
         assert!(super::super::account::read(&host(&dir, json!({}), Some(expired))).is_err());
+    }
+    fn cached_quota(now: i64, usage: Value) -> Value {
+        json!({"kind": "present", "selectedTeamId": null, "expiresAtMs": now + 3_600_000,
+               "reading": {"readAtMs": now - 60_000, "usage": usage}})
+    }
+
+    #[test]
+    fn the_weekly_quota_comes_from_the_servers_when_cursor_is_the_bots_account() {
+        let reset = (chrono::Utc::now() + chrono::Duration::days(3)).to_rfc3339();
+        let dir = tempfile::tempdir().unwrap();
+        let host = host_as(&dir, SAME, json!({}), None)
+            .answer(
+                WEEKLY,
+                Ok(json!({"usagePercent": 0.37, "nextResetTimestampUtc": reset,
+                          "hasNonZeroIncludedLimit": true, "grokPlanLabel": "Grok Bot Plan",
+                          "isUnified": true, "cursorPlanName": "Super"})),
+            )
+            .answer(PERIOD, Ok(json!({})));
+        let reading = super::super::account::read(&host).unwrap();
+        assert_eq!(reading.quotas.len(), 1);
+        assert_eq!(reading.quotas[0]["usedPercent"], 0.37);
+        assert_eq!(reading.quotas[0]["name"], "Weekly usage limit");
+        let account = reading.account.unwrap();
+        assert_eq!(
+            account["plan"], "Super",
+            "a merged account goes by its merged plan"
+        );
+        let checked = chrono::DateTime::parse_from_rfc3339(account["checkedAt"].as_str().unwrap());
+        assert!(chrono::Utc::now().timestamp() - checked.unwrap().timestamp() < 60);
+        assert!(reading.notice.is_none(), "no cache and no failure to tell");
+    }
+
+    #[test]
+    fn the_bots_cache_stands_in_when_the_servers_fail_or_cursor_is_another_account() {
+        let now = chrono::Utc::now().timestamp_millis();
+        let usage = json!({"hasNonZeroIncludedLimit": true, "isSandTrial": false,
+                           "percentUsed": 3.0, "grokPlanLabel": "Grok Bot Plan"});
+
+        // Servers unreachable: the cache, and the reason beside its notice.
+        let mut merged = usage.clone();
+        merged["unifiedPlanName"] = json!("Super");
+        let dir = tempfile::tempdir().unwrap();
+        let same = host_as(&dir, SAME, json!({}), Some(cached_quota(now, merged)));
+        let reading = super::super::account::read(&same).unwrap();
+        assert_eq!(reading.quotas[0]["usedPercent"], 3.0);
+        assert_eq!(reading.account.unwrap()["plan"], "Super");
+        assert!(reading
+            .notice
+            .unwrap()
+            .ends_with(" · Grok Bot's weekly usage could not be reached; check the connection."));
+
+        // Cursor signed in to another account: its quota is not asked for,
+        // and the placeholder plan name is no plan.
+        let dir = tempfile::tempdir().unwrap();
+        let other = host(&dir, json!({}), Some(cached_quota(now, usage))).answer(
+            WEEKLY,
+            Ok(json!({"usagePercent": 99.0, "hasNonZeroIncludedLimit": true})),
+        );
+        let reading = super::super::account::read(&other).unwrap();
+        assert_eq!(reading.quotas[0]["usedPercent"], 3.0);
+        assert!(reading.account.unwrap()["plan"].is_null());
+        assert!(!other.asked.borrow().iter().any(|(url, _)| url == WEEKLY));
+    }
+
+    #[test]
+    fn an_old_cache_says_so_when_the_servers_cannot_stand_in() {
+        let now = chrono::Utc::now().timestamp_millis();
+        let mut old = cached_quota(
+            now,
+            json!({"hasNonZeroIncludedLimit": true, "isSandTrial": false,
+                                               "percentUsed": 3.0}),
+        );
+        old["expiresAtMs"] = json!(now - 1);
+        let dir = tempfile::tempdir().unwrap();
+        let why = super::super::account::read(&host(&dir, json!({}), Some(old))).err();
+        assert_eq!(
+            why.as_deref(),
+            Some("Grok Bot's cached quota is more than a day old; open Grok Bot to refresh it.")
+        );
     }
 }

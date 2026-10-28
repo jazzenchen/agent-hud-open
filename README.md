@@ -233,7 +233,7 @@ Install and sign in to the agents you want to follow; Agent HUD finds them by it
 | **Qwen&nbsp;Code** | ✓ |  |  | ✓ |  | ✓ |  |  |
 | **Devin&nbsp;CLI** | ✓ | ✓ |  | ✓ |  | ✓ |  |  |
 
-Also: the **GLM Coding Plan** quota, and approvals for the **Qoder** builds. Codex approvals need its hook trusted in Codex, DeepSeek Harness approvals and questions need Agent HUD's plugin (Settings → Agent plugins), Copilot's quota needs your consent in Settings, and Devin's quotas come from its CLI's local cache. Cursor's tokens come from Cursor 3.27 or later. Grok Bot's bots run on Cursor's servers, which report each bot's daily tokens; an account merged into SuperGrok reports none, so only its sessions show.
+Also: the **GLM Coding Plan** quota, and approvals for the **Qoder** builds. Codex approvals need its hook trusted in Codex, DeepSeek Harness approvals and questions need Agent HUD's plugin (Settings → Agent plugins), Copilot's quota needs your consent in Settings, and Devin's quotas come from its CLI's local cache. Cursor's tokens come from Cursor 3.27 or later. Grok Bot's bots run on Cursor's servers, which report each bot's daily tokens; an account merged into SuperGrok reports none, so only its sessions show. Grok Bot's weekly quota comes from the same servers when Cursor is signed in to the Bot's account, otherwise from the Bot's own cache, which it refreshes only while in use.
 
 ## Keep your data safe.
 

@@ -4,6 +4,7 @@ pub mod bot;
 pub mod cache;
 pub mod transcript;
 mod usage;
+mod weekly;
 
 use crate::Agent;
 use crate::Discovery;
