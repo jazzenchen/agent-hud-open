@@ -20,6 +20,8 @@ pub use agent_hud_platform::claude_plugin;
 pub use agent_hud_platform::hooks;
 pub use agent_hud_platform::instance;
 pub use agent_hud_platform::local_tools;
+#[cfg(target_os = "macos")]
+pub use agent_hud_platform::registered_applications;
 pub use agent_hud_platform::CollectionGate;
 
 /// Every collecting entry point claims the data directory before constructing
