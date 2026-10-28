@@ -219,6 +219,72 @@ fn another_app_server_clients_codex_thread_opens_in_codex() {
 }
 
 #[test]
+fn a_harness_session_gets_the_discovered_app_fallback_and_loses_it_on_refresh() {
+    let temp = tempfile::tempdir().unwrap();
+    let home = temp.path();
+    let mut core = core(home);
+    let source = agent_hud_agents::deepseek::AGENT.id;
+    core.provider_roots = vec![(home.join(".dsh/sessions"), source)];
+    let header =
+        json!({"type":"session","version":4,"id":"main","createdAt":Utc::now().to_rfc3339()});
+    let path = home.join(".dsh/sessions/main/session.jsonl");
+    fs::create_dir_all(path.parent().unwrap()).unwrap();
+    fs::write(path, format!("{header}\n")).unwrap();
+    let id = "deepseek:main";
+    let found = crate::ProviderDiscovery {
+        id: source.into(),
+        installed: true,
+        ..Default::default()
+    };
+    // A CLI or a sessions folder does not prove a desktop link is available.
+    core.set_provider_discovery(vec![found.clone()]);
+    assert_eq!(target(&mut core, id), Value::Null);
+    let revision = core.sessions_revision;
+
+    let app = json!({"kind":"deepseek-app"});
+    core.set_provider_discovery(vec![crate::ProviderDiscovery {
+        navigation_target: Some(app.clone()),
+        ..found.clone()
+    }]);
+    let snapshot = core
+        .request("snapshot", json!({"changesOnly":true}))
+        .unwrap();
+    assert_eq!(snapshot["sessions"][0]["navigationTarget"], app);
+    assert!(core.sessions_revision > revision);
+    let detail = core.request("session_detail", json!({"id":id})).unwrap();
+    assert_eq!(detail["session"]["navigationTarget"], app);
+    let page = core.request("sessions", json!({})).unwrap();
+    assert_eq!(page["items"][0]["navigationTarget"], app);
+
+    core.set_provider_discovery(vec![found]);
+    let snapshot = core
+        .request("snapshot", json!({"changesOnly":true}))
+        .unwrap();
+    assert_eq!(snapshot["sessions"][0]["navigationTarget"], Value::Null);
+}
+
+#[test]
+fn an_app_fallback_preserves_specific_targets_and_belongs_only_to_its_source() {
+    let temp = tempfile::tempdir().unwrap();
+    let mut core = core(temp.path());
+    let source = agent_hud_agents::deepseek::AGENT.id;
+    core.set_provider_discovery(vec![crate::ProviderDiscovery {
+        id: source.into(),
+        navigation_target: Some(json!({"kind":"deepseek-app"})),
+        ..Default::default()
+    }]);
+    let pane = json!({"kind":"iterm-session","id":"pane"});
+    let mut session = json!({"source":source,"id":"deepseek:main","navigationTarget":pane});
+    let presentation = core.presentation(Utc::now().timestamp_millis());
+    presentation.overlay(&mut session, None, None, &Default::default());
+    assert_eq!(session["navigationTarget"], pane);
+
+    let mut other = json!({"source":agent_hud_agents::codex::AGENT.id,"id":"other"});
+    presentation.overlay(&mut other, None, None, &Default::default());
+    assert_eq!(other["navigationTarget"], Value::Null);
+}
+
+#[test]
 fn a_session_lists_where_its_first_and_latest_prompts_were_typed() {
     let temp = tempfile::tempdir().unwrap();
     let home = temp.path();

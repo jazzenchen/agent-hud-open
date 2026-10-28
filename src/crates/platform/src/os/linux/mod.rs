@@ -53,6 +53,10 @@ pub(crate) fn application_installed(home: &Path, env: &Environment, name: &str) 
 pub(crate) fn registered_bundle(_id: &str) -> bool {
     false
 }
+/// URL-handler lookup through XDG associations is not implemented.
+pub(crate) fn registered_url(_url: &str) -> bool {
+    false
+}
 pub(crate) fn executable_dirs(home: &Path, env: &Environment) -> Vec<PathBuf> {
     let mut dirs = path_entries(env);
     dirs.extend([
@@ -151,3 +155,11 @@ pub(crate) fn prepare_socket_address(_address: &mut libc::sockaddr_un) {}
 /// Linux suppresses SIGPIPE per send with MSG_NOSIGNAL instead.
 pub(crate) fn suppress_sigpipe(_fd: libc::c_int) {}
 pub(crate) const SOCKET_SEND_FLAGS: libc::c_int = libc::MSG_NOSIGNAL;
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn url_handler_discovery_is_unavailable() {
+        assert!(!super::registered_url("dsh://open"));
+    }
+}

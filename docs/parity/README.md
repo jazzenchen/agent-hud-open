@@ -47,14 +47,14 @@ Open is the floor, not the ceiling. Next must not do worse than Open; where it c
 | [c02c](c02c-buddy-copilot-qwen-zcode-hermes-openclaw.md) | CodeBuddy/WorkBuddy, Copilot, Qwen, ZCode, Hermes, OpenClaw | 70 | 29 | 0 | 1 | 7 | 4 | 26 | 3 |
 | [c02d](c02d-openagents-additional.md) | Kimi, OpenCode/Go, GLM, Pi, additional sources | 57 | 16 | 2 | 0 | 4 | 6 | 28 | 1 |
 | [c03](c03-hooks-store-ledger.md) | Hooks, permissions, collector, store, ledger | 104 | 44 | 6 | 6 | 4 | 8 | 28 | 8 |
-| [c04](c04-models-logic.md) | Models, quota math, session phases, formatting, demo | 122 | 50 | 3 | 6 | 18 | 12 | 26 | 7 |
+| [c04](c04-models-logic.md) | Models, quota math, session phases, formatting, demo | 122 | 49 | 3 | 7 | 18 | 12 | 26 | 7 |
 | [c05](c05-panel-mcp.md) | Panel layout, HUD style, MCP tools | 96 | 23 | 8 | 1 | 16 | 2 | 45 | 1 |
 | [c06](c06-notch-surface.md) | Island, hover panel, Simple mode, HUD windows | 119 | 40 | 5 | 1 | 18 | 11 | 41 | 3 |
 | [c07](c07-glow-alerts-theme.md) | Glow, alerts, permission cards, theme | 119 | 39 | 3 | 4 | 24 | 6 | 39 | 4 |
 | [c08](c08-bots.md) | Bots and Clawd | 58 | 35 | 1 | 2 | 1 | 1 | 15 | 3 |
 | [c09](c09-app-settings.md) | App lifecycle, Settings, menu bar | 90 | 25 | 6 | 6 | 7 | 9 | 32 | 5 |
 | [c10](c10-statistics-debug.md) | Statistics, sessions window, debug, recording | 101 | 14 | 1 | 9 | 13 | 8 | 54 | 2 |
-| **Total** | | **1,217** | **410** | **44** | **48** | **175** | **88** | **406** | **46** |
+| **Total** | | **1,217** | **409** | **44** | **49** | **175** | **88** | **406** | **46** |
 
 `pnpm run parity:ledger` recounts this table from the rows; `pnpm run check` fails when it is stale.
 
