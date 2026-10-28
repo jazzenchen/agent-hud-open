@@ -34,6 +34,7 @@ pub use agent_hud_agents::windows_hook_handler;
 pub use entry::{entry, handle_with_io};
 pub use inbox::{record_delivery, record_event};
 pub use install::{apply_plan, install_plan, InstallContext, InstallPlan};
+pub(crate) use install::{target as settings_target, write_contents as write_settings};
 pub use statusline::account_reports;
 
 pub const PAYLOAD_LIMIT: usize = 1024 * 1024;
@@ -57,6 +58,7 @@ pub struct Hooks {
     observers: Mutex<Option<observers::Observers>>,
     antigravity: Option<crate::clients::antigravity::permissions::Observer>,
     deepseek: Option<crate::clients::deepseek::questions::Observer>,
+    deepseek_plugin: Option<crate::deepseek_plugin::asks::Observer>,
     server: Option<transport::Server>,
     desktop: Option<crate::clients::codex::desktop::CodexDesktopObserver>,
 }
@@ -74,6 +76,7 @@ impl Hooks {
             observers: Mutex::new(None),
             antigravity: None,
             deepseek: None,
+            deepseek_plugin: None,
             clients: clients::Clients::default(),
             data,
             requests,
@@ -144,6 +147,7 @@ impl Hooks {
         if !enabled {
             self.antigravity.take();
             self.deepseek.take();
+            self.deepseek_plugin.take();
             self.desktop.take();
             self.server.take();
             return Ok(());
@@ -179,6 +183,14 @@ impl Hooks {
         }
         if clients::runs(&agents::deepseek::QUESTIONS) {
             self.deepseek = Some(deepseek::questions::Observer::start(
+                self.requests.clone(),
+                self.wake.clone(),
+            )?);
+        }
+        if clients::runs(&agents::deepseek::PLUGIN) {
+            use crate::deepseek_plugin::{asks, channel_directory, DeepSeekChannel};
+            self.deepseek_plugin = Some(asks::Observer::start(
+                DeepSeekChannel::new(channel_directory(&self.data)),
                 self.requests.clone(),
                 self.wake.clone(),
             )?);

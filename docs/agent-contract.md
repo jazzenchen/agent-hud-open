@@ -180,7 +180,9 @@ engine code that decides by client name. It goes in five slices:
 3. **Native channels**. `Agent::channel` names each:
    - `codex::DESKTOP`, the desktop app's IPC;
    - `antigravity::LOCAL_SERVICE`, its language server;
-   - `deepseek::QUESTIONS`, Harness's web question stream.
+   - `deepseek::PLUGIN`, Agent HUD's Harness plugin and the folder it shares
+     with the app (`platform/src/deepseek_plugin/`); Harness 0.1's web
+     question stream, `deepseek::QUESTIONS`, still runs beside it.
 
    Each says what it carries (requests, quota) and on which OS it runs.
    Platform keeps them in `platform/src/clients/<id>/`, starts each only where

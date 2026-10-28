@@ -124,6 +124,9 @@ fn handle(
         if !active.load(Ordering::Acquire) {
             return Err("Local tools are disabled".into());
         }
+        let plugin = app.try_state::<super::deepseek_plugin::DeepSeekPlugin>();
+        let channel = plugin.as_deref().map(|plugin| plugin.channel());
+        let params = with_caller(channel, params, std::time::SystemTime::now());
         return host_request(extension.as_deref(), method, params);
     }
     let mut owner = backend
@@ -199,6 +202,35 @@ pub(super) fn channel_wanted(
     hud_tools || extension.is_some_and(|product| product.host_tools_on())
 }
 
+/// The DeepSeek Harness session that called a host tool, when the relay
+/// could not tell: Harness runs one relay per host for all its sessions, so
+/// the relay says only which process started it (`parent`), and Agent HUD's
+/// plugin in that host notes which session is making the call
+/// (`deepseek_plugin`). `parent` itself never reaches the product.
+fn with_caller(
+    channel: Option<&agent_hud_runtime::deepseek_plugin::DeepSeekChannel>,
+    mut params: Value,
+    now: std::time::SystemTime,
+) -> Value {
+    let parent = params
+        .as_object_mut()
+        .and_then(|params| params.remove("parent"))
+        .and_then(|parent| parent.as_u64())
+        .and_then(|parent| u32::try_from(parent).ok());
+    if !params["caller"].is_null() {
+        return params;
+    }
+    let found = channel.zip(parent).and_then(|(channel, host)| {
+        channel.caller(host, params["name"].as_str()?, &params["arguments"], now)
+    });
+    if let Some(session) = found {
+        use agent_hud_runtime::hud_tools::Client;
+        params["caller"] =
+            json!({"client": Client::DeepSeek.id(), "sessionId": session, "turnId": null});
+    }
+    params
+}
+
 /// A host method, handed to the product as it came. Without a product there
 /// are no host tools.
 fn host_request(
@@ -261,6 +293,46 @@ mod tests {
             on: AtomicBool::new(on),
             asked: Mutex::new(Vec::new()),
         }
+    }
+
+    #[test]
+    fn a_harness_caller_comes_from_the_plugins_note_and_parent_never_reaches_the_product() {
+        use agent_hud_runtime::deepseek_plugin::DeepSeekChannel;
+        let temp = tempfile::tempdir().unwrap();
+        let channel = DeepSeekChannel::new(temp.path().to_path_buf());
+        let notes = temp.path().join("calls/777");
+        std::fs::create_dir_all(&notes).unwrap();
+        std::fs::write(
+            notes.join("n.json"),
+            json!({"tool":"some_tool","arguments":{"text":"hi"},"sessionId":"session-a","at":1})
+                .to_string(),
+        )
+        .unwrap();
+        let now = std::time::SystemTime::now();
+        let call = |parent: Value, caller: Value| json!({"name":"some_tool","arguments":{"text":"hi"},"caller":caller,"parent":parent});
+        assert_eq!(
+            with_caller(Some(&channel), call(json!(777), Value::Null), now),
+            json!({"name":"some_tool","arguments":{"text":"hi"},"caller":{"client":"deepseek","sessionId":"session-a","turnId":null}})
+        );
+        // Another host, no note, or no plugin: the caller stays unknown.
+        for (channel, parent) in [
+            (Some(&channel), json!(778)),
+            (None, json!(777)),
+            (Some(&channel), json!("777")),
+        ] {
+            assert_eq!(
+                with_caller(channel, call(parent, Value::Null), now),
+                json!({"name":"some_tool","arguments":{"text":"hi"},"caller":null})
+            );
+        }
+        // A caller the client named itself is kept.
+        let codex = json!({"client":"codex","sessionId":"t","turnId":null});
+        assert_eq!(
+            with_caller(Some(&channel), call(json!(777), codex.clone()), now)["caller"],
+            codex
+        );
+        // Other host methods pass as they came.
+        assert_eq!(with_caller(Some(&channel), json!({}), now), json!({}));
     }
 
     #[test]

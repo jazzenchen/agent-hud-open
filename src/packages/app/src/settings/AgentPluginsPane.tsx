@@ -2,8 +2,9 @@
 // one card per client. A row says what the thing lets you do, shows where it
 // stands as a coloured chip, offers the one action that matters now, keeps
 // removing in its ⋯ menu, and opens a next-step line only when there is a step.
-// Claude Code's card leads with Agent HUD's plugin, whose switches say what the
-// plugin may do. A product build adds its own switches to that row, or rows of
+// Claude Code's and DeepSeek Harness's cards lead with Agent HUD's plugin for
+// that client, whose switches say what the plugin may do. A product build adds
+// its own switches to that row, or rows of
 // its own to a card, through `AgentPluginItem`, drawn with `PluginControl` and
 // `PluginRow`, so both builds read the same.
 import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
@@ -55,8 +56,8 @@ export interface AgentPluginContext {
   active: boolean;
   /** Whether the client's command line is on this Mac; null while unknown. */
   clientFound: boolean | null;
-  /** The client's Agent HUD plugin (Claude Code's); installed is null while
-   * it is read, or when the client has none. */
+  /** The client's Agent HUD plugin (Claude Code's or DeepSeek Harness's);
+   * installed is null while it is read, or when the client has none. */
   plugin: { installed: boolean | null };
 }
 
@@ -65,8 +66,8 @@ export interface AgentPluginItem {
   id: string;
   /** The card it joins: "claudeCode", "codex", or a client of its own. */
   client: string;
-  /** "plugin": a switch in the client's Agent HUD plugin row, after Next's
-   * own, drawn with `PluginControl`. "row" (the default): a row of its own,
+  /** "plugin": a switch in the client's Agent HUD plugin row (Claude Code's
+   * or DeepSeek Harness's), after Next's own, drawn with `PluginControl`. "row" (the default): a row of its own,
    * drawn with `PluginRow`, before Next's rows. "tools": a tool group of the
    * product's own in the tools section, after the HUD tools switch, drawn
    * with `ToolSwitchRow`; `client` is not read. */
@@ -87,6 +88,7 @@ export interface MCPClientsStatus {
     name: string;
     available: boolean;
     installed: boolean;
+    /** The client's own command that adds the server; null when Agent HUD edits its settings file. */
     command: string | null;
   }[];
 }
@@ -120,13 +122,25 @@ const nativePlugin: ClaudePluginService = async (action) => {
   return invoke<ClaudePluginStatus>("native_claude_plugin", { action });
 };
 
+/** native_deepseek_plugin: whether DeepSeek Harness is here, whether its home
+ * patch loads Agent HUD's plugin, and how many sessions run it now. */
+const nativeDeepSeekPlugin: ClaudePluginService = async (action) => {
+  if (!isTauri()) return { found: false, installed: false, sessions: 0 };
+  return invoke<ClaudePluginStatus>("native_deepseek_plugin", { action });
+};
+
+/** The clients the host can give HUD tools to (hud_tools::CLIENTS). */
 const knownClients = [
   { id: "claudeCode", name: "Claude Code", logo: "claude" },
   { id: "codex", name: "Codex", logo: "codex" },
+  { id: "cursor", name: "Cursor", logo: "cursor" },
+  { id: "deepseek", name: "DeepSeek Harness", logo: "deepseek" },
+  { id: "antigravity", name: "Antigravity", logo: "antigravity" },
 ];
 
 let cachedStatus: MCPClientsStatus | null = null;
-let cachedPlugin: ClaudePluginStatus | null = null;
+/** Each client plugin's last status, so the page opens without a blank. */
+const cachedPlugins: Record<string, ClaudePluginStatus | null> = {};
 
 function say(zh: boolean, words: Words) {
   return zh ? words[1] : words[0];
@@ -477,44 +491,31 @@ export function ToolSwitchRow({
   );
 }
 
-/** Agent HUD's Claude Code plugin: one install, then a switch for each thing
- * it may do. Next's own is answering Claude's questions on the HUD; a
- * product build adds its switches after it. */
-function ClaudePluginRow({
-  context,
-  extra,
-  service,
-  action,
-  onStatus,
-}: {
-  context: Omit<AgentPluginContext, "plugin">;
-  extra: AgentPluginItem[];
-  service: ClaudePluginService;
-  action: (
-    method: NativeMethod,
-    params?: Record<string, unknown>,
-  ) => Promise<unknown>;
-  onStatus: (status: ClaudePluginStatus) => void;
-}) {
-  const { snapshot, active } = context;
-  const zh = snapshotLanguage(snapshot) === "zh";
-  const t = (words: Words) => say(zh, words);
-  const [status, setStatus] = useState<ClaudePluginStatus | null>(cachedPlugin);
+/** A client plugin's status, read again every 10 seconds while Settings is on
+ * screen (the loaded count follows sessions checking in) and when the app
+ * comes to the front, and its install and remove. */
+function usePlugin(
+  client: string,
+  service: ClaudePluginService,
+  active: boolean,
+  zh: boolean,
+  onStatus?: (status: ClaudePluginStatus) => void,
+) {
+  const [status, setStatus] = useState<ClaudePluginStatus | null>(
+    cachedPlugins[client] ?? null,
+  );
   const [running, setRunning] = useState<"install" | "remove" | null>(null);
   const [justInstalled, setJustInstalled] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [answering, setAnswering] = useState(false);
   const read = useRef(service);
   read.current = service;
   const report = useRef(onStatus);
   report.current = onStatus;
   const apply = (next: ClaudePluginStatus) => {
-    cachedPlugin = next;
+    cachedPlugins[client] = next;
     setStatus(next);
-    report.current(next);
+    report.current?.(next);
   };
-  // The loaded count follows sessions checking in: read again every 10
-  // seconds while Settings is on screen, and when the app comes to the front.
   useEffect(() => {
     if (!active) return;
     let dead = false;
@@ -543,11 +544,44 @@ function ClaudePluginRow({
       apply(await read.current(kind));
       setJustInstalled(kind === "install");
     } catch (failed) {
-      setError(t(failure(kind, String(failed))));
+      setError(say(zh, failure(kind, String(failed))));
     } finally {
       setRunning(null);
     }
   }
+  return { status, running, justInstalled, error, change };
+}
+
+/** Agent HUD's Claude Code plugin: one install, then a switch for each thing
+ * it may do. Next's own is answering Claude's questions on the HUD; a
+ * product build adds its switches after it. */
+function ClaudePluginRow({
+  context,
+  extra,
+  service,
+  action,
+  onStatus,
+}: {
+  context: Omit<AgentPluginContext, "plugin">;
+  extra: AgentPluginItem[];
+  service: ClaudePluginService;
+  action: (
+    method: NativeMethod,
+    params?: Record<string, unknown>,
+  ) => Promise<unknown>;
+  onStatus: (status: ClaudePluginStatus) => void;
+}) {
+  const { snapshot, active } = context;
+  const zh = snapshotLanguage(snapshot) === "zh";
+  const t = (words: Words) => say(zh, words);
+  const { status, running, justInstalled, error, change } = usePlugin(
+    "claudeCode",
+    service,
+    active,
+    zh,
+    onStatus,
+  );
+  const [answering, setAnswering] = useState(false);
   const installed = status ? status.installed : null;
   const state = pluginRow({
     installed,
@@ -597,6 +631,69 @@ function ClaudePluginRow({
   );
 }
 
+/** Agent HUD's DeepSeek Harness plugin: one install, which every Harness
+ * host loads by itself, the Desktop app's included. It shows the questions
+ * and approvals a session waits on in the HUD, beside Harness's own cards;
+ * a product build adds its switches to the row. */
+function DeepSeekPluginRow({
+  context,
+  extra,
+  service,
+  onStatus,
+}: {
+  context: Omit<AgentPluginContext, "plugin">;
+  extra: AgentPluginItem[];
+  service: ClaudePluginService;
+  onStatus: (status: ClaudePluginStatus) => void;
+}) {
+  const { snapshot, active } = context;
+  const zh = snapshotLanguage(snapshot) === "zh";
+  const t = (words: Words) => say(zh, words);
+  const { status, running, justInstalled, error, change } = usePlugin(
+    "deepseek",
+    service,
+    active,
+    zh,
+    onStatus,
+  );
+  const installed = status ? status.installed : null;
+  const state = pluginRow(
+    {
+      installed,
+      sessions: status?.sessions ?? 0,
+      clientFound: status ? status.found : context.clientFound,
+      running,
+      justInstalled,
+    },
+    "DeepSeek Harness",
+    true,
+  );
+  return (
+    <PluginRow
+      icon={<Puzzle size={14} strokeWidth={1.9} />}
+      title={t(["Agent HUD plugin", "Agent HUD 插件"])}
+      description={t([
+        "Answer DeepSeek Harness's questions and approvals from the HUD. Whichever you answer first, the HUD or Harness, counts.",
+        "在 HUD 上回答 DeepSeek Harness 的提问和批准请求。HUD 和 Harness 里先回答的那个算数。",
+      ])}
+      state={state}
+      error={error}
+      zh={zh}
+      controlsOpen={installed === true && extra.length > 0}
+      onAction={(id) => {
+        if (id === "install" || id === "remove") void change(id);
+      }}
+    >
+      {extra.length > 0 &&
+        extra.map((item) => (
+          <Fragment key={item.id}>
+            {item.render({ ...context, plugin: { installed } })}
+          </Fragment>
+        ))}
+    </PluginRow>
+  );
+}
+
 function ClientCard({
   name,
   logo,
@@ -630,6 +727,7 @@ export function AgentPluginsPane({
   request,
   clients = nativeClients,
   plugin = nativePlugin,
+  deepseekPlugin = nativeDeepSeekPlugin,
 }: {
   snapshot: Snapshot;
   action: (
@@ -643,6 +741,8 @@ export function AgentPluginsPane({
   clients?: MCPClientsService;
   /** The Claude Code plugin's service; a fake in pictures and tests. */
   plugin?: ClaudePluginService;
+  /** The DeepSeek Harness plugin's service; a fake in pictures and tests. */
+  deepseekPlugin?: ClaudePluginService;
 }) {
   const zh = snapshotLanguage(snapshot) === "zh";
   const t = (words: Words) => say(zh, words);
@@ -657,9 +757,22 @@ export function AgentPluginsPane({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [toolsPending, setToolsPending] = useState(false);
   const [toolsError, setToolsError] = useState<string | null>(null);
-  const [pluginInstalled, setPluginInstalled] = useState<boolean | null>(
-    cachedPlugin?.installed ?? null,
+  const [pluginInstalled, setPluginInstalled] = useState<
+    Record<string, boolean | null>
+  >(() =>
+    Object.fromEntries(
+      Object.entries(cachedPlugins).map(([id, status]) => [
+        id,
+        status?.installed ?? null,
+      ]),
+    ),
   );
+  const pluginReport = (client: string) => (next: ClaudePluginStatus) =>
+    setPluginInstalled((previous) =>
+      previous[client] === next.installed
+        ? previous
+        : { ...previous, [client]: next.installed },
+    );
   const service = useRef(clients);
   service.current = clients;
   const apply = (next: MCPClientsStatus) => {
@@ -824,17 +937,25 @@ export function AgentPluginsPane({
                   )}
                   service={plugin}
                   action={action}
-                  onStatus={(next) => setPluginInstalled(next.installed)}
+                  onStatus={pluginReport(card.id)}
+                />
+              )}
+              {card.id === "deepseek" && (
+                <DeepSeekPluginRow
+                  context={context}
+                  extra={items.filter(
+                    (item) =>
+                      item.client === card.id && item.place === "plugin",
+                  )}
+                  service={deepseekPlugin}
+                  onStatus={pluginReport(card.id)}
                 />
               )}
               {own.map((item) => (
                 <Fragment key={item.id}>
                   {item.render({
                     ...context,
-                    plugin: {
-                      installed:
-                        card.id === "claudeCode" ? pluginInstalled : null,
-                    },
+                    plugin: { installed: pluginInstalled[card.id] ?? null },
                   })}
                 </Fragment>
               ))}

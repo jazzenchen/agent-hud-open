@@ -26,8 +26,7 @@
     "@agent-hud/protocol": "workspace:*",
     "@agent-hud/ui": "workspace:*",
     "lucide-react": "catalog:",
-    "motion": "catalog:",
-    "shaders": "catalog:"
+    "motion": "catalog:"
   },
   "devDependencies": {
     "@types/node": "catalog:",

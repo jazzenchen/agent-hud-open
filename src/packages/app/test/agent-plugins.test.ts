@@ -92,6 +92,30 @@ test("the plugin row offers Install until it is in, then says how many sessions 
   );
 });
 
+test("a plugin the client loads by itself only asks to open the client, never to reload", () => {
+  const client = "DeepSeek Harness";
+  assert.equal(
+    pluginRow({ ...plugin, clientFound: false }, client, true).action
+      ?.unavailable?.[0],
+    "Install DeepSeek Harness first.",
+  );
+  const idle = pluginRow({ ...plugin, installed: true }, client, true);
+  assert.equal(idle.status[0], "Installed");
+  assert.equal(idle.next?.command, undefined);
+  assert.match(
+    idle.next?.words[0] ?? "",
+    /^DeepSeek Harness loads it by itself/,
+  );
+  assert.match(idle.next?.words[1] ?? "", /打开 DeepSeek Harness/);
+  const loaded = pluginRow(
+    { ...plugin, installed: true, sessions: 2, justInstalled: true },
+    client,
+    true,
+  );
+  assert.deepEqual([loaded.tone, loaded.next], ["working", null]);
+  assert.equal(loaded.menu[0]?.id, "remove");
+});
+
 test("the MCP row asks for the one step left, and never removes from its main button", () => {
   assert.equal(mcpRow({ ...mcp, setupReady: null }).status[0], "Checking…");
 

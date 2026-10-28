@@ -1,4 +1,6 @@
-//! DeepSeek CLI JSONL session & child-session reducer.
+//! DeepSeek CLI JSONL session & child-session reducer, and what its lines
+//! show in a page of messages.
+use crate::transcript::items::{Items, Line, LineItem};
 use crate::transcript::{at, n, parts, text};
 use crate::{Log, Usage};
 use serde_json::{json, Value};
@@ -223,3 +225,115 @@ pub static TURNS: crate::transcript::turns::Turns = crate::transcript::turns::Tu
     },
     may_name: |line| crate::transcript::turns::has(line, b"turn/start"),
 };
+
+/// What a DeepSeek line shows in a page of messages. A `user/message` holds
+/// its words in `data.content`; only one from the user (`source.kind`
+/// `user`) is a prompt, the others are the context and notes Harness hands
+/// the model (runtime context, skill catalog, time, background jobs…). An
+/// `assistant/message` holds the reply in `data.message.content`, as text
+/// blocks next to its reasoning and tool calls; only the text shows.
+pub static ITEMS: Items = Items { read: items };
+
+fn items(value: &Value, offset: u64) -> Vec<LineItem> {
+    let data = &value["data"];
+    let (role, prompt) = match value["type"].as_str() {
+        Some("user/message") => ("user", data["source"]["kind"] == "user"),
+        Some("assistant/message") => ("assistant", false),
+        _ => return Vec::new(),
+    };
+    let content = data["message"].get("content").unwrap_or(&data["content"]);
+    let words = words(content);
+    if words.is_empty() {
+        return Vec::new();
+    }
+    let line = Line::of(value, prompt);
+    vec![line.item(format!("o{offset}"), role, json!(words), None, &Value::Null)]
+}
+
+/// A message's words: its content as it is, or its text blocks one per line.
+/// Reasoning, tool calls and images are no words.
+fn words(content: &Value) -> String {
+    if let Some(text) = content.as_str() {
+        return text.to_owned();
+    }
+    content
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter(|block| block.get("type").is_none_or(|kind| kind == "text"))
+        .filter_map(|block| block["text"].as_str())
+        .filter(|text| !text.is_empty())
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::transcript::items::{LineKind, LineRole};
+
+    /// Lines shaped like a Harness 4 log: a message from another agent, the
+    /// context Harness adds to it, a step that only calls a tool, and the
+    /// reply with its reasoning.
+    fn lines() -> Vec<Value> {
+        vec![
+            json!({"type":"turn/start","seq":44,"time":1793127112393_i64,"data":{"turn":3}}),
+            json!({"type":"user/message","seq":48,"time":1793127112417_i64,"data":{"content":[{"type":"text","text":"[Agent HUD · from Claude Code · Test · m-b0bfc3510306]\n\nWhich model are you?"}],"source":{"kind":"user","rpcId":"m-b0bfc3510306"},"role":"user","id":"39b071df"},"surfaceOp":"append"}),
+            json!({"type":"user/message","seq":50,"time":1793127112417_i64,"data":{"content":[{"type":"text","text":"Time sampled while preparing turn 3, step 1"}],"source":{"kind":"time-context","form":"snapshot"},"role":"user","id":"5c1"}}),
+            json!({"type":"assistant/message","seq":19,"time":1793124209180_i64,"data":{"turn":1,"step":1,"message":{"role":"assistant","content":[{"type":"reasoning","text":""},{"type":"tool-call","id":"call_00","name":"ask_user_question","arguments":"{}"}],"id":"c9a"}}}),
+            json!({"type":"assistant/message","seq":54,"time":1793127114066_i64,"data":{"turn":3,"step":1,"message":{"role":"assistant","content":[{"type":"reasoning","text":"The user wants one sentence."},{"type":"text","text":"收到了你的消息；我是 DeepSeek Harness 中的 deepseek-flash 模型。"}],"source":{"kind":"model","provider":"deepseek-official","model":"deepseek-flash"},"id":"cf5"},"usage":{"inputTokens":6841,"outputTokens":134}}}),
+        ]
+    }
+
+    #[test]
+    fn a_reply_shows_its_text_without_its_reasoning() {
+        let lines = lines();
+        let read = |n: usize| (ITEMS.read)(&lines[n], n as u64 * 100);
+
+        assert!(read(0).is_empty(), "a turn's start shows nothing");
+
+        let message = read(1);
+        assert_eq!(message.len(), 1);
+        assert_eq!(message[0].id, "o100");
+        assert_eq!(message[0].role, LineRole::User);
+        assert!(message[0].is_prompt);
+        assert!(message[0]
+            .text
+            .as_deref()
+            .unwrap()
+            .contains("· m-b0bfc3510306]"));
+        assert_eq!(
+            message[0].timestamp.as_deref(),
+            Some("2026-10-27T18:51:52.417+00:00")
+        );
+
+        let context = read(2);
+        assert_eq!(context[0].role, LineRole::User);
+        assert!(!context[0].is_prompt, "Harness's context is no prompt");
+
+        assert!(read(3).is_empty(), "a tool call alone has no words");
+
+        let reply = read(4);
+        assert_eq!(reply.len(), 1);
+        assert_eq!(reply[0].role, LineRole::Assistant);
+        assert_eq!(reply[0].kind, LineKind::Text);
+        assert!(reply[0].tool.is_none());
+        assert_eq!(
+            reply[0].text.as_deref(),
+            Some("收到了你的消息；我是 DeepSeek Harness 中的 deepseek-flash 模型。")
+        );
+        assert!(!reply[0].is_prompt);
+    }
+
+    #[test]
+    fn deepseek_states_its_own_rule() {
+        assert!(std::ptr::eq(
+            crate::transcript::items::of("deepseek"),
+            &ITEMS
+        ));
+        let older = json!({"type":"user/message","time":"2026-10-25T01:00:00Z","data":{"turn":1,"source":{"kind":"user"},"content":"Fix the build"}});
+        let rows = (ITEMS.read)(&older, 0);
+        assert_eq!(rows[0].text.as_deref(), Some("Fix the build"));
+        assert!(rows[0].is_prompt);
+    }
+}

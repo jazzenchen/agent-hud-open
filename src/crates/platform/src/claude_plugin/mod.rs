@@ -612,7 +612,7 @@ fn identity(now: SystemTime) -> String {
 }
 
 /// Writes through a temporary file in the same folder, readable only by this user.
-fn write_private(file: &Path, bytes: &[u8]) -> std::io::Result<()> {
+pub(crate) fn write_private(file: &Path, bytes: &[u8]) -> std::io::Result<()> {
     let temp = file.with_extension(format!("{}.tmp", identity(SystemTime::now())));
     let result = crate::os::private_file(&temp, true).and_then(|mut out| {
         out.write_all(bytes)?;

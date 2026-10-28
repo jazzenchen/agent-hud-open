@@ -108,8 +108,11 @@ const hostSchema = (
   },
 });
 /** The agent session that called, as its client names it and never as an argument the
- * agent writes: Codex in each call's `_meta`, Claude Code in the environment it starts
- * this relay with. */
+ * agent writes: Codex and Antigravity in each call's `_meta`, Claude Code in the
+ * environment it starts this relay with. DeepSeek Harness names neither: it runs one
+ * relay per host for all its sessions. For a call no client names, the relay says which
+ * process started it (`parent`), and the app finds the session from what Agent HUD's
+ * plugin in that Harness host noted. */
 const caller = (meta: Record<string, unknown> | undefined) => {
   const turn = meta?.["x-codex-turn-metadata"] as
     Record<string, unknown> | undefined;
@@ -120,6 +123,9 @@ const caller = (meta: Record<string, unknown> | undefined) => {
       sessionId: thread,
       turnId: typeof turn?.turn_id === "string" ? turn.turn_id : null,
     };
+  const cascade = meta?.["antigravity.google/conversation_id"];
+  if (typeof cascade === "string" && cascade)
+    return { client: "antigravity", sessionId: cascade, turnId: null };
   const session = process.env.CLAUDE_CODE_SESSION_ID;
   return session
     ? { client: "claude", sessionId: session, turnId: null }
@@ -483,14 +489,17 @@ serveStdio(() => {
           ? readOnly
           : { ...localWrite, idempotentHint: false },
       },
-      (params, context) =>
-        guarded("host_tool", {
+      (params, context) => {
+        const named = caller(
+          context.mcpReq._meta as Record<string, unknown> | undefined,
+        );
+        return guarded("host_tool", {
           name: tool.name,
           arguments: params,
-          caller: caller(
-            context.mcpReq._meta as Record<string, unknown> | undefined,
-          ),
-        }),
+          caller: named,
+          ...(named ? {} : { parent: process.ppid }),
+        });
+      },
     );
   }
   return server;

@@ -202,10 +202,10 @@ pub(super) fn page(
     let mut budget = 2 * 1024 * 1024u64;
     let archive = compressed::is_archive(path);
     if tail && archive {
-        return Err("Bounded tail pages require a plain transcript; compressed history has no random decoded seek".into());
+        return archive_tail(path, source, limit, contexts, RECOVER_LIMIT);
     }
     let cursor = if tail {
-        metadata.len().saturating_sub(2 * 1024 * 1024)
+        metadata.len().saturating_sub(TAIL)
     } else {
         cursor
     };
@@ -307,6 +307,116 @@ pub(super) fn page(
     }
     Ok(
         json!({"messages":messages,"messageCursor":cursor,"nextMessageCursor":(tail||!complete).then_some(position),"endMessageCursor":position,"messagesTruncatedBefore":tail&&cursor>0,"messagesPending":false,"messagesComplete":complete}),
+    )
+}
+
+/// How much of a transcript's end a tail page reads.
+const TAIL: u64 = 2 * 1024 * 1024;
+
+/// A tail page of a compressed transcript (every DeepSeek Harness log, a
+/// cold Codex rollout): the page a plain transcript of the same text gives.
+/// Compressed text has no seek, so it is decoded once from its start; the
+/// lines before the last `TAIL` bytes are only looked at for the turn they
+/// leave open. Text longer than the tail plus `reach`, as far back as a
+/// plain tail looks for its turn, is not read: each look decodes it all.
+fn archive_tail(
+    path: &Path,
+    source: &str,
+    limit: usize,
+    contexts: &mut Contexts,
+    reach: u64,
+) -> Result<Value, String> {
+    let undecodable = || {
+        l10n::text(
+            "无法解码所选会话的日志",
+            "Could not decode the selected session transcript",
+        )
+    };
+    let file = File::open(path).map_err(|_| {
+        l10n::text(
+            "无法读取所选会话的日志",
+            "Could not read the selected session transcript",
+        )
+    })?;
+    let mut decoder = zstd::stream::read::Decoder::new(file).map_err(|_| undecodable())?;
+    decoder.window_log_max(27).map_err(|_| undecodable())?; // As `Archives` reads.
+    let mut reader = BufReader::with_capacity(64 * 1024, decoder);
+    let rule = turns::of(source);
+    // The turn open before the first line kept, and the lines that may yet
+    // fall within the tail, each with where it starts.
+    let mut context = Context {
+        path: path.into(),
+        ..Context::default()
+    };
+    let mut kept = VecDeque::<(u64, Vec<u8>)>::new();
+    let pass = |context: &mut Context, bytes: &[u8]| {
+        if bytes.len() <= MAX_LINE && (rule.may_name)(bytes) {
+            if let Ok(value) = serde_json::from_slice::<Value>(bytes) {
+                context.read(rule, &value);
+            }
+        }
+    };
+    let mut position = 0;
+    let mut length = 0;
+    loop {
+        let (bytes, count, ended) = match line(&mut reader) {
+            Ok(read) => read,
+            // A frame still being written: the text ends where it begins.
+            Err(error) if error.kind() == std::io::ErrorKind::UnexpectedEof => break,
+            Err(_) => return Err(undecodable()),
+        };
+        length = position + count;
+        if count == 0 || !ended {
+            break;
+        }
+        if length > reach + TAIL {
+            return Err(l10n::text(
+                "所选会话的压缩日志太长，无法从末尾查看消息",
+                "The selected session's compressed transcript is too long to page from its end",
+            ));
+        }
+        kept.push_back((position, bytes));
+        position = length;
+        // A line that starts a whole tail before what is read so far lies
+        // before the tail.
+        while kept
+            .front()
+            .is_some_and(|(start, _)| start + TAIL < position)
+        {
+            let (_, bytes) = kept.pop_front().unwrap();
+            pass(&mut context, &bytes);
+        }
+    }
+    // A plain tail starts `TAIL` before the end, after the line holding that
+    // byte.
+    let cursor = length.saturating_sub(TAIL);
+    while cursor > 0 && kept.front().is_some_and(|(start, _)| *start <= cursor) {
+        let (_, bytes) = kept.pop_front().unwrap();
+        pass(&mut context, &bytes);
+    }
+    let reader_items = items::of(source);
+    let mut messages = Vec::new();
+    for (start, bytes) in kept {
+        if bytes.len() > MAX_LINE {
+            continue;
+        }
+        if let Ok(value) = serde_json::from_slice::<Value>(&bytes) {
+            context.read(rule, &value);
+            for item in (reader_items.read)(&value, start) {
+                let mut entry = row(item);
+                entry["turnId"] = json!(context.turn_id);
+                entry["turnStartedAt"] = json!(context.started);
+                messages.push(entry);
+            }
+            if messages.len() > limit {
+                messages.drain(..messages.len() - limit);
+            }
+        }
+    }
+    context.cursor = position;
+    contexts.keep(context);
+    Ok(
+        json!({"messages":messages,"messageCursor":cursor,"nextMessageCursor":position,"endMessageCursor":position,"messagesTruncatedBefore":cursor>0,"messagesPending":false,"messagesComplete":true}),
     )
 }
 
@@ -414,6 +524,200 @@ mod tests {
         assert_eq!(
             recovered("claude", &only, row.len() as u64).0,
             Some("p1".into())
+        );
+    }
+
+    /// The client that writes these logs.
+    const HARNESS: &str = agent_hud_agents::deepseek::AGENT.id;
+
+    /// A DeepSeek Harness log's text: two turns, the second a message from
+    /// another agent answered after its reasoning, with `before` and `after`
+    /// lines that name no turn around that message.
+    fn harness_log(before: usize, after: usize) -> String {
+        let pad = |n: usize| json!({"type":"session-log-deepseek/delivery-accepted","seq":n,"time":1793127112000_i64,"data":{"pad":"x".repeat(4096)}});
+        let mut rows = vec![
+            json!({"type":"session","version":4,"id":"session-f8d6","createdAt":1793123855625_i64,"cwd":"/w"}),
+            json!({"type":"turn/start","seq":5,"time":1793124207977_i64,"data":{"turn":1}}),
+            json!({"type":"user/message","seq":8,"time":1793124208006_i64,"data":{"content":[{"type":"text","text":"Ask me one question."}],"source":{"kind":"user"},"role":"user"}}),
+            json!({"type":"assistant/message","seq":25,"time":1793124282761_i64,"data":{"turn":1,"step":2,"message":{"role":"assistant","content":[{"type":"reasoning","text":""},{"type":"text","text":"You chose Blue."}]}}}),
+            json!({"type":"turn/end","seq":27,"time":1793124282770_i64,"data":{"turn":1,"reason":{"kind":"completed"}}}),
+        ];
+        rows.extend((0..before).map(pad));
+        rows.extend([
+            json!({"type":"turn/start","seq":44,"time":1793127112393_i64,"data":{"turn":3}}),
+            json!({"type":"user/message","seq":48,"time":1793127112417_i64,"data":{"content":[{"type":"text","text":"[Agent HUD · from Claude Code · Test · m-b0bfc3510306]\n\nWhich model are you?"}],"source":{"kind":"user","rpcId":"m-b0bfc3510306"},"role":"user"}}),
+            json!({"type":"user/message","seq":50,"time":1793127112417_i64,"data":{"content":[{"type":"text","text":"Time sampled while preparing turn 3, step 1"}],"source":{"kind":"time-context"},"role":"user"}}),
+        ]);
+        rows.extend((0..after).map(pad));
+        rows.extend([
+            json!({"type":"assistant/message","seq":54,"time":1793127114066_i64,"data":{"turn":3,"step":1,"message":{"role":"assistant","content":[{"type":"reasoning","text":"The user wants one sentence."},{"type":"text","text":"收到了你的消息；我是 DeepSeek Harness 中的 deepseek-flash 模型。"}]}}}),
+            json!({"type":"turn/end","seq":56,"time":1793127114067_i64,"data":{"turn":3,"reason":{"kind":"completed"}}}),
+        ]);
+        rows.iter().map(|row| format!("{row}\n")).collect()
+    }
+
+    /// `text` compressed as Harness writes it: a frame every few lines.
+    fn compress(text: &str) -> Vec<u8> {
+        let lines = text.split_inclusive('\n').collect::<Vec<_>>();
+        lines
+            .chunks(7)
+            .flat_map(|chunk| zstd::stream::encode_all(chunk.concat().as_bytes(), 3).unwrap())
+            .collect()
+    }
+
+    /// The same text as a plain and a compressed DeepSeek log.
+    fn both(text: &str) -> (tempfile::TempDir, PathBuf, PathBuf) {
+        let temp = tempfile::tempdir().unwrap();
+        let plain = temp.path().join("session.v4.jsonl");
+        let archive = temp.path().join("session.v4.jsonl.zstd");
+        fs::write(&plain, text).unwrap();
+        fs::write(&archive, compress(text)).unwrap();
+        (temp, plain, archive)
+    }
+
+    fn tail(path: &Path, limit: usize) -> Result<Value, String> {
+        page(
+            path,
+            HARNESS,
+            0,
+            limit,
+            true,
+            &mut compressed::Archives::default(),
+            &mut Contexts::default(),
+        )
+    }
+
+    fn reply(page: &Value) -> &Value {
+        page["messages"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .rev()
+            .find(|row| row["role"] == "assistant")
+            .unwrap_or_else(|| panic!("no reply in {page:#}"))
+    }
+
+    #[test]
+    fn a_compressed_tail_is_the_tail_its_plain_text_gives() {
+        // The message's turn starting inside the tail, before it, and a log
+        // shorter than a tail.
+        for (before, after) in [(600, 0), (0, 600), (0, 0)] {
+            let text = harness_log(before, after);
+            let (_temp, plain, archive) = both(&text);
+            for limit in [200, 1] {
+                let mut compressed = tail(&archive, limit).unwrap();
+                let mut same = tail(&plain, limit).unwrap();
+                // A plain tail's budget runs out right at the end, before
+                // it reads that nothing follows.
+                assert_eq!(compressed["messagesComplete"], true);
+                compressed["messagesComplete"].take();
+                same["messagesComplete"].take();
+                assert_eq!(compressed, same);
+                assert_eq!(compressed["endMessageCursor"], text.len());
+                assert_eq!(
+                    compressed["messagesTruncatedBefore"],
+                    text.len() as u64 > TAIL
+                );
+                let reply = reply(&compressed);
+                assert_eq!(
+                    reply["text"],
+                    "收到了你的消息；我是 DeepSeek Harness 中的 deepseek-flash 模型。"
+                );
+                assert_eq!(reply["turnId"], "3", "{before} {after}");
+                assert_eq!(reply["turnStartedAt"], 1793127112393_i64);
+            }
+            let rows = tail(&archive, 200).unwrap()["messages"].clone();
+            let message = rows
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|row| row["text"].as_str().unwrap().contains("· m-b0bfc3510306]"));
+            if after == 0 {
+                let message = message.expect("the message lies within the tail");
+                assert_eq!(message["isPrompt"], true);
+                assert_eq!(message["turnId"], "3");
+            }
+        }
+    }
+
+    #[test]
+    fn a_compressed_tail_ends_before_a_frame_still_being_written() {
+        let text = harness_log(0, 0);
+        let (_temp, _plain, archive) = both(&text);
+        let mut bytes = compress(&text);
+        let next = zstd::stream::encode_all(
+            format!("{}\n", json!({"type":"turn/start","data":{"turn":4}})).as_bytes(),
+            3,
+        )
+        .unwrap();
+        bytes.extend_from_slice(&next[..next.len() / 2]);
+        assert_eq!(
+            zstd::stream::decode_all(&bytes[..]).unwrap_err().kind(),
+            std::io::ErrorKind::UnexpectedEof
+        );
+        fs::write(&archive, bytes).unwrap();
+        let page = tail(&archive, 200).unwrap();
+        assert_eq!(page["endMessageCursor"], text.len());
+        assert_eq!(reply(&page)["turnId"], "3");
+    }
+
+    #[test]
+    fn a_compressed_transcript_past_its_reach_has_no_tail() {
+        let (_temp, _plain, archive) = both(&harness_log(600, 0));
+        let mut contexts = Contexts::default();
+        assert!(archive_tail(&archive, HARNESS, 200, &mut contexts, 4096).is_err());
+        assert!(archive_tail(&archive, HARNESS, 200, &mut contexts, TAIL).is_ok());
+    }
+
+    #[test]
+    fn a_compressed_log_pages_forward_to_its_reply() {
+        let text = harness_log(600, 0);
+        let (_temp, _plain, archive) = both(&text);
+        let mut archives = compressed::Archives::default();
+        let mut contexts = Contexts::default();
+        let mut cursor = 0;
+        let mut rows = Vec::new();
+        loop {
+            let page = page(
+                &archive,
+                HARNESS,
+                cursor,
+                100,
+                false,
+                &mut archives,
+                &mut contexts,
+            )
+            .unwrap();
+            assert_eq!(page["messagesPending"], false);
+            rows.extend(page["messages"].as_array().unwrap().iter().cloned());
+            match page["nextMessageCursor"].as_u64() {
+                Some(next) => cursor = next,
+                None => break,
+            }
+        }
+        let seen = rows
+            .iter()
+            .map(|row| {
+                (
+                    row["role"].as_str().unwrap(),
+                    row["turnId"].as_str().unwrap(),
+                )
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(
+            seen,
+            [
+                ("user", "1"),
+                ("assistant", "1"),
+                ("user", "3"),
+                ("user", "3"),
+                ("assistant", "3")
+            ]
+        );
+        assert_eq!(
+            rows.iter().filter(|row| row["isPrompt"] == true).count(),
+            2,
+            "Harness's context is no prompt"
         );
     }
 }

@@ -220,7 +220,7 @@ iPhone 和发行版在同一个网络里，不订阅也能在 iPhone 与 Apple W
 | --- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
 | **Claude&nbsp;Code** | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | **Codex** | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| **DeepSeek&nbsp;Harness** | ✓ | 余额 | ✓ |  | ✓ | ✓ |  | ✓ |
+| **DeepSeek&nbsp;Harness** | ✓ | 余额 | ✓ | ✓ | ✓ | ✓ |  | ✓ |
 | **Antigravity** | ✓ | ✓ |  | ✓ |  | ✓ | ✓ |  |
 | **Cursor** | ✓ | ✓ |  |  |  | ✓ |  |  |
 | **Grok&nbsp;CLI** | ✓ |  | ✓ |  |  | ✓ |  |  |
@@ -237,7 +237,7 @@ iPhone 和发行版在同一个网络里，不订阅也能在 iPhone 与 Apple W
 | **Qwen&nbsp;Code** | ✓ |  |  | ✓ |  | ✓ |  |  |
 | **Devin&nbsp;CLI** | ✓ | ✓ |  | ✓ |  | ✓ |  |  |
 
-另外还读取 **GLM Coding Plan** 的额度，并支持批准 **Qoder** 系列的请求。Codex 的批准需先在 Codex 中信任回调，Copilot 的额度需先在设置中同意读取，Devin 的额度来自其 CLI 的本机缓存。Cursor 的 Token 需要 Cursor 3.27 或更新版本。Grok Bot 的 Bot 运行在 Cursor 的服务器上，由服务器给出每个 Bot 每天的 Token；已合并到 SuperGrok 的账户没有这项数据，只显示会话。
+另外还读取 **GLM Coding Plan** 的额度，并支持批准 **Qoder** 系列的请求。Codex 的批准需先在 Codex 中信任回调，DeepSeek Harness 的批准和提问需先安装 Agent HUD 插件（设置 → 智能体插件），Copilot 的额度需先在设置中同意读取，Devin 的额度来自其 CLI 的本机缓存。Cursor 的 Token 需要 Cursor 3.27 或更新版本。Grok Bot 的 Bot 运行在 Cursor 的服务器上，由服务器给出每个 Bot 每天的 Token；已合并到 SuperGrok 的账户没有这项数据，只显示会话。
 
 ## 保护你的数据
 

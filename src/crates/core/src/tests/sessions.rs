@@ -388,3 +388,62 @@ fn unified_subagent_model_tracks_parent_and_child_across_agents() {
         Some("codebuddy:parent-uuid")
     );
 }
+
+#[test]
+fn a_deepseek_harness_reply_reads_from_its_compressed_log() {
+    let temp = tempfile::tempdir().unwrap();
+    let folder = temp.path().join(".dsh/sessions/--w--/session-f8d6");
+    fs::create_dir_all(&folder).unwrap();
+    let at = Utc::now().timestamp_millis() - 60_000;
+    let reply = "收到了你的消息；我是 DeepSeek Harness 中的 deepseek-flash 模型。";
+    let rows = [
+        json!({"type":"session","version":4,"id":"session-f8d6","createdAt":at,"cwd":"/w","isSeeded":false,"delegationDepth":0}),
+        json!({"type":"turn/start","seq":44,"time":at + 1_000,"data":{"turn":3}}),
+        json!({"type":"user/message","seq":48,"time":at + 1_024,"data":{"content":[{"type":"text","text":"[Agent HUD · from Claude Code · Test · m-b0bfc3510306]\n\nWhich model are you?"}],"source":{"kind":"user","rpcId":"m-b0bfc3510306"},"role":"user"}}),
+        json!({"type":"user/message","seq":50,"time":at + 1_024,"data":{"content":[{"type":"text","text":"Time sampled while preparing turn 3, step 1"}],"source":{"kind":"time-context"},"role":"user"}}),
+        json!({"type":"assistant/message","seq":54,"time":at + 2_673,"data":{"turn":3,"step":1,"message":{"role":"assistant","content":[{"type":"reasoning","text":"The user wants one sentence."},{"type":"text","text":reply}]},"usage":{"inputTokens":6841,"outputTokens":134,"cacheReadTokens":9472,"cacheWriteTokens":0}}}),
+        json!({"type":"turn/end","seq":56,"time":at + 2_674,"data":{"turn":3,"reason":{"kind":"completed"}}}),
+    ];
+    let text = rows
+        .iter()
+        .map(|row| format!("{row}\n"))
+        .collect::<String>();
+    // Harness adds a frame each time it writes.
+    let bytes = rows
+        .iter()
+        .flat_map(|row| zstd::stream::encode_all(format!("{row}\n").as_bytes(), 3).unwrap())
+        .collect::<Vec<_>>();
+    fs::write(folder.join("session.v4.jsonl.zstd"), bytes).unwrap();
+    let mut core = fixture(temp.path());
+    core.provider_roots
+        .push((temp.path().join(".dsh/sessions"), "deepseek"));
+    core.request("snapshot", json!({})).unwrap();
+    let id = "deepseek:session-f8d6";
+
+    // The end Agent HUD's messaging reads, and the pages from the start.
+    let tail = core
+        .request(
+            "session_detail",
+            json!({"id":id,"messageTail":true,"messageLimit":200,"callLimit":1}),
+        )
+        .unwrap();
+    assert!(tail["messageNotice"].is_null(), "{tail:#}");
+    assert_eq!(tail["endMessageCursor"], text.len());
+    let first = core
+        .request("session_detail", json!({"id":id,"messageCursor":0}))
+        .unwrap();
+    for page in [&tail, &first] {
+        let messages = page["messages"].as_array().unwrap();
+        let roles = messages
+            .iter()
+            .map(|row| (row["role"].as_str().unwrap(), row["isPrompt"] == true))
+            .collect::<Vec<_>>();
+        assert_eq!(
+            roles,
+            [("user", true), ("user", false), ("assistant", false)],
+            "{page:#}"
+        );
+        assert_eq!(messages[2]["text"], reply);
+        assert!(messages.iter().all(|row| row["turnId"] == "3"));
+    }
+}

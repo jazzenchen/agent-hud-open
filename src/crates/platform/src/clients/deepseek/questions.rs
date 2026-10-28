@@ -112,7 +112,19 @@ pub fn parse_frame(json: &Value) -> Option<Frame> {
     if session_id.is_empty() {
         return None;
     }
-    let items = payload["questions"].as_array()?;
+    let questions = parse_questions(&payload["questions"])?;
+    Some(Frame {
+        rpc_id: rpc_id.to_owned(),
+        session_id: session_id.to_owned(),
+        questions,
+    })
+}
+
+/// The questions of one request, as both channels carry them; None when
+/// one of them is not a choice the HUD can offer (a plan to review, a
+/// detail to read, no options).
+pub fn parse_questions(items: &Value) -> Option<Vec<QuestionItem>> {
+    let items = items.as_array()?;
     if items.is_empty() {
         return None;
     }
@@ -171,18 +183,27 @@ pub fn parse_frame(json: &Value) -> Option<Frame> {
             multi_select,
         });
     }
-    Some(Frame {
-        rpc_id: rpc_id.to_owned(),
-        session_id: session_id.to_owned(),
-        questions,
-    })
+    Some(questions)
 }
 
 pub fn build_pending(frame: Frame, port: u16) -> Pending {
     let id = request_id(port, &frame.rpc_id);
-    let session_id = format!("deepseek:{}", frame.session_id);
-    let questions_json: Vec<Value> = frame
-        .questions
+    let session_id = format!("{}:{}", AGENT.id, frame.session_id);
+    let view = question_view(&id, &session_id, &frame.questions);
+    Pending {
+        id,
+        rpc_id: frame.rpc_id,
+        port,
+        raw_session_id: frame.session_id,
+        session_id,
+        questions: frame.questions,
+        view,
+    }
+}
+
+/// The HUD's card for a DeepSeek Harness question, whichever channel asked.
+pub fn question_view(id: &str, session_id: &str, questions: &[QuestionItem]) -> Value {
+    let questions_json: Vec<Value> = questions
         .iter()
         .map(|q| {
             json!({
@@ -198,13 +219,12 @@ pub fn build_pending(frame: Frame, port: u16) -> Pending {
             })
         })
         .collect();
-    let summary = frame
-        .questions
+    let summary = questions
         .first()
         .map(|q| q.question.clone())
         .unwrap_or_default();
     let input_obj = json!({ "questions": questions_json });
-    let view = json!({
+    json!({
         "id": id,
         "source": AGENT.id,
         "vendor": AGENT.name,
@@ -223,19 +243,34 @@ pub fn build_pending(frame: Frame, port: u16) -> Pending {
         "answersPlan": false,
         "plan": null,
         "suggestions": [],
-    });
-    Pending {
-        id,
-        rpc_id: frame.rpc_id,
-        port,
-        raw_session_id: frame.session_id,
-        session_id,
-        questions: frame.questions,
-        view,
-    }
+    })
 }
 
 pub fn build_answer(decision: &Value, pending: &Pending) -> Result<Option<Value>, String> {
+    let Some(entries) = answer_entries(decision, &pending.questions)? else {
+        return Ok(None);
+    };
+    Ok(Some(json!({
+        "type": "client-response",
+        "rpcId": pending.rpc_id,
+        "result": {
+            "ok": true,
+            "value": {
+                "sessionId": pending.raw_session_id,
+                "answer": {
+                    "answers": entries,
+                },
+            },
+        },
+    })))
+}
+
+/// Harness's answer items for the HUD's decision, one per question; None
+/// when the user left the question to be answered in Harness.
+pub fn answer_entries(
+    decision: &Value,
+    questions: &[QuestionItem],
+) -> Result<Option<Vec<Value>>, String> {
     let kind = decision["kind"].as_str().unwrap_or("");
     if kind == "leave" {
         return Ok(None);
@@ -247,8 +282,8 @@ pub fn build_answer(decision: &Value, pending: &Pending) -> Result<Option<Value>
         ));
     }
     let answers = decision["answers"].as_object();
-    let mut entries = Vec::with_capacity(pending.questions.len());
-    for question in &pending.questions {
+    let mut entries = Vec::with_capacity(questions.len());
+    for question in questions {
         let given = answers.and_then(|map| map.get(&question.id));
         let selected: Vec<Value> = given
             .and_then(|g| g["selected"].as_array())
@@ -270,19 +305,7 @@ pub fn build_answer(decision: &Value, pending: &Pending) -> Result<Option<Value>
         }
         entries.push(entry);
     }
-    Ok(Some(json!({
-        "type": "client-response",
-        "rpcId": pending.rpc_id,
-        "result": {
-            "ok": true,
-            "value": {
-                "sessionId": pending.raw_session_id,
-                "answer": {
-                    "answers": entries,
-                },
-            },
-        },
-    })))
+    Ok(Some(entries))
 }
 
 pub fn parse_receipt(reply: &Value) -> Result<Receipt, String> {

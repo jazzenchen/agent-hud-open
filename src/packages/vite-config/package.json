@@ -15,8 +15,7 @@
   "dependencies": {
     "@agent-hud/engine-client": "workspace:*",
     "@tailwindcss/vite": "catalog:",
-    "@vitejs/plugin-react": "catalog:",
-    "shaders": "catalog:"
+    "@vitejs/plugin-react": "catalog:"
   },
   "devDependencies": {
     "@types/node": "catalog:",

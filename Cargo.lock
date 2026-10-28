@@ -59,6 +59,7 @@ version = "0.1.0"
 dependencies = [
  "agent-hud-hud",
  "agent-hud-runtime",
+ "agent-hud-share",
  "base64 0.22.1",
  "block2",
  "cairo-rs",
@@ -149,6 +150,7 @@ dependencies = [
  "reqwest",
  "rusqlite",
  "serde",
+ "serde-saphyr",
  "serde_json",
  "sha2",
  "tempfile",
@@ -166,6 +168,20 @@ dependencies = [
  "chrono",
  "serde_json",
  "tempfile",
+]
+
+[[package]]
+name = "agent-hud-share"
+version = "0.1.0"
+dependencies = [
+ "agent-hud-lan",
+ "chrono",
+ "core-foundation 0.10.1",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tempfile",
+ "uuid",
 ]
 
 [[package]]

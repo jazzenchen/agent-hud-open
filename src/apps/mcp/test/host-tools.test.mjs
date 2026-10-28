@@ -151,15 +151,46 @@ test("a Claude Code caller comes from the environment the client started the rel
   }
 });
 
-test("without a caller the host is told so, and without the app there are no host tools", async () => {
+test("an Antigravity caller comes from the conversation_id in the call's _meta", async () => {
+  const fake = engine("antigravity", [tool]);
+  const client = await connect(fake.file);
+  try {
+    await client.callTool({
+      name: "some_tool",
+      arguments: { text: "hello from antigravity" },
+      _meta: {
+        "antigravity.google/conversation_id": "cascade-3",
+        "antigravity.google/agent_name": "main",
+      },
+    });
+    const call = fake
+      .requests()
+      .find((request) => request.method === "host_tool");
+    assert.deepEqual(call.params, {
+      name: "some_tool",
+      arguments: { text: "hello from antigravity" },
+      caller: { client: "antigravity", sessionId: "cascade-3", turnId: null },
+    });
+  } finally {
+    await client.close();
+  }
+});
+
+test("without a caller the host is told so, with the process that started the relay, and without the app there are no host tools", async () => {
   const fake = engine("nobody", [tool]);
   const client = await connect(fake.file);
   try {
     await client.callTool({ name: "some_tool", arguments: { text: "hi" } });
-    assert.equal(
-      fake.requests().find((request) => request.method === "host_tool").params
-        .caller,
-      null,
+    // DeepSeek Harness names no caller: the app looks it up by the relay's
+    // parent, the Harness host whose Agent HUD plugin noted the call.
+    assert.deepEqual(
+      fake.requests().find((request) => request.method === "host_tool").params,
+      {
+        name: "some_tool",
+        arguments: { text: "hi" },
+        caller: null,
+        parent: process.pid,
+      },
     );
   } finally {
     await client.close();
