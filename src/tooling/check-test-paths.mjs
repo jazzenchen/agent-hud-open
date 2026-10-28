@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Keeps Rust tests passing on Windows as well as on the Mac they are written
 // on. Tests in shared files run on every OS (check-platform-boundary keeps OS
-// conditions out of them), so two habits that only work on Unix are refused:
+// conditions out of them), so three habits that only work on Unix are refused:
 //
 //   unix-path  a path written from the Unix root: Path::new("/c"),
 //              PathBuf::from("/u"), or a folder variable such as
@@ -15,6 +15,10 @@
 //              Make them with crate::os::private_directory, as the app does.
 //              A folder that need not be private (a client's own config
 //              folder) may stay plain: end its line with `// plain directory`.
+//   temp-root  a tempfile::tempdir() itself handed to code beside such checks.
+//              The temporary folder is a plain folder too; give the code a
+//              path inside it (temp.path().join("data")) so it makes the
+//              folder itself, as the user's.
 //
 // Lines already there are counted per file in test-path-literals.json; only
 // new ones fail. Fixing old ones is welcome: run --update to lower the counts.
@@ -38,10 +42,14 @@ const rules = {
     /"[A-Z][A-Z0-9_]*(DIR|HOME|ROOT|PATH|CONFIG)"(\.(to_string|to_owned|into)\(\))?\s*,\s*"\//,
   ],
   "plain-dir": [/\bfs::create_dir(_all)?\(/],
+  // Filled per file from the names bound to a tempdir().
+  "temp-root": [],
 };
+const tempBinding =
+  /\blet\s+(?:mut\s+)?(\w+)\s*(?::[^=]+)?=\s*(?:tempfile::)?(?:tempdir\(\)|TempDir::new\(\)|Builder::new\(\)[^;]*\.tempdir\(\))/g;
 const plainMarker = /\/\/\s*plain directory\b/;
 const ownerChecks =
-  /\b(private_directory|owned_by_user|owner_only|owned_path|private_file|write_private)\b/;
+  /\b(private_directory|owned_by_user|owner_only|owned_path|private_file|write_private|private_dir|protect_directory|atomic_json)\b/;
 
 function* rustFiles(directory) {
   for (const entry of readdirSync(directory, { withFileTypes: true })) {
@@ -105,15 +113,26 @@ function guarded(path) {
   return moduleChecks(folder);
 }
 
-const counts = { "unix-path": {}, "plain-dir": {} };
-const found = { "unix-path": {}, "plain-dir": {} };
+const counts = Object.fromEntries(Object.keys(rules).map((rule) => [rule, {}]));
+const found = Object.fromEntries(Object.keys(rules).map((rule) => [rule, {}]));
 for (const [path, text] of sources) {
   const file = name(path);
+  const temps = [...text.matchAll(tempBinding)].map((match) => match[1]);
+  const patterns = {
+    ...rules,
+    "temp-root": temps.length
+      ? [
+          new RegExp(
+            `\\b(${temps.join("|")})\\.path\\(\\)(?!\\s*\\.\\s*join\\()`,
+          ),
+        ]
+      : [],
+  };
   for (const [index, line] of testLines(path, text)) {
     if (/^\s*\/\//.test(line)) continue;
-    for (const [rule, patterns] of Object.entries(rules)) {
-      if (!patterns.some((pattern) => pattern.test(line))) continue;
-      if (rule === "plain-dir") {
+    for (const [rule, ruled] of Object.entries(patterns)) {
+      if (!ruled.some((pattern) => pattern.test(line))) continue;
+      if (rule !== "unix-path") {
         if (!guarded(path) || plainMarker.test(line)) continue;
       }
       counts[rule][file] = (counts[rule][file] ?? 0) + 1;
@@ -129,7 +148,7 @@ if (process.argv.includes("--update")) {
     );
   writeFileSync(
     baselinePath,
-    `${JSON.stringify({ "unix-path": sorted(counts["unix-path"]), "plain-dir": sorted(counts["plain-dir"]) }, null, 2)}\n`,
+    `${JSON.stringify(Object.fromEntries(Object.entries(counts).map(([rule, files]) => [rule, sorted(files)])), null, 2)}\n`,
   );
   console.log(`Wrote ${relative(root, baselinePath)}.`);
   process.exit(0);
@@ -141,6 +160,8 @@ const advice = {
     "builds a test path from the Unix root, which Windows does not treat as absolute. Use a path under tempfile::tempdir() or std::env::temp_dir().",
   "plain-dir":
     "makes a plain folder beside code that only accepts the user's own folders; on an elevated Windows runner it belongs to Administrators. Use crate::os::private_directory, or end the line with `// plain directory` if the folder need not be private.",
+  "temp-root":
+    'hands a tempdir() itself to code that only accepts the user\'s own folders; on an elevated Windows runner it belongs to Administrators. Pass a path inside it, such as temp.path().join("data"), or end the line with `// plain directory` if the folder need not be private.',
 };
 let failed = false;
 let lower = false;

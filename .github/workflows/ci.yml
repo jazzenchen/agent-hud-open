@@ -64,4 +64,5 @@ jobs:
         run: mkdir -p src/apps/desktop/src-tauri/resources
       # Each host's own adapters only compile, and are only linted, on that host.
       - run: cargo clippy --workspace --tests --locked -- -D warnings
-      - run: cargo test --workspace --locked
+      # Every crate runs, so one run shows every failure.
+      - run: cargo test --workspace --locked --no-fail-fast

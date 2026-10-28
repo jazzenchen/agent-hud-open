@@ -89,15 +89,18 @@ the rule. Outside files and folders named `macos`, `windows`, `linux` or
 `cfg!()` on the operating system is refused. CI runs it on every change.
 
 Tests in shared files therefore run on every host, Windows included.
-`pnpm run check:test-paths` (`src/tooling/check-test-paths.mjs`) refuses the two
+`pnpm run check:test-paths` (`src/tooling/check-test-paths.mjs`) refuses the
 Mac habits that broke them there. A test path written from the Unix root
 (`Path::new("/c")`, `("CLAUDE_CONFIG_DIR", "/c")`) is not absolute on Windows;
 build it under `tempfile::tempdir()` or `std::env::temp_dir()`. Beside code that
-accepts only the user's own folders, a test folder made with `fs::create_dir_all`
-belongs to Administrators on an elevated Windows runner; make it with
-`crate::os::private_directory`, or mark a folder that need not be private with
-`// plain directory`. Older lines are counted in `test-path-literals.json`, so
-only new ones fail; it runs on the Mac before a push and in CI.
+accepts only the user's own folders, a plain folder belongs to Administrators on
+an elevated Windows runner, and that code refuses it. This covers a test folder
+made with `fs::create_dir_all` (make it with `crate::os::private_directory`) and
+a `tempdir()` handed over itself (pass a path inside it, such as
+`temp.path().join("data")`, so the code makes the folder). Mark a folder that
+need not be private with `// plain directory`. Older lines are counted in
+`test-path-literals.json`, so only new ones fail; it runs on the Mac before a
+push and in CI. CI runs every crate's tests even after one fails.
 
 To work on one operating system, change only its host files. A new capability
 gets a selector, one file per host, and a row in this table. If the shared

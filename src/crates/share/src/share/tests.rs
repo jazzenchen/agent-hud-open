@@ -1,7 +1,10 @@
 use super::{settings::Settings, worker::Worker, Query};
 use crate::keys;
 use serde_json::{json, Value};
-use std::sync::{Arc, Mutex};
+use std::{
+    path::PathBuf,
+    sync::{Arc, Mutex},
+};
 
 const NOW: i64 = 1_800_000_000_000;
 
@@ -43,14 +46,17 @@ fn snapshot(revision: u64) -> Arc<Value> {
     }))
 }
 
+/// The app's data folder inside a temporary one. The temporary folder itself
+/// is a plain folder, which an elevated Windows process gives to
+/// Administrators; the sharing code makes this one, as the user's own.
+fn data(directory: &tempfile::TempDir) -> PathBuf {
+    directory.path().join("data")
+}
+
 fn worker(asked: &Arc<Mutex<Vec<Value>>>, complete: bool) -> (Worker, tempfile::TempDir) {
     let directory = tempfile::tempdir().unwrap();
-    let worker = Worker::with_secrets(
-        directory.path().to_path_buf(),
-        ledger(asked.clone(), complete),
-        None,
-    )
-    .unwrap();
+    let worker =
+        Worker::with_secrets(data(&directory), ledger(asked.clone(), complete), None).unwrap();
     (worker, directory)
 }
 
@@ -147,14 +153,14 @@ fn the_switch_says_where_sharing_cannot_run() {
     assert!(worker
         .request("set_enabled", json!({"enabled": true}), NOW)
         .is_err());
-    assert!(!Settings::load(directory.path()).unwrap().enabled);
+    assert!(!Settings::load(&data(&directory)).unwrap().enabled);
     assert!(worker.request("pair_invitation", json!({}), NOW).is_err());
 }
 
 #[test]
 fn the_sharing_identifier_stays_across_launches() {
     let directory = tempfile::tempdir().unwrap();
-    let first = Settings::load(directory.path()).unwrap();
+    let first = Settings::load(&data(&directory)).unwrap();
     assert!(uuid::Uuid::parse_str(&first.device_id).is_ok());
-    assert_eq!(Settings::load(directory.path()).unwrap(), first);
+    assert_eq!(Settings::load(&data(&directory)).unwrap(), first);
 }

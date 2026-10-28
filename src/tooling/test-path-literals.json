@@ -26,5 +26,15 @@
     "src/crates/platform/src/claude_plugin/tests.rs": 6,
     "src/crates/platform/src/file_changes.rs": 3,
     "src/crates/platform/src/hooks/statusline.rs": 1
+  },
+  "temp-root": {
+    "src/crates/platform/src/accounts/homes.rs": 1,
+    "src/crates/platform/src/accounts/mod.rs": 15,
+    "src/crates/platform/src/claude_plugin/tests.rs": 6,
+    "src/crates/platform/src/deepseek_plugin/tests.rs": 3,
+    "src/crates/platform/src/file_changes.rs": 1,
+    "src/crates/platform/src/hooks/inbox.rs": 2,
+    "src/crates/platform/src/hooks/statusline.rs": 6,
+    "src/crates/platform/src/hooks/turn_log.rs": 3
   }
 }
