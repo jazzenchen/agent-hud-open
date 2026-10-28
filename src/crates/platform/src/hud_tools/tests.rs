@@ -10,24 +10,30 @@ fn places(home: &Path) -> Places {
 
 #[test]
 fn each_client_reads_the_skill_from_its_own_folder() {
-    let home = Path::new("/u");
+    // Absolute on every OS. "/c" is relative on Windows, where Places would
+    // ignore it as a CLAUDE_CONFIG_DIR. Nothing here is created.
+    let root = std::env::temp_dir().join("agent-hud-places");
+    let (home, claude) = (root.join("u"), root.join("c"));
     let env = HashMap::from([
-        ("CLAUDE_CONFIG_DIR".to_string(), "/c".to_string()),
+        (
+            "CLAUDE_CONFIG_DIR".to_string(),
+            claude.to_string_lossy().into_owned(),
+        ),
         ("DSH_HOME".to_string(), "~/d".to_string()),
     ]);
-    let places = Places::new(home, &env);
+    let places = Places::new(&home, &env);
     let folder = |client: Client| client.skills(&places);
-    assert_eq!(folder(Client::ClaudeCode), Path::new("/c/skills"));
-    assert_eq!(folder(Client::Codex), Path::new("/u/.agents/skills"));
-    assert_eq!(folder(Client::Cursor), Path::new("/u/.cursor/skills"));
-    assert_eq!(folder(Client::DeepSeek), Path::new("/u/d/skills"));
+    assert_eq!(folder(Client::ClaudeCode), claude.join("skills"));
+    assert_eq!(folder(Client::Codex), home.join(".agents/skills"));
+    assert_eq!(folder(Client::Cursor), home.join(".cursor/skills"));
+    assert_eq!(folder(Client::DeepSeek), home.join("d/skills"));
     assert_eq!(
         folder(Client::Antigravity),
-        Path::new("/u/.gemini/config/skills")
+        home.join(".gemini/config/skills")
     );
-    let defaults = Places::new(home, &HashMap::from([("DSH_HOME".into(), " ".into())]));
-    assert_eq!(defaults.claude, Path::new("/u/.claude"));
-    assert_eq!(defaults.deepseek, Path::new("/u/.dsh"));
+    let defaults = Places::new(&home, &HashMap::from([("DSH_HOME".into(), " ".into())]));
+    assert_eq!(defaults.claude, home.join(".claude"));
+    assert_eq!(defaults.deepseek, home.join(".dsh"));
     for client in CLIENTS {
         assert_eq!(Client::from_id(client.id()), Some(client));
     }
