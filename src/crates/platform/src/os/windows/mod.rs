@@ -66,6 +66,10 @@ pub(crate) fn application_installed(home: &Path, env: &Environment, name: &str) 
 pub(crate) fn registered_bundle(_id: &str) -> bool {
     false
 }
+/// URL-handler lookup through Windows associations is not implemented.
+pub(crate) fn registered_url(_url: &str) -> bool {
+    false
+}
 pub(crate) fn executable_dirs(home: &Path, env: &Environment) -> Vec<PathBuf> {
     let mut dirs = path_entries(env);
     dirs.extend([
@@ -203,6 +207,11 @@ pub(crate) fn legacy_preferences() -> Result<Option<serde_json::Value>, String> 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn url_handler_discovery_is_unavailable() {
+        assert!(!registered_url("dsh://open"));
+    }
 
     #[test]
     fn captured_windows_environment_keeps_os_name_semantics() {

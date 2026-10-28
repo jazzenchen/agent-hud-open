@@ -22,6 +22,7 @@ pub fn discover_at(home: &Path, env: &HashMap<String, String>) -> Vec<ProviderDi
                 ..Default::default()
             };
             let discovery = agent.discovery;
+            found.navigation_target = crate::navigation::app_target(discovery);
             let paths = |locations: &[agent_hud_agents::Location]| {
                 locations
                     .iter()

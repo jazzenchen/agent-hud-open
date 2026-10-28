@@ -30,7 +30,7 @@ pub(crate) struct Rendered {
     /// Bumped when the account readings change.
     pub(crate) accounts: u64,
     /// What the last snapshot was rendered from, and when it falls due.
-    last: Option<(u64, i64)>,
+    pub(super) last: Option<(u64, i64)>,
 }
 
 /// The session rows a render built, kept for the next one.
