@@ -30,6 +30,59 @@ impl SessionRows {
     }
 }
 
+/// The sub-agents with calls in a turn, for the session page's timeline: each
+/// one's log (the calls' `log`), name and type, the log that started it, when
+/// it began and was last heard from, and whether it still runs. Claude Code
+/// keeps a sub-agent's description, type and end beside its log
+/// (`agent-*.meta.json`); other clients' child sessions use their titles.
+fn turn_agents(own: &LogHead, subagents: &[&LogHead], calls: &[Call<'_>], now: i64) -> Vec<Value> {
+    let called = calls
+        .iter()
+        .filter(|call| !call.own)
+        .map(|call| call.row.contribution.as_str())
+        .collect::<HashSet<_>>();
+    let logs = || std::iter::once(own).chain(subagents.iter().copied());
+    let at = |ms: Option<i64>| {
+        ms.and_then(DateTime::<Utc>::from_timestamp_millis)
+            .map(|at| at.to_rfc3339())
+    };
+    subagents
+        .iter()
+        .filter_map(|log| {
+            let path = log.path.to_string_lossy().into_owned();
+            if !called.contains(path.as_str()) {
+                return None;
+            }
+            let meta = fs::read(log.path.with_extension("meta.json"))
+                .ok()
+                .and_then(|bytes| serde_json::from_slice::<Value>(&bytes).ok())
+                .unwrap_or(Value::Null);
+            let name = meta["description"]
+                .as_str()
+                .map(str::trim)
+                .filter(|name| !name.is_empty())
+                .map(str::to_owned)
+                .unwrap_or_else(|| log.title.clone());
+            let parent = log.live.parent_id.as_deref().and_then(|parent| {
+                logs()
+                    .find(|other| other.source == log.source && other.id == parent)
+                    .map(|other| other.path.to_string_lossy().into_owned())
+            });
+            let finished = meta["finished"].as_bool().unwrap_or(false);
+            let running = !finished && log.live.session_state(now, &log.source, None) == "running";
+            Some(json!({
+                "log": path,
+                "name": name,
+                "kind": meta["agentType"].as_str(),
+                "parent": parent,
+                "startedAt": at(log.live.started_at()),
+                "lastAt": at(log.live.last_event()),
+                "running": running,
+            }))
+        })
+        .collect()
+}
+
 /// The selected logs by the session that started them, so a session's
 /// sub-agents can be found at any depth. Decided 2026-10-21, as
 /// agent-hud-native-open does: a session counts its sub-agents in its tokens,
@@ -319,6 +372,7 @@ impl AgentHudCore {
                 .map(call)
                 .collect::<Vec<_>>();
             let summary = session_usage::turn_summary(&calls);
+            let agents = turn_agents(own, subagents, &calls, Utc::now().timestamp_millis());
             let calls = session_usage::turn_calls(&calls, previous);
             let id = session_usage::SessionUsage::turn_id(turn);
             if let Some(entry) = value["turns"]
@@ -327,7 +381,8 @@ impl AgentHudCore {
             {
                 entry["calls"] = json!(calls);
             }
-            value["turnCalls"] = json!({"turn": id, "calls": calls, "summary": summary});
+            value["turnCalls"] =
+                json!({"turn": id, "calls": calls, "summary": summary, "agents": agents});
         }
         Ok(Some(value))
     }
@@ -414,6 +469,11 @@ mod tests {
             json!({"type":"user","sessionId":id,"isSidechain":true,"timestamp":iso(t + 1_200),"message":{"role":"user","content":"Check the tests"}}),
             json!({"type":"assistant","sessionId":id,"isSidechain":true,"timestamp":iso(t + 1_500),"message":{"id":"sa1","model":"claude-haiku-4-5","role":"assistant","content":[{"type":"tool_use","id":"tu3","name":"Grep","input":{}}],"usage":{"input_tokens":100,"output_tokens":5,"cache_creation_input_tokens":0,"cache_read_input_tokens":0}}}),
         ])).unwrap();
+        fs::write(
+            root.join(format!("{id}/subagents/agent-a1.meta.json")),
+            r#"{"agentType":"Explore","description":"Check the tests","finished":true}"#,
+        )
+        .unwrap();
         let mut core = core(temp.path());
         core.request("snapshot", json!({})).unwrap();
         let detail = core.request("session_detail", json!({"id": id})).unwrap();
@@ -505,6 +565,15 @@ mod tests {
             "a sub-agent's call is not the session's context"
         );
         assert_eq!(picked["turns"][0]["calls"].as_array().unwrap().len(), 3);
+        // Its sub-agents, for the timeline: named from the meta file beside the log.
+        let agents = picked["turnCalls"]["agents"].as_array().unwrap();
+        assert_eq!(agents.len(), 1);
+        assert_eq!(agents[0]["log"], calls[1]["log"]);
+        assert_eq!(agents[0]["name"], "Check the tests");
+        assert_eq!(agents[0]["kind"], "Explore");
+        assert_eq!(agents[0]["running"], false);
+        assert_eq!(agents[0]["parent"], calls[0]["log"]);
+        assert_eq!(agents[0]["startedAt"], iso(t + 1_200));
         // The own-calls page names them too.
         let page = picked["calls"].as_array().unwrap();
         assert!(page.iter().any(|call| call["tools"] == json!(["Read"])));
