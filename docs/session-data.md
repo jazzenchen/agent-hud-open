@@ -49,7 +49,12 @@ outside the HUD projection. With the usage ledger it also returns `sessionUsage`
 the same breakdown as agent-hud-native-open's `SessionUsage` for a host to publish:
 every model and each model's 15-minute periods by agent id, the sub-agents' part
 and the kept turns, with times in milliseconds and money as exact decimal
-strings. Existing content stays visible while that session's
+strings. For a requested `turn`, `turnCalls` lists that turn's calls
+(each with the `log` it was recorded in) and `agents`: the sub-agents with calls
+in it, each with its log, name and type (Claude Code's `agent-*.meta.json`
+beside the log, else the log's title), the log that started it, when it began
+and was last heard from, and whether it still runs. The session page draws them
+as the turn's sub-agent timeline. Existing content stays visible while that session's
 facts refresh; unrelated snapshots do not re-read a cold detail. These queries
 use committed local facts and do not start collection or provider requests.
 Local MCP exposes the same queries as `hud_sessions` and `hud_session`. Synthetic

@@ -1,0 +1,40 @@
+{
+  "unix-path": {
+    "src/crates/agents/src/antigravity/cli.rs": 3,
+    "src/crates/agents/src/claude/account.rs": 1,
+    "src/crates/agents/src/codex/account.rs": 3,
+    "src/crates/agents/src/coding_plans/tests.rs": 1,
+    "src/crates/agents/src/copilot/account.rs": 4,
+    "src/crates/agents/src/hooks/turn_log.rs": 3,
+    "src/crates/agents/src/location.rs": 17,
+    "src/crates/agents/src/process.rs": 3,
+    "src/crates/agents/tests/golden.rs": 1,
+    "src/crates/core/src/data_version.rs": 12,
+    "src/crates/core/src/log_files.rs": 9,
+    "src/crates/core/src/source_db.rs": 1,
+    "src/crates/host/src/instance.rs": 1,
+    "src/crates/platform/src/deepseek_plugin/tests.rs": 6,
+    "src/crates/platform/src/file_changes.rs": 4,
+    "src/crates/platform/src/hooks/install.rs": 8,
+    "src/crates/platform/src/hud_tools/tests.rs": 1,
+    "src/crates/platform/src/instance/mod.rs": 2,
+    "src/crates/platform/src/navigation/claude_job.rs": 2,
+    "src/crates/platform/src/os/mod.rs": 1
+  },
+  "plain-dir": {
+    "src/crates/core/src/log_files.rs": 1,
+    "src/crates/platform/src/claude_plugin/tests.rs": 6,
+    "src/crates/platform/src/file_changes.rs": 3,
+    "src/crates/platform/src/hooks/statusline.rs": 1
+  },
+  "temp-root": {
+    "src/crates/platform/src/accounts/homes.rs": 1,
+    "src/crates/platform/src/accounts/mod.rs": 15,
+    "src/crates/platform/src/claude_plugin/tests.rs": 6,
+    "src/crates/platform/src/deepseek_plugin/tests.rs": 3,
+    "src/crates/platform/src/file_changes.rs": 1,
+    "src/crates/platform/src/hooks/inbox.rs": 2,
+    "src/crates/platform/src/hooks/statusline.rs": 6,
+    "src/crates/platform/src/hooks/turn_log.rs": 3
+  }
+}

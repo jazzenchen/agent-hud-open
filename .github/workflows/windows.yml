@@ -37,6 +37,7 @@ jobs:
       - run: pnpm run check:platform
       - run: pnpm run check:packages
       - run: pnpm run check:clients
+      - run: pnpm run check:test-paths
       - run: pnpm run typecheck
       - run: pnpm run test:ts
       - run: pnpm run test:mcp

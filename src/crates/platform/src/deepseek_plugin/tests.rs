@@ -7,7 +7,7 @@ use std::{collections::HashMap, sync::Arc, time::Instant};
 
 fn places(root: &Path) -> Places {
     let dsh = root.join("dsh");
-    fs::create_dir_all(&dsh).unwrap();
+    fs::create_dir_all(&dsh).unwrap(); // plain directory: Harness's own home
     Places::new(
         &root.join("home"),
         &HashMap::from([("DSH_HOME".to_owned(), dsh.to_string_lossy().into_owned())]),
@@ -116,7 +116,9 @@ fn the_module_is_written_once_per_version_and_old_ones_go_after_the_row_moves() 
     let temp = tempfile::tempdir().unwrap();
     let channel = DeepSeekChannel::new(temp.path().join("channel"));
     let folder = temp.path().join("plugin");
-    fs::create_dir_all(&folder).unwrap();
+    // Made as the app makes it: a plain directory from an elevated Windows
+    // process belongs to Administrators, and prepare_plugin refuses it.
+    crate::os::private_directory(&folder).unwrap();
     fs::write(folder.join("agent-hud-000000000000.mjs"), "old").unwrap();
     fs::write(folder.join("notes.txt"), "kept").unwrap();
     let file = channel.prepare_plugin(&folder).unwrap();
@@ -143,7 +145,7 @@ fn check_in(channel: &DeepSeekChannel, session: &str) {
         .directory()
         .join("sessions")
         .join(format!("{session}.json"));
-    fs::create_dir_all(file.parent().unwrap()).unwrap();
+    crate::os::private_directory(file.parent().unwrap()).unwrap();
     fs::write(
         file,
         json!({"at": 1, "host": 4242, "channelVersion": 1}).to_string(),
@@ -200,7 +202,7 @@ fn note(
     session: &str,
 ) -> PathBuf {
     let folder = channel.directory().join("calls").join(host.to_string());
-    fs::create_dir_all(&folder).unwrap();
+    crate::os::private_directory(&folder).unwrap();
     let file = folder.join(format!("{name}.json"));
     fs::write(
         &file,
@@ -394,7 +396,9 @@ fn the_observer_shows_asks_leaves_answers_and_settles_when_they_go() {
     let temp = tempfile::tempdir().unwrap();
     let channel = DeepSeekChannel::new(temp.path().join("channel"));
     let folder = channel.directory().join("asks");
-    fs::create_dir_all(&folder).unwrap();
+    // The observer writes its watch file only into a channel that is the
+    // user's own, so the channel is made the way the app makes it.
+    crate::os::private_directory(&folder).unwrap();
     check_in(&channel, SESSION);
     fs::write(folder.join("q1.json"), question_ask("q1").to_string()).unwrap();
     fs::write(folder.join("p1.json"), approval_ask("p1").to_string()).unwrap();

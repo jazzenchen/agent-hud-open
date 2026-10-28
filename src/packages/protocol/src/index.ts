@@ -746,6 +746,8 @@ export interface SessionCall {
   tools?: string[];
   /** From Core: the session's own log rather than a sub-agent's. */
   own?: boolean;
+  /** From Core: the log the call was recorded in; a sub-agent's matches its `SessionTurnAgent.log`. */
+  log?: string;
   modelName?: string | null;
   source?: string;
   /** From Core: prompt tokens the call sent again because the cache lapsed. */
@@ -769,6 +771,20 @@ export interface SessionTurnSummary {
   /** The call that added the most, with more than one call. */
   largestNew: number | null;
   largestShare: number | null;
+}
+/** From Core: a sub-agent with calls in a picked turn, for its timeline. */
+export interface SessionTurnAgent {
+  /** The sub-agent's log; its calls carry the same `log`. */
+  log: string;
+  /** What the agent was sent to do (Claude Code's description), else its log's title. */
+  name: string;
+  /** The client's agent type (Claude Code's `agentType`), when it records one. */
+  kind: string | null;
+  /** The log that started it: the session's own or another sub-agent's. */
+  parent: string | null;
+  startedAt: string | null;
+  lastAt: string | null;
+  running: boolean;
 }
 /** Tokens as the session page counts them. */
 export type SessionTokens = StatisticsTokens & { total: number };
@@ -812,6 +828,7 @@ export interface SessionDetail {
     turn: string;
     calls: SessionCall[];
     summary?: SessionTurnSummary;
+    agents?: SessionTurnAgent[];
   };
   startedAt?: string | null;
   updatedAt?: string | null;

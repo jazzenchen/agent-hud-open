@@ -23,6 +23,7 @@ import type {
   SessionDetail,
   Snapshot,
 } from "../lib/types";
+import { SubagentTimeline } from "./SubagentTimeline";
 import {
   ContextChart,
   ShareRows,
@@ -796,6 +797,23 @@ function TurnPanel({
         >
           {formatMessageText(entry.message)}
         </div>
+      )}
+      {calls?.some((call) => call.subagent) && (
+        <SubagentTimeline
+          calls={calls}
+          agents={
+            detail.turnCalls?.turn === entry.id
+              ? (detail.turnCalls.agents ?? [])
+              : []
+          }
+          start={Date.parse(entry.timestamp)}
+          end={Date.parse(entry.end ?? entry.timestamp)}
+          live={
+            detail.session.state === "running" &&
+            entry.index === Math.max(...detail.turns.map((turn) => turn.index))
+          }
+          theme={theme}
+        />
       )}
       {byPrompt && calls === undefined && (
         <div style={{ color: theme.secondary, fontSize: 11 }}>

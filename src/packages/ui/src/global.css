@@ -1342,6 +1342,16 @@ a:focus-visible {
 }
 
 /* The Sessions page: panels fade in, folded sections turn their chevron, ranked rows answer the pointer. */
+@keyframes session-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
 @keyframes session-fade-in {
   from {
     opacity: 0;
