@@ -1,13 +1,5 @@
 import { memo, useEffect, useMemo, useRef, useState } from "react";
-import {
-  createGpuUniformsMap,
-  registerShader,
-  resolveBoundingBox,
-  rootPassthrough,
-  shaderRendererGPU,
-  type NodeMetadata,
-} from "shaders/core";
-import { defineShader, transformColor, wgsl } from "shaders/std";
+import { startGpuPaint, type GpuPaint } from "./glow-gpu";
 import { flashMask, pulseFrames, type GlowAlert } from "./glow-alert";
 import {
   breathFrames,
@@ -80,41 +72,36 @@ const GLYPH_LO = [
 const GLYPH_HI = [1, 0, 0, 0, 0, 0, 2, 3, 3, 3, 3];
 
 /**
- * Uses shaders 4's defineShader WGSL interface.
+ * The rim's WGSL paint body, drawn by glow-gpu.
  * Contour, Gaussian grid falloff and six clocks follow GlowMatrix / GlowMotion.
  * The output is transparent inside the HUD and outside the rim; it never paints a background.
  * `clock` is seconds since the rim appeared. GpuRim advances it only while a
  * pattern moves, so a resting or breathing rim is drawn once, not every frame.
  */
-const Rim = defineShader({
-  name: "AgentHUDContourGlow",
-  props: {
-    stripWidth: { default: 200 },
-    stripHeight: { default: 32 },
-    padding: { default: 38 },
-    corner: { default: 12 },
-    shoulder: { default: 0 },
-    attachedEdge: { default: 1 },
-    pattern: { default: 0 },
-    motionKind: { default: 0 },
-    cycle: { default: 3 },
-    depth: { default: 0.6 },
-    strength: { default: 0.9 },
-    reach: { default: 14 },
-    outwardFalloff: { default: 1 },
-    feather: { default: 8 },
-    cellPitch: { default: 10 },
-    coreRows: { default: 0 },
-    fadeRows: { default: 5 },
-    cellDensity: { default: 1 },
-    clock: { default: 0 },
-    colorA: { default: "#9a9aa0", transform: transformColor },
-    colorB: { default: "#9a9aa0", transform: transformColor },
-    colorC: { default: "#9a9aa0", transform: transformColor },
-    colorD: { default: "#9a9aa0", transform: transformColor },
-    stopCount: { default: 1 },
-  },
-  paint: wgsl`
+const RIM_NUMBERS = [
+  "stripWidth",
+  "stripHeight",
+  "padding",
+  "corner",
+  "shoulder",
+  "attachedEdge",
+  "pattern",
+  "motionKind",
+  "cycle",
+  "depth",
+  "strength",
+  "reach",
+  "outwardFalloff",
+  "feather",
+  "cellPitch",
+  "coreRows",
+  "fadeRows",
+  "cellDensity",
+  "clock",
+  "stopCount",
+] as const;
+const RIM_COLORS = ["colorA", "colorB", "colorC", "colorD"] as const;
+const RIM_PAINT = /* wgsl */ `
     let canvas = vec2f(stripWidth, stripHeight) + vec2f(padding * 2.0);
     let pixel = uv * canvas;
     let pixelPoint = pixel - vec2f(padding);
@@ -247,8 +234,7 @@ const Rim = defineShader({
       }
     }
     return vec4f(rgb, alpha * strength);
-  `,
-});
+`;
 
 type RGB = [number, number, number];
 const clamp = (value: number, min: number, max: number) =>
@@ -498,45 +484,12 @@ function StaticRim({
   );
 }
 
-const RIM_ROOT = "agent_hud_rim_root";
-const RIM_NODE = "agent_hud_rim";
-/** What shaders/react's CustomShader registers for a plain layer. */
-const RIM_LAYER: NodeMetadata = {
-  blendMode: "normal",
-  opacity: undefined,
-  visible: true,
-  renderOrder: 0,
-  transform: {
-    offsetX: 0,
-    offsetY: 0,
-    rotation: 0,
-    scale: 1,
-    anchorX: 0.5,
-    anchorY: 0.5,
-    edges: "transparent",
-  },
-  boundingBox: resolveBoundingBox(undefined),
-};
-/** After a change, one more frame this much later. The renderer drops a
- * requested frame that comes within a frame of the one it drew last (or
- * within a second while the canvas is off screen), and with its loop off
- * nothing would draw the change until the next one. */
-const SETTLE_MS = 50;
-
 type RimValues = Record<string, number | string>;
 
-interface LiveRim {
-  sent: Record<string, unknown>;
-  send(key: string, value: unknown): void;
-  tick(): void;
-  settle(): void;
-}
-
 /**
- * The shaders renderer on its own canvas, drawing only when asked. Its frame
- * loop runs at the display's rate whether or not anything moves, so it stays
- * off: a change of size or uniform draws one frame, and a moving pattern
- * advances `clock` at `framesPerSecond`.
+ * The rim on its own WebGPU canvas, drawing only when asked: a change of size
+ * or value draws one frame, and a moving pattern advances `clock` at
+ * `framesPerSecond`.
  */
 function GpuRim({
   values,
@@ -552,121 +505,41 @@ function GpuRim({
   onUnavailable: () => void;
 }) {
   const canvas = useRef<HTMLCanvasElement>(null);
-  const live = useRef<LiveRim | null>(null);
+  const live = useRef<GpuPaint | null>(null);
   const latest = useRef(values);
   latest.current = values;
   const callbacks = useRef({ onReady, onUnavailable });
   callbacks.current = { onReady, onUnavailable };
+  const start = useRef(0);
   useEffect(() => {
     const element = canvas.current;
     if (!element) return;
-    const renderer = shaderRendererGPU();
-    const start = performance.now();
-    let disposed = false;
-    let initialized = false;
-    let settling: ReturnType<typeof setTimeout> | undefined;
-    renderer.setOnReady(() => {
-      if (!disposed) callbacks.current.onReady();
+    start.current = performance.now();
+    const paint = startGpuPaint({
+      canvas: element,
+      numbers: RIM_NUMBERS,
+      colors: RIM_COLORS,
+      paint: RIM_PAINT,
+      values: { ...latest.current, clock: 0 },
+      onReady: () => callbacks.current.onReady(),
+      onUnavailable: () => callbacks.current.onUnavailable(),
     });
-    renderer.setOnUnavailable(() => {
-      if (!disposed) callbacks.current.onUnavailable();
-    });
-    void (async () => {
-      try {
-        await renderer.initialize({
-          canvas: element,
-          colorSpace: "srgb",
-          toneMapping: "linear",
-        });
-      } catch {
-        // A GPU it cannot use is reported through onUnavailable.
-      }
-      if (disposed) {
-        // Unmounted while the GPU was being requested: release it now.
-        renderer.cleanup();
-        return;
-      }
-      if (!renderer.isInitialized() || renderer.getFailureReason()) return;
-      initialized = true;
-      renderer.stopAnimation();
-      const sent: Record<string, unknown> = { ...latest.current, clock: 0 };
-      // Draws now, past the renderer's frame gate, which drops a requested
-      // frame that comes within a frame of the last one it drew.
-      const draw = () => {
-        if (!disposed)
-          renderer.renderAndWait({ waitForGpu: false }).catch(() => {});
-      };
-      try {
-        renderer.registerNode(
-          RIM_ROOT,
-          rootPassthrough.fragment,
-          null,
-          null,
-          {},
-          rootPassthrough,
-        );
-        registerShader(Rim);
-        renderer.registerNode(
-          RIM_NODE,
-          Rim.fragment,
-          RIM_ROOT,
-          RIM_LAYER,
-          // The same call shaders/react's CustomShader makes; the bridge's
-          // parameter type is narrower than the definitions it takes.
-          createGpuUniformsMap(
-            Rim as unknown as Parameters<typeof createGpuUniformsMap>[0],
-            sent,
-            RIM_NODE,
-          ),
-          Rim,
-        );
-      } catch {
-        callbacks.current.onUnavailable();
-        return;
-      }
-      live.current = {
-        sent,
-        send(key, value) {
-          sent[key] = value;
-          renderer.updateUniformValue(RIM_NODE, key, value);
-        },
-        tick() {
-          renderer.updateUniformValue(
-            RIM_NODE,
-            "clock",
-            (performance.now() - start) / 1000,
-          );
-        },
-        settle() {
-          clearTimeout(settling);
-          settling = setTimeout(draw, SETTLE_MS);
-        },
-      };
-      // The first frame; onReady follows it.
-      draw();
-    })();
+    live.current = paint;
     return () => {
-      disposed = true;
       live.current = null;
-      clearTimeout(settling);
-      if (initialized) renderer.cleanup();
+      paint.dispose();
     };
   }, []);
   useEffect(() => {
-    const rim = live.current;
-    if (!rim) return;
-    let changed = false;
-    for (const key in values)
-      if (rim.sent[key] !== values[key]) {
-        rim.send(key, values[key]);
-        changed = true;
-      }
-    if (changed) rim.settle();
+    live.current?.update(values);
   });
   useEffect(() => {
     if (framesPerSecond <= 0) return;
     const timer = setInterval(
-      () => live.current?.tick(),
+      () =>
+        live.current?.update({
+          clock: (performance.now() - start.current) / 1000,
+        }),
       1000 / framesPerSecond,
     );
     return () => clearInterval(timer);
@@ -683,7 +556,7 @@ function GpuRim({
     >
       <canvas
         ref={canvas}
-        data-renderer="shaders"
+        data-renderer="webgpu"
         style={{ width: "100%", height: "100%", display: "block" }}
       />
     </div>

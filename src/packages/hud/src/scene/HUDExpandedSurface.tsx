@@ -7,7 +7,6 @@ import type {
   Snapshot,
 } from "@agent-hud/protocol";
 import { HUDArtwork as HUDLogo } from "../HUDArtwork";
-import AnimatedContent from "@agent-hud/ui/react-bits/AnimatedContent";
 import { CompactAlertView } from "../IslandNews";
 import { RequestDeliveryNotice } from "../permissions/ApprovalContent";
 import { SourceHoverPanel } from "../HoverPanel";
@@ -378,24 +377,30 @@ export function HUDExpandedSurface({
                           scrollbarWidth: "thin",
                         }}
                       >
-                        <AnimatedContent
+                        <motion.div
                           key={
                             request || (event && !inUsagePanel)
                               ? "alert-stack"
                               : (focusedVendor?.key ?? "all")
                           }
-                          trigger="mount"
-                          direction={
-                            horizontal(edge) ? "vertical" : "horizontal"
+                          // Slides in from the edge the HUD sits on.
+                          initial={
+                            reduceMotion
+                              ? false
+                              : {
+                                  [horizontal(edge) ? "y" : "x"]:
+                                    (edge === "top" || edge === "left"
+                                      ? -1
+                                      : 1) * HUD_METRICS.entryDistance,
+                                  opacity: 0,
+                                }
                           }
-                          reverse={edge === "top" || edge === "left"}
-                          distance={
-                            reduceMotion ? 0 : HUD_METRICS.entryDistance
-                          }
-                          duration={reduceMotion ? 0 : 0.22}
-                          delay={reduceMotion ? 0 : 0.12}
-                          ease="power1.out"
-                          animateOpacity={!reduceMotion}
+                          animate={{ x: 0, y: 0, opacity: 1 }}
+                          transition={{
+                            duration: 0.22,
+                            delay: 0.12,
+                            ease: [0.25, 0.46, 0.45, 0.94],
+                          }}
                         >
                           <div
                             className="hud-panel-content"
@@ -438,7 +443,7 @@ export function HUDExpandedSurface({
                               language={snapshotLanguage(snapshot)}
                             />
                           </div>
-                        </AnimatedContent>
+                        </motion.div>
                       </div>
                     )}
                   </div>
