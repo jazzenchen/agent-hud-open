@@ -6,25 +6,13 @@
 //! The reply also says whether the account was merged into SuperGrok
 //! (`isUnified`) and, if so, its plan (`cursorPlanName`), which is the name
 //! Grok Bot shows for a merged account.
-use crate::account::{Host, HttpFailure, HttpRequest};
-use crate::cursor::account::{sign_in, SignIn};
+use crate::account::{Host, HttpFailure};
+use crate::cursor::account::{dashboard, sign_in, SignIn};
 use crate::l10n;
 use serde_json::{json, Map, Value};
-use std::time::Duration;
 
-const SERVICE: &str = "https://api2.cursor.sh/aiserver.v1.DashboardService/";
 /// Grok Bot's value for a spend limit without a ceiling.
 const NO_CEILING_CENTS: f64 = 2_147_483_647.0;
-
-fn post(host: &dyn Host, token: &str, method: &str) -> Result<Value, HttpFailure> {
-    host.http_json(&HttpRequest {
-        url: &format!("{SERVICE}{method}"),
-        secrets: &[("Authorization", &format!("Bearer {token}"))],
-        headers: &[("Connect-Protocol-Version", "1")],
-        body: Some(&json!({})),
-        timeout: Duration::from_secs(12),
-    })
-}
 
 fn ms(value: &Value) -> Option<i64> {
     let text = value.as_str()?;
@@ -45,13 +33,14 @@ pub(super) fn read(host: &dyn Host, slot: &str, now_ms: i64) -> Result<Option<Va
     if slot.rsplit('|').next() != Some(user.as_str()) {
         return Ok(None);
     }
-    let status = post(host, &token, "GetSandUsageStatus").map_err(|failure| match failure {
-        HttpFailure::Unreachable => l10n::text(
-            "无法读取 Grok Bot 的周额度，请检查网络",
-            "Grok Bot's weekly usage could not be reached; check the connection.",
-        ),
-        other => other.message(),
-    })?;
+    let status =
+        dashboard(host, &token, "GetSandUsageStatus").map_err(|failure| match failure {
+            HttpFailure::Unreachable => l10n::text(
+                "无法读取 Grok Bot 的周额度，请检查网络",
+                "Grok Bot's weekly usage could not be reached; check the connection.",
+            ),
+            other => other.message(),
+        })?;
     if !status.is_object() {
         return Err(l10n::text(
             "Grok Bot 的周额度格式无法识别",
@@ -59,7 +48,7 @@ pub(super) fn read(host: &dyn Host, slot: &str, now_ms: i64) -> Result<Option<Va
         ));
     }
     // The Bot asks for the period's spend alongside and does without it.
-    let period = post(host, &token, "GetCurrentPeriodUsage").ok();
+    let period = dashboard(host, &token, "GetCurrentPeriodUsage").ok();
     Ok(usage(&status, period.as_ref(), now_ms))
 }
 
