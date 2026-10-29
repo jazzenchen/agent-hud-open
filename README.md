@@ -88,7 +88,8 @@ When Claude Code finishes a change, it can ask a Codex session to review it and 
 
 You can watch who is talking to whom: the sender folds its message into a paper plane and flies it to the receiver's mark, and the answer flies back the same way.
 
-- **Claude Code and Codex today.**
+- **A message, not the conversation**: only what the agent writes goes across; its session stays where it is. On one project, the project itself becomes the shared context, and the other agent reads the code for itself.
+- **Claude Code, Codex, Antigravity and DeepSeek Harness**: each can message the others, or start a new Claude Code, Codex or Antigravity session.
 - **Never in the way**: a message waits until its session is idle; it never interrupts a turn.
 - **In the [release](https://agenthud.app/mac).**
 
