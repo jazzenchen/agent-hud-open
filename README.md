@@ -6,10 +6,6 @@
 </p>
 
 <p align="center">
-  Agent HUD's cross-platform app, ported from the native Swift app <a href="https://github.com/jazzenchen/agent-hud-native-open">agent-hud-native-open</a>.
-</p>
-
-<p align="center">
   <a href="https://agenthud.app/mac"><img src="docs/buttons/mac.svg" alt="Download Agent HUD for Mac" width="180" height="36"></a>
   <a href="https://apps.apple.com/app/id6812113619"><img src="docs/buttons/app-store.svg" alt="App Store: iPhone and Apple Watch" width="138" height="36"></a>
   <a href="#build-from-source"><img src="docs/buttons/source.svg" alt="Build Agent HUD from source" width="181" height="36"></a>

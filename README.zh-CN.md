@@ -6,10 +6,6 @@
 </p>
 
 <p align="center">
-  Agent HUD 的跨平台版，由原生 Swift 版 <a href="https://github.com/jazzenchen/agent-hud-native-open">agent-hud-native-open</a> 迁移而来。
-</p>
-
-<p align="center">
   <a href="https://agenthud.app/mac"><img src="docs/buttons/mac.zh-CN.svg" alt="下载 Mac 版 Agent HUD" width="180" height="36"></a>
   <a href="https://apps.apple.com/cn/app/agent-hud/id6812113619?uo=4"><img src="docs/buttons/app-store.svg" alt="从 App Store 获取 iPhone 与 Apple Watch App" width="138" height="36"></a>
   <a href="#从源码构建"><img src="docs/buttons/source.zh-CN.svg" alt="从源码构建 Agent HUD" width="181" height="36"></a>
