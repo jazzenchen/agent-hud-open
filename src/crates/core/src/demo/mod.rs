@@ -9,7 +9,10 @@
 //! real readings.
 //!
 //! The transcripts are never written to disk: their paths live under `ROOT`,
-//! which no scan lists, and a scan leaves logs there alone.
+//! which no scan lists, and a scan leaves logs there alone. A Claude
+//! session's sub-agents are their own transcripts beside it, as Claude Code
+//! keeps them (`<session>/subagents/agent-<id>.jsonl`), and the meta file
+//! that names each one is made when it is asked for (`file`).
 mod data;
 pub mod script;
 
@@ -20,7 +23,7 @@ use crate::{
     naming::vendor_windows, AgentHudCore, Log, LogHead,
 };
 use chrono::{DateTime, Utc};
-use data::{Kinds, Plan, EXTRAS, HELPER, PLANS, READINGS};
+use data::{DemoAgent, DemoTurn, Kinds, Plan, EXTRAS, PLANS, READINGS};
 use serde_json::{json, Value};
 use std::{
     collections::BTreeMap,
@@ -38,6 +41,30 @@ pub(crate) fn is_demo(path: &Path) -> bool {
 
 fn path(source: &str, id: &str) -> PathBuf {
     PathBuf::from(format!("{ROOT}/{source}/{id}.jsonl"))
+}
+
+/// Where Claude Code keeps a session's sub-agent.
+fn agent_path(session: &str, agent: &str) -> PathBuf {
+    PathBuf::from(format!(
+        "{ROOT}/claude/{session}/subagents/agent-{agent}.jsonl"
+    ))
+}
+
+/// A file the demo keeps beside its transcripts, which are never on disk: a
+/// sub-agent's `agent-*.meta.json` as Claude Code writes it. None for any
+/// other path.
+pub(crate) fn file(path: &Path) -> Option<Vec<u8>> {
+    if !is_demo(path) {
+        return None;
+    }
+    let name = path.file_name()?.to_str()?;
+    let id = name.strip_prefix("agent-")?.strip_suffix(".meta.json")?;
+    let (_, task, call) = data::agent_task(id)?;
+    Some(
+        json!({"agentType":task.kind,"description":task.description,"toolUseId":call,"spawnDepth":1})
+            .to_string()
+            .into_bytes(),
+    )
 }
 
 fn iso(at: i64) -> String {
@@ -100,20 +127,81 @@ fn jsonl(lines: Vec<Value>) -> String {
         .collect()
 }
 
-/// One turn of `plan` as its client writes it, from `start` to `end`.
+/// A tool call's input, as the tool takes it, in the project at `dir`.
+fn tool_input(tool: &str, dir: &str) -> Value {
+    match tool {
+        "Bash" => json!({"command":"swift test"}),
+        "Edit" => {
+            json!({"file_path":format!("{dir}/Sources/App/ContentView.swift"),"old_string":"","new_string":""})
+        }
+        "Glob" => json!({"pattern":"**/*.swift"}),
+        "Grep" => json!({"pattern":"TODO|FIXME","path":dir}),
+        _ => json!({"file_path":format!("{dir}/Sources/App/ContentView.swift")}),
+    }
+}
+
+/// The tools a session's own calls ask for, in turn.
+const OWN_TOOLS: [&str; 3] = ["Read", "Edit", "Bash"];
+
+/// What Claude Code's Agent tool hands a sub-agent: its description, then
+/// what is wanted back.
+fn agent_prompt(agent: &DemoAgent) -> String {
+    let wanted = match agent.task.kind {
+        "Explore" => "Search the codebase and report the files, types and call sites involved. Change nothing.",
+        "Plan" => "Lay out the steps, the files each one touches and the risks. Change nothing.",
+        "test-runner" => "Run it, and for each failure give the test, the error and the likely cause.",
+        "code-reviewer" => "Review the current diff for bugs and regressions, with file and line for each finding.",
+        _ => "Make the change, build it and run the affected tests. Report what you changed.",
+    };
+    format!("{}\n\n{wanted}", agent.task.description)
+}
+
+/// A sub-agent's transcript: the task it was handed, then each call, the
+/// last tool's result before the next, and its report unless it still works.
+fn agent_lines(plan: &Plan, agent: &DemoAgent) -> Vec<Value> {
+    let dir = folder(plan.project);
+    let id = &agent.id;
+    let line = |kind: &str, at: i64, message: Value| json!({"type":kind,"isSidechain":true,"agentId":id,"sessionId":plan.id,"cwd":dir,"uuid":format!("{id}-{kind}-{at}"),"timestamp":iso(at),"message":message});
+    let mut lines = vec![line(
+        "user",
+        agent.start,
+        json!({"role":"user","content":agent_prompt(agent)}),
+    )];
+    let mut before = agent.start;
+    for (call, step) in agent.calls.iter().enumerate() {
+        if call > 0 {
+            let back = before + (step.at - before) * 2 / 5;
+            lines.push(line("user", back, json!({"role":"user","content":[{"type":"tool_result","tool_use_id":format!("{id}-t{}",call-1),"content":"ok"}]})));
+        }
+        let content = match step.tool {
+            Some(tool) => {
+                json!([{"type":"tool_use","id":format!("{id}-t{call}"),"name":tool,"input":tool_input(tool,&dir)}])
+            }
+            None => json!([{"type":"text","text":l10n::text(
+                &format!("已完成：{}。", agent.task.description),
+                &format!("Done: {}.", agent.task.description),
+            )}]),
+        };
+        let usage = step.usage;
+        lines.push(line("assistant", step.at, json!({"id":format!("msg-{id}-{call}"),"model":agent.model,"role":"assistant","content":content,"stop_reason":if step.tool.is_some() {"tool_use"} else {"end_turn"},"usage":{"input_tokens":usage.input,"output_tokens":usage.output+usage.reasoning,"cache_read_input_tokens":usage.cache_read,"cache_creation_input_tokens":usage.cache_write}})));
+        before = step.at;
+    }
+    lines
+}
+
+/// One turn of `plan` as its client writes it: its prompt at `turn.start`,
+/// each call at its time, the sub-agents it starts as Agent calls and their
+/// results as they report back.
 fn turn_lines(
     plan: &Plan,
     index: usize,
-    start: i64,
-    end: i64,
-    calls: usize,
-    own: Kinds,
-    helper: Option<Kinds>,
+    turn: &DemoTurn,
     ending: Ending,
     totals: &mut Kinds,
     seq: &mut u64,
 ) -> Vec<Value> {
-    let at = |call: usize| start + (end - start) * (call as i64 + 1) / (calls as i64 + 1);
+    let (start, end, calls, own) = (turn.start, turn.end, turn.calls, turn.own);
+    let at = |call: usize| turn.times[call];
     let text = match ending {
         Ending::Reply(Some(message)) => message.to_owned(),
         _ => reply(plan),
@@ -123,21 +211,42 @@ fn turn_lines(
     match plan.source {
         "claude" => {
             lines.push(json!({"type":"user","uuid":format!("{}-u{index}",plan.id),"sessionId":plan.id,"cwd":dir,"timestamp":iso(start),"message":{"role":"user","content":prompt(plan,index)}}));
+            // Each finished sub-agent's result comes back before the first
+            // call after its report.
+            let mut reported = vec![false; turn.agents.len()];
+            let mut results = |until: i64, lines: &mut Vec<Value>| {
+                for (agent, done) in turn.agents.iter().zip(reported.iter_mut()) {
+                    let back = agent.calls.last().map_or(agent.start, |call| call.at) + 400;
+                    if !*done && !agent.open && back < until {
+                        *done = true;
+                        lines.push(json!({"type":"user","uuid":format!("{}-r{}",plan.id,agent.id),"sessionId":plan.id,"cwd":dir,"timestamp":iso(back),"message":{"role":"user","content":[{"type":"tool_result","tool_use_id":agent.call,"content":[{"type":"text","text":format!("Done: {}.",agent.task.description)}]}]},"toolUseResult":{"status":"completed","agentId":agent.id}}));
+                    }
+                }
+            };
             for call in 0..calls {
+                results(at(call), &mut lines);
                 let share = own.share(call, calls);
                 let last = call + 1 == calls;
                 let done = last && matches!(ending, Ending::Reply(_));
+                let started = turn
+                    .agents
+                    .iter()
+                    .filter(|agent| agent.launch == call)
+                    .map(|agent| json!({"type":"tool_use","id":agent.call,"name":"Agent","input":{"description":agent.task.description,"prompt":agent_prompt(agent),"subagent_type":agent.task.kind}}))
+                    .collect::<Vec<_>>();
                 let content = if done {
                     json!([{"type":"text","text":text}])
+                } else if !started.is_empty() {
+                    Value::Array(started)
                 } else {
-                    json!([{"type":"tool_use","id":format!("{}-t{index}-{call}",plan.id),"name":"Bash","input":{"command":"swift test"}}])
+                    let tool = OWN_TOOLS[(index + call) % OWN_TOOLS.len()];
+                    json!([{"type":"tool_use","id":format!("{}-t{index}-{call}",plan.id),"name":tool,"input":tool_input(tool,&dir)}])
                 };
                 lines.push(json!({"type":"assistant","sessionId":plan.id,"cwd":dir,"timestamp":iso(at(call)),"message":{"id":format!("msg-{}-{index}-{call}",plan.id),"model":plan.model,"role":"assistant","content":content,"stop_reason":if done {"end_turn"} else {"tool_use"},"usage":{"input_tokens":share.input,"output_tokens":share.output+share.reasoning,"cache_read_input_tokens":share.cache_read,"cache_creation_input_tokens":share.cache_write}}}));
-                if call == 0 {
-                    if let Some(part) = helper {
-                        lines.push(json!({"type":"assistant","isSidechain":true,"sessionId":plan.id,"cwd":dir,"timestamp":iso(at(call)),"message":{"id":format!("msg-{}-{index}-helper",plan.id),"model":HELPER,"role":"assistant","content":[{"type":"text","text":"Checked."}],"stop_reason":"end_turn","usage":{"input_tokens":part.input,"output_tokens":part.output+part.reasoning,"cache_read_input_tokens":part.cache_read,"cache_creation_input_tokens":part.cache_write}}}));
-                    }
-                }
+            }
+            // A turn still waiting has the results back so far.
+            if ending == Ending::Open {
+                results(i64::MAX, &mut lines);
             }
             if ending == Ending::Interrupted {
                 lines.push(json!({"type":"user","uuid":format!("{}-x{index}",plan.id),"sessionId":plan.id,"cwd":dir,"timestamp":iso(end),"message":{"role":"user","content":"[Request interrupted by user]"}}));
@@ -224,6 +333,8 @@ pub struct DemoSessions {
     seq: BTreeMap<&'static str, u64>,
     turns: BTreeMap<&'static str, usize>,
     open: BTreeMap<&'static str, bool>,
+    /// The sub-agents a session's open turn waits on.
+    agents: BTreeMap<&'static str, Vec<DemoAgent>>,
 }
 
 impl DemoSessions {
@@ -296,7 +407,7 @@ impl AgentHudCore {
                     source,
                     &log.id,
                     &key,
-                    None,
+                    log.live.parent_id.as_deref(),
                     now_ms,
                 )
                 .map_err(|error| error.to_string())?;
@@ -328,9 +439,9 @@ impl AgentHudCore {
     ) -> Result<(), String> {
         self.demo = true;
         for plan in &PLANS {
-            let turns = data::turns(plan, now);
             let running_now =
                 running.map_or(plan.running, |ids| ids.iter().any(|id| id == plan.id));
+            let turns = data::turns(plan, now, running_now);
             let mut totals = Kinds::default();
             let mut seq = 0;
             let mut lines = header(plan, turns.first().map_or(now, |turn| turn.start));
@@ -340,18 +451,7 @@ impl AgentHudCore {
                 } else {
                     Ending::Reply(None)
                 };
-                lines.extend(turn_lines(
-                    plan,
-                    index,
-                    turn.start,
-                    turn.end,
-                    turn.calls,
-                    turn.own,
-                    turn.helper,
-                    ending,
-                    &mut totals,
-                    &mut seq,
-                ));
+                lines.extend(turn_lines(plan, index, turn, ending, &mut totals, &mut seq));
             }
             sessions.totals.insert(plan.id, totals);
             sessions.seq.insert(plan.id, seq);
@@ -363,6 +463,20 @@ impl AgentHudCore {
                 &jsonl(lines),
                 false,
             )?;
+            for agent in turns.iter().flat_map(|turn| &turn.agents) {
+                self.read_demo(
+                    agent_path(plan.id, &agent.id),
+                    "claude",
+                    &jsonl(agent_lines(plan, agent)),
+                    false,
+                )?;
+            }
+            let waiting = turns
+                .into_iter()
+                .flat_map(|turn| turn.agents)
+                .filter(|agent| agent.open)
+                .collect();
+            sessions.agents.insert(plan.id, waiting);
         }
         // The month of tokens behind the charts, one hidden log per client.
         for source in ["claude", "codex", "deepseek"] {
@@ -470,18 +584,15 @@ impl AgentHudCore {
         };
         let mut totals = sessions.totals.get(plan.id).copied().unwrap_or_default();
         let mut seq = sessions.seq.get(plan.id).copied().unwrap_or(0);
-        let lines = turn_lines(
-            plan,
-            index,
-            now,
-            now + 1_000,
-            2,
+        let turn = DemoTurn {
+            start: now,
+            end: now + 1_000,
+            calls: 2,
+            times: data::spread(now, now + 1_000, 2),
             own,
-            None,
-            ending,
-            &mut totals,
-            &mut seq,
-        );
+            agents: Vec::new(),
+        };
+        let lines = turn_lines(plan, index, &turn, ending, &mut totals, &mut seq);
         sessions.totals.insert(plan.id, totals);
         sessions.seq.insert(plan.id, seq);
         self.read_demo(
@@ -516,6 +627,42 @@ impl AgentHudCore {
             _ => reply(plan),
         };
         let mut seq = sessions.seq.get(plan.id).copied().unwrap_or(0);
+        // A turn ends once the sub-agents it waits on report back, or are
+        // stopped with it.
+        let mut lines = Vec::new();
+        for agent in sessions.agents.remove(plan.id).unwrap_or_default() {
+            let line = |kind: &str, at: i64, message: Value| json!({"type":kind,"isSidechain":true,"agentId":agent.id,"sessionId":plan.id,"cwd":dir,"uuid":format!("{}-{kind}-{at}",agent.id),"timestamp":iso(at),"message":message});
+            let last = agent.calls.len().saturating_sub(1);
+            let tail = if matches!(ending, Ending::Reply(_)) {
+                vec![
+                    line(
+                        "user",
+                        now - 1_600,
+                        json!({"role":"user","content":[{"type":"tool_result","tool_use_id":format!("{}-t{last}",agent.id),"content":"ok"}]}),
+                    ),
+                    line(
+                        "assistant",
+                        now - 1_200,
+                        json!({"id":format!("msg-{}-end-{now}",agent.id),"model":agent.model,"role":"assistant","content":[{"type":"text","text":format!("Done: {}.",agent.task.description)}],"stop_reason":"end_turn","usage":{"input_tokens":4,"output_tokens":640,"cache_read_input_tokens":42_000,"cache_creation_input_tokens":1_500}}),
+                    ),
+                ]
+            } else {
+                vec![line(
+                    "user",
+                    now - 500,
+                    json!({"role":"user","content":"[Request interrupted by user]"}),
+                )]
+            };
+            self.read_demo(
+                agent_path(plan.id, &agent.id),
+                "claude",
+                &jsonl(tail),
+                false,
+            )?;
+            if matches!(ending, Ending::Reply(_)) {
+                lines.push(json!({"type":"user","uuid":format!("{}-r{}",plan.id,agent.id),"sessionId":plan.id,"cwd":dir,"timestamp":iso(now - 800),"message":{"role":"user","content":[{"type":"tool_result","tool_use_id":agent.call,"content":[{"type":"text","text":format!("Done: {}.",agent.task.description)}]}]},"toolUseResult":{"status":"completed","agentId":agent.id}}));
+            }
+        }
         let line = match (plan.source, ending) {
             ("claude", Ending::Reply(_)) => {
                 json!({"type":"assistant","sessionId":plan.id,"cwd":dir,"timestamp":iso(now),"message":{"id":format!("msg-{}-{index}-end-{now}",plan.id),"model":plan.model,"role":"assistant","content":[{"type":"text","text":text}],"stop_reason":"end_turn","usage":{"input_tokens":300,"output_tokens":420,"cache_read_input_tokens":90_000,"cache_creation_input_tokens":2_000}}})
@@ -540,10 +687,11 @@ impl AgentHudCore {
             }
         };
         sessions.seq.insert(plan.id, seq);
+        lines.push(line);
         self.read_demo(
             path(plan.source, plan.id),
             source_of(plan),
-            &jsonl(vec![line]),
+            &jsonl(lines),
             false,
         )
     }
@@ -855,6 +1003,51 @@ mod tests {
         assert!(rows
             .iter()
             .any(|row| row["provider"] == "codex" && row["vendorName"] == "Codex"));
+
+        // Its sub-agents are their own Claude Code logs under it: counted in
+        // its tokens, and named with their type on a turn's timeline.
+        let detail = core.request("session_detail", json!({"id": "s1"})).unwrap();
+        assert_eq!(detail["children"].as_array().unwrap().len(), 20);
+        let part = detail["subagents"]["total"].as_u64().unwrap();
+        assert!(part * 10 > s1["tokens"].as_u64().unwrap(), "{part}");
+        assert!(detail["models"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|model| model["name"] == "Haiku 5.5"));
+        let turn = detail["turns"][1]["id"].as_str().unwrap().to_owned();
+        let picked = core
+            .request("session_detail", json!({"id": "s1", "turn": turn}))
+            .unwrap();
+        let agents = picked["turnCalls"]["agents"].as_array().unwrap();
+        assert_eq!(agents.len(), 3);
+        assert!(agents
+            .iter()
+            .any(|agent| agent["name"] == "Map the dashboard's SwiftUI views"
+                && agent["kind"] == "Explore"
+                && agent["running"] == false));
+        let live = detail["turns"].as_array().unwrap().last().unwrap()["id"]
+            .as_str()
+            .unwrap()
+            .to_owned();
+        let picked = core
+            .request("session_detail", json!({"id": "s1", "turn": live}))
+            .unwrap();
+        let running = picked["turnCalls"]["agents"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|agent| agent["running"] == true)
+            .count();
+        assert_eq!(running, 2, "the live turn waits on two of them");
+        let roots = core
+            .request("sessions", json!({"scope": "recent", "limit": 50}))
+            .unwrap();
+        assert!(roots["items"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|row| row["parentId"].is_null()));
 
         // A reply after the Core started raises the reply reminder.
         core.demo_reply(

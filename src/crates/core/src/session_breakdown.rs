@@ -53,8 +53,9 @@ fn turn_agents(own: &LogHead, subagents: &[&LogHead], calls: &[Call<'_>], now: i
             if !called.contains(path.as_str()) {
                 return None;
             }
-            let meta = fs::read(log.path.with_extension("meta.json"))
-                .ok()
+            let meta = log.path.with_extension("meta.json");
+            let meta = crate::demo::file(&meta)
+                .or_else(|| fs::read(&meta).ok())
                 .and_then(|bytes| serde_json::from_slice::<Value>(&bytes).ok())
                 .unwrap_or(Value::Null);
             let name = meta["description"]
