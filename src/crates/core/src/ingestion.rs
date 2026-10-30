@@ -475,7 +475,8 @@ impl AgentHudCore {
         self.claude_desktop.index.refresh(&self.provider_roots);
         self.claude_desktop.jobs = crate::claude_jobs::ClaudeJobs::read(&self.provider_roots);
         for head in self.logs.values_mut() {
-            if head.source == "claude" {
+            // The demo's logs are archived or not as the sample has them.
+            if head.source == "claude" && !crate::demo::is_demo(&head.path) {
                 head.archived = self.claude_desktop.index.archived.contains(&head.id);
             }
         }

@@ -647,6 +647,19 @@ fn schedule(
         1.0
     };
     let time = |offset: f64| turn.start + (offset * fit) as i64;
+    if open {
+        // The session has made only the calls before it began waiting.
+        turn.own = (0..own.len()).fold(Kinds::default(), |sum, call| {
+            let share = turn.own.share(call, turn.calls);
+            Kinds {
+                cache_write: sum.cache_write + share.cache_write,
+                input: sum.input + share.input,
+                reasoning: sum.reasoning + share.reasoning,
+                output: sum.output + share.output,
+                cache_read: sum.cache_read + share.cache_read,
+            }
+        });
+    }
     turn.times = own.iter().map(|offset| time(*offset)).collect();
     turn.calls = turn.times.len();
     turn.end = *turn.times.last().unwrap_or(&turn.start);

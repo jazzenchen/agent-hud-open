@@ -438,6 +438,9 @@ impl AgentHudCore {
         sessions: &mut DemoSessions,
     ) -> Result<(), String> {
         self.demo = true;
+        // The sample's own words (replies, the balance's label) are written
+        // now, before any snapshot has applied the Language setting.
+        l10n::follow(&self.settings["language"]);
         for plan in &PLANS {
             let running_now =
                 running.map_or(plan.running, |ids| ids.iter().any(|id| id == plan.id));
@@ -479,18 +482,44 @@ impl AgentHudCore {
             sessions.agents.insert(plan.id, waiting);
         }
         // The month of tokens behind the charts, one hidden log per client.
-        for source in ["claude", "codex", "deepseek"] {
+        // Each is named as the long-running work it stands for, so the
+        // statistics' top sessions show a session, not the home folder.
+        for (source, title, project) in [
+            ("claude", "Port the sync engine to SQLite", "~/work/orbit"),
+            (
+                "codex",
+                "Triage the nightly crash reports",
+                "~/work/ledger-api",
+            ),
+            (
+                "deepseek",
+                "Translate the onboarding copy",
+                "~/work/website",
+            ),
+        ] {
             let rows = data::history(now)
                 .into_iter()
                 .filter(|row| row.1 == source)
                 .collect::<Vec<_>>();
             let id = format!("history-{source}");
+            let dir = folder(project);
+            let began = iso(now - 31 * 86_400_000);
             let mut totals = Kinds::default();
             let mut lines = Vec::new();
-            if source == "codex" {
-                lines.push(json!({"timestamp":iso(now - 31 * 86_400_000),"type":"session_meta","payload":{"id":id,"cwd":folder("~")}}));
-            } else if source == "deepseek" {
-                lines.push(json!({"type":"session","version":4,"id":id,"cwd":folder("~"),"createdAt":iso(now - 31 * 86_400_000)}));
+            match source {
+                "codex" => {
+                    lines.push(json!({"timestamp":began,"type":"session_meta","payload":{"id":id,"cwd":dir}}));
+                    lines.push(json!({"timestamp":began,"type":"event_msg","payload":{"type":"user_message","message":title}}));
+                }
+                "deepseek" => {
+                    lines.push(
+                        json!({"type":"session","version":4,"id":id,"cwd":dir,"createdAt":began}),
+                    );
+                    lines.push(
+                        json!({"type":"session/title","time":began,"seq":0,"data":{"title":title}}),
+                    );
+                }
+                _ => lines.push(json!({"type":"ai-title","aiTitle":title,"sessionId":id})),
             }
             let mut seq = 0;
             for (index, (at, _, model, input, output, read)) in rows.into_iter().enumerate() {
@@ -501,7 +530,7 @@ impl AgentHudCore {
                     ..Default::default()
                 };
                 match source {
-                    "claude" => lines.push(json!({"type":"assistant","sessionId":id,"timestamp":iso(at),"message":{"id":format!("msg-{id}-{index}"),"model":model,"role":"assistant","content":[],"stop_reason":"end_turn","usage":{"input_tokens":input,"output_tokens":output,"cache_read_input_tokens":read,"cache_creation_input_tokens":0}}})),
+                    "claude" => lines.push(json!({"type":"assistant","sessionId":id,"cwd":dir,"timestamp":iso(at),"message":{"id":format!("msg-{id}-{index}"),"model":model,"role":"assistant","content":[],"stop_reason":"end_turn","usage":{"input_tokens":input,"output_tokens":output,"cache_read_input_tokens":read,"cache_creation_input_tokens":0}}})),
                     "codex" => {
                         lines.push(json!({"timestamp":iso(at),"type":"turn_context","payload":{"model":model}}));
                         totals.input += input;
@@ -1040,14 +1069,56 @@ mod tests {
             .filter(|agent| agent["running"] == true)
             .count();
         assert_eq!(running, 2, "the live turn waits on two of them");
+        // A collection pass leaves the hidden month of tokens hidden, and the
+        // live turn's calls keep the context within its window.
+        core.request("refresh", json!({})).unwrap();
         let roots = core
-            .request("sessions", json!({"scope": "recent", "limit": 50}))
+            .request(
+                "sessions",
+                json!({"scope": "recent", "limit": 50, "turnBars": true}),
+            )
             .unwrap();
-        assert!(roots["items"]
-            .as_array()
-            .unwrap()
+        let rows = roots["items"].as_array().unwrap();
+        assert!(rows.iter().all(
+            |row| row["parentId"].is_null() && !row["id"].as_str().unwrap().contains("history")
+        ));
+        let fill = rows.iter().find(|row| row["id"] == "s1").unwrap()["contextFill"]
+            .as_f64()
+            .unwrap();
+        assert!(fill > 0.3 && fill <= 1.0, "{fill}");
+
+        // The statistics' top sessions name sessions: the hidden month of
+        // tokens is named as work, never after the home folder or a client.
+        let statistics = core
+            .request(
+                "statistics",
+                json!({"from": iso(now - 86_400_000), "to": iso(now), "timeZone": "UTC"}),
+            )
+            .unwrap();
+        fn titles(value: &Value, out: &mut Vec<String>) {
+            match value {
+                Value::Object(map) => {
+                    if let Some(title) = map.get("title").and_then(Value::as_str) {
+                        out.push(title.to_owned());
+                    }
+                    map.values().for_each(|value| titles(value, out));
+                }
+                Value::Array(items) => items.iter().for_each(|value| titles(value, out)),
+                _ => {}
+            }
+        }
+        let mut named = Vec::new();
+        titles(&statistics, &mut named);
+        let home = std::env::var("HOME").unwrap_or_default();
+        let home = Path::new(&home).file_name().and_then(|name| name.to_str());
+        assert!(named
             .iter()
-            .all(|row| row["parentId"].is_null()));
+            .any(|title| title == "Port the sync engine to SQLite"));
+        assert!(
+            !named.iter().any(|title| Some(title.as_str()) == home
+                || ["Claude Code", "Codex", "DeepSeek"].contains(&title.as_str())),
+            "{named:?}"
+        );
 
         // A reply after the Core started raises the reply reminder.
         core.demo_reply(
