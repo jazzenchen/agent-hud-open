@@ -39,7 +39,7 @@ The details are close at hand, and what needs your approval is answered right th
   <sub>Simple mode on a display's left edge, with Separate agents on · Sample data</sub>
 </p>
 
-- **Glow**: one colour per quota, green under 70% used, yellow from 70%, red from 90%, with a warning before a quota runs out. It moves faster while an agent works.
+- **Glow**: one colour per agent, from its most used quota: green under 70% used, yellow from 70%, red from 90%, with a warning before a quota runs out. It moves faster while an agent works.
 - **Hover**: quotas with their resets or burn rates, balances, the last 24 hours of tokens, and the sessions, those waiting for you first.
 - **Requests**: approve, deny or always allow, and answer an agent's questions, all on the HUD, the questions Claude asks in its desktop app included. Agent HUD never decides for you: a request you leave goes back to the agent after 10 minutes.
 - **Jump back**: one click takes you to a session's thread, tab or terminal pane.
@@ -169,7 +169,7 @@ Agent HUD is built with Tauri 2: a Rust core, a React interface, and a thin nati
 When your iPhone and the release share a network, iPhone and Apple Watch show your Mac's quotas, token statistics and sessions without a subscription. Remote adds:
 
 - **Any network**: your quotas, token statistics and sessions, away from home too.
-- **Conversations**: read Claude Code, Codex, Grok CLI, Grok Bot and Antigravity sessions, and message Claude Code and Codex.
+- **Conversations**: read Claude Code, Codex, Antigravity and DeepSeek Harness sessions, and message Claude Code and Codex.
 - **Decisions**: allow or deny a tool call, answer a question, approve a plan.
 - **Your wrist**: an idea you say becomes a new session on your Mac, and the reply comes back to your watch.
 - **Alerts and Live Activities**: alerts on iPhone and Apple Watch, and your running sessions on the Lock Screen and in the Dynamic Island.
@@ -199,7 +199,7 @@ When your iPhone and the release share a network, iPhone and Apple Watch show yo
 - **UI prompt templates.** Ready-made prompts that reshape your HUD in one go.
 - **A Gantt view of sub-agents.** On a session's page, each sub-agent of a turn in its own lane on one time axis: when it started, how long it ran, what it used, and what ran side by side.
 - **Agents shape every screen**, not only the HUD, with image backgrounds and a customizable iPhone app.
-- **More agents in the conversation**, beyond Claude Code and Codex.
+- **More agents in the conversation**, beyond Claude Code, Codex, Antigravity and DeepSeek Harness.
 - **Files both ways.** Your agents send files to your iPhone, and you send files from your iPhone to your agents.
 - **Recordings straight to your agents.** A recording from your Apple Watch or iPhone reaches your agent as it is.
 - **More of the HUD is your call**: what Simple mode's rings show (burn rate, time to reset or cost), and which agents may alert you.
@@ -218,7 +218,7 @@ Install and sign in to the agents you want to follow; Agent HUD finds them by it
 | **Claude&nbsp;Code** | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | **Codex** | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | **DeepSeek&nbsp;Harness** | ✓ | Balance | ✓ | ✓ | ✓ | ✓ |  | ✓ |
-| **Antigravity** | ✓ | ✓ |  | ✓ |  | ✓ | ✓ |  |
+| **Antigravity** | ✓ | ✓ |  | ✓ | ✓ | ✓ | ✓ |  |
 | **Cursor** | ✓ | ✓ |  |  |  | ✓ |  |  |
 | **Grok&nbsp;CLI** | ✓ |  | ✓ |  |  | ✓ |  |  |
 | **Grok&nbsp;Bot** | ✓ | ✓ |  |  |  |  | ✓ |  |

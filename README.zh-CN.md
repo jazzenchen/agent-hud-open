@@ -39,7 +39,7 @@ Agent 在 Mac 上工作，HUD 把进展带到你身边。看一眼状态，接�
   <sub>停靠在屏幕左侧的简约形态，已开启「按 agent 分开」 · 示例数据</sub>
 </p>
 
-- **光晕**：每项额度一种颜色，已用不足 70% 为绿色，达到 70% 为黄色，达到 90% 为红色；额度耗尽前会提醒你。有 agent 在工作时，光晕动得更快。
+- **光晕**：每个 agent 一种颜色，按它用量最高的那项额度：已用不足 70% 为绿色，达到 70% 为黄色，达到 90% 为红色；额度耗尽前会提醒你。有 agent 在工作时，光晕动得更快。
 - **悬停**：额度及其重置时间或消耗速率、余额、过去 24 小时的 Token，以及会话，等你处理的排在最前。
 - **请求**：批准、拒绝、总是允许，回答 agent 的提问，都在 HUD 上完成，Claude 桌面版里的提问也一样。Agent HUD 从不替你做决定：你没处理的请求，10 分钟后交还 agent。
 - **跳转**：一键回到会话所在的线程、标签页或终端窗格。
@@ -169,7 +169,7 @@ Agent HUD 基于 Tauri 2 构建：Rust 核心、React 界面，每个操作系�
 iPhone 和发行版在同一个网络里，不订阅也能在 iPhone 与 Apple Watch 上看到 Mac 上的额度、Token 统计与会话。Remote 再加上：
 
 - **任何网络**：额度、Token 统计与会话，出门在外也看得到。
-- **对话**：阅读 Claude Code、Codex、Grok CLI、Grok Bot 与 Antigravity 的会话，并向 Claude Code 与 Codex 发送消息。
+- **对话**：阅读 Claude Code、Codex、Antigravity 与 DeepSeek Harness 的会话，并向 Claude Code 与 Codex 发送消息。
 - **决定**：允许或拒绝一次工具调用，回答提问，批准计划。
 - **手腕上**：说出的想法成为 Mac 上的新会话，回复回到你的手表。
 - **提醒与实时活动**：iPhone 与 Apple Watch 上的提醒，以及锁定屏幕和灵动岛上运行中的会话。
@@ -199,7 +199,7 @@ iPhone 和发行版在同一个网络里，不订阅也能在 iPhone 与 Apple W
 - **UI 提示词模板。** 现成的提示词，一次就把 HUD 改成你想要的样子。
 - **子 agent 甘特图。** 在会话页上，一轮里的每个子 agent 各占一条泳道，排在同一条时间轴上：何时开始、跑了多久、用了多少，哪些在同时进行。
 - **所有界面交给 agent 定制**，不只是 HUD；支持图片背景，iPhone 上的界面也能自定义。
-- **更多 agent 加入对话**，不止 Claude Code 与 Codex。
+- **更多 agent 加入对话**，不止 Claude Code、Codex、Antigravity 与 DeepSeek Harness。
 - **文件双向传送。** agent 可以把文件发到你的 iPhone，你也可以从 iPhone 把文件发给 agent。
 - **录音直接发给 agent。** Apple Watch 或 iPhone 上的录音，原样交给 agent。
 - **HUD 上更多由你决定**：简约形态的圆环显示什么（消耗速率、距重置的时间或费用），以及哪些 agent 可以提醒你。
@@ -218,7 +218,7 @@ iPhone 和发行版在同一个网络里，不订阅也能在 iPhone 与 Apple W
 | **Claude&nbsp;Code** | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | **Codex** | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | **DeepSeek&nbsp;Harness** | ✓ | 余额 | ✓ | ✓ | ✓ | ✓ |  | ✓ |
-| **Antigravity** | ✓ | ✓ |  | ✓ |  | ✓ | ✓ |  |
+| **Antigravity** | ✓ | ✓ |  | ✓ | ✓ | ✓ | ✓ |  |
 | **Cursor** | ✓ | ✓ |  |  |  | ✓ |  |  |
 | **Grok&nbsp;CLI** | ✓ |  | ✓ |  |  | ✓ |  |  |
 | **Grok&nbsp;Bot** | ✓ | ✓ |  |  |  |  | ✓ |  |
