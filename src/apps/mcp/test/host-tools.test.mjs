@@ -254,3 +254,28 @@ test("a group switched on after the relay started is listed, and announced, and 
     await client.close();
   }
 });
+
+test("on Windows the launcher names the client, which the relay gives as parent", async () => {
+  // Windows has no exec: Agent HUD.exe --mcp waits as the relay's parent and
+  // passes on its own parent, the DeepSeek Harness host.
+  for (const [value, parent] of [
+    ["4242", 4242],
+    ["not a pid", process.pid],
+    ["0", process.pid],
+  ]) {
+    const fake = engine(`launched-${parent}-${value.length}`, [tool]);
+    const client = await connect(fake.file, {
+      AGENTHUD_NEXT_MCP_PARENT: value,
+    });
+    try {
+      await client.callTool({ name: "some_tool", arguments: { text: "hi" } });
+      assert.equal(
+        fake.requests().find((request) => request.method === "host_tool").params
+          .parent,
+        parent,
+      );
+    } finally {
+      await client.close();
+    }
+  }
+});

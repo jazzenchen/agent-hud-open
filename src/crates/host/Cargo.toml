@@ -33,7 +33,7 @@ objc2-core-foundation = { version = "0.3", default-features = false, features = 
 [target.'cfg(target_os = "windows")'.dependencies]
 windows-registry = "=0.6.1"
 webview2-com = "=0.39.1"
-windows = { version = "=0.62.2", features = ["Win32_Devices_Display", "Win32_Foundation", "Win32_Globalization", "Win32_System_Com", "Win32_System_Com_StructuredStorage", "Win32_UI_WindowsAndMessaging"] }
+windows = { version = "=0.62.2", features = ["Win32_Devices_Display", "Win32_Foundation", "Win32_Globalization", "Win32_System_Com", "Win32_System_Com_StructuredStorage", "Win32_System_Diagnostics_ToolHelp", "Win32_UI_WindowsAndMessaging"] }
 
 [target.'cfg(target_os = "macos")'.dependencies.objc2-web-kit]
 version = "=0.3.2"

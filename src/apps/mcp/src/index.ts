@@ -123,7 +123,12 @@ const hostSchema = (
  * environment it starts this relay with. DeepSeek Harness names neither: it runs one
  * relay per host for all its sessions. For a call no client names, the relay says which
  * process started it (`parent`), and the app finds the session from what Agent HUD's
- * plugin in that Harness host noted. */
+ * plugin in that Harness host noted. On Windows the app's `--mcp` launcher stays as
+ * this relay's parent, so it names the client in AGENTHUD_NEXT_MCP_PARENT. */
+const launchedBy = (() => {
+  const named = Number(process.env.AGENTHUD_NEXT_MCP_PARENT);
+  return Number.isSafeInteger(named) && named > 0 ? named : process.ppid;
+})();
 const caller = (meta: Record<string, unknown> | undefined) => {
   const turn = meta?.["x-codex-turn-metadata"] as
     Record<string, unknown> | undefined;
@@ -521,7 +526,7 @@ serveStdio(() => {
               name: tool.name,
               arguments: params,
               caller: named,
-              ...(named ? {} : { parent: process.ppid }),
+              ...(named ? {} : { parent: launchedBy }),
             });
           },
         );
