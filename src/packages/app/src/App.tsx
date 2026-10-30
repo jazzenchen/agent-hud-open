@@ -223,7 +223,7 @@ export interface AppExtensionPage {
 }
 export interface AppProps {
   extensionPages?: AppExtensionPage[];
-  /** Rows a product build adds to a client's card on Agents → Agent plugins. */ agentPlugins?: AgentPluginItem[];
+  /** Rows a product build adds to a client's card on Agent plugins. */ agentPlugins?: AgentPluginItem[];
   productName?: string;
   version?: string;
 }

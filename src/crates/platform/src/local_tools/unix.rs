@@ -160,7 +160,7 @@ pub fn request(data: &Path, request: &Value) -> Result<Value, String> {
         return Err("Local tools request is too large".into());
     }
     let mut stream = UnixStream::connect(socket_path(data))
-        .map_err(|_| "Open Agent HUD and turn on Let agents arrange the HUD in Settings → Agents → Agent plugins. MCP never starts a collector.".to_owned())?;
+        .map_err(|_| "Open Agent HUD and turn on Let agents arrange the HUD in Settings → Agent plugins. MCP never starts a collector.".to_owned())?;
     stream
         .set_write_timeout(Some(Duration::from_secs(5)))
         .map_err(|_| "Local tools timeout unavailable")?;

@@ -1,4 +1,4 @@
-//! Settings → Agents → Agent plugins: Agent HUD's Claude Code plugin, which
+//! Settings → Agent plugins: Agent HUD's Claude Code plugin, which
 //! lets the HUD answer Claude's questions in the session that asked. It is
 //! installed and removed only when the user asks there, with Claude Code's own
 //! `plugin install`; at launch, a plugin the user installed from another
