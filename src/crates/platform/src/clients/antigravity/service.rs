@@ -465,6 +465,8 @@ fn valid_cascade_id(id: &str) -> bool {
 
 /// All candidates must answer successfully. A failed or malformed reply
 /// cannot prove that a second service does not own the same conversation.
+/// A service with no conversations leaves `trajectorySummaries` out (an
+/// empty map is not written), as the permissions reader also takes it.
 fn unique_owner<T: Clone>(
     endpoints: &[T],
     cascade_id: &str,
@@ -475,13 +477,20 @@ fn unique_owner<T: Clone>(
         let body = summaries(endpoint).map_err(|_| {
             MessageError::Unavailable("Could not verify every Antigravity service".into())
         })?;
-        let entries = body
+        let invalid =
+            || MessageError::Unavailable("Invalid Antigravity conversation summary".into());
+        let owns = match body
+            .as_object()
+            .ok_or_else(invalid)?
             .get("trajectorySummaries")
-            .and_then(Value::as_object)
-            .ok_or_else(|| {
-                MessageError::Unavailable("Invalid Antigravity conversation summary".into())
-            })?;
-        if entries.contains_key(cascade_id) {
+        {
+            None | Some(Value::Null) => false,
+            Some(entries) => entries
+                .as_object()
+                .ok_or_else(invalid)?
+                .contains_key(cascade_id),
+        };
+        if owns {
             if owner.is_some() {
                 return Err(MessageError::Unavailable(
                     "Antigravity conversation belongs to more than one service".into(),
@@ -581,67 +590,6 @@ impl MessageSession {
     }
 }
 
-#[cfg(test)]
-mod message_tests {
-    use super::*;
-    use std::cell::Cell;
-
-    const ID: &str = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee";
-
-    #[test]
-    fn target_must_have_one_proven_owner_among_all_services() {
-        let answer = |endpoint: &u8| {
-            Ok(if *endpoint == 1 {
-                json!({"trajectorySummaries": {(ID): {}}})
-            } else {
-                json!({"trajectorySummaries": {}})
-            })
-        };
-        assert_eq!(unique_owner(&[1, 2], ID, answer), Ok(1));
-        assert!(unique_owner(&[1, 1], ID, answer).is_err());
-        assert!(unique_owner(&[2], ID, answer).is_err());
-        assert!(unique_owner(&[1, 2], ID, |n| {
-            if *n == 2 {
-                Err("offline".into())
-            } else {
-                answer(n)
-            }
-        })
-        .is_err());
-        assert!(unique_owner(&[1, 2], ID, |n| {
-            if *n == 2 {
-                Ok(json!({}))
-            } else {
-                answer(n)
-            }
-        })
-        .is_err());
-    }
-
-    #[test]
-    fn changed_owner_is_not_written_and_lost_response_is_never_retried() {
-        let writes = Cell::new(0);
-        let write = || {
-            writes.set(writes.get() + 1);
-            Err("connection lost after submission".into())
-        };
-        assert!(matches!(
-            send_once(&1, || Ok(2), write),
-            Err(MessageError::Unavailable(_))
-        ));
-        assert_eq!(writes.get(), 0);
-        assert_eq!(send_once(&1, || Ok(1), write), Err(MessageError::Uncertain));
-        assert_eq!(writes.get(), 1);
-    }
-
-    #[test]
-    fn only_canonical_conversation_ids_are_accepted() {
-        assert!(valid_cascade_id(ID));
-        assert!(!valid_cascade_id("../../other"));
-        assert!(!valid_cascade_id("aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeeg"));
-    }
-}
-/// Quota reads may use the first readable service. Pending permissions instead
 /// retain and revalidate an explicit Endpoint through `endpoints(true)`.
 pub fn call(method: &str, params: &Value) -> Result<Value, String> {
     allowed(method)?;
@@ -741,5 +689,81 @@ mod windows_live_test {
                 }),
             "the account response has no numeric quota remaining fraction"
         );
+    }
+}
+
+#[cfg(test)]
+mod message_tests {
+    use super::*;
+    use std::cell::Cell;
+
+    const ID: &str = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee";
+
+    #[test]
+    fn target_must_have_one_proven_owner_among_all_services() {
+        let answer = |endpoint: &u8| {
+            Ok(if *endpoint == 1 {
+                json!({"trajectorySummaries": {(ID): {}}})
+            } else {
+                json!({"trajectorySummaries": {}})
+            })
+        };
+        assert_eq!(unique_owner(&[1, 2], ID, answer), Ok(1));
+        assert!(unique_owner(&[1, 1], ID, answer).is_err());
+        assert!(unique_owner(&[2], ID, answer).is_err());
+        assert!(unique_owner(&[1, 2], ID, |n| {
+            if *n == 2 {
+                Err("offline".into())
+            } else {
+                answer(n)
+            }
+        })
+        .is_err());
+        // A service with no conversations answers without the map.
+        for empty in [json!({}), json!({"trajectorySummaries": null})] {
+            assert_eq!(
+                unique_owner(&[1, 2], ID, |n| if *n == 2 {
+                    Ok(empty.clone())
+                } else {
+                    answer(n)
+                }),
+                Ok(1)
+            );
+        }
+        for malformed in [json!([]), json!({"trajectorySummaries": []})] {
+            assert_eq!(
+                unique_owner(&[1, 2], ID, |n| if *n == 2 {
+                    Ok(malformed.clone())
+                } else {
+                    answer(n)
+                }),
+                Err(MessageError::Unavailable(
+                    "Invalid Antigravity conversation summary".into()
+                ))
+            );
+        }
+    }
+
+    #[test]
+    fn changed_owner_is_not_written_and_lost_response_is_never_retried() {
+        let writes = Cell::new(0);
+        let write = || {
+            writes.set(writes.get() + 1);
+            Err("connection lost after submission".into())
+        };
+        assert!(matches!(
+            send_once(&1, || Ok(2), write),
+            Err(MessageError::Unavailable(_))
+        ));
+        assert_eq!(writes.get(), 0);
+        assert_eq!(send_once(&1, || Ok(1), write), Err(MessageError::Uncertain));
+        assert_eq!(writes.get(), 1);
+    }
+
+    #[test]
+    fn only_canonical_conversation_ids_are_accepted() {
+        assert!(valid_cascade_id(ID));
+        assert!(!valid_cascade_id("../../other"));
+        assert!(!valid_cascade_id("aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeeg"));
     }
 }

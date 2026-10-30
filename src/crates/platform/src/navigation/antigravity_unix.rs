@@ -1,6 +1,7 @@
 //! Navigate Antigravity via the host application on Unix.
+use agent_hud_core::l10n;
+use reqwest::Url;
 use std::path::Path;
-use url::Url;
 
 const APP: &str = "com.google.antigravity";
 fn workspace_uri(cwd: Option<&str>) -> Option<String> {
