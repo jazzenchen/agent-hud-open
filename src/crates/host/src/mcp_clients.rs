@@ -48,6 +48,8 @@ pub(crate) fn executable(client: &str, home: &std::path::Path) -> Option<PathBuf
     super::system::cli_candidates(home, command, paths(home))
         .into_iter()
         .find(|path| path.is_file())
+        // A desktop app's bundled copy, as the account readers find it.
+        .or_else(|| agent_hud_runtime::client_executable(command))
 }
 /// Whether the client lists Agent HUD's server.
 fn installed(client: Client, places: &Places) -> bool {

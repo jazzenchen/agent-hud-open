@@ -33,9 +33,12 @@ fn resolve_claude_desktop_local_id(id: &str, cowork: bool) -> Option<String> {
     } else {
         "claude-code-sessions"
     };
-    let root = home.join("Library/Application Support/Claude").join(folder);
     let mut matched = Vec::new();
-    for org in std::fs::read_dir(root).ok()?.flatten() {
+    for org in agent_hud_agents::claude::transcript::desktop_bases(&home)
+        .into_iter()
+        .filter_map(|base| std::fs::read_dir(base.join(folder)).ok())
+        .flat_map(|entries| entries.flatten())
+    {
         let Ok(acct_dir) = std::fs::read_dir(org.path()) else {
             continue;
         };

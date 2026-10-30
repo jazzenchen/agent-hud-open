@@ -48,6 +48,7 @@ mod tests {
             }
         }
         let codex = crate::codex::AGENT.channel.unwrap();
-        assert!(!codex.runs_on(Os::Windows) && codex.runs_on(Os::Linux));
+        // The desktop app's IPC is a named pipe on Windows.
+        assert!(codex.runs_on(Os::Windows) && codex.runs_on(Os::Linux));
     }
 }

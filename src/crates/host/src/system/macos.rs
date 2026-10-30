@@ -82,6 +82,11 @@ pub(super) fn status(_identifier: &str) -> Result<Value, String> {
     Ok(json!({"platform":"macos","launchAtLogin":login()}))
 }
 
+/// No fixed hook owner is delegated on this host yet.
+pub(super) fn installed_hook_owner() -> Option<PathBuf> {
+    None
+}
+
 pub(super) fn cli_candidates(home: &Path, command: &str, dirs: Vec<PathBuf>) -> Vec<PathBuf> {
     let mut candidates = vec![];
     if command == "codex" {

@@ -6,12 +6,14 @@ mod files;
 pub(crate) mod pipe;
 mod process;
 mod secrets;
-pub(crate) use apps::{activate_app, app_running};
+pub(crate) use apps::{activate_app, app_running, registered_bundle};
 pub(crate) use process::{codex_cli_on_port, parent_processes};
 pub(crate) use secrets::{app_cookie, stored_secret};
 pub(crate) const READS_PROCESS_ENVIRONMENT: bool = false;
-/// The desktop app's resume link for a background job is unverified here.
-pub(crate) const MOVES_CLAUDE_JOBS: bool = false;
+/// A background job moves into the desktop app through `claude stop`, Claude
+/// Code's `sessions` registry and the `claude://resume` link, all present on
+/// Windows (the Claude app registers the scheme).
+pub(crate) const MOVES_CLAUDE_JOBS: bool = true;
 pub(crate) use files::{
     hook_configuration, owned_by_user, owner_only, private_append, private_directory, private_file,
     read_stdin,
@@ -58,15 +60,15 @@ pub(crate) fn application_installed(home: &Path, env: &Environment, name: &str) 
     if matches!(name, "Codex" | "ChatGPT") {
         return codex::installation(home, env).installed;
     }
+    if name == "Claude" && apps::registered_bundle("com.anthropic.claudefordesktop") {
+        return true;
+    }
     [
         local_app(home, env).join("Programs"),
         variable(env, "ProgramFiles", home).unwrap_or_else(|| PathBuf::from("C:/Program Files")),
     ]
     .iter()
     .any(|dir| dir.join(name).is_dir())
-}
-pub(crate) fn registered_bundle(_id: &str) -> bool {
-    false
 }
 pub(crate) fn executable_dirs(home: &Path, env: &Environment) -> Vec<PathBuf> {
     let mut dirs = path_entries(env);
@@ -125,7 +127,44 @@ pub(crate) fn engine_candidates(home: &Path, env: &Environment, name: &str) -> V
     ];
     dirs.extend(executable_dirs(home, env));
     paths.extend(dirs.into_iter().map(|dir| dir.join(format!("{name}.exe"))));
+    // Fallbacks for desktop apps that keep their CLI off PATH.
+    match name {
+        // The Claude desktop app: %APPDATA%\Claude\claude-code\<version>\<hash>\claude.exe
+        "claude" => paths.extend(newest_nested(
+            &app_support(home, env).join("Claude/claude-code"),
+            "claude.exe",
+        )),
+        // The Codex desktop app's own copy of its CLI.
+        "codex" => paths.push(home.join(".codex/.sandbox-bin/codex.exe")),
+        _ => {}
+    }
     paths
+}
+/// `<root>\*\*\<file>`, most recently modified first.
+fn newest_nested(root: &Path, file: &str) -> Vec<PathBuf> {
+    let children = |dir: &Path| -> Vec<PathBuf> {
+        std::fs::read_dir(dir)
+            .into_iter()
+            .flatten()
+            .filter_map(Result::ok)
+            .map(|entry| entry.path())
+            .filter(|path| path.is_dir())
+            .collect()
+    };
+    let mut found: Vec<_> = children(root)
+        .iter()
+        .flat_map(|version| children(version))
+        .map(|dir| dir.join(file))
+        .filter(|path| path.is_file())
+        .map(|path| {
+            let modified = std::fs::metadata(&path)
+                .and_then(|meta| meta.modified())
+                .unwrap_or(std::time::SystemTime::UNIX_EPOCH);
+            (modified, path)
+        })
+        .collect();
+    found.sort_by_key(|entry| std::cmp::Reverse(entry.0));
+    found.into_iter().map(|(_, path)| path).collect()
 }
 pub(crate) fn engine_path(home: &Path, env: &Environment) -> String {
     joined_path(executable_dirs(home, env))
@@ -159,6 +198,15 @@ pub(crate) fn source_roots(home: &Path) -> Vec<agent_hud_core::SourceRoot> {
 }
 
 pub(crate) fn open_session_url(url: &str) -> Result<(), String> {
+    // A scheme no handler claims (a Codex app installed without one) goes to
+    // the app's executable instead of failing.
+    if let Some(started) = apps::open_unregistered_link(url) {
+        return if started {
+            Ok(())
+        } else {
+            Err("The native client could not open this session".into())
+        };
+    }
     use std::{
         ffi::{c_void, OsStr},
         os::windows::ffi::OsStrExt,

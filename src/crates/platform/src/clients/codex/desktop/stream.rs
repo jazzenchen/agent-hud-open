@@ -18,7 +18,7 @@ pub(super) fn work(shared: Arc<Shared>) {
         }
         let began = Instant::now();
         if let Ok(mut connection) =
-            DesktopIpc::connect(&shared.data.join("ipc/ipc.sock"), Duration::from_secs(5))
+            DesktopIpc::connect(&endpoint(&shared.data), Duration::from_secs(5))
         {
             if let Ok(handle) = connection.shutdown_handle() {
                 shared

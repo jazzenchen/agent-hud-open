@@ -1,11 +1,16 @@
 //! Public native approvals/questions only. This observer shares generic Desktop
 //! framing with other users, but never starts/resumes a conversation or engine.
+// The Codex daemon's control socket is a Unix socket; Windows reads none.
+#[cfg(unix)]
+mod daemon;
+#[cfg(windows)]
+#[path = "desktop/daemon_windows.rs"]
 mod daemon;
 mod pending;
 mod stream;
 pub(crate) use daemon::daemon_tui_origin_for as daemon_tui_origin;
 
-use super::desktop_io::{DesktopIpc, IpcError};
+use super::desktop_io::{endpoint, DesktopIpc, IpcError, ShutdownHandle};
 use crate::hooks::Wake;
 use agent_hud_agents::codex::AGENT;
 use agent_hud_core::l10n;
@@ -14,8 +19,6 @@ use pending::Pending;
 use serde_json::Value;
 use std::{
     collections::HashMap,
-    net::Shutdown,
-    os::unix::net::UnixStream,
     path::PathBuf,
     sync::{
         atomic::{AtomicBool, Ordering},
@@ -37,8 +40,8 @@ struct State {
     reported: HashMap<String, Instant>,
     known: HashMap<String, ThreadState>,
     pending: HashMap<String, LivePending>,
-    connection: Option<UnixStream>,
-    answer_connections: HashMap<String, UnixStream>,
+    connection: Option<ShutdownHandle>,
+    answer_connections: HashMap<String, ShutdownHandle>,
 }
 struct Shared {
     active: AtomicBool,
@@ -122,10 +125,10 @@ impl CodexDesktopObserver {
         {
             let mut state = self.shared.state.lock().unwrap_or_else(|p| p.into_inner());
             if let Some(socket) = state.connection.take() {
-                let _ = socket.shutdown(Shutdown::Both);
+                socket.shutdown();
             }
             for socket in state.answer_connections.values() {
-                let _ = socket.shutdown(Shutdown::Both);
+                socket.shutdown();
             }
             state.answer_connections.clear();
             for id in state.pending.keys() {
@@ -400,8 +403,7 @@ impl Shared {
         if response.is_null() {
             return Err(ReplyFailure::Cancelled);
         }
-        let mut connection =
-            DesktopIpc::connect(&self.data.join("ipc/ipc.sock"), Duration::from_secs(3))?;
+        let mut connection = DesktopIpc::connect(&endpoint(&self.data), Duration::from_secs(3))?;
         {
             let mut state = self.state.lock().unwrap_or_else(|p| p.into_inner());
             if !self.active.load(Ordering::Acquire) {
@@ -519,5 +521,6 @@ impl From<IpcError> for ReplyFailure {
     }
 }
 
-#[cfg(test)]
+// The fixtures stand up a Unix socket in place of Codex Desktop.
+#[cfg(all(test, unix))]
 mod tests;

@@ -305,14 +305,71 @@ pub(crate) fn open(
     String,
 > {
     fs::create_dir_all(directory).map_err(|e| e.to_string())?;
+    match open_checked(directory).and_then(load) {
+        // The ledger is rebuilt from the agents' own logs, so a damaged copy
+        // is set aside and indexing starts over instead of failing every read.
+        Err(error) if corrupt(&error) => {
+            set_aside(directory);
+            open_checked(directory).and_then(load)
+        }
+        result => result,
+    }
+}
+
+const DAMAGED: &str = "ingestion.sqlite is damaged";
+
+fn corrupt(error: &str) -> bool {
+    error.starts_with(DAMAGED)
+        || error.contains("malformed")
+        || error.contains("not a database")
+        || error.contains("corrupt")
+}
+
+/// Opens the ledger and checks its structure before anything reads it.
+fn open_checked(directory: &Path) -> Result<Connection, String> {
     let database =
         Connection::open(directory.join("ingestion.sqlite")).map_err(|e| e.to_string())?;
     database
         .busy_timeout(Duration::from_secs(5))
         .map_err(|e| e.to_string())?;
+    let check: String = database
+        .query_row("PRAGMA quick_check(1)", [], |row| row.get(0))
+        .map_err(|e| e.to_string())?;
+    if check != "ok" {
+        return Err(format!("{DAMAGED}: {check}"));
+    }
     schema(&database).map_err(|e| e.to_string())?;
     windows_paths::migrate(&database).map_err(|e| e.to_string())?;
+    Ok(database)
+}
 
+/// Moves a damaged ledger and its journal files beside it, named by time.
+fn set_aside(directory: &Path) {
+    let stamp = chrono::Utc::now().format("%Y%m%d-%H%M%S");
+    for name in [
+        "ingestion.sqlite",
+        "ingestion.sqlite-wal",
+        "ingestion.sqlite-shm",
+    ] {
+        let path = directory.join(name);
+        if path.exists() {
+            let _ = fs::rename(&path, directory.join(format!("{name}.damaged-{stamp}")));
+        }
+    }
+}
+
+#[allow(clippy::type_complexity)]
+fn load(
+    database: Connection,
+) -> Result<
+    (
+        Connection,
+        HashMap<PathBuf, checkpoints::LogHead>,
+        HashMap<(String, String), PathBuf>,
+        i64,
+    ),
+    String,
+> {
     let transaction = database
         .unchecked_transaction()
         .map_err(|e| e.to_string())?;
@@ -380,6 +437,28 @@ pub(crate) fn open(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_damaged_ledger_is_set_aside_and_rebuilt() {
+        let temp = tempfile::tempdir().unwrap();
+        let directory = temp.path().join("data");
+        fs::create_dir_all(&directory).unwrap(); // plain directory
+        let mut garbage = b"SQLite format 3\0".to_vec();
+        garbage.extend(std::iter::repeat_n(0xA5u8, 8192));
+        fs::write(directory.join("ingestion.sqlite"), &garbage).unwrap();
+        let (database, logs, _, _) = open(&directory).expect("a fresh ledger replaces it");
+        assert!(logs.is_empty());
+        let check: String = database
+            .query_row("PRAGMA quick_check", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(check, "ok");
+        let kept = fs::read_dir(&directory)
+            .unwrap()
+            .filter_map(Result::ok)
+            .filter(|entry| entry.file_name().to_string_lossy().contains(".damaged-"))
+            .count();
+        assert_eq!(kept, 1);
+    }
 
     #[test]
     fn a_large_write_leaves_the_wal_file_small_after_a_checkpoint() {

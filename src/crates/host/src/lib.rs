@@ -833,7 +833,13 @@ pub fn run_with_context(
     context: tauri::Context<tauri::Wry>,
     extension: Option<Arc<dyn extension::ProductExtension>>,
 ) {
-    run_with_options(context, extension, HostOptions::default())
+    run_with_options(
+        context,
+        extension,
+        HostOptions {
+            canonical_executable: system::installed_hook_owner(),
+        },
+    )
 }
 pub fn run_with_options(
     context: tauri::Context<tauri::Wry>,

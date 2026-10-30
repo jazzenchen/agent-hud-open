@@ -10,13 +10,13 @@ use std::{
 #[cfg(unix)]
 mod unix;
 #[cfg(unix)]
-pub use unix::{endpoint, LocalSocket};
+pub use unix::{endpoint, LocalSocket, ShutdownHandle};
 #[cfg(unix)]
 use unix::{random as fill_random, Frame};
 #[cfg(windows)]
 mod windows;
 #[cfg(windows)]
-pub use windows::{endpoint, LocalSocket};
+pub use windows::{endpoint, LocalSocket, ShutdownHandle};
 #[cfg(windows)]
 use windows::{random as fill_random, Frame};
 

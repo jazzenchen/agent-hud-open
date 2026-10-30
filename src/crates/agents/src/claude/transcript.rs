@@ -1158,6 +1158,48 @@ struct DesktopFile {
     tab: Option<(&'static str, String, String, bool)>,
 }
 
+/// Where the Claude desktop app keeps its data under a home folder, on any
+/// system: Application Support on macOS, roaming AppData on Windows (or the
+/// Microsoft Store package's copy of it), the config folder on Linux. Only
+/// the folders that exist, each once.
+pub fn desktop_bases(home: &Path) -> Vec<PathBuf> {
+    let mut candidates = vec![
+        home.join("Library/Application Support/Claude"),
+        home.join("AppData/Roaming/Claude"),
+        home.join(".config/Claude"),
+    ];
+    if let Some(roaming) = std::env::var_os("APPDATA").map(PathBuf::from) {
+        if roaming.starts_with(home) {
+            candidates.push(roaming.join("Claude"));
+        }
+    }
+    let packages = home.join("AppData/Local/Packages");
+    if let Ok(entries) = std::fs::read_dir(&packages) {
+        for entry in entries.flatten() {
+            if entry
+                .file_name()
+                .to_str()
+                .is_some_and(|name| name.starts_with("Claude_"))
+            {
+                candidates.push(entry.path().join("LocalCache/Roaming/Claude"));
+            }
+        }
+    }
+    let mut found: Vec<PathBuf> = Vec::new();
+    let mut seen: Vec<PathBuf> = Vec::new();
+    for candidate in candidates {
+        if !candidate.is_dir() {
+            continue;
+        }
+        let real = std::fs::canonicalize(&candidate).unwrap_or_else(|_| candidate.clone());
+        if !seen.contains(&real) {
+            seen.push(real);
+            found.push(candidate);
+        }
+    }
+    found
+}
+
 impl ClaudeDesktopIndex {
     /// Reads the desktop app's session metadata again, every collection pass
     /// as Open does, and says whether the archive or the tabs changed.
@@ -1172,14 +1214,23 @@ impl ClaudeDesktopIndex {
                 }
             }
         }
-        if let Some(env_home) = std::env::var_os("HOME").map(PathBuf::from) {
-            if !homes.contains(&env_home) {
-                homes.push(env_home);
+        for variable in ["HOME", "USERPROFILE"] {
+            if let Some(env_home) = std::env::var_os(variable).map(PathBuf::from) {
+                if !homes.contains(&env_home) {
+                    homes.push(env_home);
+                }
+            }
+        }
+        let mut bases: Vec<PathBuf> = Vec::new();
+        for home in &homes {
+            for base in desktop_bases(home) {
+                if !bases.contains(&base) {
+                    bases.push(base);
+                }
             }
         }
         let mut files = HashMap::new();
-        for home in homes {
-            let base = home.join("Library/Application Support/Claude");
+        for base in bases {
             for (folder, kind) in [
                 ("claude-code-sessions", "claude-desktop"),
                 ("local-agent-mode-sessions", "claude-cowork"),

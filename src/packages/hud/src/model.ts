@@ -54,6 +54,8 @@ export interface HUDConfig {
   logoEdgeDistance: number;
   gapScale: number;
   showsLogos: boolean;
+  /** Whether this screen shows a HUD at all; the others keep theirs. */
+  showsHUD: boolean;
   simpleSize: number;
   simpleGapScale: number;
   ringWidth: number;

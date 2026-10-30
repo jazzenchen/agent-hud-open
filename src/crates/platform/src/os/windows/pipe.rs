@@ -28,9 +28,9 @@ use windows_sys::Win32::{
             ConvertSidToStringSidW, ConvertStringSecurityDescriptorToSecurityDescriptorW,
             GetNamedSecurityInfoW, SE_FILE_OBJECT,
         },
-        GetTokenInformation, SetFileSecurityW, TokenUser, DACL_SECURITY_INFORMATION,
+        GetTokenInformation, SetFileSecurityW, TokenOwner, TokenUser, DACL_SECURITY_INFORMATION,
         OWNER_SECURITY_INFORMATION, PROTECTED_DACL_SECURITY_INFORMATION, SECURITY_ATTRIBUTES,
-        TOKEN_QUERY, TOKEN_USER,
+        TOKEN_OWNER, TOKEN_QUERY, TOKEN_USER,
     },
     Storage::FileSystem::{
         CreateDirectoryW, CreateFileW, CREATE_NEW, FILE_ATTRIBUTE_REPARSE_POINT,
@@ -51,29 +51,29 @@ impl Drop for Local {
         }
     }
 }
-fn sid() -> Result<String, String> {
+/// One SID from this process's token, as text.
+fn token_sid(class: i32) -> Result<String, String> {
     unsafe {
         let mut token: HANDLE = std::ptr::null_mut();
         if OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &mut token) == 0 {
             return Err("Current-user token unavailable".into());
         }
         let mut bytes = 0;
-        GetTokenInformation(token, TokenUser, std::ptr::null_mut(), 0, &mut bytes);
+        GetTokenInformation(token, class, std::ptr::null_mut(), 0, &mut bytes);
         let mut buffer = vec![0usize; (bytes as usize).div_ceil(size_of::<usize>())];
-        let ok = GetTokenInformation(
-            token,
-            TokenUser,
-            buffer.as_mut_ptr().cast(),
-            bytes,
-            &mut bytes,
-        );
+        let ok = GetTokenInformation(token, class, buffer.as_mut_ptr().cast(), bytes, &mut bytes);
         CloseHandle(token);
         if ok == 0 {
             return Err("Current-user identity unavailable".into());
         }
-        let user = &*buffer.as_ptr().cast::<TOKEN_USER>();
+        // TOKEN_USER and TOKEN_OWNER both begin with the SID pointer.
+        let sid = if class == TokenUser {
+            (*buffer.as_ptr().cast::<TOKEN_USER>()).User.Sid
+        } else {
+            (*buffer.as_ptr().cast::<TOKEN_OWNER>()).Owner
+        };
         let mut text = std::ptr::null_mut();
-        if ConvertSidToStringSidW(user.User.Sid, &mut text) == 0 {
+        if ConvertSidToStringSidW(sid, &mut text) == 0 {
             return Err("Current-user identity unavailable".into());
         }
         let text = Local(text.cast());
@@ -86,6 +86,17 @@ fn sid() -> Result<String, String> {
             count,
         )))
     }
+}
+fn sid() -> Result<String, String> {
+    token_sid(TokenUser)
+}
+/// The owner Windows gives what this process creates. For an elevated
+/// administrator that is the Administrators group, not the user, so files the
+/// user's own elevated programs made (Claude Code's transcripts, this app's
+/// earlier data) carry it.
+fn default_owner() -> Option<&'static str> {
+    static OWNER: std::sync::OnceLock<Option<String>> = std::sync::OnceLock::new();
+    OWNER.get_or_init(|| token_sid(TokenOwner).ok()).as_deref()
 }
 fn security(inherit: bool) -> Result<Local, String> {
     let sid = sid()?;
@@ -141,7 +152,7 @@ pub(crate) fn owned_path(path: &Path) -> bool {
     let owner = unsafe {
         String::from_utf16_lossy(std::slice::from_raw_parts(text.0.cast::<u16>(), count))
     };
-    sid().is_ok_and(|sid| sid == owner)
+    sid().is_ok_and(|sid| sid == owner) || default_owner() == Some(owner.as_str())
 }
 pub(crate) fn private_directory(path: &Path) -> Result<(), String> {
     if let Some(parent) = path

@@ -94,6 +94,8 @@ pub(super) fn screen(
 }
 
 /// No previous application is remembered; the window takes focus directly.
+// Hosts that remember no previous application never make one.
+#[allow(dead_code)]
 pub(super) struct TextFocusOrigin;
 
 pub(super) fn begin_text_focus(
