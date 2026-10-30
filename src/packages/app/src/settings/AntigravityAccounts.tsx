@@ -1,6 +1,12 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { NativeMethod } from "@agent-hud/protocol";
-import { Button } from "@agent-hud/ui/components/button";
+import {
+  Notice,
+  Section,
+  SmallButton,
+  Unavailable,
+  type Text,
+} from "./SettingsPrimitives";
 
 interface CliStatus {
   installable: boolean;
@@ -8,13 +14,15 @@ interface CliStatus {
   notice?: string | null;
 }
 
+/** The Antigravity CLI settings files Agent HUD hooks into to read each
+ * signed-in account's quota. */
 export default function AntigravityAccounts({
+  t,
   settings,
-  zh,
   action,
 }: {
+  t: Text;
   settings: string[];
-  zh: boolean;
   action: (
     method: NativeMethod,
     params?: Record<string, unknown>,
@@ -42,7 +50,6 @@ export default function AntigravityAccounts({
       active = false;
     };
   }, []);
-  const t = (en: string, cn: string) => (zh ? cn : en);
   const paths = () => [
     ...new Set(
       text
@@ -51,6 +58,20 @@ export default function AntigravityAccounts({
         .filter(Boolean),
     ),
   ];
+  const label = t("Antigravity CLI accounts", "Antigravity CLI 账户");
+  // Why the field is off: still checking, or the CLI can't take the hook.
+  const reason = !status
+    ? error
+      ? undefined
+      : t("Checking the Antigravity CLI…", "正在检查 Antigravity CLI…")
+    : !status.installable
+      ? (status.notice ??
+        t(
+          "The Antigravity CLI can't be connected.",
+          "无法连接 Antigravity CLI。",
+        ))
+      : undefined;
+  const ready = !!status?.installable;
 
   async function save() {
     setPending(true);
@@ -67,101 +88,60 @@ export default function AntigravityAccounts({
     }
   }
 
+  const gate = (button: ReactNode, off: boolean) =>
+    off && reason ? (
+      <Unavailable reason={reason}>{button}</Unavailable>
+    ) : (
+      button
+    );
+  const addDefaultOff =
+    pending || !ready || paths().includes(status?.defaultSettings ?? "");
+  const connectOff = pending || !ready || text === saved;
+
   return (
-    <section
-      style={{
-        border: "1px solid var(--border)",
-        background: "var(--card)",
-        borderRadius: 12,
-        padding: 16,
-      }}
+    <Section
+      title={label}
+      footer={t(
+        "One settings.json per line. Restart the CLI after connecting; removing a path undoes the change.",
+        "每行一个 settings.json。连接后重启 CLI；移除路径即可还原。",
+      )}
     >
-      <label htmlFor="antigravity-cli-settings" style={{ fontWeight: 600 }}>
-        {t("Antigravity CLI accounts", "Antigravity CLI 账户")}
-      </label>
-      <p
-        id="antigravity-cli-settings-help"
-        style={{
-          fontSize: 12,
-          color: "var(--muted-foreground)",
-          margin: "6px 0 12px",
-        }}
-      >
-        {t(
-          "Connect each CLI settings.json, one per line. Start or restart the CLI after connecting. Accounts appear as you use them, including after switching accounts. Inactive quotas are marked stale.",
-          "填写各个 CLI 的 settings.json 路径，每行一个。连接后启动或重启 CLI，使用过的账户会陆续显示，切换账户后也会保留；不活跃账户的额度会标为过期。",
-        )}
-      </p>
-      <textarea
-        id="antigravity-cli-settings"
-        aria-describedby="antigravity-cli-settings-help antigravity-cli-settings-restore"
-        value={text}
-        onChange={(event) => setText(event.target.value)}
-        disabled={pending || !status?.installable}
-        rows={3}
-        spellCheck={false}
-        placeholder="~/.gemini/antigravity-cli/settings.json"
-        style={{
-          width: "100%",
-          boxSizing: "border-box",
-          resize: "vertical",
-          border: "1px solid var(--border)",
-          borderRadius: 6,
-          padding: 8,
-          color: "inherit",
-          background: "var(--background)",
-          fontFamily: "monospace",
-          fontSize: 12,
-        }}
-      />
-      <p
-        id="antigravity-cli-settings-restore"
-        style={{
-          fontSize: 12,
-          color: "var(--muted-foreground)",
-          margin: "6px 0 12px",
-        }}
-      >
-        {t(
-          "Connecting adds a local quota callback and preserves your status line. Remove a path and save to restore its original status line.",
-          "连接会添加本地额度回调，并保留原有状态栏。移除路径并保存后，会恢复该配置的原有状态栏。",
-        )}
-      </p>
-      {status?.notice && (
-        <p style={{ fontSize: 12, color: "var(--muted-foreground)" }}>
-          {status.notice}
-        </p>
-      )}
-      {error && (
-        <p role="alert" style={{ fontSize: 12, color: "var(--destructive)" }}>
-          {error}
-        </p>
-      )}
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-        <Button
-          size="sm"
-          variant="outline"
-          disabled={
-            pending ||
-            !status?.installable ||
-            paths().includes(status?.defaultSettings ?? "")
-          }
-          onClick={() =>
-            setText([...paths(), status!.defaultSettings].join("\n"))
-          }
-        >
-          {t("Add default configuration", "添加默认配置")}
-        </Button>
-        <Button
-          size="sm"
-          disabled={pending || !status?.installable || text === saved}
-          onClick={() => void save()}
-        >
-          {pending
-            ? t("Saving…", "正在保存…")
-            : t("Connect accounts", "连接账户")}
-        </Button>
+      <div className="settings-field">
+        <textarea
+          aria-label={label}
+          value={text}
+          onChange={(event) => setText(event.target.value)}
+          disabled={pending || !ready}
+          rows={3}
+          spellCheck={false}
+          placeholder="~/.gemini/antigravity-cli/settings.json"
+        />
+        <div className="settings-actions">
+          {gate(
+            <SmallButton
+              disabled={addDefaultOff}
+              onClick={() =>
+                setText([...paths(), status!.defaultSettings].join("\n"))
+              }
+            >
+              {t("Add default", "添加默认配置")}
+            </SmallButton>,
+            addDefaultOff,
+          )}
+          {gate(
+            <SmallButton
+              variant="default"
+              disabled={connectOff}
+              onClick={() => void save()}
+            >
+              {pending ? t("Saving…", "正在保存…") : t("Connect", "连接")}
+            </SmallButton>,
+            connectOff,
+          )}
+        </div>
       </div>
-    </section>
+      {status?.notice && <Notice>{status.notice}</Notice>}
+      {error && <Notice tone="error">{error}</Notice>}
+    </Section>
   );
 }

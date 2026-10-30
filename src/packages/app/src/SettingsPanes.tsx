@@ -11,6 +11,7 @@ import { GeneralPane } from "./settings/GeneralPane";
 import { LocalNetworkPane } from "./settings/LocalNetworkPane";
 import { PricesPane } from "./settings/PricesPane";
 import { RelaysPane } from "./settings/RelaysPane";
+import { UpdatesPane } from "./settings/UpdatesPane";
 import type { SettingsPaneProps } from "./settings/SettingsPrimitives";
 
 export type { SettingsPaneProps } from "./settings/SettingsPrimitives";
@@ -50,6 +51,7 @@ export default function SettingsPane({
   if (page === "prices") return <PricesPane {...settingsProps} />;
   if (page === "relays") return <RelaysPane {...settingsProps} />;
   if (page === "local-network") return <LocalNetworkPane {...settingsProps} />;
+  if (page === "updates") return <UpdatesPane {...settingsProps} />;
   if (page === "display")
     return ready && selectedId ? (
       <DisplayPane
@@ -58,8 +60,6 @@ export default function SettingsPane({
         monitors={monitors}
         selectedScreenId={selectedId}
         onSelectScreen={selectScreen}
-        layout={layout}
-        onLayout={onLayout}
       />
     ) : (
       <LoadingState label={chinese ? "正在读取显示器…" : "Reading displays…"} />
@@ -69,6 +69,7 @@ export default function SettingsPane({
       <SourcesSettings
         snapshot={settingsProps.snapshot}
         action={settingsProps.action}
+        active={settingsProps.active}
         layout={layout}
         onLayout={onLayout}
         preferences={preferences}

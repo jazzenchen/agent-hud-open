@@ -1,6 +1,7 @@
 /* The app's stylesheet: the shared theme, and the class names the HUD and the
    app's windows use. A product built on the app imports this one. */
 @import "@agent-hud/ui/global.css";
+@import "./settings/settings.css";
 @source "../../hud/src";
 @source ".";
 

@@ -1,7 +1,7 @@
-// The rows of Settings → Agents → Agent plugins as data: each row's status
-// chip, its one action, what its ⋯ menu offers and the next step under it, in
-// English and Chinese. The page draws them; a product build's own rows take
-// their words from here too, so both builds read the same.
+// The rows of Settings → Agent plugins as data: each row's status pill, its
+// one action, what its ⋯ menu offers and the next step under it, in English
+// and Chinese. The page draws them; a product build's own rows take their
+// words from here too, so both builds read the same.
 
 export type Words = readonly [en: string, zh: string];
 
@@ -116,15 +116,15 @@ export function pluginRow(
         ? null
         : {
             words: [
-              `${client} loads it by itself within a few seconds, open sessions included. Open ${client} to use it.`,
+              `${client} loads it by itself within seconds, open sessions included. Open ${client} to use it.`,
               `${client} 会在几秒内自动加载，已经打开的会话也一样。打开 ${client} 即可使用。`,
             ],
           }
       : !loaded || input.justInstalled
         ? {
             words: [
-              `New ${client} sessions load it when they start. In a session that's already open, run ${reloadCommand}.`,
-              `新开的 ${client} 会话会自动加载。已经打开的会话，在其中运行 ${reloadCommand}。`,
+              `New sessions load it. In an open session, run ${reloadCommand}.`,
+              `新会话会自动加载；已经打开的会话，在其中运行 ${reloadCommand}。`,
             ],
             command: reloadCommand,
           }
@@ -164,7 +164,7 @@ export function mcpRow(input: McpInput): RowState {
         : null;
   const menu: RowState["menu"] = [];
   if (input.hasCommand)
-    menu.push({ id: "copy", label: ["Copy command", "拷贝命令"] });
+    menu.push({ id: "copy", label: ["Copy command", "复制命令"] });
   if (input.added && input.setupReady)
     menu.push({
       id: "remove",
@@ -175,7 +175,7 @@ export function mcpRow(input: McpInput): RowState {
     ? {
         words: [
           "Command copied. Paste it into Terminal.",
-          "已拷贝命令，粘贴到终端运行。",
+          "已复制命令，粘贴到终端运行。",
         ] as Words,
       }
     : null;

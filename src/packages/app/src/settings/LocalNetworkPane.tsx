@@ -1,14 +1,18 @@
 import { useCallback, useEffect, useState } from "react";
-import { Input } from "@agent-hud/ui/components/input";
 import {
-  Divider,
+  Footnote,
+  LinkButton,
+  Notice,
+  Page,
+  Pill,
   Row,
-  secondary,
   Section,
   SmallButton,
   ToggleRow,
+  Unavailable,
   useText,
   type SettingsPaneProps,
+  type Text,
 } from "./SettingsPrimitives";
 
 interface Peer {
@@ -34,6 +38,10 @@ interface Invitation {
   image: string;
   invitation: { expiresAtMs: number };
 }
+
+/** A clock time in the app's language, not the system's. */
+const clock = (ms: number, t: Text) =>
+  new Date(ms).toLocaleTimeString(t("en-US", "zh-CN"));
 
 /**
  * The Local Network page: paired phones read this computer's quota readings
@@ -85,9 +93,12 @@ export function LocalNetworkPane({
   };
   if (!status)
     return (
-      <p style={{ ...secondary, fontSize: 13 }}>
-        {error ?? t("Reading local sharing…", "正在读取局域网设置…")}
-      </p>
+      <Page>
+        <Footnote>
+          {t("Reading local sharing…", "正在读取局域网设置…")}
+        </Footnote>
+        {error && <Notice tone="error">{error}</Notice>}
+      </Page>
     );
   const addresses = status.endpoint
     ? [
@@ -99,155 +110,180 @@ export function LocalNetworkPane({
     : status.on
       ? t("No usable network address", "没有可用的网络地址")
       : t("Sharing is off", "共享已关闭");
-  const lastSeen = (peer: Peer) =>
-    peer.online
-      ? t("Online", "在线")
-      : t(
-          `Last seen ${new Date(peer.lastSeenMs).toLocaleTimeString()}`,
-          `最后连接 ${new Date(peer.lastSeenMs).toLocaleTimeString()}`,
-        );
+  const create = (
+    <SmallButton
+      disabled={pending || !status.enabled}
+      onClick={() =>
+        void perform(async () => {
+          setInvitation((await share("pair_invitation")) as Invitation);
+          setCopied(false);
+        })
+      }
+    >
+      {invitation
+        ? t("New invitation", "重新创建")
+        : t("Create invitation", "创建邀请")}
+    </SmallButton>
+  );
+  const problem = error ?? status.error;
+  const unsupported = t(
+    "Sharing with phones is not available on this system yet.",
+    "这个系统暂不支持与手机共享。",
+  );
   return (
-    <div style={{ display: "grid", gap: 24 }}>
-      <Section title={t("Sharing", "共享")}>
+    <Page>
+      <Section>
         <ToggleRow
           title={t("Share with paired phones", "与已配对手机共享")}
           subtitle={t(
-            "A paired iPhone reads this computer's quota and token usage on the same network or over your Tailscale. Sessions and conversations are not shared.",
-            "已配对的 iPhone 可以在同一网络或你的 Tailscale 里查看本机的额度和 token 用量。会话和对话内容不会共享。",
+            "Paired iPhones read quota and token usage only.",
+            "已配对的 iPhone 只能查看额度和 token 用量。",
           )}
           checked={status.on}
           disabled={!status.supported || pending}
-          reason={t(
-            "Sharing with phones is not available on this system yet.",
-            "这个系统暂不支持与手机共享。",
-          )}
+          reason={status.supported ? undefined : unsupported}
           change={(enabled) => {
             setInvitation(null);
             void perform(() => share("set_enabled", { enabled }));
           }}
         />
-        <Divider />
-        <Row title={t("Address", "地址")} subtitle={addresses}>
-          <span style={{ ...secondary, fontSize: 11 }}>
-            {t("TLS · pinned certificate", "TLS · 证书固定校验")}
-          </span>
-        </Row>
+        <Row title={t("Connection", "连接")} detail={addresses} />
       </Section>
-      <Section title={t("Pair a phone", "配对手机")}>
+      <Section
+        title={t("Pair a device", "配对设备")}
+        footer={t(
+          "An invitation works once and expires after five minutes. Paired devices can only read.",
+          "邀请仅可使用一次，五分钟后失效。配对设备只能查看。",
+        )}
+      >
         <Row
-          title={t("Pairing code", "配对码")}
-          subtitle={t(
-            "Scan it with Agent HUD on iPhone. It works once and expires after five minutes. A paired phone can only read.",
-            "用 iPhone 上的 Agent HUD 扫描。只能用一次，五分钟后失效。配对的手机只能查看。",
-          )}
+          title={t("QR invitation", "二维码邀请")}
+          subtitle={
+            invitation
+              ? t(
+                  "Scan it with Agent HUD on iPhone.",
+                  "用 iPhone 上的 Agent HUD 扫描。",
+                )
+              : undefined
+          }
+          below={
+            invitation && (
+              // A white ground whatever the theme, so a phone camera reads it.
+              <div style={{ display: "grid", justifyItems: "center" }}>
+                <img
+                  src={invitation.image}
+                  width={200}
+                  height={200}
+                  alt={t(
+                    "Single-use Agent HUD pairing invitation",
+                    "一次性 Agent HUD 配对邀请",
+                  )}
+                  style={{ background: "white", padding: 10, borderRadius: 8 }}
+                />
+              </div>
+            )
+          }
         >
-          <SmallButton
-            disabled={pending || !status.enabled}
-            onClick={() =>
-              void perform(async () => {
-                setInvitation((await share("pair_invitation")) as Invitation);
-                setCopied(false);
-              })
-            }
-          >
-            {t("Show code", "显示配对码")}
-          </SmallButton>
+          {!status.enabled && !pending ? (
+            <Unavailable
+              reason={
+                !status.supported
+                  ? unsupported
+                  : status.on
+                    ? t("Sharing isn’t running.", "共享未在运行。")
+                    : t("Turn on sharing first.", "请先打开共享。")
+              }
+            >
+              {create}
+            </Unavailable>
+          ) : (
+            create
+          )}
         </Row>
         {invitation && (
-          <div style={{ display: "grid", gap: 10, padding: "4px 16px 12px" }}>
-            <img
-              src={invitation.image}
-              width={220}
-              height={220}
-              alt={t(
-                "Single-use Agent HUD pairing code",
-                "一次性 Agent HUD 配对码",
-              )}
-              style={{
-                justifySelf: "center",
-                background: "white",
-                padding: 10,
-                borderRadius: 8,
-              }}
-            />
-            <Input value={invitation.uri} readOnly style={{ fontSize: 11 }} />
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
+          <Row
+            title={t("Pairing link", "配对链接")}
+            subtitle={t(
+              `Expires at ${clock(invitation.invitation.expiresAtMs, t)}`,
+              `${clock(invitation.invitation.expiresAtMs, t)} 失效`,
+            )}
+            detail={invitation.uri}
+          >
+            <LinkButton
+              onClick={() =>
+                void navigator.clipboard
+                  .writeText(invitation.uri)
+                  .then(() => setCopied(true))
+                  .catch(() => setCopied(false))
+              }
+            >
+              {copied ? t("Copied", "已复制") : t("Copy link", "复制链接")}
+            </LinkButton>
+          </Row>
+        )}
+      </Section>
+      <Section
+        title={t("Devices", "设备")}
+        subtitle={pairedSummary(status.pairedClients, t)}
+        action={
+          status.pairedClients > 0 && (
+            <LinkButton
+              tone="destructive"
+              disabled={pending}
+              onClick={() => {
+                setInvitation(null);
+                void perform(() => share("revoke_clients"));
               }}
             >
-              <span style={{ ...secondary, fontSize: 11 }}>
-                {t(
-                  `Expires at ${new Date(invitation.invitation.expiresAtMs).toLocaleTimeString()}`,
-                  `${new Date(invitation.invitation.expiresAtMs).toLocaleTimeString()} 失效`,
-                )}
-              </span>
-              <SmallButton
-                onClick={() =>
-                  void navigator.clipboard
-                    .writeText(invitation.uri)
-                    .then(() => setCopied(true))
-                    .catch(() => setCopied(false))
-                }
-              >
-                {copied ? t("Copied", "已复制") : t("Copy link", "复制链接")}
-              </SmallButton>
-            </div>
-          </div>
-        )}
-        <Divider />
-        <Row
-          title={t("Paired phones", "已配对手机")}
-          subtitle={t(
-            `${status.pairedClients} saved`,
-            `已保存 ${status.pairedClients} 台`,
-          )}
-        >
-          <SmallButton
-            disabled={pending || status.pairedClients === 0}
-            onClick={() => {
-              setInvitation(null);
-              void perform(() => share("revoke_clients"));
-            }}
-          >
-            {t("Remove all", "全部移除")}
-          </SmallButton>
-        </Row>
-      </Section>
-      <Section title={t("Phones", "手机")}>
+              {t("Revoke paired devices", "撤销已配对设备")}
+            </LinkButton>
+          )
+        }
+      >
         {status.peers.length ? (
-          status.peers.map((peer, index) => (
-            <div key={peer.id}>
-              {index > 0 && <Divider />}
-              <Row
-                title={
-                  (peer.name ?? t("Paired phone", "已配对手机")) +
-                  (peer.version ? ` · ${peer.version}` : "")
-                }
-                subtitle={peer.address}
-              >
-                <span style={{ ...secondary, fontSize: 11 }}>
-                  {lastSeen(peer)}
-                </span>
-              </Row>
-            </div>
+          status.peers.map((peer) => (
+            <Row
+              key={peer.id}
+              title={
+                (peer.name ?? t("Paired device", "已配对设备")) +
+                (peer.version ? ` · ${peer.version}` : "")
+              }
+              detail={peer.address}
+            >
+              {peer.online ? (
+                <Pill tone="green" dot>
+                  {t("Online", "在线")}
+                </Pill>
+              ) : (
+                <Pill>
+                  {t(
+                    `Last seen ${clock(peer.lastSeenMs, t)}`,
+                    `最后连接 ${clock(peer.lastSeenMs, t)}`,
+                  )}
+                </Pill>
+              )}
+            </Row>
           ))
         ) : (
-          <p style={{ ...secondary, fontSize: 12, padding: "8px 16px" }}>
-            {t(
-              "No phone has connected since Agent HUD started.",
-              "这次启动后还没有手机连接。",
+          <Row
+            muted
+            title={t(
+              "No device has connected since Agent HUD started.",
+              "这次启动后还没有设备连接。",
             )}
-          </p>
+          />
         )}
       </Section>
-      {(error ?? status.error) && (
-        <p style={{ color: "var(--destructive)", fontSize: 12 }}>
-          {error ?? status.error}
-        </p>
-      )}
-    </div>
+      {problem && <Notice tone="error">{problem}</Notice>}
+    </Page>
+  );
+}
+
+/** "2 paired devices": the saved pairings, not this launch's connections,
+ * which the rows below list. */
+function pairedSummary(grants: number, t: Text) {
+  return t(
+    `${grants} paired ${grants === 1 ? "device" : "devices"}`,
+    `已配对 ${grants} 台设备`,
   );
 }

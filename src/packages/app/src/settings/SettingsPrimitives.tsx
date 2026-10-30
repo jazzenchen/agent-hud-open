@@ -1,4 +1,9 @@
-import type { CSSProperties, ReactNode } from "react";
+/* The building blocks every Settings page is made of, so all pages share one
+ * look: a section is a heading over a card, a card holds rows, a row is words
+ * on the left and its control on the right. Spacing, type and dividers live in
+ * settings.css; pages never style these by hand. */
+import { useId, useState, type ReactNode } from "react";
+import { ChevronRight } from "lucide-react";
 import type { NativeMethod, Snapshot } from "@agent-hud/protocol";
 import { Button } from "@agent-hud/ui/components/button";
 import { Slider } from "@agent-hud/ui/components/slider";
@@ -32,141 +37,103 @@ export interface SettingsPaneProps {
 
 export type Text = (en: string, zh: string) => string;
 
-export const secondary: CSSProperties = {
-  color: "var(--muted-foreground)",
-  lineHeight: 1.4,
-};
-
 const nativeUnavailable =
   "This native integration is not available in this version.";
 
-export function useText(snapshot: Snapshot): Text {
-  const chinese = snapshotLanguage(snapshot) === "zh";
+export function useText(snapshot: Snapshot | null): Text {
+  const chinese = snapshot ? snapshotLanguage(snapshot) === "zh" : false;
   return (en, zh) => (chinese ? zh : en);
 }
 
+/** A page's body: its sections, one under another. */
+export function Page({ children }: { children: ReactNode }) {
+  return <div className="settings-page">{children}</div>;
+}
+
+/** A heading over a card of rows. `action` sits at the heading's right (a
+ * count, a Refresh button); `footer` is a short note under the card. With
+ * `plain` the children go under the heading without a card. */
 export function Section({
   title,
   subtitle,
+  action,
+  footer,
+  plain = false,
   children,
 }: {
-  title: string;
-  subtitle?: string;
+  title?: ReactNode;
+  subtitle?: ReactNode;
+  action?: ReactNode;
+  footer?: ReactNode;
+  plain?: boolean;
   children: ReactNode;
 }) {
   return (
-    <section
-      className="source-settings-section"
-      style={{ display: "grid", gap: 12 }}
-    >
-      <header style={{ display: "grid", gap: 5 }}>
-        <h2
-          style={{
-            margin: 0,
-            fontSize: 15,
-            fontWeight: 600,
-            lineHeight: "18px",
-          }}
-        >
-          {title}
-        </h2>
-        {subtitle && (
-          <p
-            style={{
-              ...secondary,
-              margin: 0,
-              fontSize: 12,
-              whiteSpace: "pre-line",
-            }}
-          >
-            {subtitle}
-          </p>
-        )}
-      </header>
-      <div
-        className="source-settings-card"
-        style={{
-          borderRadius: 12,
-          overflow: "hidden",
-          background: "var(--settings-card, var(--card))",
-          border: "1px solid var(--settings-card-border, var(--border))",
-        }}
-      >
-        {children}
-      </div>
+    <section className="settings-section">
+      {(title || action) && (
+        <header className="settings-section-header">
+          <div>
+            {title && <h2>{title}</h2>}
+            {subtitle && <p>{subtitle}</p>}
+          </div>
+          {action && <div className="settings-section-action">{action}</div>}
+        </header>
+      )}
+      {plain ? children : <div className="settings-card">{children}</div>}
+      {footer && <Footnote>{footer}</Footnote>}
     </section>
   );
 }
 
-export function Divider() {
-  return (
-    <div
-      className="source-settings-divider"
-      style={{ height: 1, marginInline: 16, background: "var(--border)" }}
-    />
-  );
+/** A card of rows outside a Section (inside a Collapsible, say). */
+export function Card({ children }: { children: ReactNode }) {
+  return <div className="settings-card">{children}</div>;
 }
 
+/** Words on the left, the control on the right. `icon` is a leading glyph or
+ * logo; `tag` a small grey label after the title; `detail` a line of facts
+ * under the subtitle; `below` content that spans the row under both. */
 export function Row({
   title,
   subtitle,
   tag,
+  icon,
+  detail,
+  below,
+  muted = false,
   children,
 }: {
-  title: string;
-  subtitle?: string;
-  tag?: string;
-  children: ReactNode;
+  title: ReactNode;
+  subtitle?: ReactNode;
+  tag?: ReactNode;
+  icon?: ReactNode;
+  detail?: ReactNode;
+  below?: ReactNode;
+  muted?: boolean;
+  children?: ReactNode;
 }) {
   return (
-    <div
-      className="source-setting-row"
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 24,
-        padding: "11px 16px",
-        minHeight: 52,
-      }}
-    >
-      <div style={{ flex: 1, minWidth: 0, display: "grid", gap: 4 }}>
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 7,
-            fontSize: 13,
-            lineHeight: "17px",
-          }}
-        >
-          {title}
-          {tag && (
-            <span
-              style={{
-                fontSize: 10,
-                padding: "1px 5px",
-                borderRadius: 4,
-                color: "var(--muted-foreground)",
-                background: "var(--muted)",
-              }}
-            >
-              {tag}
-            </span>
-          )}
+    <div className={`settings-row${muted ? " is-muted" : ""}`}>
+      <div className="settings-row-main">
+        {icon && <div className="settings-row-icon">{icon}</div>}
+        <div className="settings-row-text">
+          <div className="settings-row-title">
+            <span>{title}</span>
+            {tag && <span className="settings-tag">{tag}</span>}
+          </div>
+          {subtitle && <div className="settings-row-subtitle">{subtitle}</div>}
+          {detail && <div className="settings-row-detail">{detail}</div>}
         </div>
-        {subtitle && (
-          <div style={{ ...secondary, fontSize: 11 }}>{subtitle}</div>
+        {children !== undefined && children !== null && children !== false && (
+          <div className="settings-row-control">{children}</div>
         )}
       </div>
-      <div
-        style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: 8 }}
-      >
-        {children}
-      </div>
+      {below && <div className="settings-row-below">{below}</div>}
     </div>
   );
 }
 
+/** A disabled control with the reason on hover. */
 export function Unavailable({
   children,
   reason = nativeUnavailable,
@@ -193,27 +160,31 @@ export function ToggleRow({
   change,
   disabled,
   tag,
+  icon,
   reason,
+  below,
 }: {
-  title: string;
-  subtitle?: string;
+  title: ReactNode;
+  subtitle?: ReactNode;
   checked: boolean;
   change?: (value: boolean) => void;
   disabled?: boolean;
-  tag?: string;
+  tag?: ReactNode;
+  icon?: ReactNode;
   reason?: string;
+  below?: ReactNode;
 }) {
   const control = (
     <Switch
-      aria-label={title}
+      aria-label={typeof title === "string" ? title : undefined}
       checked={checked}
       onCheckedChange={change}
       disabled={disabled}
     />
   );
   return (
-    <Row title={title} subtitle={subtitle} tag={tag}>
-      {disabled ? (
+    <Row title={title} subtitle={subtitle} tag={tag} icon={icon} below={below}>
+      {disabled && reason ? (
         <Unavailable reason={reason}>{control}</Unavailable>
       ) : (
         control
@@ -236,30 +207,10 @@ export function Segments({
   disabled?: boolean;
 }) {
   return (
-    <Tabs
-      value={value}
-      onValueChange={change}
-      className="source-settings-segments"
-    >
-      <TabsList
-        aria-label={label}
-        style={{ height: 26, padding: 2, gap: 0, borderRadius: 7 }}
-      >
+    <Tabs value={value} onValueChange={change} className="settings-segments">
+      <TabsList aria-label={label}>
         {options.map(([key, name]) => (
-          <TabsTrigger
-            key={key}
-            value={key}
-            disabled={disabled}
-            style={{
-              height: 22,
-              minHeight: 22,
-              padding: "0 11px",
-              fontSize: 12,
-              borderRadius: 5,
-              lineHeight: "20px",
-              fontWeight: 400,
-            }}
-          >
+          <TabsTrigger key={key} value={key} disabled={disabled}>
             {name}
           </TabsTrigger>
         ))}
@@ -274,44 +225,46 @@ export function Menu({
   options,
   change,
   disabled = false,
-  width = 124,
+  reason,
+  width = 140,
+  placeholder,
 }: {
   label: string;
   value: string;
-  options: [string, string][];
+  options: [string, ReactNode][];
   change?: (value: string) => void;
   disabled?: boolean;
-  width?: number;
+  reason?: string;
+  width?: number | "auto";
+  placeholder?: string;
 }) {
   const control = (
     <Select value={value} onValueChange={change} disabled={disabled}>
       <SelectTrigger
         aria-label={label}
-        className="source-settings-select"
+        className="settings-select"
         size="sm"
-        style={{
-          width,
-          height: 26,
-          minHeight: 26,
-          padding: "0 8px",
-          fontSize: 12,
-          borderRadius: 6,
-        }}
+        style={{ width }}
       >
-        <SelectValue />
+        <SelectValue placeholder={placeholder} />
       </SelectTrigger>
       <SelectContent>
         {options.map(([key, name]) => (
-          <SelectItem key={key} value={key} style={{ fontSize: 12 }}>
+          <SelectItem key={key} value={key} className="settings-select-item">
             {name}
           </SelectItem>
         ))}
       </SelectContent>
     </Select>
   );
-  return disabled ? <Unavailable>{control}</Unavailable> : control;
+  return disabled && reason ? (
+    <Unavailable reason={reason}>{control}</Unavailable>
+  ) : (
+    control
+  );
 }
 
+/** A slider row: name, track, value. */
 export function Slide({
   title,
   value,
@@ -320,6 +273,7 @@ export function Slide({
   step,
   change,
   format,
+  disabled = false,
 }: {
   title: string;
   value: number;
@@ -328,42 +282,24 @@ export function Slide({
   step: number;
   change: (value: number) => void;
   format: (value: number) => string;
+  disabled?: boolean;
 }) {
   return (
-    <div
-      className="source-slider-row"
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 12,
-        minHeight: 52,
-        padding: "11px 16px",
-      }}
-    >
-      <label style={{ width: 150, flex: "0 0 150px", fontSize: 13 }}>
-        {title}
-      </label>
-      <Slider
-        aria-label={title}
-        min={min}
-        max={max}
-        step={step}
-        value={[value]}
-        onValueChange={(values) => change(values[0])}
-        style={{ flex: 1 }}
-      />
-      <output
-        style={{
-          width: 60,
-          flex: "0 0 60px",
-          textAlign: "right",
-          fontSize: 13,
-          fontVariantNumeric: "tabular-nums",
-          color: "var(--muted-foreground)",
-        }}
-      >
-        {format(value)}
-      </output>
+    <div className="settings-row settings-slider-row">
+      <div className="settings-row-main">
+        <label className="settings-slider-label">{title}</label>
+        <Slider
+          aria-label={title}
+          min={min}
+          max={max}
+          step={step}
+          value={[value]}
+          disabled={disabled}
+          onValueChange={(values) => change(values[0])}
+          className="settings-slider"
+        />
+        <output className="settings-slider-value">{format(value)}</output>
+      </div>
     </div>
   );
 }
@@ -372,27 +308,178 @@ export function SmallButton({
   children,
   onClick,
   disabled = false,
+  variant = "outline",
 }: {
   children: ReactNode;
   onClick?: () => void;
   disabled?: boolean;
+  variant?: "outline" | "default" | "destructive";
 }) {
   return (
     <Button
-      variant="outline"
+      variant={variant}
       size="sm"
       disabled={disabled}
       onClick={onClick}
-      style={{
-        height: 24,
-        minHeight: 24,
-        padding: "0 9px",
-        fontSize: 12,
-        fontWeight: 400,
-        borderRadius: 6,
-      }}
+      className="settings-button"
     >
       {children}
     </Button>
+  );
+}
+
+/** A text-only action, for "Change key", "Copy" and the like. */
+export function LinkButton({
+  children,
+  onClick,
+  href,
+  disabled = false,
+  tone = "accent",
+}: {
+  children: ReactNode;
+  onClick?: () => void;
+  href?: string;
+  disabled?: boolean;
+  tone?: "accent" | "destructive";
+}) {
+  const className = `settings-link${tone === "destructive" ? " is-destructive" : ""}`;
+  return href ? (
+    <a className={className} href={href} target="_blank" rel="noreferrer">
+      {children}
+    </a>
+  ) : (
+    <button
+      type="button"
+      className={className}
+      onClick={onClick}
+      disabled={disabled}
+    >
+      {children}
+    </button>
+  );
+}
+
+export type PillTone = "green" | "blue" | "orange" | "red" | "gray";
+
+/** A small status label: Ready, Active, Expired, Not added. */
+export function Pill({
+  tone = "gray",
+  dot = false,
+  children,
+}: {
+  tone?: PillTone;
+  dot?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <span className={`settings-pill is-${tone}`}>
+      {dot && <span className="settings-pill-dot" />}
+      {children}
+    </span>
+  );
+}
+
+/** A short note under a card or section. */
+export function Footnote({ children }: { children: ReactNode }) {
+  return <div className="settings-footnote">{children}</div>;
+}
+
+/** A message that needs the reader: a problem, a warning, a next step. */
+export function Notice({
+  tone = "info",
+  children,
+  action,
+}: {
+  tone?: "info" | "warning" | "error";
+  children: ReactNode;
+  action?: ReactNode;
+}) {
+  return (
+    <div
+      className={`settings-notice is-${tone}`}
+      role={tone === "error" ? "alert" : "status"}
+    >
+      <div>{children}</div>
+      {action && <div className="settings-notice-action">{action}</div>}
+    </div>
+  );
+}
+
+/** A card that folds: a header row (icon, title, a short summary on the
+ * right) that opens to show its rows. Closed unless `defaultOpen`. */
+export function Collapsible({
+  title,
+  subtitle,
+  icon,
+  summary,
+  defaultOpen = false,
+  children,
+}: {
+  title: ReactNode;
+  subtitle?: ReactNode;
+  icon?: ReactNode;
+  summary?: ReactNode;
+  defaultOpen?: boolean;
+  children: ReactNode;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  const id = useId();
+  return (
+    <div
+      className={`settings-card settings-collapsible${open ? " is-open" : ""}`}
+    >
+      <button
+        type="button"
+        className="settings-collapsible-header"
+        aria-expanded={open}
+        aria-controls={id}
+        onClick={() => setOpen((value) => !value)}
+      >
+        <ChevronRight className="settings-chevron" size={14} />
+        {icon && <span className="settings-row-icon">{icon}</span>}
+        <span className="settings-row-text">
+          <span className="settings-row-title">
+            <span>{title}</span>
+          </span>
+          {subtitle && (
+            <span className="settings-row-subtitle">{subtitle}</span>
+          )}
+        </span>
+        {summary && (
+          <span className="settings-collapsible-summary">{summary}</span>
+        )}
+      </button>
+      <div className="settings-collapsible-body" id={id} hidden={!open}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+/** Extra rows at the end of a card, behind a "More" row: fine-tuning that
+ * most people leave alone. */
+export function MoreRows({
+  label,
+  defaultOpen = false,
+  children,
+}: {
+  label: ReactNode;
+  defaultOpen?: boolean;
+  children: ReactNode;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <>
+      <button
+        type="button"
+        className={`settings-more${open ? " is-open" : ""}`}
+        aria-expanded={open}
+        onClick={() => setOpen((value) => !value)}
+      >
+        <ChevronRight className="settings-chevron" size={13} />
+        {label}
+      </button>
+      {open && children}
+    </>
   );
 }

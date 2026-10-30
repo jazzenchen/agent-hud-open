@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from "react";
 import { useFormat } from "@agent-hud/ui/format-context";
 import { quotaPercent, quotaPercentLabel } from "@agent-hud/ui/format";
 import settingsWallpaper from "@agent-hud/ui/assets/settings-wallpaper.png";
@@ -10,12 +11,10 @@ import {
   Sigma,
 } from "lucide-react";
 import type { Snapshot } from "@agent-hud/protocol";
-import { Button } from "@agent-hud/ui/components/button";
 import { HUDArtwork as HUDLogo } from "@agent-hud/hud/HUDArtwork";
 import { BotMark } from "@agent-hud/hud/BotMark";
 import { HUDGlow } from "@agent-hud/hud/HUDGlow";
 import {
-  agentVendorName,
   defaultHUDConfig,
   meterLabel,
   statusColor,
@@ -23,16 +22,14 @@ import {
   type HUDConfig,
 } from "@agent-hud/hud/model";
 import { islandPath, stripMetrics } from "@agent-hud/hud/geometry";
-import {
-  Divider,
-  Row,
-  type SettingsPaneProps,
-  type Text,
-} from "./SettingsPrimitives";
+import type { Text } from "./SettingsPrimitives";
 
 const originalWallpaper = settingsWallpaper;
 
-/** The same short wallpaper samples as SettingsPreview; these never open a panel. */
+/** The resting HUD on a strip of wallpaper, drawn from the screen's settings
+ * and the agents in the snapshot. Every mode sits at the top edge of the same
+ * box, shrunk to fit when it is wider than the preview; it never opens a
+ * panel, and draws nothing while the Settings window is inactive. */
 export function SmallHUDPreview({
   snapshot,
   config,
@@ -55,14 +52,32 @@ export function SmallHUDPreview({
       !matchMedia("(prefers-color-scheme: dark)").matches);
   const alpha = 1 - sample.solidTransparency;
   const surface = light ? `rgba(245,245,247,${alpha})` : `rgba(0,0,0,${alpha})`;
+  const stage = useRef<HTMLDivElement>(null);
+  const [stageWidth, setStageWidth] = useState(0);
+  useEffect(() => {
+    const element = stage.current;
+    if (!element) return;
+    const observer = new ResizeObserver(([entry]) =>
+      setStageWidth(entry.contentRect.width),
+    );
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+  // A floating strip keeps a little wallpaper round it; an attached one
+  // reaches the edge like the real notch.
+  const margin = simple ? 24 : 0;
+  const scale =
+    stageWidth > 0
+      ? Math.min(1, (stageWidth - margin * 2) / Math.max(metrics.width, 1))
+      : 1;
   return (
-    <div style={{ padding: 12 }}>
+    <div style={{ padding: "12px 14px" }}>
       <div
-        className="source-settings-preview"
+        ref={stage}
         aria-hidden="true"
         style={{
           position: "relative",
-          height: simple ? 84 : 112,
+          height: 112,
           borderRadius: 8,
           overflow: "hidden",
           pointerEvents: "none",
@@ -76,8 +91,9 @@ export function SmallHUDPreview({
             style={{
               position: "absolute",
               left: "50%",
-              top: simple ? "50%" : 0,
-              transform: simple ? "translate(-50%, -50%)" : "translateX(-50%)",
+              top: simple ? 10 : 0,
+              transform: `translateX(-50%) scale(${scale})`,
+              transformOrigin: "top center",
               width: metrics.width,
               height: metrics.height,
             }}
@@ -242,6 +258,8 @@ export function SmallHUDPreview({
   );
 }
 
+/** A made-up slice of one panel section, in the HUD's own light or dark
+ * look; faded while that section is switched off. */
 export function PartSample({
   kind,
   enabled,
@@ -262,9 +280,7 @@ export function PartSample({
   return (
     <div
       aria-hidden="true"
-      className="source-island-part-sample"
       style={{
-        margin: "0 12px 12px",
         padding: "0 14px",
         height: kind === "sessions" ? 56 : 64,
         display: "flex",
@@ -351,7 +367,12 @@ export function PartSample({
                   width: 20,
                   height: 18,
                   borderRadius: 5,
-                  background: index === 0 ? "#ffffff12" : "transparent",
+                  background:
+                    index === 0
+                      ? light
+                        ? "#0000000f"
+                        : "#ffffff12"
+                      : "transparent",
                   opacity: index === 0 ? 1 : 0.5,
                 }}
               >
@@ -449,134 +470,5 @@ export function PartSample({
         </>
       )}
     </div>
-  );
-}
-
-export function PanelOrderRows({
-  snapshot,
-  config,
-  update,
-  t,
-}: Pick<SettingsPaneProps, "snapshot" | "config" | "update"> & { t: Text }) {
-  const sectionNames = {
-    blocks: t("Quota details", "额度明细"),
-    tokens: t("Token usage", "Token 消耗"),
-    sessions: t("Session list", "会话列表"),
-  };
-  const sections = [
-    ...new Set([...config.panelSections, ...defaultHUDConfig.panelSections]),
-  ];
-  const blocks = [
-    ...new Map([
-      ...snapshot.quotas.map(
-        (row) =>
-          [
-            row.vendor,
-            { id: row.vendor, title: agentVendorName(row.vendor) },
-          ] as const,
-      ),
-      ...snapshot.billing.map(
-        (account) =>
-          [
-            `api:${account.vendor}`,
-            {
-              id: `api:${account.vendor}`,
-              title: `${agentVendorName(account.vendor)} · ${t("Balance", "余额")}`,
-            },
-          ] as const,
-      ),
-    ]).values(),
-  ];
-  const allBlockKeys = [
-    ...new Set([...config.panelOrder, ...blocks.map((block) => block.id)]),
-  ];
-  const orderedBlocks = allBlockKeys.flatMap((key) => {
-    const block = blocks.find((item) => item.id === key);
-    return block ? [block] : [];
-  });
-  const moveSection = (index: number, by: number) => {
-    const next = [...sections];
-    [next[index], next[index + by]] = [next[index + by], next[index]];
-    update({ panelSections: next });
-  };
-  const moveBlock = (index: number, by: number) => {
-    const next = [...allBlockKeys],
-      from = next.indexOf(orderedBlocks[index].id),
-      to = next.indexOf(orderedBlocks[index + by].id);
-    [next[from], next[to]] = [next[to], next[from]];
-    update({ panelOrder: next });
-  };
-  const buttons = (
-    name: string,
-    index: number,
-    count: number,
-    move: (index: number, by: number) => void,
-  ) => (
-    <>
-      <Button
-        variant="outline"
-        size="icon-sm"
-        disabled={index === 0}
-        aria-label={t(`Move ${name} up`, `上移${name}`)}
-        title={t("Move up", "上移")}
-        onClick={() => move(index, -1)}
-        style={{ width: 24, height: 24, minHeight: 24 }}
-      >
-        ↑
-      </Button>
-      <Button
-        variant="outline"
-        size="icon-sm"
-        disabled={index === count - 1}
-        aria-label={t(`Move ${name} down`, `下移${name}`)}
-        title={t("Move down", "下移")}
-        onClick={() => move(index, 1)}
-        style={{ width: 24, height: 24, minHeight: 24 }}
-      >
-        ↓
-      </Button>
-    </>
-  );
-  return (
-    <>
-      <Divider />
-      {sections.map((section, index) => (
-        <Row
-          key={section}
-          title={`${index + 1}. ${sectionNames[section]}`}
-          subtitle={
-            index === 0
-              ? t(
-                  "Section order on this display. Hidden sections keep their place.",
-                  "这块屏幕的内容顺序；隐藏的内容会保留原位置。",
-                )
-              : undefined
-          }
-        >
-          {buttons(sectionNames[section], index, sections.length, moveSection)}
-        </Row>
-      ))}
-      {orderedBlocks.length > 1 && (
-        <>
-          <Divider />
-          {orderedBlocks.map((block, index) => (
-            <Row
-              key={block.id}
-              title={block.title}
-              subtitle={
-                index === 0
-                  ? t(
-                      "Agent block order on this display",
-                      "这块屏幕的 Agent 明细顺序",
-                    )
-                  : undefined
-              }
-            >
-              {buttons(block.title, index, orderedBlocks.length, moveBlock)}
-            </Row>
-          ))}
-        </>
-      )}
-    </>
   );
 }

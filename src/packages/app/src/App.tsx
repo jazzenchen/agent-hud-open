@@ -28,7 +28,6 @@ import {
 } from "lucide-react";
 import { toast, Toaster } from "sonner";
 import { Button } from "@agent-hud/ui/components/button";
-import { Card, CardContent } from "@agent-hud/ui/components/card";
 import { Tabs, TabsList, TabsTrigger } from "@agent-hud/ui/components/tabs";
 import {
   DropdownMenu,
@@ -37,7 +36,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@agent-hud/ui/components/dropdown-menu";
-import { Tooltip, TooltipProvider } from "@agent-hud/ui/components/tooltip";
+import { TooltipProvider } from "@agent-hud/ui/components/tooltip";
 import {
   Alert,
   AlertDescription,
@@ -113,29 +112,49 @@ class ViewErrorBoundary extends Component<
 }
 
 type Page = string;
-const pages = [
+/** Sidebar groups, top to bottom; a gap separates them. */
+const pageGroups = ["app", "agents", "devices", "about"] as const;
+type PageGroup = (typeof pageGroups)[number];
+const pages: {
+  id: string;
+  label: string;
+  icon: typeof Settings2;
+  color: string;
+  description: string;
+  group: PageGroup;
+}[] = [
   {
     id: "general",
     label: "General",
     icon: Settings2,
     color: "#8e8e93",
-    description: "Appearance, language, startup and client hook preferences.",
+    description: "Appearance, language and startup.",
+    group: "app",
+  },
+  {
+    id: "display",
+    label: "Display",
+    icon: Monitor,
+    color: "#7c65e8",
+    description: "The HUD and its panel on each screen.",
+    group: "app",
   },
   {
     id: "agents",
     label: "Agents",
     icon: Puzzle,
     color: "#30b0c7",
-    description: "Manage live status, plans and visible windows.",
+    description: "Which agents Agent HUD follows, and their accounts.",
+    group: "agents",
   },
   {
-    // Right after Agents, as an entry of its own: what Agent HUD installs
-    // into each client.
+    // What Agent HUD installs into each client.
     id: "agent-plugins",
     label: "Agent plugins",
     icon: Plug,
     color: "#30b0c7",
-    description: "What Agent HUD adds to coding agents on this computer.",
+    description: "What Agent HUD adds to the agents on this computer.",
+    group: "agents",
   },
   {
     // Relays, one per address, whichever agents use them.
@@ -143,8 +162,16 @@ const pages = [
     label: "Relays",
     icon: Waypoints,
     color: "#ff9500",
-    description:
-      "The relays your agents go through: who uses each, what it has left, and what kind it is.",
+    description: "The relays your agents go through.",
+    group: "agents",
+  },
+  {
+    id: "prices",
+    label: "Prices",
+    icon: Coins,
+    color: "#34c759",
+    description: "What each model costs. Set your own when it is wrong.",
+    group: "agents",
   },
   {
     // What paired phones read: quota and token usage, never sessions.
@@ -152,44 +179,27 @@ const pages = [
     label: "Local Network",
     icon: Network,
     color: "#5e5ce6",
-    description:
-      "Share this computer's quota and token usage with paired phones.",
-  },
-  {
-    id: "prices",
-    label: "Prices",
-    icon: Coins,
-    color: "#34c759",
-    description:
-      "What each model costs and where the price comes from. Set your own when it is wrong.",
-  },
-  {
-    id: "display",
-    label: "Display",
-    icon: Monitor,
-    color: "#7c65e8",
-    description: "Customize your notch and panel. Changes apply automatically.",
+    description: "Share quota and token usage with paired phones.",
+    group: "devices",
   },
   {
     id: "updates",
     label: "Updates",
     icon: Download,
     color: "#007aff",
-    description: "Manage Agent HUD updates and Beta participation.",
+    description: "Agent HUD updates and beta releases.",
+    group: "about",
   },
-] as const;
+];
 const chinesePages: Record<string, [string, string]> = {
-  general: ["通用", "设置外观、语言、启动方式和客户端回调。"],
-  agents: ["智能体", "管理实时状态、套餐与显示窗口。"],
-  "agent-plugins": [
-    "智能体插件",
-    "Agent HUD 为这台电脑上的编程智能体添加的功能。",
-  ],
-  relays: ["中转站", "智能体经过的中转站：谁在用、还剩多少、是哪一类。"],
-  "local-network": ["局域网", "与已配对的手机共享本机的额度和 token 用量。"],
-  prices: ["价格", "每个模型按什么价格算、价格从哪里来，不对时可以自己改。"],
-  display: ["显示", "自定义灵动岛光晕与面板内容，更改自动生效。"],
-  updates: ["更新", "管理 Agent HUD 更新与 Beta 参与设置。"],
+  general: ["通用", "外观、语言与启动。"],
+  display: ["显示", "每块屏幕上的 HUD 和它的面板。"],
+  agents: ["智能体", "Agent HUD 关注哪些智能体，以及它们的账户。"],
+  "agent-plugins": ["智能体插件", "Agent HUD 为这台电脑上的智能体添加的功能。"],
+  relays: ["中转站", "智能体经过的中转站。"],
+  prices: ["价格", "每个模型的价格，不对时可以自己改。"],
+  "local-network": ["局域网", "与已配对的手机共享额度和 token 用量。"],
+  updates: ["更新", "Agent HUD 的更新与 Beta 版本。"],
 };
 const selectedScreenKey = "agenthud.next.selected-screen";
 
@@ -200,7 +210,12 @@ export interface AppExtensionPage {
   color?: string;
   description?: string;
   zh?: [string, string];
-  /** Built-in page id this page takes the place of. */ replaces?: string;
+  /** Built-in page id this page takes the place of, in its slot. */
+  replaces?: string;
+  /** Sidebar group of a page that replaces none; the last group if unset. */
+  group?: PageGroup;
+  /** Page id this page goes right before, within its group. */
+  before?: string;
   render(context: {
     snapshot: Snapshot | null;
     request: (method: string, params?: unknown) => Promise<unknown>;
@@ -211,6 +226,62 @@ export interface AppProps {
   /** Rows a product build adds to a client's card on Agents → Agent plugins. */ agentPlugins?: AgentPluginItem[];
   productName?: string;
   version?: string;
+}
+type SidebarPage = {
+  id: string;
+  label: string;
+  icon: typeof Settings2;
+  color: string;
+  description: string;
+  group: PageGroup;
+  customIcon?: ReactNode;
+};
+/** The sidebar's pages in order: a product page that replaces a built-in
+ * one takes its slot; the others join their group, before the page they
+ * name or at the group's end. */
+function sidebarPages(extensionPages: AppExtensionPage[]): SidebarPage[] {
+  const list: SidebarPage[] = pages.map((page) => {
+    const replacement = extensionPages.find(
+      (item) => item.replaces === page.id,
+    );
+    return replacement
+      ? {
+          id: replacement.id,
+          label: replacement.title,
+          icon: page.icon,
+          color: replacement.color ?? page.color,
+          description: replacement.description ?? page.description,
+          group: page.group,
+          customIcon: replacement.icon,
+        }
+      : { ...page };
+  });
+  for (const page of extensionPages) {
+    if (page.replaces) continue;
+    const entry: SidebarPage = {
+      id: page.id,
+      label: page.title,
+      icon: Puzzle,
+      color: page.color ?? "#7474d4",
+      description: page.description ?? "",
+      group: page.group ?? pageGroups[pageGroups.length - 1],
+      customIcon: page.icon,
+    };
+    const before = page.before
+      ? list.findIndex((item) => item.id === page.before)
+      : -1;
+    if (before >= 0) {
+      list.splice(before, 0, { ...entry, group: list[before].group });
+      continue;
+    }
+    let last = -1;
+    list.forEach((item, index) => {
+      if (pageGroups.indexOf(item.group) <= pageGroups.indexOf(entry.group))
+        last = index;
+    });
+    list.splice(last + 1, 0, entry);
+  }
+  return list;
 }
 const PictureView = lazy(() => import("./HUDPicture"));
 export default function App(props: AppProps = {}) {
@@ -224,18 +295,10 @@ function AppContent({
   productName = "Agent HUD",
   version = "0.1.0",
 }: AppProps) {
-  const replaced = new Set(extensionPages.map((page) => page.replaces));
-  const allPages = [
-    ...pages.filter((item) => !replaced.has(item.id)),
-    ...extensionPages.map((page) => ({
-      id: page.id,
-      label: page.title,
-      icon: Puzzle,
-      color: page.color ?? "#7474d4",
-      description: page.description ?? "",
-      customIcon: page.icon,
-    })),
-  ];
+  const allPages = useMemo(
+    () => sidebarPages(extensionPages),
+    [extensionPages],
+  );
   for (const page of extensionPages)
     if (page.zh) chinesePages[page.id] = page.zh;
   const parameters = new URLSearchParams(location.search);
@@ -751,34 +814,39 @@ function AppContent({
           <div className="apple-app" data-theme={theme}>
             <aside className="apple-sidebar">
               <div className="sidebar-drag-space" data-tauri-drag-region />
-              <div className="sidebar-section-title">
-                {chinese ? "偏好设置" : "Preferences"}
-              </div>
-              <nav>
-                {allPages.map((item) => {
-                  const { id, label, icon: Icon, color } = item;
+              <nav aria-label={chinese ? "设置" : "Settings"}>
+                {pageGroups.map((group) => {
+                  const items = allPages.filter((item) => item.group === group);
+                  if (!items.length) return null;
                   return (
-                    <Button
-                      key={id}
-                      variant="ghost"
-                      className={`apple-navigation ${page === id ? "is-selected" : ""}`}
-                      onClick={() => setPage(id)}
-                      aria-current={page === id ? "page" : undefined}
-                    >
-                      <span
-                        className="sidebar-symbol"
-                        style={{ background: color }}
-                      >
-                        {"customIcon" in item && item.customIcon ? (
-                          item.customIcon
-                        ) : (
-                          <Icon size={14} strokeWidth={1.8} />
-                        )}
-                      </span>
-                      <span>
-                        {chinese ? (chinesePages[id]?.[0] ?? label) : label}
-                      </span>
-                    </Button>
+                    <div className="sidebar-group" key={group}>
+                      {items.map((item) => {
+                        const { id, label, icon: Icon, color } = item;
+                        return (
+                          <Button
+                            key={id}
+                            variant="ghost"
+                            className={`apple-navigation ${page === id ? "is-selected" : ""}`}
+                            onClick={() => setPage(id)}
+                            aria-current={page === id ? "page" : undefined}
+                          >
+                            <span
+                              className="sidebar-symbol"
+                              style={{ background: color }}
+                            >
+                              {item.customIcon ?? (
+                                <Icon size={13} strokeWidth={1.9} />
+                              )}
+                            </span>
+                            <span>
+                              {chinese
+                                ? (chinesePages[id]?.[0] ?? label)
+                                : label}
+                            </span>
+                          </Button>
+                        );
+                      })}
+                    </div>
                   );
                 })}
               </nav>
@@ -787,32 +855,41 @@ function AppContent({
                 <div>
                   <strong>{productName}</strong>
                   <span>
-                    {runningVersion} · {demo ? "Demo" : "Live"}
+                    {runningVersion} ·{" "}
+                    {demo
+                      ? chinese
+                        ? "演示"
+                        : "Demo"
+                      : chinese
+                        ? "实时"
+                        : "Live"}
                   </span>
                 </div>
                 {sourceMenu}
               </div>
             </aside>
-            <main className="apple-content">
+            <main
+              className={`apple-content${page === "agents" ? " is-wide" : ""}`}
+            >
               <div className="settings-header" data-tauri-drag-region="deep">
-                <h1>
-                  {chinese
-                    ? (chinesePages[page]?.[0] ?? currentPage?.label)
-                    : currentPage?.label || "Migration"}
-                </h1>
-                <p>
-                  {chinese
-                    ? (chinesePages[page]?.[1] ?? currentPage?.description)
-                    : currentPage?.description ||
-                      (currentPage
-                        ? ""
-                        : "Capabilities and platform integration status.")}
-                </p>
+                <div className="settings-column">
+                  <h1>
+                    {chinese
+                      ? (chinesePages[page]?.[0] ?? currentPage?.label)
+                      : currentPage?.label}
+                  </h1>
+                  {((chinese ? chinesePages[page]?.[1] : null) ??
+                  currentPage?.description) ? (
+                    <p>
+                      {chinese
+                        ? (chinesePages[page]?.[1] ?? currentPage?.description)
+                        : currentPage?.description}
+                    </p>
+                  ) : null}
+                </div>
               </div>
-              <div
-                className={`settings-scroll ${page === "agents" ? "agents-scroll" : ""}`}
-              >
-                <div className="settings-pane-content">
+              <div className="settings-scroll">
+                <div className="settings-pane-content settings-column">
                   {error && (
                     <Alert variant="destructive">
                       <CircleHelp />
@@ -850,7 +927,8 @@ function AppContent({
                         page === "local-network" ||
                         page === "display" ||
                         page === "agents" ||
-                        page === "agent-plugins") && (
+                        page === "agent-plugins" ||
+                        page === "updates") && (
                         <SettingsPane
                           page={page}
                           settingsProps={settingsProps}
@@ -866,34 +944,6 @@ function AppContent({
                           agentPlugins={agentPlugins}
                           request={extensionRequest}
                         />
-                      )}
-                      {page === "updates" && (
-                        <section className="preference-group">
-                          <h2>{currentPage?.label}</h2>
-                          <Card>
-                            <CardContent>
-                              <div className="preference-row">
-                                <div>
-                                  <span>
-                                    {chinese
-                                      ? "自动更新检查"
-                                      : "Automatic update checks"}
-                                  </span>
-                                  <p>
-                                    {chinese
-                                      ? "这个预览版暂不支持自动更新。"
-                                      : "This preview does not update itself yet."}
-                                  </p>
-                                </div>
-                                <Tooltip>
-                                  <Button variant="outline" disabled>
-                                    {chinese ? "不可用" : "Unavailable"}
-                                  </Button>
-                                </Tooltip>
-                              </div>
-                            </CardContent>
-                          </Card>
-                        </section>
                       )}
                     </Suspense>
                   )}

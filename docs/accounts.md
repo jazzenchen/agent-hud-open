@@ -32,7 +32,7 @@ start another account reader.
 
 ## Quota display
 
-**Settings → General → Usage display** selects **Consumed** (the default) or
+**Settings → General → Usage display** selects **Used** (the default) or
 **Remaining**. Percentages, quota bars and rings use that choice across the HUD,
 expanded panel, reminders and menu bar. For example, 80% consumed becomes 20%
 remaining. The preference is saved locally as `settings.quotaDisplay`.
@@ -43,7 +43,7 @@ and token counts are unchanged.
 
 ## Multiple Codex accounts
 
-In **Settings → Sources → Codex → Additional Codex accounts**, add the
+In **Settings → Agents → Codex → More Codex accounts**, add the
 `CODEX_HOME` directories for accounts already signed in through Codex, one per
 line. Absolute paths and `~/` paths are accepted. The current `CODEX_HOME`
 (or `~/.codex` when unset) remains included. Clear the list to return to that
@@ -63,7 +63,7 @@ statistics.
 
 ## Antigravity accounts
 
-In **Settings → Sources → Antigravity → Antigravity CLI accounts**, add the
+In **Settings → Agents → Antigravity → Antigravity CLI accounts**, add the
 CLI's `settings.json` files, one per line, then select **Connect accounts**.
 **Add default configuration** supplies
 `~/.gemini/antigravity-cli/settings.json`. Restart each connected CLI to begin

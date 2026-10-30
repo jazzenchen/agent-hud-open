@@ -1,18 +1,19 @@
 import { useEffect, useRef, useState } from "react";
 import type { PanelLayout, StatisticsResponse } from "@agent-hud/protocol";
 import { systemTimeZone } from "@agent-hud/ui/format";
-import { Button } from "@agent-hud/ui/components/button";
 import { Switch } from "@agent-hud/ui/components/switch";
-import { ChevronDown, ChevronUp } from "lucide-react";
 import {
-  Divider,
+  Notice,
   Row,
-  secondary,
+  Section,
   type SettingsPaneProps,
   useText,
 } from "./SettingsPrimitives";
+import { moveAmong, ReorderButtons } from "./agents/Reorder";
 
-/** Models are discovered from the usage ledger, not a promised list of available models. */
+/** Which Codex models the token chart shows, and in what order. Models are
+ * discovered from the usage ledger, not a promised list of available
+ * models. Reads 30 days of statistics while it is on screen. */
 export function CodexModelSettings({
   snapshot,
   action,
@@ -89,93 +90,69 @@ export function CodexModelSettings({
       setPending(false);
     }
   };
-  const move = (id: string, offset: number) => {
+  const move = (id: string, direction: -1 | 1) => {
     const ordered = [...new Set([...order, ...shown.map((row) => row.id)])];
-    const current = shown.findIndex((row) => row.id === id);
-    const other = shown[current + offset];
-    if (!other) return;
-    const a = ordered.indexOf(id),
-      b = ordered.indexOf(other.id);
-    [ordered[a], ordered[b]] = [ordered[b], ordered[a]];
-    void change({ modelOrder: ordered });
+    const next = moveAmong(
+      ordered,
+      shown.map((row) => row.id),
+      id,
+      direction,
+    );
+    if (next !== ordered) void change({ modelOrder: next });
   };
   return (
-    <div>
-      <Row
-        title={t("Codex models", "Codex 模型")}
-        subtitle={t(
-          "Models used in the past 30 days; new models appear automatically. Changes apply to this screen’s token chart.",
-          "最近 30 天使用过的模型，新模型会自动出现。此设置作用于本屏幕的 Token 图表。",
-        )}
-      >
-        <span />
-      </Row>
-      {error && (
-        <p
-          style={{
-            ...secondary,
-            color: "var(--destructive)",
-            padding: "0 16px",
-          }}
-        >
-          {error}
-        </p>
+    <Section
+      title={t("Token chart models", "Token 图表中的模型")}
+      footer={t(
+        "Models used in the last 30 days. Applies to the screen chosen on the Display page.",
+        "最近 30 天用过的模型。作用于“显示”页面选中的屏幕。",
+      )}
+    >
+      {error && <Notice tone="error">{error}</Notice>}
+      {!loaded && !error && (
+        <Row muted title={t("Reading models…", "正在读取模型…")} />
       )}
       {loaded && !shown.length && (
-        <p style={{ ...secondary, fontSize: 12, padding: "0 16px" }}>
-          {t(
-            "No Codex models used in the last 30 days.",
-            "最近 30 天没有 Codex 模型用量。",
+        <Row
+          muted
+          title={t(
+            "No Codex models in the last 30 days",
+            "最近 30 天没有 Codex 模型用量",
           )}
-        </p>
+        />
       )}
       {shown.map((row, index) => (
-        <div key={row.id}>
-          <Divider />
-          <Row
-            title={row.name}
-            subtitle={
-              tokenLayout.models?.length && !tokenLayout.models.includes(row.id)
-                ? t(
-                    "Excluded by the existing model filter",
-                    "现有模型筛选未包含此项",
-                  )
-                : undefined
+        <Row
+          key={row.id}
+          title={row.name}
+          subtitle={
+            tokenLayout.models?.length && !tokenLayout.models.includes(row.id)
+              ? t("Left out by the model filter", "模型筛选未包含此项")
+              : undefined
+          }
+        >
+          <ReorderButtons
+            t={t}
+            name={row.name}
+            first={index === 0}
+            last={index === shown.length - 1}
+            disabled={pending}
+            move={(direction) => move(row.id, direction)}
+          />
+          <Switch
+            checked={!hidden.includes(row.id)}
+            disabled={pending}
+            aria-label={`${t("Show model", "显示模型")} ${row.name}`}
+            onCheckedChange={(show) =>
+              void change({
+                hiddenModels: show
+                  ? hidden.filter((id) => id !== row.id)
+                  : [...new Set([...hidden, row.id])],
+              })
             }
-          >
-            <Switch
-              checked={!hidden.includes(row.id)}
-              disabled={pending}
-              aria-label={`${t("Show model", "显示模型")} ${row.name}`}
-              onCheckedChange={(show) =>
-                void change({
-                  hiddenModels: show
-                    ? hidden.filter((id) => id !== row.id)
-                    : [...new Set([...hidden, row.id])],
-                })
-              }
-            />
-            <Button
-              variant="ghost"
-              size="icon-xs"
-              disabled={pending || index === 0}
-              aria-label={`${t("Move up", "上移")} ${row.name}`}
-              onClick={() => move(row.id, -1)}
-            >
-              <ChevronUp size={13} />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon-xs"
-              disabled={pending || index === shown.length - 1}
-              aria-label={`${t("Move down", "下移")} ${row.name}`}
-              onClick={() => move(row.id, 1)}
-            >
-              <ChevronDown size={13} />
-            </Button>
-          </Row>
-        </div>
+          />
+        </Row>
       ))}
-    </div>
+    </Section>
   );
 }

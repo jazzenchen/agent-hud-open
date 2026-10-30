@@ -1,0 +1,573 @@
+/* Settings: one look for every page. A page is a column of sections; a
+   section is a 13 pt heading over a card; a card holds rows divided by
+   inset hairlines; a row is a 13 pt title, an optional 11 pt line under it,
+   and its control on the right. Type stays on the window's scale. */
+
+.settings-page {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  width: 100%;
+  color: var(--foreground);
+}
+
+.settings-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+.settings-section-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  padding-inline: 4px;
+  min-height: 18px;
+}
+.settings-section-header h2 {
+  margin: 0;
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 600;
+}
+.settings-section-header p {
+  margin: 2px 0 0;
+  font-size: 11px;
+  line-height: 15px;
+  color: var(--muted-foreground);
+}
+.settings-section-action {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--muted-foreground);
+}
+
+.settings-card {
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--settings-card, var(--card));
+  border: 1px solid var(--settings-card-border, var(--border));
+}
+/* Inset hairlines between whatever sits in a card. */
+.settings-card > *,
+.settings-collapsible-body > * {
+  position: relative;
+}
+.settings-card > * + *::before,
+.settings-collapsible-body > * + *::before,
+.settings-collapsible.is-open .settings-collapsible-body::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 14px;
+  right: 14px;
+  height: 1px;
+  background: var(--border);
+  pointer-events: none;
+}
+.settings-collapsible-body[hidden] {
+  display: none;
+}
+
+.settings-row {
+  padding: 9px 14px;
+  min-height: 44px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+}
+.settings-row-main {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+}
+.settings-row-icon {
+  flex: 0 0 22px;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  color: var(--foreground);
+}
+.settings-row-icon img,
+.settings-row-icon svg {
+  max-width: 20px;
+  max-height: 20px;
+}
+.settings-row-main > .settings-row-icon + .settings-row-text,
+.settings-collapsible-header > .settings-row-icon + .settings-row-text {
+  margin-left: -6px;
+}
+.settings-row-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: left;
+}
+.settings-row-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 400;
+  color: var(--foreground);
+}
+.settings-row-title > span:first-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.settings-row-subtitle,
+.settings-row-detail {
+  font-size: 11px;
+  line-height: 15px;
+  color: var(--muted-foreground);
+  overflow-wrap: anywhere;
+}
+.settings-row-detail {
+  font-variant-numeric: tabular-nums;
+}
+.settings-row.is-muted .settings-row-title {
+  color: var(--muted-foreground);
+}
+.settings-row-control {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  max-width: 60%;
+}
+.settings-row-below {
+  min-width: 0;
+}
+
+.settings-tag {
+  flex-shrink: 0;
+  font-size: 10px;
+  line-height: 14px;
+  font-weight: 500;
+  padding: 0 5px;
+  border-radius: 4px;
+  color: var(--muted-foreground);
+  background: var(--muted);
+}
+
+.settings-slider-row .settings-row-main {
+  gap: 12px;
+}
+.settings-slider-label {
+  flex: 0 0 140px;
+  font-size: 13px;
+  line-height: 18px;
+}
+.settings-slider {
+  flex: 1;
+  min-width: 80px;
+}
+.settings-slider-value {
+  flex: 0 0 64px;
+  text-align: right;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted-foreground);
+}
+
+.settings-segments [data-slot="tabs-list"] {
+  height: 26px;
+  padding: 2px;
+  gap: 0;
+  border-radius: 7px;
+}
+.settings-segments [data-slot="tabs-trigger"] {
+  height: 22px;
+  min-height: 22px;
+  padding: 0 11px;
+  font-size: 12px;
+  line-height: 20px;
+  border-radius: 5px;
+}
+.settings-select[data-slot="select-trigger"] {
+  height: 26px;
+  min-height: 26px;
+  min-width: 0;
+  padding: 0 8px;
+  font-size: 12px;
+  border-radius: 6px;
+}
+.settings-select-item[data-slot="select-item"] {
+  font-size: 12px;
+}
+.settings-button[data-slot="button"] {
+  height: 24px;
+  min-height: 24px;
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 400;
+  border-radius: 6px;
+  gap: 5px;
+}
+
+.settings-link {
+  flex-shrink: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--primary);
+  cursor: pointer;
+  text-decoration: none;
+}
+.settings-link:hover:not(:disabled) {
+  text-decoration: underline;
+}
+.settings-link:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.settings-link.is-destructive {
+  color: var(--destructive);
+}
+
+.settings-pill {
+  --pill: var(--muted-foreground);
+  --pill-fill: var(--muted);
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 18px;
+  padding: 0 7px;
+  border-radius: 9px;
+  font-size: 11px;
+  line-height: 18px;
+  font-weight: 500;
+  white-space: nowrap;
+  color: var(--pill);
+  background: var(--pill-fill);
+}
+.settings-pill-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.settings-pill.is-green {
+  --pill: #30d158;
+  --pill-fill: #30d1581f;
+}
+.settings-pill.is-blue {
+  --pill: #64a8ff;
+  --pill-fill: #0a84ff24;
+}
+.settings-pill.is-orange {
+  --pill: #ffb340;
+  --pill-fill: #ff9f0a24;
+}
+.settings-pill.is-red {
+  --pill: #ff6961;
+  --pill-fill: #ff453a24;
+}
+[data-theme="light"] .settings-pill.is-green {
+  --pill: #1f8a3b;
+  --pill-fill: #34c7591f;
+}
+[data-theme="light"] .settings-pill.is-blue {
+  --pill: #0a64d8;
+  --pill-fill: #007aff1a;
+}
+[data-theme="light"] .settings-pill.is-orange {
+  --pill: #b25f00;
+  --pill-fill: #ff9f0a26;
+}
+[data-theme="light"] .settings-pill.is-red {
+  --pill: #d70015;
+  --pill-fill: #ff3b301a;
+}
+
+.settings-footnote {
+  padding-inline: 4px;
+  font-size: 11px;
+  line-height: 15px;
+  color: var(--muted-foreground);
+}
+.settings-footnote a {
+  color: var(--primary);
+}
+
+.settings-notice {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 14px;
+  border-radius: 10px;
+  font-size: 12px;
+  line-height: 16px;
+  background: var(--muted);
+  color: var(--foreground);
+}
+.settings-notice > div:first-child {
+  flex: 1;
+  min-width: 0;
+}
+.settings-notice.is-warning {
+  background: #ff9f0a1f;
+}
+.settings-notice.is-error {
+  background: #ff453a1f;
+  color: var(--destructive);
+}
+.settings-card > .settings-notice {
+  border-radius: 0;
+  background: transparent;
+}
+.settings-card > .settings-notice.is-warning {
+  color: #ffb340;
+}
+[data-theme="light"] .settings-card > .settings-notice.is-warning {
+  color: #b25f00;
+}
+.settings-notice-action {
+  flex-shrink: 0;
+  display: flex;
+  gap: 8px;
+}
+
+.settings-collapsible-header {
+  width: 100%;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 14px 9px 10px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+.settings-collapsible-header:hover {
+  background: var(--muted);
+}
+.settings-collapsible-header:focus-visible,
+.settings-more:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: -2px;
+}
+.settings-collapsible-summary {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.settings-chevron {
+  flex-shrink: 0;
+  color: var(--muted-foreground);
+  transition: transform 160ms ease;
+}
+.is-open > .settings-collapsible-header .settings-chevron,
+.settings-more.is-open .settings-chevron {
+  transform: rotate(90deg);
+}
+
+.settings-more {
+  width: 100%;
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 12px;
+  color: var(--muted-foreground);
+  cursor: pointer;
+  text-align: left;
+}
+.settings-more:hover {
+  color: var(--foreground);
+}
+
+/* Lists inside a card: a text field, a code line, a list of devices. */
+.settings-field {
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.settings-field textarea {
+  width: 100%;
+  min-height: 72px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--input);
+  background: var(--secondary);
+  color: var(--foreground);
+  font: inherit;
+  font-size: 12px;
+  line-height: 16px;
+  resize: vertical;
+}
+.settings-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+/* The window: a sidebar of grouped pages, and the page with its header. */
+.apple-app {
+  height: 100vh;
+  display: flex;
+  overflow: hidden;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+}
+.apple-sidebar {
+  width: 212px;
+  flex: 0 0 212px;
+  position: fixed;
+  inset: 0 auto 0 0;
+  padding: 0 10px 12px;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--border);
+  background: var(--sidebar);
+}
+.sidebar-drag-space {
+  height: 44px;
+  flex-shrink: 0;
+}
+.apple-sidebar nav {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  overflow-y: auto;
+  min-height: 0;
+}
+.sidebar-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.apple-navigation[data-slot="button"] {
+  width: 100%;
+  height: 30px;
+  min-height: 30px;
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  gap: 8px;
+  padding: 0 8px;
+  border-radius: 7px;
+  font-size: 13px;
+  font-weight: 400;
+}
+.apple-navigation:hover {
+  background: var(--muted);
+}
+.apple-navigation.is-selected,
+[data-theme="light"] .apple-navigation.is-selected {
+  background: var(--primary);
+  color: white;
+}
+.sidebar-symbol {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
+  border-radius: 5px;
+  box-shadow: inset 0 0 0 0.5px #fff2;
+  color: white;
+}
+.sidebar-symbol svg {
+  width: 13px;
+  height: 13px;
+}
+.sidebar-product {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 12px 8px 0;
+  margin-top: auto;
+}
+.sidebar-product > img {
+  object-fit: contain;
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+.sidebar-product > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+}
+.sidebar-product strong {
+  font-size: 12px;
+  font-weight: 600;
+}
+.sidebar-product span {
+  font-size: 11px;
+  color: var(--muted-foreground);
+}
+.sidebar-product > [data-slot="button"] {
+  width: 22px;
+  padding: 0;
+  opacity: 0.6;
+}
+.apple-content {
+  margin-left: 212px;
+  width: calc(100% - 212px);
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  --settings-column: 640px;
+}
+.apple-content.is-wide {
+  --settings-column: 920px;
+}
+/* The header and the page share one column, so their left edges line up. */
+.settings-column {
+  width: 100%;
+  max-width: var(--settings-column);
+  margin-inline: auto;
+}
+.settings-header {
+  flex-shrink: 0;
+  padding: 22px 24px 16px;
+}
+.settings-header h1 {
+  margin: 0;
+  font-size: 20px;
+  line-height: 26px;
+  font-weight: 600;
+}
+.settings-header p {
+  margin: 3px 0 0;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--muted-foreground);
+}
+.settings-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 4px 24px 32px;
+}

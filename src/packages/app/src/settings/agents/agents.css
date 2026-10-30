@@ -1,0 +1,135 @@
+/* The Agents page: a list of agents that stays put on the left, and the
+   chosen agent's settings on the right, built from the Settings primitives. */
+
+.agents-page {
+  display: flex;
+  align-items: flex-start;
+  gap: 24px;
+  width: 100%;
+}
+
+/* The list scrolls on its own and stays in view while the detail scrolls.
+   Its height is the window less the page header and the scroll padding. */
+.agents-list {
+  position: sticky;
+  top: 0;
+  flex: 0 0 184px;
+  max-height: calc(100vh - 128px);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding-bottom: 8px;
+}
+.agents-list-label {
+  padding: 12px 8px 4px;
+  font-size: 11px;
+  line-height: 15px;
+  color: var(--muted-foreground);
+}
+.agents-list-item {
+  width: 100%;
+  height: 30px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 7px;
+  background: none;
+  color: var(--foreground);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: default;
+}
+.agents-list-item:hover {
+  background: color-mix(in srgb, var(--muted) 55%, transparent);
+}
+.agents-list-item.is-selected {
+  background: var(--muted);
+}
+.agents-list-item:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: -2px;
+}
+.agents-list-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.agents-list-item.is-off .agents-list-name {
+  color: var(--muted-foreground);
+}
+.agents-list-state {
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--muted-foreground);
+}
+
+.agents-detail {
+  flex: 1;
+  min-width: 0;
+}
+.agents-detail-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-inline: 4px;
+  min-height: 32px;
+}
+.agents-detail-title {
+  flex: 1;
+  min-width: 0;
+}
+.agents-detail-title h2 {
+  margin: 0;
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 600;
+}
+.agents-detail-title p {
+  margin: 0;
+  font-size: 11px;
+  line-height: 15px;
+  color: var(--muted-foreground);
+}
+
+/* What follows the switches: dimmed and out of reach while the agent is off. */
+.agents-detail-rest {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  transition: opacity 160ms ease;
+}
+.agents-detail-rest.is-off {
+  opacity: 0.45;
+}
+
+/* A quota window row can be dragged to a new place. */
+.agents-draggable {
+  cursor: grab;
+}
+.agents-draggable.is-target {
+  background: var(--muted);
+}
+.agents-grip {
+  color: var(--muted-foreground);
+}
+
+.agents-dialog[data-slot="dialog-content"] {
+  max-width: 380px;
+  gap: 12px;
+  padding: 20px;
+}
+.agents-dialog [data-slot="dialog-title"] {
+  font-size: 13px;
+  line-height: 18px;
+}
+.agents-dialog [data-slot="dialog-description"] {
+  font-size: 12px;
+  line-height: 16px;
+}

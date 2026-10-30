@@ -1,17 +1,23 @@
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { useEffect, useState } from "react";
-import { TooltipProvider } from "@agent-hud/ui/components/tooltip";
 import {
-  Divider,
   Menu,
+  Notice,
+  Page,
   Row,
-  secondary,
   Section,
   Segments,
   ToggleRow,
+  Unavailable,
   useText,
   type SettingsPaneProps,
 } from "./SettingsPrimitives";
+
+type Failure = { key: string; message: string };
+
+const appearanceKeys = ["appearance", "appearanceFollowsScreen", "language"];
+const usageKeys = ["quotaDisplay"];
+const startupKeys = ["launchAtLogin", "showMenuBarIcon"];
 
 export function GeneralPane({ snapshot, action }: SettingsPaneProps) {
   useEffect(() => {
@@ -21,194 +27,141 @@ export function GeneralPane({ snapshot, action }: SettingsPaneProps) {
       );
   }, []);
   const t = useText(snapshot);
-  const [hookPending, setHookPending] = useState(false);
-  const [hookError, setHookError] = useState<string | null>(null);
-  const hookStatus = snapshot.connection.clientHooks;
-  const configureHooks = async (
-    key: "clientHooks" | "approvalWaitMinutes",
-    value: unknown,
-  ) => {
-    if (hookPending) return;
-    setHookPending(true);
-    setHookError(null);
+  const [pending, setPending] = useState(false);
+  const [failure, setFailure] = useState<Failure | null>(null);
+
+  /** One save at a time; a failure shows in the card of the setting that
+   * failed. */
+  const save = async (key: string, value: unknown) => {
+    if (pending) return;
+    setPending(true);
+    setFailure(null);
     try {
       await action("set_setting", { key, value });
-    } catch (failure) {
-      setHookError(
-        failure instanceof Error ? failure.message : String(failure),
-      );
+    } catch (error) {
+      setFailure({
+        key,
+        message: error instanceof Error ? error.message : String(error),
+      });
     } finally {
-      setHookPending(false);
+      setPending(false);
     }
   };
-  const setting = (key: string, value: unknown) => {
-    void configureHooks(key as "clientHooks", value);
-  };
-  const system = snapshot.connection.system;
+  const setting = (key: string) => (value: unknown) => void save(key, value);
+  const problem = (keys: string[]) =>
+    failure && keys.includes(failure.key) ? (
+      <Notice tone="error">{failure.message}</Notice>
+    ) : null;
+
+  const settings = snapshot.settings;
+  const followsScreen = Boolean(settings.appearanceFollowsScreen);
+  const login = snapshot.connection.system?.launchAtLogin;
+  const loginReason = login?.supported
+    ? undefined
+    : t(
+        login?.notice ?? "Not available in this build.",
+        "此版本不支持登录时启动。",
+      );
+  // Only states the person can act on; other notices are platform plumbing.
+  const loginNote = !login?.supported
+    ? null
+    : login.status === "requires-approval"
+      ? t(
+          login.notice ??
+            "Allow it in System Settings → General → Login Items.",
+          "需在「系统设置 → 通用 → 登录项」中允许。",
+        )
+      : login.status === "unavailable" && login.notice
+        ? t(login.notice, "此版本找不到登录服务。")
+        : null;
+
+  const appearance = (
+    <Segments
+      label={t("Appearance", "外观")}
+      value={settings.appearance}
+      disabled={followsScreen}
+      options={[
+        ["system", t("System", "跟随系统")],
+        ["light", t("Light", "浅色")],
+        ["dark", t("Dark", "深色")],
+      ]}
+      change={setting("appearance")}
+    />
+  );
+
   return (
-    <TooltipProvider delayDuration={300}>
-      <div
-        className="source-settings-pane"
-        style={{
-          width: "100%",
-          maxWidth: 640,
-          display: "flex",
-          flexDirection: "column",
-          gap: 28,
-        }}
-      >
-        <Section title={t("Appearance & language", "外观与语言")}>
-          <Row title={t("Appearance", "外观")}>
-            <Segments
-              label={t("Appearance", "外观")}
-              value={snapshot.settings.appearance}
-              disabled={Boolean(snapshot.settings.appearanceFollowsScreen)}
-              options={[
-                ["system", t("System", "跟随系统")],
-                ["light", t("Light", "浅色")],
-                ["dark", t("Dark", "深色")],
-              ]}
-              change={(value) => setting("appearance", value)}
-            />
-          </Row>
-          <Divider />
-          <ToggleRow
-            title={t("Match screen", "跟随所在屏幕")}
-            tag={t("Experimental", "实验")}
-            subtitle={t(
-              "Match window appearance to the display's HUD.",
-              "让窗口外观跟随所在屏幕的 HUD。",
-            )}
-            checked={snapshot.settings.appearanceFollowsScreen ?? false}
-            change={(value) => setting("appearanceFollowsScreen", value)}
-          />
-          <Divider />
-          <Row title={t("Language", "语言")}>
-            <Menu
-              label={t("Language", "语言")}
-              value={
-                snapshot.settings.language === "zh-Hans"
-                  ? "zh-CN"
-                  : snapshot.settings.language
-              }
-              options={[
-                ["system", t("System", "跟随系统")],
-                ["zh-CN", "中文"],
-                ["en", "English"],
-              ]}
-              change={(value) => setting("language", value)}
-            />
-          </Row>
-        </Section>
-        <Section title={t("Usage display", "用量显示")}>
-          <Row
-            title={t("Quota percentage", "额度百分比")}
-            subtitle={t(
-              "Choose whether percentages, rings and bars show used or remaining quota.",
-              "选择百分比、圆环和进度条显示已用额度还是剩余额度。",
-            )}
-          >
-            <Menu
-              label={t("Quota percentage", "额度百分比")}
-              value={snapshot.settings.quotaDisplay ?? "consumed"}
-              options={[
-                ["consumed", t("Consumed (0% → 100%)", "已用（0% → 100%）")],
-                ["remaining", t("Remaining (100% → 0%)", "剩余（100% → 0%）")],
-              ]}
-              change={(value) => setting("quotaDisplay", value)}
-            />
-          </Row>
-        </Section>
-        <Section title={t("Startup", "启动")}>
-          <ToggleRow
-            title={t("Launch at login", "登录时启动")}
-            subtitle={t(
-              "Keep an eye on usage whenever you start your Mac.",
-              "登录 Mac 后，自动开始监测用量。",
-            )}
-            checked={
-              system?.launchAtLogin.enabled ?? snapshot.settings.launchAtLogin
-            }
-            disabled={hookPending || !system?.launchAtLogin.supported}
-            reason={system?.launchAtLogin.notice ?? undefined}
-            change={(value) => setting("launchAtLogin", value)}
-          />
-        </Section>
-        <Section title={t("Clients", "客户端")}>
-          <ToggleRow
-            title={t("Client hooks", "客户端回调")}
-            subtitle={t(
-              "Added to each client's settings so the HUD can answer permission requests and show completions and waiting.",
-              "写入各客户端的设置，用来在 HUD 上回答权限请求、显示完成与等待批准。",
-            )}
-            checked={snapshot.settings.clientHooks}
-            disabled={
-              hookPending ||
-              hookStatus?.supported !== true ||
-              hookStatus?.installable !== true
-            }
-            change={(value) => {
-              void configureHooks("clientHooks", value);
-            }}
-          />
-          <div
-            role="status"
-            style={{ padding: "0 16px 12px", ...secondary, fontSize: 11 }}
-          >
-            {hookStatus?.notice ??
-              (hookStatus?.installed
-                ? t("Client callbacks are installed.", "客户端回调已安装。")
-                : t(
-                    "No client callbacks are installed. An approved installation path is required.",
-                    "尚未安装客户端回调，需要先指定固定安装路径。",
-                  ))}
-            {hookStatus?.enabled && (
-              <span style={{ display: "block", marginTop: 4 }}>
-                {t(
-                  "The local callback receiver is listening.",
-                  "本地回调接收器正在监听。",
-                )}
-              </span>
-            )}
-          </div>
-          <Divider />
-          <Row
-            title={t("Wait for an answer", "等待回答")}
-            subtitle={t(
-              "After this, an unanswered permission request goes back to the client's own prompt.",
-              "到时没回答的权限请求交还客户端，由它自己询问。",
-            )}
-          >
-            <Menu
-              label={t("Wait for an answer", "等待回答")}
-              value={String(snapshot.settings.approvalWaitMinutes ?? 10)}
-              options={[1, 3, 5, 10, 30, 60].map((minutes) => [
-                String(minutes),
-                t(
-                  minutes === 1 ? "1 minute" : `${minutes} minutes`,
-                  `${minutes} 分钟`,
-                ),
-              ])}
-              disabled={hookPending || !snapshot.settings.clientHooks}
-              change={(value) => {
-                void configureHooks("approvalWaitMinutes", Number(value));
-              }}
-            />
-          </Row>
-          {hookError && (
-            <p
-              role="alert"
-              style={{
-                margin: "0 16px 12px",
-                color: "var(--destructive)",
-                fontSize: 12,
-              }}
+    <Page>
+      <Section title={t("Appearance & language", "外观与语言")}>
+        <Row title={t("Appearance", "外观")}>
+          {followsScreen ? (
+            <Unavailable
+              reason={t(
+                "Turn off Match screen to choose.",
+                "关闭「跟随所在屏幕」后可选。",
+              )}
             >
-              {hookError}
-            </p>
+              {appearance}
+            </Unavailable>
+          ) : (
+            appearance
           )}
-        </Section>
-      </div>
-    </TooltipProvider>
+        </Row>
+        <ToggleRow
+          title={t("Match screen", "跟随所在屏幕")}
+          tag={t("Experimental", "实验")}
+          subtitle={t(
+            "Windows take the HUD look of their screen.",
+            "窗口外观跟随所在屏幕的 HUD。",
+          )}
+          checked={settings.appearanceFollowsScreen ?? false}
+          change={setting("appearanceFollowsScreen")}
+        />
+        <Row title={t("Language", "语言")}>
+          <Menu
+            label={t("Language", "语言")}
+            value={
+              settings.language === "zh-Hans" ? "zh-CN" : settings.language
+            }
+            options={[
+              ["system", t("System", "跟随系统")],
+              ["zh-CN", "中文"],
+              ["en", "English"],
+            ]}
+            change={setting("language")}
+          />
+        </Row>
+        {problem(appearanceKeys)}
+      </Section>
+      <Section title={t("Usage display", "用量显示")}>
+        <Row title={t("Quota percentage", "额度百分比")}>
+          <Menu
+            label={t("Quota percentage", "额度百分比")}
+            value={settings.quotaDisplay ?? "consumed"}
+            options={[
+              ["consumed", t("Used", "已用")],
+              ["remaining", t("Remaining", "剩余")],
+            ]}
+            change={setting("quotaDisplay")}
+          />
+        </Row>
+        {problem(usageKeys)}
+      </Section>
+      <Section title={t("Startup & menu bar", "启动与菜单栏")}>
+        <ToggleRow
+          title={t("Launch at login", "登录时启动")}
+          checked={login?.enabled ?? settings.launchAtLogin}
+          disabled={pending || !login?.supported}
+          reason={loginReason}
+          change={setting("launchAtLogin")}
+        />
+        {loginNote && <Notice tone="warning">{loginNote}</Notice>}
+        <ToggleRow
+          title={t("Show menu bar icon", "显示菜单栏图标")}
+          checked={settings.showMenuBarIcon !== false}
+          change={setting("showMenuBarIcon")}
+        />
+        {problem(startupKeys)}
+      </Section>
+    </Page>
   );
 }
