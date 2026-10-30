@@ -6,9 +6,10 @@
 //!
 //! Installing it writes the module and one marked row in Harness's home
 //! patch (`clients::deepseek::patch`), which every Harness host reads, the
-//! Desktop app's included, and reloads when it changes. The row's id and the
-//! file's name carry the module's version, because Harness does not reload a
-//! new file under an id it already runs.
+//! Desktop app's included, and reloads when it changes. The row's id carries
+//! the module's version and where the app's folder is, and the file's name
+//! the version, because Harness does not reload a new file or folder under an
+//! id it already runs.
 //!
 //! The folder holds what the plugin writes (`sessions/` check-ins, `calls/`
 //! notes, `asks/` waiting questions and approvals) and what the app writes
@@ -80,19 +81,31 @@ fn rows(items: &[Value]) -> usize {
         .count()
 }
 
+/// The row's id: the module's version, then a short hash of `channel`. A
+/// moved data folder gets a new id, so Harness drops the module that writes
+/// to the old folder and loads the one in the new folder.
+fn row_id(channel: &Path) -> String {
+    let place: String = Sha256::digest(channel.to_string_lossy().as_bytes())
+        .iter()
+        .take(3)
+        .map(|byte| format!("{byte:02x}"))
+        .collect();
+    format!("{ROW}-{}-{place}", version())
+}
+
 /// The row that loads `file` and points it at `channel`.
 fn block(file: &Path, channel: &Path) -> String {
     format!(
         "{start}\n\
          - insert:\n\
-         \x20   - id: {ROW}-{version}\n\
+         \x20   - id: {id}\n\
          \x20     name: {file}\n\
          \x20     config:\n\
          \x20       channel: {channel}\n\
          {end}\n",
         start = PLUGIN.start,
         end = PLUGIN.end,
-        version = version(),
+        id = row_id(channel),
         file = patch::quoted(&file.to_string_lossy()),
         channel = patch::quoted(&channel.to_string_lossy()),
     )

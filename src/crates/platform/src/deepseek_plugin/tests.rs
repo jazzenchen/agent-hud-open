@@ -24,8 +24,30 @@ fn the_version_names_the_file_and_the_row() {
     assert_eq!(version.len(), 12);
     assert!(version.bytes().all(|b| b.is_ascii_hexdigit()));
     assert_eq!(file_name(), format!("agent-hud-{version}.mjs"));
-    let block = block(Path::new("/p/agent-hud.mjs"), Path::new("/c"));
-    assert!(block.contains(&format!("id: agent-hud-plugin-{version}\n")));
+    let (file, channel) = (Path::new("/p/agent-hud.mjs"), Path::new("/c"));
+    let block = block(file, channel);
+    assert!(block.contains(&format!("id: {}\n", row_id(channel))));
+    assert!(row_id(channel).starts_with(&format!("agent-hud-plugin-{version}-")));
+}
+
+#[test]
+fn a_moved_folder_gives_the_row_a_new_id() {
+    let temp = tempfile::tempdir().unwrap();
+    let root = temp.path().join("root");
+    let places = places(&root);
+    let earlier = root.join("app.agenthud.next");
+    let current = root.join("app.agenthud.mac");
+    let file = |data: &Path| data.join("deepseek-plugin").join(file_name());
+    let channel = |data: &Path| data.join("deepseek-channel");
+    set_row(&places, Some((&file(&earlier), &channel(&earlier)))).unwrap();
+    let id = |places: &Places| {
+        patch::items(&patch_text(places).unwrap()).unwrap()[0]["insert"][0]["id"].clone()
+    };
+    let before = id(&places);
+    assert!(!installed_as(&places, &file(&current), &channel(&current)));
+    assert!(set_row(&places, Some((&file(&current), &channel(&current)))).unwrap());
+    assert_ne!(id(&places), before);
+    assert!(installed(&places) && installed_as(&places, &file(&current), &channel(&current)));
 }
 
 #[test]
@@ -44,7 +66,7 @@ fn the_row_is_added_and_removed_beside_hud_tools() {
     );
     let items = patch::items(&patch_text(&places).unwrap()).unwrap();
     let row = &items[0]["insert"][0];
-    assert_eq!(row["id"], format!("agent-hud-plugin-{}", version()));
+    assert_eq!(row["id"], row_id(channel));
     assert_eq!(row["name"], file.to_string_lossy().as_ref());
     assert_eq!(row["config"]["channel"], channel.to_string_lossy().as_ref());
 
