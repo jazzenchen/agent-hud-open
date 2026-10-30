@@ -445,11 +445,12 @@ pub enum MessageError {
     Uncertain,
 }
 
-/// An existing conversation bound to its one verified running owner.
-/// Its endpoint and credential remain private to the platform adapter.
+/// An existing conversation and the running service that opened it. Its
+/// endpoint and credential remain private to the platform adapter.
 pub struct MessageSession {
     cascade_id: String,
     endpoint: Endpoint,
+    trajectory: Value,
 }
 
 fn valid_cascade_id(id: &str) -> bool {
@@ -463,67 +464,37 @@ fn valid_cascade_id(id: &str) -> bool {
         })
 }
 
-/// All candidates must answer successfully. A failed or malformed reply
-/// cannot prove that a second service does not own the same conversation.
-/// A service with no conversations leaves `trajectorySummaries` out (an
-/// empty map is not written), as the permissions reader also takes it.
-fn unique_owner<T: Clone>(
+/// The service a message goes to: one that already has the conversation
+/// open, else the first that can open it. `GetAllCascadeTrajectories` lists
+/// only the conversations a service has loaded (none: the map is left out),
+/// so it can prefer a service but never refuse one; any service opens a
+/// conversation from disk with `GetCascadeTrajectory`.
+fn pick_service<T: Clone>(
     endpoints: &[T],
     cascade_id: &str,
-    mut summaries: impl FnMut(&T) -> Result<Value, String>,
-) -> Result<T, MessageError> {
-    let mut owner = None;
-    for endpoint in endpoints {
-        let body = summaries(endpoint).map_err(|_| {
-            MessageError::Unavailable("Could not verify every Antigravity service".into())
-        })?;
-        let invalid =
-            || MessageError::Unavailable("Invalid Antigravity conversation summary".into());
-        let owns = match body
-            .as_object()
-            .ok_or_else(invalid)?
-            .get("trajectorySummaries")
-        {
-            None | Some(Value::Null) => false,
-            Some(entries) => entries
+    mut loaded: impl FnMut(&T) -> Result<Value, String>,
+    mut open: impl FnMut(&T) -> Result<Value, String>,
+) -> Result<(T, Value), MessageError> {
+    let has_it = |body: Result<Value, String>| {
+        body.ok().is_some_and(|body| {
+            body["trajectorySummaries"]
                 .as_object()
-                .ok_or_else(invalid)?
-                .contains_key(cascade_id),
-        };
-        if owns {
-            if owner.is_some() {
-                return Err(MessageError::Unavailable(
-                    "Antigravity conversation belongs to more than one service".into(),
-                ));
-            }
-            owner = Some(endpoint.clone());
+                .is_some_and(|loaded| loaded.contains_key(cascade_id))
+        })
+    };
+    let (first, rest): (Vec<&T>, Vec<&T>) = endpoints
+        .iter()
+        .partition(|endpoint| has_it(loaded(endpoint)));
+    let mut last = None;
+    for endpoint in first.into_iter().chain(rest) {
+        match open(endpoint) {
+            Ok(trajectory) => return Ok((endpoint.clone(), trajectory)),
+            Err(error) => last = Some(error),
         }
     }
-    owner.ok_or_else(|| {
-        MessageError::Unavailable("No running Antigravity service owns this conversation".into())
-    })
-}
-
-fn message_owner(service: &Service, cascade_id: &str) -> Result<Endpoint, MessageError> {
-    let endpoints = service
-        .discover(true, true)
-        .map_err(MessageError::Unavailable)?;
-    unique_owner(&endpoints, cascade_id, |endpoint| {
-        service.send(endpoint, "GetAllCascadeTrajectories", &json!({}))
-    })
-}
-
-fn send_once<T: PartialEq>(
-    expected: &T,
-    owner: impl FnOnce() -> Result<T, MessageError>,
-    write: impl FnOnce() -> Result<Value, String>,
-) -> Result<Value, MessageError> {
-    if owner()? != *expected {
-        return Err(MessageError::Unavailable(
-            "Antigravity conversation service changed".into(),
-        ));
-    }
-    write().map_err(|_| MessageError::Uncertain)
+    Err(MessageError::Unavailable(last.unwrap_or_else(|| {
+        "No running Antigravity service is available".into()
+    })))
 }
 
 /// Resolve a known conversation without enabling permission observation or
@@ -537,36 +508,38 @@ pub fn message_session(cascade_id: &str) -> Result<MessageSession, MessageError>
             "Antigravity message discovery is unsupported on this system".into(),
         ));
     }
-    let endpoint = message_owner(service().map_err(MessageError::Unavailable)?, cascade_id)?;
+    let service = service().map_err(MessageError::Unavailable)?;
+    let endpoints = service
+        .discover(true, false)
+        .map_err(MessageError::Unavailable)?;
+    let (endpoint, trajectory) = pick_service(
+        &endpoints,
+        cascade_id,
+        |endpoint| service.send(endpoint, "GetAllCascadeTrajectories", &json!({})),
+        |endpoint| {
+            service.send(
+                endpoint,
+                "GetCascadeTrajectory",
+                &json!({"cascadeId": cascade_id}),
+            )
+        },
+    )?;
     Ok(MessageSession {
         cascade_id: cascade_id.to_owned(),
         endpoint,
+        trajectory,
     })
 }
 
 impl MessageSession {
-    fn current_service(&self) -> Result<&'static Service, MessageError> {
-        let service = service().map_err(MessageError::Unavailable)?;
-        if message_owner(service, &self.cascade_id)? != self.endpoint {
-            return Err(MessageError::Unavailable(
-                "Antigravity conversation service changed".into(),
-            ));
-        }
-        Ok(service)
-    }
-
+    /// The conversation as its service opened it.
     pub fn trajectory(&self) -> Result<Value, MessageError> {
-        self.current_service()?
-            .send(
-                &self.endpoint,
-                "GetCascadeTrajectory",
-                &json!({"cascadeId":self.cascade_id}),
-            )
-            .map_err(MessageError::Unavailable)
+        Ok(self.trajectory.clone())
     }
 
     pub fn user_status(&self) -> Result<Value, MessageError> {
-        self.current_service()?
+        service()
+            .map_err(MessageError::Unavailable)?
             .send(
                 &self.endpoint,
                 "GetUserStatus",
@@ -575,21 +548,21 @@ impl MessageSession {
             .map_err(MessageError::Unavailable)
     }
 
-    /// Revalidate immediately before the only write. An error after the request
-    /// starts is uncertain, including a lost response or an unexpected body.
+    /// The one write, to the service that opened the conversation. An error
+    /// after the request starts is uncertain, including a lost response or an
+    /// unexpected body, and is never retried on another service.
     pub fn send(&self, params: &Value) -> Result<Value, MessageError> {
         if params["cascadeId"].as_str() != Some(self.cascade_id.as_str()) {
             return Err(MessageError::Invalid("Antigravity session identity".into()));
         }
-        let service = service().map_err(MessageError::Unavailable)?;
-        send_once(
-            &self.endpoint,
-            || message_owner(service, &self.cascade_id),
-            || service.send(&self.endpoint, "SendUserCascadeMessage", params),
-        )
+        service()
+            .map_err(MessageError::Unavailable)?
+            .send(&self.endpoint, "SendUserCascadeMessage", params)
+            .map_err(|_| MessageError::Uncertain)
     }
 }
 
+/// Quota reads may use the first readable service. Pending permissions instead
 /// retain and revalidate an explicit Endpoint through `endpoints(true)`.
 pub fn call(method: &str, params: &Value) -> Result<Value, String> {
     allowed(method)?;
@@ -695,69 +668,88 @@ mod windows_live_test {
 #[cfg(test)]
 mod message_tests {
     use super::*;
-    use std::cell::Cell;
+    use std::cell::RefCell;
 
     const ID: &str = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee";
 
+    /// Services 1..: `loaded` lists the ones with the conversation in memory,
+    /// `opens` the ones that can open it; every open is written down.
+    fn pick(
+        services: &[u8],
+        loaded: &[u8],
+        lists: impl Fn(u8) -> Result<Value, String>,
+        opens: &[u8],
+    ) -> (Result<(u8, Value), MessageError>, Vec<u8>) {
+        let opened = RefCell::new(Vec::new());
+        let picked = pick_service(
+            services,
+            ID,
+            |n| {
+                if loaded.contains(n) {
+                    Ok(json!({"trajectorySummaries": {(ID): {}}}))
+                } else {
+                    lists(*n)
+                }
+            },
+            |n| {
+                opened.borrow_mut().push(*n);
+                if opens.contains(n) {
+                    Ok(json!({"trajectory": {"service": n}}))
+                } else {
+                    Err(format!("service {n}: trajectory not found"))
+                }
+            },
+        );
+        (picked, opened.into_inner())
+    }
+
     #[test]
-    fn target_must_have_one_proven_owner_among_all_services() {
-        let answer = |endpoint: &u8| {
-            Ok(if *endpoint == 1 {
-                json!({"trajectorySummaries": {(ID): {}}})
-            } else {
-                json!({"trajectorySummaries": {}})
-            })
-        };
-        assert_eq!(unique_owner(&[1, 2], ID, answer), Ok(1));
-        assert!(unique_owner(&[1, 1], ID, answer).is_err());
-        assert!(unique_owner(&[2], ID, answer).is_err());
-        assert!(unique_owner(&[1, 2], ID, |n| {
-            if *n == 2 {
-                Err("offline".into())
-            } else {
-                answer(n)
-            }
-        })
-        .is_err());
-        // A service with no conversations answers without the map.
-        for empty in [json!({}), json!({"trajectorySummaries": null})] {
-            assert_eq!(
-                unique_owner(&[1, 2], ID, |n| if *n == 2 {
-                    Ok(empty.clone())
-                } else {
-                    answer(n)
-                }),
-                Ok(1)
-            );
-        }
-        for malformed in [json!([]), json!({"trajectorySummaries": []})] {
-            assert_eq!(
-                unique_owner(&[1, 2], ID, |n| if *n == 2 {
-                    Ok(malformed.clone())
-                } else {
-                    answer(n)
-                }),
-                Err(MessageError::Unavailable(
-                    "Invalid Antigravity conversation summary".into()
-                ))
-            );
+    fn a_conversation_no_service_has_loaded_is_opened_by_the_first_that_can() {
+        // A service with nothing loaded leaves the map out.
+        let (picked, opened) = pick(&[1], &[], |_| Ok(json!({})), &[1]);
+        assert_eq!(picked, Ok((1, json!({"trajectory": {"service": 1}}))));
+        assert_eq!(opened, [1]);
+        let (picked, opened) = pick(&[1, 2, 3], &[], |_| Ok(json!({})), &[2, 3]);
+        assert_eq!(picked.unwrap().0, 2);
+        assert_eq!(opened, [1, 2]);
+    }
+
+    #[test]
+    fn a_service_that_has_it_open_comes_first() {
+        let (picked, opened) = pick(&[1, 2], &[2], |_| Ok(json!({})), &[1, 2]);
+        assert_eq!(picked.unwrap().0, 2);
+        assert_eq!(opened, [2]);
+    }
+
+    #[test]
+    fn an_unreadable_list_never_refuses_a_service() {
+        for list in [
+            Err("offline".to_string()),
+            Ok(json!([])),
+            Ok(json!({"trajectorySummaries": null})),
+            Ok(json!({"trajectorySummaries": []})),
+        ] {
+            let (picked, _) = pick(&[1], &[], |_| list.clone(), &[1]);
+            assert_eq!(picked.unwrap().0, 1);
         }
     }
 
     #[test]
-    fn changed_owner_is_not_written_and_lost_response_is_never_retried() {
-        let writes = Cell::new(0);
-        let write = || {
-            writes.set(writes.get() + 1);
-            Err("connection lost after submission".into())
-        };
-        assert!(matches!(
-            send_once(&1, || Ok(2), write),
-            Err(MessageError::Unavailable(_))
-        ));
-        assert_eq!(writes.get(), 0);
-        assert_eq!(send_once(&1, || Ok(1), write), Err(MessageError::Uncertain));
-        assert_eq!(writes.get(), 1);
+    fn when_no_service_can_open_it_the_last_service_says_why() {
+        let (picked, opened) = pick(&[1, 2], &[], |_| Ok(json!({})), &[]);
+        assert_eq!(
+            picked,
+            Err(MessageError::Unavailable(
+                "service 2: trajectory not found".into()
+            ))
+        );
+        assert_eq!(opened, [1, 2]);
+        assert_eq!(
+            pick(&[], &[], |_| Ok(json!({})), &[]).0,
+            Err(MessageError::Unavailable(
+                "No running Antigravity service is available".into()
+            ))
+        );
     }
 
     #[test]
