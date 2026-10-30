@@ -67,7 +67,7 @@ fn evaluate(function: &str, args: &Value) -> Option<Value> {
         "AntigravityClient.groupWord" => {
             json!(vendor_windows::antigravity_group_word(text("name")?))
         }
-        // Next keys vendors in lower case ("codex"); Open by name ("Codex").
+        // This app keys vendors in lower case ("codex"); the Swift app by name ("Codex").
         "VendorCatalog.window" => json!(window_names::catalog_window(
             &text("vendor")?.to_lowercase(),
             text("value")?
@@ -85,7 +85,7 @@ fn evaluate(function: &str, args: &Value) -> Option<Value> {
     })
 }
 
-/// The value Next must produce, whether the case is a recorded gap, and
+/// The value this app must produce, whether the case is a recorded gap, and
 /// whether it is a recorded improvement.
 fn decision<'a>(
     decisions: &'a Value,

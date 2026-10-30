@@ -2,7 +2,7 @@
 //! Claude's and Codex's tiers in their own names, any other code as words.
 //! Provider codes stay out of the UI.
 
-/// The badge for `plan` of `provider` (Next's provider id), or none for an
+/// The badge for `plan` of `provider` (the app's provider id), or none for an
 /// empty plan.
 pub fn plan_label(provider: &str, plan: &str) -> Option<String> {
     if plan.is_empty() {

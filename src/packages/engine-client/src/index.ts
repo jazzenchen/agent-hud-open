@@ -19,7 +19,7 @@ export class EngineClient {
   private binary: string;
   private mode: "standalone" | "app";
   constructor(
-    binary = process.env.AGENTHUD_NEXT_ENGINE ??
+    binary = process.env.AGENTHUD_ENGINE ??
       fileURLToPath(
         new URL(
           `../../../../target/debug/agent-hud-engine${process.platform === "win32" ? ".exe" : ""}`,

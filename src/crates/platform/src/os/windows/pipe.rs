@@ -239,7 +239,7 @@ pub(crate) fn name(data: &Path, channel: &str) -> Result<String, String> {
     let path = std::fs::canonicalize(data).unwrap_or_else(|_| data.to_owned());
     hash.update(path.as_os_str().to_string_lossy().as_bytes());
     Ok(format!(
-        "\\\\.\\pipe\\agenthud-next-{channel}-{:x}",
+        "\\\\.\\pipe\\agenthud-{channel}-{:x}",
         hash.finalize()
     ))
 }

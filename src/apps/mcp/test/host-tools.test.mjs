@@ -62,7 +62,7 @@ async function connect(engineFile, env = {}, options = {}) {
     new StdioClientTransport({
       command: process.execPath,
       args: ["--import", tsx, relay],
-      env: { ...rest, AGENTHUD_NEXT_ENGINE: engineFile, ...env },
+      env: { ...rest, AGENTHUD_ENGINE: engineFile, ...env },
     }),
   );
   return client;
@@ -214,7 +214,7 @@ test("a group switched on after the relay started is listed, and announced, and 
   const changes = [];
   const client = await connect(
     fake.file,
-    { AGENTHUD_NEXT_HOST_TOOLS_MS: "100" },
+    { AGENTHUD_HOST_TOOLS_MS: "100" },
     {
       listChanged: {
         tools: { onChanged: (error, tools) => changes.push(error ?? tools) },
@@ -265,7 +265,7 @@ test("on Windows the launcher names the client, which the relay gives as parent"
   ]) {
     const fake = engine(`launched-${parent}-${value.length}`, [tool]);
     const client = await connect(fake.file, {
-      AGENTHUD_NEXT_MCP_PARENT: value,
+      AGENTHUD_MCP_PARENT: value,
     });
     try {
       await client.callTool({ name: "some_tool", arguments: { text: "hi" } });

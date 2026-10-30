@@ -30,7 +30,7 @@ impl Clients {
         Ok(())
     }
     pub fn install(&mut self, enabled: bool) -> Result<(), String> {
-        let context=self.context.as_ref().ok_or_else(|| l10n::text("预览版没有指定固定的回调程序，客户端配置未作改动", "No fixed hook-owner executable has been delegated; no client configuration was changed"))?;
+        let context=self.context.as_ref().ok_or_else(|| l10n::text("这个版本没有指定固定的回调程序，客户端配置未作改动", "No fixed hook-owner executable has been delegated; no client configuration was changed"))?;
         let sources = crate::discovery::discover_at(&context.home, &context.environment)
             .into_iter()
             .filter(|p| p.installed || p.configured || p.usage)
@@ -104,7 +104,7 @@ impl Clients {
     }
     pub fn status(&self, enabled: bool, desired: bool) -> Value {
         let installed = self.rows.iter().any(|row| row["installed"] == true);
-        let notice=self.notice.clone().or_else(||if self.context.is_none(){Some(l10n::text("预览版没有指定固定的回调程序。接收回调不会安装客户端回调，客户端配置未作改动。", "No fixed hook-owner executable has been delegated. Listening does not install client hooks; client configuration is unchanged."))}else{None});
+        let notice=self.notice.clone().or_else(||if self.context.is_none(){Some(l10n::text("这个版本没有指定固定的回调程序。接收回调不会安装客户端回调，客户端配置未作改动。", "No fixed hook-owner executable has been delegated. Listening does not install client hooks; client configuration is unchanged."))}else{None});
         json!({"supported":super::supported(),"enabled":enabled,"desired":desired,"installed":installed,"installable":self.context.is_some(),"notice":notice,"clients":self.rows})
     }
 }

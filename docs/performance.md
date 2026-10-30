@@ -82,7 +82,7 @@ The behavioral reference is the Swift application (`UsageCollector.swift`,
   event keys remain stable for subsequent appends. Unmatched logs retain the
   bounded reader; current-window coverage is distinct from unrelated old pending
   files. Imported facts retain the original history retention boundary.
-- Account-exact quota history is imported once into Next's own SQLite database.
+- Account-exact quota history is imported once into Agent HUD's own SQLite database.
   Source reads use an existing WAL snapshot with read-only shared memory, or a
   signature-checked quiescent main file before opening SQLite. They do not
   initialize missing WAL/SHM files. Failed imports never commit a successful

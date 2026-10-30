@@ -27,6 +27,7 @@ import type {
   StatisticsResponse,
   StatisticsTokenKind,
 } from "./lib/types";
+import { storageKeys } from "./lib/storage-keys";
 import {
   ActivityHeatmap,
   APIBillingCard,
@@ -78,7 +79,7 @@ const validBucketsByRange: Record<Range, StatisticsQuery["bucketMinutes"][]> = {
   "7d": [60, 1440],
   "30d": [1440],
 };
-const hiddenAgentCardsKey = "agenthud.next.hidden-agent-cards";
+const hiddenAgentCardsKey = storageKeys.hiddenAgentCards;
 
 /** A quiet ledger still advances at the source's quarter-hour boundary and on focus. */
 function useStatisticsEnd(revision: number, refresh: number, active: boolean) {
@@ -373,9 +374,9 @@ export default function Statistics({
     if (!active) return;
     const consumePending = () => {
       try {
-        const raw = localStorage.getItem("agenthud.next.highlight-provider");
+        const raw = localStorage.getItem(storageKeys.highlightProvider);
         if (!raw) return;
-        localStorage.removeItem("agenthud.next.highlight-provider");
+        localStorage.removeItem(storageKeys.highlightProvider);
         const parsed = JSON.parse(raw) as { provider?: string; at?: number };
         if (
           parsed?.provider &&
@@ -393,7 +394,7 @@ export default function Statistics({
           "statistics:provider",
           (event) => {
             try {
-              localStorage.removeItem("agenthud.next.highlight-provider");
+              localStorage.removeItem(storageKeys.highlightProvider);
             } catch {}
             if (event.payload?.provider) {
               applyProviderHighlight(event.payload.provider);

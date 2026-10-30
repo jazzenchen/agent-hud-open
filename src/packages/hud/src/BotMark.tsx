@@ -168,7 +168,7 @@ export function BotMark({
             side = input.size * scale,
             hair = input.outline * scale,
             // Room round Claude's frame for Clawd's props (desk, laptop, light
-            // bulb, spark) at the grain Next rounds to (clawdGrain).
+            // bulb, spark) at the grain this app rounds to (clawdGrain).
             pad = key === "claude" ? Math.ceil(side * 0.3) : 0,
             extent = Math.ceil(side * 1.6) + hair * 2 + pad * 2;
           const layout = `${side}:${scale}:${hair}:${extent}`;

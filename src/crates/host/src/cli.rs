@@ -23,7 +23,7 @@ pub fn entry(arguments: &[String]) -> Option<i32> {
     };
     let mut command = Command::new(server);
     if let Some(engine) = resource("agent-hud-engine") {
-        command.env("AGENTHUD_NEXT_ENGINE", engine);
+        command.env("AGENTHUD_ENGINE", engine);
     }
     Some(serve(command))
 }

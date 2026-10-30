@@ -75,7 +75,7 @@ impl Server {
             return Err("Hooks owner lock belongs to another user".into());
         }
         lock.try_lock()
-            .map_err(|_| "Another application owns the Next hooks channel")?;
+            .map_err(|_| "Another application owns the Agent HUD hooks channel")?;
         if let Ok(metadata) = fs::symlink_metadata(&path) {
             if !metadata.file_type().is_socket() || metadata.uid() != unsafe { libc::getuid() } {
                 return Err("Hooks socket path is occupied by another file".into());
@@ -317,7 +317,7 @@ pub(crate) fn send(
         return Err("Hook callback is too large".into());
     }
     let mut stream = UnixStream::connect(socket_path(data))
-        .map_err(|_| "Next hooks are disabled or not running")?;
+        .map_err(|_| "Agent HUD hooks are disabled or not running")?;
     stream
         .set_write_timeout(Some(Duration::from_secs(2)))
         .map_err(|_| "Hook timeout unavailable")?;

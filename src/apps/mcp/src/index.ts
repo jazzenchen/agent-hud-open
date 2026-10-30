@@ -101,8 +101,8 @@ const askHost = () =>
  * the list as it was. */
 let hostTools = (await askHost()) ?? [];
 const hostInterval =
-  Number(process.env.AGENTHUD_NEXT_HOST_TOOLS_MS) > 0
-    ? Number(process.env.AGENTHUD_NEXT_HOST_TOOLS_MS)
+  Number(process.env.AGENTHUD_HOST_TOOLS_MS) > 0
+    ? Number(process.env.AGENTHUD_HOST_TOOLS_MS)
     : 15_000;
 /** A host tool's schema as the host wrote it; the host checks the arguments itself. */
 const hostSchema = (
@@ -124,9 +124,9 @@ const hostSchema = (
  * relay per host for all its sessions. For a call no client names, the relay says which
  * process started it (`parent`), and the app finds the session from what Agent HUD's
  * plugin in that Harness host noted. On Windows the app's `--mcp` launcher stays as
- * this relay's parent, so it names the client in AGENTHUD_NEXT_MCP_PARENT. */
+ * this relay's parent, so it names the client in AGENTHUD_MCP_PARENT. */
 const launchedBy = (() => {
-  const named = Number(process.env.AGENTHUD_NEXT_MCP_PARENT);
+  const named = Number(process.env.AGENTHUD_MCP_PARENT);
   return Number.isSafeInteger(named) && named > 0 ? named : process.ppid;
 })();
 const caller = (meta: Record<string, unknown> | undefined) => {

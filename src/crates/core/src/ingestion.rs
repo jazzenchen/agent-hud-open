@@ -164,8 +164,8 @@ pub(crate) fn read_lines(
 /// the ledger keeps and is not read, even when an earlier version read it;
 /// what it counted stays (agent-hud-native-open TailLogStore.index: logs modified
 /// since the history cutoff, and older ones outdated or unfinished within the
-/// retention). Open also leaves unread a log 7 to 31 days old it never read;
-/// Next reads it, so a first launch fills the 30-day token history.
+/// retention). The Swift app also leaves unread a log 7 to 31 days old it
+/// never read; this app reads it, so a first launch fills the 30-day token history.
 pub(crate) fn due(log: Option<&LogHead>, file: &FileStamp, now_ms: i64) -> bool {
     within_retention(file, now_ms) && needs_read(log, file)
 }

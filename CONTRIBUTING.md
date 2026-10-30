@@ -1,12 +1,12 @@
 # Contributing
 
-This repository ports Agent HUD's native Swift app, [agent-hud-native-open](https://github.com/jazzenchen/agent-hud-native-open) (formerly agent-hud-open), to Rust, Tauri and React so it runs on macOS, Windows and Linux with the same behavior. In these documents, **Open** means that Swift app and **Next** means this repository.
+This repository ports Agent HUD's native Swift app, [agent-hud-native-open](https://github.com/jazzenchen/agent-hud-native-open) (formerly agent-hud-open), to Rust, Tauri and React so it runs on macOS, Windows and Linux with the same behavior. In these documents, **the Swift app** means that app.
 
 ## The reference
 
-Open's behavior at commit `014524c` is the specification. [The parity ledger](docs/parity/README.md) lists, behavior by behavior, what matches and what does not. A change that closes a ledger row should say which row, and update it.
+The Swift app's behavior at commit `014524c` is the specification. [The parity ledger](docs/parity/README.md) lists, behavior by behavior, what matches and what does not. A change that closes a ledger row should say which row, and update it.
 
-Next may differ from Open only when the difference is deliberate (see the ledger's list) or clearly better. Write the reason in the ledger row.
+This app may differ from the Swift app only when the difference is deliberate (see the ledger's list) or clearly better. Write the reason in the ledger row.
 
 ## Where code goes
 

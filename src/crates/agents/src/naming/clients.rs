@@ -25,8 +25,8 @@ pub fn codex_client(source: Option<&str>, originator: Option<&str>) -> Option<St
     (source == Some("vscode")).then(|| "IDE".into())
 }
 
-/// The name a session's client is shown by, for `source` (Next's provider
-/// id) and the client its log names; none where Next has nothing to add to
+/// The name a session's client is shown by, for `source` (the app's provider
+/// id) and the client its log names; none where the app has nothing to add to
 /// the agent's own name.
 pub fn client_name(source: &str, client: Option<&str>) -> Option<String> {
     match source {

@@ -119,8 +119,8 @@ mod tests {
             temp.path().file_name().unwrap().to_string_lossy()
         ));
         let key = CURRENT_USER.create(&fixture.0).unwrap();
-        let public = "com.agenthud.next.preview";
-        let product = "app.agenthud.mac";
+        let public = "app.agenthud.windows";
+        let product = "app.agenthud.test";
         set_entry(&key, public, true).unwrap();
         set_entry(&key, product, true).unwrap();
         assert!(entry_enabled(&key, public));

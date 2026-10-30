@@ -6,7 +6,7 @@ Use Node.js 24+, Bun (to compile the packaged MCP relay), the host Rust toolchai
 
 ## Commands
 
-Run from the Next repository root:
+Run from the repository root:
 
 | Host | Desktop executable, release profile, no installer |
 | --- | --- |
@@ -27,7 +27,7 @@ Use the command matching the current host. For example, `build:windows` on macOS
 
 `--print-plan` prints the selected commands without running build tools or checking installed prerequisites. It still validates the requested platform against the current OS. It is an inspection feature, not evidence that the build would succeed.
 
-`pnpm run engine:build` retains its debug default and output at `target/debug/agent-hud-engine` (`.exe` on Windows), which the development MCP client expects. Use `pnpm run engine:build -- --release` for the release engine. With no custom Cargo target directory, the release output is `target/release/agent-hud-engine`. `CARGO_TARGET_DIR` retains standard Cargo behavior; update `AGENTHUD_NEXT_ENGINE` when choosing a different installed/output path. This tool does not silently redirect an existing MCP client.
+`pnpm run engine:build` retains its debug default and output at `target/debug/agent-hud-engine` (`.exe` on Windows), which the development MCP client expects. Use `pnpm run engine:build -- --release` for the release engine. With no custom Cargo target directory, the release output is `target/release/agent-hud-engine`. `CARGO_TARGET_DIR` retains standard Cargo behavior; update `AGENTHUD_ENGINE` when choosing a different installed/output path. This tool does not silently redirect an existing MCP client.
 
 The runner checks the Rust compiler's host OS before compiling and rejects a differing `CARGO_BUILD_TARGET`. It does not add a cross target or pass `--target`, preserving the existing Cargo output layout. Cross-architecture/universal builds are not provided by these aliases; use an appropriate build host/toolchain and qualify that artifact separately.
 

@@ -14,11 +14,11 @@ const CREATE_NO_WINDOW: u32 = 0x08000000;
 
 /// Windows has no exec, so the relay still waits on the server here. The
 /// server's own parent is then this relay, not the client, so the client's
-/// process goes to it in `AGENTHUD_NEXT_MCP_PARENT`: the app finds a DeepSeek
+/// process goes to it in `AGENTHUD_MCP_PARENT`: the app finds a DeepSeek
 /// Harness caller by the process that started the server.
 pub(super) fn serve(mut command: Command) -> i32 {
     if let Some(client) = parent() {
-        command.env("AGENTHUD_NEXT_MCP_PARENT", client.to_string());
+        command.env("AGENTHUD_MCP_PARENT", client.to_string());
     }
     command
         .creation_flags(CREATE_NO_WINDOW)

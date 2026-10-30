@@ -849,7 +849,7 @@ fn app_action(action: &str) -> Option<&'static str> {
 /// Text as the app reads a button's: without control, format or line and
 /// paragraph separator characters other than the joiners, nor the filler
 /// characters it drops, its spaces collapsed (agent-hud-native-open
-/// ClaudeDesktopAsks.shown; Next does not compose the text first).
+/// ClaudeDesktopAsks.shown; this app does not compose the text first).
 fn shown(value: &Value) -> Option<String> {
     let text = value.as_str()?;
     let kept = text

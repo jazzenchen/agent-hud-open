@@ -36,7 +36,7 @@ impl InstallPlan {
     }
 }
 pub(super) fn canonical(context: &InstallContext) -> Result<(), String> {
-    let fixed=context.canonical_executable.as_ref().ok_or_else(|| l10n::text("预览版还没有指定固定的回调程序，在迁移指定正式安装路径之前请保持客户端回调关闭。", "Next has no approved fixed hook-owner executable yet. Keep hooks disabled until an explicit migration supplies its canonical installation path."))?;
+    let fixed=context.canonical_executable.as_ref().ok_or_else(|| l10n::text("这个版本还没有指定固定的回调程序，在迁移指定正式安装路径之前请保持客户端回调关闭。", "This build has no approved fixed hook-owner executable yet. Keep hooks disabled until an explicit migration supplies its canonical installation path."))?;
     let text = fixed.to_string_lossy();
     if !fixed.is_absolute()
         || text.starts_with("/Volumes/")

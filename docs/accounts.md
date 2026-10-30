@@ -102,7 +102,7 @@ short-lived query. It cannot refresh an inactive identified CLI account. The
 verified CLI contract and official references are recorded in
 [the Antigravity parity ledger](parity/c02b-antigravity-cursor.md#cli-account-selection-investigation-2026-10-22).
 
-Quota observations and complete per-call usage are persisted in Next's own
+Quota observations and complete per-call usage are persisted in Agent HUD's own
 SQLite ledger. The five picker measures use separate facts: the current share
 used, the current cycle's sampled burn, output tokens per active reply span,
 observed cycle consumption, and the model list-price estimate. Reply spans never

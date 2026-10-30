@@ -19,7 +19,7 @@ const arch = triple?.startsWith("aarch64")
     ? "x64"
     : process.arch;
 const extension = platform === "windows" ? ".exe" : "";
-// A product built on Next passes its own folder with --out.
+// A product built on this repository passes its own folder with --out.
 const out = process.argv.indexOf("--out");
 const output =
   out > 0 && process.argv[out + 1]

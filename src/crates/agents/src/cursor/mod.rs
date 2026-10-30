@@ -11,25 +11,25 @@ const HEADERS: Source = Source {
     location: account::STATE,
 };
 /// The turn log the `stop` hook appends in Agent HUD's own data folder
-/// (`hooks::turn_log`): the folder the platform keeps its data in, or the one
-/// `AGENTHUD_NEXT_DATA_DIR` names. Cursor keeps a turn's tokens nowhere else
-/// on disk. Its hooks run on macOS and Linux only.
-const fn turn_log(base: Base) -> Source {
+/// (`hooks::turn_log`): `folder`, named after the app's identifier on that
+/// system, or the one `AGENTHUD_DATA_DIR` names. Cursor keeps a turn's tokens
+/// nowhere else on disk. Its hooks run on macOS and Linux only.
+const fn turn_log(base: Base, folder: &'static [&'static str]) -> Source {
     Source {
         reads_as: "cursor",
         location: Location {
             base,
-            env: &["AGENTHUD_NEXT_DATA_DIR"],
-            folders: &["app.agenthud.next"],
+            env: &["AGENTHUD_DATA_DIR"],
+            folders: folder,
             profiles: None,
             path: "clients/cursor",
             not_if: None,
         },
     }
 }
-static MAC_SOURCES: [Source; 2] = [HEADERS, turn_log(Base::AppData)];
+static MAC_SOURCES: [Source; 2] = [HEADERS, turn_log(Base::AppData, &["app.agenthud.mac"])];
 static WINDOWS_SOURCES: [Source; 1] = [HEADERS];
-static LINUX_SOURCES: [Source; 2] = [HEADERS, turn_log(Base::DataHome)];
+static LINUX_SOURCES: [Source; 2] = [HEADERS, turn_log(Base::DataHome, &["app.agenthud.linux"])];
 
 static DISCOVERY: Discovery = Discovery {
     storage: &[

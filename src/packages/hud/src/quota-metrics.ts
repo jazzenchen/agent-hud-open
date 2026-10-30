@@ -94,7 +94,7 @@ function rowResetLabel(row: Quota, now: number, settings: FormatSettings) {
 }
 
 /** What a quota row's measure reads: missing quota is "--", other missing
- * measures and details are "—". A reading that shows no level, stale in Next,
+ * measures and details are "—". A reading that shows no level, stale here,
  * has no burn rate, outlook, reply rate, consumption or cost. Formatting only: the UI never
  * assigns session totals or rates to a quota window. */
 export function quotaMetric(

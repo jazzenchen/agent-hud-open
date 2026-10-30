@@ -163,9 +163,9 @@ export function canonicalClawdFrame(
  * display of `scale` pixels a point. Open rounds this down, which leaves
  * Clawd's 24-pixel body as little as seven tenths of the mark: 12 pt in a
  * 17 pt reminder on a Retina screen, a size smaller than the logo it stands
- * in for. Next rounds to the nearest, so the body comes to about the mark's
+ * in for. This app rounds to the nearest, so the body comes to about the mark's
  * width (18 pt there). An odd grain lays sprite pixels as runs of one and two
- * device pixels, as Open's baker already does. */
+ * device pixels, as the Swift app's baker already does. */
 export function clawdGrain(side: number, scale: number) {
   return Math.max(1, Math.round((1.8 * side * scale) / 24));
 }

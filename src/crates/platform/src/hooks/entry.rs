@@ -10,7 +10,7 @@ fn hook_flag(flag: &str) -> bool {
 }
 fn unavailable_installer(arguments: &[String]) -> Option<&'static str> {
     arguments.iter().skip(1).find_map(|argument| match argument.as_str() {
-        "--install-completion-hook" => Some("Hook installation is unavailable: Next has no delegated fixed hook-owner executable. No client settings were changed.\n"),
+        "--install-completion-hook" => Some("Hook installation is unavailable: this build has no delegated fixed hook-owner executable. No client settings were changed.\n"),
         "--install-pi-observer" => Some("Observer installation requires the application's delegated fixed hook owner. Use the application's client-hook setting; no extension or client settings were changed by this command.\n"),
         _ => None,
     })

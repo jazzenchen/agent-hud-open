@@ -14,7 +14,7 @@ Use a direct executable in a client configuration so npm's status messages do no
 ```json
 {
   "mcpServers": {
-    "agent-hud-next": {
+    "agent-hud": {
       "command": "/absolute/path/to/agent-hud-open/node_modules/.bin/tsx",
       "args": ["/absolute/path/to/agent-hud-open/src/apps/mcp/src/index.ts"]
     }
@@ -22,7 +22,7 @@ Use a direct executable in a client configuration so npm's status messages do no
 }
 ```
 
-The default engine path is resolved relative to the package, not the client's working directory. Set `AGENTHUD_NEXT_ENGINE` to select a packaged executable.
+The default engine path is resolved relative to the package, not the client's working directory. Set `AGENTHUD_ENGINE` to select a packaged executable.
 
 Turn on "Let agents arrange the HUD" in Settings → Agent plugins first; it is off by default. On supported Unix hosts the app owns a user-private local socket, with no network listener. An absent/disabled app returns an error; the relay never opens the database or starts collection. Windows named-pipe support remains unavailable.
 

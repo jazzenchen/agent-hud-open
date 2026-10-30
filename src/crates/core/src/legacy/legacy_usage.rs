@@ -2,7 +2,7 @@
 //!
 //! The v5 Claude/v6 Codex state records retained-history completion separately
 //! from its tail offset. Only an unchanged, fully committed state with no
-//! pending/carried history can seed a matching complete Next checkpoint.
+//! pending/carried history can seed a matching complete checkpoint here.
 //! Source event IDs are stable FNV-1a business keys, not SQLite row IDs.
 use crate::legacy_database::ReadOnlyDatabase;
 use rusqlite::{params, Connection, OptionalExtension};

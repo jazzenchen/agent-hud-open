@@ -65,7 +65,7 @@ const functions: Record<string, (args: Args, language: Language) => unknown> = {
     format.samplingHint(a.elapsed, a.required, a.afterReset, l),
 };
 
-/** The value Next must produce, and whether the case is a recorded gap. */
+/** The value this app must produce, and whether the case is a recorded gap. */
 function decision(key: string, language: Language, open: unknown) {
   const lookup = (table: Record<string, any>) =>
     table[`${key}/${language}`] ?? table[key];

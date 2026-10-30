@@ -114,7 +114,7 @@ func evaluate(_ function: String, _ args: Args) throws -> Any {
     case "VendorCatalog.windowWord":
         return VendorCatalog.windowWord(try required(string(args, "value"), "value"), vendor: try required(string(args, "vendor"), "vendor"))
     case "AccountObservation.planLabel":
-        // Next's provider ids name the clients Open calls Claude and Codex.
+        // This repository's provider ids name the clients the Swift app calls Claude and Codex.
         let provider = try required(string(args, "provider"), "provider")
         let source = provider == "claude" ? "claude-code" : provider == "codex" ? "codex-cli" : provider
         let plan = try required(string(args, "plan"), "plan")

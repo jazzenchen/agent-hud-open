@@ -9,6 +9,7 @@ pub use file_changes::FileChanges;
 mod accounts;
 pub mod claude_plugin;
 pub mod clients;
+mod data_folder;
 pub mod deepseek_plugin;
 pub mod hooks;
 pub mod hud_tools;
@@ -58,15 +59,34 @@ impl NativePlatform {
     pub fn legacy_quota_database(&self) -> Option<PathBuf> {
         os::legacy_quota_database(&self.home)
     }
+    /// The data folder: the one `AGENTHUD_DATA_DIR` names, else the app's
+    /// own (`data_folder`).
     pub fn data_dir(&self) -> PathBuf {
-        if let Some(path) = directory("AGENTHUD_NEXT_DATA_DIR") {
+        if let Some(path) = directory(DATA_DIR_VARIABLE) {
             return path;
         }
-        os::data_dir(&self.home)
+        data_folder::resolve(&os::data_parent(&self.home), os::DATA_FOLDER)
+    }
+    /// An earlier build's data folder that has not been moved yet. None when
+    /// `AGENTHUD_DATA_DIR` names the folder: then nothing is moved.
+    pub fn earlier_data_dir(&self) -> Option<PathBuf> {
+        if directory(DATA_DIR_VARIABLE).is_some() {
+            return None;
+        }
+        data_folder::earlier(&os::data_parent(&self.home))
+    }
+    /// Moves an earlier build's data folder to the app's own. Only a copy
+    /// holding `shared_instance_lock` may call it, before it claims its data.
+    pub fn adopt_earlier_data(&self) -> Result<(), String> {
+        if directory(DATA_DIR_VARIABLE).is_some() {
+            return Ok(());
+        }
+        data_folder::adopt(&os::data_parent(&self.home), os::DATA_FOLDER)
+            .map_err(|error| error.to_string())
     }
     /// The lock every Agent HUD that owns client hooks claims, whatever its
     /// data directory: agent-hud-native-open's `~/Library/Caches/app.agenthud/instance.lock`
-    /// on macOS, so a Next build and an Open build never run side by side.
+    /// on macOS, so this app and the Swift app never run side by side.
     pub fn shared_instance_lock(&self) -> PathBuf {
         os::caches_dir(&self.home)
             .join("app.agenthud")
@@ -74,7 +94,7 @@ impl NativePlatform {
     }
     /// The lock that keeps two copies from collecting into one data directory.
     pub fn instance_lock(&self) -> PathBuf {
-        self.data_dir().join("instance.lock")
+        self.data_dir().join(data_folder::LOCK)
     }
     /// Implementation and verification are separate: portable readers remain
     /// usable on Windows/Linux, whose runtime validation is still pending.
@@ -125,6 +145,9 @@ impl NativePlatform {
         os::reveal_transcript(path)
     }
 }
+
+/// Names the data folder in development and tests.
+const DATA_DIR_VARIABLE: &str = "AGENTHUD_DATA_DIR";
 
 fn directory(key: &str) -> Option<PathBuf> {
     std::env::var_os(key)

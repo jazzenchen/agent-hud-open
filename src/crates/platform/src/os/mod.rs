@@ -171,7 +171,7 @@ mod tests {
         assert!(cursor.len() <= 2);
         assert!(cursor[1..]
             .iter()
-            .all(|path| path.ends_with("app.agenthud.next/clients/cursor")));
+            .all(|path| path.ends_with(Path::new(target::DATA_FOLDER).join("clients/cursor"))));
         let expected = [
             ("claude", ".claude/projects"),
             ("claude", ".config/claude/projects"),

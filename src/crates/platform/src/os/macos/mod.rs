@@ -33,9 +33,11 @@ pub(crate) fn home_dir() -> Result<PathBuf, String> {
         .map(PathBuf::from)
         .ok_or_else(|| "User home directory unavailable".into())
 }
-pub(crate) fn data_dir(home: &Path) -> PathBuf {
-    home.join("Library/Application Support/app.agenthud.next")
+/// The folder Agent HUD's data folder is in, and that folder's name.
+pub(crate) fn data_parent(home: &Path) -> PathBuf {
+    home.join("Library/Application Support")
 }
+pub(crate) const DATA_FOLDER: &str = crate::data_folder::MAC;
 pub(crate) fn caches_dir(home: &Path) -> PathBuf {
     home.join("Library/Caches")
 }

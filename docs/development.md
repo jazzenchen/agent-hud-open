@@ -1,6 +1,6 @@
 # Development
 
-An independent monorepo for migrating Agent HUD to Tauri 2, React and a portable Rust runtime. **This is an implementation in progress, not full feature parity with the existing app.** Next uses its own settings and database. It reads legacy preferences once when its own settings are absent, and never writes the original usage database. Client hooks require explicit enablement and a delegated canonical executable.
+An independent monorepo for migrating Agent HUD to Tauri 2, React and a portable Rust runtime. **This is an implementation in progress, not full feature parity with the Swift app.** It uses its own settings and database. It reads legacy preferences once when its own settings are absent, and never writes the original usage database. Client hooks require explicit enablement and a delegated canonical executable.
 
 All implementation code lives under `src/`:
 
@@ -38,7 +38,7 @@ their shared lock; owning hooks never replaces the data lock. A second native
 launch of the same executable brings the running app forward. An occupied or
 unavailable lock prevents another collector from starting. To use browser
 development while the native app runs, give the development engine its own
-`AGENTHUD_NEXT_DATA_DIR`. The MCP app-channel relay takes neither lock and
+`AGENTHUD_DATA_DIR`. The MCP app-channel relay takes neither lock and
 creates no collector.
 
 ## Run the workspace
@@ -67,7 +67,7 @@ adapters, and reject a different host before starting compilation. See
 [platform build commands](platform-builds.md); Windows/Linux execution and
 provider acquisition are not yet qualified.
 
-For MCP clients, launch the `tsx` binary with the absolute path to `src/apps/mcp/src/index.ts`, or use the configuration in [the MCP app](../src/apps/mcp/README.md). `AGENTHUD_NEXT_ENGINE` can point to an installed engine executable; the local default is `target/debug/agent-hud-engine`.
+For MCP clients, launch the `tsx` binary with the absolute path to `src/apps/mcp/src/index.ts`, or use the configuration in [the MCP app](../src/apps/mcp/README.md). `AGENTHUD_ENGINE` can point to an installed engine executable; the local default is `target/debug/agent-hud-engine`.
 
 Settings, Statistics and the floating HUD run as separate windows of the single running application. Preview builds keep client-hook installation disabled unless a delegated canonical executable path is provided, preserving existing client hook configurations.
 
@@ -82,7 +82,7 @@ Settings, Statistics and the floating HUD run as separate windows of the single 
 - Client hook formats, Unix request delivery/withdrawal/timeouts, Codex Desktop approvals/questions and HUD question/plan forms are implemented. Notifications reproject committed facts immediately without a transcript scan. Preview hook installation is still disabled without a delegated fixed executable; no current client configuration was changed. See [client hooks](client-hooks.md).
 - Claude/Codex source turn/activity reducers expose actual session phases, tool calls/results, retry/error outcomes, explicit parent IDs and read-only question facts. Source timestamps, terminal guards and the original 120s/1800s freshness rules apply. Version 4 checkpoints add complete model-attributed meter events; old checkpoints require a verified history import or bounded replay.
 - SQLite stores quota samples, canonical call events and model buckets separately from the bounded UI turn list. Quota, Burn rate, Reply rate, Consumed and Cost use those facts. Legacy samples require exact account identity; unknown cycles, prices or incomplete indexing stay explicit. See [the data boundary](accounts.md).
-- Exact provider IDs, local session metadata, usage entries, activity buckets and persistent Next preferences.
+- Exact provider IDs, local session metadata, usage entries, activity buckets and persistent preferences.
 - Tauri 2 window and tray lifecycle; title-free Overlay windows with app-owned drag regions, per-screen native HUD windows, input regions and edge placement; platform-specific transcript reveal actions.
 - macOS physical-notch measurements and stable screen UUIDs. Display preferences, panel content switches/order/width and comfortable/normal/compact spacing are independent by screen. Disconnected windows are retired, while their saved settings remain available after reconnecting.
 - One application-owned Rust collector publishes snapshots to all windows. Closing or hiding Settings does not stop collection or start another collector. Cached bootstrap reads and manual requests run off the UI thread.

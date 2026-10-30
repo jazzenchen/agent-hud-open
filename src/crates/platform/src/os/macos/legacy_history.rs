@@ -1,8 +1,9 @@
 //! The original Mac application's declared ledger; no app launch or auth reads.
 //!
 //! The installed bundle's `AgentHUDDataDirectory` names the folder. An in-place
-//! update replaces that bundle with the app built on Next, so that app must
-//! declare the same key, or this lookup falls back to Agent HUD Open's folder.
+//! update replaces that bundle with the app built from this repository, so
+//! that app must declare the same key, or this lookup falls back to the
+//! Swift app's own folder.
 use std::path::{Path, PathBuf};
 pub(super) fn quota_database(home: &Path) -> Option<PathBuf> {
     use std::{

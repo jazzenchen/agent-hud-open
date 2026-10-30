@@ -1,6 +1,6 @@
 # Parity ledger
 
-The native Swift app, [agent-hud-native-open](https://github.com/jazzenchen/agent-hud-native-open) (formerly agent-hud-open), is the behavioral reference for this port. Below, **Open** means that app and **Next** means this repository. This ledger records, behavior by behavior, where Next matches it and where it does not. It replaces an earlier audit.
+The native Swift app, [agent-hud-native-open](https://github.com/jazzenchen/agent-hud-native-open) (formerly agent-hud-open), is the behavioral reference for this port. Below, **Open** means that app and **Next** means this repository, agent-hud-open, as the port was called while the ledger was written. This ledger records, behavior by behavior, where Next matches it and where it does not. It replaces an earlier audit.
 
 ## Reference and method
 

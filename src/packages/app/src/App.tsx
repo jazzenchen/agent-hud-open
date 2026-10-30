@@ -55,6 +55,7 @@ import {
   type HUDScreenContext,
 } from "./lib/use-hud-config";
 import { useHUDGeometry } from "./lib/use-hud-geometry";
+import { storageKeys } from "./lib/storage-keys";
 import type { HUDConfig } from "@agent-hud/hud/model";
 import type { NativeMethod, Session, Snapshot } from "./lib/types";
 import appIcon from "./assets/app-icon.png";
@@ -201,7 +202,7 @@ const chinesePages: Record<string, [string, string]> = {
   "local-network": ["局域网", "与已配对的手机共享额度和 token 用量。"],
   updates: ["更新", "Agent HUD 的更新与 Beta 版本。"],
 };
-const selectedScreenKey = "agenthud.next.selected-screen";
+const selectedScreenKey = storageKeys.selectedScreen;
 
 export interface AppExtensionPage {
   id: string;
@@ -660,7 +661,7 @@ function AppContent({
       const payload = { provider, at: Date.now() };
       try {
         localStorage.setItem(
-          "agenthud.next.highlight-provider",
+          storageKeys.highlightProvider,
           JSON.stringify(payload),
         );
       } catch {}

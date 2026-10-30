@@ -137,12 +137,12 @@ Run from the repository root after frontend QA. These commands launch the new ap
 # Development: Tauri owns its Vite dev server and native process.
 npm run tauri --workspace @agent-hud/desktop -- dev
 
-# Alternative: build a debug .app, then launch that exact Next bundle.
+# Alternative: build a debug .app, then launch that exact bundle.
 npm run tauri --workspace @agent-hud/desktop -- build --debug --bundles app
 open "$PWD/target/debug/bundle/macos/Agent HUD.app"
 ```
 
-Use the new Next bundle. This workflow does not launch the original Agent HUD or install its client hooks. The app configures each connected screen's HUD itself. Statistics opens independently through its command or tray action. Settings and Statistics use Overlay title bars with hidden titles and app-owned drag regions.
+Use the new bundle. This workflow does not launch the installed Agent HUD or install its client hooks. The app configures each connected screen's HUD itself. Statistics opens independently through its command or tray action. Settings and Statistics use Overlay title bars with hidden titles and app-owned drag regions.
 
 
 ## OS operations and owned WebView snapshots

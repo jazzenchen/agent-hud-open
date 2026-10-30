@@ -1,7 +1,7 @@
 [package]
-name = "agent-hud-next"
+name = "agent-hud"
 version.workspace = true
-description = "Cross-platform Agent HUD migration preview"
+description = "Agent HUD for macOS, Windows and Linux"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true

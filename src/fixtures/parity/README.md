@@ -1,13 +1,13 @@
 # Shared parity fixtures
 
-Cases that pin the behavior of this repository (Next) against the native Swift app, agent-hud-native-open (Open). Open is the floor, not the ceiling: by default Next must produce what Open produces, and where Next is deliberately better, `decisions.json` records Next's value and the reason. Either way the case stays tested.
+Cases that pin the behavior of this repository against the native Swift app, agent-hud-native-open. The Swift app is the floor, not the ceiling: by default this app must produce what the Swift app produces, and where this app is deliberately better, `decisions.json` records its value and the reason. Either way the case stays tested.
 
 ## Layout
 
-- `contracts/<name>.json` — one contract per file: the function family, which side of Next implements it (`owner`: `rust` or `ts`), the Open source it comes from, and its cases. Each case has a `name`, the Open function (`fn`), its `args`, and `expected` per language (`en`, `zh`).
+- `contracts/<name>.json` — one contract per file: the function family, which side of this app implements it (`owner`: `rust` or `ts`), the Swift source it comes from, and its cases. Each case has a `name`, the Swift function (`fn`), its `args`, and `expected` per language (`en`, `zh`).
 - `decisions.json`:
-  - `gaps` — cases where Next does not yet match Open, keyed `contract/case` or `contract/case/language`, with the parity-ledger row. A gap that starts passing fails the run until it is removed.
-  - `improvements` — cases where Next intentionally differs, with Next's value (`next`, or `{en, zh}`) and the `reason`. An improvement equal to Open's value fails the run.
+  - `gaps` — cases where this app does not yet match the Swift app, keyed `contract/case` or `contract/case/language`, with the parity-ledger row. A gap that starts passing fails the run until it is removed.
+  - `improvements` — cases where this app intentionally differs, with its value (`next`, or `{en, zh}`) and the `reason`. An improvement equal to the Swift app's value fails the run.
 
 ## Running
 

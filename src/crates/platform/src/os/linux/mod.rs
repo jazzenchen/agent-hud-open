@@ -26,12 +26,13 @@ pub(crate) fn home_dir() -> Result<PathBuf, String> {
         .map(PathBuf::from)
         .ok_or_else(|| "User home directory unavailable".into())
 }
-pub(crate) fn data_dir(home: &Path) -> PathBuf {
+/// The folder Agent HUD's data folder is in, and that folder's name.
+pub(crate) fn data_parent(home: &Path) -> PathBuf {
     std::env::var_os("XDG_DATA_HOME")
         .map(PathBuf::from)
         .unwrap_or_else(|| home.join(".local/share"))
-        .join("app.agenthud.next")
 }
+pub(crate) const DATA_FOLDER: &str = crate::data_folder::LINUX;
 pub(crate) fn caches_dir(home: &Path) -> PathBuf {
     std::env::var_os("XDG_CACHE_HOME")
         .map(PathBuf::from)

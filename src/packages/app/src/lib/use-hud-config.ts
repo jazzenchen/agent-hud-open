@@ -4,9 +4,10 @@ import { emit } from "@tauri-apps/api/event";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import type { PanelLayout, SourcePreferences } from "@agent-hud/protocol";
 import { defaultHUDConfig, type HUDConfig } from "@agent-hud/hud/model";
-const configKey = "agenthud.next.hud-config.v3";
-const previousKey = "agenthud.next.hud-config.v2";
-const legacyKey = "agenthud.next.hud-config";
+import { storageKeys } from "./storage-keys";
+const configKey = storageKeys.hudConfig;
+const previousKey = storageKeys.hudConfigV2;
+const legacyKey = storageKeys.hudConfigV1;
 
 export interface HUDScreenContext {
   id: string;

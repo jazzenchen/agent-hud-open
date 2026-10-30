@@ -4,7 +4,7 @@ use std::process::{Command, Stdio};
 fn engine(directory: &std::path::Path) -> Command {
     let mut command = Command::new(env!("CARGO_BIN_EXE_agent-hud-engine"));
     command
-        .env("AGENTHUD_NEXT_DATA_DIR", directory)
+        .env("AGENTHUD_DATA_DIR", directory)
         .env("HOME", directory.join("home"))
         .env("USERPROFILE", directory.join("home"))
         .stdin(Stdio::null());

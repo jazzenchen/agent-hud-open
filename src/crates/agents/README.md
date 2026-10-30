@@ -30,7 +30,7 @@ No file in `src/` names an operating system: what differs by OS is data (`PerOs`
 
 **Codex must pass the coordinator's external reviewer gate before registration.** A permission-hook payload's policy is not proof that the user reviews the turn. Original source checks the exact turn's desktop state, remembered context or latest matching transcript `turn_context` for reviewer `user`; unknown/automatic review must be released unanswered. This crate sets `requires_user_reviewer = true`; it cannot inspect host state. Desktop-only requests require their separate observer/native responder and are not invented here.
 
-Permission hooks: Claude, Codex, Qoder/CN/Work, CodeBuddy, WorkBuddy, ZCode, Qwen and Devin. Antigravity and DeepSeek use native observers, not permission hooks. Cursor and Copilot have no permission-hook adapter in the original source. Legacy `qoderCN`/`qoderWork` source names normalize to Next's catalog IDs.
+Permission hooks: Claude, Codex, Qoder/CN/Work, CodeBuddy, WorkBuddy, ZCode, Qwen and Devin. Antigravity and DeepSeek use native observers, not permission hooks. Cursor and Copilot have no permission-hook adapter in the original source. Legacy `qoderCN`/`qoderWork` source names normalize to this crate's catalog IDs.
 
 ## Configuration API
 
