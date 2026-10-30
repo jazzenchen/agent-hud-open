@@ -1,5 +1,6 @@
 import {
   McpServer,
+  type RegisteredTool,
   type StandardSchemaWithJSON,
 } from "@modelcontextprotocol/server";
 import { serveStdio } from "@modelcontextprotocol/server/stdio";
@@ -86,13 +87,23 @@ type HostTool = {
   inputSchema: Record<string, unknown>;
   readOnly: boolean;
 };
-/** Asked once at start: a session started while a group was off gets it from its next session. */
-const hostTools = await engine
-  .request<{ tools?: HostTool[] }>("host_tools")
-  .then(
+/** The host's groups that are on, or null when the app could not be asked. */
+const askHost = () =>
+  engine.request<{ tools?: HostTool[] }>("host_tools").then(
     (found) => found.tools ?? [],
-    () => [],
+    () => null,
   );
+/** Asked at start, then again every `hostInterval` while the relay runs:
+ * Antigravity and DeepSeek Harness start one relay for all their sessions,
+ * so a group switched on later, or an app that was not running yet when the
+ * relay started, must still reach their next sessions. Each change goes out
+ * as notifications/tools/list_changed. An app that cannot be asked leaves
+ * the list as it was. */
+let hostTools = (await askHost()) ?? [];
+const hostInterval =
+  Number(process.env.AGENTHUD_NEXT_HOST_TOOLS_MS) > 0
+    ? Number(process.env.AGENTHUD_NEXT_HOST_TOOLS_MS)
+    : 15_000;
 /** A host tool's schema as the host wrote it; the host checks the arguments itself. */
 const hostSchema = (
   schema: Record<string, unknown>,
@@ -273,7 +284,6 @@ const proposal = z
   .strict();
 serveStdio(() => {
   const server = new McpServer({ name: "agent-hud", version: "0.1.0" });
-  server.server.onclose = () => engine.close();
   server.registerTool(
     "get_hud",
     {
@@ -479,29 +489,67 @@ serveStdio(() => {
     },
     ({ key, value }) => guarded("set_setting", { key, value }),
   );
-  for (const tool of hostTools) {
-    server.registerTool(
-      tool.name,
-      {
-        description: tool.description,
-        inputSchema: hostSchema(tool.inputSchema),
-        annotations: tool.readOnly
-          ? readOnly
-          : { ...localWrite, idempotentHint: false },
-      },
-      (params, context) => {
-        const named = caller(
-          context.mcpReq._meta as Record<string, unknown> | undefined,
+  const hosted = new Map<
+    string,
+    { tool: HostTool; registered: RegisteredTool }
+  >();
+  /** Lists exactly `tools` of the host's, adding, replacing and removing as they changed. */
+  const host = (tools: HostTool[]) => {
+    const wanted = new Map(tools.map((tool) => [tool.name, tool]));
+    for (const [name, entry] of hosted)
+      if (JSON.stringify(wanted.get(name)) !== JSON.stringify(entry.tool)) {
+        entry.registered.remove();
+        hosted.delete(name);
+      }
+    for (const tool of tools) {
+      if (hosted.has(tool.name)) continue;
+      try {
+        const registered = server.registerTool(
+          tool.name,
+          {
+            description: tool.description,
+            inputSchema: hostSchema(tool.inputSchema),
+            annotations: tool.readOnly
+              ? readOnly
+              : { ...localWrite, idempotentHint: false },
+          },
+          (params, context) => {
+            const named = caller(
+              context.mcpReq._meta as Record<string, unknown> | undefined,
+            );
+            return guarded("host_tool", {
+              name: tool.name,
+              arguments: params,
+              caller: named,
+              ...(named ? {} : { parent: process.ppid }),
+            });
+          },
         );
-        return guarded("host_tool", {
-          name: tool.name,
-          arguments: params,
-          caller: named,
-          ...(named ? {} : { parent: process.ppid }),
-        });
-      },
-    );
-  }
+        hosted.set(tool.name, { tool, registered });
+      } catch {
+        /* A name the relay's own tools already use stays theirs. */
+      }
+    }
+  };
+  host(hostTools);
+  let asking = false;
+  let closed = false;
+  const watch = setInterval(async () => {
+    if (asking) return;
+    asking = true;
+    const found = await askHost();
+    asking = false;
+    if (found && !closed) {
+      hostTools = found;
+      host(found);
+    }
+  }, hostInterval);
+  watch.unref();
+  server.server.onclose = () => {
+    closed = true;
+    clearInterval(watch);
+    engine.close();
+  };
   return server;
 });
 

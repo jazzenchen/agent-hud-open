@@ -15,8 +15,9 @@ const tsx = import.meta.resolve("tsx");
 const folder = mkdtempSync(join(tmpdir(), "agent-hud-mcp-"));
 after(() => rmSync(folder, { recursive: true, force: true }));
 
-/** An engine that answers host_tools with `tools` (or fails it) and writes down every request. */
-function engine(name, tools) {
+/** An engine that answers host_tools with `tools` (or fails it) and writes down every
+ * request. `tools` may be read again for each request from a file the test changes. */
+function engine(name, tools, state) {
   const file = join(
     folder,
     `${name}${process.platform === "win32" ? ".exe" : ""}`,
@@ -25,11 +26,11 @@ function engine(name, tools) {
   const log = `${file}.log`;
   writeFileSync(
     source,
-    `const { appendFileSync } = require('node:fs');
+    `const { appendFileSync, readFileSync } = require('node:fs');
 require('node:readline').createInterface({ input: process.stdin }).on('line', line => {
   const request = JSON.parse(line);
   appendFileSync(${JSON.stringify(log)}, line + '\\n');
-  const tools = ${JSON.stringify(tools)};
+  const tools = ${state ? `JSON.parse(readFileSync(${JSON.stringify(state)}, 'utf8'))` : JSON.stringify(tools)};
   const reply = request.method === 'host_tools'
     ? (tools ? { result: { tools } } : { error: { message: 'The app is not running' } })
     : request.method === 'host_tool' ? { result: { echoed: request.params.name } } : { error: { message: 'not here' } };
@@ -54,8 +55,8 @@ require('node:readline').createInterface({ input: process.stdin }).on('line', li
         .map((line) => JSON.parse(line)),
   };
 }
-async function connect(engineFile, env = {}) {
-  const client = new Client({ name: "relay-test", version: "0.0.0" });
+async function connect(engineFile, env = {}, options = {}) {
+  const client = new Client({ name: "relay-test", version: "0.0.0" }, options);
   const { CLAUDE_CODE_SESSION_ID: _, ...rest } = process.env;
   await client.connect(
     new StdioClientTransport({
@@ -202,5 +203,54 @@ test("without a caller the host is told so, with the process that started the re
     assert.ok(tools.some((item) => item.name === "get_hud"));
   } finally {
     await closed.close();
+  }
+});
+
+test("a group switched on after the relay started is listed, and announced, and leaves when switched off", async () => {
+  // Antigravity and DeepSeek Harness keep one relay for all their sessions.
+  const state = join(folder, "switch.json");
+  writeFileSync(state, "null");
+  const fake = engine("switch", null, state);
+  const changes = [];
+  const client = await connect(
+    fake.file,
+    { AGENTHUD_NEXT_HOST_TOOLS_MS: "100" },
+    {
+      listChanged: {
+        tools: { onChanged: (error, tools) => changes.push(error ?? tools) },
+      },
+    },
+  );
+  const listed = async () =>
+    (await client.listTools()).tools.map((item) => item.name);
+  const until = async (check) => {
+    for (let tries = 0; tries < 100 && !(await check()); tries++)
+      await new Promise((done) => setTimeout(done, 50));
+    assert.ok(await check());
+  };
+  try {
+    assert.ok(!(await listed()).includes("some_tool"), "off at start");
+    writeFileSync(state, JSON.stringify([tool]));
+    await until(async () => (await listed()).includes("some_tool"));
+    await until(() =>
+      changes.some(
+        (tools) =>
+          Array.isArray(tools) &&
+          tools.some((item) => item.name === "some_tool"),
+      ),
+    );
+    // An app that cannot be asked leaves the list as it was.
+    writeFileSync(state, "null");
+    const asked = fake.requests().length;
+    await until(() => fake.requests().length >= asked + 3);
+    assert.ok((await listed()).includes("some_tool"));
+    writeFileSync(state, JSON.stringify([reader]));
+    await until(async () => (await listed()).includes("some_reader"));
+    assert.ok(!(await listed()).includes("some_tool"));
+    writeFileSync(state, JSON.stringify([]));
+    await until(async () => !(await listed()).includes("some_reader"));
+    assert.ok((await listed()).includes("get_hud"), "HUD tools stay listed");
+  } finally {
+    await client.close();
   }
 });
