@@ -15,6 +15,13 @@ fn flags(source: &str) -> Vec<&'static str> {
         .map(|hooks| hooks.flags())
         .unwrap_or_default()
 }
+/// Whether the client's hooks have a way to launch on `os`. Where they have
+/// none (Antigravity's on Windows) its settings are left alone, and that is
+/// not a failure of the switch: the other clients' hooks still go in.
+fn launches(source: &str, os: agent_hud_agents::Os) -> bool {
+    agent_hud_agents::hooks::hooks_by_id(source)
+        .is_some_and(|hooks| hooks.launch.on(os).value().is_some())
+}
 /// Whether the client reports its sessions through an observer plugin.
 fn observed(source: &str) -> bool {
     agent_hud_agents::by_id(source).is_some_and(|agent| agent.observer.is_some())
@@ -45,7 +52,10 @@ impl Clients {
                     errors.push(format!("{source}: {error}"));
                 }
             }
-            for flag in flags(&source) {
+            // Removing ours stays possible everywhere; adding only where the
+            // hooks can launch.
+            let hooked = !enabled || launches(&source, crate::os::OS);
+            for flag in flags(&source).into_iter().filter(|_| hooked) {
                 if let Err(error) = install::install_plan(context, &source, flag, enabled)
                     .and_then(|plan| install::apply_plan(&plan))
                 {
@@ -85,7 +95,8 @@ impl Clients {
                     }
                 }
             }
-            for flag in flags(&source) {
+            let hooked = launches(&source, crate::os::OS);
+            for flag in flags(&source).into_iter().filter(|_| hooked) {
                 known = true;
                 match install::install_plan(context, &source, flag, true) {
                     Ok(plan) => installed &= !plan.changed,
@@ -106,5 +117,22 @@ impl Clients {
         let installed = self.rows.iter().any(|row| row["installed"] == true);
         let notice=self.notice.clone().or_else(||if self.context.is_none(){Some(l10n::text("这个版本没有指定固定的回调程序。接收回调不会安装客户端回调，客户端配置未作改动。", "No fixed hook-owner executable has been delegated. Listening does not install client hooks; client configuration is unchanged."))}else{None});
         json!({"supported":super::supported(),"enabled":enabled,"desired":desired,"installed":installed,"installable":self.context.is_some(),"notice":notice,"clients":self.rows})
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use agent_hud_agents::Os;
+
+    #[test]
+    fn hooks_go_in_only_where_the_client_can_launch_them() {
+        // Antigravity's hooks run as a POSIX command, which Windows lacks.
+        assert!(!super::launches("antigravity", Os::Windows));
+        assert!(super::launches("antigravity", Os::MacOs));
+        for client in ["claude", "codex"] {
+            assert!(super::launches(client, Os::Windows), "{client}");
+            assert!(super::launches(client, Os::MacOs), "{client}");
+        }
+        assert!(!super::launches("not-a-client", Os::MacOs));
     }
 }

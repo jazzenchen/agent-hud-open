@@ -64,7 +64,12 @@ export function HooksSection({
     />
   );
   return (
-    <Section title={t("Hooks", "回调")} footer={status?.notice ?? undefined}>
+    <Section
+      title={t("Hooks", "回调")}
+      // A failed switch already says why in the notice below; the status
+      // carries the same words, so it is not repeated as the footer.
+      footer={error ? undefined : (status?.notice ?? undefined)}
+    >
       <Row
         title={t("Client hooks", "客户端回调")}
         subtitle={t(
