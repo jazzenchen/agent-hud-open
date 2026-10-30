@@ -3,16 +3,16 @@
   <channel>
     <title>Agent HUD</title>
     <item>
-      <title>0.6.0-beta.4</title>
-      <pubDate>Mon, 26 Oct 2026 18:43:22 +0800</pubDate>
-      <link>https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.4</link>
+      <title>0.6.0-beta.5</title>
+      <pubDate>Sat, 31 Oct 2026 03:32:26 +0800</pubDate>
+      <link>https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.5</link>
       <sparkle:channel>beta</sparkle:channel>
-      <sparkle:minimumAutoupdateVersion>492</sparkle:minimumAutoupdateVersion>
-      <sparkle:version>492</sparkle:version>
-      <sparkle:shortVersionString>0.6.0-beta.4</sparkle:shortVersionString>
+      <sparkle:minimumAutoupdateVersion>493</sparkle:minimumAutoupdateVersion>
+      <sparkle:version>493</sparkle:version>
+      <sparkle:shortVersionString>0.6.0-beta.5</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
       <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-      <description sparkle:format="markdown"># Agent HUD 0.6.0-beta.4
+      <description sparkle:format="markdown"># Agent HUD 0.6.0-beta.5
 
 ## Compatibility
 
@@ -28,34 +28,53 @@ Requires an Apple Silicon Mac running macOS 14 or later.
 
 ### Coming from 0.5.5
 
-- Includes everything in [0.6.0-beta.1](https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.1), which moves Agent HUD to a new cross-platform app and brings your settings and 30 days of quota history with it, and the changes in [0.6.0-beta.2](https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.2) and [0.6.0-beta.3](https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.3).
+- Includes everything in [0.6.0-beta.1](https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.1), which moves Agent HUD to a new cross-platform app and brings your settings and 30 days of quota history with it, and the changes in [0.6.0-beta.2](https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.2), [0.6.0-beta.3](https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.3) and [0.6.0-beta.4](https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.4).
 
 ### New
 
-- Supports Antigravity more fully: its sessions and conversations, hooks, questions and approvals, new sessions, Remote control and agent messaging.
-- Reads relays: add one by hand or let Agent HUD recognise it, then see its balance and prices with the key its client already uses. Each relay has its own settings page.
-- Adds a price page where you can correct what a model costs.
-- Records each call under the route it goes through, for Codex, Claude Code and Hermes; local routes cost nothing.
-- Prices Haiku 5.5, Gemini 4 Argon and Antigravity's effort variants.
-- Tags each session with where its first and latest prompts were typed, and shows them in the session's Statistics detail.
-- Shows the last 24 hours for agents with no quota window or balance.
-- Reads Cursor's sessions and tokens on this Mac, and Grok Bot's daily tokens per bot.
-- Queues Codex messages through the command line inside Codex.app or ChatGPT.app, and opens another client's Codex thread in the Codex app.
-- Lists each local-network iPhone's app version next to its name.
-- Checks which of your devices run an older Agent HUD. A Mac that is behind looks for the update at once, and Settings → Subscription marks every device that is behind.
+- Adds Agent HUD's plugin for DeepSeek Harness, on the DeepSeek Harness card in Settings → Agent plugins. Every Harness host loads it at once, the Desktop app included, and it stays up to date at launch. With it:
+  - Harness's questions and approvals reach the HUD beside Harness's own cards. Whichever is answered first wins, and the other card goes away.
+  - Agents, this Mac and your phone can message Harness sessions. A message waits as the session's next message and never interrupts a turn. "Send messages" on the plugin's row turns this off.
+  - The session page shows Harness's replies, which it never did, without its reasoning or the context Harness adds to each prompt.
+- Agent messages come back properly: the recipient is asked to reply with Agent HUD's send_message, a reply marks the message as replied, and the paper plane flies back once, only with a reply or an answer it can read.
+- Adds the HUD tools to Cursor, DeepSeek Harness and Antigravity. Adding them for any client also installs the customize-agent-hud skill, which teaches the agent how to change the HUD; removing them takes it away, and it is brought up to date at launch.
+- Draws each turn's sub-agents as a timeline on the session page: name, type, when each started and was last heard from. Running ones pulse.
+- Rebuilds Settings on one set of sections and rows:
+  - The sidebar is in groups: General and Display; Agents, Agent plugins, Relays and Prices; Remote, Local Network and Subscription; then Updates.
+  - General has appearance and language, usage display, startup and the menu bar icon.
+  - Display has one preview for every mode, the glow sliders behind Fine-tune, panel density with the panel, hover and logo settings under All screens, and the undo and reset rows in a Reset section at the bottom.
+  - Agents keeps its list in place while you scroll, with agents not on this computer below the rest.
+  - Agent plugins is a page of its own: client hooks first, then a folding card per client with its status, opened only when something needs you.
+  - Relays and Prices lose their repeated headings. Prices fold per agent and open where a model has no price.
+  - Remote lists only the agents Remote serves that are on this Mac. "Send from this Mac" and the iCloud details fold away.
+  - Local Network is one sharing card, then pairing, then your devices with their online status.
+  - Every menu is drawn by Agent HUD; the relay form's type and currency menus used the system's own.
+  - Descriptions are one short line, and only where a title alone could mislead.
+  - Settings shows a centered spinner while it loads, and Retry only after a failure.
+- Gives Settings → Subscription one switch for this Mac, as the Swift app had:
+  - Turning it on uses your saved key, else an App Store seat; after you release this Mac's seat you no longer have to type the key again.
+  - Turning it off gives back every seat this Mac holds.
+  - Seats add up across the key and the App Store subscription, and a full key gives way to a free App Store seat. When neither has room, the page asks which Mac to take offline.
+  - A refused activation shows the store's own reason, and the list of your Macs comes from your account's own records.
+- Shows every DeepSeek balance currency in the HUD, not only the first one, which could be an empty USD balance beside a CNY one. Settings → Agents lets you hide balances and change their order.
+- Reads the DeepSeek Platform account that DeepSeek Harness signs in to: its topped-up balance, and its granted balance while there is one.
+- Lets you choose which Codex models the token chart shows, and in what order, in Settings → Agents → Codex. The list is the models used in the past 30 days, and new models appear on their own. Agents can change it through the HUD tools too.
+- Reads Grok Bot's weekly quota from Cursor's servers when Cursor is signed in to the same account, so it no longer goes stale when the Bot is not used on this Mac. An account merged into SuperGrok shows its plan, "Super", as the Bot does. An old reading says it is more than a day old and that opening Grok Bot refreshes it.
+- Reads a Cursor account merged into SuperGrok from the weekly period Cursor shows, so its rings move instead of staying at 0%.
+- Prices GPT-6.1 Terra.
 
 ### Fixes
 
-- Lists sessions by their last message.
-- Sends iPhone and Apple Watch messages to Claude Code as your own words, and records the HUD's answers as sent from the Mac.
-- Keeps a client's settings file as it was when Agent HUD edits it, and no longer re-sorts `~/.claude.json`.
-- Says why Codex has no ChatGPT plan limits, and tells you to update Claude Code when it is too old for the plugin. Brings an installed Claude plugin up to date at launch.
-- Shows what priced calls cost when some calls have no list price.
-- Reads each log once for both its tokens and its conversation, looks at held logs every 3 seconds, and watches only the folders it reads.
-- Streams local-network changes to the iPhone as they happen.
-- Hides and orders panel rows by the keys layouts carry over.
+- Sends to Antigravity through the service that can open the conversation. Before, a conversation not opened since Antigravity started was refused, and a message failed whenever an empty Antigravity service, such as a fresh window, ran beside the one that has the chat.
+- Reaches Antigravity sessions by the id the HUD lists. A message carries the model its conversation last ran with; a new conversation takes your default model.
+- Starts Antigravity sessions on Antigravity 2.26, which refused them, and shows the Antigravity service's own error instead of a generic one.
+- Keeps the MCP relay's tools in step with the app: a tool group switched on later reaches Antigravity and DeepSeek Harness in their next turn, without a restart.
+- Looks up a client's command line again at launch when the saved one is missing or gone, so messages to Codex conversations are no longer refused.
+- Names every window Agent HUD; some were still called Agent HUD Next.
+- Says, for each system, why HUD tools can't be added from a copy of Agent HUD outside its install location.
+- Draws the HUD rim with WebGPU directly.
 </description>
-      <enclosure url="https://github.com/jazzenchen/agent-hud-open/releases/download/v0.6.0-beta.4/Agent-HUD-0.6.0-beta.4-arm64.dmg" length="51582260" type="application/octet-stream" sparkle:edSignature="xMphu1ujGQHdl5qsAZ0r3kl+MwdieUbKGmw+/89YqDQXFtpWsKU8watNiogyyVaOBxg4+odOGZ+A11xOnP11Bw==" />
+      <enclosure url="https://github.com/jazzenchen/agent-hud-open/releases/download/v0.6.0-beta.5/Agent-HUD-0.6.0-beta.5-arm64.dmg" length="51363785" type="application/octet-stream" sparkle:edSignature="W7hn3PVYWPhAkdoncUqre51sZCkYIIh4bj3CQEEqKVU13IPZ0+cwsiwu36WVNlf2ulYBPE3M0pJ9gadYULIgAw==" />
       <agenthudMacOnly>false</agenthudMacOnly>
       <agenthudMinimumIOSVersion>1.7.2</agenthudMinimumIOSVersion>
     </item>
