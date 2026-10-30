@@ -441,6 +441,33 @@
       "contextWindow": null,
       "peakHours": false
     },
+    "gpt-6.1-terra": {
+      "vendor": "OpenAI",
+      "prices": {
+        "international": {
+          "rates": {
+            "input": 1000000,
+            "cacheWrite": 1250000,
+            "cacheRead": 50000,
+            "output": 5000000
+          },
+          "tiers": [
+            {
+              "from": 272001,
+              "rates": {
+                "input": 2000000,
+                "cacheWrite": 2500000,
+                "cacheRead": 100000,
+                "output": 7500000
+              }
+            }
+          ]
+        }
+      },
+      "global": true,
+      "contextWindow": 1050000,
+      "peakHours": false
+    },
     "gpt-6-sol": {
       "vendor": "OpenAI",
       "prices": {

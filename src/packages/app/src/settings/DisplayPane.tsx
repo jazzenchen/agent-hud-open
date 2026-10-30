@@ -23,6 +23,8 @@ import {
   type SettingsPaneProps,
 } from "./SettingsPrimitives";
 import { PanelOrderRows, PartSample, SmallHUDPreview } from "./SettingsSamples";
+import { CodexModelSettings } from "./CodexModelSettings";
+import type { PanelLayout } from "@agent-hud/protocol";
 
 const styleKeys = [
   "mode",
@@ -75,10 +77,14 @@ export function DisplayPane({
   monitors = [],
   selectedScreenId,
   onSelectScreen,
+  layout,
+  onLayout,
 }: SettingsPaneProps & {
   monitors?: NativeHUDMonitor[];
   selectedScreenId: string;
   onSelectScreen: (id: string) => void;
+  layout: PanelLayout;
+  onLayout: (layout: PanelLayout) => Promise<unknown>;
 }) {
   const config = { ...defaultHUDConfig, ...supplied },
     t = useText(snapshot);
@@ -673,6 +679,14 @@ export function DisplayPane({
             enabled={config.tokenUsage}
             config={config}
             t={t}
+          />
+          <Divider />
+          <CodexModelSettings
+            snapshot={snapshot}
+            action={action}
+            active={active}
+            layout={layout}
+            onLayout={onLayout}
           />
           <PanelOrderRows
             snapshot={snapshot}

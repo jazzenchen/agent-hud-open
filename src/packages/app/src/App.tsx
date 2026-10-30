@@ -135,8 +135,7 @@ const pages = [
     label: "Agent plugins",
     icon: Plug,
     color: "#30b0c7",
-    description:
-      "What Agent HUD adds to your coding agents. Everything here works on this Mac.",
+    description: "What Agent HUD adds to coding agents on this computer.",
   },
   {
     // Relays, one per address, whichever agents use them.
@@ -184,7 +183,7 @@ const chinesePages: Record<string, [string, string]> = {
   agents: ["智能体", "管理实时状态、套餐与显示窗口。"],
   "agent-plugins": [
     "智能体插件",
-    "Agent HUD 为编程智能体添加的功能，都在这台 Mac 上运行。",
+    "Agent HUD 为这台电脑上的编程智能体添加的功能。",
   ],
   relays: ["中转站", "智能体经过的中转站：谁在用、还剩多少、是哪一类。"],
   "local-network": ["局域网", "与已配对的手机共享本机的额度和 token 用量。"],
@@ -222,7 +221,7 @@ export default function App(props: AppProps = {}) {
 function AppContent({
   extensionPages = [],
   agentPlugins = [],
-  productName = "Agent HUD Next",
+  productName = "Agent HUD",
   version = "0.1.0",
 }: AppProps) {
   const replaced = new Set(extensionPages.map((page) => page.replaces));

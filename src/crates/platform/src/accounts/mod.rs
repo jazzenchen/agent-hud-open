@@ -152,7 +152,7 @@ impl AccountService {
             .redirect(reqwest::redirect::Policy::none())
             .connect_timeout(Duration::from_secs(10))
             .timeout(Duration::from_secs(20))
-            .user_agent("AgentHUDNext/0.1")
+            .user_agent("AgentHUD/0.1")
             .build()
             .map_err(|_| {
                 l10n::text(

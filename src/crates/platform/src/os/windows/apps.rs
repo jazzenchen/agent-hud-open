@@ -4,8 +4,6 @@
 //! an Antigravity conversation, is attempted without this check, and bringing
 //! the client forward reports false.
 
-pub(crate) const ACTIVATES_APPS: bool = false;
-
 /// Unknown here, so callers attempt navigation.
 pub(crate) fn app_running(_bundle_id: &str) -> bool {
     true

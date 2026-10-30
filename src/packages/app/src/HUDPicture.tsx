@@ -10,7 +10,6 @@ import { HUDGroundProvider } from "@agent-hud/hud/ground";
 import { stripMetrics } from "@agent-hud/hud/geometry";
 import {
   vendorKey,
-  vendorsFromSnapshot,
   configuredVendors,
   quotaAccountKey,
 } from "@agent-hud/hud/model";
@@ -159,7 +158,7 @@ export default function HUDPicture() {
     config && filtered
       ? stripMetrics(
           config,
-          vendorsFromSnapshot(filtered, config.mode),
+          configuredVendors(filtered, config),
           filtered.settings.quotaDisplay,
         )
       : null;

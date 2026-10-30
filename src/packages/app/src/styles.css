@@ -3,3 +3,8 @@
 @import "@agent-hud/ui/global.css";
 @source "../../hud/src";
 @source ".";
+
+/* WebView2 versions without scrollbar-width still scroll without the native bar. */
+.hud-windows-scroll::-webkit-scrollbar {
+  display: none;
+}

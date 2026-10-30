@@ -54,7 +54,7 @@ export interface AgentPluginContext {
   request: (method: string, params?: unknown) => Promise<unknown>;
   /** Whether the Settings window is on screen: poll only while it is. */
   active: boolean;
-  /** Whether the client's command line is on this Mac; null while unknown. */
+  /** Whether the client's command line is on this computer; null while unknown. */
   clientFound: boolean | null;
   /** The client's Agent HUD plugin (Claude Code's or DeepSeek Harness's);
    * installed is null while it is read, or when the client has none. */
@@ -862,6 +862,9 @@ export function AgentPluginsPane({
   }
 
   const ready = status?.ready ?? null;
+  const platform =
+    snapshot.connection.platformCapabilities?.os ??
+    snapshot.connection.platform;
   const groups = items.filter((item) => item.place === "tools");
   const cards = [
     ...knownClients,
@@ -886,10 +889,22 @@ export function AgentPluginsPane({
         {ready === false && (
           <p className="agent-plugins-notice">
             <Info size={13} aria-hidden />
-            {t([
-              "HUD tools can only be added from the Agent HUD installed in Applications.",
-              "只有装在「应用程序」里的 Agent HUD 才能添加 HUD 工具。",
-            ])}
+            {t(
+              platform === "windows"
+                ? [
+                    "Adding HUD tools requires Agent HUD to run from its standard Windows installation location with its MCP components. Setup is unavailable in this instance.",
+                    "添加 HUD 工具需要从 Windows 标准安装位置运行 Agent HUD，并确保 MCP 组件完整。当前实例无法添加。",
+                  ]
+                : platform === "macos"
+                  ? [
+                      "Adding HUD tools requires Agent HUD to run from an approved macOS installation location with its MCP components. Setup is unavailable in this instance.",
+                      "添加 HUD 工具需要从 macOS 指定安装位置运行 Agent HUD，并确保 MCP 组件完整。当前实例无法添加。",
+                    ]
+                  : [
+                      "Adding HUD tools requires an approved installed Agent HUD and its MCP components; they are unavailable in this build.",
+                      "添加 HUD 工具需要指定安装位置的 Agent HUD 和完整的 MCP 组件；当前版本无法添加。",
+                    ],
+            )}
           </p>
         )}
         {cards.map((card) => {
@@ -924,7 +939,7 @@ export function AgentPluginsPane({
               light={light}
               missing={
                 entry && !entry.available
-                  ? t(["Not found on this Mac", "这台 Mac 上没有找到"])
+                  ? t(["Not found on this computer", "这台电脑上没有找到"])
                   : null
               }
             >

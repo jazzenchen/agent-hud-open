@@ -1015,6 +1015,29 @@ mod tests {
     }
 
     #[test]
+    fn codex_gpt_6_1_terra_prices_both_context_tiers() {
+        assert_eq!(tier_starts("codex", "gpt-6.1-terra"), Some(vec![272_001]));
+        let at = |cache_read| PriceTokens {
+            tokens_in: 10_000,
+            cache_write: 2_000,
+            cache_read,
+            tokens_out: 1_000,
+            reasoning: 0,
+        };
+        // Official Standard list price: input $1, 30m write $1.25,
+        // cached input $0.05, output $5 per million tokens.
+        let short = 8_000 * 1_000_000 + 2_000 * 1_250_000 + 262_000 * 50_000 + 1_000 * 5_000_000;
+        assert_eq!(cost("codex", "gpt-6.1-terra", &at(262_000)), Some(short));
+        // Over 272K prompt tokens, input and cache double, output is 1.5x.
+        let long = 8_000 * 2_000_000 + 2_000 * 2_500_000 + 262_001 * 100_000 + 1_000 * 7_500_000;
+        assert_eq!(cost("codex", "gpt-6.1-terra", &at(262_001)), Some(long));
+        assert_eq!(
+            context_window("codex", "gpt-6.1-terra", None, None),
+            Some(1_050_000)
+        );
+    }
+
+    #[test]
     fn haiku_5_5_pays_the_higher_list_for_a_prompt_over_100k() {
         assert_eq!(
             tier_starts("claude", "claude-haiku-5-5"),

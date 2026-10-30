@@ -272,7 +272,7 @@ const proposal = z
   })
   .strict();
 serveStdio(() => {
-  const server = new McpServer({ name: "agent-hud-next", version: "0.1.0" });
+  const server = new McpServer({ name: "agent-hud", version: "0.1.0" });
   server.server.onclose = () => engine.close();
   server.registerTool(
     "get_hud",
@@ -470,7 +470,7 @@ serveStdio(() => {
     "hud_set_preference",
     {
       description:
-        "Save a user-requested presentation preference in Agent HUD Next. Does not change client configuration or the installed Agent HUD.",
+        "Save a user-requested presentation preference in Agent HUD. Does not change client configuration.",
       inputSchema: z.object({
         key: z.enum(["appearance", "animations"]),
         value: z.union([z.enum(["dark", "light", "system"]), z.boolean()]),

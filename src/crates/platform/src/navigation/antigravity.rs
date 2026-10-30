@@ -208,53 +208,87 @@ pub(super) fn navigate(id: &str, port: u16) -> Result<bool, String> {
         std::thread::sleep(remaining(deadline)?.min(Duration::from_millis(100)));
     }
 }
-const APP: &str = "com.google.antigravity";
-fn workspace_uri(cwd: Option<&str>) -> Option<String> {
-    let cwd = cwd?.trim();
-    if cwd.is_empty() || !cwd.starts_with('/') {
+pub(super) fn devtools_port(home: &Path) -> Option<u16> {
+    let path = crate::os::app_support(home, &std::env::vars().collect())
+        .join("Antigravity/DevToolsActivePort");
+    let file = std::fs::File::open(path).ok()?;
+    let mut bytes = Vec::new();
+    file.take(4097).read_to_end(&mut bytes).ok()?;
+    if bytes.len() > 4096 {
         return None;
     }
-    let mut url = Url::parse("antigravity://file").ok()?;
-    url.set_path(cwd);
-    Some(url.into())
+    std::str::from_utf8(&bytes)
+        .ok()?
+        .lines()
+        .next()?
+        .parse::<u16>()
+        .ok()
+        .filter(|p| *p > 0)
 }
-pub(super) fn open(home: &Path, id: &str, cwd: Option<&str>) -> Result<bool, String> {
-    if !crate::os::ACTIVATES_APPS {
-        return Err(l10n::text(
-            "此系统暂不支持打开 Antigravity 会话",
-            "Antigravity native session navigation is not implemented for this operating system",
-        ));
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const ID: &str = "12345678-1234-1234-1234-123456789abc";
+    fn page(url: &str, socket: &str) -> Page {
+        serde_json::from_value(json!({
+            "id": "page1", "type": "page", "url": url,
+            "webSocketDebuggerUrl": socket
+        }))
+        .unwrap()
     }
-    if !crate::os::app_running(APP) {
-        return Ok(false);
-    }
-    let mut opened = false;
-    if super::uuid(id) {
-        let path = crate::os::app_support(home, &std::env::vars().collect())
-            .join("Antigravity/DevToolsActivePort");
-        if let Ok(file) = std::fs::File::open(path) {
-            let mut bytes = Vec::new();
-            if file.take(4097).read_to_end(&mut bytes).is_ok() && bytes.len() <= 4096 {
-                if let Some(port) = std::str::from_utf8(&bytes)
-                    .ok()
-                    .and_then(|s| s.lines().next())
-                    .and_then(|s| s.parse::<u16>().ok())
-                    .filter(|p| *p > 0)
-                {
-                    if let Ok(true) = navigate(id, port) {
-                        opened = true;
-                    }
-                }
-            }
+
+    #[test]
+    fn desktop_destination_accepts_only_the_matching_loopback_page() {
+        let trusted = page(
+            "https://127.0.0.1:4567/",
+            "ws://127.0.0.1:1234/devtools/page/page1",
+        );
+        let target = destination(ID, &[trusted], 1234).unwrap();
+        assert_eq!(target.url.path(), format!("/c/{ID}"));
+        for (url, socket) in [
+            (
+                "https://example.com/",
+                "ws://127.0.0.1:1234/devtools/page/page1",
+            ),
+            (
+                "https://127.0.0.1/",
+                "ws://127.0.0.1:1235/devtools/page/page1",
+            ),
+            (
+                "https://user@127.0.0.1/",
+                "ws://127.0.0.1:1234/devtools/page/page1",
+            ),
+            (
+                "https://127.0.0.1/",
+                "ws://127.0.0.1:1234/devtools/page/other",
+            ),
+        ] {
+            assert!(destination(ID, &[page(url, socket)], 1234).is_none());
         }
+        assert!(destination(
+            "not-a-uuid",
+            &[page(
+                "https://127.0.0.1/",
+                "ws://127.0.0.1:1234/devtools/page/page1"
+            )],
+            1234
+        )
+        .is_none());
     }
-    if !opened {
-        if let Some(uri) = workspace_uri(cwd) {
-            if crate::os::open_session_url(&uri).is_ok() {
-                return Ok(true);
-            }
-        }
-        return Ok(false);
+
+    #[test]
+    fn desktop_destination_refuses_ambiguous_pages() {
+        let first = page(
+            "https://127.0.0.1/",
+            "ws://127.0.0.1:1234/devtools/page/page1",
+        );
+        let second: Page = serde_json::from_value(json!({
+            "id": "page2", "type": "page", "url": "https://127.0.0.1/",
+            "webSocketDebuggerUrl": "ws://127.0.0.1:1234/devtools/page/page2"
+        }))
+        .unwrap();
+        assert!(destination(ID, &[first, second], 1234).is_none());
     }
-    Ok(crate::os::activate_app(APP))
 }

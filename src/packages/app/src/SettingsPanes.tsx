@@ -58,6 +58,8 @@ export default function SettingsPane({
         monitors={monitors}
         selectedScreenId={selectedId}
         onSelectScreen={selectScreen}
+        layout={layout}
+        onLayout={onLayout}
       />
     ) : (
       <LoadingState label={chinese ? "正在读取显示器…" : "Reading displays…"} />

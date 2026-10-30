@@ -480,6 +480,10 @@ export interface PanelLayout {
     period?: "day" | "week" | "month";
     agents?: string[];
     models?: string[];
+    /** Model IDs hidden from the chart; unseen models stay visible by default. */
+    hiddenModels?: string[];
+    /** Preferred model order; newly observed models follow in their natural order. */
+    modelOrder?: string[];
   };
   hud?: { agents?: string[] };
 }

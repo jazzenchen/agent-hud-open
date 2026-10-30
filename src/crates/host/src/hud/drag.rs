@@ -131,7 +131,7 @@ pub async fn hud_drag_start(
             Ok(preview) => preview,
             Err(error) => {
                 if let Err(rollback) = restore_drag(&app, &mut state, &shared) {
-                    eprintln!("Agent HUD Next HUD pickup rollback: {rollback}");
+                    eprintln!("Agent HUD pickup rollback: {rollback}");
                 }
                 restore_input(&app, &window, &mut state);
                 if let Some(geometry) = state.geometry.as_ref() {
@@ -165,13 +165,13 @@ pub(super) fn emit_drag_end(app: &tauri::AppHandle, owner: &Shared, cancelled: b
             cancelled,
         },
     ) {
-        eprintln!("Agent HUD Next HUD drag-end event: {error}");
+        eprintln!("Agent HUD drag-end event: {error}");
     }
 }
 
 pub(super) fn emit_drag_preview(app: &tauri::AppHandle, preview: &HudPlacement) {
     if let Err(error) = app.emit("hud:drag-preview", preview) {
-        eprintln!("Agent HUD Next HUD drag preview event: {error}");
+        eprintln!("Agent HUD drag preview event: {error}");
     }
 }
 

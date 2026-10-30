@@ -286,6 +286,9 @@ pub(super) fn present_blocks(snapshot: &Value) -> Vec<Block> {
     for balance in snapshot["billing"].as_array().into_iter().flatten() {
         let key = format!("api:{}", balance["vendor"].as_str().unwrap_or("unknown"));
         let block = entry(&mut blocks, &key, Kind::Balance);
+        if let Some(id) = balance["id"].as_str().filter(|id| !id.is_empty()) {
+            push_unique(&mut block.rows, id);
+        }
         let id = balance["accountId"]
             .as_str()
             .or_else(|| balance["id"].as_str())
@@ -459,12 +462,16 @@ pub(super) fn normalize_layout(value: &Value) -> Result<Value, String> {
     {
         v.insert("period".into(), json!(period));
     }
-    for key in ["agents", "models"] {
+    for key in ["agents", "models", "hiddenModels"] {
         let mut values = strings(&tokens[key]);
         values.sort();
         if !values.is_empty() {
             v.insert(key.into(), json!(values));
         }
+    }
+    let model_order = strings(&tokens["modelOrder"]);
+    if !model_order.is_empty() {
+        v.insert("modelOrder".into(), json!(model_order));
     }
     if !v.is_empty() {
         out.insert("tokens".into(), Value::Object(v));
@@ -1189,16 +1196,17 @@ fn token_misreadings(value: &Value) -> Vec<String> {
                     "an agent's name from get_hud's tokens.offeredAgents.",
                 ));
             }
-            "models" => {
-                found.extend(names(value, "tokens.models", None));
+            "models" | "hiddenModels" | "modelOrder" => {
+                let path = format!("tokens.{property}");
+                found.extend(names(value, &path, None));
                 found.extend(empty_names(
                     value,
-                    "tokens.models",
+                    &path,
                     "a model's id from get_hud's tokens.offeredModels.",
                 ));
             }
             _ => found.push(format!(
-                "tokens has no property \"{property}\"; tokens take period, agents and models."
+                "tokens has no property \"{property}\"; tokens take period, agents, models, hiddenModels and modelOrder."
             )),
         }
     }

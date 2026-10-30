@@ -309,7 +309,7 @@ impl Planner {
                 Ok(()) => {
                     self.configured.insert(id, signature);
                 }
-                Err(error) => eprintln!("Agent HUD Next HUD window: {error}"),
+                Err(error) => eprintln!("Agent HUD window: {error}"),
             }
         }
     }

@@ -143,7 +143,7 @@ pub(super) fn set_drag_cursor(app: &tauri::AppHandle, owner: &Shared, active: bo
         }
     }
     if let Err(error) = cursor(app, active) {
-        eprintln!("Agent HUD Next HUD drag cursor: {error}");
+        eprintln!("Agent HUD drag cursor: {error}");
     }
 }
 

@@ -641,6 +641,10 @@ impl AgentHudCore {
                 .map(|head| head.path.clone()),
         );
         removed.retain(|path| !handovers.contains(path));
+        let removed: HashSet<_> = removed
+            .into_iter()
+            .map(|path| log_files::native_path(&path))
+            .collect();
         for path in &removed {
             let Some(mut head) = self.logs.get(path).filter(|head| !head.gone).cloned() else {
                 continue;
@@ -672,6 +676,7 @@ impl AgentHudCore {
             self.meters.view = None;
         }
         for (path, metadata) in found {
+            let path = log_files::native_path(&path);
             if budget == 0 {
                 break;
             }

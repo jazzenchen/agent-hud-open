@@ -2,6 +2,10 @@
 //! unreadable logs, batch updates and what a run keeps in memory.
 use super::*;
 
+#[cfg(windows)]
+#[path = "ingestion_windows.rs"]
+mod windows;
+
 #[test]
 fn codex_cumulative_repeats_and_counter_resets_follow_source_calls() {
     let mut log = Log::new("session.jsonl".into(), "codex");

@@ -27,6 +27,18 @@ pub static LOCAL_SERVICE: Channel = Channel {
     },
 };
 
+/// Account reads are independently qualified from the permission observer and
+/// remote control operations. Windows currently supports read-only discovery.
+pub static ACCOUNT_SERVICE: Channel = Channel {
+    name: "Antigravity's local account service",
+    carries: &[Carries::Quota],
+    support: PerOs {
+        macos: Support::Verified(()),
+        windows: Support::Unverified(()),
+        linux: Support::Unverified(()),
+    },
+};
+
 static SOURCES: [Source; 5] = [
     Source {
         reads_as: "antigravity",

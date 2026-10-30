@@ -1,7 +1,7 @@
 //! Antigravity's quota (Open's AntigravityService and AntigravityClient):
 //! CLI status-line callbacks identify each account; running language servers
 //! supply accounts without callbacks. Anonymous `/usage` is the last fallback.
-use super::{AGENT, LOCAL_SERVICE};
+use super::{ACCOUNT_SERVICE, AGENT};
 use crate::account::{account_id, legacy_account, legacy_unresolved, status, Host, Reading};
 use crate::l10n;
 use crate::naming::{
@@ -250,7 +250,7 @@ pub fn read(host: &dyn Host) -> Result<Reading, String> {
             None => partial = true,
         }
     }
-    if !LOCAL_SERVICE.runs_on(host.os()) && reading.account.is_none() {
+    if !ACCOUNT_SERVICE.runs_on(host.os()) && reading.account.is_none() {
         reading.notice = Some(format!(
             "{} ({})",
             l10n::text(
@@ -269,7 +269,7 @@ pub fn read(host: &dyn Host) -> Result<Reading, String> {
         .iter()
         .filter_map(|quota| quota["accountId"].as_str().map(str::to_owned))
         .collect();
-    let native = LOCAL_SERVICE.runs_on(host.os()).then(||host.native(
+    let native = ACCOUNT_SERVICE.runs_on(host.os()).then(||host.native(
         AGENT.id,
         "ReadAccounts",
         &json!({"metadata":{"ideName":"antigravity","extensionName":"antigravity","locale":"en","ideVersion":"unknown"}}),
@@ -475,15 +475,11 @@ mod tests {
     }
 
     #[test]
-    fn windows_is_not_asked() {
+    fn windows_reads_the_account_service() {
         let mut host = answering(Ok(status_body()));
         host.os = Os::Windows;
         let reading = read(&host).unwrap();
-        assert_eq!(
-            reading.notice.as_deref(),
-            Some("Antigravity local-service discovery is not implemented here (windows)")
-        );
-        assert!(reading.quotas.is_empty());
+        assert!(!reading.quotas.is_empty());
     }
 
     #[test]

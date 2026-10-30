@@ -55,9 +55,9 @@ pub(crate) fn unavailable(error: &str) {
         "Agent HUD could not start"
     };
     let body = if chinese {
-        format!("无法独占使用数据目录或客户端回调，采集未启动。\n{error}")
+        format!("无法准备数据目录或客户端回调，采集未启动。\n{error}")
     } else {
-        format!("The data directory or client hooks could not be locked exclusively. Collection has not started.\n{error}")
+        format!("The data directory or client hooks could not be prepared. Collection has not started.\n{error}")
     };
     crate::shell::alert(title, &body, "OK");
 }

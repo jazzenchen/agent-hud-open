@@ -1,11 +1,12 @@
 use super::{joined_path, path_entries, variable, Environment, ProcessInfo};
+mod antigravity;
 mod apps;
 mod codex;
 mod files;
 pub(crate) mod pipe;
 mod process;
 mod secrets;
-pub(crate) use apps::{activate_app, app_running, ACTIVATES_APPS};
+pub(crate) use apps::{activate_app, app_running};
 pub(crate) use process::{codex_cli_on_port, parent_processes};
 pub(crate) use secrets::stored_secret;
 pub(crate) const READS_PROCESS_ENVIRONMENT: bool = false;
@@ -146,10 +147,10 @@ pub(crate) fn legacy_quota_database(_home: &Path) -> Option<PathBuf> {
     None
 }
 pub(crate) fn processes() -> Result<Vec<ProcessInfo>, String> {
-    Err("Antigravity local-service discovery is not implemented on Windows.".into())
+    antigravity::processes()
 }
-pub(crate) fn listening_ports(_pid: u32) -> Result<Vec<u16>, String> {
-    Err("Antigravity local-service discovery is not implemented on Windows.".into())
+pub(crate) fn listening_ports(pid: u32) -> Result<Vec<u16>, String> {
+    antigravity::listening_ports(pid)
 }
 
 pub(crate) fn source_roots(home: &Path) -> Vec<agent_hud_core::SourceRoot> {

@@ -25,6 +25,58 @@ fn list<'a>(snapshot: &'a Value, key: &str) -> impl Iterator<Item = &'a Value> {
     snapshot[key].as_array().into_iter().flatten()
 }
 
+/// DeepSeek can return several currencies for the same account. The row ID,
+/// rather than account ID, identifies the individual display preference.
+fn deepseek_balances<'a>(snapshot: &'a Value, layout: &Value) -> (Option<String>, &'a str) {
+    let mut rows: Vec<&Value> = list(snapshot, "billing")
+        .filter(|row| mark(row["vendor"].as_str().unwrap_or("")) == "deepseek")
+        .filter(|row| {
+            let id = row["id"].as_str().unwrap_or("");
+            let account = row["accountId"].as_str().unwrap_or(id);
+            let has = |key: &str, value: &str| {
+                layout[key]
+                    .as_array()
+                    .is_some_and(|items| items.iter().any(|item| item.as_str() == Some(value)))
+            };
+            !has("hiddenRows", id)
+                && !has("hiddenAccounts", account)
+                && (layout["accounts"]
+                    .as_array()
+                    .is_none_or(|items| items.is_empty())
+                    || has("accounts", account))
+        })
+        .collect();
+    let order = layout["rows"].as_array();
+    rows.sort_by_key(|row| {
+        order
+            .and_then(|items| items.iter().position(|item| item == &row["id"]))
+            .unwrap_or(usize::MAX)
+    });
+    let level = if rows.iter().any(|row| row["level"] == "critical") {
+        "critical"
+    } else if rows.iter().any(|row| row["level"] == "warning") {
+        "warning"
+    } else if rows.iter().any(|row| row["level"] == "normal") {
+        "normal"
+    } else {
+        "stale"
+    };
+    let zh = snapshot["language"] == "zh";
+    let balance = (!rows.is_empty()).then(|| {
+        rows.iter()
+            .map(|row| {
+                money_amount(
+                    &row["amount"],
+                    row["currency"].as_str().unwrap_or("USD"),
+                    zh,
+                )
+            })
+            .collect::<Vec<_>>()
+            .join(" · ")
+    });
+    (balance, level)
+}
+
 /// Every agent a resting HUD in `mode` shows without a list, one per mark.
 pub fn vendors<'a>(snapshot: &'a Value, mode: &str, now_ms: i64) -> Vec<Vendor<'a>> {
     let zh = snapshot["language"] == "zh";
@@ -54,20 +106,25 @@ pub fn vendors<'a>(snapshot: &'a Value, mode: &str, now_ms: i64) -> Vec<Vendor<'
                         .find(|b| mark(b["vendor"].as_str().unwrap_or("")) == key)
                 })
                 .flatten();
+            let deepseek = (key == "deepseek" && quotas.is_empty() && balance.is_some())
+                .then(|| deepseek_balances(snapshot, &Value::Null));
             Vendor {
                 name: vendor_name(&source),
                 used: tightest.map(|(used, _)| used),
                 // An agent billed by balance alone takes its balance's level.
                 level: tightest
                     .and_then(|(_, q)| q["status"].as_str())
+                    .or_else(|| deepseek.as_ref().map(|(_, level)| *level))
                     .or_else(|| balance.and_then(|b| b["level"].as_str()))
                     .unwrap_or("stale"),
                 working: sessions
                     .iter()
                     .filter(|s| matches!(s["state"].as_str(), Some("running" | "waiting")))
                     .count(),
-                balance: balance.map(|b| {
-                    money_amount(&b["amount"], b["currency"].as_str().unwrap_or("USD"), zh)
+                balance: deepseek.and_then(|(label, _)| label).or_else(|| {
+                    balance.map(|b| {
+                        money_amount(&b["amount"], b["currency"].as_str().unwrap_or("USD"), zh)
+                    })
                 }),
                 usage: (quotas.is_empty() && balance.is_none())
                     .then(|| recent_label(snapshot, &key))
@@ -89,7 +146,20 @@ pub fn configured<'a>(
     layout: &Value,
     now_ms: i64,
 ) -> Vec<Vendor<'a>> {
-    let available = vendors(snapshot, mode, now_ms);
+    let mut available = vendors(snapshot, mode, now_ms);
+    for vendor in &mut available {
+        if vendor.key == "deepseek" && vendor.quotas.is_empty() && vendor.balance.is_some() {
+            let block = list(snapshot, "billing")
+                .find(|b| mark(b["vendor"].as_str().unwrap_or("")) == vendor.key)
+                .and_then(|b| b["vendor"].as_str())
+                .map(|name| &layout["blocks"][format!("api:{name}")])
+                .unwrap_or(&Value::Null);
+            let (balance, level) = deepseek_balances(snapshot, block);
+            vendor.balance = balance;
+            vendor.level = level;
+            vendor.usage = None;
+        }
+    }
     let marks: Vec<String> = layout["hud"]["agents"]
         .as_array()
         .into_iter()
@@ -406,6 +476,38 @@ mod tests {
         ] {
             assert_eq!(money_short(amount, code), text, "{amount}");
         }
+    }
+
+    #[test]
+    fn deepseek_balances_follow_row_visibility_and_order() {
+        let snapshot = json!({
+            "language": "en", "quotas": [], "sessions": [], "approvals": [], "providers": [],
+            "billing": [
+                {"id":"ds:USD", "accountId":"ds", "vendor":"deepseek", "amount":0.0, "currency":"USD", "level":"critical"},
+                {"id":"ds:CNY", "accountId":"ds", "vendor":"deepseek", "amount":9.92, "currency":"CNY", "level":"warning"}
+            ]
+        });
+        let view = |layout: Value| {
+            let list = configured(&snapshot, "simple", &layout, 0);
+            let vendor = list
+                .into_iter()
+                .find(|vendor| vendor.key == "deepseek")
+                .unwrap();
+            (meter_label(&vendor, false), vendor.level.to_owned())
+        };
+        assert_eq!(view(json!({})), ("$0.00 · ¥9.92".into(), "critical".into()));
+        assert_eq!(
+            view(json!({"blocks":{"api:deepseek":{"rows":["ds:CNY", "ds:USD"]}}})).0,
+            "¥9.92 · $0.00"
+        );
+        assert_eq!(
+            view(json!({"blocks":{"api:deepseek":{"hiddenRows":["ds:USD"]}}})),
+            ("¥9.92".into(), "warning".into())
+        );
+        assert_eq!(
+            view(json!({"blocks":{"api:deepseek":{"hiddenRows":["ds:USD", "ds:CNY"]}}})),
+            ("--".into(), "stale".into())
+        );
     }
 
     #[test]

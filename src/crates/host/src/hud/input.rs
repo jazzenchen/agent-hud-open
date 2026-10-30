@@ -194,11 +194,11 @@ fn poll_pointer(app: tauri::AppHandle, shared: Arc<Shared>) {
                     }
                     Err(error) => {
                         if let Err(rollback) = restore_drag(&app, &mut state, &shared) {
-                            eprintln!("Agent HUD Next HUD drag rollback: {rollback}");
+                            eprintln!("Agent HUD drag rollback: {rollback}");
                         }
                         restore_input(&app, &window, &mut state);
                         ended = Some(true);
-                        eprintln!("Agent HUD Next HUD drag: {error}");
+                        eprintln!("Agent HUD drag: {error}");
                     }
                 }
             }
@@ -247,7 +247,7 @@ fn poll_pointer(app: tauri::AppHandle, shared: Arc<Shared>) {
             // The dropped place becomes the screen's saved placement.
             match serde_json::to_value(&placement) {
                 Ok(placement) => crate::coordinator::save_placement(&app, placement),
-                Err(error) => eprintln!("Agent HUD Next HUD placement: {error}"),
+                Err(error) => eprintln!("Agent HUD placement: {error}"),
             }
         }
         if let Some(preview) = preview {
@@ -360,7 +360,7 @@ pub(super) fn publish_pointer(
         state.pointer = Some(pointer.clone());
         state.pointer_emitted_at = Some(Instant::now());
         if let Err(error) = app.emit_to(&owner.label, "hud:pointer", &pointer) {
-            eprintln!("Agent HUD Next HUD pointer event: {error}");
+            eprintln!("Agent HUD pointer event: {error}");
         }
     }
 }

@@ -10,6 +10,14 @@ use std::{
 /// How often every root is walked again, whatever the watcher said.
 const RECONCILE_SECS: u64 = 300;
 
+#[cfg(windows)]
+#[path = "log_files_windows.rs"]
+mod path_adapter;
+#[cfg(not(windows))]
+#[path = "log_files_unix.rs"]
+mod path_adapter;
+pub(super) use path_adapter::native_path;
+
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(super) struct FileStamp {
     pub source: &'static str,

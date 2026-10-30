@@ -28,6 +28,7 @@ import { ResetCreditsRow } from "./ResetCreditsRow";
 import { usePanelServices } from "../PanelContext";
 import { useGround } from "../ground";
 import { agentVendorName } from "../agent-artwork";
+import { visibleBalances } from "../balance-rows";
 import {
   measures,
   noButtonChrome,
@@ -774,259 +775,241 @@ export function SourceBalances({
     moneyAmount(amount, currency, language);
   return (
     <>
-      {billing
-        .filter(
-          (account) =>
-            !(layout.hiddenAccounts ?? []).includes(
-              account.accountId ?? account.id,
-            ) &&
-            (!layout.accounts?.length ||
-              layout.accounts.includes(account.accountId ?? account.id)),
-        )
-        .map((account) => {
-          const metrics = account.metrics?.periods[period],
-            cost = metrics?.cost,
-            burn = metrics?.burnRate;
-          const selected =
-            layout.measures?.find((value) =>
-              ["quota", "burn", "cost"].includes(value),
-            ) ?? measure;
-          const points = metrics?.series ?? [],
-            peak = Math.max(0.00001, ...points.map((point) => point.amount));
-          const columns =
-            selected === "burn"
+      {visibleBalances(billing, layout).map((account) => {
+        const metrics = account.metrics?.periods[period],
+          cost = metrics?.cost,
+          burn = metrics?.burnRate;
+        const selected =
+          layout.measures?.find((value) =>
+            ["quota", "burn", "cost"].includes(value),
+          ) ?? measure;
+        const points = metrics?.series ?? [],
+          peak = Math.max(0.00001, ...points.map((point) => point.amount));
+        const columns =
+          selected === "burn"
+            ? [
+                {
+                  name: language === "zh" ? "每日消耗" : "Consumption / day",
+                  value: burn ? `${money(burn.perDay, burn.currency)}/d` : "—",
+                },
+                {
+                  name: language === "zh" ? "预计用完" : "Estimated depletion",
+                  value: metrics?.runsOutAt
+                    ? dateFormat(language === "zh" ? "zh-CN" : "en-US").format(
+                        new Date(metrics.runsOutAt),
+                      )
+                    : "—",
+                },
+              ]
+            : selected === "cost"
               ? [
                   {
-                    name: language === "zh" ? "每日消耗" : "Consumption / day",
-                    value: burn
-                      ? `${money(burn.perDay, burn.currency)}/d`
-                      : "—",
+                    name: language === "zh" ? "估算花费" : "Estimated cost",
+                    value: cost ? money(cost.amount, cost.currency) : "—",
                   },
                   {
-                    name:
-                      language === "zh" ? "预计用完" : "Estimated depletion",
-                    value: metrics?.runsOutAt
-                      ? dateFormat(
-                          language === "zh" ? "zh-CN" : "en-US",
-                        ).format(new Date(metrics.runsOutAt))
+                    name: language === "zh" ? "输出速度" : "Output speed",
+                    value: metrics?.replyRate
+                      ? `${metrics.replyRate.lowerBound ? "≥" : ""}${metrics.replyRate.tokensPerSecond.toFixed(1)} tok/s`
                       : "—",
                   },
                 ]
-              : selected === "cost"
-                ? [
-                    {
-                      name: language === "zh" ? "估算花费" : "Estimated cost",
-                      value: cost ? money(cost.amount, cost.currency) : "—",
-                    },
-                    {
-                      name: language === "zh" ? "输出速度" : "Output speed",
-                      value: metrics?.replyRate
-                        ? `${metrics.replyRate.lowerBound ? "≥" : ""}${metrics.replyRate.tokensPerSecond.toFixed(1)} tok/s`
-                        : "—",
-                    },
-                  ]
-                : [
-                    {
-                      name:
-                        account.label ||
-                        (language === "zh" ? "余额" : "Balance"),
-                      value: money(account.amount, account.currency),
-                    },
-                    {
-                      name: language === "zh" ? "估算花费" : "Estimated cost",
-                      value: cost ? money(cost.amount, cost.currency) : "—",
-                    },
-                  ];
-          return (
-            <section
-              className="hud-source-balance"
-              key={account.id}
-              style={{ display: "grid", gap: 8 }}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <span
-                  style={{
-                    width: 20,
-                    display: "inline-flex",
-                    justifyContent: "center",
-                  }}
-                >
-                  <Logo source={account.vendor} size={14} light={light} />
-                </span>
-                <strong style={{ fontSize: 13, fontWeight: 700, flex: 1 }}>
-                  {agentVendorName(account.vendor)}
-                </strong>
-                {!layout.measures?.length && (
-                  <div
-                    role="group"
-                    aria-label={
-                      language === "zh" ? "余额指标" : "Balance metric"
-                    }
-                    style={{ display: "flex", gap: 2 }}
-                  >
-                    {(
-                      [
-                        {
-                          key: "quota",
-                          Icon: Percent,
-                          title: language === "zh" ? "余额" : "Balance",
-                        },
-                        {
-                          key: "burn",
-                          Icon: Flame,
-                          title:
-                            language === "zh"
-                              ? "每日消耗"
-                              : "Consumption per day",
-                        },
-                        {
-                          key: "cost",
-                          Icon: DollarSign,
-                          title:
-                            language === "zh" ? "估算花费" : "Estimated cost",
-                        },
-                      ] as const
-                    ).map(({ key, Icon, title }) => (
-                      <button
-                        key={key}
-                        aria-pressed={selected === key}
-                        title={title}
-                        onClick={() => setMeasure(key)}
-                        style={{
-                          ...noButtonChrome,
-                          color:
-                            selected === key ? colors.text : colors.tertiary,
-                          background:
-                            selected === key ? colors.selected : "transparent",
-                          borderRadius: 4,
-                          padding: 3,
-                        }}
-                      >
-                        <Icon size={12} />
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-              {account.notice && (
-                <div
-                  style={{
-                    fontSize: 11,
-                    paddingLeft: 26,
-                    color: colors.warning,
-                  }}
-                >
-                  {account.notice}
-                </div>
-              )}
-              <div
-                role="group"
-                aria-label={
-                  language === "zh" ? "消耗时段" : "Consumption period"
-                }
-                style={{ display: "flex", gap: 2, justifyContent: "flex-end" }}
+              : [
+                  {
+                    name:
+                      account.label || (language === "zh" ? "余额" : "Balance"),
+                    value: money(account.amount, account.currency),
+                  },
+                  {
+                    name: language === "zh" ? "估算花费" : "Estimated cost",
+                    value: cost ? money(cost.amount, cost.currency) : "—",
+                  },
+                ];
+        return (
+          <section
+            className="hud-source-balance"
+            key={account.id}
+            style={{ display: "grid", gap: 8 }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <span
+                style={{
+                  width: 20,
+                  display: "inline-flex",
+                  justifyContent: "center",
+                }}
               >
-                {(["day", "week", "month"] as const).map((value) => (
-                  <button
-                    key={value}
-                    aria-pressed={period === value}
-                    onClick={() => setPeriod(value)}
-                    style={{
-                      ...noButtonChrome,
-                      fontSize: 10,
-                      padding: "2px 5px",
-                      borderRadius: 4,
-                      color: period === value ? colors.text : colors.tertiary,
-                      background:
-                        period === value ? colors.selected : "transparent",
-                    }}
-                  >
-                    {{ day: "24h", week: "7d", month: "30d" }[value]}
-                  </button>
-                ))}
-              </div>
-              {layout.widget === "chart" ? (
+                <Logo source={account.vendor} size={14} light={light} />
+              </span>
+              <strong style={{ fontSize: 13, fontWeight: 700, flex: 1 }}>
+                {agentVendorName(account.vendor)}
+              </strong>
+              {!layout.measures?.length && (
                 <div
-                  aria-label={
-                    language === "zh"
-                      ? "估算花费记录"
-                      : "Estimated spending history"
-                  }
-                  title={metrics?.coverage.notice ?? undefined}
-                  style={{
-                    display: "flex",
-                    alignItems: "flex-end",
-                    gap: 2,
-                    height: 42,
-                    paddingLeft: 26,
-                  }}
+                  role="group"
+                  aria-label={language === "zh" ? "余额指标" : "Balance metric"}
+                  style={{ display: "flex", gap: 2 }}
                 >
-                  {points.length ? (
-                    points.map((point, index) => (
-                      <div
-                        key={point.timestamp + index}
-                        title={`${dateFormat(undefined, localeDateTime).format(new Date(point.timestamp))} · ${money(point.amount, point.currency)}`}
-                        style={{
-                          flex: 1,
-                          minWidth: 1,
-                          height: `${Math.max(2, (point.amount / peak) * 100)}%`,
-                          background: colors.secondary,
-                          borderRadius: "2px 2px 0 0",
-                        }}
-                      />
-                    ))
-                  ) : (
-                    <span style={{ fontSize: 11, color: colors.secondary }}>
-                      —
-                    </span>
-                  )}
-                </div>
-              ) : (
-                <div
-                  role={clickable ? "button" : undefined}
-                  tabIndex={clickable ? 0 : undefined}
-                  onClick={
-                    clickable
-                      ? () => {
-                          services?.selectProvider?.(account.vendor);
-                          onStats?.();
-                        }
-                      : undefined
-                  }
-                  style={{
-                    display: "flex",
-                    gap: 24,
-                    paddingLeft: 26,
-                    paddingRight: 6,
-                    cursor: clickable ? "pointer" : undefined,
-                  }}
-                >
-                  {columns.map((column) => (
-                    <div
-                      key={column.name}
-                      title={metrics?.coverage.notice ?? undefined}
-                      style={{ flex: 1, display: "grid", gap: 3 }}
+                  {(
+                    [
+                      {
+                        key: "quota",
+                        Icon: Percent,
+                        title: language === "zh" ? "余额" : "Balance",
+                      },
+                      {
+                        key: "burn",
+                        Icon: Flame,
+                        title:
+                          language === "zh"
+                            ? "每日消耗"
+                            : "Consumption per day",
+                      },
+                      {
+                        key: "cost",
+                        Icon: DollarSign,
+                        title:
+                          language === "zh" ? "估算花费" : "Estimated cost",
+                      },
+                    ] as const
+                  ).map(({ key, Icon, title }) => (
+                    <button
+                      key={key}
+                      aria-pressed={selected === key}
+                      title={title}
+                      onClick={() => setMeasure(key)}
+                      style={{
+                        ...noButtonChrome,
+                        color: selected === key ? colors.text : colors.tertiary,
+                        background:
+                          selected === key ? colors.selected : "transparent",
+                        borderRadius: 4,
+                        padding: 3,
+                      }}
                     >
-                      <span style={{ fontSize: 11, color: colors.secondary }}>
-                        {column.name}
-                      </span>
-                      <span
-                        style={{
-                          ...tabular,
-                          fontSize: 15,
-                          fontWeight: 600,
-                          color: colors.text,
-                        }}
-                      >
-                        {column.value}
-                      </span>
-                    </div>
+                      <Icon size={12} />
+                    </button>
                   ))}
                 </div>
               )}
-            </section>
-          );
-        })}
+            </div>
+            {account.notice && (
+              <div
+                style={{
+                  fontSize: 11,
+                  paddingLeft: 26,
+                  color: colors.warning,
+                }}
+              >
+                {account.notice}
+              </div>
+            )}
+            <div
+              role="group"
+              aria-label={language === "zh" ? "消耗时段" : "Consumption period"}
+              style={{ display: "flex", gap: 2, justifyContent: "flex-end" }}
+            >
+              {(["day", "week", "month"] as const).map((value) => (
+                <button
+                  key={value}
+                  aria-pressed={period === value}
+                  onClick={() => setPeriod(value)}
+                  style={{
+                    ...noButtonChrome,
+                    fontSize: 10,
+                    padding: "2px 5px",
+                    borderRadius: 4,
+                    color: period === value ? colors.text : colors.tertiary,
+                    background:
+                      period === value ? colors.selected : "transparent",
+                  }}
+                >
+                  {{ day: "24h", week: "7d", month: "30d" }[value]}
+                </button>
+              ))}
+            </div>
+            {layout.widget === "chart" ? (
+              <div
+                aria-label={
+                  language === "zh"
+                    ? "估算花费记录"
+                    : "Estimated spending history"
+                }
+                title={metrics?.coverage.notice ?? undefined}
+                style={{
+                  display: "flex",
+                  alignItems: "flex-end",
+                  gap: 2,
+                  height: 42,
+                  paddingLeft: 26,
+                }}
+              >
+                {points.length ? (
+                  points.map((point, index) => (
+                    <div
+                      key={point.timestamp + index}
+                      title={`${dateFormat(undefined, localeDateTime).format(new Date(point.timestamp))} · ${money(point.amount, point.currency)}`}
+                      style={{
+                        flex: 1,
+                        minWidth: 1,
+                        height: `${Math.max(2, (point.amount / peak) * 100)}%`,
+                        background: colors.secondary,
+                        borderRadius: "2px 2px 0 0",
+                      }}
+                    />
+                  ))
+                ) : (
+                  <span style={{ fontSize: 11, color: colors.secondary }}>
+                    —
+                  </span>
+                )}
+              </div>
+            ) : (
+              <div
+                role={clickable ? "button" : undefined}
+                tabIndex={clickable ? 0 : undefined}
+                onClick={
+                  clickable
+                    ? () => {
+                        services?.selectProvider?.(account.vendor);
+                        onStats?.();
+                      }
+                    : undefined
+                }
+                style={{
+                  display: "flex",
+                  gap: 24,
+                  paddingLeft: 26,
+                  paddingRight: 6,
+                  cursor: clickable ? "pointer" : undefined,
+                }}
+              >
+                {columns.map((column) => (
+                  <div
+                    key={column.name}
+                    title={metrics?.coverage.notice ?? undefined}
+                    style={{ flex: 1, display: "grid", gap: 3 }}
+                  >
+                    <span style={{ fontSize: 11, color: colors.secondary }}>
+                      {column.name}
+                    </span>
+                    <span
+                      style={{
+                        ...tabular,
+                        fontSize: 15,
+                        fontWeight: 600,
+                        color: colors.text,
+                      }}
+                    >
+                      {column.value}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        );
+      })}
     </>
   );
 }

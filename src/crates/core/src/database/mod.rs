@@ -7,6 +7,11 @@ pub(crate) mod checkpoints;
 pub(crate) mod endpoints;
 pub(crate) mod metering;
 pub(crate) mod staging;
+#[cfg(windows)]
+mod windows_paths;
+#[cfg(not(windows))]
+#[path = "unix_paths.rs"]
+mod windows_paths;
 
 use rusqlite::{params, Connection};
 use std::{
@@ -306,6 +311,7 @@ pub(crate) fn open(
         .busy_timeout(Duration::from_secs(5))
         .map_err(|e| e.to_string())?;
     schema(&database).map_err(|e| e.to_string())?;
+    windows_paths::migrate(&database).map_err(|e| e.to_string())?;
 
     let transaction = database
         .unchecked_transaction()

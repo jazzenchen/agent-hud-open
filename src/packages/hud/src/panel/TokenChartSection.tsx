@@ -22,6 +22,7 @@ import { useFormat } from "@agent-hud/ui/format-context";
 import { dateFormat, numberFormat, systemTimeZone } from "@agent-hud/ui/format";
 import { hexAlpha } from "../tokens";
 import { useGround } from "../ground";
+import { orderedModels, visibleModelCounts } from "./model-visibility";
 
 const moving: Transition = {
   duration: HUD_METRICS.duration,
@@ -80,17 +81,28 @@ export function SourceTokenChart({
   );
   // Each model in its agent colour, by its place in Core's list of models,
   // as Open colours a consumer by its place in the report's consumers.
-  const models = query.data?.available.models ?? [];
+  const models = orderedModels(
+    query.data?.available.models ?? [],
+    layout.modelOrder,
+    layout.hiddenModels,
+  );
   const points: {
     timestamp: string;
     tokens: number;
     models?: Record<string, number>;
   }[] = query.data
-    ? query.data.buckets.map((p) => ({
-        timestamp: p.timestamp,
-        tokens: p.selectedTokens,
-        models: p.models,
-      }))
+    ? query.data.buckets.map((p) => {
+        const visible = visibleModelCounts(
+          p.models,
+          p.selectedTokens,
+          layout.hiddenModels,
+        );
+        return {
+          timestamp: p.timestamp,
+          tokens: visible.total,
+          models: visible.counts,
+        };
+      })
     : snapshot.timeline.filter(
         (p) =>
           Date.parse(p.timestamp) >= now - duration &&
@@ -105,10 +117,12 @@ export function SourceTokenChart({
     (!focusVendor &&
       !layout.agents?.length &&
       !layout.models?.length &&
+      !layout.hiddenModels?.length &&
       snapshot.timeline.length > 0);
-  const total =
-    query.data?.totals.selectedTokens ??
-    points.reduce((sum, p) => sum + p.tokens, 0);
+  const total = layout.hiddenModels?.length
+    ? points.reduce((sum, p) => sum + p.tokens, 0)
+    : (query.data?.totals.selectedTokens ??
+      points.reduce((sum, p) => sum + p.tokens, 0));
   const peak = Math.max(1, ...points.map((p) => p.tokens));
   const notice = query.error ?? query.data?.coverage.notice;
   // Still, everything is drawn at its value at once, with no frame to wait
@@ -299,9 +313,15 @@ export function SourceTokenChart({
                 >
                   {query.error
                     ? query.error
-                    : zh
-                      ? "这段时间没有 token 消耗"
-                      : "No token usage in this range"}
+                    : layout.hiddenModels?.length &&
+                        (query.data?.totals.selectedTokens ?? 0) > 0 &&
+                        total === 0
+                      ? zh
+                        ? "这段时间的模型消耗已隐藏"
+                        : "Model usage in this range is hidden"
+                      : zh
+                        ? "这段时间没有 token 消耗"
+                        : "No token usage in this range"}
                 </motion.span>
               )}
         </AnimatePresence>

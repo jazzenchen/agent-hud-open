@@ -51,8 +51,8 @@ mod running {
         for process in processes {
             let pid = process.pid;
             let command = process.command.as_str();
-            let executable = process.executable.to_lowercase();
-            let cli = executable.rsplit('/').next() == Some("agy");
+            let executable = process.executable.to_lowercase().replace('\\', "/");
+            let cli = matches!(executable.rsplit('/').next(), Some("agy" | "agy.exe"));
             let server = (executable.contains("language_server")
                 || executable.contains("language-server"))
                 && (executable.contains("antigravity.app/")
@@ -108,8 +108,14 @@ mod running {
     fn cli_from(processes: Vec<crate::os::ProcessInfo>) -> Option<String> {
         processes.into_iter().find_map(|process| {
             let path = std::path::Path::new(&process.executable);
-            (path.is_absolute() && path.file_name().is_some_and(|name| name == "agy"))
-                .then_some(process.executable)
+            (path.is_absolute()
+                && path
+                    .file_name()
+                    .and_then(|name| name.to_str())
+                    .is_some_and(|name| {
+                        name.eq_ignore_ascii_case("agy") || name.eq_ignore_ascii_case("agy.exe")
+                    }))
+            .then_some(process.executable)
         })
     }
 
@@ -153,6 +159,27 @@ mod running {
             assert_eq!(
                 found.iter().map(|server| server.pid).collect::<Vec<_>>(),
                 [1, 2, 5]
+            );
+        }
+
+        #[test]
+        fn discovers_windows_language_server_and_cli_with_native_paths() {
+            let found = parse_servers(vec![
+                process(
+                    1,
+                    r"C:\Program Files\Antigravity\language_server.exe",
+                    "server --app_data_dir antigravity --csrf_token fixture",
+                ),
+                process(2, r"C:\Tools\agy.exe", "agy.exe --csrf_token fixture"),
+                process(
+                    3,
+                    r"C:\Other\language_server.exe",
+                    "server --app_data_dir unrelated --csrf_token fixture",
+                ),
+            ]);
+            assert_eq!(
+                found.iter().map(|server| server.pid).collect::<Vec<_>>(),
+                [1, 2]
             );
         }
 
@@ -368,7 +395,7 @@ pub fn endpoints(fresh: bool) -> Result<Vec<Endpoint>, String> {
 /// identity of its own endpoint so anonymous services cannot be conflated.
 /// The account reader uses the CLI fallback only when no native quota is usable.
 pub fn read_accounts(params: &Value) -> Result<Value, String> {
-    if !crate::clients::runs(&agent_hud_agents::antigravity::LOCAL_SERVICE) {
+    if !crate::clients::runs(&agent_hud_agents::antigravity::ACCOUNT_SERVICE) {
         return Err(format!(
             "Antigravity local service acquisition is unsupported on {}",
             std::env::consts::OS
@@ -407,6 +434,212 @@ pub fn read_accounts(params: &Value) -> Result<Value, String> {
         }
     };
     Ok(json!({"accounts":accounts,"partial":partial,"cliExecutable":cli}))
+}
+
+/// Failure before a message is sent, or an unconfirmed result after the one
+/// permitted send. Never retry an unconfirmed write against another service.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum MessageError {
+    Invalid(String),
+    Unavailable(String),
+    Uncertain,
+}
+
+/// An existing conversation bound to its one verified running owner.
+/// Its endpoint and credential remain private to the platform adapter.
+pub struct MessageSession {
+    cascade_id: String,
+    endpoint: Endpoint,
+}
+
+fn valid_cascade_id(id: &str) -> bool {
+    id.len() == 36
+        && id.bytes().enumerate().all(|(i, b)| {
+            if matches!(i, 8 | 13 | 18 | 23) {
+                b == b'-'
+            } else {
+                b.is_ascii_hexdigit()
+            }
+        })
+}
+
+/// All candidates must answer successfully. A failed or malformed reply
+/// cannot prove that a second service does not own the same conversation.
+fn unique_owner<T: Clone>(
+    endpoints: &[T],
+    cascade_id: &str,
+    mut summaries: impl FnMut(&T) -> Result<Value, String>,
+) -> Result<T, MessageError> {
+    let mut owner = None;
+    for endpoint in endpoints {
+        let body = summaries(endpoint).map_err(|_| {
+            MessageError::Unavailable("Could not verify every Antigravity service".into())
+        })?;
+        let entries = body
+            .get("trajectorySummaries")
+            .and_then(Value::as_object)
+            .ok_or_else(|| {
+                MessageError::Unavailable("Invalid Antigravity conversation summary".into())
+            })?;
+        if entries.contains_key(cascade_id) {
+            if owner.is_some() {
+                return Err(MessageError::Unavailable(
+                    "Antigravity conversation belongs to more than one service".into(),
+                ));
+            }
+            owner = Some(endpoint.clone());
+        }
+    }
+    owner.ok_or_else(|| {
+        MessageError::Unavailable("No running Antigravity service owns this conversation".into())
+    })
+}
+
+fn message_owner(service: &Service, cascade_id: &str) -> Result<Endpoint, MessageError> {
+    let endpoints = service
+        .discover(true, true)
+        .map_err(MessageError::Unavailable)?;
+    unique_owner(&endpoints, cascade_id, |endpoint| {
+        service.send(endpoint, "GetAllCascadeTrajectories", &json!({}))
+    })
+}
+
+fn send_once<T: PartialEq>(
+    expected: &T,
+    owner: impl FnOnce() -> Result<T, MessageError>,
+    write: impl FnOnce() -> Result<Value, String>,
+) -> Result<Value, MessageError> {
+    if owner()? != *expected {
+        return Err(MessageError::Unavailable(
+            "Antigravity conversation service changed".into(),
+        ));
+    }
+    write().map_err(|_| MessageError::Uncertain)
+}
+
+/// Resolve a known conversation without enabling permission observation or
+/// the generic control channel on Windows.
+pub fn message_session(cascade_id: &str) -> Result<MessageSession, MessageError> {
+    if !valid_cascade_id(cascade_id) {
+        return Err(MessageError::Invalid("Antigravity session identity".into()));
+    }
+    if !crate::clients::runs(&agent_hud_agents::antigravity::ACCOUNT_SERVICE) {
+        return Err(MessageError::Unavailable(
+            "Antigravity message discovery is unsupported on this system".into(),
+        ));
+    }
+    let endpoint = message_owner(service().map_err(MessageError::Unavailable)?, cascade_id)?;
+    Ok(MessageSession {
+        cascade_id: cascade_id.to_owned(),
+        endpoint,
+    })
+}
+
+impl MessageSession {
+    fn current_service(&self) -> Result<&'static Service, MessageError> {
+        let service = service().map_err(MessageError::Unavailable)?;
+        if message_owner(service, &self.cascade_id)? != self.endpoint {
+            return Err(MessageError::Unavailable(
+                "Antigravity conversation service changed".into(),
+            ));
+        }
+        Ok(service)
+    }
+
+    pub fn trajectory(&self) -> Result<Value, MessageError> {
+        self.current_service()?
+            .send(
+                &self.endpoint,
+                "GetCascadeTrajectory",
+                &json!({"cascadeId":self.cascade_id}),
+            )
+            .map_err(MessageError::Unavailable)
+    }
+
+    pub fn user_status(&self) -> Result<Value, MessageError> {
+        self.current_service()?
+            .send(
+                &self.endpoint,
+                "GetUserStatus",
+                &json!({"metadata":{"ideName":"antigravity","extensionName":"antigravity","locale":"en","ideVersion":"unknown"}}),
+            )
+            .map_err(MessageError::Unavailable)
+    }
+
+    /// Revalidate immediately before the only write. An error after the request
+    /// starts is uncertain, including a lost response or an unexpected body.
+    pub fn send(&self, params: &Value) -> Result<Value, MessageError> {
+        if params["cascadeId"].as_str() != Some(self.cascade_id.as_str()) {
+            return Err(MessageError::Invalid("Antigravity session identity".into()));
+        }
+        let service = service().map_err(MessageError::Unavailable)?;
+        send_once(
+            &self.endpoint,
+            || message_owner(service, &self.cascade_id),
+            || service.send(&self.endpoint, "SendUserCascadeMessage", params),
+        )
+    }
+}
+
+#[cfg(test)]
+mod message_tests {
+    use super::*;
+    use std::cell::Cell;
+
+    const ID: &str = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee";
+
+    #[test]
+    fn target_must_have_one_proven_owner_among_all_services() {
+        let answer = |endpoint: &u8| {
+            Ok(if *endpoint == 1 {
+                json!({"trajectorySummaries": {(ID): {}}})
+            } else {
+                json!({"trajectorySummaries": {}})
+            })
+        };
+        assert_eq!(unique_owner(&[1, 2], ID, answer), Ok(1));
+        assert!(unique_owner(&[1, 1], ID, answer).is_err());
+        assert!(unique_owner(&[2], ID, answer).is_err());
+        assert!(unique_owner(&[1, 2], ID, |n| {
+            if *n == 2 {
+                Err("offline".into())
+            } else {
+                answer(n)
+            }
+        })
+        .is_err());
+        assert!(unique_owner(&[1, 2], ID, |n| {
+            if *n == 2 {
+                Ok(json!({}))
+            } else {
+                answer(n)
+            }
+        })
+        .is_err());
+    }
+
+    #[test]
+    fn changed_owner_is_not_written_and_lost_response_is_never_retried() {
+        let writes = Cell::new(0);
+        let write = || {
+            writes.set(writes.get() + 1);
+            Err("connection lost after submission".into())
+        };
+        assert!(matches!(
+            send_once(&1, || Ok(2), write),
+            Err(MessageError::Unavailable(_))
+        ));
+        assert_eq!(writes.get(), 0);
+        assert_eq!(send_once(&1, || Ok(1), write), Err(MessageError::Uncertain));
+        assert_eq!(writes.get(), 1);
+    }
+
+    #[test]
+    fn only_canonical_conversation_ids_are_accepted() {
+        assert!(valid_cascade_id(ID));
+        assert!(!valid_cascade_id("../../other"));
+        assert!(!valid_cascade_id("aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeeg"));
+    }
 }
 /// Quota reads may use the first readable service. Pending permissions instead
 /// retain and revalidate an explicit Endpoint through `endpoints(true)`.
@@ -461,5 +694,52 @@ fn service_error(response: reqwest::blocking::Response) -> String {
             text.chars().take(300).collect::<String>()
         ),
         None => format!("Antigravity local service returned HTTP {status}"),
+    }
+}
+
+#[cfg(all(test, target_os = "windows"))]
+mod windows_live_test {
+    /// Opt in only with an already running, signed-in client. Do not print the
+    /// returned account or the credential carried by its process command line.
+    #[test]
+    #[ignore = "requires a signed-in Antigravity desktop on this machine"]
+    fn reads_an_existing_windows_desktop_account() {
+        let params = serde_json::json!({"metadata":{"ideName":"antigravity","extensionName":"antigravity","locale":"en","ideVersion":"unknown"}});
+        let response = super::read_accounts(&params).expect("read-only account discovery failed");
+        assert!(
+            response["accounts"]
+                .as_array()
+                .is_some_and(|entries| !entries.is_empty()),
+            "no authenticated account responded"
+        );
+        assert!(
+            response["accounts"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|account| {
+                    let configs = account["status"]["userStatus"]["cascadeModelConfigData"]
+                        ["clientModelConfigs"]
+                        .as_array();
+                    let groups = account["summary"]["response"]["groups"]
+                        .as_array()
+                        .or_else(|| account["summary"]["groups"].as_array());
+                    configs.is_some_and(|configs| {
+                        configs
+                            .iter()
+                            .any(|config| config["quotaInfo"]["remainingFraction"].is_number())
+                    }) || groups.is_some_and(|groups| {
+                        groups.iter().any(|group| {
+                            group["buckets"].as_array().is_some_and(|buckets| {
+                                buckets.iter().any(|bucket| {
+                                    bucket["remainingFraction"].is_number()
+                                        || bucket["remaining_fraction"].is_number()
+                                })
+                            })
+                        })
+                    })
+                }),
+            "the account response has no numeric quota remaining fraction"
+        );
     }
 }

@@ -139,7 +139,7 @@ npm run tauri --workspace @agent-hud/desktop -- dev
 
 # Alternative: build a debug .app, then launch that exact Next bundle.
 npm run tauri --workspace @agent-hud/desktop -- build --debug --bundles app
-open "$PWD/target/debug/bundle/macos/Agent HUD Next.app"
+open "$PWD/target/debug/bundle/macos/Agent HUD.app"
 ```
 
 Use the new Next bundle. This workflow does not launch the original Agent HUD or install its client hooks. The app configures each connected screen's HUD itself. Statistics opens independently through its command or tray action. Settings and Statistics use Overlay title bars with hidden titles and app-owned drag regions.

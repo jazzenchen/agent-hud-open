@@ -108,6 +108,19 @@ fn sessions_take_no_state_filter_or_sort_and_a_saved_one_reads_without_them() {
 }
 
 #[test]
+fn model_visibility_and_order_survive_layout_storage_and_tool_round_trip() {
+    let (_folder, owner) = owner();
+    let tokens = json!({"hiddenModels": ["codex-model:old"], "modelOrder": ["codex-model:new", "codex-model:old"]});
+    owner
+        .set_layout(json!({"screen":"all", "layout":{"tokens": tokens}}))
+        .unwrap();
+    let read = call(&owner, "get_hud", json!({"screen":"all"})).unwrap();
+    assert_eq!(read["layout"]["tokens"], tokens);
+    draft(&owner, json!({"screen":"all", "tokens":tokens}));
+    assert_eq!(drafts(&owner)["layouts"], json!([]));
+}
+
+#[test]
 fn the_layout_get_hud_returned_sent_back_changes_nothing() {
     let (_folder, owner) = owner();
     owner
@@ -263,6 +276,20 @@ fn the_app_is_kept_as_what_it_changes() {
 }
 
 // MARK: Goal 2: refusals
+
+#[test]
+fn balance_rows_are_accepted_for_visibility_and_order() {
+    let (_folder, owner) = owner();
+    draft(
+        &owner,
+        json!({"blocks": {"api:deepseek": {"hiddenRows": ["ds1"], "rows": ["ds1"]}}}),
+    );
+    let error = refused(
+        &owner,
+        json!({"blocks": {"api:deepseek": {"hiddenRows": ["unknown"]}}}),
+    );
+    assert!(error.contains("has no row \"unknown\""), "{error}");
+}
 
 #[test]
 fn unknown_keys_are_refused_with_what_the_panel_has() {

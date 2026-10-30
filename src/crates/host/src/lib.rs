@@ -693,7 +693,7 @@ fn show(app: &tauri::AppHandle) {
     let app = app.clone();
     tauri::async_runtime::spawn_blocking(move || {
         if let Err(error) = show_settings(&app) {
-            eprintln!("Agent HUD Next Settings: {error}");
+            eprintln!("Agent HUD Settings: {error}");
         }
     });
 }
@@ -710,7 +710,7 @@ fn show_settings_page(app: &tauri::AppHandle, page: String) {
             use tauri::Emitter;
             let _ = app.emit_to("main", "settings:page", page);
         }
-        Err(error) => eprintln!("Agent HUD Next Settings: {error}"),
+        Err(error) => eprintln!("Agent HUD Settings: {error}"),
     });
 }
 
@@ -1023,7 +1023,7 @@ pub fn run_with_options(
             }
         })
         .build(context)
-        .expect("Agent HUD Next could not start")
+        .expect("Agent HUD could not start")
         .run(|app, event| {
             // The app lives in the menu bar: closing its last window does not quit it.
             if let tauri::RunEvent::ExitRequested {

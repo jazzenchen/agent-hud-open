@@ -150,7 +150,7 @@ pub(crate) fn save_placement(app: &tauri::AppHandle, placement: Value) {
         });
         match app.state::<Presentation>().update(params) {
             Ok(view) => presentation_changed(&app, &view),
-            Err(error) => eprintln!("Agent HUD Next HUD placement was not saved: {error}"),
+            Err(error) => eprintln!("Agent HUD placement was not saved: {error}"),
         }
     });
 }
@@ -283,7 +283,7 @@ fn run(app: &tauri::AppHandle) {
                     changed |= DISPLAY;
                 }
                 Ok(None) => {}
-                Err(error) => eprintln!("Agent HUD Next displays: {error}"),
+                Err(error) => eprintln!("Agent HUD displays: {error}"),
             }
         }
         if changed & DISPLAY != 0 {
@@ -340,7 +340,7 @@ fn run(app: &tauri::AppHandle) {
                 now_ms,
             );
             if let Err(error) = tray::apply(app, state) {
-                eprintln!("Agent HUD Next menu bar: {error}");
+                eprintln!("Agent HUD menu bar: {error}");
             }
         }
     }

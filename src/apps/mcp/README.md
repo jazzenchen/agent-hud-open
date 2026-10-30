@@ -1,4 +1,4 @@
-# Agent HUD Next MCP
+# Agent HUD MCP
 
 The service uses the current official TypeScript MCP SDK v2 (`@modelcontextprotocol/server`) and attaches to the running native application through `@agent-hud/engine-client` and the Rust engine’s `--app-channel` relay. The SDK owns the MCP transport, protocol compatibility and input validation. No transcript parsing is duplicated in TypeScript.
 
@@ -15,8 +15,8 @@ Use a direct executable in a client configuration so npm's status messages do no
 {
   "mcpServers": {
     "agent-hud-next": {
-      "command": "/absolute/path/to/agent-hud-next/node_modules/.bin/tsx",
-      "args": ["/absolute/path/to/agent-hud-next/src/apps/mcp/src/index.ts"]
+      "command": "/absolute/path/to/agent-hud-open/node_modules/.bin/tsx",
+      "args": ["/absolute/path/to/agent-hud-open/src/apps/mcp/src/index.ts"]
     }
   }
 }

@@ -8,6 +8,7 @@ import type {
 import { agentArtworkKey, agentVendorName } from "./agent-artwork";
 import { restingAgents } from "./resting-agents.ts";
 import { recentLabel, recentUsage } from "./recent-usage.ts";
+import { visibleBalances } from "./balance-rows.ts";
 import type { GlowEffect, GlowStyle } from "./HUDGlow";
 import {
   moneyAmount,
@@ -159,25 +160,39 @@ export function vendorsFromSnapshot(
     const balance = quotas.length
       ? undefined
       : snapshot.billing.find((b) => vendorKey(b.vendor) === key);
+    const deepseekBalances =
+      key === "deepseek" && !quotas.length
+        ? snapshot.billing.filter((b) => vendorKey(b.vendor) === key)
+        : [];
     return {
       key,
       name: agentVendorName(name),
       used: tightest?.usedPercent ?? null,
       // An agent billed by balance alone takes its balance's level.
-      level: tightest?.status ?? balance?.level ?? "stale",
+      level:
+        tightest?.status ??
+        balanceLevel(deepseekBalances) ??
+        balance?.level ??
+        "stale",
       // In flight, as Open counts working: running or waiting on a request.
       working: sessions.filter(
         (s) => s.state === "running" || s.state === "waiting",
       ).length,
       waiting: snapshot.approvals.filter((a) => vendorKey(a.source) === key)
         .length,
-      balance: balance
-        ? moneyAmount(
-            balance.amount,
-            balance.currency,
-            snapshotLanguage(snapshot),
-          )
-        : null,
+      balance: deepseekBalances.length
+        ? deepseekBalances
+            .map((b) =>
+              moneyAmount(b.amount, b.currency, snapshotLanguage(snapshot)),
+            )
+            .join(" · ")
+        : balance
+          ? moneyAmount(
+              balance.amount,
+              balance.currency,
+              snapshotLanguage(snapshot),
+            )
+          : null,
       usage:
         quotas.length || balance
           ? null
@@ -222,13 +237,43 @@ export function configuredVendors(
   config: HUDConfig,
 ): HUDVendor[] {
   // Only the HUD's own list orders the marks; the panel's block order does not (Open ScreenAgents).
-  const available = vendorsFromSnapshot(snapshot, config.mode),
+  const available = vendorsFromSnapshot(snapshot, config.mode).map((vendor) => {
+      if (vendor.key !== "deepseek" || vendor.quotas.length) return vendor;
+      const rows = snapshot.billing.filter(
+        (row) => vendorKey(row.vendor) === vendor.key,
+      );
+      if (!rows.length) return vendor;
+      const block = config.panelLayout.blocks?.[`api:${rows[0].vendor}`] ?? {};
+      const visible = visibleBalances(rows, block);
+      return {
+        ...vendor,
+        balance: visible.length
+          ? visible
+              .map((b) =>
+                moneyAmount(b.amount, b.currency, snapshotLanguage(snapshot)),
+              )
+              .join(" · ")
+          : null,
+        level: balanceLevel(visible) ?? "stale",
+        usage: null,
+      };
+    }),
     marks = (config.panelLayout.hud?.agents ?? []).map(vendorKey);
   if (!marks.some((mark) => available.some((vendor) => vendor.key === mark)))
     return available;
   return available
     .filter((vendor) => marks.includes(vendor.key))
     .sort((a, b) => marks.indexOf(a.key) - marks.indexOf(b.key));
+}
+
+function balanceLevel(
+  rows: Snapshot["billing"],
+): HUDVendor["level"] | undefined {
+  if (!rows.length) return undefined;
+  if (rows.some((row) => row.level === "critical")) return "critical";
+  if (rows.some((row) => row.level === "warning")) return "warning";
+  if (rows.some((row) => row.level === "normal")) return "normal";
+  return "stale";
 }
 
 export function sourcesForMark(snapshot: Snapshot, mark: string): string[] {

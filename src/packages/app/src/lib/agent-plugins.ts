@@ -191,8 +191,8 @@ export function mcpRow(input: McpInput): RowState {
   if (!input.added) {
     const unavailable: Words | undefined = !input.setupReady
       ? [
-          "Only the Agent HUD installed in Applications can add HUD tools.",
-          "只有装在「应用程序」里的 Agent HUD 才能添加 HUD 工具。",
+          "Adding HUD tools requires Agent HUD at its approved installation location and its MCP components.",
+          "添加 HUD 工具需要指定安装位置的 Agent HUD 和完整的 MCP 组件。",
         ]
       : !input.clientFound
         ? [`Install ${client} first.`, `请先安装 ${client}。`]

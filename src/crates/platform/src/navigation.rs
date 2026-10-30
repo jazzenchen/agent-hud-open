@@ -2,13 +2,19 @@
 //! command, arbitrary URL or callback-declared host is accepted as navigation.
 use serde_json::Value;
 mod antigravity;
+#[cfg(windows)]
+#[path = "navigation/antigravity_windows.rs"]
+mod antigravity_host;
+#[cfg(not(windows))]
+#[path = "navigation/antigravity_unix.rs"]
+mod antigravity_host;
 mod claude_job;
 pub(super) fn open_antigravity(
     home: &std::path::Path,
     id: &str,
     cwd: Option<&str>,
 ) -> Result<bool, String> {
-    antigravity::open(home, id, cwd)
+    antigravity_host::open(home, id, cwd)
 }
 /// A Claude Code background job moves into the desktop app; false when this
 /// host cannot, so the caller falls back.

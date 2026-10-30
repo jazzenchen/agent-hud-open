@@ -87,6 +87,8 @@ export default function SourcesSettings({
     windows[0]?.vendor ??
     (billing[0] ? `api:${billing[0].vendor}` : (source?.id ?? ""));
   const block = layout.blocks?.[key] ?? {};
+  const balanceKey = billing[0] ? `api:${billing[0].vendor}` : "";
+  const balanceBlock = layout.blocks?.[balanceKey] ?? {};
   const profiles = (snapshot.accounts ?? []).filter(
     (account) => source && vendorKey(account.provider) === vendorKey(source.id),
   );
@@ -132,6 +134,16 @@ export default function SourcesSettings({
         blocks: { ...layout.blocks, [key]: { ...block, ...patch } },
       }),
     );
+  const changeBalanceBlock = (patch: Partial<PanelBlockLayout>) =>
+    perform(() =>
+      onLayout({
+        ...layout,
+        blocks: {
+          ...layout.blocks,
+          [balanceKey]: { ...balanceBlock, ...patch },
+        },
+      }),
+    );
   const move = (values: string[], id: string, direction: number) => {
     const at = values.indexOf(id),
       to = at + direction;
@@ -155,6 +167,23 @@ export default function SourcesSettings({
   const windowOrder = [
     ...new Set(inRowOrder(windows, block.rows ?? []).map(quotaRowKey)),
   ];
+  // Keep absent IDs in the order so their position survives a temporary failed read.
+  const balanceOrder = [
+    ...new Set([...(balanceBlock.rows ?? []), ...billing.map((row) => row.id)]),
+  ];
+  const visibleBalanceOrder = balanceOrder.filter((id) =>
+    billing.some((row) => row.id === id),
+  );
+  const moveBalance = (id: string, direction: number) => {
+    const at = visibleBalanceOrder.indexOf(id);
+    const adjacent = visibleBalanceOrder[at + direction];
+    if (at < 0 || !adjacent) return balanceOrder;
+    const next = [...balanceOrder];
+    const left = next.indexOf(id),
+      right = next.indexOf(adjacent);
+    [next[left], next[right]] = [next[right], next[left]];
+    return next;
+  };
   return (
     <div
       className="source-settings"
@@ -506,7 +535,102 @@ export default function SourcesSettings({
                   </div>
                 );
               })}
-              {!windows.length && (
+              {billing.length > 0 && (
+                <div style={{ borderTop: "1px solid var(--border)" }}>
+                  <div
+                    style={{
+                      ...row,
+                      fontSize: 12,
+                      color: "var(--muted-foreground)",
+                    }}
+                  >
+                    {t("Balances", "余额")}
+                  </div>
+                  {balanceOrder
+                    .map((id) => billing.find((item) => item.id === id))
+                    .filter((item): item is NonNullable<typeof item> =>
+                      Boolean(item),
+                    )
+                    .map((item) => (
+                      <div
+                        key={item.id}
+                        style={{
+                          ...row,
+                          padding: "9px 16px 9px 30px",
+                          fontSize: 12,
+                        }}
+                      >
+                        <span style={{ flex: 1 }}>
+                          {item.label} · {item.currency}
+                        </span>
+                        <span style={{ color: "var(--muted-foreground)" }}>
+                          {moneyAmount(
+                            item.amount,
+                            item.currency,
+                            snapshotLanguage(snapshot),
+                          )}
+                        </span>
+                        <Switch
+                          checked={
+                            !(balanceBlock.hiddenRows ?? []).includes(item.id)
+                          }
+                          disabled={pending}
+                          aria-label={
+                            t("Show balance", "显示余额") + ` ${item.currency}`
+                          }
+                          onCheckedChange={(show) =>
+                            void changeBalanceBlock({
+                              hiddenRows: show
+                                ? (balanceBlock.hiddenRows ?? []).filter(
+                                    (id) => id !== item.id,
+                                  )
+                                : [
+                                    ...new Set([
+                                      ...(balanceBlock.hiddenRows ?? []),
+                                      item.id,
+                                    ]),
+                                  ],
+                            })
+                          }
+                        />
+                        <Button
+                          size="icon-xs"
+                          variant="ghost"
+                          disabled={
+                            pending ||
+                            visibleBalanceOrder.indexOf(item.id) === 0
+                          }
+                          onClick={() =>
+                            void changeBalanceBlock({
+                              rows: moveBalance(item.id, -1),
+                            })
+                          }
+                          aria-label={t("Move balance up", "上移余额")}
+                        >
+                          <ChevronUp size={12} />
+                        </Button>
+                        <Button
+                          size="icon-xs"
+                          variant="ghost"
+                          disabled={
+                            pending ||
+                            visibleBalanceOrder.indexOf(item.id) ===
+                              visibleBalanceOrder.length - 1
+                          }
+                          onClick={() =>
+                            void changeBalanceBlock({
+                              rows: moveBalance(item.id, 1),
+                            })
+                          }
+                          aria-label={t("Move balance down", "下移余额")}
+                        >
+                          <ChevronDown size={12} />
+                        </Button>
+                      </div>
+                    ))}
+                </div>
+              )}
+              {!windows.length && !billing.length && (
                 <p
                   style={{
                     ...row,

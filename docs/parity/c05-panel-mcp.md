@@ -181,7 +181,7 @@ All 36 files were read in full. The tests under `Tests/AgentHUDCoreTests/{PanelL
 | 70 | P/HUDTools+Picture.swift:175-230 | The resting-HUD picture: fields mode, edge, appearance, material, glow; notes such as "black at rest" | picture.rs:54; desk/HUDPicture.tsx:28,45 | differs | Only metadata (screen, revision, unsaved, note). Data only. |
 | 71 | P/PanelPicture.swift:86-105 | The account mask `j***s@domain`; a session row is "会话 N" or "Session N" | desk/HUDPicture.tsx:15-16,21 | same | The mask is identical. Session labels are always English, and notices are dropped instead of drawn as grey bars. Minor. |
 | 72 | M/MCPTools.swift:10-15 | The five tool names | mcp/index.ts:33-37 | same | — |
-| 73 | M/MCPTools.swift:17-24; M/MCPServer.swift:116-117,145-147 | The server's instructions, and serverInfo `agent-hud` with the app's version | mcp/index.ts:31 | differs | **What:** Next sends no `instructions`, and its name is `agent-hud-next` 0.1.0. **When:** a client connects. **User sees:** nothing; the agent lacks the "draft until Save / finish_hud_edit" primer. |
+| 73 | M/MCPTools.swift:17-24; M/MCPServer.swift:116-117,145-147 | The server's instructions, and serverInfo `agent-hud` with the app's version | mcp/index.ts:31 | differs | **What:** The server reports `agent-hud` 0.1.0 but sends no `instructions`. **When:** a client connects. **User sees:** nothing; the agent lacks the "draft until Save / finish_hud_edit" primer. |
 | 74 | M/MCPTools.swift:28-284 | Detailed tool and field descriptions with ranges | mcp/index.ts:22-37 | differs | Short descriptions; most fields have none. The agent gets less guidance. |
 | 75 | M/MCPTools.swift:111-284 | The `draft_hud` schema: no additional properties; every field optional | mcp/index.ts | fixed | **Fixed 2026-10-21:** null values and `ended` are accepted, delays are advertised as 0–1500 in steps of 50, and the app checks the proposal (row 28). What remains is deliberate: `hiddenAccounts` (row 6), and no `material`, `glassStyle` or kept transparencies (row 46). |
 | 76 | M/MCPTools.swift:290-298 | Annotations | mcp/index.ts:8-9 | same | Read-only tools also carry `idempotentHint` and `destructiveHint`. Harmless. |
@@ -263,7 +263,7 @@ Since 2026-10-21, `presentation/tool_tests.rs` covers the draft contract of `pre
 
    The session-period vocabulary and `tokenTotal` handling also differ. A single core-owned type with serde, exported to TypeScript, would remove the drift.
 3. **Shared migration logic sits in an OS-specific file.** `platform/src/os/macos/legacy_preferences.rs` contains layout migration (`carry_layout`, block-key mapping, hidden-account carry) inside the macOS module. Next imports Open's preferences only on macOS, so this is acceptable, but it is business logic in an OS adapter.
-4. **The shell aborts on a bad preferences file.** `Presentation::new` returns an error on a malformed file, and setup aborts (lib.rs:728-733, `expect("Agent HUD Next could not start")`). Open reads each part forgivingly.
+4. **The shell aborts on a bad preferences file.** `Presentation::new` returns an error on a malformed file, and setup aborts (lib.rs:728-733, `expect("Agent HUD could not start")`). Open reads each part forgivingly.
 5. **Concurrency.** No parallel provider, account or log reads were found in this chunk:
    - The local-tools server accepts one request at a time (unix.rs:86-125).
    - Pictures are one at a time (picture.rs:64-68).
