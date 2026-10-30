@@ -24,17 +24,19 @@ fn the_version_names_the_file_and_the_row() {
     assert_eq!(version.len(), 12);
     assert!(version.bytes().all(|b| b.is_ascii_hexdigit()));
     assert_eq!(file_name(), format!("agent-hud-{version}.mjs"));
-    let block = block(Path::new("/p/agent-hud.mjs"), Path::new("/c"));
-    assert!(block.contains(&format!("id: {}\n", row_id(Path::new("/c")))));
-    assert!(row_id(Path::new("/c")).starts_with(&format!("agent-hud-plugin-{version}-")));
+    let (file, channel) = (Path::new("/p/agent-hud.mjs"), Path::new("/c"));
+    let block = block(file, channel);
+    assert!(block.contains(&format!("id: {}\n", row_id(channel))));
+    assert!(row_id(channel).starts_with(&format!("agent-hud-plugin-{version}-")));
 }
 
 #[test]
 fn a_moved_folder_gives_the_row_a_new_id() {
     let temp = tempfile::tempdir().unwrap();
-    let places = places(temp.path());
-    let earlier = temp.path().join("app.agenthud.next");
-    let current = temp.path().join("app.agenthud.mac");
+    let root = temp.path().join("root");
+    let places = places(&root);
+    let earlier = root.join("app.agenthud.next");
+    let current = root.join("app.agenthud.mac");
     let file = |data: &Path| data.join("deepseek-plugin").join(file_name());
     let channel = |data: &Path| data.join("deepseek-channel");
     set_row(&places, Some((&file(&earlier), &channel(&earlier)))).unwrap();
