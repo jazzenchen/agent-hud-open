@@ -173,7 +173,7 @@ pub(crate) fn registered_bundle(id: &str) -> bool {
 
 /// The applications Launch Services knows by bundle identifier, wherever
 /// they are installed (agent-hud-native-open VendorCatalog.applications).
-pub(crate) fn registered_applications(id: &str) -> Vec<PathBuf> {
+pub fn registered_applications(id: &str) -> Vec<PathBuf> {
     use std::{
         ffi::{c_void, CStr, CString},
         os::unix::ffi::OsStrExt,

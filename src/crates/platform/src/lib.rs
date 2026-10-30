@@ -20,6 +20,8 @@ mod navigation;
 mod os;
 pub use accounts::{AccountService, CollectionGate};
 pub use navigation::session_url;
+#[cfg(target_os = "macos")]
+pub use os::registered_applications;
 use std::path::{Path, PathBuf};
 
 pub struct NativePlatform {
