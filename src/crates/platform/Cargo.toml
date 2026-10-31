@@ -28,6 +28,7 @@ libc.workspace = true
 
 [target.'cfg(target_os = "macos")'.dependencies]
 plist = "=1.10.1"
+security-framework = "=3.7.0"
 objc2.workspace = true
 objc2-app-kit = { workspace = true, features = ["std", "NSRunningApplication"] }
 objc2-foundation = { workspace = true, features = ["std", "NSArray", "NSString", "NSUserDefaults", "NSData", "NSDictionary"] }

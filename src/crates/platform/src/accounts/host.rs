@@ -84,6 +84,9 @@ impl Host for AccountContext {
     fn secret(&self, service: &str) -> Answer<String> {
         crate::os::stored_secret(service)
     }
+    fn app_cookie(&self, app: &str, site: &str, name: &str) -> Answer<String> {
+        crate::os::app_cookie(&self.folder(Base::AppData), app, site, name)
+    }
     fn saved_credential(&self, agent: &str) -> Result<Option<Value>, String> {
         if agent == agent_hud_agents::relays::MANUAL {
             return credentials::relay_sources(self).map(Some);

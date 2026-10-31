@@ -8,3 +8,14 @@ use agent_hud_agents::Answer;
 pub(crate) fn stored_secret(_service: &str) -> Answer<String> {
     Answer::Unsupported
 }
+
+/// A desktop app's Chromium cookie: not decrypted on this host yet, so the
+/// Claude desktop app's sign-in is not read here.
+pub(crate) fn app_cookie(
+    _app_data: &std::path::Path,
+    _app: &str,
+    _site: &str,
+    _name: &str,
+) -> Answer<String> {
+    Answer::Unsupported
+}

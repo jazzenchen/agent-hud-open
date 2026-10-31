@@ -555,6 +555,16 @@ impl AccountService {
                 if expired_cli_sample(account, "checkedAt", now) {
                     continue;
                 }
+                // A failed read keeps the last reading; why stands under the
+                // account it failed for, as a signed-out Claude Code asks to
+                // be signed in again.
+                let failure = entry.notice.as_ref().filter(|_| entry.failed).filter(|_| {
+                    entry
+                        .reading
+                        .account
+                        .as_ref()
+                        .is_some_and(|read| std::ptr::eq(read, account))
+                });
                 let mut account = account.clone();
                 if account["checkedAt"].is_null() {
                     account["checkedAt"] = json!(entry.checked_at);
@@ -564,6 +574,9 @@ impl AccountService {
                         || account["stale"] == true
                         || stale_cli_sample(&account, "checkedAt", now)
                 );
+                if let Some(notice) = failure {
+                    account["notice"] = json!(notice);
+                }
                 result.accounts.push(account);
             }
             result
@@ -958,6 +971,51 @@ mod tests {
             assert_eq!(projection.quotas[0]["observedAt"], stale);
             assert_eq!(projection.quotas[1]["id"], "native");
         }
+    }
+
+    #[test]
+    fn a_failed_read_keeps_its_windows_and_says_why_under_its_account() {
+        let directory = tempfile::tempdir().unwrap();
+        let service = AccountService::with_readers(
+            directory.path().join("home"),
+            directory.path().join("data"),
+            HashSet::new(),
+            CollectionGate::default(),
+            &[],
+        )
+        .unwrap();
+        let mut reading = AccountReading::empty("claude");
+        reading.account = Some(json!({"id":"me","provider":"claude"}));
+        reading.additional_accounts = vec![json!({"id":"other","provider":"claude"})];
+        reading.quotas = vec![json!({"id":"me:claude-session","usedPercent":18,"status":"normal"})];
+        let checked = chrono::Utc::now().to_rfc3339();
+        {
+            let mut state = service.shared.state.lock().unwrap();
+            state.enabled.insert("claude".into());
+            state
+                .entries
+                .insert("claude", entry(reading, Some(&checked), false));
+        }
+        let projection = service.projection();
+        assert!(projection.accounts[0]["notice"].is_null());
+
+        {
+            let mut state = service.shared.state.lock().unwrap();
+            let entry = state.entries.get_mut("claude").unwrap();
+            entry.failed = true;
+            entry.notice = Some("Claude Code is signed out".into());
+        }
+        let projection = service.projection();
+        assert_eq!(projection.quotas[0]["usedPercent"], 18);
+        assert_eq!(projection.quotas[0]["status"], "stale");
+        assert_eq!(projection.accounts[0]["stale"], true);
+        assert_eq!(projection.accounts[0]["checkedAt"], checked);
+        assert_eq!(
+            projection.accounts[0]["notice"],
+            "Claude Code is signed out"
+        );
+        // The read failed for the signed-in account, not for another one.
+        assert!(projection.accounts[1]["notice"].is_null());
     }
 
     #[test]

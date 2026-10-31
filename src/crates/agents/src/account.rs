@@ -207,6 +207,13 @@ pub trait Host {
     /// A secret a client keeps in the system's credential store, by service
     /// name. `Unsupported` where this OS's store is not read yet.
     fn secret(&self, service: &str) -> Answer<String>;
+    /// A cookie a desktop app built on Chromium keeps for `site`, decrypted:
+    /// the Claude desktop app keeps its claude.ai sign-in this way. `app`
+    /// names the app's data folder. The first read may ask the user to allow
+    /// it; `Unsupported` where this OS's apps are not read yet.
+    fn app_cookie(&self, _app: &str, _site: &str, _name: &str) -> Answer<String> {
+        Answer::Unsupported
+    }
     /// The API credential the user saved in Agent HUD for this agent, if any.
     fn saved_credential(&self, agent: &str) -> Result<Option<Value>, String>;
     /// Whether the user turned on a reading that needs their consent, by its
@@ -442,6 +449,8 @@ pub(crate) mod fake {
         /// Canonical targets for paths that resolve to another location.
         pub canonical_paths: HashMap<PathBuf, PathBuf>,
         pub secrets: HashMap<String, Answer<String>>,
+        /// Desktop apps' cookies, by app, site and name joined with "|".
+        pub cookies: HashMap<String, Answer<String>>,
         pub saved: Result<Option<Value>, String>,
         /// File details by path; a listed file without them is a small regular file.
         pub info: HashMap<PathBuf, FileInfo>,
@@ -488,6 +497,7 @@ pub(crate) mod fake {
                 files: HashMap::new(),
                 canonical_paths: HashMap::new(),
                 secrets: HashMap::new(),
+                cookies: HashMap::new(),
                 saved: Ok(None),
                 info: HashMap::new(),
                 cancelled: false,
@@ -650,6 +660,12 @@ pub(crate) mod fake {
         fn secret(&self, service: &str) -> Answer<String> {
             self.secrets
                 .get(service)
+                .cloned()
+                .unwrap_or(Answer::Missing)
+        }
+        fn app_cookie(&self, app: &str, site: &str, name: &str) -> Answer<String> {
+            self.cookies
+                .get(&format!("{app}|{site}|{name}"))
                 .cloned()
                 .unwrap_or(Answer::Missing)
         }

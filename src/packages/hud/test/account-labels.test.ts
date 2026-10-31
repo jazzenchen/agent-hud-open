@@ -71,7 +71,7 @@ test("the first expiry is named only when every reset has one", () => {
 
 test("a block without readings says why in its own provider's words", () => {
   const signedOut =
-    "Claude Code is signed out. Run claude to sign in again and the quota returns";
+    "Claude Code is signed out. Run claude to sign in again to update the quota";
   const providers = [
     { id: "claude", notice: signedOut },
     { id: "codex", notice: null },

@@ -53,6 +53,17 @@ fn read_target(target: &str) -> Answer<String> {
     String::from_utf8(bytes.to_vec()).map_or(Answer::Failed, Answer::Found)
 }
 
+/// A desktop app's Chromium cookie: not decrypted on this host yet, so the
+/// Claude desktop app's sign-in is not read here.
+pub(crate) fn app_cookie(
+    _app_data: &std::path::Path,
+    _app: &str,
+    _site: &str,
+    _name: &str,
+) -> Answer<String> {
+    Answer::Unsupported
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

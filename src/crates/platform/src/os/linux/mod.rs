@@ -12,7 +12,7 @@ mod process;
 mod secrets;
 pub(crate) use apps::{activate_app, app_running, ACTIVATES_APPS};
 pub(crate) use process::{codex_cli_on_port, parent_processes};
-pub(crate) use secrets::stored_secret;
+pub(crate) use secrets::{app_cookie, stored_secret};
 pub(crate) const READS_PROCESS_ENVIRONMENT: bool = false;
 /// Claude has no desktop app on this host to take a background job in.
 pub(crate) const MOVES_CLAUDE_JOBS: bool = false;

@@ -8,7 +8,7 @@ mod process;
 mod secrets;
 pub(crate) use apps::{activate_app, app_running};
 pub(crate) use process::{codex_cli_on_port, parent_processes};
-pub(crate) use secrets::stored_secret;
+pub(crate) use secrets::{app_cookie, stored_secret};
 pub(crate) const READS_PROCESS_ENVIRONMENT: bool = false;
 /// The desktop app's resume link for a background job is unverified here.
 pub(crate) const MOVES_CLAUDE_JOBS: bool = false;

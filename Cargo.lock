@@ -149,6 +149,7 @@ dependencies = [
  "plist",
  "reqwest",
  "rusqlite",
+ "security-framework",
  "serde",
  "serde-saphyr",
  "serde_json",
