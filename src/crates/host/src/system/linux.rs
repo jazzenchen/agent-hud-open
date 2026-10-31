@@ -87,6 +87,11 @@ pub(super) fn register_if_never_registered() -> bool {
     false
 }
 
+/// No fixed hook owner is delegated on this host yet.
+pub(super) fn installed_hook_owner() -> Option<PathBuf> {
+    None
+}
+
 pub(super) fn cli_candidates(_home: &Path, command: &str, dirs: Vec<PathBuf>) -> Vec<PathBuf> {
     dirs.into_iter().map(|dir| dir.join(command)).collect()
 }

@@ -51,6 +51,16 @@ pub(super) fn register_if_never_registered() -> bool {
     false
 }
 
+/// An installed copy (not a `target` build) owns the client hooks, so it can
+/// install them and answer approvals and questions from the HUD.
+pub(super) fn installed_hook_owner() -> Option<PathBuf> {
+    let path = std::env::current_exe().ok()?;
+    let is_build = path
+        .components()
+        .any(|part| part.as_os_str().eq_ignore_ascii_case("target"));
+    (!is_build).then_some(path)
+}
+
 /// npm installs .cmd shims beside native .exe files. Extensionless npm shims
 /// contain POSIX shell scripts and must not be offered to CreateProcessW.
 pub(super) fn cli_candidates(_home: &Path, command: &str, dirs: Vec<PathBuf>) -> Vec<PathBuf> {

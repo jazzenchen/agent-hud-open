@@ -2,8 +2,7 @@
 //! pixels, with Win32 button and modifier state. Geometry, hover and drag state
 //! stay in the shared owner.
 pub(super) use super::generic::{
-    begin_text_focus, end_text_focus, global_pointer, panel_builder, place, set_drag_cursor,
-    set_ignore_cursor, shown, TextFocusOrigin,
+    global_pointer, panel_builder, place, set_drag_cursor, set_ignore_cursor, shown,
 };
 use super::{base_limitations, HudCapabilities, PointerKeys};
 #[path = "windows/displays.rs"]
@@ -24,6 +23,81 @@ pub(super) fn fixed_canvas() -> bool {
 
 pub(super) fn edge_hud_unsupported() -> Option<&'static str> {
     None
+}
+
+/// The window that had the keyboard before the HUD took it for typing.
+pub(super) struct TextFocusOrigin(isize);
+
+fn hwnd(window: &tauri::WebviewWindow) -> Result<windows::Win32::Foundation::HWND, String> {
+    let raw = window.hwnd().map_err(|error| error.to_string())?.0 as isize;
+    Ok(windows::Win32::Foundation::HWND(
+        raw as *mut core::ffi::c_void,
+    ))
+}
+
+/// Gives the HUD the keyboard for a text field. Windows lets a background
+/// process take the foreground only while attached to the input of the
+/// window in front, so the HUD joins that thread for the switch.
+pub(super) fn begin_text_focus(
+    window: &tauri::WebviewWindow,
+) -> Result<Option<TextFocusOrigin>, String> {
+    use windows::Win32::{
+        System::Threading::{AttachThreadInput, GetCurrentThreadId},
+        UI::{
+            Input::KeyboardAndMouse::SetFocus,
+            WindowsAndMessaging::{
+                BringWindowToTop, GetForegroundWindow, GetWindowThreadProcessId,
+                SetForegroundWindow,
+            },
+        },
+    };
+    let target = hwnd(window)?;
+    unsafe {
+        let previous = GetForegroundWindow();
+        let origin = (!previous.is_invalid() && previous != target)
+            .then_some(TextFocusOrigin(previous.0 as isize));
+        let ours = GetCurrentThreadId();
+        let theirs = if previous.is_invalid() {
+            0
+        } else {
+            GetWindowThreadProcessId(previous, None)
+        };
+        let attached =
+            theirs != 0 && theirs != ours && AttachThreadInput(ours, theirs, true).as_bool();
+        let _ = BringWindowToTop(target);
+        let _ = SetForegroundWindow(target);
+        let _ = SetFocus(Some(target));
+        if attached {
+            let _ = AttachThreadInput(ours, theirs, false);
+        }
+        if GetForegroundWindow() != target {
+            // The last resort Tauri offers.
+            super::generic::begin_text_focus(window)?;
+        }
+        Ok(origin)
+    }
+}
+
+/// Returns the keyboard to the window that had it, if it is still there.
+pub(super) fn end_text_focus(
+    window: &tauri::WebviewWindow,
+    previous: Option<TextFocusOrigin>,
+) -> Result<(), String> {
+    use windows::Win32::UI::WindowsAndMessaging::{
+        GetForegroundWindow, IsWindow, SetForegroundWindow,
+    };
+    let Some(TextFocusOrigin(previous)) = previous else {
+        return super::generic::end_text_focus(window, None);
+    };
+    let previous = windows::Win32::Foundation::HWND(previous as *mut core::ffi::c_void);
+    unsafe {
+        // Only while the HUD still holds the keyboard: a window the person
+        // has since clicked into keeps it.
+        if GetForegroundWindow() == hwnd(window)? && IsWindow(Some(previous)).as_bool() {
+            let _ = SetForegroundWindow(previous);
+        }
+    }
+    Ok(())
 }
 
 fn key_down(virtual_key: i32) -> bool {

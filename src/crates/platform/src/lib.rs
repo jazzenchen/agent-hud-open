@@ -21,6 +21,16 @@ mod navigation;
 mod os;
 pub use accounts::{AccountService, CollectionGate};
 pub use navigation::session_url;
+
+/// A client's own command line (`claude`, `codex`), where the account readers
+/// find it: an app's bundled copy as well as one on PATH.
+pub fn client_executable(name: &str) -> Option<std::path::PathBuf> {
+    let home = os::home_dir().ok()?;
+    let env = std::env::vars().collect::<os::Environment>();
+    os::engine_candidates(&home, &env, name)
+        .into_iter()
+        .find(|path| os::engine_executable(path))
+}
 use std::path::{Path, PathBuf};
 
 pub struct NativePlatform {

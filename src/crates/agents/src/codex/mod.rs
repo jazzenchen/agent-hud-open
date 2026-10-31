@@ -15,9 +15,7 @@ pub static DESKTOP: Channel = Channel {
     carries: &[Carries::Requests],
     support: PerOs {
         macos: Support::Verified(()),
-        windows: Support::Unsupported(
-            "Codex desktop's IPC is a Unix socket; its Windows transport is not implemented, so its requests stay in the app",
-        ),
+        windows: Support::Unverified(()),
         linux: Support::Unverified(()),
     },
 };

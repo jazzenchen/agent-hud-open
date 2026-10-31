@@ -217,7 +217,8 @@ fn plan(
         width: (f64::from(monitor.bounds.width) / scale).min((strip + card + 54.0).max(940.0)),
         height: f64::from(monitor.bounds.height) / scale,
         ignore_cursor: true,
-        visible,
+        // Each screen may turn its own HUD off and leave the others on.
+        visible: visible && screen.flag("showsHUD"),
         monitor_index: monitor.index,
         screen_id: Some(monitor.screen_id.clone()),
     }
@@ -321,6 +322,13 @@ mod tests {
 
     fn view(screen: Value, layout: Value) -> Value {
         json!({"store": {"screens": {"a": screen}, "screenDefaults": {}}, "layouts": {"a": layout}, "sharedLayout": {}})
+    }
+
+    #[test]
+    fn each_screen_shows_its_hud_unless_turned_off_there() {
+        let both = json!({"store": {"screens": {"b": {"showsHUD": false}}, "screenDefaults": {}}, "layouts": {}, "sharedLayout": {}});
+        assert!(Screen::new(&both, "a", false).flag("showsHUD"));
+        assert!(!Screen::new(&both, "b", false).flag("showsHUD"));
     }
 
     #[test]

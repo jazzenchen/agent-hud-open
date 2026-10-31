@@ -21,6 +21,11 @@ use windows as target;
 
 /// Where a client's command line may be installed: `dirs` in order, with the
 /// host's executable names, after any copy bundled inside its app.
+/// The executable that owns client hooks, when this copy is an installed one
+/// (never a `target` build). The host decides; None keeps hooks off.
+pub(crate) fn installed_hook_owner() -> Option<std::path::PathBuf> {
+    target::installed_hook_owner()
+}
 pub(crate) fn cli_candidates(
     home: &std::path::Path,
     command: &str,
