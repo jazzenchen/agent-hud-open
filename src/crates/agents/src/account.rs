@@ -469,6 +469,8 @@ pub(crate) mod fake {
         pub engine_replies_by_home: HashMap<PathBuf, HashMap<u64, Value>>,
         /// What an engine prints as soon as it starts, by its first argument.
         pub engine_output: HashMap<String, Vec<Value>>,
+        /// Engine start failures, by the first argument.
+        pub engine_start_errors: HashMap<String, String>,
         /// Whether an engine's output ends once it has nothing more to say,
         /// as when it exits; otherwise its wait runs out.
         pub engine_ends: bool,
@@ -503,6 +505,7 @@ pub(crate) mod fake {
                 engine_replies: HashMap::new(),
                 engine_replies_by_home: HashMap::new(),
                 engine_output: HashMap::new(),
+                engine_start_errors: HashMap::new(),
                 engine_ends: true,
                 started: RefCell::new(vec![]),
                 engine_sent: Rc::new(RefCell::new(vec![])),
@@ -601,6 +604,13 @@ pub(crate) mod fake {
                     .map(|(key, value)| ((*key).to_owned(), value.clone()))
                     .collect(),
             ));
+            if let Some(error) = start
+                .args
+                .first()
+                .and_then(|first| self.engine_start_errors.get(*first))
+            {
+                return Err(error.clone());
+            }
             let printed = start
                 .args
                 .first()

@@ -132,6 +132,7 @@ pub fn read(host: &dyn Host) -> Result<Reading, String> {
         if payload["rate_limits_available"] != true {
             // get_usage reports no plan limits both for an API-key login and
             // for no login at all; only `auth status` tells the two apart.
+            // An unknown login state is a failed read, so the last reading stays.
             let signed_in = host
                 .start_engine(&EngineStart {
                     executable: &executable,
@@ -141,11 +142,22 @@ pub fn read(host: &dyn Host) -> Result<Reading, String> {
                 })
                 .ok()
                 .and_then(|mut engine| engine.joined(Instant::now() + Duration::from_secs(10)))
-                .and_then(|val| val["loggedIn"].as_bool());
-            reading.notice = Some(if signed_in == Some(false) {
+                .and_then(|val| val["loggedIn"].as_bool())
+                .ok_or_else(|| {
+                    l10n::text(
+                        "这次没有读到 Claude 额度，稍后自动重试",
+                        "Couldn't read the Claude quota this time; retrying shortly",
+                    )
+                })?;
+            reading.notice = Some(if !signed_in {
                 l10n::text(
-                    "Claude Code 已退出登录，运行 claude 重新登录后恢复额度",
-                    "Claude Code is signed out. Run claude to sign in again and the quota returns",
+                    "读取额度依赖命令行版 Claude Code（claude 命令），它目前尚未登录。\
+                     Claude 桌面 App 登录不代表命令行已登录。\
+                     请在终端运行 claude auth login（或运行 claude 后输入 /login），登录后即可恢复额度读取。",
+                    "Quota readings use command-line Claude Code (the claude command), which is \
+                     signed out. Signing in to the Claude desktop app does not sign in to the CLI. \
+                     In a terminal, run claude auth login (or run claude and enter /login) \
+                     to restore quota readings.",
                 )
             } else {
                 l10n::text(
@@ -380,18 +392,80 @@ mod tests {
         let mut host = installed(none.clone());
         host.engine_output
             .insert("auth".into(), vec![json!({"loggedIn": false})]);
+        let reading = read(&host).unwrap();
+        assert!(reading.quotas.is_empty());
+        assert!(reading.account.is_none());
         assert_eq!(
-            read(&host).unwrap().notice.as_deref(),
-            Some("Claude Code is signed out. Run claude to sign in again and the quota returns")
+            reading.notice.as_deref(),
+            Some(
+                "Quota readings use command-line Claude Code (the claude command), which is \
+                 signed out. Signing in to the Claude desktop app does not sign in to the CLI. \
+                 In a terminal, run claude auth login (or run claude and enter /login) \
+                 to restore quota readings."
+            )
         );
+        assert_eq!(host.started.borrow()[1].1, ["auth", "status", "--json"]);
         let mut host = installed(none);
         host.engine_output
             .insert("auth".into(), vec![json!({"loggedIn": true})]);
+        let reading = read(&host).unwrap();
+        assert!(reading.quotas.is_empty());
+        assert!(reading.account.is_none());
         assert_eq!(
-            read(&host).unwrap().notice.as_deref(),
+            reading.notice.as_deref(),
             Some("No plan limits for this login (API key or third-party platform)")
         );
         assert_eq!(host.started.borrow()[1].1, ["auth", "status", "--json"]);
+    }
+
+    #[test]
+    fn auth_status_start_failure_is_a_failed_read() {
+        let mut host = installed(json!({
+            "subtype": "success", "response": {"rate_limits_available": false},
+        }));
+        host.engine_start_errors
+            .insert("auth".into(), "could not start".into());
+        assert_eq!(
+            read(&host).err().unwrap(),
+            "Couldn't read the Claude quota this time; retrying shortly"
+        );
+        assert_eq!(host.started.borrow()[1].1, ["auth", "status", "--json"]);
+    }
+
+    #[test]
+    fn auth_status_without_a_parsed_response_is_a_failed_read() {
+        // No parsed response covers empty or invalid JSON output and a timeout.
+        for ends in [true, false] {
+            let mut host = installed(json!({
+                "subtype": "success", "response": {"rate_limits_available": false},
+            }));
+            host.engine_ends = ends;
+            assert_eq!(
+                read(&host).err().unwrap(),
+                "Couldn't read the Claude quota this time; retrying shortly"
+            );
+            assert_eq!(host.started.borrow()[1].1, ["auth", "status", "--json"]);
+        }
+    }
+
+    #[test]
+    fn auth_status_without_a_boolean_login_state_is_a_failed_read() {
+        for output in [
+            Value::Null,
+            json!({}),
+            json!({"loggedIn": null}),
+            json!({"loggedIn": "false"}),
+            json!({"loggedIn": 0}),
+        ] {
+            let mut host = installed(json!({
+                "subtype": "success", "response": {"rate_limits_available": false},
+            }));
+            host.engine_output.insert("auth".into(), vec![output]);
+            assert_eq!(
+                read(&host).err().unwrap(),
+                "Couldn't read the Claude quota this time; retrying shortly"
+            );
+        }
     }
 
     #[test]
