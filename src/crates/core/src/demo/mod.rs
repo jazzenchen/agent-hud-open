@@ -210,7 +210,8 @@ fn turn_lines(
     let mut lines = Vec::new();
     match plan.source {
         "claude" => {
-            lines.push(json!({"type":"user","uuid":format!("{}-u{index}",plan.id),"sessionId":plan.id,"cwd":dir,"timestamp":iso(start),"message":{"role":"user","content":prompt(plan,index)}}));
+            // Typed in the Claude desktop app, where most real Claude Code prompts come from.
+            lines.push(json!({"type":"user","uuid":format!("{}-u{index}",plan.id),"sessionId":plan.id,"cwd":dir,"entrypoint":"claude-desktop","timestamp":iso(start),"message":{"role":"user","content":prompt(plan,index)}}));
             // Each finished sub-agent's result comes back before the first
             // call after its report.
             let mut reported = vec![false; turn.agents.len()];
@@ -530,7 +531,7 @@ impl AgentHudCore {
                     ..Default::default()
                 };
                 match source {
-                    "claude" => lines.push(json!({"type":"assistant","sessionId":id,"cwd":dir,"timestamp":iso(at),"message":{"id":format!("msg-{id}-{index}"),"model":model,"role":"assistant","content":[],"stop_reason":"end_turn","usage":{"input_tokens":input,"output_tokens":output,"cache_read_input_tokens":read,"cache_creation_input_tokens":0}}})),
+                    "claude" => lines.push(json!({"type":"assistant","sessionId":id,"cwd":dir,"entrypoint":"claude-desktop","timestamp":iso(at),"message":{"id":format!("msg-{id}-{index}"),"model":model,"role":"assistant","content":[],"stop_reason":"end_turn","usage":{"input_tokens":input,"output_tokens":output,"cache_read_input_tokens":read,"cache_creation_input_tokens":0}}})),
                     "codex" => {
                         lines.push(json!({"timestamp":iso(at),"type":"turn_context","payload":{"model":model}}));
                         totals.input += input;
@@ -1086,6 +1087,10 @@ mod tests {
             .as_f64()
             .unwrap();
         assert!(fill > 0.3 && fill <= 1.0, "{fill}");
+        // Its prompts were typed in the Claude desktop app, as real ones say.
+        let s1 = rows.iter().find(|row| row["id"] == "s1").unwrap();
+        assert_eq!(s1["origins"]["init"], "desktop:claude", "{}", s1["origins"]);
+        assert_eq!(s1["origins"]["latest"], "desktop:claude");
 
         // The statistics' top sessions name sessions: the hidden month of
         // tokens is named as work, never after the home folder or a client.
