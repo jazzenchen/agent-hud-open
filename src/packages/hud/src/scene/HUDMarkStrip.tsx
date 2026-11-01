@@ -5,6 +5,7 @@ import { botState, facingFromEdge, isAttention } from "../bots/bot-state";
 import { DockMemory, type Direction } from "../bots/mark-director";
 import { labelWidth, type HUDRect, type stripMetrics } from "../geometry";
 import {
+  markUsed,
   meterLabel,
   statusColor,
   vendorKey,
@@ -249,7 +250,7 @@ export function HUDMarkStrip({
               key={vendor.key}
               type="button"
               className="hud-agent-mark"
-              aria-label={`${vendor.name}, ${meterLabel(vendor, quotaDisplay)} ${vendor.used == null ? "" : quotaDisplayLabel(quotaDisplay, format.language)}`}
+              aria-label={`${vendor.name}, ${meterLabel(vendor, quotaDisplay)} ${markUsed(vendor) == null ? "" : quotaDisplayLabel(quotaDisplay, format.language)}`}
               onPointerEnter={() => {
                 if (hovered !== vendor.key) {
                   setHovered(vendor.key);
@@ -314,15 +315,16 @@ export function HUDMarkStrip({
                       cy={metrics.mark / 2}
                       r={(metrics.mark - config.ringWidth) / 2}
                       fill="none"
+                      // A failed read keeps its last share, grey by its "stale" level.
                       stroke={
-                        (quotaPercent(vendor.used, quotaDisplay) ?? 0) <= 0
+                        (quotaPercent(markUsed(vendor), quotaDisplay) ?? 0) <= 0
                           ? "transparent"
                           : statusColor(vendor.level)
                       }
                       strokeWidth={config.ringWidth}
                       strokeLinecap="round"
                       pathLength={100}
-                      strokeDasharray={`${quotaPercent(vendor.used, quotaDisplay) ?? 0} 100`}
+                      strokeDasharray={`${quotaPercent(markUsed(vendor), quotaDisplay) ?? 0} 100`}
                       transform={`rotate(-90 ${metrics.mark / 2} ${metrics.mark / 2})`}
                     />
                   </svg>

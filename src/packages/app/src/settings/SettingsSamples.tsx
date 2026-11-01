@@ -16,6 +16,7 @@ import { BotMark } from "@agent-hud/hud/BotMark";
 import { HUDGlow } from "@agent-hud/hud/HUDGlow";
 import {
   defaultHUDConfig,
+  markUsed,
   meterLabel,
   statusColor,
   vendorsFromSnapshot,
@@ -210,7 +211,7 @@ export function SmallHUDPreview({
                             pathLength={100}
                             stroke={
                               (quotaPercent(
-                                vendor.used,
+                                markUsed(vendor),
                                 snapshot.settings.quotaDisplay,
                               ) ?? 0) <= 0
                                 ? "transparent"
@@ -218,7 +219,7 @@ export function SmallHUDPreview({
                             }
                             strokeWidth={sample.ringWidth}
                             strokeLinecap="round"
-                            strokeDasharray={`${quotaPercent(vendor.used, snapshot.settings.quotaDisplay) ?? 0} 100`}
+                            strokeDasharray={`${quotaPercent(markUsed(vendor), snapshot.settings.quotaDisplay) ?? 0} 100`}
                           />
                         </svg>
                       )}

@@ -9,6 +9,7 @@ import { agentArtworkKey, agentVendorName } from "./agent-artwork";
 import { restingAgents } from "./resting-agents.ts";
 import { recentLabel, recentUsage } from "./recent-usage.ts";
 import { visibleBalances } from "./balance-rows.ts";
+import { heldUsed } from "./held-reading.ts";
 import type { GlowEffect, GlowStyle } from "./HUDGlow";
 import {
   moneyAmount,
@@ -112,6 +113,8 @@ export interface HUDVendor {
   key: string;
   name: string;
   used: number | null;
+  /** The last reading's tightest window while every window waits on a failed read; null while `used` stands (`heldUsed`). */
+  heldUsed: number | null;
   level: "normal" | "warning" | "critical" | "stale";
   working: number;
   waiting: number;
@@ -168,6 +171,7 @@ export function vendorsFromSnapshot(
       key,
       name: agentVendorName(name),
       used: tightest?.usedPercent ?? null,
+      heldUsed: heldUsed(quotas, now),
       // An agent billed by balance alone takes its balance's level.
       level:
         tightest?.status ??
@@ -214,11 +218,17 @@ export function quotaShortName(quota: {
   return quota.shortLabel || quota.name;
 }
 
-/** The number a Simple HUD writes beside a mark: its tightest window, else its balance, else its last 24 hours (vendors.rs `meter_label`). */
+/** The share a Simple mark's ring and number show: its tightest live window, else the one its last reading holds, drawn grey since its level is then "stale". */
+export function markUsed(vendor: HUDVendor): number | null {
+  return vendor.used ?? vendor.heldUsed;
+}
+
+/** The number a Simple HUD writes beside a mark: its tightest window (`markUsed`), else its balance, else its last 24 hours (vendors.rs `meter_label`). */
 export function meterLabel(vendor: HUDVendor, display?: QuotaDisplay): string {
-  return vendor.used == null
+  const used = markUsed(vendor);
+  return used == null
     ? (vendor.balance ?? vendor.usage ?? "--")
-    : quotaPercentLabel(vendor.used, display);
+    : quotaPercentLabel(used, display);
 }
 
 export function statusColor(level: HUDVendor["level"]): string {

@@ -10,6 +10,9 @@ pub struct Vendor<'a> {
     pub name: String,
     /// The tightest measured window's used percent.
     pub used: Option<f64>,
+    /// The last reading's tightest window while every window waits on a
+    /// failed read (`held`).
+    pub held: Option<f64>,
     pub level: &'a str,
     /// Sessions in flight: running, or waiting on a request.
     pub working: usize,
@@ -77,6 +80,31 @@ fn deepseek_balances<'a>(snapshot: &'a Value, layout: &Value) -> (Option<String>
     (balance, level)
 }
 
+/// The tightest window of an agent's last reading while every window waits
+/// on a failed read ("stale"), so a Simple mark keeps showing it in the stale
+/// grey. A window whose reset has passed holds nothing, since its share has
+/// started over. None while any window reads live (held-reading.ts `heldUsed`).
+fn held(quotas: &[&Value], now_ms: i64) -> Option<f64> {
+    if quotas
+        .iter()
+        .any(|q| q["usedPercent"].is_number() && q["status"] != "stale")
+    {
+        return None;
+    }
+    quotas
+        .iter()
+        .filter(|q| {
+            q["resetAt"]
+                .as_str()
+                .and_then(|at| chrono::DateTime::parse_from_rfc3339(at).ok())
+                .is_none_or(|at| at.timestamp_millis() > now_ms)
+        })
+        .filter_map(|q| q["usedPercent"].as_f64().filter(|used| used.is_finite()))
+        .fold(None, |most: Option<f64>, used| {
+            Some(most.map_or(used, |most| most.max(used)))
+        })
+}
+
 /// Every agent a resting HUD in `mode` shows without a list, one per mark.
 pub fn vendors<'a>(snapshot: &'a Value, mode: &str, now_ms: i64) -> Vec<Vendor<'a>> {
     let zh = snapshot["language"] == "zh";
@@ -111,6 +139,7 @@ pub fn vendors<'a>(snapshot: &'a Value, mode: &str, now_ms: i64) -> Vec<Vendor<'
             Vendor {
                 name: vendor_name(&source),
                 used: tightest.map(|(used, _)| used),
+                held: held(&quotas, now_ms),
                 // An agent billed by balance alone takes its balance's level.
                 level: tightest
                     .and_then(|(_, q)| q["status"].as_str())
@@ -188,10 +217,11 @@ pub fn quota_percent(used: f64, remaining: bool) -> f64 {
     }
 }
 
-/// The number a Simple HUD writes beside a mark: its tightest window, else
-/// its balance, else its last 24 hours (model.ts `meterLabel`).
+/// The number a Simple HUD writes beside a mark: its tightest window (held
+/// from the last reading when it failed), else its balance, else its last 24
+/// hours (model.ts `meterLabel`).
 pub fn meter_label(vendor: &Vendor, remaining: bool) -> String {
-    match vendor.used {
+    match vendor.used.or(vendor.held) {
         Some(used) => format!("{}%", quota_percent(used, remaining).round()),
         None => vendor
             .balance
@@ -537,9 +567,12 @@ mod tests {
         assert_eq!(simple[0].level, "warning");
         assert_eq!(simple[0].working, 1);
         assert_eq!(simple[1].name, "OpenAI");
-        // A stale reading is no reading.
+        // A stale reading gives no level; its mark keeps the share in grey.
         assert_eq!(simple[1].used, None);
         assert_eq!(simple[1].level, "stale");
+        assert_eq!(simple[1].held, Some(90.0));
+        assert_eq!(meter_label(&simple[1], false), "90%");
+        assert_eq!(simple[0].held, None);
         assert_eq!(simple[2].balance.as_deref(), Some("¥8.85"));
         assert_eq!(meter_label(&simple[0], false), "72%");
         assert_eq!(meter_label(&simple[0], true), "28%");
@@ -561,6 +594,41 @@ mod tests {
         );
         assert_eq!(unknown.len(), 3);
     }
+    #[test]
+    fn a_failed_read_holds_its_last_share_until_the_window_resets() {
+        let now = chrono::DateTime::parse_from_rfc3339("2026-11-01T12:00:00Z")
+            .unwrap()
+            .timestamp_millis();
+        let window = |used: f64, status: &str, reset: &str| json!({"vendor": "claude", "usedPercent": used, "status": status, "resetAt": reset});
+        let held_of = |quotas: Vec<Value>| {
+            let snapshot =
+                json!({"quotas": quotas, "billing": [], "providers": [], "sessions": []});
+            vendors(&snapshot, "simple", now)[0].held
+        };
+        // Every window waits on a failed read: the tightest one still running holds.
+        assert_eq!(
+            held_of(vec![
+                window(12.0, "stale", "2026-11-01T13:00:00Z"),
+                window(97.0, "stale", "2026-11-03T12:00:00Z"),
+                window(100.0, "stale", "2026-11-01T11:00:00Z"),
+            ]),
+            Some(97.0)
+        );
+        // A live window stands for the mark; nothing is held beside it.
+        assert_eq!(
+            held_of(vec![
+                window(12.0, "normal", "2026-11-01T13:00:00Z"),
+                window(97.0, "stale", "2026-11-03T12:00:00Z"),
+            ]),
+            None
+        );
+        // Every window has reset since: nothing is left to hold.
+        assert_eq!(
+            held_of(vec![window(97.0, "stale", "2026-11-01T11:00:00Z")]),
+            None
+        );
+    }
+
     #[test]
     fn detected_clients_without_readings_keep_their_marks_and_unknown_meter() {
         let now = chrono::DateTime::parse_from_rfc3339("2026-10-23T12:00:00Z")
