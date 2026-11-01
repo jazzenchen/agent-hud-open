@@ -9,7 +9,16 @@ use std::io::Read;
 pub(crate) fn read_json(response: Response) -> Result<Value, HttpFailure> {
     let status = response.status();
     if !status.is_success() {
-        return Err(HttpFailure::Status(status.as_u16()));
+        // Cloudflare names the browser check it answers with in place of the data.
+        let challenged = response
+            .headers()
+            .get("cf-mitigated")
+            .is_some_and(|value| value.as_bytes().eq_ignore_ascii_case(b"challenge"));
+        return Err(if challenged {
+            HttpFailure::Challenged
+        } else {
+            HttpFailure::Status(status.as_u16())
+        });
     }
     let mut bytes = Vec::new();
     response

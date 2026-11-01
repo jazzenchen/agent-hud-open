@@ -95,7 +95,11 @@ fn malformed() -> String {
 /// Why the engine gave no reading. Only an engine that is missing or signed
 /// out hands the reading to the desktop app's sign-in.
 enum Unread {
-    NoLogin(String),
+    /// No Claude Code, or one that is signed out (`installed`).
+    NoLogin {
+        reason: String,
+        installed: bool,
+    },
     Failed(String),
 }
 impl From<String> for Unread {
@@ -108,16 +112,19 @@ pub fn read(host: &dyn Host) -> Result<Reading, String> {
     match from_engine(host) {
         Ok(reading) => Ok(reading),
         Err(Unread::Failed(reason)) => Err(reason),
-        Err(Unread::NoLogin(reason)) => from_desktop(host).unwrap_or(Err(reason)),
+        Err(Unread::NoLogin { reason, installed }) => {
+            from_desktop(host, installed).unwrap_or(Err(reason))
+        }
     }
 }
 
 fn from_engine(host: &dyn Host) -> Result<Reading, Unread> {
-    let executable = host.executable("claude").ok_or_else(|| {
-        Unread::NoLogin(l10n::text(
+    let executable = host.executable("claude").ok_or_else(|| Unread::NoLogin {
+        reason: l10n::text(
             "未找到 Claude Code 引擎（claude 命令）",
             "Claude Code engine (claude command) not found",
-        ))
+        ),
+        installed: false,
     })?;
     let before = profile(host);
     let mut process = host.start_engine(&EngineStart {
@@ -188,10 +195,13 @@ fn from_engine(host: &dyn Host) -> Result<Reading, Unread> {
             // Signed out is a failed read, so the last reading stays until
             // the person signs in again; an API-key login has no plan limits.
             if signed_in == Some(false) {
-                return Err(Unread::NoLogin(l10n::text(
-                    "Claude Code 已退出登录，运行 claude 重新登录后更新额度",
-                    "Claude Code is signed out. Run claude to sign in again to update the quota",
-                )));
+                return Err(Unread::NoLogin {
+                    reason: l10n::text(
+                        "Claude Code 已退出登录，运行 claude 重新登录后更新额度",
+                        "Claude Code is signed out. Run claude to sign in again to update the quota",
+                    ),
+                    installed: true,
+                });
             }
             let mut reading = Reading::empty("claude");
             reading.notice = Some(l10n::text(
@@ -225,11 +235,28 @@ fn desktop_unreadable() -> String {
     )
 }
 
+/// claude.ai answered with Cloudflare's browser check. The desktop app, a
+/// browser, passes it; this request can't. A signed-out Claude Code reads
+/// without it once signed in again, so that is the way back.
+fn desktop_challenged(signed_out: bool) -> String {
+    if signed_out {
+        l10n::text(
+            "Claude Code 已退出登录，claude.ai 也要求浏览器验证；运行 claude 重新登录后更新额度",
+            "Claude Code is signed out and claude.ai asked for a browser check. Run claude to sign in again to update the quota",
+        )
+    } else {
+        l10n::text(
+            "claude.ai 要求浏览器验证，暂时无法通过 Claude 桌面版读取额度，稍后自动重试",
+            "claude.ai asked for a browser check, so the Claude desktop app's sign-in can't read the quota; retrying shortly",
+        )
+    }
+}
+
 /// The plan limits through the Claude desktop app's claude.ai sign-in, as
 /// claude.ai's own usage page reads them. None when the desktop app has no
 /// sign-in to offer, or the user did not allow reading it: the engine's
-/// reason then stands.
-fn from_desktop(host: &dyn Host) -> Option<Result<Reading, String>> {
+/// reason then stands. `signed_out`: Claude Code is installed but signed out.
+fn from_desktop(host: &dyn Host, signed_out: bool) -> Option<Result<Reading, String>> {
     let session = match host.app_cookie(DESKTOP, SITE, "sessionKey") {
         Answer::Found(value) if !value.trim().is_empty() => value,
         Answer::Failed => return Some(Err(desktop_unreadable())),
@@ -245,9 +272,11 @@ fn from_desktop(host: &dyn Host) -> Option<Result<Reading, String>> {
             timeout: Duration::from_secs(15),
         })
     };
-    // A sign-in claude.ai refuses has ended: as good as none.
+    // A sign-in claude.ai refuses has ended: as good as none. Its browser
+    // check says nothing about the sign-in, so it is named as itself.
     let failed = |failure: HttpFailure| match failure {
         HttpFailure::Status(401 | 403) => None,
+        HttpFailure::Challenged => Some(Err(desktop_challenged(signed_out))),
         failure => Some(Err(failure.message())),
     };
     let saved = read_json(
@@ -782,6 +811,37 @@ mod tests {
         assert_eq!(
             read(&unreadable).err().as_deref(),
             Some("Couldn't read the Claude desktop app's sign-in; retrying shortly")
+        );
+    }
+
+    #[test]
+    fn a_browser_check_is_named_not_taken_for_an_ended_sign_in() {
+        let challenged = signed_out_with_desktop()
+            .file(
+                "/u/AppData/Claude/config.json",
+                &json!({"lastKnownAccountUuid": "user-1"}).to_string(),
+            )
+            .answer(
+                "https://claude.ai/api/account",
+                Err(HttpFailure::Challenged),
+            );
+        assert_eq!(
+            read(&challenged).err().as_deref(),
+            Some("Claude Code is signed out and claude.ai asked for a browser check. Run claude to sign in again to update the quota")
+        );
+
+        // Without Claude Code there is no sign-in to point to: it retries.
+        let mut desktop_only = FakeHost::new("/u").answer(
+            "https://claude.ai/api/account",
+            Err(HttpFailure::Challenged),
+        );
+        desktop_only.cookies.insert(
+            "Claude|claude.ai|sessionKey".into(),
+            Answer::Found("sk-ant-sid01-secret".into()),
+        );
+        assert_eq!(
+            read(&desktop_only).err().as_deref(),
+            Some("claude.ai asked for a browser check, so the Claude desktop app's sign-in can't read the quota; retrying shortly")
         );
     }
 

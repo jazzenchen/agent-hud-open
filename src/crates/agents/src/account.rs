@@ -122,6 +122,10 @@ pub enum HttpFailure {
     Unreachable,
     /// An answer with a status other than 2xx.
     Status(u16),
+    /// A browser check (Cloudflare's challenge) in place of the data: a
+    /// browser passes it, a plain request can't. It says nothing about the
+    /// sign-in sent with the request.
+    Challenged,
     /// The body could not be read.
     Unreadable,
     /// The body exceeded `MAX_BODY`.
@@ -152,6 +156,10 @@ impl HttpFailure {
             HttpFailure::Status(429) => l10n::text(
                 "额度服务暂时限制了请求，稍后自动重试",
                 "The quota service is rate limiting requests; retrying later",
+            ),
+            HttpFailure::Challenged => l10n::text(
+                "额度服务要求浏览器验证，暂时读不到，稍后自动重试",
+                "The quota service asked for a browser check; retrying later",
             ),
             HttpFailure::Status(code) => {
                 if l10n::chinese() {
