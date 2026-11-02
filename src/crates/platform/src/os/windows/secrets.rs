@@ -64,6 +64,11 @@ pub(crate) fn app_cookie(
     Answer::Unsupported
 }
 
+/// Electron safe storage 在此系统上还不能解开。
+pub(crate) fn unseal_safe_storage(_app: &str, _encrypted: &[u8]) -> Answer<String> {
+    Answer::Unsupported
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
