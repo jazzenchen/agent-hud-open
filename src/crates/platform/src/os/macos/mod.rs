@@ -12,7 +12,7 @@ mod apps;
 mod legacy_history;
 mod process;
 mod secrets;
-pub(crate) use app_cookies::app_cookie;
+pub(crate) use app_cookies::{app_cookie, unseal_safe_storage};
 pub(crate) use apps::{activate_app, app_running, ACTIVATES_APPS};
 pub(crate) use process::{codex_cli_on_port, parent_processes};
 pub(crate) use secrets::stored_secret;
