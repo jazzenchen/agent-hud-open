@@ -12,4 +12,7 @@ pub struct ProviderDiscovery {
     pub configured: bool,
     pub usage: bool,
     pub evidence: Vec<String>,
+    /// An app-level fallback the host can open, independent of CLI or storage evidence.
+    #[serde(skip)]
+    pub navigation_target: Option<serde_json::Value>,
 }

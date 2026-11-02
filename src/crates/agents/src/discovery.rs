@@ -1,8 +1,14 @@
 //! How Agent HUD tells a client is installed, configured or used on this
 //! machine, without running it, a key resolver, a login helper or a hook.
 //! Platform does the looking; each client's descriptor says where to look.
-use crate::Location;
+use crate::{Location, PerOs};
 use serde_json::Value;
+
+/// A fixed link that brings the client forward without selecting a session.
+pub struct AppNavigation {
+    pub kind: &'static str,
+    pub url: PerOs<&'static str>,
+}
 
 /// What tells a client is here.
 pub struct Discovery {
@@ -21,6 +27,8 @@ pub struct Discovery {
     pub apps: &'static [&'static str],
     /// Its desktop apps, by bundle identifier, on systems with bundles.
     pub bundles: &'static [&'static str],
+    /// A fallback destination, offered only when the host can open its link.
+    pub app_navigation: Option<&'static AppNavigation>,
     /// Variables that hold its credential: any set and not empty says it is
     /// configured.
     pub credentials_env: &'static [&'static str],
@@ -39,6 +47,7 @@ impl Discovery {
         commands: &[],
         apps: &[],
         bundles: &[],
+        app_navigation: None,
         credentials_env: &[],
         configured: None,
     };
