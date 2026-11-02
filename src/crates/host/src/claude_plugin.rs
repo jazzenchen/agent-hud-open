@@ -106,15 +106,24 @@ fn install(
 /// A Claude Code too old for `plugin install --marketplace` only says the
 /// option is unknown; say what fixes it, keeping its words.
 fn install_error(error: String) -> String {
+    install_error_in(error, agent_hud_runtime::l10n::chinese())
+}
+
+fn install_error_in(error: String, chinese: bool) -> String {
     if error.contains("unknown option") && error.contains("--marketplace") {
-        let message = agent_hud_runtime::l10n::text(
-            "Claude Code 版本太旧，无法识别 --marketplace。请先在终端运行 claude update 升级，再点安装。",
+        let message = if chinese {
+            "Claude Code 版本太旧，无法识别 --marketplace。请先在终端运行 claude update 升级，再点安装。"
+        } else {
             concat!(
                 "This Claude Code is too old to recognize --marketplace. ",
                 "Run claude update in a terminal to upgrade, then click Install again."
-            ),
-        );
-        format!("{message} ({error})")
+            )
+        };
+        if chinese {
+            format!("{message}（{error}）")
+        } else {
+            format!("{message} ({error})")
+        }
     } else {
         error
     }
@@ -243,14 +252,32 @@ pub async fn native_claude_plugin(
 
 #[cfg(test)]
 mod error_tests {
-    use super::install_error;
+    use super::{install_error, install_error_in};
 
     #[test]
-    fn unknown_marketplace_option_explains_how_to_upgrade() {
+    fn unknown_marketplace_option_explains_how_to_upgrade_in_chinese() {
         let error = "error: unknown option '--marketplace'";
-        let message = install_error(error.into());
-        assert!(message.contains("claude update"));
-        assert!(message.ends_with(&format!("({error})")));
+        assert_eq!(
+            install_error_in(error.into(), true),
+            format!(
+                "Claude Code 版本太旧，无法识别 --marketplace。请先在终端运行 claude update 升级，再点安装。（{error}）"
+            )
+        );
+    }
+
+    #[test]
+    fn unknown_marketplace_option_explains_how_to_upgrade_in_english() {
+        let error = "error: unknown option '--marketplace'";
+        assert_eq!(
+            install_error_in(error.into(), false),
+            format!(
+                "{} ({error})",
+                concat!(
+                    "This Claude Code is too old to recognize --marketplace. ",
+                    "Run claude update in a terminal to upgrade, then click Install again."
+                )
+            )
+        );
     }
 
     #[test]
@@ -261,6 +288,9 @@ mod error_tests {
             "error: permission denied",
         ] {
             assert_eq!(install_error(error.into()), error);
+            for chinese in [true, false] {
+                assert_eq!(install_error_in(error.into(), chinese), error);
+            }
         }
     }
 }
