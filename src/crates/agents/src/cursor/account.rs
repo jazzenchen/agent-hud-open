@@ -231,7 +231,12 @@ pub fn read(host: &dyn Host) -> Result<Reading, String> {
         return Ok(Reading::empty("cursor"));
     };
     let cookie_str = format!("WorkosCursorSessionToken={user}%3A%3A{token}");
-    let body = host
+    // The web summary rides on a browser session cookie, which Cursor's
+    // servers refuse (401/403/browser check) for some accounts while the
+    // app's own bearer sign-in is still good. Then the period Cursor shows
+    // (`GetCurrentPeriodUsage`, the call Grok Bot's reading already makes)
+    // stands in for the summary, for every plan, merged or not.
+    let summary = host
         .http_json(&HttpRequest {
             url: "https://cursor.com/api/usage-summary",
             secrets: &[("Cookie", &cookie_str)],
@@ -246,19 +251,35 @@ pub fn read(host: &dyn Host) -> Result<Reading, String> {
                 "Cursor account usage could not be reached; check the connection.",
             ),
             other => other.message(),
-        })?;
-    if !body["individualUsage"].is_object()
-        && !body["teamUsage"].is_object()
-        && !body["membershipType"].is_string()
-    {
-        return Err(l10n::text(
-            "Cursor 账户返回的数据格式无法识别",
-            "Cursor account response has an unsupported format.",
-        ));
-    }
+        })
+        .and_then(|body| {
+            if !body["individualUsage"].is_object()
+                && !body["teamUsage"].is_object()
+                && !body["membershipType"].is_string()
+            {
+                Err(l10n::text(
+                    "Cursor 账户返回的数据格式无法识别",
+                    "Cursor account response has an unsupported format.",
+                ))
+            } else {
+                Ok(body)
+            }
+        });
+    let (body, fallback) = match summary {
+        Ok(body) => (body, None),
+        Err(why) => match dashboard(host, &token, "GetCurrentPeriodUsage")
+            .ok()
+            .and_then(|reply| current_period(&reply))
+        {
+            Some(period) => (json!({}), Some(period)),
+            None => return Err(why),
+        },
+    };
     let id = account_id("cursor", &[&user]);
     let account_identity = legacy_account("Cursor", &user, "").unwrap();
-    let period = if body["membershipType"] == MERGED_PLAN {
+    let period = if let Some(period) = fallback {
+        period
+    } else if body["membershipType"] == MERGED_PLAN {
         let reply =
             dashboard(host, &token, "GetCurrentPeriodUsage").map_err(|failure| match failure {
                 HttpFailure::BadHeader => auth_format(),
@@ -539,6 +560,24 @@ mod tests {
             read(&host).err().unwrap(),
             "Cursor's plan usage has an unsupported format."
         );
+    }
+
+    #[test]
+    fn a_refused_summary_falls_back_to_the_period_cursor_shows() {
+        let dir = tempfile::tempdir().unwrap();
+        let period = json!({
+            "billingCycleStart": "1792866037079",
+            "billingCycleEnd": "1793470837079",
+            "planUsage": {"totalPercentUsed": 3.0, "autoPercentUsed": 3.0},
+        });
+        let host = signed_in(&dir, &token(3600))
+            .answer(SUMMARY, Err(HttpFailure::Status(403)))
+            .answer(PERIOD, Ok(period));
+        let reading = read(&host).unwrap();
+        assert_eq!(reading.quotas[0]["usedPercent"], 3.0);
+        let dir = tempfile::tempdir().unwrap();
+        let host = signed_in(&dir, &token(3600)).answer(SUMMARY, Err(HttpFailure::Status(403)));
+        assert!(read(&host).is_err());
     }
 
     #[test]
