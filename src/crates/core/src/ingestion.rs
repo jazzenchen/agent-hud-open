@@ -34,6 +34,10 @@ pub(crate) struct Reads {
     /// Logs a client's hook pointed at: read even when their size and time
     /// look unchanged.
     pub(crate) forced: HashSet<PathBuf>,
+    /// While a Grok Bot turn works, when its roster is read again (ms) and
+    /// which file: the client says nothing when a turn ends, so quiet is only
+    /// seen by looking again.
+    pub(crate) bot_poll: Option<(i64, PathBuf)>,
 }
 
 #[derive(Default)]

@@ -73,6 +73,9 @@ pub struct SourceRoot {
 }
 
 pub(crate) const MAX_LINE: usize = 1024 * 1024;
+/// How often a working Grok Bot turn is looked at again, in ms.
+pub(crate) const BOT_POLL_MS: i64 = 10_000;
+
 pub struct AgentHudCore {
     requests: requests::Requests,
     hook_events: hook_events::HookEvidence,
@@ -310,6 +313,15 @@ impl AgentHudCore {
     pub fn look(&mut self) -> bool {
         let active = self.active_logs();
         let mut due = self.reads.listing.stale(&self.provider_roots, &active);
+        if let Some((at, _)) = &self.reads.bot_poll {
+            if Utc::now().timestamp_millis() >= *at {
+                if let Some((_, path)) = self.reads.bot_poll.take() {
+                    self.reads.pending.insert(path.clone());
+                    self.reads.forced.insert(path);
+                    due = true;
+                }
+            }
+        }
         if due {
             // The pass rechecks the logs held open at once and reads them.
             self.reads.active_checked_at = None;
@@ -337,7 +349,11 @@ impl AgentHudCore {
                 std::time::Instant::now()
                     + std::time::Duration::from_millis(u64::try_from(at - now).unwrap_or(0))
             });
-        [self.reads.listing.next_reconcile(), retry]
+        let bot = self.reads.bot_poll.as_ref().map(|(at, _)| {
+            std::time::Instant::now()
+                + std::time::Duration::from_millis(u64::try_from(at - now).unwrap_or(0))
+        });
+        [self.reads.listing.next_reconcile(), retry, bot]
             .into_iter()
             .flatten()
             .min()

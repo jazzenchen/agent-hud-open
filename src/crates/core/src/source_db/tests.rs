@@ -551,3 +551,69 @@ fn grok_bots_daily_tokens_land_on_the_rosters_own_bot_session() {
     assert_eq!(sessions["items"][0]["title"], "SEO & AEO Desk");
     assert_eq!(sessions["items"][0]["tokens"], 9_000);
 }
+
+#[test]
+fn grok_bot_session_works_while_a_message_has_no_reply_and_idles_once_answered() {
+    use crate::grok_cache as bot;
+    use std::fs;
+    let root = tempfile::tempdir().unwrap();
+    let cache = root.path().join("sand-client-persistence");
+    fs::create_dir_all(&cache).unwrap();
+    let write = |key: &str, schema: u64, value: Value| {
+        fs::write(
+            bot::path(&cache, key),
+            format!(
+                "{}\n{}",
+                serde_json::to_string(key).unwrap(),
+                json!({"schemaVersion": schema, "value": value})
+            ),
+        )
+        .unwrap();
+    };
+    let now = chrono::Utc::now().timestamp_millis();
+    let user = json!({"kind":"message","role":"user","id":"t1u","requestId":"r1","timestampMs":now - 700_000,"isStreaming":false});
+    let reply = json!({"kind":"send-message","id":"t1s1","requestId":"r1","timestampMs":now - 600_000});
+    write(bot::ACCOUNT_KEY, 1, json!("slot-1"));
+    write(
+        &bot::transcript_key("slot-1", "bot-a"),
+        1,
+        json!({"entries": [user.clone()]}),
+    );
+    let roster = |at: i64| {
+        write(
+            &bot::roster_key("slot-1"),
+            4,
+            json!({"rows": [{"id": "bot-a", "title": "SEO & AEO Desk", "lastActivityAt": at}]}),
+        )
+    };
+    roster(now - 5_000);
+    let mut backend = AgentHudCore::new(
+        vec![SourceRoot {
+            path: cache.clone(),
+            provider: "grok-bot",
+        }],
+        root.path().join("hud"),
+    );
+    let state = |backend: &mut AgentHudCore| {
+        refresh(backend);
+        let sessions = backend
+            .request("sessions", json!({"scope":"all","sources":["grok-bot"]}))
+            .unwrap();
+        sessions["items"][0]["state"].as_str().unwrap().to_owned()
+    };
+    assert_eq!(state(&mut backend), "running");
+    // While it works the roster is looked at again, every 10 seconds.
+    assert!(backend.reads.bot_poll.is_some());
+    assert!(!backend.look());
+    backend.reads.bot_poll.as_mut().unwrap().0 = 0;
+    assert!(backend.look());
+    assert!(backend.reads.bot_poll.is_none());
+    write(
+        &bot::transcript_key("slot-1", "bot-a"),
+        1,
+        json!({"entries": [user, reply]}),
+    );
+    roster(now - 600_000);
+    assert_eq!(state(&mut backend), "idle");
+    assert!(backend.reads.bot_poll.is_none());
+}

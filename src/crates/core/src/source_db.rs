@@ -192,7 +192,10 @@ impl AgentHudCore {
         } else {
             stored.unwrap()
         };
-        if !changed && !restart && !continuing && checkpoint.offset >= stamp.length {
+        // A Grok Bot roster is read again while a turn works, though it has
+        // not changed (`Reads::bot_poll`).
+        let polled = stamp.source == "grok-bot" && self.reads.forced.contains(path);
+        if !changed && !restart && !continuing && !polled && checkpoint.offset >= stamp.length {
             self.reads.pending.remove(path);
             self.reads.forced.remove(path);
             return Ok(());
@@ -270,6 +273,7 @@ impl AgentHudCore {
         let mut mappings = Vec::<(String, String, PathBuf, Option<String>)>::new();
         let generation = checkpoint.source_state["generation"].clone();
 
+        let mut bot_running = false;
         for record in page.records {
             let Some(key) =
                 self.resolve_session_path(stamp.source, &record.id, path, &mut superseded)
@@ -344,6 +348,23 @@ impl AgentHudCore {
                     log.source_state["hasOtel"] = json!(true);
                 }
             }
+            if is_bot {
+                if let (Some(dir), Some(agent)) = (path.parent(), record.id.rsplit(':').next()) {
+                    if let Some(account) = agent_hud_agents::grok::cache::account(dir) {
+                        if let Some(turn) = agent_hud_agents::grok::bot::turn(dir, &account, agent)
+                        {
+                            bot_running |= turn.running;
+                            log.live.observe_source(
+                                &turn.id,
+                                turn.running,
+                                Some(turn.started),
+                                turn.at,
+                                (!turn.running).then_some("completed"),
+                            );
+                        }
+                    }
+                }
+            }
             log.count_timed_source(
                 record.key,
                 &record.model,
@@ -360,6 +381,14 @@ impl AgentHudCore {
             ));
         }
 
+        if is_bot {
+            self.reads.bot_poll = bot_running.then(|| {
+                (
+                    chrono::Utc::now().timestamp_millis() + crate::BOT_POLL_MS,
+                    path.to_path_buf(),
+                )
+            });
+        }
         if let Some(watermark) = page.watermark {
             checkpoint.source_state["watermark"] = watermark;
         }
