@@ -222,8 +222,9 @@ pub trait Host {
     fn app_cookie(&self, _app: &str, _site: &str, _name: &str) -> Answer<String> {
         Answer::Unsupported
     }
-    /// 解开 Electron `safeStorage.encryptString` 为 `app` 写的密文。
-    /// 首次读取可能会向用户请求授权。此系统还不能解时返回 `Unsupported`。
+    /// Opens what Electron's `safeStorage.encryptString` wrote for `app`.
+    /// The first read may ask the user to allow it; `Unsupported` where this
+    /// OS can't open it yet.
     fn unseal_safe_storage(&self, _app: &str, _encrypted: &[u8]) -> Answer<String> {
         Answer::Unsupported
     }

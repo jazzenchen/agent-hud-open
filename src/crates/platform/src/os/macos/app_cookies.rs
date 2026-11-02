@@ -78,8 +78,9 @@ pub(crate) fn app_cookie(app_data: &Path, app: &str, site: &str, name: &str) -> 
     String::from_utf8(plain).map_or(Answer::Failed, Answer::Found)
 }
 
-/// Electron `safeStorage.encryptString` 为 `app` 写出的密文。macOS 上以
-/// `v10` 开头，用该应用的 “<App> Safe Storage” 钥匙串项解开。
+/// Opens what Electron's `safeStorage.encryptString` wrote for `app`. On macOS
+/// it starts with `v10` and opens with the app's "<App> Safe Storage"
+/// keychain item.
 pub(crate) fn unseal_safe_storage(app: &str, encrypted: &[u8]) -> Answer<String> {
     if !encrypted.starts_with(b"v10") {
         return Answer::Failed;

@@ -146,11 +146,12 @@ pub(crate) struct SignIn {
     pub email: Option<String>,
 }
 
-/// Cursor 用 Electron safe storage 封存访问令牌时加上的前缀。后面是
-/// `encryptString` 输出的标准 Base64。
+/// The prefix Cursor puts on an access token sealed with Electron's safe
+/// storage, followed by `encryptString`'s output in standard Base64.
 const SEALED: &str = "cursor-safe-storage:v1:";
 
-/// 数据库里的访问令牌。密封的先解开，明文 JWT 原样返回。
+/// The access token in Cursor's database: a sealed one is opened first, a
+/// plain JWT is returned as it is.
 fn opened_token(host: &dyn Host, stored: &str) -> Result<String, String> {
     let Some(encoded) = stored.strip_prefix(SEALED) else {
         return Ok(stored.to_owned());
@@ -159,8 +160,8 @@ fn opened_token(host: &dyn Host, stored: &str) -> Result<String, String> {
     match host.unseal_safe_storage("Cursor", &encrypted) {
         Answer::Found(token) => Ok(token),
         Answer::Denied => Err(l10n::text(
-            "Cursor 加密了登录信息，系统拒绝了钥匙串访问。允许后会再试",
-            "Cursor encrypted its sign-in, and the system refused keychain access. Allow it to retry.",
+            "Cursor 加密了登录信息，钥匙串访问被拒绝。重新打开 Agent HUD 后会再次询问",
+            "Cursor encrypted its sign-in, and keychain access was refused. Agent HUD asks again after it restarts.",
         )),
         Answer::Missing => Err(l10n::text(
             "Cursor 加密了登录信息，但找不到它的钥匙串项",
@@ -494,7 +495,7 @@ mod tests {
             .insert(b"v10not-opened".to_vec(), Answer::Denied);
         assert_eq!(
             read(&denied).err().unwrap(),
-            "Cursor encrypted its sign-in, and the system refused keychain access. Allow it to retry."
+            "Cursor encrypted its sign-in, and keychain access was refused. Agent HUD asks again after it restarts."
         );
         let dir = tempfile::tempdir().unwrap();
         let mut missing = signed_in(&dir, &stored);

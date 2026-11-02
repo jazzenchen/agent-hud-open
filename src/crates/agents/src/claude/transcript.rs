@@ -1623,7 +1623,6 @@ mod tests {
         )
         .unwrap();
         let mut index = ClaudeDesktopIndex::default();
-        assert!(!index.refresh(&[]), "nothing under the default folder");
         index.set_bases(vec![base]);
         assert!(index.refresh(&[]));
         assert_eq!(

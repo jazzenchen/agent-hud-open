@@ -20,7 +20,7 @@ pub(crate) fn app_cookie(
     Answer::Unsupported
 }
 
-/// Electron safe storage 在此系统上还不能解开。
+/// Electron's safe storage can't be opened on this OS yet.
 pub(crate) fn unseal_safe_storage(_app: &str, _encrypted: &[u8]) -> Answer<String> {
     Answer::Unsupported
 }
