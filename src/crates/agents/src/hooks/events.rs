@@ -123,14 +123,17 @@ pub fn parse_event(
                 let Some(began) = (begin.read)(payload) else {
                     return Ok(None);
                 };
-                let target =
-                    json!({"kind":"cursor-agent","id":began.session,"cwd":began.workspace});
+                let target = if source == "cursor" {
+                    crate::cursor::navigation_target(&began.session, began.workspace.as_deref())
+                } else {
+                    None
+                };
                 return Ok(Some(event(
                     source,
                     &began.session,
                     now_ms,
                     "session-observation",
-                    json!({"turnId":began.turn,"state":"running","startedAtMs":now_ms,"observedAtMs":now_ms,"workspace":began.workspace,"outcome":null,"navigationTarget":if source == "cursor" {target} else {Value::Null}}),
+                    json!({"turnId":began.turn,"state":"running","startedAtMs":now_ms,"observedAtMs":now_ms,"workspace":began.workspace,"outcome":null,"navigationTarget":target}),
                 )));
             }
             let Some(done) = (completion.read)(payload, now_ms) else {

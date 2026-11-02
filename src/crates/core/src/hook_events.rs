@@ -452,7 +452,10 @@ impl HookEvidence {
                 } else {
                     Value::Null
                 };
-                session["navigationTarget"] = observed.data["navigationTarget"].clone();
+                // An observation without a destination keeps the one the log gave.
+                if !observed.data["navigationTarget"].is_null() {
+                    session["navigationTarget"] = observed.data["navigationTarget"].clone();
+                }
             }
         }
 
@@ -593,6 +596,11 @@ mod tests {
             session["state"].as_str().unwrap().to_owned()
         };
         assert_eq!(state(&evidence, at + 1_000), "running");
+        // A prompt without a folder keeps the destination the log gave.
+        let folder = json!({"kind":"cursor-agent","id":"c1","cwd":"/p"});
+        let mut session = json!({"source":"cursor","id":"cursor:c1","state":"idle","updatedAt":iso(at - 60_000),"navigationTarget":folder});
+        evidence.overlay(&mut session, at + 1_000, None, None);
+        assert_eq!(session["navigationTarget"], folder);
         assert!(evidence.ingest(
             &[event("completion", at + 5_000, json!({"turnId":"g1"}))],
             at + 5_000,

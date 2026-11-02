@@ -152,18 +152,6 @@ impl NativePlatform {
             ) {
                 return Ok(navigation::activate_app("com.anthropic.claudefordesktop"));
             }
-            // A Cursor session with no folder has no link; bring Cursor forward
-            // (launching it when closed) rather than reveal its database.
-            if matches!(
-                target["kind"].as_str(),
-                Some("cursor-agent" | "cursorAgent")
-            ) {
-                if navigation::activate_app("com.todesktop.230313mzl4w4u92") {
-                    return Ok(true);
-                }
-                os::open_session_url("cursor://")?;
-                return Ok(true);
-            }
             return Ok(false);
         };
         os::open_session_url(&url)?;

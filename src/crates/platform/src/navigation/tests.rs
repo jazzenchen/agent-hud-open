@@ -64,3 +64,19 @@ fn cursor_local_session_opens_its_folder() {
     );
     assert!(session_url(&json!({"kind":"cursor-agent","id":"x","cwd":null})).is_none());
 }
+
+#[test]
+fn cursor_app_link_is_offered_only_where_it_is_registered() {
+    let target = json!({"kind":"cursor-app"});
+    assert_eq!(
+        session_url_on(&target, Os::MacOs, |url| url == "cursor://"),
+        Some("cursor://".into())
+    );
+    assert_eq!(session_url_on(&target, Os::MacOs, |_| false), None);
+    for os in [Os::Windows, Os::Linux] {
+        assert_eq!(
+            session_url_on(&target, os, |_| panic!("unverified link")),
+            None
+        );
+    }
+}

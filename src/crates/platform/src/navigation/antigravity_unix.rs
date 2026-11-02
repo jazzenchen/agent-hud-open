@@ -21,8 +21,10 @@ pub(super) fn open(home: &Path, id: &str, cwd: Option<&str>) -> Result<bool, Str
         ));
     }
     if !crate::os::app_running(APP) {
-        // Closed: launch it through its scheme rather than reveal the log.
-        return Ok(crate::os::open_session_url("antigravity://").is_ok());
+        // Closed: launch it through its scheme, where one is registered,
+        // rather than reveal the log.
+        const LINK: &str = "antigravity://";
+        return Ok(crate::os::registered_url(LINK) && crate::os::open_session_url(LINK).is_ok());
     }
     let mut opened = false;
     if super::uuid(id) {

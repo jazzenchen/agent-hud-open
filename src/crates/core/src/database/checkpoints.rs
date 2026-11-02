@@ -279,8 +279,13 @@ impl LogHead {
             }
         }
         if self.source == "cursor" {
-            if let Some(id) = self.id.strip_prefix("cursor:") {
-                session["navigationTarget"] = json!({"kind":"cursor-agent","id":id,"cwd":self.cwd})
+            // None without a folder or cloud id: Cursor's app link stands in.
+            if let Some(target) = self
+                .id
+                .strip_prefix("cursor:")
+                .and_then(|id| agent_hud_agents::cursor::navigation_target(id, self.cwd.as_deref()))
+            {
+                session["navigationTarget"] = target;
             }
         }
         if self.source == "antigravity" && self.client.as_deref() != Some("CLI") {

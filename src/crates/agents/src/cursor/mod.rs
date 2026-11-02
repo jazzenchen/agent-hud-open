@@ -31,6 +31,28 @@ static MAC_SOURCES: [Source; 2] = [HEADERS, turn_log(Base::AppData, &["app.agent
 static WINDOWS_SOURCES: [Source; 1] = [HEADERS];
 static LINUX_SOURCES: [Source; 2] = [HEADERS, turn_log(Base::DataHome, &["app.agenthud.linux"])];
 
+// Brings Cursor forward without a session, for one with no folder or cloud id.
+static APP_NAVIGATION: crate::discovery::AppNavigation = crate::discovery::AppNavigation {
+    kind: "cursor-app",
+    url: PerOs {
+        macos: Support::Verified("cursor://"),
+        windows: Support::Unsupported("Cursor's desktop link is not verified on Windows"),
+        linux: Support::Unsupported("Cursor's desktop link is not verified on Linux"),
+    },
+};
+
+/// Where a Cursor session opens: a cloud agent by its `bc-` id, a local one
+/// by its folder. None when neither is known, so Cursor's app link stands in.
+pub fn navigation_target(id: &str, cwd: Option<&str>) -> Option<serde_json::Value> {
+    let cloud = id.len() <= 128
+        && id.starts_with("bc-")
+        && id
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_'));
+    let cwd = cwd.map(str::trim).filter(|cwd| cwd.starts_with('/'));
+    (cloud || cwd.is_some()).then(|| serde_json::json!({"kind":"cursor-agent","id":id,"cwd":cwd}))
+}
+
 static DISCOVERY: Discovery = Discovery {
     storage: &[
         Location::app_data(&["Cursor"], ""),
@@ -47,6 +69,7 @@ static DISCOVERY: Discovery = Discovery {
     commands: &["cursor", "cursor-agent"],
     apps: &["Cursor"],
     bundles: &["com.todesktop.230313mzl4w4u92"],
+    app_navigation: Some(&APP_NAVIGATION),
     ..Discovery::NONE
 };
 
@@ -68,3 +91,24 @@ pub static AGENT: Agent = Agent {
     },
     discovery: &DISCOVERY,
 };
+
+#[cfg(test)]
+mod tests {
+    use super::navigation_target;
+    use serde_json::json;
+
+    #[test]
+    fn a_session_gets_its_own_target_only_with_a_folder_or_cloud_id() {
+        assert_eq!(
+            navigation_target("bc-1234", None),
+            Some(json!({"kind":"cursor-agent","id":"bc-1234","cwd":null}))
+        );
+        assert_eq!(
+            navigation_target("3e8f", Some(" /Users/a/p ")),
+            Some(json!({"kind":"cursor-agent","id":"3e8f","cwd":"/Users/a/p"}))
+        );
+        assert_eq!(navigation_target("3e8f", None), None);
+        assert_eq!(navigation_target("3e8f", Some("relative")), None);
+        assert_eq!(navigation_target("bc-a/b", None), None);
+    }
+}
