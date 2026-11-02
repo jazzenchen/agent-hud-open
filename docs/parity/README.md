@@ -40,7 +40,7 @@ Open is the floor, not the ceiling. Next must not do worse than Open; where it c
 
 | Chunk | Open scope | Rows | same | deliberate | better | fixed | missing | differs | unclear |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| [c01](c01-claude-codex.md) | Claude, Codex, provider kit | 132 | 46 | 5 | 9 | 51 | 1 | 15 | 5 |
+| [c01](c01-claude-codex.md) | Claude, Codex, provider kit | 132 | 46 | 5 | 10 | 50 | 1 | 15 | 5 |
 | [c02](c02-deepseek-catalog.md) | DeepSeek, provider catalog, window names | 43 | 10 | 0 | 1 | 5 | 3 | 21 | 3 |
 | [c02a](c02a-grok-devin.md) | Grok CLI, Grok Bot, Devin | 55 | 18 | 3 | 0 | 2 | 11 | 20 | 1 |
 | [c02b](c02b-antigravity-cursor.md) | Antigravity, Cursor | 51 | 21 | 1 | 2 | 5 | 6 | 16 | 0 |
@@ -54,7 +54,7 @@ Open is the floor, not the ceiling. Next must not do worse than Open; where it c
 | [c08](c08-bots.md) | Bots and Clawd | 58 | 35 | 1 | 2 | 1 | 1 | 15 | 3 |
 | [c09](c09-app-settings.md) | App lifecycle, Settings, menu bar | 90 | 25 | 6 | 6 | 7 | 9 | 32 | 5 |
 | [c10](c10-statistics-debug.md) | Statistics, sessions window, debug, recording | 101 | 14 | 1 | 9 | 13 | 8 | 54 | 2 |
-| **Total** | | **1,217** | **410** | **44** | **48** | **175** | **88** | **406** | **46** |
+| **Total** | | **1,217** | **410** | **44** | **49** | **174** | **88** | **406** | **46** |
 
 `pnpm run parity:ledger` recounts this table from the rows; `pnpm run check` fails when it is stale.
 

@@ -182,6 +182,7 @@ fn from_engine(host: &dyn Host) -> Result<Reading, Unread> {
         if payload["rate_limits_available"] != true {
             // get_usage reports no plan limits both for an API-key login and
             // for no login at all; only `auth status` tells the two apart.
+            // An unknown login state is a failed read, so the last reading stays.
             let signed_in = host
                 .start_engine(&EngineStart {
                     executable: &executable,
@@ -191,10 +192,16 @@ fn from_engine(host: &dyn Host) -> Result<Reading, Unread> {
                 })
                 .ok()
                 .and_then(|mut engine| engine.joined(Instant::now() + Duration::from_secs(10)))
-                .and_then(|val| val["loggedIn"].as_bool());
+                .and_then(|val| val["loggedIn"].as_bool())
+                .ok_or_else(|| {
+                    Unread::Failed(l10n::text(
+                        "这次没有读到 Claude 额度，稍后自动重试",
+                        "Couldn't read the Claude quota this time; retrying shortly",
+                    ))
+                })?;
             // Signed out is a failed read, so the last reading stays until
             // the person signs in again; an API-key login has no plan limits.
-            if signed_in == Some(false) {
+            if !signed_in {
                 return Err(Unread::NoLogin {
                     reason: l10n::text(
                         "Claude Code 已退出登录，运行 claude 重新登录后更新额度",
@@ -580,14 +587,68 @@ mod tests {
             read(&host).err().as_deref(),
             Some("Claude Code is signed out. Run claude to sign in again to update the quota")
         );
+        assert_eq!(host.started.borrow()[1].1, ["auth", "status", "--json"]);
         let mut host = installed(none);
         host.engine_output
             .insert("auth".into(), vec![json!({"loggedIn": true})]);
+        let reading = read(&host).unwrap();
+        assert!(reading.quotas.is_empty());
+        assert!(reading.account.is_none());
         assert_eq!(
-            read(&host).unwrap().notice.as_deref(),
+            reading.notice.as_deref(),
             Some("No plan limits for this login (API key or third-party platform)")
         );
         assert_eq!(host.started.borrow()[1].1, ["auth", "status", "--json"]);
+    }
+
+    #[test]
+    fn auth_status_start_failure_is_a_failed_read() {
+        let mut host = installed(json!({
+            "subtype": "success", "response": {"rate_limits_available": false},
+        }));
+        host.engine_start_errors
+            .insert("auth".into(), "could not start".into());
+        assert_eq!(
+            read(&host).err().unwrap(),
+            "Couldn't read the Claude quota this time; retrying shortly"
+        );
+        assert_eq!(host.started.borrow()[1].1, ["auth", "status", "--json"]);
+    }
+
+    #[test]
+    fn auth_status_without_a_parsed_response_is_a_failed_read() {
+        // No parsed response covers empty or invalid JSON output and a timeout.
+        for ends in [true, false] {
+            let mut host = installed(json!({
+                "subtype": "success", "response": {"rate_limits_available": false},
+            }));
+            host.engine_ends = ends;
+            assert_eq!(
+                read(&host).err().unwrap(),
+                "Couldn't read the Claude quota this time; retrying shortly"
+            );
+            assert_eq!(host.started.borrow()[1].1, ["auth", "status", "--json"]);
+        }
+    }
+
+    #[test]
+    fn auth_status_without_a_boolean_login_state_is_a_failed_read() {
+        for output in [
+            Value::Null,
+            json!({}),
+            json!({"loggedIn": null}),
+            json!({"loggedIn": "false"}),
+            json!({"loggedIn": 0}),
+        ] {
+            let mut host = installed(json!({
+                "subtype": "success", "response": {"rate_limits_available": false},
+            }));
+            host.engine_output.insert("auth".into(), vec![output]);
+            assert_eq!(
+                read(&host).err().unwrap(),
+                "Couldn't read the Claude quota this time; retrying shortly"
+            );
+        }
     }
 
     #[test]
