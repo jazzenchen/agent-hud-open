@@ -134,11 +134,11 @@ export function RelaysPane({ snapshot, action }: SettingsPaneProps) {
         footer={
           relays.some((relay) => !relay.manual)
             ? t(
-                "Turn a relay on to read its balance with its own key. The key stays on this Mac and goes only to that relay.",
+                "Turn a relay on to read its balance with its own key. The key stays on this computer and goes only to that relay.",
                 "打开开关即用中转站自己的 Key 读取余额。Key 只留在本机，只发给这个中转站。",
               )
             : t(
-                "Balances are read with each relay's own key. The key stays on this Mac and goes only to that relay.",
+                "Balances are read with each relay's own key. The key stays on this computer and goes only to that relay.",
                 "余额用中转站自己的 Key 读取。Key 只留在本机，只发给这个中转站。",
               )
         }

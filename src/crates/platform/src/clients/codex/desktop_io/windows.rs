@@ -6,17 +6,22 @@
 //! Peer validation follows OpenAI's codex-rs/tui/src/ide_context/windows_pipe.rs
 //! at 9a8a85bc539325f2819dd0717f88b6ba6286495e:
 //! query the connected pipe server's TokenUser, never infer identity from its name.
-use super::IpcError;
+use super::{DesktopIpc, IpcError};
 use std::{
     io::{self, Read, Write},
     os::windows::io::{AsRawHandle, FromRawHandle, OwnedHandle},
     path::{Path, PathBuf},
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
     time::{Duration, Instant},
 };
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::windows::named_pipe::{ClientOptions, NamedPipeClient},
     runtime::Runtime,
+    sync::Notify,
 };
 use windows_sys::Win32::{
     Foundation::{ERROR_PIPE_BUSY, HANDLE},
@@ -52,11 +57,57 @@ pub(super) fn random(bytes: &mut [u8]) -> io::Result<()> {
     Ok(())
 }
 
+/// Lets another thread end a connection that is blocked on a read or write,
+/// as `shutdown` does on the Unix socket.
+#[derive(Default)]
+struct Closer {
+    closed: AtomicBool,
+    notify: Notify,
+}
+
+/// A handle that closes its connection from another thread.
+pub struct ShutdownHandle(Arc<Closer>);
+impl ShutdownHandle {
+    pub fn shutdown(&self) {
+        self.0.closed.store(true, Ordering::Release);
+        self.0.notify.notify_waiters();
+    }
+}
+
+impl DesktopIpc {
+    pub fn shutdown_handle(&self) -> Result<ShutdownHandle, IpcError> {
+        Ok(ShutdownHandle(self.socket.closer.clone()))
+    }
+}
+
+/// Runs one pipe operation until it finishes, its time runs out, or the
+/// connection is shut down from another thread.
+async fn guarded<T>(
+    closer: &Closer,
+    timeout: Duration,
+    operation: impl std::future::Future<Output = io::Result<T>>,
+) -> Result<Option<T>, io::Error> {
+    let notified = closer.notify.notified();
+    tokio::pin!(notified);
+    notified.as_mut().enable();
+    if closer.closed.load(Ordering::Acquire) {
+        return Err(io::ErrorKind::ConnectionAborted.into());
+    }
+    tokio::select! {
+        _ = &mut notified => Err(io::ErrorKind::ConnectionAborted.into()),
+        result = tokio::time::timeout(timeout, operation) => match result {
+            Ok(result) => result.map(Some),
+            Err(_) => Ok(None),
+        },
+    }
+}
+
 /// A same-user pipe with one deadline across connection, reads and writes.
 pub struct LocalSocket {
     pipe: NamedPipeClient,
     runtime: Runtime,
     deadline: Instant,
+    closer: Arc<Closer>,
 }
 
 impl LocalSocket {
@@ -93,6 +144,7 @@ impl LocalSocket {
             pipe,
             runtime,
             deadline,
+            closer: Arc::new(Closer::default()),
         })
     }
 
@@ -106,9 +158,10 @@ impl LocalSocket {
 
     pub fn wait_for_message(&self, timeout: Duration) -> Result<bool, IpcError> {
         self.runtime.block_on(async {
-            match tokio::time::timeout(timeout, self.pipe.readable()).await {
-                Ok(result) => result.map(|_| true).map_err(IpcError::from),
-                Err(_) => Ok(false),
+            match guarded(&self.closer, timeout, self.pipe.readable()).await {
+                Ok(Some(())) => Ok(true),
+                Ok(None) => Ok(false),
+                Err(error) => Err(IpcError::from(error)),
             }
         })
     }
@@ -120,11 +173,10 @@ impl Read for LocalSocket {
         if remaining.is_zero() {
             return Err(io::ErrorKind::TimedOut.into());
         }
-        self.runtime.block_on(async {
-            tokio::time::timeout(remaining, self.pipe.read(bytes))
-                .await
-                .map_err(|_| io::Error::from(io::ErrorKind::TimedOut))?
-        })
+        let (runtime, closer, pipe) = (&self.runtime, &self.closer, &mut self.pipe);
+        runtime
+            .block_on(guarded(closer, remaining, pipe.read(bytes)))?
+            .ok_or_else(|| io::ErrorKind::TimedOut.into())
     }
 }
 
@@ -134,11 +186,10 @@ impl Write for LocalSocket {
         if remaining.is_zero() {
             return Err(io::ErrorKind::TimedOut.into());
         }
-        self.runtime.block_on(async {
-            tokio::time::timeout(remaining, self.pipe.write(bytes))
-                .await
-                .map_err(|_| io::Error::from(io::ErrorKind::TimedOut))?
-        })
+        let (runtime, closer, pipe) = (&self.runtime, &self.closer, &mut self.pipe);
+        runtime
+            .block_on(guarded(closer, remaining, pipe.write(bytes)))?
+            .ok_or_else(|| io::ErrorKind::TimedOut.into())
     }
 
     fn flush(&mut self) -> io::Result<()> {

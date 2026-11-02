@@ -51,6 +51,11 @@ pub(super) fn register_if_never_registered() -> bool {
     false
 }
 
+/// The Claude desktop app's and the Codex app's bundled copies, which Settings
+/// shows as installed when neither CLI is on PATH.
+pub(super) fn bundled_cli(command: &str) -> Option<PathBuf> {
+    agent_hud_runtime::client_executable(command)
+}
 /// npm installs .cmd shims beside native .exe files. Extensionless npm shims
 /// contain POSIX shell scripts and must not be offered to CreateProcessW.
 pub(super) fn cli_candidates(_home: &Path, command: &str, dirs: Vec<PathBuf>) -> Vec<PathBuf> {

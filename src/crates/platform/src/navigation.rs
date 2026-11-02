@@ -33,9 +33,13 @@ fn resolve_claude_desktop_local_id(id: &str, cowork: bool) -> Option<String> {
     } else {
         "claude-code-sessions"
     };
-    let root = home.join("Library/Application Support/Claude").join(folder);
+    let env = std::env::vars().collect::<crate::os::Environment>();
     let mut matched = Vec::new();
-    for org in std::fs::read_dir(root).ok()?.flatten() {
+    for org in crate::os::claude_desktop_bases(&home, &env)
+        .into_iter()
+        .filter_map(|base| std::fs::read_dir(base.join(folder)).ok())
+        .flat_map(|entries| entries.flatten())
+    {
         let Ok(acct_dir) = std::fs::read_dir(org.path()) else {
             continue;
         };

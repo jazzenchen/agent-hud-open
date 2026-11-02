@@ -37,25 +37,56 @@ pub(crate) fn private_append(path: &Path) -> io::Result<fs::File> {
 
 /// A hook payload from stdin, or Err after five seconds or past `limit` bytes.
 /// Windows console and pipe handles cannot be polled, so a thread reads.
+///
+/// A payload is one JSON object, and clients on Windows (Claude Code among
+/// them) may write it without closing stdin, so the payload is taken as soon
+/// as it is a complete JSON value instead of waiting out the five seconds.
 pub(crate) fn read_stdin(bytes: &mut Vec<u8>, limit: usize) -> Result<(), ()> {
-    let (sender, receiver) = std::sync::mpsc::sync_channel(1);
+    use std::time::{Duration, Instant};
+    let (sender, receiver) = std::sync::mpsc::channel::<Option<Vec<u8>>>();
     std::thread::spawn(move || {
-        let mut bytes = Vec::new();
-        let ok = io::stdin()
-            .lock()
-            .take((limit + 1) as u64)
-            .read_to_end(&mut bytes)
-            .is_ok();
-        let _ = sender.send((ok, bytes));
+        let mut stdin = io::stdin().lock();
+        let mut chunk = vec![0u8; 64 * 1024];
+        loop {
+            match stdin.read(&mut chunk) {
+                Ok(0) | Err(_) => {
+                    let _ = sender.send(None);
+                    return;
+                }
+                Ok(count) => {
+                    if sender.send(Some(chunk[..count].to_vec())).is_err() {
+                        return;
+                    }
+                }
+            }
+        }
     });
-    let (ok, input) = receiver
-        .recv_timeout(std::time::Duration::from_secs(5))
-        .map_err(|_| ())?;
-    if !ok || input.len() > limit {
-        return Err(());
+    let deadline = Instant::now() + Duration::from_secs(5);
+    let mut input = Vec::new();
+    loop {
+        let left = deadline.saturating_duration_since(Instant::now());
+        match receiver.recv_timeout(left) {
+            Ok(Some(chunk)) => {
+                input.extend_from_slice(&chunk);
+                if input.len() > limit {
+                    return Err(());
+                }
+                if complete_json(&input) {
+                    break;
+                }
+            }
+            // End of input: whatever arrived is the payload.
+            Ok(None) | Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => break,
+            Err(std::sync::mpsc::RecvTimeoutError::Timeout) => return Err(()),
+        }
     }
     *bytes = input;
     Ok(())
+}
+
+/// Whether the bytes are one whole JSON value, surrounding whitespace aside.
+fn complete_json(bytes: &[u8]) -> bool {
+    serde_json::from_slice::<serde::de::IgnoredAny>(bytes).is_ok()
 }
 
 /// The client's hook entry names the executable directly; no shell quoting.
@@ -71,4 +102,17 @@ pub(crate) fn hook_configuration(
         current,
         executable.and_then(Path::to_str),
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::complete_json;
+
+    #[test]
+    fn a_payload_is_taken_once_its_json_is_whole() {
+        assert!(complete_json(b"{\"a\":{\"b\":[1,2]}}\r\n"));
+        assert!(!complete_json(b"{\"a\":{\"b\":[1,2]"));
+        assert!(!complete_json(b""));
+        assert!(!complete_json(b"{\"text\":\"a } inside\""));
+    }
 }
