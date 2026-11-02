@@ -23,6 +23,7 @@ pub static CODEBUDDY: Hooks = Hooks {
         reply: Reply::HookSpecificOutput,
     }),
     completion: Some(Completion {
+        begin: None,
         event: "Stop",
         timeout: 5,
         read: completed,

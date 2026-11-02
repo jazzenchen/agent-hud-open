@@ -182,8 +182,12 @@ impl HookEvidence {
             let supported = match event.kind.as_str() {
                 "origin" => hooks.is_some_and(|hooks| hooks.origin.is_some()),
                 "delivery" => agent_hud_agents::by_id(&event.source).is_some(),
-                "session-observation" | "session-forget" => agent_hud_agents::by_id(&event.source)
-                    .is_some_and(|agent| agent.observer.is_some()),
+                "session-observation" | "session-forget" => {
+                    agent_hud_agents::by_id(&event.source).is_some_and(|agent| agent.observer.is_some())
+                        || hooks.is_some_and(|hooks| {
+                            hooks.completion.as_ref().is_some_and(|c| c.begin.is_some())
+                        })
+                }
                 "attention" => hooks.is_some_and(|hooks| hooks.attention),
                 "compaction" => hooks.is_some_and(|hooks| hooks.compaction.is_some()),
                 "completion" => COMPLETION_SOURCES.contains(&event.source.as_str()),
@@ -561,6 +565,38 @@ mod tests {
             at_ms: at,
             data: json!({"state":state,"turnId":"turn","startedAtMs":at-1000,"outcome":null}),
         }
+    }
+
+    #[test]
+    fn a_cursor_prompt_makes_its_session_run_until_the_stop_hook() {
+        let at = 1_792_470_000_000i64;
+        let event = |kind: &str, at: i64, data: Value| HookEvent {
+            source: "cursor".into(),
+            session_id: "cursor:c1".into(),
+            kind: kind.into(),
+            at_ms: at,
+            data,
+        };
+        let mut evidence = HookEvidence::default();
+        assert!(evidence.ingest(
+            &[event(
+                "session-observation",
+                at,
+                json!({"state":"running","turnId":"g1","startedAtMs":at,"outcome":null}),
+            )],
+            at,
+        ));
+        let state = |evidence: &HookEvidence, now: i64| {
+            let mut session = json!({"source":"cursor","id":"cursor:c1","state":"idle","updatedAt":iso(at - 60_000)});
+            evidence.overlay(&mut session, now, None, None);
+            session["state"].as_str().unwrap().to_owned()
+        };
+        assert_eq!(state(&evidence, at + 1_000), "running");
+        assert!(evidence.ingest(
+            &[event("completion", at + 5_000, json!({"turnId":"g1"}))],
+            at + 5_000,
+        ));
+        assert_eq!(state(&evidence, at + 6_000), "idle");
     }
 
     #[test]

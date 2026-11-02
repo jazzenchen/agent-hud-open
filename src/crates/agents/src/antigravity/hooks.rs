@@ -15,6 +15,7 @@ pub static HOOKS: Hooks = Hooks {
     layout: Layout::OwnedEntry,
     permission: None,
     completion: Some(Completion {
+        begin: None,
         event: "Stop",
         timeout: 5,
         read: completed,

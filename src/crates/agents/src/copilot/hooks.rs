@@ -19,6 +19,7 @@ pub static HOOKS: Hooks = Hooks {
     }),
     permission: None,
     completion: Some(Completion {
+        begin: None,
         event: "agentStop",
         timeout: 5,
         read: completed,

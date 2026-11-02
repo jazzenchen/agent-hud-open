@@ -130,6 +130,54 @@ pub fn session_url(target: &Value) -> Option<String> {
             url.query_pairs_mut().append_pair("id", id);
             Some(url.into())
         }
+        // A cloud agent opens in Cursor's Agents window by its `bc-` id. Cursor
+        // has no link for a local session (its composers open only through
+        // internal commands), so that one opens its folder in Cursor.
+        "cursor-agent" | "cursorAgent" => {
+            if id.len() <= 128
+                && id.starts_with("bc-")
+                && id
+                    .bytes()
+                    .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_'))
+            {
+                let mut url =
+                    reqwest::Url::parse("cursor://anysphere.cursor-deeplink/agent").ok()?;
+                url.query_pairs_mut().append_pair("id", id);
+                return Some(url.into());
+            }
+            let cwd = target["cwd"].as_str()?.trim();
+            if !cwd.starts_with('/') {
+                return None;
+            }
+            let mut url = reqwest::Url::parse("cursor://file").ok()?;
+            url.set_path(cwd);
+            Some(url.into())
+        }
         _ => None,
+    }
+}
+
+#[cfg(test)]
+mod cursor_tests {
+    use super::session_url;
+    use serde_json::json;
+
+    #[test]
+    fn cursor_cloud_agent_opens_the_agents_window() {
+        let target = json!({"kind":"cursor-agent","id":"bc-1234","cwd":null});
+        assert_eq!(
+            session_url(&target).as_deref(),
+            Some("cursor://anysphere.cursor-deeplink/agent?id=bc-1234")
+        );
+    }
+
+    #[test]
+    fn cursor_local_session_opens_its_folder() {
+        let target = json!({"kind":"cursor-agent","id":"3e8f2eb2-c0d0","cwd":"/Users/a/my proj"});
+        assert_eq!(
+            session_url(&target).as_deref(),
+            Some("cursor://file/Users/a/my%20proj")
+        );
+        assert!(session_url(&json!({"kind":"cursor-agent","id":"x","cwd":null})).is_none());
     }
 }

@@ -278,6 +278,12 @@ impl LogHead {
                 session["navigationTarget"] = json!({"kind":"grok-bot-agent","id":id})
             }
         }
+        if self.source == "cursor" {
+            if let Some(id) = self.id.strip_prefix("cursor:") {
+                session["navigationTarget"] =
+                    json!({"kind":"cursor-agent","id":id,"cwd":self.cwd})
+            }
+        }
         if self.source == "antigravity" && self.client.as_deref() != Some("CLI") {
             if let Some(id) = self.id.strip_prefix("antigravity:") {
                 session["navigationTarget"] =

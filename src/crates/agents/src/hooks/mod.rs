@@ -127,6 +127,22 @@ pub struct Completion {
     /// What the callback is answered, as JSON text; None answers `{}`. Not a
     /// permission: Antigravity's own entrypoint answers `{"decision":"stop"}`.
     pub reply: Option<&'static str>,
+    /// Events that say a turn is in flight, for a client that reports them.
+    pub begin: Option<Begin>,
+}
+
+/// A client's events that say a turn has started or is still going: the
+/// first is its prompt, the others renew it while it works.
+pub struct Begin {
+    pub events: &'static [&'static str],
+    /// What a callback's payload says about the turn; None ignores it.
+    pub read: fn(&Value) -> Option<Began>,
+}
+
+pub struct Began {
+    pub session: String,
+    pub turn: String,
+    pub workspace: Option<String>,
 }
 
 /// A completed turn, as a completion callback reports it.

@@ -19,6 +19,7 @@ pub static HOOKS: Hooks = Hooks {
         reply: Reply::HookSpecificOutput,
     }),
     completion: Some(Completion {
+        begin: None,
         event: "Stop",
         timeout: 5000,
         read: completed,

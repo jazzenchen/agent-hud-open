@@ -1,5 +1,5 @@
 //! Cursor's completion hook, in its version-1 settings.
-use crate::hooks::{Completed, Completion, Handler, Hooks, Layout, POSIX_ONLY};
+use crate::hooks::{Began, Begin, Completed, Completion, Handler, Hooks, Layout, POSIX_ONLY};
 use crate::text;
 use crate::{Location, Usage};
 use serde_json::Value;
@@ -18,7 +18,13 @@ pub static HOOKS: Hooks = Hooks {
         timeout: 5,
         read: completed,
         enrich: None,
-        reply: None,
+        // Cursor lets a prompt through unless the hook says `continue: false`;
+        // say so rather than rely on an empty answer.
+        reply: Some(r#"{"continue":true}"#),
+        begin: Some(Begin {
+            events: &["beforeSubmitPrompt", "postToolUse", "afterAgentResponse"],
+            read: began,
+        }),
     }),
     origin: None,
     attention: false,
@@ -26,6 +32,16 @@ pub static HOOKS: Hooks = Hooks {
     prefixed_sessions: true,
     launch: POSIX_ONLY,
 };
+
+/// A generation under way: the prompt that starts it, and the tool calls and
+/// replies that show it still going.
+fn began(payload: &Value) -> Option<Began> {
+    Some(Began {
+        session: text(&payload["conversation_id"])?.into(),
+        turn: text(&payload["generation_id"])?.into(),
+        workspace: payload["workspace_roots"][0].as_str().map(str::to_owned),
+    })
+}
 
 /// A completed generation: the conversation and the generation that ended.
 fn completed(payload: &Value, _now_ms: i64) -> Option<Completed> {
@@ -134,6 +150,38 @@ mod tests {
                 .unwrap()
                 .usage
                 .is_none()
+        );
+    }
+
+    #[test]
+    fn a_prompt_or_tool_call_reports_a_running_turn_and_other_events_nothing() {
+        let event = |name: &str| {
+            crate::hooks::events::parse_event(
+                "cursor",
+                "--completion-hook",
+                &stop(json!({"hook_event_name": name})),
+                1_000,
+            )
+            .unwrap()
+        };
+        for name in ["beforeSubmitPrompt", "postToolUse", "afterAgentResponse"] {
+            let event = event(name).unwrap();
+            assert_eq!(event.kind, "session-observation");
+            assert_eq!(event.session_id, "cursor:ca086626-b368-46b5-8492-2c8b493f7e7a");
+            assert_eq!(event.data["state"], "running");
+            assert_eq!(
+                event.data["navigationTarget"],
+                json!({"kind":"cursor-agent","id":"ca086626-b368-46b5-8492-2c8b493f7e7a","cwd":"/Users/me/project"})
+            );
+        }
+        assert_eq!(event("stop").unwrap().kind, "completion");
+        assert!(event("sessionStart").is_none());
+        let events = crate::hooks::configuration::configuration("cursor", "--completion-hook")
+            .unwrap()
+            .events;
+        assert_eq!(
+            events,
+            ["stop", "beforeSubmitPrompt", "postToolUse", "afterAgentResponse"]
         );
     }
 }

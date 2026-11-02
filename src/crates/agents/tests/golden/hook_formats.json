@@ -3374,7 +3374,10 @@
     },
     "output": {
       "events": [
-        "stop"
+        "stop",
+        "beforeSubmitPrompt",
+        "postToolUse",
+        "afterAgentResponse"
       ],
       "flag": "--completion-hook",
       "relativePath": ".cursor/hooks.json",
@@ -90143,6 +90146,66 @@
     "input": {
       "current": {
         "hooks": {
+          "afterAgentResponse": [
+            {
+              "hooks": [
+                {
+                  "args": [
+                    "--completion-hook",
+                    "cursor"
+                  ],
+                  "command": "C:\\Users\\me\\AppData\\Local\\Agent HUD\\agent-hud.exe",
+                  "type": "command"
+                },
+                {
+                  "command": "'C:\\Users\\me\\AppData\\Local\\Agent HUD\\agent-hud.exe' --completion-hook cursor",
+                  "type": "command"
+                },
+                "text"
+              ],
+              "matcher": ""
+            }
+          ],
+          "beforeSubmitPrompt": [
+            {
+              "hooks": [
+                {
+                  "args": [
+                    "--completion-hook",
+                    "cursor"
+                  ],
+                  "command": "C:\\Users\\me\\AppData\\Local\\Agent HUD\\agent-hud.exe",
+                  "type": "command"
+                },
+                {
+                  "command": "'C:\\Users\\me\\AppData\\Local\\Agent HUD\\agent-hud.exe' --completion-hook cursor",
+                  "type": "command"
+                },
+                "text"
+              ],
+              "matcher": ""
+            }
+          ],
+          "postToolUse": [
+            {
+              "hooks": [
+                {
+                  "args": [
+                    "--completion-hook",
+                    "cursor"
+                  ],
+                  "command": "C:\\Users\\me\\AppData\\Local\\Agent HUD\\agent-hud.exe",
+                  "type": "command"
+                },
+                {
+                  "command": "'C:\\Users\\me\\AppData\\Local\\Agent HUD\\agent-hud.exe' --completion-hook cursor",
+                  "type": "command"
+                },
+                "text"
+              ],
+              "matcher": ""
+            }
+          ],
           "stop": [
             {
               "hooks": [
@@ -90178,6 +90241,54 @@
       },
       "remove": {
         "hooks": {
+          "afterAgentResponse": [
+            {
+              "hooks": [
+                {
+                  "command": "'C:\\Users\\me\\AppData\\Local\\Agent HUD\\agent-hud.exe' --completion-hook cursor",
+                  "type": "command"
+                },
+                {
+                  "command": "'C:\\Users\\me\\AppData\\Local\\Agent HUD\\agent-hud.exe' --completion-hook cursor",
+                  "type": "command"
+                },
+                "text"
+              ],
+              "matcher": ""
+            }
+          ],
+          "beforeSubmitPrompt": [
+            {
+              "hooks": [
+                {
+                  "command": "'C:\\Users\\me\\AppData\\Local\\Agent HUD\\agent-hud.exe' --completion-hook cursor",
+                  "type": "command"
+                },
+                {
+                  "command": "'C:\\Users\\me\\AppData\\Local\\Agent HUD\\agent-hud.exe' --completion-hook cursor",
+                  "type": "command"
+                },
+                "text"
+              ],
+              "matcher": ""
+            }
+          ],
+          "postToolUse": [
+            {
+              "hooks": [
+                {
+                  "command": "'C:\\Users\\me\\AppData\\Local\\Agent HUD\\agent-hud.exe' --completion-hook cursor",
+                  "type": "command"
+                },
+                {
+                  "command": "'C:\\Users\\me\\AppData\\Local\\Agent HUD\\agent-hud.exe' --completion-hook cursor",
+                  "type": "command"
+                },
+                "text"
+              ],
+              "matcher": ""
+            }
+          ],
           "stop": [
             {
               "hooks": [
@@ -90223,6 +90334,51 @@
     "input": {
       "current": {
         "hooks": {
+          "afterAgentResponse": [
+            {
+              "hooks": [
+                {
+                  "args": [
+                    "--completion-hook",
+                    "cursor"
+                  ],
+                  "command": "",
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
+          ],
+          "beforeSubmitPrompt": [
+            {
+              "hooks": [
+                {
+                  "args": [
+                    "--completion-hook",
+                    "cursor"
+                  ],
+                  "command": "",
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
+          ],
+          "postToolUse": [
+            {
+              "hooks": [
+                {
+                  "args": [
+                    "--completion-hook",
+                    "cursor"
+                  ],
+                  "command": "",
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
+          ],
           "stop": [
             {
               "hooks": [
@@ -90253,6 +90409,51 @@
       },
       "remove": {
         "hooks": {
+          "afterAgentResponse": [
+            {
+              "hooks": [
+                {
+                  "args": [
+                    "--completion-hook",
+                    "cursor"
+                  ],
+                  "command": "",
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
+          ],
+          "beforeSubmitPrompt": [
+            {
+              "hooks": [
+                {
+                  "args": [
+                    "--completion-hook",
+                    "cursor"
+                  ],
+                  "command": "",
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
+          ],
+          "postToolUse": [
+            {
+              "hooks": [
+                {
+                  "args": [
+                    "--completion-hook",
+                    "cursor"
+                  ],
+                  "command": "",
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
+          ],
           "stop": [
             {
               "hooks": [
@@ -90277,6 +90478,48 @@
     "input": {
       "current": {
         "hooks": {
+          "afterAgentResponse": [
+            {
+              "hooks": [
+                {
+                  "args": [
+                    "--hook"
+                  ],
+                  "command": "C:\\Tools\\audit.exe",
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
+          ],
+          "beforeSubmitPrompt": [
+            {
+              "hooks": [
+                {
+                  "args": [
+                    "--hook"
+                  ],
+                  "command": "C:\\Tools\\audit.exe",
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
+          ],
+          "postToolUse": [
+            {
+              "hooks": [
+                {
+                  "args": [
+                    "--hook"
+                  ],
+                  "command": "C:\\Tools\\audit.exe",
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
+          ],
           "stop": [
             {
               "hooks": [
@@ -90306,6 +90549,48 @@
       },
       "remove": {
         "hooks": {
+          "afterAgentResponse": [
+            {
+              "hooks": [
+                {
+                  "args": [
+                    "--hook"
+                  ],
+                  "command": "C:\\Tools\\audit.exe",
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
+          ],
+          "beforeSubmitPrompt": [
+            {
+              "hooks": [
+                {
+                  "args": [
+                    "--hook"
+                  ],
+                  "command": "C:\\Tools\\audit.exe",
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
+          ],
+          "postToolUse": [
+            {
+              "hooks": [
+                {
+                  "args": [
+                    "--hook"
+                  ],
+                  "command": "C:\\Tools\\audit.exe",
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
+          ],
           "stop": [
             {
               "hooks": [
@@ -90329,6 +90614,96 @@
     "input": {
       "current": {
         "hooks": {
+          "afterAgentResponse": [
+            {
+              "hooks": [
+                {
+                  "args": [
+                    "--completion-hook",
+                    "other-client"
+                  ],
+                  "command": "C:\\Tools\\other.exe",
+                  "type": "command"
+                },
+                {
+                  "args": [
+                    "--completion-hook"
+                  ],
+                  "command": "C:\\Tools\\other.exe",
+                  "type": "command"
+                },
+                {
+                  "args": [
+                    "--completion-hook",
+                    "cursor"
+                  ],
+                  "exec": "C:\\Users\\me\\AppData\\Local\\Agent HUD\\agent-hud.exe",
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
+          ],
+          "beforeSubmitPrompt": [
+            {
+              "hooks": [
+                {
+                  "args": [
+                    "--completion-hook",
+                    "other-client"
+                  ],
+                  "command": "C:\\Tools\\other.exe",
+                  "type": "command"
+                },
+                {
+                  "args": [
+                    "--completion-hook"
+                  ],
+                  "command": "C:\\Tools\\other.exe",
+                  "type": "command"
+                },
+                {
+                  "args": [
+                    "--completion-hook",
+                    "cursor"
+                  ],
+                  "exec": "C:\\Users\\me\\AppData\\Local\\Agent HUD\\agent-hud.exe",
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
+          ],
+          "postToolUse": [
+            {
+              "hooks": [
+                {
+                  "args": [
+                    "--completion-hook",
+                    "other-client"
+                  ],
+                  "command": "C:\\Tools\\other.exe",
+                  "type": "command"
+                },
+                {
+                  "args": [
+                    "--completion-hook"
+                  ],
+                  "command": "C:\\Tools\\other.exe",
+                  "type": "command"
+                },
+                {
+                  "args": [
+                    "--completion-hook",
+                    "cursor"
+                  ],
+                  "exec": "C:\\Users\\me\\AppData\\Local\\Agent HUD\\agent-hud.exe",
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
+          ],
           "stop": [
             {
               "hooks": [
@@ -90374,6 +90749,96 @@
       },
       "remove": {
         "hooks": {
+          "afterAgentResponse": [
+            {
+              "hooks": [
+                {
+                  "args": [
+                    "--completion-hook",
+                    "other-client"
+                  ],
+                  "command": "C:\\Tools\\other.exe",
+                  "type": "command"
+                },
+                {
+                  "args": [
+                    "--completion-hook"
+                  ],
+                  "command": "C:\\Tools\\other.exe",
+                  "type": "command"
+                },
+                {
+                  "args": [
+                    "--completion-hook",
+                    "cursor"
+                  ],
+                  "exec": "C:\\Users\\me\\AppData\\Local\\Agent HUD\\agent-hud.exe",
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
+          ],
+          "beforeSubmitPrompt": [
+            {
+              "hooks": [
+                {
+                  "args": [
+                    "--completion-hook",
+                    "other-client"
+                  ],
+                  "command": "C:\\Tools\\other.exe",
+                  "type": "command"
+                },
+                {
+                  "args": [
+                    "--completion-hook"
+                  ],
+                  "command": "C:\\Tools\\other.exe",
+                  "type": "command"
+                },
+                {
+                  "args": [
+                    "--completion-hook",
+                    "cursor"
+                  ],
+                  "exec": "C:\\Users\\me\\AppData\\Local\\Agent HUD\\agent-hud.exe",
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
+          ],
+          "postToolUse": [
+            {
+              "hooks": [
+                {
+                  "args": [
+                    "--completion-hook",
+                    "other-client"
+                  ],
+                  "command": "C:\\Tools\\other.exe",
+                  "type": "command"
+                },
+                {
+                  "args": [
+                    "--completion-hook"
+                  ],
+                  "command": "C:\\Tools\\other.exe",
+                  "type": "command"
+                },
+                {
+                  "args": [
+                    "--completion-hook",
+                    "cursor"
+                  ],
+                  "exec": "C:\\Users\\me\\AppData\\Local\\Agent HUD\\agent-hud.exe",
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
+          ],
           "stop": [
             {
               "hooks": [
@@ -90413,6 +90878,72 @@
     "input": {
       "current": {
         "hooks": {
+          "afterAgentResponse": [
+            "text",
+            {
+              "matcher": "Bash"
+            },
+            {
+              "hooks": "not-a-list"
+            },
+            {
+              "hooks": [
+                {
+                  "args": [
+                    "--completion-hook",
+                    "cursor"
+                  ],
+                  "command": "C:\\Users\\me\\AppData\\Local\\Agent HUD\\agent-hud.exe",
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
+          ],
+          "beforeSubmitPrompt": [
+            "text",
+            {
+              "matcher": "Bash"
+            },
+            {
+              "hooks": "not-a-list"
+            },
+            {
+              "hooks": [
+                {
+                  "args": [
+                    "--completion-hook",
+                    "cursor"
+                  ],
+                  "command": "C:\\Users\\me\\AppData\\Local\\Agent HUD\\agent-hud.exe",
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
+          ],
+          "postToolUse": [
+            "text",
+            {
+              "matcher": "Bash"
+            },
+            {
+              "hooks": "not-a-list"
+            },
+            {
+              "hooks": [
+                {
+                  "args": [
+                    "--completion-hook",
+                    "cursor"
+                  ],
+                  "command": "C:\\Users\\me\\AppData\\Local\\Agent HUD\\agent-hud.exe",
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
+          ],
           "stop": [
             "text",
             {
@@ -90450,6 +90981,60 @@
       },
       "remove": {
         "hooks": {
+          "afterAgentResponse": [
+            "text",
+            {
+              "matcher": "Bash"
+            },
+            {
+              "hooks": "not-a-list"
+            },
+            {
+              "hooks": [
+                {
+                  "command": "'C:\\Users\\me\\AppData\\Local\\Agent HUD\\agent-hud.exe' --completion-hook cursor",
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
+          ],
+          "beforeSubmitPrompt": [
+            "text",
+            {
+              "matcher": "Bash"
+            },
+            {
+              "hooks": "not-a-list"
+            },
+            {
+              "hooks": [
+                {
+                  "command": "'C:\\Users\\me\\AppData\\Local\\Agent HUD\\agent-hud.exe' --completion-hook cursor",
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
+          ],
+          "postToolUse": [
+            "text",
+            {
+              "matcher": "Bash"
+            },
+            {
+              "hooks": "not-a-list"
+            },
+            {
+              "hooks": [
+                {
+                  "command": "'C:\\Users\\me\\AppData\\Local\\Agent HUD\\agent-hud.exe' --completion-hook cursor",
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
+          ],
           "stop": [
             "text",
             {
@@ -90477,6 +91062,45 @@
     "input": {
       "current": {
         "hooks": {
+          "afterAgentResponse": [
+            {
+              "hooks": [
+                {
+                  "command": "'C:\\Users\\me\\AppData\\Local\\Agent HUD\\agent-hud.exe' --completion-hook cursor",
+                  "commandWindows": "powershell.exe -NoLogo -NoProfile -NonInteractive -EncodedCommand c3RhbGU=",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
+          ],
+          "beforeSubmitPrompt": [
+            {
+              "hooks": [
+                {
+                  "command": "'C:\\Users\\me\\AppData\\Local\\Agent HUD\\agent-hud.exe' --completion-hook cursor",
+                  "commandWindows": "powershell.exe -NoLogo -NoProfile -NonInteractive -EncodedCommand c3RhbGU=",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
+          ],
+          "postToolUse": [
+            {
+              "hooks": [
+                {
+                  "command": "'C:\\Users\\me\\AppData\\Local\\Agent HUD\\agent-hud.exe' --completion-hook cursor",
+                  "commandWindows": "powershell.exe -NoLogo -NoProfile -NonInteractive -EncodedCommand c3RhbGU=",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
+          ],
           "stop": [
             {
               "hooks": [
@@ -90505,6 +91129,45 @@
       },
       "remove": {
         "hooks": {
+          "afterAgentResponse": [
+            {
+              "hooks": [
+                {
+                  "command": "'C:\\Users\\me\\AppData\\Local\\Agent HUD\\agent-hud.exe' --completion-hook cursor",
+                  "commandWindows": "powershell.exe -NoLogo -NoProfile -NonInteractive -EncodedCommand c3RhbGU=",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
+          ],
+          "beforeSubmitPrompt": [
+            {
+              "hooks": [
+                {
+                  "command": "'C:\\Users\\me\\AppData\\Local\\Agent HUD\\agent-hud.exe' --completion-hook cursor",
+                  "commandWindows": "powershell.exe -NoLogo -NoProfile -NonInteractive -EncodedCommand c3RhbGU=",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
+          ],
+          "postToolUse": [
+            {
+              "hooks": [
+                {
+                  "command": "'C:\\Users\\me\\AppData\\Local\\Agent HUD\\agent-hud.exe' --completion-hook cursor",
+                  "commandWindows": "powershell.exe -NoLogo -NoProfile -NonInteractive -EncodedCommand c3RhbGU=",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
+          ],
           "stop": [
             {
               "hooks": [
@@ -90527,6 +91190,54 @@
     "input": {
       "current": {
         "hooks": {
+          "afterAgentResponse": [
+            {
+              "hooks": [
+                {
+                  "args": [
+                    "--completion-hook",
+                    "cursor"
+                  ],
+                  "command": "C:\\Users\\me\\AppData\\Local\\Agent HUD\\agent-hud.exe",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
+          ],
+          "beforeSubmitPrompt": [
+            {
+              "hooks": [
+                {
+                  "args": [
+                    "--completion-hook",
+                    "cursor"
+                  ],
+                  "command": "C:\\Users\\me\\AppData\\Local\\Agent HUD\\agent-hud.exe",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
+          ],
+          "postToolUse": [
+            {
+              "hooks": [
+                {
+                  "args": [
+                    "--completion-hook",
+                    "cursor"
+                  ],
+                  "command": "C:\\Users\\me\\AppData\\Local\\Agent HUD\\agent-hud.exe",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
+          ],
           "stop": [
             {
               "hooks": [
@@ -90558,6 +91269,42 @@
       },
       "remove": {
         "hooks": {
+          "afterAgentResponse": [
+            {
+              "hooks": [
+                {
+                  "command": "'C:\\Users\\me\\AppData\\Local\\Agent HUD\\agent-hud.exe' --completion-hook cursor",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
+          ],
+          "beforeSubmitPrompt": [
+            {
+              "hooks": [
+                {
+                  "command": "'C:\\Users\\me\\AppData\\Local\\Agent HUD\\agent-hud.exe' --completion-hook cursor",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
+          ],
+          "postToolUse": [
+            {
+              "hooks": [
+                {
+                  "command": "'C:\\Users\\me\\AppData\\Local\\Agent HUD\\agent-hud.exe' --completion-hook cursor",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
+          ],
           "stop": [
             {
               "hooks": [
@@ -90579,6 +91326,42 @@
     "input": {
       "current": {
         "hooks": {
+          "afterAgentResponse": [
+            {
+              "hooks": [
+                {
+                  "command": "'C:\\Users\\me\\AppData\\Local\\Agent HUD\\agent-hud.exe' --completion-hook cursor",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
+          ],
+          "beforeSubmitPrompt": [
+            {
+              "hooks": [
+                {
+                  "command": "'C:\\Users\\me\\AppData\\Local\\Agent HUD\\agent-hud.exe' --completion-hook cursor",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
+          ],
+          "postToolUse": [
+            {
+              "hooks": [
+                {
+                  "command": "'C:\\Users\\me\\AppData\\Local\\Agent HUD\\agent-hud.exe' --completion-hook cursor",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
+          ],
           "stop": [
             {
               "hooks": [
@@ -90606,6 +91389,42 @@
       },
       "remove": {
         "hooks": {
+          "afterAgentResponse": [
+            {
+              "hooks": [
+                {
+                  "command": "'C:\\Users\\me\\AppData\\Local\\Agent HUD\\agent-hud.exe' --completion-hook cursor",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
+          ],
+          "beforeSubmitPrompt": [
+            {
+              "hooks": [
+                {
+                  "command": "'C:\\Users\\me\\AppData\\Local\\Agent HUD\\agent-hud.exe' --completion-hook cursor",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
+          ],
+          "postToolUse": [
+            {
+              "hooks": [
+                {
+                  "command": "'C:\\Users\\me\\AppData\\Local\\Agent HUD\\agent-hud.exe' --completion-hook cursor",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
+          ],
           "stop": [
             {
               "hooks": [

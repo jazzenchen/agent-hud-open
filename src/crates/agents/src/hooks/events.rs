@@ -115,6 +115,23 @@ pub fn parse_event(
                 .completion
                 .as_ref()
                 .ok_or("This client has no completion hook format")?;
+            if let Some(begin) = completion.begin.as_ref().filter(|begin| {
+                payload["hook_event_name"]
+                    .as_str()
+                    .is_some_and(|name| begin.events.contains(&name))
+            }) {
+                let Some(began) = (begin.read)(payload) else {
+                    return Ok(None);
+                };
+                let target = json!({"kind":"cursor-agent","id":began.session,"cwd":began.workspace});
+                return Ok(Some(event(
+                    source,
+                    &began.session,
+                    now_ms,
+                    "session-observation",
+                    json!({"turnId":began.turn,"state":"running","startedAtMs":now_ms,"observedAtMs":now_ms,"workspace":began.workspace,"outcome":null,"navigationTarget":if source == "cursor" {target} else {Value::Null}}),
+                )));
+            }
             let Some(done) = (completion.read)(payload, now_ms) else {
                 return Ok(None);
             };
