@@ -22,9 +22,17 @@ pub(super) fn random(bytes: &mut [u8]) -> io::Result<()> {
     fs::File::open("/dev/urandom")?.read_exact(bytes)
 }
 
+/// A handle that closes its connection from another thread.
+pub struct ShutdownHandle(UnixStream);
+impl ShutdownHandle {
+    pub fn shutdown(&self) {
+        let _ = self.0.shutdown(std::net::Shutdown::Both);
+    }
+}
+
 impl DesktopIpc {
-    pub fn shutdown_handle(&self) -> Result<UnixStream, IpcError> {
-        Ok(self.socket.stream.try_clone()?)
+    pub fn shutdown_handle(&self) -> Result<ShutdownHandle, IpcError> {
+        Ok(ShutdownHandle(self.socket.stream.try_clone()?))
     }
 }
 

@@ -82,6 +82,10 @@ pub(super) fn status(_identifier: &str) -> Result<Value, String> {
     Ok(json!({"platform":"macos","launchAtLogin":login()}))
 }
 
+/// Settings looks only where `cli_candidates` says.
+pub(super) fn bundled_cli(_command: &str) -> Option<PathBuf> {
+    None
+}
 pub(super) fn cli_candidates(home: &Path, command: &str, dirs: Vec<PathBuf>) -> Vec<PathBuf> {
     cli_candidates_with(
         home,
