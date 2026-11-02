@@ -6,7 +6,8 @@ mod files;
 pub(crate) mod pipe;
 mod process;
 mod secrets;
-pub(crate) use apps::{activate_app, app_running};
+mod shortcut;
+pub(crate) use apps::{activate_app, app_running, registered_bundle};
 pub(crate) use process::{codex_cli_on_port, parent_processes};
 pub(crate) use secrets::{app_cookie, stored_secret};
 pub(crate) const READS_PROCESS_ENVIRONMENT: bool = false;
@@ -14,7 +15,7 @@ pub(crate) const READS_PROCESS_ENVIRONMENT: bool = false;
 pub(crate) const MOVES_CLAUDE_JOBS: bool = false;
 pub(crate) use files::{
     hook_configuration, owned_by_user, owner_only, private_append, private_directory, private_file,
-    read_stdin,
+    read_stdin, user_transcript,
 };
 use std::{
     path::{Path, PathBuf},
@@ -81,15 +82,15 @@ pub(crate) fn application_installed(home: &Path, env: &Environment, name: &str) 
     if matches!(name, "Codex" | "ChatGPT") {
         return codex::installation(home, env).installed;
     }
+    if name == "Claude" && apps::registered_bundle("com.anthropic.claudefordesktop") {
+        return true;
+    }
     [
         local_app(home, env).join("Programs"),
         variable(env, "ProgramFiles", home).unwrap_or_else(|| PathBuf::from("C:/Program Files")),
     ]
     .iter()
     .any(|dir| dir.join(name).is_dir())
-}
-pub(crate) fn registered_bundle(_id: &str) -> bool {
-    false
 }
 pub(crate) fn executable_dirs(home: &Path, env: &Environment) -> Vec<PathBuf> {
     let mut dirs = path_entries(env);
@@ -219,6 +220,15 @@ pub(crate) fn source_roots(home: &Path) -> Vec<agent_hud_core::SourceRoot> {
 }
 
 pub(crate) fn open_session_url(url: &str) -> Result<(), String> {
+    // A scheme no handler claims (a Codex app installed without one) goes to
+    // the app's executable instead of failing.
+    if let Some(started) = apps::open_unregistered_link(url) {
+        return if started {
+            Ok(())
+        } else {
+            Err("The native client could not open this session".into())
+        };
+    }
     use std::{
         ffi::{c_void, OsStr},
         os::windows::ffi::OsStrExt,

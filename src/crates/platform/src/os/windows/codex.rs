@@ -29,7 +29,19 @@ pub(super) struct Installation {
 }
 
 pub(super) fn installation(home: &Path, env: &Environment) -> Installation {
-    locate(home, env, &registered_applications())
+    let mut found = locate(home, env, &registered_applications());
+    // An app installed anywhere else, found from its running process or its
+    // Start menu shortcut (a portable copy such as D:\ChatGPT\app).
+    if let Some(application) = super::apps::installed_executable("com.openai.codex") {
+        found.installed = true;
+        if let Some(directory) = application.parent() {
+            let engine = directory.join("resources/codex.exe");
+            if engine.is_file() && !found.engines.contains(&engine) {
+                found.engines.push(engine);
+            }
+        }
+    }
+    found
 }
 
 fn locate(home: &Path, env: &Environment, registered: &[PathBuf]) -> Installation {

@@ -82,6 +82,10 @@ pub(super) fn status(_identifier: &str) -> Result<Value, String> {
     Ok(json!({"platform":"macos","launchAtLogin":login()}))
 }
 
+/// The open build delegates no hook owner on this host.
+pub(super) fn installed_hook_owner(_product: &str, _binary: &str) -> Option<PathBuf> {
+    None
+}
 /// Settings looks only where `cli_candidates` says.
 pub(super) fn bundled_cli(_command: &str) -> Option<PathBuf> {
     None

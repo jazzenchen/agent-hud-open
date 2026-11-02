@@ -354,17 +354,14 @@ fn remove_ledger(directory: &Path) -> Result<(), String> {
 }
 
 fn open_once(directory: &Path) -> Result<Opened, Failure> {
-    let database =
-        Connection::open(directory.join("ingestion.sqlite")).map_err(Failure::sql)?;
+    let database = Connection::open(directory.join("ingestion.sqlite")).map_err(Failure::sql)?;
     database
         .busy_timeout(Duration::from_secs(5))
         .map_err(Failure::sql)?;
     schema(&database).map_err(Failure::sql)?;
     windows_paths::migrate(&database).map_err(Failure::sql)?;
 
-    let transaction = database
-        .unchecked_transaction()
-        .map_err(Failure::sql)?;
+    let transaction = database.unchecked_transaction().map_err(Failure::sql)?;
     let mut logs = HashMap::new();
     let mut max_updated_at = 0i64;
     {
@@ -450,8 +447,9 @@ mod tests {
             .map(|entry| entry.file_name().to_string_lossy().into_owned())
             .collect();
         assert!(
-            names.iter().all(|name| name.starts_with("ingestion.sqlite")
-                && !name.contains("damaged")),
+            names
+                .iter()
+                .all(|name| name.starts_with("ingestion.sqlite") && !name.contains("damaged")),
             "no copy of the damaged file is kept: {names:?}"
         );
     }
