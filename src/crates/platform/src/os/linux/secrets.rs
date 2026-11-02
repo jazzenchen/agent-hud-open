@@ -19,3 +19,8 @@ pub(crate) fn app_cookie(
 ) -> Answer<String> {
     Answer::Unsupported
 }
+
+/// Electron's safe storage can't be opened on this OS yet.
+pub(crate) fn unseal_safe_storage(_app: &str, _encrypted: &[u8]) -> Answer<String> {
+    Answer::Unsupported
+}

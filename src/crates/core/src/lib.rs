@@ -283,6 +283,14 @@ impl AgentHudCore {
 
     pub fn set_provider_discovery(&mut self, discovery: Vec<ProviderDiscovery>) {
         self.discovery = discovery;
+        self.sessions_checked = None;
+        self.sessions_fingerprint = None;
+        self.render.last = None;
+    }
+
+    /// The Claude desktop app's data folders on this host, beyond the macOS default.
+    pub fn set_claude_desktop_bases(&mut self, bases: Vec<PathBuf>) {
+        self.claude_desktop.index.set_bases(bases);
     }
 
     /// Whether logs are still waiting to be read: while indexing, the

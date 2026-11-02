@@ -12,7 +12,7 @@ mod apps;
 mod legacy_history;
 mod process;
 mod secrets;
-pub(crate) use app_cookies::app_cookie;
+pub(crate) use app_cookies::{app_cookie, unseal_safe_storage};
 pub(crate) use apps::{activate_app, app_running, ACTIVATES_APPS};
 pub(crate) use process::{codex_cli_on_port, parent_processes};
 pub(crate) use secrets::stored_secret;
@@ -45,6 +45,10 @@ pub(crate) fn caches_dir(home: &Path) -> PathBuf {
 }
 pub(crate) fn app_support(home: &Path, _env: &Environment) -> PathBuf {
     home.join("Library/Application Support")
+}
+/// Where the Claude desktop app keeps its session metadata.
+pub(crate) fn claude_desktop_bases(home: &Path, env: &Environment) -> Vec<PathBuf> {
+    vec![app_support(home, env).join("Claude")]
 }
 pub(crate) fn application_installed(home: &Path, _env: &Environment, name: &str) -> bool {
     [PathBuf::from("/Applications"), home.join("Applications")]
@@ -175,9 +179,55 @@ pub(crate) fn registered_bundle(id: &str) -> bool {
     !registered_applications(id).is_empty()
 }
 
+/// Whether Launch Services has an application that can open this URL.
+pub(crate) fn registered_url(url: &str) -> bool {
+    use std::{ffi::c_void, ptr};
+    #[link(name = "CoreServices", kind = "framework")]
+    unsafe extern "C" {
+        fn LSCopyDefaultApplicationURLForURL(
+            url: *const c_void,
+            roles: u32,
+            error: *mut *const c_void,
+        ) -> *const c_void;
+    }
+    #[link(name = "CoreFoundation", kind = "framework")]
+    unsafe extern "C" {
+        fn CFURLCreateWithBytes(
+            allocator: *const c_void,
+            bytes: *const u8,
+            length: isize,
+            encoding: u32,
+            base: *const c_void,
+        ) -> *const c_void;
+        fn CFRelease(value: *const c_void);
+    }
+    if url.is_empty() || url.contains('\0') {
+        return false;
+    }
+    unsafe {
+        let url = CFURLCreateWithBytes(
+            ptr::null(),
+            url.as_ptr(),
+            url.len() as isize,
+            0x08000100,
+            ptr::null(),
+        );
+        if url.is_null() {
+            return false;
+        }
+        let app = LSCopyDefaultApplicationURLForURL(url, u32::MAX, ptr::null_mut());
+        CFRelease(url);
+        if app.is_null() {
+            return false;
+        }
+        CFRelease(app);
+        true
+    }
+}
+
 /// The applications Launch Services knows by bundle identifier, wherever
 /// they are installed (agent-hud-native-open VendorCatalog.applications).
-pub(crate) fn registered_applications(id: &str) -> Vec<PathBuf> {
+pub fn registered_applications(id: &str) -> Vec<PathBuf> {
     use std::{
         ffi::{c_void, CStr, CString},
         os::unix::ffi::OsStrExt,
@@ -272,3 +322,22 @@ pub(crate) fn suppress_sigpipe(fd: libc::c_int) {
     }
 }
 pub(crate) const SOCKET_SEND_FLAGS: libc::c_int = 0;
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn invalid_urls_have_no_registered_application() {
+        assert!(!super::registered_url(""));
+        assert!(!super::registered_url("dsh://open\0"));
+    }
+
+    #[test]
+    fn an_unknown_scheme_has_no_registered_application() {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let url = format!("agent-hud-unregistered-{}-{now}://open", std::process::id());
+        assert!(!super::registered_url(&url));
+    }
+}

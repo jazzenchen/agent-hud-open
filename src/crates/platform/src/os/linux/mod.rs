@@ -12,7 +12,7 @@ mod process;
 mod secrets;
 pub(crate) use apps::{activate_app, app_running, ACTIVATES_APPS};
 pub(crate) use process::{codex_cli_on_port, parent_processes};
-pub(crate) use secrets::{app_cookie, stored_secret};
+pub(crate) use secrets::{app_cookie, stored_secret, unseal_safe_storage};
 pub(crate) const READS_PROCESS_ENVIRONMENT: bool = false;
 /// Claude has no desktop app on this host to take a background job in.
 pub(crate) const MOVES_CLAUDE_JOBS: bool = false;
@@ -42,6 +42,10 @@ pub(crate) fn caches_dir(home: &Path) -> PathBuf {
 pub(crate) fn app_support(home: &Path, env: &Environment) -> PathBuf {
     config_home(home, env)
 }
+/// Where a Claude desktop build keeps its session metadata: the config folder.
+pub(crate) fn claude_desktop_bases(home: &Path, env: &Environment) -> Vec<PathBuf> {
+    vec![app_support(home, env).join("Claude")]
+}
 pub(crate) fn application_installed(home: &Path, env: &Environment, name: &str) -> bool {
     let file = format!("{}.desktop", name.to_lowercase().replace(' ', "-"));
     [
@@ -52,6 +56,10 @@ pub(crate) fn application_installed(home: &Path, env: &Environment, name: &str) 
     .any(|dir| dir.join(&file).is_file())
 }
 pub(crate) fn registered_bundle(_id: &str) -> bool {
+    false
+}
+/// URL-handler lookup through XDG associations is not implemented.
+pub(crate) fn registered_url(_url: &str) -> bool {
     false
 }
 pub(crate) fn executable_dirs(home: &Path, env: &Environment) -> Vec<PathBuf> {
@@ -152,3 +160,11 @@ pub(crate) fn prepare_socket_address(_address: &mut libc::sockaddr_un) {}
 /// Linux suppresses SIGPIPE per send with MSG_NOSIGNAL instead.
 pub(crate) fn suppress_sigpipe(_fd: libc::c_int) {}
 pub(crate) const SOCKET_SEND_FLAGS: libc::c_int = libc::MSG_NOSIGNAL;
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn url_handler_discovery_is_unavailable() {
+        assert!(!super::registered_url("dsh://open"));
+    }
+}

@@ -1,6 +1,7 @@
 //! Only typed client-owned destinations become fixed native URL schemes. No
 //! command, arbitrary URL or callback-declared host is accepted as navigation.
-use serde_json::Value;
+use agent_hud_agents::{Discovery, Os, ALL};
+use serde_json::{json, Value};
 mod antigravity;
 #[cfg(windows)]
 #[path = "navigation/antigravity_windows.rs"]
@@ -33,9 +34,13 @@ fn resolve_claude_desktop_local_id(id: &str, cowork: bool) -> Option<String> {
     } else {
         "claude-code-sessions"
     };
-    let root = home.join("Library/Application Support/Claude").join(folder);
+    let env = std::env::vars().collect::<crate::os::Environment>();
     let mut matched = Vec::new();
-    for org in std::fs::read_dir(root).ok()?.flatten() {
+    for org in crate::os::claude_desktop_bases(&home, &env)
+        .into_iter()
+        .filter_map(|base| std::fs::read_dir(base.join(folder)).ok())
+        .flat_map(|entries| entries.flatten())
+    {
         let Ok(acct_dir) = std::fs::read_dir(org.path()) else {
             continue;
         };
@@ -84,8 +89,24 @@ fn uuid(value: &str) -> bool {
         })
 }
 pub fn session_url(target: &Value) -> Option<String> {
+    session_url_on(target, crate::os::OS, crate::os::registered_url)
+}
+pub(super) fn app_target(discovery: &Discovery) -> Option<Value> {
+    let target = json!({"kind":discovery.app_navigation?.kind});
+    session_url(&target).map(|_| target)
+}
+fn session_url_on(target: &Value, os: Os, registered: impl Fn(&str) -> bool) -> Option<String> {
+    let kind = target["kind"].as_str()?;
+    if let Some(navigation) = ALL
+        .iter()
+        .filter_map(|agent| agent.discovery.app_navigation)
+        .find(|navigation| navigation.kind == kind)
+    {
+        let url = navigation.url.on(os).value()?;
+        return registered(url).then(|| (*url).to_owned());
+    }
     let id = target["id"].as_str()?;
-    match target["kind"].as_str()? {
+    match kind {
         // As Open does, the link also launches the Codex app when it is closed.
         "codex-thread" | "codexThread"
             if uuid(id)
@@ -158,26 +179,4 @@ pub fn session_url(target: &Value) -> Option<String> {
 }
 
 #[cfg(test)]
-mod cursor_tests {
-    use super::session_url;
-    use serde_json::json;
-
-    #[test]
-    fn cursor_cloud_agent_opens_the_agents_window() {
-        let target = json!({"kind":"cursor-agent","id":"bc-1234","cwd":null});
-        assert_eq!(
-            session_url(&target).as_deref(),
-            Some("cursor://anysphere.cursor-deeplink/agent?id=bc-1234")
-        );
-    }
-
-    #[test]
-    fn cursor_local_session_opens_its_folder() {
-        let target = json!({"kind":"cursor-agent","id":"3e8f2eb2-c0d0","cwd":"/Users/a/my proj"});
-        assert_eq!(
-            session_url(&target).as_deref(),
-            Some("cursor://file/Users/a/my%20proj")
-        );
-        assert!(session_url(&json!({"kind":"cursor-agent","id":"x","cwd":null})).is_none());
-    }
-}
+mod tests;

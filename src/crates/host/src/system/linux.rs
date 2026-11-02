@@ -87,6 +87,10 @@ pub(super) fn register_if_never_registered() -> bool {
     false
 }
 
+/// Settings looks only where `cli_candidates` says.
+pub(super) fn bundled_cli(_command: &str) -> Option<PathBuf> {
+    None
+}
 pub(super) fn cli_candidates(_home: &Path, command: &str, dirs: Vec<PathBuf>) -> Vec<PathBuf> {
     dirs.into_iter().map(|dir| dir.join(command)).collect()
 }

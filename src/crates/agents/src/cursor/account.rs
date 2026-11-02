@@ -5,10 +5,14 @@
 //! Sessions and their tokens are read on this Mac (`sessions.rs`, the turn
 //! log), never from the dashboard.
 use crate::account::{
-    account_id, legacy_account, locate, DatabaseFailure, Host, HttpFailure, HttpRequest, Reading,
+    account_id, legacy_account, locate, Answer, DatabaseFailure, Host, HttpFailure, HttpRequest,
+    Reading,
 };
 use crate::{l10n, Location, PerOs, Support};
-use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
+use base64::{
+    engine::general_purpose::{STANDARD, URL_SAFE_NO_PAD},
+    Engine,
+};
 use chrono::{DateTime, FixedOffset, Utc};
 use serde_json::{json, Value};
 use std::time::Duration;
@@ -142,6 +146,38 @@ pub(crate) struct SignIn {
     pub email: Option<String>,
 }
 
+/// The prefix Cursor puts on an access token sealed with Electron's safe
+/// storage, followed by `encryptString`'s output in standard Base64.
+const SEALED: &str = "cursor-safe-storage:v1:";
+
+/// The access token in Cursor's database: a sealed one is opened first, a
+/// plain JWT is returned as it is.
+fn opened_token(host: &dyn Host, stored: &str) -> Result<String, String> {
+    let Some(encoded) = stored.strip_prefix(SEALED) else {
+        return Ok(stored.to_owned());
+    };
+    let encrypted = STANDARD.decode(encoded).map_err(|_| auth_format())?;
+    match host.unseal_safe_storage("Cursor", &encrypted) {
+        Answer::Found(token) => Ok(token),
+        Answer::Denied => Err(l10n::text(
+            "Cursor 加密了登录信息，钥匙串访问被拒绝。重新打开 Agent HUD 后会再次询问",
+            "Cursor encrypted its sign-in, and keychain access was refused. Agent HUD asks again after it restarts.",
+        )),
+        Answer::Missing => Err(l10n::text(
+            "Cursor 加密了登录信息，但找不到它的钥匙串项",
+            "Cursor encrypted its sign-in, but its keychain item is missing.",
+        )),
+        Answer::Unsupported => Err(l10n::text(
+            "Cursor 加密了登录信息，此系统还不能解密",
+            "Cursor encrypted its sign-in; this system cannot unlock it yet.",
+        )),
+        Answer::Failed => Err(l10n::text(
+            "Cursor 加密的登录信息无法解密",
+            "Cursor's encrypted sign-in could not be unlocked.",
+        )),
+    }
+}
+
 /// The sign-in Cursor keeps in its database; None where Cursor is not here.
 pub(crate) fn sign_in(host: &dyn Host) -> Result<Option<SignIn>, String> {
     let Ok(database) = locate(host, &DATABASE) else {
@@ -181,12 +217,13 @@ pub(crate) fn sign_in(host: &dyn Host) -> Result<Option<SignIn>, String> {
             })
             .transpose()
     };
-    let Some(token) = lookup("cursorAuth/accessToken")?.filter(|token| !token.is_empty()) else {
+    let Some(stored) = lookup("cursorAuth/accessToken")?.filter(|token| !token.is_empty()) else {
         return Err(l10n::text(
             "登录 Cursor 后读取账户用量",
             "Sign in to Cursor to read its account usage.",
         ));
     };
+    let token = opened_token(host, &stored)?;
     let email = lookup("cursorAuth/cachedEmail")?.filter(|email| !email.trim().is_empty());
     if token.bytes().any(|byte| matches!(byte, 0 | b'\r' | b'\n')) {
         return Err(auth_format());
@@ -379,6 +416,7 @@ pub fn read(host: &dyn Host) -> Result<Reading, String> {
 mod tests {
     use super::*;
     use crate::account::fake::FakeHost;
+    use crate::account::Answer;
     use std::path::PathBuf;
 
     const SUMMARY: &str = "https://cursor.com/api/usage-summary";
@@ -435,6 +473,72 @@ mod tests {
     fn without_cursor_there_is_nothing_to_say() {
         let reading = read(&FakeHost::new("/u")).unwrap();
         assert!(reading.account.is_none() && reading.notice.is_none());
+    }
+
+    #[test]
+    fn a_sealed_sign_in_is_read_after_it_is_unsealed() {
+        let dir = tempfile::tempdir().unwrap();
+        let jwt = token(3600);
+        let encrypted = b"v10sealed-cursor-token".to_vec();
+        let stored = format!("cursor-safe-storage:v1:{}", STANDARD.encode(&encrypted));
+        let mut host = signed_in(&dir, &stored).answer(SUMMARY, Ok(summary()));
+        host.sealed.insert(encrypted, Answer::Found(jwt.clone()));
+        let reading = read(&host).unwrap();
+        let account = reading.account.unwrap();
+        assert_eq!(account["label"], "me@example.com");
+        assert_eq!(account["plan"], "pro");
+        let sent = host.sent.borrow();
+        assert_eq!(
+            sent[0].0,
+            [(
+                "Cookie".to_owned(),
+                format!("WorkosCursorSessionToken=user_123%3A%3A{jwt}")
+            )]
+        );
+    }
+
+    #[test]
+    fn a_sealed_sign_in_names_why_it_stays_closed() {
+        let stored = format!(
+            "cursor-safe-storage:v1:{}",
+            STANDARD.encode(b"v10not-opened")
+        );
+        let dir = tempfile::tempdir().unwrap();
+        let host = signed_in(&dir, &stored);
+        assert_eq!(
+            read(&host).err().unwrap(),
+            "Cursor encrypted its sign-in; this system cannot unlock it yet."
+        );
+        let dir = tempfile::tempdir().unwrap();
+        let mut denied = signed_in(&dir, &stored);
+        denied
+            .sealed
+            .insert(b"v10not-opened".to_vec(), Answer::Denied);
+        assert_eq!(
+            read(&denied).err().unwrap(),
+            "Cursor encrypted its sign-in, and keychain access was refused. Agent HUD asks again after it restarts."
+        );
+        let dir = tempfile::tempdir().unwrap();
+        let mut missing = signed_in(&dir, &stored);
+        missing
+            .sealed
+            .insert(b"v10not-opened".to_vec(), Answer::Missing);
+        assert_eq!(
+            read(&missing).err().unwrap(),
+            "Cursor encrypted its sign-in, but its keychain item is missing."
+        );
+        let dir = tempfile::tempdir().unwrap();
+        let mut failed = signed_in(&dir, &stored);
+        failed
+            .sealed
+            .insert(b"v10not-opened".to_vec(), Answer::Failed);
+        assert_eq!(
+            read(&failed).err().unwrap(),
+            "Cursor's encrypted sign-in could not be unlocked."
+        );
+        let dir = tempfile::tempdir().unwrap();
+        let odd = signed_in(&dir, "cursor-safe-storage:v1:not base64");
+        assert_eq!(read(&odd).err().unwrap(), auth_format());
     }
 
     #[test]

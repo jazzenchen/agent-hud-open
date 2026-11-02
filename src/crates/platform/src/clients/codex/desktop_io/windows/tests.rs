@@ -204,3 +204,31 @@ fn oversized_frame_is_rejected_before_reading_its_body() {
     drop(connection);
     worker.join().unwrap();
 }
+
+#[test]
+fn shutdown_from_another_thread_ends_a_blocked_wait_and_later_reads() {
+    let (path, worker) = serve(|mut server| async move {
+        // Never writes; returns once the client side lets go of the pipe.
+        let _ = server.read(&mut [0]).await;
+    });
+    let mut connection = DesktopIpc::connect(&path, Duration::from_secs(3)).unwrap();
+    connection.renew(Duration::from_secs(30));
+    let handle = connection.shutdown_handle().unwrap();
+    let closer = thread::spawn(move || {
+        thread::sleep(Duration::from_millis(100));
+        handle.shutdown();
+    });
+    let began = Instant::now();
+    assert_eq!(
+        connection.wait_for_message(Duration::from_secs(10)),
+        Err(IpcError::Unavailable)
+    );
+    assert!(began.elapsed() < Duration::from_secs(5));
+    // A closed connection stays closed.
+    let began = Instant::now();
+    assert_eq!(connection.receive(), Err(IpcError::Unavailable));
+    assert!(began.elapsed() < Duration::from_secs(1));
+    closer.join().unwrap();
+    drop(connection);
+    worker.join().unwrap();
+}

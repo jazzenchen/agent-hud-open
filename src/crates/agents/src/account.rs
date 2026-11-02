@@ -222,6 +222,12 @@ pub trait Host {
     fn app_cookie(&self, _app: &str, _site: &str, _name: &str) -> Answer<String> {
         Answer::Unsupported
     }
+    /// Opens what Electron's `safeStorage.encryptString` wrote for `app`.
+    /// The first read may ask the user to allow it; `Unsupported` where this
+    /// OS can't open it yet.
+    fn unseal_safe_storage(&self, _app: &str, _encrypted: &[u8]) -> Answer<String> {
+        Answer::Unsupported
+    }
     /// The API credential the user saved in Agent HUD for this agent, if any.
     fn saved_credential(&self, agent: &str) -> Result<Option<Value>, String>;
     /// Whether the user turned on a reading that needs their consent, by its
@@ -459,6 +465,9 @@ pub(crate) mod fake {
         pub secrets: HashMap<String, Answer<String>>,
         /// Desktop apps' cookies, by app, site and name joined with "|".
         pub cookies: HashMap<String, Answer<String>>,
+        /// Electron safe-storage blobs this host can open, by the exact
+        /// ciphertext `encryptString` produced.
+        pub sealed: HashMap<Vec<u8>, Answer<String>>,
         pub saved: Result<Option<Value>, String>,
         /// File details by path; a listed file without them is a small regular file.
         pub info: HashMap<PathBuf, FileInfo>,
@@ -486,6 +495,8 @@ pub(crate) mod fake {
         pub engine_replies_by_home: HashMap<PathBuf, HashMap<u64, Value>>,
         /// What an engine prints as soon as it starts, by its first argument.
         pub engine_output: HashMap<String, Vec<Value>>,
+        /// Engine start failures, by the first argument.
+        pub engine_start_errors: HashMap<String, String>,
         /// Whether an engine's output ends once it has nothing more to say,
         /// as when it exits; otherwise its wait runs out.
         pub engine_ends: bool,
@@ -506,6 +517,7 @@ pub(crate) mod fake {
                 canonical_paths: HashMap::new(),
                 secrets: HashMap::new(),
                 cookies: HashMap::new(),
+                sealed: HashMap::new(),
                 saved: Ok(None),
                 info: HashMap::new(),
                 cancelled: false,
@@ -521,6 +533,7 @@ pub(crate) mod fake {
                 engine_replies: HashMap::new(),
                 engine_replies_by_home: HashMap::new(),
                 engine_output: HashMap::new(),
+                engine_start_errors: HashMap::new(),
                 engine_ends: true,
                 started: RefCell::new(vec![]),
                 engine_sent: Rc::new(RefCell::new(vec![])),
@@ -619,6 +632,13 @@ pub(crate) mod fake {
                     .map(|(key, value)| ((*key).to_owned(), value.clone()))
                     .collect(),
             ));
+            if let Some(error) = start
+                .args
+                .first()
+                .and_then(|first| self.engine_start_errors.get(*first))
+            {
+                return Err(error.clone());
+            }
             let printed = start
                 .args
                 .first()
@@ -676,6 +696,15 @@ pub(crate) mod fake {
                 .get(&format!("{app}|{site}|{name}"))
                 .cloned()
                 .unwrap_or(Answer::Missing)
+        }
+        fn unseal_safe_storage(&self, app: &str, encrypted: &[u8]) -> Answer<String> {
+            if app != "Cursor" {
+                return Answer::Unsupported;
+            }
+            self.sealed
+                .get(encrypted)
+                .cloned()
+                .unwrap_or(Answer::Unsupported)
         }
         fn saved_credential(&self, _agent: &str) -> Result<Option<Value>, String> {
             self.saved.clone()

@@ -8,7 +8,7 @@ mod process;
 mod secrets;
 pub(crate) use apps::{activate_app, app_running};
 pub(crate) use process::{codex_cli_on_port, parent_processes};
-pub(crate) use secrets::{app_cookie, stored_secret};
+pub(crate) use secrets::{app_cookie, stored_secret, unseal_safe_storage};
 pub(crate) const READS_PROCESS_ENVIRONMENT: bool = false;
 /// The desktop app's resume link for a background job is unverified here.
 pub(crate) const MOVES_CLAUDE_JOBS: bool = false;
@@ -54,6 +54,29 @@ pub(crate) fn environment_value<'a>(env: &'a Environment, key: &str) -> Option<&
 fn local_app(home: &Path, env: &Environment) -> PathBuf {
     variable(env, "LOCALAPPDATA", home).unwrap_or_else(|| home.join("AppData/Local"))
 }
+/// Where the Claude desktop app keeps its session metadata: roaming AppData,
+/// and the Microsoft Store package's redirected copy of it
+/// (`Packages\Claude_<publisher>\LocalCache\Roaming\Claude`). Only folders that exist.
+pub(crate) fn claude_desktop_bases(home: &Path, env: &Environment) -> Vec<PathBuf> {
+    let mut bases = vec![app_support(home, env).join("Claude")];
+    let packages = local_app(home, env).join("Packages");
+    let mut store: Vec<PathBuf> = std::fs::read_dir(packages)
+        .into_iter()
+        .flatten()
+        .filter_map(Result::ok)
+        .filter(|entry| {
+            entry
+                .file_name()
+                .to_str()
+                .is_some_and(|name| name.starts_with("Claude_"))
+        })
+        .map(|entry| entry.path().join("LocalCache/Roaming/Claude"))
+        .collect();
+    store.sort();
+    bases.extend(store);
+    bases.retain(|base| base.is_dir());
+    bases
+}
 pub(crate) fn application_installed(home: &Path, env: &Environment, name: &str) -> bool {
     if matches!(name, "Codex" | "ChatGPT") {
         return codex::installation(home, env).installed;
@@ -66,6 +89,10 @@ pub(crate) fn application_installed(home: &Path, env: &Environment, name: &str) 
     .any(|dir| dir.join(name).is_dir())
 }
 pub(crate) fn registered_bundle(_id: &str) -> bool {
+    false
+}
+/// URL-handler lookup through Windows associations is not implemented.
+pub(crate) fn registered_url(_url: &str) -> bool {
     false
 }
 pub(crate) fn executable_dirs(home: &Path, env: &Environment) -> Vec<PathBuf> {
@@ -125,7 +152,44 @@ pub(crate) fn engine_candidates(home: &Path, env: &Environment, name: &str) -> V
     ];
     dirs.extend(executable_dirs(home, env));
     paths.extend(dirs.into_iter().map(|dir| dir.join(format!("{name}.exe"))));
+    // Fallbacks for desktop apps that keep their CLI off PATH.
+    match name {
+        // The Claude desktop app: %APPDATA%\Claude\claude-code\<version>\<hash>\claude.exe
+        "claude" => paths.extend(newest_nested(
+            &app_support(home, env).join("Claude/claude-code"),
+            "claude.exe",
+        )),
+        // The Codex desktop app's own copy of its CLI.
+        "codex" => paths.push(home.join(".codex/.sandbox-bin/codex.exe")),
+        _ => {}
+    }
     paths
+}
+/// `<root>\*\*\<file>`, most recently modified first.
+fn newest_nested(root: &Path, file: &str) -> Vec<PathBuf> {
+    let children = |dir: &Path| -> Vec<PathBuf> {
+        std::fs::read_dir(dir)
+            .into_iter()
+            .flatten()
+            .filter_map(Result::ok)
+            .map(|entry| entry.path())
+            .filter(|path| path.is_dir())
+            .collect()
+    };
+    let mut found: Vec<_> = children(root)
+        .iter()
+        .flat_map(|version| children(version))
+        .map(|dir| dir.join(file))
+        .filter(|path| path.is_file())
+        .map(|path| {
+            let modified = std::fs::metadata(&path)
+                .and_then(|meta| meta.modified())
+                .unwrap_or(std::time::SystemTime::UNIX_EPOCH);
+            (modified, path)
+        })
+        .collect();
+    found.sort_by_key(|entry| std::cmp::Reverse(entry.0));
+    found.into_iter().map(|(_, path)| path).collect()
 }
 pub(crate) fn engine_path(home: &Path, env: &Environment) -> String {
     joined_path(executable_dirs(home, env))
@@ -205,6 +269,11 @@ pub(crate) fn legacy_preferences() -> Result<Option<serde_json::Value>, String> 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn url_handler_discovery_is_unavailable() {
+        assert!(!registered_url("dsh://open"));
+    }
 
     #[test]
     fn captured_windows_environment_keeps_os_name_semantics() {
