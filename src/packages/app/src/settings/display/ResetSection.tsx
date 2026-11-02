@@ -9,6 +9,7 @@ import type { DisplayProps } from "./controls";
 /** Everything "HUD style" resets: mode, place, sizes, look and glow. */
 const styleKeys = [
   "mode",
+  "showsHUD",
   "glowStyle",
   "glowEffect",
   "breathSeconds",

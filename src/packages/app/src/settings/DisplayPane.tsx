@@ -8,6 +8,7 @@ import {
   Page,
   Row,
   Section,
+  ToggleRow,
   useText,
   type SettingsPaneProps,
 } from "./SettingsPrimitives";
@@ -61,6 +62,15 @@ export function DisplayPane({
               width={200}
             />
           </Row>
+          <ToggleRow
+            title={t("Show the HUD on this screen", "在此屏幕显示 HUD")}
+            subtitle={t(
+              "Off hides it here while another screen shows one. With no other screen showing it, it comes back here.",
+              "关掉后，只要还有其他屏幕显示 HUD，这块屏幕就不显示；如果其他屏幕都不显示，它会在这里重新出现。",
+            )}
+            checked={config.showsHUD}
+            change={(value) => update({ showsHUD: value })}
+          />
         </Section>
       )}
       <HUDSection snapshot={snapshot} active={active} {...shared} />
