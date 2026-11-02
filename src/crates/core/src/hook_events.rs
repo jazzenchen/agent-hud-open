@@ -183,7 +183,8 @@ impl HookEvidence {
                 "origin" => hooks.is_some_and(|hooks| hooks.origin.is_some()),
                 "delivery" => agent_hud_agents::by_id(&event.source).is_some(),
                 "session-observation" | "session-forget" => {
-                    agent_hud_agents::by_id(&event.source).is_some_and(|agent| agent.observer.is_some())
+                    agent_hud_agents::by_id(&event.source)
+                        .is_some_and(|agent| agent.observer.is_some())
                         || hooks.is_some_and(|hooks| {
                             hooks.completion.as_ref().is_some_and(|c| c.begin.is_some())
                         })

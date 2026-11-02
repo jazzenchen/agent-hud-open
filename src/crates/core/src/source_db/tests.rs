@@ -572,7 +572,8 @@ fn grok_bot_session_works_while_a_message_has_no_reply_and_idles_once_answered()
     };
     let now = chrono::Utc::now().timestamp_millis();
     let user = json!({"kind":"message","role":"user","id":"t1u","requestId":"r1","timestampMs":now - 700_000,"isStreaming":false});
-    let reply = json!({"kind":"send-message","id":"t1s1","requestId":"r1","timestampMs":now - 600_000});
+    let reply =
+        json!({"kind":"send-message","id":"t1s1","requestId":"r1","timestampMs":now - 600_000});
     write(bot::ACCOUNT_KEY, 1, json!("slot-1"));
     write(
         &bot::transcript_key("slot-1", "bot-a"),

@@ -167,7 +167,10 @@ mod tests {
         for name in ["beforeSubmitPrompt", "postToolUse", "afterAgentResponse"] {
             let event = event(name).unwrap();
             assert_eq!(event.kind, "session-observation");
-            assert_eq!(event.session_id, "cursor:ca086626-b368-46b5-8492-2c8b493f7e7a");
+            assert_eq!(
+                event.session_id,
+                "cursor:ca086626-b368-46b5-8492-2c8b493f7e7a"
+            );
             assert_eq!(event.data["state"], "running");
             assert_eq!(
                 event.data["navigationTarget"],
@@ -181,7 +184,12 @@ mod tests {
             .events;
         assert_eq!(
             events,
-            ["stop", "beforeSubmitPrompt", "postToolUse", "afterAgentResponse"]
+            [
+                "stop",
+                "beforeSubmitPrompt",
+                "postToolUse",
+                "afterAgentResponse"
+            ]
         );
     }
 }

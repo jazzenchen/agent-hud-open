@@ -140,7 +140,8 @@ mod turn_tests {
     fn a_turn_works_until_it_has_replied_and_gone_quiet() {
         let user = json!({"kind":"message","role":"user","id":"u","requestId":"r","timestampMs":10,"isStreaming":false});
         let reply = json!({"kind":"send-message","id":"s","requestId":"r","timestampMs":20});
-        let streaming = json!({"kind":"message","role":"assistant","isStreaming":true,"timestampMs":30});
+        let streaming =
+            json!({"kind":"message","role":"assistant","isStreaming":true,"timestampMs":30});
         let long_after = 20 + QUIET_MS;
         let t = latest_turn(&[user.clone()], long_after).unwrap();
         assert!(t.running && t.id == "r" && t.started == 10);

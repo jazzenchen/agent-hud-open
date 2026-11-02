@@ -123,7 +123,8 @@ pub fn parse_event(
                 let Some(began) = (begin.read)(payload) else {
                     return Ok(None);
                 };
-                let target = json!({"kind":"cursor-agent","id":began.session,"cwd":began.workspace});
+                let target =
+                    json!({"kind":"cursor-agent","id":began.session,"cwd":began.workspace});
                 return Ok(Some(event(
                     source,
                     &began.session,

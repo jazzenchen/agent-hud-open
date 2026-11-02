@@ -16,16 +16,17 @@ pub fn configuration(source_name: &str, flag: &str) -> Result<HookConfiguration,
     let (source, hooks) = hooks_of(source_name)?;
     let events: Vec<&str> = match flag {
         "--permission-hook" if hooks.permission.is_some() => vec!["PermissionRequest"],
-        "--completion-hook" if hooks.completion.is_some() => {
-            hooks
-                .completion
-                .iter()
-                .flat_map(|hook| {
-                    std::iter::once(hook.event)
-                        .chain(hook.begin.iter().flat_map(|begin| begin.events.iter().copied()))
-                })
-                .collect()
-        }
+        "--completion-hook" if hooks.completion.is_some() => hooks
+            .completion
+            .iter()
+            .flat_map(|hook| {
+                std::iter::once(hook.event).chain(
+                    hook.begin
+                        .iter()
+                        .flat_map(|begin| begin.events.iter().copied()),
+                )
+            })
+            .collect(),
         "--session-origin-hook" if hooks.origin.is_some() => {
             if matches!(hooks.layout, Layout::OwnedEntry) {
                 vec!["SessionStart", "PreInvocation"]
