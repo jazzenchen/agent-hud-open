@@ -16,6 +16,7 @@ struct Client {
     source: &'static str,
     root: PathBuf,
     script: PathBuf,
+    script_boundary: PathBuf,
     marker: &'static str,
     body: &'static str,
 }
@@ -29,10 +30,23 @@ fn clients(home: &Path, env: &HashMap<String, String>) -> Vec<Client> {
         .iter()
         .filter_map(|agent| {
             let observer = agent.observer?;
+            let directory = first(&agent_hud_agents::Location {
+                path: "",
+                ..observer.script
+            })?;
+            let base = crate::os::folder(home, env, observer.script.base);
+            // Check the client's folders, stopping before the shared base or
+            // the parent of an explicitly relocated client directory.
+            let script_boundary = if directory.starts_with(&base) {
+                base
+            } else {
+                directory.parent().unwrap_or(&directory).to_owned()
+            };
             Some(Client {
                 source: agent.id,
                 root: first(&observer.turns)?,
                 script: first(&observer.script)?,
+                script_boundary,
                 marker: observer.marker,
                 body: observer.body,
             })
@@ -46,6 +60,20 @@ pub struct ObserverPlan {
     enabled: bool,
     original: Option<Vec<u8>>,
     body: &'static str,
+    script_boundary: PathBuf,
+}
+fn check_observer_path(path: &Path, boundary: &Path) -> Result<(), String> {
+    if path
+        .ancestors()
+        .take_while(|path| *path != boundary)
+        .any(|path| fs::symlink_metadata(path).is_ok_and(|m| m.file_type().is_symlink()))
+    {
+        return Err(l10n::text(
+            "观察插件的路径是符号链接，客户端文件未作改动",
+            "The observer path is a symbolic link; no client file was changed",
+        ));
+    }
+    Ok(())
 }
 pub fn observer_plan(
     context: &InstallContext,
@@ -64,12 +92,7 @@ pub fn observer_plan(
                 "This client has no public session observer",
             )
         })?;
-    if fs::symlink_metadata(&client.script).is_ok_and(|m| m.file_type().is_symlink()) {
-        return Err(l10n::text(
-            "观察插件的路径是符号链接，客户端文件未作改动",
-            "The observer path is a symbolic link; no client file was changed",
-        ));
-    }
+    check_observer_path(&client.script, &client.script_boundary)?;
     let original = match fs::read(&client.script) {
         Ok(bytes) => Some(bytes),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
@@ -101,12 +124,14 @@ pub fn observer_plan(
         enabled,
         original,
         body: client.body,
+        script_boundary: client.script_boundary,
     })
 }
 pub fn apply_observer_plan(plan: &ObserverPlan) -> Result<bool, String> {
     if !plan.changed {
         return Ok(false);
     }
+    check_observer_path(&plan.path, &plan.script_boundary)?;
     if fs::read(&plan.path).ok() != plan.original {
         return Err(l10n::text(
             "观察插件文件在准备后发生了变化，请重新检查",
@@ -138,6 +163,7 @@ pub fn apply_observer_plan(plan: &ObserverPlan) -> Result<bool, String> {
     }
     result
 }
+
 pub(super) struct Observers {
     clients: Vec<Client>,
     changes: crate::FileChanges,
@@ -258,3 +284,7 @@ impl Observers {
         events
     }
 }
+
+#[cfg(all(test, unix))]
+#[path = "observers_tests_unix.rs"]
+mod tests;

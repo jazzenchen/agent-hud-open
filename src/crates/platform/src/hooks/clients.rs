@@ -33,7 +33,7 @@ impl Clients {
     pub fn delegate(&mut self, context: InstallContext) -> Result<(), String> {
         install::canonical(&context)?;
         self.context = Some(context);
-        self.refresh(None);
+        self.refresh(Vec::new());
         Ok(())
     }
     pub fn install(&mut self, enabled: bool) -> Result<(), String> {
@@ -49,7 +49,7 @@ impl Clients {
                 if let Err(error) = observers::observer_plan(context, &source, enabled)
                     .and_then(|plan| observers::apply_observer_plan(&plan))
                 {
-                    errors.push(format!("{source}: {error}"));
+                    errors.push((source.clone(), error));
                 }
             }
             // Removing ours stays possible everywhere; adding only where the
@@ -59,20 +59,23 @@ impl Clients {
                 if let Err(error) = install::install_plan(context, &source, flag, enabled)
                     .and_then(|plan| install::apply_plan(&plan))
                 {
-                    errors.push(format!("{source}: {error}"));
+                    errors.push((source.clone(), error));
                 }
             }
         }
-        let notice = (!errors.is_empty()).then(|| errors.join("; "));
-        self.refresh(notice.clone());
-        if let Some(notice) = notice {
-            Err(notice)
-        } else {
-            Ok(())
-        }
+        // A client's optional adapter must not stop the other clients or
+        // prevent the app from launching. Keep its failure in Settings.
+        self.refresh(errors);
+        Ok(())
     }
-    fn refresh(&mut self, notice: Option<String>) {
-        self.notice = notice;
+    fn refresh(&mut self, errors: Vec<(String, String)>) {
+        self.notice = (!errors.is_empty()).then(|| {
+            errors
+                .iter()
+                .map(|(source, error)| format!("{source}: {error}"))
+                .collect::<Vec<_>>()
+                .join("; ")
+        });
         self.rows.clear();
         let Some(context) = self.context.as_ref() else {
             return;
@@ -83,8 +86,13 @@ impl Clients {
             .map(|p| p.id)
         {
             let mut known = false;
-            let mut installed = true;
-            let mut error = None;
+            // Planning again cannot recover an error that occurred only
+            // while applying a plan (for example, a failed write).
+            let mut error = errors
+                .iter()
+                .find(|(client, _)| client == &source)
+                .map(|(_, error)| error.clone());
+            let mut installed = error.is_none();
             if observed(&source) {
                 known = true;
                 match observers::observer_plan(context, &source, true) {
@@ -122,7 +130,97 @@ impl Clients {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use agent_hud_agents::Os;
+    use std::{collections::HashMap, fs, path::Path};
+
+    fn context(home: &Path) -> InstallContext {
+        // This fixed-owner fixture is checked for identity, never executed.
+        let executable = home.join("fixed hook owner");
+        fs::write(&executable, b"fixture only; never execute").unwrap();
+        InstallContext {
+            home: home.to_owned(),
+            environment: HashMap::new(),
+            canonical_executable: Some(executable.clone()),
+            executable,
+        }
+    }
+
+    fn row<'a>(status: &'a Value, source: &str) -> &'a Value {
+        status["clients"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|row| row["source"] == source)
+            .unwrap()
+    }
+
+    #[test]
+    fn client_install_failures_leave_notices_and_allow_other_clients_to_install() {
+        let temp = tempfile::tempdir().unwrap();
+        let home = temp.path().join("home");
+        fs::create_dir_all(home.join(".config")).unwrap(); // plain directory
+                                                           // Discover OpenCode independently of its unusable configuration path.
+        fs::create_dir_all(home.join(".local/share/opencode")).unwrap(); // plain directory
+        let opencode = home.join(".config/opencode");
+        fs::write(&opencode, b"a regular file, not a directory").unwrap();
+        fs::create_dir_all(home.join(".claude")).unwrap(); // plain directory
+        let claude = home.join(".claude/settings.json");
+        fs::write(&claude, b"invalid JSON").unwrap();
+        fs::create_dir_all(home.join(".pi/agent/sessions")).unwrap(); // plain directory
+
+        let mut clients = Clients::default();
+        clients.delegate(context(&home)).unwrap();
+        clients.install(true).unwrap();
+
+        assert_eq!(
+            fs::read(&opencode).unwrap(),
+            b"a regular file, not a directory"
+        );
+        assert_eq!(fs::read(&claude).unwrap(), b"invalid JSON");
+        assert_eq!(
+            fs::read(home.join(".pi/agent/extensions/agent-hud.ts")).unwrap(),
+            agent_hud_agents::pi::AGENT
+                .observer
+                .unwrap()
+                .body
+                .as_bytes()
+        );
+        let status = clients.status(true, true);
+        assert_eq!(row(&status, "pi")["installed"], true);
+        for source in ["opencode", "claude"] {
+            let failed = row(&status, source);
+            assert_eq!(failed["installed"], false);
+            let notice = failed["notice"].as_str().unwrap();
+            assert!(!notice.is_empty());
+            assert!(status["notice"].as_str().unwrap().contains(notice));
+        }
+    }
+
+    #[test]
+    fn an_apply_failure_stays_visible_even_when_the_next_plan_is_current() {
+        let temp = tempfile::tempdir().unwrap();
+        let home = temp.path().join("home");
+        fs::create_dir_all(home.join(".pi/agent/sessions")).unwrap(); // plain directory
+        let mut clients = Clients::default();
+        clients.delegate(context(&home)).unwrap();
+        clients.install(true).unwrap();
+        assert_eq!(row(&clients.status(true, true), "pi")["installed"], true);
+
+        let error = "Observer file could not be committed";
+        clients.refresh(vec![("pi".into(), error.into())]);
+        let status = clients.status(true, true);
+        assert_eq!(row(&status, "pi")["installed"], false);
+        assert_eq!(row(&status, "pi")["notice"], error);
+        assert!(status["notice"].as_str().unwrap().contains(error));
+    }
+
+    #[test]
+    fn installation_without_a_delegated_owner_remains_an_error() {
+        let mut clients = Clients::default();
+        assert!(clients.install(true).is_err());
+        assert_eq!(clients.status(false, true)["installable"], false);
+    }
 
     #[test]
     fn hooks_go_in_only_where_the_client_can_launch_them() {
