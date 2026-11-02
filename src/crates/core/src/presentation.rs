@@ -6,6 +6,7 @@ pub(super) struct Presentation<'a> {
     hooks: &'a hook_events::HookEvidence,
     claude_desktop: &'a agent_hud_agents::claude::transcript::ClaudeDesktopIndex,
     claude_jobs: &'a claude_jobs::ClaudeJobs,
+    discovery: &'a [ProviderDiscovery],
     pending: HashMap<String, HashMap<String, Vec<Value>>>,
     native_waiting: HashMap<String, HashSet<String>>,
     now: i64,
@@ -16,6 +17,7 @@ impl AgentHudCore {
             hooks: &self.hook_events,
             claude_desktop: &self.claude_desktop.index,
             claude_jobs: &self.claude_desktop.jobs,
+            discovery: &self.discovery,
             pending: self.requests.session_attention(),
             native_waiting: self.requests.native_waiting_sessions(),
             now,
@@ -103,6 +105,16 @@ impl Presentation<'_> {
         }
         if claude && session["navigationTarget"].is_null() {
             self.background_job_target(session, desktop);
+        }
+        if session["navigationTarget"].is_null() {
+            if let Some(target) = self
+                .discovery
+                .iter()
+                .find(|found| found.id == source)
+                .and_then(|found| found.navigation_target.as_ref())
+            {
+                session["navigationTarget"] = target.clone();
+            }
         }
         let source = session["source"].as_str().unwrap_or("");
         let id = session["id"].as_str().unwrap_or("");

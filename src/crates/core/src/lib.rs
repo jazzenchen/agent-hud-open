@@ -280,6 +280,9 @@ impl AgentHudCore {
 
     pub fn set_provider_discovery(&mut self, discovery: Vec<ProviderDiscovery>) {
         self.discovery = discovery;
+        self.sessions_checked = None;
+        self.sessions_fingerprint = None;
+        self.render.last = None;
     }
 
     /// Whether logs are still waiting to be read: while indexing, the

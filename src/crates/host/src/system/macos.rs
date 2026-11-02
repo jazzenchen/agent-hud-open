@@ -83,19 +83,48 @@ pub(super) fn status(_identifier: &str) -> Result<Value, String> {
 }
 
 pub(super) fn cli_candidates(home: &Path, command: &str, dirs: Vec<PathBuf>) -> Vec<PathBuf> {
+    cli_candidates_with(
+        home,
+        command,
+        dirs,
+        |path| {
+            use std::os::unix::fs::PermissionsExt;
+            path.metadata().is_ok_and(|metadata| {
+                metadata.is_file() && metadata.permissions().mode() & 0o111 != 0
+            })
+        },
+        agent_hud_runtime::registered_applications,
+    )
+}
+
+fn cli_candidates_with(
+    home: &Path,
+    command: &str,
+    dirs: Vec<PathBuf>,
+    executable: impl Fn(&Path) -> bool,
+    registered_applications: impl FnOnce(&str) -> Vec<PathBuf>,
+) -> Vec<PathBuf> {
     let mut candidates = vec![];
     if command == "codex" {
         // The app's own command line, where the engine looks for it too
         // (platform `engine_candidates`): Codex.app, or the ChatGPT app that
         // carries Codex inside it.
+        let bundled = |app: PathBuf| {
+            [
+                "Contents/Resources/codex-cli/bin/codex",
+                "Contents/Resources/codex",
+            ]
+            .map(|tail| app.join(tail))
+        };
         for root in [PathBuf::from("/Applications"), home.join("Applications")] {
             for app in ["Codex.app", "ChatGPT.app"] {
-                for tail in [
-                    "Contents/Resources/codex-cli/bin/codex",
-                    "Contents/Resources/codex",
-                ] {
-                    candidates.push(root.join(app).join(tail));
-                }
+                candidates.extend(bundled(root.join(app)));
+            }
+        }
+        // Ask Launch Services only when the known bundles have no executable.
+        if !candidates.iter().any(|path| executable(path)) {
+            for app in registered_applications("com.openai.codex") {
+                candidates.extend(bundled(app));
             }
         }
     }
@@ -114,6 +143,10 @@ pub(super) fn cli_candidates(home: &Path, command: &str, dirs: Vec<PathBuf>) -> 
         }
     }
     candidates.extend(dirs.into_iter().map(|dir| dir.join(command)));
+    if command == "codex" {
+        let mut seen = std::collections::HashSet::new();
+        candidates.retain(|path| seen.insert(path.clone()));
+    }
     candidates
 }
 
@@ -130,7 +163,8 @@ mod tests {
     fn codex_is_found_in_the_chatgpt_app_too() {
         let home = Path::new("/Users/alice");
         let dir = PathBuf::from("/opt/homebrew/bin");
-        let candidates = cli_candidates(home, "codex", vec![dir.clone()]);
+        let candidates =
+            cli_candidates_with(home, "codex", vec![dir.clone()], |_| false, |_| vec![]);
         for path in [
             PathBuf::from("/Applications/Codex.app/Contents/Resources/codex"),
             PathBuf::from("/Applications/ChatGPT.app/Contents/Resources/codex-cli/bin/codex"),
@@ -139,7 +173,13 @@ mod tests {
             assert!(candidates.contains(&path), "{path:?} is not a candidate");
         }
         assert_eq!(candidates.last(), Some(&dir.join("codex")));
-        let agy_candidates = cli_candidates(home, "agy", vec![dir.clone()]);
+        let agy_candidates = cli_candidates_with(
+            home,
+            "agy",
+            vec![dir.clone()],
+            |_| false,
+            |_| panic!("only Codex asks Launch Services"),
+        );
         for path in [
             home.join(".antigravity/antigravity/bin/agy"),
             PathBuf::from("/Applications/Antigravity.app/Contents/Resources/app/bin/agy"),
@@ -151,8 +191,112 @@ mod tests {
             );
         }
         assert_eq!(
-            cli_candidates(home, "claude", vec![dir.clone()]),
+            cli_candidates_with(
+                home,
+                "claude",
+                vec![dir.clone()],
+                |_| false,
+                |_| panic!("only Codex asks Launch Services"),
+            ),
             [dir.join("claude")]
+        );
+    }
+
+    #[test]
+    fn known_codex_executables_skip_registered_applications() {
+        let home = Path::new("/Users/alice");
+        for root in [PathBuf::from("/Applications"), home.join("Applications")] {
+            for app in ["Codex.app", "ChatGPT.app"] {
+                for tail in [
+                    "Contents/Resources/codex-cli/bin/codex",
+                    "Contents/Resources/codex",
+                ] {
+                    let known = root.join(app).join(tail);
+                    let candidates = cli_candidates_with(
+                        home,
+                        "codex",
+                        vec![],
+                        |path| path == known.as_path(),
+                        |_| panic!("a known executable needs no Launch Services lookup"),
+                    );
+                    assert_eq!(candidates.len(), 8);
+                    assert!(candidates.contains(&known));
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn registered_codex_apps_follow_known_bundles_before_path() {
+        let mut queried = false;
+        let candidates = cli_candidates_with(
+            Path::new("/Users/alice"),
+            "codex",
+            vec![
+                PathBuf::from("/opt/homebrew/bin"),
+                PathBuf::from("/usr/bin"),
+            ],
+            |_| false,
+            |id| {
+                assert_eq!(id, "com.openai.codex");
+                queried = true;
+                vec![
+                    PathBuf::from("/Applications/Renamed.app"),
+                    PathBuf::from("/Volumes/External/Codex.app"),
+                ]
+            },
+        );
+        assert!(queried);
+        assert_eq!(
+            candidates,
+            [
+                "/Applications/Codex.app/Contents/Resources/codex-cli/bin/codex",
+                "/Applications/Codex.app/Contents/Resources/codex",
+                "/Applications/ChatGPT.app/Contents/Resources/codex-cli/bin/codex",
+                "/Applications/ChatGPT.app/Contents/Resources/codex",
+                "/Users/alice/Applications/Codex.app/Contents/Resources/codex-cli/bin/codex",
+                "/Users/alice/Applications/Codex.app/Contents/Resources/codex",
+                "/Users/alice/Applications/ChatGPT.app/Contents/Resources/codex-cli/bin/codex",
+                "/Users/alice/Applications/ChatGPT.app/Contents/Resources/codex",
+                "/Applications/Renamed.app/Contents/Resources/codex-cli/bin/codex",
+                "/Applications/Renamed.app/Contents/Resources/codex",
+                "/Volumes/External/Codex.app/Contents/Resources/codex-cli/bin/codex",
+                "/Volumes/External/Codex.app/Contents/Resources/codex",
+                "/opt/homebrew/bin/codex",
+                "/usr/bin/codex",
+            ]
+            .map(PathBuf::from)
+        );
+    }
+
+    #[test]
+    fn codex_candidates_keep_the_first_of_repeated_paths() {
+        let candidates = cli_candidates_with(
+            Path::new("/Users/alice"),
+            "codex",
+            vec![
+                PathBuf::from("/Applications/Renamed.app/Contents/Resources"),
+                PathBuf::from("/opt/homebrew/bin"),
+                PathBuf::from("/opt/homebrew/bin"),
+            ],
+            |_| false,
+            |_| {
+                vec![
+                    PathBuf::from("/Applications/Renamed.app"),
+                    PathBuf::from("/Applications/Codex.app"),
+                    PathBuf::from("/Applications/Renamed.app"),
+                ]
+            },
+        );
+        assert_eq!(candidates.len(), 11);
+        assert_eq!(
+            &candidates[8..],
+            [
+                "/Applications/Renamed.app/Contents/Resources/codex-cli/bin/codex",
+                "/Applications/Renamed.app/Contents/Resources/codex",
+                "/opt/homebrew/bin/codex",
+            ]
+            .map(PathBuf::from)
         );
     }
 }
