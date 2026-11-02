@@ -1148,6 +1148,9 @@ pub struct ClaudeDesktopIndex {
     /// a pass re-reads only the files that changed (agent-hud-native-open
     /// ClaudeDesktopSessions keeps the same cache).
     files: HashMap<PathBuf, DesktopFile>,
+    /// The app's data folders the host's platform names, read along with
+    /// Application Support under each provider home.
+    bases: Vec<PathBuf>,
 }
 
 #[derive(Clone)]
@@ -1159,6 +1162,10 @@ struct DesktopFile {
 }
 
 impl ClaudeDesktopIndex {
+    /// Also reads the app's metadata from these folders.
+    pub fn set_bases(&mut self, bases: Vec<PathBuf>) {
+        self.bases = bases;
+    }
     /// Reads the desktop app's session metadata again, every collection pass
     /// as Open does, and says whether the archive or the tabs changed.
     pub fn refresh(&mut self, provider_roots: &[(PathBuf, &'static str)]) -> bool {
@@ -1177,9 +1184,17 @@ impl ClaudeDesktopIndex {
                 homes.push(env_home);
             }
         }
+        let mut bases: Vec<PathBuf> = homes
+            .iter()
+            .map(|home| home.join("Library/Application Support/Claude"))
+            .collect();
+        for base in &self.bases {
+            if !bases.contains(base) {
+                bases.push(base.clone());
+            }
+        }
         let mut files = HashMap::new();
-        for home in homes {
-            let base = home.join("Library/Application Support/Claude");
+        for base in bases {
             for (folder, kind) in [
                 ("claude-code-sessions", "claude-desktop"),
                 ("local-agent-mode-sessions", "claude-cowork"),
@@ -1591,6 +1606,29 @@ mod tests {
         assert!(
             offer.recap.is_none(),
             "an offer card shows its title and buttons only"
+        );
+    }
+
+    #[test]
+    fn the_desktop_index_also_reads_the_folders_the_platform_names() {
+        let temp = tempfile::tempdir().unwrap();
+        let base = temp.path().join("AppData/Roaming/Claude");
+        let account = base.join("claude-code-sessions/org/acct");
+        fs::create_dir_all(&account).unwrap();
+        let cli = "66666666-6666-4666-8666-666666666666";
+        let tab = "local_88888888-8888-4888-8888-888888888888";
+        fs::write(
+            account.join(format!("{tab}.json")),
+            json!({"sessionId":tab,"cliSessionId":cli,"isArchived":false}).to_string(),
+        )
+        .unwrap();
+        let mut index = ClaudeDesktopIndex::default();
+        assert!(!index.refresh(&[]), "nothing under the default folder");
+        index.set_bases(vec![base]);
+        assert!(index.refresh(&[]));
+        assert_eq!(
+            index.targets.get(cli),
+            Some(&json!({"kind":"claude-desktop","id":tab}))
         );
     }
 }

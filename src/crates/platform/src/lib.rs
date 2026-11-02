@@ -21,6 +21,16 @@ mod navigation;
 mod os;
 pub use accounts::{AccountService, CollectionGate};
 pub use navigation::session_url;
+
+/// A client's own command line (`claude`, `codex`), where the account readers
+/// find it: an app's bundled copy as well as one on PATH.
+pub fn client_executable(name: &str) -> Option<std::path::PathBuf> {
+    let home = os::home_dir().ok()?;
+    let env = std::env::vars().collect::<os::Environment>();
+    os::engine_candidates(&home, &env, name)
+        .into_iter()
+        .find(|path| os::engine_executable(path))
+}
 use std::path::{Path, PathBuf};
 
 pub struct NativePlatform {
@@ -103,6 +113,10 @@ impl NativePlatform {
     }
     pub fn source_roots(&self) -> Vec<SourceRoot> {
         os::source_roots(&self.home)
+    }
+    /// The Claude desktop app's data folders on this host, for its session index.
+    pub fn claude_desktop_bases(&self) -> Vec<PathBuf> {
+        os::claude_desktop_bases(&self.home, &std::env::vars().collect::<os::Environment>())
     }
     /// The core resolves a known session and validates source membership before this call.
     pub fn navigate_session(&self, target: &serde_json::Value) -> Result<bool, String> {

@@ -1,6 +1,6 @@
 pub(crate) use super::unix::{
     environment_value, hook_configuration, is_shell, owned_by_user, owner_only, private_append,
-    private_directory, private_file, read_stdin,
+    private_directory, private_file, read_stdin, user_transcript,
 };
 use super::{joined_path, path_entries, Environment, ProcessInfo};
 use std::{
@@ -45,6 +45,10 @@ pub(crate) fn caches_dir(home: &Path) -> PathBuf {
 }
 pub(crate) fn app_support(home: &Path, _env: &Environment) -> PathBuf {
     home.join("Library/Application Support")
+}
+/// Where the Claude desktop app keeps its session metadata.
+pub(crate) fn claude_desktop_bases(home: &Path, env: &Environment) -> Vec<PathBuf> {
+    vec![app_support(home, env).join("Claude")]
 }
 pub(crate) fn application_installed(home: &Path, _env: &Environment, name: &str) -> bool {
     [PathBuf::from("/Applications"), home.join("Applications")]

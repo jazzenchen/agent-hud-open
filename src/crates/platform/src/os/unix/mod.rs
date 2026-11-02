@@ -4,7 +4,7 @@ use super::{Environment, ProcessInfo};
 mod files;
 pub(crate) use files::{
     hook_configuration, owned_by_user, owner_only, private_append, private_directory, private_file,
-    read_stdin,
+    read_stdin, user_transcript,
 };
 use std::{
     collections::HashMap,

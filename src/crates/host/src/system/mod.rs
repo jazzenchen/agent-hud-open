@@ -29,6 +29,18 @@ pub(crate) fn cli_candidates(
     target::cli_candidates(home, command, dirs)
 }
 
+/// The executable that owns client hooks: this copy when it runs from the
+/// host installer's fixed location for `product`/`binary`; None keeps hooks off.
+pub(crate) fn installed_hook_owner(product: &str, binary: &str) -> Option<std::path::PathBuf> {
+    target::installed_hook_owner(product, binary)
+}
+
+/// A desktop app's own copy of a client's command line, where the host's
+/// account readers also look for it (none outside Windows).
+pub(crate) fn bundled_cli(command: &str) -> Option<std::path::PathBuf> {
+    target::bundled_cli(command)
+}
+
 /// A new file only this user can read, where the host has file modes.
 pub(crate) fn private_output(options: &mut std::fs::OpenOptions) {
     target::private_output(options)

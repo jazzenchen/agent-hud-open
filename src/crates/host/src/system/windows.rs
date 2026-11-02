@@ -51,6 +51,28 @@ pub(super) fn register_if_never_registered() -> bool {
     false
 }
 
+/// The per-user NSIS installer's fixed location
+/// (`%LOCALAPPDATA%\<product>\<binary>.exe`, `installMode: currentUser`). Only
+/// a copy running from there owns the client hooks: one started from Downloads
+/// or a `target` build would otherwise rewrite every client's hooks to its own
+/// path, and Codex would stop running them until the user reviews them again.
+pub(super) fn installed_hook_owner(product: &str, binary: &str) -> Option<PathBuf> {
+    let installed = PathBuf::from(std::env::var_os("LOCALAPPDATA")?)
+        .join(product)
+        .join(format!("{binary}.exe"));
+    hook_owner(&std::env::current_exe().ok()?, &installed)
+}
+fn hook_owner(running: &Path, installed: &Path) -> Option<PathBuf> {
+    match (running.canonicalize(), installed.canonicalize()) {
+        (Ok(running), Ok(fixed)) if running == fixed => Some(installed.to_path_buf()),
+        _ => None,
+    }
+}
+/// The Claude desktop app's and the Codex app's bundled copies, which Settings
+/// shows as installed when neither CLI is on PATH.
+pub(super) fn bundled_cli(command: &str) -> Option<PathBuf> {
+    agent_hud_runtime::client_executable(command)
+}
 /// npm installs .cmd shims beside native .exe files. Extensionless npm shims
 /// contain POSIX shell scripts and must not be offered to CreateProcessW.
 pub(super) fn cli_candidates(_home: &Path, command: &str, dirs: Vec<PathBuf>) -> Vec<PathBuf> {
@@ -103,6 +125,23 @@ pub(super) fn private_output(_options: &mut std::fs::OpenOptions) {}
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn only_the_installed_copy_owns_the_hooks() {
+        let temp = tempfile::tempdir().unwrap();
+        let installed = temp.path().join("Agent HUD/Agent HUD.exe");
+        let download = temp.path().join("Downloads/Agent HUD.exe");
+        for path in [&installed, &download] {
+            std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+            std::fs::write(path, b"MZ").unwrap();
+        }
+        assert_eq!(hook_owner(&installed, &installed), Some(installed.clone()));
+        assert_eq!(hook_owner(&download, &installed), None);
+        assert_eq!(
+            hook_owner(&installed, &temp.path().join("missing.exe")),
+            None
+        );
+    }
 
     #[test]
     fn products_keep_independent_startup_entries() {

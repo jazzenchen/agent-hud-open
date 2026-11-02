@@ -282,6 +282,11 @@ impl AgentHudCore {
         self.discovery = discovery;
     }
 
+    /// The Claude desktop app's data folders on this host, beyond the macOS default.
+    pub fn set_claude_desktop_bases(&mut self, bases: Vec<PathBuf>) {
+        self.claude_desktop.index.set_bases(bases);
+    }
+
     /// Whether logs are still waiting to be read: while indexing, the
     /// collector reads again every 2 s (agent-hud-native-open
     /// UsageRefresh.indexingInterval).
