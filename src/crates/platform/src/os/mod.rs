@@ -19,6 +19,8 @@ mod target;
 compile_error!("agent-hud-platform supports macOS, Windows and Linux host builds only");
 #[cfg(unix)]
 mod unix;
+#[cfg(target_os = "macos")]
+pub use target::registered_applications;
 pub(crate) use target::*;
 
 /// The directory a client's variable moves its files to: the value without
