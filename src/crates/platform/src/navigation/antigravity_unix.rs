@@ -21,7 +21,8 @@ pub(super) fn open(home: &Path, id: &str, cwd: Option<&str>) -> Result<bool, Str
         ));
     }
     if !crate::os::app_running(APP) {
-        return Ok(false);
+        // Closed: launch it through its scheme rather than reveal the log.
+        return Ok(crate::os::open_session_url("antigravity://").is_ok());
     }
     let mut opened = false;
     if super::uuid(id) {
@@ -37,7 +38,8 @@ pub(super) fn open(home: &Path, id: &str, cwd: Option<&str>) -> Result<bool, Str
                 return Ok(true);
             }
         }
-        return Ok(false);
+        // No exact conversation or folder: still bring Antigravity forward.
+        return Ok(crate::os::activate_app(APP));
     }
     Ok(crate::os::activate_app(APP))
 }
