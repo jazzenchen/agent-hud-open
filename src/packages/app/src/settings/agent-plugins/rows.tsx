@@ -33,11 +33,21 @@ const tones: Record<Tone, PillTone> = {
   off: "gray",
 };
 
-/** A row's state as a pill; a running command shows its words in grey. */
-export function StatePill({ state, t }: { state: RowState; t: Text }) {
+/** A row's state as a pill; a running command shows its words in grey.
+ * `label` names the row, for pills shown away from it (a card's summary). */
+export function StatePill({
+  state,
+  label,
+  t,
+}: {
+  state: RowState;
+  label?: Words;
+  t: Text;
+}) {
+  const [en, zh] = state.busy ?? state.status;
   return (
     <Pill tone={state.busy ? "gray" : tones[state.tone]} dot>
-      {t(...(state.busy ?? state.status))}
+      {label ? t(`${label[0]}: ${en}`, `${label[1]}：${zh}`) : t(en, zh)}
     </Pill>
   );
 }
