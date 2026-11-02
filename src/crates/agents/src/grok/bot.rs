@@ -143,7 +143,7 @@ mod turn_tests {
         let streaming =
             json!({"kind":"message","role":"assistant","isStreaming":true,"timestampMs":30});
         let long_after = 20 + QUIET_MS;
-        let t = latest_turn(&[user.clone()], long_after).unwrap();
+        let t = latest_turn(std::slice::from_ref(&user), long_after).unwrap();
         assert!(t.running && t.id == "r" && t.started == 10);
         let t = latest_turn(&[user.clone(), reply.clone()], 20 + QUIET_MS - 1).unwrap();
         assert!(t.running);
