@@ -723,15 +723,18 @@ pub(crate) fn session_calls(
     Ok((total, calls))
 }
 
+/// A window's reading: what remained when, and the plan it was read under
+/// (`plan_value::plan_key`), where the account named one.
 pub(crate) fn insert_quota_sample(
     db: &Connection,
     window_id: &str,
     observed_at_ms: i64,
     remaining: f64,
+    plan: Option<&str>,
 ) -> rusqlite::Result<usize> {
     db.execute(
-        "INSERT OR IGNORE INTO quota_sample(window_id,observed_at_ms,remaining) VALUES(?1,?2,?3)",
-        params![window_id, observed_at_ms, remaining],
+        "INSERT OR IGNORE INTO quota_sample(window_id,observed_at_ms,remaining,plan) VALUES(?1,?2,?3,?4)",
+        params![window_id, observed_at_ms, remaining, plan],
     )
 }
 
@@ -1431,6 +1434,30 @@ impl View {
             }
         }
         recent
+    }
+
+    /// What the calls of `sources` from `since` to `now` used and cost at
+    /// list prices, leaving out the calls recorded through a route (a relay
+    /// or a coding plan, which is paid for apart from any subscription), and
+    /// when the selected logs' buckets begin.
+    pub fn spent(&self, sources: &[&str], since: i64, now: i64) -> (Recent, Option<i64>) {
+        let mut spent = Recent::default();
+        for bucket in self.buckets.iter().filter(|bucket| {
+            bucket.at >= since
+                && bucket.at <= now
+                && sources.contains(&bucket.source.as_str())
+                && !bucket.model.contains('#')
+        }) {
+            let tokens = bucket.usage.total();
+            spent.tokens += tokens;
+            match &bucket.cost {
+                Some(cost) => {
+                    *spent.costs.entry(cost.currency.clone()).or_default() += cost.amount_pico;
+                }
+                None => spent.unpriced_tokens += tokens,
+            }
+        }
+        (spent, self.buckets.first().map(|bucket| bucket.at))
     }
 
     pub fn metrics(
@@ -2306,6 +2333,71 @@ mod retention_tests {
                 "pool.example.net".to_string(),
                 BTreeSet::from(["claude".to_string(), "pi".to_string()])
             )])
+        );
+    }
+
+    #[test]
+    fn a_plans_spend_leaves_out_calls_through_a_route_and_other_sources() {
+        let db = Connection::open_in_memory().unwrap();
+        crate::database::schema(&db).unwrap();
+        let now = Utc::now().timestamp_millis();
+        let used = Usage {
+            input: 1_000,
+            output: 100,
+            ..Default::default()
+        };
+        let call = |key: &str, model: &str, at: i64| Event {
+            key: key.into(),
+            model: model.into(),
+            at,
+            usage: used,
+            ..Default::default()
+        };
+        write(
+            &db,
+            "logs/a.jsonl",
+            "claude",
+            &[
+                call(
+                    "a1",
+                    "claude-sonnet-4-5",
+                    now - 30 * 86_400_000 - 21_600_000,
+                ),
+                call("a2", "claude-sonnet-4-5", now - 3_600_000),
+                call("a3", "claude-sonnet-4-5#relay.example.com", now - 1_800_000),
+                call("a4", "qwen3-coder:30b", now - 1_800_000),
+            ],
+        )
+        .unwrap();
+        write(
+            &db,
+            "logs/b.jsonl",
+            "codex",
+            &[call("b1", "gpt-6-sol", now - 600_000)],
+        )
+        .unwrap();
+        let paths = vec!["logs/a.jsonl".to_string(), "logs/b.jsonl".to_string()];
+        let view = View::load(&db, &paths, now, &pricing::PriceRegions::default()).unwrap();
+        let (spent, oldest) = view.spent(&["claude"], now - 30 * 86_400_000, now);
+        assert_eq!(
+            (spent.tokens, spent.unpriced_tokens),
+            (2 * used.total(), used.total()),
+            "the old call, the relayed one and Codex's are left out"
+        );
+        let price = pricing::cost_at(
+            "claude",
+            "claude-sonnet-4-5",
+            &price_tokens(used),
+            false,
+            pricing::Region::International,
+            Some(now),
+        )
+        .unwrap()
+        .amount_pico;
+        assert_eq!(spent.costs, BTreeMap::from([("USD".to_string(), price)]));
+        assert!(
+            oldest.is_some_and(|at| at <= now - 30 * 86_400_000 - 21_600_000),
+            "the buckets begin with the older call"
         );
     }
 

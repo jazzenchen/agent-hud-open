@@ -28,6 +28,7 @@ mod ingestion;
 mod island_events;
 mod legacy;
 mod log_files;
+mod plan_value;
 mod presentation;
 mod prices;
 mod pricing;
@@ -480,6 +481,7 @@ impl AgentHudCore {
             "price_list" => self.price_list(),
             "usage_buckets" => self.usage_buckets(params),
             "quota_history" => self.quota_history(params),
+            "plan_value" => self.plan_value(params),
             "set_setting" => {
                 let key = params["key"].as_str().ok_or("Setting key is required")?;
                 let value = params.get("value").ok_or("Setting value is required")?;

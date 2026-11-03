@@ -178,6 +178,10 @@ pub(crate) fn schema(db: &Connection) -> rusqlite::Result<()> {
     // not); calls read before the column existed keep NULL.
     ensure_column(db, "usage_meter_event", "duration_ms", "INTEGER")?;
     ensure_column(db, "source_log_record", "duration_ms", "INTEGER")?;
+    // The plan a quota reading was taken under (`plan_value::plan_key`);
+    // readings from before the column, or of an account with no plan, have
+    // none and are never compared across plans.
+    ensure_column(db, "quota_sample", "plan", "TEXT")?;
     // Prompt (0) and compaction (1) marks drive a session's turns.
     db.execute_batch(
         "CREATE TABLE IF NOT EXISTS usage_meter_mark(

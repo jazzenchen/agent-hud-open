@@ -290,9 +290,8 @@ impl Runtime {
     /// or applying a newly completed account job as a side effect of an MCP call.
     pub fn local_query(&mut self, method: &str, params: Value) -> Result<Value, String> {
         match method {
-            "statistics" | "session_detail" | "sessions" | "usage_buckets" | "quota_history" => {
-                self.core.request(method, params)
-            }
+            "statistics" | "session_detail" | "sessions" | "usage_buckets" | "quota_history"
+            | "plan_value" => self.core.request(method, params),
             _ => Err("This operation is not a local cached query".into()),
         }
     }
@@ -412,7 +411,12 @@ impl Runtime {
         // completed account job as an incidental side effect.
         if matches!(
             method,
-            "statistics" | "session_detail" | "sessions" | "usage_buckets" | "quota_history"
+            "statistics"
+                | "session_detail"
+                | "sessions"
+                | "usage_buckets"
+                | "quota_history"
+                | "plan_value"
         ) {
             return self.local_query(method, params);
         }

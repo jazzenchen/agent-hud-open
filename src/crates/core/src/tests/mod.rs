@@ -5,6 +5,7 @@ use super::*;
 mod claude_desktop;
 mod conversation_feed;
 mod ingestion;
+mod plan_value;
 mod quota_history;
 mod sessions;
 mod workbuddy;

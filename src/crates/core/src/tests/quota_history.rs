@@ -130,6 +130,7 @@ fn a_history_reads_each_shown_windows_readings_by_its_key() {
             "claude:a:session",
             now - minutes_ago * 60_000,
             100.0 - used,
+            None,
         )
         .unwrap();
     }

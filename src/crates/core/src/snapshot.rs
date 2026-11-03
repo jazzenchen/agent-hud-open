@@ -173,7 +173,7 @@ impl crate::AgentHudCore {
     /// that failed is the warning, in amber; otherwise the client's notice is
     /// the line under the name. Every account a reader reports is signed in
     /// now: the app keeps no former accounts, so `current` is always true.
-    fn account_heading(&self, value: &Value) -> Value {
+    pub(crate) fn account_heading(&self, value: &Value) -> Value {
         let mut account = value.clone();
         let provider = account["provider"].as_str().unwrap_or_default().to_owned();
         let id = account["id"].as_str().unwrap_or_default();

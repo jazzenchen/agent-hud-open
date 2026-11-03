@@ -43,11 +43,24 @@ impl crate::AgentHudCore {
                 let Some(used) = row["usedPercent"].as_f64().filter(|v| v.is_finite()) else {
                     continue;
                 };
+                // The plan the reading was taken under, so a share is only
+                // ever compared with others measured against the same cap.
+                let plan = accounts
+                    .accounts
+                    .iter()
+                    .find(|account| account["id"] == row["accountId"])
+                    .and_then(|account| {
+                        crate::plan_value::plan_key(
+                            account["provider"].as_str()?,
+                            account["plan"].as_str()?,
+                        )
+                    });
                 match metering::insert_quota_sample(
                     database,
                     id,
                     at,
                     (100.0 - used).clamp(0.0, 100.0),
+                    plan.as_deref(),
                 ) {
                     Ok(count) => {
                         changed |= count > 0;
