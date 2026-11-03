@@ -58,8 +58,8 @@ function missing(measure: QuotaMeasure, language: Language) {
     case "tokens":
       return say(
         language,
-        "输出速度需要这个窗口模型的计时调用：同一日志中至少一对相隔不超过 120 秒的记录。",
-        "Reply rate needs timed calls from this window's models: at least one same-log pair no more than 120 seconds apart.",
+        "输出速度需要这个窗口模型至少 3 次可计时的回复，合计至少 5 秒：按日志记下的用时，或同一日志中相隔不超过 120 秒的上一次调用算起。",
+        "Reply rate needs at least 3 timed replies from this window's models, 5 seconds in all: each timed by its log, or from the same log's call before it within 120 seconds.",
       );
     case "consumed":
       return say(

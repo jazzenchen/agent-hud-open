@@ -1056,6 +1056,10 @@ impl Reply {
 }
 
 const WEEK_MS: i64 = 7 * 86_400_000;
+/// The fewest calls, and the least time they took in all, a reply rate is
+/// worked out from (`reply_rate`): fewer is noise, so no rate.
+const REPLY_RATE_CALLS: u64 = 3;
+const REPLY_RATE_SPAN_MS: u64 = 5_000;
 /// How far back an agent's recent usage reaches (`View::recent`), as the
 /// hover panel's token chart reaches back 24 hours.
 const RECENT_MS: i64 = 86_400_000;
@@ -1110,18 +1114,24 @@ pub(crate) fn reply_span(
 }
 
 /// The reply rate of the calls in `sums` ([gap-timed, log-timed] output,
-/// span and calls): the calls their logs timed when there are any, else the
-/// gap-timed ones, whose spans hold tool runs and the person's time, so the
-/// rate is a lower bound.
+/// span and calls): the calls their logs timed when there are enough of
+/// them, else the gap-timed ones, whose spans hold tool runs and the
+/// person's time, so the rate is a lower bound. Enough is at least
+/// `REPLY_RATE_CALLS` calls taking `REPLY_RATE_SPAN_MS` in all; with too few
+/// either way there is no rate, which is unknown, not zero.
 pub(crate) fn reply_rate(sums: [(u64, u64, u64); 2]) -> Option<Value> {
-    let (lower_bound, (output, span, calls)) = if sums[1].1 > 0 {
+    let enough =
+        |(_, span, calls): (u64, u64, u64)| calls >= REPLY_RATE_CALLS && span >= REPLY_RATE_SPAN_MS;
+    let (lower_bound, (output, span, calls)) = if enough(sums[1]) {
         (false, sums[1])
-    } else {
+    } else if enough(sums[0]) {
         (true, sums[0])
+    } else {
+        return None;
     };
-    (span > 0).then(|| {
-        json!({"tokensPerSecond":output as f64/(span as f64/1000.0),"calls":calls,"tokensOut":output,"lowerBound":lower_bound})
-    })
+    Some(
+        json!({"tokensPerSecond":output as f64/(span as f64/1000.0),"calls":calls,"tokensOut":output,"lowerBound":lower_bound}),
+    )
 }
 
 impl View {
@@ -1621,8 +1631,8 @@ impl View {
                     )
                 } else if consumer {
                     l10n::text(
-                        "最近七天没有可计时的回复调用",
-                        "No reply calls that could be timed were observed in the last seven days.",
+                        "最近七天可计时的回复调用不足 3 次或合计不足 5 秒",
+                        "Fewer than 3 reply calls that could be timed, or under 5 seconds of them, were observed in the last seven days.",
                     )
                 } else {
                     reason.clone()
@@ -2459,7 +2469,7 @@ mod retention_tests {
         assert_eq!(reply_span(9, Some(5_000), None), None, "too little output");
         assert_eq!(reply_span(2_000, Some(150), None), None, "a burst");
         assert_eq!(reply_span(200, Some(50), None), None);
-        let timed = reply_rate([(400, 20_000, 2), (300, 3_000, 1)]).unwrap();
+        let timed = reply_rate([(400, 20_000, 3), (600, 6_000, 3)]).unwrap();
         assert_eq!(
             (
                 timed["tokensPerSecond"].as_f64(),
@@ -2468,7 +2478,7 @@ mod retention_tests {
             (Some(100.0), Some(false)),
             "gap-timed calls do not dilute timed ones"
         );
-        let floor = reply_rate([(400, 20_000, 2), (0, 0, 0)]).unwrap();
+        let floor = reply_rate([(400, 20_000, 3), (0, 0, 0)]).unwrap();
         assert_eq!(
             (
                 floor["tokensPerSecond"].as_f64(),
@@ -2477,5 +2487,26 @@ mod retention_tests {
             (Some(20.0), Some(true))
         );
         assert!(reply_rate([(0, 0, 0); 2]).is_none());
+    }
+
+    #[test]
+    fn a_reply_rate_needs_three_calls_and_five_seconds() {
+        assert!(
+            reply_rate([(0, 0, 0), (300, 3_000, 1)]).is_none(),
+            "one call"
+        );
+        assert!(
+            reply_rate([(0, 0, 0), (300, 4_999, 3)]).is_none(),
+            "three calls under five seconds"
+        );
+        assert!(reply_rate([(0, 0, 0), (300, 5_000, 3)]).is_some());
+        // Too few timed calls leave the gap-timed ones, when there are
+        // enough of those.
+        let floor = reply_rate([(900, 30_000, 4), (300, 3_000, 2)]).unwrap();
+        assert_eq!(
+            (floor["calls"].as_u64(), floor["lowerBound"].as_bool()),
+            (Some(4), Some(true))
+        );
+        assert!(reply_rate([(900, 30_000, 2), (300, 3_000, 2)]).is_none());
     }
 }
