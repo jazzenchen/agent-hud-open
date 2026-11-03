@@ -67,9 +67,10 @@ pub static ALL: &[&Agent] = &[
 ];
 
 /// Every account reader, in the order the engine reads them, one at a
-/// time. A provider is not always one client: Grok's quota covers its CLI
-/// and its Bot, the open agents' plans are read per plan, and relays are
-/// read for whichever clients send their calls through them.
+/// time. A provider is not always one client: Grok Bot's quota covers its
+/// CLI and its Bot, beside the CLI's own xAI credits, the open agents' plans
+/// are read per plan, and relays are read for whichever clients send their
+/// calls through them.
 pub static ACCOUNTS: &[&crate::account::Provider] = &[
     &claude::account::PROVIDER,
     &codex::account::PROVIDER,
@@ -77,6 +78,7 @@ pub static ACCOUNTS: &[&crate::account::Provider] = &[
     &antigravity::account::PROVIDER,
     &cursor::account::PROVIDER,
     &grok::account::PROVIDER,
+    &grok::credits::PROVIDER,
     &copilot::account::PROVIDER,
     &devin::account::PROVIDER,
     &crate::coding_plans::KIMI,

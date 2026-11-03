@@ -15,6 +15,7 @@ The implementation follows the original Swift account readers:
 | Cursor       | Read-only Cursor account SQLite database            | Current usage-summary endpoint and billing-cycle reset               |
 | DeepSeek     | Harness settings and versioned credential reference | Official API balance endpoint and response currency                  |
 | Kimi, GLM, OpenCode Go | Keys other clients hold: the environment, Claude Code's settings files (as for relays below), OpenCode, Pi, Kimi Code, WorkBuddy | Each plan's own usage endpoint |
+| Grok CLI     | The CLI's own xAI sign-in (`auth.json` in `GROK_HOME`, else `~/.grok`), never refreshed or rewritten; an expired one reads as signed out until the CLI runs again | The CLI's billing endpoint (`cli-chat-proxy.grok.com/v1/billing?format=credits`): the share of the period's credits used, on-demand credits of their cap when reported, the plan from `/v1/settings` |
 | Copilot      | Once Copilot quota reading is on: the GitHub CLI's sign-in (environment, credential store, `hosts.yml`), then the one GitHub's Copilot clients keep (`github-copilot/apps.json`, older `hosts.json`); a token GitHub refuses gives way to the next | `copilot_internal/user`; premium requests beyond the plan as an estimated overage in US dollars (US$0.04 each, GitHub's published price) |
 | Antigravity  | Connected CLI status-line reports and all running authenticated language servers | Identified quota callbacks, serial loopback `GetUserStatus`, anonymous `/usage` fallback |
 
