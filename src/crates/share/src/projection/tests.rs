@@ -80,8 +80,8 @@ fn readings_name_each_enabled_agents_windows() {
 fn a_forecast_from_the_whole_window_reaches_the_phone_as_too_few_readings() {
     let snapshot = |basis: &str| {
         json!({
-            "providers": [{"id": "claude", "name": "Claude", "enabled": true}],
-            "quotas": [{"id": "claude:session", "vendor": "claude", "usedPercent": 25.0,
+            "providers": [{"id": "v", "name": "V", "enabled": true}],
+            "quotas": [{"id": "v:session", "vendor": "v", "usedPercent": 25.0,
                         "resetAt": iso(START + 4 * 3_600_000), "observedAt": iso(START),
                         "metrics": {"outlook": {"kind": "exhausts", "basis": basis, "beforeReset": true,
                                                 "exhaustsAt": iso(START + 3 * 3_600_000)}}}],

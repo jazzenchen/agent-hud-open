@@ -1828,7 +1828,7 @@ mod retention_tests {
     fn only_a_forecast_from_recent_readings_alerts() {
         let now = Utc::now().timestamp_millis();
         let quota = |at: i64, outlook: Value| {
-            json!({"id":"q","vendor":"claude","name":"Current session","usedPercent":25.0,
+            json!({"id":"q","vendor":"v","name":"Current session","usedPercent":25.0,
                 "resetAt":iso(now + 4 * 3_600_000),"observedAt":iso(at),"status":"normal",
                 "metrics":{"outlook":outlook}})
         };
