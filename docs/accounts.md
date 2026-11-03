@@ -132,11 +132,18 @@ Quota observations and complete per-call usage are persisted in Agent HUD's own
 SQLite ledger. The five picker measures use separate facts: the current share
 used, the current cycle's sampled burn, output tokens per active reply span,
 observed cycle consumption, and the model list-price estimate. Reply spans never
-bridge logs or idle gaps over 120 seconds. Currencies remain separate.
+bridge logs or idle gaps over 120 seconds, and a reply rate needs at least 3
+calls taking 5 seconds in all; fewer leave it unknown. Currencies remain separate.
 
 Source-reported counts take precedence over inferred token consumption. Unknown
 cycle boundaries, model mappings or price entries stay explicitly unavailable.
 An initial burn series reports its actual sampling progress rather than a rate.
+Until it spans enough time, a window with a known start and length forecasts
+from the cycle so far on a straight line (used ÷ time since it started), once
+3% of the cycle has gone by; that forecast is labeled as estimated from the
+whole window and never raises an alert. Such a window also carries a budget:
+the share a steady pace through the cycle would have used by now, and how many
+points over or under it the use is (more than 2 either way is ahead or under).
 The price catalog is a port of the original app's snapshot; this migration does
 not assert that every vendor's current list price has been independently refreshed.
 

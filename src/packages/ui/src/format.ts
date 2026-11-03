@@ -550,6 +550,41 @@ export function outlookText(
   }
 }
 
+/** What a forecast's pace comes from: this cycle's recent readings, or the cycle so far on a straight line. */
+export function outlookBasisText(
+  basis: "recent" | "window",
+  language: Language,
+) {
+  return basis === "window"
+    ? text(language, "按整个窗口估算", "Estimated from the whole window")
+    : text(language, "按目前节奏", "At the recent pace");
+}
+
+/** Where a window's use stands against a steady pace through its cycle: "12 pts ahead of budget" / "比预算超前 12 个点". */
+export function budgetText(
+  budget: { paceDelta: number; status: "ahead" | "behind" | "onTrack" },
+  language: Language,
+) {
+  const points = roundHalfAway(Math.abs(budget.paceDelta));
+  const unit = points === 1 ? "pt" : "pts";
+  switch (budget.status) {
+    case "ahead":
+      return text(
+        language,
+        `比预算超前 ${points} 个点`,
+        `${points} ${unit} ahead of budget`,
+      );
+    case "behind":
+      return text(
+        language,
+        `比预算少用 ${points} 个点`,
+        `${points} ${unit} under budget`,
+      );
+    case "onTrack":
+      return text(language, "与预算持平", "On budget");
+  }
+}
+
 /** The burn rate's detail while readings are still too few: first sampling or again after a reset. */
 export function samplingLabel(afterReset: boolean, language: Language) {
   return afterReset

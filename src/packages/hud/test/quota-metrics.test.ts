@@ -118,6 +118,56 @@ test("burn rate: sampling is the detail, a run-out before the reset is its time,
   assert.match(quotaMetric(gaps, "tokens", now, en).hint, /at least this/);
 });
 
+test("a forecast from the whole window says so, and the budget reads in points", () => {
+  const early = row({
+    metrics: {
+      burnRatePctPerHour: null,
+      sampling: { elapsed: 120, required: 900, afterReset: true },
+      outlook: {
+        kind: "exhausts",
+        basis: "window",
+        ratePctPerHour: 25,
+        beforeReset: true,
+        exhaustsAt: "2026-10-21T14:24:00Z",
+      },
+      budget: { expectedUsedPercent: 28, paceDelta: 12.4, status: "ahead" },
+    },
+  });
+  const burn = quotaMetric(early, "burn", now, en);
+  assert.deepEqual(
+    [burn.value, burn.detail, burn.available, burn.runsOut],
+    ["~25.0%/h", "Wed 14:24", true, true],
+  );
+  assert.equal(burn.budgetPercent, 28);
+  assert.match(burn.hint, /Estimated from the whole window/);
+  assert.match(burn.hint, /12 pts ahead of budget/);
+  const zhBurn = quotaMetric(early, "burn", now, zh);
+  assert.match(zhBurn.hint, /按整个窗口估算/);
+  assert.match(zhBurn.hint, /比预算超前 12 个点/);
+  const under = row({
+    metrics: {
+      burnRatePctPerHour: 2,
+      outlook: { kind: "exhausts", basis: "recent", beforeReset: false },
+      budget: { expectedUsedPercent: 48, paceDelta: -8, status: "behind" },
+    },
+  });
+  assert.match(quotaMetric(under, "burn", now, en).hint, /At the recent pace/);
+  assert.match(quotaMetric(under, "quota", now, zh).hint, /比预算少用 8 个点/);
+  assert.match(
+    quotaMetric(
+      row({
+        metrics: {
+          budget: { expectedUsedPercent: 41, paceDelta: -1, status: "onTrack" },
+        },
+      }),
+      "quota",
+      now,
+      en,
+    ).hint,
+    /On budget/,
+  );
+});
+
 test("remaining quota changes the figure without changing readings, risk or other measures", () => {
   const reading = row({
     usedPercent: 92,

@@ -98,6 +98,12 @@ pub fn readings(device: &str, snapshot: &Value, now: i64) -> SyncRecord {
                         Some("insufficient-data" | "insufficientData") => {
                             quota["outlook"] = json!("insufficientData");
                         }
+                        // The phone has no words for a forecast from the whole
+                        // window's straight line yet: to it, readings are still
+                        // too few, as before the Mac made one.
+                        Some("exhausts") if outlook["basis"] == "window" => {
+                            quota["outlook"] = json!("insufficientData");
+                        }
                         Some("exhausts") => {
                             if outlook["beforeReset"] == false {
                                 if let Some(used_reset) = outlook["projectedUsedPercent"]

@@ -129,7 +129,10 @@ impl Tracker {
             if reset.is_some_and(|reset| reset <= now) || (reset.is_none() && used != 0.0) {
                 continue;
             }
+            // A forecast from the whole window's straight line, before recent
+            // readings give a pace, is too rough to alert on.
             let forecast = quota["metrics"]["outlook"]["kind"] == "exhausts"
+                && quota["metrics"]["outlook"]["basis"] != "window"
                 && quota["metrics"]["outlook"]["beforeReset"] == true
                 && reset.is_some();
             let critical = used >= 90.0;

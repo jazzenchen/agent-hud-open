@@ -84,9 +84,25 @@ export interface QuotaMetrics {
       | "no-usage"
       | "insufficient-data"
       | "exhausts";
+    /** What the pace of a forecast or of no usage comes from: this cycle's
+     * recent readings, or, until they span enough time, the cycle so far on
+     * a straight line (used ÷ time since it started, from 3% of it in). Only
+     * a forecast from recent readings raises an alert. */
+    basis?: "recent" | "window";
+    /** The pace the forecast runs on, percentage points per hour. */
+    ratePctPerHour?: number;
     exhaustsAt?: string | null;
     beforeReset?: boolean;
     projectedUsedPercent?: number | null;
+  } | null;
+  /** Where use stands against a steady pace through the cycle when the
+   * metrics were worked out: the share that pace would have used by then,
+   * how many points over (+) or under (−) it the use is, and whether that is
+   * more than 2 points either way. Null without a known cycle or reading. */
+  budget?: {
+    expectedUsedPercent: number;
+    paceDelta: number;
+    status: "ahead" | "behind" | "onTrack";
   } | null;
   /** Specific missing facts, safe for display; absence must not be interpreted as zero. */
   unavailable?: Partial<Record<QuotaMeasure, string>>;

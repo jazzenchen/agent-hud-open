@@ -1,10 +1,12 @@
 import type { Quota, QuotaMeasure } from "@agent-hud/protocol";
 import {
+  budgetText,
   moneyShort,
   quotaPercentLabel,
   quotaDisplayLabel,
   monthDayTime,
   numberFormat,
+  outlookBasisText,
   outlookText,
   relativeWeekdayTime,
   resetLabel,
@@ -23,6 +25,9 @@ export interface QuotaMetricReading {
   selectable: boolean;
   runsOut: boolean;
   projectedPercent: number | null;
+  /** Where Core's budget, a steady pace through the cycle, has the used
+   * share now, for a mark on the bar; null without one. */
+  budgetPercent: number | null;
 }
 const finite = (value: number | null | undefined): value is number =>
   value != null && Number.isFinite(value);
@@ -112,6 +117,7 @@ export function quotaMetric(
     selectable: measure === "quota",
     runsOut: false,
     projectedPercent: null,
+    budgetPercent: null,
     hint: metrics?.unavailable?.[measure] ?? missing(measure, language),
   };
   const stale = say(
@@ -119,6 +125,13 @@ export function quotaMetric(
     "额度读数已过期，请刷新这个账户。",
     "Last quota reading is stale; refresh this account.",
   );
+  const budget =
+    metrics?.budget &&
+    finite(metrics.budget.paceDelta) &&
+    finite(metrics.budget.expectedUsedPercent)
+      ? metrics.budget
+      : null;
+  const budgetLine = budget ? budgetText(budget, language) : null;
   if (measure === "quota") {
     result.value = "--";
     result.detail = rowResetLabel(row, now, settings);
@@ -128,7 +141,7 @@ export function quotaMetric(
       result.hint =
         row.status === "stale"
           ? stale
-          : `${row.name}: ${result.value} · ${quotaDisplayLabel(settings.quotaDisplay, language)} · ${result.detail}`;
+          : `${row.name}: ${result.value} · ${quotaDisplayLabel(settings.quotaDisplay, language)} · ${result.detail}${budgetLine ? ` · ${budgetLine}` : ""}`;
     }
     return result;
   }
@@ -150,7 +163,15 @@ export function quotaMetric(
     if (nonnegative(metrics?.burnRatePctPerHour)) {
       result.value = `${metrics.burnRatePctPerHour.toFixed(1)}%/h`;
       result.available = result.selectable = true;
+    } else if (
+      outlook?.basis === "window" &&
+      nonnegative(outlook.ratePctPerHour)
+    ) {
+      // The cycle's average pace so far, until recent readings give one.
+      result.value = `~${outlook.ratePctPerHour.toFixed(1)}%/h`;
+      result.available = result.selectable = true;
     }
+    result.budgetPercent = budget ? budget.expectedUsedPercent : null;
     const sample = metrics?.sampling;
     const sampling =
       outlook?.kind === "insufficient-data" &&
@@ -186,16 +207,35 @@ export function quotaMetric(
           ? samplingLabel(sampling.afterReset, language)
           : (words ?? "—");
     result.projectedPercent = result.runsOut ? 100 : projected;
-    result.hint = sampling
-      ? samplingHint(
-          sampling.elapsed,
-          sampling.required,
-          sampling.afterReset,
-          language,
-        )
+    const basis =
+      outlook?.basis === "window"
+        ? say(
+            language,
+            `${outlookBasisText("window", language)}，读数够了改按目前节奏`,
+            `${outlookBasisText("window", language)} until readings give the recent pace`,
+          )
+        : outlook?.basis === "recent"
+          ? outlookBasisText("recent", language)
+          : null;
+    const lines = sampling
+      ? [
+          samplingHint(
+            sampling.elapsed,
+            sampling.required,
+            sampling.afterReset,
+            language,
+          ),
+        ]
       : result.available
-        ? `${result.value} · ${words ?? say(language, "这个周期的读数", "from this quota cycle's readings")}`
-        : result.hint;
+        ? [
+            `${result.value} · ${words ?? say(language, "这个周期的读数", "from this quota cycle's readings")}`,
+            basis,
+          ]
+        : [];
+    if (lines.length) {
+      if (budgetLine) lines.push(budgetLine);
+      result.hint = lines.filter(Boolean).join("\n");
+    }
   } else if (
     measure === "tokens" &&
     metrics?.replyRate &&

@@ -77,6 +77,26 @@ fn readings_name_each_enabled_agents_windows() {
 }
 
 #[test]
+fn a_forecast_from_the_whole_window_reaches_the_phone_as_too_few_readings() {
+    let snapshot = |basis: &str| {
+        json!({
+            "providers": [{"id": "claude", "name": "Claude", "enabled": true}],
+            "quotas": [{"id": "claude:session", "vendor": "claude", "usedPercent": 25.0,
+                        "resetAt": iso(START + 4 * 3_600_000), "observedAt": iso(START),
+                        "metrics": {"outlook": {"kind": "exhausts", "basis": basis, "beforeReset": true,
+                                                "exhaustsAt": iso(START + 3 * 3_600_000)}}}],
+            "accounts": [], "billing": [],
+        })
+    };
+    let outlook = |basis: &str| {
+        readings("mac", &snapshot(basis), START).payload["providers"][0]["quotas"][0]["outlook"]
+            .clone()
+    };
+    assert_eq!(outlook("window"), "insufficientData");
+    assert_eq!(outlook("recent"), "exhausts");
+}
+
+#[test]
 fn readings_change_with_what_was_read_not_with_the_clock() {
     let payload = |rate: f64, at: i64| {
         json!({"providers": [{"quotas": [{"remainingPercent": 60.0, "tokensPerHour": rate, "observedAtMs": at}],

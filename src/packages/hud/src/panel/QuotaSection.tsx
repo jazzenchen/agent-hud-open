@@ -150,6 +150,7 @@ export function SourceQuotaRow({
     format.quotaDisplay === "remaining" && projection != null
       ? projection
       : pct;
+  const budget = quotaPercent(reading.budgetPercent, format.quotaDisplay);
   const quotaLevel =
     row.status === "critical"
       ? colors.critical
@@ -274,6 +275,22 @@ export function SourceQuotaRow({
                 row.status === "stale" ? colors.secondary : quotaLevel,
             }}
           />
+          {measure === "burn" && budget != null && (
+            // Where a steady pace through the cycle would have the bar now.
+            <i
+              aria-hidden
+              style={{
+                position: "absolute",
+                top: 0,
+                bottom: 0,
+                left: `calc(${budget}% - 0.75px)`,
+                display: "block",
+                width: 1.5,
+                background: colors.text,
+                opacity: 0.6,
+              }}
+            />
+          )}
         </span>
       ) : (
         <span aria-hidden="true" style={{ flex: "1 1 0", minWidth: 0 }} />

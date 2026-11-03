@@ -1056,6 +1056,12 @@ impl Reply {
 }
 
 const WEEK_MS: i64 = 7 * 86_400_000;
+/// How many points a window's use may stray from its budget, either way,
+/// and still be on track (`View::metrics`).
+const BUDGET_SLACK: f64 = 2.0;
+/// The share of a cycle that has to go by before its use so far, on a
+/// straight line, makes a forecast while recent readings are too few.
+const WINDOW_BASIS_FROM: f64 = 0.03;
 /// The fewest calls, and the least time they took in all, a reply rate is
 /// worked out from (`reply_rate`): fewer is noise, so no rate.
 const REPLY_RATE_CALLS: u64 = 3;
@@ -1510,24 +1516,45 @@ impl View {
                 }
             }
         }
+        let used = remaining.map(|remaining| 100.0 - remaining);
+        // How far into its cycle the window is, 0 to 1.
+        let elapsed = cycle.map(|(start, _, duration)| (now - start) as f64 / (duration * 1000.0));
+        // The budget: what a steady pace from nothing at the cycle's start to
+        // the whole window at its reset would have used by now.
+        let budget = elapsed.zip(used).map_or(Value::Null, |(elapsed, used)| {
+            let expected = elapsed * 100.0;
+            let delta = used - expected;
+            json!({"expectedUsedPercent":expected,"paceDelta":delta,"status":if delta > BUDGET_SLACK {"ahead"} else if delta < -BUDGET_SLACK {"behind"} else {"onTrack"}})
+        });
+        // The pace a forecast runs on: this cycle's recent readings, else,
+        // until they span enough time, the cycle so far on a straight line,
+        // once 3% of it has gone by.
+        let pace = rate.map(|rate| (rate, "recent")).or_else(|| {
+            let ((start, _, _), used) = cycle.zip(used)?;
+            elapsed
+                .filter(|elapsed| *elapsed >= WINDOW_BASIS_FROM)
+                .map(|_| (used / ((now - start) as f64 / 3_600_000.0), "window"))
+        });
         let mut outlook = if reset.is_none() {
             json!({"kind":"untimed"})
         } else if remaining.is_some_and(|r| r <= 0.5) {
             json!({"kind":"exhausted"})
         } else if cycle.is_none() || remaining.is_none() {
             json!({"kind":"no-estimate"})
-        } else if rate == Some(0.0) {
-            json!({"kind":"no-usage"})
         } else {
             json!({"kind":"insufficient-data"})
         };
-        if let (Some(rate), Some(remaining), Some(reset)) = (rate, remaining, reset) {
-            if rate > 0.0 && remaining > 0.5 && cycle.is_some() {
+        if let (Some((rate, basis)), Some(remaining), Some(reset), Some(_)) =
+            (pace, remaining, reset, cycle)
+        {
+            if remaining > 0.5 && rate <= 0.0 {
+                outlook = json!({"kind":"no-usage","basis":basis,"ratePctPerHour":0.0});
+            } else if remaining > 0.5 {
                 // From the time the metrics are worked out at, as native's Mac
                 // rows have it: a reading with no newer one never forecasts a
                 // run-out that has already passed.
                 let interval = remaining / rate * 3_600_000.0;
-                outlook = json!({"kind":"exhausts","exhaustsAt":now.checked_add(interval as i64).and_then(iso),"beforeReset":interval<(reset-now)as f64,"projectedUsedPercent":(100.0-remaining+rate*(reset-now)as f64/3_600_000.0).min(100.0)});
+                outlook = json!({"kind":"exhausts","basis":basis,"ratePctPerHour":rate,"exhaustsAt":now.checked_add(interval as i64).and_then(iso),"beforeReset":interval<(reset-now)as f64,"projectedUsedPercent":(100.0-remaining+rate*(reset-now)as f64/3_600_000.0).min(100.0)});
             }
         }
         let source = row["consumerSource"].as_str();
@@ -1655,7 +1682,7 @@ impl View {
                 }),
             );
         }
-        if rate.is_none() && sampling.is_null() {
+        if pace.is_none() && sampling.is_null() {
             unavailable.insert(
                 "burn".into(),
                 json!(if cycle.is_none() {
@@ -1671,7 +1698,7 @@ impl View {
                 }),
             );
         }
-        json!({"burnRatePctPerHour":rate,"tokensPerHour":token_rate,"replyRate":reply,"consumed":consumed,"cost":cost,"sampling":sampling,"outlook":outlook,"unavailable":unavailable,"observedFrom":observed})
+        json!({"burnRatePctPerHour":rate,"tokensPerHour":token_rate,"replyRate":reply,"consumed":consumed,"cost":cost,"sampling":sampling,"outlook":outlook,"budget":budget,"unavailable":unavailable,"observedFrom":observed})
     }
 }
 
@@ -1734,6 +1761,96 @@ mod retention_tests {
                 iso(at + 6 * 3_600_000).as_deref(),
                 "{metrics}"
             );
+            assert_eq!(metrics["outlook"]["basis"], "recent");
+        }
+    }
+
+    #[test]
+    fn until_readings_give_a_pace_the_cycle_so_far_makes_the_forecast() {
+        let db = Connection::open_in_memory().unwrap();
+        crate::database::schema(&db).unwrap();
+        let now = Utc::now().timestamp_millis();
+        let view = View::load(&db, &[], now, &pricing::PriceRegions::default()).unwrap();
+        // A five-hour window an hour into its cycle, read once just now.
+        let row = |used: f64, reset: i64| {
+            json!({"id":"q","usedPercent":used,"resetAt":iso(reset),
+                "windowDurationSeconds":18_000.0,"observedAt":iso(now)})
+        };
+        let samples = Samples::from([("q".to_string(), vec![(now, 75.0)])]);
+        let metrics = view.metrics(&row(25.0, now + 4 * 3_600_000), now, false, false, &samples);
+        let outlook = &metrics["outlook"];
+        // 25% in the hour so far: the other 75% lasts three hours.
+        assert_eq!(outlook["kind"], "exhausts", "{metrics}");
+        assert_eq!(outlook["basis"], "window");
+        assert_eq!(outlook["ratePctPerHour"], 25.0);
+        assert_eq!(
+            outlook["exhaustsAt"].as_str(),
+            iso(now + 3 * 3_600_000).as_deref()
+        );
+        assert_eq!(outlook["beforeReset"], true);
+        assert!(
+            metrics["burnRatePctPerHour"].is_null(),
+            "no recent pace yet"
+        );
+        assert!(metrics["sampling"].is_object(), "still sampling");
+        assert!(metrics["unavailable"]["burn"].is_null());
+        // A fifth of the cycle gone: 20% is the budget, 25% five points over.
+        assert_eq!(
+            metrics["budget"],
+            json!({"expectedUsedPercent":20.0,"paceDelta":5.0,"status":"ahead"})
+        );
+        let budget = |used| {
+            view.metrics(&row(used, now + 4 * 3_600_000), now, false, false, &samples)["budget"]
+                ["status"]
+                .clone()
+        };
+        assert_eq!(budget(21.0), "onTrack");
+        assert_eq!(budget(10.0), "behind");
+        // Nothing used yet is no usage, from the same basis.
+        let idle = view.metrics(&row(0.0, now + 4 * 3_600_000), now, false, false, &samples);
+        assert_eq!(
+            idle["outlook"],
+            json!({"kind":"no-usage","basis":"window","ratePctPerHour":0.0})
+        );
+        // Under 3% of the cycle gone, too little to go on.
+        let early = view.metrics(
+            &row(5.0, now + 18_000_000 - 300_000),
+            now,
+            false,
+            false,
+            &samples,
+        );
+        assert_eq!(early["outlook"]["kind"], "insufficient-data");
+        assert_eq!(early["budget"]["status"], "ahead");
+    }
+
+    #[test]
+    fn only_a_forecast_from_recent_readings_alerts() {
+        let now = Utc::now().timestamp_millis();
+        let quota = |at: i64, outlook: Value| {
+            json!({"id":"q","vendor":"claude","name":"Current session","usedPercent":25.0,
+                "resetAt":iso(now + 4 * 3_600_000),"observedAt":iso(at),"status":"normal",
+                "metrics":{"outlook":outlook}})
+        };
+        for (basis, alerts) in [("window", 0), ("recent", 1)] {
+            let mut tracker = crate::island_events::Tracker::new();
+            tracker.update(
+                &[],
+                &[quota(now - 60_000, json!({"kind":"insufficient-data"}))],
+                &[],
+                now,
+            );
+            let events = tracker.update(
+                &[],
+                &[quota(
+                    now,
+                    json!({"kind":"exhausts","basis":basis,"beforeReset":true,
+                        "exhaustsAt":iso(now + 3 * 3_600_000)}),
+                )],
+                &[],
+                now,
+            );
+            assert_eq!(events["items"].as_array().unwrap().len(), alerts, "{basis}");
         }
     }
 
