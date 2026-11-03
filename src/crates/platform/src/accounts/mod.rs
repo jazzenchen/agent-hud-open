@@ -2,6 +2,12 @@
 //! cache outside the Runtime mutex. A reading holds the collection gate, so it
 //! never overlaps a local pass either.
 //! Cadence follows UsageRefresh: 300s quiet, 150s running, >=60s per account.
+//!
+//! Each provider states its own facts (`agents::account::Provider`): how it
+//! is read, whose work spends its windows, what a failure means. Everything
+//! here is the same for every provider: when to read, how long a reading
+//! that missed an answer keeps the last one, how far apart retries are, and
+//! when the vendor's status page is asked.
 use agent_hud_core::l10n;
 use agent_hud_core::AccountProjection;
 use reqwest::blocking::Client;
@@ -23,6 +29,7 @@ mod homes;
 mod host;
 pub(crate) mod http;
 mod restart_copy;
+mod status;
 
 #[derive(Clone)]
 pub(super) struct AccountContext {
@@ -41,49 +48,41 @@ use agent_hud_agents::account::Reading as AccountReading;
 
 type Waker = Arc<dyn Fn() + Send + Sync>;
 use agent_hud_agents as agents;
-type Reader = fn(&dyn agents::Host) -> Result<AccountReading, String>;
-/// One reading at a time, in this order, as UsageCollector runs the sources'
-/// account steps: Claude, Codex, DeepSeek, then the additional sources in
-/// AdditionalSource order, then the open agents (CombinedUsageProvider).
-const READERS: [(&str, Reader); 12] = [
-    ("claude", agents::claude::account::read),
-    ("codex", agents::codex::account::read),
-    ("deepseek", agents::deepseek::account::read),
-    ("antigravity", agents::antigravity::account::read),
-    ("cursor", agents::cursor::account::read),
-    ("grok-bot", agents::grok::account::read),
-    ("copilot", agents::copilot::account::read),
-    ("devin", agents::devin::account::read),
-    ("kimi", agents::coding_plans::kimi),
-    ("glm", agents::coding_plans::glm),
-    ("opencode", agents::coding_plans::opencode_go),
-    ("relay", agents::relays::read),
-];
+use agents::account::{Provider, Unread};
+/// The providers a service reads, one at a time, in their order
+/// (`agents::ACCOUNTS` outside tests).
+type Providers = &'static [&'static Provider];
 
-/// Whether this Mac's work moves the provider's windows. Codex's are spent
-/// by Pi and other clients without Codex rollouts, Cursor's on every device
-/// the account signs in on, and Grok Bot's by bots running on Cursor's
-/// servers, so theirs are read on the account interval whatever this Mac
-/// does (agent-hud-native-open `seesLocalWork`).
+/// A provider's own facts, by id. A provider that states none (a test's
+/// fixture) is read like one whose windows this computer's work moves.
+fn facts(provider: &str) -> Option<&'static Provider> {
+    agents::account_provider(provider)
+}
+/// Whether this computer's work moves the provider's windows.
 fn sees_local_work(provider: &str) -> bool {
-    !matches!(provider, "codex" | "cursor" | "grok-bot")
+    facts(provider).is_none_or(|facts| facts.local_work)
+}
+/// The session sources whose work is the provider's.
+fn work_sources(provider: &str) -> &'static [&'static str] {
+    facts(provider).map_or(&[], Provider::sources)
 }
 
-/// The session sources whose work is the provider's: Grok's quota covers
-/// its CLI and its Bot, and the open agents' plans are read as one source
-/// whose sessions are OpenCode's, Kimi's, GLM's and Pi's (agent-hud-native-open
-/// OpenAgentSessions).
-fn work_sources(provider: &str) -> &[&str] {
-    match provider {
-        "grok-bot" => &["grok-bot", "grok-cli"],
-        "kimi" | "glm" | "opencode" => &["opencode", "kimi", "glm", "pi"],
-        // A relay is read sooner while the clients it is found in work.
-        "relay" => &["claude", "codex"],
-        _ => READERS
-            .iter()
-            .find(|(id, _)| *id == provider)
-            .map_or(&[], |(id, _)| std::slice::from_ref(id)),
-    }
+/// How long a reading that missed an answer (`Unread::Transient`) keeps the
+/// last good one on screen as it was, without greying it or saying why:
+/// a network hiccup or a busy service passes by itself.
+const GRACE_MS: i64 = 10 * 60_000;
+/// Retries after failed readings wait 60 s, then twice as long each time,
+/// up to this.
+const MOST_BACKOFF: Duration = Duration::from_secs(15 * 60);
+/// The longest wait a service's `Retry-After` is followed for.
+const MOST_RETRY_AFTER: Duration = Duration::from_secs(3600);
+
+/// How long after a failed reading the next one waits, by how many failed in
+/// a row.
+fn backoff(failures: u32) -> Duration {
+    Duration::from_secs(60)
+        .saturating_mul(1u32 << failures.saturating_sub(1).min(10))
+        .min(MOST_BACKOFF)
 }
 /// UsageRefresh.accountStepBudget: after this long of back-to-back readings the
 /// worker waits as long again, so a local pass is not held behind the queue.
@@ -100,10 +99,34 @@ struct Entry {
     attempted: Instant,
     attempted_ms: i64,
     notice: Option<String>,
+    /// The last reading failed and is shown so: its rows stale, why under it.
     failed: bool,
     spread: u64,
     /// From the restart copy and not yet read in this run: due at once.
     restored: bool,
+    /// Readings that failed in a row, shown or not (within the grace).
+    failures: u32,
+    /// What the last failed reading was (`Unread::kind`), while it is shown.
+    failure: Option<&'static str>,
+    /// Since when the readings fail, in ms.
+    failing_since: Option<i64>,
+    /// Not before this, as the service asked.
+    retry_at: Option<Instant>,
+}
+/// A vendor's status page, as last read.
+struct PageReading {
+    attempted: Instant,
+    checked_at: Option<String>,
+    summary: Option<Value>,
+}
+/// What the worker does next: read a provider's account, or a status page.
+enum Job {
+    Account(
+        &'static str,
+        &'static Provider,
+        HashMap<String, Vec<PathBuf>>,
+    ),
+    Page(&'static agents::account::StatusPage),
 }
 struct Control {
     stopped: bool,
@@ -116,6 +139,8 @@ struct Control {
     live: HashSet<String>,
     finished: HashMap<String, i64>,
     entries: BTreeMap<&'static str, Entry>,
+    /// Status pages by address.
+    pages: HashMap<&'static str, PageReading>,
     account_homes: HashMap<String, Vec<PathBuf>>,
     waker: Option<Waker>,
 }
@@ -138,14 +163,14 @@ impl AccountService {
         enabled: HashSet<String>,
         gate: CollectionGate,
     ) -> Result<Self, String> {
-        Self::with_readers(home, data_dir, enabled, gate, &READERS)
+        Self::with_readers(home, data_dir, enabled, gate, agents::ACCOUNTS)
     }
     fn with_readers(
         home: PathBuf,
         data_dir: PathBuf,
         enabled: HashSet<String>,
         gate: CollectionGate,
-        readers: &'static [(&'static str, Reader)],
+        readers: Providers,
     ) -> Result<Self, String> {
         // Never follow a redirect carrying credentials to a different origin.
         let http = Client::builder()
@@ -177,6 +202,10 @@ impl AccountService {
                     failed: false,
                     spread: 0,
                     restored: true,
+                    failures: 0,
+                    failure: None,
+                    failing_since: None,
+                    retry_at: None,
                 };
                 (entry.reading.provider, entry)
             })
@@ -201,6 +230,7 @@ impl AccountService {
                 live: HashSet::new(),
                 finished: HashMap::new(),
                 entries,
+                pages: HashMap::new(),
                 account_homes: restored.account_homes,
                 waker: None,
             }),
@@ -494,7 +524,9 @@ impl AccountService {
         };
         let mut result = AccountProjection::default();
         let now = chrono::Utc::now().timestamp_millis();
-        for (provider, _) in READERS {
+        // Every provider the app knows, whatever this service reads.
+        for &facts in agents::ACCOUNTS {
+            let provider = facts.id;
             if !state.enabled.contains(provider) {
                 continue;
             }
@@ -510,7 +542,7 @@ impl AccountService {
                     .reading
                     .quotas
                     .iter()
-                    .filter(|row| !expired_cli_sample(row, "observedAt", now))
+                    .filter(|row| !expired_report(facts, row, "observedAt", now))
                     .cloned()
                     .map(|mut row| {
                         if row["observedAt"].is_null() {
@@ -522,7 +554,7 @@ impl AccountService {
                             }
                         }
                         if entry.failed
-                            || stale_cli_sample(&row, "observedAt", now)
+                            || stale_report(facts, &row, "observedAt", now)
                             || row["resetAt"]
                                 .as_str()
                                 .and_then(date_ms)
@@ -552,7 +584,7 @@ impl AccountService {
                 .iter()
                 .chain(&entry.reading.additional_accounts)
             {
-                if expired_cli_sample(account, "checkedAt", now) {
+                if expired_report(facts, account, "checkedAt", now) {
                     continue;
                 }
                 // A failed read keeps the last reading; why stands under the
@@ -572,7 +604,7 @@ impl AccountService {
                 account["stale"] = json!(
                     entry.failed
                         || account["stale"] == true
-                        || stale_cli_sample(&account, "checkedAt", now)
+                        || stale_report(facts, &account, "checkedAt", now)
                 );
                 if let Some(notice) = failure {
                     account["notice"] = json!(notice);
@@ -586,7 +618,21 @@ impl AccountService {
                 .services
                 .extend(entry.reading.services.iter().cloned());
             let ready = !entry.reading.quotas.is_empty() || !entry.reading.billing.is_empty();
-            result.providers.insert(entry.reading.provider.into(),json!({"status":if entry.failed {"error"}else if ready {"ready"}else{"unavailable"},"checkedAt":entry.checked_at,"notice":entry.notice}));
+            // A failure shows with its kind, so what the agent's own state
+            // is (signed out) stays apart from what only missed an answer.
+            let failure = entry.failure.filter(|_| entry.failed);
+            let failing_since = entry
+                .failing_since
+                .filter(|_| entry.failed)
+                .and_then(chrono::DateTime::from_timestamp_millis)
+                .map(|at| at.to_rfc3339());
+            // What the vendor's status page says, while a component this
+            // provider depends on is not operational.
+            let service = facts.status.and_then(|page| {
+                let read = state.pages.get(page.url)?;
+                status::service(page, read.summary.as_ref()?, read.checked_at.as_deref()?)
+            });
+            result.providers.insert(entry.reading.provider.into(),json!({"status":if entry.failed {"error"}else if ready {"ready"}else{"unavailable"},"checkedAt":entry.checked_at,"notice":entry.notice,"failure":failure,"failingSince":failing_since,"service":service}));
         }
         for metadata in credentials::status(&self.context)["providers"]
             .as_array()
@@ -608,12 +654,7 @@ impl Drop for AccountService {
     }
 }
 
-fn run(
-    context: AccountContext,
-    shared: Arc<Shared>,
-    gate: CollectionGate,
-    readers: &'static [(&'static str, Reader)],
-) {
+fn run(context: AccountContext, shared: Arc<Shared>, gate: CollectionGate, readers: Providers) {
     let mut burst: Option<Instant> = None;
     let mut resume_at: Option<Instant> = None;
     let mut saved: Option<Instant> = None;
@@ -630,7 +671,8 @@ fn run(
                 // same 60s request spacing as the original collector.
                 let mut pause = Duration::from_secs(300);
                 let mut due = None;
-                for &(provider, reader) in readers {
+                for &facts in readers {
+                    let provider = facts.id;
                     if !state.enabled.contains(provider) {
                         continue;
                     }
@@ -639,21 +681,43 @@ fn run(
                         .get(provider)
                         .map_or(Duration::ZERO, |entry| due_after(provider, entry, &state));
                     if wait.is_zero() {
-                        due = Some((provider, reader));
+                        due = Some((provider, facts));
                         break;
                     }
                     pause = pause.min(wait);
                 }
                 let now = Instant::now();
+                // A status page waits behind every account reading that is due.
+                let mut page = None;
+                if due.is_none() {
+                    for &facts in readers {
+                        let Some(status) =
+                            facts.status.filter(|_| state.enabled.contains(facts.id))
+                        else {
+                            continue;
+                        };
+                        let wait = state.pages.get(status.url).map_or(Duration::ZERO, |read| {
+                            status::INTERVAL.saturating_sub(read.attempted.elapsed())
+                        });
+                        if wait.is_zero() {
+                            page = Some(status);
+                            break;
+                        }
+                        pause = pause.min(wait);
+                    }
+                }
                 if let Some(at) = resume_at.filter(|at| *at > now) {
                     pause = at - now;
-                } else if let Some(selected) = due {
+                } else if due.is_some() || page.is_some() {
                     if burst.is_none_or(|started| started.elapsed() < STEP_BUDGET) {
                         resume_at = None;
+                        let Some(selected) = due else {
+                            break Job::Page(page.expect("a page is due"));
+                        };
                         // Consume the request this job serves. A callback arriving
                         // during I/O remains pending for the next permitted pass.
                         state.force.remove(selected.0);
-                        break (selected.0, selected.1, state.account_homes.clone());
+                        break Job::Account(selected.0, selected.1, state.account_homes.clone());
                     }
                     burst = None;
                     resume_at = Some(now + STEP_BUDGET);
@@ -668,6 +732,47 @@ fn run(
             }
         };
         burst.get_or_insert_with(Instant::now);
+        let selected = match selected {
+            Job::Account(provider, facts, homes) => (provider, facts, homes),
+            Job::Page(page) => {
+                let attempted = Instant::now();
+                let summary = {
+                    let _turn = gate.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+                    if shared.cancelled.load(Ordering::Acquire) {
+                        return;
+                    }
+                    status::read(&context.http, page.url)
+                };
+                let waker = {
+                    let Ok(mut state) = shared.state.lock() else {
+                        return;
+                    };
+                    // A page that could not be read keeps what it said last.
+                    let old = state.pages.remove(page.url);
+                    let changed = summary.is_some()
+                        && old.as_ref().and_then(|old| old.summary.as_ref()) != summary.as_ref();
+                    let (checked_at, summary) = match summary {
+                        Some(summary) => (Some(chrono::Utc::now().to_rfc3339()), Some(summary)),
+                        None => old
+                            .map(|old| (old.checked_at, old.summary))
+                            .unwrap_or_default(),
+                    };
+                    state.pages.insert(
+                        page.url,
+                        PageReading {
+                            attempted,
+                            checked_at,
+                            summary,
+                        },
+                    );
+                    changed.then(|| state.waker.clone()).flatten()
+                };
+                if let Some(waker) = waker {
+                    waker();
+                }
+                continue;
+            }
+        };
         let attempted = Instant::now();
         let attempted_ms = chrono::Utc::now().timestamp_millis();
         // The gate, not the shared state or the Runtime, is held across the I/O.
@@ -678,7 +783,7 @@ fn run(
             }
             let mut reading_context = context.clone();
             reading_context.account_homes = selected.2.clone();
-            (selected.1)(&reading_context)
+            (selected.1.read)(&reading_context)
         };
         let (waker, copy) = {
             let Ok(mut state) = shared.state.lock() else {
@@ -698,7 +803,9 @@ fn run(
                 % 61;
             match result {
                 Ok(mut reading) => {
-                    retain_windows(state.entries.get(selected.0), &mut reading, attempted_ms);
+                    if selected.1.keeps_unreported_windows {
+                        retain_windows(state.entries.get(selected.0), &mut reading, attempted_ms);
+                    }
                     let notice = reading.notice.clone();
                     state.entries.insert(
                         selected.0,
@@ -711,10 +818,14 @@ fn run(
                             failed: false,
                             spread,
                             restored: false,
+                            failures: 0,
+                            failure: None,
+                            failing_since: None,
+                            retry_at: None,
                         },
                     );
                 }
-                Err(error) => {
+                Err(unread) => {
                     let entry = state.entries.entry(selected.0).or_insert_with(|| Entry {
                         reading: AccountReading::empty(selected.0),
                         checked_at: None,
@@ -724,13 +835,13 @@ fn run(
                         failed: true,
                         spread,
                         restored: false,
+                        failures: 0,
+                        failure: None,
+                        failing_since: None,
+                        retry_at: None,
                     });
-                    entry.attempted = attempted;
-                    entry.attempted_ms = attempted_ms;
-                    entry.notice = Some(error);
-                    entry.failed = true;
+                    failed_reading(entry, unread, attempted, attempted_ms);
                     entry.spread = spread;
-                    entry.restored = false;
                 }
             }
             let copy = saved
@@ -752,8 +863,10 @@ fn run(
 /// (agent-hud-native-open QuotaHistoryStore.retention).
 const WINDOW_RETENTION_MS: i64 = 30 * 86_400_000;
 
-fn cli_sample_age(row: &Value, time_key: &str, now: i64) -> Option<i64> {
-    (row["source"] == "antigravity_cli")
+/// How old a row a client reported by itself is (`Provider::reported`).
+fn report_age(facts: &Provider, row: &Value, time_key: &str, now: i64) -> Option<i64> {
+    let reported = facts.reported?;
+    (row["source"] == reported.source)
         .then(|| {
             row[time_key]
                 .as_str()
@@ -763,13 +876,48 @@ fn cli_sample_age(row: &Value, time_key: &str, now: i64) -> Option<i64> {
         .flatten()
 }
 
-fn stale_cli_sample(row: &Value, time_key: &str, now: i64) -> bool {
-    cli_sample_age(row, time_key, now)
-        .is_some_and(|age| age > agents::antigravity::statusline::STALE_AFTER_SECONDS * 1000)
+fn stale_report(facts: &Provider, row: &Value, time_key: &str, now: i64) -> bool {
+    let Some(reported) = facts.reported else {
+        return false;
+    };
+    report_age(facts, row, time_key, now)
+        .is_some_and(|age| age > reported.stale_after_seconds * 1000)
 }
 
-fn expired_cli_sample(row: &Value, time_key: &str, now: i64) -> bool {
-    cli_sample_age(row, time_key, now).is_some_and(|age| age >= WINDOW_RETENTION_MS)
+fn expired_report(facts: &Provider, row: &Value, time_key: &str, now: i64) -> bool {
+    report_age(facts, row, time_key, now).is_some_and(|age| age >= WINDOW_RETENTION_MS)
+}
+
+/// Records a failed reading. A reading that only missed an answer, while the
+/// last good one is under `GRACE_MS` old, changes nothing on screen; any
+/// other failure is shown at once with its reason, and the last reading
+/// stays, marked stale. Either way the next try backs off, and waits as long
+/// as the service asked.
+fn failed_reading(entry: &mut Entry, unread: Unread, attempted: Instant, attempted_ms: i64) {
+    let recent = entry
+        .checked_at
+        .as_deref()
+        .and_then(date_ms)
+        .is_some_and(|at| attempted_ms.saturating_sub(at) < GRACE_MS);
+    let unnoticed = !entry.failed && recent && matches!(unread, Unread::Transient { .. });
+    entry.attempted = attempted;
+    entry.attempted_ms = attempted_ms;
+    entry.restored = false;
+    entry.failures = entry.failures.saturating_add(1);
+    entry.failing_since.get_or_insert(attempted_ms);
+    entry.retry_at = match &unread {
+        Unread::Transient {
+            retry_after: Some(wait),
+            ..
+        } => Some(attempted + (*wait).min(MOST_RETRY_AFTER)),
+        _ => None,
+    };
+    if unnoticed {
+        return;
+    }
+    entry.failure = Some(unread.kind());
+    entry.notice = Some(unread.reason().to_owned());
+    entry.failed = true;
 }
 
 /// An absent reading is not a reset (agent-hud-native-open
@@ -779,9 +927,6 @@ fn expired_cli_sample(row: &Value, time_key: &str, now: i64) -> bool {
 /// its complete window inventory, so a window it leaves out retires at once;
 /// the other providers' rules belong to their own readers.
 fn retain_windows(previous: Option<&Entry>, reading: &mut AccountReading, now: i64) {
-    if reading.provider != "claude" {
-        return;
-    }
     let (Some(previous), Some(account)) = (previous, reading.account.as_ref()) else {
         return;
     };
@@ -826,6 +971,11 @@ fn due_after(provider: &str, entry: &Entry, state: &Control) -> Duration {
         return Duration::ZERO;
     }
     let elapsed = entry.attempted.elapsed();
+    // What the service asked holds even for a refresh the user asked for.
+    let asked = entry.retry_at.map_or(Duration::ZERO, |at| {
+        at.saturating_duration_since(Instant::now())
+    });
+    let spacing = Duration::from_secs(60).saturating_sub(elapsed);
     let now = chrono::Utc::now().timestamp_millis();
     let resets = entry
         .reading
@@ -841,6 +991,18 @@ fn due_after(provider: &str, entry: &Entry, state: &Control) -> Duration {
         .filter_map(|source| state.finished.get(*source))
         .any(|at| *at > entry.attempted_ms);
     let local = sees_local_work(provider) && !state.account_homes.contains_key(provider);
+    // After failed readings the next try backs off, whatever the interval;
+    // a refresh the user asked for, or this computer's work finishing, tries
+    // at once (signing in again and working is how many failures end).
+    if entry.failures > 0 {
+        let now_due = state.force.contains(provider) || (local && finished);
+        let retry = if now_due {
+            Duration::ZERO
+        } else {
+            backoff(entry.failures).saturating_sub(elapsed)
+        };
+        return retry.max(spacing).max(asked);
+    }
     let quiet_known_reset = local
         && !entry.failed
         && !resets.is_empty()
@@ -866,9 +1028,8 @@ fn due_after(provider: &str, entry: &Entry, state: &Control) -> Duration {
             (reset + entry.spread as i64 * 1000 - now).max(0) as u64,
         ));
     }
-    // Failed account reads use the same provider due calculation. Swift's 5s
-    // local-source retry is separate; account requests are never <60s apart.
-    pause.max(Duration::from_secs(60).saturating_sub(elapsed))
+    // Account requests are never <60s apart.
+    pause.max(spacing).max(asked)
 }
 
 #[cfg(test)]
@@ -881,7 +1042,7 @@ mod tests {
     static DONE: AtomicUsize = AtomicUsize::new(0);
     static GATE: Mutex<Option<CollectionGate>> = Mutex::new(None);
 
-    fn reading(provider: &'static str) -> Result<AccountReading, String> {
+    fn reading(provider: &'static str) -> Result<AccountReading, Unread> {
         let active = ACTIVE.fetch_add(1, Ordering::SeqCst) + 1;
         MOST.fetch_max(active, Ordering::SeqCst);
         let gate = GATE.lock().unwrap().clone().unwrap();
@@ -894,16 +1055,19 @@ mod tests {
         DONE.fetch_add(1, Ordering::SeqCst);
         Ok(AccountReading::empty(provider))
     }
-    fn first(_: &dyn agents::Host) -> Result<AccountReading, String> {
+    fn first(_: &dyn agents::Host) -> Result<AccountReading, Unread> {
         reading("first")
     }
-    fn second(_: &dyn agents::Host) -> Result<AccountReading, String> {
+    fn second(_: &dyn agents::Host) -> Result<AccountReading, Unread> {
         reading("second")
     }
-    fn third(_: &dyn agents::Host) -> Result<AccountReading, String> {
+    fn third(_: &dyn agents::Host) -> Result<AccountReading, Unread> {
         reading("third")
     }
-    static FAKE: [(&str, Reader); 3] = [("first", first), ("second", second), ("third", third)];
+    static FIRST: Provider = Provider::new("first", first);
+    static SECOND: Provider = Provider::new("second", second);
+    static THIRD: Provider = Provider::new("third", third);
+    static FAKE: [&Provider; 3] = [&FIRST, &SECOND, &THIRD];
 
     fn control() -> Control {
         Control {
@@ -914,6 +1078,7 @@ mod tests {
             live: HashSet::new(),
             finished: HashMap::new(),
             entries: BTreeMap::new(),
+            pages: HashMap::new(),
             account_homes: HashMap::new(),
             waker: None,
         }
@@ -1038,7 +1203,7 @@ mod tests {
 
     #[test]
     fn a_callback_during_an_account_read_remains_pending_after_that_read_commits() {
-        fn blocked(host: &dyn agents::Host) -> Result<AccountReading, String> {
+        fn blocked(host: &dyn agents::Host) -> Result<AccountReading, Unread> {
             assert_eq!(
                 host.account_homes("antigravity"),
                 [host.home().join("cli/settings.json")],
@@ -1054,7 +1219,8 @@ mod tests {
             }
             Ok(AccountReading::empty("antigravity"))
         }
-        static READERS: [(&str, Reader); 1] = [("antigravity", blocked)];
+        static BLOCKED: Provider = Provider::new("antigravity", blocked);
+        static READERS: [&Provider; 1] = [&BLOCKED];
         let directory = tempfile::tempdir().unwrap();
         let service = AccountService::with_readers(
             directory.path().into(),
@@ -1164,6 +1330,10 @@ mod tests {
             failed: checked_at.is_none(),
             spread: 0,
             restored,
+            failures: 0,
+            failure: None,
+            failing_since: None,
+            retry_at: None,
         }
     }
 
@@ -1285,10 +1455,12 @@ mod tests {
 
     #[test]
     fn restored_accounts_keep_their_home_scope_and_removed_homes_do_not_return() {
-        fn unread(_: &dyn agents::Host) -> Result<AccountReading, String> {
+        fn unread(_: &dyn agents::Host) -> Result<AccountReading, Unread> {
             panic!("the collection gate keeps this fixture read-only")
         }
-        static READERS: [(&str, Reader); 2] = [("codex", unread), ("antigravity", unread)];
+        static CODEX: Provider = Provider::new("codex", unread);
+        static ANTIGRAVITY: Provider = Provider::new("antigravity", unread);
+        static READERS: [&Provider; 2] = [&CODEX, &ANTIGRAVITY];
         for (provider, setting) in [
             ("codex", "codexHomes"),
             ("antigravity", "antigravityCliSettings"),
@@ -1447,8 +1619,82 @@ mod tests {
     }
 
     #[test]
+    fn a_missed_answer_keeps_a_fresh_reading_as_it_was_and_backs_off() {
+        let mut reading = AccountReading::empty("claude");
+        reading.quotas = vec![json!({"id":"w","usedPercent":10})];
+        let checked = chrono::Utc::now().to_rfc3339();
+        let mut entry = entry(reading, Some(&checked), false);
+        let now = Instant::now();
+        let now_ms = chrono::Utc::now().timestamp_millis();
+        failed_reading(&mut entry, Unread::transient("offline"), now, now_ms);
+        assert!(!entry.failed, "within the grace nothing changes on screen");
+        assert_eq!(entry.notice, None);
+        assert_eq!(entry.failures, 1);
+        let state = control();
+        let first = due_after("claude", &entry, &state);
+        assert!(first > Duration::from_secs(55) && first <= Duration::from_secs(60));
+        failed_reading(&mut entry, Unread::transient("offline"), now, now_ms);
+        failed_reading(&mut entry, Unread::transient("offline"), now, now_ms);
+        let third = due_after("claude", &entry, &state);
+        assert!(third > Duration::from_secs(235) && third <= Duration::from_secs(240));
+        for _ in 0..10 {
+            failed_reading(&mut entry, Unread::transient("offline"), now, now_ms);
+        }
+        assert!(due_after("claude", &entry, &state) <= MOST_BACKOFF);
+        // A refresh the user asks for tries again at once, past the spacing.
+        let mut asked = control();
+        asked.force.insert("claude".into());
+        assert!(due_after("claude", &entry, &asked) <= Duration::from_secs(60));
+    }
+
+    #[test]
+    fn an_old_reading_or_a_sign_out_shows_the_failure_at_once() {
+        let now = Instant::now();
+        let now_ms = chrono::Utc::now().timestamp_millis();
+        let old = (chrono::Utc::now() - chrono::Duration::minutes(11)).to_rfc3339();
+        let mut stale = entry(AccountReading::empty("claude"), Some(&old), false);
+        failed_reading(&mut stale, Unread::transient("offline"), now, now_ms);
+        assert!(stale.failed);
+        assert_eq!(stale.failure, Some("transient"));
+        assert_eq!(stale.notice.as_deref(), Some("offline"));
+
+        let fresh = chrono::Utc::now().to_rfc3339();
+        let mut signed_out = entry(AccountReading::empty("claude"), Some(&fresh), false);
+        failed_reading(
+            &mut signed_out,
+            Unread::SignedOut("sign in again".into()),
+            now,
+            now_ms,
+        );
+        assert!(signed_out.failed, "the agent's own state is not hidden");
+        assert_eq!(signed_out.failure, Some("signedOut"));
+        assert_eq!(signed_out.failing_since, Some(now_ms));
+    }
+
+    #[test]
+    fn a_service_that_asks_to_wait_is_not_asked_sooner() {
+        let fresh = chrono::Utc::now().to_rfc3339();
+        let mut limited = entry(AccountReading::empty("codex"), Some(&fresh), false);
+        failed_reading(
+            &mut limited,
+            Unread::Transient {
+                reason: "busy".into(),
+                retry_after: Some(Duration::from_secs(1800)),
+            },
+            Instant::now(),
+            chrono::Utc::now().timestamp_millis(),
+        );
+        let mut state = control();
+        state.force.insert("codex".into());
+        assert!(due_after("codex", &limited, &state) > Duration::from_secs(1790));
+    }
+
+    #[test]
     fn readings_run_in_opens_source_order() {
-        let order = READERS.iter().map(|(id, _)| *id).collect::<Vec<_>>();
+        let order = agents::ACCOUNTS
+            .iter()
+            .map(|facts| facts.id)
+            .collect::<Vec<_>>();
         assert_eq!(&order[..3], ["claude", "codex", "deepseek"]);
     }
 
@@ -1500,9 +1746,9 @@ mod tests {
             "a window unseen for 30 days retires"
         );
 
-        let mut codex = AccountReading::empty("codex");
-        codex.account = Some(json!({"id":"acct-a"}));
-        retain_windows(Some(&previous), &mut codex, now);
-        assert!(codex.quotas.is_empty(), "Codex reports its whole inventory");
+        // Only a provider that reports the windows in use keeps the others;
+        // Codex reports its whole inventory.
+        assert!(agents::claude::account::PROVIDER.keeps_unreported_windows);
+        assert!(!agents::codex::account::PROVIDER.keeps_unreported_windows);
     }
 }

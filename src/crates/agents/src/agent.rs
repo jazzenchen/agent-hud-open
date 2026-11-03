@@ -66,6 +66,30 @@ pub static ALL: &[&Agent] = &[
     &glm::AGENT,
 ];
 
+/// Every account reader, in the order the engine reads them, one at a
+/// time. A provider is not always one client: Grok's quota covers its CLI
+/// and its Bot, the open agents' plans are read per plan, and relays are
+/// read for whichever clients send their calls through them.
+pub static ACCOUNTS: &[&crate::account::Provider] = &[
+    &claude::account::PROVIDER,
+    &codex::account::PROVIDER,
+    &deepseek::account::PROVIDER,
+    &antigravity::account::PROVIDER,
+    &cursor::account::PROVIDER,
+    &grok::account::PROVIDER,
+    &copilot::account::PROVIDER,
+    &devin::account::PROVIDER,
+    &crate::coding_plans::KIMI,
+    &crate::coding_plans::GLM,
+    &crate::coding_plans::OPENCODE_GO,
+    &crate::relays::PROVIDER,
+];
+
+/// The account reader with this provider id.
+pub fn account_provider(id: &str) -> Option<&'static crate::account::Provider> {
+    ACCOUNTS.iter().copied().find(|provider| provider.id == id)
+}
+
 /// The client with this id.
 pub fn by_id(id: &str) -> Option<&'static Agent> {
     ALL.iter().copied().find(|agent| agent.id == id)

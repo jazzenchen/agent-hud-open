@@ -2,7 +2,8 @@
 //! Credentials stay in the engine and are sent only to their fixed official
 //! endpoints; no client or helper is launched.
 use crate::account::{
-    account_id, legacy_unresolved, Answer, Host, HttpFailure, HttpRequest, Reading,
+    account_id, legacy_unresolved, Answer, Host, HttpFailure, HttpRequest, Provider, Reading,
+    Unread,
 };
 use crate::l10n;
 use chrono::Utc;
@@ -207,7 +208,16 @@ fn platform_balance(
     }))
 }
 
-pub fn read(host: &dyn Host) -> Result<Reading, String> {
+/// DeepSeek's balance, with the key DeepSeek Harness or the user keeps.
+pub static PROVIDER: Provider = Provider {
+    ..Provider::new("deepseek", read)
+};
+
+pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
+    read_text(host).map_err(Unread::from)
+}
+
+fn read_text(host: &dyn Host) -> Result<Reading, String> {
     let directory = directory(host);
     let saved = host.saved_credential("deepseek")?;
     let settings = if saved.is_none() {
@@ -464,7 +474,7 @@ mod tests {
             GRANT.replace("      version: 1", "      version: 2"),
         ] {
             let host = FakeHost::new("/u").file("/u/.dsh/.credentials.yaml", &invalid);
-            let error = read(&host).err().unwrap();
+            let error = read(&host).err().unwrap().reason().to_owned();
             assert!(!error.contains("sample-grant"));
             assert!(host.asked.borrow().is_empty());
         }
@@ -481,7 +491,7 @@ mod tests {
             let host = FakeHost::new("/u")
                 .file("/u/.dsh/.credentials.yaml", GRANT)
                 .answer(PLATFORM_BALANCE, Ok(body));
-            let error = read(&host).err().unwrap();
+            let error = read(&host).err().unwrap().reason().to_owned();
             assert!(!error.contains("sample-grant"));
         }
     }

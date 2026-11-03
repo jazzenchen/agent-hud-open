@@ -1,7 +1,10 @@
 //! Copilot's quota through the existing GitHub CLI sign-in, read only after
 //! the user's explicit consent (Open's readCopilotQuota). No gh or client is
 //! launched and no token is refreshed.
-use crate::account::{legacy_account, status, Answer, Host, HttpFailure, HttpRequest, Reading};
+use crate::account::{
+    legacy_account, status, Answer, Host, HttpFailure, HttpRequest, Provider, Reading, StatusPage,
+    Unread,
+};
 use crate::l10n;
 use crate::naming::vendor_windows;
 use base64::Engine;
@@ -191,7 +194,25 @@ fn parse(body: &Value, id: &str, label: Option<&str>) -> Reading {
         Some(json!({"id":id,"provider":"copilot","label":label,"plan":body["copilot_plan"]}));
     r
 }
-pub fn read(host: &dyn Host) -> Result<Reading, String> {
+/// Copilot's plan, read with the GitHub CLI's sign-in once the user agrees.
+pub static PROVIDER: Provider = Provider {
+    status: Some(&STATUS),
+    ..Provider::new("copilot", read)
+};
+/// GitHub's status page.
+static STATUS: StatusPage = StatusPage {
+    url: "https://www.githubstatus.com/api/v2/summary.json",
+    components: &["Copilot"],
+};
+
+fn signed_out() -> Unread {
+    Unread::SignedOut(l10n::text(
+        "请先登录 GitHub CLI，再读取 Copilot 额度",
+        "Sign in to GitHub CLI before reading Copilot quota",
+    ))
+}
+
+pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
     if !host.consented(CONSENT) {
         let mut r = Reading::empty("copilot");
         r.notice = Some(l10n::text(
@@ -200,12 +221,7 @@ pub fn read(host: &dyn Host) -> Result<Reading, String> {
         ));
         return Ok(r);
     }
-    let key = token(host).ok_or_else(|| {
-        l10n::text(
-            "请先登录 GitHub CLI，再读取 Copilot 额度",
-            "Sign in to GitHub CLI before reading Copilot quota",
-        )
-    })?;
+    let key = token(host).ok_or_else(signed_out)?;
     let authorization = format!("token {key}");
     let request = |url: &str| {
         host.http_json(&HttpRequest {
@@ -221,14 +237,17 @@ pub fn read(host: &dyn Host) -> Result<Reading, String> {
             timeout: Duration::from_secs(12),
         })
         .map_err(|failure| match failure {
-            HttpFailure::BadHeader => l10n::text(
+            HttpFailure::BadHeader => Unread::from(l10n::text(
                 "GitHub 令牌格式无效，无法用于请求",
                 "GitHub token cannot be used as a header",
-            ),
-            HttpFailure::Unreachable => {
-                l10n::text("Copilot 账户请求失败", "Copilot account request failed")
-            }
-            other => other.message(),
+            )),
+            HttpFailure::Unreachable => failure.unread_as(l10n::text(
+                "Copilot 账户请求失败",
+                "Copilot account request failed",
+            )),
+            // The token gh keeps no longer signs in.
+            HttpFailure::Status(401) => Unread::SignedOut(failure.message()),
+            other => other.unread(),
         })
     };
     let body = request("https://api.github.com/copilot_internal/user")?;

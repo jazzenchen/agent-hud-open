@@ -8,7 +8,7 @@
 //! The copy is rewritten at most every five minutes, as Open does, and once
 //! more when the service stops, so the next launch starts from the readings
 //! the app last showed.
-use super::{AccountReading, Entry, Reader};
+use super::{AccountReading, Entry, Providers};
 use serde_json::{json, Value};
 use std::{
     collections::{BTreeMap, HashMap},
@@ -37,7 +37,7 @@ fn path(data_dir: &Path) -> PathBuf {
 
 /// The kept readings of the providers in `readers`, each with the time it was
 /// read. A missing, unreadable or foreign file restores nothing.
-pub(super) fn load(data_dir: &Path, readers: &[(&'static str, Reader)]) -> Restored {
+pub(super) fn load(data_dir: &Path, readers: Providers) -> Restored {
     let path = path(data_dir);
     let Some(copy) = fs::metadata(&path)
         .ok()
@@ -56,7 +56,7 @@ pub(super) fn load(data_dir: &Path, readers: &[(&'static str, Reader)]) -> Resto
         .filter_map(|saved| {
             let provider = readers
                 .iter()
-                .map(|(provider, _)| *provider)
+                .map(|facts| facts.id)
                 .find(|provider| saved["provider"] == *provider)?;
             let checked_at = saved["checkedAt"].as_str()?.to_owned();
             let reading = AccountReading {

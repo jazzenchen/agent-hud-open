@@ -207,9 +207,18 @@ fn nothing_configured_or_only_expired_keys_leave_a_notice() {
 #[test]
 fn one_unreadable_plan_is_a_notice_when_another_was_read() {
     let alone = FakeHost::new("/u").env("OPENCODE_GO_API_KEY", "a");
+    // No answer at all passes by itself.
+    assert!(matches!(
+        opencode_go(&alone).err(),
+        Some(Unread::Transient { reason, .. }) if reason == "Coding plan quota could not be reached"
+    ));
+    let refused = FakeHost::new("/u").env("OPENCODE_GO_API_KEY", "a").answer(
+        "https://opencode.ai/zen/go/v1/usage",
+        Err(HttpFailure::Status(401)),
+    );
     assert_eq!(
-        opencode_go(&alone).err().unwrap(),
-        "Existing coding-plan credentials could not read a verifiable quota; check the source client's login or API key"
+        opencode_go(&refused).err().unwrap(),
+        Unread::Failed("Existing coding-plan credentials could not read a verifiable quota; check the source client's login or API key".into())
     );
     let two = FakeHost::new("/u")
         .env("ZAI_API_KEY", "global")

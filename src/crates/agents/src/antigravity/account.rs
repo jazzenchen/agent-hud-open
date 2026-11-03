@@ -2,7 +2,10 @@
 //! CLI status-line callbacks identify each account; running language servers
 //! supply accounts without callbacks. Anonymous `/usage` is the last fallback.
 use super::{ACCOUNT_SERVICE, AGENT};
-use crate::account::{account_id, legacy_account, legacy_unresolved, status, Host, Reading};
+use crate::account::{
+    account_id, legacy_account, legacy_unresolved, status, Host, Provider, Reading, Reported,
+    Unread,
+};
 use crate::l10n;
 use crate::naming::{
     vendor_windows,
@@ -241,7 +244,21 @@ fn parse(scope: &str, body: &Value, summary: &Value) -> Result<Reading, String> 
     })
 }
 
-pub fn read(host: &dyn Host) -> Result<Reading, String> {
+/// Antigravity's plan, from its CLI's status-line reports and its running
+/// language servers. A CLI report goes stale when the CLI stops reporting.
+pub static PROVIDER: Provider = Provider {
+    reported: Some(Reported {
+        source: "antigravity_cli",
+        stale_after_seconds: super::statusline::STALE_AFTER_SECONDS,
+    }),
+    ..Provider::new("antigravity", read)
+};
+
+pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
+    read_text(host).map_err(Unread::from)
+}
+
+fn read_text(host: &dyn Host) -> Result<Reading, String> {
     let mut reading = Reading::empty("antigravity");
     let mut partial = false;
     for report in host.account_reports("antigravity") {

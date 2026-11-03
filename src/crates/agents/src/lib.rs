@@ -24,7 +24,7 @@ pub mod sqlite;
 pub mod transcript;
 
 pub use account::{Answer, Host, Reading};
-pub use agent::{by_id, Agent, ALL};
+pub use agent::{account_provider, by_id, Agent, ACCOUNTS, ALL};
 pub use agent_hud_l10n as l10n;
 pub use change::{Change, Why};
 pub use channel::{Carries, Channel};

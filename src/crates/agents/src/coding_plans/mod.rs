@@ -7,7 +7,7 @@ mod parse;
 #[cfg(test)]
 mod tests;
 
-use crate::account::{account_id, Host, HttpFailure, HttpRequest, Reading};
+use crate::account::{account_id, Host, HttpFailure, HttpRequest, Provider, Reading, Unread};
 use crate::l10n;
 use serde_json::{json, Value};
 use std::{collections::HashSet, time::Duration};
@@ -35,7 +35,7 @@ fn numeric(value: &Value) -> Option<f64> {
         .or_else(|| value.as_str()?.parse().ok())
         .filter(|v| v.is_finite() && *v >= 0.0)
 }
-fn read_provider(host: &dyn Host, provider: &'static str) -> Result<Reading, String> {
+fn read_provider(host: &dyn Host, provider: &'static str) -> Result<Reading, Unread> {
     let entries = discover::discover(host, provider)?
         .into_iter()
         .filter(|e| e.provider == provider)
@@ -49,9 +49,10 @@ fn read_provider(host: &dyn Host, provider: &'static str) -> Result<Reading, Str
         return Ok(result);
     }
     let mut failures = 0;
+    let mut transient = 0;
     for entry in entries {
         if host.cancelled() {
-            return Err(l10n::text("账户读取已停止", "Account reading was stopped"));
+            return Err(l10n::text("账户读取已停止", "Account reading was stopped").into());
         }
         let mut id = account_id(
             provider,
@@ -111,12 +112,17 @@ fn read_provider(host: &dyn Host, provider: &'static str) -> Result<Reading, Str
             }
         }
         let reading = get(&endpoint, 15)
-            .map_err(|failure| match failure {
-                HttpFailure::Unreachable | HttpFailure::BadHeader => l10n::text(
-                    "无法连接 Coding Plan 额度服务",
-                    "Coding plan quota could not be reached",
-                ),
-                other => other.message(),
+            .map_err(|failure| {
+                if matches!(failure.unread(), Unread::Transient { .. }) {
+                    transient += 1;
+                }
+                match failure {
+                    HttpFailure::Unreachable | HttpFailure::BadHeader => l10n::text(
+                        "无法连接 Coding Plan 额度服务",
+                        "Coding plan quota could not be reached",
+                    ),
+                    other => other.message(),
+                }
             })
             .and_then(|body| parse::parse(&body, &entry, &id));
         // Every client configured with this plan reaches it on the plan's
@@ -156,7 +162,14 @@ fn read_provider(host: &dyn Host, provider: &'static str) -> Result<Reading, Str
     });
     if failures > 0 {
         if result.quotas.is_empty() {
-            return Err(l10n::text("现有 Coding Plan 凭据未能读到可核实的额度，请检查来源客户端的登录或 API Key", "Existing coding-plan credentials could not read a verifiable quota; check the source client's login or API key"));
+            // Only no answer this time, for every plan: it passes by itself.
+            if transient == failures {
+                return Err(Unread::transient(l10n::text(
+                    "无法连接 Coding Plan 额度服务",
+                    "Coding plan quota could not be reached",
+                )));
+            }
+            return Err(l10n::text("现有 Coding Plan 凭据未能读到可核实的额度，请检查来源客户端的登录或 API Key", "Existing coding-plan credentials could not read a verifiable quota; check the source client's login or API key").into());
         }
         result.notice = Some(format!(
             "{failures} configured coding-plan account(s) could not be read"
@@ -164,16 +177,35 @@ fn read_provider(host: &dyn Host, provider: &'static str) -> Result<Reading, Str
     }
     Ok(result)
 }
+/// The open agents' plans are read as one source whose sessions are
+/// OpenCode's, Kimi's, GLM's and Pi's.
+const OPEN_AGENTS: &[&str] = &["opencode", "kimi", "glm", "pi"];
+/// Kimi Code's plan.
+pub static KIMI: Provider = Provider {
+    work_sources: OPEN_AGENTS,
+    ..Provider::new("kimi", kimi)
+};
+/// GLM's coding plan.
+pub static GLM: Provider = Provider {
+    work_sources: OPEN_AGENTS,
+    ..Provider::new("glm", glm)
+};
+/// OpenCode Go's plan.
+pub static OPENCODE_GO: Provider = Provider {
+    work_sources: OPEN_AGENTS,
+    ..Provider::new("opencode", opencode_go)
+};
+
 /// Kimi Code's quota.
-pub fn kimi(host: &dyn Host) -> Result<Reading, String> {
+pub fn kimi(host: &dyn Host) -> Result<Reading, Unread> {
     read_provider(host, "kimi")
 }
 /// The GLM Coding Plan's quota.
-pub fn glm(host: &dyn Host) -> Result<Reading, String> {
+pub fn glm(host: &dyn Host) -> Result<Reading, Unread> {
     read_provider(host, "glm")
 }
 /// OpenCode Go's quota.
-pub fn opencode_go(host: &dyn Host) -> Result<Reading, String> {
+pub fn opencode_go(host: &dyn Host) -> Result<Reading, Unread> {
     read_provider(host, "opencode")
 }
 

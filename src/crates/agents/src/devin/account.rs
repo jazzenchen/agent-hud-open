@@ -1,7 +1,7 @@
 //! Devin's quota, from the account status the Devin CLI caches. When the CLI
 //! fetched it stays the observation time: reading the file now does not make
 //! old data fresh.
-use crate::account::{legacy_account, legacy_unresolved, status, Host, Reading};
+use crate::account::{legacy_account, legacy_unresolved, status, Host, Provider, Reading, Unread};
 use crate::naming::window_names;
 use crate::{l10n, protobuf};
 use base64::Engine;
@@ -31,7 +31,16 @@ fn integer(map: &HashMap<u32, protobuf::Field<'_>>, key: u32) -> Option<u64> {
     map.get(&key).copied()?.integer().ok()
 }
 
-pub fn read(host: &dyn Host) -> Result<Reading, String> {
+/// Devin's plan, from the status its CLI caches.
+pub static PROVIDER: Provider = Provider {
+    ..Provider::new("devin", read)
+};
+
+pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
+    read_text(host).map_err(Unread::from)
+}
+
+fn read_text(host: &dyn Host) -> Result<Reading, String> {
     let mut reading = Reading::empty("devin");
     let directory = host.home().join(".cache/devin/cli");
     let mut candidates = host

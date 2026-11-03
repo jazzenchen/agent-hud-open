@@ -40,6 +40,199 @@ impl Reading {
     }
 }
 
+/// Why a reading brought nothing back. The kinds keep apart what belongs to
+/// the agent (its sign-in) from what belongs to Agent HUD's own reading (no
+/// answer this time), because the engine treats them differently: an agent
+/// that signed out is shown at once, a reading that only missed an answer
+/// keeps the last one for a while and tries again later.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Unread {
+    /// The agent's sign-in is gone or expired: only signing in again in the
+    /// agent brings the reading back.
+    SignedOut(String),
+    /// No answer this time: offline, a timeout, the service busy or asking
+    /// to slow down. It passes by itself; `retry_after` is how long the
+    /// service asked to wait, when it said.
+    Transient {
+        reason: String,
+        retry_after: Option<Duration>,
+    },
+    /// Anything else, shown as it is.
+    Failed(String),
+}
+impl Unread {
+    pub fn transient(reason: impl Into<String>) -> Self {
+        Unread::Transient {
+            reason: reason.into(),
+            retry_after: None,
+        }
+    }
+    /// What the user is told.
+    pub fn reason(&self) -> &str {
+        match self {
+            Unread::SignedOut(reason)
+            | Unread::Transient { reason, .. }
+            | Unread::Failed(reason) => reason,
+        }
+    }
+    /// The kind, as the snapshot names it.
+    pub fn kind(&self) -> &'static str {
+        match self {
+            Unread::SignedOut(_) => "signedOut",
+            Unread::Transient { .. } => "transient",
+            Unread::Failed(_) => "failed",
+        }
+    }
+    /// Several failures of one reading (one per client home, say) as one:
+    /// their reasons line by line, signed out only when every one is, and
+    /// transient only when every one is, waiting the longest wait asked.
+    /// None for none.
+    pub fn combined(failures: Vec<Unread>) -> Option<Unread> {
+        let signed_out = failures
+            .iter()
+            .all(|unread| matches!(unread, Unread::SignedOut(_)));
+        let transient = failures
+            .iter()
+            .all(|unread| matches!(unread, Unread::Transient { .. }));
+        let retry_after = failures
+            .iter()
+            .filter_map(|unread| match unread {
+                Unread::Transient { retry_after, .. } => *retry_after,
+                _ => None,
+            })
+            .max();
+        let reason = failures
+            .iter()
+            .map(Unread::reason)
+            .collect::<Vec<_>>()
+            .join("\n");
+        if failures.is_empty() {
+            None
+        } else if signed_out {
+            Some(Unread::SignedOut(reason))
+        } else if transient {
+            Some(Unread::Transient {
+                reason,
+                retry_after,
+            })
+        } else {
+            Some(Unread::Failed(reason))
+        }
+    }
+    /// The same kind, with `prefix` before the reason.
+    pub fn prefixed(self, prefix: &str) -> Unread {
+        let reason = |reason: String| format!("{prefix}{reason}");
+        match self {
+            Unread::SignedOut(text) => Unread::SignedOut(reason(text)),
+            Unread::Transient {
+                reason: text,
+                retry_after,
+            } => Unread::Transient {
+                reason: reason(text),
+                retry_after,
+            },
+            Unread::Failed(text) => Unread::Failed(reason(text)),
+        }
+    }
+}
+impl From<String> for Unread {
+    fn from(reason: String) -> Self {
+        Unread::Failed(reason)
+    }
+}
+impl From<&str> for Unread {
+    fn from(reason: &str) -> Self {
+        Unread::Failed(reason.into())
+    }
+}
+/// Readers' tests compare a failure with the text the user is told.
+#[cfg(test)]
+impl PartialEq<&str> for Unread {
+    fn eq(&self, other: &&str) -> bool {
+        self.reason() == *other
+    }
+}
+#[cfg(test)]
+impl PartialEq<String> for Unread {
+    fn eq(&self, other: &String) -> bool {
+        self.reason() == other
+    }
+}
+#[cfg(test)]
+impl PartialEq<str> for Unread {
+    fn eq(&self, other: &str) -> bool {
+        self.reason() == other
+    }
+}
+
+/// A provider's account reader.
+pub type Read = fn(&dyn Host) -> Result<Reading, Unread>;
+
+/// What the engine needs to know about one provider's account reading. Each
+/// provider states it in its own folder; the engine treats every provider
+/// alike from these facts (scheduling, the serial gate, retries, keeping the
+/// last reading) and never decides by a provider's name.
+pub struct Provider {
+    /// The provider's id in readings and the snapshot.
+    pub id: &'static str,
+    pub read: Read,
+    /// Whether work on this computer is what moves the provider's windows,
+    /// so a reading can wait while nothing runs here. Windows that other
+    /// devices or servers spend are read on the account interval whatever
+    /// this computer does.
+    pub local_work: bool,
+    /// The session sources whose work spends this provider's windows; empty
+    /// means the provider's own id.
+    pub work_sources: &'static [&'static str],
+    /// Whether a window a reading leaves out keeps its last reading (for at
+    /// most 30 days, while the same account is signed in), because the
+    /// provider reports only the windows in use. False when the provider
+    /// reports its complete window list.
+    pub keeps_unreported_windows: bool,
+    /// Rows a connected client reports by itself rather than by being read,
+    /// which go stale when the client stops reporting.
+    pub reported: Option<Reported>,
+    /// The vendor's public status page.
+    pub status: Option<&'static StatusPage>,
+}
+impl Provider {
+    pub const fn new(id: &'static str, read: Read) -> Self {
+        Self {
+            id,
+            read,
+            local_work: true,
+            work_sources: &[],
+            keeps_unreported_windows: false,
+            reported: None,
+            status: None,
+        }
+    }
+    /// The session sources whose work is this provider's.
+    pub fn sources(&self) -> &[&'static str] {
+        if self.work_sources.is_empty() {
+            std::slice::from_ref(&self.id)
+        } else {
+            self.work_sources
+        }
+    }
+}
+
+/// Rows a client reports by itself: those whose `source` is `source` go
+/// stale `stale_after_seconds` after they were observed.
+#[derive(Debug, Clone, Copy)]
+pub struct Reported {
+    pub source: &'static str,
+    pub stale_after_seconds: i64,
+}
+
+/// A vendor's public status page (Atlassian Statuspage `summary.json`) and
+/// the components on it that a provider's users depend on, by their names
+/// on the page.
+pub struct StatusPage {
+    pub url: &'static str,
+    pub components: &'static [&'static str],
+}
+
 /// What a host found, or why it found nothing.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Answer<T> {
@@ -122,6 +315,9 @@ pub enum HttpFailure {
     Unreachable,
     /// An answer with a status other than 2xx.
     Status(u16),
+    /// 429: the service asks to slow down, for `retry_after` seconds when it
+    /// said how long.
+    Limited { retry_after: Option<u32> },
     /// A browser check (Cloudflare's challenge) in place of the data: a
     /// browser passes it, a plain request can't. It says nothing about the
     /// sign-in sent with the request.
@@ -153,7 +349,7 @@ impl HttpFailure {
                 "Existing sign-in expired or quota access is unavailable",
             ),
             // Better than Open's bare status: a rate limit passes by itself.
-            HttpFailure::Status(429) => l10n::text(
+            HttpFailure::Status(429) | HttpFailure::Limited { .. } => l10n::text(
                 "额度服务暂时限制了请求，稍后自动重试",
                 "The quota service is rate limiting requests; retrying later",
             ),
@@ -180,6 +376,27 @@ impl HttpFailure {
                 "额度服务返回了无法识别的格式",
                 "The quota service returned an unsupported format",
             ),
+        }
+    }
+    /// The failure as a reading's `Unread`, with `message` as its reason. No
+    /// answer, a server error, a rate limit or a browser check is transient;
+    /// everything else is a plain failure. What a 401 or 403 means is the
+    /// provider's to say, so it is never taken for a sign-out here.
+    pub fn unread(self) -> Unread {
+        self.unread_as(self.message())
+    }
+    /// `unread`, with the reader's own wording.
+    pub fn unread_as(self, reason: String) -> Unread {
+        match self {
+            HttpFailure::Unreachable
+            | HttpFailure::Unreadable
+            | HttpFailure::Challenged
+            | HttpFailure::Status(429 | 500..=599) => Unread::transient(reason),
+            HttpFailure::Limited { retry_after } => Unread::Transient {
+                reason,
+                retry_after: retry_after.map(|seconds| Duration::from_secs(seconds.into())),
+            },
+            _ => Unread::Failed(reason),
         }
     }
 }

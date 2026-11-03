@@ -25,7 +25,8 @@ fn ms(value: &Value) -> Option<i64> {
 /// Cursor is not signed in to the same account as the Bot, or the servers
 /// keep no personal weekly usage for it (a team's pooled allowance).
 pub(super) fn read(host: &dyn Host, slot: &str, now_ms: i64) -> Result<Option<Value>, String> {
-    let Some(SignIn { user, token, .. }) = sign_in(host)? else {
+    let Some(SignIn { user, token, .. }) = sign_in(host).map_err(|why| why.reason().to_owned())?
+    else {
         return Ok(None);
     };
     // The Bot's slot is "<provider>|<user>", and Cursor's sign-in names the

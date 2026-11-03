@@ -2,7 +2,7 @@
 //! account/read), and Pi's ChatGPT sign-in, which spends the same plan.
 use crate::account::{
     account_id, client_home_key, legacy_account, legacy_unresolved, read_json, status, variable,
-    EngineStart, Host, HttpFailure, HttpRequest, Reading,
+    EngineStart, Host, HttpFailure, HttpRequest, Provider, Reading, StatusPage, Unread,
 };
 use crate::l10n;
 use crate::naming::{vendor_windows, window_names};
@@ -16,14 +16,28 @@ use std::{
 /// Where Agent HUD remembers which email signed in to which workspace.
 const IDENTITIES: &str = "codex-identities.json";
 
-pub fn read(host: &dyn Host) -> Result<Reading, String> {
+/// Codex's plan, read through its CLI's app-server and Pi's ChatGPT
+/// sign-in. Pi and other clients spend it without Codex rollouts here, so it
+/// is read on the account interval whatever this computer does.
+pub static PROVIDER: Provider = Provider {
+    local_work: false,
+    status: Some(&STATUS),
+    ..Provider::new("codex", read)
+};
+/// OpenAI's status page names Codex by its desktop home.
+static STATUS: StatusPage = StatusPage {
+    url: "https://status.openai.com/api/v2/summary.json",
+    components: &["Codex in ChatGPT Desktop", "Responses", "Login"],
+};
+
+pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
     let executable = host.executable("codex");
     let native = match executable.as_deref() {
         Some(executable) => read_native(host, executable),
-        None => Err(l10n::text(
+        None => Err(Unread::Failed(l10n::text(
             "安装并登录后即可读取额度",
             "Install and sign in to read quota",
-        )),
+        ))),
     };
     let pi = read_pi(host);
     match (native, pi) {
@@ -32,7 +46,7 @@ pub fn read(host: &dyn Host) -> Result<Reading, String> {
             Ok(native)
         }
         (Ok(mut native), Err(error)) => {
-            append_notice(&mut native, error);
+            append_notice(&mut native, error.reason().to_owned());
             Ok(native)
         }
         (Ok(native), _) => Ok(native),
@@ -40,11 +54,11 @@ pub fn read(host: &dyn Host) -> Result<Reading, String> {
             // Pi can be the only client installed. A configured Codex home
             // still needs its CLI, so a missing executable matters there.
             if executable.is_some() || !host.account_homes("codex").is_empty() {
-                append_notice(&mut pi, error);
+                append_notice(&mut pi, error.reason().to_owned());
             }
             Ok(pi)
         }
-        (Err(native), Err(pi)) => Err(format!("{native}\n{pi}")),
+        (Err(native), Err(pi)) => Err(Unread::combined(vec![native, pi]).expect("two failures")),
         (Err(error), _) => Err(error),
     }
 }
@@ -85,7 +99,7 @@ fn merge(reading: &mut Reading, other: Reading) {
     }
 }
 
-fn read_native(host: &dyn Host, executable: &Path) -> Result<Reading, String> {
+fn read_native(host: &dyn Host, executable: &Path) -> Result<Reading, Unread> {
     let home = variable(host, "CODEX_HOME").unwrap_or_else(|| host.home().join(".codex"));
     let mut seen = HashSet::new();
     let homes: Vec<_> = std::iter::once(home)
@@ -95,39 +109,43 @@ fn read_native(host: &dyn Host, executable: &Path) -> Result<Reading, String> {
         .collect();
     let mut reading = Reading::empty("codex");
     let mut succeeded = false;
+    let mut failures = Vec::new();
     for home in &homes {
         if host.cancelled() {
-            return Err(l10n::text("账户读取已停止", "Account reading was stopped"));
+            return Err(l10n::text("账户读取已停止", "Account reading was stopped").into());
         }
-        let result = read_home(host, executable, home);
-        let notice = match result {
+        let prefix = if homes.len() > 1 {
+            format!("{}: ", home.display())
+        } else {
+            String::new()
+        };
+        let notice = match read_home(host, executable, home) {
             Ok(mut account) => {
                 succeeded = true;
                 let notice = account.notice.take();
                 merge(&mut reading, account);
                 notice
             }
-            Err(error) => Some(error),
+            Err(error) => {
+                let error = error.prefixed(&prefix);
+                let notice = error.reason().to_owned();
+                failures.push(error);
+                append_notice(&mut reading, notice);
+                None
+            }
         };
         if let Some(notice) = notice {
-            append_notice(
-                &mut reading,
-                if homes.len() > 1 {
-                    format!("{}: {notice}", home.display())
-                } else {
-                    notice
-                },
-            );
+            append_notice(&mut reading, format!("{prefix}{notice}"));
         }
     }
     if succeeded {
         Ok(reading)
     } else {
-        Err(reading.notice.unwrap_or_default())
+        Err(Unread::combined(failures).unwrap_or_else(|| Unread::Failed(String::new())))
     }
 }
 
-fn read_home(host: &dyn Host, executable: &Path, home: &Path) -> Result<Reading, String> {
+fn read_home(host: &dyn Host, executable: &Path, home: &Path) -> Result<Reading, Unread> {
     let mut process = host.start_engine(&EngineStart {
         executable,
         args: &["app-server", "--listen", "stdio://"],
@@ -167,7 +185,8 @@ fn read_home(host: &dyn Host, executable: &Path, home: &Path) -> Result<Reading,
                     message["error"]["message"]
                         .as_str()
                         .unwrap_or("app-server error")
-                ));
+                )
+                .into());
             }
         } else if let Some(result) = message.get("result") {
             match id {
@@ -193,23 +212,33 @@ fn read_home(host: &dyn Host, executable: &Path, home: &Path) -> Result<Reading,
         }
     }
     if let (None, Some(error)) = (&limits, refused) {
+        // No sign-in at all is Codex's own state: the last windows stay.
+        if requires_openai_auth == Some(true) && account.is_null() {
+            return Err(Unread::SignedOut(l10n::text(
+                "Codex 尚未登录，运行 codex login 登录 ChatGPT 后即可读取额度",
+                "Codex is not signed in. Run codex login with ChatGPT to read its quota",
+            )));
+        }
         return match no_plan_notice(&account, requires_openai_auth) {
             Some(notice) => {
                 let mut reading = Reading::empty("codex");
                 reading.notice = Some(notice);
                 Ok(reading)
             }
-            None => Err(format!("Codex: {error}")),
+            None => Err(format!("Codex: {error}").into()),
         };
     }
     let limits = limits.ok_or_else(|| {
         if process.ended() {
-            l10n::text(
+            Unread::Failed(l10n::text(
                 "Codex 引擎提前退出，请检查本机登录状态",
                 "Codex exited before reporting limits; check local sign-in",
-            )
+            ))
         } else {
-            l10n::text("Codex 额度查询超时", "Codex quota query timed out")
+            Unread::transient(l10n::text(
+                "Codex 额度查询超时",
+                "Codex quota query timed out",
+            ))
         }
     })?;
     parse(
@@ -220,6 +249,7 @@ fn read_home(host: &dyn Host, executable: &Path, home: &Path) -> Result<Reading,
         &client_home_key(host, home, &host.home().join(".codex")),
         true,
     )
+    .map_err(Unread::from)
 }
 
 /// Why a Codex home has no ChatGPT plan limits, as account/read tells it: an
@@ -241,16 +271,19 @@ fn no_plan_notice(account: &Value, requires_openai_auth: Option<bool>) -> Option
                 "Codex 用的是自定义模型服务，没有 ChatGPT 套餐额度",
                 "Codex uses a custom model provider, which has no ChatGPT plan limits",
             )),
-            Some(true) if account.is_null() => Some(l10n::text(
-                "Codex 尚未登录，运行 codex login 登录 ChatGPT 后即可读取额度",
-                "Codex is not signed in. Run codex login with ChatGPT to read its quota",
-            )),
             _ => None,
         },
     }
 }
 
-fn read_pi(host: &dyn Host) -> Result<Option<Reading>, String> {
+fn pi_signed_out() -> Unread {
+    Unread::SignedOut(l10n::text(
+        "请在 Pi 中重新登录 ChatGPT",
+        "Sign in to ChatGPT again in Pi",
+    ))
+}
+
+fn read_pi(host: &dyn Host) -> Result<Option<Reading>, Unread> {
     if host.cancelled() {
         return Ok(None);
     }
@@ -266,30 +299,17 @@ fn read_pi(host: &dyn Host) -> Result<Option<Reading>, String> {
     let token = auth["access"]
         .as_str()
         .filter(|value| !value.is_empty())
-        .ok_or_else(|| {
-            l10n::text(
-                "请在 Pi 中重新登录 ChatGPT",
-                "Sign in to ChatGPT again in Pi",
-            )
-        })?;
+        .ok_or_else(pi_signed_out)?;
     let account = auth["accountId"]
         .as_str()
         .filter(|value| !value.is_empty())
-        .ok_or_else(|| {
-            l10n::text(
-                "请在 Pi 中重新登录 ChatGPT",
-                "Sign in to ChatGPT again in Pi",
-            )
-        })?;
+        .ok_or_else(pi_signed_out)?;
     if auth["type"] != "oauth"
         || auth["expires"]
             .as_f64()
             .is_none_or(|value| value / 1000.0 <= chrono::Utc::now().timestamp() as f64)
     {
-        return Err(l10n::text(
-            "请在 Pi 中重新登录 ChatGPT",
-            "Sign in to ChatGPT again in Pi",
-        ));
+        return Err(pi_signed_out());
     }
     let payload = host
         .http_json(&HttpRequest {
@@ -300,11 +320,12 @@ fn read_pi(host: &dyn Host) -> Result<Option<Reading>, String> {
             timeout: Duration::from_secs(12),
         })
         .map_err(|failure| match failure {
-            HttpFailure::Unreachable | HttpFailure::BadHeader => l10n::text(
+            HttpFailure::Unreachable | HttpFailure::BadHeader => failure.unread_as(l10n::text(
                 "Pi 的 ChatGPT 用量请求失败",
                 "Pi ChatGPT usage request failed",
-            ),
-            other => other.message(),
+            )),
+            HttpFailure::Status(401) => pi_signed_out(),
+            other => other.unread(),
         })?;
     if payload["account_id"] != account
         || payload["email"]
@@ -314,7 +335,8 @@ fn read_pi(host: &dyn Host) -> Result<Option<Reading>, String> {
         return Err(l10n::text(
             "Pi 的 ChatGPT 用量返回了其他或未知的账户",
             "Pi ChatGPT usage returned a different or unknown account",
-        ));
+        )
+        .into());
     }
     let window = |value: &Value| json!({"usedPercent":value["used_percent"],"windowDurationMins":value["limit_window_seconds"].as_i64().map(|seconds|seconds/60),"resetsAt":value["reset_at"]});
     let bucket = |value: &Value, id: &str, name: Option<&str>| json!({"limitId":id,"limitName":name,"planType":payload["plan_type"],"primary":window(&value["primary_window"]),"secondary":window(&value["secondary_window"])});
@@ -780,7 +802,7 @@ mod tests {
         host.account_homes
             .insert("codex".into(), vec![work.clone()]);
 
-        let error = read(&host).err().unwrap();
+        let error = read(&host).err().unwrap().reason().to_owned();
         assert_eq!(host.started.borrow().len(), 2);
         assert!(error.contains(&*host.home().join(".codex").to_string_lossy()));
         assert!(error.contains(&*work.to_string_lossy()));
@@ -855,10 +877,6 @@ mod tests {
                 json!({"account": null, "requiresOpenaiAuth": false}),
                 "Codex uses a custom model provider, which has no ChatGPT plan limits",
             ),
-            (
-                json!({"account": null, "requiresOpenaiAuth": true}),
-                "Codex is not signed in. Run codex login with ChatGPT to read its quota",
-            ),
         ];
         for (answer, notice) in cases {
             let mut host = installed(limits(), Value::Null);
@@ -870,6 +888,20 @@ mod tests {
             assert!(reading.account.is_none(), "{notice}");
             assert_eq!(reading.notice.as_deref(), Some(notice));
         }
+        // No sign-in at all is Codex's own state, not a plan without limits:
+        // a failed read, so the last windows stay.
+        let mut host = installed(limits(), Value::Null);
+        host.engine_replies.insert(2, refused.clone());
+        host.engine_replies.insert(
+            3,
+            json!({"id": 3, "result": {"account": null, "requiresOpenaiAuth": true}}),
+        );
+        assert_eq!(
+            read(&host).err(),
+            Some(Unread::SignedOut(
+                "Codex is not signed in. Run codex login with ChatGPT to read its quota".into()
+            ))
+        );
 
         // A ChatGPT sign-in whose limits fail still shows what Codex said.
         let mut host = installed(limits(), Value::Null);

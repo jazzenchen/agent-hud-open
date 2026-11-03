@@ -13,7 +13,9 @@
 //! Sub2API site's `/v1/usage`. When none fits, the owner may choose the
 //! template for that address, or describe its balance endpoint
 //! (`custom`); every request still goes only to the relay's own host.
-use crate::account::{read_json, variable, Host, HttpFailure, HttpRequest, Reading};
+use crate::account::{
+    read_json, variable, Host, HttpFailure, HttpRequest, Provider, Reading, Unread,
+};
 use crate::endpoints::{base_url_host, host_kind, HostKind};
 use crate::l10n;
 use serde_json::{json, Value};
@@ -131,7 +133,18 @@ struct Found {
     recognized: bool,
 }
 
-pub fn read(host: &dyn Host) -> Result<Reading, String> {
+/// The relays the clients send their calls through. A relay is read sooner
+/// while the clients it is found in work.
+pub static PROVIDER: Provider = Provider {
+    work_sources: &["claude", "codex"],
+    ..Provider::new("relay", read)
+};
+
+pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
+    read_text(host).map_err(Unread::from)
+}
+
+fn read_text(host: &dyn Host) -> Result<Reading, String> {
     let mut reading = Reading::empty("relay");
     for target in targets(host) {
         let consented = target.manual.is_some() || host.consented(&consent_key(&target.host));

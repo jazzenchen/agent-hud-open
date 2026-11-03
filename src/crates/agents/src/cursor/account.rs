@@ -6,7 +6,7 @@
 //! log), never from the dashboard.
 use crate::account::{
     account_id, legacy_account, locate, Answer, DatabaseFailure, Host, HttpFailure, HttpRequest,
-    Reading,
+    Provider, Reading, Unread,
 };
 use crate::{l10n, Location, PerOs, Support};
 use base64::{
@@ -179,7 +179,7 @@ fn opened_token(host: &dyn Host, stored: &str) -> Result<String, String> {
 }
 
 /// The sign-in Cursor keeps in its database; None where Cursor is not here.
-pub(crate) fn sign_in(host: &dyn Host) -> Result<Option<SignIn>, String> {
+pub(crate) fn sign_in(host: &dyn Host) -> Result<Option<SignIn>, Unread> {
     let Ok(database) = locate(host, &DATABASE) else {
         return Ok(None);
     };
@@ -195,15 +195,17 @@ pub(crate) fn sign_in(host: &dyn Host) -> Result<Option<SignIn>, String> {
             return Err(l10n::text(
                 "无法打开 Cursor 账户数据库",
                 "Cursor account database could not be opened.",
-            ))
+            )
+            .into())
         }
         Err(DatabaseFailure::Unreadable) => {
             return Err(l10n::text(
                 "无法读取 Cursor 账户数据库",
                 "Cursor account database could not be read.",
-            ))
+            )
+            .into())
         }
-        Err(DatabaseFailure::Unrecognized) => return Err(database_format()),
+        Err(DatabaseFailure::Unrecognized) => return Err(database_format().into()),
     };
     // A stored value that is not text does not fit the database Cursor writes.
     let lookup = |key: &str| -> Result<Option<String>, String> {
@@ -218,19 +220,19 @@ pub(crate) fn sign_in(host: &dyn Host) -> Result<Option<SignIn>, String> {
             .transpose()
     };
     let Some(stored) = lookup("cursorAuth/accessToken")?.filter(|token| !token.is_empty()) else {
-        return Err(l10n::text(
+        return Err(Unread::SignedOut(l10n::text(
             "登录 Cursor 后读取账户用量",
             "Sign in to Cursor to read its account usage.",
-        ));
+        )));
     };
     let token = opened_token(host, &stored)?;
     let email = lookup("cursorAuth/cachedEmail")?.filter(|email| !email.trim().is_empty());
     if token.bytes().any(|byte| matches!(byte, 0 | b'\r' | b'\n')) {
-        return Err(auth_format());
+        return Err(auth_format().into());
     }
     let parts = token.split('.').collect::<Vec<_>>();
     if parts.len() != 3 {
-        return Err(auth_format());
+        return Err(auth_format().into());
     }
     let claims: Value = URL_SAFE_NO_PAD
         .decode(parts[1].trim_end_matches('='))
@@ -241,10 +243,10 @@ pub(crate) fn sign_in(host: &dyn Host) -> Result<Option<SignIn>, String> {
         .as_f64()
         .is_some_and(|expiry| expiry > Utc::now().timestamp() as f64 + 60.0)
     {
-        return Err(l10n::text(
+        return Err(Unread::SignedOut(l10n::text(
             "Cursor 保存的登录已过期，请在 Cursor 中重新登录",
             "Cursor's saved access token expired; sign in in Cursor to renew it.",
-        ));
+        )));
     }
     let user = claims["sub"]
         .as_str()
@@ -263,7 +265,14 @@ pub(crate) fn sign_in(host: &dyn Host) -> Result<Option<SignIn>, String> {
     }))
 }
 
-pub fn read(host: &dyn Host) -> Result<Reading, String> {
+/// Cursor's plan, read with the sign-in Cursor keeps. It is spent on every
+/// device the account signs in on, so it is read on the account interval.
+pub static PROVIDER: Provider = Provider {
+    local_work: false,
+    ..Provider::new("cursor", read)
+};
+
+pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
     let Some(SignIn { user, token, email }) = sign_in(host)? else {
         return Ok(Reading::empty("cursor"));
     };
@@ -282,12 +291,12 @@ pub fn read(host: &dyn Host) -> Result<Reading, String> {
             timeout: Duration::from_secs(15),
         })
         .map_err(|failure| match failure {
-            HttpFailure::BadHeader => auth_format(),
-            HttpFailure::Unreachable => l10n::text(
+            HttpFailure::BadHeader => auth_format().into(),
+            HttpFailure::Unreachable => failure.unread_as(l10n::text(
                 "无法读取 Cursor 账户用量，请检查网络",
                 "Cursor account usage could not be reached; check the connection.",
-            ),
-            other => other.message(),
+            )),
+            other => other.unread(),
         })
         .and_then(|body| {
             if !body["individualUsage"].is_object()
@@ -297,7 +306,8 @@ pub fn read(host: &dyn Host) -> Result<Reading, String> {
                 Err(l10n::text(
                     "Cursor 账户返回的数据格式无法识别",
                     "Cursor account response has an unsupported format.",
-                ))
+                )
+                .into())
             } else {
                 Ok(body)
             }
@@ -319,18 +329,18 @@ pub fn read(host: &dyn Host) -> Result<Reading, String> {
     } else if body["membershipType"] == MERGED_PLAN {
         let reply =
             dashboard(host, &token, "GetCurrentPeriodUsage").map_err(|failure| match failure {
-                HttpFailure::BadHeader => auth_format(),
-                HttpFailure::Unreachable => l10n::text(
+                HttpFailure::BadHeader => auth_format().into(),
+                HttpFailure::Unreachable => failure.unread_as(l10n::text(
                     "无法读取 Cursor 的计划用量，请检查网络",
                     "Cursor's plan usage could not be reached; check the connection.",
-                ),
-                other => other.message(),
+                )),
+                other => other.unread(),
             })?;
         current_period(&reply).ok_or_else(|| {
-            l10n::text(
+            Unread::from(l10n::text(
                 "Cursor 的计划用量格式无法识别",
                 "Cursor's plan usage has an unsupported format.",
-            )
+            ))
         })?
     } else {
         summary_period(&body)

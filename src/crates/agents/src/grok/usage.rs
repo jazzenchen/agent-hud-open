@@ -47,7 +47,7 @@ pub(super) fn read(
     slot: &str,
     now_ms: i64,
 ) -> Result<Vec<Value>, String> {
-    let Some(SignIn { token, .. }) = sign_in(host)? else {
+    let Some(SignIn { token, .. }) = sign_in(host).map_err(|why| why.reason().to_owned())? else {
         return Err(l10n::text(
             "Grok Bot 的 Token 用 Cursor 的登录读取；登录 Cursor 后可见",
             "Grok Bot's tokens are read with Cursor's sign-in; sign in to Cursor to see them.",
@@ -421,7 +421,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let why = super::super::account::read(&host(&dir, json!({}), Some(old))).err();
         assert_eq!(
-            why.as_deref(),
+            why.as_ref().map(crate::account::Unread::reason),
             Some("Grok Bot's cached quota is more than a day old; open Grok Bot to refresh it.")
         );
     }

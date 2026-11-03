@@ -4,7 +4,7 @@
 //! reading the file now does not make old data fresh. Its tokens come from
 //! Cursor's servers (`usage.rs`).
 use super::cache as bot;
-use crate::account::{legacy_unresolved, locate, status, Host, Reading};
+use crate::account::{legacy_unresolved, locate, status, Host, Provider, Reading, Unread};
 use crate::naming::window_names;
 use crate::{l10n, Location, PerOs, Support};
 use serde_json::{json, Value};
@@ -23,7 +23,19 @@ fn iso(ms: i64) -> Option<String> {
         .map(|d: chrono::DateTime<chrono::Utc>| d.to_rfc3339())
 }
 
-pub fn read(host: &dyn Host) -> Result<Reading, String> {
+/// Grok's quota covers its CLI and its Bot, and the Bot's bots run on
+/// Cursor's servers, so it is read on the account interval.
+pub static PROVIDER: Provider = Provider {
+    local_work: false,
+    work_sources: &["grok-bot", "grok-cli"],
+    ..Provider::new("grok-bot", read)
+};
+
+pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
+    read_text(host).map_err(Unread::from)
+}
+
+fn read_text(host: &dyn Host) -> Result<Reading, String> {
     let mut r = Reading::empty("grok-bot");
     let Ok(directory) = locate(host, &CACHE) else {
         r.notice = Some(l10n::text(

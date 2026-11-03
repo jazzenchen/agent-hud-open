@@ -16,6 +16,32 @@ The implementation follows the original Swift account readers:
 | DeepSeek     | Harness settings and versioned credential reference | Official API balance endpoint and response currency                  |
 | Antigravity  | Connected CLI status-line reports and all running authenticated language servers | Identified quota callbacks, serial loopback `GetUserStatus`, anonymous `/usage` fallback |
 
+Each provider states its own facts in its folder under `src/crates/agents/src/`
+(`agents::account::Provider`, listed in `agents::ACCOUNTS`): how it is read,
+whether this computer's work moves its windows, which session sources spend
+them, whether a window a reading leaves out keeps its last value, which rows a
+client reports by itself, and the vendor's status page. A reading that fails
+says why (`Unread`): the agent signed out, the reading only missed an answer
+(offline, a timeout, the service busy or asking to wait), or anything else.
+What a 401 means is the provider's to say.
+
+Everything else is the same for every provider:
+
+- A reading that only missed an answer, while the last good one is under 10
+  minutes old, changes nothing on screen. Any other failure shows at once with
+  its reason, and the last reading stays, marked stale.
+- After a failed reading the next try waits 60 s, then twice as long each time,
+  up to 15 minutes. A refresh the user asks for, or this computer's work
+  finishing, tries at once. A service's `Retry-After` is followed (at most an
+  hour), even for a refresh.
+- An agent that signed out is told on the island once, at most once a day,
+  again after it was signed in in between. The first look after launch only
+  notes how things stand. The Mac posts no system notification.
+- A vendor status page (Statuspage `summary.json`) is read every five minutes
+  in the same one-at-a-time queue, after any account reading that is due, with
+  no credential. The agent's quota block shows the page's word only while one
+  of the components the provider names is not operational.
+
 The client retains only projected account identity/plan, percentages, reset
 times, balances and fixed diagnostics. Authentication tokens, headers, raw responses and
 credential documents are never sent to React or included in error messages.
