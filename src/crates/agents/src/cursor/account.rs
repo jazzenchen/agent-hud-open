@@ -112,7 +112,10 @@ fn summary_period(body: &Value) -> Period {
 }
 
 /// The period Cursor shows (`GetCurrentPeriodUsage`), whose bounds are
-/// milliseconds. The servers leave out a meter at 0.
+/// milliseconds. A plan metered in percentages (one merged into SuperGrok)
+/// reports its meters, leaving out one at 0; a plan metered in dollars
+/// reports cents spent of each limit, which give the share as Cursor's usage
+/// bar works it out. A meter with neither is not shown.
 fn current_period(reply: &Value) -> Option<Period> {
     let plan = reply.get("planUsage").filter(|plan| plan.is_object())?;
     let at = |key: &str| {
@@ -123,16 +126,27 @@ fn current_period(reply: &Value) -> Option<Period> {
         Some(DateTime::from_timestamp_millis(ms)?.fixed_offset())
     };
     let (start, end) = (at("billingCycleStart"), at("billingCycleEnd"));
-    let used = |key: &str| match &plan[key] {
-        Value::Null => Some(0.0),
-        value => number(value),
+    let percents = ["totalPercentUsed", "autoPercentUsed", "apiPercentUsed"];
+    let used = if percents.iter().any(|key| !plan[key].is_null()) {
+        percents.map(|key| match &plan[key] {
+            Value::Null => Some(0.0),
+            value => number(value),
+        })
+    } else {
+        // Cents, which the servers leave out at 0.
+        let share = |spend: &str, limit: &str| {
+            let limit = number(&plan[limit]).filter(|limit| *limit > 0.0)?;
+            let spent = number(&plan[spend]).unwrap_or(0.0);
+            Some((spent / limit * 100.0).min(100.0))
+        };
+        [
+            share("includedSpend", "limit"),
+            share("autoSpend", "autoLimit"),
+            share("apiSpend", "apiLimit"),
+        ]
     };
     Some(Period {
-        used: [
-            used("totalPercentUsed"),
-            used("autoPercentUsed"),
-            used("apiPercentUsed"),
-        ],
+        used,
         reset: end.map(|end| end.to_rfc3339()),
         seconds: seconds(start, end),
     })
@@ -692,6 +706,70 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let host = signed_in(&dir, &token(3600)).answer(SUMMARY, Err(HttpFailure::Status(403)));
         assert!(read(&host).is_err());
+    }
+
+    /// A refused summary, and Cursor's own period for `plan_usage` over October.
+    fn refused_with_period(dir: &tempfile::TempDir, plan_usage: Value) -> FakeHost {
+        let period = json!({
+            "billingCycleStart": "1790812800000",
+            "billingCycleEnd": "1793491200000",
+            "planUsage": plan_usage,
+        });
+        signed_in(dir, &token(3600))
+            .answer(SUMMARY, Err(HttpFailure::Status(403)))
+            .answer(PERIOD, Ok(period))
+    }
+
+    #[test]
+    fn a_plan_metered_in_dollars_reads_its_spend_of_each_limit() {
+        // A plan not merged into SuperGrok reports cents, not percentages:
+        // $15 of the $20 included, as Cursor's usage bar works it out.
+        let dir = tempfile::tempdir().unwrap();
+        let host = refused_with_period(
+            &dir,
+            json!({"totalSpend": 1500, "includedSpend": 1500, "limit": 2000}),
+        );
+        let reading = read(&host).unwrap();
+        let rows: Vec<_> = reading
+            .quotas
+            .iter()
+            .map(|q| {
+                (
+                    q["shortLabel"].as_str().unwrap(),
+                    q["usedPercent"].as_f64().unwrap(),
+                )
+            })
+            .collect();
+        assert_eq!(rows, [("Included", 75.0)], "no meter it does not report");
+        assert_eq!(reading.quotas[0]["status"], "warning");
+        assert_eq!(reading.quotas[0]["windowDurationSeconds"], 2_678_400.0);
+
+        // Its own models and other models, where it states their limits; a
+        // spend past the included limit is the limit used up.
+        let dir = tempfile::tempdir().unwrap();
+        let host = refused_with_period(
+            &dir,
+            json!({"includedSpend": 2600, "limit": 2000, "autoSpend": 300,
+                   "autoLimit": 1000, "apiLimit": 1000}),
+        );
+        let used: Vec<_> = read(&host)
+            .unwrap()
+            .quotas
+            .iter()
+            .map(|q| q["usedPercent"].as_f64().unwrap())
+            .collect();
+        assert_eq!(used, [100.0, 30.0, 0.0]);
+    }
+
+    #[test]
+    fn a_period_with_neither_percentages_nor_limits_shows_no_meter() {
+        let dir = tempfile::tempdir().unwrap();
+        let reading = read(&refused_with_period(&dir, json!({"totalSpend": 0}))).unwrap();
+        assert!(reading.quotas.is_empty(), "not a 0% it never reported");
+        assert_eq!(
+            reading.notice.as_deref(),
+            Some("Cursor is connected; this plan reports no quota percentage.")
+        );
     }
 
     #[test]
