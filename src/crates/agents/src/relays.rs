@@ -13,7 +13,7 @@
 //! Sub2API site's `/v1/usage`. When none fits, the owner may choose the
 //! template for that address, or describe its balance endpoint
 //! (`custom`); every request still goes only to the relay's own host.
-use crate::account::{variable, Host, HttpFailure, HttpRequest, Provider, Reading, Unread};
+use crate::account::{Host, HttpFailure, HttpRequest, Provider, Reading, Unread};
 use crate::endpoints::{base_url_host, host_kind, HostKind};
 use crate::l10n;
 use serde_json::{json, Value};
@@ -265,90 +265,16 @@ fn targets(host: &dyn Host) -> Vec<Target> {
     }
     // Codex: the providers its config.toml defines; its calls are recorded
     // under the provider's id.
-    let codex = variable(host, "CODEX_HOME").unwrap_or_else(|| host.home().join(".codex"));
-    if let Some(bytes) = host
-        .read_file(&codex.join("config.toml"), 1024 * 1024)
-        .found()
-    {
-        for provider in codex_providers(&String::from_utf8_lossy(&bytes)) {
-            let key = provider.bearer.clone().or_else(|| {
-                provider
-                    .env_key
-                    .as_deref()
-                    .and_then(|name| host.env(name))
-                    .map(str::to_owned)
-            });
-            add(
-                "codex",
-                Some(&provider.base_url),
-                key.as_deref(),
-                Some(&provider.id),
-            );
-        }
+    for provider in crate::codex::providers::configured(host) {
+        let key = provider.key(&|name| host.env(name).map(str::to_owned));
+        add(
+            "codex",
+            Some(&provider.base_url),
+            key.as_deref(),
+            Some(&provider.id),
+        );
     }
     found
-}
-
-/// One `[model_providers.<id>]` table of a Codex `config.toml`.
-#[derive(Debug, Default, PartialEq)]
-struct CodexProvider {
-    /// The table's name, which its calls are recorded under.
-    id: String,
-    base_url: String,
-    env_key: Option<String>,
-    bearer: Option<String>,
-}
-
-/// The model providers a Codex `config.toml` defines: each
-/// `[model_providers.<id>]` table's `base_url`, `env_key` and
-/// `experimental_bearer_token`, read as plain string values.
-fn codex_providers(toml: &str) -> Vec<CodexProvider> {
-    let mut providers = Vec::new();
-    let mut current: Option<CodexProvider> = None;
-    let mut flush = |current: &mut Option<CodexProvider>| {
-        if let Some(provider) = current.take().filter(|p| !p.base_url.is_empty()) {
-            providers.push(provider);
-        }
-    };
-    for line in toml.lines() {
-        let line = line.trim();
-        if line.starts_with('[') {
-            flush(&mut current);
-            let table = line.trim_start_matches('[').trim_end_matches(']').trim();
-            if let Some(id) = table.strip_prefix("model_providers.") {
-                let id = id.trim().trim_matches('"');
-                if !id.contains('.') && !id.is_empty() {
-                    current = Some(CodexProvider {
-                        id: id.to_owned(),
-                        ..CodexProvider::default()
-                    });
-                }
-            }
-            continue;
-        }
-        let Some(provider) = current.as_mut() else {
-            continue;
-        };
-        let Some((name, value)) = line.split_once('=') else {
-            continue;
-        };
-        let value = value.trim();
-        let Some(value) = value
-            .strip_prefix('"')
-            .and_then(|rest| rest.split_once('"'))
-            .map(|(text, _)| text.to_owned())
-        else {
-            continue;
-        };
-        match name.trim() {
-            "base_url" => provider.base_url = value,
-            "env_key" => provider.env_key = Some(value),
-            "experimental_bearer_token" => provider.bearer = Some(value),
-            _ => {}
-        }
-    }
-    flush(&mut current);
-    providers
 }
 
 /// What the relay reports of the key's balance, and a New API site's price
@@ -1056,23 +982,6 @@ experimental_bearer_token = "sk-inline"
 [profiles.fast]
 base_url = "https://ignored.example.com"
 "#;
-        assert_eq!(
-            codex_providers(toml),
-            [
-                CodexProvider {
-                    id: "relay".into(),
-                    base_url: "https://relay.example.com/v1".into(),
-                    env_key: Some("RELAY_KEY".into()),
-                    bearer: None
-                },
-                CodexProvider {
-                    id: "inline".into(),
-                    base_url: "https://other.example.com/v1".into(),
-                    env_key: None,
-                    bearer: Some("sk-inline".into())
-                },
-            ]
-        );
         let host = FakeHost::new("/u")
             .file("/u/.codex/config.toml", toml)
             .env("RELAY_KEY", "sk-env");

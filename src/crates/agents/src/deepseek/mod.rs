@@ -1,6 +1,7 @@
 //! DeepSeek.
 pub mod account;
 mod hooks;
+pub mod routes;
 pub mod transcript;
 
 use crate::Discovery;
@@ -59,6 +60,7 @@ static DISCOVERY: Discovery = Discovery {
     commands: &["dsh"],
     apps: &["DeepSeek", "DeepSeek Harness"],
     app_navigation: Some(&APP_NAVIGATION),
+    configured: Some(routes::configured),
     ..Discovery::NONE
 };
 

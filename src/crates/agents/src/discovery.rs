@@ -63,6 +63,10 @@ pub trait Look {
     /// allowed, at most 1 MiB; null when missing, larger or unreadable.
     /// Secrets in it are only ever checked for presence.
     fn settings(&self, location: &Location) -> Value;
+    /// A text settings file at the location (TOML, say), at most 1 MiB;
+    /// None when missing, larger or not UTF-8. Secrets in it are only ever
+    /// checked for presence.
+    fn text(&self, location: &Location) -> Option<String>;
 }
 
 /// JSON with comments and trailing commas (JSONC, as OpenCode allows) as

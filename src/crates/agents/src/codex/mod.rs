@@ -2,6 +2,7 @@
 pub mod account;
 mod hooks;
 pub mod process;
+pub mod providers;
 pub mod transcript;
 
 use crate::Discovery;

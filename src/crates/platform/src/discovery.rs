@@ -120,6 +120,15 @@ impl agent_hud_agents::Look for Looking<'_> {
             .first()
             .map_or(Value::Null, |path| read_config(path))
     }
+    fn text(&self, location: &agent_hud_agents::Location) -> Option<String> {
+        let path = crate::os::resolve(self.home, self.env, location)
+            .into_iter()
+            .next()?;
+        if !fs::metadata(&path).is_ok_and(|meta| meta.len() <= 1024 * 1024) {
+            return None;
+        }
+        fs::read_to_string(path).ok()
+    }
 }
 
 fn mark(provider: &mut ProviderDiscovery, kind: &str, evidence: &str) {
@@ -266,6 +275,30 @@ mod tests {
             ["claude-provider-route"],
             "a key looked up by a command is not there"
         );
+    }
+
+    #[test]
+    fn deepseek_is_configured_by_a_client_sending_a_key_to_its_api() {
+        let dir = tempfile::tempdir().unwrap();
+        let home = dir.path();
+        assert!(from_files(home, &[])["deepseek"].is_empty());
+        file(
+            &home.join(".codex/config.toml"),
+            "[model_providers.deepseek]\nbase_url = \"https://api.deepseek.com\"\nenv_key = \"DEEPSEEK_KEY\"\n",
+        );
+        assert!(
+            from_files(home, &[])["deepseek"].is_empty(),
+            "the key's variable is not set"
+        );
+        assert_eq!(
+            from_files(home, &[("DEEPSEEK_KEY", "k")])["deepseek"],
+            ["codex-provider-route"]
+        );
+        file(
+            &home.join(".claude/settings.json"),
+            r#"{"env":{"ANTHROPIC_BASE_URL":"https://api.deepseek.com/anthropic","ANTHROPIC_AUTH_TOKEN":"t"}}"#,
+        );
+        assert_eq!(from_files(home, &[])["deepseek"], ["claude-provider-route"]);
     }
 
     #[test]

@@ -1,6 +1,8 @@
-//! DeepSeek's API balance, or the Harness Platform account's separate wallets.
-//! Credentials stay in the engine and are sent only to their fixed official
-//! endpoints; no client or helper is launched.
+//! DeepSeek's API balance, or the Harness Platform account's separate wallets,
+//! and the balance of every key Claude Code or Codex sends to DeepSeek's own
+//! API (`routes.rs`). Credentials stay in the engine and are sent only to
+//! their fixed official endpoints; no client or helper is launched.
+use super::routes::{self, Routed};
 use crate::account::{
     account_id, legacy_unresolved, Answer, Host, HttpFailure, HttpRequest, Provider, Reading,
     Unread,
@@ -208,16 +210,197 @@ fn platform_balance(
     }))
 }
 
-/// DeepSeek's balance, with the key DeepSeek Harness or the user keeps.
+/// DeepSeek's balance, with the key DeepSeek Harness or the user keeps, and
+/// with the keys other clients send to DeepSeek's API.
 pub static PROVIDER: Provider = Provider {
     ..Provider::new("deepseek", read)
 };
 
 pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
-    read_text(host).map_err(Unread::from)
+    let mut routed = routes::keys(host);
+    let own = read_text(host, &mut routed);
+    if routed.is_empty() {
+        return own;
+    }
+    let mut failures = Vec::new();
+    let mut reading = match own {
+        // Without a key of Harness's own, its notice gives way to the
+        // clients' keys.
+        Ok(mut reading) if reading.account.is_none() => {
+            reading.notice = None;
+            reading
+        }
+        Ok(reading) => reading,
+        Err(unread) => {
+            failures.push(unread);
+            Reading::empty("deepseek")
+        }
+    };
+    let checked = Utc::now().to_rfc3339();
+    for route in routed {
+        if host.cancelled() {
+            return Err(l10n::text("账户读取已停止", "Account reading was stopped").into());
+        }
+        let names = client_names(&route.clients);
+        let id = account_id("deepseek", &["api-key", &route.key]);
+        let balances = match api_balance(host, &route.key) {
+            Ok(balances) => balances,
+            Err(unread) => {
+                failures.push(unread.prefixed(&format!("{names}: ")));
+                continue;
+            }
+        };
+        let label = if l10n::chinese() {
+            format!("{names} 的 API 余额")
+        } else {
+            format!("API balance ({names})")
+        };
+        for (currency, amount) in &balances.amounts {
+            reading.billing.push(json!({"id":format!("{id}:{currency}"),"vendor":"deepseek","accountId":id,"clients":route.clients,"label":label,"amount":amount,"currency":currency,"available":balances.available,"notice":balances.notice()}));
+        }
+        reading
+            .services
+            .extend(services(&route.clients, &id, &balances));
+        let account = json!({"id":id,"provider":"deepseek","label":"DeepSeek API","plan":null,"identity":"credential-scope","clients":route.clients,"checkedAt":checked});
+        if reading.account.is_none() {
+            reading.account = Some(account);
+        } else {
+            reading.additional_accounts.push(account);
+        }
+    }
+    let failed = Unread::combined(failures);
+    if reading.account.is_none() {
+        return match failed {
+            Some(unread) => Err(unread),
+            None => Ok(reading),
+        };
+    }
+    if let Some(unread) = failed {
+        reading.notice = Some(match reading.notice.take() {
+            Some(notice) => format!("{notice}\n{}", unread.reason()),
+            None => unread.reason().to_owned(),
+        });
+    }
+    Ok(reading)
 }
 
-fn read_text(host: &dyn Host) -> Result<Reading, String> {
+/// The clients' names, as they call themselves.
+fn client_names(clients: &[&str]) -> String {
+    clients
+        .iter()
+        .map(|id| crate::by_id(id).map_or(*id, |agent| agent.name))
+        .collect::<Vec<_>>()
+        .join(if l10n::chinese() { "、" } else { ", " })
+}
+
+/// Which clients reach DeepSeek's API with the account, on the platform its
+/// balance's money names (CNY for China's, USD for the international one).
+fn services(clients: &[&str], id: &str, balances: &Balances) -> Vec<Value> {
+    let region = match balances.amounts.as_slice() {
+        [("CNY", _)] => Some("china"),
+        [("USD", _)] => Some("international"),
+        _ => None,
+    };
+    clients
+        .iter()
+        .map(|client| json!({"client":client,"provider":"DeepSeek","product":"api","accountId":id,"region":region}))
+        .collect()
+}
+
+/// What DeepSeek's balance endpoint says of an API key.
+struct Balances {
+    /// Whether the balance can pay for calls.
+    available: bool,
+    /// The balance in each currency.
+    amounts: Vec<(&'static str, f64)>,
+}
+impl Balances {
+    fn notice(&self) -> Option<String> {
+        (!self.available).then(|| {
+            l10n::text(
+                "DeepSeek 表示此余额当前不能用于 API 调用",
+                "DeepSeek reports that this balance is unavailable for API calls.",
+            )
+        })
+    }
+}
+
+/// An API key's balance, from DeepSeek's balance endpoint, the only place
+/// the key is sent.
+fn api_balance(host: &dyn Host, credential: &str) -> Result<Balances, Unread> {
+    if credential
+        .bytes()
+        .any(|byte| matches!(byte, 0 | b'\r' | b'\n'))
+    {
+        return Err(l10n::text(
+            "DeepSeek 凭据格式无法识别",
+            "DeepSeek credentials have an unsupported format.",
+        )
+        .into());
+    }
+    let body = host
+        .http_json(&HttpRequest {
+            url: BALANCE,
+            secrets: &[("Authorization", &format!("Bearer {credential}"))],
+            body: None,
+            headers: &[],
+            timeout: Duration::from_secs(15),
+        })
+        .map_err(|failure| {
+            let unreachable = || {
+                l10n::text(
+                    "DeepSeek 余额读取失败，请检查网络后重试",
+                    "DeepSeek balance could not be reached; check the connection.",
+                )
+            };
+            match failure {
+                HttpFailure::Unreachable => failure.unread_as(unreachable()),
+                HttpFailure::BadHeader => Unread::Failed(unreachable()),
+                other => other.unread(),
+            }
+        })?;
+    let unsupported = || {
+        Unread::from(l10n::text(
+            "DeepSeek 余额返回的数据格式无法识别",
+            "DeepSeek balance response has an unsupported format.",
+        ))
+    };
+    let invalid = || {
+        Unread::from(l10n::text(
+            "DeepSeek 余额金额无效",
+            "DeepSeek balance response has an invalid amount.",
+        ))
+    };
+    let available = body["is_available"].as_bool().ok_or_else(unsupported)?;
+    let rows = body["balance_infos"].as_array().ok_or_else(unsupported)?;
+    let mut amounts = Vec::new();
+    for row in rows {
+        let currency = match row["currency"].as_str() {
+            Some("CNY") => "CNY",
+            Some("USD") => "USD",
+            _ => {
+                return Err(l10n::text(
+                    "DeepSeek 余额的币种无法识别",
+                    "DeepSeek balance response has an unsupported currency.",
+                )
+                .into())
+            }
+        };
+        let amount = decimal(&row["total_balance"]).ok_or_else(invalid)?;
+        if decimal(&row["granted_balance"]).is_none()
+            || decimal(&row["topped_up_balance"]).is_none()
+        {
+            return Err(invalid());
+        }
+        amounts.push((currency, amount));
+    }
+    Ok(Balances { available, amounts })
+}
+
+/// The balance of the key DeepSeek Harness or the user keeps, or the Harness
+/// Platform account's wallets. A client in `routed` that sends the same key
+/// is taken out and named on these rows.
+fn read_text(host: &dyn Host, routed: &mut Vec<Routed>) -> Result<Reading, Unread> {
     let directory = directory(host);
     let saved = host.saved_credential("deepseek")?;
     let settings = if saved.is_none() {
@@ -265,7 +448,8 @@ fn read_text(host: &dyn Host) -> Result<Reading, String> {
                 return Err(l10n::text(
                     "DeepSeek 凭据文件格式无法识别",
                     "DeepSeek credentials have an unsupported document format.",
-                ));
+                )
+                .into());
             }
             credential = credentials["refs"][reference].as_str().map(str::to_owned);
         }
@@ -292,76 +476,32 @@ fn read_text(host: &dyn Host) -> Result<Reading, String> {
         return Err(l10n::text(
             "自定义 API 地址无法读取 DeepSeek 官方余额",
             "Official DeepSeek balance is unavailable for a custom API endpoint.",
-        ));
-    }
-    if credential
-        .bytes()
-        .any(|byte| matches!(byte, 0 | b'\r' | b'\n'))
-    {
-        return Err(l10n::text(
-            "DeepSeek 凭据格式无法识别",
-            "DeepSeek credentials have an unsupported format.",
-        ));
-    }
-    let body = host
-        .http_json(&HttpRequest {
-            url: BALANCE,
-            secrets: &[("Authorization", &format!("Bearer {credential}"))],
-            body: None,
-            headers: &[],
-            timeout: Duration::from_secs(15),
-        })
-        .map_err(|failure| match failure {
-            HttpFailure::Unreachable | HttpFailure::BadHeader => l10n::text(
-                "DeepSeek 余额读取失败，请检查网络后重试",
-                "DeepSeek balance could not be reached; check the connection.",
-            ),
-            other => other.message(),
-        })?;
-    let available = body["is_available"].as_bool().ok_or_else(|| {
-        l10n::text(
-            "DeepSeek 余额返回的数据格式无法识别",
-            "DeepSeek balance response has an unsupported format.",
         )
-    })?;
-    let balances = body["balance_infos"].as_array().ok_or_else(|| {
-        l10n::text(
-            "DeepSeek 余额返回的数据格式无法识别",
-            "DeepSeek balance response has an unsupported format.",
-        )
-    })?;
+        .into());
+    }
+    // The clients that send Harness's own key share its rows.
+    let mut shared = Vec::new();
+    routed.retain(|route| {
+        let same = route.key == credential;
+        if same {
+            shared.extend(route.clients.iter().copied());
+        }
+        !same
+    });
+    let balances = api_balance(host, &credential)?;
     // The balance endpoint returns no account identity. The original retains it
     // under the Harness billing source; rotating a key must not create an account.
     let scope = host.canonical(&directory).unwrap_or(directory);
     let id = account_id("deepseek", &[scope.to_string_lossy().as_ref()]);
     let account_identity = legacy_unresolved("DeepSeek", &scope.to_string_lossy());
     let mut billing = Vec::new();
-    for row in balances {
-        let currency = row["currency"]
-            .as_str()
-            .filter(|currency| matches!(*currency, "CNY" | "USD"))
-            .ok_or_else(|| {
-                l10n::text(
-                    "DeepSeek 余额的币种无法识别",
-                    "DeepSeek balance response has an unsupported currency.",
-                )
-            })?;
-        let amount = decimal(&row["total_balance"]).ok_or_else(|| {
-            l10n::text(
-                "DeepSeek 余额金额无效",
-                "DeepSeek balance response has an invalid amount.",
-            )
-        })?;
-        if decimal(&row["granted_balance"]).is_none()
-            || decimal(&row["topped_up_balance"]).is_none()
-        {
-            return Err(l10n::text(
-                "DeepSeek 余额金额无效",
-                "DeepSeek balance response has an invalid amount.",
-            ));
+    for (currency, amount) in &balances.amounts {
+        let mut row = json!({"id":format!("{id}:{currency}"),"vendor":"deepseek","accountId":account_identity,"consumerRoutes":["deepseek-official"],"consumerHome":scope,"label":l10n::text("API 余额", "API balance"),"amount":amount,"currency":currency,"available":balances.available,
+            "notice":balances.notice()});
+        if !shared.is_empty() {
+            row["clients"] = json!(["deepseek"].iter().chain(&shared).collect::<Vec<_>>());
         }
-        billing.push(json!({"id":format!("{id}:{currency}"),"vendor":"deepseek","accountId":account_identity,"consumerRoutes":["deepseek-official"],"consumerHome":scope,"label":l10n::text("API 余额", "API balance"),"amount":amount,"currency":currency,"available":available,
-            "notice":(!available).then(|| l10n::text("DeepSeek 表示此余额当前不能用于 API 调用", "DeepSeek reports that this balance is unavailable for API calls."))}));
+        billing.push(row);
     }
     Ok(Reading {
         provider: "deepseek",
@@ -370,7 +510,7 @@ fn read_text(host: &dyn Host) -> Result<Reading, String> {
         notice: None,
         additional_accounts: Vec::new(),
         session_records: Vec::new(),
-        services: Vec::new(),
+        services: services(&shared, &account_identity, &balances),
         account: Some(
             json!({"id":account_identity,"provider":"deepseek","label":"DeepSeek API","plan":null,"identity":"local-home","checkedAt":Utc::now().to_rfc3339()}),
         ),
@@ -596,6 +736,148 @@ mod tests {
             assert_eq!(decimal(&json!(bad)), None, "{bad}");
         }
         assert_eq!(decimal(&json!(12.5)), None);
+    }
+
+    const CLAUDE_ROUTE: &str = r#"{"env":{"ANTHROPIC_BASE_URL":"https://api.deepseek.com/anthropic","ANTHROPIC_AUTH_TOKEN":"sk-claude"}}"#;
+    const CODEX_ROUTE: &str = "[model_providers.deepseek]\nbase_url = \"https://api.deepseek.com\"\nexperimental_bearer_token = \"sk-codex\"\n";
+
+    /// Everything a reading hands on, as text.
+    fn shown(reading: &Reading) -> String {
+        serde_json::to_string(&json!({
+            "billing": reading.billing, "account": reading.account,
+            "accounts": reading.additional_accounts, "services": reading.services,
+            "notice": reading.notice,
+        }))
+        .unwrap()
+    }
+
+    #[test]
+    fn a_key_claude_code_sends_to_deepseek_reads_its_balance() {
+        let host = FakeHost::new("/u")
+            .file("/u/.claude/settings.json", CLAUDE_ROUTE)
+            .answer(BALANCE, Ok(balance("7.25")));
+        let reading = read(&host).unwrap();
+        assert_eq!(
+            *host.asked.borrow(),
+            [(BALANCE.into(), Some("Bearer sk-claude".into()))],
+            "the key goes to DeepSeek's balance endpoint and nowhere else"
+        );
+        assert!(reading.notice.is_none(), "Harness's own notice gives way");
+        assert_eq!(reading.billing.len(), 1);
+        let id = account_id("deepseek", &["api-key", "sk-claude"]);
+        let row = &reading.billing[0];
+        assert_eq!(row["id"], format!("{id}:CNY"));
+        assert_eq!(row["vendor"], "deepseek");
+        assert_eq!(row["accountId"], id.as_str());
+        assert_eq!(row["clients"], json!(["claude"]));
+        assert_eq!(row["label"], "API balance (Claude Code)");
+        assert_eq!(row["amount"], 7.25);
+        assert!(row["consumerHome"].is_null(), "not Harness's home");
+        let account = reading.account.as_ref().unwrap();
+        assert_eq!(account["id"], id.as_str());
+        assert_eq!(account["identity"], "credential-scope");
+        assert_eq!(
+            reading.services,
+            [
+                json!({"client":"claude","provider":"DeepSeek","product":"api","accountId":id,"region":"china"})
+            ]
+        );
+        assert!(!shown(&reading).contains("sk-claude"));
+    }
+
+    #[test]
+    fn harness_and_the_clients_share_one_key_once() {
+        let host = FakeHost::new("/u")
+            .env("DEEPSEEK_API_KEY", "sk-codex")
+            .file("/u/.codex/config.toml", CODEX_ROUTE)
+            .answer(BALANCE, Ok(balance("3")));
+        let reading = read(&host).unwrap();
+        assert_eq!(host.asked.borrow().len(), 1);
+        assert_eq!(reading.billing.len(), 1);
+        let row = &reading.billing[0];
+        assert_eq!(row["label"], "API balance");
+        assert_eq!(row["clients"], json!(["deepseek", "codex"]));
+        assert_eq!(row["consumerRoutes"], json!(["deepseek-official"]));
+        assert_eq!(reading.services[0]["client"], "codex");
+        assert_eq!(reading.services[0]["accountId"], row["accountId"]);
+        assert!(reading.additional_accounts.is_empty());
+    }
+
+    #[test]
+    fn each_clients_own_key_is_its_own_account() {
+        let usd = json!({"is_available": false, "balance_infos": [
+            {"currency": "USD", "total_balance": "0.40", "granted_balance": "0", "topped_up_balance": "0.40"}
+        ]});
+        let host = FakeHost::new("/u")
+            .env("DEEPSEEK_API_KEY", "sk-harness")
+            .file("/u/.claude/settings.json", CLAUDE_ROUTE)
+            .file("/u/.codex/config.toml", CODEX_ROUTE)
+            .answer_for(BALANCE, "Bearer sk-harness", Ok(balance("1")))
+            .answer_for(BALANCE, "Bearer sk-claude", Ok(balance("2")))
+            .answer_for(BALANCE, "Bearer sk-codex", Ok(usd));
+        let reading = read(&host).unwrap();
+        let sent = host
+            .asked
+            .borrow()
+            .iter()
+            .map(|(url, key)| (url.clone(), key.clone().unwrap()))
+            .collect::<Vec<_>>();
+        assert_eq!(
+            sent,
+            [
+                (BALANCE.to_owned(), "Bearer sk-harness".to_owned()),
+                (BALANCE.to_owned(), "Bearer sk-claude".to_owned()),
+                (BALANCE.to_owned(), "Bearer sk-codex".to_owned()),
+            ]
+        );
+        assert_eq!(reading.billing.len(), 3);
+        assert_eq!(reading.billing[0]["label"], "API balance");
+        assert_eq!(reading.billing[2]["label"], "API balance (Codex)");
+        assert_eq!(reading.billing[2]["available"], false);
+        assert!(reading.billing[2]["notice"].is_string());
+        assert_eq!(reading.additional_accounts.len(), 2);
+        assert_eq!(reading.services[1]["region"], "international");
+        assert!(!shown(&reading).contains("sk-"));
+    }
+
+    #[test]
+    fn a_clients_key_that_fails_is_a_notice_or_the_reading_s_failure() {
+        let host = FakeHost::new("/u")
+            .env("DEEPSEEK_API_KEY", "sk-harness")
+            .file("/u/.claude/settings.json", CLAUDE_ROUTE)
+            .answer_for(BALANCE, "Bearer sk-harness", Ok(balance("1")))
+            .answer_for(BALANCE, "Bearer sk-claude", Err(HttpFailure::Status(401)));
+        let reading = read(&host).unwrap();
+        assert_eq!(reading.billing.len(), 1);
+        assert_eq!(
+            reading.notice.as_deref(),
+            Some(format!("Claude Code: {}", HttpFailure::Status(401).message()).as_str())
+        );
+
+        let host = FakeHost::new("/u").file("/u/.claude/settings.json", CLAUDE_ROUTE);
+        let failed = read(&host).err().unwrap();
+        assert!(matches!(failed, Unread::Transient { .. }), "{failed:?}");
+        assert_eq!(
+            failed,
+            "Claude Code: DeepSeek balance could not be reached; check the connection."
+        );
+        assert!(!failed.reason().contains("sk-claude"));
+    }
+
+    #[test]
+    fn a_broken_harness_setup_does_not_hide_a_clients_balance() {
+        let host = FakeHost::new("/u")
+            .env("DEEPSEEK_API_KEY", "sk-harness")
+            .env("DEEPSEEK_BASE_URL", "https://proxy.example.com")
+            .file("/u/.claude/settings.json", CLAUDE_ROUTE)
+            .answer(BALANCE, Ok(balance("5")));
+        let reading = read(&host).unwrap();
+        assert_eq!(reading.billing.len(), 1);
+        assert_eq!(reading.billing[0]["clients"], json!(["claude"]));
+        assert_eq!(
+            reading.notice.as_deref(),
+            Some("Official DeepSeek balance is unavailable for a custom API endpoint.")
+        );
     }
 
     #[test]
