@@ -138,6 +138,11 @@ impl NativePlatform {
                 target["cwd"].as_str(),
             );
         }
+        if let Some(folder) = navigation::cursor_folder(target) {
+            if os::open_folder_in_app(agent_hud_agents::cursor::BUNDLE, folder) {
+                return Ok(true);
+            }
+        }
         let Some(url) = navigation::session_url(target) else {
             if matches!(
                 target["kind"].as_str(),

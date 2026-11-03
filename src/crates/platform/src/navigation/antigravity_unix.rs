@@ -35,6 +35,12 @@ pub(super) fn open(home: &Path, id: &str, cwd: Option<&str>) -> Result<bool, Str
         }
     }
     if !opened {
+        // Its folder opens in Antigravity itself, as Finder would: the app
+        // asks before it follows its `file` link.
+        let folder = cwd.map(str::trim).filter(|cwd| cwd.starts_with('/'));
+        if folder.is_some_and(|folder| crate::os::open_folder_in_app(APP, Path::new(folder))) {
+            return Ok(true);
+        }
         if let Some(uri) = workspace_uri(cwd) {
             if crate::os::open_session_url(&uri).is_ok() {
                 return Ok(true);

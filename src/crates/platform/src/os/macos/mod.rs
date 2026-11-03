@@ -296,6 +296,18 @@ pub(crate) fn source_roots(home: &Path) -> Vec<agent_hud_core::SourceRoot> {
     super::portable_cli_roots(home)
 }
 
+/// Opens `folder` in the app `bundle_id`, as Finder would: an app built on
+/// VS Code asks before it opens a folder from its `file` link, never from this.
+pub(crate) fn open_folder_in_app(bundle_id: &str, folder: &std::path::Path) -> bool {
+    folder.is_absolute()
+        && folder.is_dir()
+        && super::unix::spawn_script(
+            include_str!("../../../scripts/macos/open-folder-in-app.sh"),
+            &[std::ffi::OsStr::new(bundle_id), folder.as_os_str()],
+        )
+        .is_ok()
+}
+
 pub(crate) fn open_session_url(url: &str) -> Result<(), String> {
     super::unix::spawn_script(
         include_str!("../../../scripts/macos/open-session-url.sh"),

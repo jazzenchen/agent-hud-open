@@ -88,6 +88,23 @@ fn uuid(value: &str) -> bool {
             }
         })
 }
+/// The folder of a local Cursor session (one with no cloud `bc-` id), which
+/// opens in Cursor itself where the host can; its `cursor://file` link is
+/// the fallback, and Cursor asks before it follows one.
+pub(super) fn cursor_folder(target: &Value) -> Option<&std::path::Path> {
+    if !matches!(
+        target["kind"].as_str(),
+        Some("cursor-agent" | "cursorAgent")
+    ) || target["id"]
+        .as_str()
+        .is_some_and(|id| id.starts_with("bc-"))
+    {
+        return None;
+    }
+    let cwd = target["cwd"].as_str()?.trim();
+    cwd.starts_with('/').then(|| std::path::Path::new(cwd))
+}
+
 pub fn session_url(target: &Value) -> Option<String> {
     session_url_on(target, crate::os::OS, crate::os::registered_url)
 }

@@ -66,6 +66,24 @@ fn cursor_local_session_opens_its_folder() {
 }
 
 #[test]
+fn a_local_cursor_session_names_its_folder_to_open_in_cursor() {
+    let local = json!({"kind":"cursor-agent","id":"3e8f2eb2-c0d0","cwd":" /Users/a/my proj "});
+    assert_eq!(
+        cursor_folder(&local).and_then(|folder| folder.to_str()),
+        Some("/Users/a/my proj")
+    );
+    // A cloud agent opens by its link, and a relative or missing folder is no folder.
+    for target in [
+        json!({"kind":"cursor-agent","id":"bc-1234","cwd":"/Users/a/p"}),
+        json!({"kind":"cursor-agent","id":"3e8f","cwd":"relative"}),
+        json!({"kind":"cursor-agent","id":"3e8f","cwd":null}),
+        json!({"kind":"grok-bot-agent","id":"3e8f","cwd":"/Users/a/p"}),
+    ] {
+        assert_eq!(cursor_folder(&target), None, "{target}");
+    }
+}
+
+#[test]
 fn cursor_app_link_is_offered_only_where_it_is_registered() {
     let target = json!({"kind":"cursor-app"});
     assert_eq!(

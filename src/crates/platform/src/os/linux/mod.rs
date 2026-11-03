@@ -143,6 +143,11 @@ pub(crate) fn source_roots(home: &Path) -> Vec<agent_hud_core::SourceRoot> {
     super::portable_cli_roots(home)
 }
 
+/// Not implemented on this host: callers fall back to the client's link.
+pub(crate) fn open_folder_in_app(_bundle_id: &str, _folder: &std::path::Path) -> bool {
+    false
+}
+
 pub(crate) fn open_session_url(url: &str) -> Result<(), String> {
     super::unix::spawn_script(
         include_str!("../../../scripts/linux/open-session-url.sh"),
