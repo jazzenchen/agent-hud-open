@@ -267,4 +267,21 @@ mod tests {
             "a key looked up by a command is not there"
         );
     }
+
+    #[test]
+    fn claude_codes_local_settings_in_its_config_dir_route_to_glm() {
+        let dir = tempfile::tempdir().unwrap();
+        let home = dir.path();
+        let config = home.join("claude-work");
+        file(
+            &config.join("settings.local.json"),
+            r#"{"env":{"ANTHROPIC_BASE_URL":"https://open.bigmodel.cn/api/anthropic","ANTHROPIC_API_KEY":"k"}}"#,
+        );
+        assert!(from_files(home, &[])["glm"].is_empty());
+        let config = config.to_string_lossy().into_owned();
+        assert_eq!(
+            from_files(home, &[("CLAUDE_CONFIG_DIR", &config)])["glm"],
+            ["claude-provider-route"]
+        );
+    }
 }

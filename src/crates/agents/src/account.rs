@@ -507,17 +507,21 @@ impl crate::Places for HostPlaces<'_> {
 /// Where `place` is on the host's OS, or why it is not known there.
 pub fn locate(host: &dyn Host, place: &PerOs<Location>) -> Result<PathBuf, &'static str> {
     match place.on(host.os()) {
-        Support::Verified(location) | Support::Unverified(location) => location
-            .resolve(
-                &host.folder(location.base),
-                &|name| host.env(name).map(str::to_owned),
-                &HostPlaces(host),
-            )
+        Support::Verified(location) | Support::Unverified(location) => resolve(host, location)
             .into_iter()
             .next()
             .ok_or("No variable names this location here"),
         Support::Unsupported(why) => Err(why),
     }
+}
+
+/// Every path a location that is the same on every OS names on the host.
+pub fn resolve(host: &dyn Host, location: &Location) -> Vec<PathBuf> {
+    location.resolve(
+        &host.folder(location.base),
+        &|name| host.env(name).map(str::to_owned),
+        &HostPlaces(host),
+    )
 }
 
 /// The official API address a saved credential may use for `provider`, with

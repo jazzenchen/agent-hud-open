@@ -126,6 +126,58 @@ fn glm_through_opencode_uses_the_configured_address() {
 }
 
 #[test]
+fn claude_codes_plan_keys_come_from_both_settings_files_in_its_config_dir() {
+    let home = "/u";
+    let config = format!("{home}/claude-work");
+    let glm_route = r#"{"env":{"ANTHROPIC_BASE_URL":"https://open.bigmodel.cn/api/anthropic","ANTHROPIC_AUTH_TOKEN":"gk"}}"#;
+    let kimi_route = r#"{"env":{"ANTHROPIC_BASE_URL":"https://api.kimi.com/coding/","ANTHROPIC_API_KEY":"sk-local"}}"#;
+    let host = FakeHost::new(home)
+        .env("CLAUDE_CONFIG_DIR", &config)
+        .file(&format!("{config}/settings.json"), glm_route)
+        .file(&format!("{config}/settings.local.json"), kimi_route)
+        .file("/u/.claude/settings.json", r#"{"env":{"ANTHROPIC_BASE_URL":"https://api.kimi.com/coding","ANTHROPIC_AUTH_TOKEN":"sk-default"}}"#)
+        .answer(GLM_CHINA, Ok(glm_limits()))
+        .answer(KIMI_USAGES, Ok(kimi_usages()));
+    let reading = glm(&host).unwrap();
+    assert_eq!(reading.quotas.len(), 2);
+    assert_eq!(reading.services[0]["client"], "Claude");
+    assert_eq!(
+        host.asked.borrow()[0],
+        (GLM_CHINA.into(), Some("Bearer gk".into()))
+    );
+
+    let reading = kimi(&host).unwrap();
+    assert_eq!(reading.services[0]["client"], "Claude");
+    let asked = host.asked.borrow();
+    assert!(
+        asked
+            .iter()
+            .any(|(url, key)| url == KIMI_USAGES && key.as_deref() == Some("Bearer sk-local")),
+        "settings.local.json's key is read"
+    );
+    assert!(
+        asked
+            .iter()
+            .all(|(_, key)| key.as_deref() != Some("Bearer sk-default")),
+        "~/.claude is not read while CLAUDE_CONFIG_DIR names another folder"
+    );
+}
+
+#[test]
+fn claude_codes_local_settings_are_read_in_the_default_folder() {
+    let host = FakeHost::new("/u")
+        .file(
+            "/u/.claude/settings.local.json",
+            r#"{"env":{"ANTHROPIC_BASE_URL":"https://api.z.ai/api/anthropic","ANTHROPIC_AUTH_TOKEN":"zk"}}"#,
+        )
+        .answer(GLM_GLOBAL, Ok(glm_limits()));
+    let reading = glm(&host).unwrap();
+    assert_eq!(reading.quotas.len(), 2);
+    assert_eq!(reading.services[0]["client"], "Claude");
+    assert_eq!(reading.services[0]["region"], "international");
+}
+
+#[test]
 fn an_unreadable_opencode_config_hides_its_keys() {
     let host = FakeHost::new("/u")
         .file("/u/.config/opencode/opencode.json", "not json")

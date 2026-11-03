@@ -141,30 +141,17 @@ pub(super) fn discover(host: &dyn Host, wanted: &str) -> Result<Vec<Credential>,
             None,
         );
     }
-    let claude = file(host, &host.home().join(".claude/settings.json"), false);
-    let c = &claude["env"];
-    for (base, key) in [
-        (
-            env("ANTHROPIC_BASE_URL"),
-            env("ANTHROPIC_AUTH_TOKEN").or_else(|| env("ANTHROPIC_API_KEY")),
-        ),
-        (
-            c["ANTHROPIC_BASE_URL"].as_str(),
-            c["ANTHROPIC_AUTH_TOKEN"]
-                .as_str()
-                .or_else(|| c["ANTHROPIC_API_KEY"].as_str()),
-        ),
-    ] {
-        if let Some(base) = base {
-            add(
-                service("", Some(base), false),
-                key,
-                "Claude",
-                None,
-                None,
-                None,
-            );
-        }
+    // Claude Code: both its settings files (in CLAUDE_CONFIG_DIR when set),
+    // then the environment.
+    for route in crate::claude::routes::configured(host) {
+        add(
+            service("", Some(&route.base_url), false),
+            route.key.as_deref(),
+            "Claude",
+            None,
+            None,
+            None,
+        );
     }
     let data = variable(host, "XDG_DATA_HOME").unwrap_or_else(|| host.home().join(".local/share"));
     let config = variable(host, "XDG_CONFIG_HOME").unwrap_or_else(|| host.home().join(".config"));

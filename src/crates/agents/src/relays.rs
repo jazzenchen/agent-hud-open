@@ -13,9 +13,7 @@
 //! Sub2API site's `/v1/usage`. When none fits, the owner may choose the
 //! template for that address, or describe its balance endpoint
 //! (`custom`); every request still goes only to the relay's own host.
-use crate::account::{
-    read_json, variable, Host, HttpFailure, HttpRequest, Provider, Reading, Unread,
-};
+use crate::account::{variable, Host, HttpFailure, HttpRequest, Provider, Reading, Unread};
 use crate::endpoints::{base_url_host, host_kind, HostKind};
 use crate::l10n;
 use serde_json::{json, Value};
@@ -262,20 +260,9 @@ fn targets(host: &dyn Host) -> Vec<Target> {
         }
     };
     // Claude Code: its settings' env, then this process's own environment.
-    let claude = variable(host, "CLAUDE_CONFIG_DIR").unwrap_or_else(|| host.home().join(".claude"));
-    for name in ["settings.json", "settings.local.json"] {
-        if let Some(settings) = read_json(host, &claude.join(name)) {
-            let env = &settings["env"];
-            let key = env["ANTHROPIC_AUTH_TOKEN"]
-                .as_str()
-                .or_else(|| env["ANTHROPIC_API_KEY"].as_str());
-            add("claude", env["ANTHROPIC_BASE_URL"].as_str(), key, None);
-        }
+    for route in crate::claude::routes::configured(host) {
+        add("claude", Some(&route.base_url), route.key.as_deref(), None);
     }
-    let key = host
-        .env("ANTHROPIC_AUTH_TOKEN")
-        .or_else(|| host.env("ANTHROPIC_API_KEY"));
-    add("claude", host.env("ANTHROPIC_BASE_URL"), key, None);
     // Codex: the providers its config.toml defines; its calls are recorded
     // under the provider's id.
     let codex = variable(host, "CODEX_HOME").unwrap_or_else(|| host.home().join(".codex"));

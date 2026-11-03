@@ -3,6 +3,7 @@ pub mod account;
 mod hooks;
 pub mod jobs;
 pub mod process;
+pub mod routes;
 pub mod transcript;
 
 use crate::Discovery;
@@ -38,7 +39,7 @@ static DISCOVERY: Discovery = Discovery {
         Location::home(&[], &[".local/share/claude"], "versions"),
     ],
     settings: &[
-        Location::home(&["CLAUDE_CONFIG_DIR"], &[".claude"], "settings.json"),
+        routes::SETTINGS[0],
         Location::home(&["CLAUDE_CONFIG_DIR"], &[".claude"], ".credentials.json"),
         Location::home(&[], &[""], ".claude.json"),
     ],

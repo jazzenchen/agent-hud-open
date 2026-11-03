@@ -6,8 +6,6 @@ use crate::discovery::Look;
 use crate::Location;
 use serde_json::Value;
 
-const CLAUDE_SETTINGS: Location =
-    Location::home(&["CLAUDE_CONFIG_DIR"], &[".claude"], "settings.json");
 const OPENCODE_CONFIGS: [Location; 2] = [
     Location::config_home(&["opencode"], "opencode.json"),
     Location::config_home(&["opencode"], "opencode.jsonc"),
@@ -54,16 +52,15 @@ pub fn configured(look: &dyn Look) -> Vec<&'static str> {
     {
         found.push("provider-environment");
     }
-    if plan("", look.env("ANTHROPIC_BASE_URL"), false)
-        && (has("ANTHROPIC_AUTH_TOKEN") || has("ANTHROPIC_API_KEY"))
-    {
-        found.push("claude-provider-route");
-    }
-    let settings = look.settings(&CLAUDE_SETTINGS);
-    let settings = &settings["env"];
-    if plan("", settings["ANTHROPIC_BASE_URL"].as_str(), false)
-        && (present(&settings["ANTHROPIC_AUTH_TOKEN"]) || present(&settings["ANTHROPIC_API_KEY"]))
-    {
+    // Claude Code's settings files (in CLAUDE_CONFIG_DIR when set), then
+    // the environment.
+    if crate::claude::routes::seen(look).iter().any(|route| {
+        plan("", Some(&route.base_url), false)
+            && route
+                .key
+                .as_deref()
+                .is_some_and(|key| !key.is_empty() && !key.starts_with('!'))
+    }) {
         found.push("claude-provider-route");
     }
     let configs = OPENCODE_CONFIGS
