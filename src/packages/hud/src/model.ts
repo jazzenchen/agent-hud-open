@@ -5,7 +5,7 @@ import type {
   Snapshot,
 } from "@agent-hud/protocol";
 import { agentArtworkKey, agentVendorName } from "./agent-artwork";
-import { restingAgents } from "./resting-agents.ts";
+import { layoutMarks, restingAgents } from "./resting-agents.ts";
 import { recentLabel, recentUsage } from "./recent-usage.ts";
 import { visibleBalances } from "./balance-rows.ts";
 import { heldUsed } from "./held-reading.ts";
@@ -247,34 +247,28 @@ export function configuredVendors(
   snapshot: Snapshot,
   config: HUDConfig,
 ): HUDVendor[] {
-  // Only the HUD's own list orders the marks; the panel's block order does not (Open ScreenAgents).
   const available = vendorsFromSnapshot(snapshot, config.mode).map((vendor) => {
-      if (vendor.key !== "deepseek" || vendor.quotas.length) return vendor;
-      const rows = snapshot.billing.filter(
-        (row) => vendorKey(row.vendor) === vendor.key,
-      );
-      if (!rows.length) return vendor;
-      const block = config.panelLayout.blocks?.[`api:${rows[0].vendor}`] ?? {};
-      const visible = visibleBalances(rows, block);
-      return {
-        ...vendor,
-        balance: visible.length
-          ? visible
-              .map((b) =>
-                moneyAmount(b.amount, b.currency, snapshotLanguage(snapshot)),
-              )
-              .join(" · ")
-          : null,
-        level: balanceLevel(visible) ?? "stale",
-        usage: null,
-      };
-    }),
-    marks = (config.panelLayout.hud?.agents ?? []).map(vendorKey);
-  if (!marks.some((mark) => available.some((vendor) => vendor.key === mark)))
-    return available;
-  return available
-    .filter((vendor) => marks.includes(vendor.key))
-    .sort((a, b) => marks.indexOf(a.key) - marks.indexOf(b.key));
+    if (vendor.key !== "deepseek" || vendor.quotas.length) return vendor;
+    const rows = snapshot.billing.filter(
+      (row) => vendorKey(row.vendor) === vendor.key,
+    );
+    if (!rows.length) return vendor;
+    const block = config.panelLayout.blocks?.[`api:${rows[0].vendor}`] ?? {};
+    const visible = visibleBalances(rows, block);
+    return {
+      ...vendor,
+      balance: visible.length
+        ? visible
+            .map((b) =>
+              moneyAmount(b.amount, b.currency, snapshotLanguage(snapshot)),
+            )
+            .join(" · ")
+        : null,
+      level: balanceLevel(visible) ?? "stale",
+      usage: null,
+    };
+  });
+  return layoutMarks(available, config.panelLayout);
 }
 
 function balanceLevel(

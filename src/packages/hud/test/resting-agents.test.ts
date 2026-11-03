@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { restingAgents } from "../src/resting-agents.ts";
+import { layoutMarks, restingAgents } from "../src/resting-agents.ts";
 
 const now = Date.parse("2026-10-21T12:00:00Z");
 const hoursAgo = (hours: number) =>
@@ -104,3 +104,34 @@ for (const mode of ["notch", "logos", "simple"] as const) {
     assert.equal(restingAgents(onlyInstalled, mode, now).expiresAt, Infinity);
   });
 }
+
+test("marks follow the agent order set in Settings until the HUD has a list of its own", () => {
+  // Open #31: Settings' agent order is the panel's block order; a balance block stands for its agent.
+  const marks = ["claude", "openai", "deepseek", "cursor"].map((key) => ({
+    key,
+  }));
+  const keys = (layout: Parameters<typeof layoutMarks>[1]) =>
+    layoutMarks(marks, layout).map((mark) => mark.key);
+  assert.deepEqual(keys({}), ["claude", "openai", "deepseek", "cursor"]);
+  assert.deepEqual(keys({ order: ["api:deepseek", "codex", "claude"] }), [
+    "deepseek",
+    "openai",
+    "claude",
+    "cursor",
+  ]);
+  // A list of the HUD's own picks the marks and their order.
+  assert.deepEqual(
+    keys({
+      order: ["api:deepseek", "codex"],
+      hud: { agents: ["Claude Code", "Cursor"] },
+    }),
+    ["claude", "cursor"],
+  );
+  // One that names no mark here leaves Settings' order in charge.
+  assert.deepEqual(keys({ order: ["cursor"], hud: { agents: ["kimi"] } }), [
+    "cursor",
+    "claude",
+    "openai",
+    "deepseek",
+  ]);
+});

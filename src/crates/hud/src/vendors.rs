@@ -168,7 +168,8 @@ pub fn vendors<'a>(snapshot: &'a Value, mode: &str, now_ms: i64) -> Vec<Vendor<'
 
 /// The marks a screen's HUD names in its layout's `hud.agents`, in that order;
 /// a list naming none of the available agents never empties a HUD
-/// (HUDAgentOrder.swift).
+/// (HUDAgentOrder.swift). Without one, the layout's `order` sorts them
+/// (resting-agents.ts `layoutMarks`).
 pub fn configured<'a>(
     snapshot: &'a Value,
     mode: &str,
@@ -197,6 +198,21 @@ pub fn configured<'a>(
         .map(mark)
         .collect();
     if !available.iter().any(|vendor| marks.contains(&vendor.key)) {
+        // Without a list of its own, the HUD follows Settings' agent order: the panel's blocks, a balance block
+        // standing for its agent. An agent with no block keeps its place after them (Open #31).
+        let order: Vec<String> = layout["order"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter_map(Value::as_str)
+            .map(|key| mark(key.strip_prefix("api:").unwrap_or(key)))
+            .collect();
+        available.sort_by_key(|vendor| {
+            order
+                .iter()
+                .position(|key| *key == vendor.key)
+                .unwrap_or(order.len())
+        });
         return available;
     }
     let mut named: Vec<Vendor> = available
@@ -593,6 +609,29 @@ mod tests {
             now,
         );
         assert_eq!(unknown.len(), 3);
+        // Without a list of its own the HUD follows Settings' agent order, the panel's blocks (Open #31);
+        // a balance block stands for its agent, and an agent with no block keeps its place after them.
+        let keys = |layout: Value| -> Vec<String> {
+            configured(&snapshot, "simple", &layout, now)
+                .iter()
+                .map(|v| v.key.clone())
+                .collect()
+        };
+        assert_eq!(
+            keys(json!({"order": ["api:deepseek", "codex"]})),
+            ["deepseek", "openai", "claude"]
+        );
+        assert_eq!(
+            keys(
+                json!({"order": ["api:deepseek", "codex"], "hud": {"agents": ["Claude Code", "Codex"]}})
+            ),
+            ["claude", "openai"],
+            "the HUD's own list still picks and orders"
+        );
+        assert_eq!(
+            keys(json!({"order": ["codex"], "hud": {"agents": ["kimi"]}})),
+            ["openai", "claude", "deepseek"]
+        );
     }
     #[test]
     fn a_failed_read_holds_its_last_share_until_the_window_resets() {

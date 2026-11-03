@@ -71,3 +71,25 @@ export function restingAgents(snapshot: Snapshot, mode: HUDMode, now: number) {
     .forEach((provider) => add(provider.id));
   return { order, expiresAt };
 }
+
+/** The marks a layout shows, in its order (HUDAgentOrder.swift, vendors.rs
+ * `configured`): those its own `hud.agents` list names, in that order. A list
+ * naming none of them never empties a HUD. Without one, Settings' agent order
+ * sorts them: the panel's blocks, a balance block standing for its agent; an
+ * agent with no block keeps its place after them (Open #31). */
+export function layoutMarks<T extends { key: string }>(
+  available: T[],
+  layout: { order?: string[]; hud?: { agents?: string[] } },
+): T[] {
+  const marks = (layout.hud?.agents ?? []).map(vendorKey);
+  if (marks.some((mark) => available.some((vendor) => vendor.key === mark)))
+    return available
+      .filter((vendor) => marks.includes(vendor.key))
+      .sort((a, b) => marks.indexOf(a.key) - marks.indexOf(b.key));
+  const order = (layout.order ?? []).map((key) =>
+    vendorKey(key.replace(/^api:/, "")),
+  );
+  const rank = (vendor: T) =>
+    order.includes(vendor.key) ? order.indexOf(vendor.key) : order.length;
+  return [...available].sort((a, b) => rank(a) - rank(b));
+}
