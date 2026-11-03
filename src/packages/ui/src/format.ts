@@ -225,6 +225,15 @@ export function moneyAmount(
   return formatAmount(format, amount);
 }
 
+/** A list price as a pricing page writes it: whole units for a whole amount ("$20"), else two decimals ("$19.99"). */
+export function listPrice(amount: number, code: string, language: Language) {
+  const digits = Number.isInteger(amount) ? 0 : 2;
+  return formatAmount(
+    currency(language, code, [digits, digits], "halfEven"),
+    amount,
+  );
+}
+
 /** Whole units from a hundred up ("$412"), two decimals below ("$3.10"), "<$0.01" for a positive amount that rounds to none. */
 export function moneyShort(amount: Amount, code: string, language: Language) {
   const cents = numberFormat("en-US", {

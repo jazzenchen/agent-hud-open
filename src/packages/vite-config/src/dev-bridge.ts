@@ -5,6 +5,7 @@ const methods = new Set([
   "refresh",
   "statistics",
   "quota_history",
+  "plan_value",
   "price_list",
   "sessions",
   "set_setting",

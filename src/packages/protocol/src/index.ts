@@ -348,6 +348,71 @@ export interface QuotaHistoryResponse {
   binSeconds: number;
   windows: QuotaHistoryWindow[];
 }
+/** A subscription tier with a published monthly price, from the provider's catalog. */
+export interface PlanTier {
+  id: string;
+  name: string;
+  /** US dollars a month, billed monthly, before tax. */
+  monthlyUSD: number;
+  /** The usage it allows as a multiple of the base paid tier, where the vendor states it. */
+  multiple: number | null;
+}
+/** One signed-in account of a provider with a plan catalog (`plan_value`), from Core. */
+export interface PlanValueAccount {
+  id: string;
+  provider: string;
+  name: string;
+  /** The reported plan in words, for a plan the catalog does not price. */
+  planLabel: string | null;
+  plan: PlanTier | null;
+  /** The provider's calls on this Mac over the stretch at API list prices,
+   * by currency; calls through a relay or a coding plan are left out. */
+  value: {
+    /** Where the value's record begins: the stretch's start, or later
+     * when the ledger's record begins inside it. */
+    from: string;
+    tokens: number;
+    amounts: Record<string, number>;
+    unpricedTokens: number;
+    /** Some of the provider's logs are still being read. */
+    indexing: boolean;
+  } | null;
+  /** The US dollar value ÷ the plan's monthly price. */
+  ratio: number | null;
+  /** The value is a lower bound: logs still read, a record shorter than the
+   * stretch, unpriced calls, or calls priced in another currency. */
+  partial: boolean;
+  /** Why there is no value. */
+  unavailable: string | null;
+  /** A tier that fits better, only where the quota readings under this plan
+   * show it: two of the last four cycles of the longest window ran out
+   * (upgrade), or at least two showed their peaks and every window's busiest
+   * use would fit a cheaper tier at 80% (downgrade). */
+  advice: {
+    kind: "upgrade" | "downgrade";
+    plan: PlanTier;
+    monthlyDeltaUSD: number;
+    window: {
+      id: string;
+      name: string;
+      shortLabel?: string | null;
+      windowDurationSeconds: number;
+    };
+    cycles: number;
+    ranOut: number;
+    /** Upgrade: the longest window's busiest cycle; downgrade: the busiest use of any window. */
+    busiestPercent: number;
+  } | null;
+}
+export interface PlanValueResponse {
+  kind: "plan_value";
+  generatedAt: string;
+  /** When the catalog's prices were checked, YYYY-MM-DD. */
+  checked: string;
+  from: string;
+  to: string;
+  accounts: PlanValueAccount[];
+}
 export interface Provider {
   id: string;
   name: string;
@@ -1014,6 +1079,7 @@ export type NativeMethod =
   | "price_list"
   | "statistics"
   | "quota_history"
+  | "plan_value"
   | "sessions"
   | "refresh"
   | "set_setting"

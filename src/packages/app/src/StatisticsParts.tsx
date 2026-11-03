@@ -32,3 +32,4 @@ export {
 } from "./statistics/ProviderCard";
 export { ActivityHeatmap } from "./statistics/ActivityHeatmap";
 export { QuotaHistory } from "./statistics/QuotaHistory";
+export { PlanValue } from "./statistics/PlanValue";

@@ -35,6 +35,7 @@ import {
   IndexingProgress,
   Heading,
   ProviderCard,
+  PlanValue,
   QuotaHistory,
   RecentUsage,
   TotalSummary,
@@ -970,6 +971,17 @@ export default function Statistics({
           theme={theme}
           light={light}
           timeZone={timeZone}
+        />
+      )}
+      {(snapshot.accounts?.length ?? 0) > 0 && (
+        <PlanValue
+          refresh={`${revision}|${historyEnd}|${(snapshot.accounts ?? [])
+            .map((account) => `${account.id}:${account.plan ?? ""}`)
+            .join(",")}`}
+          action={action}
+          active={active}
+          theme={theme}
+          light={light}
         />
       )}
       {data && (

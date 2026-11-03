@@ -157,6 +157,30 @@ two per bin. A line never crosses a reset (a fall of 5 points in the used share,
 or the current cycle's start) or a stretch with no readings over 20 minutes in
 which the share moved; an unchanged share within one window length is joined.
 
+Each provider with subscription tiers lists them in its folder
+(`agents/src/<agent>/plans.rs`, gathered by `agents::plans`): the vendor's
+current name, the monthly list price in US dollars (monthly billing, before
+tax, checked on `plans::CHECKED`), the usage multiple of the base paid tier
+where the vendor states one, and the spellings its reader reports. Seat-priced
+tiers, quotes and names that could be more than one tier (a bare Claude `max`
+since the October 2026 rename) are not listed and stay unpriced. Each quota
+reading keeps the plan it was taken under (`quota_sample.plan`: the tier's id,
+else the reported plan; none for readings before the column existed).
+
+The Statistics window's **Plan value** (`plan_value`) shows each signed-in
+account of such a provider: its tier and list price, the provider's calls on
+this Mac over the last 30 days at API list prices (calls through a relay or a
+coding plan left out), and that as a multiple of the monthly price, marked "≥"
+while logs are still read, when the ledger begins inside the 30 days, or when
+some calls are unpriced or priced in another currency. Several accounts of one
+provider share its calls, so none of them gets a value. Advice appears only
+from readings taken under the current tier, for tiers with a stated multiple:
+a higher tier when the longest window (a day or more) reached 95% in at least
+2 of its last 4 completed cycles, the cheapest that would have held the busiest
+to 80%; a lower one when at least 2 such cycles all show their peak (read
+within 1/24 of the window before the reset) and every window's busiest use
+would have fitted a cheaper tier at 80%.
+
 Existing original history is read without launching or modifying the original
 app. Quota samples require exact provider/account/window identities. Transcript
 facts require matching source paths, parser codecs, file signatures and completed
