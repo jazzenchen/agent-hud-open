@@ -70,6 +70,19 @@ pub fn observer_plan(
             "The observer path is a symbolic link; no client file was changed",
         ));
     }
+    // A folder on the way that links to a place that is gone, such as a moved dotfiles folder (Open #16), leaves the
+    // client out: nothing is made through it. A link to a real folder is followed as before.
+    if enabled
+        && client.script.ancestors().skip(1).any(|folder| {
+            fs::symlink_metadata(folder).is_ok_and(|m| m.file_type().is_symlink())
+                && fs::metadata(folder).is_err()
+        })
+    {
+        return Err(l10n::text(
+            "观察插件所在的文件夹是指向不存在位置的符号链接，客户端文件未作改动",
+            "The observer's folder is a symbolic link to a place that does not exist; no client file was changed",
+        ));
+    }
     let original = match fs::read(&client.script) {
         Ok(bytes) => Some(bytes),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
@@ -258,3 +271,7 @@ impl Observers {
         events
     }
 }
+
+#[cfg(all(test, unix))]
+#[path = "observers_tests_unix.rs"]
+mod tests;

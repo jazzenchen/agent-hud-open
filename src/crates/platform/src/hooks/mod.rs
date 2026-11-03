@@ -126,6 +126,7 @@ impl Hooks {
         if enabled {
             let previous = self.is_listening();
             self.configure(true)?;
+            // A client left out is only named in the status; this undoes the listener when no client can go in.
             if let Err(error) = self.clients.install(true) {
                 if !previous {
                     let _ = self.configure(false);

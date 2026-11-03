@@ -966,8 +966,11 @@ pub fn run_with_options(
                     app,
                     legacy.as_ref().and_then(|v| v.get("settings")).cloned(),
                 )?;
+                // Client hooks add to the app; it starts without them, and Settings says what is missing (Open #16).
                 if let Some(path) = &options.canonical_executable {
-                    runtime.delegate_hook_owner(path.clone())?;
+                    if let Err(error) = runtime.delegate_hook_owner(path.clone()) {
+                        eprintln!("Agent HUD client hooks: {error}");
+                    }
                 }
                 let launch_at_login = runtime.launch_at_login_enabled();
                 let data = agent_hud_runtime::local_tools_directory()?;

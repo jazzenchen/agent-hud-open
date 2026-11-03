@@ -36,8 +36,14 @@ impl Clients {
         self.refresh(None);
         Ok(())
     }
+    /// Puts in, or takes out, every found client's hooks and observer. A client that fails is left out and named in
+    /// the notice; the others still go in, so one broken client folder never turns the switch off (Open #16). The
+    /// error is only what stops every client.
     pub fn install(&mut self, enabled: bool) -> Result<(), String> {
         let context=self.context.as_ref().ok_or_else(|| l10n::text("这个版本没有指定固定的回调程序，客户端配置未作改动", "No fixed hook-owner executable has been delegated; no client configuration was changed"))?;
+        if enabled {
+            install::canonical(context)?;
+        }
         let sources = crate::discovery::discover_at(&context.home, &context.environment)
             .into_iter()
             .filter(|p| p.installed || p.configured || p.usage)
@@ -63,13 +69,8 @@ impl Clients {
                 }
             }
         }
-        let notice = (!errors.is_empty()).then(|| errors.join("; "));
-        self.refresh(notice.clone());
-        if let Some(notice) = notice {
-            Err(notice)
-        } else {
-            Ok(())
-        }
+        self.refresh((!errors.is_empty()).then(|| errors.join("; ")));
+        Ok(())
     }
     fn refresh(&mut self, notice: Option<String>) {
         self.notice = notice;
