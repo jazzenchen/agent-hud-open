@@ -335,6 +335,10 @@ mod tests {
 
     const HOUR: i64 = 3_600_000;
     const WEEK: i64 = 7 * DAY_MS;
+    // The catalogs as the agents list them, named by their own ids.
+    use agent_hud_agents::{claude, codex, grok};
+    const CLAUDE: &str = claude::plans::CATALOG.provider;
+    const CODEX: &str = codex::plans::CATALOG.provider;
 
     #[test]
     fn a_reported_plan_is_matched_by_its_normalised_spelling() {
@@ -343,16 +347,16 @@ mod tests {
         assert_eq!(normalized("Pro+").as_deref(), Some("proplus"));
         assert_eq!(normalized(" _ "), None);
         assert_eq!(
-            plan_key("claude", "max_20x").as_deref(),
+            plan_key(CLAUDE, "max_20x").as_deref(),
             Some("claude.max20x")
         );
         assert_eq!(
-            plan_key("claude", "max").as_deref(),
+            plan_key(CLAUDE, "max").as_deref(),
             Some("max"),
             "an ambiguous tier is kept as reported"
         );
-        assert!(tier("claude", "max").is_none());
-        assert!(tier("deepseek", "pro").is_none(), "no catalog");
+        assert!(tier(CLAUDE, "max").is_none());
+        assert!(tier("no-such-provider", "pro").is_none(), "no catalog");
     }
 
     /// Weekly readings an hour apart for `weeks` cycles, each rising to
@@ -375,8 +379,8 @@ mod tests {
 
     #[test]
     fn running_out_twice_in_four_weeks_names_the_cheapest_tier_that_holds_the_busiest() {
-        let catalog = plans::catalog("codex").unwrap();
-        let plus = tier("codex", "plus").unwrap();
+        let catalog = &codex::plans::CATALOG;
+        let plus = tier(CODEX, "plus").unwrap();
         let start = 1_800_000_000_000i64;
         // Four completed weeks, two run out; the fifth is under way.
         let samples = weeks(start, &[100.0, 40.0, 97.0, 60.0, 10.0], plus.id);
@@ -401,8 +405,8 @@ mod tests {
 
     #[test]
     fn a_lower_tier_needs_every_window_to_fit_and_readings_under_this_plan() {
-        let catalog = plans::catalog("codex").unwrap();
-        let pro = tier("codex", "pro").unwrap();
+        let catalog = &codex::plans::CATALOG;
+        let pro = tier(CODEX, "pro").unwrap();
         let start = 1_800_000_000_000i64;
         let long = (
             weekly(start + 3 * WEEK),
@@ -427,7 +431,7 @@ mod tests {
         );
         assert!(advise(catalog, pro, &other, std::slice::from_ref(&other)).is_none());
         // A tier without a stated multiple is never advised from or to.
-        let grok = plans::catalog("grok-bot").unwrap();
+        let grok = &grok::plans::CATALOG;
         assert!(advise(grok, &grok.plans[1], &long, std::slice::from_ref(&long)).is_none());
     }
 
