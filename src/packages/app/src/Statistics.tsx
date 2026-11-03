@@ -35,6 +35,7 @@ import {
   IndexingProgress,
   Heading,
   ProviderCard,
+  QuotaHistory,
   RecentUsage,
   TotalSummary,
   UsageChart,
@@ -326,6 +327,15 @@ export default function Statistics({
     action,
     active,
   );
+  // The quota history runs to the latest reading: a window read again
+  // moves its end along with the page's.
+  const readings = snapshot.quotas
+    .map((quota) => `${quota.id}@${quota.observedAt ?? ""}`)
+    .join("|");
+  const [historyEnd, setHistoryEnd] = useState(end);
+  useEffect(() => {
+    if (active) setHistoryEnd(Date.now());
+  }, [end, readings, active]);
   const providerChoices = available?.providers ?? [];
   const modelChoices = available?.models ?? [];
   const visibleProviders = useMemo(
@@ -949,6 +959,18 @@ export default function Statistics({
             ))}
           </div>
         </>
+      )}
+      {snapshot.quotas.length > 0 && (
+        <QuotaHistory
+          quotas={snapshot.quotas}
+          from={historyEnd - durations[range] * 3_600_000}
+          to={historyEnd}
+          action={action}
+          active={active}
+          theme={theme}
+          light={light}
+          timeZone={timeZone}
+        />
       )}
       {data && (
         <>

@@ -147,6 +147,13 @@ points over or under it the use is (more than 2 either way is ahead or under).
 The price catalog is a port of the original app's snapshot; this migration does
 not assert that every vendor's current list price has been independently refreshed.
 
+The Statistics window charts the readings kept for each shown window over its
+selected range, at most 30 days (`quota_history`): one row per window on a
+fixed 0–100% axis in the Used/Remaining choice, thinned by Core to a point or
+two per bin. A line never crosses a reset (a fall of 5 points in the used share,
+or the current cycle's start) or a stretch with no readings over 20 minutes in
+which the share moved; an unchanged share within one window length is joined.
+
 Existing original history is read without launching or modifying the original
 app. Quota samples require exact provider/account/window identities. Transcript
 facts require matching source paths, parser codecs, file signatures and completed

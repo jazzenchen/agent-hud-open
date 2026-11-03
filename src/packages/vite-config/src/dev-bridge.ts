@@ -4,6 +4,7 @@ const methods = new Set([
   "snapshot",
   "refresh",
   "statistics",
+  "quota_history",
   "price_list",
   "sessions",
   "set_setting",

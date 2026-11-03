@@ -313,6 +313,41 @@ export interface StatisticsResponse {
   recent: StatisticsPeriod[];
   heatmap: StatisticsHeatmap;
 }
+/** What `quota_history` is asked for: a stretch of the last 30 days,
+ * RFC3339 or epoch milliseconds; `to` defaults to now, `from` to a day
+ * before it. */
+export interface QuotaHistoryQuery {
+  from?: string | number;
+  to?: string | number;
+}
+/** One shown quota window's readings over the stretch, from Core. */
+export interface QuotaHistoryWindow {
+  id: string;
+  vendor: string;
+  accountId?: string | null;
+  account?: string | null;
+  name: string;
+  /** Distinct among the account's windows, else the full name. */
+  shortLabel?: string;
+  windowDurationSeconds: number | null;
+  resetAt: string | null;
+  /** The runs a line joins, oldest first, each of [epoch ms, used %]
+   * points: its first reading and the last of every bin. The first run may
+   * start just before `from`, at the reading that leads into the stretch.
+   * Nothing joins one run to the next: a reset or a gap in the readings
+   * lies between them. */
+  segments: [number, number][][];
+  /** Where a new cycle began in the stretch, epoch ms. */
+  resets: number[];
+}
+export interface QuotaHistoryResponse {
+  kind: "quota_history";
+  generatedAt: string;
+  from: string;
+  to: string;
+  binSeconds: number;
+  windows: QuotaHistoryWindow[];
+}
 export interface Provider {
   id: string;
   name: string;
@@ -978,6 +1013,7 @@ export type NativeMethod =
   | "snapshot"
   | "price_list"
   | "statistics"
+  | "quota_history"
   | "sessions"
   | "refresh"
   | "set_setting"
