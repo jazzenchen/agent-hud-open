@@ -698,6 +698,8 @@ pub(crate) mod fake {
         pub consent: AtomicBool,
         /// Answers by URL; a URL not listed is unreachable.
         pub web: HashMap<String, Result<Value, HttpFailure>>,
+        /// Answers by URL and the `Authorization` sent, before `web`.
+        pub web_for: HashMap<(String, String), Result<Value, HttpFailure>>,
         /// Every request: URL and authorization.
         pub asked: RefCell<Vec<(String, Option<String>)>>,
         /// Every request's other headers.
@@ -745,6 +747,7 @@ pub(crate) mod fake {
                 natives: HashMap::new(),
                 consent: AtomicBool::new(false),
                 web: HashMap::new(),
+                web_for: HashMap::new(),
                 asked: RefCell::new(vec![]),
                 headers: RefCell::new(vec![]),
                 sent: RefCell::new(vec![]),
@@ -771,6 +774,17 @@ pub(crate) mod fake {
         }
         pub fn answer(mut self, url: &str, body: Result<Value, HttpFailure>) -> Self {
             self.web.insert(url.into(), body);
+            self
+        }
+        /// `answer`, only for a request sending this `Authorization`.
+        pub fn answer_for(
+            mut self,
+            url: &str,
+            authorization: &str,
+            body: Result<Value, HttpFailure>,
+        ) -> Self {
+            self.web_for
+                .insert((url.into(), authorization.into()), body);
             self
         }
     }
@@ -946,7 +960,7 @@ pub(crate) mod fake {
                 .map(|(_, value)| (*value).to_owned());
             self.asked
                 .borrow_mut()
-                .push((request.url.into(), authorization));
+                .push((request.url.into(), authorization.clone()));
             self.sent
                 .borrow_mut()
                 .push((pairs(request.secrets), request.body.cloned()));
@@ -957,8 +971,9 @@ pub(crate) mod fake {
                     .map(|(name, value)| ((*name).to_owned(), (*value).to_owned()))
                     .collect(),
             );
-            self.web
-                .get(request.url)
+            authorization
+                .and_then(|sent| self.web_for.get(&(request.url.to_owned(), sent)))
+                .or_else(|| self.web.get(request.url))
                 .cloned()
                 .unwrap_or(Err(HttpFailure::Unreachable))
         }

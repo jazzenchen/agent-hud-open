@@ -1,39 +1,106 @@
-//! Copilot's quota through the existing GitHub CLI sign-in, read only after
-//! the user's explicit consent (Open's readCopilotQuota). No gh or client is
-//! launched and no token is refreshed.
+//! Copilot's quota through an existing GitHub sign-in, read only after the
+//! user's explicit consent (Open's readCopilotQuota): the GitHub CLI's, else
+//! the one GitHub's own Copilot clients keep. No gh or client is launched and
+//! no token is refreshed.
 use crate::account::{
-    legacy_account, status, Answer, Host, HttpFailure, HttpRequest, Provider, Reading, StatusPage,
-    Unread,
+    legacy_account, locate, read_json, status, Answer, Host, HttpFailure, HttpRequest, Provider,
+    Reading, StatusPage, Unread,
 };
-use crate::l10n;
 use crate::naming::vendor_windows;
+use crate::{l10n, Location, PerOs, Support};
 use base64::Engine;
 use serde_json::{json, Value};
 use std::{path::PathBuf, time::Duration};
 
-/// The setting that allows reading the GitHub CLI's sign-in.
+/// The setting that allows reading the GitHub CLI's or Copilot's sign-in.
 pub const CONSENT: &str = "readCopilotQuota";
 /// The service name gh gives its token in the system credential store.
 const STORED_TOKEN: &str = "gh:github.com";
+
+/// A file GitHub's own Copilot clients (the editor extensions and the
+/// Copilot language server) keep their GitHub sign-in in: in
+/// `XDG_CONFIG_HOME`'s `github-copilot` folder when it is set, else in
+/// `~/.config/github-copilot`, or the local application data folder on
+/// Windows.
+const fn copilot_file(name: &'static str) -> PerOs<Location> {
+    let unix = Location::home(&["XDG_CONFIG_HOME"], &[".config"], name);
+    PerOs {
+        macos: Support::Verified(unix),
+        windows: Support::Unverified(Location::home(
+            &["XDG_CONFIG_HOME", "LOCALAPPDATA"],
+            &["AppData/Local"],
+            name,
+        )),
+        linux: Support::Unverified(unix),
+    }
+}
+/// Copilot's sign-ins, by GitHub host and app: `{"github.com:<app id>":
+/// {"user", "oauth_token", "githubAppId"}}`; `hosts.json` is the older name.
+const COPILOT_SIGN_INS: [PerOs<Location>; 2] = [
+    copilot_file("github-copilot/apps.json"),
+    copilot_file("github-copilot/hosts.json"),
+];
 
 fn clean(s: &str) -> Option<String> {
     let s = s.trim().trim_matches(['\'', '"']);
     (!s.is_empty() && s.len() < 32768 && !s.contains(['\r', '\n'])).then(|| s.to_owned())
 }
-fn token(host: &dyn Host) -> Option<String> {
-    for name in ["GH_TOKEN", "GITHUB_TOKEN"] {
-        if let Some(s) = host.env(name).and_then(clean) {
-            return Some(s);
-        }
-    }
+/// The GitHub tokens to try, in order, each read only when the one before
+/// it is refused: one the environment names is the only one; else the
+/// GitHub CLI's, then Copilot's own, each once.
+fn tokens(host: &dyn Host) -> impl Iterator<Item = String> + '_ {
+    let named = ["GH_TOKEN", "GITHUB_TOKEN"]
+        .into_iter()
+        .find_map(|name| host.env(name).and_then(clean));
     // On Windows the empty-user credential is a global compatibility slot.
     // An explicitly selected hosts.yml token must win over another config's
     // last active keyring login, as it does in GitHub CLI itself.
-    if host.os() == crate::Os::Windows {
-        file_token(host).or_else(|| stored_token(host))
+    let gh: [fn(&dyn Host) -> Option<String>; 2] = if host.os() == crate::Os::Windows {
+        [file_token, stored_token]
     } else {
-        stored_token(host).or_else(|| file_token(host))
-    }
+        [stored_token, file_token]
+    };
+    let found = named.is_none().then(move || {
+        gh.into_iter()
+            .map(move |read| read(host))
+            .chain(
+                COPILOT_SIGN_INS
+                    .iter()
+                    .map(move |place| copilot_token(host, place)),
+            )
+            .flatten()
+    });
+    let mut seen = Vec::new();
+    named
+        .into_iter()
+        .chain(found.into_iter().flatten())
+        .filter(move |token| {
+            let new = !seen.contains(token);
+            if new {
+                seen.push(token.clone());
+            }
+            new
+        })
+}
+#[cfg(test)]
+fn token(host: &dyn Host) -> Option<String> {
+    tokens(host).next()
+}
+
+/// The token a Copilot client keeps for github.com, from its sign-ins file;
+/// another host's (GitHub Enterprise) is never sent to api.github.com.
+fn copilot_token(host: &dyn Host, place: &PerOs<Location>) -> Option<String> {
+    let path = locate(host, place).ok()?;
+    let sign_ins = read_json(host, &path)?;
+    let sign_ins = sign_ins.as_object()?;
+    let mut keys = sign_ins
+        .keys()
+        .filter(|key| *key == "github.com" || key.starts_with("github.com:"))
+        .collect::<Vec<_>>();
+    // The same file always gives the same account.
+    keys.sort();
+    keys.into_iter()
+        .find_map(|key| sign_ins[key]["oauth_token"].as_str().and_then(clean))
 }
 
 fn stored_token(host: &dyn Host) -> Option<String> {
@@ -190,9 +257,50 @@ fn parse(body: &Value, id: &str, label: Option<&str>) -> Reading {
             }
         }
     }
+    if let Some(row) = snapshots
+        .get("premium_interactions")
+        .filter(|premium| !(usage || premium["token_based_billing"] == true))
+        .and_then(|premium| overage(premium, id, label))
+    {
+        r.billing.push(row);
+    }
     r.account =
         Some(json!({"id":id,"provider":"copilot","label":label,"plan":body["copilot_plan"]}));
     r
+}
+
+/// GitHub's published price of a premium request beyond a plan's allowance:
+/// US$0.04 each ("Requests in GitHub Copilot" in GitHub's Copilot billing
+/// docs, and its plans page, from June 2025). `copilot_internal/user` says
+/// only how many requests went over, so the amount is an estimate at this
+/// price, not GitHub's bill.
+const OVERAGE_PRICE_USD: f64 = 0.04;
+
+/// What the premium requests beyond the plan cost this period, as a billing
+/// row in US dollars: only when some went over (`overage_count`) and paying
+/// for them is not turned off (`overage_permitted`). Plans billed in AI
+/// credits are left out, since a credit's price is not this one.
+fn overage(premium: &Value, id: &str, label: Option<&str>) -> Option<Value> {
+    if premium["overage_permitted"] == false {
+        return None;
+    }
+    let count = number(&premium["overage_count"]).filter(|count| *count > 0.)?;
+    let amount = (count * OVERAGE_PRICE_USD * 100.).round() / 100.;
+    let notice = if l10n::chinese() {
+        format!("{count} 次超出套餐的高级请求，按每次 0.04 美元估算，以 GitHub 账单为准")
+    } else {
+        format!("{count} premium requests beyond the plan at US$0.04 each; GitHub's bill is authoritative")
+    };
+    Some(json!({
+        "id": format!("{id}/copilot:overage"),
+        "vendor": "copilot",
+        "accountId": id,
+        "account": label,
+        "label": l10n::text("超额请求（估算）", "Overage (estimated)"),
+        "amount": amount,
+        "currency": "USD",
+        "notice": notice,
+    }))
 }
 /// Copilot's plan, read with the GitHub CLI's sign-in once the user agrees.
 pub static PROVIDER: Provider = Provider {
@@ -205,56 +313,75 @@ static STATUS: StatusPage = StatusPage {
     components: &["Copilot"],
 };
 
+/// Copilot's own quota endpoint.
+const USER: &str = "https://api.github.com/copilot_internal/user";
+
 fn signed_out() -> Unread {
     Unread::SignedOut(l10n::text(
-        "请先登录 GitHub CLI，再读取 Copilot 额度",
-        "Sign in to GitHub CLI before reading Copilot quota",
+        "请先登录 GitHub CLI 或 Copilot，再读取 Copilot 额度",
+        "Sign in to GitHub CLI or Copilot before reading Copilot quota",
     ))
+}
+
+/// A request to GitHub's API with a token, as Copilot Chat sends it.
+fn get(host: &dyn Host, url: &str, token: &str) -> Result<Value, HttpFailure> {
+    let authorization = format!("token {token}");
+    host.http_json(&HttpRequest {
+        url,
+        secrets: &[("Authorization", &authorization)],
+        body: None,
+        headers: &[
+            ("Editor-Version", "vscode/1.96.2"),
+            ("Editor-Plugin-Version", "copilot-chat/0.26.7"),
+            ("User-Agent", "GitHubCopilotChat/0.26.7"),
+            ("X-Github-Api-Version", "2025-04-01"),
+        ],
+        timeout: Duration::from_secs(12),
+    })
+}
+
+fn unread(failure: HttpFailure) -> Unread {
+    match failure {
+        HttpFailure::BadHeader => Unread::from(l10n::text(
+            "GitHub 令牌格式无效，无法用于请求",
+            "GitHub token cannot be used as a header",
+        )),
+        HttpFailure::Unreachable => failure.unread_as(l10n::text(
+            "Copilot 账户请求失败",
+            "Copilot account request failed",
+        )),
+        // The token no longer signs in.
+        HttpFailure::Status(401) => Unread::SignedOut(failure.message()),
+        other => other.unread(),
+    }
 }
 
 pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
     if !host.consented(CONSENT) {
         let mut r = Reading::empty("copilot");
         r.notice = Some(l10n::text(
-            "开启 Copilot 额度读取后，才会使用 GitHub CLI 的现有登录",
-            "Enable Copilot quota reading to permit access to the existing GitHub CLI sign-in",
+            "开启 Copilot 额度读取后，才会使用 GitHub CLI 或 Copilot 的现有登录",
+            "Enable Copilot quota reading to permit access to the existing GitHub CLI or Copilot sign-in",
         ));
         return Ok(r);
     }
-    let key = token(host).ok_or_else(signed_out)?;
-    let authorization = format!("token {key}");
-    let request = |url: &str| {
-        host.http_json(&HttpRequest {
-            url,
-            secrets: &[("Authorization", &authorization)],
-            body: None,
-            headers: &[
-                ("Editor-Version", "vscode/1.96.2"),
-                ("Editor-Plugin-Version", "copilot-chat/0.26.7"),
-                ("User-Agent", "GitHubCopilotChat/0.26.7"),
-                ("X-Github-Api-Version", "2025-04-01"),
-            ],
-            timeout: Duration::from_secs(12),
-        })
-        .map_err(|failure| match failure {
-            HttpFailure::BadHeader => Unread::from(l10n::text(
-                "GitHub 令牌格式无效，无法用于请求",
-                "GitHub token cannot be used as a header",
-            )),
-            HttpFailure::Unreachable => failure.unread_as(l10n::text(
-                "Copilot 账户请求失败",
-                "Copilot account request failed",
-            )),
-            // The token gh keeps no longer signs in.
-            HttpFailure::Status(401) => Unread::SignedOut(failure.message()),
-            other => other.unread(),
-        })
+    let mut tokens = tokens(host);
+    let mut key = tokens.next().ok_or_else(signed_out)?;
+    // A token that no longer signs in gives way to the next one.
+    let body = loop {
+        match get(host, USER, &key) {
+            Ok(body) => break body,
+            Err(HttpFailure::Status(401)) => match tokens.next() {
+                Some(next) if !host.cancelled() => key = next,
+                _ => return Err(unread(HttpFailure::Status(401))),
+            },
+            Err(failure) => return Err(unread(failure)),
+        }
     };
-    let body = request("https://api.github.com/copilot_internal/user")?;
     if !host.consented(CONSENT) {
         return Ok(Reading::empty("copilot"));
     }
-    let profile = request("https://api.github.com/user").ok();
+    let profile = get(host, "https://api.github.com/user", &key).ok();
     let label = profile.as_ref().and_then(|v| v["login"].as_str());
     let id = profile
         .as_ref()
@@ -282,7 +409,6 @@ mod tests {
     use crate::account::fake::FakeHost;
     use std::sync::atomic::Ordering;
 
-    const USER: &str = "https://api.github.com/copilot_internal/user";
     const PROFILE: &str = "https://api.github.com/user";
 
     fn consenting(host: FakeHost) -> FakeHost {
@@ -449,8 +575,187 @@ mod tests {
         let host = consenting(FakeHost::new("/h"));
         assert_eq!(
             read(&host).err().unwrap(),
-            "Sign in to GitHub CLI before reading Copilot quota"
+            "Sign in to GitHub CLI or Copilot before reading Copilot quota"
         );
+    }
+
+    fn all(host: &FakeHost) -> Vec<String> {
+        tokens(host).collect()
+    }
+
+    /// A Copilot sign-ins file with a github.com entry and an Enterprise one.
+    fn sign_ins(token: &str) -> String {
+        json!({
+            "ghe.example.com:Iv1.enterprise": {"user": "corp", "oauth_token": "enterprise-token"},
+            "github.com:Iv1.app": {"user": "octo", "oauth_token": token, "githubAppId": "Iv1.app"},
+        })
+        .to_string()
+    }
+
+    #[test]
+    fn copilots_own_sign_in_follows_the_github_clis() {
+        let apps = "/h/.config/github-copilot/apps.json";
+        let host = FakeHost::new("/h").file(apps, &sign_ins("from-copilot"));
+        assert_eq!(all(&host), ["from-copilot"], "never the Enterprise token");
+
+        let host = FakeHost::new("/h")
+            .file(apps, &sign_ins("from-copilot"))
+            .file(
+                "/h/.config/gh/hosts.yml",
+                "github.com:\n  oauth_token: from-gh\n",
+            );
+        assert_eq!(all(&host), ["from-gh", "from-copilot"]);
+
+        let host = FakeHost::new("/h").file(apps, &sign_ins("same")).file(
+            "/h/.config/gh/hosts.yml",
+            "github.com:\n  oauth_token: same\n",
+        );
+        assert_eq!(all(&host), ["same"], "each token once");
+
+        let host = FakeHost::new("/h")
+            .file(apps, &sign_ins("from-copilot"))
+            .env("GH_TOKEN", "from-env");
+        assert_eq!(
+            all(&host),
+            ["from-env"],
+            "the environment's is the only one"
+        );
+
+        let older = FakeHost::new("/h").file(
+            "/h/.config/github-copilot/hosts.json",
+            &json!({"github.com": {"oauth_token": "older"}}).to_string(),
+        );
+        assert_eq!(all(&older), ["older"]);
+    }
+
+    #[test]
+    fn copilots_folder_follows_xdg_and_windows_local_app_data() {
+        let home = "/h";
+        let xdg = format!("{home}/xdg");
+        let host = FakeHost::new(home)
+            .env("XDG_CONFIG_HOME", &xdg)
+            .file("/h/.config/github-copilot/apps.json", &sign_ins("default"))
+            .file(&format!("{xdg}/github-copilot/apps.json"), &sign_ins("xdg"));
+        assert_eq!(all(&host), ["xdg"]);
+
+        let local = format!("{home}/Local");
+        let mut host = FakeHost::new(home)
+            .file(
+                "/h/AppData/Local/github-copilot/apps.json",
+                &sign_ins("app-data"),
+            )
+            .file(
+                &format!("{local}/github-copilot/apps.json"),
+                &sign_ins("local"),
+            );
+        host.os = crate::Os::Windows;
+        assert_eq!(all(&host), ["app-data"]);
+        host.env.insert("LOCALAPPDATA".into(), local);
+        assert_eq!(all(&host), ["local"]);
+    }
+
+    #[test]
+    fn a_reading_with_copilots_sign_in_waits_for_consent() {
+        let host = FakeHost::new("/h").file(
+            "/h/.config/github-copilot/apps.json",
+            &sign_ins("from-copilot"),
+        );
+        assert!(read(&host).unwrap().notice.is_some());
+        assert!(host.asked.borrow().is_empty());
+
+        let host = consenting(host).answer(USER, Ok(json!({"copilot_plan": "individual"})));
+        let reading = read(&host).unwrap();
+        assert_eq!(reading.account.unwrap()["plan"], "individual");
+        assert_eq!(
+            host.asked.borrow()[0],
+            (USER.into(), Some("token from-copilot".into()))
+        );
+    }
+
+    #[test]
+    fn a_token_that_no_longer_signs_in_gives_way_to_the_next() {
+        let host = consenting(
+            FakeHost::new("/h")
+                .file(
+                    "/h/.config/gh/hosts.yml",
+                    "github.com:\n  oauth_token: old\n",
+                )
+                .file("/h/.config/github-copilot/apps.json", &sign_ins("current"))
+                .answer_for(USER, "token old", Err(HttpFailure::Status(401)))
+                .answer_for(
+                    USER,
+                    "token current",
+                    Ok(json!({"copilot_plan": "business"})),
+                )
+                .answer_for(
+                    PROFILE,
+                    "token current",
+                    Ok(json!({"login": "octo", "id": 7})),
+                ),
+        );
+        let reading = read(&host).unwrap();
+        assert_eq!(reading.account.unwrap()["label"], "octo");
+        let asked = host.asked.borrow();
+        assert_eq!(asked[0].1.as_deref(), Some("token old"));
+        assert_eq!(asked[1].1.as_deref(), Some("token current"));
+        assert_eq!(asked[2], (PROFILE.into(), Some("token current".into())));
+
+        let host = consenting(
+            FakeHost::new("/h")
+                .file(
+                    "/h/.config/gh/hosts.yml",
+                    "github.com:\n  oauth_token: old\n",
+                )
+                .answer(USER, Err(HttpFailure::Status(401))),
+        );
+        assert!(matches!(read(&host), Err(Unread::SignedOut(_))));
+    }
+
+    fn premium(extra: Value) -> Value {
+        let mut premium = json!({"entitlement": 300, "remaining": 0, "percent_remaining": 0});
+        for (key, value) in extra.as_object().unwrap() {
+            premium[key] = value.clone();
+        }
+        json!({"copilot_plan": "individual", "quota_snapshots": {"premium_interactions": premium}})
+    }
+
+    #[test]
+    fn premium_requests_beyond_the_plan_are_priced_as_overage() {
+        let body = premium(json!({"overage_count": 37, "overage_permitted": true}));
+        let reading = parse(&body, "id", Some("octo"));
+        assert_eq!(reading.quotas[0]["usedPercent"], 100.0);
+        assert_eq!(reading.billing.len(), 1);
+        let row = &reading.billing[0];
+        assert_eq!(row["id"], "id/copilot:overage");
+        assert_eq!(row["vendor"], "copilot");
+        assert_eq!(row["accountId"], "id");
+        assert_eq!(row["amount"], 1.48);
+        assert_eq!(row["currency"], "USD");
+        assert_eq!(row["label"], "Overage (estimated)");
+        assert!(row["notice"]
+            .as_str()
+            .unwrap()
+            .starts_with("37 premium requests"));
+
+        // Allowed unless turned off, as the field may be missing.
+        let body = premium(json!({"overage_count": "2"}));
+        assert_eq!(parse(&body, "id", None).billing[0]["amount"], 0.08);
+    }
+
+    #[test]
+    fn no_overage_is_shown_without_any_or_when_it_is_off_or_billed_in_credits() {
+        for extra in [
+            json!({}),
+            json!({"overage_count": 0, "overage_permitted": true}),
+            json!({"overage_count": 12, "overage_permitted": false}),
+            json!({"overage_count": 12, "token_based_billing": true}),
+        ] {
+            let body = premium(extra.clone());
+            assert!(parse(&body, "id", None).billing.is_empty(), "{extra}");
+        }
+        let mut body = premium(json!({"overage_count": 12}));
+        body["token_based_billing"] = json!(true);
+        assert!(parse(&body, "id", None).billing.is_empty());
     }
 
     #[test]
