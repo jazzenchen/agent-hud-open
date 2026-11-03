@@ -1,6 +1,7 @@
 //! Cursor: sessions from its own database, tokens from its `stop` hook.
 pub mod account;
 mod hooks;
+pub mod plans;
 pub mod sessions;
 
 use crate::{Agent, Base, Discovery, Location, PerOs, Source, Support};

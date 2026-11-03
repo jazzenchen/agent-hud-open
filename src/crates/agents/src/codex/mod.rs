@@ -1,6 +1,7 @@
 //! Codex.
 pub mod account;
 mod hooks;
+pub mod plans;
 pub mod process;
 pub mod providers;
 pub mod transcript;

@@ -3,6 +3,7 @@ pub mod account;
 pub mod bot;
 pub mod cache;
 pub mod credits;
+pub mod plans;
 pub mod transcript;
 mod usage;
 mod weekly;

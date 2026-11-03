@@ -1,6 +1,7 @@
 //! GitHub Copilot.
 pub mod account;
 mod hooks;
+pub mod plans;
 pub mod transcript;
 
 use crate::Agent;

@@ -2,6 +2,7 @@
 pub mod account;
 mod hooks;
 pub mod jobs;
+pub mod plans;
 pub mod process;
 pub mod routes;
 pub mod transcript;

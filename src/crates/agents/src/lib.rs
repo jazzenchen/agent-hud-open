@@ -16,6 +16,7 @@ pub mod hooks;
 mod location;
 pub mod naming;
 mod os;
+pub mod plans;
 pub mod process;
 pub mod protobuf;
 pub mod relays;
