@@ -23,7 +23,7 @@ import { quotaAccountKey, quotaShortName, vendorKey } from "../model";
 import { recentCost, recentUsage } from "../recent-usage";
 import { FittingName } from "./FittingName";
 import { AccountHeader, BlockNotice } from "./AccountHeader";
-import { missingReadingNotice } from "./account-labels";
+import { missingReadingNotice, serviceNotice } from "./account-labels";
 import { ResetCreditsRow } from "./ResetCreditsRow";
 import { usePanelServices } from "../PanelContext";
 import { useGround } from "../ground";
@@ -578,6 +578,11 @@ export const SourceProviderBlock = memo(function SourceProviderBlock({
   const missingNotice = missingReading
     ? missingReadingNotice(snapshot.providers, vendor)
     : null;
+  const vendorStatus = serviceNotice(
+    snapshot.providers,
+    vendor,
+    format.language,
+  );
   // Without a window, the block shows what the agent used in the last 24
   // hours instead (vendors.rs `recent_label`).
   const recent = missingReading
@@ -645,6 +650,7 @@ export const SourceProviderBlock = memo(function SourceProviderBlock({
           />
         )}
       </div>
+      {vendorStatus && <BlockNotice text={vendorStatus} light={light} />}
       {layout.widget === "chart" ? (
         <SourceTokenChart
           snapshot={snapshot}

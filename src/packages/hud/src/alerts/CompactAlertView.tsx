@@ -1,4 +1,10 @@
-import { Flame, Hand, MessageSquareText, RotateCcw } from "lucide-react";
+import {
+  Flame,
+  Hand,
+  KeyRound,
+  MessageSquareText,
+  RotateCcw,
+} from "lucide-react";
 import type { Approval, IslandEvent } from "@agent-hud/protocol";
 import { labelWidth } from "../geometry";
 import { agentVendorName } from "../model";
@@ -51,6 +57,12 @@ export function compactAlertLabels(
     return {
       who: clientDisplayName(event.source),
       status: zh ? "有新回复" : "New reply",
+    };
+  }
+  if (event.kind === "sign-in-needed") {
+    return {
+      who: event.title ?? agentVendorName(event.source),
+      status: zh ? "需要重新登录" : "Sign in again",
     };
   }
   if (event.kind === "reset-credits") {
@@ -142,7 +154,7 @@ export function CompactAlertView({
   // CompletionAlertCompactView opens the detail card; Quota / ResetCredit compact views open usage stats.
   const handleClick = request
     ? undefined
-    : event?.kind === "completion"
+    : event?.kind === "completion" || event?.kind === "sign-in-needed"
       ? onOpen
       : onDismissAndStats;
 
@@ -195,6 +207,27 @@ export function CompactAlertView({
           fontSize: font,
           fontWeight: 500,
           color: turnText,
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "nowrap",
+        }}
+      >
+        {status}
+      </span>
+    </>
+  ) : event?.kind === "sign-in-needed" ? (
+    <>
+      <KeyRound
+        size={glyphSize}
+        strokeWidth={2.4}
+        color={warnAccent}
+        style={{ flexShrink: 0 }}
+      />
+      <span
+        style={{
+          fontSize: font,
+          fontWeight: 500,
+          color: warnAccent,
           overflow: "hidden",
           textOverflow: "ellipsis",
           whiteSpace: "nowrap",

@@ -3,7 +3,11 @@ import type { Approval, IslandEvent, Snapshot } from "@agent-hud/protocol";
 import { usePanelServices } from "./PanelContext";
 import { agentVendorName, sourceID, vendorKey } from "./model";
 import { CompletionAlertView } from "./alerts/CompletionAlertView";
-import { QuotaAlertView, ResetCreditAlertView } from "./alerts/QuotaAlertViews";
+import {
+  QuotaAlertView,
+  ResetCreditAlertView,
+  SignInAlertView,
+} from "./alerts/QuotaAlertViews";
 import { snapshotLanguage } from "@agent-hud/ui/format";
 
 export { ReminderMark } from "./alerts/ReminderMark";
@@ -195,9 +199,13 @@ export const newsTitle = (event: IslandEvent, zh = false) =>
         ? zh
           ? "获得使用重置"
           : "Usage resets added"
-        : zh
-          ? "额度预警"
-          : "Running low";
+        : event.kind === "sign-in-needed"
+          ? zh
+            ? "需要重新登录"
+            : "Sign in again"
+          : zh
+            ? "额度预警"
+            : "Running low";
 
 export const compactDuration = (seconds: number) => {
   const total = Math.max(0, Math.round(seconds)),
@@ -252,6 +260,17 @@ export function NewsContent({
         handoff={handoff}
         light={light}
         botLogos={botLogos}
+      />
+    );
+  }
+  if (event.kind === "sign-in-needed") {
+    return (
+      <SignInAlertView
+        event={event}
+        dismiss={dismiss}
+        light={light}
+        botLogos={botLogos}
+        zh={zh}
       />
     );
   }

@@ -32,6 +32,12 @@ test("accents follow Open's IslandAlert: blue turns, warm warnings, calm news", 
     null,
     "a sender without a colour flashes the whole rim",
   );
+  assert.equal(
+    glowAlert({ id: "f", kind: "sign-in-needed", vendor: "claude" }, vendors)
+      ?.warning,
+    true,
+    "a signed-out agent is a warning",
+  );
   assert.equal(glowAlert(null, vendors), null);
 });
 

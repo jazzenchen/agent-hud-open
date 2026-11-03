@@ -239,7 +239,7 @@ impl crate::AgentHudCore {
         let relays = self.relay_rows(&relay_users);
         let island_events = self
             .island_events
-            .update(&sessions, &quotas, &accounts, now);
+            .update(&sessions, &quotas, &accounts, &providers, now);
         self.render.last = Some((self.render_key(), self.render_due(now)));
         let projection = self
             .usage_projection

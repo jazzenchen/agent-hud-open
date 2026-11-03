@@ -314,6 +314,23 @@ export interface Provider {
     status: "loading" | "ready" | "error" | "unavailable";
     checkedAt: string | null;
     notice: string | null;
+    /** Why a shown failure happened: the agent signed out (its own state),
+     * the reading missed an answer, or anything else. */
+    failure?: "signedOut" | "transient" | "failed" | null;
+    failingSince?: string | null;
+    /** The vendor's status page, only while a component this agent depends
+     * on is not operational. */
+    service?: {
+      status:
+        | "under_maintenance"
+        | "degraded_performance"
+        | "partial_outage"
+        | "major_outage";
+      components: string[];
+      incident: string | null;
+      page: string | null;
+      checkedAt: string;
+    } | null;
     configurableFields?: string[];
     configured?: boolean;
   };
@@ -535,7 +552,13 @@ export interface PlatformCapabilities {
 }
 export interface IslandEvent {
   id: string;
-  kind: "completion" | "quota-exhaustion" | "quota-reset" | "reset-credits";
+  kind:
+    | "completion"
+    | "quota-exhaustion"
+    | "quota-reset"
+    | "reset-credits"
+    /** The agent signed out; `message` is what its account reading says. */
+    | "sign-in-needed";
   at: string;
   startedAt?: string | null;
   source: string;

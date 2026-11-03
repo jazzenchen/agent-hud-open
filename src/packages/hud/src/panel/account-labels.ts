@@ -27,6 +27,28 @@ export function accountReadLabel(
   return language === "zh" ? `上次读取 ${ago} 前` : `Last read ${ago} ago`;
 }
 
+/** What the vendor's status page says about the components the agent
+ * depends on, while one is not operational: "官方状态：部分故障 · <incident>".
+ * Null while all is well. */
+export function serviceNotice(
+  providers: readonly Pick<Provider, "id" | "accountStatus">[],
+  vendor: string,
+  language: Language,
+): string | null {
+  const service = providers.find((provider) => provider.id === vendor)
+    ?.accountStatus?.service;
+  if (!service) return null;
+  const words: Record<string, [string, string]> = {
+    under_maintenance: ["维护中", "under maintenance"],
+    degraded_performance: ["性能下降", "degraded performance"],
+    partial_outage: ["部分故障", "partial outage"],
+    major_outage: ["严重故障", "major outage"],
+  };
+  const [zh, en] = words[service.status] ?? [service.status, service.status];
+  const head = say(language, `官方状态：${zh}`, `Vendor status: ${en}`);
+  return service.incident ? `${head} · ${service.incident}` : head;
+}
+
 /** Why a detected agent's block has no reading, in its reader's words: a
  * client signed out, a login without plan limits, a read that failed. Null
  * when the reader said nothing. A block without readings is named by its

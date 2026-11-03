@@ -22,13 +22,17 @@ export function glowAlert(
       | "quota-exhaustion"
       | "quota-reset"
       | "reset-credits"
+      | "sign-in-needed"
       | "request";
     vendor: string;
   } | null,
   glowVendors: string[],
 ): GlowAlert | null {
   if (!alert) return null;
-  const warning = alert.kind === "quota-exhaustion" || alert.kind === "request";
+  const warning =
+    alert.kind === "quota-exhaustion" ||
+    alert.kind === "sign-in-needed" ||
+    alert.kind === "request";
   const color =
     alert.kind === "completion" ? "#82aaff" : warning ? "#e9a16d" : "#6cd8ac";
   const first = glowVendors.indexOf(alert.vendor);
