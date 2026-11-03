@@ -40,11 +40,19 @@ static CLI_DISCOVERY: Discovery = Discovery {
     commands: &["grok"],
     ..Discovery::NONE
 };
+/// A Grok Bot session opens on its bot, the last part of its id
+/// (`grok-bot:<account>:<bot>`).
+fn bot_target(id: &str, _cwd: Option<&str>, _client: Option<&str>) -> Option<serde_json::Value> {
+    let bot = id.strip_prefix("grok-bot:")?.rsplit(':').next()?;
+    (!bot.is_empty()).then(|| serde_json::json!({"kind":"grok-bot-agent","id":bot}))
+}
+
 static BOT_DISCOVERY: Discovery = Discovery {
     storage: &[Location::app_data(&["Grok Bot"], "")],
     sessions: &[Location::app_data(&["Grok Bot"], "sand-client-persistence")],
     apps: &["Grok Bot"],
     bundles: &["com.anysphere.sand"],
+    session_target: Some(bot_target),
     ..Discovery::NONE
 };
 

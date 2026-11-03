@@ -25,11 +25,11 @@ pub mod sqlite;
 pub mod transcript;
 
 pub use account::{Answer, Host, Reading};
-pub use agent::{account_provider, by_id, Agent, ACCOUNTS, ALL};
+pub use agent::{account_provider, by_id, session_target, Agent, ACCOUNTS, ALL};
 pub use agent_hud_l10n as l10n;
 pub use change::{Change, Why};
 pub use channel::{Carries, Channel};
-pub use discovery::{Discovery, Look};
+pub use discovery::{Discovery, Look, SessionTarget};
 pub use location::{everywhere, Base, Location, Places, Source};
 pub use os::{Os, PerOs, Support};
 pub use replies::Replies;

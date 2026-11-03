@@ -102,8 +102,21 @@ static DISCOVERY: Discovery = Discovery {
     ],
     commands: &["agy", "antigravity"],
     apps: &["Antigravity", "Antigravity IDE"],
+    session_target: Some(conversation_target),
     ..Discovery::NONE
 };
+
+/// An Antigravity session opens on its conversation in the app, with its
+/// folder; its CLI has no conversation to open.
+fn conversation_target(
+    id: &str,
+    cwd: Option<&str>,
+    client: Option<&str>,
+) -> Option<serde_json::Value> {
+    let id = id.strip_prefix("antigravity:")?;
+    (client != Some("CLI"))
+        .then(|| serde_json::json!({"kind":"antigravity-conversation","id":id,"cwd":cwd}))
+}
 
 pub static AGENT: Agent = Agent {
     id: "antigravity",

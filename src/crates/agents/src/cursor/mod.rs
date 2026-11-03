@@ -54,6 +54,11 @@ pub fn navigation_target(id: &str, cwd: Option<&str>) -> Option<serde_json::Valu
     (cloud || cwd.is_some()).then(|| serde_json::json!({"kind":"cursor-agent","id":id,"cwd":cwd}))
 }
 
+/// `navigation_target` for a session's id as the engine keeps it, `cursor:<id>`.
+fn session_target(id: &str, cwd: Option<&str>, _client: Option<&str>) -> Option<serde_json::Value> {
+    navigation_target(id.strip_prefix("cursor:")?, cwd)
+}
+
 static DISCOVERY: Discovery = Discovery {
     storage: &[
         Location::app_data(&["Cursor"], ""),
@@ -70,6 +75,7 @@ static DISCOVERY: Discovery = Discovery {
     commands: &["cursor", "cursor-agent"],
     apps: &["Cursor"],
     bundles: &["com.todesktop.230313mzl4w4u92"],
+    session_target: Some(session_target),
     app_navigation: Some(&APP_NAVIGATION),
     ..Discovery::NONE
 };

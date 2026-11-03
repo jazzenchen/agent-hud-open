@@ -1314,11 +1314,15 @@ impl LogSession for Log {
             &Default::default(),
         )
         .json();
-        if self.source == "antigravity" && self.client.as_deref() != Some("CLI") {
-            if let Some(id) = self.id.strip_prefix("antigravity:") {
-                session["navigationTarget"] =
-                    json!({"kind":"antigravity-conversation","id":id,"cwd":self.cwd});
-            }
+        // The same way back as its row in the list (`LogHead::session`):
+        // `open_session` goes where this says.
+        if let Some(target) = agent_hud_agents::session_target(
+            &self.source,
+            &self.id,
+            self.cwd.as_deref(),
+            self.client.as_deref(),
+        ) {
+            session["navigationTarget"] = target;
         }
         // A demo session has a way back, so its reply card shows "Return to
         // session" as a real one does; the demo runtime goes nowhere with it.

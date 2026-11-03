@@ -87,6 +87,18 @@ pub static ACCOUNTS: &[&crate::account::Provider] = &[
     &crate::relays::PROVIDER,
 ];
 
+/// Where a session of `source` opens, as its agent says (`Discovery::session_target`):
+/// the target the session list and `open_session` both use. None for an
+/// agent with no rule or a session with no place of its own.
+pub fn session_target(
+    source: &str,
+    id: &str,
+    cwd: Option<&str>,
+    client: Option<&str>,
+) -> Option<serde_json::Value> {
+    (by_id(source)?.discovery.session_target?)(id, cwd, client)
+}
+
 /// The account reader with this provider id.
 pub fn account_provider(id: &str) -> Option<&'static crate::account::Provider> {
     ACCOUNTS.iter().copied().find(|provider| provider.id == id)
@@ -135,5 +147,41 @@ mod tests {
             assert!(std::ptr::eq(by_id(agent.id).unwrap(), *agent));
         }
         assert!(by_id("unknown").is_none());
+    }
+
+    #[test]
+    fn a_session_opens_where_its_agent_says() {
+        use serde_json::json;
+        assert_eq!(
+            session_target("grok-bot", "grok-bot:acct:126dbae3-ad9b", None, None),
+            Some(json!({"kind":"grok-bot-agent","id":"126dbae3-ad9b"}))
+        );
+        // Not a Grok Bot session id: no bot to open.
+        assert_eq!(session_target("grok-bot", "onqw4zbomnwg", None, None), None);
+        assert_eq!(
+            session_target("grok-bot", "grok-bot:acct:", None, None),
+            None
+        );
+        assert_eq!(
+            session_target("cursor", "cursor:bc-12", None, None),
+            Some(json!({"kind":"cursor-agent","id":"bc-12","cwd":null}))
+        );
+        assert_eq!(
+            session_target("cursor", "cursor:3e8f", Some("/w/p"), None),
+            Some(json!({"kind":"cursor-agent","id":"3e8f","cwd":"/w/p"}))
+        );
+        assert_eq!(session_target("cursor", "cursor:3e8f", None, None), None);
+        assert_eq!(
+            session_target("antigravity", "antigravity:c1", Some("/w"), Some("Desktop")),
+            Some(json!({"kind":"antigravity-conversation","id":"c1","cwd":"/w"}))
+        );
+        assert_eq!(
+            session_target("antigravity", "antigravity:c1", None, Some("CLI")),
+            None
+        );
+        // Agents with no rule of their own, and unknown sources.
+        assert_eq!(session_target("claude", "abc", Some("/w"), None), None);
+        assert_eq!(session_target("grok-cli", "grok-cli:s", None, None), None);
+        assert_eq!(session_target("unknown", "x", None, None), None);
     }
 }

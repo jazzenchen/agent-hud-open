@@ -27,6 +27,10 @@ pub struct Discovery {
     pub apps: &'static [&'static str],
     /// Its desktop apps, by bundle identifier, on systems with bundles.
     pub bundles: &'static [&'static str],
+    /// Where one of its sessions opens, from the session's id, folder and
+    /// client name: the target a click on it hands the host. None for a
+    /// session with no place of its own, where `app_navigation` stands in.
+    pub session_target: Option<SessionTarget>,
     /// A fallback destination, offered only when the host can open its link.
     pub app_navigation: Option<&'static AppNavigation>,
     /// Variables that hold its credential: any set and not empty says it is
@@ -36,6 +40,10 @@ pub struct Discovery {
     /// name.
     pub configured: Option<fn(&dyn Look) -> Vec<&'static str>>,
 }
+
+/// A session's way back: from its id, folder and client name, the
+/// navigation target the host opens.
+pub type SessionTarget = fn(&str, Option<&str>, Option<&str>) -> Option<serde_json::Value>;
 
 impl Discovery {
     /// Nothing to look for.
@@ -47,6 +55,7 @@ impl Discovery {
         commands: &[],
         apps: &[],
         bundles: &[],
+        session_target: None,
         app_navigation: None,
         credentials_env: &[],
         configured: None,

@@ -447,3 +447,55 @@ fn a_deepseek_harness_reply_reads_from_its_compressed_log() {
         assert!(messages.iter().all(|row| row["turnId"] == "3"));
     }
 }
+
+#[test]
+fn a_session_opens_where_its_row_says_from_the_detail_too() {
+    // `open_session` reads the session as its detail shows it, from the
+    // parsed log; the list shows it from the log's head. Both must name the
+    // same way back, or the click falls back to revealing the log in Finder.
+    use crate::ingestion::LogSession;
+    let now = chrono::Utc::now().timestamp_millis();
+    let cases = [
+        (
+            "grok-bot",
+            "grok-bot:slothash:126dbae3-ad9b-4b3c-9bb5-07dfd11de3df",
+            None,
+            None,
+            json!({"kind":"grok-bot-agent","id":"126dbae3-ad9b-4b3c-9bb5-07dfd11de3df"}),
+        ),
+        (
+            "cursor",
+            "cursor:839140eb-232f-47fb-ab0d-1e8fb31a5fcb",
+            Some("/Users/a/project"),
+            None,
+            json!({"kind":"cursor-agent","id":"839140eb-232f-47fb-ab0d-1e8fb31a5fcb","cwd":"/Users/a/project"}),
+        ),
+        // A Cursor session with no folder has no target of its own.
+        ("cursor", "cursor:3e8f", None, None, Value::Null),
+        (
+            "antigravity",
+            "antigravity:c1",
+            Some("/w"),
+            Some("Desktop"),
+            json!({"kind":"antigravity-conversation","id":"c1","cwd":"/w"}),
+        ),
+        // Antigravity's CLI has no conversation to open.
+        (
+            "antigravity",
+            "antigravity:c2",
+            None,
+            Some("CLI"),
+            Value::Null,
+        ),
+    ];
+    for (source, id, cwd, client, expected) in cases {
+        let mut log = Log::new(format!("{source}.log").into(), source);
+        log.id = id.into();
+        log.cwd = cwd.map(str::to_owned);
+        log.client = client.map(str::to_owned);
+        let detail = LogSession::session(&log, now, None);
+        let row = crate::database::checkpoints::LogHead::from_log(&log).session(now, None);
+        assert_eq!(row["navigationTarget"], expected, "{source} row");
+        assert_eq!(detail["navigationTarget"], expected, "{source} detail");
+    }
+}
