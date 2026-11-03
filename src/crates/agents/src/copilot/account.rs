@@ -264,9 +264,30 @@ fn parse(body: &Value, id: &str, label: Option<&str>) -> Reading {
     {
         r.billing.push(row);
     }
-    r.account =
-        Some(json!({"id":id,"provider":"copilot","label":label,"plan":body["copilot_plan"]}));
+    r.account = Some(json!({"id":id,"provider":"copilot","label":label,"plan":plan(body)}));
     r
+}
+
+/// The account's plan, in a stable lowercase spelling. `copilot_plan` says
+/// `individual` for Free and Pro alike, so the access SKU decides when there
+/// is one: `free`, `pro`, `pro_plus`, `business` or `enterprise` for the
+/// SKUs known here, else the SKU itself; without one, `copilot_plan`.
+fn plan(body: &Value) -> Value {
+    let sku = body["access_type_sku"]
+        .as_str()
+        .map(|sku| sku.trim().to_lowercase())
+        .filter(|sku| !sku.is_empty());
+    let Some(sku) = sku else {
+        return body["copilot_plan"].clone();
+    };
+    json!(match sku.as_str() {
+        "free_limited_copilot" => "free",
+        "monthly_subscriber_quota" | "yearly_subscriber_quota" => "pro",
+        "plus_monthly_subscriber_quota" | "plus_yearly_subscriber_quota" => "pro_plus",
+        "copilot_for_business_seat_quota" => "business",
+        "copilot_enterprise_seat_quota" => "enterprise",
+        other => other,
+    })
 }
 
 /// GitHub's published price of a premium request beyond a plan's allowance:
@@ -756,6 +777,32 @@ mod tests {
         let mut body = premium(json!({"overage_count": 12}));
         body["token_based_billing"] = json!(true);
         assert!(parse(&body, "id", None).billing.is_empty());
+    }
+
+    #[test]
+    fn the_plan_comes_from_the_access_sku_before_copilot_plan() {
+        let plan_of = |sku: Option<&str>| {
+            let mut body = json!({"copilot_plan": "individual"});
+            if let Some(sku) = sku {
+                body["access_type_sku"] = json!(sku);
+            }
+            parse(&body, "id", None).account.unwrap()["plan"].clone()
+        };
+        assert_eq!(plan_of(Some("free_limited_copilot")), "free");
+        assert_eq!(plan_of(Some("monthly_subscriber_quota")), "pro");
+        assert_eq!(plan_of(Some("yearly_subscriber_quota")), "pro");
+        assert_eq!(plan_of(Some("plus_monthly_subscriber_quota")), "pro_plus");
+        assert_eq!(plan_of(Some("plus_yearly_subscriber_quota")), "pro_plus");
+        assert_eq!(plan_of(Some("copilot_for_business_seat_quota")), "business");
+        assert_eq!(plan_of(Some("copilot_enterprise_seat_quota")), "enterprise");
+        assert_eq!(
+            plan_of(Some(" Free_Educational_Quota ")),
+            "free_educational_quota",
+            "an SKU not known here is kept, in lower case"
+        );
+        assert_eq!(plan_of(Some("")), "individual");
+        assert_eq!(plan_of(None), "individual");
+        assert!(parse(&json!({}), "id", None).account.unwrap()["plan"].is_null());
     }
 
     #[test]
