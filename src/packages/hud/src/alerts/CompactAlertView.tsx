@@ -12,7 +12,7 @@ import { clientDisplayName, projectName } from "../IslandNews";
 import { ReminderMark } from "./ReminderMark";
 import { quotaAlertCopy } from "./quota-alert-copy";
 import { systemCalendar } from "@agent-hud/ui/format";
-import { alertText } from "../tokens";
+import { alertInk, alertText } from "../tokens";
 import { useGround } from "../ground";
 
 /** What a quota reminder says beside its agent (Open's QuotaAlertCopy.compactTitle). */
@@ -321,6 +321,9 @@ export function CompactAlertView({
           style={{
             fontSize: font,
             fontWeight: 500,
+            // The row's own ink: the scene's may be the light HUD's while the
+            // row itself is drawn dark (on the notch).
+            color: alertInk(0.96, ground),
             overflow: "hidden",
             textOverflow: "ellipsis",
             whiteSpace: "nowrap",

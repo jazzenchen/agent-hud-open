@@ -354,8 +354,10 @@ export interface PlanTier {
   name: string;
   /** US dollars a month, billed monthly, before tax. */
   monthlyUSD: number;
-  /** The usage it allows as a multiple of the base paid tier, where the vendor states it. */
+  /** The usage it allows as a multiple of the base paid tier, where the vendor states it, for its longest window. */
   multiple: number | null;
+  /** The multiple for windows under a day, where the vendor states another (Claude Ultra's five hours). */
+  shortMultiple?: number | null;
 }
 /** One signed-in account of a provider with a plan catalog (`plan_value`), from Core. */
 export interface PlanValueAccount {

@@ -22,6 +22,20 @@ type Action = (
   params?: Record<string, unknown>,
 ) => Promise<unknown>;
 
+/** A tier's usage as a multiple of the base tier: one figure, or the
+ * weekly and five-hour ones when the vendor states two (Claude Ultra). */
+export function multipleText(
+  multiple: number,
+  short: number | null,
+  zh: boolean,
+): string {
+  if (short != null && short !== multiple)
+    return zh
+      ? `每周 ${multiple} 倍 · 5 小时 ${short} 倍用量`
+      : `${multiple}× weekly · ${short}× 5-hour usage`;
+  return zh ? `基础档 ${multiple} 倍用量` : `${multiple}× base usage`;
+}
+
 /** Only the latest request can publish into the section; a failure keeps the last answer shown. */
 function usePlanValue(refresh: string, action: Action, active: boolean) {
   const actionRef = useRef(action);
@@ -94,7 +108,7 @@ function adviceText(
       : `${window} reached 95% in ${advice.ranOut} of the last ${advice.cycles} cycles. ${advice.plan.name} (${price}/mo, ${delta} more) would have kept the busiest under 80%.`;
   return zh
     ? `${window}：近 ${advice.cycles} 个周期，各窗口最多用到 ${busiest}%。换 ${advice.plan.name}（每月 ${price}，省 ${delta}），也不超过 80%。`
-    : `Over the last ${advice.cycles} ${window} cycles no window went past ${busiest}%. ${advice.plan.name} (${price}/mo, ${delta} less) would still have stayed under 80%.`;
+    : `${window}: over the last ${advice.cycles} cycles no window went past ${busiest}%. ${advice.plan.name} (${price}/mo, ${delta} less) would still have stayed under 80%.`;
 }
 
 /** The Statistics window's plan value: each signed-in account's plan at its monthly list price beside what its calls on this Mac would have cost at API list prices. */
@@ -128,7 +142,6 @@ export function PlanValue({
           alignItems: "baseline",
           justifyContent: "space-between",
           flexWrap: "wrap",
-          padding: "0 16px",
         }}
       >
         <strong style={{ fontSize: 13, fontWeight: 600 }}>
@@ -159,9 +172,11 @@ export function PlanValue({
               </strong>
               {account.plan?.multiple != null && account.plan.multiple > 1 && (
                 <span style={{ color: theme.secondary, fontSize: 11 }}>
-                  {zh
-                    ? `基础档 ${account.plan.multiple} 倍用量`
-                    : `${account.plan.multiple}× base usage`}
+                  {multipleText(
+                    account.plan.multiple,
+                    account.plan.shortMultiple ?? null,
+                    zh,
+                  )}
                 </span>
               )}
               <span
@@ -238,7 +253,7 @@ export function PlanValue({
         style={{
           color: theme.secondary,
           fontSize: 11,
-          margin: "0 16px",
+          margin: 0,
           lineHeight: 1.45,
         }}
       >

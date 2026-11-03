@@ -74,7 +74,16 @@ export function AccountHeader({
 
 /** A block's notice where it has no account to stand under, as when its
  * client is signed out: set like the notice under an account's name. */
-export function BlockNotice({ text, light }: { text: string; light: boolean }) {
+export function BlockNotice({
+  text,
+  light,
+  warning = false,
+}: {
+  text: string;
+  light: boolean;
+  /** In the warning's text shade, as for a vendor outage. */
+  warning?: boolean;
+}) {
   const colors = palette(useGround(light));
   return (
     <div
@@ -86,7 +95,10 @@ export function BlockNotice({ text, light }: { text: string; light: boolean }) {
         lineHeight: "13px",
       }}
     >
-      <Notice text={text} color={colors.secondary} />
+      <Notice
+        text={text}
+        color={warning ? colors.warningText : colors.secondary}
+      />
     </div>
   );
 }

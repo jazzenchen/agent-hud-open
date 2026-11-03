@@ -323,7 +323,7 @@ export function SourceQuotaRow({
             fontWeight: 400,
             color:
               measure === "burn" && reading.runsOut
-                ? colors.warning
+                ? colors.warningText
                 : colors.secondary,
           }}
         >
@@ -667,7 +667,9 @@ export const SourceProviderBlock = memo(function SourceProviderBlock({
           />
         )}
       </div>
-      {vendorStatus && <BlockNotice text={vendorStatus} light={light} />}
+      {vendorStatus && (
+        <BlockNotice text={vendorStatus} light={light} warning />
+      )}
       {layout.widget === "chart" ? (
         <SourceTokenChart
           snapshot={snapshot}

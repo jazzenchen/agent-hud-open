@@ -58,7 +58,7 @@ pub(crate) fn plan_key(provider: &str, reported: &str) -> Option<String> {
 }
 
 fn plan_json(plan: &Plan) -> Value {
-    json!({"id":plan.id,"name":plan.name,"monthlyUSD":plan.monthly_usd,"multiple":plan.multiple})
+    json!({"id":plan.id,"name":plan.name,"monthlyUSD":plan.monthly_usd,"multiple":plan.multiple,"shortMultiple":plan.short_multiple})
 }
 
 fn iso(at: i64) -> Option<String> {
