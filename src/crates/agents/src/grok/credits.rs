@@ -5,8 +5,9 @@
 //! provider, under the CLI's id.
 //!
 //! The CLI's token is never refreshed or written. It lives a few hours and
-//! the CLI renews it whenever it runs, so an expired one reads as signed out
-//! until the CLI runs again.
+//! the CLI renews it whenever it runs, so an expired one is the CLI's
+//! ordinary state between uses, not a sign-out: the last credits stay until
+//! the CLI runs again (its work finishing reads them at once).
 use crate::account::{
     account_id, read_json, resolve, status, Host, HttpFailure, HttpRequest, Provider, Reading,
     Unread,
@@ -123,9 +124,9 @@ fn signed_out() -> Unread {
 }
 
 fn expired() -> Unread {
-    Unread::SignedOut(l10n::text(
-        "Grok CLI 的登录已过期，运行一次 grok 即可续期",
-        "Grok CLI's sign-in has expired; running grok renews it",
+    Unread::Failed(l10n::text(
+        "Grok CLI 下次运行时会续期登录，之后更新额度",
+        "Grok CLI renews its sign-in the next time it runs; the credits update then",
     ))
 }
 
@@ -363,12 +364,13 @@ mod tests {
     }
 
     #[test]
-    fn an_expired_or_missing_sign_in_is_signed_out_without_asking() {
+    fn an_expired_sign_in_waits_for_the_cli_and_a_missing_one_is_signed_out() {
+        // The CLI's short-lived token lapses between uses: not a sign-out.
         let host = FakeHost::new("/u").file(AUTH_FILE, &auth(&token(-1)));
-        assert!(matches!(read(&host), Err(Unread::SignedOut(_))));
+        assert!(matches!(read(&host), Err(Unread::Failed(_))));
         assert_eq!(
             read(&host).err().unwrap(),
-            "Grok CLI's sign-in has expired; running grok renews it"
+            "Grok CLI renews its sign-in the next time it runs; the credits update then"
         );
         assert!(host.asked.borrow().is_empty());
         assert!(host.own.borrow().is_empty(), "nothing is refreshed");
@@ -378,7 +380,7 @@ mod tests {
         let host = FakeHost::new("/u").file(AUTH_FILE, &past.to_string());
         assert_eq!(
             read(&host).err().unwrap(),
-            "Grok CLI's sign-in has expired; running grok renews it"
+            "Grok CLI renews its sign-in the next time it runs; the credits update then"
         );
 
         let host = FakeHost::new("/u");
