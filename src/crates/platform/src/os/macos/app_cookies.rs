@@ -163,13 +163,14 @@ fn safe_storage_key(app: &str) -> Answer<[u8; 16]> {
             None => {
                 let (sender, receiver) = mpsc::channel();
                 let service = format!("{app} Safe Storage");
-                let account = app.to_owned();
+                let accounts = safe_storage_accounts(app);
                 let asked = std::thread::Builder::new()
                     .name("app-cookie-key".into())
                     .spawn(move || {
-                        let answer =
-                            security_framework::passwords::get_generic_password(&service, &account)
-                                .map_err(|error| error.code());
+                        let answer = first_found(&accounts, |account| {
+                            security_framework::passwords::get_generic_password(&service, account)
+                                .map_err(|error| error.code())
+                        });
                         let _ = sender.send(answer);
                     });
                 if asked.is_err() {
@@ -210,6 +211,29 @@ fn safe_storage_key(app: &str) -> Answer<[u8; 16]> {
         }
         Err(_) => Answer::Failed,
     }
+}
+
+/// The accounts an app's "<App> Safe Storage" item may be under: Electron
+/// builds differ, so the Claude desktop app files it under "Claude" and
+/// Cursor under "Cursor Key".
+fn safe_storage_accounts(app: &str) -> [String; 2] {
+    [app.to_owned(), format!("{app} Key")]
+}
+
+/// The first account's answer that is not errSecItemNotFound, which only a
+/// missing item gives, so no account that is there is skipped.
+fn first_found(
+    accounts: &[String],
+    mut lookup: impl FnMut(&str) -> Result<Vec<u8>, i32>,
+) -> Result<Vec<u8>, i32> {
+    let mut answer = Err(-25300);
+    for account in accounts {
+        answer = lookup(account);
+        if answer != Err(-25300) {
+            break;
+        }
+    }
+    answer
 }
 
 // CommonCrypto, part of libSystem.
@@ -391,5 +415,32 @@ mod tests {
             app_cookie(folder.path(), "Missing", "example.com", "plain"),
             Answer::Missing
         );
+    }
+
+    #[test]
+    fn the_key_is_looked_up_under_each_account_an_app_may_use() {
+        assert_eq!(safe_storage_accounts("Cursor"), ["Cursor", "Cursor Key"]);
+        let accounts = safe_storage_accounts("Cursor");
+        // Cursor files its key under "Cursor Key": the first account is not there.
+        let mut asked = Vec::new();
+        let answer = first_found(&accounts, |account| {
+            asked.push(account.to_owned());
+            if account == "Cursor Key" {
+                Ok(b"key".to_vec())
+            } else {
+                Err(-25300)
+            }
+        });
+        assert_eq!(answer, Ok(b"key".to_vec()));
+        assert_eq!(asked, ["Cursor", "Cursor Key"]);
+        // A refusal on the first account is the answer; the next is not tried.
+        let mut asked = 0;
+        let answer = first_found(&accounts, |_| {
+            asked += 1;
+            Err(-128)
+        });
+        assert_eq!((answer, asked), (Err(-128), 1));
+        // Neither account there: still not found.
+        assert_eq!(first_found(&accounts, |_| Err(-25300)), Err(-25300));
     }
 }
