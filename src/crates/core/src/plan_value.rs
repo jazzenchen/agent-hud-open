@@ -137,9 +137,10 @@ fn advise(
     long: &(Value, Vec<(i64, f64, Option<String>)>),
     windows: &[(Value, Vec<(i64, f64, Option<String>)>)],
 ) -> Option<Value> {
-    let multiple = plan.multiple?;
+    plan.multiple?;
     let (row, samples) = long;
-    let length = (row["windowDurationSeconds"].as_f64()? * 1000.0) as i64;
+    let seconds = row["windowDurationSeconds"].as_f64()?;
+    let length = (seconds * 1000.0) as i64;
     let reset = row["resetAt"].as_str().and_then(metering::date_ms);
     let cycles = completed(samples, reset.map(|reset| reset - length), length, plan.id)
         .into_iter()
@@ -151,9 +152,12 @@ fn advise(
     }
     let ran_out = recent.iter().filter(|cycle| cycle.peak >= RAN_OUT).count();
     let busiest = recent.iter().map(|cycle| cycle.peak).fold(0.0, f64::max);
-    let fits = |tier: &Plan, used: f64| {
-        tier.multiple
-            .is_some_and(|other| used * multiple / other <= FITS)
+    // A window's use on another tier, by both tiers' multiples for a window
+    // of its length (a tier may allow a different multiple in five hours).
+    let fits = |tier: &Plan, used: f64, seconds: f64| {
+        plan.multiple_for(seconds)
+            .zip(tier.multiple_for(seconds))
+            .is_some_and(|(mine, other)| used * mine / other <= FITS)
     };
     let window = json!({"id":row["id"],"name":row["name"],"shortLabel":row["shortLabel"],"windowDurationSeconds":row["windowDurationSeconds"]});
     let advice = |kind: &str, tier: &Plan, used: f64| {
@@ -164,16 +168,21 @@ fn advise(
         return catalog
             .plans
             .iter()
-            .find(|tier| tier.monthly_usd > plan.monthly_usd && fits(tier, busiest))
+            .find(|tier| tier.monthly_usd > plan.monthly_usd && fits(tier, busiest, seconds))
             .map(|tier| advice("upgrade", tier, busiest));
     }
     if !recent.iter().all(|cycle| cycle.ends_known) {
         return None;
     }
     // Every window must fit: the long one's cycles and what it uses now,
-    // and the highest reading of each other window under this plan.
-    let mut used = busiest;
+    // and the highest reading of each other window under this plan, each by
+    // the multiples for its own length.
+    let mut uses = vec![(busiest, seconds)];
     for (row, samples) in windows {
+        let Some(length) = row["windowDurationSeconds"].as_f64() else {
+            continue;
+        };
+        let mut used = 0.0f64;
         if row["status"] != "stale" {
             used = used.max(row["usedPercent"].as_f64().unwrap_or(0.0));
         }
@@ -183,11 +192,16 @@ fn advise(
         {
             used = used.max(sample.1);
         }
+        uses.push((used, length));
     }
+    let used = uses.iter().map(|(used, _)| *used).fold(0.0, f64::max);
     catalog
         .plans
         .iter()
-        .find(|tier| tier.monthly_usd < plan.monthly_usd && fits(tier, used))
+        .find(|tier| {
+            tier.monthly_usd < plan.monthly_usd
+                && uses.iter().all(|(used, length)| fits(tier, *used, *length))
+        })
         .map(|tier| advice("downgrade", tier, used))
 }
 

@@ -12,6 +12,7 @@ pub static CATALOG: Catalog = Catalog {
             name: "Plus",
             monthly_usd: 20.0,
             multiple: Some(1.0),
+            short_multiple: None,
             spellings: &["plus"],
         },
         Plan {
@@ -19,6 +20,7 @@ pub static CATALOG: Catalog = Catalog {
             name: "Pro 5x",
             monthly_usd: 100.0,
             multiple: Some(5.0),
+            short_multiple: None,
             spellings: &["prolite", "pro5x"],
         },
         Plan {
@@ -26,6 +28,7 @@ pub static CATALOG: Catalog = Catalog {
             name: "Pro 20x",
             monthly_usd: 200.0,
             multiple: Some(20.0),
+            short_multiple: None,
             spellings: &["pro", "pro20x"],
         },
     ],

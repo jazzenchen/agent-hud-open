@@ -21,11 +21,26 @@ pub struct Plan {
     /// US dollars a month, billed monthly, before tax.
     pub monthly_usd: f64,
     /// The usage the tier allows as a multiple of the provider's base paid
-    /// tier, as the vendor states it; None where it states none.
+    /// tier, as the vendor states it, for its longest (weekly or monthly)
+    /// window; None where it states none.
     pub multiple: Option<f64>,
+    /// The multiple for windows shorter than a day (Claude's five hours),
+    /// where the vendor states a different one; None means `multiple`.
+    pub short_multiple: Option<f64>,
     /// The plan as the provider's reader reports it, lower case with `+` as
     /// `plus` and only ASCII letters and digits (`max_20x` is `max20x`).
     pub spellings: &'static [&'static str],
+}
+
+impl Plan {
+    /// The tier's multiple for a window this many seconds long.
+    pub fn multiple_for(&self, window_seconds: f64) -> Option<f64> {
+        if window_seconds < 86_400.0 {
+            self.short_multiple.or(self.multiple)
+        } else {
+            self.multiple
+        }
+    }
 }
 
 /// A provider's tiers, cheapest first.
@@ -54,6 +69,19 @@ pub fn catalog(provider: &str) -> Option<&'static Catalog> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_tier_may_allow_another_multiple_in_short_windows() {
+        let ultra = crate::claude::plans::CATALOG
+            .plans
+            .iter()
+            .find(|plan| plan.id == "claude.max20x")
+            .unwrap();
+        assert_eq!(ultra.multiple_for(7.0 * 86_400.0), Some(10.0), "weekly");
+        assert_eq!(ultra.multiple_for(5.0 * 3600.0), Some(20.0), "five hours");
+        let pro = &crate::claude::plans::CATALOG.plans[0];
+        assert_eq!(pro.multiple_for(5.0 * 3600.0), Some(1.0), "falls back");
+    }
 
     #[test]
     fn every_catalog_belongs_to_an_account_reader_and_lists_its_tiers_cheapest_first() {

@@ -996,7 +996,7 @@ mod tests {
                 claude["planLabel"].as_str(),
                 claude["current"].as_bool()
             ),
-            (Some("Personal"), Some("Max x20"), Some(true))
+            (Some("Personal"), Some("Ultra"), Some(true))
         );
         assert_eq!(account("codex:demo")["planLabel"], "Pro x20");
         assert_eq!(account("codex:demo")["resetCredits"]["availableCount"], 2);

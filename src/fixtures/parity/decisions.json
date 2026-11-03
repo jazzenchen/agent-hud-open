@@ -40,6 +40,18 @@
     "token-format/short-999999999": {
       "next": "1.0B",
       "reason": "A count that rounds up to the next unit reads in it; Open wrote 1000M."
+    },
+    "plan-labels/claude-max_5x": {
+      "next": "Max",
+      "reason": "Anthropic renamed Max 5x to Max on 2026-10-30; the badge follows the vendor's current name."
+    },
+    "plan-labels/claude-max_20x": {
+      "next": "Ultra",
+      "reason": "Anthropic renamed Max 20x to Ultra on 2026-10-30; the badge follows the vendor's current name."
+    },
+    "plan-labels/claude-MAX_20X": {
+      "next": "Ultra",
+      "reason": "Anthropic renamed Max 20x to Ultra on 2026-10-30; the badge follows the vendor's current name, whatever the code's case."
     }
   }
 }

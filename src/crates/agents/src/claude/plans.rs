@@ -14,6 +14,7 @@ pub static CATALOG: Catalog = Catalog {
             name: "Pro",
             monthly_usd: 20.0,
             multiple: Some(1.0),
+            short_multiple: None,
             spellings: &["pro"],
         },
         Plan {
@@ -21,13 +22,18 @@ pub static CATALOG: Catalog = Catalog {
             name: "Max",
             monthly_usd: 100.0,
             multiple: Some(5.0),
+            short_multiple: None,
             spellings: &["max5x"],
         },
         Plan {
             id: "claude.max20x",
             name: "Ultra",
             monthly_usd: 200.0,
-            multiple: Some(20.0),
+            // Since the rename Ultra's weekly allowance is ten times Pro's;
+            // its five-hour one stays twenty times (verified accounts have
+            // none).
+            multiple: Some(10.0),
+            short_multiple: Some(20.0),
             spellings: &["max20x"],
         },
     ],

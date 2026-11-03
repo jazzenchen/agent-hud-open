@@ -472,7 +472,7 @@ export interface Account {
   stale: boolean;
   /** From Core: the label, else "Account" and the id's end. */
   name?: string;
-  /** From Core: the plan in the provider's tier names ("Max x20"). */
+  /** From Core: the plan in the provider's tier names ("Ultra"). */
   planLabel?: string | null;
   /** From Core: included in the current account inventory. */
   current?: boolean;

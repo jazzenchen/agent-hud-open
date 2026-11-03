@@ -12,6 +12,7 @@ pub static CATALOG: Catalog = Catalog {
             name: "SuperGrok",
             monthly_usd: 30.0,
             multiple: None,
+            short_multiple: None,
             spellings: &["supergrok"],
         },
         Plan {
@@ -19,6 +20,7 @@ pub static CATALOG: Catalog = Catalog {
             name: "SuperGrok Heavy",
             monthly_usd: 300.0,
             multiple: None,
+            short_multiple: None,
             spellings: &["supergrokheavy"],
         },
     ],
