@@ -99,3 +99,94 @@ fn snapshot_rows_keep_the_window_id_layouts_name_them_by() {
     assert!(row["consumerSource"].is_null());
     assert!(row["modelFamilies"].is_null());
 }
+
+#[test]
+fn a_history_reads_each_shown_windows_readings_by_its_key() {
+    let temp = tempfile::tempdir().unwrap();
+    let mut core = fixture(temp.path());
+    let now = Utc::now().timestamp_millis() / 60_000 * 60_000;
+    let iso = |at: i64| {
+        DateTime::<Utc>::from_timestamp_millis(at)
+            .unwrap()
+            .to_rfc3339()
+    };
+    // A five-hour window that reset two hours ago, and a switched-off
+    // client's window.
+    core.set_account_projection(AccountProjection {
+        quotas: vec![
+            json!({"id":"claude:a:session","vendor":"claude","accountId":"claude:a",
+                   "name":"Current session","usedPercent":30.0,"observedAt":iso(now),
+                   "resetAt":iso(now + 3 * 3_600_000),"windowDurationSeconds":18_000}),
+            json!({"id":"codex:a:weekly","vendor":"codex","accountId":"codex:a",
+                   "name":"Weekly","usedPercent":10.0,"observedAt":iso(now)}),
+        ],
+        ..Default::default()
+    });
+    core.enabled.insert("codex".into(), false);
+    let database = core.database.as_ref().unwrap();
+    for (minutes_ago, used) in [(200, 70.0), (190, 80.0), (110, 5.0), (60, 20.0), (5, 30.0)] {
+        metering::insert_quota_sample(
+            database,
+            "claude:a:session",
+            now - minutes_ago * 60_000,
+            100.0 - used,
+        )
+        .unwrap();
+    }
+    let history = core
+        .request(
+            "quota_history",
+            json!({"from": iso(now - 5 * 3_600_000), "to": iso(now)}),
+        )
+        .unwrap();
+    assert_eq!(history["kind"], "quota_history");
+    let windows = history["windows"].as_array().unwrap();
+    assert_eq!(
+        windows.len(),
+        1,
+        "a switched-off client's window is left out"
+    );
+    let window = &windows[0];
+    assert_eq!(window["windowDurationSeconds"], 18_000);
+    assert_eq!(window["shortLabel"], "Current session");
+    let minute = |at: &Value| (now - at.as_i64().unwrap()) / 60_000;
+    assert_eq!(
+        window["resets"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(minute)
+            .collect::<Vec<_>>(),
+        [120],
+        "the cycle started two hours ago"
+    );
+    let segments = window["segments"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|points| {
+            points
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|point| (minute(&point[0]), point[1].as_f64().unwrap()))
+                .collect::<Vec<_>>()
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        segments,
+        [
+            vec![(200, 70.0), (190, 80.0)],
+            vec![(110, 5.0)],
+            vec![(60, 20.0)],
+            vec![(5, 30.0), (0, 30.0)],
+        ],
+        "the old cycle, then the new one with gaps where the share moved unread"
+    );
+    assert!(core
+        .request(
+            "quota_history",
+            json!({"from": iso(now), "to": iso(now - 1)})
+        )
+        .is_err());
+}

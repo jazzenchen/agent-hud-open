@@ -32,6 +32,7 @@ mod presentation;
 mod prices;
 mod pricing;
 pub mod projects;
+mod quota_history;
 pub mod replies;
 pub mod requests;
 mod session_breakdown;
@@ -478,6 +479,7 @@ impl AgentHudCore {
             "statistics" => self.statistics(params),
             "price_list" => self.price_list(),
             "usage_buckets" => self.usage_buckets(params),
+            "quota_history" => self.quota_history(params),
             "set_setting" => {
                 let key = params["key"].as_str().ok_or("Setting key is required")?;
                 let value = params.get("value").ok_or("Setting value is required")?;

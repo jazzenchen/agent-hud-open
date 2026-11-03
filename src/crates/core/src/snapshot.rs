@@ -706,7 +706,7 @@ impl crate::AgentHudCore {
     }
 
     /// Whether the client a row names under `key` is turned on.
-    fn shown(&self, value: &Value, key: &str) -> bool {
+    pub(crate) fn shown(&self, value: &Value, key: &str) -> bool {
         value[key]
             .as_str()
             .is_some_and(|id| self.enabled.get(id).copied().unwrap_or(true))
