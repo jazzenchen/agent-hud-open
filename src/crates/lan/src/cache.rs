@@ -1,6 +1,7 @@
 use super::*;
 use sha2::Digest;
 use std::{
+    cell::OnceCell,
     collections::{BTreeMap, VecDeque},
     path::PathBuf,
     sync::{Arc, Condvar, Mutex},
@@ -81,6 +82,13 @@ pub struct Head {
     pub generated_at_ms: i64,
     pub cursor: Cursor,
 }
+/// The published version as the cache keeps it, with its cursor in the
+/// phone's JSON form, which the content revision hashes.
+struct Published {
+    generated_at_ms: i64,
+    cursor: Cursor,
+    cursor_body: Vec<u8>,
+}
 struct Base {
     base: String,
     first: u64,
@@ -91,7 +99,11 @@ pub struct SnapshotCache<R> {
     name: String,
     file: PathBuf,
     persisted: Option<Cursor>,
-    head: Option<Head>,
+    head: Option<Published>,
+    /// The published version's content revision, hashed the first time it is
+    /// asked for after each commit. It covers every record's body, so its cost
+    /// grows with the records, and a version no phone looks at is not hashed.
+    revision: OnceCell<String>,
     /// The published records by id, held once.
     previous: BTreeMap<String, R>,
     /// Each published record in the phone's JSON form, encoded when it changed;
@@ -130,6 +142,7 @@ impl<R: Record> SnapshotCache<R> {
             file,
             persisted,
             head: None,
+            revision: OnceCell::new(),
             previous: BTreeMap::new(),
             bodies: BTreeMap::new(),
             written: BTreeMap::new(),
@@ -203,8 +216,34 @@ impl<R: Record> SnapshotCache<R> {
         Ok(self.snapshot())
     }
     /// The published version, if any.
-    pub fn head(&self) -> Option<&Head> {
-        self.head.as_ref()
+    pub fn head(&self) -> Option<Head> {
+        let head = self.head.as_ref()?;
+        Some(Head {
+            revision: self.revision()?.to_owned(),
+            generated_at_ms: head.generated_at_ms,
+            cursor: head.cursor.clone(),
+        })
+    }
+    /// The published version's content revision, hashed as the phone writes
+    /// the snapshot back, which is what it hashes to check:
+    /// {"cursor":…,"records":[…]}, the records in id order.
+    fn revision(&self) -> Option<&str> {
+        let head = self.head.as_ref()?;
+        let revision = self.revision.get_or_init(|| {
+            let mut hash = sha2::Sha256::new();
+            hash.update(b"{\"cursor\":");
+            hash.update(&head.cursor_body);
+            hash.update(b",\"records\":[");
+            for (index, body) in self.bodies.values().enumerate() {
+                if index > 0 {
+                    hash.update(b",");
+                }
+                hash.update(body);
+            }
+            hash.update(b"]}");
+            format!("{:x}", hash.finalize())
+        });
+        Some(revision)
     }
     /// The published version with copies of its records.
     pub fn snapshot(&self) -> Option<Snapshot<R>> {
@@ -213,7 +252,7 @@ impl<R: Record> SnapshotCache<R> {
             schema_version: 1,
             device_id: self.device.clone(),
             device_name: self.name.clone(),
-            revision: head.revision.clone(),
+            revision: self.revision()?.to_owned(),
             generated_at_ms: head.generated_at_ms,
             records: self.previous.values().cloned().collect(),
             cursor: head.cursor.clone(),
@@ -258,21 +297,8 @@ impl<R: Record> SnapshotCache<R> {
         for id in deleted {
             self.bodies.remove(id);
         }
-        // Hashed as the phone writes the snapshot back, which is what it hashes
-        // to check: {"cursor":…,"records":[…]}, the records in id order.
         let cursor_value = serde_json::to_value(&cursor).map_err(|_| "LAN cursor encoding")?;
-        let mut hash = sha2::Sha256::new();
-        hash.update(b"{\"cursor\":");
-        hash.update(crate::canonical::to_vec(&cursor_value));
-        hash.update(b",\"records\":[");
-        for (index, body) in self.bodies.values().enumerate() {
-            if index > 0 {
-                hash.update(b",");
-            }
-            hash.update(body);
-        }
-        hash.update(b"]}");
-        let revision = format!("{:x}", hash.finalize());
+        let cursor_body = crate::canonical::to_vec(&cursor_value);
         crate::fs::atomic_json(&self.file, &cursor).map_err(|e| e.to_string())?;
         self.persisted = Some(cursor.clone());
         self.version += 1;
@@ -314,11 +340,12 @@ impl<R: Record> SnapshotCache<R> {
         }
         self.deleted.retain(|_, v| *v > self.oldest);
         self.bases.retain(|base| base.last >= self.oldest);
-        self.head = Some(Head {
-            revision,
+        self.head = Some(Published {
             generated_at_ms: now,
             cursor,
+            cursor_body,
         });
+        self.revision = OnceCell::new();
         self.body = None;
         self.signal.bump();
         Ok(())
@@ -326,18 +353,22 @@ impl<R: Record> SnapshotCache<R> {
     /// The snapshot as served, encoded once per version on first request.
     pub fn body(&mut self) -> Result<Option<Vec<u8>>> {
         if self.body.is_none() {
-            if let Some(head) = &self.head {
-                let body = SnapshotBody {
-                    schema_version: 1,
-                    device_id: &self.device,
-                    device_name: &self.name,
-                    revision: &head.revision,
-                    generated_at_ms: head.generated_at_ms,
-                    records: self.previous.values().collect(),
-                    cursor: &head.cursor,
-                };
-                self.body = Some(serde_json::to_vec(&body).map_err(|_| "LAN snapshot encoding")?);
-            }
+            let encoded = match (self.head.as_ref(), self.revision()) {
+                (Some(head), Some(revision)) => Some(
+                    serde_json::to_vec(&SnapshotBody {
+                        schema_version: 1,
+                        device_id: &self.device,
+                        device_name: &self.name,
+                        revision,
+                        generated_at_ms: head.generated_at_ms,
+                        records: self.previous.values().collect(),
+                        cursor: &head.cursor,
+                    })
+                    .map_err(|_| "LAN snapshot encoding")?,
+                ),
+                _ => None,
+            };
+            self.body = encoded;
         }
         Ok(self.body.clone())
     }
@@ -365,7 +396,7 @@ impl<R: Record> SnapshotCache<R> {
             device_name: self.name.clone(),
             from_cursor: since.clone(),
             to_cursor: snapshot.cursor.clone(),
-            revision: snapshot.revision.clone(),
+            revision: self.revision()?.to_owned(),
             generated_at_ms: snapshot.generated_at_ms,
             records: self
                 .written
@@ -383,6 +414,7 @@ impl<R: Record> SnapshotCache<R> {
     }
     pub fn clear(&mut self) {
         self.head = None;
+        self.revision = OnceCell::new();
         self.previous.clear();
         self.bodies.clear();
         self.written.clear();
@@ -484,6 +516,39 @@ mod tests {
             served,
             serde_json::to_value(cache.snapshot().unwrap()).unwrap()
         );
+        std::fs::remove_dir_all(&folder).unwrap();
+    }
+
+    #[test]
+    fn a_revision_hashed_only_when_asked_is_still_the_whole_ones() {
+        // Commits that nobody reads in between are hashed once, when asked,
+        // and the answer is the latest version's, never an earlier one's.
+        let folder = std::env::temp_dir().join(format!("lan-lazy-{}", std::process::id()));
+        crate::fs::private_dir(&folder).unwrap();
+        let mut cache =
+            SnapshotCache::<Item>::new("mac".into(), "Mac".into(), folder.join("cursor.json"))
+                .unwrap();
+        assert!(cache.head().is_none());
+        assert!(cache.update(&[item("a", 1.0, 10)], 1_000).unwrap());
+        let first = cache.head().unwrap().revision;
+        assert!(cache.update(&[item("a", 2.0, 20)], 2_000).unwrap());
+        assert!(cache
+            .update(&[item("a", 2.0, 20), item("b", 1.0, 20)], 3_000)
+            .unwrap());
+        let latest = cache.head().unwrap();
+        assert_ne!(latest.revision, first);
+        assert_eq!(latest.revision, whole(&cache));
+        assert_eq!(latest.cursor.change_sequence, 2);
+        let served: Value = serde_json::from_slice(&cache.body().unwrap().unwrap()).unwrap();
+        assert_eq!(served["revision"], latest.revision.as_str());
+        // A change set names the same revision as the head.
+        let changes = cache.changes(&Cursor {
+            change_sequence: 0,
+            ..latest.cursor.clone()
+        });
+        assert_eq!(changes.unwrap().revision, latest.revision);
+        cache.clear();
+        assert!(cache.head().is_none());
         std::fs::remove_dir_all(&folder).unwrap();
     }
 }
