@@ -6,6 +6,35 @@ import { Row, Section, Segments } from "../SettingsPrimitives";
 import { SmallHUDPreview } from "../SettingsSamples";
 import { displayControls, type DisplayProps } from "./controls";
 
+/** What a Simple mark draws, in a sentence. */
+function usageSubtitle(
+  style: HUDConfig["simpleStyle"],
+  t: DisplayProps["t"],
+): string {
+  switch (style) {
+    case "rings":
+      return t(
+        "One ring per window round the logo, the first outermost.",
+        "每项一圈，套在标志外，第一项在最外圈。",
+      );
+    case "segments":
+      return t(
+        "One ring round the logo, split into a segment per window.",
+        "标志外一圈，按项分段，第一段在最上面。",
+      );
+    case "bars":
+      return t(
+        "One bar per window beside the logo, the first on top.",
+        "标志旁每项一条，第一项在最上面。",
+      );
+    case "numbers":
+      return t(
+        "The most used window's percentage beside the logo.",
+        "标志旁只写用得最多那项的百分比。",
+      );
+  }
+}
+
 export function HUDSection({
   snapshot,
   active,
@@ -88,28 +117,45 @@ export function HUDSection({
             0.05,
             (value) => pt(value * config.simpleSize),
           )}
-          {toggle(
-            "showsRings",
-            t("Show rings", "显示圆环"),
-            t(
-              "Each agent's most used quota, round its logo.",
-              "标志外圈显示用得最多的额度。",
-            ),
-          )}
-          {config.showsRings &&
+          <Row
+            title={t("Usage", "用量画法")}
+            subtitle={usageSubtitle(config.simpleStyle, t)}
+          >
+            <Segments
+              label={t("Usage", "用量画法")}
+              value={config.simpleStyle}
+              options={[
+                ["rings", t("Rings", "年轮")],
+                ["segments", t("Segments", "分段环")],
+                ["bars", t("Bars", "进度条")],
+                ["numbers", t("Numbers", "数字")],
+              ]}
+              change={(value) =>
+                update({ simpleStyle: value as HUDConfig["simpleStyle"] })
+              }
+            />
+          </Row>
+          {config.simpleStyle !== "numbers" &&
             slider(
               "ringWidth",
-              t("Ring thickness", "圆环粗细"),
+              config.simpleStyle === "bars"
+                ? t("Bar thickness", "进度条粗细")
+                : t("Ring thickness", "圆环粗细"),
               1,
               4,
               0.5,
-              (value) => `${value.toFixed(1)} pt`,
+              (value) =>
+                `${(config.simpleStyle === "bars" ? value + 0.5 : value).toFixed(1)} pt`,
             )}
-          {toggle(
-            "showsNumbers",
-            t("Show numbers", "显示数字"),
-            t("Quota percentage beside each logo.", "标志旁显示额度百分比。"),
-          )}
+          {config.simpleStyle !== "numbers" &&
+            toggle(
+              "showsNumbers",
+              t("Show numbers", "显示数字"),
+              t(
+                "The most used window's percentage beside each logo.",
+                "标志旁写出用得最多那项的百分比。",
+              ),
+            )}
           {separateAgents}
         </>
       )}

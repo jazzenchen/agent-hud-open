@@ -154,7 +154,7 @@ const measures = z.array(
 );
 const block = z
   .object({
-    widget: z.enum(["bar", "ring", "number", "chart"]).optional(),
+    widget: z.enum(["bar", "rings", "segments", "number", "chart"]).optional(),
     measures: measures.optional(),
     hidden: z.boolean().optional(),
     hiddenRows: keys.optional(),
@@ -189,7 +189,7 @@ const hud = z
     simpleSize: z.number().min(20).max(60).optional(),
     simpleGap: z.number().min(0.1).max(0.6).optional(),
     ringWidth: z.number().min(1).max(4).optional(),
-    showRings: z.boolean().optional(),
+    simpleStyle: z.enum(["rings", "segments", "bars", "numbers"]).optional(),
     showNumbers: z.boolean().optional(),
     separateAgents: z.boolean().optional(),
     appearance: z.enum(["dark", "light", "system"]).optional(),

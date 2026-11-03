@@ -4,6 +4,7 @@ import { emit } from "@tauri-apps/api/event";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import type { PanelLayout, SourcePreferences } from "@agent-hud/protocol";
 import { defaultHUDConfig, type HUDConfig } from "@agent-hud/hud/model";
+import { usageStyle } from "@agent-hud/hud/usage-meter/arcs";
 import { storageKeys } from "./storage-keys";
 const configKey = storageKeys.hudConfig;
 const previousKey = storageKeys.hudConfigV2;
@@ -151,7 +152,15 @@ function pickSettings<K extends keyof HUDConfig>(
   ) as Partial<Pick<HUDConfig, K>>;
 }
 function screenSettings(value: unknown): HUDScreenSettings {
-  return pickSettings(value, settingKeys);
+  const settings = pickSettings(value, settingKeys);
+  // `simpleStyle` took over from `showsRings`: a screen saved with its rings
+  // off draws the number alone (plans.rs reads it the same way).
+  if (!usageStyle(settings.simpleStyle)) {
+    delete settings.simpleStyle;
+    if (record(value) && value.showsRings === false)
+      settings.simpleStyle = "numbers";
+  }
+  return settings;
 }
 export function parseHUDConfigStore(value: unknown): HUDConfigStore | null {
   if (!record(value) || value.version !== 3 || !record(value.screens))

@@ -31,7 +31,7 @@ const styleKeys = [
   "simpleSize",
   "simpleGapScale",
   "ringWidth",
-  "showsRings",
+  "simpleStyle",
   "showsNumbers",
   "separatesAgents",
   "appearance",

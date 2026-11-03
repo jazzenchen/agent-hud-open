@@ -24,7 +24,7 @@
   "simpleSize": 22,
   "simpleGapScale": 0.45,
   "ringWidth": 1.5,
-  "showsRings": true,
+  "simpleStyle": "segments",
   "showsNumbers": true,
   "separatesAgents": false,
   "appearance": "dark",

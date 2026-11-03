@@ -15,7 +15,6 @@ import {
   localeDateTime,
   moneyAmount,
   quotaPercent,
-  quotaPercentLabel,
   quotaDisplayLabel,
   tokensShort,
 } from "@agent-hud/ui/format";
@@ -38,6 +37,7 @@ import {
   type Measure,
 } from "./theme";
 import { SourceTokenChart } from "./TokenChartSection";
+import { QuotaRingCard } from "./QuotaRingCard";
 
 export function MetricPicker({
   selected,
@@ -356,7 +356,16 @@ export function QuotaWidgets({
     services = usePanelServices(),
     format = useFormat(),
     clickable = Boolean(services?.selectProvider || onStats),
-    widget = layout.widget ?? "bar";
+    // A layout saved before rings and segments says "ring": concentric rings.
+    widget = layout.widget === "ring" ? "rings" : (layout.widget ?? "bar");
+  if (widget === "rings" || widget === "segments")
+    return (
+      <QuotaRingCard
+        style={widget}
+        ringSize={layout.ringSize}
+        {...{ rows, measure, now, light, showReset, onStats }}
+      />
+    );
   if (widget === "bar")
     return (
       <>
@@ -368,10 +377,7 @@ export function QuotaWidgets({
         ))}
       </>
     );
-  const size = { small: 40, medium: 46, large: 60 }[
-      layout.ringSize ?? "medium"
-    ],
-    columns = layout.columns ?? 4;
+  const columns = layout.columns ?? 4;
   return (
     <div
       style={{
@@ -383,16 +389,7 @@ export function QuotaWidgets({
       }}
     >
       {rows.map((row) => {
-        const metric = quotaMetric(row, measure, now, format),
-          color =
-            row.status === "stale"
-              ? colors.secondary
-              : row.status === "critical"
-                ? colors.critical
-                : row.status === "warning"
-                  ? colors.warning
-                  : colors.ok;
-        // The ring is a fill; its figure and the number are text.
+        const metric = quotaMetric(row, measure, now, format);
         const figure =
           row.status === "stale"
             ? colors.secondary
@@ -401,7 +398,6 @@ export function QuotaWidgets({
               : row.status === "warning"
                 ? colors.warningText
                 : colors.okText;
-        const pct = quotaPercent(row.usedPercent, format.quotaDisplay) ?? 0;
         return (
           <div
             key={row.id}
@@ -421,84 +417,27 @@ export function QuotaWidgets({
               minWidth: 0,
               display: "flex",
               flexDirection: "column",
-              alignItems: widget === "number" ? "flex-start" : "center",
+              alignItems: "flex-start",
               gap: 5,
               fontSize: 12,
               cursor: clickable ? "pointer" : undefined,
               borderRadius: 6,
             }}
           >
-            {widget === "ring" ? (
-              <div
-                style={{
-                  width: size,
-                  maxWidth: "100%",
-                  aspectRatio: 1,
-                  position: "relative",
-                }}
-              >
-                <svg
-                  viewBox="0 0 60 60"
-                  role="img"
-                  aria-label={`${row.name} · ${quotaDisplayLabel(format.quotaDisplay, format.language)} · ${row.usedPercent == null ? "—" : quotaPercentLabel(row.usedPercent, format.quotaDisplay)}`}
-                  style={{
-                    width: "100%",
-                    height: "100%",
-                    transform: "rotate(-90deg)",
-                  }}
-                >
-                  <circle
-                    cx="30"
-                    cy="30"
-                    r="26"
-                    fill="none"
-                    stroke={colors.track}
-                    strokeWidth="5"
-                  />
-                  <circle
-                    cx="30"
-                    cy="30"
-                    r="26"
-                    fill="none"
-                    stroke={pct > 0 ? color : "transparent"}
-                    strokeWidth="5"
-                    strokeDasharray={`${pct * 1.6336} 163.36`}
-                    strokeLinecap="round"
-                  />
-                </svg>
-                <span
-                  style={{
-                    position: "absolute",
-                    inset: 0,
-                    display: "grid",
-                    placeItems: "center",
-                    fontSize: size === 60 ? 13 : 11,
-                    fontWeight: 600,
-                    color: figure,
-                  }}
-                >
-                  {row.usedPercent == null
-                    ? "--"
-                    : quotaPercentLabel(row.usedPercent, format.quotaDisplay)}
-                </span>
-              </div>
-            ) : null}
             <FittingName
               name={row.name}
               short={quotaShortName(row)}
               wrap
               style={{
                 alignSelf: "stretch",
-                fontSize: widget === "number" ? 11 : 12,
-                color: widget === "number" ? colors.secondary : colors.text,
+                fontSize: 11,
+                color: colors.secondary,
                 textAlign: "center",
               }}
             />
-            {widget === "number" ? (
-              <strong style={{ color: figure, fontSize: 15 }}>
-                {metric.value}
-              </strong>
-            ) : null}
+            <strong style={{ color: figure, fontSize: 15 }}>
+              {metric.value}
+            </strong>
             <span
               style={{
                 fontSize: 11,
@@ -507,9 +446,6 @@ export function QuotaWidgets({
                 minHeight: 13,
               }}
             >
-              {measure !== "quota" && widget === "ring"
-                ? `${metric.value} · `
-                : ""}
               {showReset || measure !== "quota" ? metric.detail : ""}
             </span>
           </div>

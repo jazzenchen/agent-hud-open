@@ -7,7 +7,6 @@ import { labelWidth, type HUDRect, type stripMetrics } from "../geometry";
 import {
   markUsed,
   meterLabel,
-  statusColor,
   vendorKey,
   type HUDConfig,
   type HUDEdge,
@@ -16,8 +15,12 @@ import {
 import { Silhouette } from "./NotchSurface";
 import type { HUDNativePointer } from "../HUDScene";
 import { useFormat } from "@agent-hud/ui/format-context";
-import { quotaPercent, quotaDisplayLabel } from "@agent-hud/ui/format";
+import { quotaDisplayLabel } from "@agent-hud/ui/format";
 import { useMarkLevelText } from "../ground";
+import { isRingStyle } from "../usage-meter/arcs";
+import { MarkBars, MarkRing, markItems } from "../usage-meter/mark-usage";
+
+const clampedSize = (size: number) => Math.max(20, Math.min(60, size));
 
 const horizontal = (edge: HUDEdge) => edge === "top" || edge === "bottom";
 
@@ -292,43 +295,21 @@ export function HUDMarkStrip({
                   position: "relative",
                 }}
               >
-                {config.mode === "simple" && config.showsRings && (
-                  <svg
-                    viewBox={`0 0 ${metrics.mark} ${metrics.mark}`}
-                    aria-hidden="true"
-                    style={{
-                      position: "absolute",
-                      inset: 0,
-                      overflow: "visible",
-                    }}
-                  >
-                    <circle
-                      cx={metrics.mark / 2}
-                      cy={metrics.mark / 2}
-                      r={(metrics.mark - config.ringWidth) / 2}
-                      fill="none"
-                      stroke={light ? "#0000000f" : "#ffffff1a"}
-                      strokeWidth={config.ringWidth}
+                {config.mode === "simple" &&
+                  isRingStyle(config.simpleStyle) && (
+                    <MarkRing
+                      style={config.simpleStyle}
+                      items={markItems(
+                        vendor,
+                        quotaDisplay,
+                        config.panelLayout,
+                      )}
+                      size={metrics.mark}
+                      ringWidth={config.ringWidth}
+                      light={light}
+                      reduceMotion={reduceMotion}
                     />
-                    <circle
-                      cx={metrics.mark / 2}
-                      cy={metrics.mark / 2}
-                      r={(metrics.mark - config.ringWidth) / 2}
-                      fill="none"
-                      // A failed read keeps its last share, grey by its "stale" level.
-                      stroke={
-                        (quotaPercent(markUsed(vendor), quotaDisplay) ?? 0) <= 0
-                          ? "transparent"
-                          : statusColor(vendor.level)
-                      }
-                      strokeWidth={config.ringWidth}
-                      strokeLinecap="round"
-                      pathLength={100}
-                      strokeDasharray={`${quotaPercent(markUsed(vendor), quotaDisplay) ?? 0} 100`}
-                      transform={`rotate(-90 ${metrics.mark / 2} ${metrics.mark / 2})`}
-                    />
-                  </svg>
-                )}
+                  )}
                 <BotMark
                   source={vendor.name}
                   size={metrics.logo}
@@ -419,30 +400,42 @@ export function HUDMarkStrip({
                   />
                 )}
               </span>
-              {config.mode === "simple" && config.showsNumbers && (
-                <span
-                  style={{
-                    color: figureColor(vendor.level),
-                    fontSize: metrics.font,
-                    fontWeight: 400,
-                    fontVariantNumeric: "tabular-nums",
-                    whiteSpace: "nowrap",
-                    textAlign: "right",
-                    minWidth: horizontal(edge)
-                      ? undefined
-                      : Math.max(
-                          ...vendors.map((v) =>
-                            labelWidth(
-                              meterLabel(v, quotaDisplay),
-                              metrics.font,
+              {config.mode === "simple" && metrics.bar > 0 && (
+                <MarkBars
+                  items={markItems(vendor, quotaDisplay, config.panelLayout)}
+                  length={metrics.bar}
+                  height={metrics.mark}
+                  size={clampedSize(config.simpleSize)}
+                  ringWidth={config.ringWidth}
+                  light={light}
+                  reduceMotion={reduceMotion}
+                />
+              )}
+              {config.mode === "simple" &&
+                (config.showsNumbers || config.simpleStyle === "numbers") && (
+                  <span
+                    style={{
+                      color: figureColor(vendor.level),
+                      fontSize: metrics.font,
+                      fontWeight: 400,
+                      fontVariantNumeric: "tabular-nums",
+                      whiteSpace: "nowrap",
+                      textAlign: "right",
+                      minWidth: horizontal(edge)
+                        ? undefined
+                        : Math.max(
+                            ...vendors.map((v) =>
+                              labelWidth(
+                                meterLabel(v, quotaDisplay),
+                                metrics.font,
+                              ),
                             ),
                           ),
-                        ),
-                  }}
-                >
-                  {meterLabel(vendor, quotaDisplay)}
-                </span>
-              )}
+                    }}
+                  >
+                    {meterLabel(vendor, quotaDisplay)}
+                  </span>
+                )}
             </button>
           ))}
         </div>

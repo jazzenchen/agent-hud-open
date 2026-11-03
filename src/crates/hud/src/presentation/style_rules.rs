@@ -79,8 +79,8 @@ const FIELDS: &[Field] = &[
         range: Some((1., 4.)),
     },
     Field {
-        name: "showRings",
-        stored: "showsRings",
+        name: "simpleStyle",
+        stored: "simpleStyle",
         modes: &["simple"],
         range: None,
     },
@@ -291,6 +291,7 @@ pub(super) fn misreadings(value: &Value) -> Vec<String> {
                     "mode" => Some(MODES),
                     "edge" => Some(EDGES),
                     "appearance" => Some(APPEARANCES),
+                    "simpleStyle" => Some(super::SIMPLE_STYLES),
                     _ => None,
                 };
                 if let Some(choices) = choices {
@@ -370,9 +371,17 @@ pub(super) fn drawn(saved: &Saved, key: &str, has_notch: bool) -> Map<String, Va
         json!(if has_notch { "notch" } else { "logos" }),
     );
     merge(&mut style, &saved.screen_defaults);
-    if let Some(own) = saved.screens.get(key).and_then(Value::as_object) {
+    let own = saved.screens.get(key).cloned().unwrap_or(Value::Null);
+    if let Some(own) = own.as_object() {
         merge(&mut style, own);
     }
+    // A screen saved before the Simple style existed keeps what its rings switch drew.
+    let screen_defaults = Value::Object(saved.screen_defaults.clone());
+    style.insert(
+        "simpleStyle".into(),
+        json!(super::simple_style([&own, &screen_defaults])),
+    );
+    style.remove("showsRings");
     style.retain(|key, _| look_key(key));
     style
 }
@@ -391,6 +400,12 @@ fn default_look(s: &State, has_notch: bool) -> Map<String, Value> {
     let defaults: Value = serde_json::from_str(DEFAULTS).expect("checked-in defaults");
     let mut style = defaults.as_object().cloned().unwrap_or_default();
     merge(&mut style, &s.saved.screen_defaults);
+    let screen_defaults = Value::Object(s.saved.screen_defaults.clone());
+    style.insert(
+        "simpleStyle".into(),
+        json!(super::simple_style([&screen_defaults])),
+    );
+    style.remove("showsRings");
     style.retain(|key, _| look_key(key));
     style.insert(
         "mode".into(),

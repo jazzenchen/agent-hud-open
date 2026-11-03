@@ -581,7 +581,9 @@ export interface Capability {
   detail: string;
 }
 export interface PanelBlockLayout {
-  widget?: "bar" | "ring" | "number" | "chart";
+  /** `rings` are concentric (年轮) and `segments` split one ring (分段环), one
+   * per account; a layout saved before them says `ring`, read as `rings`. */
+  widget?: "bar" | "rings" | "segments" | "ring" | "number" | "chart";
   measures?: QuotaMeasure[];
   hidden?: boolean;
   hiddenRows?: string[];

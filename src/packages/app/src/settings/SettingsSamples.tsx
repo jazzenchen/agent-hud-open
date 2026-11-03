@@ -16,13 +16,18 @@ import { BotMark } from "@agent-hud/hud/BotMark";
 import { HUDGlow } from "@agent-hud/hud/HUDGlow";
 import {
   defaultHUDConfig,
-  markUsed,
   meterLabel,
   statusColor,
   vendorsFromSnapshot,
   type HUDConfig,
 } from "@agent-hud/hud/model";
 import { islandPath, stripMetrics } from "@agent-hud/hud/geometry";
+import { isRingStyle } from "@agent-hud/hud/usage-meter/arcs";
+import {
+  MarkBars,
+  MarkRing,
+  markItems,
+} from "@agent-hud/hud/usage-meter/mark-usage";
 import type { Text } from "./SettingsPrimitives";
 
 const originalWallpaper = settingsWallpaper;
@@ -185,43 +190,19 @@ export function SmallHUDPreview({
                         placeItems: "center",
                       }}
                     >
-                      {simple && sample.showsRings && (
-                        <svg
-                          width={metrics.mark}
-                          height={metrics.mark}
-                          style={{
-                            position: "absolute",
-                            inset: 0,
-                            transform: "rotate(-90deg)",
-                          }}
-                        >
-                          <circle
-                            cx={metrics.mark / 2}
-                            cy={metrics.mark / 2}
-                            r={(metrics.mark - sample.ringWidth) / 2}
-                            fill="none"
-                            stroke={light ? "#00000010" : "#ffffff18"}
-                            strokeWidth={sample.ringWidth}
-                          />
-                          <circle
-                            cx={metrics.mark / 2}
-                            cy={metrics.mark / 2}
-                            r={(metrics.mark - sample.ringWidth) / 2}
-                            fill="none"
-                            pathLength={100}
-                            stroke={
-                              (quotaPercent(
-                                markUsed(vendor),
-                                snapshot.settings.quotaDisplay,
-                              ) ?? 0) <= 0
-                                ? "transparent"
-                                : statusColor(vendor.level)
-                            }
-                            strokeWidth={sample.ringWidth}
-                            strokeLinecap="round"
-                            strokeDasharray={`${quotaPercent(markUsed(vendor), snapshot.settings.quotaDisplay) ?? 0} 100`}
-                          />
-                        </svg>
+                      {simple && isRingStyle(sample.simpleStyle) && (
+                        <MarkRing
+                          style={sample.simpleStyle}
+                          items={markItems(
+                            vendor,
+                            snapshot.settings.quotaDisplay,
+                            sample.panelLayout,
+                          )}
+                          size={metrics.mark}
+                          ringWidth={sample.ringWidth}
+                          light={light}
+                          reduceMotion={!sample.animations}
+                        />
                       )}
                       <BotMark
                         source={vendor.name}
@@ -238,17 +219,34 @@ export function SmallHUDPreview({
                         }
                       />
                     </span>
-                    {simple && sample.showsNumbers && (
-                      <span
-                        style={{
-                          fontSize: metrics.font,
-                          color: statusColor(vendor.level),
-                          fontVariantNumeric: "tabular-nums",
-                        }}
-                      >
-                        {meterLabel(vendor, snapshot.settings.quotaDisplay)}
-                      </span>
+                    {simple && metrics.bar > 0 && (
+                      <MarkBars
+                        items={markItems(
+                          vendor,
+                          snapshot.settings.quotaDisplay,
+                          sample.panelLayout,
+                        )}
+                        length={metrics.bar}
+                        height={metrics.mark}
+                        size={Math.max(20, Math.min(60, sample.simpleSize))}
+                        ringWidth={sample.ringWidth}
+                        light={light}
+                        reduceMotion={!sample.animations}
+                      />
                     )}
+                    {simple &&
+                      (sample.showsNumbers ||
+                        sample.simpleStyle === "numbers") && (
+                        <span
+                          style={{
+                            fontSize: metrics.font,
+                            color: statusColor(vendor.level),
+                            fontVariantNumeric: "tabular-nums",
+                          }}
+                        >
+                          {meterLabel(vendor, snapshot.settings.quotaDisplay)}
+                        </span>
+                      )}
                   </div>
                 ))}
             </div>

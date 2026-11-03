@@ -16,7 +16,9 @@
     "./bots/mark-director": "./src/bots/mark-director.ts",
     "./geometry": "./src/geometry.ts",
     "./ground": "./src/ground.tsx",
-    "./model": "./src/model.ts"
+    "./model": "./src/model.ts",
+    "./usage-meter/arcs": "./src/usage-meter/arcs.ts",
+    "./usage-meter/mark-usage": "./src/usage-meter/mark-usage.tsx"
   },
   "peerDependencies": {
     "react": "catalog:",

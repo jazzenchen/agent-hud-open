@@ -2,11 +2,13 @@
 //! are memory-only; a tool cannot turn its proposal into the user's saved choice.
 mod app_rules;
 mod rules;
+mod simple_style;
 mod style_rules;
 mod tools;
 pub use rules::{mark, resting_agents};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value};
+pub use simple_style::{simple_style, SIMPLE_STYLES};
 use std::{
     collections::HashMap,
     fs,

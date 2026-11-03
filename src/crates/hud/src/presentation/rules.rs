@@ -11,7 +11,9 @@ use super::*;
 use agent_hud_core::projects;
 
 pub(super) const SECTIONS: &[&str] = &["blocks", "tokens", "sessions"];
-const WIDGETS: &[&str] = &["bar", "ring", "number", "chart"];
+/// `rings` are concentric and `segments` split one ring, one per account; a layout
+/// saved before them says `ring`, which `parse_block` reads as `rings`.
+const WIDGETS: &[&str] = &["bar", "rings", "segments", "number", "chart"];
 const MEASURES: &[&str] = &["quota", "burn", "tokens", "consumed", "cost"];
 const RING_SIZES: &[&str] = &["small", "medium", "large"];
 const SPANS: &[&str] = &["full", "half"];
@@ -194,10 +196,10 @@ impl Kind {
         self == Kind::Quota
     }
     fn takes_columns(self, widget: &str) -> bool {
-        self == Kind::Quota && (widget == "ring" || widget == "number")
+        self == Kind::Quota && widget == "number"
     }
     fn takes_ring_size(self, widget: &str) -> bool {
-        self == Kind::Quota && widget == "ring"
+        self == Kind::Quota && (widget == "rings" || widget == "segments")
     }
     fn takes_half(self, widget: &str) -> bool {
         widget != "bar"
@@ -314,7 +316,11 @@ fn parse_block(block: &Value) -> Map<String, Value> {
         ("span", SPANS),
         ("period", PERIODS),
     ] {
-        if let Some(value) = block[key].as_str().filter(|s| offered.contains(s)) {
+        let value = match block[key].as_str() {
+            Some("ring") if key == "widget" => Some("rings"),
+            value => value,
+        };
+        if let Some(value) = value.filter(|s| offered.contains(s)) {
             v.insert(key.into(), json!(value));
         }
     }
@@ -673,7 +679,9 @@ fn block_issues(
     let mut found = vec![];
     let asked = change["widget"].as_str();
     if let Some(widget) = asked.filter(|w| !kind.widgets().contains(w)) {
-        let refusal = if kind == Kind::Balance && (widget == "bar" || widget == "ring") {
+        let refusal = if kind == Kind::Balance
+            && matches!(widget, "bar" | "ring" | "rings" | "segments")
+        {
             format!("\"{key}\" is an API balance, which has no ceiling, so the \"{widget}\" widget has nothing to measure it against.")
         } else {
             format!("\"{key}\" does not accept the \"{widget}\" widget.")

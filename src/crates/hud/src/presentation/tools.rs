@@ -291,7 +291,7 @@ fn blocks(snapshot: &Value, layout: &Value) -> Vec<Value> {
         .map(|block| {
             let key = block.key.as_str();
             let mut group = match block.kind {
-                rules::Kind::Quota => json!({"key":key,"kind":"quota","accounts":[],"rows":[],"widgets":["bar","ring","number","chart"],"measures":["quota","burn","tokens","consumed","cost"]}),
+                rules::Kind::Quota => json!({"key":key,"kind":"quota","accounts":[],"rows":[],"widgets":["bar","rings","segments","number","chart"],"measures":["quota","burn","tokens","consumed","cost"]}),
                 rules::Kind::Balance => json!({"key":key,"kind":"balance","accounts":[],"rows":[],"widgets":["number","chart"],"measures":["quota","burn","cost"]}),
             };
             if block.kind == rules::Kind::Quota {

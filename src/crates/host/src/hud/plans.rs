@@ -77,6 +77,15 @@ impl<'a> Screen<'a> {
         self.value(key).as_str().unwrap_or("").to_owned()
     }
 
+    /// How the screen's Simple marks draw usage, read as Settings reads it.
+    fn simple_style(&self) -> &'static str {
+        let store = &self.view["store"];
+        agent_hud_hud::presentation::simple_style([
+            &store["screens"][self.id],
+            &store["screenDefaults"],
+        ])
+    }
+
     pub(crate) fn mode(&self) -> Mode {
         serde_json::from_value(self.value("mode")).unwrap_or(if self.has_notch {
             Mode::Notch
@@ -127,9 +136,17 @@ fn strip_width(
         }
         Mode::Simple => {
             let size = screen.number("simpleSize").clamp(20.0, 60.0);
-            let (rings, numbers) = (screen.flag("showsRings"), screen.flag("showsNumbers"));
+            let style = screen.simple_style();
+            let rings = matches!(style, "rings" | "segments");
+            let numbers = style == "numbers" || screen.flag("showsNumbers");
             let logo = (size * if rings { 0.55 } else { 0.68 }).round();
             let mark = if rings { size } else { logo };
+            // geometry.ts `bar`: bars beside the logo, 1.09 marks long.
+            let bar = if style == "bars" {
+                (size * 1.09).round()
+            } else {
+                0.0
+            };
             let font = (9.0 * (size / 26.0).max(1.0)).round();
             let label_gap = (size * 0.23).round();
             let spacing = if numbers || !horizontal { 1.0 } else { 0.7 };
@@ -141,11 +158,12 @@ fn strip_width(
             let widths: Vec<f64> = labels
                 .iter()
                 .map(|label| {
-                    mark + if numbers {
-                        label_gap + label_width(label, font)
-                    } else {
-                        0.0
-                    }
+                    mark + if bar > 0.0 { label_gap + bar } else { 0.0 }
+                        + if numbers {
+                            label_gap + label_width(label, font)
+                        } else {
+                            0.0
+                        }
                 })
                 .collect();
             if !horizontal {

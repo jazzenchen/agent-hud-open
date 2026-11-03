@@ -1,4 +1,4 @@
-import type { Quota } from "@agent-hud/protocol";
+import type { PanelBlockLayout, Quota } from "@agent-hud/protocol";
 
 /** The key a layout writes for a quota row: the Swift app's window id where the
  * row has one, so layouts carried over from it keep naming the same row. */
@@ -63,4 +63,27 @@ export function inRowOrder<T extends Quota>(
     return index < 0 ? Infinity : index;
   };
   return [...rows].sort((a, b) => position(a) - position(b));
+}
+
+/** Account labels are display values; provider identity owns saved visibility. */
+export function quotaAccountKey(row: Quota): string {
+  return row.accountId ?? row.account ?? "unassigned";
+}
+
+/** The rows a block shows, in its order: none its layout hides, none of a
+ * hidden account, only the accounts it names when it names some. */
+export function blockRows<T extends Quota>(
+  rows: readonly T[],
+  block: PanelBlockLayout | undefined,
+): T[] {
+  return inRowOrder(
+    rows.filter(
+      (row) =>
+        !quotaRowHidden(row, block?.hiddenRows ?? []) &&
+        !(block?.hiddenAccounts ?? []).includes(quotaAccountKey(row)) &&
+        (!block?.accounts?.length ||
+          block.accounts.includes(quotaAccountKey(row))),
+    ),
+    block?.rows ?? [],
+  );
 }

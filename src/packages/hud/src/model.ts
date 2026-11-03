@@ -1,7 +1,6 @@
 import hudDefaults from "@agent-hud/protocol/hud-defaults.json";
 import type {
   PanelLayout,
-  Quota,
   RequestDecision,
   Snapshot,
 } from "@agent-hud/protocol";
@@ -11,6 +10,7 @@ import { recentLabel, recentUsage } from "./recent-usage.ts";
 import { visibleBalances } from "./balance-rows.ts";
 import { heldUsed } from "./held-reading.ts";
 import type { GlowEffect, GlowStyle } from "./HUDGlow";
+import type { UsageStyle } from "./usage-meter/arcs";
 import {
   moneyAmount,
   snapshotLanguage,
@@ -58,7 +58,8 @@ export interface HUDConfig {
   simpleSize: number;
   simpleGapScale: number;
   ringWidth: number;
-  showsRings: boolean;
+  /** How a Simple mark draws its usage: rings, a segmented ring, bars, or the number alone. */
+  simpleStyle: UsageStyle;
   showsNumbers: boolean;
   separatesAgents: boolean;
   appearance: "dark" | "light" | "system";
@@ -292,12 +293,10 @@ export function sourcesForMark(snapshot: Snapshot, mark: string): string[] {
     .map((provider) => provider.id);
 }
 
-/** Account labels are display values; provider identity owns saved visibility. */
-export function quotaAccountKey(row: Quota): string {
-  return row.accountId ?? row.account ?? "unassigned";
-}
 export {
+  blockRows,
   inRowOrder,
+  quotaAccountKey,
   quotaRowHidden,
   quotaRowKey,
   quotaRowMatches,

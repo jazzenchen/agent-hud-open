@@ -16,10 +16,8 @@ import { motion, MotionConfig } from "motion/react";
 import type { Quota, Snapshot } from "@agent-hud/protocol";
 import { Button } from "@agent-hud/ui/components/button";
 import {
+  blockRows,
   defaultHUDConfig,
-  inRowOrder,
-  quotaAccountKey,
-  quotaRowHidden,
   quotaRowKey,
   vendorKey,
   type HUDConfig,
@@ -145,19 +143,9 @@ export const SourceHoverPanel = memo(function SourceHoverPanel({
         content: (
           <SourceProviderBlock
             vendor={vendor}
-            rows={inRowOrder(
-              (rowsByVendor.get(vendor) ?? []).filter((row) => {
-                const block = config.panelLayout.blocks?.[vendor];
-                return (
-                  !quotaRowHidden(row, block?.hiddenRows ?? []) &&
-                  !(block?.hiddenAccounts ?? []).includes(
-                    quotaAccountKey(row),
-                  ) &&
-                  (!block?.accounts?.length ||
-                    block.accounts.includes(quotaAccountKey(row)))
-                );
-              }),
-              config.panelLayout.blocks?.[vendor]?.rows ?? [],
+            rows={blockRows(
+              rowsByVendor.get(vendor) ?? [],
+              config.panelLayout.blocks?.[vendor],
             ).map((row) => ({ ...row, key: quotaRowKey(row) }))}
             layout={config.panelLayout.blocks?.[vendor]}
             snapshot={snapshot}

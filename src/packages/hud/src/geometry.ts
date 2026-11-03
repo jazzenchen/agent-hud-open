@@ -6,6 +6,13 @@ import {
   type HUDEdge,
   type HUDVendor,
 } from "./model";
+import {
+  isRingStyle,
+  simpleLogoSize,
+  simpleRingSpec,
+  usageArcs,
+} from "./usage-meter/arcs";
+import { markWindows } from "./usage-meter/mark-windows";
 
 export interface HUDRect {
   x: number;
@@ -76,6 +83,8 @@ export interface StripMetrics {
   mark: number;
   font: number;
   labelGap: number;
+  /** A Simple mark's bars beside its logo, how long; 0 when it draws none. */
+  bar: number;
   padding: { top: number; right: number; bottom: number; left: number };
   radius: number;
   centers: number[];
@@ -118,6 +127,7 @@ export function stripMetrics(
       mark: 0,
       font: 0,
       labelGap: 0,
+      bar: 0,
       padding: { top: 0, right: 0, bottom: 0, left: 0 },
       radius: config.hasNotch ? 12 : 10,
       centers: [],
@@ -135,25 +145,45 @@ export function stripMetrics(
       mark: logo,
       font: 0,
       labelGap: 0,
+      bar: 0,
       padding: { top: 0, right: 0, bottom: 0, left: 0 },
       radius: 10,
       centers: vendors.map((_, i) => i * (logo + gap) + logo / 2),
     };
   }
   const size = clamp(config.simpleSize, 20, 60),
-    logo = Math.round(size * (config.showsRings ? 0.55 : 0.68));
-  const mark = config.showsRings ? size : logo;
+    style = config.simpleStyle,
+    ringed = isRingStyle(style),
+    numbers = style === "numbers" || config.showsNumbers;
+  // Rings take every mark's logo down to what the agent with the most rings leaves.
+  const logo = Math.round(
+    style === "rings"
+      ? simpleLogoSize(
+          size,
+          usageArcs(
+            "rings",
+            Math.max(
+              1,
+              ...vendors.map((v) => markWindows(v, config.panelLayout).length),
+            ),
+            simpleRingSpec(size, config.ringWidth),
+          ),
+        )
+      : size * (ringed ? 0.55 : 0.68),
+  );
+  const mark = ringed ? size : logo;
+  const bar = style === "bars" ? Math.round(size * 1.09) : 0;
   const font = Math.round(HUD_METRICS.dockTextSize * Math.max(1, size / 26));
   const labelGap = Math.round(size * 0.23);
   const gap = Math.round(
     size *
       clamp(config.simpleGapScale, 0.1, 0.6) *
-      (config.showsNumbers || !horizontal ? 1 : 0.7),
+      (numbers || !horizontal ? 1 : 0.7),
   );
   const tight = Math.max(3, Math.round(size * 0.18)),
     loose = Math.round(size * 0.45);
-  const left = config.showsRings ? tight + 1 : loose,
-    right = config.showsNumbers ? loose : left;
+  const left = ringed ? tight + 1 : loose,
+    right = numbers ? loose : left;
   const padding = {
     top: tight + (horizontal ? 0 : 3),
     right,
@@ -163,9 +193,8 @@ export function stripMetrics(
   const widths = vendors.map(
     (v) =>
       mark +
-      (config.showsNumbers
-        ? labelGap + labelWidth(meterLabel(v, display), font)
-        : 0),
+      (bar ? labelGap + bar : 0) +
+      (numbers ? labelGap + labelWidth(meterLabel(v, display), font) : 0),
   );
   const run = n
     ? (horizontal ? widths.reduce((a, b) => a + b, 0) : n * mark) +
@@ -195,6 +224,7 @@ export function stripMetrics(
     mark,
     font,
     labelGap,
+    bar,
     padding,
     radius: Math.min(Math.round(size * 0.73), Math.min(width, height) / 2),
     centers,

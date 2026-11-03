@@ -1,6 +1,6 @@
 ---
 name: customize-agent-hud
-description: Rearrange or restyle Agent HUD, the notch or dock HUD on the Mac and its hover panel, with Agent HUD's HUD tools (get_hud, draft_hud, get_hud_screenshot, discard_hud_draft, finish_hud_edit). Use it when the person asks to change, customize, tidy, simplify, reorder, hide or show anything in Agent HUD, such as quota or balance blocks, rows, accounts, widgets (bar, ring, number, chart), panel sections, the sessions or token lists, panel width or spacing, or the resting HUD's mode (notch, dynamic, simple), edge, position, size, glow, appearance or transparency. It also covers hover timing and other app settings when the person asks for them. Use it for "make the HUD smaller", "show only Codex", "move the HUD to the left", "改一下 HUD", "刘海/动态/简约模式", and to explain what the HUD shows now or why a change was refused. Your changes are drafts, and only the person can save them in the panel.
+description: Rearrange or restyle Agent HUD, the notch or dock HUD on the Mac and its hover panel, with Agent HUD's HUD tools (get_hud, draft_hud, get_hud_screenshot, discard_hud_draft, finish_hud_edit). Use it when the person asks to change, customize, tidy, simplify, reorder, hide or show anything in Agent HUD, such as quota or balance blocks, rows, accounts, widgets (bar, rings, segments, number, chart), panel sections, the sessions or token lists, panel width or spacing, or the resting HUD's mode (notch, dynamic, simple), edge, position, size, glow, appearance or transparency. It also covers hover timing and other app settings when the person asks for them. Use it for "make the HUD smaller", "show only Codex", "move the HUD to the left", "改一下 HUD", "刘海/动态/简约模式", and to explain what the HUD shows now or why a change was refused. Your changes are drafts, and only the person can save them in the panel.
 metadata:
   managed-by: agent-hud
 ---
@@ -52,14 +52,14 @@ Agent HUD adds its tools to this client as an MCP server named `agent-hud`. This
 - `sections`: the order of `"blocks"`, `"tokens"` and `"sessions"`. `hiddenSections` hides some of them.
 - `countdown`: `false` hides the reset countdowns.
 - `blocks.<key>` takes these fields:
-  - `widget`: `bar`, `ring`, `number` or `chart`. Balances (`api:…`) take only `number` or `chart`.
+  - `widget`: `bar`, `rings`, `segments`, `number` or `chart`. `rings` draws an account's windows as concentric rings, the first outermost; `segments` splits one ring into a segment per window (two: top and bottom; three: thirds; four: quarters), the first on top. Both show at most four windows, with a legend of every window beside the ring. Balances (`api:…`) take only `number` or `chart`.
   - `measures`: from `quota`, `burn`, `tokens`, `consumed` and `cost`. A quota `chart` takes only `tokens`. A balance `number` takes `quota`, `burn` and `cost`, and a balance `chart` takes `cost`.
   - `hidden`
   - `rows` sets the order of row ids, and `hiddenRows` hides rows.
   - `accounts` shows only the accounts listed, and `hiddenAccounts` hides accounts. Use `accounts[].id`.
   - `countdown`: quota blocks only.
-  - `columns`: 2–6, for a quota block's `ring` or `number`.
-  - `ringSize`: `small`, `medium` or `large`, for `ring` only.
+  - `columns`: 2–6, for a quota block's `number`.
+  - `ringSize`: `small`, `medium` or `large`, for `rings` and `segments`.
   - `span`: `full` or `half`. Bar rows cannot be `half`.
   - `period`: `day`, `week` or `month`, for a quota `chart` or a balance.
 - `style`:
@@ -84,7 +84,7 @@ Agent HUD adds its tools to this client as an MCP server named `agent-hud`. This
   - `transparency`: 0–1
 - **`dynamic` and `simple`:** `edge` (top, right, bottom or left), `position` (0–1) and `separateAgents`.
 - **`dynamic` only:** `logoSize` (20–60), `logoGap` (0.1–0.6), `edgeDistance` (0–20) and `showLogos`.
-- **`simple` only:** `simpleSize` (20–60), `simpleGap` (0.1–0.6), `ringWidth` (1–4), `showRings` and `showNumbers`.
+- **`simple` only:** `simpleSize` (20–60), `simpleGap` (0.1–0.6), `ringWidth` (1–4), `simpleStyle` and `showNumbers`. `simpleStyle` is how each logo shows its usage: `rings` (concentric rings round it), `segments` (one ring split per window, the default), `bars` (bars beside it) or `numbers` (the most used window's percentage alone). `ringWidth` is also the bars' thickness, and `showNumbers` adds the percentage beside rings, segments or bars.
 - **`reset: true`:** restores the default look. Send it alone, with no other style field.
 - **`glow` (not drawn in `simple`):**
   - `style`: `blur`, `dots`, `ascii`, `blocks`, `braille` or `binary`

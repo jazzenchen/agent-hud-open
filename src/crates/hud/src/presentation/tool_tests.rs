@@ -140,7 +140,7 @@ fn the_layout_get_hud_returned_sent_back_changes_nothing() {
     assert_eq!(drafts(&owner)["layouts"], json!(["all"]));
     draft(
         &owner,
-        json!({"screen": "all", "order": ["codex", "claude"], "blocks": {"claude": {"widget": "ring", "rows": ["acct1/claude-weekly", "acct1/claude-session"], "ringSize": "medium"}}}),
+        json!({"screen": "all", "order": ["codex", "claude"], "blocks": {"claude": {"widget": "rings", "rows": ["acct1/claude-weekly", "acct1/claude-session"], "ringSize": "medium"}}}),
     );
     assert_eq!(drafts(&owner)["layouts"], json!([]));
 }
