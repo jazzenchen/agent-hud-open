@@ -6,7 +6,7 @@
 //! sub-agents, groups and routines included.
 use super::cache as bot;
 use crate::account::{Host, HttpFailure, HttpRequest};
-use crate::cursor::account::{sign_in, SignIn};
+use crate::cursor::account::SignIn;
 use crate::l10n;
 use serde_json::{json, Value};
 use std::collections::{BTreeMap, HashSet};
@@ -39,20 +39,24 @@ fn number(value: &Value) -> Option<u64> {
 }
 
 /// The session records of the last seven days of Grok Bot's per-bot usage,
-/// for the Bot signed in as `slot`. Empty for an account the servers do not
-/// meter.
+/// for the Bot signed in as `slot`, read with `cursor`, Cursor's sign-in or
+/// why it could not be read. Empty for an account the servers do not meter.
 pub(super) fn read(
     host: &dyn Host,
     directory: &Path,
     slot: &str,
+    cursor: &Result<Option<SignIn>, String>,
     now_ms: i64,
 ) -> Result<Vec<Value>, String> {
-    let Some(SignIn { token, .. }) = sign_in(host).map_err(|why| why.reason().to_owned())? else {
-        return Err(l10n::text(
-            "Grok Bot 的 Token 用 Cursor 的登录读取；登录 Cursor 后可见",
-            "Grok Bot's tokens are read with Cursor's sign-in; sign in to Cursor to see them.",
-        ));
-    };
+    let token =
+        match cursor {
+            Ok(Some(SignIn { token, .. })) => token,
+            Ok(None) => return Err(l10n::text(
+                "Grok Bot 的 Token 用 Cursor 的登录读取；登录 Cursor 后可见",
+                "Grok Bot's tokens are read with Cursor's sign-in; sign in to Cursor to see them.",
+            )),
+            Err(why) => return Err(why.clone()),
+        };
     let unreachable = |failure: HttpFailure| match failure {
         HttpFailure::Unreachable => l10n::text(
             "无法读取 Grok Bot 的 Token 用量，请检查网络",
@@ -60,7 +64,7 @@ pub(super) fn read(
         ),
         other => other.message(),
     };
-    let me = post(host, &token, "GetMe", &json!({})).map_err(unreachable)?;
+    let me = post(host, token, "GetMe", &json!({})).map_err(unreachable)?;
     let start = ((now_ms - 7 * 86_400_000) / 86_400_000) * 86_400_000;
     let mut body = json!({
         "periodStartMs": start.to_string(),
@@ -77,7 +81,7 @@ pub(super) fn read(
     {
         body["userId"] = user;
     }
-    let reply = post(host, &token, "GetDailySpendByCategory", &body).map_err(unreachable)?;
+    let reply = post(host, token, "GetDailySpendByCategory", &body).map_err(unreachable)?;
     let Some(rows) = reply["dailySpend"].as_array().or_else(|| {
         // An account with nothing metered answers an empty object.
         reply
@@ -228,6 +232,11 @@ mod tests {
             [token()],
         )
         .unwrap();
+        db.execute(
+            "INSERT INTO ItemTable VALUES ('cursorAuth/cachedEmail', 'me@example.com')",
+            [],
+        )
+        .unwrap();
         let mut host = FakeHost::new("/u")
             .file(&account_file, &account)
             .file(&roster_file, &roster)
@@ -239,6 +248,12 @@ mod tests {
         }
         host.databases.insert(CURSOR_DB.into(), state);
         host
+    }
+
+    /// The tokens of the Bot signed in as slot-1, read with Cursor's sign-in.
+    fn tokens(host: &FakeHost, now: i64) -> Result<Vec<Value>, String> {
+        let cursor = crate::cursor::account::sign_in(host).map_err(|why| why.reason().to_owned());
+        read(host, DIR.as_ref(), "slot-1", &cursor, now)
     }
 
     fn row(category: &str, day: i64, tokens: &str) -> Value {
@@ -255,7 +270,7 @@ mod tests {
             row("bot-b", DAY, "0"),
         ]});
         let host = host(&dir, spend, None);
-        let records = read(&host, DIR.as_ref(), "slot-1", DAY + 3_600_000).unwrap();
+        let records = tokens(&host, DAY + 3_600_000).unwrap();
         assert_eq!(records.len(), 3, "a day without tokens is left out");
         let by = |id: &str| {
             records
@@ -287,20 +302,18 @@ mod tests {
     #[test]
     fn a_merged_account_reads_nothing_and_another_accounts_bots_are_refused() {
         let dir = tempfile::tempdir().unwrap();
-        assert!(
-            read(&host(&dir, json!({}), None), DIR.as_ref(), "slot-1", DAY)
-                .unwrap()
-                .is_empty()
-        );
+        assert!(tokens(&host(&dir, json!({}), None), DAY)
+            .unwrap()
+            .is_empty());
         let dir = tempfile::tempdir().unwrap();
         let theirs = json!({"dailySpend": [row("not-ours", DAY, "7")]});
         assert_eq!(
-            read(&host(&dir, theirs, None), DIR.as_ref(), "slot-1", DAY).unwrap_err(),
+            tokens(&host(&dir, theirs, None), DAY).unwrap_err(),
             "Cursor is signed in to another account than Grok Bot; its tokens are not read."
         );
         let dir = tempfile::tempdir().unwrap();
         let odd = json!({"dailySpend": "none"});
-        assert!(read(&host(&dir, odd, None), DIR.as_ref(), "slot-1", DAY).is_err());
+        assert!(tokens(&host(&dir, odd, None), DAY).is_err());
     }
 
     #[test]
@@ -372,6 +385,10 @@ mod tests {
             account["plan"], "Super",
             "a merged account goes by its merged plan"
         );
+        assert_eq!(
+            account["label"], "me@example.com",
+            "Cursor's sign-in to the same account names it"
+        );
         let checked = chrono::DateTime::parse_from_rfc3339(account["checkedAt"].as_str().unwrap());
         assert!(chrono::Utc::now().timestamp() - checked.unwrap().timestamp() < 60);
         assert!(reading.notice.is_none(), "no cache and no failure to tell");
@@ -383,18 +400,22 @@ mod tests {
         let usage = json!({"hasNonZeroIncludedLimit": true, "isSandTrial": false,
                            "percentUsed": 3.0, "grokPlanLabel": "Grok Bot Plan"});
 
-        // Servers unreachable: the cache, and the reason beside its notice.
+        // The servers refusing the request: the cache, and the reason
+        // beside its notice.
         let mut merged = usage.clone();
         merged["unifiedPlanName"] = json!("Super");
         let dir = tempfile::tempdir().unwrap();
-        let same = host_as(&dir, SAME, json!({}), Some(cached_quota(now, merged)));
+        let same = host_as(&dir, SAME, json!({}), Some(cached_quota(now, merged)))
+            .answer(WEEKLY, Err(HttpFailure::Status(403)));
         let reading = super::super::account::read(&same).unwrap();
         assert_eq!(reading.quotas[0]["usedPercent"], 3.0);
-        assert_eq!(reading.account.unwrap()["plan"], "Super");
+        let account = reading.account.unwrap();
+        assert_eq!(account["plan"], "Super");
+        assert_eq!(account["label"], "me@example.com");
         assert!(reading
             .notice
             .unwrap()
-            .ends_with(" · Grok Bot's weekly usage could not be reached; check the connection."));
+            .starts_with("Quota from Grok Bot cache"));
 
         // Cursor signed in to another account: its quota is not asked for,
         // and the placeholder plan name is no plan.
@@ -405,8 +426,40 @@ mod tests {
         );
         let reading = super::super::account::read(&other).unwrap();
         assert_eq!(reading.quotas[0]["usedPercent"], 3.0);
-        assert!(reading.account.unwrap()["plan"].is_null());
+        let account = reading.account.unwrap();
+        assert!(account["plan"].is_null());
+        assert!(
+            account["label"].is_null(),
+            "another account's email is not the Bot's"
+        );
         assert!(!other.asked.borrow().iter().any(|(url, _)| url == WEEKLY));
+    }
+
+    #[test]
+    fn a_missed_answer_goes_to_the_engine_rather_than_an_older_cache() {
+        let now = chrono::Utc::now().timestamp_millis();
+        let usage = json!({"hasNonZeroIncludedLimit": true, "isSandTrial": false,
+                           "percentUsed": 3.0, "unifiedPlanName": "Super"});
+        for failure in [
+            HttpFailure::Status(503),
+            HttpFailure::Unreachable,
+            HttpFailure::Limited {
+                retry_after: Some(30),
+            },
+        ] {
+            let dir = tempfile::tempdir().unwrap();
+            let host = host_as(
+                &dir,
+                SAME,
+                json!({}),
+                Some(cached_quota(now, usage.clone())),
+            )
+            .answer(WEEKLY, Err(failure));
+            let why = super::super::account::read(&host).err().unwrap();
+            assert_eq!(why.kind(), "transient", "{}", why.reason());
+            // Nothing else is asked for while the servers miss answers.
+            assert!(!host.asked.borrow().iter().any(|(url, _)| url == SPEND));
+        }
     }
 
     #[test]

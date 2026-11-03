@@ -3,8 +3,14 @@
 //! itself. For the cache, when the Bot read it stays the observation time:
 //! reading the file now does not make old data fresh. Its tokens come from
 //! Cursor's servers (`usage.rs`).
+//!
+//! The Bot fills its cache from the same servers, so while they miss an
+//! answer the cache is no newer than the last reading: that failure goes to
+//! the engine as it is, which keeps the last reading through a short outage.
+//! Any other server failure falls back to the cache, with the reason.
 use super::cache as bot;
 use crate::account::{legacy_unresolved, locate, status, Host, Provider, Reading, Unread};
+use crate::cursor::account::sign_in;
 use crate::naming::window_names;
 use crate::{l10n, Location, PerOs, Support};
 use serde_json::{json, Value};
@@ -32,10 +38,6 @@ pub static PROVIDER: Provider = Provider {
 };
 
 pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
-    read_text(host).map_err(Unread::from)
-}
-
-fn read_text(host: &dyn Host) -> Result<Reading, String> {
     let mut r = Reading::empty("grok-bot");
     let Ok(directory) = locate(host, &CACHE) else {
         r.notice = Some(l10n::text(
@@ -52,19 +54,28 @@ fn read_text(host: &dyn Host) -> Result<Reading, String> {
         return Ok(r);
     };
     let now = chrono::Utc::now().timestamp_millis();
-    let tokens = super::usage::read(host, &directory, &slot, now);
-    let quota = match super::weekly::read(host, &slot, now) {
-        Ok(Some(usage)) => quota(&usage, &slot, now),
-        Ok(None) => cached(host, &directory, &slot, now),
-        // The servers failed: the Bot's own cache, with the reason.
-        Err(why) => match cached(host, &directory, &slot, now) {
+    // Cursor's sign-in, read once: the Bot's account is read with it.
+    let cursor = sign_in(host).map_err(|why| why.reason().to_owned());
+    let same = match &cursor {
+        Ok(Some(cursor)) if super::weekly::same_account(&slot, cursor) => Some(cursor),
+        _ => None,
+    };
+    // The account's name, known when Cursor is signed in to it.
+    let email = same.and_then(|cursor| cursor.email.as_deref());
+    let quota = match super::weekly::read(host, same, now) {
+        Ok(Some(usage)) => quota(&usage, &slot, now, email),
+        Ok(None) => cached(host, &directory, &slot, now, email),
+        Err(why @ Unread::Transient { .. }) => return Err(why),
+        // The servers failed otherwise: the Bot's own cache, with the reason.
+        Err(why) => match cached(host, &directory, &slot, now, email) {
             Ok(mut r) => {
-                r.notice = Some(joined(r.notice.take(), why));
+                r.notice = Some(joined(r.notice.take(), why.reason().to_owned()));
                 Ok(r)
             }
-            Err(_) => Err(why),
+            Err(_) => Err(why.reason().to_owned()),
         },
     };
+    let tokens = super::usage::read(host, &directory, &slot, &cursor, now);
     match (quota, tokens) {
         (Ok(mut r), Ok(records)) => {
             r.session_records = records;
@@ -82,7 +93,7 @@ fn read_text(host: &dyn Host) -> Result<Reading, String> {
             r.notice = Some(why);
             Ok(r)
         }
-        (Err(why), _) => Err(why),
+        (Err(why), _) => Err(why.into()),
     }
 }
 
@@ -106,6 +117,7 @@ fn cached(
     directory: &std::path::Path,
     slot: &str,
     now: i64,
+    email: Option<&str>,
 ) -> Result<Reading, String> {
     let value = bot::value_through(host, directory, &bot::quota_key(slot), 2).ok_or_else(|| {
         l10n::text(
@@ -128,7 +140,7 @@ fn cached(
             "Grok Bot's cached quota is more than a day old; open Grok Bot to refresh it.",
         ));
     };
-    let mut r = quota(&value["reading"]["usage"], slot, observed)?;
+    let mut r = quota(&value["reading"]["usage"], slot, observed, email)?;
     r.notice = Some(l10n::text(
         "额度来自 Grok Bot 缓存；在 Bot 中刷新可更新读数",
         "Quota from Grok Bot cache; refresh in Bot to update",
@@ -150,8 +162,9 @@ fn no_personal_quota() -> String {
 }
 
 /// The quota of Grok Bot's weekly `usage` (as its cache keeps it, or as
-/// `weekly` reads it from the servers) for `slot`, read at `observed`.
-fn quota(u: &Value, slot: &str, observed: i64) -> Result<Reading, String> {
+/// `weekly` reads it from the servers) for `slot`, read at `observed`, on
+/// the account named `email` where Cursor's sign-in to it tells.
+fn quota(u: &Value, slot: &str, observed: i64, email: Option<&str>) -> Result<Reading, String> {
     if u["hasNonZeroIncludedLimit"] != true
         || !u["isSandTrial"].is_boolean()
         || u["isTeamSeat"] == true
@@ -187,7 +200,7 @@ fn quota(u: &Value, slot: &str, observed: i64) -> Result<Reading, String> {
         .or_else(|| u["grokPlanLabel"].as_str().filter(|p| *p != NO_PLAN_NAME))
         .filter(|p| !p.is_empty());
     r.account = Some(
-        json!({"id":id,"provider":"grok-bot","identity":"unresolved","plan":plan,"checkedAt":observed}),
+        json!({"id":id,"provider":"grok-bot","identity":"unresolved","label":email,"plan":plan,"checkedAt":observed}),
     );
     Ok(r)
 }

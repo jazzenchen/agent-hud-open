@@ -6,8 +6,8 @@
 //! The reply also says whether the account was merged into SuperGrok
 //! (`isUnified`) and, if so, its plan (`cursorPlanName`), which is the name
 //! Grok Bot shows for a merged account.
-use crate::account::{Host, HttpFailure};
-use crate::cursor::account::{dashboard, sign_in, SignIn};
+use crate::account::{Host, HttpFailure, Unread};
+use crate::cursor::account::{dashboard, SignIn};
 use crate::l10n;
 use serde_json::{json, Map, Value};
 
@@ -20,36 +20,41 @@ fn ms(value: &Value) -> Option<i64> {
     Some(at.timestamp_millis())
 }
 
-/// The weekly usage of the Bot signed in as `slot`, shaped as the `usage`
-/// the Bot keeps in its cache, so that both are read alike. None when
-/// Cursor is not signed in to the same account as the Bot, or the servers
-/// keep no personal weekly usage for it (a team's pooled allowance).
-pub(super) fn read(host: &dyn Host, slot: &str, now_ms: i64) -> Result<Option<Value>, String> {
-    let Some(SignIn { user, token, .. }) = sign_in(host).map_err(|why| why.reason().to_owned())?
-    else {
+/// Whether Cursor's sign-in is the account Grok Bot is signed in to as
+/// `slot`. The Bot's slot is "<provider>|<user>", and Cursor's sign-in names
+/// the same user when both are signed in to one account.
+pub(super) fn same_account(slot: &str, cursor: &SignIn) -> bool {
+    slot.rsplit('|').next() == Some(cursor.user.as_str())
+}
+
+/// The weekly usage of the Bot's account, read with `cursor`, Cursor's
+/// sign-in to the same account, and shaped as the `usage` the Bot keeps in
+/// its cache, so that both are read alike. None without that sign-in, or
+/// when the servers keep no personal weekly usage for the account (a team's
+/// pooled allowance).
+pub(super) fn read(
+    host: &dyn Host,
+    cursor: Option<&SignIn>,
+    now_ms: i64,
+) -> Result<Option<Value>, Unread> {
+    let Some(SignIn { token, .. }) = cursor else {
         return Ok(None);
     };
-    // The Bot's slot is "<provider>|<user>", and Cursor's sign-in names the
-    // same user when both are signed in to one account.
-    if slot.rsplit('|').next() != Some(user.as_str()) {
-        return Ok(None);
-    }
-    let status =
-        dashboard(host, &token, "GetSandUsageStatus").map_err(|failure| match failure {
-            HttpFailure::Unreachable => l10n::text(
-                "无法读取 Grok Bot 的周额度，请检查网络",
-                "Grok Bot's weekly usage could not be reached; check the connection.",
-            ),
-            other => other.message(),
-        })?;
+    let status = dashboard(host, token, "GetSandUsageStatus").map_err(|failure| match failure {
+        HttpFailure::Unreachable => failure.unread_as(l10n::text(
+            "无法读取 Grok Bot 的周额度，请检查网络",
+            "Grok Bot's weekly usage could not be reached; check the connection.",
+        )),
+        other => other.unread(),
+    })?;
     if !status.is_object() {
-        return Err(l10n::text(
+        return Err(Unread::from(l10n::text(
             "Grok Bot 的周额度格式无法识别",
             "Grok Bot's weekly usage has an unsupported format.",
-        ));
+        )));
     }
     // The Bot asks for the period's spend alongside and does without it.
-    let period = dashboard(host, &token, "GetCurrentPeriodUsage").ok();
+    let period = dashboard(host, token, "GetCurrentPeriodUsage").ok();
     Ok(usage(&status, period.as_ref(), now_ms))
 }
 
