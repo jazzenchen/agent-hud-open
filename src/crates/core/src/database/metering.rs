@@ -1838,6 +1838,7 @@ mod retention_tests {
                 &[],
                 &[quota(now - 60_000, json!({"kind":"insufficient-data"}))],
                 &[],
+                &[],
                 now,
             );
             let events = tracker.update(
@@ -1847,6 +1848,7 @@ mod retention_tests {
                     json!({"kind":"exhausts","basis":basis,"beforeReset":true,
                         "exhaustsAt":iso(now + 3 * 3_600_000)}),
                 )],
+                &[],
                 &[],
                 now,
             );
