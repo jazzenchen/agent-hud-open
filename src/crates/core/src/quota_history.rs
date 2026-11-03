@@ -129,6 +129,21 @@ impl AgentHudCore {
     }
 }
 
+/// Where a new cycle began between two readings of a window, (time, used
+/// share) one after the other: the current cycle's start (`cycle_start`)
+/// when it passed between them, else the later reading's time when the
+/// used share fell by `RESET_FALL` points, the earliest the reset is known
+/// to have happened; none within one cycle.
+pub(crate) fn reset_between(
+    previous: (i64, f64),
+    next: (i64, f64),
+    cycle_start: Option<i64>,
+) -> Option<i64> {
+    cycle_start
+        .filter(|start| (previous.0 + 1..=next.0).contains(start))
+        .or((previous.1 - next.1 >= RESET_FALL).then_some(next.0))
+}
+
 /// A window's readings, oldest first, as (time, used share), drawn from
 /// `from` to `to`: the runs a line joins, each thinned to its first reading
 /// and the last of every `bin`, and the resets that start a new cycle in
@@ -153,8 +168,7 @@ fn history(
     let mut run = Vec::new();
     for (index, sample) in samples.iter().copied().enumerate() {
         if let Some(previous) = index.checked_sub(1).map(|index| samples[index]) {
-            let started = cycle_start.filter(|start| (previous.0 + 1..=sample.0).contains(start));
-            let reset = started.or((previous.1 - sample.1 >= RESET_FALL).then_some(sample.0));
+            let reset = reset_between(previous, sample, cycle_start);
             let apart = sample.0 - previous.0;
             let gap = apart > GAP_MS
                 && ((sample.1 - previous.1).abs() >= 0.01
