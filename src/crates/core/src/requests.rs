@@ -5,7 +5,7 @@ use agent_hud_agents::Request;
 use serde_json::Value;
 use std::{
     collections::{HashMap, HashSet, VecDeque},
-    sync::{mpsc, Arc, Mutex},
+    sync::{mpsc, Arc, Mutex, PoisonError},
     time::{SystemTime, UNIX_EPOCH},
 };
 
@@ -76,14 +76,14 @@ impl Default for Requests {
 
 impl Requests {
     pub fn set_waker(&self, wake: Wake) {
-        *self.0.wake.lock().unwrap_or_else(|p| p.into_inner()) = Some(wake);
+        *self.0.wake.lock().unwrap_or_else(PoisonError::into_inner) = Some(wake);
     }
     fn wake(&self) {
         let wake = self
             .0
             .wake
             .lock()
-            .unwrap_or_else(|p| p.into_inner())
+            .unwrap_or_else(PoisonError::into_inner)
             .clone();
         if let Some(wake) = wake {
             wake();
@@ -92,7 +92,7 @@ impl Requests {
     pub fn register(&self, request: Request, now_ms: i64) -> Ticket {
         let (sender, response) = mpsc::channel();
         let ticket = {
-            let mut state = self.0.state.lock().unwrap_or_else(|p| p.into_inner());
+            let mut state = self.0.state.lock().unwrap_or_else(PoisonError::into_inner);
             state.sequence = state.sequence.wrapping_add(1);
             let id = format!("hook:{}:{}:{}", request.source, state.epoch, state.sequence);
             let deadline_ms = now_ms.saturating_add(state.hold_ms as i64);
@@ -118,7 +118,7 @@ impl Requests {
     pub fn register_native(&self, id: String, mut view: Value, now_ms: i64) -> Option<Ticket> {
         let (sender, response) = mpsc::channel();
         let ticket = {
-            let mut state = self.0.state.lock().unwrap_or_else(|p| p.into_inner());
+            let mut state = self.0.state.lock().unwrap_or_else(PoisonError::into_inner);
             if state.dismissed.contains(&id) || state.pending.iter().any(|p| p.id == id) {
                 return None;
             }
@@ -146,7 +146,7 @@ impl Requests {
     /// and its ticket stay.
     pub fn refresh_native(&self, id: &str, mut view: Value) {
         let changed = {
-            let mut state = self.0.state.lock().unwrap_or_else(|p| p.into_inner());
+            let mut state = self.0.state.lock().unwrap_or_else(PoisonError::into_inner);
             view["id"] = Value::String(id.into());
             match state.pending.iter_mut().find(|p| p.id == id) {
                 Some(Pending {
@@ -166,7 +166,7 @@ impl Requests {
     }
     pub fn cancel(&self, id: &str) {
         let removed = {
-            let mut state = self.0.state.lock().unwrap_or_else(|p| p.into_inner());
+            let mut state = self.0.state.lock().unwrap_or_else(PoisonError::into_inner);
             let item = state
                 .pending
                 .iter()
@@ -188,7 +188,7 @@ impl Requests {
         self.0
             .state
             .lock()
-            .unwrap_or_else(|p| p.into_inner())
+            .unwrap_or_else(PoisonError::into_inner)
             .dismissed
             .remove(id);
     }
@@ -197,7 +197,7 @@ impl Requests {
     /// the card goes, and keep it waiting when the client refuses.
     pub fn checked(&self, id: &str, decision: &Value, now_ms: i64) -> Result<Value, String> {
         self.expire(now_ms);
-        let state = self.0.state.lock().unwrap_or_else(|p| p.into_inner());
+        let state = self.0.state.lock().unwrap_or_else(PoisonError::into_inner);
         let item =
             state.pending.iter().find(|p| p.id == id).ok_or_else(|| {
                 l10n::text("这个请求已不再等待", "This request is no longer waiting")
@@ -212,7 +212,7 @@ impl Requests {
     pub fn answer(&self, id: &str, decision: &Value, now_ms: i64) -> Result<(), String> {
         self.expire(now_ms);
         let (item, response) = {
-            let mut state = self.0.state.lock().unwrap_or_else(|p| p.into_inner());
+            let mut state = self.0.state.lock().unwrap_or_else(PoisonError::into_inner);
             let index = state
                 .pending
                 .iter()
@@ -254,7 +254,7 @@ impl Requests {
     }
     pub fn expire(&self, now_ms: i64) {
         let expired = {
-            let mut state = self.0.state.lock().unwrap_or_else(|p| p.into_inner());
+            let mut state = self.0.state.lock().unwrap_or_else(PoisonError::into_inner);
             let mut expired = Vec::new();
             let mut index = 0;
             while index < state.pending.len() {
@@ -282,7 +282,7 @@ impl Requests {
     }
     pub fn clear(&self) {
         let (pending, changed) = {
-            let mut state = self.0.state.lock().unwrap_or_else(|p| p.into_inner());
+            let mut state = self.0.state.lock().unwrap_or_else(PoisonError::into_inner);
             let changed = !state.pending.is_empty() || !state.native_waiting.is_empty();
             if changed {
                 state.revision = state.revision.wrapping_add(1);
@@ -300,7 +300,7 @@ impl Requests {
     }
     pub fn set_hold_ms(&self, hold_ms: u64) {
         let changed = {
-            let mut state = self.0.state.lock().unwrap_or_else(|p| p.into_inner());
+            let mut state = self.0.state.lock().unwrap_or_else(PoisonError::into_inner);
             if state.hold_ms == hold_ms {
                 false
             } else {
@@ -318,7 +318,7 @@ impl Requests {
     /// The first time a waiting request expires or a delivery leaves the
     /// hour it is kept for; `views` and `deliveries` change then.
     pub fn next_deadline(&self) -> Option<i64> {
-        let state = self.0.state.lock().unwrap_or_else(|p| p.into_inner());
+        let state = self.0.state.lock().unwrap_or_else(PoisonError::into_inner);
         let deliveries = state.deliveries.iter().filter_map(|row| {
             row["at"]
                 .as_str()
@@ -336,14 +336,14 @@ impl Requests {
         self.0
             .state
             .lock()
-            .unwrap_or_else(|p| p.into_inner())
+            .unwrap_or_else(PoisonError::into_inner)
             .revision
     }
     pub fn deadline(&self, id: &str) -> Option<i64> {
         self.0
             .state
             .lock()
-            .unwrap_or_else(|p| p.into_inner())
+            .unwrap_or_else(PoisonError::into_inner)
             .pending
             .iter()
             .find(|p| p.id == id)
@@ -353,7 +353,7 @@ impl Requests {
         self.0
             .state
             .lock()
-            .unwrap_or_else(|p| p.into_inner())
+            .unwrap_or_else(PoisonError::into_inner)
             .pending
             .iter()
             .filter(|item| match &item.content {
@@ -364,7 +364,7 @@ impl Requests {
             .min()
     }
     pub fn attention(&self, source: &str, session: &str) -> Vec<Value> {
-        self.0.state.lock().unwrap_or_else(|p| p.into_inner()).pending.iter().filter_map(|item| {
+        self.0.state.lock().unwrap_or_else(PoisonError::into_inner).pending.iter().filter_map(|item| {
             let kind = match &item.content {
                 Content::Hook(request) if request.source == source && request.session_id == session => request.kind.as_str(),
                 Content::Native(view) if view["source"] == source && view["sessionId"] == session => view["kind"].as_str().unwrap_or("permission"),
@@ -382,7 +382,7 @@ impl Requests {
             .cloned()
             .collect();
         let changed = {
-            let mut state = self.0.state.lock().unwrap_or_else(|p| p.into_inner());
+            let mut state = self.0.state.lock().unwrap_or_else(PoisonError::into_inner);
             if state
                 .native_waiting
                 .get(source)
@@ -408,14 +408,14 @@ impl Requests {
         self.0
             .state
             .lock()
-            .unwrap_or_else(|p| p.into_inner())
+            .unwrap_or_else(PoisonError::into_inner)
             .native_waiting
             .clone()
     }
     /// Small per-snapshot index: presentation never locks this owner once for
     /// every historical transcript, or clones tool payloads just to sort sessions.
     pub fn session_attention(&self) -> HashMap<String, HashMap<String, Vec<Value>>> {
-        let state = self.0.state.lock().unwrap_or_else(|p| p.into_inner());
+        let state = self.0.state.lock().unwrap_or_else(PoisonError::into_inner);
         let mut result: HashMap<String, HashMap<String, Vec<Value>>> = HashMap::new();
         for item in &state.pending {
             let (source, session, kind) = match &item.content {
@@ -446,7 +446,7 @@ impl Requests {
         self.0
             .state
             .lock()
-            .unwrap_or_else(|p| p.into_inner())
+            .unwrap_or_else(PoisonError::into_inner)
             .pending
             .iter()
             .map(|item| match &item.content {
@@ -472,7 +472,7 @@ impl Requests {
         let at = chrono::DateTime::<chrono::Utc>::from_timestamp_millis(now_ms)
             .map(|date| date.to_rfc3339());
         {
-            let mut state = self.0.state.lock().unwrap_or_else(|p| p.into_inner());
+            let mut state = self.0.state.lock().unwrap_or_else(PoisonError::into_inner);
             state.deliveries.retain(|row| row["id"] != id);
             state.deliveries.push_back(serde_json::json!({"id":id,"source":source,"sessionId":session,"state":delivery,"reason":reason,"at":at}));
             while state.deliveries.len() > 256 {
@@ -483,7 +483,7 @@ impl Requests {
         self.wake();
     }
     pub fn deliveries(&self, now_ms: i64) -> Vec<Value> {
-        let mut state = self.0.state.lock().unwrap_or_else(|p| p.into_inner());
+        let mut state = self.0.state.lock().unwrap_or_else(PoisonError::into_inner);
         let before = state.deliveries.len();
         state.deliveries.retain(|row| {
             row["at"]
@@ -510,7 +510,7 @@ impl Requests {
         if now_ms.saturating_sub(at_ms) >= 86_400_000 {
             return;
         }
-        let mut state = self.0.state.lock().unwrap_or_else(|p| p.into_inner());
+        let mut state = self.0.state.lock().unwrap_or_else(PoisonError::into_inner);
         let key = (source.into(), session.into(), turn.into());
         if state.reviewers.get(&key).is_some_and(|old| old.at > at_ms) {
             return;
@@ -546,7 +546,7 @@ impl Requests {
         self.0
             .state
             .lock()
-            .unwrap_or_else(|p| p.into_inner())
+            .unwrap_or_else(PoisonError::into_inner)
             .reviewers
             .get(&(source.into(), session.into(), turn.into()))
             .filter(|entry| now_ms.saturating_sub(entry.at) < 86_400_000)

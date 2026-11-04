@@ -5,7 +5,10 @@
 //! gate, republishes, and tells the HUD when a step opens or closes the panel.
 use crate::{wake_collector, Service, REQUEST};
 use agent_hud_runtime::DemoScript;
-use std::{sync::Arc, time::Duration};
+use std::{
+    sync::{Arc, PoisonError},
+    time::Duration,
+};
 use tauri::Emitter;
 
 /// Whether this launch shows the demo.
@@ -47,21 +50,17 @@ pub(crate) fn play(app: tauri::AppHandle, service: &Service) {
                 let Some(backend) = backend.upgrade() else {
                     return;
                 };
-                let Ok(backend) = backend.lock() else { return };
+                let backend = backend.lock().unwrap_or_else(PoisonError::into_inner);
                 backend.runtime.demo_next_at()
             };
             let Some(next) = next else { return };
             std::thread::sleep(Duration::from_millis((next - now()).max(0) as u64));
             let panels = {
-                let _turn = collection
-                    .lock()
-                    .unwrap_or_else(|poisoned| poisoned.into_inner());
+                let _turn = collection.lock().unwrap_or_else(PoisonError::into_inner);
                 let Some(backend) = backend.upgrade() else {
                     return;
                 };
-                let Ok(mut backend) = backend.lock() else {
-                    return;
-                };
+                let mut backend = backend.lock().unwrap_or_else(PoisonError::into_inner);
                 match backend.runtime.demo_play(now()) {
                     Ok(panels) => panels,
                     Err(error) => {

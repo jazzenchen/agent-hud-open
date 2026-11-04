@@ -4,7 +4,7 @@ use serde_json::Value;
 use std::{
     collections::HashSet,
     path::PathBuf,
-    sync::{Arc, Mutex},
+    sync::{Arc, Mutex, PoisonError},
 };
 
 #[derive(Clone, Default)]
@@ -26,13 +26,13 @@ impl Reminders {
         }
         self.0
             .lock()
-            .unwrap_or_else(|p| p.into_inner())
+            .unwrap_or_else(PoisonError::into_inner)
             .insert(path);
     }
     pub fn drain(&self) -> Vec<PathBuf> {
         self.0
             .lock()
-            .unwrap_or_else(|p| p.into_inner())
+            .unwrap_or_else(PoisonError::into_inner)
             .drain()
             .collect()
     }

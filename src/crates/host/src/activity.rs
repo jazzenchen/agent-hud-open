@@ -3,7 +3,10 @@
 //! hidden window is sent nothing: Tauri evaluates an event's payload in every
 //! page that still has a listener for it, whatever the target.
 use serde::Serialize;
-use std::{collections::HashMap, sync::Mutex};
+use std::{
+    collections::HashMap,
+    sync::{Mutex, PoisonError},
+};
 use tauri::{Emitter, Manager};
 
 #[derive(Default)]
@@ -28,7 +31,7 @@ fn current(window: &tauri::WebviewWindow) -> Activity {
 
 fn recorded(app: &tauri::AppHandle, label: &str) -> Option<bool> {
     let state = app.try_state::<WindowActivity>()?;
-    let windows = state.0.lock().ok()?;
+    let windows = state.0.lock().unwrap_or_else(PoisonError::into_inner);
     windows.get(label).copied()
 }
 
@@ -47,9 +50,9 @@ pub(crate) fn window_activity(window: tauri::WebviewWindow) -> Activity {
 fn record(app: &tauri::AppHandle, label: &str, value: Activity) -> (bool, Activity) {
     let changed = app
         .try_state::<WindowActivity>()
-        .and_then(|state| {
-            let mut windows = state.0.lock().ok()?;
-            Some(windows.insert(label.into(), value.active) != Some(value.active))
+        .map(|state| {
+            let mut windows = state.0.lock().unwrap_or_else(PoisonError::into_inner);
+            windows.insert(label.into(), value.active) != Some(value.active)
         })
         .unwrap_or(true);
     (changed, value)
@@ -58,9 +61,11 @@ fn record(app: &tauri::AppHandle, label: &str, value: Activity) -> (bool, Activi
 /// A window that is going away receives no more events.
 pub(crate) fn forget(app: &tauri::AppHandle, label: &str) {
     if let Some(state) = app.try_state::<WindowActivity>() {
-        if let Ok(mut windows) = state.0.lock() {
-            windows.remove(label);
-        }
+        state
+            .0
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .remove(label);
     }
 }
 
@@ -90,15 +95,13 @@ pub(crate) fn publish<S: Serialize + ?Sized>(app: &tauri::AppHandle, event: &str
     // getters to the UI thread: Exit can be waiting for that same Backend lock.
     let inactive: Vec<String> = app
         .try_state::<WindowActivity>()
-        .and_then(|state| {
-            let windows = state.0.lock().ok()?;
-            Some(
-                windows
-                    .iter()
-                    .filter(|(_, active)| !**active)
-                    .map(|(label, _)| label.clone())
-                    .collect(),
-            )
+        .map(|state| {
+            let windows = state.0.lock().unwrap_or_else(PoisonError::into_inner);
+            windows
+                .iter()
+                .filter(|(_, active)| !**active)
+                .map(|(label, _)| label.clone())
+                .collect()
         })
         .unwrap_or_default();
     let filter = |target: &tauri::EventTarget| match target {

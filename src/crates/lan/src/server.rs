@@ -13,7 +13,7 @@ use std::{
     net::{Shutdown, SocketAddr, TcpListener, TcpStream},
     sync::{
         atomic::{AtomicBool, AtomicU64, Ordering},
-        Arc, Mutex,
+        Arc, Mutex, PoisonError,
     },
     thread::{self, JoinHandle},
     time::{Duration, Instant},
@@ -73,7 +73,10 @@ impl<R: Record + Send + 'static> LanServer<R> {
         identity: Identity,
         extension: Extension,
     ) -> Self {
-        let signal = cache.lock().unwrap_or_else(|p| p.into_inner()).signal();
+        let signal = cache
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .signal();
         Self {
             shared: Arc::new(Shared {
                 device,
@@ -131,7 +134,10 @@ impl<R: Record + Send + 'static> LanServer<R> {
                 }
                 match listener.accept() {
                     Ok((socket, address)) => {
-                        let mut sockets = shared.sockets.lock().unwrap_or_else(|p| p.into_inner());
+                        let mut sockets = shared
+                            .sockets
+                            .lock()
+                            .unwrap_or_else(PoisonError::into_inner);
                         if sockets.len() >= 32 {
                             let _ = socket.shutdown(Shutdown::Both);
                             continue;
@@ -148,7 +154,7 @@ impl<R: Record + Send + 'static> LanServer<R> {
                             shared
                                 .sockets
                                 .lock()
-                                .unwrap_or_else(|p| p.into_inner())
+                                .unwrap_or_else(PoisonError::into_inner)
                                 .remove(&id);
                         });
                     }
@@ -181,19 +187,19 @@ impl<R: Record + Send + 'static> LanServer<R> {
             .shared
             .endpoint
             .lock()
-            .unwrap_or_else(|p| p.into_inner());
+            .unwrap_or_else(PoisonError::into_inner);
         let mut others = self
             .shared
             .alternates
             .lock()
-            .unwrap_or_else(|p| p.into_inner());
+            .unwrap_or_else(PoisonError::into_inner);
         if *current != endpoint || *others != alternates {
             *current = endpoint;
             *others = alternates;
             self.shared
                 .credentials
                 .lock()
-                .unwrap_or_else(|p| p.into_inner())
+                .unwrap_or_else(PoisonError::into_inner)
                 .discard_invitations();
             true
         } else {
@@ -208,7 +214,7 @@ impl<R: Record + Send + 'static> LanServer<R> {
             .shared
             .sockets
             .lock()
-            .unwrap_or_else(|p| p.into_inner())
+            .unwrap_or_else(PoisonError::into_inner)
             .values()
         {
             let _ = socket.shutdown(Shutdown::Both);
@@ -224,17 +230,17 @@ impl<R: Record + Send + 'static> LanServer<R> {
             .shared
             .endpoint
             .lock()
-            .unwrap_or_else(|p| p.into_inner()) = None;
+            .unwrap_or_else(PoisonError::into_inner) = None;
         self.shared
             .alternates
             .lock()
-            .unwrap_or_else(|p| p.into_inner())
+            .unwrap_or_else(PoisonError::into_inner)
             .clear();
         let mut credentials = self
             .shared
             .credentials
             .lock()
-            .unwrap_or_else(|p| p.into_inner());
+            .unwrap_or_else(PoisonError::into_inner);
         credentials.discard_invitations();
         if revoke {
             credentials.revoke()?;
@@ -243,13 +249,13 @@ impl<R: Record + Send + 'static> LanServer<R> {
         self.shared
             .streams
             .lock()
-            .unwrap_or_else(|p| p.into_inner())
+            .unwrap_or_else(PoisonError::into_inner)
             .clear();
         for peer in self
             .shared
             .peers
             .lock()
-            .unwrap_or_else(|p| p.into_inner())
+            .unwrap_or_else(PoisonError::into_inner)
             .values_mut()
         {
             peer.online = false;
@@ -257,7 +263,7 @@ impl<R: Record + Send + 'static> LanServer<R> {
         self.shared
             .cache
             .lock()
-            .unwrap_or_else(|p| p.into_inner())
+            .unwrap_or_else(PoisonError::into_inner)
             .clear();
         Ok(())
     }
@@ -265,7 +271,7 @@ impl<R: Record + Send + 'static> LanServer<R> {
         self.shared
             .credentials
             .lock()
-            .unwrap_or_else(|p| p.into_inner())
+            .unwrap_or_else(PoisonError::into_inner)
             .revoke()?;
         self.disconnect();
         Ok(())
@@ -275,7 +281,7 @@ impl<R: Record + Send + 'static> LanServer<R> {
             .shared
             .credentials
             .lock()
-            .unwrap_or_else(|p| p.into_inner());
+            .unwrap_or_else(PoisonError::into_inner);
         credentials.invalidate_automatic();
         if let Some(account) = account {
             credentials.automatic_token(account)?;
@@ -289,13 +295,13 @@ impl<R: Record + Send + 'static> LanServer<R> {
             .shared
             .endpoint
             .lock()
-            .unwrap_or_else(|p| p.into_inner())
+            .unwrap_or_else(PoisonError::into_inner)
             .clone();
         let token = self
             .shared
             .credentials
             .lock()
-            .unwrap_or_else(|p| p.into_inner())
+            .unwrap_or_else(PoisonError::into_inner)
             .automatic_credential()
             .map(str::to_owned);
         match (token, endpoint) {
@@ -315,14 +321,14 @@ impl<R: Record + Send + 'static> LanServer<R> {
             .shared
             .endpoint
             .lock()
-            .unwrap_or_else(|p| p.into_inner())
+            .unwrap_or_else(PoisonError::into_inner)
             .clone()
             .ok_or("No active local network address")?;
         let (token, expires) = self
             .shared
             .credentials
             .lock()
-            .unwrap_or_else(|p| p.into_inner())
+            .unwrap_or_else(PoisonError::into_inner)
             .invite(now);
         let invitation = with_alternates(
             json!({"schemaVersion":1,"deviceID":self.shared.device,"deviceName":self.shared.name,"endpoint":endpoint,"certificateSHA256":self.shared.identity.fingerprint,"token":token,"expiresAtMs":expires}),
@@ -349,7 +355,7 @@ impl<R: Record + Send + 'static> LanServer<R> {
             .shared
             .peers
             .lock()
-            .unwrap_or_else(|p| p.into_inner())
+            .unwrap_or_else(PoisonError::into_inner)
             .values()
             .cloned()
             .collect::<Vec<_>>();
@@ -359,7 +365,7 @@ impl<R: Record + Send + 'static> LanServer<R> {
                 .then_with(|| b.last_seen_ms.cmp(&a.last_seen_ms))
         });
         with_alternates(
-            json!({"enabled":self.port.is_some(),"port":self.port,"endpoint":*self.shared.endpoint.lock().unwrap_or_else(|p|p.into_inner()),"pairedClients":self.shared.credentials.lock().unwrap_or_else(|p|p.into_inner()).count(),"peers":peers}),
+            json!({"enabled":self.port.is_some(),"port":self.port,"endpoint":*self.shared.endpoint.lock().unwrap_or_else(PoisonError::into_inner),"pairedClients":self.shared.credentials.lock().unwrap_or_else(PoisonError::into_inner).count(),"peers":peers}),
             &self.shared,
         )
     }
@@ -369,13 +375,13 @@ impl<R: Record + Send + 'static> LanServer<R> {
         self.shared
             .streams
             .lock()
-            .unwrap_or_else(|p| p.into_inner())
+            .unwrap_or_else(PoisonError::into_inner)
             .clear();
         for peer in self
             .shared
             .peers
             .lock()
-            .unwrap_or_else(|p| p.into_inner())
+            .unwrap_or_else(PoisonError::into_inner)
             .values_mut()
         {
             peer.online = false;
@@ -384,7 +390,7 @@ impl<R: Record + Send + 'static> LanServer<R> {
             .shared
             .sockets
             .lock()
-            .unwrap_or_else(|p| p.into_inner())
+            .unwrap_or_else(PoisonError::into_inner)
             .values()
         {
             let _ = socket.shutdown(Shutdown::Both);
@@ -422,7 +428,7 @@ fn with_alternates<R>(mut value: Value, shared: &Shared<R>) -> Value {
     let alternates = shared
         .alternates
         .lock()
-        .unwrap_or_else(|p| p.into_inner())
+        .unwrap_or_else(PoisonError::into_inner)
         .clone();
     if !alternates.is_empty() {
         value["alternateEndpoints"] = json!(alternates);
@@ -511,7 +517,7 @@ fn connection<R: Record>(shared: &Shared<R>, socket: TcpStream, address: SocketA
         let token = shared
             .credentials
             .lock()
-            .unwrap_or_else(|p| p.into_inner())
+            .unwrap_or_else(PoisonError::into_inner)
             .pair(token, client, now())?;
         let Some(token) = token else {
             return reply(410, &[], &[]);
@@ -519,7 +525,7 @@ fn connection<R: Record>(shared: &Shared<R>, socket: TcpStream, address: SocketA
         let endpoint = shared
             .endpoint
             .lock()
-            .unwrap_or_else(|p| p.into_inner())
+            .unwrap_or_else(PoisonError::into_inner)
             .clone();
         let Some(endpoint) = endpoint else {
             return reply(503, &[], &[]);
@@ -527,7 +533,7 @@ fn connection<R: Record>(shared: &Shared<R>, socket: TcpStream, address: SocketA
         if let Some(authorization) = shared
             .credentials
             .lock()
-            .unwrap_or_else(|p| p.into_inner())
+            .unwrap_or_else(PoisonError::into_inner)
             .authorization(&token)
         {
             remember_peer(shared, &request, address, &authorization, false);
@@ -546,7 +552,7 @@ fn connection<R: Record>(shared: &Shared<R>, socket: TcpStream, address: SocketA
     let authorization = shared
         .credentials
         .lock()
-        .unwrap_or_else(|p| p.into_inner())
+        .unwrap_or_else(PoisonError::into_inner)
         .authorization(token);
     let Some(authorization) = authorization else {
         return reply(401, &[], &[]);
@@ -590,7 +596,7 @@ fn connection<R: Record>(shared: &Shared<R>, socket: TcpStream, address: SocketA
                 || shared
                     .credentials
                     .lock()
-                    .unwrap_or_else(|p| p.into_inner())
+                    .unwrap_or_else(PoisonError::into_inner)
                     .authorization(token)
                     .is_none()
             {
@@ -599,7 +605,7 @@ fn connection<R: Record>(shared: &Shared<R>, socket: TcpStream, address: SocketA
             // Read before the head, so a commit after this look still wakes the wait.
             let seen = shared.signal.current();
             let (frame, latest) = {
-                let cache = shared.cache.lock().unwrap_or_else(|p| p.into_inner());
+                let cache = shared.cache.lock().unwrap_or_else(PoisonError::into_inner);
                 (
                     next_frame(&cache, changes, &mut told),
                     cache.head().map(|s| (s.revision.clone(), s.cursor.clone())),
@@ -634,7 +640,10 @@ fn connection<R: Record>(shared: &Shared<R>, socket: TcpStream, address: SocketA
             );
         }
         let online = {
-            let mut streams = shared.streams.lock().unwrap_or_else(|p| p.into_inner());
+            let mut streams = shared
+                .streams
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner);
             if let Some(count) = streams.get_mut(&peer_id) {
                 *count = count.saturating_sub(1);
                 if *count == 0 {
@@ -650,7 +659,7 @@ fn connection<R: Record>(shared: &Shared<R>, socket: TcpStream, address: SocketA
         if let Some(peer) = shared
             .peers
             .lock()
-            .unwrap_or_else(|p| p.into_inner())
+            .unwrap_or_else(PoisonError::into_inner)
             .get_mut(&peer_id)
         {
             peer.online = online;
@@ -658,7 +667,7 @@ fn connection<R: Record>(shared: &Shared<R>, socket: TcpStream, address: SocketA
         }
         return Ok(());
     }
-    let mut cache = shared.cache.lock().unwrap_or_else(|p| p.into_inner());
+    let mut cache = shared.cache.lock().unwrap_or_else(PoisonError::into_inner);
     let Some(head) = cache.head() else {
         drop(cache);
         return reply(503, &[], &[]);
@@ -760,13 +769,16 @@ fn remember_peer<R>(
         Authorization::Paired { client_id_hash } => format!("client:{client_id_hash}"),
     };
     let online = {
-        let mut streams = shared.streams.lock().unwrap_or_else(|p| p.into_inner());
+        let mut streams = shared
+            .streams
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
         if streaming {
             *streams.entry(peer_id.clone()).or_default() += 1;
         }
         streams.get(&peer_id).copied().unwrap_or(0) > 0
     };
-    let mut peers = shared.peers.lock().unwrap_or_else(|p| p.into_inner());
+    let mut peers = shared.peers.lock().unwrap_or_else(PoisonError::into_inner);
     let prior = peers.get(&peer_id);
     let prior_name = prior.and_then(|p| p.name.clone());
     let prior_version = prior.and_then(|p| p.version.clone());

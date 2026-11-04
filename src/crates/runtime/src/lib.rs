@@ -5,7 +5,7 @@ use agent_hud_platform::{AccountService, FileChanges, NativePlatform};
 use serde_json::{json, Value};
 use std::{
     path::{Path, PathBuf},
-    sync::{Arc, Mutex},
+    sync::{Arc, Mutex, PoisonError},
 };
 
 mod demo;
@@ -132,7 +132,7 @@ impl Runtime {
         )?));
         hooks
             .lock()
-            .unwrap_or_else(|p| p.into_inner())
+            .unwrap_or_else(PoisonError::into_inner)
             .observe_local_clients()?;
         core.set_platform(platform.name());
         core.set_provider_discovery(platform.discover_providers());
@@ -212,7 +212,7 @@ impl Runtime {
         self.core.requests().set_waker(Arc::clone(&wake));
         self.hooks
             .lock()
-            .unwrap_or_else(|p| p.into_inner())
+            .unwrap_or_else(PoisonError::into_inner)
             .set_waker(wake);
     }
     /// The product host's way to send words into a session as its user's
@@ -239,7 +239,7 @@ impl Runtime {
                 .map_err(|_| "The application executable is unavailable")?,
             canonical_executable: Some(canonical_executable),
         };
-        let mut hooks = self.hooks.lock().unwrap_or_else(|p| p.into_inner());
+        let mut hooks = self.hooks.lock().unwrap_or_else(PoisonError::into_inner);
         hooks.delegate_owner(context)?;
         if self.core.client_hooks_enabled() {
             hooks.set_enabled(true)?;
@@ -280,7 +280,7 @@ impl Runtime {
         let paths = self
             .hooks
             .lock()
-            .unwrap_or_else(|p| p.into_inner())
+            .unwrap_or_else(PoisonError::into_inner)
             .drain_log_reminders();
         self.log_reminders.remind(paths);
         let due = self.log_reminders.due(std::time::Instant::now());
@@ -367,7 +367,7 @@ impl Runtime {
             return Ok(self
                 .hooks
                 .lock()
-                .unwrap_or_else(|p| p.into_inner())
+                .unwrap_or_else(PoisonError::into_inner)
                 .antigravity_cli_status());
         }
         if method == "set_setting" {
@@ -392,7 +392,7 @@ impl Runtime {
                             .ok_or("Each CLI setting must name a path")
                     })
                     .collect::<Result<Vec<_>, _>>()?;
-                let hooks = self.hooks.lock().unwrap_or_else(|p| p.into_inner());
+                let hooks = self.hooks.lock().unwrap_or_else(PoisonError::into_inner);
                 let change = hooks
                     .set_antigravity_cli_accounts(&self.core.antigravity_cli_settings(), &next)?;
                 let result = self.core.request(
@@ -455,7 +455,7 @@ impl Runtime {
         let events = self
             .hooks
             .lock()
-            .unwrap_or_else(|p| p.into_inner())
+            .unwrap_or_else(PoisonError::into_inner)
             .drain_events();
         let events = events
             .into_iter()
@@ -475,7 +475,7 @@ impl Runtime {
 
     fn decorate_snapshot(&self, mut result: Value, update_accounts: bool) -> Value {
         if result.get("schemaVersion").is_some() {
-            let hooks = self.hooks.lock().unwrap_or_else(|p| p.into_inner());
+            let hooks = self.hooks.lock().unwrap_or_else(PoisonError::into_inner);
             let desired = result["settings"]["clientHooks"].as_bool().unwrap_or(false);
             if let Some(connection) = result["connection"].as_object_mut() {
                 connection.insert("platformCapabilities".into(), self.platform.capabilities());

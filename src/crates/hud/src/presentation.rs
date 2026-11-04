@@ -13,7 +13,7 @@ use std::{
     collections::HashMap,
     fs,
     path::PathBuf,
-    sync::{LazyLock, Mutex},
+    sync::{LazyLock, Mutex, PoisonError},
     time::{SystemTime, UNIX_EPOCH},
 };
 static DEFAULTS: LazyLock<Map<String, Value>> = LazyLock::new(|| {
@@ -159,10 +159,7 @@ impl Presentation {
     }
     /// One-time, read-only legacy import. Existing native preferences always win.
     pub fn seed_if_absent(&self, legacy: &Value) -> Result<(), String> {
-        let mut s = self
-            .state
-            .lock()
-            .map_err(|_| "Display preference owner unavailable")?;
+        let mut s = self.state.lock().unwrap_or_else(PoisonError::into_inner);
         if s.initialized {
             return Ok(());
         }
@@ -237,12 +234,12 @@ impl Presentation {
     pub fn revision(&self) -> u64 {
         self.state
             .lock()
-            .unwrap_or_else(|p| p.into_inner())
+            .unwrap_or_else(PoisonError::into_inner)
             .revision
     }
 
     pub fn view(&self) -> Value {
-        let mut state = self.state.lock().unwrap_or_else(|p| p.into_inner());
+        let mut state = self.state.lock().unwrap_or_else(PoisonError::into_inner);
         Self::view_of(&mut state)
     }
     fn view_of(s: &mut State) -> Value {
@@ -273,7 +270,7 @@ impl Presentation {
     }
     /// Apply display preferences once at the host boundary, before any window or product relay sees data.
     pub fn project_snapshot(&self, snapshot: &mut Value) {
-        let mut s = self.state.lock().unwrap_or_else(|p| p.into_inner());
+        let mut s = self.state.lock().unwrap_or_else(PoisonError::into_inner);
         self.apply_live_status_defaults(&mut s, snapshot);
         snapshot["sourcePreferences"] = Value::Object(s.saved.sources.clone());
         if let Some(sessions) = snapshot["sessions"]
@@ -339,13 +336,13 @@ impl Presentation {
     }
     /// Shows or hides the notch glow.
     pub fn toggle_glow(&self) -> Value {
-        let mut s = self.state.lock().unwrap_or_else(|p| p.into_inner());
+        let mut s = self.state.lock().unwrap_or_else(PoisonError::into_inner);
         s.glow_hidden = !s.glow_hidden;
         s.revision = s.revision.wrapping_add(1);
         Self::view_of(&mut s)
     }
     pub fn manual_app_edit(&self, key: &str) -> Option<Value> {
-        let mut s = self.state.lock().unwrap_or_else(|p| p.into_inner());
+        let mut s = self.state.lock().unwrap_or_else(PoisonError::into_inner);
         if !clear_app_field(&mut s, key) {
             return None;
         }
@@ -353,17 +350,14 @@ impl Presentation {
         Some(Self::view_of(&mut s))
     }
     pub fn screens(&self, screens: Vec<Value>) {
-        let mut s = self.state.lock().unwrap_or_else(|p| p.into_inner());
+        let mut s = self.state.lock().unwrap_or_else(PoisonError::into_inner);
         if s.screens != screens {
             s.screens = screens;
             s.revision = s.revision.wrapping_add(1);
         }
     }
     pub fn update(&self, params: Value) -> Result<Value, String> {
-        let mut s = self
-            .state
-            .lock()
-            .map_err(|_| "Display preference owner unavailable")?;
+        let mut s = self.state.lock().unwrap_or_else(PoisonError::into_inner);
         let checkpoint = s.clone();
         let before = s.saved.clone();
         let id = params["screen"].as_str().unwrap_or("all");
@@ -414,10 +408,7 @@ impl Presentation {
         Ok(Self::view_of(&mut s))
     }
     pub fn import(&self, params: Value) -> Result<Value, String> {
-        let mut s = self
-            .state
-            .lock()
-            .map_err(|_| "Display preference owner unavailable")?;
+        let mut s = self.state.lock().unwrap_or_else(PoisonError::into_inner);
         if !s.initialized {
             if let Some(store) = params.get("store").filter(|v| v["version"] == 3) {
                 let checkpoint = s.clone();
@@ -447,10 +438,7 @@ impl Presentation {
         Ok(Self::view_of(&mut s))
     }
     pub fn source_update(&self, params: Value) -> Result<Value, String> {
-        let mut s = self
-            .state
-            .lock()
-            .map_err(|_| "Display preference owner unavailable")?;
+        let mut s = self.state.lock().unwrap_or_else(PoisonError::into_inner);
         let checkpoint = s.clone();
         let before = s.saved.clone();
         let source = params["source"].as_str().ok_or("Source is required")?;
@@ -470,10 +458,7 @@ impl Presentation {
         Ok(Self::view_of(&mut s))
     }
     pub fn set_layout(&self, params: Value) -> Result<Value, String> {
-        let mut s = self
-            .state
-            .lock()
-            .map_err(|_| "Display preference owner unavailable")?;
+        let mut s = self.state.lock().unwrap_or_else(PoisonError::into_inner);
         let checkpoint = s.clone();
         let before = s.saved.clone();
         let screen = params["screen"].as_str().unwrap_or("all");
@@ -496,10 +481,7 @@ impl Presentation {
         screen: &str,
         commit: impl FnOnce(&Value) -> Result<(), String>,
     ) -> Result<Value, String> {
-        let mut s = self
-            .state
-            .lock()
-            .map_err(|_| "Display preference owner unavailable")?;
+        let mut s = self.state.lock().unwrap_or_else(PoisonError::into_inner);
         let checkpoint = s.clone();
         let before = s.saved.clone();
         let patch = s.app.as_ref().map(tools::app_settings).unwrap_or(json!({}));
@@ -540,7 +522,7 @@ impl Presentation {
         Ok(Self::view_of(&mut s))
     }
     pub fn discard_panel(&self, screen: &str) -> Value {
-        let mut s = self.state.lock().unwrap_or_else(|p| p.into_inner());
+        let mut s = self.state.lock().unwrap_or_else(PoisonError::into_inner);
         let scope = if s.layouts.contains_key(screen) {
             screen
         } else {
@@ -554,7 +536,7 @@ impl Presentation {
         Self::view_of(&mut s)
     }
     pub fn release_hold(&self, screen: &str) -> Value {
-        let mut s = self.state.lock().unwrap_or_else(|p| p.into_inner());
+        let mut s = self.state.lock().unwrap_or_else(PoisonError::into_inner);
         s.holds.remove(screen);
         Self::view_of(&mut s)
     }

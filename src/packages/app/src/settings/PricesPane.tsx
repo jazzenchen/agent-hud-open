@@ -47,9 +47,10 @@ export function PricesPane({ snapshot, action }: SettingsPaneProps) {
         ),
     [action],
   );
+  // Read again when the ledger changes, so the 30-day token counts stay live.
   useEffect(() => {
     void load();
-  }, [load]);
+  }, [load, snapshot.statisticsRevision]);
   const save = (key: string, value: unknown) =>
     run(async () => {
       await action("set_setting", { key, value });

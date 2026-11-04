@@ -2,6 +2,7 @@
 use agent_hud_runtime::Runtime;
 use serde_json::{json, Value};
 use std::io::{self, BufRead, Write};
+use std::sync::PoisonError;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     if let Some(status) = agent_hud_runtime::hooks::entry(&std::env::args().collect::<Vec<_>>()) {
@@ -53,9 +54,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             .filter(|_| {
                                 matches!(method, "snapshot" | "refresh" | "request_snapshot")
                             })
-                            .map(|gate| {
-                                gate.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
-                            });
+                            .map(|gate| gate.lock().unwrap_or_else(PoisonError::into_inner));
                         match runtime
                             .as_mut()
                             .unwrap()

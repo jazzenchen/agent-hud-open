@@ -3,7 +3,7 @@
 //! projects it from each snapshot itself; no window has to stay open for it.
 use crate::vendors::Vendor;
 use serde_json::Value;
-use std::sync::Mutex;
+use std::sync::{Mutex, PoisonError};
 use tauri::{
     menu::{Menu, MenuItem, PredefinedMenuItem},
     tray::TrayIconBuilder,
@@ -242,7 +242,7 @@ pub(crate) fn project(
 pub(crate) fn apply(app: &tauri::AppHandle, state: Presentation) -> Result<(), String> {
     use tauri::Manager;
     let owner = app.state::<TrayState>();
-    let mut shown = owner.0.lock().map_err(|_| "Tray owner is unavailable")?;
+    let mut shown = owner.0.lock().unwrap_or_else(PoisonError::into_inner);
     if shown.as_ref() == Some(&state) {
         return Ok(());
     }

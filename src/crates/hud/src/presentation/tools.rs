@@ -671,10 +671,7 @@ pub(super) fn call(
     snapshot: &Value,
     catalog: Option<&Value>,
 ) -> Result<Value, String> {
-    let mut guard = owner
-        .state
-        .lock()
-        .map_err(|_| "Display preference owner unavailable")?;
+    let mut guard = owner.state.lock().unwrap_or_else(PoisonError::into_inner);
     let mut transaction = guard.clone();
     let s = &mut transaction;
     let changes = |s: &State| (s.layouts.clone(), s.styles.clone(), s.app.clone());

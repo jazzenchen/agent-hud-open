@@ -12,7 +12,7 @@ use std::{
     path::{Path, PathBuf},
     sync::{
         atomic::{AtomicU64, Ordering},
-        Arc, Mutex,
+        Arc, Mutex, PoisonError,
     },
 };
 const RECORD_LIMIT: u64 = 64 * 1024;
@@ -194,7 +194,7 @@ impl Inbox {
                     return;
                 };
                 {
-                    let mut pending = changes.lock().unwrap_or_else(|p| p.into_inner());
+                    let mut pending = changes.lock().unwrap_or_else(PoisonError::into_inner);
                     match change {
                         Change::Full => *pending = None,
                         Change::Paths(paths) => {
@@ -219,7 +219,7 @@ impl Inbox {
     }
     pub fn drain(&mut self) -> Vec<HookEvent> {
         let changed = {
-            let mut pending = self.pending.lock().unwrap_or_else(|p| p.into_inner());
+            let mut pending = self.pending.lock().unwrap_or_else(PoisonError::into_inner);
             (*pending).replace(HashSet::new())
         };
         if changed.as_ref().is_some_and(HashSet::is_empty) {
@@ -233,7 +233,7 @@ impl Inbox {
             paths
         } else {
             let Ok(entries) = fs::read_dir(&self.directory) else {
-                *self.pending.lock().unwrap_or_else(|p| p.into_inner()) = None;
+                *self.pending.lock().unwrap_or_else(PoisonError::into_inner) = None;
                 return events;
             };
             entries

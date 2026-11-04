@@ -4,7 +4,7 @@ use agent_hud_core::l10n;
 use reqwest::{blocking::Client, header::HeaderValue};
 use serde_json::{json, Value};
 use std::{
-    sync::{Mutex, OnceLock},
+    sync::{Mutex, OnceLock, PoisonError},
     time::{Duration, Instant},
 };
 mod running {
@@ -298,28 +298,25 @@ impl Service {
     fn cached(&self) -> Vec<Endpoint> {
         self.state
             .lock()
-            .map(|state| state.endpoints.clone())
-            .unwrap_or_default()
+            .unwrap_or_else(PoisonError::into_inner)
+            .endpoints
+            .clone()
     }
     fn discover(&self, fresh: bool, strict: bool) -> Result<Vec<Endpoint>, String> {
-        let _guard = self
-            .resolve
-            .lock()
-            .map_err(|_| "Antigravity service discovery is unavailable")?;
+        let _guard = self.resolve.lock().unwrap_or_else(PoisonError::into_inner);
         if !fresh {
-            if let Ok(state) = self.state.lock() {
-                if !state.endpoints.is_empty() && (!strict || state.complete) {
-                    return Ok(state.endpoints.clone());
-                }
-                if state
-                    .failed_at
-                    .is_some_and(|at| at.elapsed() < Duration::from_secs(5))
-                {
-                    return Err(l10n::text(
-                        "启动并登录 Antigravity 后读取额度",
-                        "Start and sign in to Antigravity to use its local service",
-                    ));
-                }
+            let state = self.state.lock().unwrap_or_else(PoisonError::into_inner);
+            if !state.endpoints.is_empty() && (!strict || state.complete) {
+                return Ok(state.endpoints.clone());
+            }
+            if state
+                .failed_at
+                .is_some_and(|at| at.elapsed() < Duration::from_secs(5))
+            {
+                return Err(l10n::text(
+                    "启动并登录 Antigravity 后读取额度",
+                    "Start and sign in to Antigravity to use its local service",
+                ));
             }
         }
         let deadline = Instant::now() + Duration::from_secs(20);
@@ -364,11 +361,10 @@ impl Service {
             }
         }
         let complete = found.len() == expected;
-        if let Ok(mut state) = self.state.lock() {
-            state.endpoints = found.clone();
-            state.complete = complete;
-            state.failed_at = found.is_empty().then(Instant::now);
-        }
+        let mut state = self.state.lock().unwrap_or_else(PoisonError::into_inner);
+        state.endpoints = found.clone();
+        state.complete = complete;
+        state.failed_at = found.is_empty().then(Instant::now);
         if strict && !complete {
             return Err(l10n::text(
                 "部分正在运行的 Antigravity 服务无法核实",
@@ -390,11 +386,11 @@ pub fn endpoints(fresh: bool) -> Result<Vec<Endpoint>, String> {
 pub fn read_accounts(params: &Value) -> Result<Value, String> {
     let service = service()?;
     let endpoints = service.discover(true, false)?;
-    let mut partial = service
+    let mut partial = !service
         .state
         .lock()
-        .map(|state| !state.complete)
-        .unwrap_or(true);
+        .unwrap_or_else(PoisonError::into_inner)
+        .complete;
     let mut accounts = Vec::new();
     for endpoint in endpoints {
         match service.send(&endpoint, "GetUserStatus", params) {
@@ -553,10 +549,9 @@ pub fn call(method: &str, params: &Value) -> Result<Value, String> {
         if let Ok(value) = service.send(&endpoint, method, params) {
             return Ok(value);
         }
-        if let Ok(mut state) = service.state.lock() {
-            state.endpoints.retain(|old| old != &endpoint);
-            state.complete = false;
-        }
+        let mut state = service.state.lock().unwrap_or_else(PoisonError::into_inner);
+        state.endpoints.retain(|old| old != &endpoint);
+        state.complete = false;
     }
     let mut last = None;
     for endpoint in service.discover(true, false)? {

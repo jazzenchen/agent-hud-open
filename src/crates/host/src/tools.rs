@@ -6,7 +6,7 @@ use std::{
     path::PathBuf,
     sync::{
         atomic::{AtomicBool, Ordering},
-        Arc, Mutex, Weak,
+        Arc, Mutex, PoisonError, Weak,
     },
 };
 use tauri::Manager;
@@ -61,9 +61,7 @@ impl ToolsChannel {
         }
     }
     pub(super) fn configure(&self, enabled: bool) -> Value {
-        let Ok(mut state) = self.state.lock() else {
-            return json!({"supported":local_tools::supported(),"enabled":enabled,"listening":false,"notice":"Local tools state unavailable"});
-        };
+        let mut state = self.state.lock().unwrap_or_else(PoisonError::into_inner);
         state.configure(enabled, || {
             let backend = self.backend.clone();
             let app = self.app.clone();
@@ -80,9 +78,7 @@ impl ToolsChannel {
         })
     }
     pub(super) fn stop(&self) {
-        if let Ok(mut state) = self.state.lock() {
-            *state = ChannelState::Disabled;
-        }
+        *self.state.lock().unwrap_or_else(PoisonError::into_inner) = ChannelState::Disabled;
     }
 }
 
@@ -118,7 +114,7 @@ fn handle(
         // work takes.
         let extension = backend
             .lock()
-            .map_err(|_| "Application state unavailable")?
+            .unwrap_or_else(PoisonError::into_inner)
             .extension
             .clone();
         if !active.load(Ordering::Acquire) {
@@ -128,9 +124,7 @@ fn handle(
         let params = with_caller(plugin.channel(), params, std::time::SystemTime::now());
         return host_request(extension.as_deref(), method, params);
     }
-    let mut owner = backend
-        .lock()
-        .map_err(|_| "Application state unavailable")?;
+    let mut owner = backend.lock().unwrap_or_else(PoisonError::into_inner);
     if !active.load(Ordering::Acquire) {
         return Err("Local tools are disabled".into());
     }

@@ -4,12 +4,7 @@ import { Card } from "@agent-hud/ui/components/card";
 import { Button } from "@agent-hud/ui/components/button";
 import { Tabs, TabsList, TabsTrigger } from "@agent-hud/ui/components/tabs";
 import { HUDArtwork as HUDLogo } from "@agent-hud/hud/HUDArtwork";
-import {
-  sessionClient,
-  sessionWhere,
-  tokenKindOrder,
-  type TokenKindName,
-} from "../lib/sessions";
+import { presentKinds, sessionClient, sessionWhere } from "../lib/sessions";
 import {
   countdown,
   dateFormat,
@@ -94,15 +89,6 @@ function turnNotes(entry: Entry, zh: boolean): string[] {
         (zh ? " 按 API 价" : " at API prices"),
     );
   return notes;
-}
-
-/** The kinds present in `tokens`, in Open's order (`TokenKind.allCases`). */
-function presentKinds(
-  tokens: Partial<Record<TokenKindName, number>> | null | undefined,
-): { kind: TokenKindName; value: number }[] {
-  return tokenKindOrder
-    .map((kind) => ({ kind, value: tokens?.[kind] ?? 0 }))
-    .filter((entry) => entry.value > 0);
 }
 
 /** A card's title line: its name, and on the right what it measures or a control. */

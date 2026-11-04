@@ -4,7 +4,7 @@ use crate::{extension::ProductExtension, Backend};
 use agent_hud_share::PhoneShare;
 use std::{
     path::PathBuf,
-    sync::{Arc, Mutex, Weak},
+    sync::{Arc, Mutex, PoisonError, Weak},
 };
 
 /// `directory` is None for the demo, which shares nothing.
@@ -19,9 +19,7 @@ pub(crate) fn start(
     }
     let query = Arc::new(move |method: &str, params| {
         let backend = backend.upgrade().ok_or("Application is stopping")?;
-        let mut backend = backend
-            .lock()
-            .map_err(|_| "Application state unavailable")?;
+        let mut backend = backend.lock().unwrap_or_else(PoisonError::into_inner);
         backend.runtime.local_query(method, params)
     });
     match PhoneShare::start(directory, query) {

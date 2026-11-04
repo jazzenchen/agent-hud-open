@@ -10,7 +10,7 @@ use std::{
     sync::{
         atomic::{AtomicBool, Ordering},
         mpsc::RecvTimeoutError,
-        Arc, Condvar, Mutex,
+        Arc, Condvar, Mutex, PoisonError,
     },
     thread::{self, JoinHandle},
     time::Duration,
@@ -54,7 +54,7 @@ impl Drop for Observer {
                 .shared
                 .pending
                 .lock()
-                .unwrap_or_else(|p| p.into_inner());
+                .unwrap_or_else(PoisonError::into_inner);
             for id in known.keys() {
                 self.shared.requests.settle_native(id);
             }
@@ -107,7 +107,10 @@ fn work(shared: Arc<Shared>) {
     let mut waiters: Vec<JoinHandle<()>> = Vec::new();
     while shared.active.load(Ordering::Acquire) {
         let fetched = fetch(&shared.active);
-        let mut known = shared.pending.lock().unwrap_or_else(|p| p.into_inner());
+        let mut known = shared
+            .pending
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
         if !shared.active.load(Ordering::Acquire) {
             break;
         }
@@ -163,7 +166,10 @@ fn work(shared: Arc<Shared>) {
                 Err(_) => shared.requests.cancel(&id),
             }
         }
-        let guard = shared.pending.lock().unwrap_or_else(|p| p.into_inner());
+        let guard = shared
+            .pending
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
         if shared.active.load(Ordering::Acquire) {
             let _ = shared.changed.wait_timeout(guard, Duration::from_secs(2));
         }

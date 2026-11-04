@@ -14,7 +14,7 @@ use std::{
     sync::{
         atomic::{AtomicBool, Ordering},
         mpsc::RecvTimeoutError,
-        Arc, Condvar, Mutex,
+        Arc, Condvar, Mutex, PoisonError,
     },
     thread,
     time::{Duration, Instant},
@@ -385,7 +385,7 @@ struct Shared {
 impl Shared {
     fn publish_waiting(&self) {
         let sessions: Vec<String> = {
-            let state = self.state.lock().unwrap_or_else(|p| p.into_inner());
+            let state = self.state.lock().unwrap_or_else(PoisonError::into_inner);
             let mut set: Vec<String> = state
                 .pending
                 .values()
@@ -403,7 +403,7 @@ impl Shared {
 
     fn withdraw(&self, id: &str) {
         {
-            let mut state = self.state.lock().unwrap_or_else(|p| p.into_inner());
+            let mut state = self.state.lock().unwrap_or_else(PoisonError::into_inner);
             state.resolved.insert(id.to_owned(), Instant::now());
             state.pending.remove(id);
         }
@@ -451,7 +451,11 @@ impl Drop for Observer {
         self.shared.active.store(false, Ordering::Release);
         self.shared.changed.notify_all();
         {
-            let mut state = self.shared.state.lock().unwrap_or_else(|p| p.into_inner());
+            let mut state = self
+                .shared
+                .state
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner);
             for id in state.pending.keys() {
                 self.shared.requests.settle_native(id);
             }
@@ -532,7 +536,7 @@ fn handle_frame(shared: &Arc<Shared>, port: u16, frame_json: &Value) {
     let id = request_id(port, &frame.rpc_id);
     let pending = build_pending(frame, port);
     let ticket = {
-        let mut state = shared.state.lock().unwrap_or_else(|p| p.into_inner());
+        let mut state = shared.state.lock().unwrap_or_else(PoisonError::into_inner);
         state
             .resolved
             .retain(|_, seen| now.duration_since(*seen) < RESOLUTION_MEMORY);
@@ -619,7 +623,7 @@ fn stream_port(shared: Arc<Shared>, port: u16) {
                 let still_tracked = shared
                     .state
                     .lock()
-                    .unwrap_or_else(|p| p.into_inner())
+                    .unwrap_or_else(PoisonError::into_inner)
                     .streams
                     .contains(&port);
                 if !still_tracked {
@@ -655,7 +659,7 @@ fn stream_port(shared: Arc<Shared>, port: u16) {
         }
     }
     let settled: Vec<String> = {
-        let mut state = shared.state.lock().unwrap_or_else(|p| p.into_inner());
+        let mut state = shared.state.lock().unwrap_or_else(PoisonError::into_inner);
         state.streams.remove(&port);
         state.endpoints.remove(&port);
         let ids: Vec<String> = state
@@ -684,7 +688,7 @@ fn work(shared: Arc<Shared>) {
         let now = Instant::now();
         let mut to_describe = Vec::new();
         {
-            let state = shared.state.lock().unwrap_or_else(|p| p.into_inner());
+            let state = shared.state.lock().unwrap_or_else(PoisonError::into_inner);
             for &port in &found {
                 if state
                     .endpoints
@@ -705,7 +709,7 @@ fn work(shared: Arc<Shared>) {
         let mut spawn_ports = Vec::new();
         let mut removed_ids = Vec::new();
         {
-            let mut state = shared.state.lock().unwrap_or_else(|p| p.into_inner());
+            let mut state = shared.state.lock().unwrap_or_else(PoisonError::into_inner);
             for (port, ok) in newly_described {
                 if ok {
                     state.endpoints.insert(port, now);
@@ -753,7 +757,7 @@ fn work(shared: Arc<Shared>) {
                 .spawn(move || stream_port(owned, port));
         }
         shared.publish_waiting();
-        let guard = shared.state.lock().unwrap_or_else(|p| p.into_inner());
+        let guard = shared.state.lock().unwrap_or_else(PoisonError::into_inner);
         if shared.active.load(Ordering::Acquire) {
             let _ = shared.changed.wait_timeout(guard, Duration::from_secs(2));
         }

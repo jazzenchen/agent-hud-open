@@ -3,7 +3,7 @@ use std::{
     collections::{HashMap, HashSet},
     sync::{
         atomic::{AtomicBool, Ordering},
-        Arc, Condvar, Mutex,
+        Arc, Condvar, Mutex, PoisonError,
     },
     time::Instant,
 };
@@ -80,11 +80,10 @@ struct HudState {
 
 impl HudWindows {
     pub fn stop(&self) {
-        if let Ok(owners) = self.0.lock() {
-            for owner in owners.values() {
-                owner.stopped.store(true, Ordering::Release);
-                owner.changed.notify_all();
-            }
+        let owners = self.0.lock().unwrap_or_else(PoisonError::into_inner);
+        for owner in owners.values() {
+            owner.stopped.store(true, Ordering::Release);
+            owner.changed.notify_all();
         }
     }
 }
@@ -143,7 +142,7 @@ fn owner_for_window(
     }
     owners
         .lock()
-        .map_err(|_| "HUD screen registry is unavailable")?
+        .unwrap_or_else(PoisonError::into_inner)
         .values()
         .find(|owner| owner.label == window.label())
         .cloned()
@@ -160,9 +159,7 @@ fn reconcile(app: &tauri::AppHandle, connected: &HashSet<String>) {
         return;
     };
     let removed: Vec<_> = {
-        let Ok(mut owners) = windows.0.lock() else {
-            return;
-        };
+        let mut owners = windows.0.lock().unwrap_or_else(PoisonError::into_inner);
         let disconnected: Vec<_> = owners
             .keys()
             .filter(|key| !connected.contains(*key))
@@ -179,7 +176,8 @@ fn reconcile(app: &tauri::AppHandle, connected: &HashSet<String>) {
             .collect()
     };
     for owner in removed {
-        let cancelled = if let Ok(mut state) = owner.state.lock() {
+        let cancelled = {
+            let mut state = owner.state.lock().unwrap_or_else(PoisonError::into_inner);
             let cancelled = state.drag.take().is_some();
             if let Some(window) = app.get_webview_window(&owner.label) {
                 let _ = release_text_focus(&window, &mut state);
@@ -192,8 +190,6 @@ fn reconcile(app: &tauri::AppHandle, connected: &HashSet<String>) {
                 }
             }
             cancelled
-        } else {
-            false
         };
         if cancelled {
             host::set_drag_cursor(app, &owner, false);
@@ -230,25 +226,18 @@ pub async fn hud_geometry(
                     None => None,
                 },
             };
-            let registry = owners
-                .lock()
-                .map_err(|_| "HUD screen registry is unavailable")?;
+            let registry = owners.lock().unwrap_or_else(PoisonError::into_inner);
             selected.and_then(|id| registry.get(&id).cloned())
         };
         let Some(shared) = shared else {
             return Ok(None);
         };
-        shared
-            .state
-            .lock()
-            .map(|state| {
-                if shared.stopped.load(Ordering::Acquire) {
-                    None
-                } else {
-                    state.geometry.clone()
-                }
-            })
-            .map_err(|_| "HUD geometry owner is unavailable".to_owned())
+        let state = shared.state.lock().unwrap_or_else(PoisonError::into_inner);
+        Ok(if shared.stopped.load(Ordering::Acquire) {
+            None
+        } else {
+            state.geometry.clone()
+        })
     })
     .await
     .map_err(|error| format!("HUD geometry worker failed: {error}"))?
@@ -263,20 +252,14 @@ fn configure_display(
 ) -> Result<(), String> {
     let shared = {
         let windows = app.state::<HudWindows>();
-        let mut registry = windows
-            .0
-            .lock()
-            .map_err(|_| "HUD screen registry is unavailable")?;
+        let mut registry = windows.0.lock().unwrap_or_else(PoisonError::into_inner);
         Arc::clone(
             registry
                 .entry(display.info.screen_id.clone())
                 .or_insert_with(|| Arc::new(Shared::new(display.info.screen_id.clone()))),
         )
     };
-    let mut state = shared
-        .state
-        .lock()
-        .map_err(|_| "HUD window lock is unavailable")?;
+    let mut state = shared.state.lock().unwrap_or_else(PoisonError::into_inner);
     shared.ensure_connected()?;
     let was_dragging = state.drag.is_some();
     if was_dragging {

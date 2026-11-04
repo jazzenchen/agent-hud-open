@@ -4,7 +4,7 @@ use agent_hud_agents::HookEvent;
 use agent_hud_core::requests::Requests;
 use std::{
     path::{Path, PathBuf},
-    sync::{Arc, Mutex},
+    sync::{Arc, Mutex, PoisonError},
 };
 
 mod clients;
@@ -65,7 +65,7 @@ impl Hooks {
         let waker = Arc::new(Mutex::new(wake));
         let relay = waker.clone();
         let wake: Wake = Arc::new(move || {
-            let wake = relay.lock().unwrap_or_else(|p| p.into_inner()).clone();
+            let wake = relay.lock().unwrap_or_else(PoisonError::into_inner).clone();
             wake();
         });
         let inbox = inbox::Inbox::new(&data, wake.clone())?;
@@ -239,7 +239,7 @@ impl Hooks {
         self.requests.clone()
     }
     pub fn set_waker(&self, wake: Wake) {
-        *self.waker.lock().unwrap_or_else(|p| p.into_inner()) = wake;
+        *self.waker.lock().unwrap_or_else(PoisonError::into_inner) = wake;
     }
     pub fn data_dir(&self) -> &Path {
         &self.data

@@ -81,34 +81,13 @@ export const tokenKindOrder = [
 ] as const;
 export type TokenKindName = (typeof tokenKindOrder)[number];
 
-interface TokenFacts {
-  /** From Core: the session with its sub-agents (decided 2026-10-21); lists show only parents, so nothing counts twice. */
-  tokens: number;
-  /** From Core: the same tokens by kind. */
-  usage?: (Record<TokenKindName, number> & { total: number }) | null;
-}
-
-/**
- * What a group of sessions spent (Open's Today card): their tokens and the
- * kinds present, in Open's order; `kinds` is null when no session carries a
- * breakdown by kind.
- */
-export function sessionKinds(sessions: readonly TokenFacts[]): {
-  total: number;
-  kinds: { kind: TokenKindName; value: number }[] | null;
-} {
-  const total = sessions.reduce((sum, session) => sum + session.tokens, 0);
-  if (!sessions.some((session) => session.usage)) return { total, kinds: null };
-  const kinds = tokenKindOrder
-    .map((kind) => ({
-      kind,
-      value: sessions.reduce(
-        (sum, session) => sum + (session.usage?.[kind] ?? 0),
-        0,
-      ),
-    }))
+/** The kinds present in `tokens`, in Open's order (`TokenKind.allCases`). */
+export function presentKinds(
+  tokens: Partial<Record<TokenKindName, number>> | null | undefined,
+): { kind: TokenKindName; value: number }[] {
+  return tokenKindOrder
+    .map((kind) => ({ kind, value: tokens?.[kind] ?? 0 }))
     .filter((entry) => entry.value > 0);
-  return { total, kinds };
 }
 
 // What the Sessions page's charts draw, as the iPhone's and agent-hud-native-open's
@@ -264,26 +243,7 @@ export function contextRuns(
   return runs;
 }
 
-/** The sessions that spent the most, largest first, and how many the rest are and what they spent. */
-export function topSessions<T extends { tokens: number }>(
-  sessions: readonly T[],
-  n: number,
-): { top: T[]; rest: { count: number; tokens: number } } {
-  const sorted = [...sessions]
-    .filter((session) => session.tokens > 0)
-    .sort((a, b) => b.tokens - a.tokens);
-  const top = sorted.slice(0, Math.max(0, n));
-  const rest = sorted.slice(top.length);
-  return {
-    top,
-    rest: {
-      count: rest.length,
-      tokens: rest.reduce((sum, session) => sum + session.tokens, 0),
-    },
-  };
-}
-
-/** What a session's list-price money is made of (Session's `cost`, `pricedCost`, `unpricedTokens`). */
+/** What a session's or a day's list-price money is made of (Session's and SessionsDay's `cost`, `pricedCost`, `unpricedTokens`). */
 export interface MoneyFacts {
   cost: number | null;
   pricedCost?: number | null;
@@ -296,25 +256,13 @@ export interface ListMoney {
   unpriced: number;
 }
 
-/** A session's list-price money: its whole cost, else its priced calls' with the rest's tokens. */
+/** A session's or a day's list-price money: its whole cost, else its priced calls' with the rest's tokens. */
 export function sessionMoney(session: MoneyFacts): ListMoney {
   if (session.cost !== null) return { value: session.cost, unpriced: 0 };
   return {
     value: session.pricedCost ?? null,
     unpriced: session.unpricedTokens ?? 0,
   };
-}
-
-/** What sessions spent together at list prices; the value is null when none has a priced call. */
-export function sessionsMoney(sessions: MoneyFacts[]): ListMoney {
-  let value: number | null = null;
-  let unpriced = 0;
-  for (const session of sessions) {
-    const money = sessionMoney(session);
-    if (money.value !== null) value = (value ?? 0) + money.value;
-    unpriced += money.unpriced;
-  }
-  return { value, unpriced };
 }
 
 /** What a cost leaves out, as its tooltip says it; undefined when nothing. */

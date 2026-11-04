@@ -13,7 +13,7 @@ use std::{
     collections::BTreeSet,
     path::{Path, PathBuf},
     process::{Command, Stdio},
-    sync::Mutex,
+    sync::{Mutex, PoisonError},
     time::{Duration, Instant},
 };
 
@@ -44,7 +44,7 @@ pub(super) fn open(home: &Path, session: &str, job: &str) -> Result<bool, String
     let path = crate::os::engine_path(home, &env);
     if !MOVING
         .lock()
-        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .unwrap_or_else(PoisonError::into_inner)
         .insert(session.to_owned())
     {
         return Ok(true);
@@ -68,13 +68,13 @@ pub(super) fn open(home: &Path, session: &str, job: &str) -> Result<bool, String
             );
             MOVING
                 .lock()
-                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .unwrap_or_else(PoisonError::into_inner)
                 .remove(&session);
         });
     if spawned.is_err() {
         MOVING
             .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .unwrap_or_else(PoisonError::into_inner)
             .remove(&moving);
         return Err("The session could not be moved into the Claude desktop app".into());
     }

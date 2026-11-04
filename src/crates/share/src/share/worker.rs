@@ -13,7 +13,7 @@ use serde_json::{json, Value};
 use std::{
     collections::BTreeMap,
     path::PathBuf,
-    sync::{mpsc, Arc, Mutex},
+    sync::{mpsc, Arc, Mutex, PoisonError},
     time::Duration,
 };
 
@@ -209,7 +209,7 @@ impl Worker {
         self.project(now)?;
         self.cache
             .lock()
-            .unwrap_or_else(|p| p.into_inner())
+            .unwrap_or_else(PoisonError::into_inner)
             .update(self.records.values(), now)?;
         self.error = None;
         Ok(())

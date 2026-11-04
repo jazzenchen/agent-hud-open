@@ -11,7 +11,7 @@ use std::{
     process::{Command, Stdio},
     sync::{
         atomic::{AtomicU64, Ordering},
-        Mutex,
+        Mutex, PoisonError,
     },
     time::{Duration, Instant},
 };
@@ -208,9 +208,7 @@ pub(crate) fn repair_on_launch(app: &tauri::AppHandle) {
     let app = app.clone();
     tauri::async_runtime::spawn_blocking(move || {
         let owner = app.state::<Clients>();
-        let Ok(_guard) = owner.0.lock() else {
-            return;
-        };
+        let _guard = owner.0.lock().unwrap_or_else(PoisonError::into_inner);
         let Ok(home) = agent_hud_runtime::home_directory() else {
             return;
         };
@@ -312,7 +310,7 @@ pub async fn native_mcp_clients(
     }
     tauri::async_runtime::spawn_blocking(move || {
         let owner = app.state::<Clients>();
-        let _guard = owner.0.lock().map_err(|_| "MCP client owner unavailable")?;
+        let _guard = owner.0.lock().unwrap_or_else(PoisonError::into_inner);
         match action.as_str() {
             "status" => status(&app),
             "install" | "remove" => run(

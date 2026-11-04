@@ -12,7 +12,7 @@ use std::{
     io::Read,
     path::{Path, PathBuf},
     process::{Command, Stdio},
-    sync::{mpsc, Mutex, OnceLock},
+    sync::{mpsc, Mutex, OnceLock, PoisonError},
     time::{Duration, Instant, SystemTime},
 };
 
@@ -127,7 +127,7 @@ fn runtime_hash(directory: &Path) -> Option<String> {
     let mut cache = HASH
         .get_or_init(|| Mutex::new(None))
         .lock()
-        .unwrap_or_else(|error| error.into_inner());
+        .unwrap_or_else(PoisonError::into_inner);
     if let Some(found) = cache
         .as_ref()
         .filter(|found| found.directory == directory && found.stamps == stamps)
@@ -181,7 +181,7 @@ fn registered_applications() -> Vec<PathBuf> {
     let mut cache = CACHE
         .get_or_init(|| Mutex::new(None))
         .lock()
-        .unwrap_or_else(|error| error.into_inner());
+        .unwrap_or_else(PoisonError::into_inner);
     let now = Instant::now();
     if let Some(found) = cache.as_ref().filter(|found| found.reusable(now)) {
         return found.applications.clone();

@@ -5,7 +5,7 @@ use notify::{Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use std::{
     collections::{HashMap, HashSet},
     path::PathBuf,
-    sync::{Arc, Mutex},
+    sync::{Arc, Mutex, PoisonError},
     time::{Duration, Instant},
 };
 
@@ -42,7 +42,7 @@ impl FileChanges {
             // index must not wake the collector for every unrelated .codex write.
             let changed = match event {
                 Ok(event) if !event.need_rescan() && !event.paths.is_empty() => {
-                    let Ok(roots) = source_names.lock() else { return; };
+                    let roots = source_names.lock().unwrap_or_else(PoisonError::into_inner);
                     let mut owned = HashSet::new();
                     for path in event.paths {
                         for root in roots.iter() {
@@ -55,7 +55,8 @@ impl FileChanges {
                 }
                 _ => None,
             };
-            if let Ok(mut paths) = pending.lock() {
+            {
+                let mut paths = pending.lock().unwrap_or_else(PoisonError::into_inner);
                 match changed {
                     Some(changed) => {
                         if let Some(known) = paths.as_mut() {
@@ -68,7 +69,7 @@ impl FileChanges {
                     _ => *paths = None,
                 }
             }
-            let wake = notify_wake.lock().ok().and_then(|wake| wake.clone());
+            let wake = notify_wake.lock().unwrap_or_else(PoisonError::into_inner).clone();
             if let Some(wake) = wake {
                 wake();
             }
@@ -88,16 +89,13 @@ impl FileChanges {
         this
     }
     pub fn set_waker(&mut self, wake: Waker) {
-        if let Ok(mut waker) = self.waker.lock() {
-            *waker = Some(wake);
-        }
+        *self.waker.lock().unwrap_or_else(PoisonError::into_inner) = Some(wake);
     }
     fn update(&mut self) {
         let wanted = targets(&self.roots);
         if wanted != self.wanted {
-            if let Ok(mut names) = self.names.lock() {
-                *names = root_names(self.roots.iter());
-            }
+            *self.names.lock().unwrap_or_else(PoisonError::into_inner) =
+                root_names(self.roots.iter());
             if let Some(watcher) = &mut self.watcher {
                 for (path, recursive) in &self.watched {
                     if wanted.get(path) != Some(recursive) {
@@ -110,9 +108,7 @@ impl FileChanges {
             self.wanted = wanted;
             self.retry = None;
             // What changed while the watched set moved is unknown.
-            if let Ok(mut paths) = self.changes.lock() {
-                *paths = None;
-            }
+            *self.changes.lock().unwrap_or_else(PoisonError::into_inner) = None;
         } else if self.watched.len() == self.wanted.len()
             || self.retry.is_some_and(|(at, _)| Instant::now() < at)
         {
@@ -152,8 +148,8 @@ impl FileChanges {
         let mut changed = self
             .changes
             .lock()
-            .ok()
-            .and_then(|mut paths| (*paths).replace(HashSet::new()))?;
+            .unwrap_or_else(PoisonError::into_inner)
+            .replace(HashSet::new())?;
         // A root no watch covers is read again on every pass, not every root.
         changed.extend(unwatched(&self.roots, &self.wanted, &self.watched));
         Some(changed)

@@ -10,7 +10,7 @@ use std::{
     sync::{
         atomic::Ordering,
         mpsc::{self, Receiver},
-        Arc, Mutex,
+        Arc, Mutex, PoisonError,
     },
     time::Instant,
 };
@@ -61,15 +61,18 @@ impl Engine {
         let output = child.stdout.take().unwrap();
         let mut errors = child.stderr.take().unwrap();
         let child = Arc::new(Mutex::new(child));
-        if let Ok(mut children) = context.children.lock() {
+        {
+            let mut children = context
+                .children
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner);
             children.retain(|child| child.strong_count() > 0);
             children.push(Arc::downgrade(&child));
         }
         if context.cancelled.load(Ordering::Acquire) {
-            if let Ok(mut child) = child.lock() {
-                let _ = child.kill();
-                let _ = child.wait();
-            }
+            let mut child = child.lock().unwrap_or_else(PoisonError::into_inner);
+            let _ = child.kill();
+            let _ = child.wait();
             return Err(l10n::text("账户读取已停止", "Account reading was stopped"));
         }
         let (tx, lines) = mpsc::sync_channel(8);
@@ -127,17 +130,15 @@ impl Engine {
                     if count == 0 {
                         break;
                     }
-                    if let Ok(mut kept) = kept.lock() {
-                        let room = STDERR_LIMIT.saturating_sub(kept.len());
-                        kept.extend_from_slice(&buffer[..count.min(room)]);
-                    }
+                    let mut kept = kept.lock().unwrap_or_else(PoisonError::into_inner);
+                    let room = STDERR_LIMIT.saturating_sub(kept.len());
+                    kept.extend_from_slice(&buffer[..count.min(room)]);
                 }
             });
         if reader.is_err() {
-            if let Ok(mut child) = child.lock() {
-                let _ = child.kill();
-                let _ = child.wait();
-            }
+            let mut child = child.lock().unwrap_or_else(PoisonError::into_inner);
+            let _ = child.kill();
+            let _ = child.wait();
             return Err(l10n::text(
                 "账户读取器无法启动",
                 "Account reader could not start",
@@ -196,7 +197,11 @@ impl agent_hud_agents::account::Engine for Engine {
         serde_json::from_slice(&text).ok()
     }
     fn stderr_preview(&self, limit: usize) -> Option<String> {
-        let bytes = self.stderr.lock().ok()?.clone();
+        let bytes = self
+            .stderr
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clone();
         let text = String::from_utf8_lossy(&bytes);
         let text = text.trim();
         (!text.is_empty()).then(|| text.chars().take(limit).collect())
@@ -204,9 +209,8 @@ impl agent_hud_agents::account::Engine for Engine {
 }
 impl Drop for Engine {
     fn drop(&mut self) {
-        if let Ok(mut child) = self.child.lock() {
-            let _ = child.kill();
-            let _ = child.wait();
-        }
+        let mut child = self.child.lock().unwrap_or_else(PoisonError::into_inner);
+        let _ = child.kill();
+        let _ = child.wait();
     }
 }

@@ -1,6 +1,6 @@
 //! Native HUD pointer polling, hit-testing, cursor pass-through, and text-focus leases.
 use std::{
-    sync::{atomic::Ordering, Arc},
+    sync::{atomic::Ordering, Arc, PoisonError},
     time::{Duration, Instant},
 };
 use tauri::{Emitter, Manager};
@@ -34,10 +34,7 @@ pub async fn hud_report_regions(
         return Err("HUD regions must contain finite coordinates and non-negative sizes".into());
     }
     tauri::async_runtime::spawn_blocking(move || {
-        let mut state = shared
-            .state
-            .lock()
-            .map_err(|_| "HUD input owner is unavailable")?;
+        let mut state = shared.state.lock().unwrap_or_else(PoisonError::into_inner);
         shared.ensure_connected()?;
         state.regions = Some(regions);
         let pointer = if window.is_visible().unwrap_or(false) {
@@ -78,10 +75,7 @@ pub async fn hud_text_focus(
         return Err("The HUD text-input lease is invalid".into());
     }
     tauri::async_runtime::spawn_blocking(move || {
-        let mut state = shared
-            .state
-            .lock()
-            .map_err(|_| "HUD input owner is unavailable")?;
+        let mut state = shared.state.lock().unwrap_or_else(PoisonError::into_inner);
         if !active {
             // A disposed React surface must not release a newer text-input owner.
             return if state.text_focus.as_deref() == Some(lease_id.as_str()) {
@@ -160,18 +154,16 @@ fn poll_pointer(app: tauri::AppHandle, shared: Arc<Shared>) {
         return;
     };
     while !shared.stopped.load(Ordering::Acquire) {
-        let Ok(mut state) = shared.state.lock() else {
-            return;
-        };
+        let mut state = shared.state.lock().unwrap_or_else(PoisonError::into_inner);
         while state.drag.is_none()
             && state.regions.as_ref().is_none_or(Vec::is_empty)
             && !shared.stopped.load(Ordering::Acquire)
         {
             // Timed wait also makes shutdown independent of a notification arriving just before wait.
-            let Ok((next, _)) = shared.changed.wait_timeout(state, Duration::from_secs(1)) else {
-                return;
-            };
-            state = next;
+            (state, _) = shared
+                .changed
+                .wait_timeout(state, Duration::from_secs(1))
+                .unwrap_or_else(PoisonError::into_inner);
         }
         if shared.stopped.load(Ordering::Acquire) {
             return;
@@ -253,9 +245,12 @@ fn poll_pointer(app: tauri::AppHandle, shared: Arc<Shared>) {
         if let Some(cancelled) = ended {
             emit_drag_end(&app, &shared, cancelled);
         }
-        if shared.changed.wait_timeout(state, pause).is_err() {
-            return;
-        }
+        drop(
+            shared
+                .changed
+                .wait_timeout(state, pause)
+                .unwrap_or_else(PoisonError::into_inner),
+        );
     }
 }
 

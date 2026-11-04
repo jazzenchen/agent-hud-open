@@ -57,7 +57,7 @@ import {
 import { useHUDGeometry } from "./lib/use-hud-geometry";
 import { storageKeys } from "./lib/storage-keys";
 import type { HUDConfig } from "@agent-hud/hud/model";
-import type { NativeMethod, Session, Snapshot } from "@agent-hud/protocol";
+import type { Session, Snapshot } from "@agent-hud/protocol";
 import appIcon from "./assets/app-icon.png";
 import { snapshotLanguage } from "@agent-hud/ui/format";
 import type { AgentPluginItem } from "./settings/AgentPluginsPane";
@@ -458,7 +458,10 @@ function AppContent({
     localStorage.setItem(selectedScreenKey, id);
   }
   function toggleHUDVisibility() {
-    void action("set_setting", { key: "hudVisible", value: !hudVisible });
+    // The menu has no place for a failure, so it shows as a toast.
+    void act("set_setting", { key: "hudVisible", value: !hudVisible }).catch(
+      (failure) => toast.error(String(failure)),
+    );
   }
   useEffect(() => {
     if (settings && selectedId && !preferredScreenId) selectScreen(selectedId);
@@ -521,17 +524,6 @@ function AppContent({
       void subscription.then((unlisten) => unlisten());
     };
   }, [statistics]);
-  async function action(
-    method: NativeMethod,
-    params?: Record<string, unknown>,
-  ) {
-    try {
-      return await act(method, params);
-    } catch (failure) {
-      toast.error(String(failure));
-      throw failure;
-    }
-  }
   async function showStatistics(tab = "tokens") {
     if (isTauri()) {
       await invoke("open_statistics", { tab });
@@ -630,7 +622,7 @@ function AppContent({
     sources: snapshot?.sourcePreferences ?? store.sources,
     openSession: async (session) => {
       try {
-        await action("open_session", { id: session.id });
+        await act("open_session", { id: session.id });
         return true;
       } catch {
         return false;
@@ -709,7 +701,7 @@ function AppContent({
             config={config}
             geometry={measured}
             monitors={monitors}
-            action={action}
+            action={act}
           />
         </PanelServicesProvider>
       ) : null,
@@ -749,7 +741,7 @@ function AppContent({
                   <Statistics
                     snapshot={snapshot}
                     light={theme === "light"}
-                    action={action}
+                    action={act}
                     active={windowActive && statisticsTab === "tokens"}
                     onSelectSession={(session) => {
                       setSelectedSession(session);
@@ -765,7 +757,7 @@ function AppContent({
                   <SessionStatistics
                     snapshot={snapshot}
                     light={theme === "light"}
-                    action={action}
+                    action={act}
                     active={windowActive && statisticsTab === "sessions"}
                     initialSessionId={selectedSession?.id ?? null}
                     onClearSelection={() => setSelectedSession(null)}
@@ -796,7 +788,13 @@ function AppContent({
     );
   const currentPage = allPages.find((item) => item.id === page);
   const settingsProps = snapshot
-    ? { snapshot, config, update: updateConfig, action, active: windowActive }
+    ? {
+        snapshot,
+        config,
+        update: updateConfig,
+        action: act,
+        active: windowActive,
+      }
     : null;
   return provide(
     <PanelServicesProvider value={panelServices}>

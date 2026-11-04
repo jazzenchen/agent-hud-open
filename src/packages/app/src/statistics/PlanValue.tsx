@@ -1,4 +1,6 @@
+import { useEffect } from "react";
 import { TrendingDown, TrendingUp } from "lucide-react";
+import { toast } from "sonner";
 import { HUDArtwork as HUDLogo } from "@agent-hud/hud/HUDArtwork";
 import { listCost, listPrice, monthDayTime } from "@agent-hud/ui/format";
 import { useFormat } from "@agent-hud/ui/format-context";
@@ -103,13 +105,17 @@ export function PlanValue({
   light: boolean;
 }) {
   // Only the latest request publishes; a failure keeps the last answer shown.
-  const { data } = useCoreQuery<PlanValueResponse>(
+  const { data, error } = useCoreQuery<PlanValueResponse>(
     action,
     "plan_value",
     {},
     active,
     refresh,
   );
+  // The section has no place for a failure, so it shows as a toast.
+  useEffect(() => {
+    if (error) toast.error(error);
+  }, [error]);
   const { calendar } = useFormat();
   const zh = Boolean(theme.zh);
   if (!data?.accounts.length) return null;

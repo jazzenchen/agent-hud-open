@@ -3,10 +3,10 @@
 //! session tail or a session's lifetime total.
 mod query;
 use crate::l10n;
-pub(crate) use query::Cache;
+pub(crate) use query::{day_start, local_date, Cache};
 use query::{
-    day_start, floor, load, local_date, model_id, overlaps, periods, provider_name, tokens_json,
-    Context, Data, Query, Total, DAY,
+    floor, load, model_id, overlaps, periods, provider_name, tokens_json, Context, Data, Query,
+    Total, DAY,
 };
 
 use crate::{iso, pricing, AgentHudCore};
