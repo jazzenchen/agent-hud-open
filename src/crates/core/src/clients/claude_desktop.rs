@@ -157,3 +157,105 @@ pub(crate) struct ClaudeDesktop {
     /// were asked: their cards stay answerable while they stand.
     pub(crate) reached: HashSet<String>,
 }
+
+impl crate::AgentHudCore {
+    /// Puts the questions the Claude desktop app asks in its own window among
+    /// the requests the user is asked about, in place of the ones asked
+    /// before. A next-step box whose session the host reaches is answerable
+    /// (a card of its own id, which replaces the display-only one, as a host
+    /// that starts sending replaces Open's); any other has the reason it can
+    /// only be answered in the app (agent-hud-native-open
+    /// ClaudeDesktopAsks.show/requests).
+    pub(crate) fn sync_claude_desktop_asks(&mut self, now: i64) {
+        let mut active = HashMap::new();
+        let mut standing = HashSet::new();
+        let claude = agent_hud_agents::claude::AGENT.id;
+        if self.enabled.get(claude).copied().unwrap_or(true) {
+            self.reword_desktop_asks(now);
+            // Every pass prepares the projection first; its selection saves
+            // choosing among each session's copies again.
+            let candidates = self
+                .listed_sessions()
+                .into_iter()
+                .filter(|log| log.source == claude)
+                .filter_map(|log| {
+                    let ask = log.live.activity.as_ref()?.desktop_ask.as_ref()?;
+                    // A question whose words this run could not read has no card.
+                    if !ask.is_worded() {
+                        return None;
+                    }
+                    if now - ask.at >= 1_800_000
+                        || !matches!(
+                            log.live.session_state(now, &log.source, None),
+                            "running" | "waiting"
+                        )
+                    {
+                        return None;
+                    }
+                    let key = crate::grok_cache::hash(&[&log.id, &ask.id]);
+                    Some((key, log.id.clone(), log.cwd.clone(), ask.clone()))
+                })
+                .collect::<Vec<_>>();
+            for (key, session, cwd, ask) in candidates {
+                standing.insert(key.clone());
+                if self.claude_desktop.settled.contains(&key) {
+                    continue;
+                }
+                // Once answerable, a box stays so while it stands: a session
+                // the host stops reaching for a while (the app pauses a
+                // hidden session) refuses the answer with the host's reason
+                // instead of its card being replaced back and forth, here
+                // and on the phone.
+                // Turning answering off takes effect at once, reached or not.
+                let way = if let Some(off) = self.claude_answers_off() {
+                    Err(off)
+                } else if self.claude_desktop.reached.contains(&key) {
+                    Ok(())
+                } else {
+                    self.desktop_ask_way(&session, &ask)
+                };
+                if way.is_ok() {
+                    self.claude_desktop.reached.insert(key.clone());
+                }
+                let req_id = format!(
+                    "claude-desktop-ask:{}{key}",
+                    if way.is_ok() { "reply:" } else { "" }
+                );
+                let view = agent_hud_agents::claude::transcript::desktop_ask_view(
+                    &req_id,
+                    &session,
+                    cwd.as_deref(),
+                    &ask,
+                    way.err(),
+                );
+                match self
+                    .requests
+                    .register_native(req_id.clone(), view.clone(), now)
+                {
+                    Some(ticket) => {
+                        active.insert(req_id, (key, ticket));
+                    }
+                    None => {
+                        // Shown already, or put away by its wait running out.
+                        self.requests.refresh_native(&req_id, view);
+                        if let Some(kept) = self.claude_desktop.asks.remove(&req_id) {
+                            active.insert(req_id, kept);
+                        }
+                    }
+                }
+            }
+        }
+        for old_id in self.claude_desktop.asks.keys() {
+            if !active.contains_key(old_id) {
+                self.requests.settle_native(old_id);
+            }
+        }
+        self.claude_desktop.asks = active;
+        self.claude_desktop
+            .settled
+            .retain(|key| standing.contains(key));
+        self.claude_desktop
+            .reached
+            .retain(|key| standing.contains(key));
+    }
+}
