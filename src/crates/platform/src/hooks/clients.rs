@@ -108,8 +108,14 @@ impl Clients {
                 }
             }
             if known {
+                // Installed hooks some clients run only after a step in the client.
+                let notice = error.or_else(|| {
+                    installed
+                        .then(|| agent_hud_agents::hooks::setup_step(&source))
+                        .flatten()
+                });
                 self.rows.push(
-                    json!({"source":source,"installed":installed,"active":false,"notice":error}),
+                    json!({"source":source,"installed":installed,"active":false,"notice":notice}),
                 );
             }
         }

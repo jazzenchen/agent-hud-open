@@ -81,6 +81,12 @@ export function AgentDetail({
   }
 
   const enabled = source.enabled;
+  // What the client needs before it runs the hooks Agent HUD put in, such as
+  // TRAE's own hooks switch.
+  const hookStep =
+    snapshot.connection.clientHooks?.clients?.find(
+      (client) => client.source === source.id && client.installed,
+    )?.notice ?? null;
   const live = preferences[source.id]?.live !== false;
   const reminders = preferences[source.id]?.reminders !== false;
   const offReason = t("Turn on Enabled first.", "请先启用。");
@@ -123,7 +129,7 @@ export function AgentDetail({
           {error}
         </Notice>
       )}
-      <Section footer={source.notice ?? undefined}>
+      <Section footer={source.notice ?? hookStep ?? undefined}>
         <ToggleRow
           title={t("Enabled", "启用")}
           checked={enabled}

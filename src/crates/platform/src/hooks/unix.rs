@@ -94,6 +94,7 @@ impl Server {
             UnixStream::pair().map_err(|_| "Hooks shutdown channel unavailable")?;
         let running = Arc::new(AtomicBool::new(true));
         let alive = running.clone();
+        let data = data.to_path_buf();
         let worker = std::thread::Builder::new()
             .name("agenthud-hooks".into())
             .spawn(move || {
@@ -133,6 +134,7 @@ impl Server {
                     let requests = requests.clone();
                     let wake = wake.clone();
                     let reminders = reminders.clone();
+                    let data = data.clone();
                     let alive = alive.clone();
                     let count = active.clone();
                     count.fetch_add(1, Ordering::AcqRel);
@@ -140,7 +142,7 @@ impl Server {
                     match std::thread::Builder::new()
                         .name("agenthud-hook-call".into())
                         .spawn(move || {
-                            serve(stream, requests, wake, reminders, &alive);
+                            serve(stream, &data, requests, wake, reminders, &alive);
                             count.fetch_sub(1, Ordering::AcqRel);
                         }) {
                         Ok(worker) => workers.push(worker),
@@ -183,6 +185,7 @@ impl Drop for Server {
 
 fn serve(
     mut stream: UnixStream,
+    data: &Path,
     requests: Requests,
     wake: Wake,
     reminders: super::reminders::Reminders,
@@ -211,7 +214,11 @@ fn serve(
     }
     if flag != "--permission-hook" {
         // Reporting facts were atomically committed by the callback, even if
-        // the application was absent. This connection merely accelerates wake.
+        // the application was absent. This connection merely accelerates wake,
+        // or carries the event of a callback that could not write it.
+        if let Some(event) = super::handed_event(source, payload) {
+            let _ = super::record_event(data, &event);
+        }
         reminders.record(source, flag, payload);
         wake();
         let _ = stream.write_all(b"{}\n");
@@ -388,5 +395,61 @@ pub(crate) fn send(
         serde_json::from_slice(&response)
             .map(Some)
             .map_err(|_| "Invalid hook response".into())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use agent_hud_agents::HookEvent;
+
+    #[test]
+    fn an_event_a_callback_could_not_write_is_kept_by_the_app() {
+        let root = tempfile::tempdir().unwrap();
+        let data = root.path().join("data");
+        let _server = Server::start(
+            &data,
+            Requests::default(),
+            Arc::new(|| {}),
+            super::super::reminders::Reminders::default(),
+        )
+        .unwrap();
+        let event = |source: &str| HookEvent {
+            source: source.into(),
+            session_id: format!("{source}:c1"),
+            at_ms: now_ms(),
+            kind: "session-observation".into(),
+            data: json!({"turnId":"c1","state":"running","title":"Fix the login"}),
+        };
+        let hand = |source: &str, event: HookEvent| {
+            send(
+                &data,
+                source,
+                "--completion-hook",
+                &json!({"transcript_path":null,"event":event}),
+                None,
+            )
+            .unwrap()
+        };
+        // Another client's event, or one no hook reports, is not taken.
+        hand("trae", event("trae-cn"));
+        hand(
+            "trae",
+            HookEvent {
+                kind: "delivery".into(),
+                ..event("trae")
+            },
+        );
+        hand("trae", event("trae"));
+        let records = fs::read_dir(data.join("hooks/inbox"))
+            .unwrap()
+            .flatten()
+            .filter(|entry| super::super::inbox::is_record(&entry.path()))
+            .map(|entry| fs::read(entry.path()).unwrap())
+            .collect::<Vec<_>>();
+        assert_eq!(records.len(), 1);
+        let kept: HookEvent = serde_json::from_slice(&records[0]).unwrap();
+        assert_eq!(kept.session_id, "trae:c1");
+        assert_eq!(kept.data["title"], "Fix the login");
     }
 }

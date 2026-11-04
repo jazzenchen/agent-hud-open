@@ -62,6 +62,7 @@ pub mod opencode;
 pub mod pi;
 pub mod qoder;
 pub mod qwen;
+pub mod trae;
 pub mod zcode;
 
 pub use antigravity::permissions::{antigravity_permissions, AntigravityPermission};
@@ -99,6 +100,8 @@ pub const COMPLETION_SOURCES: &[&str] = &[
     "hermes",
     "droid",
     "goose",
+    "trae",
+    "trae-cn",
 ];
 pub const HOOK_FLAGS: &[&str] = &[
     "--permission-hook",

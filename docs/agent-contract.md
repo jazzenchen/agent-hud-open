@@ -192,6 +192,7 @@ engine code that decides by client name. It goes in five slices:
    - `agents::process` holds the caller types: `Ancestor` and `Caller` (the kernel-reported parents and the callback's own environment) and `Origin`.
    - Each client's rules live in its folder. `claude/process.rs` holds Claude Code's argument grammar, the apps that host it, its entrypoints and headless runs. `codex/process.rs` holds Codex's invocation grammar and its desktop app.
    - `Hooks::origin` and `Permission::unattended` name the rules.
+   - `process::IMPORTERS` names the clients that run another client's hooks from its settings (TRAE runs Claude Code's), with the rule that tells such a callback apart; it is dropped, never counted as the named client's session.
    - Platform's `hooks/origins.rs` gathers the caller and applies the result, including the iTerm target. Codex's daemon terminal lookup moved to `clients/codex/`.
 
 5. **Replies**.

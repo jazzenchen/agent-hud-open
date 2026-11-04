@@ -130,12 +130,23 @@ pub fn parse_event(
                     } else {
                         None
                     };
+                    let mut data = json!({"turnId":began.turn,"state":if began.waiting {"waiting"} else {"running"},"startedAtMs":now_ms,"observedAtMs":now_ms,"workspace":began.workspace,"outcome":null,"navigationTarget":target});
+                    // The first of the events is the prompt, which titles a
+                    // session no log names; the others keep the title it gave.
+                    if payload["hook_event_name"] == begin.events[0] {
+                        if let Some(title) = payload["prompt"]
+                            .as_str()
+                            .and_then(crate::naming::session_title::from_prompt)
+                        {
+                            data["title"] = json!(title);
+                        }
+                    }
                     return Ok(Some(event(
                         source,
                         &began.session,
                         now_ms,
                         "session-observation",
-                        json!({"turnId":began.turn,"state":if began.waiting {"waiting"} else {"running"},"startedAtMs":now_ms,"observedAtMs":now_ms,"workspace":began.workspace,"outcome":null,"navigationTarget":target}),
+                        data,
                     )));
                 }
             }

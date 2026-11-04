@@ -240,6 +240,23 @@ pub enum Launch {
     ExecArgs,
 }
 
+/// A step the user takes in a client itself before it runs the hooks Agent
+/// HUD put in its settings (TRAE asks to turn its hooks on).
+pub struct Setup {
+    pub clients: &'static [&'static str],
+    /// What to tell the user, given the client's name.
+    pub step: fn(&str) -> String,
+}
+
+/// Every client that needs such a step.
+pub static SETUPS: &[&Setup] = &[&crate::trae::SETUP];
+
+/// What the user does in the client with this id before its hooks run.
+pub fn setup_step(id: &str) -> Option<String> {
+    let setup = SETUPS.iter().find(|setup| setup.clients.contains(&id))?;
+    Some((setup.step)(display(id)))
+}
+
 /// A client with hooks, by its id or one of its older names.
 pub fn hooks_of(name: &str) -> Result<(&'static str, &'static Hooks), String> {
     ALL.iter()

@@ -273,6 +273,18 @@ pub(crate) fn now_ms() -> i64 {
     chrono::Utc::now().timestamp_millis()
 }
 
+/// The event a callback hands over the channel because it could not write
+/// it to the inbox (`entry`): only one the named client's hooks report.
+pub(crate) fn handed_event(source: &str, payload: &serde_json::Value) -> Option<HookEvent> {
+    let event: HookEvent = serde_json::from_value(payload.get("event")?.clone()).ok()?;
+    let (id, _) = agent_hud_agents::hooks::hooks_of(source).ok()?;
+    let reported = matches!(
+        event.kind.as_str(),
+        "origin" | "attention" | "compaction" | "completion" | "session-observation"
+    );
+    (event.source == id && reported).then_some(event)
+}
+
 /// Whether the client's transcript shows a permission request answered in
 /// its own window, so a waiting callback can stop waiting for the HUD.
 pub(crate) fn settles_in_transcript(source: &str) -> bool {

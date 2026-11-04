@@ -43,6 +43,15 @@ scope boundaries, independently of the snapshot clock. Hidden Sessions windows
 stop querying and retain their last display. Partially loaded list summaries
 are labelled as covering loaded sessions.
 
+A client whose sessions are known only from its hooks (TRAE, TRAE CN, and any
+completion-only client) gets rows from its hook evidence: running from its
+prompt and tool-call hooks, idle at its `Stop` or two minutes after the last
+renewal, titled by its first prompt, else its folder. A permission
+notification newer than the running turn holds it waiting until the next
+hook, for up to 30 minutes, since a turn that asked for the user reports
+nothing until they answer. They carry `usageStatus: "unavailable"` and no tokens, and
+leave the lists like any other session.
+
 `session_detail {id}` loads only the requested parser checkpoint and returns
 its session, recorded usage entries, parent and children, including relationships
 outside the HUD projection. With the usage ledger it also returns `sessionUsage`,

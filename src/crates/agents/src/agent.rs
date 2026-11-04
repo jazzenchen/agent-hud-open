@@ -2,7 +2,7 @@
 use crate::hooks::{Hooks, Observer};
 use crate::{
     antigravity, ark, buddy, claude, cline, codex, copilot, cursor, deepseek, devin, droid, glm,
-    goose, grok, hermes, kimi, minimax, openclaw, opencode, pi, qoder, qwen, zcode,
+    goose, grok, hermes, kimi, minimax, openclaw, opencode, pi, qoder, qwen, trae, zcode,
 };
 use crate::{Channel, Discovery, PerOs, Replies, Source};
 
@@ -62,6 +62,8 @@ pub static ALL: &[&Agent] = &[
     &qoder::QODER,
     &qoder::QODER_CN,
     &qoder::QODER_WORK,
+    &trae::TRAE,
+    &trae::TRAE_CN,
     &devin::AGENT,
     &glm::AGENT,
     &minimax::AGENT,
@@ -155,6 +157,8 @@ mod tests {
                 "qoder",
                 "qoder-cn",
                 "qoder-work",
+                "trae",
+                "trae-cn",
                 "devin",
                 "glm",
                 "minimax",

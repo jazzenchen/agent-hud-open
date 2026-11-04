@@ -14,6 +14,7 @@ impl Server {
         wake: Wake,
         reminders: super::reminders::Reminders,
     ) -> Result<Self, String> {
+        let folder = data.to_path_buf();
         let handler = Arc::new(
             move |message: Value, active: &std::sync::atomic::AtomicBool| {
                 let (Some(source), Some(flag), Some(payload)) = (
@@ -27,6 +28,10 @@ impl Server {
                     return None;
                 }
                 if flag != "--permission-hook" {
+                    // The event of a callback that could not write it (`entry`).
+                    if let Some(event) = super::handed_event(source, payload) {
+                        let _ = super::record_event(&folder, &event);
+                    }
                     reminders.record(source, flag, payload);
                     wake();
                     return Some(json!({}));

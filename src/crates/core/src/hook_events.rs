@@ -11,6 +11,9 @@ const DAY: i64 = 86_400_000;
 const COMPACTION: i64 = 300_000;
 const FUTURE: i64 = 60_000;
 const PI_HEARTBEAT: i64 = 120_000;
+/// How long a notification holds a hook-reported turn waiting for the user:
+/// the span after which a quiet session counts as abandoned.
+const ASKED: i64 = 1_800_000;
 
 type Key = (String, String);
 #[derive(Default)]
@@ -53,6 +56,18 @@ fn observation_state(event: &HookEvent, now: i64) -> Option<&'static str> {
         "completed" | "ended" => Some("idle"),
         _ => None,
     }
+}
+/// The notification that holds a turn its hooks report waiting: one newer
+/// than the running observation, within `ASKED` of now. A turn that asked
+/// for the user reports nothing until they answer, so its heartbeat does
+/// not lapse meanwhile (TRAE's permission prompt).
+fn asked(evidence: &Evidence, now: i64) -> Option<&HookEvent> {
+    let observed = evidence.observation.as_ref()?;
+    evidence.attention.as_ref().filter(|attention| {
+        observed.data["state"] == "running"
+            && attention.at_ms > observed.at_ms
+            && valid(attention, now, ASKED)
+    })
 }
 fn newer(slot: &mut Option<HookEvent>, event: &HookEvent) -> bool {
     if slot.as_ref().is_some_and(|old| {
@@ -285,6 +300,9 @@ impl HookEvidence {
                     times.push(event.at_ms.saturating_add(PI_HEARTBEAT));
                 }
             }
+            if let Some(attention) = asked(evidence, now) {
+                times.push(attention.at_ms.saturating_add(ASKED));
+            }
             for (event, retention) in [
                 (&evidence.attention, DAY),
                 (&evidence.compaction, COMPACTION),
@@ -314,6 +332,7 @@ impl HookEvidence {
                     .as_ref()
                     .map(|e| (&e.data, e.at_ms, observation_state(e, now)))
                     .hash(&mut hash);
+                asked(evidence, now).is_some().hash(&mut hash);
                 evidence
                     .attention
                     .as_ref()
@@ -437,7 +456,8 @@ impl HookEvidence {
             .as_ref()
             .filter(|e| valid(e, now, 30 * DAY) && last_event.is_none_or(|at| e.at_ms >= at))
         {
-            if let Some(state) = observation_state(observed, now) {
+            let held = asked(entry, now).map(|_| "waiting");
+            if let Some(state) = held.or_else(|| observation_state(observed, now)) {
                 session["state"] = json!(state);
                 advance(session, observed.at_ms);
                 let facts = facts(session);
@@ -606,6 +626,62 @@ mod tests {
             at + 5_000,
         ));
         assert_eq!(state(&evidence, at + 6_000), "idle");
+    }
+
+    #[test]
+    fn a_turn_that_asked_for_the_user_waits_past_its_heartbeat() {
+        let at = 1_792_470_000_000i64;
+        let event = |kind: &str, at: i64, data: Value| HookEvent {
+            source: "trae".into(),
+            session_id: "trae:c1".into(),
+            kind: kind.into(),
+            at_ms: at,
+            data,
+        };
+        let running = json!({"state":"running","turnId":"c1","startedAtMs":at,"outcome":null,"title":"Fix the login"});
+        let mut evidence = HookEvidence::default();
+        evidence.ingest(&[event("session-observation", at, running.clone())], at);
+        let asked = at + 10_000;
+        evidence.ingest(
+            &[event(
+                "attention",
+                asked,
+                json!({"message":"RunCommand needs your confirmation"}),
+            )],
+            asked,
+        );
+        let row = |evidence: &HookEvidence, now: i64| {
+            evidence.extra_sessions(now, 1, &HashSet::new())[0].clone()
+        };
+        let waiting = row(&evidence, at + PI_HEARTBEAT + 60_000);
+        assert_eq!(waiting["state"], "waiting");
+        assert_eq!(waiting["title"], "Fix the login");
+        assert_eq!(
+            waiting["liveFacts"]["attention"]["message"],
+            "RunCommand needs your confirmation"
+        );
+        // The answer runs the tool: the turn goes on.
+        let answered = at + PI_HEARTBEAT + 90_000;
+        evidence.ingest(&[event("session-observation", answered, running)], answered);
+        assert_eq!(row(&evidence, answered + 1_000)["state"], "running");
+        // Unanswered, it is quiet once the wait is over, and that is a change due.
+        let mut evidence = HookEvidence::default();
+        evidence.ingest(
+            &[
+                event(
+                    "session-observation",
+                    at,
+                    json!({"state":"running","turnId":"c1","startedAtMs":at,"outcome":null}),
+                ),
+                event("attention", asked, json!({"message":"Allow?"})),
+            ],
+            asked,
+        );
+        assert_eq!(
+            evidence.next_change(at + PI_HEARTBEAT + 1),
+            Some(asked + ASKED)
+        );
+        assert_eq!(row(&evidence, asked + ASKED)["state"], "idle");
     }
 
     #[test]

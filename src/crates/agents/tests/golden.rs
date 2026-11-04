@@ -53,6 +53,8 @@ const SOURCES: &[&str] = &[
     "copilot",
     "droid",
     "goose",
+    "trae",
+    "trae-cn",
     "unknown-client",
 ];
 /// Every hook flag, and one the crate does not know.
@@ -2333,6 +2335,33 @@ fn goose_stop() -> Value {
     })
 }
 
+/// A TRAE hook payload: the common fields, and each event's own.
+fn trae_event(event: &str) -> Value {
+    let mut payload = json!({
+        "session_id": "trae-session-1",
+        "cwd": "/Users/me/project",
+        "hook_event_name": event,
+        "workspace_roots": ["/Users/me/project"],
+    });
+    let extra = match event {
+        "UserPromptSubmit" => json!({"prompt": "Fix the failing test"}),
+        "PreToolUse" | "PostToolUse" => {
+            json!({"tool_use_id": "t1", "tool_name": "RunCommand", "llm_tool_name": "RunCommand", "tool_input": {"command": "ls"}})
+        }
+        "Stop" => {
+            json!({"stop_hook_active": false, "loop_count": 0, "last_assistant_message": "Done."})
+        }
+        _ => {
+            json!({"notification_type": "permission_prompt", "message": "RunCommand needs your confirmation", "tool_use_id": "t1"})
+        }
+    };
+    payload
+        .as_object_mut()
+        .unwrap()
+        .extend(extra.as_object().unwrap().clone());
+    payload
+}
+
 fn completion_payload(source: &str) -> Value {
     match source {
         "antigravity" => antigravity_stop(),
@@ -2897,6 +2926,37 @@ fn events(golden: &mut Golden) {
             "goose",
             completion,
             claude_style_stop(),
+        ),
+        // TRAE: a prompt and a finished tool call run the session.
+        (
+            "completion/trae/prompt",
+            "trae",
+            completion,
+            trae_event("UserPromptSubmit"),
+        ),
+        (
+            "completion/trae-cn/tool",
+            "trae-cn",
+            completion,
+            trae_event("PostToolUse"),
+        ),
+        (
+            "completion/trae/pre-tool",
+            "trae",
+            completion,
+            trae_event("PreToolUse"),
+        ),
+        (
+            "completion/trae/stop",
+            "trae",
+            completion,
+            trae_event("Stop"),
+        ),
+        (
+            "attention/trae/permission",
+            "trae",
+            attention,
+            trae_event("Notification"),
         ),
         // Malformed payloads.
         (

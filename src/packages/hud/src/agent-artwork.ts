@@ -94,6 +94,11 @@ const aliases: Readonly<Record<string, string>> = {
   "qoder-work": "qoder",
   qoderwork: "qoder",
   "qoder-dark": "qoder",
+  "trae-cn": "trae",
+};
+/** Vendors without their own artwork yet, drawn with the fallback mark. */
+const unmarked: Readonly<Record<string, string>> = {
+  trae: "TRAE",
 };
 export function agentArtworkKey(source: string): string {
   const key = normalize(source);

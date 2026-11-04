@@ -367,6 +367,7 @@ fn vendor_name(source: &str) -> String {
         "cline" => "Cline",
         "roo-code" => "Roo Code",
         "goose" => "Goose",
+        "trae" => "TRAE",
         // Agents with no mark of their own here, by their own names.
         _ => agent_hud_core::naming::model_names::vendor_name(source),
     };

@@ -98,6 +98,14 @@ fn handle_payload(arguments: &[String], data: &Path, input: &[u8], output: &mut 
     }
     let env: HashMap<String, String> = std::env::vars().collect();
     let home = crate::os::home_dir().ok();
+    // Another client running this one's hooks from its own import of them
+    // (TRAE running Claude Code's) is no session of this client: no opinion,
+    // nothing recorded.
+    if agent_hud_agents::hooks::hooks_of(source)
+        .is_ok_and(|(id, _)| agent_hud_agents::process::imported_by(id, &env, &payload).is_some())
+    {
+        return 0;
+    }
     if flag == "--permission-hook" {
         if home
             .as_ref()
@@ -151,19 +159,19 @@ fn handle_payload(arguments: &[String], data: &Path, input: &[u8], output: &mut 
                 event.data["endpoint"] = super::endpoint::claude(&env, starting);
             }
         }
-        let _ = super::record_event(data, &event);
+        let recorded = super::record_event(data, &event).is_ok();
         // A turn's tokens, for a client that keeps them nowhere else (Cursor).
         let _ = super::turn_log::append(data, &event);
         let transcript_path = payload["transcript_path"]
             .as_str()
             .or_else(|| payload["transcriptPath"].as_str());
-        let _ = super::transport::send(
-            data,
-            source,
-            flag,
-            &json!({"transcript_path":transcript_path}),
-            None,
-        );
+        let mut nudge = json!({"transcript_path":transcript_path});
+        // A client that runs its hooks where Agent HUD's folder is read-only
+        // (TRAE's sandbox) hands the event to the running app instead.
+        if !recorded {
+            nudge["event"] = json!(event);
+        }
+        let _ = super::transport::send(data, source, flag, &nudge, None);
     }
     let reply = (flag == "--completion-hook")
         .then(|| agent_hud_agents::hooks::hooks_of(source).ok())
@@ -176,4 +184,55 @@ fn handle_payload(arguments: &[String], data: &Path, input: &[u8], output: &mut 
     let _ = serde_json::to_writer(&mut *output, &response);
     let _ = output.write_all(b"\n");
     0
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn run(data: &Path, flag: &str, source: &str, payload: Value) -> Vec<Value> {
+        let arguments = ["agent-hud".to_owned(), flag.to_owned(), source.to_owned()];
+        let bytes = serde_json::to_vec(&payload).unwrap();
+        let mut output = Vec::new();
+        assert_eq!(
+            handle_with_io(&arguments, data, &mut bytes.as_slice(), &mut output),
+            Some(0)
+        );
+        let Ok(entries) = std::fs::read_dir(data.join("hooks/inbox")) else {
+            return vec![];
+        };
+        entries
+            .flatten()
+            .filter_map(|entry| std::fs::read(entry.path()).ok())
+            .filter_map(|bytes| serde_json::from_slice(&bytes).ok())
+            .collect()
+    }
+
+    #[test]
+    fn a_trae_prompt_is_kept_as_its_session_running() {
+        let root = tempfile::tempdir().unwrap();
+        let prompt = json!({"session_id": "c1", "cwd": "/w", "hook_event_name": "UserPromptSubmit", "prompt": "Fix the login", "workspace_roots": ["/w"]});
+        let records = run(
+            &root.path().join("data"),
+            "--completion-hook",
+            "trae",
+            prompt,
+        );
+        assert_eq!(records.len(), 1);
+        assert_eq!(records[0]["kind"], "session-observation");
+        assert_eq!(records[0]["sessionId"], "trae:c1");
+        assert_eq!(records[0]["data"]["title"], "Fix the login");
+    }
+
+    #[test]
+    fn trae_running_claude_codes_imported_hooks_records_nothing() {
+        let root = tempfile::tempdir().unwrap();
+        let data = root.path().join("data");
+        let trae = json!({"session_id": "c1", "cwd": "/w", "hook_event_name": "Notification", "notification_type": "permission_prompt", "message": "Allow?", "workspace_roots": ["/w"]});
+        assert!(run(&data, "--attention-hook", "claude", trae).is_empty());
+        let claude = json!({"session_id": "s1", "transcript_path": "/u/.claude/projects/p/s1.jsonl", "cwd": "/w", "hook_event_name": "Notification", "message": "Allow?"});
+        let records = run(&data, "--attention-hook", "claude", claude);
+        assert_eq!(records.len(), 1);
+        assert_eq!(records[0]["sessionId"], "s1");
+    }
 }

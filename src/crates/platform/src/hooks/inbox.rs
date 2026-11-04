@@ -50,7 +50,7 @@ pub(super) fn valid(event: &HookEvent, now: i64) -> bool {
     let retention = match event.kind.as_str() {
         "attention" => 86_400_000,
         "compaction" => 300_000,
-        "completion" | "account" => 30 * 86_400_000,
+        "completion" | "account" | "session-observation" => 30 * 86_400_000,
         "origin" | "delivery" => i64::MAX,
         _ => return false,
     };
@@ -107,6 +107,14 @@ fn first_surface(event: &HookEvent, old: &HookEvent) -> Option<serde_json::Value
     Some(serde_json::json!({"surface":surface,"at":old.at_ms}))
 }
 
+/// The title an observation keeps from the record it replaces: a session's
+/// first prompt titles it (`naming::session_title`), and each tool call that
+/// renews its turn, or a later prompt, replaces the record.
+fn kept_title(event: &HookEvent, old: &HookEvent) -> Option<serde_json::Value> {
+    (event.kind == "session-observation" && event.data.is_object() && old.data["title"].is_string())
+        .then(|| old.data["title"].clone())
+}
+
 /// Only reduced public reporting facts are persisted. Approval payloads never
 /// enter this inbox. A hook can report while the GUI and Runtime are absent.
 pub fn record_event(data: &Path, event: &HookEvent) -> Result<(), String> {
@@ -125,14 +133,20 @@ pub fn record_event(data: &Path, event: &HookEvent) -> Result<(), String> {
         return Ok(());
     }
     let carried;
-    let event = match old.as_ref().and_then(|old| first_surface(event, old)) {
-        Some(first) => {
-            let mut next = event.clone();
+    let first = old.as_ref().and_then(|old| first_surface(event, old));
+    let title = old.as_ref().and_then(|old| kept_title(event, old));
+    let event = if first.is_some() || title.is_some() {
+        let mut next = event.clone();
+        if let Some(first) = first {
             next.data["first"] = first;
-            carried = next;
-            &carried
         }
-        None => event,
+        if let Some(title) = title {
+            next.data["title"] = title;
+        }
+        carried = next;
+        &carried
+    } else {
+        event
     };
     let bytes = serde_json::to_vec(event).map_err(|_| "Invalid hook event")?;
     if bytes.len() as u64 > RECORD_LIMIT {
@@ -358,6 +372,31 @@ mod tests {
             kept.data["first"],
             json!({"surface":"mobile:iphone","at":at})
         );
+    }
+
+    #[test]
+    fn a_session_keeps_the_title_its_first_prompt_gave() {
+        let root = tempfile::tempdir().unwrap();
+        let data = &root.path().join("data");
+        let at = now_ms() - 10_000;
+        let observation = |offset: i64, title: Option<&str>| HookEvent {
+            source: "trae".into(),
+            session_id: "trae:c1".into(),
+            kind: "session-observation".into(),
+            at_ms: at + offset,
+            data: json!({"turnId":"c1","state":"running","title":title}),
+        };
+        record_event(data, &observation(0, Some("Fix the login"))).unwrap();
+        record_event(data, &observation(5, None)).unwrap();
+        let path = data
+            .join("hooks/inbox")
+            .join(format!("{}.json", key(&observation(0, None))));
+        let (kept, _) = read(&path).unwrap();
+        assert_eq!(kept.at_ms, at + 5);
+        assert_eq!(kept.data["title"], "Fix the login");
+        // A later prompt does not rename it.
+        record_event(data, &observation(9, Some("Add tests"))).unwrap();
+        assert_eq!(read(&path).unwrap().0.data["title"], "Fix the login");
     }
 
     #[test]

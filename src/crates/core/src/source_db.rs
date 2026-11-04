@@ -233,7 +233,8 @@ impl AgentHudCore {
         // A messages file written again whole (Cline's, Roo Code's).
         let is_document = agent_hud_agents::cline::transcript::accepts(path, stamp.source);
         let replaces_sessions = opencode(stamp.source).is_some() && !is_legacy;
-        let reader = if is_batch || is_bot || is_legacy || is_turn_log || is_document || is_settings {
+        let reader = if is_batch || is_bot || is_legacy || is_turn_log || is_document || is_settings
+        {
             None
         } else {
             Some(legacy_database::ReadOnlyDatabase::open(path).map_err(|_| {

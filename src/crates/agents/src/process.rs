@@ -84,6 +84,35 @@ pub type OriginRule = fn(&Caller, &str) -> Origin;
 /// requests stay with the client.
 pub type UnattendedRule = fn(&Caller) -> bool;
 
+/// A client that runs other clients' hooks it imports from their settings,
+/// with its own payloads (TRAE runs Claude Code's). Such a callback is not
+/// the named client's, and is not taken as its session's.
+pub struct Imported {
+    /// The client that runs them.
+    pub by: &'static str,
+    /// The clients whose hooks it imports.
+    pub from: &'static [&'static str],
+    /// Whether a callback of those hooks comes from it, by the callback's
+    /// own environment and payload.
+    pub rule: fn(&HashMap<String, String>, &Value) -> bool,
+}
+
+/// Every client that runs other clients' hooks.
+pub static IMPORTERS: &[&Imported] = &[&crate::trae::IMPORTS];
+
+/// The client that ran this callback of `source`'s hooks from its own
+/// import of them, if one did.
+pub fn imported_by(
+    source: &str,
+    env: &HashMap<String, String>,
+    payload: &Value,
+) -> Option<&'static str> {
+    IMPORTERS
+        .iter()
+        .find(|imported| imported.from.contains(&source) && (imported.rule)(env, payload))
+        .map(|imported| imported.by)
+}
+
 /// A native executable name. Windows paths may also appear in imported facts
 /// on another host, so recognize both separators and the native `.exe` suffix.
 pub(crate) fn native_program(path: &Path, name: &str) -> bool {

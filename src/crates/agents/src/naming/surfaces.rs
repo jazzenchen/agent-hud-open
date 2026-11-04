@@ -147,6 +147,7 @@ fn agent_category(agent: &str) -> (Category, Option<&'static str>) {
         "cursor" => (Category::Ide, Some("cursor")),
         "qoder" | "qoder-cn" => (Category::Ide, Some("qoder")),
         "qoder-work" => (Category::Desktop, Some("qoderwork")),
+        "trae" | "trae-cn" => (Category::Ide, Some("trae")),
         "workbuddy" => (Category::Desktop, Some("workbuddy")),
         "grok-cli" | "hermes" | "kimi" | "opencode" | "pi" | "qwen" | "kilo" | "mimocode"
         | "omp" => (Category::Cli, None),
@@ -202,6 +203,8 @@ pub fn bundle_app(bundle: &str) -> Option<&'static str> {
         ("com.anthropic.claudefordesktop", "claude"),
         ("com.openai.codex", "codex"),
         ("com.google.antigravity", "antigravity"),
+        (crate::trae::process::BUNDLES[0], "trae"),
+        (crate::trae::process::BUNDLES[1], "trae"),
         ("app.agenthud", AGENT_HUD),
         ("com.agenthud", AGENT_HUD),
     ];

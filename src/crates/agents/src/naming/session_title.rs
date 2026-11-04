@@ -193,6 +193,8 @@ fn folder_named(source: &str) -> bool {
             | "cline"
             | "roo-code"
             | "goose"
+            | "trae"
+            | "trae-cn"
     )
 }
 
