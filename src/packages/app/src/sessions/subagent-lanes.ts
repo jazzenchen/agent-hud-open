@@ -233,18 +233,6 @@ export function lanes(
   return result;
 }
 
-/** A lane's calls in view, one tick each, but none within 0.4% of the view of
- * the last one kept: hundreds of calls would otherwise merge into a block. */
-export function ticks(lane: Lane, from: number, to: number, span: number) {
-  const kept: { at: number; call: SessionCall }[] = [];
-  for (const entry of lane.calls) {
-    if (entry.at < from || entry.at > to) continue;
-    const last = kept.at(-1);
-    if (!last || entry.at - last.at >= span * 0.004) kept.push(entry);
-  }
-  return kept;
-}
-
 export function tipLine(
   lane: Lane,
   at: number,

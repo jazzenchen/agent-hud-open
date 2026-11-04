@@ -1,9 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
+  callRuns,
   contextRuns,
   largestPositions,
   niceScale,
+  panWindow,
   stackTurn,
   stackTurnBars,
   turnTicks,
@@ -121,6 +123,35 @@ test("the context line breaks at each compaction and skips turns without a conte
     "a first turn compacted starts the line",
   );
   assert.deepEqual(contextRuns([]), []);
+});
+
+test("calls closer than the gap join one run; a lone call stays a tick", () => {
+  const calls = [0, 4, 9, 30, 70, 74].map((at) => ({ at }));
+  assert.deepEqual(callRuns(calls, 0, 100, 10), [
+    { from: 0, to: 9, calls: 3 },
+    { from: 30, to: 30, calls: 1 },
+    { from: 70, to: 74, calls: 2 },
+  ]);
+  assert.deepEqual(
+    callRuns(calls, 0, 100, 3).map((run) => run.calls),
+    [1, 1, 1, 1, 1, 1],
+    "zoomed in, every call is its own tick",
+  );
+  assert.deepEqual(
+    callRuns(calls, 5, 40, 10),
+    [
+      { from: 0, to: 9, calls: 3 },
+      { from: 30, to: 30, calls: 1 },
+    ],
+    "a run reaching into the view keeps the calls before it",
+  );
+  assert.deepEqual(callRuns([], 0, 100, 10), []);
+});
+
+test("a zoomed window pans at the same length and stops at the turn's ends", () => {
+  assert.deepEqual(panWindow([100, 200], 50, 0, 1_000), [150, 250]);
+  assert.deepEqual(panWindow([100, 200], -500, 0, 1_000), [0, 100]);
+  assert.deepEqual(panWindow([800, 900], 500, 0, 1_000), [900, 1_000]);
 });
 
 test("a row names its model, its project with ~ else its folder, and its client", () => {

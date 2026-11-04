@@ -1,14 +1,16 @@
-import { memo, useEffect, useMemo, useRef, useState } from "react";
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import type { MouseEvent as ReactMouseEvent } from "react";
 import type { SessionCall, SessionTurnAgent } from "@agent-hud/protocol";
-import {
-  lanes,
-  offset,
-  ticks,
-  tipLine,
-  type Lane,
-  type Step,
-} from "./subagent-lanes";
+import { callRuns, panWindow } from "../lib/session-charts";
+import { lanes, offset, tipLine, type Lane, type Step } from "./subagent-lanes";
 import { SubagentTimelineLegend } from "./SubagentTimelineLegend";
 import {
   clipped,
@@ -25,19 +27,28 @@ const BAR = 12;
 const AXIS_STEPS = [
   1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 900, 1800, 3600, 7200,
 ];
+/** Calls closer than this on screen, px, draw as one run. */
+const RUN_GAP = 12;
+/** How quickly the view glides after a zoom and after a pan: ms to cover about two thirds of the way. */
+const GLIDE = 70;
+const PAN_GLIDE = 40;
+
+/** A stretch of the turn, ms. */
+type View = [number, number];
 
 interface Hover {
   lane: number;
-  at: number;
   x: number;
   y: number;
 }
 
 /**
  * A picked turn's work over time: the session and each sub-agent it sent, one
- * row each, from when it started to its last call. A tick is a model call, a
- * darker stretch a step of 15 s or more; dots on the parent row mark sending
- * and handing back. Drag across the plot to zoom; double-click to return.
+ * row each, from when it started to its last call. A tick is a model call and
+ * a bar a run of calls too close to tell apart, a darker stretch a step of
+ * 15 s or more; dots on the parent row mark sending and handing back. Drag
+ * across the plot to zoom, swipe sideways (or shift-scroll) to pan the zoomed
+ * view, double-click to return.
  */
 export const SubagentTimeline = memo(function SubagentTimeline({
   calls,
@@ -70,7 +81,9 @@ export const SubagentTimeline = memo(function SubagentTimeline({
     [calls, agents, start, end, now, live, theme],
   );
   const fullTo = Math.max(start + 1000, end, ...rows.map((lane) => lane.end));
-  const [view, setView] = useState<[number, number] | null>(null);
+  // `view` is the window drawn, `aim` the one it glides to; null is the whole turn.
+  const [view, setView] = useState<View | null>(null);
+  const [aim, setAim] = useState<View | null>(null);
   const [from, to] = view ?? [start, fullTo];
   const span = Math.max(1, to - from);
   const pos = (at: number) => ((at - from) / span) * 100;
@@ -79,6 +92,91 @@ export const SubagentTimeline = memo(function SubagentTimeline({
   const visible = (a: number, b: number) => b >= from && a <= to;
 
   const plot = useRef<HTMLDivElement>(null);
+  const [plotWidth, setPlotWidth] = useState(0);
+  useLayoutEffect(() => {
+    const node = plot.current;
+    if (!node) return;
+    setPlotWidth(node.clientWidth);
+    const observer = new ResizeObserver(([entry]) =>
+      setPlotWidth(entry.contentRect.width),
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+  const runGap = (RUN_GAP / Math.max(1, plotWidth)) * span;
+
+  // What the glide and the wheel read between renders.
+  const glide = useRef({
+    view: null as View | null,
+    aim: null as View | null,
+    frame: 0,
+    tau: GLIDE,
+    start,
+    fullTo,
+    plotWidth,
+  });
+  useLayoutEffect(() => {
+    Object.assign(glide.current, { start, fullTo, plotWidth });
+  });
+  useEffect(() => () => cancelAnimationFrame(glide.current.frame), []);
+  const glideTo = useCallback((next: View | null, tau = GLIDE) => {
+    const g = glide.current;
+    g.aim = next;
+    g.tau = tau;
+    setAim(next);
+    if (g.frame) return;
+    // A frame's time can come before the moment the glide began, so the
+    // first frame counts as one frame (16 ms), never as a step backwards.
+    let last = 0;
+    const step = (time: number) => {
+      const whole: View = [g.start, g.fullTo];
+      const goal = g.aim ?? whole;
+      const [a, b] = g.view ?? whole;
+      const elapsed = last ? Math.min(Math.max(0, time - last), 64) : 16;
+      const k = 1 - Math.exp(-elapsed / g.tau);
+      last = time;
+      const moved: View = [a + (goal[0] - a) * k, b + (goal[1] - b) * k];
+      const pixels =
+        Math.max(Math.abs(goal[0] - moved[0]), Math.abs(goal[1] - moved[1])) *
+        (g.plotWidth / Math.min(goal[1] - goal[0], moved[1] - moved[0]));
+      const done = pixels < 0.25;
+      g.view = done ? g.aim : moved;
+      g.frame = done ? 0 : requestAnimationFrame(step);
+      setView(g.view);
+    };
+    g.frame = requestAnimationFrame(step);
+  }, []);
+  // Swiping sideways on a trackpad, or shift with a mouse wheel, pans a zoomed
+  // view; up and down still scroll the page. React's wheel listener is passive,
+  // so this one is added by hand to keep the page from moving too.
+  useEffect(() => {
+    const node = plot.current;
+    if (!node) return;
+    const onWheel = (event: WheelEvent) => {
+      const g = glide.current;
+      const sideways =
+        event.shiftKey || Math.abs(event.deltaX) > Math.abs(event.deltaY);
+      if (!sideways || !g.aim) return;
+      event.preventDefault();
+      const delta = event.deltaX || event.deltaY;
+      const pixels =
+        delta *
+        (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? g.plotWidth : 1);
+      const length = g.aim[1] - g.aim[0];
+      glideTo(
+        panWindow(
+          g.aim,
+          (pixels / Math.max(1, g.plotWidth)) * length,
+          g.start,
+          g.fullTo,
+        ),
+        PAN_GLIDE,
+      );
+    };
+    node.addEventListener("wheel", onWheel, { passive: false });
+    return () => node.removeEventListener("wheel", onWheel);
+  }, [glideTo]);
+
   const [hover, setHover] = useState<Hover | null>(null);
   const [focus, setFocus] = useState<number | null>(null);
   const [drag, setDrag] = useState<{ a: number; b: number } | null>(null);
@@ -115,13 +213,15 @@ export const SubagentTimeline = memo(function SubagentTimeline({
     axis.push(start + t);
 
   const hovered = hover ? rows[hover.lane] : null;
+  // From the pointer's x, so the card follows what slides under it while panning.
+  const hoverAt = hover ? from + (hover.x / Math.max(1, plotWidth)) * span : 0;
   const nearest =
     hover && hovered
       ? hovered.calls.reduce<{ at: number; call: SessionCall } | null>(
           (best, entry) =>
-            Math.abs(entry.at - hover.at) < span * 0.015 &&
+            Math.abs(entry.at - hoverAt) < span * 0.015 &&
             (!best ||
-              Math.abs(entry.at - hover.at) < Math.abs(best.at - hover.at))
+              Math.abs(entry.at - hoverAt) < Math.abs(best.at - hoverAt))
               ? entry
               : best,
           null,
@@ -129,9 +229,7 @@ export const SubagentTimeline = memo(function SubagentTimeline({
       : null;
   const hoveredStep =
     hover && hovered && !nearest
-      ? hovered.steps.find(
-          (step) => step.from <= hover.at && step.to >= hover.at,
-        )
+      ? hovered.steps.find((step) => step.from <= hoverAt && step.to >= hoverAt)
       : undefined;
 
   const stepColor = (lane: Lane, kind: Step["kind"]) =>
@@ -239,7 +337,7 @@ export const SubagentTimeline = memo(function SubagentTimeline({
                 rows.length - 1,
                 Math.max(0, Math.floor(point.y / ROW)),
               );
-              setHover({ lane, at: point.at, x: point.x, y: point.y });
+              setHover({ lane, x: point.x, y: point.y });
             }}
             onMouseDown={(event) => {
               const point = atX(event);
@@ -251,7 +349,7 @@ export const SubagentTimeline = memo(function SubagentTimeline({
               if (drag && point) {
                 const [a, b] = [drag.a, point.at].sort((x, y) => x - y);
                 if (((b - a) / span) * point.box.width > 6)
-                  setView([a, Math.max(b, a + 1000)]);
+                  glideTo([a, Math.max(b, a + 1000)]);
               }
               setDrag(null);
             }}
@@ -259,7 +357,7 @@ export const SubagentTimeline = memo(function SubagentTimeline({
               setHover(null);
               setDrag(null);
             }}
-            onDoubleClick={() => setView(null)}
+            onDoubleClick={() => glideTo(null)}
             style={{
               position: "relative",
               height: plotHeight,
@@ -332,20 +430,25 @@ export const SubagentTimeline = memo(function SubagentTimeline({
                         />
                       ),
                     )}
-                  {ticks(lane, from, to, span).map((entry, n) => (
-                    <div
-                      key={`t${n}`}
-                      style={{
-                        position: "absolute",
-                        left: `calc(${pos(entry.at)}% - 1px)`,
-                        top: top - 2,
-                        width: 2,
-                        height: BAR + 4,
-                        borderRadius: 1,
-                        background: lane.color,
-                      }}
-                    />
-                  ))}
+                  {callRuns(lane.calls, from, to, runGap).map((run) => {
+                    // A lone call, or calls too close to spread, stand taller
+                    // than the bar as a tick; a run lies flush with it.
+                    const tick = run.to - run.from < runGap / 3;
+                    return (
+                      <div
+                        key={`t${run.from}`}
+                        style={{
+                          position: "absolute",
+                          left: `calc(${pos(run.from)}% - 1px)`,
+                          width: `calc(${pos(run.to) - pos(run.from)}% + 2px)`,
+                          top: tick ? top - 2 : top,
+                          height: tick ? BAR + 4 : BAR,
+                          borderRadius: tick ? 1 : 2,
+                          background: lane.color,
+                        }}
+                      />
+                    );
+                  })}
                   {lane.running && visible(lane.end, lane.end) && (
                     <div
                       style={{
@@ -422,10 +525,7 @@ export const SubagentTimeline = memo(function SubagentTimeline({
               <div
                 style={{
                   position: "absolute",
-                  left: Math.min(
-                    hover.x + 12,
-                    (plot.current?.clientWidth ?? 400) - 224,
-                  ),
+                  left: Math.min(hover.x + 12, plotWidth - 224),
                   top: Math.min(hover.y + 12, Math.max(0, plotHeight - 64)),
                   width: 212,
                   boxSizing: "border-box",
@@ -444,7 +544,7 @@ export const SubagentTimeline = memo(function SubagentTimeline({
                   {hovered.name}
                 </div>
                 <div style={{ color: theme.secondary }}>
-                  {tipLine(hovered, hover.at, start, nearest, hoveredStep, zh)}
+                  {tipLine(hovered, hoverAt, start, nearest, hoveredStep, zh)}
                 </div>
               </div>
             )}
@@ -506,8 +606,8 @@ export const SubagentTimeline = memo(function SubagentTimeline({
       </div>
 
       <SubagentTimelineLegend
-        zoomed={view ? to - from : null}
-        onShowAll={() => setView(null)}
+        zoomed={aim ? aim[1] - aim[0] : null}
+        onShowAll={() => glideTo(null)}
         theme={theme}
       />
     </div>
