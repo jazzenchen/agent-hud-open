@@ -1,15 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import type {
-  Approval,
-  IslandEvent,
-  RequestDelivery,
-  Snapshot,
-} from "@agent-hud/protocol";
-import { HUDArtwork as HUDLogo } from "../HUDArtwork";
+import type { Approval, IslandEvent, Snapshot } from "@agent-hud/protocol";
 import { CompactAlertView } from "../IslandNews";
-import { RequestDeliveryNotice } from "../permissions/ApprovalContent";
-import { SourceHoverPanel } from "../HoverPanel";
 import type { HUDRect } from "../geometry";
 import {
   HUD_METRICS,
@@ -59,11 +51,9 @@ export function HUDExpandedSurface({
   forceOpen,
   dismissNews,
   showPanelStats,
-  configurePanel,
   surfacePadding,
-  eventContent,
   inUsagePanel,
-  delivery,
+  children,
 }: {
   config: HUDConfig;
   edge: HUDEdge;
@@ -100,11 +90,10 @@ export function HUDExpandedSurface({
   forceOpen: () => void;
   dismissNews: () => void;
   showPanelStats?: () => void;
-  configurePanel?: () => void;
   surfacePadding: { top: number; right: number; bottom: number; left: number };
-  eventContent: ReactNode;
   inUsagePanel?: boolean;
-  delivery?: RequestDelivery;
+  /** The panel's body: an alert stack or the usage panel. */
+  children: ReactNode;
 }) {
   // A hardware notch's row stays dark whatever the appearance, at rest and
   // while a reminder shows its wings, so it stays one with the camera
@@ -419,37 +408,7 @@ export function HUDExpandedSurface({
                               paddingLeft: surfacePadding.left,
                             }}
                           >
-                            {eventContent &&
-                            (!inUsagePanel || Boolean(request)) ? (
-                              eventContent
-                            ) : (
-                              <SourceHoverPanel
-                                active={open}
-                                config={config}
-                                snapshot={snapshot}
-                                focusVendor={focusedVendor?.name}
-                                light={light}
-                                Logo={HUDLogo}
-                                onConfigure={configurePanel}
-                                onStats={showPanelStats}
-                                inlineAlert={
-                                  inUsagePanel && !request
-                                    ? eventContent
-                                    : undefined
-                                }
-                                maxHeight={Math.max(
-                                  40,
-                                  frame.height -
-                                    surfacePadding.top -
-                                    surfacePadding.bottom,
-                                )}
-                              />
-                            )}
-                            <RequestDeliveryNotice
-                              delivery={delivery}
-                              light={light}
-                              language={snapshotLanguage(snapshot)}
-                            />
+                            {children}
                           </div>
                         </motion.div>
                       </div>
