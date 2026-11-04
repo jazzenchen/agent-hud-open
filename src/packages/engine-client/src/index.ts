@@ -54,8 +54,10 @@ export class EngineClient {
     child.stderr.on("data", () => {
       /* Engine output is never mixed into MCP stdout or UI responses. */
     });
-    child.stdout.on("data", (chunk: Buffer) => {
-      this.buffer += chunk.toString("utf8");
+    // Decoded as a stream: a chunk can end inside a character.
+    child.stdout.setEncoding("utf8");
+    child.stdout.on("data", (chunk: string) => {
+      this.buffer += chunk;
       if (this.buffer.length > 16 * 1024 * 1024) {
         this.fail("Engine response exceeded 16 MiB.");
         this.close();
