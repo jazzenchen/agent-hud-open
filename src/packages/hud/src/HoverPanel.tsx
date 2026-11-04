@@ -26,7 +26,8 @@ import {
 import { usePanelServices } from "./PanelContext";
 import { useGround } from "./ground";
 import { FittingName } from "./panel/FittingName";
-import { SourceBalances, SourceProviderBlock } from "./panel/QuotaSection";
+import { SourceProviderBlock } from "./panel/QuotaSection";
+import { SourceBalances } from "./panel/SourceBalances";
 import { SourceSessions } from "./panel/SessionsSection";
 import {
   densityMetrics,
