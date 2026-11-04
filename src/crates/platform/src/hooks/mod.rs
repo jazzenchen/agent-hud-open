@@ -17,6 +17,7 @@ mod statusline_install;
 pub use statusline_install::AntigravityCliChange;
 mod observers;
 pub(crate) mod origins;
+mod policy;
 pub use observers::{apply_observer_plan, observer_plan, ObserverPlan};
 mod reminders;
 mod reviewer;

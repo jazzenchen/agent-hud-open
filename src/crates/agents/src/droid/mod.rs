@@ -6,6 +6,7 @@
 //! is unverified.
 pub mod account;
 mod hooks;
+mod rules;
 pub mod transcript;
 
 use crate::Agent;
