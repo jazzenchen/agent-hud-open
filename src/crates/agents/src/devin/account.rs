@@ -37,10 +37,6 @@ pub static PROVIDER: Provider = Provider {
 };
 
 pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
-    read_text(host).map_err(Unread::from)
-}
-
-fn read_text(host: &dyn Host) -> Result<Reading, String> {
     let mut reading = Reading::empty("devin");
     let directory = host.home().join(".cache/devin/cli");
     let mut candidates = host

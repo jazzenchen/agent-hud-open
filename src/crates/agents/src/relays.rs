@@ -139,10 +139,6 @@ pub static PROVIDER: Provider = Provider {
 };
 
 pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
-    read_text(host).map_err(Unread::from)
-}
-
-fn read_text(host: &dyn Host) -> Result<Reading, String> {
     let mut reading = Reading::empty("relay");
     for target in targets(host) {
         let consented = target.manual.is_some() || host.consented(&consent_key(&target.host));
