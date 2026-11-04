@@ -237,6 +237,28 @@ export function Missing({
   );
 }
 
+/** A card's title line: its name, and on the right what it measures or a control. */
+export function CardTitle({
+  title,
+  right,
+  theme,
+}: {
+  title: ReactNode;
+  right?: ReactNode;
+  theme: Theme;
+}) {
+  return (
+    <div style={{ ...row, justifyContent: "space-between", minHeight: 22 }}>
+      <strong style={{ fontSize: 13, fontWeight: 600 }}>{title}</strong>
+      {right != null && (
+        <span style={{ color: theme.secondary, fontSize: 11, ...row, gap: 8 }}>
+          {right}
+        </span>
+      )}
+    </div>
+  );
+}
+
 export function ColorKey({
   color,
   children,
