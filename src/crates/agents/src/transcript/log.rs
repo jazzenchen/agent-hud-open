@@ -246,7 +246,7 @@ impl Log {
         if self.source == "codex" {
             self.meter_codex_call(value);
             self.parse_codex(value);
-        } else if self.source == "claude" {
+        } else if crate::transcript::claude_lines(&self.source) {
             self.parse_claude(value);
         } else {
             self.parse_source(value);

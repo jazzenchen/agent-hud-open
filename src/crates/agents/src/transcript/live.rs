@@ -313,7 +313,7 @@ impl LiveLog {
         let in_subagents = path
             .components()
             .any(|part| part.as_os_str() == "subagents");
-        if source == "claude" {
+        if crate::transcript::claude_lines(source) {
             live.is_subagent = in_subagents
                 || path
                     .file_stem()
@@ -325,6 +325,16 @@ impl LiveLog {
                 .unwrap_or("");
             if !live.is_subagent && uuid(stem) {
                 live.owned_claude_id = Some(stem.into());
+            }
+            // Claude Code names the parent in a sub-agent's lines; the other
+            // clients that write its lines name the sub-agent's own id there,
+            // so its folder, `<parent>/subagents/`, names the parent.
+            if source != "claude" && in_subagents {
+                live.parent_id = path
+                    .parent()
+                    .and_then(Path::parent)
+                    .and_then(Path::file_name)
+                    .map(|name| name.to_string_lossy().into_owned());
             }
         } else if in_subagents {
             live.is_subagent = true;
@@ -346,7 +356,7 @@ impl LiveLog {
 
     /// Reject copied Claude fork history before it changes identity, state or counters.
     pub fn accepts(&self, source: &str, value: &Value) -> bool {
-        source != "claude"
+        !crate::transcript::claude_lines(source)
             || self.is_subagent
             || match (self.owned_claude_id.as_deref(), value["sessionId"].as_str()) {
                 (Some(own), Some(session)) => own == session,
@@ -357,7 +367,7 @@ impl LiveLog {
     pub fn ingest(&mut self, source: &str, value: &Value) {
         match source {
             "codex" => self.codex(value),
-            "claude" => self.claude(value),
+            source if crate::transcript::claude_lines(source) => self.claude(value),
             _ => {}
         }
     }
@@ -492,7 +502,10 @@ impl LiveLog {
             // Sources read from a database (Antigravity) or whose session never prompted (DeepSeek)
             // carry no lifecycle: nothing says work is in flight, so they are idle, not out of date,
             // and their mark must not rest as a faded "no news" logo.
-            return if self.is_internal || matches!(source, "claude" | "codex") {
+            return if self.is_internal
+                || source == "codex"
+                || crate::transcript::claude_lines(source)
+            {
                 "unverified"
             } else {
                 "idle"
@@ -512,7 +525,7 @@ impl LiveLog {
             Some(turn) if !turn.running => fresh_child,
             Some(turn) => {
                 now - last
-                    < if source == "claude" && turn.started.is_none() {
+                    < if crate::transcript::claude_lines(source) && turn.started.is_none() {
                         QUIET_MS
                     } else {
                         ABANDONED_MS
@@ -549,7 +562,9 @@ impl LiveLog {
         if let Some(last) = self.last_event().filter(|_| !self.is_internal) {
             match self.turns.back() {
                 Some(turn) if !turn.running => {}
-                Some(turn) if !(source == "claude" && turn.started.is_none()) => {
+                Some(turn)
+                    if !(crate::transcript::claude_lines(source) && turn.started.is_none()) =>
+                {
                     times.push(last + ABANDONED_MS)
                 }
                 _ => times.push(last + QUIET_MS),

@@ -184,6 +184,9 @@ fn folder_named(source: &str) -> bool {
             | "devin"
             | "grok-cli"
             | "opencode"
+            | "qoder"
+            | "qoder-cn"
+            | "qoder-work"
     )
 }
 

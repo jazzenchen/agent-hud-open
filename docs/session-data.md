@@ -60,3 +60,12 @@ use committed local facts and do not start collection or provider requests.
 Local MCP exposes the same queries as `hud_sessions` and `hud_session`. Synthetic
 responses are available only after explicit `--demo`; failures never activate
 sample data.
+
+## Where some clients' tokens come from
+
+A session's tokens come from one source for each call; when a client reports
+a call in more than one place, the best one counts it and the others give way.
+
+| Client | Sessions and live state | Tokens |
+| --- | --- | --- |
+| Qoder, Qoder CN, QoderWork | Claude Code's lines in `projects/<folder>/<session>.jsonl` under `~/.qoder` (`QODER_CONFIG_DIR`), `~/.qoder-cn` (`QODERCN_CONFIG_DIR`), `~/.qoderwork` and the Qoder app's `SharedClientCache/cli/projects`; sub-agents in `<session>/subagents/`. A session's id is the one its hooks report. Each build is a client of its own. | Each response's usage; Qoder's `input_tokens` holds its cache reads, which count apart. Qoder CN's older `QoderCN/SharedClientCache/cache/db/local.db` adds its assistant messages. A response billed only in credits has no tokens. |

@@ -53,6 +53,16 @@ use rusqlite::Connection;
 use serde_json::{json, Value};
 use std::collections::HashSet;
 
+/// Whether `source` writes Claude Code's JSON lines: Claude Code itself, and
+/// each client whose descriptor reads its turns by Claude Code's rule (the
+/// Qoder builds), so one parser and one live reducer read them all.
+pub fn claude_lines(source: &str) -> bool {
+    source == "claude"
+        || crate::by_id(source)
+            .and_then(|agent| agent.turns)
+            .is_some_and(|turns| std::ptr::eq(turns, &crate::claude::transcript::TURNS))
+}
+
 pub fn text(value: &Value) -> Option<&str> {
     value.as_str().filter(|s| !s.trim().is_empty())
 }

@@ -618,3 +618,119 @@ fn grok_bot_session_works_while_a_message_has_no_reply_and_idles_once_answered()
     assert_eq!(state(&mut backend), "idle");
     assert!(backend.reads.bot_poll.is_none());
 }
+
+/// Qoder and Qoder CN, each a client of its own: Claude Code's lines with
+/// Qoder's input, a sub-agent under its session, and Qoder CN's older store.
+#[test]
+fn qoder_sessions_are_read_as_claude_lines_under_their_own_clients() {
+    let root = tempfile::tempdir().unwrap();
+    let session = "11111111-1111-4111-8111-111111111111";
+    let at = chrono::Utc::now() - chrono::Duration::minutes(5);
+    let stamp = |seconds: i64| (at + chrono::Duration::seconds(seconds)).to_rfc3339();
+    let write = |path: PathBuf, lines: &[Value]| {
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        let text = lines.iter().map(|l| format!("{l}\n")).collect::<String>();
+        std::fs::write(path, text).unwrap();
+    };
+    let qoder = root.path().join(".qoder/projects");
+    let project = qoder.join("-w-app");
+    write(
+        project.join(format!("{session}.jsonl")),
+        &[
+            json!({"type":"user","uuid":"u1","timestamp":stamp(0),"sessionId":session,"cwd":"/w/app","message":{"role":"user","content":"help me"}}),
+            json!({"type":"assistant","uuid":"a1","timestamp":stamp(4),"sessionId":session,"message":{"id":"m1","role":"assistant","model":"auto","usage":{"input_tokens":1_000,"cache_read_input_tokens":800,"output_tokens":30},"content":[{"type":"text","text":"done"}]}}),
+        ],
+    );
+    write(
+        project.join(session).join("subagents/agent-7.jsonl"),
+        &[
+            json!({"type":"user","uuid":"s1","timestamp":stamp(1),"sessionId":"agent-7","message":{"role":"user","content":"look"}}),
+            json!({"type":"assistant","uuid":"s2","timestamp":stamp(2),"sessionId":"agent-7","message":{"id":"m2","usage":{"input_tokens":50,"output_tokens":5}}}),
+        ],
+    );
+    let cn = root.path().join(".qoder-cn/projects");
+    write(
+        cn.join("-w-cn")
+            .join("22222222-2222-4222-8222-222222222222.jsonl"),
+        &[
+            json!({"type":"assistant","uuid":"a1","timestamp":stamp(3),"sessionId":"22222222-2222-4222-8222-222222222222","message":{"id":"m3","usage":{"input_tokens":10,"output_tokens":1}}}),
+        ],
+    );
+    let legacy = root
+        .path()
+        .join("QoderCN/SharedClientCache/cache/db/local.db");
+    std::fs::create_dir_all(legacy.parent().unwrap()).unwrap();
+    let db = Connection::open(&legacy).unwrap();
+    db.execute_batch(
+        "CREATE TABLE chat_session(session_id TEXT,project_name TEXT);
+         CREATE TABLE chat_message(id TEXT,session_id TEXT,request_id TEXT,role TEXT,
+           token_info TEXT,model_info TEXT,gmt_create INTEGER);",
+    )
+    .unwrap();
+    db.execute(
+        "INSERT INTO chat_message VALUES('old','legacy-1','r','assistant',
+           '{\"prompt_tokens\":300,\"cached_tokens\":200,\"completion_tokens\":20}',
+           '{\"model_key\":\"dmodel\"}',?1)",
+        [at.timestamp_millis()],
+    )
+    .unwrap();
+    let mut backend = AgentHudCore::new(
+        vec![
+            SourceRoot {
+                path: qoder,
+                provider: "qoder",
+            },
+            SourceRoot {
+                path: cn,
+                provider: "qoder-cn",
+            },
+            SourceRoot {
+                path: legacy,
+                provider: "qoder-cn",
+            },
+        ],
+        root.path().join("hud"),
+    );
+    let snapshot = refresh(&mut backend);
+    // 1,030 and the sub-agent's 55 for Qoder, 11 and 320 for Qoder CN.
+    assert_eq!(snapshot["totals"]["total"], 1_416);
+    let sessions = backend
+        .request("sessions", json!({"scope":"all","rootsOnly":false}))
+        .unwrap();
+    let mut rows = sessions["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|s| {
+            (
+                s["source"].as_str().unwrap().to_owned(),
+                s["id"].as_str().unwrap().to_owned(),
+                s["parentId"].as_str().map(str::to_owned),
+                s["tokens"].as_u64().unwrap(),
+            )
+        })
+        .collect::<Vec<_>>();
+    rows.sort();
+    let row = |source: &str, id: &str, parent: Option<&str>, tokens| {
+        (
+            source.to_owned(),
+            id.to_owned(),
+            parent.map(str::to_owned),
+            tokens,
+        )
+    };
+    assert_eq!(
+        rows,
+        [
+            // A session's row holds its sub-agents' tokens too.
+            row("qoder", session, None, 1_085),
+            row("qoder", "agent-7", Some(session), 55),
+            row("qoder-cn", "22222222-2222-4222-8222-222222222222", None, 11),
+            row("qoder-cn", "legacy-1", None, 320),
+        ]
+    );
+    let detail = backend
+        .request("session_detail", json!({"id":session}))
+        .unwrap();
+    assert_eq!(detail["usage"]["cacheRead"], 800);
+}

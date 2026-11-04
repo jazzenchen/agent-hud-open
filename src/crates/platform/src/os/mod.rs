@@ -201,11 +201,25 @@ mod tests {
             ("kimi", ".kimi-code/sessions"),
             ("kimi", ".kimi/sessions"),
             ("pi", ".pi/agent/sessions"),
+            ("qoder", ".qoder/projects"),
+            ("qoder", "<app>/Qoder/SharedClientCache/cli/projects"),
+            ("qoder-cn", ".qoder-cn/projects"),
+            (
+                "qoder-cn",
+                "<app>/QoderCN/SharedClientCache/cache/db/local.db",
+            ),
+            ("qoder-work", ".qoderwork/projects"),
             ("devin", ".local/share/devin/cli"),
         ];
+        // The application data folder differs by OS.
+        let app = folder(home, &Environment::new(), agent_hud_agents::Base::AppData);
+        let app = app.strip_prefix(home).unwrap();
         let expected = expected
             .iter()
-            .map(|(provider, path)| (*provider, PathBuf::from(path)))
+            .map(|(provider, path)| match path.strip_prefix("<app>/") {
+                Some(rest) => (*provider, app.join(rest)),
+                None => (*provider, PathBuf::from(path)),
+            })
             .collect::<Vec<_>>();
         assert_eq!(roots, expected);
     }

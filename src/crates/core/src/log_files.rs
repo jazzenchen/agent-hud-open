@@ -308,9 +308,13 @@ fn accepts(path: &Path, roots: &[(PathBuf, &'static str)]) -> bool {
         .iter()
         .find(|(root, _)| path.starts_with(root))
         .is_some_and(|(root, source)| {
-            accepts_source(path, source)
-                && !(matches!(*source, "claude" | "codex") && hidden_below(path, root))
+            accepts_source(path, source) && !(hides_files(source) && hidden_below(path, root))
         })
+}
+/// Whether a client's hidden files and folders are never listed: Codex's, and
+/// Claude Code's and those of every client that writes its lines.
+fn hides_files(source: &str) -> bool {
+    source == "codex" || agent_hud_agents::transcript::claude_lines(source)
 }
 /// Whether a file or a folder it lies in, below its root, is hidden.
 fn hidden_below(path: &Path, root: &Path) -> bool {
@@ -327,8 +331,9 @@ pub(super) fn accepts_source(path: &Path, source: &str) -> bool {
     match source {
         // A session, or a subagent's transcript. A subagents folder also holds the
         // Workflow tool's journal.jsonl, a run log with no turns: read as a session it
-        // would never report an event and leave the Claude mark faded.
-        "claude" => {
+        // would never report an event and leave the Claude mark faded. The same for
+        // every client that writes Claude Code's lines.
+        source if agent_hud_agents::transcript::claude_lines(source) => {
             name.ends_with(".jsonl")
                 && (name.starts_with("agent-")
                     || !path.components().any(|p| p.as_os_str() == "subagents"))
@@ -464,8 +469,7 @@ fn walk(
             // listed (agent-hud-native-open LogFiles); other readers keep their own
             // rules.
             Ok(entry)
-                if matches!(source, "claude" | "codex")
-                    && entry.file_name().to_string_lossy().starts_with('.') => {}
+                if hides_files(source) && entry.file_name().to_string_lossy().starts_with('.') => {}
             Ok(entry) => walk(&entry.path(), source, files, errors),
             Err(error) => errors.push(format!("Could not list {source} logs: {error}")),
         }

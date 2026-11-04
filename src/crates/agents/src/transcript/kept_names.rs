@@ -1,5 +1,6 @@
 //! Names some clients keep beside a session's log rather than in it: Copilot's
-//! `workspace.yaml`, Kimi's `state.json` and Grok CLI's `summary.json`. They
+//! `workspace.yaml`, Kimi's `state.json`, Grok CLI's `summary.json` and the
+//! Qoder builds' `<session>-session.json`. They
 //! are read whenever the log is read from its start. Each file is part of the
 //! log's stamp (`log_files::stamp`), so a rename makes the log read again.
 use crate::Log;
@@ -18,6 +19,10 @@ pub fn kept_name_file(path: &Path, source: &str) -> Option<PathBuf> {
     match source {
         "copilot" if path.file_name()? == "events.jsonl" => Some(dir.join("workspace.yaml")),
         "grok-cli" if path.file_name()? == "updates.jsonl" => Some(dir.join("summary.json")),
+        "qoder" | "qoder-cn" | "qoder-work" if dir.file_name()? != "subagents" => {
+            let stem = path.file_stem()?.to_str()?;
+            Some(dir.join(format!("{stem}-session.json")))
+        }
         "kimi" => {
             let (folder, agent) = kimi_session(path);
             (agent == "main").then(|| folder.join("state.json"))
@@ -66,6 +71,7 @@ impl Log {
             "copilot" => self.copilot_workspace(),
             "kimi" => self.kimi_state(),
             "grok-cli" => self.grok_summary(),
+            "qoder" | "qoder-cn" | "qoder-work" => self.qoder_session(),
             _ => {}
         }
     }
@@ -119,6 +125,19 @@ impl Log {
                     self.cwd = Some(root.to_owned());
                 }
             }
+        }
+    }
+
+    /// The Qoder builds keep a session's title and folder in
+    /// `<session>-session.json` beside its log (agentsview's Qoder reader).
+    fn qoder_session(&mut self) {
+        let Some(path) = kept_name_file(&self.path, &self.source) else {
+            return;
+        };
+        let session = read_json(&path);
+        self.naming.name(0, session["title"].as_str());
+        if self.cwd.is_none() {
+            self.cwd = crate::text(&session["working_dir"]).map(str::to_owned);
         }
     }
 
@@ -275,5 +294,25 @@ mod tests {
         log.read_kept_name();
         assert_eq!(log.title(), "Generated");
         assert_eq!(log.cwd.as_deref(), Some("/w/grok"));
+    }
+
+    #[test]
+    fn a_qoder_session_takes_its_title_and_folder_from_beside_its_log() {
+        let temp = tempfile::tempdir().unwrap();
+        let project = temp.path().join(".qoder/projects/-w-app");
+        let session = "11111111-1111-4111-8111-111111111111";
+        fs::create_dir_all(project.join(session).join("subagents")).unwrap();
+        fs::write(
+            project.join(format!("{session}-session.json")),
+            r#"{"title":"Forked work","working_dir":"/w/app","fork_from":"x"}"#,
+        )
+        .unwrap();
+        let mut log = Log::new(project.join(format!("{session}.jsonl")), "qoder");
+        log.read_kept_name();
+        assert_eq!(log.title(), "Forked work");
+        assert_eq!(log.cwd.as_deref(), Some("/w/app"));
+        // A sub-agent keeps no file of its own there.
+        let sub = project.join(session).join("subagents/agent-1.jsonl");
+        assert_eq!(kept_name_file(&sub, "qoder"), None);
     }
 }

@@ -44,6 +44,7 @@ pub(crate) fn accepts(path: &Path, source: &str) -> bool {
         "opencode" => name == "opencode.db",
         // Cursor's session headers, and the turn log its `stop` hook keeps.
         "cursor" => name == "state.vscdb" || agent_hud_agents::hooks::turn_log::accepts(path),
+        "qoder-cn" => agent_hud_agents::qoder::legacy::accepts(path),
         _ => false,
     }
 }
@@ -248,6 +249,7 @@ impl AgentHudCore {
                 }
                 "devin" => agent_hud_agents::devin::transcript::read(&reader.connection, cursor),
                 "cursor" => agent_hud_agents::cursor::sessions::read(&reader.connection, cursor),
+                "qoder-cn" => agent_hud_agents::qoder::legacy::read(&reader.connection, cursor),
                 "antigravity" => crate::clients::antigravity::read(
                     &reader.connection,
                     self.database.as_ref().ok_or("Usage ledger unavailable")?,

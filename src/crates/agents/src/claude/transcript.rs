@@ -278,13 +278,16 @@ impl Log {
         }
         // The counters as the line writes them: output includes the thinking
         // tokens, kept apart as reasoning (`claude_counted`).
-        let next = Usage {
-            input: number(usage, "input_tokens"),
-            output: number(usage, "output_tokens"),
-            read: number(usage, "cache_read_input_tokens"),
-            write: number(usage, "cache_creation_input_tokens"),
-            reasoning: number(&usage["output_tokens_details"], "thinking_tokens"),
-        };
+        let next = crate::qoder::transcript::counters(
+            &self.source,
+            Usage {
+                input: number(usage, "input_tokens"),
+                output: number(usage, "output_tokens"),
+                read: number(usage, "cache_read_input_tokens"),
+                write: number(usage, "cache_creation_input_tokens"),
+                reasoning: number(&usage["output_tokens_details"], "thinking_tokens"),
+            },
+        );
         // Each counter keeps its largest value over the response's lines:
         // builds before about 2026-09 wrote the first block's line with the
         // output counted so far and only the last line with the whole count.

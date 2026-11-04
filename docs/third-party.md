@@ -12,3 +12,9 @@ Registry-generated utility imports are adapted to `@agent-hud/ui/lib/utils` so t
 shadcn visual overrides live in src/packages/ui/src/global.css; registry component behavior is unchanged. HUD geometry and timelines are product implementation code. The HUD rim's WGSL shader implements the original six glow styles and six effects and is drawn with WebGPU directly (`src/packages/hud/src/glow-gpu.ts`); it keeps a static fallback when WebGPU is unavailable.
 
 - Nous Portal credits (`src/crates/agents/src/hermes/account.rs`): the auth file shapes, the never-refresh rule and the trusted-portal rule follow CodexBar's Nous reader (`NousSettingsReader.swift`, `nous.ts`, commit 897bff3), MIT, Copyright (c) 2026 Peter Steinberger; re-implemented in Rust and checked against Hermes Agent 0.19 (MIT). Hermes's hook payloads and `config.yaml` layout, and Kimi Code's log records, were read from those clients themselves; no code was taken from them.
+## Client formats
+
+Facts about other clients' files, and the readers built on them, come from these MIT-licensed projects; no code is copied.
+
+- agentsview (kenn-io/agentsview, commit 3c4ccb4, MIT): Qoder's transcript folders, its sub-agent layout and the `<session>-session.json` beside a log.
+- Token Monitor (Javis603/token-monitor, commit 6c78d38, MIT) and its tokscale fork (Javis603/tokscale, commit f4abd58, MIT): Qoder CN's older `local.db` store, and Qoder's input holding its cache reads, which Qoder CLI's own package (`@qoder-ai/qodercli` 1.1.82, Apache-2.0) confirms with its folders and hook payload.
