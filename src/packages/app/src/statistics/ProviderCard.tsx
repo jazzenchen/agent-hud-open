@@ -25,24 +25,6 @@ import { Sparkline } from "./Sparkline";
 import { TopSessions } from "./TopSessions";
 import { moneyAmount } from "@agent-hud/ui/format";
 
-export function agentRows<T>(values: T[]): T[][] {
-  const sizes = Array.from({ length: Math.floor(values.length / 3) }, () => 3);
-  if (values.length % 3 === 2) sizes.push(2);
-  if (values.length % 3 === 1) {
-    if (!sizes.length) sizes.push(1);
-    else {
-      sizes.pop();
-      sizes.push(2, 2);
-    }
-  }
-  let offset = 0;
-  return sizes.map((size) => {
-    const result = values.slice(offset, offset + size);
-    offset += size;
-    return result;
-  });
-}
-
 export const ProviderCard = memo(function ProviderCard({
   provider,
   total,

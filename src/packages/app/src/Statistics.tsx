@@ -1,22 +1,5 @@
-import {
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type CSSProperties,
-} from "react";
-import { Check, ChevronDown, ChevronRight } from "lucide-react";
-import { isTauri } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { Button } from "@agent-hud/ui/components/button";
-import {
-  DropdownMenu,
-  DropdownMenuCheckboxItem,
-  DropdownMenuContent,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@agent-hud/ui/components/dropdown-menu";
-import { HUDArtwork as HUDLogo } from "@agent-hud/hud/HUDArtwork";
 import { vendorKey } from "@agent-hud/hud/model";
 import type {
   NativeMethod,
@@ -28,33 +11,27 @@ import type {
 } from "@agent-hud/protocol";
 import { readJSON, storageKeys } from "./lib/storage-keys";
 import { useCoreQuery } from "./lib/use-core-query";
+import { Coverage, IndexingProgress, Heading } from "./statistics/StatsParts";
 import {
-  Coverage,
-  IndexingProgress,
-  Heading,
-  TotalSummary,
-} from "./statistics/StatsParts";
-import {
-  compact,
   dimensionsLabel,
   freshKinds,
-  kindLabel,
-  kinds,
-  modelColor,
-  number,
-  plain,
   row,
   themeFor,
-  truncate,
 } from "./statistics/StatsTheme";
-import { UsageChart } from "./statistics/UsageChart";
-import { agentRows, ProviderCard } from "./statistics/ProviderCard";
+import {
+  TokenControls,
+  validBucketsByRange,
+  type Range,
+} from "./statistics/TokenControls";
+import { TokenUsage } from "./statistics/TokenUsage";
+import { AgentCards } from "./statistics/AgentCards";
+import { useStatisticsEnd } from "./statistics/use-statistics-end";
+import { useProviderHighlight } from "./statistics/use-provider-highlight";
 import { APIBillingCard } from "./statistics/APIBillingCard";
 import { RecentUsage } from "./statistics/RecentUsage";
 import { ActivityHeatmap } from "./statistics/ActivityHeatmap";
 import { QuotaHistory } from "./statistics/QuotaHistory";
 import { PlanValue } from "./statistics/PlanValue";
-import { Segments } from "./statistics/Segments";
 import { snapshotLanguage, systemTimeZone } from "@agent-hud/ui/format";
 import { indexingText } from "@agent-hud/ui/text/indexing";
 
@@ -69,47 +46,12 @@ interface StatisticsProps {
   ) => Promise<unknown>;
   onSelectSession?: (session: Session) => void;
 }
-type Range = "5h" | "24h" | "7d" | "30d";
 const durations: Record<Range, number> = {
   "5h": 5,
   "24h": 24,
   "7d": 168,
   "30d": 720,
 };
-const validBucketsByRange: Record<Range, StatisticsQuery["bucketMinutes"][]> = {
-  "5h": [15, 30, 60],
-  "24h": [15, 30, 60],
-  "7d": [60, 1440],
-  "30d": [1440],
-};
-const hiddenAgentCardsKey = storageKeys.hiddenAgentCards;
-
-/** A quiet ledger still advances at the source's quarter-hour boundary and on focus. */
-function useStatisticsEnd(revision: number, refresh: number, active: boolean) {
-  const [end, setEnd] = useState(() => Date.now());
-  useEffect(() => {
-    if (active) setEnd(Date.now());
-  }, [revision, refresh, active]);
-  useEffect(() => {
-    if (!active) return;
-    const quarter = 15 * 60_000;
-    let timer: number;
-    const advance = () => {
-      const now = Date.now();
-      setEnd(now);
-      window.clearTimeout(timer);
-      timer = window.setTimeout(advance, quarter - (now % quarter));
-    };
-    const now = Date.now();
-    timer = window.setTimeout(advance, quarter - (now % quarter));
-    window.addEventListener("focus", advance);
-    return () => {
-      window.clearTimeout(timer);
-      window.removeEventListener("focus", advance);
-    };
-  }, [active]);
-  return end;
-}
 
 /** Tokens page only. The containing native window owns the Tokens/Sessions tabs. */
 export default function Statistics({
@@ -125,9 +67,8 @@ export default function Statistics({
   const [selectedKinds, setKinds] = useState<StatisticsTokenKind[]>(freshKinds);
   const [selectedProviders, setProviders] = useState<string[] | null>(null);
   const [selectedModels, setModels] = useState<string[] | null>(null);
-  const [modelsExpanded, setModelsExpanded] = useState(false);
   const [hiddenAgentCards, setHiddenAgentCards] = useState<string[]>(
-    () => (readJSON(hiddenAgentCardsKey) as string[] | null) ?? [],
+    () => (readJSON(storageKeys.hiddenAgentCards) as string[] | null) ?? [],
   );
   const [refresh, setRefresh] = useState(0);
   // generatedAt is a presentation/collector clock, not a ledger invalidation signal.
@@ -145,26 +86,6 @@ export default function Statistics({
   const validBuckets = validBucketsByRange[range];
   const effectiveBucketMinutes: StatisticsQuery["bucketMinutes"] =
     validBuckets.includes(bucketMinutes) ? bucketMinutes : validBuckets[0];
-  const rangeChoices = useMemo(
-    () => [
-      { value: "5h", label: zh ? "5 小时" : "5 h" },
-      { value: "24h", label: zh ? "24 小时" : "24 h" },
-      { value: "7d", label: zh ? "7 天" : "7 days" },
-      { value: "30d", label: zh ? "30 天" : "30 days" },
-    ],
-    [zh],
-  );
-  const bucketChoices = useMemo(() => {
-    const all: { value: StatisticsQuery["bucketMinutes"]; label: string }[] = [
-      { value: 15, label: zh ? "15 分钟" : "15min" },
-      { value: 30, label: zh ? "30 分钟" : "30min" },
-      { value: 60, label: zh ? "1 小时" : "1hr" },
-      { value: 1440, label: zh ? "1 天" : "1d" },
-    ];
-    return all
-      .filter((choice) => validBuckets.includes(choice.value))
-      .map((choice) => ({ value: String(choice.value), label: choice.label }));
-  }, [validBuckets, zh]);
   const query: StatisticsQuery = useMemo(
     () => ({
       from: new Date(end - durations[range] * 3_600_000).toISOString(),
@@ -202,7 +123,6 @@ export default function Statistics({
     revision,
   );
   const loading = !data && !error && fetching;
-  const available = data?.available;
   // The quota history runs to the latest reading: a window read again
   // moves its end along with the page's.
   const readings = snapshot.quotas
@@ -212,89 +132,12 @@ export default function Statistics({
   useEffect(() => {
     if (active) setHistoryEnd(Date.now());
   }, [end, readings, active]);
-  const providerChoices = available?.providers ?? [];
-  const modelChoices = available?.models ?? [];
-  const visibleProviders = useMemo(
-    () =>
-      (data?.providers ?? []).filter(
-        (provider) => !hiddenAgentCards.includes(provider.id),
-      ),
-    [data?.providers, hiddenAgentCards],
+  const highlightedVendor = useProviderHighlight(
+    active,
+    Boolean(data),
+    setProviders,
+    setHiddenAgentCards,
   );
-  const toggleAgentCard = (providerId: string, shown: boolean) => {
-    setHiddenAgentCards((previous) => {
-      const next = shown
-        ? previous.filter((id) => id !== providerId)
-        : [...new Set([...previous, providerId])];
-      localStorage.setItem(hiddenAgentCardsKey, JSON.stringify(next));
-      return next;
-    });
-  };
-  const [highlightedVendor, setHighlightedVendor] = useState<string | null>(
-    null,
-  );
-  const highlightTimerRef = useRef<number | null>(null);
-  const applyProviderHighlight = (providerName: string) => {
-    const key = vendorKey(providerName);
-    if (!key) return;
-    setHighlightedVendor(key);
-    setProviders(null);
-    setHiddenAgentCards((previous) => {
-      const next = previous.filter((id) => vendorKey(id) !== key);
-      if (next.length !== previous.length)
-        localStorage.setItem(hiddenAgentCardsKey, JSON.stringify(next));
-      return next;
-    });
-    if (highlightTimerRef.current !== null) {
-      window.clearTimeout(highlightTimerRef.current);
-    }
-    highlightTimerRef.current = window.setTimeout(() => {
-      setHighlightedVendor(null);
-      highlightTimerRef.current = null;
-    }, 2500);
-  };
-  useEffect(() => {
-    if (!active) return;
-    const consumePending = () => {
-      const pending = readJSON(storageKeys.highlightProvider) as {
-        provider?: string;
-        at?: number;
-      } | null;
-      if (!pending) return;
-      localStorage.removeItem(storageKeys.highlightProvider);
-      if (pending.provider && (!pending.at || Date.now() - pending.at < 15_000))
-        applyProviderHighlight(pending.provider);
-    };
-    consumePending();
-    window.addEventListener("focus", consumePending);
-    window.addEventListener("storage", consumePending);
-    const sub = isTauri()
-      ? listen<{ provider: string; at: number }>(
-          "statistics:provider",
-          (event) => {
-            localStorage.removeItem(storageKeys.highlightProvider);
-            if (event.payload?.provider) {
-              applyProviderHighlight(event.payload.provider);
-            }
-          },
-        )
-      : null;
-    return () => {
-      window.removeEventListener("focus", consumePending);
-      window.removeEventListener("storage", consumePending);
-      if (sub) void sub.then((unlisten) => unlisten());
-    };
-  }, [active]);
-  useEffect(() => {
-    if (!highlightedVendor || !data) return;
-    const frame = window.requestAnimationFrame(() => {
-      const target =
-        document.getElementById(`agent-${highlightedVendor}`) ??
-        document.getElementById(`api-${highlightedVendor}`);
-      target?.scrollIntoView({ behavior: "smooth", block: "center" });
-    });
-    return () => window.cancelAnimationFrame(frame);
-  }, [highlightedVendor, Boolean(data)]);
   const content: CSSProperties = {
     display: "flex",
     flexDirection: "column",
@@ -306,15 +149,6 @@ export default function Statistics({
     color: `var(--statistics-text, ${theme.text})`,
     background: `var(--statistics-ground, ${theme.ground})`,
   };
-  const pickModel = (id: string) =>
-    setModels((previous) => {
-      if (previous === null) return [id];
-      if (previous.includes(id)) {
-        const next = previous.filter((value) => value !== id);
-        return next.length ? next : null;
-      }
-      return [...previous, id].sort();
-    });
   return (
     <section
       className="statistics-native"
@@ -322,115 +156,17 @@ export default function Statistics({
       aria-label={t("Token statistics", "Token 统计")}
       aria-busy={loading}
     >
-      <div
-        className="statistics-token-controls"
-        style={{
-          ...row,
-          position: "sticky",
-          top: 44,
-          zIndex: 15,
-          background: `var(--statistics-ground, ${theme.ground})`,
-          gap: 10,
-          minHeight: 28,
-          paddingTop: 6,
-          paddingBottom: 12,
-          marginBottom: 4,
-          borderBottom: `1px solid ${theme.divider}`,
-          flexWrap: "wrap",
-        }}
-      >
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button
-              type="button"
-              aria-label={t("Token kinds counted", "计入的 Token 类型")}
-              style={{
-                ...plain,
-                ...row,
-                fontSize: 12,
-                fontWeight: 500,
-                height: 28,
-                padding: "0 10px",
-                borderRadius: 6,
-                background: theme.segment,
-              }}
-            >
-              Token · {label}
-              <ChevronDown size={11} style={{ opacity: 0.7 }} />
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start">
-            <DropdownMenuCheckboxItem
-              checked={
-                selectedKinds.length === freshKinds.length &&
-                !selectedKinds.includes("cacheRead")
-              }
-              onSelect={(event) => event.preventDefault()}
-              onCheckedChange={() => setKinds([...freshKinds])}
-            >
-              {t("Excl. cache reads", "不含缓存读取")}
-            </DropdownMenuCheckboxItem>
-            <DropdownMenuCheckboxItem
-              checked={selectedKinds.length === kinds.length}
-              onSelect={(event) => event.preventDefault()}
-              onCheckedChange={() => setKinds([...kinds])}
-            >
-              {t("All tokens", "全部 Token")}
-            </DropdownMenuCheckboxItem>
-            <DropdownMenuSeparator />
-            {kinds.map((kind) => (
-              <DropdownMenuCheckboxItem
-                key={kind}
-                checked={selectedKinds.includes(kind)}
-                onSelect={(event) => event.preventDefault()}
-                onCheckedChange={(selected) =>
-                  setKinds((previous) =>
-                    selected
-                      ? kinds.filter(
-                          (value) => value === kind || previous.includes(value),
-                        )
-                      : previous.length > 1
-                        ? previous.filter((value) => value !== kind)
-                        : previous,
-                  )
-                }
-              >
-                {kindLabel(kind, zh)}
-              </DropdownMenuCheckboxItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
-        <span style={{ flex: 1, minWidth: 12 }} />
-        {bucketChoices.length > 1 && (
-          <Segments
-            label={t("Time bucket", "时间粒度")}
-            value={String(effectiveBucketMinutes)}
-            onChange={(value) =>
-              setBucketMinutes(
-                Number(value) as StatisticsQuery["bucketMinutes"],
-              )
-            }
-            choices={bucketChoices}
-            theme={theme}
-          />
-        )}
-        <Segments
-          label={t("Statistics range", "统计范围")}
-          value={range}
-          onChange={(value) => {
-            const nextRange = value as Range;
-            setRange(nextRange);
-            const allowed = validBucketsByRange[nextRange];
-            if (!allowed.includes(bucketMinutes)) {
-              setBucketMinutes(
-                nextRange === "7d" ? 60 : allowed[allowed.length - 1],
-              );
-            }
-          }}
-          choices={rangeChoices}
-          theme={theme}
-        />
-      </div>
+      <TokenControls
+        theme={theme}
+        label={label}
+        selectedKinds={selectedKinds}
+        setKinds={setKinds}
+        range={range}
+        setRange={setRange}
+        bucketMinutes={bucketMinutes}
+        effectiveBucketMinutes={effectiveBucketMinutes}
+        setBucketMinutes={setBucketMinutes}
+      />
       {error && (
         <div
           role="alert"
@@ -459,352 +195,29 @@ export default function Statistics({
       ) : (
         data && <Coverage coverage={data.coverage} theme={theme} />
       )}
-      <div
-        className="statistics-consumption"
-        style={{ padding: "6px 16px 8px", minWidth: 0 }}
-      >
-        <div
-          style={{
-            ...row,
-            alignItems: "baseline",
-            justifyContent: "space-between",
-            marginBottom: 6,
-          }}
-        >
-          <strong style={{ fontSize: 13, fontWeight: 600 }}>
-            {t("Tokens", "Token")}
-          </strong>
-          {data ? (
-            <TotalSummary
-              value={data.totals}
-              coverage={data.coverage}
-              theme={theme}
-            />
-          ) : (
-            <span style={{ color: theme.secondary, ...number }}>
-              {loading ? t("Loading…", "加载中…") : "—"}
-            </span>
-          )}
-        </div>
-        <div
-          style={{
-            ...row,
-            justifyContent: "space-between",
-            color: theme.secondary,
-            fontSize: 11,
-          }}
-        >
-          <div style={{ ...row, gap: 14 }}>
-            <button
-              type="button"
-              onClick={() => setModelsExpanded((value) => !value)}
-              aria-expanded={modelsExpanded}
-              style={{ ...plain, ...row, gap: 4 }}
-            >
-              <ChevronRight
-                size={10}
-                style={{
-                  transform: modelsExpanded ? "rotate(90deg)" : "rotate(0deg)",
-                  transition: "transform 180ms cubic-bezier(0.22, 1, 0.36, 1)",
-                }}
-              />
-              {t("Models", "模型")} ·{" "}
-              {selectedModels === null
-                ? t("All", "全部")
-                : t(
-                    `${selectedModels.length} selected`,
-                    `已选 ${selectedModels.length} 个`,
-                  )}
-            </button>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  type="button"
-                  style={{ ...plain, ...row, gap: 4 }}
-                  aria-label={t("Filter statistics by agent", "按智能体筛选")}
-                >
-                  {t("Agents", "智能体")} ·{" "}
-                  {selectedProviders === null
-                    ? t("All", "全部")
-                    : t(
-                        `${selectedProviders.length} selected`,
-                        `已选 ${selectedProviders.length} 个`,
-                      )}
-                  <ChevronDown size={10} />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start">
-                <DropdownMenuCheckboxItem
-                  checked={selectedProviders === null}
-                  onSelect={(event) => event.preventDefault()}
-                  onCheckedChange={() => setProviders(null)}
-                >
-                  {t("All agents", "全部智能体")}
-                </DropdownMenuCheckboxItem>
-                <DropdownMenuSeparator />
-                {providerChoices.map((provider) => (
-                  <DropdownMenuCheckboxItem
-                    key={provider.id}
-                    checked={
-                      selectedProviders === null ||
-                      selectedProviders.includes(provider.id)
-                    }
-                    onSelect={(event) => event.preventDefault()}
-                    onCheckedChange={(checked) =>
-                      setProviders((previous) => {
-                        const values =
-                          previous ?? providerChoices.map((entry) => entry.id);
-                        return checked
-                          ? [...new Set([...values, provider.id])].sort()
-                          : values.filter((value) => value !== provider.id);
-                      })
-                    }
-                  >
-                    <HUDLogo source={provider.id} size={12} light={light} />
-                    {provider.name}
-                  </DropdownMenuCheckboxItem>
-                ))}
-                {!providerChoices.length && (
-                  <span
-                    style={{ padding: 8, color: theme.secondary, fontSize: 11 }}
-                  >
-                    {t("No recorded agents", "暂无已记录的智能体")}
-                  </span>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-          {(selectedModels !== null || selectedProviders !== null) && (
-            <button
-              type="button"
-              onClick={() => {
-                setModels(null);
-                setProviders(null);
-              }}
-              style={{ ...plain, color: theme.secondary, fontSize: 11 }}
-            >
-              {t("Clear filter", "清除筛选")}
-            </button>
-          )}
-        </div>
-        <div
-          style={{
-            display: "grid",
-            gridTemplateRows: modelsExpanded ? "1fr" : "0fr",
-            opacity: modelsExpanded ? 1 : 0,
-            visibility: modelsExpanded ? "visible" : "hidden",
-            pointerEvents: modelsExpanded ? "auto" : "none",
-            transition:
-              "grid-template-rows 200ms cubic-bezier(0.22, 1, 0.36, 1), opacity 180ms ease",
-          }}
-        >
-          <div style={{ overflow: "hidden", minHeight: 0 }}>
-            <div style={{ display: "grid", gap: 6, paddingTop: 8 }}>
-              <button
-                type="button"
-                onClick={() => setModels(null)}
-                style={{
-                  ...plain,
-                  ...row,
-                  color: theme.secondary,
-                  fontSize: 11,
-                }}
-              >
-                <Check
-                  size={11}
-                  style={{ opacity: selectedModels === null ? 1 : 0 }}
-                />
-                {t("All models", "全部模型")}
-                {selectedModels !== null &&
-                  (zh ? " · 清除筛选" : " · Clear filter")}
-              </button>
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(auto-fit,minmax(190px,1fr))",
-                  gap: "6px 16px",
-                }}
-              >
-                {modelChoices.map((model) => {
-                  const value = data?.models.find(
-                    (entry) => entry.id === model.id,
-                  );
-                  const checked = selectedModels?.includes(model.id) ?? false;
-                  return (
-                    <button
-                      key={model.id}
-                      type="button"
-                      role="checkbox"
-                      aria-checked={checked}
-                      aria-label={`Include ${model.name} from ${model.provider}`}
-                      title={`${model.provider} · ${model.name}`}
-                      onClick={() => pickModel(model.id)}
-                      style={{
-                        ...plain,
-                        ...row,
-                        width: "100%",
-                        textAlign: "left",
-                        color: checked ? theme.text : theme.secondary,
-                        fontSize: 11,
-                        padding: "3px 4px",
-                        borderRadius: 4,
-                        background: checked ? theme.segment : "transparent",
-                      }}
-                    >
-                      <span
-                        aria-hidden
-                        style={{
-                          width: 13,
-                          height: 13,
-                          flexShrink: 0,
-                          borderRadius: 3.5,
-                          border: `1px solid ${checked ? "#007aff" : theme.divider}`,
-                          background: checked ? "#007aff" : "transparent",
-                          color: "#fff",
-                          display: "inline-grid",
-                          placeItems: "center",
-                        }}
-                      >
-                        {checked && <Check size={9} strokeWidth={3} />}
-                      </span>
-                      <span
-                        aria-hidden
-                        style={{
-                          width: 6,
-                          height: 6,
-                          flexShrink: 0,
-                          borderRadius: 2,
-                          background: modelColor(model.id),
-                        }}
-                      />
-                      <HUDLogo
-                        source={model.provider}
-                        size={12}
-                        light={light}
-                      />
-                      <span style={truncate}>{model.name}</span>
-                      <span style={{ marginLeft: "auto", ...number }}>
-                        {value ? compact(value.selectedTokens) : "—"}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-              {!modelChoices.length && (
-                <span style={{ color: theme.secondary, fontSize: 11 }}>
-                  {loading
-                    ? t("Loading models…", "正在加载模型…")
-                    : t("No recorded models", "暂无已记录的模型")}
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
-        {data ? (
-          <UsageChart data={data} theme={theme} />
-        ) : (
-          <div
-            style={{
-              height: 138,
-              display: "grid",
-              placeItems: "center",
-              color: theme.secondary,
-              fontSize: 11,
-            }}
-          >
-            {loading
-              ? t("Loading token usage…", "正在加载 Token 用量…")
-              : t("Token usage is unavailable", "Token 用量暂不可用")}
-          </div>
-        )}
-      </div>
-      <Heading
+      <TokenUsage
+        data={data}
+        loading={loading}
+        selectedModels={selectedModels}
+        setModels={setModels}
+        selectedProviders={selectedProviders}
+        setProviders={setProviders}
         theme={theme}
-        trailing={
-          data ? (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  type="button"
-                  style={{ ...plain, ...row, gap: 4, color: theme.secondary }}
-                >
-                  {t(
-                    `${visibleProviders.length} shown`,
-                    `显示 ${visibleProviders.length} 个`,
-                  )}
-                  <ChevronDown size={10} />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuCheckboxItem
-                  checked={hiddenAgentCards.length === 0}
-                  onSelect={(event) => event.preventDefault()}
-                  onCheckedChange={() => {
-                    setHiddenAgentCards([]);
-                    localStorage.removeItem(hiddenAgentCardsKey);
-                  }}
-                >
-                  {t("Show all", "全部显示")}
-                </DropdownMenuCheckboxItem>
-                <DropdownMenuSeparator />
-                {data.providers.map((provider) => (
-                  <DropdownMenuCheckboxItem
-                    key={provider.id}
-                    checked={!hiddenAgentCards.includes(provider.id)}
-                    onSelect={(event) => event.preventDefault()}
-                    onCheckedChange={(checked) =>
-                      toggleAgentCard(provider.id, Boolean(checked))
-                    }
-                  >
-                    <HUDLogo source={provider.id} size={12} light={light} />
-                    {provider.name}
-                  </DropdownMenuCheckboxItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          ) : undefined
-        }
-      >
-        {t("By agent", "按智能体")}
-      </Heading>
-      {data &&
-        agentRows(visibleProviders).map((providers, index) => (
-          <div
-            key={index}
-            className="statistics-agent-row"
-            style={{
-              display: "grid",
-              gridTemplateColumns: `repeat(${providers.length},minmax(0,1fr))`,
-              gap: 12,
-            }}
-          >
-            {providers.map((provider) => (
-              <ProviderCard
-                key={provider.id}
-                provider={provider}
-                total={data.totals.selectedTokens}
-                perRow={providers.length}
-                label={label}
-                theme={theme}
-                highlighted={highlightedVendor === vendorKey(provider.id)}
-                billing={snapshot.billing}
-                onSelectSession={onSelectSession}
-              />
-            ))}
-          </div>
-        ))}
-      {data && !visibleProviders.length && (
-        <p style={{ color: theme.secondary, fontSize: 12, margin: "4px 0" }}>
-          {selectedProviders?.length === 0 ||
-          selectedModels?.length === 0 ||
-          (data.providers.length > 0 && visibleProviders.length === 0)
-            ? t("No agents or models selected.", "未选择智能体或模型。")
-            : t(
-                "No recorded agent usage in this range.",
-                "该范围内无已记录的智能体用量。",
-              )}
-        </p>
-      )}
+        light={light}
+      />
+      <AgentCards
+        data={data}
+        hiddenAgentCards={hiddenAgentCards}
+        setHiddenAgentCards={setHiddenAgentCards}
+        selectedProviders={selectedProviders}
+        selectedModels={selectedModels}
+        label={label}
+        theme={theme}
+        light={light}
+        highlightedVendor={highlightedVendor}
+        billing={snapshot.billing}
+        onSelectSession={onSelectSession}
+      />
       {snapshot.billing.length > 0 && (
         <>
           <Heading theme={theme}>{t("API balances", "API 余额")}</Heading>
