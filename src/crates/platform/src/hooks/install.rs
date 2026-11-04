@@ -136,12 +136,6 @@ pub fn install_plan(
     flag: &str,
     enabled: bool,
 ) -> Result<InstallPlan, String> {
-    if !super::supported() {
-        return Err(l10n::text(
-            "Windows 版暂不支持安装客户端回调，设置未作改动。",
-            "Windows hook execution/ACL adapter is not implemented; no settings were changed.",
-        ));
-    }
     if enabled {
         canonical(context)?;
     }

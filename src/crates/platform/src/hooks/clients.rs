@@ -117,7 +117,7 @@ impl Clients {
     pub fn status(&self, enabled: bool, desired: bool) -> Value {
         let installed = self.rows.iter().any(|row| row["installed"] == true);
         let notice=self.notice.clone().or_else(||if self.context.is_none(){Some(l10n::text("这个版本没有指定固定的回调程序。接收回调不会安装客户端回调，客户端配置未作改动。", "No fixed hook-owner executable has been delegated. Listening does not install client hooks; client configuration is unchanged."))}else{None});
-        json!({"supported":super::supported(),"enabled":enabled,"desired":desired,"installed":installed,"installable":self.context.is_some(),"notice":notice,"clients":self.rows})
+        json!({"supported":true,"enabled":enabled,"desired":desired,"installed":installed,"installable":self.context.is_some(),"notice":notice,"clients":self.rows})
     }
 }
 

@@ -1,9 +1,9 @@
-use super::{now_ms, Wake, PAYLOAD_LIMIT};
+use super::{Wake, PAYLOAD_LIMIT};
 use agent_hud_core::requests::Requests;
 use serde_json::{json, Value};
 use std::{
     path::Path,
-    sync::{atomic::Ordering, mpsc::RecvTimeoutError, Arc},
+    sync::{atomic::Ordering, Arc},
     time::Duration,
 };
 pub(super) struct Server(crate::os::pipe::Server);
@@ -31,33 +31,9 @@ impl Server {
                     wake();
                     return Some(json!({}));
                 }
-                let request = agent_hud_agents::parse_request(source, payload).ok()??;
-                if request.requires_user_reviewer
-                    && !super::reviewer::is_user(&requests, &request.source, payload)
-                {
-                    return None;
-                }
-                reminders.record(source, flag, payload);
-                let ticket = requests.register(request, now_ms());
-                let response = loop {
-                    if !active.load(Ordering::Acquire) {
-                        break None;
-                    }
-                    match ticket.response.recv_timeout(Duration::from_millis(100)) {
-                        Ok(response) => break response,
-                        Err(RecvTimeoutError::Disconnected) => break None,
-                        Err(RecvTimeoutError::Timeout) => {
-                            if requests
-                                .deadline(&ticket.id)
-                                .is_none_or(|at| now_ms() >= at)
-                            {
-                                break None;
-                            }
-                        }
-                    }
-                };
-                requests.cancel(&ticket.id);
-                response
+                super::wait_for_answer(&requests, &reminders, source, flag, payload, || {
+                    active.load(Ordering::Acquire)
+                })
             },
         );
         crate::os::pipe::Server::start(data, "hooks", PAYLOAD_LIMIT, PAYLOAD_LIMIT, handler)
@@ -72,7 +48,6 @@ pub(super) fn send(
     source: &str,
     flag: &str,
     payload: &Value,
-    _origin: Option<Value>,
 ) -> Result<Option<Value>, String> {
     let mut transcript = if super::settles_in_transcript(source) && flag == "--permission-hook" {
         super::transcript::Transcript::new(payload)
