@@ -3,17 +3,19 @@
 These files are unchanged copies from
 `agent-hud-native-open/Sources/AgentHUDDesktop/Resources/`.
 
-The 22 provider PNGs are the exact files named by the original desktop
+The 22 original provider PNGs are the exact files named by the original desktop
 `Components/AgentLogo.swift` artwork map, including the OpenCode and Qoder dark
 variants. Codex and ChatGPT share `chatgpt.png`. In the original renderer,
 ChatGPT's mark is tinted `#10a37f`; Grok, Cursor, Kimi, Pi, GitHub Copilot, Hermes
 and ZCode are template images tinted to their foreground. The source bitmaps
 are preserved here without applying those rendering transformations.
 
-`minimax.png` and `ark.png` (Volcengine's mark, for Volcengine Ark) were added
-later, unchanged from LobeHub's `@lobehub/icons-static-png` 2.6.0
-(`light/minimax-color.png`, `light/volcengine-color.png`; MIT, the notice in
-`LobeIcons-LICENSE.txt`).
+Seven marks were added later, unchanged from LobeHub's
+`@lobehub/icons-static-png` 2.6.0 (MIT, the notice in `LobeIcons-LICENSE.txt`):
+`minimax.png` (`light/minimax-color.png`), `ark.png` (Volcengine's mark, for
+Volcengine Ark, `light/volcengine-color.png`), `cline.png`, `roo-code.png` and
+`goose.png` (their `light/` marks), `kilocode.png` (`light/kilocode.png`) and
+`xiaomimimo.png` (`light/xiaomimimo.png`, for MiMo Code).
 
 The bundled `clawd-sprites.json` is consumed by the original Clawd bot renderer.
 It contains Anthropic's artwork copied unchanged from Claude for macOS

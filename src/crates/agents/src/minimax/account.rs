@@ -18,6 +18,10 @@ use std::time::Duration;
 /// Work in Claude Code, Codex, OpenCode and Pi spends the plan, as the
 /// clients its keys are found in.
 pub static PROVIDER: Provider = Provider {
+    // The plan is also spent from clients whose sessions are not read here
+    // (Cursor, TRAE, the vendor's own app) and from other devices, so it is
+    // read on the account interval whatever this computer does.
+    local_work: false,
     work_sources: &["claude", "codex", "opencode", "pi"],
     ..Provider::new("minimax", read)
 };

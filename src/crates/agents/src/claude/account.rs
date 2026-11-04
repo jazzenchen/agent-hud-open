@@ -264,9 +264,9 @@ fn read_folder(host: &dyn Host, folder: &Folder) -> Result<Reading, Unread> {
     {
         return Ok(reading);
     }
-    let read = match from_engine(host, folder, &config["oauthAccount"]) {
+    match from_engine(host, folder, &config["oauthAccount"]) {
         Ok(reading) => Ok(reading),
-        Err(EngineUnread::Failed(unread)) => Err(unread),
+        Err(EngineUnread::Failed(unread)) => kept(host, folder, unread),
         // A Claude Code that is installed and signed out is the agent's own
         // state; no Claude Code at all is not a sign-out.
         Err(EngineUnread::NoLogin { reason, installed }) => {
@@ -275,14 +275,25 @@ fn read_folder(host: &dyn Host, folder: &Folder) -> Result<Reading, Unread> {
             } else {
                 from_desktop(host, folder, installed)
             };
-            desktop.unwrap_or(Err(if installed {
-                Unread::SignedOut(reason)
-            } else {
-                Unread::Failed(reason)
-            }))
+            match desktop {
+                // The desktop app's account is the one read: Claude Code's
+                // record stands in for it only when it is the same account.
+                Some(Err(failure)) if desktop_is_claude_codes(host, folder) => {
+                    kept(host, folder, failure)
+                }
+                Some(read) => read,
+                None => kept(
+                    host,
+                    folder,
+                    if installed {
+                        Unread::SignedOut(reason)
+                    } else {
+                        Unread::Failed(reason)
+                    },
+                ),
+            }
         }
-    };
-    read.or_else(|failure| kept(host, folder, failure))
+    }
 }
 
 /// `failure`, with the windows Claude Code last recorded for the folder's
@@ -474,6 +485,21 @@ fn desktop_challenged(signed_out: bool) -> String {
 /// sign-in to offer, or the user did not allow reading it: the engine's
 /// reason then stands. `signed_out`: Claude Code is installed but signed out.
 /// Only the default `folder` is read this way.
+/// The account the Claude desktop app last signed in to.
+fn desktop_user(host: &dyn Host) -> Option<String> {
+    read_json(
+        host,
+        &host.folder(Base::AppData).join(DESKTOP).join("config.json"),
+    )?["lastKnownAccountUuid"]
+        .as_str()
+        .filter(|user| !user.is_empty())
+        .map(str::to_owned)
+}
+/// Whether the desktop app last signed in to the account Claude Code last
+/// signed in to in `folder`.
+fn desktop_is_claude_codes(host: &dyn Host, folder: &Folder) -> bool {
+    desktop_user(host).is_some_and(|user| profile(host, folder)["accountUuid"] == user.as_str())
+}
 fn from_desktop(
     host: &dyn Host,
     folder: &Folder,
@@ -505,22 +531,14 @@ fn from_desktop(
         })),
         failure => Some(Err(failure.unread())),
     };
-    let saved = read_json(
-        host,
-        &host.folder(Base::AppData).join(DESKTOP).join("config.json"),
-    )
-    .unwrap_or(Value::Null);
-    let user = saved["lastKnownAccountUuid"]
-        .as_str()
-        .filter(|user| !user.is_empty());
+    let user = desktop_user(host);
     let organization = host
         .app_cookie(DESKTOP, SITE, "lastActiveOrg")
         .found()
         .map(|organization| organization.trim().to_owned())
         .filter(|organization| !organization.is_empty());
     let cli = profile(host, folder);
-    let same = user.is_some()
-        && cli["accountUuid"].as_str() == user
+    let same = desktop_is_claude_codes(host, folder)
         && cli["organizationUuid"].is_string()
         && organization
             .as_deref()
@@ -548,7 +566,7 @@ fn from_desktop(
             .unwrap_or(Value::Null);
         let tier = membership["organization"]["rate_limit_tier"].as_str();
         json!({
-            "accountUuid": user.or(account["uuid"].as_str()),
+            "accountUuid": user.as_deref().or(account["uuid"].as_str()),
             "organizationUuid": organization.as_deref().or(membership["organization"]["uuid"].as_str()),
             "emailAddress": account["email_address"],
             "organizationType": tier.filter(|tier| tier.contains("claude_max")).map(|_| "claude_max"),
@@ -1537,6 +1555,27 @@ mod tests {
             .reason()
             .ends_with(" · Showing Claude Code's own reading from 5d ago"));
         assert_eq!(reading.quotas.len(), 3);
+    }
+
+    #[test]
+    fn claude_codes_record_never_stands_in_for_another_desktop_account() {
+        // Signed out; the desktop app last signed in to someone else, and
+        // its reading failed: the record is of an account not being read.
+        let mut other = signed_out_with_desktop()
+            .file(
+                "/u/AppData/Claude/config.json",
+                &json!({"lastKnownAccountUuid": "user-2"}).to_string(),
+            )
+            .answer(
+                "https://claude.ai/api/account",
+                Err(HttpFailure::Challenged),
+            );
+        record(&mut other, "/u/.claude.json", 5 * 86_400_000, None);
+        let failure = read(&other).err().unwrap();
+        assert!(matches!(failure, Unread::SignedOut(_)));
+        assert!(!failure
+            .reason()
+            .contains("Showing Claude Code's own reading"));
     }
 
     #[test]
