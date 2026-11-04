@@ -53,12 +53,7 @@ function useQuotaHistory(
       })
       .then((value) => {
         if (sequence.current !== id) return;
-        const response = value as QuotaHistoryResponse;
-        if (!response || response.kind !== "quota_history")
-          throw new Error(
-            "The runtime returned an unsupported quota history response.",
-          );
-        setData(response);
+        setData(value as QuotaHistoryResponse);
         setError(null);
       })
       .catch((failure: unknown) => {

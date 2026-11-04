@@ -49,8 +49,6 @@ export function CodexModelSettings({
       .then((answer) => {
         if (!current) return;
         const result = answer as StatisticsResponse;
-        if (result.kind !== "statistics")
-          throw new Error("Unsupported statistics response");
         setModels(
           result.available.models.filter((row) => row.provider === "codex"),
         );

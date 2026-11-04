@@ -140,14 +140,6 @@ function useStatistics(
       .then((value) => {
         if (sequence.current !== id) return;
         const response = value as StatisticsResponse;
-        if (
-          !response ||
-          response.kind !== "statistics" ||
-          !Number.isFinite(response.dataRevision)
-        )
-          throw new Error(
-            "The runtime returned an unsupported statistics response.",
-          );
         if (response.dataRevision < revision)
           throw new Error(
             "Statistics are catching up with the current ledger. Try refreshing again.",

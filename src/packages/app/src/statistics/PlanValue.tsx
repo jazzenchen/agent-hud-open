@@ -48,9 +48,7 @@ function usePlanValue(refresh: string, action: Action, active: boolean) {
     void actionRef
       .current("plan_value", {})
       .then((value) => {
-        const response = value as PlanValueResponse;
-        if (sequence.current === id && response?.kind === "plan_value")
-          setData(response);
+        if (sequence.current === id) setData(value as PlanValueResponse);
       })
       .catch(() => {});
     return () => {
