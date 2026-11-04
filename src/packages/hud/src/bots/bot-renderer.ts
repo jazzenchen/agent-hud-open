@@ -44,18 +44,15 @@ function group(
     context.canvas.width,
     context.canvas.height,
   );
-  try {
-    c.setTransform(context.getTransform());
-    draw(c);
-    context.save();
-    context.resetTransform();
-    context.globalAlpha = alpha;
-    context.globalCompositeOperation = operation;
-    context.drawImage(canvas, 0, 0);
-    context.restore();
-  } finally {
-    giveBack(canvas);
-  }
+  c.setTransform(context.getTransform());
+  draw(c);
+  context.save();
+  context.resetTransform();
+  context.globalAlpha = alpha;
+  context.globalCompositeOperation = operation;
+  context.drawImage(canvas, 0, 0);
+  context.restore();
+  giveBack(canvas);
 }
 export function botRenderLook(motion: BotMotion) {
   const f = motion.face,
