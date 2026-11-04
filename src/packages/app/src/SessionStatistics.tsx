@@ -8,7 +8,6 @@ import {
 import { ChevronLeft, ChevronRight, Search, X } from "lucide-react";
 import { Card } from "@agent-hud/ui/components/card";
 import { Button } from "@agent-hud/ui/components/button";
-import { Tabs, TabsList, TabsTrigger } from "@agent-hud/ui/components/tabs";
 import { SelectItem } from "@agent-hud/ui/components/select";
 import { Input } from "@agent-hud/ui/components/input";
 import { lastMessageTime, sessionClient } from "./lib/sessions";
@@ -20,6 +19,7 @@ import type {
   Snapshot,
 } from "@agent-hud/protocol";
 import { InlineDetail } from "./sessions/SessionDetailView";
+import { Segments } from "./statistics/Segments";
 import {
   DayHeader,
   SessionRow,
@@ -282,53 +282,17 @@ export default function SessionStatistics({
             }}
           >
             <div style={{ ...row, gap: 12, minHeight: 26 }}>
-              <Tabs
+              <Segments
+                small
+                label={t("Session arrangement", "会话排列")}
                 value={arrangement}
-                onValueChange={(value) => setArrangement(value as Arrangement)}
-                style={{ gap: 0 }}
-                aria-label={t("Session arrangement", "会话排列")}
-              >
-                <TabsList
-                  style={{
-                    height: 26,
-                    background: theme.segment,
-                    padding: 2,
-                    borderRadius: 6,
-                    gap: 1,
-                  }}
-                >
-                  {(["day", "active"] as const).map((value) => (
-                    <TabsTrigger
-                      key={value}
-                      value={value}
-                      style={{
-                        height: 22,
-                        border: 0,
-                        fontSize: 11,
-                        fontWeight: arrangement === value ? 500 : 400,
-                        lineHeight: "14px",
-                        padding: "2px 12px",
-                        borderRadius: 4,
-                        boxShadow:
-                          arrangement === value && theme.light
-                            ? "0 1px 2px rgba(0,0,0,.08)"
-                            : "none",
-                        color: theme.text,
-                        background:
-                          arrangement === value
-                            ? theme.selected
-                            : "transparent",
-                        transition:
-                          "background-color 160ms ease, color 160ms ease, box-shadow 160ms ease",
-                      }}
-                    >
-                      {value === "day"
-                        ? t("Day", "按日期")
-                        : t("Active", "活跃")}
-                    </TabsTrigger>
-                  ))}
-                </TabsList>
-              </Tabs>
+                onChange={(value) => setArrangement(value as Arrangement)}
+                choices={[
+                  { value: "day", label: t("Day", "按日期") },
+                  { value: "active", label: t("Active", "活跃") },
+                ]}
+                theme={theme}
+              />
               <span
                 style={{
                   marginLeft: "auto",

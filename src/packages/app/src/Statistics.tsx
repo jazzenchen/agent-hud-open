@@ -9,7 +9,6 @@ import { Check, ChevronDown, ChevronRight } from "lucide-react";
 import { isTauri } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { Button } from "@agent-hud/ui/components/button";
-import { Tabs, TabsList, TabsTrigger } from "@agent-hud/ui/components/tabs";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -45,7 +44,6 @@ import {
   row,
   themeFor,
   truncate,
-  type StatsTheme,
 } from "./statistics/StatsTheme";
 import { UsageChart } from "./statistics/UsageChart";
 import {
@@ -57,6 +55,7 @@ import {
 import { ActivityHeatmap } from "./statistics/ActivityHeatmap";
 import { QuotaHistory } from "./statistics/QuotaHistory";
 import { PlanValue } from "./statistics/PlanValue";
+import { Segments } from "./statistics/Segments";
 import { snapshotLanguage, systemTimeZone } from "@agent-hud/ui/format";
 import { indexingText } from "@agent-hud/ui/text/indexing";
 
@@ -111,66 +110,6 @@ function useStatisticsEnd(revision: number, refresh: number, active: boolean) {
     };
   }, [active]);
   return end;
-}
-
-function Segments({
-  value,
-  onChange,
-  choices,
-  theme,
-  label,
-}: {
-  value: string;
-  onChange: (value: string) => void;
-  choices: { value: string; label: string }[];
-  theme: StatsTheme;
-  label: string;
-}) {
-  return (
-    <Tabs
-      value={value}
-      onValueChange={onChange}
-      style={{ gap: 0 }}
-      aria-label={label}
-    >
-      <TabsList
-        style={{
-          background: theme.segment,
-          borderRadius: 7,
-          height: 28,
-          padding: 2,
-          gap: 1,
-        }}
-      >
-        {choices.map((choice) => (
-          <TabsTrigger
-            key={choice.value}
-            value={choice.value}
-            style={{
-              height: 24,
-              padding: "3px 11px",
-              border: 0,
-              borderRadius: 5,
-              fontSize: 12,
-              fontWeight: value === choice.value ? 500 : 400,
-              lineHeight: "16px",
-              color: theme.text,
-              boxShadow:
-                value === choice.value && theme.light
-                  ? "0 1px 2px rgba(0,0,0,.08)"
-                  : "none",
-              background:
-                value === choice.value ? theme.selected : "transparent",
-              transition:
-                "background-color 160ms ease, color 160ms ease, box-shadow 160ms ease",
-            }}
-          >
-            {choice.label}
-          </TabsTrigger>
-        ))}
-      </TabsList>
-    </Tabs>
-  );
 }
 
 /** Tokens page only. The containing native window owns the Tokens/Sessions tabs. */
