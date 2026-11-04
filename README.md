@@ -258,13 +258,19 @@ Also: the **GLM Coding Plan**, **MiniMax** and **Volcengine Ark** plan quotas. Q
 
 ## Install
 
-Download the [release](https://agenthud.app/mac), or install the newest release, betas included, with Homebrew:
+Download the [release](https://agenthud.app/mac), or install the newest release, betas included, from a terminal. With Homebrew:
 
 ```sh
 brew install --cask jazzenchen/tap/agent-hud
 ```
 
-Agent HUD updates itself after that. If it is already in `/Applications`, add `--adopt` and Homebrew takes over that copy.
+If Agent HUD is already in `/Applications`, add `--adopt` and Homebrew takes over that copy. Or with Node.js, which also installs the Windows and Linux test builds ([how it installs](src/apps/installer/README.md)):
+
+```sh
+npx @agenthud/install
+```
+
+On a Mac, Agent HUD updates itself after that.
 
 ## Build from source
 

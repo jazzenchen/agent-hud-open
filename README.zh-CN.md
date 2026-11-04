@@ -258,13 +258,19 @@ iPhone 和发行版在同一个网络里，不订阅也能在 iPhone 与 Apple W
 
 ## 安装
 
-下载[发行版](https://agenthud.app/mac)，或用 Homebrew 安装最新的版本（包括 Beta）：
+下载[发行版](https://agenthud.app/mac)，或在终端里安装最新的版本（包括 Beta）。用 Homebrew：
 
 ```sh
 brew install --cask jazzenchen/tap/agent-hud
 ```
 
-之后 Agent HUD 会自己更新。`/Applications` 里已经装了的话，加上 `--adopt`，Homebrew 会接管现有的那份。
+`/Applications` 里已经装了的话，加上 `--adopt`，Homebrew 会接管现有的那份。或者用 Node.js，它也能安装 Windows 与 Linux 的测试版（[安装方式](src/apps/installer/README.md)）：
+
+```sh
+npx @agenthud/install
+```
+
+在 Mac 上，之后 Agent HUD 会自己更新。
 
 ## 从源码构建
 
