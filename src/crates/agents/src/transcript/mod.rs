@@ -12,6 +12,7 @@ pub mod log;
 pub mod metering;
 pub mod records;
 mod session_state;
+mod shared_items;
 pub mod turns;
 pub mod usage;
 
