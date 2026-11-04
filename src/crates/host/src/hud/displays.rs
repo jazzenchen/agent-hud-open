@@ -1,5 +1,10 @@
 //! Display discovery, native screen matching, and edge-frame geometry.
-use super::{host, label_for_screen, Edge, HudConfig, HudMonitor, Rect, ScreenMeasurement};
+use std::sync::{atomic::Ordering, Arc, PoisonError};
+
+use super::{
+    host, label_for_screen, owner_for_window, Edge, HudConfig, HudGeometry, HudMonitor, HudWindows,
+    Rect, ScreenMeasurement,
+};
 
 #[tauri::command]
 pub async fn hud_monitors(app: tauri::AppHandle) -> Result<Vec<HudMonitor>, String> {
@@ -9,6 +14,50 @@ pub async fn hud_monitors(app: tauri::AppHandle) -> Result<Vec<HudMonitor>, Stri
     })
     .await
     .map_err(|error| format!("Display geometry worker failed: {error}"))?
+}
+
+#[tauri::command]
+pub async fn hud_geometry(
+    app: tauri::AppHandle,
+    window: tauri::WebviewWindow,
+    screen_id: Option<String>,
+    monitor_index: Option<usize>,
+    windows: tauri::State<'_, HudWindows>,
+) -> Result<Option<HudGeometry>, String> {
+    let owners = Arc::clone(&windows.0);
+    tauri::async_runtime::spawn_blocking(move || {
+        let shared = if window.label().starts_with("hud-") {
+            let owner = owner_for_window(&owners, &window)?;
+            if screen_id.as_ref().is_some_and(|id| id != &owner.screen_id) {
+                return Err("A HUD can only query its own screen geometry".into());
+            }
+            Some(owner)
+        } else {
+            let selected = match screen_id {
+                Some(id) => Some(id),
+                None => match monitor_index {
+                    Some(index) => display_catalog(&app)?
+                        .into_iter()
+                        .find(|display| display.info.index == index)
+                        .map(|display| display.info.screen_id),
+                    None => None,
+                },
+            };
+            let registry = owners.lock().unwrap_or_else(PoisonError::into_inner);
+            selected.and_then(|id| registry.get(&id).cloned())
+        };
+        let Some(shared) = shared else {
+            return Ok(None);
+        };
+        let state = shared.state.lock().unwrap_or_else(PoisonError::into_inner);
+        Ok(if shared.stopped.load(Ordering::Acquire) {
+            None
+        } else {
+            state.geometry.clone()
+        })
+    })
+    .await
+    .map_err(|error| format!("HUD geometry worker failed: {error}"))?
 }
 
 #[derive(Clone)]
