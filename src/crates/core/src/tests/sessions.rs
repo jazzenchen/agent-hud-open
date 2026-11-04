@@ -599,6 +599,160 @@ fn sessions_list_newest_last_message_first_whatever_their_state() {
 }
 
 #[test]
+fn the_sessions_days_add_up_every_matching_session_by_its_local_day() {
+    use chrono::TimeZone;
+    let temp = tempfile::tempdir().unwrap();
+    let root = temp.path().join(".claude/projects/test");
+    fs::create_dir_all(&root).unwrap();
+    // New York keeps summer time, so its days are not 24 hours apart.
+    let zone = chrono_tz::America::New_York;
+    let now = Utc::now().timestamp_millis();
+    let local_midnight = |date: chrono::NaiveDate| {
+        zone.from_local_datetime(&date.and_hms_opt(0, 0, 0).unwrap())
+            .earliest()
+            .unwrap()
+            .timestamp_millis()
+    };
+    let today = zone.timestamp_millis_opt(now).unwrap().date_naive();
+    let midnight = local_midnight(today);
+    let yesterday = local_midnight(today.pred_opt().unwrap());
+    let session = |id: &str, at: i64, cwd: &str, input: u64, model: &str| {
+        let at = iso(at);
+        let lines = [
+            json!({"sessionId":id,"type":"user","timestamp":at,"uuid":format!("{id}-u"),"cwd":cwd,"message":{"role":"user","content":format!("Task {id}")}}),
+            json!({"sessionId":id,"type":"assistant","timestamp":at,"message":{"id":format!("{id}-a"),"model":model,"role":"assistant","content":[{"type":"text","text":"Done."}],"stop_reason":"end_turn","usage":{"input_tokens":input,"output_tokens":0}}}),
+        ];
+        let text = lines
+            .iter()
+            .map(|line| format!("{line}\n"))
+            .collect::<String>();
+        fs::write(root.join(format!("{id}.jsonl")), text).unwrap();
+    };
+    // Six sessions today, two just before today began, one ten days ago.
+    for (index, input) in [600, 500, 400, 300, 200, 100].into_iter().enumerate() {
+        let cwd = if input == 100 {
+            "/work/other"
+        } else {
+            "/work/app"
+        };
+        session(
+            &format!("t{}", index + 1),
+            midnight + (now - midnight) / (index as i64 + 2),
+            cwd,
+            input,
+            "claude-opus-4-5",
+        );
+    }
+    session("y1", midnight - 60_000, "/work/app", 50, "claude-opus-4-5");
+    // A session on a model with no list price leaves its day no whole cost.
+    session("y2", midnight - 120_000, "/work/app", 30, "house-model");
+    session(
+        "e1",
+        now - 10 * 86_400_000,
+        "/work/app",
+        7,
+        "claude-opus-4-5",
+    );
+    let mut core = fixture(temp.path());
+    core.request("snapshot", json!({})).unwrap();
+    let query = |extra: Value| {
+        let mut query = json!({"scope":"all","limit":2,"timeZone":"America/New_York"});
+        query
+            .as_object_mut()
+            .unwrap()
+            .extend(extra.as_object().unwrap().clone());
+        query
+    };
+    let page = core.request("sessions", query(json!({}))).unwrap();
+    assert_eq!(page["items"].as_array().unwrap().len(), 2);
+    assert_eq!(page["total"], 9);
+    let days = page["days"].as_array().unwrap();
+    let starts = days
+        .iter()
+        .map(|day| day["start"].clone())
+        .collect::<Vec<_>>();
+    assert_eq!(starts, [iso(midnight), iso(yesterday), Value::Null]);
+    let counts = days.iter().map(|day| {
+        (
+            day["sessions"].as_u64().unwrap(),
+            day["tokens"].as_u64().unwrap(),
+        )
+    });
+    assert_eq!(
+        counts.collect::<Vec<_>>(),
+        [(6, 2_100), (2, 80), (1, 7)],
+        "every matching session, not only the page's two"
+    );
+    let ranked = |day: &Value| {
+        let top = day["top"].as_array().unwrap().iter();
+        top.map(|row| json!([row["id"], row["tokens"]]))
+            .collect::<Value>()
+    };
+    assert_eq!(
+        ranked(&days[0]),
+        json!([
+            ["t1", 600],
+            ["t2", 500],
+            ["t3", 400],
+            ["t4", 300],
+            ["t5", 200]
+        ])
+    );
+    assert_eq!(days[0]["rest"], json!({"count": 1, "tokens": 100}));
+    assert_eq!(days[0]["usage"]["input"], 2_100);
+    assert_eq!(days[0]["top"][0]["title"], page["items"][0]["title"]);
+    // A day's money is its rows' added up.
+    let all = core
+        .request("sessions", query(json!({"limit": 200})))
+        .unwrap();
+    let rows = all["items"].as_array().unwrap();
+    let cost = rows[..6]
+        .iter()
+        .map(|row| row["cost"].as_f64().unwrap())
+        .sum::<f64>();
+    assert!(cost > 0.0);
+    assert!((days[0]["cost"].as_f64().unwrap() - cost).abs() < 1e-12);
+    assert_eq!(days[0]["pricedCost"], days[0]["cost"]);
+    assert_eq!(days[0]["unpricedTokens"], 0);
+    assert_eq!(days[1]["cost"], Value::Null);
+    assert_eq!(days[1]["pricedCost"], rows[6]["cost"]);
+    assert_eq!(days[1]["unpricedTokens"], 30);
+    assert_eq!(all["days"], page["days"], "the same days on every page");
+
+    // The days follow the list's filters.
+    let other = core
+        .request("sessions", query(json!({"search": "other"})))
+        .unwrap();
+    let days = other["days"].as_array().unwrap();
+    assert_eq!(days.len(), 1);
+    assert_eq!(days[0]["start"], iso(midnight));
+    assert_eq!(
+        (days[0]["sessions"].as_u64(), days[0]["tokens"].as_u64()),
+        (Some(1), Some(100))
+    );
+    assert_eq!(ranked(&days[0]), json!([["t6", 100]]));
+    let none = core
+        .request("sessions", query(json!({"sources": ["codex"]})))
+        .unwrap();
+    assert_eq!(none["days"], json!([]));
+    // Without a time zone the days are UTC's: the newest session's first.
+    let utc = core.request("sessions", json!({"scope":"all"})).unwrap();
+    let newest = Utc.timestamp_millis_opt(midnight + (now - midnight) / 2);
+    let date = newest.unwrap().date_naive();
+    assert_eq!(
+        utc["days"][0]["start"],
+        iso(date
+            .and_hms_opt(0, 0, 0)
+            .unwrap()
+            .and_utc()
+            .timestamp_millis())
+    );
+    assert!(core
+        .request("sessions", json!({"timeZone": "Mars/Olympus"}))
+        .is_err());
+}
+
+#[test]
 fn unified_subagent_model_tracks_parent_and_child_across_agents() {
     let mut child = Log::new(
         "/tmp/.codebuddy/projects/p1/parent-uuid/subagents/agent-a1.jsonl".into(),

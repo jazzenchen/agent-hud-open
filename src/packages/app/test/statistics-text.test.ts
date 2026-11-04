@@ -2,9 +2,9 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { listCost } from "@agent-hud/ui/format";
 import {
+  presentKinds,
   sessionClient,
   sessionHelp,
-  sessionKinds,
 } from "../src/lib/sessions.ts";
 import { hourModels } from "../src/lib/statistics.ts";
 
@@ -64,39 +64,15 @@ test("a row's tooltip is the title, the client and the folder", () => {
   );
 });
 
-const usage = (
-  kinds: Partial<
-    Record<
-      "input" | "output" | "reasoning" | "cacheWrite" | "cacheRead",
-      number
-    >
-  >,
-) => {
-  const full = {
-    input: 0,
-    output: 0,
-    reasoning: 0,
-    cacheWrite: 0,
-    cacheRead: 0,
-    ...kinds,
-  };
-  return {
-    ...full,
-    total: Object.values(full).reduce((sum, value) => sum + value, 0),
-  };
-};
-
-test("the Today card splits its sessions' tokens by every kind present, in Open's order", () => {
-  const today = sessionKinds([
-    {
-      tokens: 1_100,
-      usage: usage({ input: 10, output: 20, cacheRead: 1_000, cacheWrite: 70 }),
-    },
-    { tokens: 50, usage: usage({ input: 5, output: 45, reasoning: 0 }) },
-  ]);
-  assert.equal(today.total, 1_150);
+test("the Today card names every kind present, in Open's order", () => {
   assert.deepEqual(
-    today.kinds,
+    presentKinds({
+      input: 15,
+      output: 65,
+      reasoning: 0,
+      cacheWrite: 70,
+      cacheRead: 1_000,
+    }),
     [
       { kind: "cacheWrite", value: 70 },
       { kind: "input", value: 15 },
@@ -104,26 +80,6 @@ test("the Today card splits its sessions' tokens by every kind present, in Open'
       { kind: "cacheRead", value: 1_000 },
     ],
     "reasoning is absent, so it is left out",
-  );
-});
-
-test("without any breakdown the Today card keeps its total and has no kinds", () => {
-  assert.deepEqual(sessionKinds([{ tokens: 40 }, { tokens: 2 }]), {
-    total: 42,
-    kinds: null,
-  });
-  assert.deepEqual(sessionKinds([]), { total: 0, kinds: null });
-  assert.deepEqual(sessionKinds([{ tokens: 0, usage: usage({}) }]), {
-    total: 0,
-    kinds: [],
-  });
-  // A row Core has no log for (a hook-only session) adds its tokens, not kinds.
-  assert.deepEqual(
-    sessionKinds([{ tokens: 30, usage: usage({ input: 30 }) }, { tokens: 0 }]),
-    {
-      total: 30,
-      kinds: [{ kind: "input", value: 30 }],
-    },
   );
 });
 

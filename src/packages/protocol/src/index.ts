@@ -1088,6 +1088,27 @@ export interface SessionsQuery {
   turnBars?: boolean;
   /** Direct children of this parent; overrides rootsOnly. */
   parentId?: string;
+  /** IANA calendar time zone the response's `days` are cut in, DST-aware; UTC when omitted. */
+  timeZone?: string;
+}
+/** From Core: what the sessions of one local day spent, every matching session, not only a page's. */
+export interface SessionsDay {
+  /** When the day began, RFC3339; null for Earlier: before the six days ahead of today, or with no time. */
+  start: string | null;
+  sessions: number;
+  /** The sessions' tokens, sub-agents' included, as their rows count them. */
+  tokens: number;
+  /** The same by kind; null when no session has a breakdown. */
+  usage: (StatisticsTokens & { total: number }) | null;
+  /** Money as a row has it: the whole cost when every session has one, else null. */
+  cost: number | null;
+  /** The sessions' whole costs, else their priced calls', in US dollars; null when none has one. */
+  pricedCost: number | null;
+  /** The tokens of the calls with no list price, of the sessions with no whole cost. */
+  unpricedTokens: number;
+  /** The five sessions that spent the most tokens, most first, and the others that spent any (the Today card's ranking). */
+  top: { id: string; title: string; tokens: number }[];
+  rest: { count: number; tokens: number };
 }
 export interface SessionsResponse {
   kind: "sessions";
@@ -1102,6 +1123,8 @@ export interface SessionsResponse {
   projects: (string | null)[];
   /** Readable labels for stable local Project keys. */
   projectLabels?: Record<string, string>;
+  /** Each local day the matching sessions' last messages fall on (a later one under today), newest first, Earlier last. The days follow `items`: the first day's `sessions` are the first items, the next day's the next. */
+  days: SessionsDay[];
 }
 export type NativeMethod =
   | "snapshot"

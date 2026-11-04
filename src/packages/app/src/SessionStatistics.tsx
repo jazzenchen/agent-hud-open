@@ -10,7 +10,8 @@ import { Card } from "@agent-hud/ui/components/card";
 import { Button } from "@agent-hud/ui/components/button";
 import { SelectItem } from "@agent-hud/ui/components/select";
 import { Input } from "@agent-hud/ui/components/input";
-import { lastMessageTime, sessionClient } from "./lib/sessions";
+import { systemTimeZone } from "@agent-hud/ui/format";
+import { sessionClient } from "./lib/sessions";
 import { useSessionDetail, useSessions } from "./lib/use-sessions";
 import type {
   NativeMethod,
@@ -37,12 +38,11 @@ import {
   plain,
   projectName,
   row,
-  sessionsMoney,
+  sessionMoney,
   SourceSelect,
   themeFor,
   titleForDay,
   type Arrangement,
-  type SessionGroup,
 } from "./sessions/SessionTheme";
 
 interface SessionStatisticsProps {
@@ -84,6 +84,7 @@ export default function SessionStatistics({
   const t = (en: string, cn: string) => (zh ? cn : en);
   const now = Date.parse(snapshot.generatedAt),
     today = dayStart(now);
+  const timeZone = useMemo(systemTimeZone, []);
   const listQuery = useMemo<Omit<SessionsQuery, "offset" | "limit">>(
     () => ({
       scope: arrangement === "active" ? "active" : "recent",
@@ -95,8 +96,9 @@ export default function SessionStatistics({
         ? {}
         : { project: project === "__unassigned__" ? null : project }),
       ...(query.trim() ? { search: query.trim() } : {}),
+      timeZone,
     }),
-    [arrangement, source, project, query],
+    [arrangement, source, project, query, timeZone],
   );
   const revision =
     snapshot.sessionsRevision ?? (snapshot.mode === "demo" ? now : 0);
@@ -142,23 +144,21 @@ export default function SessionStatistics({
     window.addEventListener("keydown", back);
     return () => window.removeEventListener("keydown", back);
   }, [selectedId, parent?.id, onClearSelection, active]);
-  const groups = new Map<number, Session[]>();
-  const firstNamed = new Date(today);
-  firstNamed.setDate(firstNamed.getDate() - 6);
-  // A session files under the day of its last message, whatever it is doing.
-  for (const session of filtered) {
-    const observedAt = Date.parse(lastMessageTime(session));
-    const day = dayStart(Math.min(observedAt, now));
-    const key =
-      day < firstNamed.getTime() || !Number.isFinite(day) ? earlier : day;
-    const group = groups.get(key);
-    if (group) group.push(session);
-    else groups.set(key, [session]);
-  }
-  const grouped: SessionGroup[] = [...groups]
-    .map(([day, sessions]) => ({ day, sessions }))
-    .sort((a, b) => b.day - a.day);
-  const todaySessions = groups.get(today) ?? [];
+  // Core files every matching session under the day of its last message,
+  // in the list's order, so each day takes the next of the loaded rows.
+  const days = list.page?.days ?? [];
+  let next = 0;
+  const grouped = days
+    .map((day) => {
+      const sessions = filtered.slice(next, next + day.sessions);
+      next += day.sessions;
+      const key = day.start === null ? earlier : Date.parse(day.start);
+      return { key, day, sessions };
+    })
+    .filter((group) => group.sessions.length > 0);
+  const todayFigures = days.find(
+    (day) => day.start !== null && Date.parse(day.start) === today,
+  );
   const choose = (id: string) => {
     setSelectedId(id);
     setSelectedEntry(null);
@@ -423,24 +423,19 @@ export default function SessionStatistics({
               }}
             >
               {zh
-                ? `已显示 ${filtered.length} / ${list.page!.total} 个会话。下方汇总仅统计已加载会话。`
-                : `Showing ${filtered.length} of ${list.page!.total} sessions. Totals below cover loaded sessions.`}
+                ? `已显示 ${filtered.length} / ${list.page!.total} 个会话。`
+                : `Showing ${filtered.length} of ${list.page!.total} sessions.`}
             </div>
           )}
-          {todaySessions.length > 0 && (
-            <TodayCard
-              sessions={todaySessions}
-              theme={theme}
-              partial={partial}
-              onSelect={choose}
-            />
+          {todayFigures && (
+            <TodayCard day={todayFigures} theme={theme} onSelect={choose} />
           )}
           {arrangement === "active"
             ? filtered.length > 0 && (
                 <>
                   <DayHeader
                     title={t("Last 24 hours", "最近 24 小时")}
-                    count={filtered.length}
+                    count={list.page!.total}
                     open
                     folded=""
                     theme={theme}
@@ -450,23 +445,17 @@ export default function SessionStatistics({
                 </>
               )
             : grouped.map((group) => {
-                const open = (group.day === today) !== flipped.has(group.day);
-                const groupTokens = group.sessions.reduce(
-                  (sum, session) => sum + session.tokens,
-                  0,
-                );
-                const groupMoney = sessionsMoney(group.sessions);
+                const open = (group.key === today) !== flipped.has(group.key);
+                const money = sessionMoney(group.day);
                 return (
-                  <div key={group.day}>
+                  <div key={group.key}>
                     <DayHeader
-                      title={titleForDay(group.day, today, zh)}
-                      count={group.sessions.length}
+                      title={titleForDay(group.key, today, zh)}
+                      count={group.day.sessions}
                       open={open}
                       folded={[
-                        groupMoney.value !== null
-                          ? moneyText(groupMoney, zh)
-                          : null,
-                        groupTokens > 0 ? compact(groupTokens) : "—",
+                        money.value !== null ? moneyText(money, zh) : null,
+                        group.day.tokens > 0 ? compact(group.day.tokens) : "—",
                       ]
                         .filter(Boolean)
                         .join(" · ")}
@@ -474,8 +463,8 @@ export default function SessionStatistics({
                       onToggle={() =>
                         setFlipped((previous) => {
                           const next = new Set(previous);
-                          if (next.has(group.day)) next.delete(group.day);
-                          else next.add(group.day);
+                          if (next.has(group.key)) next.delete(group.key);
+                          else next.add(group.key);
                           return next;
                         })
                       }

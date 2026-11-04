@@ -8,7 +8,6 @@ import {
   sessionWhere,
   stackTurn,
   stackTurnBars,
-  topSessions,
   turnTicks,
 } from "../src/lib/sessions.ts";
 
@@ -123,26 +122,6 @@ test("the context line breaks at each compaction and skips turns without a conte
     "a first turn compacted starts the line",
   );
   assert.deepEqual(contextRuns([]), []);
-});
-
-test("today's sessions rank by tokens with the rest summed", () => {
-  const sessions = [
-    { id: "a", tokens: 10 },
-    { id: "b", tokens: 50 },
-    { id: "c", tokens: 0 },
-    { id: "d", tokens: 30 },
-    { id: "e", tokens: 5 },
-  ];
-  const { top, rest } = topSessions(sessions, 2);
-  assert.deepEqual(
-    top.map((session) => session.id),
-    ["b", "d"],
-  );
-  assert.deepEqual(
-    rest,
-    { count: 2, tokens: 15 },
-    "a session that spent nothing is not counted",
-  );
 });
 
 test("a row names its model, its project with ~ else its folder, and its client", () => {

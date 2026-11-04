@@ -21,12 +21,7 @@ import {
   themeFor as statsTheme,
   type StatsTheme,
 } from "../statistics/StatsTheme";
-export {
-  sessionMoney,
-  sessionsMoney,
-  unpricedHelp,
-  type ListMoney,
-} from "../lib/sessions";
+export { sessionMoney, unpricedHelp, type ListMoney } from "../lib/sessions";
 export {
   compact,
   integer,
@@ -57,11 +52,6 @@ export interface Theme extends StatsTheme {
   pick: string;
   /** A card's colour as one solid, for halos behind chart labels. */
   surface: string;
-}
-
-export interface SessionGroup {
-  day: number;
-  sessions: Session[];
 }
 
 export const ALL = "__all__";

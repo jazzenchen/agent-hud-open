@@ -90,17 +90,14 @@ impl<'a> Family<'a> {
     pub(crate) fn descendants(&self, source: &str, id: &str) -> Vec<&'a LogHead> {
         let mut found = Vec::<&LogHead>::new();
         let mut seen = HashSet::<&Path>::new();
-        let mut queue = vec![(source.to_owned(), id.to_owned())];
+        // The names are borrowed, never copied: the Sessions page's day
+        // totals walk every matching session.
+        let mut queue = vec![(source, id)];
         while let Some((source, id)) = queue.pop() {
-            for child in self
-                .children
-                .get(&(source.as_str(), id.as_str()))
-                .into_iter()
-                .flatten()
-            {
+            for child in self.children.get(&(source, id)).into_iter().flatten() {
                 if seen.insert(child.path.as_path()) {
                     found.push(child);
-                    queue.push((child.source.clone(), child.id.clone()));
+                    queue.push((child.source.as_str(), child.id.as_str()));
                 }
             }
         }

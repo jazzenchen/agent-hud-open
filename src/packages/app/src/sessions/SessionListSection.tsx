@@ -1,13 +1,12 @@
 import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import { Card } from "@agent-hud/ui/components/card";
 import {
+  presentKinds,
   sessionHelp,
-  sessionKinds,
   sessionWhere,
   stackTurnBars,
-  topSessions,
 } from "../lib/sessions";
-import type { Session } from "@agent-hud/protocol";
+import type { Session, SessionsDay } from "@agent-hud/protocol";
 import { useAnimatedNumber } from "../statistics/StatsTheme";
 import { moneyAmount, share } from "@agent-hud/ui/format";
 import { ShareRows, TurnSparkline } from "./SessionCharts";
@@ -25,7 +24,6 @@ import {
   plain,
   row,
   sessionMoney,
-  sessionsMoney,
   statusLine,
   type Theme,
   unpricedHelp,
@@ -37,30 +35,29 @@ export const rowGap = 18;
 
 /**
  * The sessions filed under today in one card (Open's SessionsTodayCard, the
- * phone's TodaySummary): how many, what they cost, their tokens split by the
- * kinds present in Open's order; and beside them, where those tokens went:
- * the sessions that spent the most, each a labelled bar of its share, the
- * rest summed. A session counts its sub-agents, which nest under it.
+ * phone's TodaySummary), as Core counts every matching one: how many, what
+ * they cost, their tokens split by the kinds present in Open's order; and
+ * beside them, where those tokens went: the sessions that spent the most,
+ * each a labelled bar of its share, the rest summed. A session counts its
+ * sub-agents, which nest under it.
  */
 export function TodayCard({
-  sessions,
+  day,
   theme,
-  partial,
   onSelect,
 }: {
-  sessions: Session[];
+  day: SessionsDay;
   theme: Theme;
-  partial: boolean;
   onSelect: (id: string) => void;
 }) {
   const zh = Boolean(theme.zh);
-  const { total, kinds } = sessionKinds(sessions);
+  const total = day.tokens;
+  const kinds = day.usage ? presentKinds(day.usage) : null;
   const animatedTotal = useAnimatedNumber(total);
-  const money = sessionsMoney(sessions);
+  const money = sessionMoney(day);
   const kindsTotal = kinds?.reduce((sum, entry) => sum + entry.value, 0) ?? 0;
-  const ranked = topSessions(sessions, 5);
   const ranking = [
-    ...ranked.top.map((session) => ({
+    ...day.top.map((session) => ({
       id: session.id,
       label: session.title || (zh ? "未命名会话" : "Untitled session"),
       value: session.tokens,
@@ -68,19 +65,17 @@ export function TodayCard({
       color: theme.tertiary,
       title: session.title,
     })),
-    ...(ranked.rest.count > 0
+    ...(day.rest.count > 0
       ? [
           {
             id: "__rest__",
             label: (
               <span style={{ color: theme.secondary }}>
-                {zh
-                  ? `其余 ${ranked.rest.count} 个`
-                  : `${ranked.rest.count} more`}
+                {zh ? `其余 ${day.rest.count} 个` : `${day.rest.count} more`}
               </span>
             ),
-            value: ranked.rest.tokens,
-            note: share(ranked.rest.tokens, total),
+            value: day.rest.tokens,
+            note: share(day.rest.tokens, total),
             color: theme.track,
           },
         ]
@@ -108,8 +103,8 @@ export function TodayCard({
         >
           <strong style={{ fontSize: 13, fontWeight: 600 }}>
             {zh
-              ? `今天 · ${partial ? "已加载 " : ""}${sessions.length} 个会话`
-              : `Today · ${sessions.length}${partial ? " loaded " : " "}${sessions.length === 1 ? "session" : "sessions"}`}
+              ? `今天 · ${day.sessions} 个会话`
+              : `Today · ${day.sessions} ${day.sessions === 1 ? "session" : "sessions"}`}
           </strong>
           {money.value !== null && (
             <span

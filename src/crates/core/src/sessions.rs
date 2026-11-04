@@ -297,6 +297,15 @@ impl AgentHudCore {
             .unwrap_or("")
             .trim()
             .to_lowercase();
+        let zone = params
+            .get("timeZone")
+            .map(|v| {
+                v.as_str()
+                    .and_then(|name| name.parse::<chrono_tz::Tz>().ok())
+                    .ok_or("timeZone must be an IANA time-zone name")
+            })
+            .transpose()?
+            .unwrap_or(chrono_tz::Tz::UTC);
         let now = Utc::now().timestamp_millis();
         self.refresh_sessions_revision(now);
         let presentation = self.presentation(now);
@@ -538,6 +547,126 @@ impl AgentHudCore {
         let selected = self.selected();
         let family = session_breakdown::Family::new(&selected);
         let currency = self.deepseek_account_currency();
+        // What every matching session spent, not only this page's, by the
+        // local day of its last message (a later one under today): the
+        // Sessions page's day headers and Today card. The six days before
+        // today are named, older ones are Earlier. The rows are in order, so
+        // each day covers the next of them. A day's money reads as a row's:
+        // the whole cost while every session has one, else each session's
+        // whole or priced cost, with the unpriced tokens of those with none.
+        #[derive(Default)]
+        struct Day {
+            date: Option<chrono::NaiveDate>,
+            sessions: usize,
+            tokens: u64,
+            usage: Option<Usage>,
+            /// The sum of whole costs while every session has one.
+            whole: Option<f64>,
+            priced: Option<f64>,
+            unpriced: u64,
+            /// The most tokens first, each with its row's position.
+            top: Vec<(u64, usize)>,
+            rest: (usize, u64),
+        }
+        let today = statistics::local_date(zone, now);
+        let named = today - chrono::Days::new(6);
+        let mut days = Vec::<Day>::new();
+        for (index, (row, _)) in rows.iter().enumerate() {
+            let date = message_at(row)
+                .map(|at| statistics::local_date(zone, at.min(now)))
+                .filter(|date| *date >= named);
+            if days.last().is_none_or(|day| day.date != date) {
+                days.push(Day {
+                    date,
+                    whole: Some(0.0),
+                    ..Day::default()
+                });
+            }
+            let day = days.last_mut().unwrap();
+            let (tokens, usage, cost, (priced, unpriced)) = match row {
+                Row::Log(log) => {
+                    let (usage, _) = family.usage(log);
+                    let cost = family.list_cost(log);
+                    (usage.total(), Some(usage), cost, family.priced_cost(log))
+                }
+                Row::Extra(value) => {
+                    let kind = |key| value["usage"][key].as_u64().unwrap_or(0);
+                    (
+                        value["tokens"].as_u64().unwrap_or(0),
+                        value["usage"].is_object().then(|| Usage {
+                            input: kind("input"),
+                            output: kind("output"),
+                            read: kind("cacheRead"),
+                            write: kind("cacheWrite"),
+                            reasoning: kind("reasoning"),
+                        }),
+                        value["cost"].as_f64(),
+                        (
+                            value["pricedCost"].as_f64(),
+                            value["unpricedTokens"].as_u64().unwrap_or(0),
+                        ),
+                    )
+                }
+            };
+            day.sessions += 1;
+            day.tokens += tokens;
+            if let Some(usage) = usage {
+                day.usage.get_or_insert_default().add(usage);
+            }
+            day.whole = day.whole.zip(cost).map(|(sum, cost)| sum + cost);
+            if let Some(part) = cost.or(priced) {
+                *day.priced.get_or_insert(0.0) += part;
+            }
+            if cost.is_none() {
+                day.unpriced += unpriced;
+            }
+            if tokens > 0 {
+                let at = day.top.iter().position(|(most, _)| *most < tokens);
+                day.top.insert(at.unwrap_or(day.top.len()), (tokens, index));
+                if day.top.len() > 5 {
+                    let (tokens, _) = day.top.pop().unwrap();
+                    day.rest = (day.rest.0 + 1, day.rest.1 + tokens);
+                }
+            }
+        }
+        let days = days
+            .into_iter()
+            .map(|day| {
+                let top = day
+                    .top
+                    .iter()
+                    .map(|(tokens, index)| {
+                        let (id, title) = match &rows[*index].0 {
+                            Row::Log(log) => (
+                                log.id.as_str(),
+                                self.usage_projection
+                                    .as_ref()
+                                    .and_then(|p| p.titles.get(&log.id))
+                                    .unwrap_or(&log.title)
+                                    .as_str(),
+                            ),
+                            Row::Extra(value) => (
+                                value["id"].as_str().unwrap_or(""),
+                                value["title"].as_str().unwrap_or(""),
+                            ),
+                        };
+                        json!({"id": id, "title": title, "tokens": tokens})
+                    })
+                    .collect::<Vec<_>>();
+                let start = day.date.map(|date| statistics::day_start(zone, date));
+                Ok(json!({
+                    "start": start.transpose()?.map(iso),
+                    "sessions": day.sessions,
+                    "tokens": day.tokens,
+                    "usage": day.usage.map(Usage::json),
+                    "cost": day.whole,
+                    "pricedCost": day.priced,
+                    "unpricedTokens": day.unpriced,
+                    "top": top,
+                    "rest": {"count": day.rest.0, "tokens": day.rest.1},
+                }))
+            })
+            .collect::<Result<Vec<_>, String>>()?;
         if turn_bars {
             // Forgets the sessions no longer listed, so the map follows the logs.
             let listed = selected
@@ -589,7 +718,7 @@ impl AgentHudCore {
             .collect::<Vec<_>>();
         let next = offset.saturating_add(items.len());
         Ok(
-            json!({"kind":"sessions","revision":self.sessions_revision,"generatedAt":Utc::now().to_rfc3339(),"items":items,"total":total,"nextOffset":(next<total).then_some(next),"sources":sources,"projects":projects,"projectLabels":project_labels}),
+            json!({"kind":"sessions","revision":self.sessions_revision,"generatedAt":Utc::now().to_rfc3339(),"items":items,"total":total,"nextOffset":(next<total).then_some(next),"sources":sources,"projects":projects,"projectLabels":project_labels,"days":days}),
         )
     }
     pub(super) fn session_detail(&mut self, params: Value) -> Result<Value, String> {
