@@ -93,8 +93,7 @@ fn parse_header(content: &str) -> Option<(String, String)> {
     };
     let content = header_window;
     let mut cursor = 0;
-    let wake = parse_open_tag(content, &mut cursor, "wake")?;
-    let _ = wake;
+    parse_open_tag(content, &mut cursor, "wake")?;
     skip_space(content, &mut cursor);
     let project = parse_open_tag(content, &mut cursor, "project")?;
     if project.get("type").map(String::as_str) != Some("project") {

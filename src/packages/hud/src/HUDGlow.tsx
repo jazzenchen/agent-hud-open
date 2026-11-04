@@ -1,6 +1,14 @@
-import { memo, useEffect, useMemo, useRef, useState } from "react";
+import {
+  memo,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { cssChannels, startGpuPaint, type GpuPaint } from "./glow-gpu";
 import { flashMask, pulseFrames, type GlowAlert } from "./glow-alert";
+import { fixedTrack, type RimShape, type RimTrack } from "./rim-track";
 import {
   breathFrames,
   breathTiming,
@@ -18,32 +26,37 @@ export type GlowEffect =
   "breathe" | "flow" | "scan" | "ripple" | "shimmer" | "boot";
 
 export interface HUDGlowProps {
-  /** Size of the silhouette this rim wraps, in CSS pixels. */
+  /** Size of the silhouette this rim wraps, in CSS pixels; with `track`, the
+   * box the moving silhouette stays inside. */
   width: number;
   height: number;
-  style: GlowStyle;
-  effect: GlowEffect;
-  colors: string[];
+  /** A silhouette that moves inside the box: the rim follows it in the frame
+   * it moves, without a render, and `radius` and `flare` come from it. */
+  track?: RimTrack;
+  style?: GlowStyle;
+  effect?: GlowEffect;
+  colors?: string[];
   active?: boolean;
   period?: number;
-  amplitude: number;
-  brightness: number;
-  range: number;
-  outwardOnly: boolean;
-  blur: number;
-  pitch: number;
-  core: number;
-  fade: number;
-  density: number;
-  radius: number;
+  amplitude?: number;
+  brightness?: number;
+  range?: number;
+  outwardOnly?: boolean;
+  blur?: number;
+  pitch?: number;
+  core?: number;
+  fade?: number;
+  density?: number;
+  radius?: number;
   /** Concave contact shoulders outside the core; excluded from the rim's ink. */
   flare?: number;
   /** Notch joins the screen's top edge; a floating logo strip has four rounded corners. */
-  attached: boolean;
-  reduceMotion: boolean;
+  attached?: boolean;
+  reduceMotion?: boolean;
   /** The island alert that just arrived: the rim flashes in its colour over
    * its sender's part of the gradient (`glowAlert`). */
   alert?: GlowAlert | null;
+  className?: string;
 }
 
 const STYLES: GlowStyle[] = [
@@ -98,11 +111,17 @@ const RIM_NUMBERS = [
   "cellDensity",
   "clock",
   "stopCount",
+  "boxWidth",
+  "boxHeight",
+  "offsetX",
+  "offsetY",
 ] as const;
 const RIM_COLORS = ["colorA", "colorB", "colorC", "colorD"] as const;
 const RIM_PAINT = /* wgsl */ `
+    // The canvas covers the box; the silhouette sits offsetX, offsetY into it.
+    let box = vec2f(boxWidth, boxHeight) + vec2f(padding * 2.0);
+    let pixel = uv * box - vec2f(offsetX, offsetY);
     let canvas = vec2f(stripWidth, stripHeight) + vec2f(padding * 2.0);
-    let pixel = uv * canvas;
     let pixelPoint = pixel - vec2f(padding);
     let pixelRadius = min(corner, min(stripWidth, stripHeight) * 0.5);
     var pixelDistance: f32;
@@ -276,11 +295,9 @@ function contour(
 
 /** CPU rendering is a still of the same contour, falloff, grid and local glyph masks. */
 function StaticRim({
-  width,
-  height,
+  box,
+  track,
   padding,
-  radius,
-  flare,
   attached,
   style,
   colors,
@@ -296,10 +313,6 @@ function StaticRim({
 }: Required<
   Pick<
     HUDGlowProps,
-    | "width"
-    | "height"
-    | "radius"
-    | "flare"
     | "attached"
     | "style"
     | "colors"
@@ -312,7 +325,12 @@ function StaticRim({
     | "density"
     | "brightness"
   >
-> & { padding: number; stopCount: number }) {
+> & {
+  box: { width: number; height: number };
+  track: RimTrack;
+  padding: number;
+  stopCount: number;
+}) {
   const ref = useRef<HTMLCanvasElement>(null);
   const rgb = useMemo<RGB[]>(
     () =>
@@ -322,23 +340,31 @@ function StaticRim({
       }),
     [colors],
   );
-  useEffect(() => {
+  const draw = () => {
     const canvas = ref.current;
     const context = canvas?.getContext("2d");
     if (!canvas || !context) return;
-    const w = Math.ceil(width + padding * 2),
-      h = Math.ceil(height + padding * 2);
-    canvas.width = w;
-    canvas.height = h;
+    const { x: ox, y: oy, width, height, radius, flare } = track.get();
+    const w = Math.ceil(box.width + padding * 2),
+      h = Math.ceil(box.height + padding * 2);
+    if (canvas.width !== w) canvas.width = w;
+    if (canvas.height !== h) canvas.height = h;
     const image = context.createImageData(w, h);
     const step = style === "braille" ? pitch / 2 : pitch;
+    // The silhouette's own canvas inside the box; nothing outside it is inked.
+    const sw = Math.ceil(width + padding * 2),
+      sh = Math.ceil(height + padding * 2);
+    const left = clamp(Math.floor(ox), 0, w),
+      right = clamp(Math.ceil(ox + sw), 0, w);
+    const top = clamp(Math.floor(oy), 0, h),
+      bottom = clamp(Math.ceil(oy + sh), 0, h);
     // The palette varies only along x. Resolve it once per column, rather than
     // repeating the same interpolation for every pixel in the contour's height.
     const gradient = new Uint8ClampedArray(w * 3);
-    for (let x = 0; x < w; x++) {
-      const col = Math.floor((x - padding) / step);
-      const sx = style === "blur" ? x : (col + 0.5) * step + padding;
-      const location = clamp((sx / w) * stopCount - 0.5, 0, stopCount - 1);
+    for (let x = left; x < right; x++) {
+      const col = Math.floor((x - ox - padding) / step);
+      const sx = style === "blur" ? x - ox : (col + 0.5) * step + padding;
+      const location = clamp((sx / sw) * stopCount - 0.5, 0, stopCount - 1);
       const index = Math.min(2, Math.floor(location));
       const fraction = location - index;
       for (let channel = 0; channel < 3; channel++)
@@ -346,10 +372,13 @@ function StaticRim({
           rgb[index][channel] * (1 - fraction) +
           rgb[index + 1][channel] * fraction;
     }
-    for (let y = 0; y < h; y++)
-      for (let x = 0; x < w; x++) {
-        const px = x - padding,
-          py = y - padding;
+    for (let y = top; y < bottom; y++)
+      for (let x = left; x < right; x++) {
+        // X, Y: this pixel on the silhouette's own canvas.
+        const X = x - ox,
+          Y = y - oy;
+        const px = X - padding,
+          py = Y - padding;
         const pixelDistance = contour(px, py, width, height, radius, attached);
         if (pixelDistance < 0) continue;
         const lip = Math.min(flare, height / 2);
@@ -357,10 +386,10 @@ function StaticRim({
           const outside = lip * (1 - Math.sqrt(py / lip)) ** 2;
           if (px >= -outside && px <= width + outside) continue;
         }
-        const col = Math.floor((x - padding) / step),
-          row = Math.floor((y - padding - height) / step);
-        const sx = style === "blur" ? x : (col + 0.5) * step + padding;
-        const sy = style === "blur" ? y : (row + 0.5) * step + padding + height;
+        const col = Math.floor((X - padding) / step),
+          row = Math.floor((Y - padding - height) / step);
+        const sx = style === "blur" ? X : (col + 0.5) * step + padding;
+        const sy = style === "blur" ? Y : (row + 0.5) * step + padding + height;
         const distance =
           style === "blur"
             ? pixelDistance
@@ -394,8 +423,8 @@ function StaticRim({
         }
         if (style === "blur" && blur <= 0) value = distance <= range ? 1 : 0;
         if ((style !== "blur" && fall > 1) || value < 0.06) continue;
-        const lx = (x - sx) / step,
-          ly = (y - sy) / step;
+        const lx = (X - sx) / step,
+          ly = (Y - sy) / step;
         const threshold = (BAYER[(row & 3) * 4 + (col & 3)] + 0.5) / 16;
         if (style === "dots")
           value = clamp(
@@ -447,12 +476,16 @@ function StaticRim({
         image.data[offset + 3] = Math.round(value * brightness * 255);
       }
     context.putImageData(image, 0, 0);
-  }, [
-    width,
-    height,
+  };
+  const latestDraw = useRef(draw);
+  latestDraw.current = draw;
+  // Before paint, so a new box or look never shows the old picture
+  // stretched over it.
+  useLayoutEffect(draw, [
+    box.width,
+    box.height,
+    track,
     padding,
-    radius,
-    flare,
     attached,
     style,
     rgb,
@@ -466,6 +499,7 @@ function StaticRim({
     brightness,
     stopCount,
   ]);
+  useLayoutEffect(() => track.subscribe(() => latestDraw.current()), [track]);
   return (
     <canvas
       ref={ref}
@@ -481,14 +515,28 @@ type RimValues = Record<string, number | string>;
  * or value draws one frame, and a moving pattern advances `clock` at
  * `framesPerSecond`.
  */
+/** The silhouette's part of the rim's values. */
+function shapeValues(shape: RimShape): RimValues {
+  return {
+    stripWidth: shape.width,
+    stripHeight: shape.height,
+    corner: shape.radius,
+    shoulder: shape.flare,
+    offsetX: shape.x,
+    offsetY: shape.y,
+  };
+}
+
 function GpuRim({
   values,
+  track,
   framesPerSecond,
   shown,
   onReady,
   onUnavailable,
 }: {
   values: RimValues;
+  track: RimTrack;
   framesPerSecond: number;
   shown: boolean;
   onReady: () => void;
@@ -496,6 +544,12 @@ function GpuRim({
 }) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const live = useRef<GpuPaint | null>(null);
+  const latest = useRef(values);
+  latest.current = values;
+  const latestTrack = useRef(track);
+  latestTrack.current = track;
+  const callbacks = useRef({ onReady, onUnavailable });
+  callbacks.current = { onReady, onUnavailable };
   const start = useRef(0);
   useEffect(() => {
     const element = canvas.current;
@@ -506,9 +560,13 @@ function GpuRim({
       numbers: RIM_NUMBERS,
       colors: RIM_COLORS,
       paint: RIM_PAINT,
-      values: { ...values, clock: 0 },
-      onReady,
-      onUnavailable,
+      values: {
+        ...latest.current,
+        ...shapeValues(latestTrack.current.get()),
+        clock: 0,
+      },
+      onReady: () => callbacks.current.onReady(),
+      onUnavailable: () => callbacks.current.onUnavailable(),
     });
     live.current = paint;
     return () => {
@@ -516,9 +574,18 @@ function GpuRim({
       paint.dispose();
     };
   }, []);
-  useEffect(() => {
-    live.current?.update(values);
+  useLayoutEffect(() => {
+    live.current?.update({ ...values, ...shapeValues(track.get()) });
   });
+  // The silhouette moves in a frame of its own animation: draw in that
+  // frame, not the next one, so the rim never trails it.
+  useLayoutEffect(
+    () =>
+      track.subscribe(() =>
+        live.current?.update(shapeValues(track.get()), true),
+      ),
+    [track],
+  );
   useEffect(() => {
     if (framesPerSecond <= 0) return;
     const timer = setInterval(
@@ -552,25 +619,27 @@ function GpuRim({
 export const HUDGlow = memo(function HUDGlow({
   width,
   height,
-  style,
-  effect,
-  colors,
+  style = "blur",
+  effect = "breathe",
+  colors = [],
   active = true,
   period,
-  amplitude,
-  brightness,
-  range,
-  outwardOnly,
-  blur,
-  pitch,
-  core,
-  fade,
-  density,
-  radius,
+  amplitude = 0.6,
+  brightness = 0.9,
+  range = 14,
+  outwardOnly = true,
+  blur = 8,
+  pitch = 10,
+  core = 0,
+  fade = 5,
+  density = 1,
+  radius = 12,
   flare = 0,
-  attached,
-  reduceMotion,
+  attached = true,
+  reduceMotion = false,
   alert = null,
+  track,
+  className,
 }: HUDGlowProps) {
   const [systemReduced, setSystemReduced] = useState(
     () => window.matchMedia("(prefers-reduced-motion: reduce)").matches,
@@ -669,11 +738,40 @@ export const HUDGlow = memo(function HUDGlow({
       setFlashing((current) => (current?.id === flashing.id ? null : current));
     return () => animation.cancel();
   }, [flashing?.id]);
+  const flashStops = useMemo(
+    () => (flashing ? palette([flashing.color]) : []),
+    [flashing?.color],
+  );
+  // Without a track the silhouette fills the box, as it always did.
+  const box = useMemo(() => ({ width, height }), [width, height]);
+  const fixed = useMemo(
+    () => fixedTrack({ x: 0, y: 0, width, height, radius, flare }),
+    [width, height, radius, flare],
+  );
+  const shape = track ?? fixed;
+  const maskAt = (at: RimShape) =>
+    flashing
+      ? flashMask(flashing.span, at.width, padding, width, at.x)
+      : undefined;
+  const latestMask = useRef(maskAt);
+  latestMask.current = maskAt;
+  // The flash covers its sender's part of the moving silhouette.
+  useLayoutEffect(() => {
+    if (!flashing) return;
+    return shape.subscribe(() => {
+      const element = flash.current;
+      if (!element) return;
+      const mask = latestMask.current(shape.get()) ?? "";
+      element.style.maskImage = mask;
+      element.style.setProperty("-webkit-mask-image", mask);
+    });
+  }, [flashing?.id, shape]);
   if (!drawn) return null;
-  const mask = flashing ? flashMask(flashing.span, width, padding) : undefined;
+  const mask = maskAt(shape.get());
   return (
     <div
       aria-hidden="true"
+      className={className}
       data-hud-glow={style}
       data-renderer={still || !gpuReady ? "static" : "webgpu"}
       data-motion={
@@ -712,11 +810,9 @@ export const HUDGlow = memo(function HUDGlow({
       >
         {(still || !gpuReady) && (
           <StaticRim
-            width={width}
-            height={height}
+            box={box}
+            track={shape}
             padding={padding}
-            radius={radius}
-            flare={flare}
             attached={attached}
             style={style}
             colors={stops}
@@ -733,6 +829,7 @@ export const HUDGlow = memo(function HUDGlow({
         )}
         {!still && (
           <GpuRim
+            track={shape}
             framesPerSecond={motion.framesPerSecond}
             shown={gpuReady}
             onReady={() => setGpuReady(true)}
@@ -741,11 +838,9 @@ export const HUDGlow = memo(function HUDGlow({
               setGpuReady(false);
             }}
             values={{
-              stripWidth: width,
-              stripHeight: height,
+              boxWidth: width,
+              boxHeight: height,
               padding,
-              corner: radius,
-              shoulder: flare,
               attachedEdge: attached ? 1 : 0,
               pattern: STYLES.indexOf(style),
               motionKind: EFFECTS.indexOf(effect),
@@ -782,14 +877,12 @@ export const HUDGlow = memo(function HUDGlow({
           }}
         >
           <StaticRim
-            width={width}
-            height={height}
+            box={box}
+            track={shape}
             padding={padding}
-            radius={radius}
-            flare={flare}
             attached={attached}
             style={style}
-            colors={palette([flashing.color])}
+            colors={flashStops}
             range={range}
             outwardOnly={outwardOnly}
             blur={blur}

@@ -2,7 +2,7 @@
 //! collection is performed here; details decode only the requested checkpoint.
 use super::*;
 
-fn session_project(target: &Value, _project: Option<&str>, cwd: Option<&str>) -> Option<String> {
+fn session_project(target: &Value, cwd: Option<&str>) -> Option<String> {
     if target["kind"] == "claude-project-thread" {
         target["projectId"]
             .as_str()
@@ -388,23 +388,17 @@ impl AgentHudCore {
             .iter()
             .map(|l| project_of(l.cwd.as_deref()))
             .collect::<Vec<_>>();
-        projects.extend(extras.iter().map(|row| {
-            session_project(
-                &row["navigationTarget"],
-                row["project"].as_str(),
-                row["cwd"].as_str(),
-            )
-        }));
+        projects.extend(
+            extras
+                .iter()
+                .map(|row| session_project(&row["navigationTarget"], row["cwd"].as_str())),
+        );
         projects.sort_by(crate::projects::compare);
         projects.dedup();
         let project_labels = extras
             .iter()
             .filter_map(|row| {
-                let project = session_project(
-                    &row["navigationTarget"],
-                    row["project"].as_str(),
-                    row["cwd"].as_str(),
-                )?;
+                let project = session_project(&row["navigationTarget"], row["cwd"].as_str())?;
                 let label = row["desktopProject"]["projectLabel"].as_str()?.trim();
                 (!label.is_empty()).then(|| (project, label.to_owned()))
             })
@@ -416,9 +410,9 @@ impl AgentHudCore {
                 .map(|entry| normalize_project_filter(entry))
                 .collect::<Vec<_>>()
         });
-        let in_project = |target: &Value, project_name: Option<&str>, cwd: Option<&str>| {
-            let id = session_project(target, project_name, cwd)
-                .unwrap_or_else(|| crate::projects::UNASSIGNED.into());
+        let in_project = |target: &Value, cwd: Option<&str>| {
+            let id =
+                session_project(target, cwd).unwrap_or_else(|| crate::projects::UNASSIGNED.into());
             project_filter
                 .as_ref()
                 .is_none_or(|projects| projects.contains(&id))
@@ -431,7 +425,7 @@ impl AgentHudCore {
                         .as_ref()
                         .is_none_or(|sources| sources.contains(&log.source))
                     && wanted.as_ref().is_none_or(|wanted| project_of(log.cwd.as_deref()) == *wanted)
-                    && in_project(&Value::Null, None, log.cwd.as_deref())
+                    && in_project(&Value::Null, log.cwd.as_deref())
                     && (search.is_empty()
                         || [
                             Some(log.id.as_str()),
@@ -474,17 +468,10 @@ impl AgentHudCore {
                                 sources.contains(row["source"].as_str().unwrap_or(""))
                             })
                             && wanted.as_ref().is_none_or(|wanted| {
-                                session_project(
-                                    &row["navigationTarget"],
-                                    row["project"].as_str(),
-                                    row["cwd"].as_str(),
-                                ) == *wanted
+                                session_project(&row["navigationTarget"], row["cwd"].as_str())
+                                    == *wanted
                             })
-                            && in_project(
-                                &row["navigationTarget"],
-                                row["project"].as_str(),
-                                row["cwd"].as_str(),
-                            )
+                            && in_project(&row["navigationTarget"], row["cwd"].as_str())
                             && (search.is_empty()
                                 || ["id", "source", "title", "model", "cwd", "project"]
                                     .iter()

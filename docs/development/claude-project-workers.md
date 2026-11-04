@@ -23,13 +23,17 @@ their existing Local projection until their native Project route is supported.
 ## Presentation and compatibility
 
 Local worker files cannot establish the original conversation's current status,
-title, or total usage. The card therefore uses a generic Project label, shows
-unknown status and unavailable totals, and lists local execution usage separately.
+title, or total usage. The card is labelled "Claude Project" with the start of
+the Project's id, shows unknown status, and counts only what its workers ran on
+this Mac. Like every other card, it opens the session's details, whose
+**Return to Project thread** goes back to Claude. A change to what the
+transcript keeps is a data version (`DATA_VERSIONS`), so existing workers are
+read again once, with the re-index shown.
 The managed envelope and Desktop metadata are undocumented compatibility points.
 
 Tests cover provenance spoofing, ambiguity, bounds, worker grouping, checkpoint
 reparsing without duplicate usage, unsupported-host Local behavior, and validated
-native targets. Native acceptance should additionally verify an actual HUD click
-against the original thread and regress standalone Local navigation. Test only
+native targets. Native acceptance should additionally verify **Return to Project
+thread** against the original thread and regress standalone Local navigation. Test only
 disposable sessions or navigate existing sessions read-only; do not commit their
 titles, identifiers, transcripts, or screenshots.

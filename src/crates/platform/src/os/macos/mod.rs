@@ -21,6 +21,9 @@ pub(crate) const READS_PROCESS_ENVIRONMENT: bool = true;
 /// Returning to a Claude Code background job moves it into the desktop app
 /// (`claude stop`, then `claude://resume`), verified with Claude Code 2.1.300.
 pub(crate) const MOVES_CLAUDE_JOBS: bool = true;
+/// A Claude Desktop Project thread opens from its `claude://` link, sent to
+/// Claude itself so the link keeps its `?thread=` (agent-hud-open #43).
+pub(crate) const OPENS_CLAUDE_PROJECTS: bool = true;
 mod legacy_preferences;
 pub(crate) fn legacy_preferences() -> Option<serde_json::Value> {
     legacy_preferences::read()
@@ -300,10 +303,20 @@ pub(crate) fn open_folder_in_app(bundle_id: &str, folder: &std::path::Path) -> b
     folder.is_absolute()
         && folder.is_dir()
         && super::unix::spawn_script(
-            include_str!("../../../scripts/macos/open-folder-in-app.sh"),
+            include_str!("../../../scripts/macos/open-in-app.sh"),
             &[std::ffi::OsStr::new(bundle_id), folder.as_os_str()],
         )
         .is_ok()
+}
+
+/// Opens `url` in the app `bundle_id` rather than in whatever handles its
+/// scheme.
+pub(crate) fn open_url_in_app(bundle_id: &str, url: &str) -> bool {
+    super::unix::spawn_script(
+        include_str!("../../../scripts/macos/open-in-app.sh"),
+        &[std::ffi::OsStr::new(bundle_id), std::ffi::OsStr::new(url)],
+    )
+    .is_ok()
 }
 
 pub(crate) fn open_session_url(url: &str) -> Result<(), String> {

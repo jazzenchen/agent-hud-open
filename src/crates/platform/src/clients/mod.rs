@@ -3,7 +3,6 @@
 //! and on which OS it runs; the channel itself lives here, one folder per
 //! client. None of them starts a conversation, an engine or a sign-in.
 pub mod antigravity;
-pub(crate) mod claude;
 pub mod codex;
 pub(crate) mod deepseek;
 

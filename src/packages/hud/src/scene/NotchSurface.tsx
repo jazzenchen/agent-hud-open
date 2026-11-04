@@ -1,6 +1,8 @@
 import { memo, useLayoutEffect, useMemo, useState } from "react";
 import {
   animate,
+  cancelFrame,
+  frame as nextFrame,
   motion,
   useMotionValue,
   useMotionValueEvent,
@@ -8,6 +10,7 @@ import {
 } from "motion/react";
 import HUDGlow, { type GlowAlert } from "../HUDGlow";
 import { islandPath, type HUDRect } from "../geometry";
+import { rimBox, rimCore, type RimRect, type RimTrack } from "../rim-track";
 import {
   HUD_METRICS,
   type HUDConfig,
@@ -89,7 +92,10 @@ export function useNotchGeometry(
     height = useMotionValue(frame.height);
   const shoulder = useMotionValue(flare),
     corner = useMotionValue(radius);
+  // The box the rim is drawn in: the core at both ends of the current move.
+  const rim = useMotionValue<RimRect>(rimCore(frame, flare));
   useLayoutEffect(() => {
+    const target = rimCore(frame, flare);
     if (reduced) {
       x.set(frame.x);
       y.set(frame.y);
@@ -97,6 +103,7 @@ export function useNotchGeometry(
       height.set(frame.height);
       shoulder.set(flare);
       corner.set(radius);
+      rim.set(target);
       return;
     }
     const origin = {
@@ -107,6 +114,7 @@ export function useNotchGeometry(
       flare: shoulder.get(),
       radius: corner.get(),
     };
+    rim.set(rimBox(rimCore(origin, origin.flare), target));
     const tween = animate(0, 1, {
       duration: HUD_METRICS.duration,
       ease: HUD_METRICS.ease,
@@ -118,6 +126,7 @@ export function useNotchGeometry(
         shoulder.set(origin.flare + (flare - origin.flare) * progress);
         corner.set(origin.radius + (radius - origin.radius) * progress);
       },
+      onComplete: () => rim.set(target),
     });
     return () => tween.stop();
   }, [
@@ -134,6 +143,7 @@ export function useNotchGeometry(
     height,
     shoulder,
     corner,
+    rim,
   ]);
   const path = useTransform(() =>
     islandPath(width.get(), height.get(), shoulder.get(), corner.get()),
@@ -141,8 +151,8 @@ export function useNotchGeometry(
   const clip = useTransform(() => `path("${path.get()}")`);
   const coreX = useTransform(() => x.get() + shoulder.get());
   return useMemo(
-    () => ({ x, y, width, height, shoulder, corner, coreX, path, clip }),
-    [x, y, width, height, shoulder, corner, coreX, path, clip],
+    () => ({ x, y, width, height, shoulder, corner, coreX, path, clip, rim }),
+    [x, y, width, height, shoulder, corner, coreX, path, clip, rim],
   );
 }
 
@@ -162,35 +172,60 @@ export const NotchGlow = memo(function NotchGlow({
   reduceMotion: boolean;
   alert?: GlowAlert | null;
 }) {
-  const read = () => ({
-    width: geometry.width.get() - 2 * geometry.shoulder.get(),
-    height: geometry.height.get(),
-    radius: geometry.corner.get(),
-    flare: geometry.shoulder.get(),
-  });
-  const [size, setSize] = useState(read);
-  const update = () => setSize(read());
-  useMotionValueEvent(geometry.width, "change", update);
-  useMotionValueEvent(geometry.height, "change", update);
-  useMotionValueEvent(geometry.shoulder, "change", update);
-  useMotionValueEvent(geometry.corner, "change", update);
+  // The box renders only when a move starts or ends. Every frame between,
+  // the rim reads the notch's own values and draws in the frame they change,
+  // as the path does; through a render it trailed the notch by a frame or
+  // more and left a gap while the panel closed.
+  const [box, setBox] = useState(() => geometry.rim.get());
+  useMotionValueEvent(geometry.rim, "change", setBox);
+  const track = useMemo<RimTrack>(() => {
+    const values = [
+      geometry.x,
+      geometry.y,
+      geometry.width,
+      geometry.height,
+      geometry.shoulder,
+      geometry.corner,
+    ];
+    return {
+      get: () => {
+        const flare = geometry.shoulder.get();
+        return {
+          x: geometry.x.get() + flare - box.x,
+          y: geometry.y.get() - box.y,
+          width: geometry.width.get() - 2 * flare,
+          height: geometry.height.get(),
+          radius: geometry.corner.get(),
+          flare,
+        };
+      },
+      subscribe: (change) => {
+        // Once a frame, in the step where motion draws the path.
+        const schedule = () => nextFrame.render(change);
+        const stops = values.map((value) => value.on("change", schedule));
+        return () => {
+          stops.forEach((stop) => stop());
+          cancelFrame(change);
+        };
+      },
+    };
+  }, [geometry, box.x, box.y]);
   const active = vendors.some((vendor) => vendor.working > 0);
   return (
-    <motion.div
+    <div
       aria-hidden="true"
       style={{
         position: "absolute",
-        left: geometry.coreX,
-        top: geometry.y,
+        left: box.x,
+        top: box.y,
         pointerEvents: "none",
         zIndex: 1,
       }}
     >
       <HUDGlow
-        width={size.width}
-        height={size.height}
-        radius={size.radius}
-        flare={size.flare}
+        width={box.width}
+        height={box.height}
+        track={track}
         attached
         outwardOnly={config.glowOutwardOnly}
         style={config.glowStyle}
@@ -209,6 +244,6 @@ export const NotchGlow = memo(function NotchGlow({
         reduceMotion={reduceMotion}
         alert={alert}
       />
-    </motion.div>
+    </div>
   );
 });

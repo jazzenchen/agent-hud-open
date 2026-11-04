@@ -100,6 +100,19 @@ fn project_workers_fold_into_original_conversation_and_never_fall_back_to_local(
     assert_eq!(project["desktopProject"]["execution"], "local");
     assert_eq!(project["desktopProject"]["kindLabel"], "Local");
     assert_eq!(project["desktopProject"]["localWorkerCount"], 2);
+    assert_eq!(
+        project["tokens"], 26,
+        "the row adds up what its workers ran on this Mac"
+    );
+    assert_eq!(
+        project["desktopProject"]["projectLabel"],
+        "Claude Project synthe"
+    );
+    assert_eq!(
+        page["projectLabels"]["claude-project:chan_syntheticproject"],
+        "Claude Project synthe"
+    );
+    assert_eq!(unknown["tokens"], 13);
     assert_eq!(project["navigationTarget"]["kind"], "claude-project-thread");
     assert!(!project["title"].as_str().unwrap().contains("wake"));
     assert!(!snapshot["sessions"]
@@ -110,6 +123,7 @@ fn project_workers_fold_into_original_conversation_and_never_fall_back_to_local(
     let target = project["navigationTarget"].clone();
     let detail = core.request("session_detail", json!({"id":key})).unwrap();
     assert_eq!(detail["children"].as_array().unwrap().len(), 2);
+    assert_eq!(detail["usage"]["total"], 26);
     for worker in [&first, &second] {
         let detail = core
             .request("session_detail", json!({"id":worker}))
@@ -186,7 +200,13 @@ fn existing_project_worker_checkpoints_reparse_without_changing_usage() {
     core.request("snapshot", json!({})).unwrap();
     drop(core);
     let db = rusqlite::Connection::open(home.join("app/ingestion.sqlite")).unwrap();
-    db.execute("UPDATE ingestion_logs SET head=json_remove(json_set(head,'$.reader_version',1),'$.live.claude_project_origin'), payload=json_remove(json_set(payload,'$.reader_version',1),'$.live.claude_project_origin')", []).unwrap();
+    // A checkpoint read by the rules before Project origins were kept.
+    let older = agent_hud_agents::transcript::PARSER_VERSION - 1;
+    db.execute(
+        "UPDATE ingestion_logs SET head=json_remove(json_set(head,'$.parser_version',?1),'$.live.claude_project_origin'), payload=json_remove(json_set(payload,'$.parser_version',?1),'$.live.claude_project_origin')",
+        [older],
+    )
+    .unwrap();
     drop(db);
     let mut core = fixture(home);
     core.request("snapshot", json!({})).unwrap();
@@ -197,7 +217,10 @@ fn existing_project_worker_checkpoints_reparse_without_changing_usage() {
     );
     assert_eq!(detail["session"]["tokens"], 13);
     let head = core.logs.values().find(|log| log.id == cli).unwrap();
-    assert_eq!(head.reader_version, 2);
+    assert_eq!(
+        head.parser_version,
+        agent_hud_agents::transcript::PARSER_VERSION
+    );
     assert!(head.live.claude_project_origin.is_some());
     core.request("snapshot", json!({})).unwrap();
     assert_eq!(

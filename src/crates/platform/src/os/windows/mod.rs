@@ -12,6 +12,8 @@ pub(crate) use secrets::{app_cookie, stored_secret, unseal_safe_storage};
 pub(crate) const READS_PROCESS_ENVIRONMENT: bool = false;
 /// The desktop app's resume link for a background job is unverified here.
 pub(crate) const MOVES_CLAUDE_JOBS: bool = false;
+/// Claude Desktop's Project thread links are unverified here.
+pub(crate) const OPENS_CLAUDE_PROJECTS: bool = false;
 pub(crate) use files::{
     hook_configuration, owned_by_user, owner_only, private_append, private_directory, private_file,
     read_stdin,
@@ -227,6 +229,11 @@ pub(crate) fn source_roots(home: &Path) -> Vec<agent_hud_core::SourceRoot> {
 
 /// Not implemented on this host: callers fall back to the client's link.
 pub(crate) fn open_folder_in_app(_bundle_id: &str, _folder: &std::path::Path) -> bool {
+    false
+}
+
+/// Not implemented on this host: nothing opens a link in a named app here.
+pub(crate) fn open_url_in_app(_bundle_id: &str, _url: &str) -> bool {
     false
 }
 
