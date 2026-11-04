@@ -37,7 +37,6 @@ pub(super) const FORMATS: &[&str] = &[
     "date",
     "weekday",
 ];
-pub(super) const CHART_OF: &[&str] = &["tokens", "cost"];
 pub(super) const PERIODS: &[&str] = &["day", "week", "month"];
 pub(super) const STATISTICS_TABS: &[&str] = &["tokens", "sessions"];
 pub(super) const SETTINGS_PAGES: &[&str] = &[
@@ -50,7 +49,7 @@ pub(super) const SETTINGS_PAGES: &[&str] = &[
     "local-network",
     "updates",
 ];
-pub(super) const OPENS: &[&str] = &["statistics", "session", "settings", "url"];
+pub(super) const OPENS: &[&str] = &["statistics", "session", "settings"];
 pub(super) const VERBS: &[&str] = &["open", "set", "next", "copy"];
 pub(super) const CONDITIONS: &[&str] = &["is", "in", "not", "above", "below", "present"];
 pub(super) const EDITS: &[&str] = &["update", "insert", "move", "remove", "replace"];
@@ -203,8 +202,8 @@ pub(in crate::presentation) fn catalog() -> Value {
             "sessions": {"fields": {"limit": "1 to 10", "period": "day or week", "agents": "agent names from sessions.offeredAgents", "projects": "project ids from sessions.offeredProjects", "hidden": "true or false"}}
         },
         "controls": {
-            "row": {"fields": {"gap": "none, small, medium or large", "align": "start, center, end or spread"}, "children": "side by side"},
-            "column": {"fields": {"gap": "none, small, medium or large", "align": "start, center, end or spread"}, "children": "one under another"},
+            "row": {"fields": {"gap": "none, small, medium or large", "align": "where the children sit along it: start (the default), center, end, or spread to both ends"}, "children": "side by side, centred top to bottom; a bar takes the room left"},
+            "column": {"fields": {"gap": "none, small, medium or large", "align": "start, center or end; left out, the children take its whole width"}, "children": "one under another"},
             "grid": {"fields": {"columns": "2 to 6", "gap": "none, small, medium or large"}, "children": "in cells, left to right"},
             "repeat": {"fields": {"over": "windows, balances, accounts, agents or sessions", "where": "only items whose fields have these values, such as {\"agent\": \"claude\"}; a list allows several", "sort": "a field to sort by; -used sorts largest first", "limit": "1 to 20"}, "children": "drawn once for each item, in the repeat's parent"},
             "text": {"fields": {"text": "words and placeholders, up to 200 characters", "style": "title, body, caption or figure (a large number)", "color": "primary, secondary, tertiary, level (the item's level), agent (its agent's colour), ok, warning or critical", "align": "start, center or end"}},
@@ -212,7 +211,7 @@ pub(in crate::presentation) fn catalog() -> Value {
             "bar": {"fields": {"value": "0 to 1, or a placeholder such as {window.used}", "level": "normal, warning, critical, or {window.level}; sets the colour"}},
             "rings": {"fields": {"items": "which windows: {\"over\": \"windows\", \"where\": {...}, \"sort\": ..., \"limit\": up to 4}; one ring each, the first outermost", "size": "small, medium or large", "legend": "true or false: the windows' names and percentages beside it"}},
             "segments": {"fields": {"items": "as for rings; one segment each, the first on top", "size": "small, medium or large", "legend": "true or false"}},
-            "chart": {"fields": {"of": "tokens or cost", "period": "day, week or month", "agent": "an agent's id, or all agents when left out"}},
+            "chart": {"fields": {"period": "day, week or month", "agent": "an agent's id, or all agents when left out"}, "draws": "the tokens over the period, by model"},
             "divider": {"fields": {}},
             "picker": {"fields": {"state": "the name of a state its block declares", "options": "2 to 6 of {\"value\": ..., \"text\": ...}; the value shown is the state's"}}
         },
@@ -227,7 +226,7 @@ pub(in crate::presentation) fn catalog() -> Value {
         "data": data,
         "placeholders": "Write {item.field} in text, or {item.field|format} to pick a format: percent, number, money, tokens, countdown, relative, clock, date or weekday. A field has a format of its own when none is picked.",
         "actions": {
-            "open": "{\"open\": \"statistics\", \"tab\": \"tokens\" or \"sessions\", \"agent\": optional, \"session\": optional}, {\"open\": \"session\", \"session\": \"{session.id}\"}, {\"open\": \"settings\", \"page\": general, display, agents, agent-plugins, prices, relays, local-network or updates}, {\"open\": \"url\", \"url\": \"https://...\"}",
+            "open": "{\"open\": \"statistics\", \"tab\": \"tokens\" or \"sessions\", \"agent\": optional, \"session\": optional}, {\"open\": \"session\", \"session\": \"{session.id}\"}, {\"open\": \"settings\", \"page\": general, display, agents, agent-plugins, prices, relays, local-network or updates}",
             "set": "{\"set\": \"tab\", \"to\": \"week\"}: sets a state",
             "next": "{\"next\": \"tab\"}: the state's next option",
             "copy": "{\"copy\": \"{session.title}\"}: copies the text"

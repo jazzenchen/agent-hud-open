@@ -22,7 +22,6 @@ const LAYOUT_KEYS: &[&str] = &[
 ];
 const DRAFT_NOTE: &str = "Shown in the panel as an unsaved draft. The user keeps it by hovering the Agent HUD and pressing Save in the panel; it is dropped when Agent HUD restarts.";
 const SAVED_NOTE: &str = "This is the layout already saved, so there is no draft.";
-const CUSTOM_NOTE: &str = "Your own controls are checked and kept with the layout, but this build does not draw them yet.";
 /// The two ways a proposal spells the panel as a tree: whole, or as edits of it.
 const TREE_KEYS: &[&str] = &["panel", "edit"];
 /// How long an edit holds a panel open, renewed by each edit.
@@ -613,9 +612,6 @@ fn draft(
         }
         let read = tree::layout_from(&panel, &present);
         tree_reasons.extend(read.issues);
-        if read.custom {
-            tree_notes.push(CUSTOM_NOTE.into());
-        }
         let mut document = read.layout;
         // The tree does not spell the resting HUD's agents: they stay unless given.
         let mut hud = params["hud"].clone();

@@ -682,7 +682,7 @@ fn an_agents_own_controls_are_checked_kept_and_named_for_later_edits() {
         result["note"]
             .as_str()
             .unwrap()
-            .contains("does not draw them yet"),
+            .starts_with("Shown in the panel"),
         "{result}"
     );
     let layout = layout(&owner);

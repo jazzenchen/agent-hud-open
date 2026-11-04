@@ -49,7 +49,7 @@ Agent HUD adds its tools to this client as an MCP server named `agent-hud`. This
 - **The panel's own parts:** the root `panel` (spacing, separators, width, countdown), its sections `blocks`, `tokens` and `sessions`, and inside `blocks` one `quota` or `balance` block per agent, named by its block key (`claude`, `codex`, `api:deepseek`). They cannot be deleted; `hidden: true` hides one. Their fields are in `catalog.own`.
 - **Your own controls:** from `catalog.controls`: `row`, `column`, `grid`, `repeat`, `text`, `logo`, `bar`, `rings`, `segments`, `chart`, `divider` and `picker`. Put one in `panel` as a section of its own, or in `blocks` among the agents' blocks. A control placed there needs an `id`.
 - **Data:** text reads data through placeholders: `{window.used}`, `{session.title}`, `{now.time|clock}`. A `repeat` over `windows`, `balances`, `accounts`, `agents` or `sessions` draws its children once per item, and inside it the item is named `window`, `balance`, `account`, `agent` or `session`. `where`, `sort` and `limit` choose the items. Match windows by `agent` and `kind` (such as `claude-session`), not by account ids, so the panel works on any computer.
-- **Clicks:** `onClick` opens Statistics, a session, a Settings page or a web address, sets or steps a `state` the control placed in the panel declares, or copies text. A `picker` shows a state's options.
+- **Clicks:** `onClick` opens Statistics, a session or a Settings page, sets or steps a `state` the control placed in the panel declares, or copies text. A `picker` shows a state's options.
 - **Checks:** a draft that cannot be drawn is refused whole; the error lists every reason with the values that would work. Fix them all and send again.
 
 ### Words people use

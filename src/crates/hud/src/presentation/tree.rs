@@ -181,8 +181,6 @@ fn blocks(
 pub(super) struct FromTree {
     pub layout: Value,
     pub issues: Vec<String>,
-    /// Whether it holds controls of an agent's own.
-    pub custom: bool,
 }
 
 pub(super) fn kind_of(node: &Value) -> &str {
@@ -195,7 +193,6 @@ pub(super) fn layout_from(tree: &Value, present: &[Block]) -> FromTree {
     let mut found = FromTree {
         layout: json!({}),
         issues: vec![],
-        custom: false,
     };
     let Some(root) = tree.as_object() else {
         found
@@ -327,7 +324,6 @@ pub(super) fn layout_from(tree: &Value, present: &[Block]) -> FromTree {
     if !blocks.is_empty() {
         layout.insert("blocks".into(), Value::Object(blocks));
     }
-    found.custom = !custom.is_empty();
     if !custom.is_empty() {
         layout.insert("custom".into(), Value::Object(custom));
     }

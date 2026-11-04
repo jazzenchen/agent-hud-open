@@ -36,6 +36,7 @@ import {
 } from "./panel/theme";
 import { SourceTokenChart } from "./panel/TokenChartSection";
 import { SourceIndexing } from "./panel/IndexingSection";
+import { CustomControl } from "./panel/custom/CustomControl";
 import { snapshotLanguage } from "@agent-hud/ui/format";
 
 export { SOURCE_PANEL } from "./panel/theme";
@@ -153,6 +154,24 @@ export const SourceHoverPanel = memo(function SourceHoverPanel({
     color,
     background: "transparent",
   });
+  // Controls an agent added, placed among the blocks by `order` or among the
+  // sections by `sections`; an agent's own panel shows its blocks alone.
+  const custom = focusVendor ? {} : (config.panelLayout.custom ?? {});
+  const customAt = (key: string, divided = false) => {
+    const node = custom[key];
+    return node && node.hidden !== true ? (
+      <CustomControl
+        node={node}
+        snapshot={snapshot}
+        light={light}
+        Logo={Logo}
+        active={active}
+        showReset={config.resetCountdown}
+        onStats={onStats}
+        divided={divided}
+      />
+    ) : null;
+  };
   const blocks = inPanelOrder<{ key: string; content: ReactNode }>(
     [
       ...vendorNames.map((vendor) => ({
@@ -192,9 +211,14 @@ export const SourceHoverPanel = memo(function SourceHoverPanel({
             />
           ),
         })),
+      ...(config.panelOrder ?? [])
+        .filter((key) => custom[key] && custom[key].hidden !== true)
+        .map((key) => ({ key, content: customAt(key) })),
     ],
     config.panelOrder ?? [],
   );
+  const span = (key: string) =>
+    custom[key]?.span ?? config.panelLayout.blocks?.[key]?.span;
   const blockLines: (typeof blocks)[] = [];
   for (let i = 0; i < blocks.length; i++) {
     const block = blocks[i],
@@ -202,14 +226,18 @@ export const SourceHoverPanel = memo(function SourceHoverPanel({
     if (
       (contentWidth ?? config.panelWidth - 40) - density.section >= 460 &&
       next &&
-      config.panelLayout.blocks?.[block.key]?.span === "half" &&
-      config.panelLayout.blocks?.[next.key]?.span === "half"
+      span(block.key) === "half" &&
+      span(next.key) === "half"
     ) {
       blockLines.push([block, next]);
       i++;
     } else blockLines.push([block]);
   }
-  const sections = inPanelOrder<{ key: string; content: ReactNode }>(
+  const sections = inPanelOrder<{
+    key: string;
+    content: ReactNode;
+    custom?: boolean;
+  }>(
     [
       {
         key: "blocks",
@@ -279,6 +307,9 @@ export const SourceHoverPanel = memo(function SourceHoverPanel({
           />
         ),
       },
+      ...((config.panelSections ?? []) as string[])
+        .filter((key) => custom[key] && custom[key].hidden !== true)
+        .map((key) => ({ key, content: true, custom: true })),
     ],
     config.panelSections ?? defaultHUDConfig.panelSections,
   );
@@ -340,13 +371,15 @@ export const SourceHoverPanel = memo(function SourceHoverPanel({
               {focusVendor}
             </strong>
           )}
-          {sections.map((section) =>
-            section.content ? (
+          {sections
+            .filter((section) => section.content)
+            .map((section, index) => (
               <div key={section.key} data-hud-section={section.key}>
-                {section.content}
+                {section.custom
+                  ? customAt(section.key, index > 0 && separated)
+                  : section.content}
               </div>
-            ) : null,
-          )}
+            ))}
         </div>
       </div>
       {services?.draft?.unsaved && (

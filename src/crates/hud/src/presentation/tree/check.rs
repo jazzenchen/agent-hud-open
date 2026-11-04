@@ -294,7 +294,6 @@ impl Check {
             }
             ("rings" | "segments", "items") => self.items(value, at, scope),
             ("rings" | "segments", "legend") => self.boolean(value, at),
-            ("chart", "of") => self.named(value, at, CHART_OF),
             ("chart", "period") => self.named(value, at, PERIODS),
             ("chart", "agent") => self.text(value, at, scope),
             ("picker", "state") => {
@@ -564,7 +563,6 @@ impl Check {
             ("open", Some("statistics")) => &["open", "tab", "agent", "session"],
             ("open", Some("session")) => &["open", "session"],
             ("open", Some("settings")) => &["open", "page"],
-            ("open", Some("url")) => &["open", "url"],
             ("open", _) => {
                 self.issues
                     .push(format!("{at}.open is one of {}.", quoted(OPENS)));
@@ -600,18 +598,6 @@ impl Check {
             }
             ("open", Some("settings")) => {
                 ok &= self.named(&value["page"], &format!("{at}.page"), SETTINGS_PAGES);
-            }
-            ("open", Some("url")) => {
-                let url = value["url"].as_str().unwrap_or("");
-                if !(url.starts_with("https://") || url.starts_with("http://")) || url.len() > 2000
-                {
-                    self.issues.push(format!(
-                        "{at}.url is a web address that starts with https:// or http://."
-                    ));
-                    ok = false;
-                } else {
-                    ok &= self.text(&value["url"], &format!("{at}.url"), scope);
-                }
             }
             ("set", _) | ("next", _) => {
                 let named = value[verb].as_str().unwrap_or("");
@@ -674,7 +660,7 @@ fn fields_of(kind: &str) -> String {
         "logo" => &["agent", "size"],
         "bar" => &["value", "level"],
         "rings" | "segments" => &["items", "size", "legend"],
-        "chart" => &["of", "period", "agent"],
+        "chart" => &["period", "agent"],
         "picker" => &["state", "options"],
         _ => &[],
     };
