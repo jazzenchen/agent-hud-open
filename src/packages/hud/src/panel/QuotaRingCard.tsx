@@ -32,6 +32,8 @@ const RINGS = {
   medium: { size: 52, width: 5 },
   large: { size: 60, width: 6 },
 } as const;
+/** A compact block's ring: one size in every block, larger than a legend's. */
+const COMPACT_RING = { size: 72, width: 7 };
 
 /** The window with the largest share: the one a ring's figure shows. */
 export function mostUsed(rows: Quota[]): Quota | undefined {
@@ -104,7 +106,7 @@ export function QuotaRingCard({
     services = usePanelServices(),
     reduceMotion = useReducedMotion() ?? false,
     [lit, setLit] = useState<number | null>(null);
-  const ring = RINGS[ringSize] ?? RINGS.medium;
+  const ring = legend ? (RINGS[ringSize] ?? RINGS.medium) : COMPACT_RING;
   const drawn = rows.slice(0, MAX_USAGE_ITEMS);
   // The ring is a fill; its figure and the legend's figures are text.
   const fill = (row: Quota) =>
@@ -193,7 +195,15 @@ export function QuotaRingCard({
             inset: 0,
             display: "grid",
             placeItems: "center",
-            fontSize: figureText.length > 4 ? 10 : ring.size >= 60 ? 13 : 11,
+            fontSize: !legend
+              ? figureText.length > 4
+                ? 12
+                : 15
+              : figureText.length > 4
+                ? 10
+                : ring.size >= 60
+                  ? 13
+                  : 11,
             fontWeight: 600,
             fontVariantNumeric: "tabular-nums",
             color: tightest ? figure(tightest) : colors.secondary,

@@ -17,7 +17,7 @@ import { useGround } from "../ground";
 import { measures, palette, type Logo, type Measure } from "./theme";
 import { SourceTokenChart } from "./TokenChartSection";
 import { MetricPicker } from "./MetricPicker";
-import { BlockHeading } from "./BlockHeading";
+import { BlockHeading, PlanBadge } from "./BlockHeading";
 import { RingReset } from "./QuotaRingCard";
 import { QuotaWidgets } from "./QuotaWidgets";
 
@@ -135,6 +135,12 @@ export const SourceProviderBlock = memo(function SourceProviderBlock({
         light={light}
         color={colors.text}
         compact={compact}
+        trailing={
+          compact &&
+          sections[0]?.account && (
+            <PlanBadge account={sections[0].account} light={light} />
+          )
+        }
         picker={
           layout.widget !== "chart" &&
           !missingReading && (
@@ -220,7 +226,7 @@ export const SourceProviderBlock = memo(function SourceProviderBlock({
           )}
         </>
       ) : (
-        sections.map(({ key, rows: sectionRows, account, current }) => {
+        sections.map(({ key, rows: sectionRows, account, current }, index) => {
           // Earned resets belong to the signed-in Codex account.
           const resets =
             account &&
@@ -258,7 +264,8 @@ export const SourceProviderBlock = memo(function SourceProviderBlock({
                   onStats={onStats}
                 />
               </div>
-              {account && compact && (
+              {/* A compact block's first account is its heading's plan. */}
+              {account && compact && index > 0 && (
                 <AccountHeader
                   account={account}
                   now={now}
