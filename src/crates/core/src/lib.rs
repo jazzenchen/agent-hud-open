@@ -151,8 +151,9 @@ pub struct AgentHudCore {
     /// first prompt line names them (`conversation_collect::Gathered`).
     conversation_awaiting: HashMap<PathBuf, String>,
     workbuddy_metering: agent_hud_agents::buddy::transcript::WorkBuddyMeteringReading,
-    /// What each listed session's row shows of its breakdown, until its logs move.
-    session_rows: session_breakdown::SessionRows,
+    /// What each listed session's row shows of its breakdown (a key of its
+    /// logs' read offsets, and the value), until its logs move.
+    session_rows: std::cell::RefCell<HashMap<PathBuf, (u64, Value)>>,
 }
 
 impl AgentHudCore {

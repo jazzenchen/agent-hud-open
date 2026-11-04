@@ -16,20 +16,6 @@ fn own_call<'a>(row: &'a metering::CallRow, own_key: &str) -> Call<'a> {
     }
 }
 
-/// The rows' look at their breakdowns (`AgentHudCore::session_row_usage`) by
-/// the session's own log: a key of its logs' read offsets, and the value.
-#[derive(Default)]
-pub(crate) struct SessionRows(pub(crate) std::sync::Mutex<HashMap<PathBuf, (u64, Value)>>);
-
-impl SessionRows {
-    /// Forgets the sessions no longer listed, so the map follows the logs.
-    pub(crate) fn retain(&self, listed: &HashSet<&Path>) {
-        if let Ok(mut rows) = self.0.lock() {
-            rows.retain(|path, _| listed.contains(path.as_path()));
-        }
-    }
-}
-
 /// The sub-agents with calls in a turn, for the session page's timeline: each
 /// one's log (the calls' `log`), name and type, the log that started it, when
 /// it began and was last heard from, and whether it still runs. Claude Code
@@ -306,9 +292,7 @@ impl AgentHudCore {
             (log.offset, log.length, log.usage.total()).hash(&mut hash);
         }
         let key = hash.finish();
-        let Ok(mut rows) = self.session_rows.0.lock() else {
-            return Value::Null;
-        };
+        let mut rows = self.session_rows.borrow_mut();
         if let Some((kept, value)) = rows.get(&own.path) {
             if *kept == key {
                 return value.clone();

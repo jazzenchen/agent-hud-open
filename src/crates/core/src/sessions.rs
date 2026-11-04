@@ -499,8 +499,14 @@ impl AgentHudCore {
         let family = session_breakdown::Family::new(&selected);
         let currency = self.deepseek_account_currency();
         if turn_bars {
+            // Forgets the sessions no longer listed, so the map follows the logs.
+            let listed = selected
+                .iter()
+                .map(|log| log.path.as_path())
+                .collect::<HashSet<_>>();
             self.session_rows
-                .retain(&selected.iter().map(|log| log.path.as_path()).collect());
+                .borrow_mut()
+                .retain(|path, _| listed.contains(path.as_path()));
         }
         let items = rows
             .into_iter()
