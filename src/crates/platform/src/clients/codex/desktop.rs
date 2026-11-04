@@ -8,7 +8,7 @@ mod daemon;
 mod daemon;
 mod pending;
 mod stream;
-pub(crate) use daemon::daemon_tui_origin_for as daemon_tui_origin;
+pub(crate) use daemon::daemon_tui_port_for as daemon_tui_port;
 
 use super::desktop_io::{endpoint, DesktopIpc, IpcError, ShutdownHandle};
 use crate::hooks::Wake;
@@ -106,7 +106,10 @@ impl CodexDesktopObserver {
             {
                 continue;
             }
-            let Some(id) = target["id"].as_str().filter(|id| valid_id(id)) else {
+            let Some(id) = target["id"]
+                .as_str()
+                .filter(|id| crate::hooks::origins::is_uuid(id))
+            else {
                 continue;
             };
             changed |= state.reported.insert(id.into(), now).is_none();
@@ -149,16 +152,6 @@ impl Drop for CodexDesktopObserver {
     fn drop(&mut self) {
         self.stop();
     }
-}
-fn valid_id(id: &str) -> bool {
-    id.len() == 36
-        && id.bytes().enumerate().all(|(i, b)| {
-            if [8, 13, 18, 23].contains(&i) {
-                b == b'-'
-            } else {
-                b.is_ascii_hexdigit()
-            }
-        })
 }
 
 impl Shared {
@@ -455,9 +448,6 @@ impl Shared {
         };
         // A reply attempt is never automatically retried. Requests retains its
         // dismissed identity until the owner actually settles this exact request.
-        if !self.active.load(Ordering::Acquire) {
-            return Err(ReplyFailure::Cancelled);
-        }
         let mut wrote = false;
         let receipt = connection
             .request(

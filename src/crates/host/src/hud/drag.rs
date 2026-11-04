@@ -2,10 +2,10 @@
 use tauri::Emitter;
 
 use super::{
-    apply_ignore_cursor, configure, edge_frame, emit_geometry, ensure_worker, global_pointer,
-    global_units_per_point, host, left_mouse_down, monitor_bounds, owner_for_window,
-    resolve_display, restore_input, Bounds, Display, DragEnd, DragPointer, DragRuns, Edge,
-    HudConfig, HudPlacement, HudState, HudWindows, InteractiveRegion, Mode, Point, Shared,
+    apply_ignore_cursor, configure, edge_frame, emit_geometry, ensure_worker,
+    global_units_per_point, host, monitor_bounds, owner_for_window, resolve_display, restore_input,
+    Bounds, Display, DragEnd, DragPointer, DragRuns, Edge, HudConfig, HudPlacement, HudState,
+    HudWindows, InteractiveRegion, Mode, Point, Shared,
 };
 
 pub(super) struct DragState {
@@ -74,7 +74,7 @@ pub async fn hud_drag_start(
         if state.drag.is_some() {
             return Err("A HUD drag is already active".into());
         }
-        if !left_mouse_down()? {
+        if !host::left_mouse_down()? {
             return Err("The left mouse button was released before the HUD pickup".into());
         }
         if !window.is_visible().map_err(|error| error.to_string())? {
@@ -91,9 +91,6 @@ pub async fn hud_drag_start(
         }
         let viewport = window.inner_size().map_err(|error| error.to_string())?;
         let scale = window.scale_factor().map_err(|error| error.to_string())?;
-        if !scale.is_finite() || scale <= 0.0 {
-            return Err("The HUD window reported an invalid scale".into());
-        }
         let width = f64::from(viewport.width) / scale;
         let height = f64::from(viewport.height) / scale;
         if pointer.x < 0.0 || pointer.y < 0.0 || pointer.x > width || pointer.y > height {
@@ -110,7 +107,7 @@ pub async fn hud_drag_start(
             pointer.y - strip.y
         };
         // Check the real native position before taking input ownership. No AX or keyboard hook is used.
-        let position = global_pointer(&app)?;
+        let position = host::global_pointer(&app)?;
         let display = resolve_display(&app, &config)?;
         ensure_worker(&app, &shared, &mut state)?;
         apply_ignore_cursor(&window, &mut state, false, true)?;
@@ -141,7 +138,7 @@ pub async fn hud_drag_start(
                 return Err(error);
             }
         };
-        set_drag_cursor(&app, &shared, true);
+        host::set_drag_cursor(&app, &shared, true);
         // The first preview is always sent, including a stationary hold. Serialize this
         // owner's notifications with its state so an old preview cannot follow a cancellation.
         if let Some(geometry) = state.geometry.as_ref() {
@@ -173,10 +170,6 @@ pub(super) fn emit_drag_preview(app: &tauri::AppHandle, preview: &HudPlacement) 
     if let Err(error) = app.emit("hud:drag-preview", preview) {
         eprintln!("Agent HUD drag preview event: {error}");
     }
-}
-
-pub(super) fn set_drag_cursor(app: &tauri::AppHandle, owner: &Shared, active: bool) {
-    host::set_drag_cursor(app, owner, active);
 }
 
 pub(super) fn preview_drag(
@@ -218,7 +211,7 @@ pub(super) fn preview_drag(
         }
     } else {
         configure(app, config, state, owner, display, true)?;
-        set_drag_cursor(app, owner, true);
+        host::set_drag_cursor(app, owner, true);
     }
     state.drag.as_mut().unwrap().preview = Some(preview.clone());
     Ok(Some(preview))
@@ -229,7 +222,7 @@ pub(super) fn restore_drag(
     state: &mut HudState,
     owner: &Shared,
 ) -> Result<(), String> {
-    set_drag_cursor(app, owner, false);
+    host::set_drag_cursor(app, owner, false);
     if let Some(drag) = state.drag.take() {
         // Keep the pre-pickup configuration even if restoring the native frame fails.
         // The measured geometry remains the last actual frame until a successful readback.
@@ -245,8 +238,8 @@ pub(super) fn poll_drag(
     state: &mut HudState,
     owner: &Shared,
 ) -> Result<DragTick, String> {
-    let pointer = global_pointer(app)?;
-    if left_mouse_down()? {
+    let pointer = host::global_pointer(app)?;
+    if host::left_mouse_down()? {
         apply_ignore_cursor(window, state, false, false)?;
         return preview_drag(app, state, owner, pointer)
             .map(|preview| preview.map_or(DragTick::Unchanged, DragTick::Preview));
@@ -261,7 +254,7 @@ pub(super) fn poll_drag(
     config.monitor_index = placement.monitor_index;
     configure(app, config, state, owner, display, true)?;
     state.drag = None;
-    set_drag_cursor(app, owner, false);
+    host::set_drag_cursor(app, owner, false);
     restore_input(app, window, state);
     Ok(DragTick::Dropped(placement))
 }

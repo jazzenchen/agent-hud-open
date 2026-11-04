@@ -139,26 +139,9 @@ pub(crate) fn is_uuid(text: &str) -> bool {
         })
 }
 
-pub(crate) fn loopback_port(origin: &str) -> Option<u16> {
-    let rest = origin.strip_prefix("http://127.0.0.1:")?;
-    let digits = rest.strip_suffix('/').unwrap_or(rest);
-    if digits.is_empty() || !digits.bytes().all(|b| b.is_ascii_digit()) {
-        return None;
-    }
-    digits.parse::<u16>().ok().filter(|port| *port > 0)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn daemon_loopback_port_matches_source() {
-        assert_eq!(loopback_port("http://127.0.0.1:54321"), Some(54321));
-        assert_eq!(loopback_port("http://127.0.0.1:54321/"), Some(54321));
-        assert_eq!(loopback_port("http://localhost:54321"), None);
-        assert_eq!(loopback_port("http://127.0.0.1:0"), None);
-    }
 
     #[test]
     fn the_app_a_hook_runs_under_names_its_source() {

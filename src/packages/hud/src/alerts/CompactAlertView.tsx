@@ -158,19 +158,36 @@ export function CompactAlertView({
       ? onOpen
       : onDismissAndStats;
 
-  const trailingWhat = request ? (
+  // Each kind's glyph, drawn or filled, and the colour of its words.
+  const look: {
+    Icon: typeof Hand;
+    color: string;
+    stroke?: number;
+    filled?: boolean;
+    words?: string;
+  } = request
+    ? { Icon: Hand, color: signalText, filled: true, words: secondary }
+    : event?.kind === "completion"
+      ? { Icon: MessageSquareText, color: turnText, stroke: 2.2 }
+      : event?.kind === "sign-in-needed"
+        ? { Icon: KeyRound, color: warnAccent, stroke: 2.4 }
+        : event?.kind === "reset-credits" || event?.kind === "quota-reset"
+          ? { Icon: RotateCcw, color: calmAccent, stroke: 2.4 }
+          : { Icon: Flame, color: warnAccent, filled: true };
+  const trailingWhat = (
     <>
-      <Hand
+      <look.Icon
         size={glyphSize}
-        color={signalText}
-        fill={signalText}
+        strokeWidth={look.stroke}
+        color={look.color}
+        fill={look.filled ? look.color : "none"}
         style={{ flexShrink: 0 }}
       />
       <span
         style={{
           fontSize: font,
           fontWeight: 500,
-          color: secondary,
+          color: look.words ?? look.color,
           overflow: "hidden",
           textOverflow: "ellipsis",
           whiteSpace: "nowrap",
@@ -193,90 +210,6 @@ export function CompactAlertView({
           {badge}
         </span>
       )}
-    </>
-  ) : event?.kind === "completion" ? (
-    <>
-      <MessageSquareText
-        size={glyphSize}
-        strokeWidth={2.2}
-        color={turnText}
-        style={{ flexShrink: 0 }}
-      />
-      <span
-        style={{
-          fontSize: font,
-          fontWeight: 500,
-          color: turnText,
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-          whiteSpace: "nowrap",
-        }}
-      >
-        {status}
-      </span>
-    </>
-  ) : event?.kind === "sign-in-needed" ? (
-    <>
-      <KeyRound
-        size={glyphSize}
-        strokeWidth={2.4}
-        color={warnAccent}
-        style={{ flexShrink: 0 }}
-      />
-      <span
-        style={{
-          fontSize: font,
-          fontWeight: 500,
-          color: warnAccent,
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-          whiteSpace: "nowrap",
-        }}
-      >
-        {status}
-      </span>
-    </>
-  ) : event?.kind === "reset-credits" || event?.kind === "quota-reset" ? (
-    <>
-      <RotateCcw
-        size={glyphSize}
-        strokeWidth={2.4}
-        color={calmAccent}
-        style={{ flexShrink: 0 }}
-      />
-      <span
-        style={{
-          fontSize: font,
-          fontWeight: 500,
-          color: calmAccent,
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-          whiteSpace: "nowrap",
-        }}
-      >
-        {status}
-      </span>
-    </>
-  ) : (
-    <>
-      <Flame
-        size={glyphSize}
-        color={warnAccent}
-        fill={warnAccent}
-        style={{ flexShrink: 0 }}
-      />
-      <span
-        style={{
-          fontSize: font,
-          fontWeight: 500,
-          color: warnAccent,
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-          whiteSpace: "nowrap",
-        }}
-      >
-        {status}
-      </span>
     </>
   );
 

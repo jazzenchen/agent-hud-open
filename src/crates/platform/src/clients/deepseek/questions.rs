@@ -16,7 +16,7 @@ use std::{
         mpsc::RecvTimeoutError,
         Arc, Condvar, Mutex,
     },
-    thread::{self, JoinHandle},
+    thread,
     time::{Duration, Instant},
 };
 use tungstenite::Message;
@@ -167,9 +167,6 @@ pub fn parse_questions(items: &Value) -> Option<Vec<QuestionItem>> {
                 description,
             });
         }
-        if options.len() != raw_options.len() {
-            return None;
-        }
         let header = item["header"]
             .as_str()
             .filter(|s| !s.is_empty())
@@ -233,7 +230,7 @@ pub fn question_view(id: &str, session_id: &str, questions: &[QuestionItem]) -> 
         "summary": summary,
         "toolName": "AskUserQuestion",
         "kind": "question",
-        "input": serde_json::to_string(&input_obj).unwrap_or_default(),
+        "input": input_obj.to_string(),
         "detail": null,
         "cwd": null,
         "createdAt": Utc::now().to_rfc3339(),
@@ -417,7 +414,6 @@ impl Shared {
 
 pub struct Observer {
     shared: Arc<Shared>,
-    worker: Option<JoinHandle<()>>,
 }
 
 impl Observer {
@@ -442,14 +438,11 @@ impl Observer {
             http,
         });
         let owned = shared.clone();
-        let worker = thread::Builder::new()
+        thread::Builder::new()
             .name("DeepSeek questions".into())
             .spawn(move || work(owned))
             .map_err(|_| "DeepSeek question observer could not start")?;
-        Ok(Self {
-            shared,
-            worker: Some(worker),
-        })
+        Ok(Self { shared })
     }
 }
 
@@ -470,11 +463,6 @@ impl Drop for Observer {
         self.shared
             .requests
             .set_native_waiting(AGENT.id, &[], crate::hooks::now_ms());
-        if let Some(worker) = self.worker.take() {
-            if worker.is_finished() {
-                let _ = worker.join();
-            }
-        }
     }
 }
 
@@ -529,10 +517,6 @@ fn post_answer(http: &Client, port: u16, body: &Value) -> Result<Receipt, String
 
 fn handle_frame(shared: &Arc<Shared>, port: u16, frame_json: &Value) {
     let now = Instant::now();
-    {
-        let mut state = prune_resolved(shared, now);
-        let _ = &mut state;
-    }
     if frame_json["method"].as_str() == Some("question/resolved") {
         if let Some(rpc_id) = frame_json["payload"]["questionRpcId"]
             .as_str()
@@ -570,14 +554,6 @@ fn handle_frame(shared: &Arc<Shared>, port: u16, frame_json: &Value) {
             .name("DeepSeek question answer".into())
             .spawn(move || answer_loop(owned, pending, ticket));
     }
-}
-
-fn prune_resolved<'a>(shared: &'a Arc<Shared>, now: Instant) -> std::sync::MutexGuard<'a, State> {
-    let mut state = shared.state.lock().unwrap_or_else(|p| p.into_inner());
-    state
-        .resolved
-        .retain(|_, seen| now.duration_since(*seen) < RESOLUTION_MEMORY);
-    state
 }
 
 fn answer_loop(shared: Arc<Shared>, pending: Pending, ticket: Ticket) {

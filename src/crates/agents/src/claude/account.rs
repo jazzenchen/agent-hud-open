@@ -202,7 +202,7 @@ pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
     if succeeded {
         Ok(reading)
     } else {
-        Err(Unread::combined(failures).unwrap_or_else(|| Unread::Failed(String::new())))
+        Err(Unread::combined(failures).expect("a failure per folder"))
     }
 }
 

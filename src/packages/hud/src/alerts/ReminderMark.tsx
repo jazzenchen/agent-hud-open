@@ -69,8 +69,7 @@ export function ReminderMark({
       />
     );
   }
-  const exhausted =
-    (event.usedPercent ?? 0) >= 99.5 || event.crossing === "exhausted";
+  const exhausted = event.crossing === "exhausted";
   return (
     <BotMark
       source={event.source}

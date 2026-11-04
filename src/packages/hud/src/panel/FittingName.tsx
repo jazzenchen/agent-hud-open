@@ -24,7 +24,6 @@ export function FittingName({
     // The full name is measured on one line, whatever is shown now.
     const measure = () => setFits(full.offsetWidth <= container.clientWidth);
     measure();
-    if (typeof ResizeObserver === "undefined") return;
     const observer = new ResizeObserver(measure);
     observer.observe(container);
     return () => observer.disconnect();

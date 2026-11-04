@@ -9,7 +9,6 @@ import { Check, ChevronDown, ChevronRight } from "lucide-react";
 import { isTauri } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { Button } from "@agent-hud/ui/components/button";
-import { Tabs, TabsList, TabsTrigger } from "@agent-hud/ui/components/tabs";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -26,21 +25,14 @@ import type {
   StatisticsQuery,
   StatisticsResponse,
   StatisticsTokenKind,
-} from "./lib/types";
-import { storageKeys } from "./lib/storage-keys";
+} from "@agent-hud/protocol";
+import { readJSON, storageKeys } from "./lib/storage-keys";
+import { useCoreQuery } from "./lib/use-core-query";
 import {
-  ActivityHeatmap,
-  APIBillingCard,
   Coverage,
   IndexingProgress,
   Heading,
-  ProviderCard,
-  PlanValue,
-  QuotaHistory,
-  RecentUsage,
   TotalSummary,
-  UsageChart,
-  agentRows,
   compact,
   dimensionsLabel,
   freshKinds,
@@ -52,8 +44,18 @@ import {
   row,
   themeFor,
   truncate,
-  type StatsTheme,
-} from "./StatisticsParts";
+} from "./statistics/StatsTheme";
+import { UsageChart } from "./statistics/UsageChart";
+import {
+  agentRows,
+  APIBillingCard,
+  ProviderCard,
+  RecentUsage,
+} from "./statistics/ProviderCard";
+import { ActivityHeatmap } from "./statistics/ActivityHeatmap";
+import { QuotaHistory } from "./statistics/QuotaHistory";
+import { PlanValue } from "./statistics/PlanValue";
+import { Segments } from "./statistics/Segments";
 import { snapshotLanguage, systemTimeZone } from "@agent-hud/ui/format";
 import { indexingText } from "@agent-hud/ui/text/indexing";
 
@@ -110,136 +112,6 @@ function useStatisticsEnd(revision: number, refresh: number, active: boolean) {
   return end;
 }
 
-/** Only the latest query/revision can publish into this page. No statistics result updates Snapshot. */
-function useStatistics(
-  query: StatisticsQuery,
-  revision: number,
-  action: StatisticsProps["action"],
-  active: boolean,
-) {
-  const actionRef = useRef(action);
-  actionRef.current = action;
-  const sequence = useRef(0);
-  const [result, setResult] = useState<{
-    key: string;
-    data: StatisticsResponse;
-  } | null>(null);
-  const [failure, setFailure] = useState<{
-    key: string;
-    message: string;
-  } | null>(null);
-  const [fetching, setFetching] = useState(active);
-  const key = JSON.stringify(query);
-  useEffect(() => {
-    const id = ++sequence.current;
-    if (!active) return;
-    setFetching(true);
-    const params = JSON.parse(key) as Record<string, unknown>;
-    void actionRef
-      .current("statistics", params)
-      .then((value) => {
-        if (sequence.current !== id) return;
-        const response = value as StatisticsResponse;
-        if (
-          !response ||
-          response.kind !== "statistics" ||
-          !Number.isFinite(response.dataRevision)
-        )
-          throw new Error(
-            "The runtime returned an unsupported statistics response.",
-          );
-        if (response.dataRevision < revision)
-          throw new Error(
-            "Statistics are catching up with the current ledger. Try refreshing again.",
-          );
-        setResult({ key, data: response });
-        setFailure(null);
-      })
-      .catch((error: unknown) => {
-        if (sequence.current === id)
-          setFailure({
-            key,
-            message: error instanceof Error ? error.message : String(error),
-          });
-      })
-      .finally(() => {
-        if (sequence.current === id) setFetching(false);
-      });
-    return () => {
-      sequence.current += 1;
-    };
-  }, [key, revision, active]);
-  const data = result?.data ?? null;
-  const error = failure?.key === key ? failure.message : null;
-  return {
-    data,
-    error,
-    loading: !data && !error && fetching,
-    updating: Boolean(data && fetching),
-    available: result?.data.available,
-  };
-}
-
-function Segments({
-  value,
-  onChange,
-  choices,
-  theme,
-  label,
-}: {
-  value: string;
-  onChange: (value: string) => void;
-  choices: { value: string; label: string }[];
-  theme: StatsTheme;
-  label: string;
-}) {
-  return (
-    <Tabs
-      value={value}
-      onValueChange={onChange}
-      style={{ gap: 0 }}
-      aria-label={label}
-    >
-      <TabsList
-        style={{
-          background: theme.segment,
-          borderRadius: 7,
-          height: 28,
-          padding: 2,
-          gap: 1,
-        }}
-      >
-        {choices.map((choice) => (
-          <TabsTrigger
-            key={choice.value}
-            value={choice.value}
-            style={{
-              height: 24,
-              padding: "3px 11px",
-              border: 0,
-              borderRadius: 5,
-              fontSize: 12,
-              fontWeight: value === choice.value ? 500 : 400,
-              lineHeight: "16px",
-              color: theme.text,
-              boxShadow:
-                value === choice.value && theme.light
-                  ? "0 1px 2px rgba(0,0,0,.08)"
-                  : "none",
-              background:
-                value === choice.value ? theme.selected : "transparent",
-              transition:
-                "background-color 160ms ease, color 160ms ease, box-shadow 160ms ease",
-            }}
-          >
-            {choice.label}
-          </TabsTrigger>
-        ))}
-      </TabsList>
-    </Tabs>
-  );
-}
-
 /** Tokens page only. The containing native window owns the Tokens/Sessions tabs. */
 export default function Statistics({
   snapshot,
@@ -255,17 +127,9 @@ export default function Statistics({
   const [selectedProviders, setProviders] = useState<string[] | null>(null);
   const [selectedModels, setModels] = useState<string[] | null>(null);
   const [modelsExpanded, setModelsExpanded] = useState(false);
-  const [hiddenAgentCards, setHiddenAgentCards] = useState<string[]>(() => {
-    try {
-      const raw = localStorage.getItem(hiddenAgentCardsKey);
-      const parsed = raw ? JSON.parse(raw) : [];
-      return Array.isArray(parsed)
-        ? parsed.filter((x) => typeof x === "string")
-        : [];
-    } catch {
-      return [];
-    }
-  });
+  const [hiddenAgentCards, setHiddenAgentCards] = useState<string[]>(
+    () => (readJSON(hiddenAgentCardsKey) as string[] | null) ?? [],
+  );
   const [refresh, setRefresh] = useState(0);
   // generatedAt is a presentation/collector clock, not a ledger invalidation signal.
   const revision = snapshot.statisticsRevision ?? 0;
@@ -322,12 +186,24 @@ export default function Statistics({
       timeZone,
     ],
   );
-  const { data, error, loading, available } = useStatistics(
+  // Only the latest query and revision publish into this page; no statistics
+  // answer updates the Snapshot.
+  const { data, error, fetching } = useCoreQuery<StatisticsResponse>(
+    async (method, params) => {
+      const response = (await action(method, params)) as StatisticsResponse;
+      if (response.dataRevision < revision)
+        throw new Error(
+          "Statistics are catching up with the current ledger. Try refreshing again.",
+        );
+      return response;
+    },
+    "statistics",
     query,
-    revision,
-    action,
     active,
+    revision,
   );
+  const loading = !data && !error && fetching;
+  const available = data?.available;
   // The quota history runs to the latest reading: a window read again
   // moves its end along with the page's.
   const readings = snapshot.quotas
@@ -366,11 +242,8 @@ export default function Statistics({
     setProviders(null);
     setHiddenAgentCards((previous) => {
       const next = previous.filter((id) => vendorKey(id) !== key);
-      if (next.length !== previous.length) {
-        try {
-          localStorage.setItem(hiddenAgentCardsKey, JSON.stringify(next));
-        } catch {}
-      }
+      if (next.length !== previous.length)
+        localStorage.setItem(hiddenAgentCardsKey, JSON.stringify(next));
       return next;
     });
     if (highlightTimerRef.current !== null) {
@@ -384,18 +257,14 @@ export default function Statistics({
   useEffect(() => {
     if (!active) return;
     const consumePending = () => {
-      try {
-        const raw = localStorage.getItem(storageKeys.highlightProvider);
-        if (!raw) return;
-        localStorage.removeItem(storageKeys.highlightProvider);
-        const parsed = JSON.parse(raw) as { provider?: string; at?: number };
-        if (
-          parsed?.provider &&
-          (!parsed.at || Date.now() - parsed.at < 15_000)
-        ) {
-          applyProviderHighlight(parsed.provider);
-        }
-      } catch {}
+      const pending = readJSON(storageKeys.highlightProvider) as {
+        provider?: string;
+        at?: number;
+      } | null;
+      if (!pending) return;
+      localStorage.removeItem(storageKeys.highlightProvider);
+      if (pending.provider && (!pending.at || Date.now() - pending.at < 15_000))
+        applyProviderHighlight(pending.provider);
     };
     consumePending();
     window.addEventListener("focus", consumePending);
@@ -404,9 +273,7 @@ export default function Statistics({
       ? listen<{ provider: string; at: number }>(
           "statistics:provider",
           (event) => {
-            try {
-              localStorage.removeItem(storageKeys.highlightProvider);
-            } catch {}
+            localStorage.removeItem(storageKeys.highlightProvider);
             if (event.payload?.provider) {
               applyProviderHighlight(event.payload.provider);
             }

@@ -23,6 +23,7 @@ export {
   PermissionClosedRow,
   PermissionRowHead,
   WaitedLabel,
+  WaitingHeader,
   permissionToolBadge,
 } from "./alerts/PendingEventRows";
 

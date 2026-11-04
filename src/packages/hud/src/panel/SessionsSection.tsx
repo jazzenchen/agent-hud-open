@@ -3,7 +3,7 @@ import type {
   SessionsResponse,
   Snapshot,
 } from "@agent-hud/protocol";
-import { formatTokens } from "../quota-metrics";
+import { tokensShort } from "@agent-hud/ui/format";
 import { sourceID, sourcesForMark } from "../model";
 import { usePanelQuery, usePanelServices } from "../PanelContext";
 import { noButtonChrome, palette, tabular, type Logo } from "./theme";
@@ -184,7 +184,7 @@ export function SourceSessions({
               (zh ? "（未命名会话）" : "(untitled session)")}
           </span>
           <span style={{ ...tabular, fontSize: 12, whiteSpace: "nowrap" }}>
-            {formatTokens(session.tokens)} tok
+            {tokensShort(session.tokens)} tok
           </span>
         </button>
       ))}

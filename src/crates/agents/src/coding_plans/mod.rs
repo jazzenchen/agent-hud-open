@@ -66,7 +66,7 @@ fn read_provider(host: &dyn Host, provider: &'static str) -> Result<Reading, Unr
         let server = url::Url::parse(&entry.base)
             .ok()
             .and_then(|url| url.host_str().map(str::to_owned))
-            .ok_or_else(|| l10n::text("Coding Plan 地址无效", "Invalid coding endpoint"))?;
+            .expect("discovery keeps only checked endpoints");
         let endpoint = match provider {
             "kimi" => format!("https://{server}/coding/v1/usages"),
             "opencode" => "https://opencode.ai/zen/go/v1/usage".into(),

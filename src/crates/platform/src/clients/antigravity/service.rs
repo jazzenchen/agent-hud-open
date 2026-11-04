@@ -99,9 +99,7 @@ mod running {
             return Ok(None);
         };
         let env = std::env::vars().collect::<crate::os::Environment>();
-        Ok(crate::os::engine_candidates(&home, &env, "agy")
-            .into_iter()
-            .find(|path| crate::os::engine_executable(path))
+        Ok(crate::os::find_engine(&home, &env, "agy")
             .and_then(|path| path.to_str().map(str::to_owned)))
     }
 
@@ -294,7 +292,8 @@ impl Service {
         if !response.status().is_success() {
             return Err(service_error(response));
         }
-        crate::accounts::http::response_json(response, "Antigravity")
+        crate::accounts::http::read_json(response)
+            .map_err(agent_hud_agents::account::HttpFailure::message)
     }
     fn cached(&self) -> Vec<Endpoint> {
         self.state
@@ -382,12 +381,6 @@ impl Service {
 /// Complete discovery is required by the permissions observer. Endpoint identity
 /// includes the exact process, address and CSRF credential; none is exposed.
 pub fn endpoints(fresh: bool) -> Result<Vec<Endpoint>, String> {
-    if !crate::clients::runs(&agent_hud_agents::antigravity::LOCAL_SERVICE) {
-        return Err(format!(
-            "Antigravity local service acquisition is unsupported on {}",
-            std::env::consts::OS
-        ));
-    }
     service()?.discover(fresh, true)
 }
 
@@ -395,12 +388,6 @@ pub fn endpoints(fresh: bool) -> Result<Vec<Endpoint>, String> {
 /// identity of its own endpoint so anonymous services cannot be conflated.
 /// The account reader uses the CLI fallback only when no native quota is usable.
 pub fn read_accounts(params: &Value) -> Result<Value, String> {
-    if !crate::clients::runs(&agent_hud_agents::antigravity::ACCOUNT_SERVICE) {
-        return Err(format!(
-            "Antigravity local service acquisition is unsupported on {}",
-            std::env::consts::OS
-        ));
-    }
     let service = service()?;
     let endpoints = service.discover(true, false)?;
     let mut partial = service
@@ -453,17 +440,6 @@ pub struct MessageSession {
     trajectory: Value,
 }
 
-fn valid_cascade_id(id: &str) -> bool {
-    id.len() == 36
-        && id.bytes().enumerate().all(|(i, b)| {
-            if matches!(i, 8 | 13 | 18 | 23) {
-                b == b'-'
-            } else {
-                b.is_ascii_hexdigit()
-            }
-        })
-}
-
 /// The service a message goes to: one that already has the conversation
 /// open, else the first that can open it. `GetAllCascadeTrajectories` lists
 /// only the conversations a service has loaded (none: the map is left out),
@@ -500,7 +476,7 @@ fn pick_service<T: Clone>(
 /// Resolve a known conversation without enabling permission observation or
 /// the generic control channel on Windows.
 pub fn message_session(cascade_id: &str) -> Result<MessageSession, MessageError> {
-    if !valid_cascade_id(cascade_id) {
+    if !crate::hooks::origins::is_uuid(cascade_id) {
         return Err(MessageError::Invalid("Antigravity session identity".into()));
     }
     if !crate::clients::runs(&agent_hud_agents::antigravity::ACCOUNT_SERVICE) {
@@ -754,8 +730,10 @@ mod message_tests {
 
     #[test]
     fn only_canonical_conversation_ids_are_accepted() {
-        assert!(valid_cascade_id(ID));
-        assert!(!valid_cascade_id("../../other"));
-        assert!(!valid_cascade_id("aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeeg"));
+        assert!(crate::hooks::origins::is_uuid(ID));
+        assert!(!crate::hooks::origins::is_uuid("../../other"));
+        assert!(!crate::hooks::origins::is_uuid(
+            "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeeg"
+        ));
     }
 }

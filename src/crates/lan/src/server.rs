@@ -98,9 +98,6 @@ impl<R: Record + Send + 'static> LanServer<R> {
         }
     }
     pub fn start(&mut self, port: u16) -> Result<u16> {
-        if let Some(port) = self.port {
-            return Ok(port);
-        }
         self.start_at(SocketAddr::from((std::net::Ipv4Addr::UNSPECIFIED, port)))
     }
     /// An explicit bind address permits isolated loopback fixtures. Product start
@@ -331,10 +328,9 @@ impl<R: Record + Send + 'static> LanServer<R> {
             json!({"schemaVersion":1,"deviceID":self.shared.device,"deviceName":self.shared.name,"endpoint":endpoint,"certificateSHA256":self.shared.identity.fingerprint,"token":token,"expiresAtMs":expires}),
             &self.shared,
         );
-        let bytes = serde_json::to_vec(&invitation).map_err(|_| "Pairing invitation encoding")?;
         let uri = format!(
             "agenthud://pair?payload={}",
-            base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(bytes)
+            base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(invitation.to_string())
         );
         let svg = qrcode::QrCode::new(uri.as_bytes())
             .map_err(|_| "Pairing QR is too large")?
@@ -536,11 +532,12 @@ fn connection<R: Record>(shared: &Shared<R>, socket: TcpStream, address: SocketA
         {
             remember_peer(shared, &request, address, &authorization, false);
         }
-        let body = serde_json::to_vec(&with_alternates(
+        let body = with_alternates(
             json!({"deviceID":shared.device,"deviceName":shared.name,"endpoint":endpoint,"certificateSHA256":shared.identity.fingerprint,"token":token}),
             shared,
-        ))
-        .map_err(|_| "LAN pair encoding")?;
+        )
+        .to_string()
+        .into_bytes();
         return reply(200, &[("Content-Type", "application/json".into())], &body);
     }
     let Some(token) = request.bearer() else {
@@ -568,7 +565,8 @@ fn connection<R: Record>(shared: &Shared<R>, socket: TcpStream, address: SocketA
     {
         return reply(404, &[], &[]);
     }
-    if request.path == "/v1/changes" && request.cursor().is_none() {
+    let cursor = request.cursor();
+    if request.path == "/v1/changes" && cursor.is_none() {
         return reply(400, &[], &[]);
     }
     let peer_id = remember_peer(
@@ -582,7 +580,7 @@ fn connection<R: Record>(shared: &Shared<R>, socket: TcpStream, address: SocketA
         let changes = request.streams_changes();
         let mut told = Told {
             revision: String::new(),
-            cursor: if changes { request.cursor() } else { None },
+            cursor: if changes { cursor } else { None },
         };
         let mut beat = Instant::now();
         stream.write_all(b"HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nCache-Control: no-store\r\nConnection: keep-alive\r\n\r\n").map_err(|_|"LAN stream header")?;
@@ -678,11 +676,7 @@ fn connection<R: Record>(shared: &Shared<R>, socket: TcpStream, address: SocketA
         headers.extend(encoding);
         reply(200, &headers, &body)
     } else {
-        let Some(cursor) = request.cursor() else {
-            drop(cache);
-            return reply(400, &[], &[]);
-        };
-        let Some(changes) = cache.changes(&cursor) else {
+        let Some(changes) = cursor.and_then(|cursor| cache.changes(&cursor)) else {
             drop(cache);
             return reply(410, &[], &[]);
         };

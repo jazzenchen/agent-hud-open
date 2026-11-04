@@ -1,7 +1,7 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { HUDArtwork as HUDLogo } from "@agent-hud/hud/HUDArtwork";
 import { tokenPlot } from "../lib/statistics";
-import type { StatisticsResponse } from "../lib/types";
+import type { StatisticsResponse } from "@agent-hud/protocol";
 import {
   card,
   compact,
@@ -13,7 +13,7 @@ import {
   Swatch,
   truncate,
   useAnimatedNumber,
-  useCanvasWidth,
+  useCanvas,
   type StatsTheme,
 } from "./StatsTheme";
 
@@ -101,9 +101,9 @@ export const UsageChart = memo(function UsageChart({
   data: StatisticsResponse;
   theme: StatsTheme;
 }) {
-  const { ref, width } = useCanvasWidth();
-  const [hovered, setHovered] = useState<number | null>(null);
   const height = 100;
+  const { ref, width, context } = useCanvas(height);
+  const [hovered, setHovered] = useState<number | null>(null);
   const start = Date.parse(data.query.from),
     end = Date.parse(data.query.to);
   // Whole buckets at both ends, as Open's plotInterval: a bucket the range cuts
@@ -154,19 +154,8 @@ export const UsageChart = memo(function UsageChart({
 
   const paint = useCallback(
     (bars: NormalizedBar[], activeHover: number | null) => {
-      const canvas = ref.current,
-        ctx = canvas?.getContext("2d");
-      if (!canvas || !ctx || width <= 0) return;
-      const scale = window.devicePixelRatio || 1;
-      const targetW = Math.round(width * scale);
-      const targetH = Math.round(height * scale);
-      if (canvas.width !== targetW || canvas.height !== targetH) {
-        canvas.width = targetW;
-        canvas.height = targetH;
-      }
-      ctx.setTransform(scale, 0, 0, scale, 0, 0);
-      ctx.clearRect(0, 0, width, height);
-      if (!bars.length) return;
+      const ctx = context();
+      if (!ctx || !bars.length) return;
       if (activeHover !== null && bars[activeHover]) {
         const left = bars[activeHover].leftRatio * width;
         const right = bars[activeHover].rightRatio * width;
@@ -217,16 +206,16 @@ export const UsageChart = memo(function UsageChart({
         ctx.restore();
       }
     },
-    [height, ref, theme.secondary, theme.text, width],
+    [context, height, theme.secondary, theme.text, width],
   );
 
   useEffect(() => {
     if (width <= 0) return;
     const prev = currentBarsRef.current;
-    const reduceMotion =
-      typeof window !== "undefined" &&
-      window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-    if (prev === null || reduceMotion) {
+    if (
+      prev === null ||
+      matchMedia("(prefers-reduced-motion: reduce)").matches
+    ) {
       currentBarsRef.current = targetBars;
       paint(targetBars, hoveredRef.current);
       return;
@@ -447,7 +436,8 @@ export const Sparkline = memo(function Sparkline({
   values: number[];
   color: string;
 }) {
-  const { ref, width } = useCanvasWidth();
+  const height = 28;
+  const { ref, width, context } = useCanvas(height);
   const targetRatios = useMemo(() => {
     const peak = Math.max(0, ...values);
     return peak > 0
@@ -458,20 +448,8 @@ export const Sparkline = memo(function Sparkline({
 
   const paint = useCallback(
     (ratios: number[]) => {
-      const canvas = ref.current,
-        ctx = canvas?.getContext("2d");
-      if (!canvas || !ctx || !width) return;
-      const dpr = window.devicePixelRatio || 1,
-        height = 28;
-      const targetW = Math.round(width * dpr);
-      const targetH = Math.round(height * dpr);
-      if (canvas.width !== targetW || canvas.height !== targetH) {
-        canvas.width = targetW;
-        canvas.height = targetH;
-      }
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      ctx.clearRect(0, 0, width, height);
-      if (!ratios.length) return;
+      const ctx = context();
+      if (!ctx || !ratios.length) return;
       const slot = width / ratios.length;
       ctx.fillStyle = color;
       ctx.globalAlpha = 0.85;
@@ -487,16 +465,16 @@ export const Sparkline = memo(function Sparkline({
         }
       }
     },
-    [color, ref, width],
+    [color, context, width],
   );
 
   useEffect(() => {
     if (!width) return;
     const prev = currentRatiosRef.current;
-    const reduceMotion =
-      typeof window !== "undefined" &&
-      window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-    if (prev === null || reduceMotion) {
+    if (
+      prev === null ||
+      matchMedia("(prefers-reduced-motion: reduce)").matches
+    ) {
       currentRatiosRef.current = targetRatios;
       paint(targetRatios);
       return;
@@ -536,7 +514,7 @@ export const Sparkline = memo(function Sparkline({
     <canvas
       ref={ref}
       aria-hidden
-      style={{ width: "100%", height: 28, display: "block" }}
+      style={{ width: "100%", height, display: "block" }}
     />
   );
 });

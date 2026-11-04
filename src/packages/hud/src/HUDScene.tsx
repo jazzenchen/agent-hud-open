@@ -570,6 +570,7 @@ export function HUDScene({
     entered,
     domExited,
     pin,
+    openAtTop,
     handoff,
     configurePanel,
     showPanelStats,
@@ -585,7 +586,6 @@ export function HUDScene({
     open,
     hoverPhase: state.phase,
     hovered,
-    pinned,
     pointerInside,
     dragVisual,
     dragPreview,
@@ -671,6 +671,75 @@ export function HUDScene({
   const listedSessions = useMemo<ListedSessions>(
     () => ({ openStats: openStatsAt }),
     [openStatsAt],
+  );
+  // The footer's Settings, Statistics and update arrow end an agent's edit
+  // hold, then hand over: each opens another window.
+  const footer = useMemo(
+    () => ({
+      configure:
+        configurePanel &&
+        (() => {
+          endHold();
+          configurePanel();
+        }),
+      stats:
+        showPanelStats &&
+        (() => {
+          endHold();
+          showPanelStats();
+        }),
+      update:
+        onUpdate &&
+        (() => {
+          endHold();
+          handoff(onUpdate);
+        }),
+    }),
+    [configurePanel, showPanelStats, onUpdate, endHold, handoff],
+  );
+  // The panel's body, drawn by the visible panel and by the hidden copy
+  // below, which measures its natural height (no `maxHeight`) over the
+  // snapshot it last drew.
+  const panelBody = (shown: Snapshot, maxHeight?: number) => (
+    <>
+      {eventContent && !inUsagePanel ? (
+        eventContent
+      ) : (
+        <SourceHoverPanel
+          active={open}
+          config={config}
+          snapshot={shown}
+          focusVendor={focusedVendor?.name}
+          light={light}
+          Logo={HUDLogo}
+          onConfigure={footer.configure}
+          onStats={footer.stats}
+          update={update}
+          onUpdate={footer.update}
+          inlineAlert={
+            inUsagePanel && event ? (
+              <InlineEventRow
+                event={event}
+                snapshot={shown}
+                light={light}
+                botLogos={config.botLogos}
+                zh={snapshotLanguage(shown) === "zh"}
+                onOpen={() => {
+                  news.dismiss();
+                  footer.stats?.();
+                }}
+              />
+            ) : undefined
+          }
+          maxHeight={maxHeight}
+        />
+      )}
+      <RequestDeliveryNotice
+        delivery={delivery}
+        light={light}
+        language={snapshotLanguage(shown)}
+      />
+    </>
   );
   // The hidden copy measures the panel for its next opening, as the native
   // hosting view measured its fitting size. A pointer move never draws it
@@ -772,63 +841,7 @@ export function HUDScene({
               draw={() => {
                 const drawn = (
                   <ListedSessionsContext.Provider value={measured.listed}>
-                    {eventContent && (!inUsagePanel || Boolean(request)) ? (
-                      eventContent
-                    ) : (
-                      <SourceHoverPanel
-                        active={open}
-                        config={config}
-                        snapshot={measured.snapshot}
-                        focusVendor={focusedVendor?.name}
-                        light={light}
-                        Logo={HUDLogo}
-                        onConfigure={
-                          onConfigure
-                            ? () => {
-                                endHold();
-                                onConfigure();
-                              }
-                            : undefined
-                        }
-                        onStats={
-                          onStats
-                            ? () => {
-                                endHold();
-                                onStats();
-                              }
-                            : undefined
-                        }
-                        update={update}
-                        onUpdate={
-                          onUpdate
-                            ? () => {
-                                endHold();
-                                onUpdate();
-                              }
-                            : undefined
-                        }
-                        inlineAlert={
-                          inUsagePanel && !request && event ? (
-                            <InlineEventRow
-                              event={event}
-                              snapshot={measured.snapshot}
-                              light={light}
-                              botLogos={config.botLogos}
-                              zh={snapshotLanguage(measured.snapshot) === "zh"}
-                              onOpen={() => {
-                                news.dismiss();
-                                showPanelStats?.();
-                              }}
-                            />
-                          ) : undefined
-                        }
-                      />
-                    )}
-                    <RequestDeliveryNotice
-                      delivery={delivery}
-                      light={light}
-                      language={snapshotLanguage(measured.snapshot)}
-                    />
+                    {panelBody(measured.snapshot)}
                   </ListedSessionsContext.Provider>
                 );
                 return measured.services ? (
@@ -857,7 +870,8 @@ export function HUDScene({
             <NotchGlow
               geometry={notchGeometry}
               config={config}
-              vendors={detectionPaused ? [] : vendors}
+              vendors={vendors}
+              colors={glowColors}
               reduceMotion={reduceMotion}
               alert={glowFlash}
             />
@@ -912,12 +926,17 @@ export function HUDScene({
             forceOpen={forceOpen}
             dismissNews={news.dismiss}
             showPanelStats={showPanelStats}
-            configurePanel={configurePanel}
             surfacePadding={surfacePadding}
-            eventContent={eventContent}
             inUsagePanel={inUsagePanel}
-            delivery={delivery}
-          />
+          >
+            {panelBody(
+              snapshot,
+              Math.max(
+                40,
+                frame.height - surfacePadding.top - surfacePadding.bottom,
+              ),
+            )}
+          </HUDExpandedSurface>
           <div
             className="hud-resting-strip"
             style={{
@@ -947,21 +966,7 @@ export function HUDScene({
             onPointerMove={(event) => {
               if (nativePointer) return;
               followMark(event);
-              if (
-                config.openImmediatelyAtTop &&
-                edge === "top" &&
-                (state.phase === "opening" || state.phase === "collapsed") &&
-                !suppressHover.current &&
-                (!config.requiresOptionToOpen ||
-                  event.altKey ||
-                  hover.inside.current)
-              ) {
-                const bounds = scene.current?.getBoundingClientRect();
-                const x = event.clientX - (bounds?.left ?? 0);
-                const y = event.clientY - (bounds?.top ?? 0);
-                if (x >= strip.x && x <= strip.x + strip.width && y <= 1)
-                  forceOpen();
-              }
+              openAtTop(event);
             }}
           >
             {onDragStart && (
@@ -1003,7 +1008,6 @@ export function HUDScene({
               marginStyle={marginStyle}
               dragVisual={dragVisual}
               hovered={hovered}
-              pinned={pinned}
               pointerInside={pointerInside}
               open={open}
               sender={sender}
@@ -1015,7 +1019,6 @@ export function HUDScene({
               hasAlert={Boolean(request || event)}
               suppressHover={suppressHover}
               setHovered={setHovered}
-              setPinned={setPinned}
               forceOpen={forceOpen}
               pin={pin}
             />

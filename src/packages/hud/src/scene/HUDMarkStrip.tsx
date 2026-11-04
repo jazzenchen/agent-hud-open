@@ -3,7 +3,7 @@ import { BotMark } from "../BotMark";
 import HUDGlow, { type GlowAlert } from "../HUDGlow";
 import { botState, facingFromEdge, isAttention } from "../bots/bot-state";
 import { DockMemory, type Direction } from "../bots/mark-director";
-import { labelWidth, type HUDRect, type stripMetrics } from "../geometry";
+import { horizontal, type HUDRect, type stripMetrics } from "../geometry";
 import {
   markUsed,
   meterLabel,
@@ -21,8 +21,6 @@ import { isRingStyle } from "../usage-meter/arcs";
 import { MarkBars, MarkRing, markItems } from "../usage-meter/mark-usage";
 
 const clampedSize = (size: number) => Math.max(20, Math.min(60, size));
-
-const horizontal = (edge: HUDEdge) => edge === "top" || edge === "bottom";
 
 export function HUDMarkStrip({
   id,
@@ -42,7 +40,6 @@ export function HUDMarkStrip({
   marginStyle,
   dragVisual,
   hovered,
-  pinned: _pinned,
   pointerInside,
   open,
   sender,
@@ -54,7 +51,6 @@ export function HUDMarkStrip({
   hasAlert,
   suppressHover,
   setHovered,
-  setPinned: _setPinned,
   forceOpen,
   pin,
 }: {
@@ -75,7 +71,6 @@ export function HUDMarkStrip({
   marginStyle: CSSProperties;
   dragVisual: boolean;
   hovered: string | null;
-  pinned: boolean;
   pointerInside: boolean;
   open: boolean;
   sender?: { source: string };
@@ -87,7 +82,6 @@ export function HUDMarkStrip({
   hasAlert: boolean;
   suppressHover: MutableRefObject<boolean>;
   setHovered: (key: string | null) => void;
-  setPinned: (pinned: boolean) => void;
   forceOpen: () => void;
   pin: (key?: string) => void;
 }) {
@@ -207,7 +201,7 @@ export function HUDMarkStrip({
               edge="top"
               flare={8}
               radius={metrics.radius}
-              fill={config.hasNotch ? "#000" : fill}
+              fill="#000"
               outline={outline}
             />
           )}
@@ -421,16 +415,7 @@ export function HUDMarkStrip({
                       fontVariantNumeric: "tabular-nums",
                       whiteSpace: "nowrap",
                       textAlign: "right",
-                      minWidth: horizontal(edge)
-                        ? undefined
-                        : Math.max(
-                            ...vendors.map((v) =>
-                              labelWidth(
-                                meterLabel(v, quotaDisplay),
-                                metrics.font,
-                              ),
-                            ),
-                          ),
+                      minWidth: horizontal(edge) ? undefined : metrics.label,
                     }}
                   >
                     {meterLabel(vendor, quotaDisplay)}

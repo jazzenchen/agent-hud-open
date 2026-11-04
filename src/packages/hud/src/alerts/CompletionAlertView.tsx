@@ -14,6 +14,7 @@ import { dateFormat, snapshotLanguage } from "@agent-hud/ui/format";
 import { alertFill, alertInk, alertText, onAlertFill } from "../tokens";
 import { useGround } from "../ground";
 import { cardColumn } from "../card-column";
+import { CardButton } from "../permissions/CardButton";
 
 export function CompletionAlertView({
   event,
@@ -220,48 +221,22 @@ export function CompletionAlertView({
           )
         )}
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <button
-            type="button"
+          <CardButton
             onClick={openUsage}
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 4,
-              height: 22,
-              padding: "0 9px",
-              borderRadius: 6,
-              border: `1px solid ${ink(0.18)}`,
-              background: "transparent",
-              color: ink(0.6),
-              fontSize: 11,
-              fontWeight: 500,
-              whiteSpace: "nowrap",
-              cursor: "pointer",
-            }}
+            edge={ink(0.18)}
+            color={ink(0.6)}
+            style={{ whiteSpace: "nowrap" }}
           >
             <ChartNoAxesColumn size={9} strokeWidth={2.6} />
             {zh ? "查看 Token 用量" : "View token usage"}
-          </button>
+          </CardButton>
           <span style={{ flex: 1, minWidth: 8 }} />
           {hasSession && (
-            <button
-              type="button"
+            <CardButton
               onClick={openSession}
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 4,
-                height: 22,
-                padding: "0 9px",
-                borderRadius: 6,
-                border: 0,
-                background: turnAccent,
-                color: onTurnAccent,
-                fontSize: 11,
-                fontWeight: 500,
-                whiteSpace: "nowrap",
-                cursor: "pointer",
-              }}
+              fill={turnAccent}
+              color={onTurnAccent}
+              style={{ whiteSpace: "nowrap" }}
             >
               {failed ? (
                 <RotateCcw size={9} strokeWidth={2.6} />
@@ -275,7 +250,7 @@ export function CompletionAlertView({
                 : zh
                   ? "回到会话"
                   : "Return to session"}
-            </button>
+            </CardButton>
           )}
         </div>
       </div>

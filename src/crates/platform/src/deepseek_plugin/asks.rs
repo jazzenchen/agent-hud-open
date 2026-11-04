@@ -6,7 +6,7 @@
 //! or answered here. While this runs, `app.json` tells the plugin the app is
 //! there, so a host with no window of its own can still be answered here.
 use super::DeepSeekChannel;
-use crate::claude_plugin::{valid_name, write_private};
+use crate::claude_plugin::{file_age, millis, valid_name, write_private};
 use crate::clients::deepseek::questions::{self, QuestionItem};
 use crate::hooks::Wake;
 use agent_hud_agents::deepseek::AGENT;
@@ -22,8 +22,8 @@ use std::{
         mpsc::RecvTimeoutError,
         Arc, Condvar, Mutex,
     },
-    thread::{self, JoinHandle},
-    time::{Duration, SystemTime, UNIX_EPOCH},
+    thread,
+    time::{Duration, SystemTime},
 };
 
 const POLL: Duration = Duration::from_millis(300);
@@ -67,10 +67,10 @@ fn session_id(session: &str) -> String {
 /// show (a plan to review, a question without choices), which Harness's own
 /// card still answers.
 pub fn parse(id: &str, value: &Value) -> Option<Ask> {
-    if !valid_name(id) || value["id"] != id {
+    if value["id"] != id {
         return None;
     }
-    let session = value["sessionId"].as_str().filter(|s| valid_name(s))?;
+    let session = value["sessionId"].as_str()?;
     let request = request_id(id);
     let (kind, view) = match value["kind"].as_str()? {
         "question" => {
@@ -176,7 +176,6 @@ struct Shared {
 /// Watches the channel folder's asks while the HUD answers requests.
 pub struct Observer {
     shared: Arc<Shared>,
-    worker: Option<JoinHandle<()>>,
 }
 
 impl Observer {
@@ -191,14 +190,11 @@ impl Observer {
             changed: Condvar::new(),
         });
         let owned = shared.clone();
-        let worker = thread::Builder::new()
+        thread::Builder::new()
             .name("DeepSeek plugin asks".into())
             .spawn(move || work(owned))
             .map_err(|_| "DeepSeek Harness plugin observer could not start")?;
-        Ok(Self {
-            shared,
-            worker: Some(worker),
-        })
+        Ok(Self { shared })
     }
 
     /// One pass now, for tests.
@@ -221,18 +217,7 @@ impl Drop for Observer {
             .requests
             .set_native_waiting(AGENT.id, &[], crate::hooks::now_ms());
         let _ = fs::remove_file(self.shared.channel.directory().join("app.json"));
-        if let Some(worker) = self.worker.take() {
-            if worker.is_finished() {
-                let _ = worker.join();
-            }
-        }
     }
-}
-
-fn millis(now: SystemTime) -> u64 {
-    now.duration_since(UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_millis() as u64
 }
 
 fn work(shared: Arc<Shared>) {
@@ -296,12 +281,7 @@ fn pass(shared: &Arc<Shared>, now: SystemTime) {
             };
             let session = value["sessionId"].as_str().unwrap_or_default();
             if !loaded.contains(session) {
-                let old = fs::metadata(&path)
-                    .and_then(|m| m.modified())
-                    .ok()
-                    .and_then(|at| now.duration_since(at).ok())
-                    .is_some_and(|age| age > ORPHAN_GRACE);
-                if old {
+                if file_age(&path, now) > ORPHAN_GRACE {
                     let _ = fs::remove_file(&path);
                 }
                 continue;

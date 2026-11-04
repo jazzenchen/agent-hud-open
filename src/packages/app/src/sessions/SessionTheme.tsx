@@ -5,13 +5,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@agent-hud/ui/components/select";
-import type { Session, SessionDetail, Snapshot } from "../lib/types";
+import type { Session, SessionDetail, Snapshot } from "@agent-hud/protocol";
 import {
   age,
   dateFormat,
   moneyAmount,
-  numberFormat,
-  tokensShort,
   snapshotLanguage,
 } from "@agent-hud/ui/format";
 import {
@@ -19,29 +17,29 @@ import {
   type ListMoney,
   type TokenKindName,
 } from "../lib/sessions";
+import {
+  themeFor as statsTheme,
+  type StatsTheme,
+} from "../statistics/StatsTheme";
 export {
   sessionMoney,
   sessionsMoney,
   unpricedHelp,
   type ListMoney,
 } from "../lib/sessions";
+export {
+  compact,
+  integer,
+  kindLabel,
+  number as numeric,
+  truncate as clipped,
+} from "../statistics/StatsTheme";
 
 export type Arrangement = "day" | "active";
 export type Entry = SessionDetail["turns"][number];
 
-export interface Theme {
-  light: boolean;
-  zh?: boolean;
-  ground: string;
-  text: string;
-  secondary: string;
-  tertiary: string;
-  card: string;
-  border: string;
-  divider: string;
-  track: string;
-  segment: string;
-  selected: string;
+/** The Statistics window's colours, and the Sessions page's own. */
+export interface Theme extends StatsTheme {
   input: string;
   output: string;
   cache: string;
@@ -69,11 +67,6 @@ export interface SessionGroup {
 export const ALL = "__all__";
 export const earlier = Number.NEGATIVE_INFINITY;
 
-/** TokenFormat.short: "48k", "1.3k", "2.4M". */
-export const compact = tokensShort;
-
-export const integer = (value: number) => numberFormat("en").format(value);
-
 /** What a session's calls would cost at API list prices, in US dollars; always an estimate. A partial one, which leaves out calls with no list price, ends in "+". */
 export const cost = (value: number | null, zh = false, partial = false) =>
   value === null
@@ -96,18 +89,6 @@ export const row: CSSProperties = {
   gap: 8,
 };
 
-export const numeric: CSSProperties = {
-  fontVariantNumeric: "tabular-nums",
-  whiteSpace: "nowrap",
-};
-
-export const clipped: CSSProperties = {
-  minWidth: 0,
-  whiteSpace: "nowrap",
-  overflow: "hidden",
-  textOverflow: "ellipsis",
-};
-
 export const plain: CSSProperties = {
   padding: 0,
   border: 0,
@@ -121,21 +102,10 @@ export const plain: CSSProperties = {
 
 /** The Sessions page's colours in the window's look (`light`, App's theme), as Open's `Theme.forScheme`. */
 export function themeFor(snapshot: Snapshot, light: boolean): Theme {
-  const zh = snapshotLanguage(snapshot) === "zh";
+  const base = statsTheme(light, snapshotLanguage(snapshot) === "zh");
   return light
     ? {
-        light,
-        zh,
-        ground: "#f5f5f7",
-        text: "#1d1d1f",
-        secondary: "#6e6e73",
-        tertiary: "#8e8e93",
-        card: "#fff",
-        border: "rgba(0,0,0,.06)",
-        divider: "rgba(0,0,0,.08)",
-        track: "rgba(0,0,0,.1)",
-        segment: "rgba(0,0,0,.08)",
-        selected: "#fff",
+        ...base,
         input: "#398ad6",
         output: "#c26e12",
         cache: "#00a091",
@@ -149,18 +119,7 @@ export function themeFor(snapshot: Snapshot, light: boolean): Theme {
         surface: "#fff",
       }
     : {
-        light,
-        zh,
-        ground: "#282828",
-        text: "#f5f5f7",
-        secondary: "#98989d",
-        tertiary: "#6e6e73",
-        card: "rgba(255,255,255,.05)",
-        border: "rgba(255,255,255,.12)",
-        divider: "rgba(255,255,255,.1)",
-        track: "rgba(255,255,255,.12)",
-        segment: "rgba(255,255,255,.08)",
-        selected: "rgba(255,255,255,.24)",
+        ...base,
         input: "#6db0f4",
         output: "#e29858",
         cache: "#31c3b5",
@@ -174,15 +133,6 @@ export function themeFor(snapshot: Snapshot, light: boolean): Theme {
         surface: "#333",
       };
 }
-
-/** Open's labels for the token kinds, in the window's language. */
-export const kindNames: Record<TokenKindName, [string, string]> = {
-  cacheWrite: ["Cache write", "缓存写入"],
-  input: ["Input", "输入"],
-  reasoning: ["Reasoning", "思考"],
-  output: ["Output", "输出"],
-  cacheRead: ["Cache read", "缓存读取"],
-};
 
 /** A kind's colour on the page (Open's `Theme.kind`). */
 export function kindColor(theme: Theme, kind: TokenKindName): string {
@@ -206,24 +156,6 @@ export function dayStart(at: number) {
   const date = new Date(at);
   date.setHours(0, 0, 0, 0);
   return date.getTime();
-}
-
-export function updatedLabel(session: Session, now: number, zh = false) {
-  const time = Date.parse(session.updatedAt);
-  if (!Number.isFinite(time)) return "—";
-  const seconds = Math.max(0, Math.floor((now - time) / 1000));
-  if (seconds < 60) return zh ? "刚刚更新" : "Updated just now";
-  if (seconds < 3600)
-    return zh
-      ? `${Math.floor(seconds / 60)} 分钟前更新`
-      : `Updated ${Math.floor(seconds / 60)}m ago`;
-  if (seconds < 86400)
-    return zh
-      ? `${Math.floor(seconds / 3600)} 小时前更新`
-      : `Updated ${Math.floor(seconds / 3600)}h ago`;
-  return zh
-    ? `${Math.floor(seconds / 86400)} 天前更新`
-    : `Updated ${Math.floor(seconds / 86400)}d ago`;
 }
 
 /** How long ago the session's last message was written ("2h ago"). */

@@ -26,7 +26,7 @@ pub(super) struct Destination {
     socket: Url,
 }
 fn eligible(id: &str, page: &Page, port: u16) -> Option<Destination> {
-    if !super::uuid(id) || page.kind != "page" {
+    if !super::is_uuid(id) || page.kind != "page" {
         return None;
     }
     let mut url = Url::parse(&page.url).ok()?;

@@ -63,7 +63,7 @@ pub(crate) use database::{
     metering, staging,
 };
 pub use discovery::ProviderDiscovery;
-pub(crate) use ingestion::{due, line, LogSession};
+pub(crate) use ingestion::{due, line};
 pub(crate) use legacy::{carried_usage, legacy_database, legacy_quota};
 pub(crate) use log_files::{FileStamp, LogFiles};
 pub(crate) use usage::UsageProjection;
@@ -77,6 +77,11 @@ pub struct SourceRoot {
 pub(crate) const MAX_LINE: usize = 1024 * 1024;
 /// How often a working Grok Bot turn is looked at again, in ms.
 pub(crate) const BOT_POLL_MS: i64 = 10_000;
+
+/// A time in Unix ms as RFC 3339 text; null out of range.
+pub(crate) fn iso(at: i64) -> Value {
+    json!(DateTime::<Utc>::from_timestamp_millis(at).map(|at| at.to_rfc3339()))
+}
 
 pub struct AgentHudCore {
     requests: requests::Requests,
@@ -152,8 +157,9 @@ pub struct AgentHudCore {
     /// first prompt line names them (`conversation_collect::Gathered`).
     conversation_awaiting: HashMap<PathBuf, String>,
     workbuddy_metering: agent_hud_agents::buddy::transcript::WorkBuddyMeteringReading,
-    /// What each listed session's row shows of its breakdown, until its logs move.
-    session_rows: session_breakdown::SessionRows,
+    /// What each listed session's row shows of its breakdown (a key of its
+    /// logs' read offsets, and the value), until its logs move.
+    session_rows: std::cell::RefCell<HashMap<PathBuf, (u64, Value)>>,
 }
 
 impl AgentHudCore {
@@ -177,7 +183,7 @@ impl AgentHudCore {
             }
         }
         let enabled = serde_json::from_value(stored["providers"].clone()).unwrap_or_default();
-        let opened = checkpoints::open(&app_data);
+        let opened = database::open(&app_data);
         let (database, logs, session_map, last_synced_at_ms, storage_issue) = match opened {
             Ok((database, logs, session_map, last_synced_at_ms)) => {
                 (Some(database), logs, session_map, last_synced_at_ms, None)

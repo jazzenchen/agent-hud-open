@@ -7,6 +7,7 @@ import {
   Unavailable,
   type Text,
 } from "./SettingsPrimitives";
+import { usePending } from "./use-pending";
 
 interface CliStatus {
   installable: boolean;
@@ -31,8 +32,7 @@ export default function AntigravityAccounts({
   const saved = settings.join("\n");
   const [text, setText] = useState(saved);
   const [status, setStatus] = useState<CliStatus | null>(null);
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { pending, error, setError, run } = usePending();
   const latestAction = useRef(action);
   latestAction.current = action;
   useEffect(() => setText(saved), [saved]);
@@ -73,20 +73,10 @@ export default function AntigravityAccounts({
       : undefined;
   const ready = !!status?.installable;
 
-  async function save() {
-    setPending(true);
-    setError(null);
-    try {
-      await action("set_setting", {
-        key: "antigravityCliSettings",
-        value: paths(),
-      });
-    } catch (error) {
-      setError(String(error));
-    } finally {
-      setPending(false);
-    }
-  }
+  const save = () =>
+    run(() =>
+      action("set_setting", { key: "antigravityCliSettings", value: paths() }),
+    );
 
   const gate = (button: ReactNode, off: boolean) =>
     off && reason ? (

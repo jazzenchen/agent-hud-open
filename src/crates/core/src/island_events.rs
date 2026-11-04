@@ -38,11 +38,6 @@ pub(super) struct Tracker {
 fn date(value: &Value) -> Option<i64> {
     value.as_str().and_then(metering::date_ms)
 }
-fn iso(at: i64) -> Value {
-    DateTime::<Utc>::from_timestamp_millis(at)
-        .map(|d| json!(d.to_rfc3339()))
-        .unwrap_or(Value::Null)
-}
 impl Tracker {
     pub fn new() -> Self {
         Self {
@@ -120,7 +115,7 @@ impl Tracker {
             }
             let Some(used) = quota["usedPercent"]
                 .as_f64()
-                .filter(|n| n.is_finite() && (0.0..=100.0).contains(n))
+                .filter(|n| (0.0..=100.0).contains(n))
             else {
                 self.quotas.remove(id);
                 continue;

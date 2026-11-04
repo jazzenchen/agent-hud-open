@@ -1,4 +1,5 @@
-import type { MarkState, SpritePicture } from "./clawd";
+import type { SpritePicture } from "./clawd";
+import { shownSign, type BotSign } from "./bot-state";
 import {
   clawdClips,
   clawdTicks,
@@ -6,17 +7,14 @@ import {
   isClawdAttention,
   sameFrame,
   standing,
-  winningSign,
   zeroOffset,
   type ClawdCard,
   type ClawdClip,
-  type ClawdClips,
   type ClawdEvent,
   type ClawdFrame,
   type ClawdLook,
   type ClawdOffset,
   type ClawdShot,
-  type ClawdSign,
   type ClawdVisit,
 } from "./clawd-clips";
 
@@ -30,7 +28,7 @@ interface Step {
   frame: ClawdFrame | null;
   ticks: number;
   offset: ClawdOffset;
-  sign?: ClawdSign;
+  sign?: BotSign;
   mini?: number;
   holds?: boolean;
   endsCycle?: boolean;
@@ -41,13 +39,7 @@ type Activity =
   | { kind: "resting" | "visit" | "greeting" | "gazing" | "card" | "at-card" }
   | { kind: "entering" | "looping" | "leaving"; shown: Shown }
   | { kind: "event"; event: ClawdEvent; resume: Shown | null };
-export interface ClawdPlayerOptions {
-  clips?: ClawdClips;
-  canonical?: (frame: ClawdFrame) => ClawdFrame;
-  rest?: "logo" | "standing";
-}
 const tickAt = (time: number) => Math.floor((time + 0.004) * 12);
-const gridAfter = (time: number) => Math.ceil((time - 0.004) * 12) / 12;
 const frameStep = (
   frame: ClawdFrame | null,
   values: Partial<Step> = {},
@@ -57,13 +49,13 @@ const samePicture = (a: SpritePicture | null, b: SpritePicture | null) =>
 
 /** Full source ClawdPlayer: clips, not renders, own every state transition on the absolute 12fps grid. */
 export class ClawdPlayer {
-  readonly clips: ClawdClips;
+  readonly clips = clawdClips;
   readonly restMode: "logo" | "standing";
-  private canonical: (frame: ClawdFrame) => ClawdFrame;
+  private canonical = (frame: ClawdFrame) => frame;
   target: ClawdLook | null = null;
   subagents = false;
   pendingEvent: ClawdEvent | null = null;
-  badge: ClawdSign | undefined;
+  badge: BotSign | undefined;
   private hovered = false;
   private sector: number | null = null;
   private activity: Activity = { kind: "resting" };
@@ -73,18 +65,9 @@ export class ClawdPlayer {
   private cameInAt: number | null = null;
   private showing: boolean;
   private appearanceSince = 0;
-  private legacy: {
-    state: MarkState | null;
-    hovered: boolean;
-    greetAt: number | null;
-    visitAt: number;
-    visiting: boolean;
-  } | null = null;
 
-  constructor(options: ClawdPlayerOptions = {}) {
-    this.clips = options.clips ?? clawdClips;
-    this.restMode = options.rest ?? "logo";
-    this.canonical = options.canonical ?? ((frame) => frame);
+  constructor(rest: "logo" | "standing") {
+    this.restMode = rest;
     this.script = [this.restStep()];
     this.showing = this.restMode === "standing";
   }
@@ -98,11 +81,7 @@ export class ClawdPlayer {
     this.canonical = canonical;
   }
   get due(): number {
-    return Math.min(
-      this.nextChange() ?? Infinity,
-      this.legacy?.greetAt ?? Infinity,
-      this.legacy?.visitAt ?? Infinity,
-    );
+    return this.nextChange() ?? Infinity;
   }
   get shown(): ClawdLook | null {
     return "shown" in this.activity ? this.activity.shown.look : null;
@@ -311,76 +290,12 @@ export class ClawdPlayer {
           });
     this.holdAtCard(held, time);
   }
-  setBadge(badge: ClawdSign | undefined, time: number) {
+  setBadge(badge: BotSign | undefined, time: number) {
     this.stepTo(time);
     this.badge = badge;
   }
   advance(time: number) {
     this.stepTo(time);
-    return this.picture;
-  }
-
-  /** Transitional four-phase adapter; the full runtime uses ClawdPerformer and the rich methods above. */
-  step(
-    state: MarkState,
-    hovered: boolean,
-    time: number,
-    aim: readonly [number, number],
-  ): SpritePicture | null {
-    this.advance(time);
-    const legacy = (this.legacy ??= {
-      state: null,
-      hovered: false,
-      greetAt: null,
-      visitAt: Infinity,
-      visiting: false,
-    });
-    const schedule = () => {
-      legacy.visitAt =
-        state === "idle" && !hovered
-          ? gridAfter(time + 20 + Math.random() * 15)
-          : Infinity;
-    };
-    if (state !== legacy.state) {
-      legacy.state = state;
-      if (state === "done") this.card("done", time);
-      else
-        this.show(
-          state === "working"
-            ? "command"
-            : state === "asking"
-              ? "permission"
-              : null,
-          time,
-        );
-      schedule();
-    }
-    if (hovered !== legacy.hovered) {
-      legacy.hovered = hovered;
-      legacy.greetAt = hovered ? gridAfter(time + 0.3) : null;
-      if (!hovered) this.endHover(time);
-      schedule();
-    }
-    if (legacy.greetAt !== null && time >= legacy.greetAt - 0.004) {
-      legacy.greetAt = null;
-      if (state === "idle") this.greet(time);
-    }
-    if (hovered) this.look(aim, time);
-    if (time >= legacy.visitAt - 0.004) {
-      legacy.visitAt = Infinity;
-      this.visit(
-        (["swaying", "turning", "glancing"] as const)[
-          Math.floor(Math.random() * 3)
-        ],
-        time,
-      );
-      legacy.visiting = this.picture !== null;
-      if (!legacy.visiting) schedule();
-    }
-    if (legacy.visiting && this.picture === null) {
-      legacy.visiting = false;
-      schedule();
-    }
     return this.picture;
   }
 
@@ -418,11 +333,8 @@ export class ClawdPlayer {
     return null;
   }
   private clone() {
-    const probe = new ClawdPlayer({
-      clips: this.clips,
-      canonical: this.canonical,
-      rest: this.restMode,
-    });
+    const probe = new ClawdPlayer(this.restMode);
+    probe.canonical = this.canonical;
     probe.target = this.target;
     probe.subagents = this.subagents;
     probe.pendingEvent = this.pendingEvent;
@@ -441,7 +353,7 @@ export class ClawdPlayer {
   private pictureOf(step: Step): SpritePicture | null {
     if (!step.frame) return null;
     const frame = this.canonical(step.frame),
-      sign = winningSign(step.sign, this.badge);
+      sign = shownSign(step.sign ?? null, this.badge ?? null);
     return {
       name: frame.name,
       index: frame.index,

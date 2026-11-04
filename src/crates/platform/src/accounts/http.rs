@@ -50,12 +50,6 @@ fn retry_after(headers: &reqwest::header::HeaderMap) -> Option<u32> {
     u32::try_from((at.timestamp() - chrono::Utc::now().timestamp()).max(0)).ok()
 }
 
-/// `read_json`, with a failure worded as Open's ProviderHTTP words it; the
-/// provider's section already names whose reading it is.
-pub(crate) fn response_json(response: Response, _provider: &str) -> Result<Value, String> {
-    read_json(response).map_err(HttpFailure::message)
-}
-
 #[cfg(test)]
 mod tests {
     use super::retry_after;

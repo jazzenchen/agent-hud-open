@@ -6,7 +6,7 @@ use std::{
     net::Shutdown,
     os::fd::AsRawFd,
     os::unix::{
-        fs::{DirBuilderExt, FileTypeExt, MetadataExt, OpenOptionsExt, PermissionsExt},
+        fs::{FileTypeExt, MetadataExt, OpenOptionsExt, PermissionsExt},
         net::{UnixListener, UnixStream},
     },
     path::{Path, PathBuf},
@@ -20,26 +20,6 @@ use std::{
 fn identity(path: &Path) -> Option<(u64, u64)> {
     fs::symlink_metadata(path).ok().map(|m| (m.dev(), m.ino()))
 }
-fn owner_directory(directory: &Path) -> Result<(), String> {
-    // The private parent prevents access even in the interval between bind and
-    // chmod, without changing the multithreaded application's global umask.
-    fs::create_dir_all(directory.parent().ok_or("Tools directory unavailable")?)
-        .map_err(|_| "Tools directory unavailable")?;
-    match fs::DirBuilder::new().mode(0o700).create(directory) {
-        Ok(()) => {}
-        Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {}
-        Err(_) => return Err("Tools directory unavailable".into()),
-    }
-    unsafe extern "C" {
-        fn getuid() -> u32;
-    }
-    let metadata = fs::symlink_metadata(directory).map_err(|_| "Tools directory unavailable")?;
-    if !metadata.is_dir() || metadata.uid() != unsafe { getuid() } {
-        return Err("Tools directory must belong to the current user".into());
-    }
-    fs::set_permissions(directory, fs::Permissions::from_mode(0o700))
-        .map_err(|_| "Tools directory permissions unavailable".into())
-}
 
 pub struct Server {
     path: PathBuf,
@@ -51,7 +31,9 @@ pub struct Server {
 impl Server {
     pub fn start(data: &Path, handler: Handler) -> Result<Self, String> {
         let path = socket_path(data);
-        owner_directory(path.parent().ok_or("Tools directory unavailable")?)?;
+        // The private parent prevents access even in the interval between bind and
+        // chmod, without changing the multithreaded application's global umask.
+        crate::os::private_directory(path.parent().ok_or("Tools directory unavailable")?)?;
         let lock = File::options()
             .read(true)
             .write(true)
@@ -117,7 +99,7 @@ impl Server {
                         Err(_) => json!({"id":null,"error":{"message":"Invalid local tools request"}}),
                     }
                 };
-                let mut bytes = serde_json::to_vec(&response).unwrap_or_default();
+                let mut bytes = serde_json::to_vec(&response).unwrap();
                 if bytes.len() as u64 > RESPONSE_LIMIT {
                     bytes = serde_json::to_vec(&json!({"id":response.get("id"),"error":{"message":"Local tools response is too large"}})).unwrap();
                 }
@@ -155,7 +137,7 @@ impl Drop for Server {
 }
 
 pub fn request(data: &Path, request: &Value) -> Result<Value, String> {
-    let bytes = serde_json::to_vec(request).map_err(|_| "Invalid local tools request")?;
+    let bytes = serde_json::to_vec(request).unwrap();
     if bytes.len() as u64 > REQUEST_LIMIT {
         return Err("Local tools request is too large".into());
     }

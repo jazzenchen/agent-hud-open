@@ -74,7 +74,7 @@ pub(super) fn whole(v: &Value) -> Option<i64> {
         return Some(n);
     }
     let n = v.as_f64()?;
-    (n.is_finite() && n.fract() == 0.0 && n.abs() < 9.0e15).then_some(n as i64)
+    (n.fract() == 0.0 && n.abs() < 9.0e15).then_some(n as i64)
 }
 
 /// Whether two values say the same: numbers by value, so 20 and 20.0 are one.
@@ -166,7 +166,7 @@ pub(super) enum Kind {
 }
 
 impl Kind {
-    fn widgets(self) -> &'static [&'static str] {
+    pub(super) fn widgets(self) -> &'static [&'static str] {
         match self {
             Kind::Quota => WIDGETS,
             Kind::Balance => &["number", "chart"],
@@ -183,7 +183,7 @@ impl Kind {
     }
     /// The measures the kind offers under a widget, in picker order. A balance's card
     /// offers what this build draws on it: its balance, its burn rate and its cost.
-    fn measures(self, widget: &str) -> &'static [&'static str] {
+    pub(super) fn measures(self, widget: &str) -> &'static [&'static str] {
         match (self, widget) {
             (Kind::Quota, "chart") => &["tokens"],
             (Kind::Quota, _) => MEASURES,
@@ -799,6 +799,18 @@ fn block_issues(
     found
 }
 
+/// The agents whose sessions the panel lists now, the names `sessions.agents` takes.
+pub(super) fn session_agents(snapshot: &Value) -> Vec<String> {
+    let mut agents: Vec<String> = vec![];
+    for session in snapshot["sessions"].as_array().into_iter().flatten() {
+        if let Some(source) = session["source"].as_str() {
+            push_unique(&mut agents, source);
+        }
+    }
+    agents.sort();
+    agents
+}
+
 /// Every agent of `sessions.agents` that no session has now, of `tokens.agents` that
 /// no model in the token chart has now, every model of `tokens.models` the chart
 /// cannot draw now, and every one whose agent `tokens.agents` leaves out
@@ -812,13 +824,7 @@ pub(super) fn filter_issues(
 ) -> Vec<String> {
     let mut found = vec![];
     let normalize = |v: &str| collapse(v, |c| c == ' ' || c == '_');
-    let mut with_sessions: Vec<String> = vec![];
-    for session in snapshot["sessions"].as_array().into_iter().flatten() {
-        if let Some(source) = session["source"].as_str() {
-            push_unique(&mut with_sessions, source);
-        }
-    }
-    with_sessions.sort();
+    let with_sessions = session_agents(snapshot);
     let offered = if with_sessions.is_empty() {
         "No agent has a session now.".to_owned()
     } else {

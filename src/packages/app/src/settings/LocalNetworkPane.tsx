@@ -14,6 +14,7 @@ import {
   type SettingsPaneProps,
   type Text,
 } from "./SettingsPrimitives";
+import { usePending } from "./use-pending";
 
 interface Peer {
   id: string;
@@ -57,8 +58,7 @@ export function LocalNetworkPane({
   const [status, setStatus] = useState<ShareStatus | null>(null);
   const [invitation, setInvitation] = useState<Invitation | null>(null);
   const [copied, setCopied] = useState(false);
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { pending, error, setError, run } = usePending();
   const share = useCallback(
     (method: string, params: Record<string, unknown> = {}) =>
       action("phone_share", { method, params }),
@@ -80,16 +80,8 @@ export function LocalNetworkPane({
     return () => window.clearInterval(timer);
   }, [active, read]);
   const perform = async (job: () => Promise<unknown>) => {
-    setPending(true);
-    setError(null);
-    try {
-      await job();
-    } catch (failure) {
-      setError(failure instanceof Error ? failure.message : String(failure));
-    } finally {
-      setPending(false);
-      void read();
-    }
+    await run(job);
+    void read();
   };
   if (!status)
     return (

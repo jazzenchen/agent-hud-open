@@ -13,10 +13,13 @@ use std::{
     collections::HashMap,
     fs,
     path::PathBuf,
-    sync::Mutex,
+    sync::{LazyLock, Mutex},
     time::{SystemTime, UNIX_EPOCH},
 };
-const DEFAULTS: &str = include_str!("../../../packages/protocol/hud-defaults.json");
+static DEFAULTS: LazyLock<Map<String, Value>> = LazyLock::new(|| {
+    serde_json::from_str(include_str!("../../../packages/protocol/hud-defaults.json"))
+        .expect("checked-in defaults")
+});
 const GLOBAL: &[&str] = &[
     "botLogos",
     "hoverDelayMs",
@@ -87,21 +90,16 @@ fn merge(target: &mut Map<String, Value>, patch: &Map<String, Value>) {
 }
 /// A direct Settings edit supersedes only that setting of an app draft.
 fn clear_app_field(s: &mut State, key: &str) -> bool {
-    let field = match key {
-        "appearance" => "appearance",
-        "appearanceFollowsScreen" => "matchScreen",
-        "showMenuBarIcon" => "showMenuBarIcon",
-        "botLogos" => "botLogos",
-        "hoverDelayMs" => "hover:delayMs",
-        "collapseDelayMs" => "hover:collapseDelayMs",
-        "requiresOptionToOpen" => "hover:pressOptionToOpen",
-        "openImmediatelyAtTop" => "hover:openAtTopEdge",
-        _ => return false,
+    let Some((field, ..)) = app_rules::SAVED_AS
+        .iter()
+        .find(|(_, saved, _)| *saved == key)
+    else {
+        return false;
     };
     let Some(draft) = s.app.as_mut().and_then(Value::as_object_mut) else {
         return false;
     };
-    let changed = if let Some(field) = field.strip_prefix("hover:") {
+    let changed = if let Some(field) = field.strip_prefix("hover.") {
         if let Some(hover) = draft.get_mut("hover").and_then(Value::as_object_mut) {
             let removed = hover.remove(field).is_some();
             if hover.is_empty() {
@@ -112,7 +110,7 @@ fn clear_app_field(s: &mut State, key: &str) -> bool {
             false
         }
     } else {
-        draft.remove(field).is_some()
+        draft.remove(*field).is_some()
     };
     if draft.is_empty() {
         s.app = None;
@@ -151,11 +149,9 @@ impl Presentation {
         }
         let bytes = serde_json::to_vec_pretty(&state.saved).map_err(|e| e.to_string())?;
         let temporary = self.path.with_extension("json.tmp");
-        if let Err(e) = fs::write(&temporary, bytes).and_then(|_| fs::rename(temporary, &self.path))
-        {
-            state.saved = before;
-            return Err(e.to_string());
-        }
+        fs::write(&temporary, bytes)
+            .and_then(|_| fs::rename(temporary, &self.path))
+            .map_err(|e| e.to_string())?;
         state.previous = Some(before);
         state.initialized = true;
         state.revision = state.revision.wrapping_add(1);
@@ -195,11 +191,10 @@ impl Presentation {
             key.starts_with("glow")
                 || ["breathSeconds", "idleBreathSeconds", "breathAmplitude"].contains(&key.as_str())
         });
-        let defaults: Value = serde_json::from_str(DEFAULTS).expect("checked-in defaults");
         for value in seeded.screens.values_mut() {
             if let Some(settings) = value.as_object_mut() {
                 settings.retain(|key, _| {
-                    defaults.get(key).is_some()
+                    DEFAULTS.contains_key(key)
                         && !HARDWARE.contains(&key.as_str())
                         && !GLOBAL.contains(&key.as_str())
                         && !tools::panel_key(key)

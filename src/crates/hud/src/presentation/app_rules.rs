@@ -15,6 +15,19 @@ const HOVER: &[&str] = &[
     "collapseDelayMs",
 ];
 const READ_ONLY: &[&str] = &["language", "writtenIn"];
+/// Every field of an app draft, `hover.` before one under `app.hover`, with the
+/// setting it is saved as, and whether the display preferences' `global` keeps that
+/// setting rather than the app's settings.
+pub(super) const SAVED_AS: &[(&str, &str, bool)] = &[
+    ("appearance", "appearance", false),
+    ("matchScreen", "appearanceFollowsScreen", false),
+    ("showMenuBarIcon", "showMenuBarIcon", false),
+    ("botLogos", "botLogos", true),
+    ("hover.delayMs", "hoverDelayMs", true),
+    ("hover.collapseDelayMs", "collapseDelayMs", true),
+    ("hover.pressOptionToOpen", "requiresOptionToOpen", true),
+    ("hover.openAtTopEdge", "openImmediatelyAtTop", true),
+];
 /// The milliseconds Settings sets a delay in, and the step its slider moves by.
 const DELAY_RANGE: (i64, i64) = (0, 1500);
 const DELAY_STEP: i64 = 50;

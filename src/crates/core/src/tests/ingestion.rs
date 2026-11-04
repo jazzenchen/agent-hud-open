@@ -508,7 +508,7 @@ fn a_log_this_run_writes_keeps_the_meter_view() {
     use std::io::Write;
     let mut f = fs::OpenOptions::new().append(true).open(&path).unwrap();
     write!(f, "{}", reply("m2", at + 1_000, 30)).unwrap();
-    backend.scan_impl(None).unwrap();
+    backend.scan(None).unwrap();
     // The view reads the written log again alone rather than every log.
     assert!(backend.meters.view.is_some());
     assert!(backend

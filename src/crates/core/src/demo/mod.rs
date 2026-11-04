@@ -19,10 +19,9 @@ pub mod script;
 pub use script::{DemoAction, DemoScript, DemoStep};
 
 use crate::{
-    accounts::AccountProjection, database::checkpoints, ingestion::read_lines, l10n, metering,
+    accounts::AccountProjection, database::checkpoints, ingestion::read_lines, iso, l10n, metering,
     naming::vendor_windows, AgentHudCore, Log, LogHead,
 };
-use chrono::{DateTime, Utc};
 use data::{DemoAgent, DemoTurn, Kinds, Plan, EXTRAS, PLANS, READINGS};
 use serde_json::{json, Value};
 use std::{
@@ -65,12 +64,6 @@ pub(crate) fn file(path: &Path) -> Option<Vec<u8>> {
             .to_string()
             .into_bytes(),
     )
-}
-
-fn iso(at: i64) -> String {
-    DateTime::<Utc>::from_timestamp_millis(at)
-        .map(|at| at.to_rfc3339())
-        .unwrap_or_default()
 }
 
 fn plan(id: &str) -> Result<&'static Plan, String> {
@@ -945,6 +938,7 @@ pub fn demo_request(id: &str, at: i64) -> Option<Value> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use chrono::Utc;
 
     #[test]
     fn the_demo_reads_through_the_real_parsers() {

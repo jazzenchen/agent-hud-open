@@ -94,15 +94,19 @@ fn encodeSrgb(color: vec3f) -> vec3f {
 `;
 }
 
-/** CSS colour → linear sRGB, through a one-pixel 2D canvas. */
-function linearColor(css: string): [number, number, number, number] {
+/** A CSS colour's sRGB channels and alpha, 0 to 255, through a one-pixel 2D canvas. */
+export function cssChannels(css: string) {
   const probe = document.createElement("canvas");
   probe.width = probe.height = 1;
-  const context = probe.getContext("2d", { willReadFrequently: true });
-  if (!context) return [0, 0, 0, 0];
+  const context = probe.getContext("2d", { willReadFrequently: true })!;
   context.fillStyle = css;
   context.fillRect(0, 0, 1, 1);
-  const [r, g, b, a] = context.getImageData(0, 0, 1, 1).data;
+  return context.getImageData(0, 0, 1, 1).data;
+}
+
+/** CSS colour → linear sRGB. */
+function linearColor(css: string): [number, number, number, number] {
+  const [r, g, b, a] = cssChannels(css);
   const decode = (channel: number) => {
     const c = channel / 255;
     return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;

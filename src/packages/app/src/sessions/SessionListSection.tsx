@@ -7,7 +7,7 @@ import {
   stackTurnBars,
   topSessions,
 } from "../lib/sessions";
-import type { Session } from "../lib/types";
+import type { Session } from "@agent-hud/protocol";
 import { useAnimatedNumber } from "../statistics/StatsTheme";
 import { moneyAmount, share } from "@agent-hud/ui/format";
 import { ShareRows, TurnSparkline } from "./SessionCharts";
@@ -18,7 +18,7 @@ import {
   compact,
   integer,
   kindColor,
-  kindNames,
+  kindLabel,
   Missing,
   moneyText,
   numeric,
@@ -208,7 +208,7 @@ export function TodayCard({
         >
           {kinds
             ? kinds.map((entry) => {
-                const name = kindNames[entry.kind][zh ? 1 : 0];
+                const name = kindLabel(entry.kind, zh);
                 return (
                   <span
                     key={entry.kind}
@@ -235,7 +235,7 @@ export function TodayCard({
                   key={kind}
                   style={{ ...row, gap: 6, color: theme.secondary }}
                 >
-                  {kindNames[kind][zh ? 1 : 0]}
+                  {kindLabel(kind, zh)}
                   <Missing theme={theme} />
                 </span>
               ))}

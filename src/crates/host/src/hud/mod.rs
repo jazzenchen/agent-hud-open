@@ -28,7 +28,7 @@ mod types;
 //   set_ignore_cursor                    pass input through all but the reported regions
 //   set_drag_cursor, global_pointer,     pointer and button state while hovering
 //     left_mouse_down, pointer_keys        or dragging
-//   edge_hud_unsupported, capabilities   what this host cannot do
+//   edge_hud_unsupported                 what this host cannot do
 // generic.rs holds the pieces that need only Tauri's own window API; a host
 // re-exports those until it has a native adapter.
 #[cfg(not(target_os = "macos"))]
@@ -196,7 +196,7 @@ fn reconcile(app: &tauri::AppHandle, connected: &HashSet<String>) {
             false
         };
         if cancelled {
-            set_drag_cursor(app, &owner, false);
+            host::set_drag_cursor(app, &owner, false);
             emit_drag_end(app, &owner, true);
         }
         crate::activity::forget(app, &owner.label);
@@ -285,19 +285,15 @@ fn configure_display(
         }
     }
     let result = configure(app, config, &mut state, &shared, display, false);
-    let geometry = result
-        .as_ref()
-        .ok()
-        .and_then(|result| result.geometry.clone());
-    if let Some(geometry) = geometry {
-        emit_geometry(app, &geometry);
+    if let Some(geometry) = state.geometry.as_ref().filter(|_| result.is_ok()) {
+        emit_geometry(app, geometry);
     }
     if was_dragging {
         emit_drag_end(app, &shared, true);
     }
     drop(state);
     shared.changed.notify_all();
-    result.map(|_| ())
+    result
 }
 
 fn configure(
@@ -307,59 +303,29 @@ fn configure(
     owner: &Shared,
     display: Display,
     keep_drag: bool,
-) -> Result<HudWindowState, String> {
+) -> Result<(), String> {
     config.screen_id = Some(owner.screen_id.clone());
     config.monitor_index = display.info.index;
-    let capabilities = hud_native_capabilities();
     if !config.visible {
         if !keep_drag {
             state.drag = None;
         }
-        let window = app.get_webview_window(&owner.label);
-        if let Some(window) = window.as_ref() {
-            release_text_focus(window, state)?;
-            apply_ignore_cursor(window, state, true, true)?;
+        if let Some(window) = app.get_webview_window(&owner.label) {
+            release_text_focus(&window, state)?;
+            apply_ignore_cursor(&window, state, true, true)?;
             window.hide().map_err(|error| error.to_string())?;
         }
         crate::activity::set(app, &owner.label, false);
         publish_pointer(app, owner, state, HudPointer::outside(owner), false);
-        state.config = Some(config.clone());
-        return Ok(HudWindowState {
-            screen_id: owner.screen_id.clone(),
-            window_label: owner.label.clone(),
-            created: window.is_some(),
-            visible: false,
-            config,
-            frame: None,
-            requested_frame: None,
-            capabilities,
-            geometry: state.geometry.clone(),
-        });
+        state.config = Some(config);
+        return Ok(());
     }
     if let Some(reason) = edge_hud_unsupported() {
         return Err(reason.into());
     }
-    if !config.width.is_finite()
-        || !config.height.is_finite()
-        || config.width <= 0.0
-        || config.height <= 0.0
-        || !config.offset.is_finite()
-    {
-        return Err(
-            "HUD width and height must be positive finite numbers, and offset must be finite"
-                .into(),
-        );
-    }
     config.offset = config.offset.clamp(0.0, 1.0);
-    if matches!(config.mode, Mode::Notch) {
-        config.edge = Edge::Top;
-        config.offset = 0.5;
-    }
     let monitor = &display.monitor;
     let scale = monitor.scale_factor();
-    if !scale.is_finite() || scale <= 0.0 {
-        return Err("The HUD monitor reported an invalid scale".into());
-    }
     let measured = &display.measured;
     let frame = edge_frame(monitor_bounds(monitor), scale, &config);
     // Report the actual clamped logical size, rather than an impossible requested canvas.
@@ -406,7 +372,7 @@ fn configure(
     if !keep_drag {
         state.drag = None;
     }
-    let (actual, canvas) = host::place(&window, frame, scale, keep_drag, config.mode)?;
+    let canvas = host::place(&window, frame, scale, config.mode)?;
     crate::activity::set(app, &owner.label, true);
     state.config = Some(config.clone());
     let expected = LogicalRect {
@@ -449,17 +415,7 @@ fn configure(
         }
     };
     apply_ignore_cursor(&window, state, ignore, !keep_drag)?;
-    Ok(HudWindowState {
-        screen_id: owner.screen_id.clone(),
-        window_label: owner.label.clone(),
-        created: true,
-        visible: true,
-        config,
-        frame: Some(actual),
-        requested_frame: Some(frame),
-        capabilities,
-        geometry: state.geometry.clone(),
-    })
+    Ok(())
 }
 
 pub(super) fn emit_geometry(app: &tauri::AppHandle, geometry: &HudGeometry) {

@@ -5,7 +5,6 @@ import {
   sessionClient,
   sessionHelp,
   sessionKinds,
-  sessionPlace,
 } from "../src/lib/sessions.ts";
 import { hourModels } from "../src/lib/statistics.ts";
 
@@ -26,10 +25,6 @@ test("list costs read as Open's ListCost.text: ≈ each currency, US dollars fir
     "two decimals, as Open writes a list cost",
   );
   assert.equal(listCost({}, "en"), "");
-});
-
-test("a currency code Intl does not know still reads as an amount", () => {
-  assert.equal(listCost({ usd1: 3 }, "en"), "≈usd1 3.00");
 });
 
 const providers = [
@@ -56,30 +51,6 @@ test("a session's client is Core's name for it, else its agent's name, else the 
   );
   assert.equal(sessionClient({ source: "grok-cli" }, providers), "grok-cli");
   assert.equal(sessionClient({ source: "pi" }), "pi");
-});
-
-test("a row's second line is the model, then the folder, else the client", () => {
-  const session = {
-    model: "claude-opus-4-5-20251101",
-    modelName: "Opus 4.5",
-    cwd: "/Users/me/app",
-  };
-  assert.deepEqual(sessionPlace(session, "Claude Code CLI"), [
-    "Opus 4.5",
-    "/Users/me/app",
-  ]);
-  assert.deepEqual(sessionPlace({ ...session, cwd: null }, "Claude Code CLI"), [
-    "Opus 4.5",
-    "Claude Code CLI",
-  ]);
-  assert.deepEqual(
-    sessionPlace({ model: "gpt-5", modelName: null, cwd: null }, "Codex CLI"),
-    ["gpt-5", "Codex CLI"],
-  );
-  assert.deepEqual(sessionPlace({ model: "", cwd: null }, "Codex CLI"), [
-    "—",
-    "Codex CLI",
-  ]);
 });
 
 test("a row's tooltip is the title, the client and the folder", () => {

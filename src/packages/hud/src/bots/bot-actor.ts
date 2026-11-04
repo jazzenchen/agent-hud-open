@@ -16,7 +16,6 @@ export interface BotActorOptions {
   staysBot?: boolean;
   arrivesAfter?: number;
   awake?: boolean;
-  seed?: number;
 }
 /** One event timeline; canvas resources and both renderers are consumers of it. */
 export class BotActor {
@@ -42,7 +41,7 @@ export class BotActor {
   }
   constructor(state: BotState, now: number, options: BotActorOptions = {}) {
     this.state = state;
-    this.motion = new BotMotion(options.seed);
+    this.motion = new BotMotion();
     this.motion.staysBot = options.staysBot ?? false;
     this.motion.arrivesAfter = options.arrivesAfter ?? 0;
     this.clawd = new ClawdActor({

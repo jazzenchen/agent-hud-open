@@ -14,7 +14,7 @@ import type {
   HUDUpdateNotice,
 } from "@agent-hud/hud/model";
 import type { Direction } from "@agent-hud/hud/bots/mark-director";
-import type { Snapshot, NativeMethod } from "./lib/types";
+import type { Snapshot, NativeMethod } from "@agent-hud/protocol";
 import type {
   NativeHUDGeometry,
   NativeHUDMonitor,
@@ -93,7 +93,7 @@ export default function NativeHUDSurface({
   snapshot: Snapshot;
   config: HUDConfig;
   geometry: NativeHUDGeometry | null;
-  monitors?: NativeHUDMonitor[];
+  monitors: NativeHUDMonitor[];
   botDirections?: Record<string, Direction>;
   glowHidden?: boolean;
   action: (
@@ -415,11 +415,9 @@ export default function NativeHUDSurface({
         setUpdate(payload);
       },
     );
-    void invoke<HUDUpdateNotice | null>("hud_update_notice")
-      .then((notice) => {
-        if (!heard) setUpdate(notice);
-      })
-      .catch(() => {});
+    void invoke<HUDUpdateNotice | null>("hud_update_notice").then((notice) => {
+      if (!heard) setUpdate(notice);
+    });
     return () => void subscription.then((unlisten) => unlisten());
   }, []);
   const openUpdate = useCallback(() => {
@@ -560,16 +558,11 @@ export default function NativeHUDSurface({
   }, [screenId]);
   if (isTauri() && (!geometry || geometry.screenId !== screenId)) return null;
   const primary =
-    !monitors ||
-    (monitors.find((m) => m.screenId === screenId)?.primary ??
-      monitors[0]?.screenId === screenId);
+    monitors.find((m) => m.screenId === screenId)?.primary ??
+    monitors[0]?.screenId === screenId;
   const underPointer = (() => {
-    if (!isTauri() || !geometry || !monitors || monitors.length <= 1)
-      return true;
-    const isPrimary =
-      monitors.find((m) => m.screenId === screenId)?.primary ??
-      monitors[0]?.screenId === screenId;
-    if (!nativePointer?.point) return isPrimary;
+    if (!isTauri() || !geometry || monitors.length <= 1) return true;
+    if (!nativePointer?.point) return primary;
     const globalX = nativePointer.point.x + geometry.canvas.x;
     const globalY = nativePointer.point.y + geometry.canvas.y;
     const screen = geometry.screen;
@@ -600,7 +593,7 @@ export default function NativeHUDSurface({
         return false;
       }
     }
-    return isPrimary;
+    return primary;
   })();
   const notchFrame = geometry
     ? (geometry.notchInViewport ?? {

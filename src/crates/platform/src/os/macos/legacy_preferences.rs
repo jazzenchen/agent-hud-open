@@ -1,5 +1,6 @@
 //! Read-only first-run seed from the original public SettingsStore. Never
 //! writes its defaults, imports credentials or copies unknown product fields.
+use crate::hooks::origins::is_uuid;
 use serde_json::{json, Map, Value};
 fn copy_bool(out: &mut Map<String, Value>, from: &Value, keys: &[&str]) {
     for key in keys {
@@ -24,16 +25,6 @@ fn number(
     if let Some(n) = from[source].as_f64().filter(|n| n.is_finite()) {
         out.insert(target.into(), json!(n.clamp(min, max)));
     }
-}
-fn uuid(id: &str) -> bool {
-    id.len() == 36
-        && id.bytes().enumerate().all(|(i, b)| {
-            if matches!(i, 8 | 13 | 18 | 23) {
-                b == b'-'
-            } else {
-                b.is_ascii_hexdigit()
-            }
-        })
 }
 fn glow(from: &Value, flat: bool) -> Map<String, Value> {
     let mut out = Map::new();
@@ -542,7 +533,7 @@ pub(super) fn normalize(settings: &Value, layouts: &Value, agents: &Value) -> Va
     let mut ids = std::collections::BTreeSet::new();
     for field in ["screens", "screenGlow"] {
         if let Some(values) = settings[field].as_object() {
-            ids.extend(values.keys().filter(|id| uuid(id)).cloned());
+            ids.extend(values.keys().filter(|id| is_uuid(id)).cloned());
         }
     }
     for id in ids {
@@ -576,7 +567,7 @@ pub(super) fn normalize(settings: &Value, layouts: &Value, agents: &Value) -> Va
     let mut own_layouts = Map::new();
     if let Some(values) = layouts["screens"].as_object() {
         for (id, value) in values {
-            if uuid(id) && value["current"].is_object() {
+            if is_uuid(id) && value["current"].is_object() {
                 own_layouts.insert(
                     id.clone(),
                     carry_layout(layout(&value["current"]), settings, &rows, &order, &hidden),
@@ -609,7 +600,7 @@ pub(super) fn normalize(settings: &Value, layouts: &Value, agents: &Value) -> Va
     );
     json!({"settings":app,"presentation":{"global":global,"screenDefaults":defaults,"screens":screens,"sharedLayout":shared,"layouts":own_layouts,"sources":sources}})
 }
-pub(crate) fn read() -> Result<Option<Value>, String> {
+pub(crate) fn read() -> Option<Value> {
     use objc2_foundation::{NSData, NSString, NSUserDefaults};
     let defaults = NSUserDefaults::standardUserDefaults();
     for name in ["app.agenthud.mac", "app.agenthud.open"] {
@@ -628,12 +619,12 @@ pub(crate) fn read() -> Result<Option<Value>, String> {
         let layouts = decode("panelLayout.v2").filter(Value::is_object);
         let agents = decode("agents.v5").filter(Value::is_array);
         if settings.is_some() || layouts.is_some() || agents.is_some() {
-            return Ok(Some(normalize(
+            return Some(normalize(
                 settings.as_ref().unwrap_or(&Value::Null),
                 layouts.as_ref().unwrap_or(&Value::Null),
                 agents.as_ref().unwrap_or(&Value::Null),
-            )));
+            ));
         }
     }
-    Ok(None)
+    None
 }

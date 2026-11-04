@@ -16,14 +16,13 @@ pub(super) fn panel_builder<'a>(
 
 /// Sizes, positions and shows the window at `frame` (physical pixels); show()
 /// keeps focusable/focused disabled and never calls set_focus(). Returns the
-/// frame the system gave it in physical pixels and the monitor's points.
+/// frame the system gave it in the monitor's points.
 pub(super) fn place(
     window: &tauri::WebviewWindow,
     frame: Rect,
     scale: f64,
-    _keep_drag: bool,
     _mode: super::types::Mode,
-) -> Result<(Rect, LogicalRect), String> {
+) -> Result<LogicalRect, String> {
     window
         .set_size(PhysicalSize::new(frame.width, frame.height))
         .map_err(|error| error.to_string())?;
@@ -33,19 +32,12 @@ pub(super) fn place(
     window.show().map_err(|error| error.to_string())?;
     let position = window.outer_position().map_err(|error| error.to_string())?;
     let size = window.outer_size().map_err(|error| error.to_string())?;
-    let actual = Rect {
-        x: position.x,
-        y: position.y,
-        width: size.width,
-        height: size.height,
-    };
-    let canvas = LogicalRect {
-        x: f64::from(actual.x) / scale,
-        y: f64::from(actual.y) / scale,
-        width: f64::from(actual.width) / scale,
-        height: f64::from(actual.height) / scale,
-    };
-    Ok((actual, canvas))
+    Ok(LogicalRect {
+        x: f64::from(position.x) / scale,
+        y: f64::from(position.y) / scale,
+        width: f64::from(size.width) / scale,
+        height: f64::from(size.height) / scale,
+    })
 }
 
 /// Ignoring the cursor passes the whole window through; the regions are only

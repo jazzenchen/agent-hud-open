@@ -8,7 +8,7 @@ import type {
   StatisticsPeriod,
   StatisticsProvider,
   StatisticsTokenKind,
-} from "../lib/types";
+} from "@agent-hud/protocol";
 import {
   card,
   compact,

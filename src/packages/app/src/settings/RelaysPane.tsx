@@ -15,6 +15,7 @@ import {
   type SettingsPaneProps,
 } from "./SettingsPrimitives";
 import { RelayForm, RelayKindForm } from "./RelayForms";
+import { usePending } from "./use-pending";
 
 /**
  * The relay page: every relay once, by its address, whether a client's
@@ -27,8 +28,7 @@ import { RelayForm, RelayKindForm } from "./RelayForms";
 export function RelaysPane({ snapshot, action }: SettingsPaneProps) {
   const t = useText(snapshot);
   const language = snapshotLanguage(snapshot);
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { pending, error, run: perform } = usePending();
   const [adding, setAdding] = useState(false);
   // The relay address whose type is being chosen by hand.
   const [choosing, setChoosing] = useState<string | null>(null);
@@ -42,19 +42,6 @@ export function RelaysPane({ snapshot, action }: SettingsPaneProps) {
     sub2api: "Sub2API",
     openrouter: "OpenRouter",
     custom: t("Custom endpoint", "自定义接口"),
-  };
-  const perform = async (job: () => Promise<unknown>) => {
-    setPending(true);
-    setError(null);
-    try {
-      await job();
-      return true;
-    } catch (failure) {
-      setError(failure instanceof Error ? failure.message : String(failure));
-      return false;
-    } finally {
-      setPending(false);
-    }
   };
   /** Where the relay came from, next to its name. */
   const origin = (relay: RelaySource) => {

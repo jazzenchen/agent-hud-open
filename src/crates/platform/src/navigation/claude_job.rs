@@ -27,7 +27,7 @@ const GONE: Duration = Duration::from_secs(10);
 
 /// False when this host cannot move the job; the caller then falls back.
 pub(super) fn open(home: &Path, session: &str, job: &str) -> Result<bool, String> {
-    if !crate::os::MOVES_CLAUDE_JOBS || !super::uuid(session) || !job_name(job) {
+    if !crate::os::MOVES_CLAUDE_JOBS || !super::is_uuid(session) || !job_name(job) {
         return Ok(false);
     }
     let env = std::env::vars().collect::<Environment>();
@@ -36,14 +36,11 @@ pub(super) fn open(home: &Path, session: &str, job: &str) -> Result<bool, String
     {
         return Ok(false);
     }
-    let Some(claude) = crate::os::engine_candidates(home, &env, "claude")
-        .into_iter()
-        .find(|path| crate::os::engine_executable(path))
-    else {
+    let Some(claude) = crate::os::find_engine(home, &env, "claude") else {
         return Ok(false);
     };
-    let config = crate::os::variable(&env, "CLAUDE_CONFIG_DIR", home)
-        .unwrap_or_else(|| home.join(".claude"));
+    let config =
+        crate::os::variable(&env, "CLAUDE_CONFIG_DIR").unwrap_or_else(|| home.join(".claude"));
     let path = crate::os::engine_path(home, &env);
     if !MOVING
         .lock()

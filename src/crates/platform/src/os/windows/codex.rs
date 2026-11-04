@@ -59,7 +59,7 @@ fn locate(home: &Path, env: &Environment, registered: &[PathBuf]) -> Installatio
     }
     for directory in [
         local_app(home, env).join("Programs"),
-        variable(env, "ProgramFiles", home).unwrap_or_else(|| PathBuf::from("C:/Program Files")),
+        variable(env, "ProgramFiles").unwrap_or_else(|| PathBuf::from("C:/Program Files")),
     ] {
         for name in ["Codex", "ChatGPT"] {
             let app = directory.join(name);

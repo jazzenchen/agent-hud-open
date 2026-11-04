@@ -1,12 +1,7 @@
 // Original Anthropic sprite data; attribution is retained in assets/THIRD_PARTY_NOTICES.txt.
-import {
-  clawdClips,
-  sameFrame,
-  standing,
-  swiftRound,
-  type ClawdFrame,
-  type ClawdSign,
-} from "./clawd-clips";
+import { clawdClips, swiftRound, type ClawdFrame } from "./clawd-clips";
+import type { BotSign } from "./bot-state";
+import { SIGN_ROWS } from "./bot-signs";
 import { layHairline } from "./bot-hairline";
 import { reuseCanvas } from "./scratch";
 export type MarkState = "idle" | "working" | "asking" | "done";
@@ -16,7 +11,7 @@ interface RawSprite {
   palette: string[];
   base: string;
   deltas: string[];
-  a0?: number[];
+  a0: number[];
 }
 export interface ClawdSprite {
   width: number;
@@ -29,7 +24,7 @@ export interface ClawdSprite {
 export interface SpritePicture extends ClawdFrame {
   offsetX?: number;
   offsetY?: number;
-  sign?: ClawdSign;
+  sign?: BotSign;
   mini?: number;
   mirrored?: boolean;
 }
@@ -37,24 +32,13 @@ export type ClawdSheet = Record<string, ClawdSprite>;
 let loading: Promise<ClawdSheet> | undefined;
 const canonical = new WeakMap<ClawdSheet, Map<string, ClawdFrame>>();
 const frameKey = (frame: ClawdFrame) => `${frame.name}:${frame.index}`;
-const value36 = (text: string) =>
-  /^[0-9a-z]+$/i.test(text) ? parseInt(text, 36) : NaN;
-const paletteIndex = (value: string, colors: number) => {
-  const index = value === "." ? 255 : value36(value);
-  if (index !== 255 && (!Number.isInteger(index) || index >= colors))
-    throw new Error("Invalid Clawd palette index");
-  return index;
-};
+const paletteIndex = (value: string) =>
+  value === "." ? 255 : parseInt(value, 36);
 const rgba = (color: string) => {
   let value = color.slice(1);
   if (value.length === 3)
     value = [...value].map((digit) => digit + digit).join("");
   if (value.length === 6) value += "ff";
-  if (
-    !/^#[0-9a-f]{3}([0-9a-f]{3}([0-9a-f]{2})?)?$/i.test(color) ||
-    value.length !== 8
-  )
-    throw new Error("Invalid Clawd palette color");
   return value.toLowerCase();
 };
 
@@ -64,59 +48,37 @@ export function decodeClawdTable(table: {
 }): ClawdSheet {
   const sheet: ClawdSheet = {};
   for (const [name, raw] of Object.entries(table.sprites)) {
-    if (
-      !Number.isInteger(raw.w) ||
-      !Number.isInteger(raw.h) ||
-      raw.w <= 0 ||
-      raw.h <= 0 ||
-      raw.w * raw.h > 65536 ||
-      !raw.palette.length ||
-      raw.palette.length > 36 ||
-      raw.base.length !== raw.w * raw.h
-    )
-      throw new Error(`Invalid Clawd sprite ${name}`);
-    raw.palette.forEach(rgba);
-    let frame = Uint8Array.from(raw.base, (value) =>
-      paletteIndex(value, raw.palette.length),
-    );
+    let frame = Uint8Array.from(raw.base, paletteIndex);
     const frames = [frame];
     for (const delta of raw.deltas) {
       frame = frame.slice();
       for (const change of delta.split(","))
-        if (change.length >= 2) {
-          const pixel = value36(change.slice(0, -1));
-          if (!Number.isInteger(pixel) || pixel < 0 || pixel >= frame.length)
-            throw new Error(`Invalid Clawd pixel in ${name}`);
-          frame[pixel] = paletteIndex(change.slice(-1), raw.palette.length);
-        }
+        if (change.length >= 2)
+          frame[parseInt(change.slice(0, -1), 36)] = paletteIndex(
+            change.slice(-1),
+          );
       frames.push(frame);
     }
-    const box =
-      raw.a0?.length === 4 && raw.a0.every(Number.isInteger) && raw.a0[2] > 0
-        ? raw.a0
-        : [0, 0, raw.w, raw.h];
+    const [left, top, width, height] = raw.a0;
     sheet[name] = {
       width: raw.w,
       height: raw.h,
       palette: raw.palette,
       frames,
-      anchorX: box[0] + Math.floor(box[2] / 2),
-      anchorY: box[1] + box[3],
+      anchorX: left + Math.floor(width / 2),
+      anchorY: top + height,
     };
   }
-  for (const [name, count] of Object.entries(clawdClips.frameCounts))
-    if (sheet[name]?.frames.length !== count)
-      throw new Error(`Clawd clips do not fit ${name}`);
   return sheet;
 }
 export function loadClawd(): Promise<ClawdSheet> {
   return (loading ??= fetch(
     new URL("../assets/clawd-sprites.json", import.meta.url).href,
   )
-    .then((response) => {
-      if (!response.ok) throw new Error("Clawd sprite table is unavailable");
-      return response.json() as Promise<{ sprites: Record<string, RawSprite> }>;
-    })
+    .then(
+      (response) =>
+        response.json() as Promise<{ sprites: Record<string, RawSprite> }>,
+    )
     .then(decodeClawdTable));
 }
 
@@ -186,7 +148,6 @@ function fillSprite(
   mirrored: boolean,
 ) {
   const frame = sprite.frames[index];
-  if (!frame) return;
   for (let y = 0; y < sprite.height; y++)
     for (let x = 0; x < sprite.width; x++) {
       const color = frame[y * sprite.width + x];
@@ -210,7 +171,6 @@ function drawClawdPixels(
   light: boolean,
 ) {
   const sprite = sheet[picture.name];
-  if (!sprite?.frames[picture.index]) return;
   const grain = clawdGrain(side, scale),
     flip = picture.mirrored ? -1 : 1;
   const footX =
@@ -287,11 +247,7 @@ export class ClawdBaker {
       Math.floor((extent - Math.ceil(side * scale * 1.6)) / 2),
     ),
   ) {
-    if (
-      !drawsClawdSprites(side, scale) ||
-      !this.sheet[picture.name]?.frames[picture.index]
-    )
-      return null;
+    if (!this.sheet[picture.name]?.frames[picture.index]) return null;
     const key = JSON.stringify([picture, side, scale, extent, light, outline]);
     let canvas = this.kept.get(key);
     if (canvas) this.kept.delete(key);
@@ -313,47 +269,15 @@ export class ClawdBaker {
     return canvas;
   }
 }
-const bakers = new WeakMap<ClawdSheet, ClawdBaker>();
-export function clawdBaker(sheet: ClawdSheet) {
-  let baker = bakers.get(sheet);
-  if (!baker) {
-    baker = new ClawdBaker(sheet);
-    bakers.set(sheet, baker);
-  }
-  return baker;
-}
-export function drawClawd(
-  context: CanvasRenderingContext2D,
-  sheet: ClawdSheet,
-  picture: SpritePicture,
-  side: number,
-  scale: number,
-  extent: number,
-  light: boolean,
-) {
-  const image = clawdBaker(sheet).image(picture, side, scale, extent, light);
-  if (image) {
-    context.imageSmoothingEnabled = false;
-    context.drawImage(image, 0, 0);
-  }
-}
-
-const signRows: Record<ClawdSign, readonly string[]> = {
-  "!": ["..#..", "..#..", "..#..", "..#..", "..#..", ".....", "..#.."],
-  "?": [".###.", "#...#", "....#", "..##.", "..#..", ".....", "..#.."],
-  "×": [".....", "#...#", ".#.#.", "..#..", ".#.#.", "#...#", "....."],
-  "⧗": [".....", "#####", ".#.#.", "..#..", ".###.", "#####", "....."],
-  z: [".....", ".....", "#####", "...#.", "..#..", ".#...", "#####"],
-};
 export function drawSign(
   context: CanvasRenderingContext2D,
   x: number,
   y: number,
   cell: number,
   light: boolean,
-  sign: ClawdSign = "!",
+  sign: BotSign,
 ) {
-  const rows = signRows[sign];
+  const rows = SIGN_ROWS[sign];
   if (!light) {
     context.fillStyle = "#0d0d0f99";
     rows.forEach((row, j) =>
@@ -376,10 +300,3 @@ export function drawSign(
     }),
   );
 }
-
-// Useful to a renderer handing off a procedural standing pose to the sprite actor.
-export const isClawdStanding = (sheet: ClawdSheet, picture: SpritePicture) =>
-  sameFrame(
-    canonicalClawdFrame(sheet, picture),
-    canonicalClawdFrame(sheet, standing),
-  );

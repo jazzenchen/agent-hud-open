@@ -45,9 +45,6 @@ pub struct LocalSocket {
 impl LocalSocket {
     pub fn connect(path: &Path, timeout: Duration) -> Result<Self, IpcError> {
         use std::os::unix::ffi::OsStrExt;
-        if timeout.is_zero() {
-            return Err(IpcError::TimedOut);
-        }
         let info = fs::symlink_metadata(path).map_err(|_| IpcError::Unavailable)?;
         if !info.file_type().is_socket() || info.uid() != unsafe { libc::getuid() } {
             return Err(IpcError::Unavailable);

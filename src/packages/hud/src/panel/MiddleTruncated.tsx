@@ -35,7 +35,6 @@ export function MiddleTruncated({
       setShown(cut(text, low));
     };
     fit();
-    if (typeof ResizeObserver === "undefined") return;
     const observer = new ResizeObserver(fit);
     observer.observe(container);
     return () => observer.disconnect();

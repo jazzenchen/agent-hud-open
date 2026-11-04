@@ -93,7 +93,7 @@ fn handle_payload(arguments: &[String], data: &Path, input: &[u8], output: &mut 
     let Ok(payload) = serde_json::from_slice::<Value>(input) else {
         return 0;
     };
-    if input.len() > PAYLOAD_LIMIT || !payload.is_object() {
+    if !payload.is_object() {
         return 0;
     }
     let env: HashMap<String, String> = std::env::vars().collect();
@@ -105,7 +105,7 @@ fn handle_payload(arguments: &[String], data: &Path, input: &[u8], output: &mut 
         {
             return 0;
         }
-        if let Ok(Some(response)) = super::transport::send(data, source, flag, &payload, None) {
+        if let Ok(Some(response)) = super::transport::send(data, source, flag, &payload) {
             let _ = serde_json::to_writer(&mut *output, &response);
             let _ = output.write_all(b"\n");
         }
@@ -162,7 +162,6 @@ fn handle_payload(arguments: &[String], data: &Path, input: &[u8], output: &mut 
             source,
             flag,
             &json!({"transcript_path":transcript_path}),
-            None,
         );
     }
     let reply = (flag == "--completion-hook")

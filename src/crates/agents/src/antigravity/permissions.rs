@@ -1,7 +1,7 @@
 //! Public native request schemas. Acquisition and transport stay in platform;
 //! these records never grant permission or create a tool call by themselves.
+use crate::text;
 use serde_json::{json, Value};
-use sha2::{Digest, Sha256};
 #[derive(Clone)]
 pub struct AntigravityPermission {
     pub id: String,
@@ -26,17 +26,6 @@ fn canonical(value: &Value) -> Value {
         Value::Array(values) => Value::Array(values.iter().map(canonical).collect()),
         _ => value.clone(),
     }
-}
-fn record_hash(parts: &[&str]) -> String {
-    let mut digest = Sha256::new();
-    for part in parts {
-        digest.update(format!("{}:", part.len()));
-        digest.update(part.as_bytes());
-    }
-    format!("{:x}", digest.finalize())
-}
-fn text(value: &Value) -> Option<&str> {
-    value.as_str().filter(|s| !s.is_empty())
 }
 fn clipped(value: &str) -> String {
     value.chars().take(2048).collect()
@@ -120,7 +109,7 @@ pub fn antigravity_permissions(
                 let identity = canonical(&json!({"permission":permission,"toolCall":metadata["toolCall"],"workspace":workspace,"executionId":metadata["executionId"]})).to_string();
                 let id = format!(
                     "antigravity:{service_identity}:{cascade}:{trajectory}:{index}:{}",
-                    record_hash(&[&identity])
+                    crate::account::hash(&[&identity])
                 );
                 let session_id = format!("antigravity:{cascade}");
                 let summary = clipped(description);
@@ -190,7 +179,7 @@ pub fn antigravity_permissions(
                 let identity = canonical(&json!({"askQuestion":ask_value,"toolCall":metadata["toolCall"],"workspace":workspace,"executionId":metadata["executionId"]})).to_string();
                 let id = format!(
                     "antigravity:{service_identity}:{cascade}:{trajectory}:{index}:{}",
-                    record_hash(&[&identity])
+                    crate::account::hash(&[&identity])
                 );
                 let session_id = format!("antigravity:{cascade}");
                 let summary_text = clipped(first_question.as_deref().unwrap_or("Question"));

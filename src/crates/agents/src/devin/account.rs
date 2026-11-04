@@ -1,9 +1,11 @@
 //! Devin's quota, from the account status the Devin CLI caches. When the CLI
 //! fetched it stays the observation time: reading the file now does not make
 //! old data fresh.
-use crate::account::{legacy_account, legacy_unresolved, status, Host, Provider, Reading, Unread};
+use crate::account::{
+    legacy_account, legacy_unresolved, read_bounded, status, Host, Provider, Reading, Unread,
+};
 use crate::naming::window_names;
-use crate::{l10n, protobuf};
+use crate::{iso, l10n, protobuf};
 use base64::Engine;
 use serde_json::{json, Value};
 use std::collections::HashMap;
@@ -11,10 +13,6 @@ use std::collections::HashMap;
 /// A status file's size limit.
 const LIMIT: u64 = 2 * 1024 * 1024;
 
-fn iso(ms: i64) -> Option<String> {
-    chrono::DateTime::from_timestamp_millis(ms)
-        .map(|d: chrono::DateTime<chrono::Utc>| d.to_rfc3339())
-}
 fn fields(bytes: &[u8]) -> Option<HashMap<u32, protobuf::Field<'_>>> {
     let mut map = HashMap::new();
     protobuf::fields(bytes, |f| {
@@ -37,10 +35,6 @@ pub static PROVIDER: Provider = Provider {
 };
 
 pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
-    read_text(host).map_err(Unread::from)
-}
-
-fn read_text(host: &dyn Host) -> Result<Reading, String> {
     let mut reading = Reading::empty("devin");
     let directory = host.home().join(".cache/devin/cli");
     let mut candidates = host
@@ -60,10 +54,8 @@ fn read_text(host: &dyn Host) -> Result<Reading, String> {
     // The newest first.
     candidates.sort_by(|a, b| b.cmp(a));
     for (modified, path) in candidates {
-        let Some(parsed) = host
-            .read_file(&path, LIMIT)
+        let Some(parsed) = read_bounded(host, &path, LIMIT)
             .found()
-            .filter(|bytes| bytes.len() as u64 <= LIMIT)
             .and_then(|b| serde_json::from_slice::<Value>(&b).ok())
         else {
             continue;

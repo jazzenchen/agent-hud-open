@@ -109,9 +109,8 @@ pub(crate) fn publish<S: Serialize + ?Sized>(app: &tauri::AppHandle, event: &str
         // Tauri injects event payloads as JavaScript source. A full session
         // object literal makes WebKit compile a large syntax tree every pass.
         // Transfer JSON as a string and decode data once in the subscriber.
-        if let Ok(json) = serde_json::to_string(value) {
-            let _ = app.emit_filter("hud:snapshot-json", json, filter);
-        }
+        let json = serde_json::to_string(value).expect("a snapshot is JSON");
+        let _ = app.emit_filter("hud:snapshot-json", json, filter);
     } else {
         let _ = app.emit_filter(event, value, filter);
     }

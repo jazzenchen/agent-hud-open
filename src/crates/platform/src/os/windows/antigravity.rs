@@ -25,10 +25,7 @@ pub(super) fn processes() -> Result<Vec<ProcessInfo>, String> {
         .stderr(Stdio::null())
         .spawn()
         .map_err(|_| "Antigravity process discovery unavailable")?;
-    let stdout = child
-        .stdout
-        .take()
-        .ok_or("Antigravity process discovery unavailable")?;
+    let stdout = child.stdout.take().unwrap();
     let (sender, receiver) = std::sync::mpsc::sync_channel(1);
     std::thread::spawn(move || {
         let mut bytes = Vec::new();

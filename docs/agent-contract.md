@@ -98,7 +98,7 @@ reading records which one answered.
 | Privacy prompts from broad scans (App Data, Keychain) | macOS | Read only declared locations and declared Keychain items, with a time limit; never scan the home folder |
 | No file events on network drives, inotify limits | All, Linux | The stat-only check stands in |
 | WSL beside Windows | Windows | A separate source environment with its own identity, never merged with the Windows paths, so usage is not counted twice |
-| Wayland | Linux | HUD capabilities report it; agents are unaffected |
+| Wayland | Linux | Only the HUD host differs; agents are unaffected |
 
 **Tests cover every OS on every machine.**
 - `agents` is pure, so its fixture tests run each OS's table on every runner against a fake `Host` per OS. For example, they cover Windows paths with drive letters, CRLF logs, `.cmd` shims, and a missing credential store.

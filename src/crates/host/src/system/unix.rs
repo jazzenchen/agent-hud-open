@@ -1,4 +1,4 @@
-pub(super) fn client_command_line(arguments: &[String]) -> String {
+pub(crate) fn client_command_line(arguments: &[String]) -> String {
     arguments
         .iter()
         .map(|argument| format!("'{}'", argument.replace('\'', "'\\''")))
@@ -6,9 +6,9 @@ pub(super) fn client_command_line(arguments: &[String]) -> String {
         .join(" ")
 }
 
-pub(super) fn configure_client_command(_command: &mut std::process::Command) {}
+pub(crate) fn configure_client_command(_command: &mut std::process::Command) {}
 
-pub(super) fn stop_client(child: &mut std::process::Child) {
+pub(crate) fn stop_client(child: &mut std::process::Child) {
     let _ = child.kill();
     let _ = child.wait();
 }

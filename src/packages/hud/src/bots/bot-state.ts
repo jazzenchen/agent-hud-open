@@ -44,22 +44,6 @@ export interface BotCue {
 }
 export const BOT_EVENT_FRESHNESS = 3;
 export const BOT_CARD_LONG_TURN = 600;
-export const BOT_LOOKS: readonly BotLook[] = [
-  "permission",
-  "question",
-  "plan",
-  "compacting",
-  "thinking",
-  "tool-edit",
-  "tool-command",
-  "tool-read",
-  "tool-long-command",
-  "plain",
-  "no-news",
-  "idle",
-  "asleep",
-  "done",
-];
 export const BOT_SIGNS: readonly BotSign[] = [
   "exclamation",
   "question",
@@ -81,7 +65,6 @@ export function botState(value: Partial<BotState> = {}): BotState {
     ...value,
   };
 }
-export const defaultBotState: Readonly<BotState> = Object.freeze(botState());
 export const isAttention = (look: BotLook) =>
   look === "permission" || look === "question" || look === "plan";
 export const isWorking = (look: BotLook) =>
@@ -126,17 +109,6 @@ export function botPhaseState(phase: BotPhase): BotState {
             ? { hovered: true }
             : {},
   );
-}
-export function botStatePhase(state: BotState): BotPhase {
-  return isAttention(state.look)
-    ? "asking"
-    : isWorking(state.look)
-      ? "working"
-      : state.look === "done"
-        ? "done"
-        : state.hovered
-          ? "opened"
-          : "idle";
 }
 export function facingFromEdge(
   edge: "top" | "bottom" | "left" | "right",

@@ -266,7 +266,7 @@ impl Worker {
         };
         let facts = (self.query)(
             "usage_buckets",
-            json!({"from":rfc3339(window_start)?,"to":rfc3339(now)?,"bucketMinutes":15}),
+            json!({"from":rfc3339(window_start),"to":rfc3339(now),"bucketMinutes":15}),
         )?;
         // Until indexing can replace whole days, the days already sent stay.
         if facts["coverage"]["complete"] != true {
@@ -299,10 +299,10 @@ fn usage_day(record: &SyncRecord) -> i64 {
         .map(|end| end - 31 * keys::DAY_MS)
         .unwrap_or(0)
 }
-fn rfc3339(ms: i64) -> Result<String, String> {
+fn rfc3339(ms: i64) -> String {
     chrono::DateTime::<chrono::Utc>::from_timestamp_millis(ms)
-        .map(|at| at.to_rfc3339())
-        .ok_or_else(|| "Usage range".to_owned())
+        .expect("a clock time")
+        .to_rfc3339()
 }
 fn now() -> i64 {
     chrono::Utc::now().timestamp_millis()

@@ -1,6 +1,6 @@
 import type { PanelLayout, SourcePreferences } from "@agent-hud/protocol";
 import type { NativeHUDMonitor } from "./lib/use-hud-geometry";
-import SourcesSettings from "./SourcesSettings";
+import AgentsPage from "./settings/agents/AgentsPage";
 import { LoadingState } from "./LoadingState";
 import {
   AgentPluginsPane,
@@ -13,10 +13,6 @@ import { PricesPane } from "./settings/PricesPane";
 import { RelaysPane } from "./settings/RelaysPane";
 import { UpdatesPane } from "./settings/UpdatesPane";
 import type { SettingsPaneProps } from "./settings/SettingsPrimitives";
-
-export type { SettingsPaneProps } from "./settings/SettingsPrimitives";
-export { DisplayPane } from "./settings/DisplayPane";
-export { GeneralPane } from "./settings/GeneralPane";
 
 export default function SettingsPane({
   page,
@@ -45,7 +41,7 @@ export default function SettingsPane({
   preferences: Record<string, SourcePreferences>;
   onPreferences: (source: string, patch: SourcePreferences) => Promise<unknown>;
   agentPlugins?: AgentPluginItem[];
-  request?: (method: string, params?: unknown) => Promise<unknown>;
+  request: (method: string, params?: unknown) => Promise<unknown>;
 }) {
   if (page === "general") return <GeneralPane {...settingsProps} />;
   if (page === "prices") return <PricesPane {...settingsProps} />;
@@ -66,7 +62,7 @@ export default function SettingsPane({
     );
   if (page === "agents")
     return (
-      <SourcesSettings
+      <AgentsPage
         snapshot={settingsProps.snapshot}
         action={settingsProps.action}
         active={settingsProps.active}
@@ -83,9 +79,7 @@ export default function SettingsPane({
         action={settingsProps.action}
         active={settingsProps.active}
         items={agentPlugins}
-        request={
-          request ?? (() => Promise.reject(new Error("No product requests")))
-        }
+        request={request}
       />
     );
   return null;

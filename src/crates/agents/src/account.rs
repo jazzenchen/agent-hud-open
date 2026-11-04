@@ -627,13 +627,17 @@ pub fn variable(host: &dyn Host, key: &str) -> Option<PathBuf> {
         .filter(|value| !value.is_empty())
         .map(PathBuf::from)
 }
+/// A file of at most `limit` bytes; a larger one fails to read.
+pub fn read_bounded(host: &dyn Host, path: &Path, limit: u64) -> Answer<Vec<u8>> {
+    match host.read_file(path, limit) {
+        Answer::Found(bytes) if bytes.len() as u64 > limit => Answer::Failed,
+        answer => answer,
+    }
+}
+
 /// A JSON file of at most 16 MiB; None when it is missing, larger or not JSON.
 pub fn read_json(host: &dyn Host, path: &Path) -> Option<Value> {
-    const LIMIT: u64 = 16 * 1024 * 1024;
-    let bytes = host.read_file(path, LIMIT).found()?;
-    if bytes.len() as u64 > LIMIT {
-        return None;
-    }
+    let bytes = read_bounded(host, path, 16 * 1024 * 1024).found()?;
     serde_json::from_slice(&bytes).ok()
 }
 
@@ -645,21 +649,13 @@ pub fn client_home_key(host: &dyn Host, directory: &Path, default: &Path) -> Str
     if path == resolve(default) {
         String::new()
     } else {
-        crate::grok::cache::hash(&[path.to_string_lossy().as_ref()])
+        hash(&[path.to_string_lossy().as_ref()])
     }
 }
 
 /// The original ledger identity uses length-prefixed UTF-8 and nested hashes.
 /// Only provider-owned identifiers may enter this exact migration key.
 pub fn legacy_account(provider: &str, user: &str, workspace: &str) -> Option<String> {
-    fn hash(parts: &[&str]) -> String {
-        let mut h = Sha256::new();
-        for part in parts {
-            h.update(format!("{}:", part.len()).as_bytes());
-            h.update(part.as_bytes());
-        }
-        format!("{:x}", h.finalize())
-    }
     let user = user.trim();
     let workspace = workspace.trim();
     if user.is_empty() && workspace.is_empty() {
@@ -677,13 +673,32 @@ pub fn legacy_account(provider: &str, user: &str, workspace: &str) -> Option<Str
     };
     Some(format!("account:{}", hash(&[provider, &user, &workspace])))
 }
+/// A JWT's claims: the middle of its three parts, decoded. None when the
+/// token is not a JWT.
+pub fn jwt_claims(token: &str) -> Option<Value> {
+    use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
+    let parts = token.split('.').collect::<Vec<_>>();
+    if parts.len() != 3 {
+        return None;
+    }
+    let bytes = URL_SAFE_NO_PAD
+        .decode(parts[1].trim_end_matches('='))
+        .ok()?;
+    serde_json::from_slice(&bytes).ok()
+}
+/// SHA-256 over each part's byte length, a colon and the part, in hex.
+pub fn hash(parts: &[&str]) -> String {
+    let mut h = Sha256::new();
+    for part in parts {
+        h.update(format!("{}:", part.len()).as_bytes());
+        h.update(part.as_bytes());
+    }
+    format!("{:x}", h.finalize())
+}
 /// The account of a login that names none, per client home: `home` is the
 /// home's key (agent-hud-native-open ProviderAccount.unresolved).
 pub fn legacy_unresolved(provider: &str, home: &str) -> String {
-    format!(
-        "account:{}",
-        crate::grok::cache::hash(&[provider, "", &format!("home:{home}")])
-    )
+    format!("account:{}", hash(&[provider, "", &format!("home:{home}")]))
 }
 pub fn account_id(provider: &str, parts: &[&str]) -> String {
     let mut hash = Sha256::new();

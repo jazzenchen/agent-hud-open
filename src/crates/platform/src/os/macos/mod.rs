@@ -25,7 +25,7 @@ pub(crate) const MOVES_CLAUDE_JOBS: bool = true;
 /// Claude itself so the link keeps its `?thread=` (agent-hud-open #43).
 pub(crate) const OPENS_CLAUDE_PROJECTS: bool = true;
 mod legacy_preferences;
-pub(crate) fn legacy_preferences() -> Result<Option<serde_json::Value>, String> {
+pub(crate) fn legacy_preferences() -> Option<serde_json::Value> {
     legacy_preferences::read()
 }
 pub(crate) const VALIDATION: &str = "macos-live-verified";
@@ -207,9 +207,6 @@ pub(crate) fn registered_url(url: &str) -> bool {
         ) -> *const c_void;
         fn CFRelease(value: *const c_void);
     }
-    if url.is_empty() || url.contains('\0') {
-        return false;
-    }
     unsafe {
         let url = CFURLCreateWithBytes(
             ptr::null(),
@@ -263,9 +260,7 @@ pub fn registered_applications(id: &str) -> Vec<PathBuf> {
         ) -> u8;
         fn CFRelease(value: *const c_void);
     }
-    let Ok(id) = CString::new(id) else {
-        return Vec::new();
-    };
+    let id = CString::new(id).unwrap();
     let mut found = Vec::new();
     unsafe {
         let string = CFStringCreateWithCString(ptr::null(), id.as_ptr(), 0x08000100);
@@ -353,12 +348,6 @@ pub(crate) const SOCKET_SEND_FLAGS: libc::c_int = 0;
 
 #[cfg(test)]
 mod tests {
-    #[test]
-    fn invalid_urls_have_no_registered_application() {
-        assert!(!super::registered_url(""));
-        assert!(!super::registered_url("dsh://open\0"));
-    }
-
     #[test]
     fn an_unknown_scheme_has_no_registered_application() {
         let now = std::time::SystemTime::now()

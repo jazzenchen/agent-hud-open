@@ -3,6 +3,7 @@ import type { Approval, RequestDecision } from "@agent-hud/protocol";
 import { permissionColors } from "../tokens";
 import { useGround } from "../ground";
 import { cardColumn } from "../card-column";
+import { CardButton } from "./CardButton";
 
 export function PermissionToolCard({
   request,
@@ -157,75 +158,37 @@ export function PermissionToolCard({
         </div>
       )}
       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-        <button
-          type="button"
+        <CardButton
           disabled={disabled}
           onClick={() => void answer({ kind: "deny" })}
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 4,
-            height: 22,
-            padding: "0 9px",
-            borderRadius: 6,
-            border: `1px solid ${denyStroke}`,
-            background: denyFill,
-            color: denyText,
-            fontSize: 11,
-            fontWeight: 500,
-            whiteSpace: "nowrap",
-            cursor: disabled ? "default" : "pointer",
-          }}
+          edge={denyStroke}
+          fill={denyFill}
+          color={denyText}
+          style={{ whiteSpace: "nowrap" }}
         >
           <X size={9} strokeWidth={2.6} />
           {t("Deny", "拒绝")}
-        </button>
+        </CardButton>
         <span style={{ flex: 1, minWidth: 8 }} />
         {request.allowsAlways && (
-          <button
-            type="button"
+          <CardButton
             disabled={disabled}
             title={request.alwaysAllowRule ?? undefined}
             onClick={() => void answer({ kind: "always" })}
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 4,
-              height: 22,
-              padding: "0 9px",
-              borderRadius: 6,
-              border: `1px solid ${allowEdge}`,
-              background: "transparent",
-              color: allowText,
-              fontSize: 11,
-              fontWeight: 500,
-              whiteSpace: "nowrap",
-              cursor: disabled ? "default" : "pointer",
-            }}
+            edge={allowEdge}
+            color={allowText}
+            style={{ whiteSpace: "nowrap" }}
           >
             <BadgeCheck size={9} strokeWidth={2.6} />
             {t("Always allow", "总是允许")}
-          </button>
+          </CardButton>
         )}
-        <button
-          type="button"
+        <CardButton
           disabled={disabled}
           onClick={() => void answer({ kind: "allow" })}
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 4,
-            height: 22,
-            padding: "0 9px",
-            borderRadius: 6,
-            border: 0,
-            background: allow,
-            color: onAllow,
-            fontSize: 11,
-            fontWeight: 500,
-            whiteSpace: "nowrap",
-            cursor: disabled ? "default" : "pointer",
-          }}
+          fill={allow}
+          color={onAllow}
+          style={{ whiteSpace: "nowrap" }}
         >
           {pending ? (
             <LoaderCircle size={9} className="animate-spin" />
@@ -233,7 +196,7 @@ export function PermissionToolCard({
             <Check size={9} strokeWidth={2.6} />
           )}
           {request.allowLabel ?? t("Allow once", "批准一次")}
-        </button>
+        </CardButton>
       </div>
     </div>
   );

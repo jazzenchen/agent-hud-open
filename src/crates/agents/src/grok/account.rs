@@ -12,7 +12,7 @@ use super::cache as bot;
 use crate::account::{legacy_unresolved, locate, status, Host, Provider, Reading, Unread};
 use crate::cursor::account::sign_in;
 use crate::naming::window_names;
-use crate::{l10n, Location, PerOs, Support};
+use crate::{iso, l10n, Location, PerOs, Support};
 use serde_json::{json, Value};
 
 /// Grok Bot's desktop cache, where it is known.
@@ -23,11 +23,6 @@ pub const CACHE: PerOs<Location> = PerOs {
     windows: Support::Unsupported("Grok Bot's cache location on Windows is not known yet"),
     linux: Support::Unsupported("Grok Bot's cache location on Linux is not known yet"),
 };
-
-fn iso(ms: i64) -> Option<String> {
-    chrono::DateTime::from_timestamp_millis(ms)
-        .map(|d: chrono::DateTime<chrono::Utc>| d.to_rfc3339())
-}
 
 /// Grok's quota covers its CLI and its Bot, and the Bot's bots run on
 /// Cursor's servers, so it is read on the account interval.

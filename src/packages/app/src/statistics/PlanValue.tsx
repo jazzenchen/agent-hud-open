@@ -1,4 +1,3 @@
-import { useEffect, useRef, useState } from "react";
 import { TrendingDown, TrendingUp } from "lucide-react";
 import { HUDArtwork as HUDLogo } from "@agent-hud/hud/HUDArtwork";
 import { listCost, listPrice, monthDayTime } from "@agent-hud/ui/format";
@@ -7,7 +6,8 @@ import type {
   NativeMethod,
   PlanValueAccount,
   PlanValueResponse,
-} from "../lib/types";
+} from "@agent-hud/protocol";
+import { useCoreQuery } from "../lib/use-core-query";
 import {
   card,
   number,
@@ -34,30 +34,6 @@ export function multipleText(
       ? `每周 ${multiple} 倍 · 5 小时 ${short} 倍用量`
       : `${multiple}× weekly · ${short}× 5-hour usage`;
   return zh ? `基础档 ${multiple} 倍用量` : `${multiple}× base usage`;
-}
-
-/** Only the latest request can publish into the section; a failure keeps the last answer shown. */
-function usePlanValue(refresh: string, action: Action, active: boolean) {
-  const actionRef = useRef(action);
-  actionRef.current = action;
-  const sequence = useRef(0);
-  const [data, setData] = useState<PlanValueResponse | null>(null);
-  useEffect(() => {
-    const id = ++sequence.current;
-    if (!active) return;
-    void actionRef
-      .current("plan_value", {})
-      .then((value) => {
-        const response = value as PlanValueResponse;
-        if (sequence.current === id && response?.kind === "plan_value")
-          setData(response);
-      })
-      .catch(() => {});
-    return () => {
-      sequence.current += 1;
-    };
-  }, [refresh, active]);
-  return data;
 }
 
 const usd = (amount: number, zh: boolean) =>
@@ -126,7 +102,14 @@ export function PlanValue({
   theme: StatsTheme;
   light: boolean;
 }) {
-  const data = usePlanValue(refresh, action, active);
+  // Only the latest request publishes; a failure keeps the last answer shown.
+  const { data } = useCoreQuery<PlanValueResponse>(
+    action,
+    "plan_value",
+    {},
+    active,
+    refresh,
+  );
   const { calendar } = useFormat();
   const zh = Boolean(theme.zh);
   if (!data?.accounts.length) return null;

@@ -48,7 +48,7 @@ pub(crate) fn caches_dir(home: &Path) -> PathBuf {
         .unwrap_or_else(|| home.join("AppData/Local"))
 }
 pub(crate) fn app_support(home: &Path, env: &Environment) -> PathBuf {
-    variable(env, "APPDATA", home).unwrap_or_else(|| home.join("AppData/Roaming"))
+    variable(env, "APPDATA").unwrap_or_else(|| home.join("AppData/Roaming"))
 }
 /// Windows environment names are case-insensitive even when captured in a map.
 pub(crate) fn environment_value<'a>(env: &'a Environment, key: &str) -> Option<&'a str> {
@@ -57,7 +57,7 @@ pub(crate) fn environment_value<'a>(env: &'a Environment, key: &str) -> Option<&
         .map(|(_, value)| value.as_str())
 }
 fn local_app(home: &Path, env: &Environment) -> PathBuf {
-    variable(env, "LOCALAPPDATA", home).unwrap_or_else(|| home.join("AppData/Local"))
+    variable(env, "LOCALAPPDATA").unwrap_or_else(|| home.join("AppData/Local"))
 }
 /// Where the Claude desktop app keeps its session metadata: roaming AppData,
 /// and the Microsoft Store package's redirected copy of it
@@ -88,7 +88,7 @@ pub(crate) fn application_installed(home: &Path, env: &Environment, name: &str) 
     }
     [
         local_app(home, env).join("Programs"),
-        variable(env, "ProgramFiles", home).unwrap_or_else(|| PathBuf::from("C:/Program Files")),
+        variable(env, "ProgramFiles").unwrap_or_else(|| PathBuf::from("C:/Program Files")),
     ]
     .iter()
     .any(|dir| dir.join(name).is_dir())
@@ -277,8 +277,8 @@ pub(crate) fn open_session_url(url: &str) -> Result<(), String> {
 }
 
 /// Swift UserDefaults has no native source on this host.
-pub(crate) fn legacy_preferences() -> Result<Option<serde_json::Value>, String> {
-    Ok(None)
+pub(crate) fn legacy_preferences() -> Option<serde_json::Value> {
+    None
 }
 
 #[cfg(test)]

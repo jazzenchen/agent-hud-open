@@ -57,7 +57,7 @@ impl Log {
         // so its own time holds the tool runs. A fork's copied history times
         // nothing.
         if !self.live.inherited(value) {
-            if let Some(at) = value["timestamp"].as_str().and_then(metering::date_ms) {
+            if let Some(at) = timestamp(&value["timestamp"]) {
                 if value["type"] == "token_usage_record" {
                     let took = self.call_timing.since_request(0, at);
                     self.call_timing.replies.push(took);
@@ -132,7 +132,7 @@ impl Log {
         if self.live.inherited(value) {
             return;
         }
-        let Some(at) = value["timestamp"].as_str().and_then(metering::date_ms) else {
+        let Some(at) = timestamp(&value["timestamp"]) else {
             return;
         };
         let event = metering::Event {
@@ -169,7 +169,7 @@ impl Log {
         let payload = &value["payload"];
         // A turn starts at its task_started event and a compacted record marks a
         // compaction; a fork's copied history marks neither.
-        let at = || value["timestamp"].as_str().and_then(metering::date_ms);
+        let at = || timestamp(&value["timestamp"]);
         if !self.live.inherited(value) {
             if value["type"] == "compacted" {
                 self.mark(at(), metering::MarkKind::Compaction);
@@ -193,18 +193,15 @@ impl Log {
                     // A spawned agent is named by its path, else its nickname
                     // (agent-hud-native-open CodexTranscript.agentPath, agentName).
                     let spawn = &payload["source"]["subagent"]["thread_spawn"];
-                    fn nonempty(value: &Value) -> Option<&str> {
-                        value.as_str().filter(|text| !text.trim().is_empty())
-                    }
-                    let path = nonempty(&spawn["agent_path"]).map(|path| {
+                    let path = crate::transcript::text(&spawn["agent_path"]).map(|path| {
                         path.trim_end_matches('/')
                             .rsplit('/')
                             .next()
                             .unwrap_or(path)
                             .to_owned()
                     });
-                    let nickname = nonempty(&spawn["agent_nickname"])
-                        .or_else(|| nonempty(&payload["agent_nickname"]))
+                    let nickname = crate::transcript::text(&spawn["agent_nickname"])
+                        .or_else(|| crate::transcript::text(&payload["agent_nickname"]))
                         .map(str::to_owned);
                     if let Some(name) = path.or(nickname) {
                         self.naming.agent(&name);

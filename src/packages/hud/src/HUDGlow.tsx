@@ -6,7 +6,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { startGpuPaint, type GpuPaint } from "./glow-gpu";
+import { cssChannels, startGpuPaint, type GpuPaint } from "./glow-gpu";
 import { flashMask, pulseFrames, type GlowAlert } from "./glow-alert";
 import { fixedTrack, type RimShape, type RimTrack } from "./rim-track";
 import {
@@ -332,23 +332,14 @@ function StaticRim({
   stopCount: number;
 }) {
   const ref = useRef<HTMLCanvasElement>(null);
-  const rgb = useMemo<RGB[]>(() => {
-    const probe = document.createElement("canvas");
-    probe.width = colors.length;
-    probe.height = 1;
-    const context = probe.getContext("2d", { willReadFrequently: true });
-    if (!context) return colors.map(() => [110, 110, 115]);
-    colors.forEach((color, index) => {
-      context.fillStyle = color;
-      context.fillRect(index, 0, 1, 1);
-    });
-    const pixels = context.getImageData(0, 0, colors.length, 1).data;
-    return colors.map((_, index) => [
-      pixels[index * 4],
-      pixels[index * 4 + 1],
-      pixels[index * 4 + 2],
-    ]);
-  }, [colors]);
+  const rgb = useMemo<RGB[]>(
+    () =>
+      colors.map((color) => {
+        const [r, g, b] = cssChannels(color);
+        return [r, g, b];
+      }),
+    [colors],
+  );
   const draw = () => {
     const canvas = ref.current;
     const context = canvas?.getContext("2d");
@@ -651,9 +642,7 @@ export const HUDGlow = memo(function HUDGlow({
   className,
 }: HUDGlowProps) {
   const [systemReduced, setSystemReduced] = useState(
-    () =>
-      typeof window !== "undefined" &&
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+    () => window.matchMedia("(prefers-reduced-motion: reduce)").matches,
   );
   const [gpuReady, setGpuReady] = useState(false);
   const [gpuFailed, setGpuFailed] = useState(false);
@@ -697,8 +686,7 @@ export const HUDGlow = memo(function HUDGlow({
   );
   useEffect(() => {
     const element = breath.current;
-    if (!motion.pulse || !element || typeof element.animate !== "function")
-      return;
+    if (!motion.pulse || !element) return;
     const animation = element.animate(
       breathFrames(amplitude),
       breathTiming(cycle),
@@ -733,13 +721,11 @@ export const HUDGlow = memo(function HUDGlow({
   const [flashing, setFlashing] = useState<GlowAlert | null>(null);
   useEffect(() => {
     // A new alert flashes; one that is gone stops its flash at once.
-    setFlashing(
-      alert && alert.id !== flashing?.id ? alert : alert ? flashing : null,
-    );
+    setFlashing(alert);
   }, [alert?.id]);
   useEffect(() => {
     const element = flash.current;
-    if (!flashing || !element || typeof element.animate !== "function") return;
+    if (!flashing || !element) return;
     const animation = element.animate(
       pulseFrames(flashing.warning, reduceMotion || systemReduced),
       {

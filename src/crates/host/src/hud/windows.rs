@@ -4,7 +4,7 @@
 pub(super) use super::generic::{
     global_pointer, panel_builder, place, set_drag_cursor, set_ignore_cursor, shown,
 };
-use super::{base_limitations, HudCapabilities, PointerKeys};
+use super::PointerKeys;
 #[path = "windows/displays.rs"]
 mod displays;
 pub(super) use displays::{measure_screens, screen};
@@ -148,34 +148,6 @@ pub(super) fn pointer_keys() -> PointerKeys {
         ctrl: Some(key_down(0x11)),
         meta: Some(key_down(0x5b) || key_down(0x5c)),
         shift: Some(key_down(0x10)),
-    }
-}
-
-pub(super) fn capabilities() -> HudCapabilities {
-    let mut limitations = base_limitations();
-    limitations.push("Tauri does not support visible-on-all-workspaces on Windows. Exclusive fullscreen applications and secure desktops are not covered.");
-    limitations.push("Windows monitor device paths identify unambiguous displays. Mirroring, remote sessions, or unavailable device paths use session IDs; moving a display to another connection or changing its driver can change its device path.");
-    HudCapabilities {
-        platform: std::env::consts::OS,
-        backend: "win32-webview2",
-        lazy_creation: true,
-        single_window: false,
-        per_screen_windows: true,
-        transparent_surface: true,
-        native_material: false,
-        non_focusing_window: true,
-        native_nonactivating_panel: false,
-        keyboard_handoff: false,
-        cursor_passthrough: true,
-        interactive_regions: true,
-        native_drag: native_drag(),
-        global_pointer: "native_cursor_polling",
-        absolute_edge_position: "supported",
-        all_workspaces: "unsupported",
-        fullscreen_overlay: "not_guaranteed",
-        hardware_notch: false,
-        persistent_display_identity: true,
-        limitations,
     }
 }
 

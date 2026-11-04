@@ -7,7 +7,6 @@ import {
   type BotFace,
   type BotLimbs,
   type BotFlap,
-  type BotPose,
 } from "./bot-motion";
 import { easeInOut } from "./bot-moves";
 import type { BotSign } from "./bot-state";
@@ -16,8 +15,7 @@ import { paintSign, signBox } from "./bot-signs";
 import { layHairline } from "./bot-hairline";
 import { BotStill } from "./bot-still";
 import { borrowCanvas, giveBack, reuseCanvas } from "./scratch";
-const margin = 0.3,
-  ink = "#0d0d0f",
+const ink = "#0d0d0f",
   box: Box = [0, 0, 1, 1];
 const cut = (form: BotForm) => (form.light ? "#f5f5f7" : ink);
 const rectWidth = (b: Box) => b[2] - b[0],
@@ -46,29 +44,15 @@ function group(
     context.canvas.width,
     context.canvas.height,
   );
-  try {
-    c.setTransform(context.getTransform());
-    draw(c);
-    context.save();
-    context.resetTransform();
-    context.globalAlpha = alpha;
-    context.globalCompositeOperation = operation;
-    context.drawImage(canvas, 0, 0);
-    context.restore();
-  } finally {
-    giveBack(canvas);
-  }
-}
-export function applyBotPose(
-  context: CanvasRenderingContext2D,
-  pose: BotPose,
-  side = 1,
-) {
-  const foot = pose.footing * side;
-  context.translate(pose.x * side, pose.y * side + foot);
-  context.rotate((pose.rotation * Math.PI) / 180);
-  context.scale(pose.scaleX, pose.scaleY);
-  context.translate(0, -foot);
+  c.setTransform(context.getTransform());
+  draw(c);
+  context.save();
+  context.resetTransform();
+  context.globalAlpha = alpha;
+  context.globalCompositeOperation = operation;
+  context.drawImage(canvas, 0, 0);
+  context.restore();
+  giveBack(canvas);
 }
 export function botRenderLook(motion: BotMotion) {
   const f = motion.face,
@@ -129,7 +113,6 @@ function fillPaint(
             paint.outer * 2 * s.radius,
           )
         : context.createLinearGradient(...at(paint.from), ...at(paint.to));
-    if (paint.colors.length < 2) return;
     paint.colors.forEach((color, i) =>
       gradient.addColorStop(i / (paint.colors.length - 1), color),
     );
@@ -221,7 +204,7 @@ function spinner(path: Path2D, frame: number, center: Point, size: number) {
     [6, 0.9, 0.2],
     [8, 1, 0.2],
     [8, 1, 0.28],
-  ][Math.max(0, Math.min(5, frame - 1))];
+  ][frame - 1];
   if (!spokes) {
     path.rect(
       center[0] - (length * size) / 2,
@@ -321,8 +304,7 @@ function eyes(
     spread = s.eye.spread,
     flat = s.eye.across,
     grain = s.limbs ? s.limbs.pixel / 2 : null,
-    snapped = (v: number) =>
-      grain && grain > 0 ? Math.round(v / grain) * grain : v,
+    snapped = (v: number) => (grain ? Math.round(v / grain) * grain : v),
     paint = s.eyeColor ?? ink,
     apart =
       flat !== undefined
@@ -404,7 +386,6 @@ function ownEyes(
   face: BotFace,
   ink: string,
 ) {
-  if (!boxes.length) return;
   const center = (b: Box) => (b[0] + b[2]) / 2,
     middle = (center(boxes[0]) + center(boxes.at(-1)!)) / 2,
     apart = Math.abs(center(boxes.at(-1)!) - center(boxes[0]));
@@ -691,45 +672,6 @@ function bare(
     }
   } else drawBody(context, form, motion, cache);
 }
-/** Draw in normalized mark coordinates. A cached image stays upright; its host applies pose independently. */
-export function drawBot(
-  context: CanvasRenderingContext2D,
-  form: BotForm,
-  motion: BotMotion,
-  options: { pose?: boolean; signs?: boolean } = {},
-) {
-  context.save();
-  if (options.pose !== false) {
-    context.translate(0.5, 0.5);
-    applyBotPose(context, motion.pose);
-    context.translate(-0.5, -0.5);
-  }
-  context.save();
-  bare(context, form, motion);
-  context.restore();
-  if (options.signs !== false && motion.sign) {
-    const t = context.getTransform(),
-      side = Math.hypot(t.a, t.b),
-      place = signBox(form, side),
-      unit = Math.ceil(side * 1.6) / 1.6;
-    paintSign(
-      context,
-      motion.sign,
-      {
-        x: (place.x - 0.3 * unit) / unit,
-        y: (place.y - 0.3 * unit) / unit,
-        width: place.width / unit,
-        height: place.height / unit,
-      },
-      form.light,
-      motion.lit,
-      motion.sign === "ellipsis" || motion.sign === "z"
-        ? morph(motion.morph).dressed
-        : 1,
-    );
-  }
-  context.restore();
-}
 function canvasFor(side: number, outline: number, into?: HTMLCanvasElement) {
   const inner = Math.ceil(side * 1.6),
     canvas = reuseCanvas(into, inner + outline * 2, inner + outline * 2);
@@ -780,9 +722,3 @@ export function renderLogo(
   if (outline > 0) layHairline(context, outline, form.light);
   return canvas;
 }
-export const BotRenderer = {
-  margin,
-  image: renderBot,
-  logo: renderLogo,
-  look: botRenderLook,
-};

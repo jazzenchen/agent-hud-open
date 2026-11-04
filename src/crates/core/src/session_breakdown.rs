@@ -5,31 +5,6 @@ use super::*;
 use crate::session_usage::{self, Builder, Call};
 use std::hash::{Hash, Hasher};
 
-/// One call of a session's logs as the breakdown takes it. Only the session's
-/// own log (`own_key`) marks its turns; a sub-agent's prompts are steps of the
-/// turn that started it. Its own log records every call.
-fn own_call<'a>(row: &'a metering::CallRow, own_key: &str) -> Call<'a> {
-    Call {
-        row,
-        own: row.contribution == own_key,
-        call_log: row.contribution == own_key,
-    }
-}
-
-/// The rows' look at their breakdowns (`AgentHudCore::session_row_usage`) by
-/// the session's own log: a key of its logs' read offsets, and the value.
-#[derive(Default)]
-pub(crate) struct SessionRows(pub(crate) std::sync::Mutex<HashMap<PathBuf, (u64, Value)>>);
-
-impl SessionRows {
-    /// Forgets the sessions no longer listed, so the map follows the logs.
-    pub(crate) fn retain(&self, listed: &HashSet<&Path>) {
-        if let Ok(mut rows) = self.0.lock() {
-            rows.retain(|path, _| listed.contains(path.as_path()));
-        }
-    }
-}
-
 /// The sub-agents with calls in a turn, for the session page's timeline: each
 /// one's log (the calls' `log`), name and type, the log that started it, when
 /// it began and was last heard from, and whether it still runs. Claude Code
@@ -276,7 +251,10 @@ impl AgentHudCore {
         let rows = metering::calls_of(db, &paths, None, None).map_err(failed)?;
         let mut builder = Builder::new(prompts, compactions);
         for row in &rows {
-            builder.add(own_call(row, &own_paths[0]));
+            builder.add(Call {
+                row,
+                own: row.contribution == own_paths[0],
+            });
         }
         if builder.is_empty() {
             return Ok(None);
@@ -306,9 +284,7 @@ impl AgentHudCore {
             (log.offset, log.length, log.usage.total()).hash(&mut hash);
         }
         let key = hash.finish();
-        let Ok(mut rows) = self.session_rows.0.lock() else {
-            return Value::Null;
-        };
+        let mut rows = self.session_rows.borrow_mut();
         if let Some((kept, value)) = rows.get(&own.path) {
             if *kept == key {
                 return value.clone();
@@ -339,7 +315,6 @@ impl AgentHudCore {
         };
         let own_paths = vec![own.path.to_string_lossy().into_owned()];
         let failed = |_| l10n::text("无法读取会话用量", "Could not read session usage");
-        let call = |row| own_call(row, &own_paths[0]);
         let mut value = usage.json();
         // The session at its account's own prices (agent-hud-native-open
         // `UsageLedger` costs): a currency only when every priced log of the
@@ -370,7 +345,10 @@ impl AgentHudCore {
             let calls = rows
                 .iter()
                 .filter(|row| row.at >= turn.start && row.at <= turn.end)
-                .map(call)
+                .map(|row| Call {
+                    row,
+                    own: row.contribution == own_paths[0],
+                })
                 .collect::<Vec<_>>();
             let summary = session_usage::turn_summary(&calls);
             let agents = turn_agents(own, subagents, &calls, Utc::now().timestamp_millis());

@@ -34,9 +34,7 @@ pub fn launched_executable() -> std::io::Result<std::path::PathBuf> {
 pub fn client_executable(name: &str) -> Option<std::path::PathBuf> {
     let home = os::home_dir().ok()?;
     let env = std::env::vars().collect::<os::Environment>();
-    os::engine_candidates(&home, &env, name)
-        .into_iter()
-        .find(|path| os::engine_executable(path))
+    os::find_engine(&home, &env, name)
 }
 use std::path::{Path, PathBuf};
 
@@ -70,7 +68,7 @@ impl NativePlatform {
             gate,
         )
     }
-    pub fn legacy_preferences(&self) -> Result<Option<serde_json::Value>, String> {
+    pub fn legacy_preferences() -> Option<serde_json::Value> {
         os::legacy_preferences()
     }
     pub fn legacy_quota_database(&self) -> Option<PathBuf> {

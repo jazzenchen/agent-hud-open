@@ -1,7 +1,6 @@
 // Client hooks: Agent HUD's hooks in each client's settings, which let the HUD
 // answer permission requests and show finished turns, and how long the HUD
 // holds a request before the client asks by itself.
-import { useState } from "react";
 import type { Snapshot } from "@agent-hud/protocol";
 import { Switch } from "@agent-hud/ui/components/switch";
 import {
@@ -14,6 +13,7 @@ import {
   type SettingsPaneProps,
   type Text,
 } from "../SettingsPrimitives";
+import { usePending } from "../use-pending";
 
 export function HooksSection({
   snapshot,
@@ -24,8 +24,7 @@ export function HooksSection({
   action: SettingsPaneProps["action"];
   t: Text;
 }) {
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { pending, error, run } = usePending();
   const status = snapshot.connection.clientHooks;
   const on = snapshot.settings.clientHooks;
   const configure = async (
@@ -33,15 +32,7 @@ export function HooksSection({
     value: unknown,
   ) => {
     if (pending) return;
-    setPending(true);
-    setError(null);
-    try {
-      await action("set_setting", { key, value });
-    } catch (failure) {
-      setError(failure instanceof Error ? failure.message : String(failure));
-    } finally {
-      setPending(false);
-    }
+    await run(() => action("set_setting", { key, value }));
   };
   const reason =
     status?.supported !== true
