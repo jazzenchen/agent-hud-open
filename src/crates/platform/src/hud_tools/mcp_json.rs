@@ -73,8 +73,6 @@ pub(super) fn edit(
             }
         }
     }
-    let saved = || format!("{client}'s MCP settings could not be saved");
-    let bytes =
-        crate::json_text::rewrite(original.map(str::as_bytes), &value).map_err(|_| saved())?;
-    String::from_utf8(bytes).map(Some).map_err(|_| saved())
+    let bytes = crate::json_text::rewrite(original.map(str::as_bytes), &value).unwrap();
+    Ok(Some(String::from_utf8(bytes).unwrap()))
 }

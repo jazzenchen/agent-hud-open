@@ -188,8 +188,7 @@ pub fn apply_plan(plan: &InstallPlan) -> Result<bool, String> {
             "Client settings changed after this hook plan was prepared; prepare a new plan.",
         ));
     }
-    let bytes = crate::json_text::rewrite(plan.original.as_deref(), &plan.updated)
-        .map_err(|_| "Hook settings could not be saved")?;
+    let bytes = crate::json_text::rewrite(plan.original.as_deref(), &plan.updated).unwrap();
     write_contents(&plan.target, Some(&bytes))?;
     Ok(true)
 }

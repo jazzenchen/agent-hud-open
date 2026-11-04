@@ -26,19 +26,11 @@ pub fn rewrite(original: Option<&[u8]>, updated: &Value) -> serde_json::Result<V
 fn edited(original: &[u8], updated: &Value) -> Option<Vec<u8>> {
     let text = std::str::from_utf8(original).ok()?;
     let current: Value = serde_json::from_str(text).ok()?;
-    let mut parser = Parser {
-        text,
-        at: 0,
-        depth: 0,
-    };
+    let mut parser = Parser { text, at: 0 };
     parser.space();
     let start = parser.at;
     let root = parser.value()?;
     let end = parser.at;
-    parser.space();
-    if parser.at != text.len() {
-        return None;
-    }
     let style = Style::of(text, &root);
     let mut out = String::with_capacity(text.len() + 256);
     out.push_str(&text[..start]);
@@ -75,7 +67,6 @@ struct Entry<'a> {
 struct Parser<'a> {
     text: &'a str,
     at: usize,
-    depth: usize,
 }
 
 impl<'a> Parser<'a> {
@@ -112,15 +103,7 @@ impl<'a> Parser<'a> {
     fn value(&mut self) -> Option<Node<'a>> {
         let start = self.at;
         let kind = match self.byte()? {
-            b'{' | b'[' => {
-                self.depth += 1;
-                if self.depth > 128 {
-                    return None;
-                }
-                let kind = self.container()?;
-                self.depth -= 1;
-                kind
-            }
+            b'{' | b'[' => self.container()?,
             b'"' => {
                 self.string()?;
                 Kind::Scalar
@@ -131,9 +114,6 @@ impl<'a> Parser<'a> {
                     None | Some(b',' | b'}' | b']' | b' ' | b'\t' | b'\n' | b'\r')
                 ) {
                     self.at += 1;
-                }
-                if self.at == start {
-                    return None;
                 }
                 Kind::Scalar
             }
