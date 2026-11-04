@@ -1,4 +1,5 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCoreQuery } from "../lib/use-core-query";
 import { HUDArtwork as HUDLogo } from "@agent-hud/hud/HUDArtwork";
 import { useFormat } from "@agent-hud/ui/format-context";
 import {
@@ -30,44 +31,6 @@ type Action = (
   method: NativeMethod,
   params?: Record<string, unknown>,
 ) => Promise<unknown>;
-
-/** Only the latest stretch can publish into the section; a failure keeps the last one drawn. */
-function useQuotaHistory(
-  from: number,
-  to: number,
-  action: Action,
-  active: boolean,
-) {
-  const actionRef = useRef(action);
-  actionRef.current = action;
-  const sequence = useRef(0);
-  const [data, setData] = useState<QuotaHistoryResponse | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  useEffect(() => {
-    const id = ++sequence.current;
-    if (!active) return;
-    void actionRef
-      .current("quota_history", {
-        from: new Date(from).toISOString(),
-        to: new Date(to).toISOString(),
-      })
-      .then((value) => {
-        if (sequence.current !== id) return;
-        setData(value as QuotaHistoryResponse);
-        setError(null);
-      })
-      .catch((failure: unknown) => {
-        if (sequence.current === id)
-          setError(
-            failure instanceof Error ? failure.message : String(failure),
-          );
-      });
-    return () => {
-      sequence.current += 1;
-    };
-  }, [from, to, active]);
-  return { data, error };
-}
 
 const HEIGHT = 44;
 
@@ -370,7 +333,13 @@ export function QuotaHistory({
   light: boolean;
   timeZone: string;
 }) {
-  const { data, error } = useQuotaHistory(from, to, action, active);
+  // Only the latest stretch publishes; a failure keeps the last one drawn.
+  const { data, error } = useCoreQuery<QuotaHistoryResponse>(
+    action,
+    "quota_history",
+    { from: new Date(from).toISOString(), to: new Date(to).toISOString() },
+    active,
+  );
   const display = useFormat().quotaDisplay ?? "consumed";
   const zh = Boolean(theme.zh);
   const now = Date.now();
