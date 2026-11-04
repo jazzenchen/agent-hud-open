@@ -6,7 +6,7 @@ use std::{
     cmp::Ordering,
     collections::HashMap,
     path::{Path, PathBuf},
-    sync::{Mutex, OnceLock},
+    sync::{Mutex, OnceLock, PoisonError},
 };
 
 /// The id of the sessions of no folder.
@@ -23,13 +23,19 @@ pub fn project_id(cwd: Option<&str>) -> Option<String> {
     let cwd = cwd.filter(|cwd| !cwd.is_empty())?;
     static CACHE: OnceLock<Mutex<HashMap<String, String>>> = OnceLock::new();
     let cache = CACHE.get_or_init(Default::default);
-    if let Some(id) = cache.lock().ok().and_then(|cache| cache.get(cwd).cloned()) {
+    if let Some(id) = cache
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner)
+        .get(cwd)
+        .cloned()
+    {
         return Some(id);
     }
     let id = abbreviate(&repository(&expand(cwd)));
-    if let Ok(mut cache) = cache.lock() {
-        cache.insert(cwd.to_owned(), id.clone());
-    }
+    cache
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner)
+        .insert(cwd.to_owned(), id.clone());
     Some(id)
 }
 

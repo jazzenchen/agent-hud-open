@@ -8,9 +8,9 @@
 use chrono::{Datelike, FixedOffset, TimeZone, Timelike};
 use serde::Deserialize;
 use std::collections::HashMap;
-#[cfg(not(test))]
-use std::sync::Mutex;
 use std::sync::OnceLock;
+#[cfg(not(test))]
+use std::sync::{Mutex, PoisonError};
 
 mod regions;
 pub use regions::PriceRegions;
@@ -316,7 +316,7 @@ fn overrides<R>(read: impl FnOnce(&mut Overrides) -> R) -> R {
     let mut state = STATE
         .get_or_init(Default::default)
         .lock()
-        .unwrap_or_else(|poisoned| poisoned.into_inner());
+        .unwrap_or_else(PoisonError::into_inner);
     read(&mut state)
 }
 
