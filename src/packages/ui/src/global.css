@@ -101,6 +101,10 @@ html {
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   background: var(--background);
+  /* An app window never bounces as a whole page. On macOS a bounce can stay
+   * stuck part way: the page is drawn shifted while clicks land where it
+   * was. Scrolling lists inside a page still bounce. */
+  overscroll-behavior: none;
 }
 body {
   margin: 0;
