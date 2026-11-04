@@ -225,7 +225,7 @@ export function DetailFigures({
         : compact(totals?.total ?? session.tokens),
       note: projectUsageUnavailable
         ? zh
-          ? "Project 總用量不可用"
+          ? "Project 总用量不可用"
           : "Project total usage unavailable"
         : detail?.subagents
           ? (zh ? "含子 agent " : "Sub-agents ") +
@@ -1201,10 +1201,10 @@ function ProjectExecutionsCard({
       <CardTitle
         title={
           zh
-            ? `本機執行會話（${count}）`
+            ? `本机执行会话（${count}）`
             : `Local execution sessions (${count})`
         }
-        right={zh ? "Project 總用量不可用" : "Project total usage unavailable"}
+        right={zh ? "Project 总用量不可用" : "Project total usage unavailable"}
         theme={theme}
       />
       {children.map((child) => (
@@ -1224,7 +1224,7 @@ function ProjectExecutionsCard({
           }}
         >
           <span style={{ ...clipped, flex: 1, minWidth: 0 }}>
-            {child.title || (zh ? "本機執行會話" : "Local execution session")}
+            {child.title || (zh ? "本机执行会话" : "Local execution session")}
           </span>
           <span style={{ ...numeric, color: theme.secondary, flexShrink: 0 }}>
             {compact(child.tokens)} {zh ? "Token" : "tok"}

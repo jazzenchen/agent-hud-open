@@ -228,7 +228,7 @@ export function SourceSessions({
             {session.desktopProject
               ? failedProjectOpen === session.id
                 ? zh
-                  ? "無法開啟專案"
+                  ? "无法重新打开 Project"
                   : "Couldn't reopen Project"
                 : `${session.desktopProject.kindLabel} · ${session.desktopProject.label}`
               : `${tokensShort(session.tokens)} tok`}

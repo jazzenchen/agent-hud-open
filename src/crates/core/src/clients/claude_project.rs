@@ -48,16 +48,16 @@ fn unavailable(log: &LogHead) -> Value {
         .unwrap_or_else(|| log.updated.clone());
     json!({
         "id": format!("claude-project-worker:{}", log.id),
-        "source": "claude", "title": crate::l10n::text("Project 對話", "Project conversation"),
+        "source": "claude", "title": crate::l10n::text("Project 对话", "Project conversation"),
         "client": "Claude Code Desktop", "model": "Unknown", "cwd": null, "project": null,
         "updatedAt": at, "lastMessageAt": at, "state": "unverified", "tokens": 0,
         "cost": null, "contextPercent": null, "logPath": null, "parentId": null,
         "usageStatus": "unavailable", "navigationTarget": null,
         "desktopProject": {
             "execution": "unknown", "status": "unknown", "kindLabel": "Project",
-            "label": crate::l10n::text("無法確認原始對話", "Project link unavailable"),
+            "label": crate::l10n::text("无法确认原始对话", "Project link unavailable"),
             "projectLabel": "Claude Project", "openAvailable": false,
-            "openLabel": crate::l10n::text("無法確認原始 Project 對話", "The original Project thread could not be identified")
+            "openLabel": crate::l10n::text("无法确认原始 Project 对话", "The original Project thread could not be identified")
         }
     })
 }
@@ -69,7 +69,7 @@ impl AgentHudCore {
         }
         overlay_worker(&self.claude_desktop.index, &mut row, None);
         if row["desktopProject"].is_object() {
-            row["title"] = json!(crate::l10n::text("Project 對話", "Project conversation"));
+            row["title"] = json!(crate::l10n::text("Project 对话", "Project conversation"));
             row["state"] = json!("unverified");
         }
         row
@@ -105,14 +105,14 @@ impl AgentHudCore {
                 row["navigationTarget"] =
                     json!({"kind":"claude-project-thread", "projectId":project, "id":thread});
                 row["desktopProject"]["label"] =
-                    json!(crate::l10n::text("狀態未知", "Status unknown"));
+                    json!(crate::l10n::text("状态未知", "Status unknown"));
                 row["desktopProject"]["openAvailable"] = json!(true);
                 row
             });
             row["desktopProject"]["execution"] = json!("local");
             row["desktopProject"]["kindLabel"] = json!("Local");
             row["desktopProject"]["openLabel"] = json!(crate::l10n::text(
-                "回到 Project 對話",
+                "回到 Project 对话",
                 "Return to Project thread"
             ));
             let count = row["desktopProject"]["localWorkerCount"]
@@ -158,7 +158,7 @@ impl AgentHudCore {
             })
             .map(|log| {
                 let mut row = log.session(now, None);
-                row["title"] = json!(crate::l10n::text("本機執行會話", "Local execution session"));
+                row["title"] = json!(crate::l10n::text("本机执行会话", "Local execution session"));
                 row["navigationTarget"] = session["navigationTarget"].clone();
                 row["desktopProject"] = session["desktopProject"].clone();
                 row
@@ -199,8 +199,8 @@ pub(crate) fn overlay_worker(
     session["navigationTarget"] = target.clone().unwrap_or(Value::Null);
     session["desktopProject"] = json!({
         "execution":"local", "status":"unknown", "kindLabel":"Project",
-        "label":crate::l10n::text("本機執行會話", "Local execution session"),
+        "label":crate::l10n::text("本机执行会话", "Local execution session"),
         "projectLabel":"Claude Project", "openAvailable":target.is_some(),
-        "openLabel":if target.is_some() {crate::l10n::text("回到 Project 對話", "Return to Project thread")} else {crate::l10n::text("無法確認原始 Project 對話", "The original Project thread could not be identified")}
+        "openLabel":if target.is_some() {crate::l10n::text("回到 Project 对话", "Return to Project thread")} else {crate::l10n::text("无法确认原始 Project 对话", "The original Project thread could not be identified")}
     });
 }
