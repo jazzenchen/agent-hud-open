@@ -47,3 +47,26 @@ export function reuseCanvas(
   }
   return canvas;
 }
+
+/** Draws `draw` on a borrowed canvas with `context`'s transform, then lays it
+ * over `context` at `alpha` with `operation`. */
+export function group(
+  context: CanvasRenderingContext2D,
+  alpha: number,
+  draw: (c: CanvasRenderingContext2D) => void,
+  operation: GlobalCompositeOperation = "source-over",
+) {
+  const { canvas, context: c } = borrowCanvas(
+    context.canvas.width,
+    context.canvas.height,
+  );
+  c.setTransform(context.getTransform());
+  draw(c);
+  context.save();
+  context.resetTransform();
+  context.globalAlpha = alpha;
+  context.globalCompositeOperation = operation;
+  context.drawImage(canvas, 0, 0);
+  context.restore();
+  giveBack(canvas);
+}
