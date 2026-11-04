@@ -594,13 +594,13 @@ async fn cached_snapshot(service: tauri::State<'_, Service>) -> Result<CachedSna
     let backend = Arc::clone(&service.backend);
     tauri::async_runtime::spawn_blocking(move || {
         let backend = backend.lock().unwrap_or_else(PoisonError::into_inner);
-        Ok(CachedSnapshot {
+        CachedSnapshot {
             snapshot: backend.snapshot.clone(),
             error: backend.error.clone(),
-        })
+        }
     })
     .await
-    .map_err(|error| format!("Snapshot reader failed: {error}"))?
+    .map_err(|error| format!("Snapshot reader failed: {error}"))
 }
 
 /// Settings, built again from its configuration when it was closed. Never on
