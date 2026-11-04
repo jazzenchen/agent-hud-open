@@ -1,0 +1,84 @@
+// The app's settings and the HUD panel's layout.
+import type { CustomPrice } from "./prices-relays.ts";
+import type { QuotaMeasure } from "./quota.ts";
+
+export type ApprovalWaitMinutes = 1 | 3 | 5 | 10 | 30 | 60;
+export interface PanelBlockLayout {
+  /** `rings` are concentric (年轮) and `segments` split one ring (分段环), one
+   * per account; a layout saved before them says `ring`, read as `rings`. */
+  widget?: "bar" | "rings" | "segments" | "ring" | "number" | "chart";
+  measures?: QuotaMeasure[];
+  hidden?: boolean;
+  hiddenRows?: string[];
+  hiddenAccounts?: string[];
+  rows?: string[];
+  accounts?: string[];
+  countdown?: boolean;
+  columns?: number;
+  ringSize?: "small" | "medium" | "large";
+  span?: "full" | "half";
+  period?: "day" | "week" | "month";
+}
+export interface PanelLayout {
+  order?: string[];
+  sections?: ("blocks" | "tokens" | "sessions")[];
+  hiddenSections?: ("blocks" | "tokens" | "sessions")[];
+  countdown?: boolean;
+  blocks?: Record<string, PanelBlockLayout>;
+  style?: {
+    spacing?: "compact" | "regular" | "roomy";
+    separators?: boolean;
+    width?: number;
+  };
+  sessions?: {
+    limit?: number;
+    period?: "day" | "week";
+    agents?: string[];
+    projects?: string[];
+  };
+  tokens?: {
+    period?: "day" | "week" | "month";
+    agents?: string[];
+    models?: string[];
+    /** Model IDs hidden from the chart; unseen models stay visible by default. */
+    hiddenModels?: string[];
+    /** Preferred model order; newly observed models follow in their natural order. */
+    modelOrder?: string[];
+  };
+  hud?: { agents?: string[] };
+}
+export interface SourcePreferences {
+  live?: boolean;
+  reminders?: boolean;
+}
+export interface AppSettings {
+  /** Display quota percentages as used or available; readings remain usedPercent. */
+  quotaDisplay?: "consumed" | "remaining";
+  /** Additional Codex CLI homes whose signed-in accounts should be read. */
+  codexHomes?: string[];
+  /** Additional Claude Code CLAUDE_CONFIG_DIR folders whose signed-in accounts should be read. */
+  claudeHomes?: string[];
+  /** CLI settings files connected to Antigravity's account status callback. */
+  antigravityCliSettings?: string[];
+  appearance: "dark" | "light" | "system";
+  language: string;
+  clientHooks: boolean;
+  readCopilotQuota?: boolean;
+  /** The relay hosts whose balance may be read with the key the client already sends them. */
+  relayReading?: string[];
+  /** The owner's prices per million tokens, by model as recorded (`model` or `model#route`). */
+  customPrices?: Record<string, CustomPrice>;
+  /** By relay host: times the vendor's list price, when the relay has no price list. */
+  relayMultipliers?: Record<string, number>;
+  /** By local host: a model server (free) or a gateway to a paid API. */
+  localKinds?: Record<string, "model" | "gateway">;
+  approvalWaitMinutes?: ApprovalWaitMinutes;
+  launchAtLogin: boolean;
+  appearanceFollowsScreen?: boolean;
+  animations: boolean;
+  hudVisible: boolean;
+  showMenuBarIcon?: boolean;
+  hudTools?: boolean;
+  /** Answer the Claude desktop app's questions on the HUD through Agent HUD's Claude Code plugin; on unless turned off. */
+  claudeAnswers?: boolean;
+}
