@@ -315,7 +315,6 @@ export function start(ctx, channel, options = {}) {
     original?.addEventListener?.("abort", onAbort, { once: true });
     try {
       const fromClient = Promise.resolve().then(next);
-      fromClient.then(undefined, () => {});
       const first = await Promise.race([
         fromClient.then(
           (value) => ({ value }),
@@ -418,9 +417,7 @@ export function start(ctx, channel, options = {}) {
     }
   });
   ctx.on("tools/result", (exec) => {
-    quietly(() => {
-      if (typeof exec?.callId === "string") calls.delete(exec.callId);
-    });
+    if (typeof exec?.callId === "string") calls.delete(exec.callId);
   });
   ctx.on("agent/created", (event) => {
     quietly(() => {
@@ -429,9 +426,7 @@ export function start(ctx, channel, options = {}) {
     return undefined;
   });
   ctx.on("agent/disposed", (event) => {
-    quietly(() => {
-      if (typeof event?.agent?.id === "string") end(event.agent.id);
-    });
+    if (typeof event?.agent?.id === "string") end(event.agent.id);
   });
 
   quietly(checkIns);
