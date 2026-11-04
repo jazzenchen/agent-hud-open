@@ -1,49 +1,32 @@
 import type { SpritePicture } from "./clawd";
 import { shownSign, type BotSign } from "./bot-state";
 import {
+  cycle,
+  exitLead,
+  frameStep,
+  introSteps,
+  outroSteps,
+  stepsOf,
+  type Shown,
+  type Step,
+} from "./clawd-script";
+import {
   clawdClips,
-  clawdTicks,
-  easedOffset,
   isClawdAttention,
   sameFrame,
   standing,
-  zeroOffset,
   type ClawdCard,
-  type ClawdClip,
   type ClawdEvent,
   type ClawdFrame,
   type ClawdLook,
-  type ClawdOffset,
-  type ClawdShot,
   type ClawdVisit,
 } from "./clawd-clips";
 
-interface Shown {
-  look: ClawdLook;
-  clip: ClawdClip;
-  still: boolean;
-  epoch: number | null;
-}
-interface Step {
-  frame: ClawdFrame | null;
-  ticks: number;
-  offset: ClawdOffset;
-  sign?: BotSign;
-  mini?: number;
-  holds?: boolean;
-  endsCycle?: boolean;
-  outro?: boolean;
-  mirrored?: boolean;
-}
 type Activity =
   | { kind: "resting" | "visit" | "greeting" | "gazing" | "card" | "at-card" }
   | { kind: "entering" | "looping" | "leaving"; shown: Shown }
   | { kind: "event"; event: ClawdEvent; resume: Shown | null };
 const tickAt = (time: number) => Math.floor((time + 0.004) * 12);
-const frameStep = (
-  frame: ClawdFrame | null,
-  values: Partial<Step> = {},
-): Step => ({ frame, ticks: 1, offset: zeroOffset, ...values });
 const samePicture = (a: SpritePicture | null, b: SpritePicture | null) =>
   JSON.stringify(a) === JSON.stringify(b);
 
@@ -232,7 +215,7 @@ export class ClawdPlayer {
     )
       return;
     this.activity = { kind: "visit" };
-    this.begin(this.stepsOf(this.clips.visits[visit]), now);
+    this.begin(stepsOf(this.clips.visits[visit]), now);
   }
   greet(time: number) {
     const now = this.stepTo(time);
@@ -242,7 +225,7 @@ export class ClawdPlayer {
       this.target === null
     ) {
       this.activity = { kind: "greeting" };
-      this.begin(this.stepsOf(this.clips.greet), now);
+      this.begin(stepsOf(this.clips.greet), now);
     }
   }
   endHover(time: number) {
@@ -262,7 +245,7 @@ export class ClawdPlayer {
     this.target = null;
     this.pendingEvent = null;
     this.activity = { kind: "card" };
-    this.begin(this.stepsOf(this.clips.cards[card]), now);
+    this.begin(stepsOf(this.clips.cards[card]), now);
   }
   pointAtCard(mirrored: boolean, time: number) {
     this.holdAtCard(
@@ -469,16 +452,7 @@ export class ClawdPlayer {
   private playShot(event: ClawdEvent, resume: Shown | null, tick: number) {
     this.pendingEvent = null;
     this.activity = { kind: "event", event, resume };
-    this.begin(this.stepsOf(this.clips.events[event]), tick);
-  }
-  private stepsOf(shot: ClawdShot): Step[] {
-    return shot.steps.map((step) =>
-      frameStep(step.frame, {
-        ticks: step.ticks,
-        offset: step.offset,
-        sign: step.sign,
-      }),
-    );
+    this.begin(stepsOf(this.clips.events[event]), tick);
   }
   private enter(look: ClawdLook, source: Shown | null, tick: number) {
     const clip = this.clips.looks[look],
@@ -488,76 +462,18 @@ export class ClawdPlayer {
       kind: "entering",
       shown: { look, clip, still: look === "retrying", epoch: null },
     };
-    const steps = frames.map((frame, at) =>
-      frameStep(frame, {
-        ticks: clip.ticks,
-        offset: easedOffset(
-          clip.offset,
-          frames.length > 1 ? at / (frames.length - 1) : 1,
-        ),
-        sign: clip.sign,
-        mini: clip.miniShift,
-      }),
-    );
-    if (steps.length) steps[steps.length - 1].endsCycle = true;
-    this.begin(steps, tick);
+    this.begin(introSteps(clip, frames), tick);
   }
   private loop(shown: Shown, tick: number) {
     const next = { ...shown, epoch: shown.epoch ?? tick };
     this.activity = { kind: "looping", shown: next };
-    this.begin(this.cycle(next, tick), tick);
-  }
-  private cycle(shown: Shown, tick: number): Step[] {
-    const clip = shown.clip,
-      each = clip.ticks;
-    const make = (index: number, ticks: number) =>
-      frameStep(
-        { name: clip.sprite, index },
-        { ticks, offset: clip.offset, sign: clip.sign, mini: clip.miniShift },
-      );
-    if (shown.still || !clip.loop.length)
-      return [
-        {
-          ...(clip.loop.length
-            ? make(clip.loop[0], Infinity)
-            : frameStep(null, { ticks: Infinity })),
-          holds: true,
-        },
-      ];
-    let steps = clip.loop.map((index) => make(index, each));
-    const looped = tick - (shown.epoch ?? tick),
-      past = (seconds: number) => looped >= clawdTicks(seconds),
-      pace = clip.pace;
-    if (pace.kind === "resting" && past(pace.after)) {
-      steps[0].ticks += clawdTicks(pace.hold);
-      steps[0].holds = true;
-    } else if (pace.kind === "waiting" && past(pace.after)) {
-      steps[0].ticks = Math.max(
-        each,
-        clawdTicks(past(pace.slowAfter) ? pace.slowEvery : pace.every) -
-          (steps.length - 1) * each,
-      );
-      steps[0].holds = true;
-    } else if (pace.kind === "replaying" && past(pace.after)) {
-      steps = [
-        {
-          ...make(
-            pace.hold,
-            Math.max(each, clawdTicks(pace.every) - pace.replay.length * each),
-          ),
-          holds: true,
-        },
-        ...pace.replay.map((index) => make(index, each)),
-      ];
-    }
-    steps[steps.length - 1].endsCycle = true;
-    return steps;
+    this.begin(cycle(next, tick), tick);
   }
   private leave(shown: Shown, tick: number) {
     const clip = shown.clip,
       empty = !this.script.length;
     let lead: Step[];
-    if (empty) lead = this.exitLead(clip);
+    if (empty) lead = exitLead(clip);
     else {
       lead = this.script.map((step) => ({ ...step }));
       if (lead[0].holds) lead[0].ticks = tick + 1 - this.start;
@@ -575,8 +491,7 @@ export class ClawdPlayer {
               index: clip.exit.kind === "through" ? clip.exit.frame : 0,
             }),
           );
-          lead =
-            at >= 0 ? lead.slice(0, at + 1) : [...lead, ...this.exitLead(clip)];
+          lead = at >= 0 ? lead.slice(0, at + 1) : [...lead, ...exitLead(clip)];
           break;
         }
       }
@@ -590,33 +505,10 @@ export class ClawdPlayer {
       holds: false,
       endsCycle: false,
     }));
-    const outro = clip.outro.map((frame, at) =>
-      frameStep(frame, {
-        ticks: clip.ticks,
-        offset: easedOffset(
-          clip.offset,
-          clip.outro.length > 1 ? 1 - at / (clip.outro.length - 1) : 0,
-        ),
-        mini: clip.miniShift,
-        outro: true,
-      }),
-    );
+    const outro = outroSteps(clip);
     this.activity = { kind: "leaving", shown };
     if (empty) this.begin([...lead, ...outro], tick);
     else this.script = [...lead, ...outro];
-  }
-  private exitLead(clip: ClawdClip): Step[] {
-    if (clip.exit.kind !== "through") return [];
-    const at = clip.loop.indexOf(clip.exit.frame);
-    if (at < 0) return [];
-    return clip.loop
-      .slice(0, at + 1)
-      .map((index) =>
-        frameStep(
-          { name: clip.sprite, index },
-          { ticks: clip.ticks, offset: clip.offset, mini: clip.miniShift },
-        ),
-      );
   }
   private endHold(tick: number) {
     if (this.activity.kind !== "looping" || !this.script[0].holds) return;
