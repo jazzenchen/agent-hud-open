@@ -10,7 +10,7 @@ import {
   type BotState,
 } from "./bot-state";
 import { ClawdPlayer } from "./clawd-player";
-import { SplitMix } from "./bot-motion";
+import { SplitMix } from "./bot-pace";
 import { frameAfter, type ClawdLook } from "./clawd-clips";
 
 const following = (time: number) => (Math.floor((time + 0.004) * 12) + 1) / 12;

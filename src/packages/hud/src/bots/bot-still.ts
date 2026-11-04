@@ -1,5 +1,5 @@
 import type { BotForm } from "./bot-form";
-import type { BotFlap } from "./bot-motion";
+import type { BotFlap } from "./bot-pose";
 interface Slot {
   form: BotForm;
   width: number;

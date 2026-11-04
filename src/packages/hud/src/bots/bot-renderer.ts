@@ -1,13 +1,9 @@
 import { formOutline, type BotForm } from "./bot-form";
 import type { BotSpec, Box, Point, Paint, Decor } from "./bot-spec";
-import {
-  BotMotion,
-  botFace,
-  botLimbs,
-  type BotFace,
-  type BotLimbs,
-  type BotFlap,
-} from "./bot-motion";
+import type { BotMotion } from "./bot-motion";
+import { botFace, type BotFace } from "./bot-face";
+import { botLimbs, type BotLimbs } from "./bot-stance";
+import type { BotFlap } from "./bot-pose";
 import { easeInOut } from "./bot-moves";
 import type { BotSign } from "./bot-state";
 import { finPath, finSilhouette } from "./bot-fins";

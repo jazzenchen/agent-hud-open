@@ -6,140 +6,27 @@ import {
   isCalm,
   staysInPlace,
   eventRank,
-  badgeSign,
-  shownSign,
-  stillSign,
-  facingAim,
   BOT_EVENT_FRESHNESS,
   type BotState,
   type BotPhase,
   type BotEvent,
   type BotSign,
 } from "./bot-state";
-import { BotMoves, easeInOut, easeOut, easeOutBack } from "./bot-moves";
-export interface BotFace {
-  open: number;
-  look: number;
-  lookY: number;
-  wide: number;
-  happy: number;
-  lean: number;
-  crossed: number;
-}
-export interface BotPose {
-  x: number;
-  y: number;
-  rotation: number;
-  scaleX: number;
-  scaleY: number;
-  footing: number;
-}
-export interface BotLimbs {
-  left: number;
-  right: number;
-  lifted: number;
-  x: number;
-  y: number;
-  spinner: number;
-}
-export interface BotFlap {
-  left: number;
-  right: number;
-}
-export const botFace = (): BotFace => ({
-  open: 1,
-  look: 0,
-  lookY: 0,
-  wide: 1,
-  happy: 0,
-  lean: 0,
-  crossed: 0,
-});
-export const botPose = (): BotPose => ({
-  x: 0,
-  y: 0,
-  rotation: 0,
-  scaleX: 1,
-  scaleY: 1,
-  footing: 0,
-});
-export const botLimbs = (): BotLimbs => ({
-  left: 0,
-  right: 0,
-  lifted: 0,
-  x: 0,
-  y: 0,
-  spinner: 0,
-});
-export function mixPose(a: BotPose, b: BotPose, t: number): BotPose {
-  return Object.fromEntries(
-    Object.keys(a).map((key) => [
-      key,
-      a[key as keyof BotPose] +
-        (b[key as keyof BotPose] - a[key as keyof BotPose]) * t,
-    ]),
-  ) as unknown as BotPose;
-}
-export const BotPace = {
-  lively: 1 / 24,
-  following: 1 / 12,
-  calm: 1 / 6,
-  slack: 0.004,
-  next: (now: number, pace: number) =>
-    (Math.floor((now + 0.004) / pace) + 1) * pace,
-  frame(time: number, now: number) {
-    return Math.max(
-      this.next(now, this.lively),
-      Math.ceil((time - this.slack) / this.lively) * this.lively,
-    );
-  },
-  onFrame(now: number) {
-    const frame = Math.round(now / this.lively) * this.lively;
-    return Math.abs(frame - now) <= this.slack ? frame : now;
-  },
-};
-export class SplitMix {
-  state: bigint;
-  constructor(
-    seed: bigint | number = BigInt(
-      Math.floor(Math.random() * Number.MAX_SAFE_INTEGER),
-    ),
-  ) {
-    this.state = BigInt.asUintN(64, BigInt(seed));
-  }
-  next() {
-    this.state = BigInt.asUintN(64, this.state + 0x9e3779b97f4a7c15n);
-    let z = this.state;
-    z = BigInt.asUintN(64, (z ^ (z >> 30n)) * 0xbf58476d1ce4e5b9n);
-    z = BigInt.asUintN(64, (z ^ (z >> 27n)) * 0x94d049bb133111ebn);
-    return z ^ (z >> 31n);
-  }
-  unit() {
-    return Number(this.next() >> 11n) / 2 ** 53;
-  }
-}
-type ActKind =
-  | "glance"
-  | "blink-twice"
-  | "squint"
-  | "widen"
-  | "smile"
-  | "inspect"
-  | "tilt"
-  | "stretch"
-  | "wiggle"
-  | "turn"
-  | "wave"
-  | "scuttle"
-  | "hop";
-interface Act {
-  kind: ActKind;
-  start: number;
-  length: number;
-  side: number;
-  gaze: readonly [number, number];
-  from: number;
-}
+import { BotMoves, easeInOut, easeOut } from "./bot-moves";
+import { BotPace, SplitMix } from "./bot-pace";
+import {
+  botPose,
+  mixPose,
+  sitting,
+  played,
+  flapping,
+  keep,
+  type BotPose,
+  type BotFlap,
+} from "./bot-pose";
+import { botFace, updateFace, signs } from "./bot-face";
+import { botLimbs, stance } from "./bot-stance";
+import { pick, type Act } from "./bot-acts";
 export interface MotionSpec {
   radius: number;
   spin?: number;
@@ -148,17 +35,9 @@ export interface MotionSpec {
   keeps?: unknown;
   decor?: readonly { kind: string; fins?: readonly { hand: number }[] }[];
 }
-const hopPath = [
-  [1, 3, 0],
-  [-2, 0, 1],
-  [-3, 0, 2],
-  [-3, 0, 2],
-  [-2, 0, 1],
-  [0, 0, 0],
-  [1, 3, 0],
-  [0, 0, 0],
-] as const;
-/** Direct BotMotion.swift state machine. set/play record events even when a host skips drawing. */
+/** Direct BotMotion.swift state machine. set/play record events even when a host skips drawing.
+ * Its pose, face, stance and acts are worked out in bot-pose, bot-face,
+ * bot-stance and bot-acts, which read and write the fields left public here. */
 export class BotMotion {
   staysBot = false;
   arrivesAfter = 0;
@@ -184,24 +63,24 @@ export class BotMotion {
   wait: number | null = BotPace.lively;
   private last: number | null = null;
   private leaving: BotPose | null = null;
-  private act: Act | null = null;
+  act: Act | null = null;
   private nextAct = 0;
-  private blinks = [-1, -1];
-  private nextBlink = 2;
-  private following = false;
-  private blinking = false;
-  private blinksOn = true;
+  blinks = [-1, -1];
+  nextBlink = 2;
+  following = false;
+  blinking = false;
+  blinksOn = true;
   private botInterval: readonly [number, number] | null = null;
-  private greets = false;
+  greets = false;
   private greetAfter: number | null = null;
-  private greeting: number | null = null;
-  private greetSide = 1;
-  private pending: { kind: BotEvent; asked: number } | null = null;
-  private event: { kind: BotEvent; start: number } | null = null;
-  private beatsFrom = 0;
-  private heldSide = 1;
+  greeting: number | null = null;
+  greetSide = 1;
+  pending: { kind: BotEvent; asked: number } | null = null;
+  event: { kind: BotEvent; start: number } | null = null;
+  beatsFrom = 0;
+  heldSide = 1;
   private settled = false;
-  private random: SplitMix;
+  random: SplitMix;
   constructor(seed?: bigint | number) {
     this.random = new SplitMix(seed);
   }
@@ -362,7 +241,7 @@ export class BotMotion {
         !this.act &&
         now >= this.nextAct
       ) {
-        const chosen = this.pick(now);
+        const chosen = pick(this, now);
         if (chosen.kind === "wave" && aim[0] !== 0)
           chosen.side = aim[0] > 0 ? 1 : -1;
         this.act = chosen;
@@ -381,9 +260,9 @@ export class BotMotion {
         this.act?.kind === "turn"
           ? this.act.from + 60 * this.act.side * easeInOut(progress)
           : this.turn + this.spinRate(now, dozing) * dt;
-    this.signs(now, arrived, dozing);
+    signs(this, now, arrived, dozing);
     this.pose = arrived
-      ? this.sitting(age, progress, swell, dozing)
+      ? sitting(this, age, progress, swell, dozing)
       : botPose();
     if (this.leaving && arrived && age < 0.3)
       this.pose = mixPose(this.leaving, this.pose, easeOut(age / 0.3));
@@ -395,17 +274,17 @@ export class BotMotion {
       if (!this.limbed && this.look.startsWith("tool-") && !this.state.holds)
         this.pose.y = BotMoves.bob(now - this.beatsFrom) * this.morph;
     } else if (this.morph > 0.5) this.pose.x += 0.025 * this.face.look;
-    if (!this.limbed) this.played(now);
+    if (!this.limbed) played(this, now);
     this.limbs =
-      this.limbed && arrived ? this.stance(age, now, dozing) : botLimbs();
+      this.limbed && arrived ? stance(this, age, now, dozing) : botLimbs();
     this.flap =
-      this.finned && arrived ? this.flapping(age, now) : { left: 0, right: 0 };
+      this.finned && arrived ? flapping(this, age, now) : { left: 0, right: 0 };
     this.pose.x += this.limbs.x * this.stepShare * this.morph;
     this.pose.y += this.limbs.y * this.stepShare * this.morph;
     if (arrived && (!inPlace || this.morph > 0))
-      this.updateFace(age, now, dt, aim, swell, dozing);
+      updateFace(this, age, now, dt, aim, swell, dozing);
     else this.following = this.blinking = false;
-    if (arrived) this.keep(age, now, dt);
+    if (arrived) keep(this, age, now, dt);
     const stills =
       (this.state.holds && isWorking(this.look)) ||
       (this.turnsToCard && age >= 0.45);
@@ -510,17 +389,17 @@ export class BotMotion {
       this.look === "no-news"
     );
   }
-  private get greetsOnHover() {
+  get greetsOnHover() {
     return (
       this.state.hovered &&
       !isAttention(this.look) &&
       (isCalm(this.look) || this.state.badge !== null)
     );
   }
-  private get turnsToCard() {
+  get turnsToCard() {
     return this.state.facing !== null && isAttention(this.look);
   }
-  private breathes(dozing: boolean) {
+  breathes(dozing: boolean) {
     return (
       !this.limbed && staysInPlace(this.look) && !this.state.holds && !dozing
     );
@@ -540,7 +419,7 @@ export class BotMotion {
         : 0
       : this.spin;
   }
-  private moving(age: number) {
+  moving(age: number) {
     const start = BotMoves.move(age).start;
     return (
       !this.turnsToCard &&
@@ -573,367 +452,6 @@ export class BotMotion {
     this.botInterval = [start, start + 3 + this.random.unit() * 2 - 0.5];
     this.nextAct = start + 0.5;
   }
-  private sitting(
-    age: number,
-    progress: number,
-    swell: number,
-    dozing: boolean,
-  ) {
-    const pose = botPose();
-    if (isAttention(this.look)) {
-      if (age < 0.45) {
-        const x = age / 0.45,
-          arc = Math.sin(Math.PI * x);
-        pose.y = -0.26 * 4 * x * (1 - x);
-        pose.scaleY = 1 + 0.08 * arc;
-        pose.scaleX = 1 - 0.05 * arc;
-      }
-      const raised = 1 + 0.12 * easeOutBack(Math.min(1, age / 0.35));
-      pose.scaleX *= raised;
-      pose.scaleY *= raised;
-      if (!this.turnsToCard) {
-        const start = BotMoves.move(age).start;
-        if (!this.limbed) {
-          if (this.look === "permission")
-            pose.rotation = start === null ? 0 : BotMoves.knock(age - start);
-          if (this.look === "question")
-            pose.rotation = BotMoves.questionTilt(age);
-          if (this.look === "plan")
-            pose.y += start === null ? 0 : BotMoves.nod(age - start);
-        }
-      }
-    } else if (this.look === "done") {
-      if (age < 0.6) {
-        const pop = Math.sin((Math.PI * age) / 0.6);
-        pose.scaleX = pose.scaleY = 1 + 0.2 * pop;
-        pose.y = -0.1 * pop;
-      }
-    } else {
-      if (this.breathes(dozing)) {
-        const breath = (2 * Math.PI * age) / this.period;
-        pose.scaleX = 1 + 0.03 * Math.sin(2 * breath);
-        pose.scaleY = 1 - 0.03 * Math.sin(2 * breath);
-      }
-      if (this.look === "thinking" && !this.limbed)
-        pose.rotation =
-          BotMoves.ponderTilt *
-          Math.max(-1, Math.min(1, this.face.look / BotMoves.ponderGaze[0]));
-    }
-    if (this.act && !this.limbed) {
-      if (this.act.kind === "tilt") pose.rotation += this.act.side * 9 * swell;
-      if (this.act.kind === "stretch") {
-        const arc = Math.sin(Math.PI * progress);
-        pose.scaleY *= 1 + 0.06 * arc;
-        pose.scaleX *= 1 - 0.04 * arc;
-      }
-      if (this.act.kind === "wiggle")
-        pose.rotation +=
-          8 * Math.sin(2 * Math.PI * 3 * progress) * (1 - progress);
-    }
-    return pose;
-  }
-  private played(now: number) {
-    if (this.greeting !== null)
-      this.pose.y += BotMoves.hop(now - this.greeting) * this.morph;
-    if (!this.event) return;
-    const time = now - this.event.start;
-    if (this.event.kind === "start")
-      this.pose.y += BotMoves.hop(time) * this.morph;
-    else if (this.event.kind === "failed") {
-      const sag = BotMoves.sag(time);
-      this.pose.x += BotMoves.shake(time) * this.morph;
-      this.pose.rotation += 6 * sag * this.morph;
-      this.pose.y += 0.02 * sag * this.morph;
-    } else {
-      const sigh = BotMoves.sigh(time);
-      this.pose.scaleX *= 1 + (sigh.scaleX - 1) * this.morph;
-      this.pose.scaleY *= 1 + (sigh.scaleY - 1) * this.morph;
-      this.pose.footing = 0.5;
-    }
-  }
-  private flapping(age: number, now: number): BotFlap {
-    let left = 0,
-      right = 0;
-    if (this.event) {
-      left = right =
-        this.event.kind === "start"
-          ? BotMoves.finFlap(now - this.event.start) * this.morph
-          : 0;
-    } else if (this.greeting !== null) {
-      const wave = BotMoves.finWave(now - this.greeting) * this.morph;
-      if (this.greetSide < 0 || this.helper) left = wave;
-      else right = wave;
-    } else if (this.look.startsWith("tool-") && !this.state.holds)
-      left = right =
-        BotMoves.bob(now - this.beatsFrom) > 0
-          ? BotMoves.paddle * this.morph
-          : 0;
-    else if (this.look === "done")
-      left = right = BotMoves.cheer(age) * this.morph;
-    return { left: Math.round(left), right: Math.round(right) };
-  }
-  private updateFace(
-    age: number,
-    now: number,
-    dt: number,
-    aim: readonly [number, number],
-    swell: number,
-    dozing: boolean,
-  ) {
-    const target = botFace();
-    let every: readonly [number, number] | null = [3.2, 6.5];
-    if (isAttention(this.look)) {
-      target.wide = 1.22;
-      if (this.state.facing) {
-        const a = facingAim(this.state.facing);
-        target.look = a[0];
-        target.lookY = a[1];
-      } else if (this.state.hovered) {
-        target.look = aim[0];
-        target.lookY = aim[1];
-      }
-      if (this.look === "plan" && this.moving(age)) target.lookY = 0.5;
-      every =
-        age < 1.5 || age >= BotMoves.fullWait || this.turnsToCard
-          ? null
-          : [4, 7];
-    } else if (this.look === "done") {
-      if (age < 1.25) {
-        target.happy = 1;
-        every = null;
-      } else {
-        target.look = aim[0];
-        target.lookY = aim[1];
-      }
-    } else if (this.look === "thinking" && !this.state.hovered) {
-      const side = this.state.holds ? this.heldSide : BotMoves.ponderSide(now);
-      target.look = BotMoves.ponderGaze[0] * side;
-      target.lookY = BotMoves.ponderGaze[1];
-      every = [2.2, 4.5];
-    } else if (dozing || (this.look === "compacting" && this.limbed)) {
-      target.open = 0;
-      every = null;
-    } else {
-      target.look = aim[0];
-      target.lookY = aim[1];
-      every = [2.2, 4.5];
-      const act = this.act;
-      if (act) {
-        if (act.kind === "glance") {
-          target.look += (act.gaze[0] * 0.8 - target.look) * swell;
-          target.lookY += (act.gaze[1] - target.lookY) * swell;
-        }
-        if (act.kind === "squint") target.open = 1 - 0.55 * swell;
-        if (act.kind === "widen" || act.kind === "hop")
-          target.wide = 1 + 0.2 * swell;
-        if (act.kind === "smile") target.happy = swell > 0.4 ? 1 : 0;
-        if (act.kind === "inspect") {
-          target.lean = act.side * swell;
-          target.look += (act.side * 0.6 - target.look) * swell;
-          target.lookY -= target.lookY * swell;
-        }
-        if (act.kind === "stretch" && this.limbed)
-          target.open = 1 - 0.9 * swell;
-      }
-    }
-    if (this.state.holds) every = null;
-    if (this.pending?.kind === "start") target.open = 0;
-    if (this.event) {
-      const time = now - this.event.start;
-      if (this.event.kind === "start")
-        target.open = Math.min(1, time / BotMoves.hopSeconds);
-      else if (this.event.kind === "failed") {
-        if (this.crossesEyes) target.crossed = 1;
-        else target.open = 0.45;
-        target.lookY = 0.35 * BotMoves.sag(time);
-      } else {
-        target.open = this.limbed
-          ? time < 4 * BotMoves.beat
-            ? 0
-            : 0.5
-          : BotMoves.sigh(time).open;
-        target.lookY = 0.3;
-      }
-      every = null;
-    }
-    this.blinksOn = every !== null;
-    const eyes = 1 - Math.exp(-dt * 18),
-      head = 1 - Math.exp(-dt * 9);
-    this.face.look += (target.look - this.face.look) * head;
-    this.face.lookY += (target.lookY - this.face.lookY) * head;
-    for (const key of ["wide", "happy", "lean", "crossed"] as const)
-      this.face[key] += (target[key] - this.face[key]) * eyes;
-    let lid = target.open;
-    if (every) {
-      if (now >= this.nextBlink) {
-        this.blinks = [now, -1];
-        this.nextBlink =
-          now + every[0] + this.random.unit() * (every[1] - every[0]);
-      }
-    } else if (this.nextBlink < now) this.nextBlink = now + 1.2;
-    for (const start of this.blinks) {
-      const blink = (now - start) / 0.17;
-      if (blink >= 0 && blink < 1) lid *= 1 - Math.sin(Math.PI * blink);
-    }
-    this.face.open += (lid - this.face.open) * (1 - Math.exp(-dt * 60));
-    this.blinking =
-      Math.abs(lid - this.face.open) > 0.01 ||
-      this.blinks.some((start) => now >= start && now - start < 0.17);
-    this.following =
-      Math.abs(target.look - this.face.look) > 0.004 ||
-      Math.abs(target.lookY - this.face.lookY) > 0.004 ||
-      Math.abs(target.wide - this.face.wide) > 0.004 ||
-      Math.abs(target.happy - this.face.happy) > 0.01 ||
-      Math.abs(target.lean - this.face.lean) > 0.01 ||
-      Math.abs(target.crossed - this.face.crossed) > 0.01;
-  }
-  private keep(age: number, now: number, dt: number) {
-    if (staysInPlace(this.look)) {
-      this.kept = { lift: 0, scale: 1 };
-      return;
-    }
-    let lift = 0,
-      scale = 1;
-    if (isAttention(this.look)) {
-      lift = 0.03;
-      scale = 1.22;
-      if (!this.turnsToCard && (age < BotMoves.fullWait || this.moving(age)))
-        scale += 0.08 * Math.sin((2 * Math.PI * now) / 0.8);
-    } else if (this.look === "done" && age < 0.6)
-      lift = 0.22 * Math.sin((Math.PI * age) / 0.6);
-    const ease = 1 - Math.exp(-dt * 22);
-    this.kept.lift += (lift - this.kept.lift) * ease;
-    this.kept.scale += (scale - this.kept.scale) * ease;
-  }
-  private signs(now: number, arrived: boolean, dozing: boolean) {
-    // Arrived, the still mark's sign; on its way, only its badge's.
-    let sign = arrived
-      ? stillSign(this.state)
-      : this.state.badge
-        ? badgeSign(this.state.badge)
-        : null;
-    if (this.event?.kind === "failed") sign = shownSign(sign, "cross");
-    if (this.morph > 0 && this.look === "thinking" && !this.limbed)
-      sign = shownSign(sign, "ellipsis");
-    if (this.morph > 0 && dozing) sign = shownSign(sign, "z");
-    this.sign = sign;
-    this.lit =
-      sign === "ellipsis" && !this.state.holds
-        ? Math.floor(now * 3 + 1e-6) % 3
-        : 0;
-  }
-  private stance(age: number, now: number, dozing: boolean) {
-    if (this.event)
-      return BotMotion.eventStance(this.event.kind, now - this.event.start);
-    const limbs = botLimbs(),
-      beat = (seconds: number, every: number) =>
-        Math.floor(Math.max(0, seconds) / every + 1e-6),
-      clock = now - this.beatsFrom;
-    if (
-      this.look === "thinking" ||
-      this.look.startsWith("tool-") ||
-      this.look === "plain"
-    ) {
-      if (!this.sign) {
-        const frame = this.state.holds ? 0 : beat(now, BotMoves.beat) % 10;
-        limbs.spinner = frame < 6 ? frame + 1 : 11 - frame;
-      }
-      if (
-        this.look !== "thinking" &&
-        !this.state.holds &&
-        BotMoves.inBurst(clock)
-      ) {
-        const tap = beat(clock, BotMoves.beat);
-        limbs.left = tap % 2;
-        limbs.right = 1 - limbs.left;
-        limbs.y = Math.floor(tap / 2) % 2;
-      }
-    } else if (this.look === "compacting") {
-      limbs.left = limbs.right = 1;
-      limbs.lifted = 3;
-    } else if (this.turnsToCard) {
-      if (this.state.facing === "left") limbs.left = 2;
-      else if (this.state.facing === "right") limbs.right = 2;
-    } else if (isAttention(this.look)) {
-      const move = BotMoves.move(age),
-        into = move.start === null ? null : age - move.start;
-      if (age < BotMoves.firstMove || this.moving(age)) {
-        limbs.left = 1 + (beat(clock, BotMoves.beat) % 2);
-        limbs.right = 3 - limbs.left;
-        if (into !== null && beat(into, BotMoves.beat) % 2 === 0) {
-          limbs.y = -2;
-          limbs.lifted = 3;
-        }
-      } else limbs.right = 2;
-    } else if (this.look === "done" && age < 1.5) {
-      const step = beat(clock, 2 * BotMoves.beat);
-      limbs.left = step % 2 === 0 ? 2 : 0;
-      limbs.right = 2 - limbs.left;
-      if (step % 2 === 1) {
-        limbs.y = -2;
-        limbs.lifted = 3;
-      }
-    } else if (this.look === "asleep" && dozing) {
-      limbs.lifted = 3;
-      limbs.y = 1;
-    }
-    const act = this.act;
-    if (!act || !staysInPlace(this.look)) return limbs;
-    const since = now - act.start,
-      ending = since > act.length - 0.15,
-      frame = (count: number) =>
-        Math.min(count - 1, beat(since, act.length / count));
-    if (["wave", "scuttle", "hop", "stretch"].includes(act.kind))
-      limbs.left = limbs.right = limbs.y = 0;
-    if (act.kind === "wave") {
-      if (since < 0.24) limbs.y = -1;
-      const arm =
-        since < 0.12 || ending ? 1 : 2 - (beat(since - 0.12, 0.16) % 2);
-      if (act.side < 0) limbs.left = arm;
-      else limbs.right = arm;
-    }
-    if (act.kind === "scuttle") {
-      const path = [0, 1, 2, 1, 0, -1, -2, -1, 0],
-        step = frame(path.length);
-      limbs.x = path[step] * (act.side < 0 ? -1 : 1);
-      limbs.lifted =
-        step === 0 || step === path.length - 1 ? 0 : 1 + (step % 2);
-    }
-    if (act.kind === "hop") {
-      const at = hopPath[frame(hopPath.length)];
-      limbs.y = at[0];
-      limbs.lifted = at[1];
-      limbs.left = limbs.right = at[2];
-    }
-    if (act.kind === "stretch" && since > 0.15 && !ending) {
-      limbs.left = limbs.right = 2;
-      limbs.y = -1;
-    }
-    return limbs;
-  }
-  private static eventStance(event: BotEvent, time: number) {
-    const limbs = botLimbs(),
-      beat = (every: number) => Math.floor(Math.max(0, time) / every + 1e-6);
-    if (event === "start") {
-      const at = hopPath[Math.min(hopPath.length - 1, beat(BotMoves.beat))];
-      limbs.y = at[0];
-      limbs.lifted = at[1];
-      limbs.left = limbs.right = at[2];
-    } else if (event === "failed") {
-      if (time < 0.5) limbs.x = beat(1 / 12) % 2 === 0 ? 1 : -1;
-      else {
-        limbs.y = 1;
-        limbs.lifted = 3;
-      }
-    } else if (time < 4 * BotMoves.beat) {
-      limbs.left = limbs.right = 2;
-      limbs.y = -1;
-    } else {
-      limbs.y = 1;
-      limbs.lifted = 3;
-    }
-    return limbs;
-  }
   private get stanceBeats() {
     return (
       !this.state.holds &&
@@ -941,72 +459,5 @@ export class BotMotion {
         this.look === "plain" ||
         (this.look === "thinking" && this.sign === null))
     );
-  }
-  private pick(now: number): Act {
-    let pool: [ActKind, number][] = [
-      ["glance", 5],
-      ["blink-twice", 2],
-      ["squint", 2],
-      ["widen", 2],
-      ["smile", 2],
-      ["inspect", 2],
-      ["tilt", 3],
-      ["stretch", 2],
-      ["wiggle", 2],
-    ];
-    if (this.spin !== 0) pool.push(["turn", 3]);
-    if (this.limbed) {
-      pool = pool.filter(([kind]) => kind !== "tilt" && kind !== "wiggle");
-      if (this.state.hovered)
-        pool.push(["wave", 4], ["hop", 2], ["scuttle", 2]);
-      else if (isWorking(this.look))
-        pool.push(["scuttle", 4], ["hop", 3], ["wave", 1]);
-      else if (isCalm(this.look))
-        pool = [
-          ["scuttle", 3],
-          ["hop", 3],
-          ["stretch", 3],
-          ["wave", 2],
-        ];
-    }
-    let roll = this.random.unit() * pool.reduce((a, b) => a + b[1], 0),
-      kind = pool[0][0];
-    for (const [candidate, weight] of pool) {
-      roll -= weight;
-      if (roll < 0) {
-        kind = candidate;
-        break;
-      }
-    }
-    if (this.greets) {
-      this.greets = false;
-      if (this.greetsOnHover) kind = "wave";
-    }
-    const lengths: Record<ActKind, number> = {
-        glance: 0,
-        "blink-twice": 0.5,
-        squint: 1.2,
-        widen: 0.9,
-        smile: 1.1,
-        inspect: 1.5,
-        tilt: 1.1,
-        stretch: 0.55,
-        wiggle: 0.6,
-        turn: 0.7,
-        wave: 1.4,
-        scuttle: 1.1,
-        hop: 0.8,
-      },
-      length =
-        kind === "glance" ? 1.1 + this.random.unit() * 0.7 : lengths[kind],
-      angle = this.random.unit() * 2 * Math.PI;
-    return {
-      kind,
-      start: now,
-      length,
-      side: this.random.unit() < 0.5 ? -1 : 1,
-      gaze: [Math.cos(angle), Math.sin(angle) * 0.7],
-      from: this.turn,
-    };
   }
 }
