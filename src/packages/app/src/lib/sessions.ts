@@ -339,3 +339,28 @@ export function unpricedHelp(
     ? `另有 ${count} 个 Token 来自没有 API 价格的模型，未计入${named}`
     : `${count} more tokens came from models with no API list price and are not included${named}`;
 }
+
+interface MessagePage<M> {
+  messages?: M[] | null;
+  nextMessageCursor?: number | null;
+  messagesPending?: boolean;
+  messagesComplete?: boolean;
+}
+
+/**
+ * A session detail with the next page of its messages added. A page carries
+ * messages only: the rest stays as the detail had it, the selected turn's
+ * calls included, which a page is asked without.
+ */
+export function withMessagePage<M, D extends MessagePage<M>>(
+  detail: D,
+  page: MessagePage<M>,
+): D {
+  return {
+    ...detail,
+    messages: [...(detail.messages ?? []), ...(page.messages ?? [])],
+    nextMessageCursor: page.nextMessageCursor,
+    messagesPending: page.messagesPending,
+    messagesComplete: page.messagesComplete,
+  };
+}

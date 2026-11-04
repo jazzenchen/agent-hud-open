@@ -6,6 +6,7 @@ import type {
   SessionsQuery,
   SessionsResponse,
 } from "./types";
+import { withMessagePage } from "./sessions";
 
 type Action = (
   method: NativeMethod,
@@ -263,13 +264,7 @@ export function useSessionDetail(
       if (sequence.current !== version) return;
       setDetail((previous) =>
         previous?.session.id === id
-          ? {
-              ...next,
-              messages: [
-                ...(previous.messages ?? []),
-                ...(next.messages ?? []),
-              ],
-            }
+          ? withMessagePage(previous, next)
           : previous,
       );
     } catch (failure) {
