@@ -143,12 +143,3 @@ export function stillSignImage(
     },
   };
 }
-export const BotSigns = {
-  columns: 5,
-  rows: 7,
-  faint: 0.35,
-  cell: signCell,
-  paint: paintSign,
-  box: signBox,
-  still: stillSignImage,
-};

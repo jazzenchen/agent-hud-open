@@ -1,4 +1,4 @@
-import type { MarkState, SpritePicture } from "./clawd";
+import type { SpritePicture } from "./clawd";
 import { shownSign, type BotSign } from "./bot-state";
 import {
   clawdClips,
@@ -46,7 +46,6 @@ export interface ClawdPlayerOptions {
   rest?: "logo" | "standing";
 }
 const tickAt = (time: number) => Math.floor((time + 0.004) * 12);
-const gridAfter = (time: number) => Math.ceil((time - 0.004) * 12) / 12;
 const frameStep = (
   frame: ClawdFrame | null,
   values: Partial<Step> = {},
@@ -72,13 +71,6 @@ export class ClawdPlayer {
   private cameInAt: number | null = null;
   private showing: boolean;
   private appearanceSince = 0;
-  private legacy: {
-    state: MarkState | null;
-    hovered: boolean;
-    greetAt: number | null;
-    visitAt: number;
-    visiting: boolean;
-  } | null = null;
 
   constructor(options: ClawdPlayerOptions = {}) {
     this.clips = options.clips ?? clawdClips;
@@ -97,11 +89,7 @@ export class ClawdPlayer {
     this.canonical = canonical;
   }
   get due(): number {
-    return Math.min(
-      this.nextChange() ?? Infinity,
-      this.legacy?.greetAt ?? Infinity,
-      this.legacy?.visitAt ?? Infinity,
-    );
+    return this.nextChange() ?? Infinity;
   }
   get shown(): ClawdLook | null {
     return "shown" in this.activity ? this.activity.shown.look : null;
@@ -316,70 +304,6 @@ export class ClawdPlayer {
   }
   advance(time: number) {
     this.stepTo(time);
-    return this.picture;
-  }
-
-  /** Transitional four-phase adapter; the full runtime uses ClawdPerformer and the rich methods above. */
-  step(
-    state: MarkState,
-    hovered: boolean,
-    time: number,
-    aim: readonly [number, number],
-  ): SpritePicture | null {
-    this.advance(time);
-    const legacy = (this.legacy ??= {
-      state: null,
-      hovered: false,
-      greetAt: null,
-      visitAt: Infinity,
-      visiting: false,
-    });
-    const schedule = () => {
-      legacy.visitAt =
-        state === "idle" && !hovered
-          ? gridAfter(time + 20 + Math.random() * 15)
-          : Infinity;
-    };
-    if (state !== legacy.state) {
-      legacy.state = state;
-      if (state === "done") this.card("done", time);
-      else
-        this.show(
-          state === "working"
-            ? "command"
-            : state === "asking"
-              ? "permission"
-              : null,
-          time,
-        );
-      schedule();
-    }
-    if (hovered !== legacy.hovered) {
-      legacy.hovered = hovered;
-      legacy.greetAt = hovered ? gridAfter(time + 0.3) : null;
-      if (!hovered) this.endHover(time);
-      schedule();
-    }
-    if (legacy.greetAt !== null && time >= legacy.greetAt - 0.004) {
-      legacy.greetAt = null;
-      if (state === "idle") this.greet(time);
-    }
-    if (hovered) this.look(aim, time);
-    if (time >= legacy.visitAt - 0.004) {
-      legacy.visitAt = Infinity;
-      this.visit(
-        (["swaying", "turning", "glancing"] as const)[
-          Math.floor(Math.random() * 3)
-        ],
-        time,
-      );
-      legacy.visiting = this.picture !== null;
-      if (!legacy.visiting) schedule();
-    }
-    if (legacy.visiting && this.picture === null) {
-      legacy.visiting = false;
-      schedule();
-    }
     return this.picture;
   }
 

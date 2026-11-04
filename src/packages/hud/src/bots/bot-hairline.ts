@@ -65,4 +65,3 @@ export function layHairline(
     giveBack(canvas);
   }
 }
-export const BotHairline = { lay: layHairline };

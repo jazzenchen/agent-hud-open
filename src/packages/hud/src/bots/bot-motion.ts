@@ -1,7 +1,6 @@
 import {
   botState,
   botPhaseState,
-  botStatePhase,
   isAttention,
   isWorking,
   isCalm,
@@ -222,23 +221,8 @@ export class BotMotion {
   get look() {
     return this.state.look;
   }
-  get phase() {
-    return botStatePhase(this.state);
-  }
-  get playing() {
-    return this.event?.kind ?? null;
-  }
   get helper() {
     return this.state.subagents && isWorking(this.look);
-  }
-  get restsAsLogo() {
-    return (
-      this.morph === 0 &&
-      this.opacity === 1 &&
-      this.sign === null &&
-      (this.wait === null ||
-        (isCalm(this.look) && !this.state.hovered && !this.staysBot))
-    );
   }
   get isAtRest() {
     if (this.pending || this.event || this.greeting !== null) return false;
@@ -296,7 +280,7 @@ export class BotMotion {
     this.beatsFrom =
       Math.ceil((this.since - BotPace.slack) / BotMoves.beat) * BotMoves.beat;
   }
-  step(time: number, aim: readonly [number, number] = [0, 0], hasFace = true) {
+  step(time: number, aim: readonly [number, number] = [0, 0]) {
     const now = BotPace.onFrame(time),
       gap = Math.max(0, now - (this.last ?? now)),
       dt = gap > 1 / 3 ? 0 : Math.min(1 / 6, gap);
@@ -327,7 +311,7 @@ export class BotMotion {
           (this.look === "done" && age < 1.5) ||
           this.pending !== null ||
           this.event !== null),
-      wanted = arrived && (awake || this.staysBot) && hasFace ? 1 : 0,
+      wanted = arrived && (awake || this.staysBot) ? 1 : 0,
       stride = dt / 0.5;
     this.morph =
       Math.abs(wanted - this.morph) <= stride
@@ -338,7 +322,7 @@ export class BotMotion {
       this.pending &&
       !this.event &&
       !isAttention(this.look) &&
-      (this.morph > 0.9 || !hasFace)
+      this.morph > 0.9
     ) {
       this.event = { kind: this.pending.kind, start: now };
       this.pending = null;
@@ -374,7 +358,7 @@ export class BotMotion {
     if (inPlace && this.acts) {
       if (
         (awake || this.staysBot) &&
-        (this.morph > 0.9 || !hasFace) &&
+        this.morph > 0.9 &&
         !this.act &&
         now >= this.nextAct
       ) {
@@ -437,17 +421,6 @@ export class BotMotion {
       this.greeting === null;
     const wait = this.nextFrame(now, age, wanted, dozing);
     this.wait = wait === null ? null : wait + now - time;
-  }
-  static aim(
-    center: readonly [number, number],
-    target: readonly [number, number],
-  ): readonly [number, number] {
-    const dx = target[0] - center[0],
-      dy = target[1] - center[1],
-      distance = Math.hypot(dx, dy);
-    if (distance < 1) return [0, 0];
-    const share = distance / (distance + 120);
-    return [(dx / distance) * share, (dy / distance) * share];
   }
   private nextFrame(
     now: number,

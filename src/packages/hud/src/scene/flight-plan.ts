@@ -314,15 +314,6 @@ export function measure(route: readonly Cubic[]): Measured {
   };
 }
 
-/** SVG path data for the route (the trail). */
-export function pathData(route: readonly Cubic[]): string {
-  const at = (point: Point) => `${round(point.x)} ${round(point.y)}`;
-  return route.length
-    ? `M ${at(route[0][0])} ` +
-        route.map(([, b, c, d]) => `C ${at(b)}, ${at(c)}, ${at(d)}`).join(" ")
-    : "";
-}
-
 /** True when every point of the route stays `margin` inside `bounds`. */
 export function fits(
   route: readonly Cubic[],
@@ -428,7 +419,6 @@ export interface Story {
   letter: Keyframe[];
   /** The trail: short dashes along the route, each shown as the plane passes and fading after. */
   dashes: { translate: string; rotate: string; frames: Keyframe[] }[];
-  routeLength: number;
 }
 
 /** A flight's whole story. `start` and `end` are beside the sender's and the
@@ -440,7 +430,6 @@ export function story({
   to,
   falls,
   delay = 0,
-  samples = 28,
 }: {
   route: readonly Cubic[];
   from: Point;
@@ -448,8 +437,8 @@ export function story({
   falls: boolean;
   /** The robots' entrance around the notch. */
   delay?: number;
-  samples?: number;
 }): Story {
+  const samples = 28;
   const measured = measure(route);
   const start = measured.at(0);
   const finish = measured.at(1);
@@ -692,7 +681,6 @@ export function story({
     pocket,
     letter,
     dashes,
-    routeLength: measured.length,
   };
 }
 /** Reduced motion: no flight. A closed envelope fades in beside the sender and

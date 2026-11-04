@@ -1,11 +1,5 @@
 // Original Anthropic sprite data; attribution is retained in assets/THIRD_PARTY_NOTICES.txt.
-import {
-  clawdClips,
-  sameFrame,
-  standing,
-  swiftRound,
-  type ClawdFrame,
-} from "./clawd-clips";
+import { clawdClips, swiftRound, type ClawdFrame } from "./clawd-clips";
 import type { BotSign } from "./bot-state";
 import { SIGN_ROWS } from "./bot-signs";
 import { layHairline } from "./bot-hairline";
@@ -275,31 +269,6 @@ export class ClawdBaker {
     return canvas;
   }
 }
-const bakers = new WeakMap<ClawdSheet, ClawdBaker>();
-export function clawdBaker(sheet: ClawdSheet) {
-  let baker = bakers.get(sheet);
-  if (!baker) {
-    baker = new ClawdBaker(sheet);
-    bakers.set(sheet, baker);
-  }
-  return baker;
-}
-export function drawClawd(
-  context: CanvasRenderingContext2D,
-  sheet: ClawdSheet,
-  picture: SpritePicture,
-  side: number,
-  scale: number,
-  extent: number,
-  light: boolean,
-) {
-  const image = clawdBaker(sheet).image(picture, side, scale, extent, light);
-  if (image) {
-    context.imageSmoothingEnabled = false;
-    context.drawImage(image, 0, 0);
-  }
-}
-
 export function drawSign(
   context: CanvasRenderingContext2D,
   x: number,
@@ -331,10 +300,3 @@ export function drawSign(
     }),
   );
 }
-
-// Useful to a renderer handing off a procedural standing pose to the sprite actor.
-export const isClawdStanding = (sheet: ClawdSheet, picture: SpritePicture) =>
-  sameFrame(
-    canonicalClawdFrame(sheet, picture),
-    canonicalClawdFrame(sheet, standing),
-  );
