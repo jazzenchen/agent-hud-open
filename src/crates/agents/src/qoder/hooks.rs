@@ -4,7 +4,11 @@ use crate::hooks::{Hooks, Layout, Permission, Reply, POSIX_ONLY};
 use crate::Location;
 
 pub static QODER: Hooks = Hooks {
-    settings: Some(Location::home(&[], &[".qoder"], "settings.json")),
+    settings: Some(Location::home(
+        &["QODER_CONFIG_DIR"],
+        &[".qoder"],
+        "settings.json",
+    )),
     aliases: &[],
     layout: Layout::Groups,
     permission: Some(Permission {
@@ -27,7 +31,11 @@ pub static QODER: Hooks = Hooks {
 };
 
 pub static QODER_CN: Hooks = Hooks {
-    settings: Some(Location::home(&[], &[".qoder-cn"], "settings.json")),
+    settings: Some(Location::home(
+        &["QODERCN_CONFIG_DIR"],
+        &[".qoder-cn"],
+        "settings.json",
+    )),
     aliases: &["qoderCN"],
     layout: Layout::Groups,
     permission: Some(Permission {
