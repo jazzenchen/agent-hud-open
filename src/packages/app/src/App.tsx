@@ -1,5 +1,5 @@
 import { FormatProvider } from "@agent-hud/ui/format-context";
-import { lazy, useEffect, useMemo, useState, type ReactNode } from "react";
+import { lazy, useMemo, type ReactNode } from "react";
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { emit } from "@tauri-apps/api/event";
 import { toast } from "sonner";
@@ -13,6 +13,7 @@ import { useBotDirections } from "./lib/use-bot-directions";
 import type { HUDScreenContext } from "./lib/hud-config-store";
 import { useHUDConfig } from "./lib/use-hud-config";
 import { useHUDGeometry } from "./lib/use-hud-geometry";
+import { useSelectedScreen } from "./lib/use-selected-screen";
 import { useRequestDeliveryToasts } from "./lib/use-request-delivery-toasts";
 import { useWindowTheme } from "./lib/use-window-theme";
 import { storageKeys } from "./lib/storage-keys";
@@ -27,8 +28,6 @@ import { StatisticsWindow } from "./StatisticsWindow";
 // Windows load their own views. Statistics does not need the shader/bot renderer,
 // and a resting HUD does not need the historical charts and settings panes.
 const NativeHUDSurface = lazy(() => import("./HUDSurface"));
-
-const selectedScreenKey = storageKeys.selectedScreen;
 
 export interface AppProps {
   extensionPages?: AppExtensionPage[];
@@ -75,16 +74,11 @@ function AppContent({
     surfaceScreenId,
     windowActive,
   );
-  const [preferredScreenId, setPreferredScreenId] = useState(
-    () => localStorage.getItem(selectedScreenKey) || "",
+  const { selectedId, selectScreen } = useSelectedScreen(
+    surfaceScreenId,
+    monitors,
+    settings,
   );
-  const selectedId = surface
-    ? surfaceScreenId!
-    : (monitors.find((monitor) => monitor.screenId === preferredScreenId)
-        ?.screenId ??
-      monitors.find((monitor) => monitor.primary)?.screenId ??
-      monitors[0]?.screenId ??
-      "");
   const screenContexts = useMemo<HUDScreenContext[]>(
     () =>
       monitors.map((monitor) => ({
@@ -141,13 +135,6 @@ function AppContent({
   };
   const glowHidden = presentation?.glowHidden ?? false;
   const hudVisible = snapshot?.settings.hudVisible !== false;
-  function selectScreen(id: string) {
-    setPreferredScreenId(id);
-    localStorage.setItem(selectedScreenKey, id);
-  }
-  useEffect(() => {
-    if (settings && selectedId && !preferredScreenId) selectScreen(selectedId);
-  }, [settings, selectedId, preferredScreenId]);
   const theme = useWindowTheme(snapshot, store, monitors, surface);
   const chinese = snapshotLanguage(snapshot) === "zh";
   const sourceMenu = (
