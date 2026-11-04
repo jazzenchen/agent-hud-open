@@ -305,25 +305,5 @@ export const clawdClips = {
     string,
     ClawdOffset
   >,
-  frameCounts: {
-    DancingHappy: 40,
-    Desktop: 88,
-    Dizzy: 41,
-    Excited: 23,
-    Facepalm: 35,
-    JumpingHappy: 21,
-    Laptop: 43,
-    Lightbulb: 50,
-    LookingAround: 31,
-    LookingAroundEyesOnly: 42,
-    Meditating: 60,
-    Pointing: 43,
-    Spark: 73,
-    Swaying: 49,
-    Thinking: 38,
-    Turning: 29,
-    Walking: 28,
-    Waving: 17,
-  } as Record<string, number>,
 };
 export type ClawdClips = typeof clawdClips;

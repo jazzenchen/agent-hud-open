@@ -129,7 +129,6 @@ function fillPaint(
             paint.outer * 2 * s.radius,
           )
         : context.createLinearGradient(...at(paint.from), ...at(paint.to));
-    if (paint.colors.length < 2) return;
     paint.colors.forEach((color, i) =>
       gradient.addColorStop(i / (paint.colors.length - 1), color),
     );
@@ -221,7 +220,7 @@ function spinner(path: Path2D, frame: number, center: Point, size: number) {
     [6, 0.9, 0.2],
     [8, 1, 0.2],
     [8, 1, 0.28],
-  ][Math.max(0, Math.min(5, frame - 1))];
+  ][frame - 1];
   if (!spokes) {
     path.rect(
       center[0] - (length * size) / 2,
@@ -321,8 +320,7 @@ function eyes(
     spread = s.eye.spread,
     flat = s.eye.across,
     grain = s.limbs ? s.limbs.pixel / 2 : null,
-    snapped = (v: number) =>
-      grain && grain > 0 ? Math.round(v / grain) * grain : v,
+    snapped = (v: number) => (grain ? Math.round(v / grain) * grain : v),
     paint = s.eyeColor ?? ink,
     apart =
       flat !== undefined
@@ -404,7 +402,6 @@ function ownEyes(
   face: BotFace,
   ink: string,
 ) {
-  if (!boxes.length) return;
   const center = (b: Box) => (b[0] + b[2]) / 2,
     middle = (center(boxes[0]) + center(boxes.at(-1)!)) / 2,
     apart = Math.abs(center(boxes.at(-1)!) - center(boxes[0]));
