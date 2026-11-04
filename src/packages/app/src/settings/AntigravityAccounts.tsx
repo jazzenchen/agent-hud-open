@@ -1,12 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { NativeMethod } from "@agent-hud/protocol";
-import {
-  Notice,
-  Section,
-  SmallButton,
-  Unavailable,
-  type Text,
-} from "./SettingsPrimitives";
+import { Notice, Section, type Text } from "./SettingsPrimitives";
+import { SmallButton, Unavailable } from "./SettingsControls";
 import { usePending } from "./use-pending";
 
 interface CliStatus {

@@ -2,7 +2,8 @@
  * to change them, the language, and the slider and switch rows built on
  * them. */
 import type { HUDConfig } from "@agent-hud/hud/model";
-import { Slide, ToggleRow, type Text } from "../SettingsPrimitives";
+import { Slide, ToggleRow } from "../SettingsControls";
+import type { Text } from "../SettingsPrimitives";
 
 export interface DisplayProps {
   /** The selected screen's settings, with defaults filled in. */

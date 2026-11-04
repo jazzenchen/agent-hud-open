@@ -3,8 +3,8 @@
  * ./display. */
 import { defaultHUDConfig } from "@agent-hud/hud/model";
 import type { NativeHUDMonitor } from "../lib/use-hud-geometry";
+import { Menu } from "./SettingsControls";
 import {
-  Menu,
   Page,
   Row,
   Section,

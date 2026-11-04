@@ -13,20 +13,22 @@ export {
   Card,
   Collapsible,
   Footnote,
-  LinkButton,
-  Menu,
   MoreRows,
   Notice,
   Page,
   Pill,
   Row,
   Section,
+  useText,
+  type PillTone,
+  type Text,
+} from "./settings/SettingsPrimitives";
+export {
+  LinkButton,
+  Menu,
   Segments,
   Slide,
   SmallButton,
   ToggleRow,
   Unavailable,
-  useText,
-  type PillTone,
-  type Text,
-} from "./settings/SettingsPrimitives";
+} from "./settings/SettingsControls";

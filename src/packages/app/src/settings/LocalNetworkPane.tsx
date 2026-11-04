@@ -1,19 +1,21 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   Footnote,
-  LinkButton,
   Notice,
   Page,
   Pill,
   Row,
   Section,
-  SmallButton,
-  ToggleRow,
-  Unavailable,
   useText,
   type SettingsPaneProps,
   type Text,
 } from "./SettingsPrimitives";
+import {
+  LinkButton,
+  SmallButton,
+  ToggleRow,
+  Unavailable,
+} from "./SettingsControls";
 import { usePending } from "./use-pending";
 
 interface Peer {

@@ -3,13 +3,12 @@
 // holds a request before the client asks by itself.
 import type { Snapshot } from "@agent-hud/protocol";
 import { Switch } from "@agent-hud/ui/components/switch";
+import { Menu, Unavailable } from "../SettingsControls";
 import {
-  Menu,
   Notice,
   Pill,
   Row,
   Section,
-  Unavailable,
   type SettingsPaneProps,
   type Text,
 } from "../SettingsPrimitives";

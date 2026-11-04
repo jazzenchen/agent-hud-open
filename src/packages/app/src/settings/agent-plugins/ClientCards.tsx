@@ -11,10 +11,10 @@ import {
   Collapsible,
   Pill,
   Row,
-  SmallButton,
   type SettingsPaneProps,
   type Text,
 } from "../SettingsPrimitives";
+import { SmallButton } from "../SettingsControls";
 import { PluginControl, StatePill, StatusRow } from "./rows";
 import type { AgentPluginContext, AgentPluginItem } from "./types";
 import {

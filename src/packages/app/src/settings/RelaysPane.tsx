@@ -3,14 +3,12 @@ import { Info } from "lucide-react";
 import { Switch } from "@agent-hud/ui/components/switch";
 import { moneyAmount, snapshotLanguage } from "@agent-hud/ui/format";
 import type { RelaySource } from "@agent-hud/protocol";
+import { LinkButton, SmallButton, Unavailable } from "./SettingsControls";
 import {
-  LinkButton,
   Notice,
   Page,
   Row,
   Section,
-  SmallButton,
-  Unavailable,
   useText,
   type SettingsPaneProps,
 } from "./SettingsPrimitives";

@@ -8,17 +8,16 @@ import {
 import type { PriceList, PriceRow } from "@agent-hud/protocol";
 import {
   Collapsible,
-  LinkButton,
   Notice,
   Pill,
   Row,
   Section,
-  Segments,
   Page,
   useText,
   type PillTone,
   type SettingsPaneProps,
 } from "./SettingsPrimitives";
+import { LinkButton, Segments } from "./SettingsControls";
 import { MultiplierInput, PriceEditor } from "./PriceFields";
 import { usePending } from "./use-pending";
 

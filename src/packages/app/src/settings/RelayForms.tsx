@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { RelayCustom, RelayKind } from "@agent-hud/protocol";
-import { Menu, Row, Segments, type Text } from "./SettingsPrimitives";
+import { Menu, Segments } from "./SettingsControls";
+import { Row, type Text } from "./SettingsPrimitives";
 import { FieldRow, FormActions, InlineForm } from "./SettingsFields";
 
 /** A relay added by hand: its address and key, and a name if the owner wants

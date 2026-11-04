@@ -16,14 +16,8 @@ import {
   TooltipTrigger,
 } from "@agent-hud/ui/components/tooltip";
 import { HUDArtwork as HUDLogo } from "@agent-hud/hud/HUDArtwork";
-import {
-  LinkButton,
-  Notice,
-  Page,
-  Section,
-  ToggleRow,
-  type Text,
-} from "../SettingsPrimitives";
+import { LinkButton, ToggleRow } from "../SettingsControls";
+import { Notice, Page, Section, type Text } from "../SettingsPrimitives";
 import AccountHomes from "../AccountHomes";
 import AntigravityAccounts from "../AntigravityAccounts";
 import { CodexModelSettings } from "../CodexModelSettings";

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { CustomPrice, PriceRow } from "@agent-hud/protocol";
-import { LinkButton, Row, Segments, type Text } from "./SettingsPrimitives";
+import { LinkButton, Segments } from "./SettingsControls";
+import { Row, type Text } from "./SettingsPrimitives";
 import { FormActions, InlineForm, TextInput } from "./SettingsFields";
 
 type Rates = Record<"input" | "output" | "cacheRead" | "cacheWrite", string>;

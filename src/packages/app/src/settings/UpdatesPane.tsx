@@ -2,10 +2,10 @@ import {
   Page,
   Row,
   Section,
-  SmallButton,
   useText,
   type SettingsPaneProps,
 } from "./SettingsPrimitives";
+import { SmallButton } from "./SettingsControls";
 
 /** Open builds have no update feed; a product build replaces this page. */
 export function UpdatesPane({ snapshot }: SettingsPaneProps) {

@@ -1,14 +1,11 @@
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { useEffect, useState } from "react";
+import { Menu, Segments, ToggleRow, Unavailable } from "./SettingsControls";
 import {
-  Menu,
   Notice,
   Page,
   Row,
   Section,
-  Segments,
-  ToggleRow,
-  Unavailable,
   useText,
   type SettingsPaneProps,
 } from "./SettingsPrimitives";

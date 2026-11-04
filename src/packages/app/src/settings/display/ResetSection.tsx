@@ -3,7 +3,8 @@
  * replaced, until the page closes or another screen is picked. */
 import { useRef, useState } from "react";
 import { defaultHUDConfig, type HUDConfig } from "@agent-hud/hud/model";
-import { Row, Section, SmallButton } from "../SettingsPrimitives";
+import { Row, Section } from "../SettingsPrimitives";
+import { SmallButton } from "../SettingsControls";
 import type { DisplayProps } from "./controls";
 
 /** Everything "HUD style" resets: mode, place, sizes, look and glow. */

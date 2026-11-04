@@ -9,13 +9,8 @@ import {
   defaultHUDConfig,
   type HUDConfig,
 } from "@agent-hud/hud/model";
-import {
-  MoreRows,
-  Row,
-  Section,
-  Segments,
-  ToggleRow,
-} from "../SettingsPrimitives";
+import { MoreRows, Row, Section } from "../SettingsPrimitives";
+import { Segments, ToggleRow } from "../SettingsControls";
 import { PartSample } from "../SettingsSamples";
 import type { DisplayProps } from "./controls";
 import { ReorderButtons } from "./ReorderButtons";

@@ -1,7 +1,8 @@
 /* The glow round the notch or behind the Dynamic logos: a style and an effect
  * up front, every slider behind Fine-tune. Simple mode has no glow. */
 import type { HUDConfig } from "@agent-hud/hud/model";
-import { Menu, MoreRows, Row, Section } from "../SettingsPrimitives";
+import { Menu } from "../SettingsControls";
+import { MoreRows, Row, Section } from "../SettingsPrimitives";
 import { displayControls, type DisplayProps } from "./controls";
 
 export function GlowSection({ config, update, t }: DisplayProps) {

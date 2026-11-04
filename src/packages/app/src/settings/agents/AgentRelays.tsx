@@ -1,6 +1,7 @@
 import type { Provider, Snapshot } from "@agent-hud/protocol";
 import { moneyAmount, snapshotLanguage } from "@agent-hud/ui/format";
-import { LinkButton, Row, Section, type Text } from "../SettingsPrimitives";
+import { LinkButton } from "../SettingsControls";
+import { Row, Section, type Text } from "../SettingsPrimitives";
 import { useOpenSettingsPage } from "../SettingsNavigation";
 
 /** The relays this agent goes through; they are set up on the Relays page. */

@@ -11,14 +11,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@agent-hud/ui/components/dialog";
-import {
-  Notice,
-  Pill,
-  Row,
-  Section,
-  SmallButton,
-  type Text,
-} from "../SettingsPrimitives";
+import { Notice, Pill, Row, Section, type Text } from "../SettingsPrimitives";
+import { SmallButton } from "../SettingsControls";
 import { FieldRow } from "../SettingsFields";
 
 const labels: Record<string, [string, string]> = {

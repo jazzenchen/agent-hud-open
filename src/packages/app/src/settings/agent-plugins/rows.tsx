@@ -14,12 +14,14 @@ import {
 import type { RowState, Tone, Words } from "../../lib/agent-plugins";
 import {
   LinkButton,
-  Notice,
-  Pill,
-  Row,
   SmallButton,
   ToggleRow,
   Unavailable,
+} from "../SettingsControls";
+import {
+  Notice,
+  Pill,
+  Row,
   type PillTone,
   type Text,
 } from "../SettingsPrimitives";

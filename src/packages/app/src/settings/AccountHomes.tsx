@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Notice, Section, SmallButton, type Text } from "./SettingsPrimitives";
+import { Notice, Section, type Text } from "./SettingsPrimitives";
+import { SmallButton } from "./SettingsControls";
 import { usePending } from "./use-pending";
 
 /** Extra client folders (CODEX_HOME, CLAUDE_CONFIG_DIR), one per signed-in
