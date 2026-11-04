@@ -700,11 +700,6 @@ impl LiveLog {
     }
 
     fn claude_terminal(&mut self, at: i64, outcome: Option<&str>, until: Option<i64>) {
-        let (id, started) = self
-            .turns
-            .back()
-            .map(|turn| (turn.id.clone(), turn.started))
-            .unwrap_or_default();
         let fallback = (outcome == Some("completed")).then(|| format!("completed-{at}"));
         if let Some(turn) = self.turns.back_mut() {
             if turn.id.is_none() {
@@ -716,8 +711,8 @@ impl LiveLog {
             turn.limited_until = until;
         } else {
             self.push(Turn {
-                id: id.or(fallback),
-                started,
+                id: fallback,
+                started: None,
                 observed: at,
                 running: false,
                 outcome: outcome.map(str::to_owned),

@@ -106,7 +106,7 @@ fn read_native(host: &dyn Host, executable: &Path) -> Result<Reading, Unread> {
     if succeeded {
         Ok(reading)
     } else {
-        Err(Unread::combined(failures).unwrap_or_else(|| Unread::Failed(String::new())))
+        Err(Unread::combined(failures).expect("a failure per home"))
     }
 }
 
