@@ -4,6 +4,7 @@ use super::{
     restart_copy, schedule::due_after, settle::settle, status, AccountContext, CollectionGate,
     PageReading, Providers, Shared,
 };
+use crate::clients::claude::cloud::{Collector as CloudCollector, Reading as CloudReading};
 use agent_hud_agents as agents;
 use agents::account::Provider;
 use std::{
@@ -25,6 +26,24 @@ enum Job {
         HashMap<String, Vec<PathBuf>>,
     ),
     Page(&'static agents::account::StatusPage),
+    DesktopCloud(u64),
+}
+
+pub(super) fn read_desktop_cloud_job<F>(
+    cancelled: &std::sync::atomic::AtomicBool,
+    read: F,
+) -> Option<(CloudReading, i64)>
+where
+    F: FnOnce() -> CloudReading,
+{
+    if cancelled.load(Ordering::Acquire) {
+        return None;
+    }
+    let reading = read();
+    if cancelled.load(Ordering::Acquire) {
+        return None;
+    }
+    Some((reading, chrono::Utc::now().timestamp_millis()))
 }
 
 pub(super) fn run(
@@ -32,14 +51,20 @@ pub(super) fn run(
     shared: Arc<Shared>,
     gate: CollectionGate,
     readers: Providers,
+    cloud_supported: bool,
 ) {
     let mut burst: Option<Instant> = None;
     let mut resume_at: Option<Instant> = None;
     let mut saved: Option<Instant> = None;
+    let mut cloud = CloudCollector::default();
     loop {
         let selected = {
             let mut state = shared.state.lock().unwrap_or_else(PoisonError::into_inner);
             loop {
+                if state.cloud_reset {
+                    cloud = CloudCollector::default();
+                    state.cloud_reset = false;
+                }
                 if state.stopped {
                     return;
                 }
@@ -63,9 +88,14 @@ pub(super) fn run(
                     pause = pause.min(wait);
                 }
                 let now = Instant::now();
+                let claude_enabled = state.enabled.contains(agents::claude::AGENT.id);
+                let cloud_due = cloud_supported && claude_enabled && cloud.due();
+                if cloud_supported && claude_enabled {
+                    pause = pause.min(cloud.next_due().saturating_duration_since(now));
+                }
                 // A status page waits behind every account reading that is due.
                 let mut page = None;
-                if due.is_none() {
+                if due.is_none() && !cloud_due {
                     for &facts in readers {
                         let Some(status) =
                             facts.status.filter(|_| state.enabled.contains(facts.id))
@@ -84,10 +114,13 @@ pub(super) fn run(
                 }
                 if let Some(at) = resume_at.filter(|at| *at > now) {
                     pause = at - now;
-                } else if due.is_some() || page.is_some() {
+                } else if due.is_some() || cloud_due || page.is_some() {
                     if burst.is_none_or(|started| started.elapsed() < STEP_BUDGET) {
                         resume_at = None;
                         let Some(selected) = due else {
+                            if cloud_due {
+                                break Job::DesktopCloud(state.cloud_sequence);
+                            }
                             break Job::Page(page.expect("a page is due"));
                         };
                         // Consume the request this job serves. A callback arriving
@@ -111,6 +144,37 @@ pub(super) fn run(
         burst.get_or_insert_with(Instant::now);
         let selected = match selected {
             Job::Account(provider, facts, homes) => (provider, facts, homes),
+            Job::DesktopCloud(sequence) => {
+                let Some((reading, observed_ms)) =
+                    read_desktop_cloud_job(&context.cancelled, || {
+                        cloud.collect(&context.home, &gate)
+                    })
+                else {
+                    return;
+                };
+                let waker = {
+                    let mut state = shared.state.lock().unwrap_or_else(PoisonError::into_inner);
+                    if state.stopped {
+                        return;
+                    }
+                    if !state.enabled.contains(agents::claude::AGENT.id)
+                        || sequence != state.cloud_sequence
+                    {
+                        continue;
+                    }
+                    state.cloud_sequence = state.cloud_sequence.wrapping_add(1);
+                    state.cloud_completion = Some(super::CloudCompletion {
+                        sequence: state.cloud_sequence,
+                        reading,
+                        observed_ms,
+                    });
+                    state.waker.clone()
+                };
+                if let Some(waker) = waker {
+                    waker();
+                }
+                continue;
+            }
             Job::Page(page) => {
                 let attempted = Instant::now();
                 let summary = {

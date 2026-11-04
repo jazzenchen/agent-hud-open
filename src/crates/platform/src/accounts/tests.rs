@@ -49,9 +49,59 @@ fn control() -> Control {
         finished: HashMap::new(),
         entries: BTreeMap::new(),
         pages: HashMap::new(),
+        cloud_completion: None,
+        cloud_sequence: 0,
+        cloud_reset: false,
         account_homes: HashMap::new(),
         waker: None,
     }
+}
+
+#[test]
+fn cancelled_cloud_job_does_not_start_or_publish_a_read() {
+    let cancelled = AtomicBool::new(true);
+    assert!(
+        worker::read_desktop_cloud_job(&cancelled, || panic!("cancelled read started")).is_none()
+    );
+
+    cancelled.store(false, Ordering::Release);
+    assert!(worker::read_desktop_cloud_job(&cancelled, || {
+        cancelled.store(true, Ordering::Release);
+        CloudReading::Unavailable { clear: false }
+    })
+    .is_none());
+}
+
+#[test]
+fn cloud_job_does_not_hold_account_control_or_the_collection_gate_during_io() {
+    let gate = CollectionGate::default();
+    let control = Arc::new(Mutex::new(control()));
+    let cancelled = Arc::new(AtomicBool::new(false));
+    let (started_tx, started_rx) = std::sync::mpsc::channel();
+    let (finish_tx, finish_rx) = std::sync::mpsc::channel();
+    let worker_gate = Arc::clone(&gate);
+    let worker_control = Arc::clone(&control);
+    let worker_cancelled = Arc::clone(&cancelled);
+    let result = std::thread::spawn(move || {
+        worker::read_desktop_cloud_job(&worker_cancelled, || {
+            assert!(
+                worker_gate.try_lock().is_ok(),
+                "Cloud I/O acquires the gate per request"
+            );
+            assert!(
+                worker_control.try_lock().is_ok(),
+                "Control stays available during I/O"
+            );
+            started_tx.send(()).unwrap();
+            finish_rx.recv().unwrap();
+            CloudReading::Unavailable { clear: false }
+        })
+    });
+    started_rx.recv_timeout(Duration::from_secs(2)).unwrap();
+    assert!(control.try_lock().is_ok());
+    assert!(gate.try_lock().is_ok());
+    finish_tx.send(()).unwrap();
+    assert!(result.join().unwrap().is_some());
 }
 
 #[test]

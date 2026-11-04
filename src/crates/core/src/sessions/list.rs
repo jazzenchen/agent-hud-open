@@ -177,7 +177,7 @@ impl AgentHudCore {
         };
         if parent.is_none() && self.enabled.get("claude").copied().unwrap_or(true) {
             let max_age = if scope == "active" { 1 } else { 7 };
-            extras.extend(self.claude_project_rows().into_iter().filter(|row| {
+            extras.extend(self.claude_project_rows(now).into_iter().filter(|row| {
                 scope == "all"
                     || row["lastMessageAt"]
                         .as_str()

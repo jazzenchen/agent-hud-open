@@ -21,6 +21,7 @@ The native Swift app, [agent-hud-native-open](https://github.com/jazzenchen/agen
 Deliberate differences:
 
 - Claude Desktop Project workers on macOS share a card for their original Project conversation and return to its exact thread. Unknown origins disable navigation; standalone Local behavior is preserved. Identification uses local files only; the card shows unknown status and counts only its workers' local usage. See [Project workers](../development/claude-project-workers.md).
+- Proposed Claude Desktop Cloud metadata adds remote identity/state to those Project rows, with unknown on stale reads and unavailable Cloud totals. It retains detail-first navigation and local worker totals. Authentication and background polling are pending maintainer agreement; see [Cloud proposal](../development/claude-cloud-desktop.md).
 
 - Decided 2026-10-22 (issue #3): Settings → General → Usage display can show consumed (the default) or remaining quota. Percentages, rings and bars follow this choice, including the menu bar and reminders; source readings, warning levels, burn rates and exhaustion forecasts remain based on consumed usage.
 
@@ -47,7 +48,7 @@ Open is the floor, not the ceiling. Next must not do worse than Open; where it c
 | [c02a](c02a-grok-devin.md) | Grok CLI, Grok Bot, Devin | 55 | 18 | 4 | 0 | 2 | 11 | 19 | 1 |
 | [c02b](c02b-antigravity-cursor.md) | Antigravity, Cursor | 51 | 21 | 1 | 2 | 5 | 6 | 16 | 0 |
 | [c02c](c02c-buddy-copilot-qwen-zcode-hermes-openclaw.md) | CodeBuddy/WorkBuddy, Copilot, Qwen, ZCode, Hermes, OpenClaw | 70 | 29 | 0 | 1 | 7 | 4 | 26 | 3 |
-| [c02d](c02d-openagents-additional.md) | Kimi, OpenCode/Go, GLM, Pi, additional sources | 57 | 16 | 2 | 0 | 4 | 6 | 28 | 1 |
+| [c02d](c02d-openagents-additional.md) | Kimi, OpenCode/Go, GLM, Pi, additional sources | 57 | 16 | 2 | 0 | 5 | 5 | 28 | 1 |
 | [c03](c03-hooks-store-ledger.md) | Hooks, permissions, collector, store, ledger | 104 | 44 | 6 | 6 | 4 | 8 | 28 | 8 |
 | [c04](c04-models-logic.md) | Models, quota math, session phases, formatting, demo | 122 | 49 | 3 | 7 | 18 | 12 | 26 | 7 |
 | [c05](c05-panel-mcp.md) | Panel layout, HUD style, MCP tools | 96 | 23 | 8 | 1 | 16 | 2 | 45 | 1 |
@@ -56,7 +57,7 @@ Open is the floor, not the ceiling. Next must not do worse than Open; where it c
 | [c08](c08-bots.md) | Bots and Clawd | 58 | 35 | 1 | 2 | 1 | 1 | 15 | 3 |
 | [c09](c09-app-settings.md) | App lifecycle, Settings, menu bar | 90 | 25 | 6 | 6 | 7 | 9 | 32 | 5 |
 | [c10](c10-statistics-debug.md) | Statistics, sessions window, debug, recording | 101 | 14 | 1 | 9 | 13 | 8 | 54 | 2 |
-| **Total** | | **1,217** | **408** | **46** | **50** | **174** | **88** | **405** | **46** |
+| **Total** | | **1,217** | **408** | **46** | **50** | **175** | **87** | **405** | **46** |
 
 `pnpm run parity:ledger` recounts this table from the rows; `pnpm run check` fails when it is stale.
 

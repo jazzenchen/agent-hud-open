@@ -109,6 +109,13 @@ export function SessionRow({
   const zh = Boolean(theme.zh);
   const [hovered, setHovered] = useState(false);
   const animatedTokens = useAnimatedNumber(session.tokens);
+  const project = session.desktopProject;
+  const showProjectState = Boolean(
+    project &&
+    (project.execution === "cloud" ||
+      project.execution === "mixed" ||
+      session.usageStatus === "unavailable"),
+  );
   const bars = useMemo(
     () => (session.turnBars ? stackTurnBars(session.turnBars) : null),
     [session.turnBars],
@@ -147,6 +154,11 @@ export function SessionRow({
         <strong style={{ ...clipped, fontSize: 13, fontWeight: 600 }}>
           {session.title || (zh ? "未命名会话" : "Untitled session")}
         </strong>
+        {showProjectState && project && (
+          <span style={{ ...line, ...clipped }}>
+            {project.kindLabel} · {project.label}
+          </span>
+        )}
         <span style={{ ...line, ...clipped }}>
           {sessionWhere(session, client).join(" · ")}
         </span>
@@ -192,7 +204,9 @@ export function SessionRow({
             ...numeric,
           }}
         >
-          {session.tokens > 0 ? compact(animatedTokens) : "—"}
+          {session.usageStatus === "unavailable" || session.tokens <= 0
+            ? "—"
+            : compact(animatedTokens)}
         </strong>
         <span
           style={numeric}

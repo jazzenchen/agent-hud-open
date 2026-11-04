@@ -33,6 +33,9 @@ export function DetailFigures({
     (detail?.session.desktopProject?.localWorkerCount ??
       session.desktopProject?.localWorkerCount ??
       0) > 0;
+  const usageUnavailable =
+    !localOnly &&
+    (detail?.session.usageStatus ?? session.usageStatus) === "unavailable";
   const language = zh ? "zh" : "en";
   // A priced account's own estimate comes first, as Open's SessionMoney.
   const account = session.accountCost !== undefined;
@@ -47,21 +50,29 @@ export function DetailFigures({
   const items = [
     {
       title: zh ? "Token" : "Tokens",
-      value: compact(totals?.total ?? session.tokens),
-      note: localOnly
+      value: usageUnavailable
         ? zh
-          ? "仅本机执行会话"
-          : "Local execution sessions only"
-        : detail?.subagents
-          ? (zh ? "含子 agent " : "Sub-agents ") +
-            compact(detail.subagents.total)
-          : totals
-            ? zh
-              ? `不含缓存读取 ${compact(totals.total - totals.cacheRead)}`
-              : `Excl. cache reads ${compact(totals.total - totals.cacheRead)}`
-            : zh
-              ? "不含缓存读取 —"
-              : "Excl. cache reads —",
+          ? "不可用"
+          : "Unavailable"
+        : compact(totals?.total ?? session.tokens),
+      note: usageUnavailable
+        ? zh
+          ? "Cloud 用量不在本地数据中"
+          : "Cloud usage is not in local files"
+        : localOnly
+          ? zh
+            ? "仅本机执行会话"
+            : "Local execution sessions only"
+          : detail?.subagents
+            ? (zh ? "含子 agent " : "Sub-agents ") +
+              compact(detail.subagents.total)
+            : totals
+              ? zh
+                ? `不含缓存读取 ${compact(totals.total - totals.cacheRead)}`
+                : `Excl. cache reads ${compact(totals.total - totals.cacheRead)}`
+              : zh
+                ? "不含缓存读取 —"
+                : "Excl. cache reads —",
       help: zh
         ? "五类合计，含缓存读取"
         : "All five kinds, cache reads included",

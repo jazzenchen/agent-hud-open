@@ -882,3 +882,364 @@ fn a_session_opens_where_its_row_says_from_the_detail_too() {
         assert_eq!(detail["navigationTarget"], expected, "{source} detail");
     }
 }
+
+#[test]
+fn claude_project_threads_keep_environment_and_identity_separate() {
+    let temp = tempfile::tempdir().unwrap();
+    let mut backend = fixture(temp.path());
+    let now = Utc::now();
+    let at = now.to_rfc3339();
+    let local_root = temp.path().join(".claude/projects/synthetic");
+    fs::create_dir_all(&local_root).unwrap();
+    fs::write(
+        local_root.join("local.jsonl"),
+        format!("{}\n", json!({"sessionId":"local_synthetic01","type":"custom-title","customTitle":"Synthetic same title","timestamp":at})),
+    )
+    .unwrap();
+    let initial = backend.request("snapshot", json!({})).unwrap();
+    backend.set_claude_cloud_threads(
+        vec![
+            crate::clients::claude_cloud::ClaudeCloudThread {
+                project_id: "chan_testproject01".into(),
+                thread_id: "cmsg_testthread01".into(),
+                title: "Synthetic same title".into(),
+                project_name: "Synthetic project".into(),
+                updated_at: at.clone(),
+                status: "working".into(),
+                execution: crate::ClaudeProjectExecution::Cloud,
+            },
+            crate::clients::claude_cloud::ClaudeCloudThread {
+                project_id: "chan_testproject01".into(),
+                thread_id: "cmsg_testthread02".into(),
+                title: "Synthetic same title".into(),
+                project_name: "Synthetic project".into(),
+                updated_at: (now + chrono::Duration::seconds(1)).to_rfc3339(),
+                status: "needs_input".into(),
+                execution: crate::ClaudeProjectExecution::Cloud,
+            },
+            crate::clients::claude_cloud::ClaudeCloudThread {
+                project_id: "chan_otherproject01".into(),
+                thread_id: "cmsg_testthread03".into(),
+                title: "Synthetic same title".into(),
+                project_name: "Synthetic project".into(),
+                updated_at: (now + chrono::Duration::seconds(2)).to_rfc3339(),
+                status: "resolved".into(),
+                execution: crate::ClaudeProjectExecution::Cloud,
+            },
+            crate::ClaudeCloudThread {
+                project_id: "chan_testproject01".into(),
+                thread_id: "cmsg_localthread01".into(),
+                title: "Synthetic same title".into(),
+                project_name: "Synthetic project".into(),
+                updated_at: (now + chrono::Duration::seconds(3)).to_rfc3339(),
+                status: "working".into(),
+                execution: crate::ClaudeProjectExecution::Local,
+            },
+            crate::ClaudeCloudThread {
+                project_id: "chan_testproject01".into(),
+                thread_id: "cmsg_unknownthread01".into(),
+                title: "Synthetic same title".into(),
+                project_name: "Synthetic project".into(),
+                updated_at: (now + chrono::Duration::seconds(4)).to_rfc3339(),
+                status: "working".into(),
+                execution: crate::ClaudeProjectExecution::Unknown,
+            },
+        ],
+        now.timestamp_millis(),
+    );
+    let snapshot = backend.request("snapshot", json!({})).unwrap();
+    assert_ne!(initial["sessionsRevision"], snapshot["sessionsRevision"]);
+    let snapshot_rows = snapshot["sessions"].as_array().unwrap();
+    assert_eq!(snapshot_rows.len(), 6);
+    assert!(snapshot_rows
+        .iter()
+        .any(|row| row["id"] == "local_synthetic01"));
+    let page = backend.request("sessions", json!({"scope":"all"})).unwrap();
+    assert_eq!(
+        page["projectLabels"]["claude-project:chan_testproject01"],
+        "Synthetic project (testpr)"
+    );
+    assert_eq!(
+        page["projectLabels"]["claude-project:chan_otherproject01"],
+        "Synthetic project (otherp)"
+    );
+    assert_eq!(page["projectLabels"].as_object().unwrap().len(), 2);
+    let rows = page["items"].as_array().unwrap();
+    assert_eq!(rows.len(), 6);
+    let projects = rows
+        .iter()
+        .filter(|row| row["desktopProject"].is_object())
+        .collect::<Vec<_>>();
+    assert_eq!(projects.len(), 5);
+    assert!(projects
+        .windows(2)
+        .all(|pair| pair[0]["id"] != pair[1]["id"]));
+    assert!(projects
+        .iter()
+        .all(|row| row["title"] == "Synthetic same title"));
+    let first_project_threads = projects
+        .iter()
+        .filter(|row| row["navigationTarget"]["projectId"] == "chan_testproject01")
+        .collect::<Vec<_>>();
+    let second_project_threads = projects
+        .iter()
+        .filter(|row| row["navigationTarget"]["projectId"] == "chan_otherproject01")
+        .collect::<Vec<_>>();
+    assert_eq!(first_project_threads.len(), 4);
+    assert!(first_project_threads
+        .iter()
+        .all(|row| row["project"] == "claude-project:chan_testproject01"));
+    assert_eq!(second_project_threads.len(), 1);
+    assert_eq!(
+        second_project_threads[0]["project"],
+        "claude-project:chan_otherproject01"
+    );
+    assert!(projects
+        .iter()
+        .all(|row| row["desktopProject"]["projectLabel"]
+            .as_str()
+            .unwrap()
+            .starts_with("Synthetic project (")));
+    assert!(projects
+        .iter()
+        .all(|row| row["navigationTarget"]["kind"] == "claude-project-thread"));
+    let local = projects
+        .iter()
+        .find(|row| row["desktopProject"]["execution"] == "local")
+        .unwrap();
+    assert_eq!(local["client"], "Claude Code Desktop");
+    assert_eq!(local["desktopProject"]["kindLabel"], "Local");
+    let unknown = projects
+        .iter()
+        .find(|row| row["desktopProject"]["execution"] == "unknown")
+        .unwrap();
+    assert_eq!(
+        unknown["desktopProject"]["kindLabel"],
+        "Environment unknown"
+    );
+    let detail = backend
+        .request("session_detail", json!({"id":projects[0]["id"]}))
+        .unwrap();
+    assert_eq!(
+        detail["session"]["navigationTarget"],
+        projects[0]["navigationTarget"]
+    );
+    assert_eq!(detail["session"]["usageStatus"], "unavailable");
+    let filtered = backend
+        .request(
+            "sessions",
+            json!({"scope":"all","source":"claude","project":"claude-project:chan_testproject01","sources":["claude"]}),
+        )
+        .unwrap();
+    assert_eq!(filtered["items"].as_array().unwrap().len(), 4);
+    let filtered_list = backend
+        .request(
+            "sessions",
+            json!({"scope":"all","projects":["claude-project:chan_otherproject01"]}),
+        )
+        .unwrap();
+    assert_eq!(filtered_list["items"].as_array().unwrap().len(), 1);
+    assert_eq!(
+        filtered_list["items"][0]["project"],
+        "claude-project:chan_otherproject01"
+    );
+    let cloud_id = projects
+        .iter()
+        .find(|row| {
+            row["desktopProject"]["execution"] == "cloud"
+                && row["navigationTarget"]["projectId"] == "chan_testproject01"
+                && row["navigationTarget"]["id"] == "cmsg_testthread01"
+        })
+        .unwrap()["id"]
+        .clone();
+    let cloud_navigation =
+        projects.iter().find(|row| row["id"] == cloud_id).unwrap()["navigationTarget"].clone();
+    for (execution, execution_name, kind_label) in [
+        (crate::ClaudeProjectExecution::Local, "local", "Local"),
+        (
+            crate::ClaudeProjectExecution::Unknown,
+            "unknown",
+            "Environment unknown",
+        ),
+    ] {
+        backend.set_claude_cloud_threads(
+            vec![crate::ClaudeCloudThread {
+                project_id: "chan_testproject01".into(),
+                thread_id: "cmsg_testthread01".into(),
+                title: "Synthetic same title".into(),
+                project_name: "Synthetic project".into(),
+                updated_at: at.clone(),
+                status: "working".into(),
+                execution,
+            }],
+            now.timestamp_millis(),
+        );
+        let reclassified = backend
+            .request("session_detail", json!({"id":cloud_id}))
+            .unwrap()["session"]
+            .clone();
+        assert_eq!(reclassified["id"], cloud_id);
+        assert_eq!(reclassified["navigationTarget"], cloud_navigation);
+        assert_eq!(reclassified["desktopProject"]["execution"], execution_name);
+        assert_eq!(reclassified["desktopProject"]["kindLabel"], kind_label);
+        assert!(reclassified.get("cloud").is_none());
+        assert!(!reclassified["navigationTarget"]
+            .as_object()
+            .unwrap()
+            .contains_key("localId"));
+    }
+    assert!(backend
+        .request("sessions", json!({"scope":"all","source":"codex"}))
+        .unwrap()["items"]
+        .as_array()
+        .unwrap()
+        .is_empty());
+    backend.enabled.insert("claude".into(), false);
+    let disabled = backend.request("sessions", json!({"scope":"all"})).unwrap();
+    assert!(disabled["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .all(|row| row["desktopProject"].is_null()));
+}
+
+#[test]
+fn repeated_cloud_unavailability_preserves_sessions_revision() {
+    let temp = tempfile::tempdir().unwrap();
+    let mut backend = fixture(temp.path());
+    let now = Utc::now().timestamp_millis();
+    backend.invalidate_claude_cloud_threads(true);
+    backend.refresh_sessions_revision(now);
+    let revision = backend.sessions_revision;
+    backend.invalidate_claude_cloud_threads(true);
+    backend.refresh_sessions_revision(now);
+    assert_eq!(backend.sessions_revision, revision);
+}
+
+#[test]
+fn claude_project_status_mapping_invalidation_and_expiry_are_explicit() {
+    let temp = tempfile::tempdir().unwrap();
+    let mut backend = fixture(temp.path());
+    let now = Utc::now();
+    let updated_at = now.to_rfc3339();
+    let statuses = [
+        ("working", "running", "running"),
+        ("needs_input", "waiting", "waiting"),
+        ("resolved", "completed", "idle"),
+        ("archived", "completed", "idle"),
+        ("idle", "idle", "idle"),
+        ("failed", "failed", "idle"),
+        ("other", "unknown", "unverified"),
+    ];
+    for (index, (input, cloud_status, state)) in statuses.into_iter().enumerate() {
+        let id = format!("cmsg_statuscase{index:02}");
+        backend.set_claude_cloud_threads(
+            vec![crate::ClaudeCloudThread {
+                project_id: "chan_statuscase01".into(),
+                thread_id: id.clone(),
+                title: format!("Synthetic status {index}"),
+                project_name: "Synthetic status project".into(),
+                updated_at: updated_at.clone(),
+                status: input.into(),
+                execution: crate::ClaudeProjectExecution::Cloud,
+            }],
+            now.timestamp_millis(),
+        );
+        let session = backend
+            .request(
+                "session_detail",
+                json!({"id":format!("claude-project:chan_statuscase01:{id}")}),
+            )
+            .unwrap()["session"]
+            .clone();
+        assert_eq!(session["desktopProject"]["status"], cloud_status, "{input}");
+        assert_eq!(session["state"], state, "{input}");
+    }
+    backend.set_claude_cloud_threads(
+        vec![crate::ClaudeCloudThread {
+            project_id: "chan_statuscase01".into(),
+            thread_id: "cmsg_expirycase01".into(),
+            title: "Synthetic expiry".into(),
+            project_name: "Synthetic status project".into(),
+            updated_at: updated_at.clone(),
+            status: "working".into(),
+            execution: crate::ClaudeProjectExecution::Cloud,
+        }],
+        now.timestamp_millis(),
+    );
+    backend.refresh_sessions_revision(now.timestamp_millis());
+    let revision = backend.sessions_revision;
+    backend.refresh_sessions_revision(now.timestamp_millis() + 90_001);
+    assert_ne!(
+        backend.sessions_revision, revision,
+        "expiry updates session revision"
+    );
+    backend.invalidate_claude_cloud_threads(false);
+    let retained = backend
+        .request(
+            "session_detail",
+            json!({"id":"claude-project:chan_statuscase01:cmsg_expirycase01"}),
+        )
+        .unwrap()["session"]
+        .clone();
+    assert_eq!(retained["desktopProject"]["status"], "unknown");
+    assert_eq!(retained["state"], "unverified");
+    backend.set_claude_cloud_threads(
+        vec![crate::ClaudeCloudThread {
+            project_id: "chan_statuscase01".into(),
+            thread_id: "cmsg_expirycase01".into(),
+            title: "Synthetic expiry".into(),
+            project_name: "Synthetic status project".into(),
+            updated_at,
+            status: "working".into(),
+            execution: crate::ClaudeProjectExecution::Cloud,
+        }],
+        now.timestamp_millis(),
+    );
+    assert_eq!(
+        backend.claude_cloud.rows(now.timestamp_millis() + 90_001)[0]["desktopProject"]["status"],
+        "unknown"
+    );
+    backend.invalidate_claude_cloud_threads(true);
+    assert!(backend.claude_cloud.rows(now.timestamp_millis()).is_empty());
+}
+
+#[test]
+fn cloud_metadata_preserves_merged_local_worker_usage_and_navigation() {
+    let temp = tempfile::tempdir().unwrap();
+    project_worker_fixture(temp.path(), 1, true, true);
+    project_worker_fixture(temp.path(), 2, true, true);
+    let mut core = fixture(temp.path());
+    core.request("snapshot", json!({})).unwrap();
+    let key = "claude-project:chan_syntheticproject:cmsg_syntheticproject_thread";
+    let before = core.request("session_detail", json!({"id":key})).unwrap();
+    let now = Utc::now();
+    core.set_claude_cloud_threads(
+        vec![crate::ClaudeCloudThread {
+            project_id: "chan_syntheticproject".into(),
+            thread_id: "cmsg_syntheticproject_thread".into(),
+            title: "Synthetic Cloud coordinator".into(),
+            project_name: "Synthetic Project".into(),
+            updated_at: now.to_rfc3339(),
+            status: "working".into(),
+            execution: crate::ClaudeProjectExecution::Cloud,
+        }],
+        now.timestamp_millis(),
+    );
+    let after = core.request("session_detail", json!({"id":key})).unwrap();
+    assert_eq!(after["session"]["desktopProject"]["execution"], "mixed");
+    assert_eq!(after["session"]["desktopProject"]["status"], "running");
+    assert_eq!(after["session"]["desktopProject"]["openAvailable"], true);
+    assert_eq!(
+        after["session"]["navigationTarget"],
+        before["session"]["navigationTarget"]
+    );
+    assert_eq!(after["session"]["tokens"], 26);
+    assert_eq!(after["usage"], before["usage"]);
+    assert_eq!(after["children"].as_array().unwrap().len(), 2);
+    assert!(after["session"].get("usageStatus").is_none());
+    core.invalidate_claude_cloud_threads(true);
+    let cleared = core.request("session_detail", json!({"id":key})).unwrap();
+    assert_eq!(cleared["session"]["desktopProject"]["execution"], "local");
+    assert_eq!(cleared["usage"], before["usage"]);
+}

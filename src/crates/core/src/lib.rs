@@ -58,6 +58,7 @@ pub(crate) use agent_hud_agents::{
     LiveLog, Log, TimelineBucket, Usage, DATA_VERSION, PARSER_VERSION,
 };
 pub use agent_hud_l10n as l10n;
+pub use clients::claude_cloud::{ClaudeCloudThread, ClaudeProjectExecution};
 pub(crate) use database::{
     checkpoints::{self, LogHead, ParserCache},
     metering, staging,
@@ -105,7 +106,7 @@ pub struct AgentHudCore {
     sessions_revision: u64,
     sessions_fingerprint: Option<u64>,
     /// What the session fingerprint was last worked out from, and when.
-    sessions_checked: Option<((u64, u64, u64), i64)>,
+    sessions_checked: Option<((u64, u64, u64, u64), i64)>,
     /// The listed session rows of the last render and what they were built
     /// from; a render with no session input changed reuses them.
     listed_rows: Option<(u64, snapshot::ListedRows)>,
@@ -143,6 +144,7 @@ pub struct AgentHudCore {
     /// (`render_if_changed`).
     render: snapshot::Rendered,
     claude_desktop: crate::clients::claude_desktop::ClaudeDesktop,
+    claude_cloud: crate::clients::claude_cloud::ClaudeCloudThreads,
     claude_projects_supported: bool,
     /// The host's way into a session (`replies`); None in the public build.
     session_replies: Option<std::sync::Arc<dyn replies::SessionReplies>>,
@@ -256,6 +258,7 @@ impl AgentHudCore {
             metrics_clock: None,
             render: Default::default(),
             claude_desktop: Default::default(),
+            claude_cloud: Default::default(),
             claude_projects_supported: false,
             session_replies: None,
             conversation_sink: None,
@@ -308,6 +311,21 @@ impl AgentHudCore {
         if self.claude_projects_supported != supported {
             self.claude_projects_supported = supported;
             self.projection_sources = self.projection_sources.wrapping_add(1);
+            self.sessions_checked = None;
+            self.render.last = None;
+        }
+    }
+
+    /// Replaces the in-memory metadata projection of Claude Code Cloud threads.
+    pub fn set_claude_cloud_threads(&mut self, threads: Vec<ClaudeCloudThread>, observed_at: i64) {
+        self.claude_cloud.set(threads, observed_at);
+        self.sessions_checked = None;
+        self.render.last = None;
+    }
+
+    /// Marks Cloud metadata stale; clearing is reserved for an account change.
+    pub fn invalidate_claude_cloud_threads(&mut self, clear: bool) {
+        if self.claude_cloud.invalidate(clear) {
             self.sessions_checked = None;
             self.render.last = None;
         }

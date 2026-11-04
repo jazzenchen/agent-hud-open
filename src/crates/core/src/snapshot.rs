@@ -111,6 +111,7 @@ impl crate::AgentHudCore {
         self.render.accounts.hash(&mut hash);
         self.hook_events.revision().hash(&mut hash);
         self.requests.revision().hash(&mut hash);
+        self.claude_cloud.revision().hash(&mut hash);
         self.settings.to_string().hash(&mut hash);
         self.source_notice.hash(&mut hash);
         self.storage_issue.hash(&mut hash);
@@ -160,6 +161,7 @@ impl crate::AgentHudCore {
             self.hook_events.next_change(now),
             self.requests.next_deadline(),
             self.meters.view.as_ref().and_then(|view| view.valid_until),
+            self.claude_cloud.next_expiry(now),
         ]
         .into_iter()
         .flatten()
@@ -353,6 +355,7 @@ impl crate::AgentHudCore {
                 self.projection_sources,
                 self.hook_events.revision(),
                 self.requests.revision(),
+                self.claude_cloud.fingerprint(presented_at),
                 &currency,
             )
                 .hash(&mut hash);
@@ -411,12 +414,16 @@ impl crate::AgentHudCore {
             );
         }
         if self.enabled.get("claude").copied().unwrap_or(true) {
-            sessions.extend(self.claude_project_rows().into_iter().filter(|row| {
-                row["lastMessageAt"]
-                    .as_str()
-                    .and_then(metering::date_ms)
-                    .is_some_and(|timestamp| timestamp >= presented_at - 86_400_000)
-            }));
+            sessions.extend(
+                self.claude_project_rows(presented_at)
+                    .into_iter()
+                    .filter(|row| {
+                        row["lastMessageAt"]
+                            .as_str()
+                            .and_then(metering::date_ms)
+                            .is_some_and(|timestamp| timestamp >= presented_at - 86_400_000)
+                    }),
+            );
         }
         presentation::sort_sessions(&mut sessions);
         sessions
