@@ -14,7 +14,7 @@ import type {
   StatisticsTokenKind,
   StatisticsTotal,
 } from "@agent-hud/protocol";
-import { unpricedHelp } from "../lib/sessions";
+import { tokenKindOrder, unpricedHelp } from "../lib/sessions";
 import {
   dateFormat,
   listCost,
@@ -38,13 +38,7 @@ export interface StatsTheme {
   selected: string;
 }
 
-export const kinds: StatisticsTokenKind[] = [
-  "cacheWrite",
-  "input",
-  "reasoning",
-  "output",
-  "cacheRead",
-];
+export const kinds: StatisticsTokenKind[] = [...tokenKindOrder];
 export const freshKinds = kinds.filter((kind) => kind !== "cacheRead");
 export const kindLabels: Record<StatisticsTokenKind, string> = {
   input: "Input",

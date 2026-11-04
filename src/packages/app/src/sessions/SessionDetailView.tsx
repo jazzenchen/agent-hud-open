@@ -39,7 +39,7 @@ import {
   durationLabel,
   integer,
   kindColor,
-  kindNames,
+  kindLabel,
   moneyText,
   numeric,
   plain,
@@ -168,7 +168,7 @@ function TurnHover({ entry, theme }: { entry: Entry; theme: Theme }) {
         <span key={kind} style={{ ...row, gap: 6 }}>
           <ColorKey color={kindColor(theme, kind)}>
             <span style={{ color: theme.secondary }}>
-              {kindNames[kind][zh ? 1 : 0]}
+              {kindLabel(kind, zh)}
             </span>
           </ColorKey>
           <span style={{ marginLeft: "auto", ...numeric }}>
@@ -586,7 +586,7 @@ function ChartLegend({
       ) : (
         kinds.map((kind) => (
           <ColorKey key={kind} color={kindColor(theme, kind)}>
-            {kindNames[kind][zh ? 1 : 0]}
+            {kindLabel(kind, zh)}
           </ColorKey>
         ))
       )}
@@ -746,7 +746,7 @@ function TurnPanel({
             <span key={kind} style={{ ...row, gap: 6 }}>
               <ColorKey color={kindColor(theme, kind)}>
                 <span style={{ color: theme.secondary }}>
-                  {kindNames[kind][zh ? 1 : 0]}
+                  {kindLabel(kind, zh)}
                 </span>
               </ColorKey>
               <span style={numeric}>{compact(value)}</span>
@@ -976,7 +976,7 @@ function KindsCard({ detail, theme }: { detail: SessionDetail; theme: Theme }) {
         {kinds.map(({ kind, value }, index) => (
           <div
             key={kind}
-            title={`${kindNames[kind][zh ? 1 : 0]} ${integer(value)}`}
+            title={`${kindLabel(kind, zh)} ${integer(value)}`}
             style={{
               ...row,
               padding: "6px 0",
@@ -985,7 +985,7 @@ function KindsCard({ detail, theme }: { detail: SessionDetail; theme: Theme }) {
             }}
           >
             <ColorKey color={kindColor(theme, kind)}>
-              {kindNames[kind][zh ? 1 : 0]}
+              {kindLabel(kind, zh)}
             </ColorKey>
             <strong style={{ marginLeft: "auto", fontWeight: 600, ...numeric }}>
               {compact(value)}
