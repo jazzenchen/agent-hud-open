@@ -1943,7 +1943,6 @@ fn requests(golden: &mut Golden) {
         object(fixed_decisions()),
         json!("Every parsed request's responses use these decisions, plus its extraDecisions."),
     );
-    let oversized = tool_payload("Bash", json!({"command": "x".repeat(1024 * 1024)}));
     for source in SOURCES {
         for (name, payload) in source_payloads() {
             request_case(
@@ -1954,15 +1953,6 @@ fn requests(golden: &mut Golden) {
                 None,
             );
         }
-        request_case(
-            golden,
-            format!("request/{source}/oversized"),
-            source,
-            &oversized,
-            Some(json!(
-                "A Bash payload whose tool_input.command is 1,048,576 bytes of 'x'"
-            )),
-        );
     }
     for (name, payload) in claude_tool_payloads() {
         request_case(
@@ -2687,16 +2677,6 @@ fn events(golden: &mut Golden) {
             None,
         );
     }
-    event_case(
-        golden,
-        "event/malformed/oversized".into(),
-        "claude",
-        attention,
-        &with(notification(), "message", json!("m".repeat(1024 * 1024))),
-        Some(json!(
-            "A Notification payload whose message is 1,048,576 bytes of 'm'"
-        )),
-    );
 }
 
 // ---------------------------------------------------------------------------

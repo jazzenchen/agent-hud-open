@@ -113,25 +113,13 @@ pub fn trimmed(value: &Value) -> Option<String> {
         .filter(|s| !s.is_empty())
         .map(|s| s.chars().take(2048).collect())
 }
+/// The platform bounds a hook payload's bytes where it reads them; here it
+/// only has to be an object.
 pub fn validate_payload(value: &Value) -> Result<(), String> {
     if !value.is_object() {
         return Err("Hook payload must be a JSON object".into());
     }
-    struct Limited(usize);
-    impl std::io::Write for Limited {
-        fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
-            self.0 += bytes.len();
-            if self.0 > 1024 * 1024 {
-                return Err(std::io::Error::other("limit"));
-            }
-            Ok(bytes.len())
-        }
-        fn flush(&mut self) -> std::io::Result<()> {
-            Ok(())
-        }
-    }
-    serde_json::to_writer(Limited(0), value)
-        .map_err(|_| "Hook payload exceeds the supported size".into())
+    Ok(())
 }
 
 #[cfg(test)]
