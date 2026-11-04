@@ -129,11 +129,23 @@ impl AccountService {
                     .or_insert(at);
             }
         }
+        let mut cloud_waker = None;
         let mut state = self
             .shared
             .state
             .lock()
             .unwrap_or_else(PoisonError::into_inner);
+        let cloud_id = agents::claude::AGENT.id;
+        if self.cloud_supported && state.enabled.contains(cloud_id) && !enabled.contains(cloud_id) {
+            state.cloud_reset = true;
+            state.cloud_sequence = state.cloud_sequence.wrapping_add(1);
+            state.cloud_completion = Some(super::CloudCompletion {
+                sequence: state.cloud_sequence,
+                reading: super::CloudReading::Unavailable { clear: true },
+                observed_ms: chrono::Utc::now().timestamp_millis(),
+            });
+            cloud_waker = state.waker.clone();
+        }
         if state.account_homes != account_homes {
             let changed = state
                 .account_homes
@@ -159,6 +171,10 @@ impl AccountService {
             state.live = live;
             state.finished = finished;
             self.shared.wake.notify_all();
+        }
+        drop(state);
+        if let Some(waker) = cloud_waker {
+            waker();
         }
     }
 }

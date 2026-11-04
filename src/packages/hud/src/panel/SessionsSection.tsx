@@ -174,20 +174,40 @@ export function SourceSessions({
           >
             <Logo source={session.source} size={14} light={light} />
           </span>
-          <span
-            style={{
-              flex: 1,
-              minWidth: 0,
-              whiteSpace: "nowrap",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-            }}
-          >
-            {sessionTitle(session.title, session.cwd) ||
-              (zh ? "（未命名会话）" : "(untitled session)")}
+          <span style={{ flex: 1, minWidth: 0, display: "grid", gap: 2 }}>
+            <span
+              style={{
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+              }}
+            >
+              {sessionTitle(session.title, session.cwd) ||
+                (zh ? "（未命名会话）" : "(untitled session)")}
+            </span>
+            {session.desktopProject &&
+              (session.desktopProject.execution === "cloud" ||
+                session.desktopProject.execution === "mixed" ||
+                session.usageStatus === "unavailable") && (
+                <span
+                  style={{
+                    color: colors.secondary,
+                    fontSize: 10,
+                    lineHeight: "12px",
+                    whiteSpace: "nowrap",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                  }}
+                >
+                  {session.desktopProject.kindLabel} ·{" "}
+                  {session.desktopProject.label}
+                </span>
+              )}
           </span>
           <span style={{ ...tabular, fontSize: 12, whiteSpace: "nowrap" }}>
-            {tokensShort(session.tokens)} tok
+            {session.usageStatus === "unavailable"
+              ? "—"
+              : `${tokensShort(session.tokens)} tok`}
           </span>
         </button>
       ))}

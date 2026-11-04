@@ -2,11 +2,11 @@
 import type { StatisticsTokens } from "./statistics.ts";
 
 export type SessionState = "running" | "waiting" | "idle" | "unverified";
-/** A local Claude Desktop Code Project thread. */
+/** A Claude Code Project thread, regardless of where it executes. */
 export interface DesktopProjectSession {
-  execution: "local" | "unknown";
-  status: "unknown";
-  /** Core's localized status label. */
+  execution: "cloud" | "local" | "mixed" | "unknown";
+  status: "running" | "waiting" | "completed" | "idle" | "failed" | "unknown";
+  /** Core's localized status label, including explicit unknown. */
   label: string;
   /** Core's localized Project worker label. */
   kindLabel: string;
@@ -46,6 +46,8 @@ export interface Session {
   state: SessionState;
   /** From Core: the session's tokens with its sub-agents' at any depth (decided 2026-10-21, as Open); a sub-agent's own row still counts once in every total. */
   tokens: number;
+  /** Why this row has no token total; for example, Cloud usage is not in local files. */
+  usageStatus?: "available" | "unavailable";
   turnCount?: number | null;
   /** From Core, on the Sessions page's rows (`turnBars: true`): the newest turns a row draws. */
   turnBars?: SessionTurnBars;

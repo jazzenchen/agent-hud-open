@@ -155,6 +155,17 @@ impl Runtime {
                 accounts.refresh();
             }
             self.core.set_account_projection(accounts.projection());
+            if let Some((reading, observed_ms)) = accounts.take_cloud_reading() {
+                use agent_hud_platform::clients::claude::cloud::Reading;
+                match reading {
+                    Reading::Ready(threads) => {
+                        self.core.set_claude_cloud_threads(threads, observed_ms)
+                    }
+                    Reading::Unavailable { clear } => {
+                        self.core.invalidate_claude_cloud_threads(clear)
+                    }
+                }
+            }
         }
         // Discovery checks installation/configuration only at startup or an explicit
         // refresh. Routine snapshot polls do not repeatedly inspect PATH or credentials.

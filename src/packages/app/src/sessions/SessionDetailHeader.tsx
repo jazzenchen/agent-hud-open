@@ -84,6 +84,14 @@ export function DetailHeader({
   revealLabel: string;
 }) {
   const zh = Boolean(theme.zh);
+  const project = detail?.session.desktopProject ?? session.desktopProject;
+  const usageStatus = detail?.session.usageStatus ?? session.usageStatus;
+  const showProjectState = Boolean(
+    project &&
+    (project.execution === "cloud" ||
+      project.execution === "mixed" ||
+      usageStatus === "unavailable"),
+  );
   const startedRaw =
     detail?.startedAt ??
     detail?.turns[0]?.timestamp ??
@@ -166,6 +174,25 @@ export function DetailHeader({
           ].join(" · ")}
         </span>
       </div>
+      {showProjectState && project && (
+        <span
+          className="session-statistics-detail-project-state"
+          style={{
+            ...row,
+            gap: 6,
+            width: "fit-content",
+            fontSize: 11,
+            color: theme.secondary,
+            padding: "2px 8px",
+            borderRadius: 999,
+            border: `1px solid ${theme.border}`,
+          }}
+        >
+          <span style={{ color: theme.text }}>{project.kindLabel}</span>
+          <span>·</span>
+          <span>{project.label}</span>
+        </span>
+      )}
       <OriginTags session={session} theme={theme} />
     </div>
   );

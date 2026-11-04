@@ -8,6 +8,7 @@
 //! here is the same for every provider: when to read, how long a reading
 //! that missed an answer keeps the last one, how far apart retries are, and
 //! when the vendor's status page is asked.
+use crate::clients::claude::cloud::Reading as CloudReading;
 use agent_hud_core::l10n;
 use reqwest::blocking::Client;
 use serde_json::{json, Value};
@@ -109,6 +110,9 @@ struct Control {
     entries: BTreeMap<&'static str, Entry>,
     /// Status pages by address.
     pages: HashMap<&'static str, PageReading>,
+    cloud_completion: Option<CloudCompletion>,
+    cloud_sequence: u64,
+    cloud_reset: bool,
     account_homes: HashMap<String, Vec<PathBuf>>,
     waker: Option<Waker>,
 }
@@ -116,10 +120,16 @@ struct Shared {
     state: Mutex<Control>,
     wake: Condvar,
 }
+struct CloudCompletion {
+    sequence: u64,
+    reading: CloudReading,
+    observed_ms: i64,
+}
 pub struct AccountService {
     shared: Arc<Shared>,
     context: AccountContext,
     gate: CollectionGate,
+    cloud_supported: bool,
 }
 
 impl AccountService {
@@ -138,6 +148,10 @@ impl AccountService {
         gate: CollectionGate,
         readers: Providers,
     ) -> Result<Self, String> {
+        let cloud_supported = crate::clients::claude::cloud::SUPPORTED
+            && readers
+                .iter()
+                .any(|provider| provider.id == agents::claude::AGENT.id);
         // Never follow a redirect carrying credentials to a different origin.
         let http = Client::builder()
             .redirect(reqwest::redirect::Policy::none())
@@ -196,6 +210,9 @@ impl AccountService {
                 finished: HashMap::new(),
                 entries,
                 pages: HashMap::new(),
+                cloud_completion: None,
+                cloud_sequence: 0,
+                cloud_reset: false,
                 account_homes: restored.account_homes,
                 waker: None,
             }),
@@ -206,12 +223,21 @@ impl AccountService {
         let worker_gate = Arc::clone(&gate);
         std::thread::Builder::new()
             .name("agenthud-accounts".into())
-            .spawn(move || run(worker_context, worker, worker_gate, readers))
+            .spawn(move || {
+                run(
+                    worker_context,
+                    worker,
+                    worker_gate,
+                    readers,
+                    cloud_supported,
+                )
+            })
             .map_err(|_| l10n::text("账户读取线程无法启动", "Account worker could not start"))?;
         Ok(Self {
             shared,
             context,
             gate,
+            cloud_supported,
         })
     }
     pub fn set_waker(&self, waker: Waker) {
@@ -261,6 +287,22 @@ impl AccountService {
         let enabled = state.enabled.clone();
         state.force.extend(enabled);
         self.shared.wake.notify_all();
+    }
+    /// Takes the newest in-memory Cloud result for the Runtime collection pass.
+    pub fn take_cloud_reading(&self) -> Option<(CloudReading, i64)> {
+        if !self.cloud_supported {
+            return None;
+        }
+        self.shared
+            .state
+            .lock()
+            .ok()?
+            .cloud_completion
+            .take()
+            .map(|completion| {
+                let _sequence = completion.sequence;
+                (completion.reading, completion.observed_ms)
+            })
     }
 }
 impl Drop for AccountService {
