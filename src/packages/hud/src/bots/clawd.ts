@@ -5,8 +5,9 @@ import {
   standing,
   swiftRound,
   type ClawdFrame,
-  type ClawdSign,
 } from "./clawd-clips";
+import type { BotSign } from "./bot-state";
+import { SIGN_ROWS } from "./bot-signs";
 import { layHairline } from "./bot-hairline";
 import { reuseCanvas } from "./scratch";
 export type MarkState = "idle" | "working" | "asking" | "done";
@@ -29,7 +30,7 @@ export interface ClawdSprite {
 export interface SpritePicture extends ClawdFrame {
   offsetX?: number;
   offsetY?: number;
-  sign?: ClawdSign;
+  sign?: BotSign;
   mini?: number;
   mirrored?: boolean;
 }
@@ -299,22 +300,15 @@ export function drawClawd(
   }
 }
 
-const signRows: Record<ClawdSign, readonly string[]> = {
-  "!": ["..#..", "..#..", "..#..", "..#..", "..#..", ".....", "..#.."],
-  "?": [".###.", "#...#", "....#", "..##.", "..#..", ".....", "..#.."],
-  "×": [".....", "#...#", ".#.#.", "..#..", ".#.#.", "#...#", "....."],
-  "⧗": [".....", "#####", ".#.#.", "..#..", ".###.", "#####", "....."],
-  z: [".....", ".....", "#####", "...#.", "..#..", ".#...", "#####"],
-};
 export function drawSign(
   context: CanvasRenderingContext2D,
   x: number,
   y: number,
   cell: number,
   light: boolean,
-  sign: ClawdSign = "!",
+  sign: BotSign,
 ) {
-  const rows = signRows[sign];
+  const rows = SIGN_ROWS[sign];
   if (!light) {
     context.fillStyle = "#0d0d0f99";
     rows.forEach((row, j) =>

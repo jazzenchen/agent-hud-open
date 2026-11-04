@@ -9,6 +9,7 @@ import {
   eventRank,
   badgeSign,
   shownSign,
+  stillSign,
   facingAim,
   BOT_EVENT_FRESHNESS,
   type BotState,
@@ -832,17 +833,13 @@ export class BotMotion {
     this.kept.scale += (scale - this.kept.scale) * ease;
   }
   private signs(now: number, arrived: boolean, dozing: boolean) {
-    let sign: BotSign | null = arrived
-      ? this.look === "permission"
-        ? "exclamation"
-        : this.look === "question"
-          ? "question"
-          : this.look === "plan"
-            ? "lines"
-            : null
-      : null;
+    // Arrived, the still mark's sign; on its way, only its badge's.
+    let sign = arrived
+      ? stillSign(this.state)
+      : this.state.badge
+        ? badgeSign(this.state.badge)
+        : null;
     if (this.event?.kind === "failed") sign = shownSign(sign, "cross");
-    if (this.state.badge) sign = shownSign(sign, badgeSign(this.state.badge));
     if (this.morph > 0 && this.look === "thinking" && !this.limbed)
       sign = shownSign(sign, "ellipsis");
     if (this.morph > 0 && dozing) sign = shownSign(sign, "z");

@@ -6,11 +6,12 @@ import {
   isCalm,
   type BotCue,
   type BotEvent,
+  type BotSign,
   type BotState,
 } from "./bot-state";
 import { ClawdPlayer, type ClawdPlayerOptions } from "./clawd-player";
 import { canonicalClawdFrame, type ClawdSheet } from "./clawd";
-import type { ClawdLook, ClawdSign } from "./clawd-clips";
+import type { ClawdLook } from "./clawd-clips";
 
 const onGrid = (time: number) => Math.ceil((time - 0.004) * 12) / 12;
 const following = (time: number) => (Math.floor((time + 0.004) * 12) + 1) / 12;
@@ -79,11 +80,11 @@ export class ClawdPerformer {
   get picture() {
     return this.onStage ? this.player.picture : null;
   }
-  get logoSign(): ClawdSign | undefined {
+  get logoSign(): BotSign | undefined {
     return this.state.badge === "failed"
-      ? "×"
+      ? "cross"
       : this.state.badge === "limited"
-        ? "⧗"
+        ? "hourglass"
         : undefined;
   }
   get appearanceChangedAt() {

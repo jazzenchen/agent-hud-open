@@ -272,20 +272,7 @@ export function BotMark({
                     hair,
                   );
                 if (baked) ctx.drawImage(baked, 0, 0);
-                else
-                  drawLogo(
-                    seen.sign
-                      ? (
-                          {
-                            "!": "exclamation",
-                            "?": "question",
-                            "×": "cross",
-                            "⧗": "hourglass",
-                            z: "z",
-                          } as const
-                        )[seen.sign]
-                      : null,
-                  );
+                else drawLogo(seen.sign ?? null);
               };
               if (frame.back) draw(frame.back, frame.backOpacity);
               draw(frame.front, frame.frontOpacity);

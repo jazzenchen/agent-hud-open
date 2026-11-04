@@ -1,4 +1,5 @@
 import type { MarkState, SpritePicture } from "./clawd";
+import { shownSign, type BotSign } from "./bot-state";
 import {
   clawdClips,
   clawdTicks,
@@ -6,7 +7,6 @@ import {
   isClawdAttention,
   sameFrame,
   standing,
-  winningSign,
   zeroOffset,
   type ClawdCard,
   type ClawdClip,
@@ -16,7 +16,6 @@ import {
   type ClawdLook,
   type ClawdOffset,
   type ClawdShot,
-  type ClawdSign,
   type ClawdVisit,
 } from "./clawd-clips";
 
@@ -30,7 +29,7 @@ interface Step {
   frame: ClawdFrame | null;
   ticks: number;
   offset: ClawdOffset;
-  sign?: ClawdSign;
+  sign?: BotSign;
   mini?: number;
   holds?: boolean;
   endsCycle?: boolean;
@@ -63,7 +62,7 @@ export class ClawdPlayer {
   target: ClawdLook | null = null;
   subagents = false;
   pendingEvent: ClawdEvent | null = null;
-  badge: ClawdSign | undefined;
+  badge: BotSign | undefined;
   private hovered = false;
   private sector: number | null = null;
   private activity: Activity = { kind: "resting" };
@@ -311,7 +310,7 @@ export class ClawdPlayer {
           });
     this.holdAtCard(held, time);
   }
-  setBadge(badge: ClawdSign | undefined, time: number) {
+  setBadge(badge: BotSign | undefined, time: number) {
     this.stepTo(time);
     this.badge = badge;
   }
@@ -441,7 +440,7 @@ export class ClawdPlayer {
   private pictureOf(step: Step): SpritePicture | null {
     if (!step.frame) return null;
     const frame = this.canonical(step.frame),
-      sign = winningSign(step.sign, this.badge);
+      sign = shownSign(step.sign ?? null, this.badge ?? null);
     return {
       name: frame.name,
       index: frame.index,

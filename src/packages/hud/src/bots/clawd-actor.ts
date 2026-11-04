@@ -1,4 +1,4 @@
-import type { BotCue, BotEvent, BotState } from "./bot-state";
+import type { BotCue, BotEvent, BotSign, BotState } from "./bot-state";
 import {
   canonicalClawdFrame,
   ClawdBaker,
@@ -6,11 +6,10 @@ import {
   type SpritePicture,
 } from "./clawd";
 import { ClawdPerformer, type ClawdPerformerOptions } from "./clawd-performer";
-import type { ClawdSign } from "./clawd-clips";
 
 interface Seen {
   picture: SpritePicture | null;
-  sign?: ClawdSign;
+  sign?: BotSign;
 }
 export interface ClawdActorOptions extends ClawdPerformerOptions {
   showing?: boolean;

@@ -1,4 +1,5 @@
 // Direct port of Bots/Clawd/ClawdClip.swift and ClawdClips.swift. Art stays unchanged.
+import type { BotSign } from "./bot-state";
 export type ClawdLook =
   | "thinking"
   | "retrying"
@@ -13,7 +14,6 @@ export type ClawdLook =
 export type ClawdEvent = "start" | "failed" | "limit-hit";
 export type ClawdVisit = "swaying" | "turning" | "glancing" | "dozing";
 export type ClawdCard = "done" | "long-done" | "reset";
-export type ClawdSign = "!" | "?" | "×" | "⧗" | "z";
 export interface ClawdFrame {
   name: string;
   index: number;
@@ -51,7 +51,7 @@ export interface ClawdClip {
   exit: ClawdExit;
   ticks: number;
   offset: ClawdOffset;
-  sign?: ClawdSign;
+  sign?: BotSign;
   pace: ClawdPace;
   working: boolean;
   miniShift?: number;
@@ -59,7 +59,7 @@ export interface ClawdClip {
 export interface ClawdShotStep {
   frame: ClawdFrame;
   ticks: number;
-  sign?: ClawdSign;
+  sign?: BotSign;
   offset: ClawdOffset;
 }
 export interface ClawdShot {
@@ -87,19 +87,6 @@ export function easedOffset(offset: ClawdOffset, share: number): ClawdOffset {
 }
 export const isClawdAttention = (look: ClawdLook) =>
   look === "permission" || look === "question" || look === "plan";
-export const signOrder: readonly ClawdSign[] = ["!", "?", "×", "⧗", "z"];
-export function winningSign(
-  one?: ClawdSign,
-  other?: ClawdSign,
-): ClawdSign | undefined {
-  return one == null
-    ? other
-    : other == null
-      ? one
-      : signOrder.indexOf(one) <= signOrder.indexOf(other)
-        ? one
-        : other;
-}
 export const numbers = (first: number, last: number) =>
   Array.from({ length: last - first + 1 }, (_, at) => first + at);
 const frames = (name: string, first: number, last = first): ClawdFrame[] =>
@@ -121,7 +108,7 @@ const clip = (
 function shot(
   all: ClawdFrame[],
   options: {
-    sign?: ClawdSign;
+    sign?: BotSign;
     signDuring?: [number, number];
     hold?: { frame: ClawdFrame; seconds: number };
     offset?: ClawdOffset;
@@ -218,7 +205,7 @@ const pointing = clip("Pointing", {
   loop: numbers(19, 23),
   outro: [...frames("Pointing", 18), standing],
   exit: { kind: "any-frame" },
-  sign: "!",
+  sign: "exclamation",
   pace: longWait,
 });
 const waving = clip("Waving", {
@@ -227,7 +214,7 @@ const waving = clip("Waving", {
   loop: numbers(7, 8),
   outro: [...frames("Waving", 6), standing],
   exit: { kind: "through", frame: 8 },
-  sign: "?",
+  sign: "question",
   pace: longWait,
 });
 const lightbulb = clip("Lightbulb", {
@@ -261,7 +248,10 @@ export const clawdClips = {
   } satisfies Record<ClawdLook, ClawdClip>,
   events: {
     start: shot(frames("JumpingHappy", 3, 20)),
-    failed: shot(frames("Facepalm", 2, 33), { sign: "×", signDuring: [5, 31] }),
+    failed: shot(frames("Facepalm", 2, 33), {
+      sign: "cross",
+      signDuring: [5, 31],
+    }),
     "limit-hit": shot([
       ...frames("Dizzy", 6, 21),
       ...frames("Dizzy", 6, 17),
