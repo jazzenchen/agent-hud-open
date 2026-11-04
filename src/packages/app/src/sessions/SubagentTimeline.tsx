@@ -1,26 +1,12 @@
-import {
-  memo,
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import type { MouseEvent as ReactMouseEvent } from "react";
 import type { SessionCall, SessionTurnAgent } from "@agent-hud/protocol";
-import { callRuns, panWindow } from "../lib/session-charts";
+import { callRuns } from "../lib/session-charts";
 import { lanes, offset, tipLine, type Lane, type Step } from "./subagent-lanes";
 import { SubagentTimelineLegend } from "./SubagentTimelineLegend";
-import {
-  clipped,
-  compact,
-  cost,
-  numeric,
-  plain,
-  row,
-  type Theme,
-} from "./SessionTheme";
+import { SubagentTimelineNames } from "./SubagentTimelineNames";
+import { clipped, compact, cost, numeric, type Theme } from "./SessionTheme";
+import { useTimelineGlide } from "./use-timeline-glide";
 
 const ROW = 36;
 const BAR = 12;
@@ -29,12 +15,6 @@ const AXIS_STEPS = [
 ];
 /** Calls closer than this on screen, px, draw as one run. */
 const RUN_GAP = 12;
-/** How quickly the view glides after a zoom and after a pan: ms to cover about two thirds of the way. */
-const GLIDE = 70;
-const PAN_GLIDE = 40;
-
-/** A stretch of the turn, ms. */
-type View = [number, number];
 
 interface Hover {
   lane: number;
@@ -81,101 +61,19 @@ export const SubagentTimeline = memo(function SubagentTimeline({
     [calls, agents, start, end, now, live, theme],
   );
   const fullTo = Math.max(start + 1000, end, ...rows.map((lane) => lane.end));
-  // `view` is the window drawn, `aim` the one it glides to; null is the whole turn.
-  const [view, setView] = useState<View | null>(null);
-  const [aim, setAim] = useState<View | null>(null);
+  const plot = useRef<HTMLDivElement>(null);
+  const { view, aim, plotWidth, glideTo } = useTimelineGlide(
+    plot,
+    start,
+    fullTo,
+  );
   const [from, to] = view ?? [start, fullTo];
   const span = Math.max(1, to - from);
   const pos = (at: number) => ((at - from) / span) * 100;
   const width = (a: number, b: number) =>
     Math.max(0, pos(Math.min(b, to)) - pos(Math.max(a, from)));
   const visible = (a: number, b: number) => b >= from && a <= to;
-
-  const plot = useRef<HTMLDivElement>(null);
-  const [plotWidth, setPlotWidth] = useState(0);
-  useLayoutEffect(() => {
-    const node = plot.current;
-    if (!node) return;
-    setPlotWidth(node.clientWidth);
-    const observer = new ResizeObserver(([entry]) =>
-      setPlotWidth(entry.contentRect.width),
-    );
-    observer.observe(node);
-    return () => observer.disconnect();
-  }, []);
   const runGap = (RUN_GAP / Math.max(1, plotWidth)) * span;
-
-  // What the glide and the wheel read between renders.
-  const glide = useRef({
-    view: null as View | null,
-    aim: null as View | null,
-    frame: 0,
-    tau: GLIDE,
-    start,
-    fullTo,
-    plotWidth,
-  });
-  useLayoutEffect(() => {
-    Object.assign(glide.current, { start, fullTo, plotWidth });
-  });
-  useEffect(() => () => cancelAnimationFrame(glide.current.frame), []);
-  const glideTo = useCallback((next: View | null, tau = GLIDE) => {
-    const g = glide.current;
-    g.aim = next;
-    g.tau = tau;
-    setAim(next);
-    if (g.frame) return;
-    // A frame's time can come before the moment the glide began, so the
-    // first frame counts as one frame (16 ms), never as a step backwards.
-    let last = 0;
-    const step = (time: number) => {
-      const whole: View = [g.start, g.fullTo];
-      const goal = g.aim ?? whole;
-      const [a, b] = g.view ?? whole;
-      const elapsed = last ? Math.min(Math.max(0, time - last), 64) : 16;
-      const k = 1 - Math.exp(-elapsed / g.tau);
-      last = time;
-      const moved: View = [a + (goal[0] - a) * k, b + (goal[1] - b) * k];
-      const pixels =
-        Math.max(Math.abs(goal[0] - moved[0]), Math.abs(goal[1] - moved[1])) *
-        (g.plotWidth / Math.min(goal[1] - goal[0], moved[1] - moved[0]));
-      const done = pixels < 0.25;
-      g.view = done ? g.aim : moved;
-      g.frame = done ? 0 : requestAnimationFrame(step);
-      setView(g.view);
-    };
-    g.frame = requestAnimationFrame(step);
-  }, []);
-  // Swiping sideways on a trackpad, or shift with a mouse wheel, pans a zoomed
-  // view; up and down still scroll the page. React's wheel listener is passive,
-  // so this one is added by hand to keep the page from moving too.
-  useEffect(() => {
-    const node = plot.current;
-    if (!node) return;
-    const onWheel = (event: WheelEvent) => {
-      const g = glide.current;
-      const sideways =
-        event.shiftKey || Math.abs(event.deltaX) > Math.abs(event.deltaY);
-      if (!sideways || !g.aim) return;
-      event.preventDefault();
-      const delta = event.deltaX || event.deltaY;
-      const pixels =
-        delta *
-        (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? g.plotWidth : 1);
-      const length = g.aim[1] - g.aim[0];
-      glideTo(
-        panWindow(
-          g.aim,
-          (pixels / Math.max(1, g.plotWidth)) * length,
-          g.start,
-          g.fullTo,
-        ),
-        PAN_GLIDE,
-      );
-    };
-    node.addEventListener("wheel", onWheel, { passive: false });
-    return () => node.removeEventListener("wheel", onWheel);
-  }, [glideTo]);
 
   const [hover, setHover] = useState<Hover | null>(null);
   const [focus, setFocus] = useState<number | null>(null);
@@ -238,73 +136,14 @@ export const SubagentTimeline = memo(function SubagentTimeline({
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
       <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
-        {/* Names */}
-        <div style={{ width: 200, flexShrink: 0 }}>
-          <div style={{ height: 16, fontSize: 11, color: theme.secondary }}>
-            agent
-          </div>
-          {rows.map((lane, i) => (
-            <button
-              key={lane.key}
-              type="button"
-              onClick={() => setFocus(focus === i ? null : i)}
-              aria-pressed={focus === i}
-              aria-label={`${lane.name}${lane.sub ? `, ${lane.sub}` : ""}`}
-              style={{
-                ...plain,
-                ...row,
-                gap: 7,
-                width: "100%",
-                height: ROW,
-                paddingLeft: Math.min(lane.depth, 3) * 10,
-                boxSizing: "border-box",
-                borderRadius: 6,
-                background: focus === i ? theme.pick : "transparent",
-                opacity: dim(i),
-                transition: "opacity 150ms ease",
-              }}
-            >
-              <span
-                aria-hidden="true"
-                style={{
-                  width: 3,
-                  height: 22,
-                  borderRadius: 2,
-                  background: lane.color,
-                  flexShrink: 0,
-                }}
-              />
-              <span
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  minWidth: 0,
-                }}
-              >
-                <span
-                  style={{
-                    ...clipped,
-                    fontSize: 12,
-                    fontWeight: lane.depth === 0 ? 600 : 500,
-                  }}
-                >
-                  {lane.name}
-                </span>
-                {lane.sub && (
-                  <span
-                    style={{
-                      ...clipped,
-                      fontSize: 10.5,
-                      color: theme.secondary,
-                    }}
-                  >
-                    {lane.sub}
-                  </span>
-                )}
-              </span>
-            </button>
-          ))}
-        </div>
+        <SubagentTimelineNames
+          rows={rows}
+          rowHeight={ROW}
+          focus={focus}
+          onFocus={setFocus}
+          dim={dim}
+          theme={theme}
+        />
 
         {/* Plot */}
         <div style={{ flex: "1 1 auto", minWidth: 120 }}>

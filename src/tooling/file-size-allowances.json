@@ -7,7 +7,7 @@
   "src/crates/core/src/sessions/list.rs": 527,
   "src/crates/core/src/source_db/scan.rs": 425,
   "src/crates/platform/src/deepseek_plugin/agent-hud.mjs": 455,
-  "src/packages/app/src/sessions/SubagentTimeline.tsx": 524,
+  "src/packages/app/src/sessions/SubagentTimeline.tsx": 463,
   "src/packages/app/src/sessions/TurnBarsChart.tsx": 329,
   "src/packages/hud/src/HUDScene.tsx": 667,
   "src/packages/hud/src/bots/bot-motion.ts": 463,
