@@ -21,30 +21,29 @@ export interface HUDGlowProps {
   /** Size of the silhouette this rim wraps, in CSS pixels. */
   width: number;
   height: number;
-  style?: GlowStyle;
-  effect?: GlowEffect;
-  colors?: string[];
+  style: GlowStyle;
+  effect: GlowEffect;
+  colors: string[];
   active?: boolean;
   period?: number;
-  amplitude?: number;
-  brightness?: number;
-  range?: number;
-  outwardOnly?: boolean;
-  blur?: number;
-  pitch?: number;
-  core?: number;
-  fade?: number;
-  density?: number;
-  radius?: number;
+  amplitude: number;
+  brightness: number;
+  range: number;
+  outwardOnly: boolean;
+  blur: number;
+  pitch: number;
+  core: number;
+  fade: number;
+  density: number;
+  radius: number;
   /** Concave contact shoulders outside the core; excluded from the rim's ink. */
   flare?: number;
   /** Notch joins the screen's top edge; a floating logo strip has four rounded corners. */
-  attached?: boolean;
-  reduceMotion?: boolean;
+  attached: boolean;
+  reduceMotion: boolean;
   /** The island alert that just arrived: the rim flashes in its colour over
    * its sender's part of the gradient (`glowAlert`). */
   alert?: GlowAlert | null;
-  className?: string;
 }
 
 const STYLES: GlowStyle[] = [
@@ -562,26 +561,25 @@ function GpuRim({
 export const HUDGlow = memo(function HUDGlow({
   width,
   height,
-  style = "blur",
-  effect = "breathe",
-  colors = [],
+  style,
+  effect,
+  colors,
   active = true,
   period,
-  amplitude = 0.6,
-  brightness = 0.9,
-  range = 14,
-  outwardOnly = true,
-  blur = 8,
-  pitch = 10,
-  core = 0,
-  fade = 5,
-  density = 1,
-  radius = 12,
+  amplitude,
+  brightness,
+  range,
+  outwardOnly,
+  blur,
+  pitch,
+  core,
+  fade,
+  density,
+  radius,
   flare = 0,
-  attached = true,
-  reduceMotion = false,
+  attached,
+  reduceMotion,
   alert = null,
-  className,
 }: HUDGlowProps) {
   const [systemReduced, setSystemReduced] = useState(
     () => window.matchMedia("(prefers-reduced-motion: reduce)").matches,
@@ -685,7 +683,6 @@ export const HUDGlow = memo(function HUDGlow({
   return (
     <div
       aria-hidden="true"
-      className={className}
       data-hud-glow={style}
       data-renderer={still || !gpuReady ? "static" : "webgpu"}
       data-motion={
