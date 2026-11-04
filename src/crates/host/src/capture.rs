@@ -32,18 +32,11 @@ use host::capture;
 /// Checks the PNG a host produced and wraps it for the picture tool.
 fn png(bytes: Vec<u8>) -> Result<Captured, String> {
     use base64::Engine;
-    if bytes.len() > 16 * 1024 * 1024
-        || bytes.len() < 24
-        || &bytes[..8] != b"\x89PNG\r\n\x1a\n"
-        || &bytes[12..16] != b"IHDR"
-    {
-        return Err("The webview returned an invalid or oversized PNG".into());
+    if bytes.len() < 24 || &bytes[..8] != b"\x89PNG\r\n\x1a\n" || &bytes[12..16] != b"IHDR" {
+        return Err("The webview returned an invalid PNG".into());
     }
     let width = u32::from_be_bytes(bytes[16..20].try_into().unwrap());
     let height = u32::from_be_bytes(bytes[20..24].try_into().unwrap());
-    if width == 0 || height == 0 || u64::from(width) * u64::from(height) > 16_777_216 {
-        return Err("The picture dimensions exceed the capture limit".into());
-    }
     Ok(Captured {
         mime_type: "image/png",
         png_base64: base64::engine::general_purpose::STANDARD.encode(bytes),

@@ -16,9 +16,6 @@ fn bytes(stream: &IStream) -> Result<Vec<u8>, String> {
     let mut stat = STATSTG::default();
     unsafe { stream.Stat(&mut stat, STATFLAG_NONAME) }
         .map_err(|_| "WebView2 picture stream is unavailable")?;
-    if stat.cbSize == 0 || stat.cbSize > 16 * 1024 * 1024 {
-        return Err("The picture PNG exceeds its size limit".into());
-    }
     unsafe { stream.Seek(0, STREAM_SEEK_SET, None) }
         .map_err(|_| "WebView2 picture stream is unavailable")?;
     let mut bytes = vec![0; stat.cbSize as usize];

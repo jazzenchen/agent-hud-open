@@ -35,16 +35,6 @@ pub(super) fn capture(window: tauri::WebviewWindow) -> Result<Captured, String> 
                         .ok_or("The captured image has no bitmap representation")?;
                     let bitmap = NSBitmapImageRep::initWithData(NSBitmapImageRep::alloc(), &tiff)
                         .ok_or("The captured image could not be decoded")?;
-                    let width = u32::try_from(bitmap.pixelsWide())
-                        .map_err(|_| "The picture width is invalid")?;
-                    let height = u32::try_from(bitmap.pixelsHigh())
-                        .map_err(|_| "The picture height is invalid")?;
-                    if width == 0
-                        || height == 0
-                        || u64::from(width) * u64::from(height) > 16_777_216
-                    {
-                        return Err("The picture dimensions exceed the capture limit".into());
-                    }
                     let png = unsafe {
                         bitmap.representationUsingType_properties(
                             NSBitmapImageFileType::PNG,

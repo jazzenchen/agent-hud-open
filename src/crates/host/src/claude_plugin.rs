@@ -43,14 +43,12 @@ impl ClaudePlugin {
     }
 
     /// The HUD's way to answer Claude's questions in a session running the plugin.
-    pub(crate) fn replies(&self) -> Arc<dyn SessionReplies> {
-        let claude_config = super::mcp_clients::home()
-            .map(|home| plugin::claude_config_directory(&home))
-            .unwrap_or_default();
-        Arc::new(
+    pub(crate) fn replies(&self) -> Result<Arc<dyn SessionReplies>, String> {
+        let claude_config = plugin::claude_config_directory(&agent_hud_runtime::home_directory()?);
+        Ok(Arc::new(
             ClaudeReplies::new(self.channel.clone(), claude_config)
-                .recording_deliveries(agent_hud_runtime::local_tools_directory().ok()),
-        )
+                .recording_deliveries(Some(agent_hud_runtime::local_tools_directory()?)),
+        ))
     }
 }
 
@@ -144,7 +142,7 @@ pub(crate) fn repair_on_launch(app: &tauri::AppHandle) {
         let Ok(_owner) = state.owner.lock() else {
             return;
         };
-        let result = super::mcp_clients::home().and_then(|home| {
+        let result = agent_hud_runtime::home_directory().and_then(|home| {
             let executable = super::mcp_clients::executable("claudeCode", &home);
             let config = plugin::claude_config_directory(&home);
             repair(
@@ -224,7 +222,7 @@ pub async fn native_claude_plugin(
             .owner
             .lock()
             .map_err(|_| "The plugin's owner is unavailable")?;
-        let home = super::mcp_clients::home()?;
+        let home = agent_hud_runtime::home_directory()?;
         let executable = super::mcp_clients::executable("claudeCode", &home);
         let config = plugin::claude_config_directory(&home);
         match action.as_str() {

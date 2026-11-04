@@ -1,4 +1,4 @@
-pub(super) use super::unix::{client_command_line, configure_client_command, stop_client};
+pub(crate) use super::unix::{client_command_line, configure_client_command, stop_client};
 use serde_json::{json, Value};
 use std::path::Path;
 use std::{fs, path::PathBuf};
@@ -88,14 +88,14 @@ pub(super) fn register_if_never_registered() -> bool {
 }
 
 /// Settings looks only where `cli_candidates` says.
-pub(super) fn bundled_cli(_command: &str) -> Option<PathBuf> {
+pub(crate) fn bundled_cli(_command: &str) -> Option<PathBuf> {
     None
 }
-pub(super) fn cli_candidates(_home: &Path, command: &str, dirs: Vec<PathBuf>) -> Vec<PathBuf> {
+pub(crate) fn cli_candidates(_home: &Path, command: &str, dirs: Vec<PathBuf>) -> Vec<PathBuf> {
     dirs.into_iter().map(|dir| dir.join(command)).collect()
 }
 
-pub(super) fn private_output(options: &mut std::fs::OpenOptions) {
+pub(crate) fn private_output(options: &mut std::fs::OpenOptions) {
     use std::os::unix::fs::OpenOptionsExt;
     options.mode(0o600);
 }

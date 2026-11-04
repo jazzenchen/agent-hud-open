@@ -19,9 +19,6 @@ use tauri::Manager;
 #[derive(Default)]
 pub struct Clients(Mutex<()>);
 static SEQUENCE: AtomicU64 = AtomicU64::new(0);
-pub(crate) fn home() -> Result<PathBuf, String> {
-    agent_hud_runtime::home_directory()
-}
 fn client(id: &str) -> Result<Client, String> {
     Client::from_id(id).ok_or_else(|| "Unknown MCP client".into())
 }
@@ -119,7 +116,7 @@ fn args(client: Client, install: bool, path: &std::path::Path) -> Vec<String> {
     args
 }
 fn status(app: &tauri::AppHandle) -> Result<Value, String> {
-    let home = home()?;
+    let home = agent_hud_runtime::home_directory()?;
     let places = Places::current(&home);
     let options = app.state::<super::HostOptions>();
     let path = options.canonical_executable.as_ref();
@@ -153,7 +150,7 @@ fn status(app: &tauri::AppHandle) -> Result<Value, String> {
     }))
 }
 fn run(app: &tauri::AppHandle, id: &str, install: bool) -> Result<Value, String> {
-    let home = home()?;
+    let home = agent_hud_runtime::home_directory()?;
     let places = Places::current(&home);
     let client = client(id)?;
     let options = app.state::<super::HostOptions>();
@@ -214,7 +211,7 @@ pub(crate) fn repair_on_launch(app: &tauri::AppHandle) {
         let Ok(_guard) = owner.0.lock() else {
             return;
         };
-        let Ok(home) = home() else {
+        let Ok(home) = agent_hud_runtime::home_directory() else {
             return;
         };
         let places = Places::current(&home);

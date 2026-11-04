@@ -53,12 +53,12 @@ pub(super) fn register_if_never_registered() -> bool {
 
 /// The Claude desktop app's and the Codex app's bundled copies, which Settings
 /// shows as installed when neither CLI is on PATH.
-pub(super) fn bundled_cli(command: &str) -> Option<PathBuf> {
+pub(crate) fn bundled_cli(command: &str) -> Option<PathBuf> {
     agent_hud_runtime::client_executable(command)
 }
 /// npm installs .cmd shims beside native .exe files. Extensionless npm shims
 /// contain POSIX shell scripts and must not be offered to CreateProcessW.
-pub(super) fn cli_candidates(_home: &Path, command: &str, dirs: Vec<PathBuf>) -> Vec<PathBuf> {
+pub(crate) fn cli_candidates(_home: &Path, command: &str, dirs: Vec<PathBuf>) -> Vec<PathBuf> {
     dirs.into_iter()
         .flat_map(|dir| {
             [".exe", ".cmd", ".bat"].map(|suffix| dir.join(format!("{command}{suffix}")))
@@ -68,7 +68,7 @@ pub(super) fn cli_candidates(_home: &Path, command: &str, dirs: Vec<PathBuf>) ->
 
 /// PowerShell needs the call operator for a quoted command name; single quotes
 /// preserve spaces, dollar signs and backticks, and apostrophes are doubled.
-pub(super) fn client_command_line(arguments: &[String]) -> String {
+pub(crate) fn client_command_line(arguments: &[String]) -> String {
     format!(
         "& {}",
         arguments
@@ -79,7 +79,7 @@ pub(super) fn client_command_line(arguments: &[String]) -> String {
     )
 }
 
-pub(super) fn configure_client_command(command: &mut std::process::Command) {
+pub(crate) fn configure_client_command(command: &mut std::process::Command) {
     use std::os::windows::process::CommandExt;
     const CREATE_NO_WINDOW: u32 = 0x08000000;
     command.creation_flags(CREATE_NO_WINDOW);
@@ -87,7 +87,7 @@ pub(super) fn configure_client_command(command: &mut std::process::Command) {
 
 /// npm's .cmd launcher owns a node.exe descendant. Killing only cmd.exe would
 /// leave a timed-out setup operation running and still changing client files.
-pub(super) fn stop_client(child: &mut std::process::Child) {
+pub(crate) fn stop_client(child: &mut std::process::Child) {
     use std::process::{Command, Stdio};
     let mut command = Command::new("taskkill.exe");
     configure_client_command(&mut command);
@@ -103,7 +103,7 @@ pub(super) fn stop_client(child: &mut std::process::Child) {
 }
 
 /// The temporary directory is already per-user.
-pub(super) fn private_output(_options: &mut std::fs::OpenOptions) {}
+pub(crate) fn private_output(_options: &mut std::fs::OpenOptions) {}
 
 #[cfg(test)]
 mod tests {

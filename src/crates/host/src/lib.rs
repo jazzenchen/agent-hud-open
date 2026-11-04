@@ -42,13 +42,10 @@ struct Backend {
 }
 impl Backend {
     fn install_snapshot(&mut self, app: &tauri::AppHandle, mut value: Value) {
-        if let Some(owner) = app.try_state::<presentation::Presentation>() {
-            owner.project_snapshot(&mut value);
-            self.projected = Some(owner.revision());
-        }
-        if let Some(system) = app.try_state::<system::System>() {
-            system.project(&mut value);
-        }
+        let owner = app.state::<presentation::Presentation>();
+        owner.project_snapshot(&mut value);
+        self.projected = Some(owner.revision());
+        app.state::<system::System>().project(&mut value);
         if let Some(tools) = &self.tools {
             value["connection"]["localTools"] = tools.configure(tools::channel_wanted(
                 value["settings"]["hudTools"].as_bool().unwrap_or(false),
@@ -224,19 +221,9 @@ impl Service {
         let collection = runtime.collection_gate();
         let wake = Arc::new((Mutex::new(0u8), Condvar::new()));
         let watcher_wake = Arc::clone(&wake);
-        runtime.set_change_waker(Arc::new(move || {
-            if let Ok(mut changed) = watcher_wake.0.lock() {
-                *changed |= DATA;
-                watcher_wake.1.notify_one();
-            }
-        }));
+        runtime.set_change_waker(Arc::new(move || wake_collector(&watcher_wake, DATA)));
         let request_wake = Arc::clone(&wake);
-        runtime.set_request_waker(Arc::new(move || {
-            if let Ok(mut changed) = request_wake.0.lock() {
-                *changed |= REQUEST;
-                request_wake.1.notify_one();
-            }
-        }));
+        runtime.set_request_waker(Arc::new(move || wake_collector(&request_wake, REQUEST)));
         let backend = Arc::new(Mutex::new(Backend {
             runtime,
             snapshot: None,
@@ -311,20 +298,18 @@ impl Service {
         // Before the first collection pass, so a Claude desktop question the
         // app can answer never shows first as one it cannot: the product's own
         // way into sessions, else Agent HUD's Claude Code plugin.
-        let replies = extension
+        let replies = match extension
             .as_ref()
             .and_then(|product| product.session_replies())
-            .or_else(|| {
-                app.try_state::<claude_plugin::ClaudePlugin>()
-                    .map(|plugin| plugin.replies())
-            });
-        if let Some(replies) = replies {
-            backend
-                .lock()
-                .map_err(|_| "Runtime lock is unavailable")?
-                .runtime
-                .set_session_replies(Some(replies));
-        }
+        {
+            Some(replies) => replies,
+            None => app.state::<claude_plugin::ClaudePlugin>().replies()?,
+        };
+        backend
+            .lock()
+            .map_err(|_| "Runtime lock is unavailable")?
+            .runtime
+            .set_session_replies(Some(replies));
         // Before the first collection pass too, so the first reads already
         // reach the product's conversation store.
         if let Some(sink) = extension
@@ -449,9 +434,7 @@ impl Service {
                         }
                         // Core is asked for changes only while the display
                         // preferences the snapshot was projected with stand.
-                        let projected = app
-                            .try_state::<presentation::Presentation>()
-                            .map(|owner| owner.revision());
+                        let projected = Some(app.state::<presentation::Presentation>().revision());
                         let changes_only =
                             backend.snapshot.is_some() && backend.projected == projected;
                         let _ = backend.request(
@@ -609,9 +592,9 @@ async fn presentation_request(
     tauri::async_runtime::spawn_blocking(move || {
         let owner=app.state::<presentation::Presentation>();
         let value=match method.as_str(){
-            "state"=>return Ok(owner.view()),"import"=>owner.import(params)?,"update"=>owner.update(params)?,"source_update"=>{let value=owner.source_update(params)?;if let Some(service)=app.try_state::<Service>(){service.request_pass();}value},"layout"=>owner.set_layout(params)?,
+            "state"=>return Ok(owner.view()),"import"=>owner.import(params)?,"update"=>owner.update(params)?,"source_update"=>{let value=owner.source_update(params)?;app.state::<Service>().request_pass();value},"layout"=>owner.set_layout(params)?,
             "save"=>{
-                let service=app.try_state::<Service>().ok_or("The live runtime is unavailable")?;
+                let service=app.state::<Service>();
                 // Lock order is Backend then Presentation, as it is for all local tools.
                 let mut backend=service.backend.lock().map_err(|_|"Application state unavailable")?;
                 let previous=backend.snapshot.as_ref().map(|v|v["settings"].clone()).unwrap_or(Value::Null);
@@ -645,17 +628,6 @@ async fn cached_snapshot(service: tauri::State<'_, Service>) -> Result<CachedSna
     })
     .await
     .map_err(|error| format!("Snapshot reader failed: {error}"))?
-}
-
-fn backend(
-    app: &tauri::App,
-    initial: Option<Value>,
-) -> Result<Runtime, Box<dyn std::error::Error>> {
-    Ok(Runtime::new_with_preferences(
-        None,
-        !app.state::<AppState>().demo,
-        initial,
-    )?)
 }
 
 /// Settings, built again from its configuration when it was closed. Never on
@@ -746,9 +718,7 @@ fn quit_app(app: tauri::AppHandle) {
 fn refresh_data(app: &tauri::AppHandle) {
     let app = app.clone();
     tauri::async_runtime::spawn_blocking(move || {
-        let Some(service) = app.try_state::<Service>() else {
-            return;
-        };
+        let service = app.state::<Service>();
         let _turn = service
             .collection
             .lock()
@@ -862,7 +832,7 @@ pub fn run_with_options(
         match instance::claim(options.canonical_executable.is_some()) {
             instance::Launch::Run(locks) => Some(locks),
             instance::Launch::HandOver(lock) => {
-                if !instance::hand_over(&lock) {
+                if !agent_hud_runtime::instance::hand_over(&lock) {
                     instance::refuse(None);
                 }
                 std::process::exit(0);
@@ -961,8 +931,9 @@ pub fn run_with_options(
                 demo::play(app.handle().clone(), &service);
                 app.manage(service);
             } else {
-                let mut runtime = backend(
-                    app,
+                let mut runtime = Runtime::new_with_preferences(
+                    None,
+                    true,
                     legacy.as_ref().and_then(|v| v.get("settings")).cloned(),
                 )?;
                 // Client hooks add to the app; it starts without them, and Settings says what is missing (Open #16).
