@@ -1,0 +1,5 @@
+[
+  {"ts":1760999999000,"type":"say","say":"text","text":"Add a checkout page"},
+  {"ts":1761000000000,"type":"say","say":"api_req_started","text":"{\"apiProtocol\":\"anthropic\",\"tokensIn\":1000,\"tokensOut\":10,\"cacheWrites\":100,\"cacheReads\":600,\"cost\":0.02}"},
+  {"ts":1789022955200,"type":"say","say":"api_req_started","text":"{\"apiProtocol\":\"anthropic\",\"tokensIn\":1000,\"tokensOut\":10,\"cacheWrites\":100,\"cacheReads\":600,\"cost\":0.01}"}
+]

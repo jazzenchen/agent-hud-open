@@ -831,3 +831,146 @@ fn qoder_sessions_are_read_as_claude_lines_under_their_own_clients() {
         .unwrap();
     assert_eq!(detail["usage"]["cacheRead"], 800);
 }
+
+/// A classic Cline task's messages: its words, then one request per count.
+fn cline_task(start: i64, requests: &[(i64, u64)]) -> String {
+    let mut messages = vec![json!({"ts":start,"type":"say","say":"task","text":"Fix the build"})];
+    for (at, input) in requests {
+        let counts = json!({"tokensIn":input,"tokensOut":10,"cacheReads":0,"cacheWrites":0});
+        messages.push(
+            json!({"ts":at,"type":"say","say":"api_req_started","text":counts.to_string(),
+            "modelInfo":{"modelId":"claude-sonnet-4-5","providerId":"anthropic"}}),
+        );
+    }
+    Value::Array(messages).to_string()
+}
+
+#[test]
+fn a_cline_task_in_two_editors_counts_once_and_a_session_keeps_its_sub_agent() {
+    use std::fs;
+    let root = tempfile::tempdir().unwrap();
+    let now = chrono::Utc::now().timestamp_millis();
+    let editor = |name: &str| {
+        root.path()
+            .join(name)
+            .join("User/globalStorage/saoudrizwan.claude-dev/tasks")
+    };
+    let (code, cursor) = (editor("Code"), editor("Cursor"));
+    let task = cline_task(now - 60_000, &[(now - 50_000, 100), (now - 40_000, 200)]);
+    for tasks in [&code, &cursor] {
+        fs::create_dir_all(tasks.join("1761700000000")).unwrap();
+        fs::write(tasks.join("1761700000000/ui_messages.json"), &task).unwrap();
+    }
+    let sessions = root.path().join(".cline/data/sessions");
+    let folder = sessions.join("s1");
+    fs::create_dir_all(&folder).unwrap();
+    fs::write(
+        folder.join("s1.json"),
+        json!({"version":1,"session_id":"s1","model":"claude-sonnet-4-5","provider":"anthropic",
+               "cwd":"/repo","metadata":{"title":"Ship it"}})
+        .to_string(),
+    )
+    .unwrap();
+    let call = |id: &str, at: i64, input: u64| json!({"id":id,"role":"assistant","ts":at,"metrics":{"inputTokens":input,"outputTokens":5,"cacheReadTokens":40,"cacheWriteTokens":0}});
+    fs::write(
+        folder.join("s1.messages.json"),
+        json!({"sessionId":"s1","messages":[call("m1", now - 30_000, 100)]}).to_string(),
+    )
+    .unwrap();
+    fs::write(
+        folder.join("helper.messages.json"),
+        json!({"sessionId":"s1__helper","messages":[call("m2", now - 20_000, 50)]}).to_string(),
+    )
+    .unwrap();
+    let mut backend = AgentHudCore::new(
+        [&code, &cursor, &sessions]
+            .into_iter()
+            .map(|path| SourceRoot {
+                path: path.clone(),
+                provider: "cline",
+            })
+            .collect(),
+        root.path().join("hud"),
+    );
+    // The task's two requests once (110 + 210), the session's call (60
+    // fresh + 40 read + 5) and its sub-agent's (10 + 40 + 5).
+    assert_eq!(refresh(&mut backend)["totals"]["total"], 320 + 105 + 55);
+    let listed = backend
+        .request("sessions", json!({"scope":"all","sources":["cline"]}))
+        .unwrap();
+    assert_eq!(listed["total"], 2, "the sub-agent nests under its session");
+    let titles = listed["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|item| item["title"].as_str().unwrap().to_owned())
+        .collect::<Vec<_>>();
+    assert!(titles.contains(&"Fix the build".to_owned()), "{titles:?}");
+    assert!(titles.contains(&"Ship it".to_owned()), "{titles:?}");
+    let detail = backend
+        .request("session_detail", json!({"id":"cline:s1"}))
+        .unwrap();
+    assert_eq!(detail["children"][0]["id"], "cline:s1__helper");
+
+    // The task is written again whole with one more request: only it is new.
+    let task = cline_task(
+        now - 60_000,
+        &[
+            (now - 50_000, 100),
+            (now - 40_000, 200),
+            (now - 10_000, 400),
+        ],
+    );
+    fs::write(code.join("1761700000000/ui_messages.json"), task).unwrap();
+    assert_eq!(
+        refresh(&mut backend)["totals"]["total"],
+        320 + 410 + 105 + 55
+    );
+}
+
+#[test]
+fn goose_calls_come_from_its_ledger_and_its_names_from_its_sessions() {
+    let root = tempfile::tempdir().unwrap();
+    let folder = root.path().join("goose/sessions");
+    std::fs::create_dir_all(&folder).unwrap();
+    let now = chrono::Utc::now().timestamp();
+    let db = Connection::open(folder.join("sessions.db")).unwrap();
+    db.execute_batch(
+        "CREATE TABLE sessions (id TEXT PRIMARY KEY, name TEXT NOT NULL DEFAULT '', description TEXT NOT NULL DEFAULT '', working_dir TEXT NOT NULL, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, provider_name TEXT, model_config_json TEXT, archived_at TIMESTAMP, parent_session_id TEXT);
+         CREATE TABLE usage_ledger (id INTEGER PRIMARY KEY AUTOINCREMENT, session_id TEXT NOT NULL, created_timestamp INTEGER NOT NULL, model TEXT, input_tokens INTEGER, output_tokens INTEGER, total_tokens INTEGER, cache_read_tokens INTEGER, cache_write_tokens INTEGER, cost REAL, cost_source TEXT, is_compaction INTEGER DEFAULT 0);
+         INSERT INTO sessions (id, working_dir, provider_name, model_config_json) VALUES ('20261104_1', '/repo', 'anthropic', '{\"model_name\":\"claude-sonnet-4-5\"}');",
+    )
+    .unwrap();
+    db.execute(
+        "INSERT INTO usage_ledger (session_id, created_timestamp, model, input_tokens, output_tokens, cache_read_tokens, cache_write_tokens) VALUES ('20261104_1', ?1, 'claude-sonnet-4-5', 1000, 50, 800, 0)",
+        [now - 30],
+    )
+    .unwrap();
+    let mut backend = AgentHudCore::new(
+        vec![SourceRoot {
+            path: folder.clone(),
+            provider: "goose",
+        }],
+        root.path().join("hud"),
+    );
+    assert_eq!(refresh(&mut backend)["totals"]["total"], 1050);
+    // Goose names the session after its first call.
+    db.execute(
+        "UPDATE sessions SET name='Tidy the repo', updated_at=datetime('now','+1 second') WHERE id='20261104_1'",
+        [],
+    )
+    .unwrap();
+    db.execute(
+        "INSERT INTO usage_ledger (session_id, created_timestamp, input_tokens, output_tokens) VALUES ('20261104_1', ?1, 300, 20)",
+        [now - 10],
+    )
+    .unwrap();
+    assert_eq!(refresh(&mut backend)["totals"]["total"], 1050 + 320);
+    let listed = backend
+        .request("sessions", json!({"scope":"all","sources":["goose"]}))
+        .unwrap();
+    assert_eq!(listed["total"], 1);
+    assert_eq!(listed["items"][0]["id"], "goose:20261104_1");
+    assert_eq!(listed["items"][0]["title"], "Tidy the repo");
+    assert_eq!(listed["items"][0]["model"], "claude-sonnet-4-5");
+}

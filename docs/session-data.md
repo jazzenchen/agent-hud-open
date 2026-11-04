@@ -103,3 +103,33 @@ folder and parent come from the transcript's first line (`session_start`),
 which Droid rewrites when the title changes; the transcript is part of the
 settings file's stamp, and its last write is the session's activity time.
 `archivedAt` archives a session.
+## Whole-file and database sources
+
+Most clients append to their logs, which are read from where the last read
+stopped. A few write their sessions differently:
+
+- **Cline** keeps each session in `~/.cline/data/sessions/<id>/` since 4.0
+  (its VS Code extension and its CLI alike): `<id>.messages.json`, written
+  again whole, with each call's `metrics`, and a sub-agent's
+  `<agent>.messages.json` beside it, listed under the session. The manifest
+  `<id>.json` gives the title, folder and model. Older tasks
+  (`tasks/<id>/ui_messages.json` in each VS Code-family editor's
+  `globalStorage/saoudrizwan.claude-dev`, and in `~/.cline/data` for JetBrains
+  and the first CLI) are read too; a task found under several editors counts
+  once, as one session.
+- **Roo Code** keeps the same task files in
+  `globalStorage/rooveterinaryinc.roo-cline`, with `history_item.json` for the
+  title, folder and parent task. Its `tokensIn` counts the cache since v3.29.5,
+  Cline's does not (except through its "OpenAI Compatible" provider); both are
+  recorded as fresh input apart from cache reads and writes.
+- **Goose** keeps one SQLite database, `sessions/sessions.db` in its data folder
+  (`~/.local/share/goose`, `%APPDATA%\Block\goose\data` on Windows,
+  `GOOSE_PATH_ROOT/data`). Each call is a row of `usage_ledger` (Goose 1.42 and
+  later); a pass reads the rows after the last one read, then the sessions
+  changed since, for their names, folders, sub-agents' parents and archive
+  state. A row carried forward from before the ledger is left out, since its
+  time is not its calls'. Older databases give each session's running totals.
+
+None of these layouts has been checked on a machine with the client
+installed yet; the samples in `src/crates/agents/tests/fixtures/` are made up
+from each client's source.

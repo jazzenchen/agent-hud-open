@@ -118,7 +118,7 @@ const PREFIX_VENDORS: [(&str, &str); 7] = [
 
 /// Open's other clients by the source their ids start with
 /// (`AdditionalSource.vendor`, `OpenAgentSource.name`).
-const SOURCE_VENDORS: [(&str, &str); 12] = [
+const SOURCE_VENDORS: [(&str, &str); 15] = [
     ("copilot", "GitHub Copilot"),
     ("openclaw", "OpenClaw"),
     ("hermes", "Hermes"),
@@ -131,6 +131,9 @@ const SOURCE_VENDORS: [(&str, &str); 12] = [
     ("kimi", "Kimi"),
     ("glm", "GLM"),
     ("pi", "Pi"),
+    ("cline", "Cline"),
+    ("roo-code", "Roo Code"),
+    ("goose", "Goose"),
 ];
 
 /// The vendor a consumer id's calls are listed under, as Open names it

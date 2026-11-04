@@ -1,0 +1,4 @@
+{"version":1,"updated_at":"2026-11-01T10:00:03.000Z","agent":"subagent","sessionId":"1793000000000_ab12c__explorer","messages":[
+ {"id":"msg_s1","role":"user","ts":1793000001000,"content":[{"type":"text","text":"Find the build script"}]},
+ {"id":"msg_s2","role":"assistant","ts":1793000002500,"modelInfo":{"id":"anthropic/claude-haiku-4.5","provider":"cline","family":"claude-haiku"},"metrics":{"inputTokens":5000,"outputTokens":90,"cacheReadTokens":0,"cacheWriteTokens":4000,"cost":0.006},"content":[{"type":"text","text":"It is build.rs."}]}
+]}

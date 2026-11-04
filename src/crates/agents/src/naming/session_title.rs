@@ -190,6 +190,9 @@ fn folder_named(source: &str) -> bool {
             | "kilo"
             | "mimocode"
             | "droid"
+            | "cline"
+            | "roo-code"
+            | "goose"
     )
 }
 

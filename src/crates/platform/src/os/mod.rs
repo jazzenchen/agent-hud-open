@@ -149,14 +149,20 @@ mod tests {
 
     /// The sources every agent's descriptor names, under a home without
     /// variables set (Grok Bot's cache is left out: only macOS has it;
-    /// Cursor's places differ by OS and are checked after).
+    /// Cursor's, Goose's and the editors' places differ by OS and are
+    /// checked after).
     #[test]
     fn roots_follow_the_descriptors() {
         let home = Path::new("/h");
         let all = agent_source_roots(home, &Environment::new());
+        let app_data = app_support(home, &Environment::new());
+        let in_editor = |root: &agent_hud_core::SourceRoot| {
+            matches!(root.provider, "cline" | "roo-code") && root.path.starts_with(&app_data)
+        };
         let roots = all
             .iter()
-            .filter(|root| !matches!(root.provider, "grok-bot" | "cursor"))
+            .filter(|root| !matches!(root.provider, "grok-bot" | "cursor" | "goose"))
+            .filter(|root| !in_editor(root))
             .map(|root| {
                 let path = root.path.strip_prefix(home).unwrap().to_owned();
                 (root.provider, path)
@@ -215,6 +221,8 @@ mod tests {
             ("mimocode", ".local/share/mimocode"),
             ("omp", ".omp/agent/sessions"),
             ("droid", ".factory/sessions"),
+            ("cline", ".cline/data/sessions"),
+            ("cline", ".cline/data/tasks"),
         ];
         // The application data folder differs by OS.
         let app = folder(home, &Environment::new(), agent_hud_agents::Base::AppData);
@@ -227,5 +235,36 @@ mod tests {
             })
             .collect::<Vec<_>>();
         assert_eq!(roots, expected);
+
+        // Cline's and Roo Code's tasks in each editor's application data.
+        let editors = |provider: &str, extension: &str| {
+            let found = all
+                .iter()
+                .filter(|root| root.provider == provider && in_editor(root))
+                .map(|root| root.path.clone())
+                .collect::<Vec<_>>();
+            assert_eq!(found.len(), 7, "{provider}");
+            assert_eq!(
+                found[0],
+                app_data
+                    .join("Code/User/globalStorage")
+                    .join(extension)
+                    .join("tasks")
+            );
+        };
+        editors("cline", "saoudrizwan.claude-dev");
+        editors("roo-code", "rooveterinaryinc.roo-cline");
+        // Goose: the XDG data folder, or the roaming AppData folder on Windows.
+        let goose = all
+            .iter()
+            .filter(|root| root.provider == "goose")
+            .map(|root| root.path.clone())
+            .collect::<Vec<_>>();
+        let expected = if OS == agent_hud_agents::Os::Windows {
+            app_data.join("Block/goose/data/sessions")
+        } else {
+            home.join(".local/share/goose/sessions")
+        };
+        assert_eq!(goose, [expected]);
     }
 }

@@ -385,7 +385,8 @@ pub(super) fn accepts_source(path: &Path, source: &str) -> bool {
                         && !name.ends_with(".zst")
                         && !name.ends_with(".tmp")))
         }
-        "hermes" | "zcode" | "devin" | "grok-bot" | "cursor" | "droid" => false,
+        "hermes" | "zcode" | "devin" | "grok-bot" | "cursor" | "droid" | "cline" | "roo-code"
+        | "goose" => false,
         "antigravity" => {
             name == "transcript.jsonl" && path.components().any(|p| p.as_os_str() == "brain")
         }
@@ -450,11 +451,11 @@ fn walk(
             return;
         }
     }
-    if matches!(source, "zcode" | "devin")
+    if matches!(source, "zcode" | "devin" | "goose")
         && !path
             .join(match source {
                 "zcode" => "db.sqlite",
-                "devin" => "sessions.db",
+                "devin" | "goose" => "sessions.db",
                 _ => "opencode.db",
             })
             .is_file()

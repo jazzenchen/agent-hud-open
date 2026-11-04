@@ -43,6 +43,7 @@ fn opencode_legacy(path: &Path, source: &str) -> bool {
 
 pub(crate) fn accepts(path: &Path, source: &str) -> bool {
     if opencode_legacy(path, source)
+        || agent_hud_agents::cline::transcript::accepts(path, source)
         || source_batches::accepts(path, source)
         || (source == "grok-bot" && agent_hud_agents::grok::bot::accepts(path))
         || (source == "droid" && agent_hud_agents::droid::transcript::accepts(path))
@@ -56,7 +57,7 @@ pub(crate) fn accepts(path: &Path, source: &str) -> bool {
             path.extension().is_some_and(|e| e == "db") && name != "conversation_summaries.db"
         }
         "zcode" => name == "db.sqlite",
-        "devin" => name == "sessions.db",
+        "devin" | "goose" => name == "sessions.db",
         _ if opencode(source).is_some_and(|store| name == store.database) => true,
         // Cursor's session headers, and the turn log its `stop` hook keeps.
         "cursor" => name == "state.vscdb" || agent_hud_agents::hooks::turn_log::accepts(path),
@@ -226,11 +227,13 @@ impl AgentHudCore {
         }
         let is_bot = stamp.source == "grok-bot";
         // A JSON document per session, read whole: Factory Droid's settings.
-        let is_document = stamp.source == "droid";
+        let is_settings = stamp.source == "droid";
         let is_turn_log = agent_hud_agents::hooks::turn_log::accepts(path);
         let is_legacy = opencode_legacy(path, stamp.source);
+        // A messages file written again whole (Cline's, Roo Code's).
+        let is_document = agent_hud_agents::cline::transcript::accepts(path, stamp.source);
         let replaces_sessions = opencode(stamp.source).is_some() && !is_legacy;
-        let reader = if is_batch || is_bot || is_legacy || is_turn_log || is_document {
+        let reader = if is_batch || is_bot || is_legacy || is_turn_log || is_document || is_settings {
             None
         } else {
             Some(legacy_database::ReadOnlyDatabase::open(path).map_err(|_| {
@@ -243,9 +246,11 @@ impl AgentHudCore {
         let cursor = &checkpoint.source_state["cursor"];
         let page = if is_legacy {
             agent_hud_agents::opencode::legacy::read(path)
+        } else if is_document {
+            agent_hud_agents::cline::transcript::read(path, stamp.source)
         } else if is_bot {
             agent_hud_agents::grok::bot::read(path, cursor)
-        } else if is_document {
+        } else if is_settings {
             agent_hud_agents::droid::transcript::read(path, cursor)
         } else if is_turn_log {
             agent_hud_agents::hooks::turn_log::read(path, cursor)
@@ -267,6 +272,7 @@ impl AgentHudCore {
                     agent_hud_agents::hermes::transcript::read(&reader.connection, path, cursor)
                 }
                 "devin" => agent_hud_agents::devin::transcript::read(&reader.connection, cursor),
+                "goose" => agent_hud_agents::goose::transcript::read(&reader.connection, cursor),
                 "cursor" => agent_hud_agents::cursor::sessions::read(&reader.connection, cursor),
                 "copilot" => agent_hud_agents::copilot::store::read(&reader.connection, cursor),
                 "qoder-cn" => agent_hud_agents::qoder::legacy::read(&reader.connection, cursor),

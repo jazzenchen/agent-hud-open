@@ -52,6 +52,7 @@ const SOURCES: &[&str] = &[
     "cursor",
     "copilot",
     "droid",
+    "goose",
     "unknown-client",
 ];
 /// Every hook flag, and one the crate does not know.
@@ -2323,11 +2324,21 @@ fn copilot_stop() -> Value {
     })
 }
 
+fn goose_stop() -> Value {
+    json!({
+        "event": "Stop",
+        "session_id": "20251009_1",
+        "matcher_context": null,
+        "last_assistant_message": "Done.",
+    })
+}
+
 fn completion_payload(source: &str) -> Value {
     match source {
         "antigravity" => antigravity_stop(),
         "cursor" => cursor_stop(),
         "copilot" => copilot_stop(),
+        "goose" => goose_stop(),
         _ => claude_style_stop(),
     }
 }
@@ -2862,6 +2873,30 @@ fn events(golden: &mut Golden) {
                 "PreCompact",
                 json!({"trigger": "auto", "message_count": 80, "estimated_tokens": 150000}),
             ),
+        ),
+        (
+            "completion/goose/prompt",
+            "goose",
+            completion,
+            json!({"event": "UserPromptSubmit", "session_id": "20251009_1", "matcher_context": "fix it", "message": "fix it"}),
+        ),
+        (
+            "completion/goose/tool-result",
+            "goose",
+            completion,
+            json!({"event": "PostToolUse", "session_id": "20251009_1", "matcher_context": "shell", "tool_name": "shell", "tool_input": {"command": "ls"}, "working_dir": "/Users/me/project", "tool_call_id": "t1"}),
+        ),
+        (
+            "completion/goose/missing-session",
+            "goose",
+            completion,
+            without(goose_stop(), "session_id"),
+        ),
+        (
+            "completion/goose/claude-style-stop",
+            "goose",
+            completion,
+            claude_style_stop(),
         ),
         // Malformed payloads.
         (

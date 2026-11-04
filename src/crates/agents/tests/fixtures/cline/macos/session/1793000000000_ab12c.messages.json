@@ -1,0 +1,6 @@
+{"version":1,"updated_at":"2026-11-01T10:00:07.000Z","agent":"lead","sessionId":"1793000000000_ab12c","system_prompt":"You are Cline.","messages":[
+ {"id":"msg_1","role":"user","ts":1793000000100,"content":[{"type":"text","text":"Fix the build"},{"type":"file","path":"/Users/me/projects/app/src/main.rs","content":"fn main() {}"}]},
+ {"id":"msg_2","role":"assistant","ts":1793000004200,"modelInfo":{"id":"anthropic/claude-sonnet-4.5","provider":"cline","family":"claude-sonnet"},"metrics":{"inputTokens":36000,"outputTokens":410,"cacheReadTokens":34000,"cacheWriteTokens":1200,"cost":0.031},"content":[{"type":"text","text":"Running the build."},{"type":"tool_use","id":"toolu_1","name":"run_commands","input":{"commands":["cargo build"]}}]},
+ {"id":"msg_3","role":"user","ts":1793000004300,"content":[{"type":"tool_result","tool_use_id":"toolu_1","content":"ok"}]},
+ {"id":"msg_4","role":"assistant","ts":1793000006000,"metrics":{"inputTokens":37000,"outputTokens":20,"cacheReadTokens":36000,"cacheWriteTokens":0,"cost":0.012},"content":[{"type":"text","text":"Done."}]}
+]}

@@ -115,9 +115,11 @@ pub fn parse_event(
                 .completion
                 .as_ref()
                 .ok_or("This client has no completion hook format")?;
+            // Goose names its event `event`.
             if let Some(begin) = completion.begin.as_ref().filter(|begin| {
                 payload["hook_event_name"]
                     .as_str()
+                    .or_else(|| payload["event"].as_str())
                     .is_some_and(|name| begin.events.contains(&name))
             }) {
                 // A begin event that says no turn is going on may still end

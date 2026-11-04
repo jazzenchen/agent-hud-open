@@ -43,6 +43,7 @@ pub mod antigravity;
 pub mod ark;
 pub mod buddy;
 pub mod claude;
+pub mod cline;
 pub mod codex;
 pub mod coding_plans;
 pub mod copilot;
@@ -51,6 +52,7 @@ pub mod deepseek;
 pub mod devin;
 pub mod droid;
 pub mod glm;
+pub mod goose;
 pub mod grok;
 pub mod hermes;
 pub mod kimi;
@@ -96,6 +98,7 @@ pub const COMPLETION_SOURCES: &[&str] = &[
     "devin",
     "hermes",
     "droid",
+    "goose",
 ];
 pub const HOOK_FLAGS: &[&str] = &[
     "--permission-hook",

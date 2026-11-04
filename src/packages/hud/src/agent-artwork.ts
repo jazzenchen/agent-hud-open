@@ -26,6 +26,10 @@ export const ORIGINAL_ARTWORK_FILES = {
   "Volcengine Ark": "ark",
   "Kilo Code": "kilocode",
   "MiMo Code": "xiaomimimo",
+  // Not from the original app: LobeHub's static PNGs 2.6.0 (MIT), `light/`.
+  Cline: "cline",
+  "Roo Code": "roo-code",
+  Goose: "goose",
 } as const;
 type OriginalVendor = keyof typeof ORIGINAL_ARTWORK_FILES;
 const vendors: Readonly<Record<string, OriginalVendor>> = {
@@ -53,6 +57,9 @@ const vendors: Readonly<Record<string, OriginalVendor>> = {
   ark: "Volcengine Ark",
   kilo: "Kilo Code",
   mimocode: "MiMo Code",
+  cline: "Cline",
+  "roo-code": "Roo Code",
+  goose: "Goose",
 };
 const templates: ReadonlySet<OriginalVendor> = new Set([
   "Grok",
@@ -64,6 +71,9 @@ const templates: ReadonlySet<OriginalVendor> = new Set([
   "ZCode",
   "Kilo Code",
   "MiMo Code",
+  "Cline",
+  "Roo Code",
+  "Goose",
 ]);
 const normalize = (source: string) =>
   source
