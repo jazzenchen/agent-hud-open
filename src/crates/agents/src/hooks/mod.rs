@@ -16,8 +16,15 @@ pub use observer::Observer;
 
 /// A client's hooks.
 pub struct Hooks {
-    /// The settings file the hooks live in; None when they have none.
+    /// The settings file the hooks live in, one per profile for a client
+    /// whose profiles each read their own (`Location::profiles`); None when
+    /// they have none.
     pub settings: Option<crate::Location>,
+    /// Variables of the environment the client runs its hooks in that say
+    /// what its payloads leave out (the folder of the Hermes profile that
+    /// fired one). The hook adds the ones set to the payload under
+    /// `ENVIRONMENT` before reading it.
+    pub environment: &'static [&'static str],
     /// Older names of the client that its callbacks and owned commands may use.
     pub aliases: &'static [&'static str],
     pub layout: Layout,
@@ -298,6 +305,27 @@ pub fn hooks_by_id(id: &str) -> Option<&'static Hooks> {
     by_id(id)?.hooks
 }
 
+/// Where a hook puts the variables of its environment that the client's
+/// `Hooks::environment` names, in the payload it reads.
+pub const ENVIRONMENT: &str = "agentHudEnvironment";
+
+/// Adds to `payload` the variables of the hook's environment (`env`) that the
+/// client's `Hooks::environment` names and that are set, under
+/// `ENVIRONMENT`. A client that names none, or a payload that is no object,
+/// is left as it is.
+pub fn add_environment(source: &str, payload: &mut Value, env: &dyn Fn(&str) -> Option<String>) {
+    let Some(names) = hooks_of(source).ok().map(|(_, hooks)| hooks.environment) else {
+        return;
+    };
+    let set = names
+        .iter()
+        .filter_map(|name| Some(((*name).to_owned(), Value::String(env(name)?))))
+        .collect::<serde_json::Map<_, _>>();
+    if let (false, Some(payload)) = (set.is_empty(), payload.as_object_mut()) {
+        payload.insert(ENVIRONMENT.into(), Value::Object(set));
+    }
+}
+
 pub fn session_id(source: &str, raw: &str) -> String {
     if hooks_by_id(source).is_some_and(|hooks| hooks.prefixed_sessions) {
         format!("{source}:{raw}")
@@ -390,6 +418,31 @@ mod tests {
             for (flag, _) in agent.hooks.map(Hooks::all_flags).unwrap_or_default() {
                 assert!(crate::HOOK_FLAGS.contains(&flag), "{} {flag}", agent.id);
             }
+        }
+    }
+
+    #[test]
+    fn a_hook_adds_only_the_variables_its_client_names() {
+        let env = |name: &str| {
+            ["HERMES_HOME", "CLAUDE_CONFIG_DIR", "SECRET"]
+                .contains(&name)
+                .then(|| format!("{name} value"))
+        };
+        let mut hermes = serde_json::json!({"session_id": "s"});
+        add_environment("hermes", &mut hermes, &env);
+        assert_eq!(
+            hermes[ENVIRONMENT],
+            serde_json::json!({"HERMES_HOME": "HERMES_HOME value"})
+        );
+        // A client that names none, or none that is set, is left as it was.
+        let payload = serde_json::json!({"session_id": "s"});
+        for (source, env) in [
+            ("claude", &env as &dyn Fn(&str) -> Option<String>),
+            ("hermes", &|_: &str| None),
+        ] {
+            let mut left = payload.clone();
+            add_environment(source, &mut left, env);
+            assert_eq!(left, payload, "{source}");
         }
     }
 

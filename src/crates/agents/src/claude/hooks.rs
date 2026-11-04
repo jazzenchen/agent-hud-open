@@ -11,6 +11,7 @@ pub static HOOKS: Hooks = Hooks {
         "settings.json",
     )),
     aliases: &[],
+    environment: &[],
     layout: Layout::Groups,
     permission: Some(Permission {
         timeout: 86_400,

@@ -75,11 +75,13 @@ impl Clients {
             // and an opt-in hook only once the user turned it on.
             let hooked = !enabled || launches(&source, crate::os::OS);
             let opted_in = self.opted_in.contains(&source);
+            // Every settings file, one per profile where the client keeps
+            // them: a file that cannot be changed leaves the others to go in.
             for (flag, wanted) in flags(&source, opted_in).into_iter().filter(|_| hooked) {
-                if let Err(error) = install::install_plan(context, &source, flag, enabled && wanted)
-                    .and_then(|plan| install::apply_plan(&plan))
-                {
-                    errors.push(format!("{source}: {error}"));
+                for plan in install::install_plans(context, &source, flag, enabled && wanted) {
+                    if let Err(error) = plan.and_then(|plan| install::apply_plan(&plan)) {
+                        errors.push(format!("{source}: {error}"));
+                    }
                 }
             }
         }
@@ -140,10 +142,10 @@ impl Clients {
                 .into_iter()
                 .filter(|(_, opt_in)| *opt_in);
             for (flag, _) in opt_in {
-                if let Err(error) = install::install_plan(context, source, flag, opted_in)
-                    .and_then(|plan| install::apply_plan(&plan))
-                {
-                    errors.push(format!("{source}: {error}"));
+                for plan in install::install_plans(context, source, flag, opted_in) {
+                    if let Err(error) = plan.and_then(|plan| install::apply_plan(&plan)) {
+                        errors.push(format!("{source}: {error}"));
+                    }
                 }
             }
         }
@@ -175,11 +177,13 @@ impl Clients {
                 .filter(|(_, wanted)| *wanted && hooked);
             for (flag, _) in wanted {
                 known = true;
-                match install::install_plan(context, &source, flag, true) {
-                    Ok(plan) => installed &= !plan.changed,
-                    Err(e) => {
-                        installed = false;
-                        error = Some(e);
+                for plan in install::install_plans(context, &source, flag, true) {
+                    match plan {
+                        Ok(plan) => installed &= !plan.changed,
+                        Err(e) => {
+                            installed = false;
+                            error = Some(e);
+                        }
                     }
                 }
             }

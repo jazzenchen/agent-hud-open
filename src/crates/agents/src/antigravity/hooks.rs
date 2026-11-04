@@ -12,6 +12,7 @@ pub static HOOKS: Hooks = Hooks {
         "config/hooks.json",
     )),
     aliases: &[],
+    environment: &[],
     layout: Layout::OwnedEntry,
     permission: None,
     completion: Some(Completion {

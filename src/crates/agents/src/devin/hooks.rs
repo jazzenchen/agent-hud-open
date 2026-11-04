@@ -10,6 +10,7 @@ use serde_json::Value;
 pub static HOOKS: Hooks = Hooks {
     settings: Some(Location::home(&[], &[".config/devin"], "config.json")),
     aliases: &[],
+    environment: &[],
     layout: Layout::Groups,
     permission: Some(Permission {
         timeout: 86_400,

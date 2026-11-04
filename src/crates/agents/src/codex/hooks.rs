@@ -7,6 +7,7 @@ use crate::{PerOs, Support};
 pub static HOOKS: Hooks = Hooks {
     settings: Some(Location::home(&["CODEX_HOME"], &[".codex"], "hooks.json")),
     aliases: &[],
+    environment: &[],
     layout: Layout::Groups,
     permission: Some(Permission {
         timeout: 86_400,

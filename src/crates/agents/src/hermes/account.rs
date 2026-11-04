@@ -6,9 +6,11 @@
 //! The token is only read. Nous rotates its refresh tokens and revokes the
 //! whole sign-in when one is used twice, so a refresh here would sign Hermes
 //! out; the refresh token never leaves the file. The access token lives a
-//! short while and Hermes renews it when it runs, so an expired one keeps the
-//! last credits until Hermes runs again, and is never sent. The token goes
-//! only to a `nousresearch.com` address over HTTPS.
+//! short while and Hermes renews it when it runs, so an expired one is never
+//! sent: it is a reading that got no answer (`Unread::Transient`), which
+//! leaves the last credits as they were for a while and then shows them
+//! stale, saying that Hermes renews its sign-in when it next runs. The token
+//! goes only to a `nousresearch.com` address over HTTPS.
 //!
 //! The file shapes and the trust rule for the portal's address follow
 //! CodexBar's Nous reader (MIT, `NousSettingsReader.swift` and `nous.ts`),
@@ -140,8 +142,9 @@ fn sign_in(auth: &Value) -> Option<SignIn> {
     pooled.or_else(|| from_state(auth))
 }
 
+/// Not read now: Hermes renews the token itself, and nothing here can.
 fn expired() -> Unread {
-    Unread::Failed(l10n::text(
+    Unread::transient(l10n::text(
         "Hermes 下次运行时会续期 Nous Portal 的登录，之后更新额度",
         "Hermes renews its Nous Portal sign-in the next time it runs; the credits update then",
     ))
@@ -395,7 +398,13 @@ mod tests {
             &auth(&token(-1), "https://portal.nousresearch.com"),
         );
         let failed = read(&host).err().unwrap();
-        assert!(matches!(failed, Unread::Failed(_)));
+        assert!(matches!(
+            failed,
+            Unread::Transient {
+                retry_after: None,
+                ..
+            }
+        ));
         assert_eq!(
             failed,
             "Hermes renews its Nous Portal sign-in the next time it runs; the credits update then"

@@ -90,7 +90,7 @@ pub fn handle_with_io(
 fn handle_payload(arguments: &[String], data: &Path, input: &[u8], output: &mut dyn Write) -> i32 {
     let flag = &arguments[1];
     let source = &arguments[2];
-    let Ok(payload) = serde_json::from_slice::<Value>(input) else {
+    let Ok(mut payload) = serde_json::from_slice::<Value>(input) else {
         return 0;
     };
     if !payload.is_object() {
@@ -117,6 +117,9 @@ fn handle_payload(arguments: &[String], data: &Path, input: &[u8], output: &mut 
         }
         return 0;
     }
+    // What the client's payloads leave out, from the environment it ran the
+    // hook in (the folder of the Hermes profile that fired it).
+    agent_hud_agents::hooks::add_environment(source, &mut payload, &|name| env.get(name).cloned());
     if let Ok(Some(mut event)) =
         agent_hud_agents::parse_event(source, flag, &payload, super::now_ms())
     {

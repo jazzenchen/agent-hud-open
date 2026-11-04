@@ -6,6 +6,7 @@ use crate::Location;
 pub static HOOKS: Hooks = Hooks {
     settings: Some(Location::home(&[], &[".zcode/cli"], "config.json")),
     aliases: &[],
+    environment: &[],
     layout: Layout::NestedGroups,
     permission: Some(Permission {
         timeout: 86_400,

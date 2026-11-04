@@ -5,6 +5,7 @@ use crate::hooks::{Hooks, Layout, POSIX_ONLY};
 pub static HOOKS: Hooks = Hooks {
     settings: None,
     aliases: &[],
+    environment: &[],
     layout: Layout::Groups,
     permission: None,
     completion: None,

@@ -70,17 +70,19 @@ pub(super) fn canonical(context: &InstallContext) -> Result<(), String> {
     }
     Ok(())
 }
-/// The client's hook settings file: where its descriptor puts it, or its
-/// default place under home.
-fn configuration(context: &InstallContext, source: &str, relative: &str) -> PathBuf {
-    agent_hud_agents::hooks::hooks_by_id(source)
+/// The client's hook settings files: where its descriptor puts them, the
+/// first its own and then one per profile for a client whose profiles each
+/// read their own, or its default place under home.
+fn configurations(context: &InstallContext, source: &str, relative: &str) -> Vec<PathBuf> {
+    let placed = agent_hud_agents::hooks::hooks_by_id(source)
         .and_then(|hooks| hooks.settings)
-        .and_then(|settings| {
-            crate::os::resolve(&context.home, &context.environment, &settings)
-                .into_iter()
-                .next()
-        })
-        .unwrap_or_else(|| context.home.join(relative))
+        .map(|settings| crate::os::resolve(&context.home, &context.environment, &settings))
+        .unwrap_or_default();
+    if placed.is_empty() {
+        vec![context.home.join(relative)]
+    } else {
+        placed
+    }
 }
 /// What a hooks-only file holds before Agent HUD's hook joins it: for a
 /// client that reads the `hooks` of another settings file for the events this
@@ -167,17 +169,43 @@ pub(super) fn contents(path: &Path) -> Result<Option<Vec<u8>>, String> {
         )),
     }
 }
-pub fn install_plan(
+/// A plan for each of the client's settings files (`configurations`), so a
+/// client whose profiles each read their own has one per profile. A file
+/// that cannot be changed safely says why in its place, naming itself when
+/// there are several, and the others still go in. Only what stops every
+/// file is one error alone.
+pub fn install_plans(
     context: &InstallContext,
     source: &str,
     flag: &str,
     enabled: bool,
+) -> Vec<Result<InstallPlan, String>> {
+    let checked = if enabled { canonical(context) } else { Ok(()) };
+    let description = match checked.and_then(|()| agent_hud_agents::configuration(source, flag)) {
+        Ok(description) => description,
+        Err(error) => return vec![Err(error)],
+    };
+    let files = configurations(context, &description.source, &description.relative_path);
+    let several = files.len() > 1;
+    files
+        .into_iter()
+        .map(|configuration| {
+            let shown = several.then(|| configuration.display().to_string());
+            plan(context, &description, configuration, enabled).map_err(|error| match shown {
+                Some(file) => format!("{error} ({file})"),
+                None => error,
+            })
+        })
+        .collect()
+}
+
+/// The plan for one settings file.
+fn plan(
+    context: &InstallContext,
+    description: &agent_hud_agents::HookConfiguration,
+    configuration: PathBuf,
+    enabled: bool,
 ) -> Result<InstallPlan, String> {
-    if enabled {
-        canonical(context)?;
-    }
-    let description = agent_hud_agents::configuration(source, flag)?;
-    let configuration = configuration(context, &description.source, &description.relative_path);
     let target = target(&configuration)?;
     let original = contents(&target)?;
     if agent_hud_agents::text_settings(&description.source) {
@@ -199,8 +227,8 @@ pub fn install_plan(
         let changed = updated != current && (enabled || original.is_some());
         return Ok(InstallPlan {
             configuration,
-            source: description.source,
-            flag: description.flag,
+            source: description.source.clone(),
+            flag: description.flag.clone(),
             enabled,
             changed,
             original,
@@ -237,8 +265,8 @@ pub fn install_plan(
     let changed = updated != current && (enabled || original.is_some());
     Ok(InstallPlan {
         configuration,
-        source: description.source,
-        flag: description.flag,
+        source: description.source.clone(),
+        flag: description.flag.clone(),
         enabled,
         changed,
         original,
@@ -370,8 +398,8 @@ mod tests {
             current
         );
         assert_eq!(
-            configuration(&context, "droid", ".factory/hooks.json"),
-            factory.join("hooks.json")
+            configurations(&context, "droid", ".factory/hooks.json"),
+            [factory.join("hooks.json")]
         );
     }
 
@@ -383,7 +411,7 @@ mod tests {
                 .or_else(|_| agent_hud_agents::configuration(source, "--completion-hook"))
                 .unwrap()
                 .relative_path;
-            configuration(&context(home, env), source, &relative)
+            configurations(&context(home, env), source, &relative).remove(0)
         };
         assert_eq!(path("claude", &[]), home.join(".claude/settings.json"));
         assert_eq!(

@@ -10,6 +10,7 @@ pub static QODER: Hooks = Hooks {
         "settings.json",
     )),
     aliases: &[],
+    environment: &[],
     layout: Layout::Groups,
     permission: Some(Permission {
         timeout: 86_400,
@@ -37,6 +38,7 @@ pub static QODER_CN: Hooks = Hooks {
         "settings.json",
     )),
     aliases: &["qoderCN"],
+    environment: &[],
     layout: Layout::Groups,
     permission: Some(Permission {
         timeout: 86_400,
@@ -60,6 +62,7 @@ pub static QODER_CN: Hooks = Hooks {
 pub static QODER_WORK: Hooks = Hooks {
     settings: Some(Location::home(&[], &[".qoderwork"], "settings.json")),
     aliases: &["qoderWork"],
+    environment: &[],
     layout: Layout::Groups,
     permission: Some(Permission {
         timeout: 86_400,

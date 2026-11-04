@@ -28,6 +28,7 @@ use serde_json::Value;
 pub static HOOKS: Hooks = Hooks {
     settings: Some(Location::home(&[], &[".factory"], "hooks.json")),
     aliases: &[],
+    environment: &[],
     layout: Layout::Events {
         shadowed: Some(Location::home(&[], &[".factory"], "settings.json")),
     },

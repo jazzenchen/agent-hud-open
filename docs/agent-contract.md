@@ -176,7 +176,11 @@ engine code that decides by client name. It goes in five slices:
 2. **Where the hooks live**. `Hooks::settings`
    is a `Location`: the folder variable (`CLAUDE_CONFIG_DIR`, `CODEX_HOME`,
    `CODEBUDDY_CONFIG_DIR`, `QWEN_HOME`, `GEMINI_CLI_HOME`, `COPILOT_HOME`) and
-   each client's file, which `platform/src/hooks/install.rs` resolves.
+   each client's file, which `platform/src/hooks/install.rs` resolves; a
+   client whose profiles each read their own file gets one plan per file.
+   `Hooks::environment` names the variables of the hook's environment that
+   its payloads leave out (Hermes's `HERMES_HOME`), which the hook adds to
+   the payload before reading it.
 3. **Native channels**. `Agent::channel` names each:
    - `codex::DESKTOP`, the desktop app's IPC;
    - `antigravity::LOCAL_SERVICE`, its language server;
@@ -206,7 +210,7 @@ engine code that decides by client name. It goes in five slices:
 - `base`: home, application data, or the XDG data or config folder;
 - `env`: folder variables, the first set one winning;
 - `folders`: alternative folder names, the first existing one winning;
-- `profiles`: profile folders matched by a name prefix;
+- `profiles`: the client's profile folders, each holding the same path: beside the folder, matched by a name prefix (OpenClaw's `~/.openclaw-<name>`), or inside it, every profile that already holds the path (Hermes's `~/.hermes/profiles/<name>/config.yaml`);
 - `path`: the file or folder inside;
 - `not_if`: a folder a variable may name for another client.
 
