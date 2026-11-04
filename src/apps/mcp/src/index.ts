@@ -45,12 +45,14 @@ const result = (data: unknown) => {
         });
   return { content, structuredContent: fields };
 };
-const guarded = async (
+/** The app's answer to `method`, through `shape`, or the app's error as the tool's. */
+const guarded = async <T>(
   method: string,
   params: Record<string, unknown> = {},
+  shape: (answer: T) => unknown = (answer) => answer,
 ) => {
   try {
-    return result(await engine.request(method, params));
+    return result(shape(await engine.request<T>(method, params)));
   } catch (error) {
     return {
       isError: true,
@@ -65,6 +67,11 @@ const guarded = async (
   }
 };
 
+/** The one check the relay makes before the app's own: the arguments are an object. */
+const objectArguments = <T>(value: unknown) =>
+  typeof value === "object" && value !== null && !Array.isArray(value)
+    ? { value: value as T }
+    : { issues: [{ message: "The arguments are a JSON object." }] };
 /** Advertises `schema` to clients and leaves the checking to the app: it refuses a
  * proposal it cannot draw as asked with Agent HUD's own sentences, every reason at
  * once, and reads null as not given, as agent-hud-native-open's draft_hud does. zod would
@@ -74,10 +81,7 @@ const checkedByTheApp = <S extends z.ZodType>(
 ): StandardSchemaWithJSON<z.input<S>, z.output<S>> => ({
   "~standard": {
     ...schema["~standard"],
-    validate: (value: unknown) =>
-      typeof value === "object" && value !== null && !Array.isArray(value)
-        ? { value: value as z.output<S> }
-        : { issues: [{ message: "The arguments are a JSON object." }] },
+    validate: objectArguments<z.output<S>>,
   },
 });
 /** A tool the host app adds: its own group, which the app's settings switch on and off. */
@@ -111,10 +115,7 @@ const hostSchema = (
   "~standard": {
     version: 1,
     vendor: "agent-hud",
-    validate: (value: unknown) =>
-      typeof value === "object" && value !== null && !Array.isArray(value)
-        ? { value: value as Record<string, unknown> }
-        : { issues: [{ message: "The arguments are a JSON object." }] },
+    validate: objectArguments<Record<string, unknown>>,
     jsonSchema: { input: () => schema, output: () => schema },
   },
 });
@@ -459,27 +460,12 @@ serveStdio(() => {
       inputSchema: z.object({}),
       annotations: readOnly,
     },
-    async () => {
-      try {
-        const snapshot = await engine.request<Snapshot>("snapshot");
-        return result({
-          platform: snapshot.connection.platform,
-          platformCapabilities: snapshot.connection.platformCapabilities,
-          capabilities: snapshot.capabilities,
-        });
-      } catch (error) {
-        return {
-          isError: true,
-          content: [
-            {
-              type: "text" as const,
-              text:
-                error instanceof Error ? error.message : "Engine unavailable.",
-            },
-          ],
-        };
-      }
-    },
+    () =>
+      guarded("snapshot", {}, (snapshot: Snapshot) => ({
+        platform: snapshot.connection.platform,
+        platformCapabilities: snapshot.connection.platformCapabilities,
+        capabilities: snapshot.capabilities,
+      })),
   );
   server.registerTool(
     "hud_set_preference",

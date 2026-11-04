@@ -148,7 +148,7 @@ pub fn record_event(data: &Path, event: &HookEvent) -> Result<(), String> {
     } else {
         event
     };
-    let bytes = serde_json::to_vec(event).map_err(|_| "Invalid hook event")?;
+    let bytes = serde_json::to_vec(event).unwrap();
     if bytes.len() as u64 > RECORD_LIMIT {
         return Err("Hook event is too large".into());
     }
@@ -174,7 +174,7 @@ pub(super) struct Inbox {
     directory: PathBuf,
     // None requests an initial/full scan; Some(empty) is a quiet inbox.
     pending: Arc<Mutex<Option<HashSet<PathBuf>>>>,
-    seen: Mutex<HashMap<PathBuf, Vec<u8>>>,
+    seen: HashMap<PathBuf, Vec<u8>>,
     _watcher: RecommendedWatcher,
 }
 impl Inbox {
@@ -213,11 +213,11 @@ impl Inbox {
         Ok(Self {
             directory,
             pending,
-            seen: Mutex::new(HashMap::new()),
+            seen: HashMap::new(),
             _watcher: watcher,
         })
     }
-    pub fn drain(&self) -> Vec<HookEvent> {
+    pub fn drain(&mut self) -> Vec<HookEvent> {
         let changed = {
             let mut pending = self.pending.lock().unwrap_or_else(|p| p.into_inner());
             (*pending).replace(HashSet::new())
@@ -226,7 +226,7 @@ impl Inbox {
             return Vec::new();
         }
         let mut events = Vec::new();
-        let mut seen = self.seen.lock().unwrap_or_else(|p| p.into_inner());
+        let seen = &mut self.seen;
         let now = now_ms();
         let full = changed.is_none();
         let paths = if let Some(paths) = changed {

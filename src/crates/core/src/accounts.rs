@@ -40,7 +40,7 @@ impl crate::AgentHudCore {
                 let Some(at) = metering::date_ms(observed) else {
                     continue;
                 };
-                let Some(used) = row["usedPercent"].as_f64().filter(|v| v.is_finite()) else {
+                let Some(used) = row["usedPercent"].as_f64() else {
                     continue;
                 };
                 // The plan the reading was taken under, so a share is only
@@ -168,8 +168,7 @@ fn route_prices(services: &[Value]) -> HashMap<String, pricing::RoutePrices> {
                     let rates = rates.as_array()?;
                     let pico = |index: usize| -> Option<i128> {
                         let per_million = rates.get(index)?.as_f64()?;
-                        (per_million.is_finite() && per_million >= 0.0)
-                            .then(|| (per_million * 1e6).round() as i128)
+                        (per_million >= 0.0).then(|| (per_million * 1e6).round() as i128)
                     };
                     Some((model.clone(), [pico(0)?, pico(1)?, pico(2)?, pico(3)?]))
                 })

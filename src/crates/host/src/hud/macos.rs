@@ -1,9 +1,6 @@
 //! Public AppKit HUD operations. The pinned creation-time adapter allocates an
 //! NSPanel subclass for HUDs while ordinary Tauri windows remain NSWindow.
-use super::{
-    base_limitations, monitor_bounds, HudCapabilities, LogicalRect, Point, PointerKeys, Rect,
-    ScreenMeasurement, Shared,
-};
+use super::{monitor_bounds, LogicalRect, Point, PointerKeys, Rect, ScreenMeasurement, Shared};
 use objc2::runtime::NSObjectProtocol;
 use objc2::{rc::Retained, MainThreadMarker, Message};
 use objc2_app_kit::{
@@ -45,15 +42,14 @@ pub(super) fn panel_builder<'a>(
 }
 
 /// Orders the panel at `frame` (physical pixels) without making it key, and
-/// returns the frame AppKit gave it in physical pixels and logical points.
+/// returns the frame AppKit gave it in logical points.
 pub(super) fn place(
     window: &tauri::WebviewWindow,
     frame: Rect,
     scale: f64,
-    keep_drag: bool,
     mode: super::types::Mode,
-) -> Result<(Rect, LogicalRect), String> {
-    let canvas = configure(
+) -> Result<LogicalRect, String> {
+    configure(
         window,
         mode,
         LogicalRect {
@@ -62,25 +58,7 @@ pub(super) fn place(
             width: f64::from(frame.width) / scale,
             height: f64::from(frame.height) / scale,
         },
-    )?;
-    let actual = if keep_drag {
-        Rect {
-            x: (canvas.x * scale).round() as i32,
-            y: (canvas.y * scale).round() as i32,
-            width: (canvas.width * scale).round() as u32,
-            height: (canvas.height * scale).round() as u32,
-        }
-    } else {
-        let position = window.outer_position().map_err(|error| error.to_string())?;
-        let size = window.outer_size().map_err(|error| error.to_string())?;
-        Rect {
-            x: position.x,
-            y: position.y,
-            width: size.width,
-            height: size.height,
-        }
-    };
-    Ok((actual, canvas))
+    )
 }
 
 /// The panel is ordered without Tao's show(), so the configuration says
@@ -144,33 +122,6 @@ pub(super) fn set_drag_cursor(app: &tauri::AppHandle, owner: &Shared, active: bo
     }
     if let Err(error) = cursor(app, active) {
         eprintln!("Agent HUD drag cursor: {error}");
-    }
-}
-
-pub(super) fn capabilities() -> HudCapabilities {
-    let mut limitations = base_limitations();
-    limitations.push("The native adapter sets status-bar level + 1 and fullscreen/Spaces collection flags. Fullscreen and focus behavior still require native GUI qualification.");
-    HudCapabilities {
-        platform: std::env::consts::OS,
-        backend: "appkit",
-        lazy_creation: true,
-        single_window: false,
-        per_screen_windows: true,
-        transparent_surface: true,
-        native_material: false,
-        non_focusing_window: true,
-        native_nonactivating_panel: true,
-        keyboard_handoff: true,
-        cursor_passthrough: true,
-        interactive_regions: true,
-        native_drag: native_drag(),
-        global_pointer: "native_cursor_polling",
-        absolute_edge_position: "supported",
-        all_workspaces: "configured_unverified",
-        fullscreen_overlay: "configured_unverified",
-        hardware_notch: true,
-        persistent_display_identity: true,
-        limitations,
     }
 }
 
@@ -418,15 +369,6 @@ pub(super) fn measure_screens(app: &tauri::AppHandle) -> Result<Vec<ScreenMeasur
                     width: frame.size.width,
                     height: frame.size.height,
                 };
-                if ![logical.x, logical.y, logical.width, logical.height, scale]
-                    .iter()
-                    .all(|value| value.is_finite())
-                    || logical.width <= 0.0
-                    || logical.height <= 0.0
-                    || scale <= 0.0
-                {
-                    return Err("AppKit reported invalid screen geometry".into());
-                }
                 // These public properties arrived in macOS 12. Older supported hosts return an
                 // accurately measured menu-bar stand-in, without claiming hardware-notch support.
                 let top = if screen.respondsToSelector(objc2::sel!(safeAreaInsets)) {

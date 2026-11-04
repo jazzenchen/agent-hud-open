@@ -31,10 +31,8 @@ export function permissionToolBadge(request: Approval): {
   badge: string;
   Icon: typeof Terminal;
 } {
-  if (request.kind === "question" || request.toolName === "AskUserQuestion")
-    return { badge: "ASK", Icon: HelpCircle };
-  if (request.kind === "plan" || request.toolName === "ExitPlanMode")
-    return { badge: "PLAN", Icon: ListTodo };
+  if (request.kind === "question") return { badge: "ASK", Icon: HelpCircle };
+  if (request.kind === "plan") return { badge: "PLAN", Icon: ListTodo };
   // A native approval's kind comes from Core (Open's PermissionRequest.badge).
   if (request.badge === "APP") return { badge: "APP", Icon: Monitor };
   if (request.badge === "WEB") return { badge: "WEB", Icon: Globe };
@@ -111,8 +109,7 @@ export function PermissionRowHead({
     clientDisplayName(request.source);
   const summary = request.summary ?? request.title;
   const detail = request.detail ?? request.input;
-  const isQuestion =
-    request.kind === "question" || Boolean(request.questions?.length);
+  const isQuestion = request.kind === "question";
   const isPlan = request.kind === "plan";
   const showsDetail = Boolean(
     request.removed || request.added || detail || isPlan,
@@ -350,6 +347,49 @@ export function CompletionClosedRow({
   );
 }
 
+/** "Waiting" over the requests that wait, with how many. */
+export function WaitingHeader({
+  count,
+  padding,
+  light,
+  zh,
+}: {
+  count: number;
+  padding: string;
+  light: boolean;
+  zh: boolean;
+}) {
+  const signalText = alertText("warning", useGround(light));
+  const secondary = light ? "rgba(0,0,0,0.55)" : "rgba(255,255,255,0.55)";
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        padding,
+      }}
+    >
+      <span style={{ fontSize: 11, fontWeight: 600, color: secondary }}>
+        {zh ? "待审批" : "Waiting"}
+      </span>
+      <span
+        style={{
+          fontSize: 10,
+          fontWeight: 600,
+          fontVariantNumeric: "tabular-nums",
+          color: signalText,
+          padding: "2px 6px",
+          borderRadius: 999,
+          background: "rgba(233, 161, 109, 0.16)",
+        }}
+      >
+        {count}
+      </span>
+    </div>
+  );
+}
+
 export function PendingEventRows({
   queue,
   currentID,
@@ -367,7 +407,6 @@ export function PendingEventRows({
   light?: boolean;
   zh?: boolean;
 }) {
-  const ground = useGround(light);
   const waitingRequests = includeRequests
     ? requests.filter((req) => req.id !== currentID)
     : [];
@@ -379,38 +418,17 @@ export function PendingEventRows({
   );
   if (waitingRequests.length === 0 && otherCompletions.length === 0)
     return null;
-  const signalText = alertText("warning", ground);
-  const secondary = light ? "rgba(0,0,0,0.55)" : "rgba(255,255,255,0.55)";
 
   return (
     <div style={{ ...cardColumn(6), marginTop: 10 }}>
       {waitingRequests.length > 0 && (
         <div style={cardColumn(2)}>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              padding: "4px 4px 6px",
-            }}
-          >
-            <span style={{ fontSize: 11, fontWeight: 600, color: secondary }}>
-              {zh ? "待审批" : "Waiting"}
-            </span>
-            <span
-              style={{
-                fontSize: 10,
-                fontWeight: 600,
-                fontVariantNumeric: "tabular-nums",
-                color: signalText,
-                padding: "2px 6px",
-                borderRadius: 999,
-                background: "rgba(233, 161, 109, 0.16)",
-              }}
-            >
-              {waitingRequests.length}
-            </span>
-          </div>
+          <WaitingHeader
+            count={waitingRequests.length}
+            padding="4px 4px 6px"
+            light={light}
+            zh={zh}
+          />
           {waitingRequests.map((req) => (
             <PermissionClosedRow
               key={req.id}

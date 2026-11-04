@@ -1,4 +1,4 @@
-//! The Codex daemon's control socket: which local HTTP origin serves the TUI
+//! The Codex daemon's control socket: which local HTTP port serves the TUI
 //! of a thread. Unix socket and WebSocket framing only; no conversation data.
 use serde_json::{json, Value};
 use std::{
@@ -6,19 +6,19 @@ use std::{
     path::{Path, PathBuf},
 };
 
-/// The `codex_tui` HTTP origin the daemon reports for `thread_id`.
-pub(crate) fn daemon_tui_origin_for(
+/// The port of the `codex_tui` HTTP origin the daemon reports for `thread_id`.
+pub(crate) fn daemon_tui_port_for(
     thread_id: &str,
     home: &Path,
     env: &HashMap<String, String>,
-) -> Option<String> {
+) -> Option<u16> {
     let socket = daemon_socket_path(home, env)?;
-    daemon_tui_origin(thread_id, &socket)
+    daemon_tui_port(thread_id, &socket)
 }
 
 fn daemon_socket_path(home: &Path, env: &HashMap<String, String>) -> Option<PathBuf> {
     use std::os::unix::fs::{FileTypeExt, MetadataExt};
-    let root = crate::os::variable(env, "CODEX_HOME", home).unwrap_or_else(|| home.join(".codex"));
+    let root = crate::os::variable(env, "CODEX_HOME").unwrap_or_else(|| home.join(".codex"));
     let uid = unsafe { libc::getuid() };
     for relative in [
         "app-server-control/app-server-control.sock",
@@ -34,7 +34,7 @@ fn daemon_socket_path(home: &Path, env: &HashMap<String, String>) -> Option<Path
     None
 }
 
-fn daemon_tui_origin(thread_id: &str, socket_path: &Path) -> Option<String> {
+fn daemon_tui_port(thread_id: &str, socket_path: &Path) -> Option<u16> {
     let socket = super::super::desktop_io::LocalSocket::connect(
         socket_path,
         std::time::Duration::from_secs(3),
@@ -44,8 +44,8 @@ fn daemon_tui_origin(thread_id: &str, socket_path: &Path) -> Option<String> {
     let send_json = |ws: &mut tungstenite::WebSocket<super::super::desktop_io::LocalSocket>,
                      value: Value|
      -> Option<()> {
-        let text = serde_json::to_string(&value).ok()?;
-        ws.send(tungstenite::Message::Text(text.into())).ok()
+        ws.send(tungstenite::Message::Text(value.to_string().into()))
+            .ok()
     };
     let recv_reply = |ws: &mut tungstenite::WebSocket<super::super::desktop_io::LocalSocket>,
                       id: i64|
@@ -124,29 +124,28 @@ fn daemon_tui_origin(thread_id: &str, socket_path: &Path) -> Option<String> {
     )?;
     let reply = recv_reply(&mut ws, 2)?;
     let _ = ws.close(None);
-    http_origin(&reply)
+    http_port(&reply)
 }
 
-/// The TUI's origin when the daemon reports exactly one server, `codex_tui`,
+/// The TUI's port when the daemon reports exactly one server, `codex_tui`,
 /// at a plain `http://127.0.0.1:<port>`; anything else, two entries
 /// included, names no pane (agent-hud-native-open
 /// CodexDaemonOriginTransport.httpOrigin).
-fn http_origin(reply: &Value) -> Option<String> {
+fn http_port(reply: &Value) -> Option<u16> {
     let [server] = reply["data"].as_array()?.as_slice() else {
         return None;
     };
     if server["name"].as_str() != Some("codex_tui") {
         return None;
     }
-    let value = server["httpOrigin"].as_str()?;
-    let rest = value.strip_prefix("http://127.0.0.1:")?;
+    let rest = server["httpOrigin"]
+        .as_str()?
+        .strip_prefix("http://127.0.0.1:")?;
     let digits = rest.strip_suffix('/').unwrap_or(rest);
-    let port = digits
-        .bytes()
-        .all(|byte| byte.is_ascii_digit())
-        .then(|| digits.parse::<u32>().ok())
-        .flatten()?;
-    (1..=65_535).contains(&port).then(|| value.to_owned())
+    if !digits.bytes().all(|byte| byte.is_ascii_digit()) {
+        return None;
+    }
+    digits.parse::<u16>().ok().filter(|port| *port > 0)
 }
 
 #[cfg(test)]
@@ -158,25 +157,26 @@ mod tests {
         let reply = |data: Value| json!({ "data": data });
         let tui = |origin: &str| json!({"name":"codex_tui","httpOrigin":origin});
         assert_eq!(
-            http_origin(&reply(json!([tui("http://127.0.0.1:61234")]))).as_deref(),
-            Some("http://127.0.0.1:61234")
+            http_port(&reply(json!([tui("http://127.0.0.1:61234")]))),
+            Some(61234)
         );
         assert_eq!(
-            http_origin(&reply(json!([tui("http://127.0.0.1:61234/")]))).as_deref(),
-            Some("http://127.0.0.1:61234/")
+            http_port(&reply(json!([tui("http://127.0.0.1:61234/")]))),
+            Some(61234)
         );
         assert!(
-            http_origin(&reply(json!([
+            http_port(&reply(json!([
                 tui("http://127.0.0.1:1"),
                 tui("http://127.0.0.1:2")
             ])))
             .is_none(),
             "two entries are ambiguous"
         );
-        assert!(http_origin(&reply(json!([tui("http://0.0.0.0:61234")]))).is_none());
-        assert!(http_origin(&reply(json!([tui("http://127.0.0.1:61234/x?y")]))).is_none());
-        assert!(http_origin(&reply(json!([tui("http://127.0.0.1:70000")]))).is_none());
-        assert!(http_origin(&reply(
+        assert!(http_port(&reply(json!([tui("http://0.0.0.0:61234")]))).is_none());
+        assert!(http_port(&reply(json!([tui("http://127.0.0.1:61234/x?y")]))).is_none());
+        assert!(http_port(&reply(json!([tui("http://127.0.0.1:70000")]))).is_none());
+        assert!(http_port(&reply(json!([tui("http://127.0.0.1:0")]))).is_none());
+        assert!(http_port(&reply(
             json!([{"name":"other","httpOrigin":"http://127.0.0.1:5"}])
         ))
         .is_none());
@@ -229,8 +229,7 @@ mod tests {
         env.insert("CODEX_HOME".into(), dir.to_string_lossy().into_owned());
         let found_sock = daemon_socket_path(&dir, &env).unwrap();
         assert_eq!(found_sock, sock_path);
-        let origin = daemon_tui_origin(thread_id, &found_sock);
-        assert_eq!(origin.as_deref(), Some("http://127.0.0.1:61234"));
+        assert_eq!(daemon_tui_port(thread_id, &found_sock), Some(61234));
         handle.join().unwrap();
         let _ = std::fs::remove_dir_all(&dir);
     }

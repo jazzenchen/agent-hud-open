@@ -173,12 +173,6 @@ pub fn install_plan(
     flag: &str,
     enabled: bool,
 ) -> Result<InstallPlan, String> {
-    if !super::supported() {
-        return Err(l10n::text(
-            "Windows 版暂不支持安装客户端回调，设置未作改动。",
-            "Windows hook execution/ACL adapter is not implemented; no settings were changed.",
-        ));
-    }
     if enabled {
         canonical(context)?;
     }
@@ -265,8 +259,9 @@ pub fn apply_plan(plan: &InstallPlan) -> Result<bool, String> {
         ));
     }
     let bytes = match &plan.updated {
-        Updated::Json(updated) => crate::json_text::rewrite(plan.original.as_deref(), updated)
-            .map_err(|_| "Hook settings could not be saved")?,
+        Updated::Json(updated) => {
+            crate::json_text::rewrite(plan.original.as_deref(), updated).unwrap()
+        }
         Updated::Text(updated) => updated.clone().into_bytes(),
     };
     write_contents(&plan.target, Some(&bytes))?;

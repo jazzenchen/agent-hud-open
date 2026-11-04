@@ -121,9 +121,6 @@ pub struct SnapshotCache<R> {
 }
 impl<R: Record> SnapshotCache<R> {
     pub fn new(device: String, name: String, file: PathBuf) -> Result<Self> {
-        if !file.is_absolute() {
-            return Err("Explicit LAN cursor path required".into());
-        }
         let persisted = match std::fs::read(&file) {
             Ok(bytes) => {
                 let value: Cursor =
@@ -196,9 +193,12 @@ impl<R: Record> SnapshotCache<R> {
             self.previous = named;
             return Ok(false);
         }
-        // Until the version is committed the published records stay as they
-        // were, so a failed commit is found changed again on the next update.
-        let mut restore = |cache: &mut Self, mut named: BTreeMap<String, R>| {
+        let cursor = self.next_cursor(now, &named);
+        self.previous = named;
+        if let Err(error) = self.commit(&changed, &deleted, cursor, now) {
+            // Until the version is committed the published records stay as they
+            // were, so a failed commit is found changed again on the next update.
+            let mut named = std::mem::take(&mut self.previous);
             for id in &changed {
                 match replaced.remove(id) {
                     Some(old) => named.insert(id.clone(), old),
@@ -206,36 +206,21 @@ impl<R: Record> SnapshotCache<R> {
                 };
             }
             named.append(&mut previous);
-            cache.previous = named;
-        };
-        let cursor = match self.next_cursor(now, &named) {
-            Ok(cursor) => cursor,
-            Err(error) => {
-                restore(self, named);
-                return Err(error);
-            }
-        };
-        self.previous = named;
-        if let Err(error) = self.commit(&changed, &deleted, cursor, now) {
-            let named = std::mem::take(&mut self.previous);
-            restore(self, named);
+            self.previous = named;
             return Err(error);
         }
         Ok(true)
     }
     /// The cursor of the next version over `named`: the next change on the
     /// published base, or a new base.
-    fn next_cursor(&self, now: i64, named: &BTreeMap<String, R>) -> Result<Cursor> {
-        Ok(if let Some(head) = &self.head {
-            let mut cursor = head.cursor.clone();
-            cursor.change_sequence = cursor
-                .change_sequence
-                .checked_add(1)
-                .ok_or("LAN cursor exhausted")?;
-            cursor
-        } else {
-            self.next_baseline(now, named)?
-        })
+    fn next_cursor(&self, now: i64, named: &BTreeMap<String, R>) -> Cursor {
+        match &self.head {
+            Some(head) => Cursor {
+                change_sequence: head.cursor.change_sequence + 1,
+                ..head.cursor.clone()
+            },
+            None => self.next_baseline(now, named),
+        }
     }
     /// A new major version over the published records, for the next business
     /// upload; returned with copies of them.
@@ -243,7 +228,7 @@ impl<R: Record> SnapshotCache<R> {
         if self.head.is_none() {
             return Ok(None);
         }
-        let cursor = self.next_baseline(now, &self.previous)?;
+        let cursor = self.next_baseline(now, &self.previous);
         self.commit(&[], &[], cursor, now)?;
         Ok(self.snapshot())
     }
@@ -290,16 +275,15 @@ impl<R: Record> SnapshotCache<R> {
             cursor: head.cursor.clone(),
         })
     }
-    fn next_baseline(&self, now: i64, records: &BTreeMap<String, R>) -> Result<Cursor> {
+    fn next_baseline(&self, now: i64, records: &BTreeMap<String, R>) -> Cursor {
         let prior = self
             .persisted
             .as_ref()
             .and_then(|c| chrono::DateTime::parse_from_rfc3339(&c.base_version).ok())
             .map(|t| t.timestamp_millis())
             .unwrap_or(0);
-        let next = prior.checked_add(1).ok_or("LAN cursor exhausted")?;
         Cursor::new(
-            now.max(next).max(
+            now.max(prior + 1).max(
                 records
                     .values()
                     .map(|r| r.modified_at_ms())
@@ -308,7 +292,7 @@ impl<R: Record> SnapshotCache<R> {
             ),
             0,
         )
-        .ok_or_else(|| "LAN cursor timestamp invalid".into())
+        .expect("a cursor at a clock time")
     }
     /// Commits the records now in `previous` as a version at `cursor`, where
     /// `changed` and `deleted` name what differs from the last one.
@@ -327,8 +311,7 @@ impl<R: Record> SnapshotCache<R> {
                 bodies.push((id.clone(), crate::canonical::to_vec(&value)));
             }
         }
-        let cursor_value = serde_json::to_value(&cursor).map_err(|_| "LAN cursor encoding")?;
-        let cursor_body = crate::canonical::to_vec(&cursor_value);
+        let cursor_body = crate::canonical::to_vec(&json!(cursor));
         crate::fs::atomic_json(&self.file, &cursor).map_err(|e| e.to_string())?;
         self.bodies.extend(bodies);
         for id in deleted {
@@ -408,9 +391,6 @@ impl<R: Record> SnapshotCache<R> {
     }
     pub fn changes(&self, since: &Cursor) -> Option<Changes<R>> {
         let snapshot = self.head.as_ref()?;
-        if !since.valid() {
-            return None;
-        }
         let version = if *since == snapshot.cursor {
             self.version
         } else {
@@ -483,8 +463,8 @@ mod tests {
         fn is_visible(&self, _: i64) -> bool {
             true
         }
-        fn content(&self) -> String {
-            format!("{}={}", self.key, self.value)
+        fn same_content(&self, other: &Self) -> bool {
+            self.key == other.key && self.value == other.value
         }
     }
     fn item(key: &str, value: f64, at: i64) -> Item {

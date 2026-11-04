@@ -43,19 +43,16 @@ pub type Wake = Arc<dyn Fn() + Send + Sync>;
 pub fn socket_path(data: &Path) -> PathBuf {
     data.join("hooks/callback.sock")
 }
-pub fn supported() -> bool {
-    true
-}
 
 pub struct Hooks {
     data: PathBuf,
     clients: clients::Clients,
     requests: Requests,
     reminders: reminders::Reminders,
-    inbox: Option<inbox::Inbox>,
+    inbox: inbox::Inbox,
     wake: Wake,
     waker: Arc<Mutex<Wake>>,
-    observers: Mutex<Option<observers::Observers>>,
+    observers: Option<observers::Observers>,
     antigravity: Option<crate::clients::antigravity::permissions::Observer>,
     deepseek: Option<crate::clients::deepseek::questions::Observer>,
     deepseek_plugin: Option<crate::deepseek_plugin::asks::Observer>,
@@ -71,9 +68,9 @@ impl Hooks {
             let wake = relay.lock().unwrap_or_else(|p| p.into_inner()).clone();
             wake();
         });
-        let inbox = Some(inbox::Inbox::new(&data, wake.clone())?);
+        let inbox = inbox::Inbox::new(&data, wake.clone())?;
         Ok(Self {
-            observers: Mutex::new(None),
+            observers: None,
             antigravity: None,
             deepseek: None,
             deepseek_plugin: None,
@@ -89,18 +86,20 @@ impl Hooks {
         })
     }
     /// Explicit live-host discovery; isolated with_sources runtimes never call this.
-    pub fn observe_local_clients(&self) -> Result<(), String> {
+    pub fn observe_local_clients(&mut self) -> Result<(), String> {
         self.observe_clients_at(crate::os::home_dir()?, std::env::vars().collect());
         Ok(())
     }
     pub fn observe_clients_at(
-        &self,
+        &mut self,
         home: PathBuf,
         environment: std::collections::HashMap<String, String>,
     ) {
-        *self.observers.lock().unwrap_or_else(|p| p.into_inner()) = Some(
-            observers::Observers::new(&home, &environment, self.wake.clone()),
-        );
+        self.observers = Some(observers::Observers::new(
+            &home,
+            &environment,
+            self.wake.clone(),
+        ));
     }
     pub fn delegate_owner(&mut self, context: InstallContext) -> Result<(), String> {
         self.clients.delegate(context)
@@ -205,18 +204,9 @@ impl Hooks {
             .as_ref()
             .is_some_and(transport::Server::is_listening)
     }
-    pub fn drain_events(&self) -> Vec<HookEvent> {
-        let mut events = self
-            .inbox
-            .as_ref()
-            .map(inbox::Inbox::drain)
-            .unwrap_or_default();
-        if let Some(observers) = self
-            .observers
-            .lock()
-            .unwrap_or_else(|p| p.into_inner())
-            .as_mut()
-        {
+    pub fn drain_events(&mut self) -> Vec<HookEvent> {
+        let mut events = self.inbox.drain();
+        if let Some(observers) = &mut self.observers {
             events.extend(observers.drain());
         }
         for event in &events {
@@ -267,6 +257,47 @@ impl Drop for Hooks {
     fn drop(&mut self) {
         self.stop();
     }
+}
+
+/// Waits for the HUD's answer to a permission request a client's hook sent,
+/// while `keep_waiting` holds and until the request's deadline. None when the
+/// request is not one, its reviewer is not the user, or no answer came.
+fn wait_for_answer(
+    requests: &Requests,
+    reminders: &reminders::Reminders,
+    source: &str,
+    flag: &str,
+    payload: &serde_json::Value,
+    keep_waiting: impl Fn() -> bool,
+) -> Option<serde_json::Value> {
+    let request = agent_hud_agents::parse_request(source, payload).ok()??;
+    if request.requires_user_reviewer && !reviewer::is_user(requests, &request.source, payload) {
+        return None;
+    }
+    reminders.record(source, flag, payload);
+    let ticket = requests.register(request, now_ms());
+    let response = loop {
+        if !keep_waiting() {
+            break None;
+        }
+        match ticket
+            .response
+            .recv_timeout(std::time::Duration::from_millis(100))
+        {
+            Ok(response) => break response,
+            Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => break None,
+            Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
+                if requests
+                    .deadline(&ticket.id)
+                    .is_none_or(|at| now_ms() >= at)
+                {
+                    break None;
+                }
+            }
+        }
+    };
+    requests.cancel(&ticket.id);
+    response
 }
 
 pub(crate) fn now_ms() -> i64 {

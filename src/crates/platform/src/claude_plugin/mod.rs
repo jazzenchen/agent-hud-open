@@ -248,8 +248,7 @@ impl ClaudeChannel {
         crate::os::private_directory(&self.directory)?;
         crate::os::private_directory(&self.directory.join("sessions"))?;
         crate::os::private_directory(&self.directory.join("prompts"))?;
-        let channel =
-            serde_json::to_string(&self.directory.to_string_lossy()).map_err(|e| e.to_string())?;
+        let channel = serde_json::to_string(&self.directory.to_string_lossy()).unwrap();
         let files = [
             (
                 ".claude-plugin/marketplace.json",
@@ -538,10 +537,7 @@ impl SessionReplies for ClaudeReplies {
         let handed = self.channel.hand(session, words, now);
         if let (Ok(_), Some(data)) = (&handed, &self.deliveries) {
             use agent_hud_agents::naming::surfaces::{Category, Surface, AGENT_HUD};
-            let at = now
-                .duration_since(SystemTime::UNIX_EPOCH)
-                .map(|since| since.as_millis() as i64)
-                .unwrap_or_default();
+            let at = millis(now) as i64;
             // A tag is a label: a failed write only leaves the log's tag.
             let _ = crate::hooks::record_delivery(
                 data,
@@ -566,14 +562,14 @@ impl SessionReplies for ClaudeReplies {
     }
 }
 
-fn millis(now: SystemTime) -> u64 {
+pub(crate) fn millis(now: SystemTime) -> u64 {
     now.duration_since(UNIX_EPOCH)
         .unwrap_or_default()
         .as_millis()
         .min(u64::MAX as u128) as u64
 }
 
-fn file_age(path: &Path, now: SystemTime) -> Duration {
+pub(crate) fn file_age(path: &Path, now: SystemTime) -> Duration {
     fs::metadata(path)
         .and_then(|metadata| metadata.modified())
         .ok()

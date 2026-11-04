@@ -3,18 +3,15 @@
 //! and `quota_sample` live here.
 
 use crate::l10n;
-use crate::{pricing, Usage};
+use crate::{iso, pricing, Usage};
 pub(crate) use agent_hud_agents::transcript::metering::{date_ms, event_key, Event, Mark};
 use chrono::{DateTime, Utc};
 use rusqlite::{params, Connection};
 use serde_json::{json, Value};
-use std::{
-    collections::{BTreeMap, BTreeSet, HashMap, HashSet},
-    path::PathBuf,
-};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 fn tools_text(tools: &[String]) -> Option<String> {
-    (!tools.is_empty()).then(|| serde_json::to_string(tools).unwrap_or_default())
+    (!tools.is_empty()).then(|| json!(tools).to_string())
 }
 
 fn tools_from(text: Option<String>) -> Vec<String> {
@@ -23,8 +20,7 @@ fn tools_from(text: Option<String>) -> Vec<String> {
 }
 
 fn unsigned(row: &rusqlite::Row<'_>, index: usize) -> rusqlite::Result<u64> {
-    let value = row.get::<_, i64>(index)?;
-    u64::try_from(value).map_err(|_| rusqlite::Error::IntegralValueOutOfRange(index, value))
+    Ok(row.get::<_, i64>(index)? as u64)
 }
 
 fn integer(value: u64) -> rusqlite::Result<i64> {
@@ -234,11 +230,9 @@ pub(crate) fn write(
                         r.get::<_, String>(0)?,
                         r.get::<_, i64>(1)?,
                         usage(r, 2)?,
-                        r.get::<_, Option<i64>>(7)?
-                            .and_then(|n| u64::try_from(n).ok()),
+                        r.get::<_, Option<i64>>(7)?.map(|n| n as u64),
                         tools_from(r.get::<_, Option<String>>(8)?),
-                        r.get::<_, Option<i64>>(9)?
-                            .and_then(|n| u64::try_from(n).ok()),
+                        r.get::<_, Option<i64>>(9)?.map(|n| n as u64),
                     ))
                 })
                 .transpose()?
@@ -375,7 +369,7 @@ pub(crate) fn list_cost(db: &Connection, path: &str) -> rusqlite::Result<Option<
                      FROM usage_meter_event WHERE contribution=?1 AND source=?2 AND model=?3",
                 )?
                 .query_row(params![path, source, model], |row| row.get(0))?;
-            cost.unpriced_tokens += u64::try_from(tokens).unwrap_or(0);
+            cost.unpriced_tokens += tokens as u64;
             continue;
         };
         // The tier a call is on: the last start its prompt reaches, -1 for the base rates.
@@ -398,13 +392,7 @@ pub(crate) fn list_cost(db: &Connection, path: &str) -> rusqlite::Result<Option<
         while let Some(row) = rows.next()? {
             let tier = usize::try_from(row.get::<_, i64>(0)?).ok();
             let used = usage(row, 1)?;
-            let tokens = pricing::PriceTokens {
-                tokens_in: used.input + used.write,
-                tokens_out: used.output + used.reasoning,
-                cache_read: used.read,
-                cache_write: used.write,
-                reasoning: used.reasoning,
-            };
+            let tokens = price_tokens(used);
             // Session costs are US dollars; a relay that prices in another
             // currency leaves its calls unpriced there.
             match pricing::cost_in_tier(&source, &model, &tokens, tier)
@@ -465,7 +453,7 @@ pub(crate) fn write_marks(db: &Connection, path: &str, marks: &[Mark]) -> rusqli
 
 /// The prompt and compaction marks of these logs, each oldest first.
 pub(crate) fn marks(db: &Connection, paths: &[String]) -> rusqlite::Result<(Vec<i64>, Vec<i64>)> {
-    let selected = serde_json::to_string(paths).unwrap_or_else(|_| "[]".into());
+    let selected = json!(paths).to_string();
     let mut statement = db.prepare_cached(
         "SELECT at_ms,kind FROM usage_meter_mark WHERE contribution IN (SELECT value FROM json_each(?1)) ORDER BY at_ms",
     )?;
@@ -503,7 +491,7 @@ pub(crate) fn calls_of(
     from: Option<i64>,
     through: Option<i64>,
 ) -> rusqlite::Result<Vec<CallRow>> {
-    let selected = serde_json::to_string(paths).unwrap_or_else(|_| "[]".into());
+    let selected = json!(paths).to_string();
     let mut statement = db.prepare_cached(
         "SELECT contribution,event_key,source,model,at_ms,input,output,cache_read,cache_write,reasoning,context_window,tools
          FROM usage_meter_event WHERE contribution IN (SELECT value FROM json_each(?1))
@@ -524,9 +512,7 @@ pub(crate) fn calls_of(
             model: row.get(3)?,
             at: row.get(4)?,
             usage: usage(row, 5)?,
-            context_window: row
-                .get::<_, Option<i64>>(10)?
-                .and_then(|n| u64::try_from(n).ok()),
+            context_window: row.get::<_, Option<i64>>(10)?.map(|n| n as u64),
             tools: tools_from(row.get(11)?),
         });
     }
@@ -540,7 +526,7 @@ pub(crate) fn prompt_before(
     paths: &[String],
     before: i64,
 ) -> rusqlite::Result<Option<u64>> {
-    let selected = serde_json::to_string(paths).unwrap_or_else(|_| "[]".into());
+    let selected = json!(paths).to_string();
     let mut statement = db.prepare_cached(
         "SELECT input+cache_write+cache_read FROM usage_meter_event
          WHERE contribution IN (SELECT value FROM json_each(?1)) AND at_ms<?2
@@ -560,7 +546,7 @@ pub(crate) fn recached(
     paths: &[String],
     since: i64,
 ) -> rusqlite::Result<Vec<(i64, String, String, u64, u64)>> {
-    let selected = serde_json::to_string(paths).unwrap_or_else(|_| "[]".into());
+    let selected = json!(paths).to_string();
     let mut statement = db.prepare_cached(
         "SELECT r.bucket,r.source,r.model,SUM(r.sent),SUM(CASE WHEN r.wrote THEN r.sent ELSE 0 END) FROM (
             SELECT (e.at_ms/900000)*900000 AS bucket,e.source,e.model,e.input+e.cache_write AS sent,
@@ -655,15 +641,7 @@ pub(crate) fn contribution_usage(db: &Connection, path: &str) -> rusqlite::Resul
         "SELECT coalesce(sum(input),0),coalesce(sum(output),0),coalesce(sum(cache_read),0),coalesce(sum(cache_write),0),coalesce(sum(reasoning),0)
          FROM usage_meter_event WHERE contribution=?1",
         [path],
-        |row| {
-            Ok(Usage {
-                input: row.get::<_, i64>(0)? as u64,
-                output: row.get::<_, i64>(1)? as u64,
-                read: row.get::<_, i64>(2)? as u64,
-                write: row.get::<_, i64>(3)? as u64,
-                reasoning: row.get::<_, i64>(4)? as u64,
-            })
-        },
+        |row| usage(row, 0),
     )
 }
 
@@ -678,7 +656,7 @@ pub(crate) fn session_calls(
         .query_row(
             "SELECT COUNT(*) FROM usage_meter_event WHERE contribution=?1",
             [path],
-            |row| row.get::<_, i64>(0).map(|n| n.max(0) as u64),
+            |row| row.get::<_, i64>(0).map(|n| n as u64),
         )
         .map_err(|_| "Could not count session calls")?;
     let mut statement = db
@@ -690,15 +668,10 @@ pub(crate) fn session_calls(
         .map_err(|_| "Could not read session calls")?;
     let calls = statement
         .query_map(params![path, limit as i64, offset as i64], |row| {
-            let count = |i| row.get::<_, i64>(i).map(|n| n.max(0) as u64);
-            let input = count(3)?;
-            let output = count(4)?;
-            let read = count(5)?;
-            let write = count(6)?;
-            let reasoning = count(7)?;
+            let used = usage(row, 3)?;
+            let Usage { input, output, read, write, reasoning } = used;
             let at: i64 = row.get(2)?;
             let model = row.get::<_, String>(1)?;
-            let used = Usage { input, output, read, write, reasoning };
             Ok(json!({
                 "id": row.get::<_, String>(0)?,
                 "modelName": (!model.is_empty()).then(|| crate::naming::model_names::consumer_name(&format!("{source}-model:{model}"))),
@@ -783,40 +756,22 @@ pub(crate) fn query_events_between(
     selected_paths: &[String],
     from_ms: i64,
     to_ms: i64,
-) -> Result<Vec<EventRow>, String> {
-    let paths = serde_json::to_string(selected_paths)
-        .map_err(|_| "Could not encode counted usage contributions")?;
-    let mut statement = db
-        .prepare(
-            "WITH selected(contribution) AS (SELECT value FROM json_each(?1))
-             SELECT source,model,at_ms,input,output,cache_read,cache_write,reasoning
-             FROM usage_meter_event JOIN selected USING(contribution)
-             WHERE at_ms>=?2 AND at_ms<?3
-             ORDER BY at_ms,event_key",
-        )
-        .map_err(|_| "Could not query usage ledger")?;
-    let mut rows = statement
-        .query(params![paths, from_ms, to_ms])
-        .map_err(|_| "Could not query usage ledger")?;
+) -> rusqlite::Result<Vec<EventRow>> {
+    let mut statement = db.prepare(
+        "WITH selected(contribution) AS (SELECT value FROM json_each(?1))
+         SELECT source,model,at_ms,input,output,cache_read,cache_write,reasoning
+         FROM usage_meter_event JOIN selected USING(contribution)
+         WHERE at_ms>=?2 AND at_ms<?3
+         ORDER BY at_ms,event_key",
+    )?;
+    let mut rows = statement.query(params![json!(selected_paths).to_string(), from_ms, to_ms])?;
     let mut result = Vec::new();
-    while let Some(row) = rows.next().map_err(|_| "Could not read usage ledger")? {
-        let count = |i| {
-            row.get::<_, i64>(i)
-                .ok()
-                .and_then(|n| u64::try_from(n).ok())
-                .ok_or("Invalid usage counter")
-        };
+    while let Some(row) = rows.next()? {
         result.push(EventRow {
-            source: row.get(0).map_err(|_| "Invalid usage source")?,
-            model: row.get(1).map_err(|_| "Invalid usage model")?,
-            at: row.get(2).map_err(|_| "Invalid usage timestamp")?,
-            usage: Usage {
-                input: count(3)?,
-                output: count(4)?,
-                read: count(5)?,
-                write: count(6)?,
-                reasoning: count(7)?,
-            },
+            source: row.get(0)?,
+            model: row.get(1)?,
+            at: row.get(2)?,
+            usage: usage(row, 3)?,
             gap: None,
             duration: None,
         });
@@ -826,43 +781,26 @@ pub(crate) fn query_events_between(
 
 pub(crate) fn query_deepseek_billing_events(
     db: &Connection,
-    paths: &[PathBuf],
+    paths: &[String],
     since_ms: i64,
-) -> Result<Vec<EventRow>, String> {
-    let selected =
-        serde_json::to_string(paths).map_err(|_| "Invalid billing contribution selection")?;
-    let mut s = db
-        .prepare(
-            "WITH selected(contribution) AS(SELECT value FROM json_each(?1))
-             SELECT model,at_ms,input,output,cache_read,cache_write,reasoning,gap_ms,duration_ms
-             FROM usage_meter_event JOIN selected USING(contribution)
-             WHERE source='deepseek' AND model LIKE '%#deepseek-official' AND at_ms>=?2
-             ORDER BY at_ms,event_key",
-        )
-        .map_err(|_| "Could not query billing usage")?;
-    let mut rows = s
-        .query(params![selected, since_ms])
-        .map_err(|_| "Could not read billing usage")?;
+) -> rusqlite::Result<Vec<EventRow>> {
+    let mut s = db.prepare(
+        "WITH selected(contribution) AS(SELECT value FROM json_each(?1))
+         SELECT model,at_ms,input,output,cache_read,cache_write,reasoning,gap_ms,duration_ms
+         FROM usage_meter_event JOIN selected USING(contribution)
+         WHERE source='deepseek' AND model LIKE '%#deepseek-official' AND at_ms>=?2
+         ORDER BY at_ms,event_key",
+    )?;
+    let mut rows = s.query(params![json!(paths).to_string(), since_ms])?;
     let mut events = Vec::new();
-    while let Some(r) = rows.next().map_err(|_| "Could not read billing usage")? {
-        let count = |i| {
-            r.get::<_, i64>(i)
-                .map(|n| n.max(0) as u64)
-                .map_err(|_| "Invalid billed count")
-        };
+    while let Some(r) = rows.next()? {
         events.push(EventRow {
             source: "deepseek".into(),
-            model: r.get(0).map_err(|_| "Invalid billed model")?,
-            at: r.get(1).map_err(|_| "Invalid billed date")?,
-            usage: Usage {
-                input: count(2)?,
-                output: count(3)?,
-                read: count(4)?,
-                write: count(5)?,
-                reasoning: count(6)?,
-            },
-            gap: r.get(7).map_err(|_| "Invalid billed gap")?,
-            duration: r.get(8).map_err(|_| "Invalid billed duration")?,
+            model: r.get(0)?,
+            at: r.get(1)?,
+            usage: usage(r, 2)?,
+            gap: r.get(7)?,
+            duration: r.get(8)?,
         });
     }
     Ok(events)
@@ -895,8 +833,7 @@ pub(crate) fn query_statistics_data(
             "Statistics could not be read from the local usage ledger",
         )
     };
-    let selected = serde_json::to_string(paths)
-        .map_err(|_| "Could not encode counted statistics contributions")?;
+    let selected = json!(paths).to_string();
     let mut model_bounds = Vec::new();
     {
         let mut s = db
@@ -940,13 +877,7 @@ pub(crate) fn query_statistics_data(
                     source: r.get(1)?,
                     model: r.get(2)?,
                     at: r.get(3)?,
-                    tokens: Usage {
-                        input: unsigned(r, 4)?,
-                        output: unsigned(r, 5)?,
-                        read: unsigned(r, 6)?,
-                        write: unsigned(r, 7)?,
-                        reasoning: unsigned(r, 8)?,
-                    },
+                    tokens: usage(r, 4)?,
                 })
             })
             .map_err(sql_error)?;
@@ -1291,12 +1222,7 @@ impl View {
         let mut sums = BTreeMap::<(i64, u32), Usage>::new();
         for part in self.parts.values() {
             for (key, at, u) in &part.buckets {
-                let sum = sums.entry((*at, *key)).or_default();
-                sum.input += u.input;
-                sum.output += u.output;
-                sum.read += u.read;
-                sum.write += u.write;
-                sum.reasoning += u.reasoning;
+                sums.entry((*at, *key)).or_default().add(*u);
             }
         }
         self.buckets = sums
@@ -1304,13 +1230,7 @@ impl View {
             .filter(|(_, u)| u.total() > 0)
             .map(|((at, key), u)| {
                 let (source, model) = &self.keys[key as usize];
-                let tokens = pricing::PriceTokens {
-                    tokens_in: u.input + u.write,
-                    tokens_out: u.output + u.reasoning,
-                    cache_read: u.read,
-                    cache_write: u.write,
-                    reasoning: u.reasoning,
-                };
+                let tokens = price_tokens(u);
                 let cost = pricing::cost_at(
                     source,
                     model,
@@ -1469,9 +1389,7 @@ impl View {
         samples: &Samples,
     ) -> Value {
         let reset = row["resetAt"].as_str().and_then(date_ms);
-        let duration = row["windowDurationSeconds"]
-            .as_f64()
-            .filter(|d| d.is_finite() && *d > 0.0);
+        let duration = row["windowDurationSeconds"].as_f64().filter(|d| *d > 0.0);
         let cycle = reset
             .zip(duration)
             .filter(|(reset, duration)| now < *reset && now >= *reset - (*duration * 1000.0) as i64)
@@ -1581,7 +1499,7 @@ impl View {
                 // rows have it: a reading with no newer one never forecasts a
                 // run-out that has already passed.
                 let interval = remaining / rate * 3_600_000.0;
-                outlook = json!({"kind":"exhausts","basis":basis,"ratePctPerHour":rate,"exhaustsAt":now.checked_add(interval as i64).and_then(iso),"beforeReset":interval<(reset-now)as f64,"projectedUsedPercent":(100.0-remaining+rate*(reset-now)as f64/3_600_000.0).min(100.0)});
+                outlook = json!({"kind":"exhausts","basis":basis,"ratePctPerHour":rate,"exhaustsAt":now.checked_add(interval as i64).map(iso),"beforeReset":interval<(reset-now)as f64,"projectedUsedPercent":(100.0-remaining+rate*(reset-now)as f64/3_600_000.0).min(100.0)});
             }
         }
         let source = row["consumerSource"].as_str();
@@ -1602,7 +1520,7 @@ impl View {
         let mut consumed = Value::Null;
         let mut cost = Value::Null;
         let mut reply = Value::Null;
-        let mut observed = None;
+        let mut observed = Value::Null;
         let mut unavailable = serde_json::Map::new();
         let reason = if !complete {
             l10n::text(
@@ -1736,10 +1654,6 @@ fn model_family(model: &str) -> Option<&str> {
         .find(|family| model.split(['-', '_', '.']).any(|part| part == *family))
 }
 
-fn iso(at: i64) -> Option<String> {
-    DateTime::<Utc>::from_timestamp_millis(at).map(|date| date.to_rfc3339())
-}
-
 #[cfg(test)]
 mod retention_tests {
     use super::*;
@@ -1784,8 +1698,8 @@ mod retention_tests {
         for at in [observed + 10_000, observed + 50 * 60_000] {
             let metrics = view.metrics(&row, at, false, false, &samples);
             assert_eq!(
-                metrics["outlook"]["exhaustsAt"].as_str(),
-                iso(at + 6 * 3_600_000).as_deref(),
+                metrics["outlook"]["exhaustsAt"],
+                iso(at + 6 * 3_600_000),
                 "{metrics}"
             );
             assert_eq!(metrics["outlook"]["basis"], "recent");
@@ -1810,10 +1724,7 @@ mod retention_tests {
         assert_eq!(outlook["kind"], "exhausts", "{metrics}");
         assert_eq!(outlook["basis"], "window");
         assert_eq!(outlook["ratePctPerHour"], 25.0);
-        assert_eq!(
-            outlook["exhaustsAt"].as_str(),
-            iso(now + 3 * 3_600_000).as_deref()
-        );
+        assert_eq!(outlook["exhaustsAt"], iso(now + 3 * 3_600_000));
         assert_eq!(outlook["beforeReset"], true);
         assert!(
             metrics["burnRatePctPerHour"].is_null(),

@@ -1,4 +1,6 @@
 // Direct port of Bots/Clawd/ClawdClip.swift and ClawdClips.swift. Art stays unchanged.
+import type { BotSign } from "./bot-state";
+import { easeInOut } from "./bot-moves";
 export type ClawdLook =
   | "thinking"
   | "retrying"
@@ -13,7 +15,6 @@ export type ClawdLook =
 export type ClawdEvent = "start" | "failed" | "limit-hit";
 export type ClawdVisit = "swaying" | "turning" | "glancing" | "dozing";
 export type ClawdCard = "done" | "long-done" | "reset";
-export type ClawdSign = "!" | "?" | "×" | "⧗" | "z";
 export interface ClawdFrame {
   name: string;
   index: number;
@@ -51,7 +52,7 @@ export interface ClawdClip {
   exit: ClawdExit;
   ticks: number;
   offset: ClawdOffset;
-  sign?: ClawdSign;
+  sign?: BotSign;
   pace: ClawdPace;
   working: boolean;
   miniShift?: number;
@@ -59,13 +60,16 @@ export interface ClawdClip {
 export interface ClawdShotStep {
   frame: ClawdFrame;
   ticks: number;
-  sign?: ClawdSign;
+  sign?: BotSign;
   offset: ClawdOffset;
 }
 export interface ClawdShot {
   steps: ClawdShotStep[];
 }
 export const CLAWD_FPS = 12;
+/** The first frame of Clawd's 12 fps grid at or after `time`. */
+export const frameAfter = (time: number) =>
+  Math.ceil((time - 0.004) * CLAWD_FPS) / CLAWD_FPS;
 export const clawdTicks = (seconds: number) =>
   Math.max(1, swiftRound(seconds * CLAWD_FPS));
 /** Swift's .rounded(): half away from zero, including negative offsets. */
@@ -81,25 +85,11 @@ export const sameFrame = (
     ? one == null && other == null
     : one.name === other.name && one.index === other.index;
 export function easedOffset(offset: ClawdOffset, share: number): ClawdOffset {
-  const x = Math.max(0, Math.min(1, share));
-  const ease = x < 0.5 ? 2 * x * x : 1 - (-2 * x + 2) ** 2 / 2;
+  const ease = easeInOut(Math.max(0, Math.min(1, share)));
   return { x: swiftRound(offset.x * ease), y: swiftRound(offset.y * ease) };
 }
 export const isClawdAttention = (look: ClawdLook) =>
   look === "permission" || look === "question" || look === "plan";
-export const signOrder: readonly ClawdSign[] = ["!", "?", "×", "⧗", "z"];
-export function winningSign(
-  one?: ClawdSign,
-  other?: ClawdSign,
-): ClawdSign | undefined {
-  return one == null
-    ? other
-    : other == null
-      ? one
-      : signOrder.indexOf(one) <= signOrder.indexOf(other)
-        ? one
-        : other;
-}
 export const numbers = (first: number, last: number) =>
   Array.from({ length: last - first + 1 }, (_, at) => first + at);
 const frames = (name: string, first: number, last = first): ClawdFrame[] =>
@@ -121,7 +111,7 @@ const clip = (
 function shot(
   all: ClawdFrame[],
   options: {
-    sign?: ClawdSign;
+    sign?: BotSign;
     signDuring?: [number, number];
     hold?: { frame: ClawdFrame; seconds: number };
     offset?: ClawdOffset;
@@ -218,7 +208,7 @@ const pointing = clip("Pointing", {
   loop: numbers(19, 23),
   outro: [...frames("Pointing", 18), standing],
   exit: { kind: "any-frame" },
-  sign: "!",
+  sign: "exclamation",
   pace: longWait,
 });
 const waving = clip("Waving", {
@@ -227,7 +217,7 @@ const waving = clip("Waving", {
   loop: numbers(7, 8),
   outro: [...frames("Waving", 6), standing],
   exit: { kind: "through", frame: 8 },
-  sign: "?",
+  sign: "question",
   pace: longWait,
 });
 const lightbulb = clip("Lightbulb", {
@@ -261,7 +251,10 @@ export const clawdClips = {
   } satisfies Record<ClawdLook, ClawdClip>,
   events: {
     start: shot(frames("JumpingHappy", 3, 20)),
-    failed: shot(frames("Facepalm", 2, 33), { sign: "×", signDuring: [5, 31] }),
+    failed: shot(frames("Facepalm", 2, 33), {
+      sign: "cross",
+      signDuring: [5, 31],
+    }),
     "limit-hit": shot([
       ...frames("Dizzy", 6, 21),
       ...frames("Dizzy", 6, 17),
@@ -305,25 +298,4 @@ export const clawdClips = {
     string,
     ClawdOffset
   >,
-  frameCounts: {
-    DancingHappy: 40,
-    Desktop: 88,
-    Dizzy: 41,
-    Excited: 23,
-    Facepalm: 35,
-    JumpingHappy: 21,
-    Laptop: 43,
-    Lightbulb: 50,
-    LookingAround: 31,
-    LookingAroundEyesOnly: 42,
-    Meditating: 60,
-    Pointing: 43,
-    Spark: 73,
-    Swaying: 49,
-    Thinking: 38,
-    Turning: 29,
-    Walking: 28,
-    Waving: 17,
-  } as Record<string, number>,
 };
-export type ClawdClips = typeof clawdClips;

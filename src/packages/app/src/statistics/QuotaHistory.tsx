@@ -1,4 +1,5 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCoreQuery } from "../lib/use-core-query";
 import { HUDArtwork as HUDLogo } from "@agent-hud/hud/HUDArtwork";
 import { useFormat } from "@agent-hud/ui/format-context";
 import {
@@ -15,14 +16,14 @@ import type {
   Quota,
   QuotaHistoryResponse,
   QuotaHistoryWindow,
-} from "../lib/types";
+} from "@agent-hud/protocol";
 import {
   card,
   dateLabel,
   number,
   row,
   truncate,
-  useCanvasWidth,
+  useCanvas,
   type StatsTheme,
 } from "./StatsTheme";
 
@@ -31,60 +32,10 @@ type Action = (
   params?: Record<string, unknown>,
 ) => Promise<unknown>;
 
-/** Only the latest stretch can publish into the section; a failure keeps the last one drawn. */
-function useQuotaHistory(
-  from: number,
-  to: number,
-  action: Action,
-  active: boolean,
-) {
-  const actionRef = useRef(action);
-  actionRef.current = action;
-  const sequence = useRef(0);
-  const [data, setData] = useState<QuotaHistoryResponse | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  useEffect(() => {
-    const id = ++sequence.current;
-    if (!active) return;
-    void actionRef
-      .current("quota_history", {
-        from: new Date(from).toISOString(),
-        to: new Date(to).toISOString(),
-      })
-      .then((value) => {
-        if (sequence.current !== id) return;
-        const response = value as QuotaHistoryResponse;
-        if (!response || response.kind !== "quota_history")
-          throw new Error(
-            "The runtime returned an unsupported quota history response.",
-          );
-        setData(response);
-        setError(null);
-      })
-      .catch((failure: unknown) => {
-        if (sequence.current === id)
-          setError(
-            failure instanceof Error ? failure.message : String(failure),
-          );
-      });
-    return () => {
-      sequence.current += 1;
-    };
-  }, [from, to, active]);
-  return { data, error };
-}
-
 const HEIGHT = 44;
 
 function accent(theme: StatsTheme) {
   return theme.light ? "#007aff" : "#0a84ff";
-}
-
-function reducedMotion() {
-  return (
-    typeof window !== "undefined" &&
-    Boolean(window.matchMedia?.("(prefers-reduced-motion: reduce)").matches)
-  );
 }
 
 /** One window's line on a fixed 0–100% axis: its runs, never joined across a reset or a gap, the resets as dashed rules, and the current cycle's steady budget as a faint diagonal. */
@@ -106,7 +57,7 @@ const QuotaLine = memo(function QuotaLine({
   reveal: string;
   timeZone: string;
 }) {
-  const { ref, width } = useCanvasWidth();
+  const { ref, width, context } = useCanvas(HEIGHT);
   const zh = Boolean(theme.zh);
   const language = zh ? "zh" : "en";
   const [hovered, setHovered] = useState<[number, number] | null>(null);
@@ -130,18 +81,8 @@ const QuotaLine = memo(function QuotaLine({
   }, [quota.resetAt, quota.windowDurationSeconds]);
   const paint = useCallback(
     (progress: number) => {
-      const canvas = ref.current,
-        ctx = canvas?.getContext("2d");
-      if (!canvas || !ctx || width <= 0) return;
-      const scale = window.devicePixelRatio || 1;
-      const targetW = Math.round(width * scale),
-        targetH = Math.round(HEIGHT * scale);
-      if (canvas.width !== targetW || canvas.height !== targetH) {
-        canvas.width = targetW;
-        canvas.height = targetH;
-      }
-      ctx.setTransform(scale, 0, 0, scale, 0, 0);
-      ctx.clearRect(0, 0, width, HEIGHT);
+      const ctx = context();
+      if (!ctx) return;
       // The axis: its top, middle and bottom.
       ctx.fillStyle = theme.divider;
       for (const level of [0, 0.5, 1])
@@ -214,14 +155,27 @@ const QuotaLine = memo(function QuotaLine({
         ctx.stroke();
       }
     },
-    [budget, hovered, quota.resets, quota.segments, ref, theme, width, x, y],
+    [
+      budget,
+      context,
+      hovered,
+      quota.resets,
+      quota.segments,
+      theme,
+      width,
+      x,
+      y,
+    ],
   );
   const revealed = useRef<string | null>(null);
   useEffect(() => {
     if (width <= 0) return;
     // A new stretch draws in from the left; new readings in the same one
     // land in place, and Reduce Motion draws it whole at once.
-    if (revealed.current === reveal || reducedMotion()) {
+    if (
+      revealed.current === reveal ||
+      matchMedia("(prefers-reduced-motion: reduce)").matches
+    ) {
       revealed.current = reveal;
       paint(1);
       return;
@@ -379,7 +333,13 @@ export function QuotaHistory({
   light: boolean;
   timeZone: string;
 }) {
-  const { data, error } = useQuotaHistory(from, to, action, active);
+  // Only the latest stretch publishes; a failure keeps the last one drawn.
+  const { data, error } = useCoreQuery<QuotaHistoryResponse>(
+    action,
+    "quota_history",
+    { from: new Date(from).toISOString(), to: new Date(to).toISOString() },
+    active,
+  );
   const display = useFormat().quotaDisplay ?? "consumed";
   const zh = Boolean(theme.zh);
   const now = Date.now();

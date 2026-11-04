@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Notice, Section, SmallButton, type Text } from "./SettingsPrimitives";
+import { usePending } from "./use-pending";
 
 /** Extra client folders (CODEX_HOME, CLAUDE_CONFIG_DIR), one per signed-in
  * account, read beside the default one. */
@@ -21,13 +22,10 @@ export default function AccountHomes({
 }) {
   const saved = homes.join("\n");
   const [text, setText] = useState(saved);
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { pending, error, run } = usePending();
   useEffect(() => setText(saved), [saved]);
 
   async function save() {
-    setPending(true);
-    setError(null);
     const next = [
       ...new Set(
         text
@@ -36,14 +34,7 @@ export default function AccountHomes({
           .filter(Boolean),
       ),
     ];
-    try {
-      await onSave(next);
-      setText(next.join("\n"));
-    } catch (error) {
-      setError(String(error));
-    } finally {
-      setPending(false);
-    }
+    if (await run(() => onSave(next))) setText(next.join("\n"));
   }
 
   return (

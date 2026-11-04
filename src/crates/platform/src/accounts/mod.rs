@@ -57,20 +57,6 @@ use agents::account::{Provider, Unread};
 /// (`agents::ACCOUNTS` outside tests).
 type Providers = &'static [&'static Provider];
 
-/// A provider's own facts, by id. A provider that states none (a test's
-/// fixture) is read like one whose windows this computer's work moves.
-fn facts(provider: &str) -> Option<&'static Provider> {
-    agents::account_provider(provider)
-}
-/// Whether this computer's work moves the provider's windows.
-fn sees_local_work(provider: &str) -> bool {
-    facts(provider).is_none_or(|facts| facts.local_work)
-}
-/// The session sources whose work is the provider's.
-fn work_sources(provider: &str) -> &'static [&'static str] {
-    facts(provider).map_or(&[], Provider::sources)
-}
-
 /// How long a reading that missed an answer (`Unread::Transient`) keeps the
 /// last good one on screen as it was, without greying it or saying why:
 /// a network hiccup or a busy service passes by itself.
@@ -151,13 +137,10 @@ struct Control {
 struct Shared {
     state: Mutex<Control>,
     wake: Condvar,
-    children: Arc<Mutex<Vec<Weak<Mutex<Child>>>>>,
-    cancelled: Arc<AtomicBool>,
 }
 pub struct AccountService {
     shared: Arc<Shared>,
     context: AccountContext,
-    credential_lock: Mutex<()>,
     gate: CollectionGate,
 }
 
@@ -259,8 +242,6 @@ impl AccountService {
                     "Account HTTP client could not start",
                 )
             })?;
-        let children = Arc::new(Mutex::new(Vec::new()));
-        let cancelled = Arc::new(AtomicBool::new(false));
         let restored = restart_copy::load(&data_dir, readers);
         let entries = restored
             .readings
@@ -290,8 +271,8 @@ impl AccountService {
             env: std::env::vars().collect(),
             account_homes: HashMap::new(),
             http,
-            children: Arc::clone(&children),
-            cancelled: Arc::clone(&cancelled),
+            children: Arc::new(Mutex::new(Vec::new())),
+            cancelled: Arc::new(AtomicBool::new(false)),
             copilot_consent: Arc::new(AtomicBool::new(false)),
             relay_consent: Arc::new(Mutex::new(HashSet::new())),
             trial_web: None,
@@ -310,8 +291,6 @@ impl AccountService {
                 waker: None,
             }),
             wake: Condvar::new(),
-            children,
-            cancelled,
         });
         let worker = Arc::clone(&shared);
         let worker_context = context.clone();
@@ -323,7 +302,6 @@ impl AccountService {
         Ok(Self {
             shared,
             context,
-            credential_lock: Mutex::new(()),
             gate,
         })
     }
@@ -358,24 +336,12 @@ impl AccountService {
         }
     }
     pub fn set_credentials(&self, params: &Value) -> Result<Value, String> {
-        let _guard = self.credential_lock.lock().map_err(|_| {
-            l10n::text(
-                "凭据存储暂时不可用",
-                "Credential storage lock is unavailable",
-            )
-        })?;
         let result = credentials::save(&self.context, params)?;
         self.credentials_changed(params);
         Ok(result)
     }
     /// Adds a relay by hand (`credentials::add_relay_source`) and reads it.
     pub fn add_relay_source(&self, params: &Value) -> Result<Value, String> {
-        let _guard = self.credential_lock.lock().map_err(|_| {
-            l10n::text(
-                "凭据存储暂时不可用",
-                "Credential storage lock is unavailable",
-            )
-        })?;
         let result = credentials::add_relay_source(&self.context, params)?;
         self.account_changed("relay");
         Ok(result)
@@ -383,35 +349,17 @@ impl AccountService {
     /// Keeps the template chosen for a relay's address
     /// (`credentials::set_relay_kind`) and reads the relays again.
     pub fn set_relay_kind(&self, params: &Value) -> Result<Value, String> {
-        let _guard = self.credential_lock.lock().map_err(|_| {
-            l10n::text(
-                "凭据存储暂时不可用",
-                "Credential storage lock is unavailable",
-            )
-        })?;
         let result = credentials::set_relay_kind(&self.context, params)?;
         self.account_changed("relay");
         Ok(result)
     }
     /// Removes a relay added by hand.
     pub fn remove_relay_source(&self, params: &Value) -> Result<Value, String> {
-        let _guard = self.credential_lock.lock().map_err(|_| {
-            l10n::text(
-                "凭据存储暂时不可用",
-                "Credential storage lock is unavailable",
-            )
-        })?;
         let result = credentials::remove_relay_source(&self.context, params)?;
         self.account_changed("relay");
         Ok(result)
     }
     pub fn remove_credentials(&self, params: &Value) -> Result<Value, String> {
-        let _guard = self.credential_lock.lock().map_err(|_| {
-            l10n::text(
-                "凭据存储暂时不可用",
-                "Credential storage lock is unavailable",
-            )
-        })?;
         let result = credentials::remove(&self.context, params)?;
         self.credentials_changed(params);
         Ok(result)
@@ -438,7 +386,7 @@ impl AccountService {
         }
     }
     pub fn stop(&self) {
-        self.shared.cancelled.store(true, Ordering::Release);
+        self.context.cancelled.store(true, Ordering::Release);
         let mut copy = None;
         if let Ok(mut state) = self.shared.state.lock() {
             // The next launch starts from what the app shows now.
@@ -452,7 +400,7 @@ impl AccountService {
             restart_copy::save(&self.context.data_dir, &copy);
         }
         let children = self
-            .shared
+            .context
             .children
             .lock()
             .map(|children| {
@@ -789,7 +737,7 @@ fn run(context: AccountContext, shared: Arc<Shared>, gate: CollectionGate, reade
                     let wait = state
                         .entries
                         .get(provider)
-                        .map_or(Duration::ZERO, |entry| due_after(provider, entry, &state));
+                        .map_or(Duration::ZERO, |entry| due_after(facts, entry, &state));
                     if wait.is_zero() {
                         due = Some((provider, facts));
                         break;
@@ -848,7 +796,7 @@ fn run(context: AccountContext, shared: Arc<Shared>, gate: CollectionGate, reade
                 let attempted = Instant::now();
                 let summary = {
                     let _turn = gate.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
-                    if shared.cancelled.load(Ordering::Acquire) {
+                    if context.cancelled.load(Ordering::Acquire) {
                         return;
                     }
                     status::read(&context.http, page.url)
@@ -888,7 +836,7 @@ fn run(context: AccountContext, shared: Arc<Shared>, gate: CollectionGate, reade
         // The gate, not the shared state or the Runtime, is held across the I/O.
         let result = {
             let _turn = gate.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
-            if shared.cancelled.load(Ordering::Acquire) {
+            if context.cancelled.load(Ordering::Acquire) {
                 return;
             }
             let mut reading_context = context.clone();
@@ -1150,7 +1098,8 @@ fn date_ms(value: &str) -> Option<i64> {
 /// whose windows all reset later only at the first reset. Every interval
 /// waits the reading's spread past it, and no reading follows another within
 /// 60 s.
-fn due_after(provider: &str, entry: &Entry, state: &Control) -> Duration {
+fn due_after(facts: &Provider, entry: &Entry, state: &Control) -> Duration {
+    let provider = facts.id;
     if entry.restored {
         return Duration::ZERO;
     }
@@ -1167,14 +1116,14 @@ fn due_after(provider: &str, entry: &Entry, state: &Control) -> Duration {
         .iter()
         .filter_map(|row| row["resetAt"].as_str().and_then(date_ms))
         .collect::<Vec<_>>();
-    let sources = work_sources(provider);
+    let sources = facts.sources();
     let running = sources.iter().any(|source| state.running.contains(*source));
     let live = sources.iter().any(|source| state.live.contains(*source));
     let finished = sources
         .iter()
         .filter_map(|source| state.finished.get(*source))
         .any(|at| *at > entry.attempted_ms);
-    let local = sees_local_work(provider) && !state.account_homes.contains_key(provider);
+    let local = facts.local_work && !state.account_homes.contains_key(provider);
     // After failed readings the next try backs off, whatever the interval;
     // a refresh the user asked for, or this computer's work finishing, tries
     // at once (signing in again and working is how many failures end).
@@ -1252,6 +1201,9 @@ mod tests {
     static SECOND: Provider = Provider::new("second", second);
     static THIRD: Provider = Provider::new("third", third);
     static FAKE: [&Provider; 3] = [&FIRST, &SECOND, &THIRD];
+    fn facts(provider: &str) -> &'static Provider {
+        agents::account_provider(provider).unwrap()
+    }
 
     fn control() -> Control {
         Control {
@@ -1375,13 +1327,13 @@ mod tests {
             .quotas
             .push(json!({"resetAt": (chrono::Utc::now()+chrono::Duration::days(7)).to_rfc3339()}));
         let fresh = entry(reading, Some("2026-10-23T08:00:00Z"), false);
-        assert!(due_after("antigravity", &fresh, &state) > Duration::from_secs(300));
+        assert!(due_after(facts("antigravity"), &fresh, &state) > Duration::from_secs(300));
         state
             .account_homes
             .insert("antigravity".into(), vec!["/tmp/config.json".into()]);
-        assert!(due_after("antigravity", &fresh, &state) <= Duration::from_secs(300));
+        assert!(due_after(facts("antigravity"), &fresh, &state) <= Duration::from_secs(300));
         state.force.insert("antigravity".into());
-        let pause = due_after("antigravity", &fresh, &state);
+        let pause = due_after(facts("antigravity"), &fresh, &state);
         assert!(pause > Duration::from_secs(59) && pause <= Duration::from_secs(60));
     }
 
@@ -1435,7 +1387,7 @@ mod tests {
             if let Some(entry) = state.entries.get("antigravity") {
                 break (
                     state.force.contains("antigravity"),
-                    due_after("antigravity", entry, &state),
+                    due_after(&BLOCKED, entry, &state),
                     entry.attempted.elapsed(),
                     entry.failed,
                 );
@@ -1719,14 +1671,14 @@ mod tests {
             Some("2026-10-20T10:00:00+00:00"),
             true,
         );
-        assert_eq!(due_after("first", &restored, &state), Duration::ZERO);
+        assert_eq!(due_after(&FIRST, &restored, &state), Duration::ZERO);
         let fresh = entry(
             AccountReading::empty("first"),
             Some("2026-10-20T10:00:00+00:00"),
             false,
         );
         assert!(
-            due_after("first", &fresh, &state) >= Duration::from_secs(60),
+            due_after(&FIRST, &fresh, &state) >= Duration::from_secs(60),
             "never sooner than 60 s after a reading"
         );
     }
@@ -1779,17 +1731,17 @@ mod tests {
         let mut state = control();
         let claude = reset_later("claude");
         assert!(
-            due_after("claude", &claude, &state) > Duration::from_secs(3600),
+            due_after(facts("claude"), &claude, &state) > Duration::from_secs(3600),
             "idle: wait for the reset"
         );
         state.live.insert("claude".into());
         assert_eq!(
-            due_after("claude", &claude, &state),
+            due_after(facts("claude"), &claude, &state),
             Duration::ZERO,
             "live: read every 300 s"
         );
         state.running.insert("claude".into());
-        assert_eq!(due_after("claude", &claude, &state), Duration::ZERO);
+        assert_eq!(due_after(facts("claude"), &claude, &state), Duration::ZERO);
     }
 
     #[test]
@@ -1797,13 +1749,14 @@ mod tests {
         let mut state = control();
         for provider in ["copilot", "antigravity", "devin", "kimi"] {
             assert!(
-                due_after(provider, &reset_later(provider), &state) > Duration::from_secs(3600),
+                due_after(facts(provider), &reset_later(provider), &state)
+                    > Duration::from_secs(3600),
                 "{provider}"
             );
         }
         for provider in ["codex", "cursor", "grok-bot"] {
             assert_eq!(
-                due_after(provider, &reset_later(provider), &state),
+                due_after(facts(provider), &reset_later(provider), &state),
                 Duration::ZERO,
                 "{provider}"
             );
@@ -1813,7 +1766,7 @@ mod tests {
         let later = chrono::Utc::now().timestamp_millis();
         state.finished.insert("opencode".into(), later);
         assert_eq!(
-            due_after("glm", &reset_later("glm"), &state),
+            due_after(facts("glm"), &reset_later("glm"), &state),
             Duration::ZERO,
             "an open agent's work is the plans'"
         );
@@ -1832,20 +1785,20 @@ mod tests {
         assert_eq!(entry.notice, None);
         assert_eq!(entry.failures, 1);
         let state = control();
-        let first = due_after("claude", &entry, &state);
+        let first = due_after(facts("claude"), &entry, &state);
         assert!(first > Duration::from_secs(55) && first <= Duration::from_secs(60));
         failed_reading(&mut entry, Unread::transient("offline"), now, now_ms);
         failed_reading(&mut entry, Unread::transient("offline"), now, now_ms);
-        let third = due_after("claude", &entry, &state);
+        let third = due_after(facts("claude"), &entry, &state);
         assert!(third > Duration::from_secs(235) && third <= Duration::from_secs(240));
         for _ in 0..10 {
             failed_reading(&mut entry, Unread::transient("offline"), now, now_ms);
         }
-        assert!(due_after("claude", &entry, &state) <= MOST_BACKOFF);
+        assert!(due_after(facts("claude"), &entry, &state) <= MOST_BACKOFF);
         // A refresh the user asks for tries again at once, past the spacing.
         let mut asked = control();
         asked.force.insert("claude".into());
-        assert!(due_after("claude", &entry, &asked) <= Duration::from_secs(60));
+        assert!(due_after(facts("claude"), &entry, &asked) <= Duration::from_secs(60));
     }
 
     #[test]
@@ -1969,7 +1922,7 @@ mod tests {
         );
         let mut state = control();
         state.force.insert("codex".into());
-        assert!(due_after("codex", &limited, &state) > Duration::from_secs(1790));
+        assert!(due_after(facts("codex"), &limited, &state) > Duration::from_secs(1790));
     }
 
     #[test]

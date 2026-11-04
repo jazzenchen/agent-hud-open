@@ -256,10 +256,6 @@ pub static PROVIDER: Provider = Provider {
 };
 
 pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
-    read_text(host).map_err(Unread::from)
-}
-
-fn read_text(host: &dyn Host) -> Result<Reading, String> {
     let mut reading = Reading::empty("antigravity");
     let mut partial = false;
     for report in host.account_reports("antigravity") {
@@ -330,23 +326,25 @@ fn read_text(host: &dyn Host) -> Result<Reading, String> {
                     return Err(l10n::text(
                         "Antigravity 本地服务返回的账户格式无法识别",
                         "Antigravity local service returned an unsupported account format.",
-                    ));
+                    )
+                    .into());
                 } else {
                     partial = true;
                 }
             }
-            Err(error) if reading.account.is_none() => return Err(error),
+            Err(error) if reading.account.is_none() => return Err(error.into()),
             Err(_) => partial = true,
         }
     }
     if reading.quotas.is_empty() && reading.account.is_none() {
         if let Some(executable) = executable {
-            return super::cli::read(host, Path::new(&executable));
+            return Ok(super::cli::read(host, Path::new(&executable))?);
         }
         return Err(l10n::text(
             "没有已登录且正在运行的 Antigravity 服务",
             "No authenticated already-running Antigravity service is available",
-        ));
+        )
+        .into());
     }
     reading.notice = if partial {
         Some(l10n::text(

@@ -1,4 +1,4 @@
-import type { BotCue, BotEvent, BotState } from "./bot-state";
+import type { BotCue, BotEvent, BotSign, BotState } from "./bot-state";
 import {
   canonicalClawdFrame,
   ClawdBaker,
@@ -6,14 +6,13 @@ import {
   type SpritePicture,
 } from "./clawd";
 import { ClawdPerformer, type ClawdPerformerOptions } from "./clawd-performer";
-import type { ClawdSign } from "./clawd-clips";
+import { frameAfter } from "./clawd-clips";
 
 interface Seen {
   picture: SpritePicture | null;
-  sign?: ClawdSign;
+  sign?: BotSign;
 }
 export interface ClawdActorOptions extends ClawdPerformerOptions {
-  showing?: boolean;
   resumes?: boolean;
   restsHidden?: boolean;
 }
@@ -27,7 +26,6 @@ export interface ClawdActorFrame {
   due: number;
 }
 const logo: Seen = { picture: null };
-const frameAfter = (time: number) => Math.ceil((time - 0.004) * 12) / 12;
 /** IslandAnimation.mediaCurve, ClawdActor's exact original crossfade curve. */
 function fadeCurve(progress: number) {
   const x = Math.max(0, Math.min(1, progress));
@@ -49,7 +47,7 @@ export class ClawdActor {
   static readonly fade = 0.3;
   static readonly keepsFrames = 60;
   readonly performer: ClawdPerformer;
-  baker: ClawdBaker | null;
+  baker: ClawdBaker | null = null;
   restsHidden: boolean;
   private seen: Seen | null;
   private back: Seen | null = null;
@@ -63,10 +61,9 @@ export class ClawdActor {
 
   constructor(options: ClawdActorOptions = {}) {
     this.performer = new ClawdPerformer(options);
-    this.baker = options.sheet ? new ClawdBaker(options.sheet) : null;
     this.restsHidden = options.restsHidden ?? true;
     this.resumes = options.resumes ?? false;
-    this.seen = options.showing || this.resumes ? null : logo;
+    this.seen = this.resumes ? null : logo;
   }
   get state() {
     return this.performer.state;

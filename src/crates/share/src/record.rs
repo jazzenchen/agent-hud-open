@@ -77,7 +77,7 @@ pub fn content(record: &SyncRecord) -> String {
         &record.kind,
         &record.device_id,
         &record.key,
-        &serde_json::to_string(&record.payload).unwrap_or_default(),
+        &record.payload.to_string(),
     ])
 }
 /// What a record says, its expiry included: a new value means a new version.
@@ -102,9 +102,6 @@ impl agent_hud_lan::Record for SyncRecord {
     }
     fn is_visible(&self, now_ms: i64) -> bool {
         SyncRecord::is_visible(self, now_ms)
-    }
-    fn content(&self) -> String {
-        current_content(self)
     }
     /// The fields `current_content` hashes, compared without hashing them.
     fn same_content(&self, other: &Self) -> bool {

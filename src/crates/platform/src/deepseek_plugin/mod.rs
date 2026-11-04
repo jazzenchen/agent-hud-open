@@ -16,7 +16,7 @@
 //! (`prompts/` words for a session, `asks/<id>.answer`, `app.json` while the
 //! app watches asks). Check-ins and prompts are the Claude Code plugin's
 //! protocol, read and written with `ClaudeChannel`'s code.
-use crate::claude_plugin::{valid_name, ClaudeChannel, PromptState, Refusal};
+use crate::claude_plugin::{file_age, valid_name, ClaudeChannel, PromptState, Refusal};
 use crate::clients::deepseek::patch::{self, Block};
 use crate::hud_tools::Places;
 use serde_json::Value;
@@ -225,7 +225,7 @@ impl DeepSeekChannel {
         for entry in fs::read_dir(folder).ok()?.flatten() {
             let path = entry.path();
             if path.extension().and_then(|e| e.to_str()) != Some("json")
-                || age(&path, now) > CALL_LIFETIME
+                || file_age(&path, now) > CALL_LIFETIME
             {
                 continue;
             }
@@ -292,7 +292,7 @@ impl DeepSeekChannel {
             for host in hosts.flatten() {
                 if let Ok(notes) = fs::read_dir(host.path()) {
                     for note in notes.flatten() {
-                        if age(&note.path(), now) > CALL_LIFETIME {
+                        if file_age(&note.path(), now) > CALL_LIFETIME {
                             let _ = fs::remove_file(note.path());
                         }
                     }
@@ -302,7 +302,7 @@ impl DeepSeekChannel {
         }
         if let Ok(files) = fs::read_dir(self.directory.join("asks")) {
             for file in files.flatten() {
-                if age(&file.path(), now) > LEFTOVER_LIFETIME {
+                if file_age(&file.path(), now) > LEFTOVER_LIFETIME {
                     let _ = fs::remove_file(file.path());
                 }
             }
@@ -329,12 +329,4 @@ pub fn remove_other_versions(folder: &Path, keep: &Path) {
 pub fn remove_plugin(folder: &Path) {
     remove_other_versions(folder, Path::new(""));
     let _ = fs::remove_dir(folder);
-}
-
-fn age(path: &Path, now: SystemTime) -> Duration {
-    fs::metadata(path)
-        .and_then(|metadata| metadata.modified())
-        .ok()
-        .and_then(|modified| now.duration_since(modified).ok())
-        .unwrap_or_default()
 }

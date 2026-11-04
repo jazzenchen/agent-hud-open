@@ -227,9 +227,8 @@ impl Log {
                     .as_str()
                     .map(|m| (m, self.source_state["lastCallRoute"].as_str()));
                 if let Some(hit) = parse_limit_hit(v, line_at, last_call) {
-                    if let Ok(encoded) = serde_json::to_string(&hit) {
-                        self.titles.insert(hit.row_id(), encoded);
-                    }
+                    let encoded = serde_json::to_string(&hit).expect("a limit hit serializes");
+                    self.titles.insert(hit.row_id(), encoded);
                 }
             }
             return;

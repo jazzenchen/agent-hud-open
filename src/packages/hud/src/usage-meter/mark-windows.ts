@@ -10,6 +10,12 @@ export interface RingItem {
   color: string;
 }
 
+/** An item's share as drawn: 0 to 100, and 0 without one. */
+export const itemShare = (percent: number | null) =>
+  percent == null || !Number.isFinite(percent)
+    ? 0
+    : Math.max(0, Math.min(100, percent));
+
 /** The windows a Simple mark draws, in the panel's order: those the panel
  * shows of the account that holds the agent's tightest window (its last
  * reading's, while every window waits on a failed read), at most four. An

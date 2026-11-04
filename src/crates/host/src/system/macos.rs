@@ -1,6 +1,6 @@
 //! SMAppService uses only public frameworks. The Mac never posts system
 //! notifications: the HUD island is its alert surface.
-pub(super) use super::unix::{client_command_line, configure_client_command, stop_client};
+pub(crate) use super::unix::{client_command_line, configure_client_command, stop_client};
 use objc2::{
     msg_send,
     rc::Retained,
@@ -83,10 +83,10 @@ pub(super) fn status(_identifier: &str) -> Result<Value, String> {
 }
 
 /// Settings looks only where `cli_candidates` says.
-pub(super) fn bundled_cli(_command: &str) -> Option<PathBuf> {
+pub(crate) fn bundled_cli(_command: &str) -> Option<PathBuf> {
     None
 }
-pub(super) fn cli_candidates(home: &Path, command: &str, dirs: Vec<PathBuf>) -> Vec<PathBuf> {
+pub(crate) fn cli_candidates(home: &Path, command: &str, dirs: Vec<PathBuf>) -> Vec<PathBuf> {
     cli_candidates_with(
         home,
         command,
@@ -154,7 +154,7 @@ fn cli_candidates_with(
     candidates
 }
 
-pub(super) fn private_output(options: &mut std::fs::OpenOptions) {
+pub(crate) fn private_output(options: &mut std::fs::OpenOptions) {
     use std::os::unix::fs::OpenOptionsExt;
     options.mode(0o600);
 }

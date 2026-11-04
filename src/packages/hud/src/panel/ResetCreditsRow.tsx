@@ -114,7 +114,6 @@ function ExpiryLabel({ full, short }: { full: string; short: string }) {
       );
     };
     fit();
-    if (typeof ResizeObserver === "undefined") return;
     const observer = new ResizeObserver(fit);
     observer.observe(element);
     return () => observer.disconnect();

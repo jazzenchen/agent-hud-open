@@ -5,10 +5,8 @@
 //! events stand in for the cursor and the drag button. Without layer-shell (GNOME) Wayland refuses an
 //! edge HUD; on X11 it is an ordinary GTK/WebKit window whose placement depends
 //! on the window manager.
-pub(super) use super::generic::{measure_screens, screen, set_drag_cursor, shown};
-use super::{
-    base_limitations, HudCapabilities, InteractiveRegion, LogicalRect, Point, PointerKeys, Rect,
-};
+pub(super) use super::generic::{measure_screens, panel_builder, screen, set_drag_cursor, shown};
+use super::{InteractiveRegion, LogicalRect, Point, PointerKeys, Rect};
 use gtk::{cairo, gdk, glib, prelude::*};
 use gtk_layer_shell::{self as layer, LayerShell};
 use std::{
@@ -19,7 +17,6 @@ use std::{
     },
     time::Duration,
 };
-use tauri::WebviewUrl;
 
 pub(super) const GLOBAL_POINTS: bool = false;
 pub(super) const COORDINATE_SPACE: &str = "monitor-scaled-physical-top-left";
@@ -90,14 +87,6 @@ fn on_gtk<T: Send + 'static>(
         .map_err(|_| "The GTK thread did not answer for the HUD window".to_owned())?
 }
 
-pub(super) fn panel_builder<'a>(
-    app: &'a tauri::AppHandle,
-    label: &str,
-    url: WebviewUrl,
-) -> tauri::WebviewWindowBuilder<'a, tauri::Wry, tauri::AppHandle> {
-    super::generic::panel_builder(app, label, url)
-}
-
 /// On layer-shell, makes the window a layer surface before its first show and
 /// lets it cover the whole output that contains the requested frame. Its
 /// pointer events are relative to the surface, so a surface that moved or
@@ -109,11 +98,10 @@ pub(super) fn place(
     window: &tauri::WebviewWindow,
     frame: Rect,
     scale: f64,
-    keep_drag: bool,
     mode: super::types::Mode,
-) -> Result<(Rect, LogicalRect), String> {
+) -> Result<LogicalRect, String> {
     if !layer_shell() {
-        return super::generic::place(window, frame, scale, keep_drag, mode);
+        return super::generic::place(window, frame, scale, mode);
     }
     let requested = LogicalRect {
         x: f64::from(frame.x) / scale,
@@ -184,13 +172,7 @@ pub(super) fn place(
         );
     }
     window.show().map_err(|error| error.to_string())?;
-    let actual = Rect {
-        x: (canvas.x * scale).round() as i32,
-        y: (canvas.y * scale).round() as i32,
-        width: (canvas.width * scale).round() as u32,
-        height: (canvas.height * scale).round() as u32,
-    };
-    Ok((actual, canvas))
+    Ok(canvas)
 }
 
 /// The WebView's own pointer events, translated to its toplevel surface and
@@ -340,68 +322,4 @@ pub(super) fn end_text_focus(
         toplevel.set_keyboard_mode(layer::KeyboardMode::None);
         Ok(())
     })
-}
-
-pub(super) fn capabilities() -> HudCapabilities {
-    let wayland = wayland_session();
-    let layered = layer_shell();
-    let mut limitations = base_limitations();
-    if layered {
-        limitations.push("Wayland: each HUD is a wlr-layer-shell overlay surface. Hover and drag read the surface's own pointer events, so the pointer is unknown while it is outside a HUD and Bots cannot follow it there.");
-    } else if wayland {
-        limitations.push(
-            "This Wayland compositor offers no wlr-layer-shell: showing an edge HUD is refused.",
-        );
-    } else {
-        limitations.push("X11 stacking, all-workspace visibility and transparency depend on the window manager and compositor.");
-        limitations.push(
-            "Native HUD dragging is unsupported on X11; no global mouse-button backend is installed.",
-        );
-    }
-    HudCapabilities {
-        platform: std::env::consts::OS,
-        backend: if layered {
-            "wayland-layer-shell"
-        } else if wayland {
-            "wayland"
-        } else {
-            "x11"
-        },
-        lazy_creation: true,
-        single_window: false,
-        per_screen_windows: true,
-        transparent_surface: true,
-        native_material: false,
-        non_focusing_window: true,
-        native_nonactivating_panel: layered,
-        keyboard_handoff: false,
-        cursor_passthrough: true,
-        interactive_regions: layered || !wayland,
-        native_drag: native_drag(),
-        global_pointer: if layered {
-            "surface_events"
-        } else if wayland {
-            "unsupported"
-        } else {
-            "native_cursor_polling"
-        },
-        absolute_edge_position: if layered {
-            "supported"
-        } else if wayland {
-            "unsupported"
-        } else {
-            "window_manager_dependent"
-        },
-        all_workspaces: if layered {
-            "supported"
-        } else if wayland {
-            "unsupported"
-        } else {
-            "window_manager_dependent"
-        },
-        fullscreen_overlay: "not_guaranteed",
-        hardware_notch: false,
-        persistent_display_identity: false,
-        limitations,
-    }
 }

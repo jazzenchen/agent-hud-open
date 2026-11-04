@@ -37,7 +37,7 @@ pub fn readings(device: &str, snapshot: &Value, now: i64) -> SyncRecord {
                         || q["accountId"].is_null()
                         || q["accountId"] == account["id"])
             }) {
-                let Some(used) = q["usedPercent"].as_f64().filter(|n| n.is_finite()) else {
+                let Some(used) = q["usedPercent"].as_f64() else {
                     continue;
                 };
                 let stale = q["status"] == "stale" || account["stale"] == true;
@@ -57,10 +57,7 @@ pub fn readings(device: &str, snapshot: &Value, now: i64) -> SyncRecord {
                 let window_id = clean_window_id(id_str, id, account["id"].as_str());
                 let all_models = q["allModels"].as_bool().unwrap_or(false);
                 let mut quota = json!({"windowID":window_id,"windowName":q["name"],"windowShortName":short_name,"allModels":all_models,"status":if stale{"readFailed"}else{"normal"},"remainingPercent":remaining,"observedAtMs":observed});
-                if let Some(seconds) = q["windowDurationSeconds"]
-                    .as_f64()
-                    .filter(|n| n.is_finite() && *n >= 0.0)
-                {
+                if let Some(seconds) = q["windowDurationSeconds"].as_f64().filter(|n| *n >= 0.0) {
                     quota["windowSeconds"] = json!(seconds.round().min(i32::MAX as f64) as i64);
                 }
                 if let Some(reset) = milliseconds(&q["resetAt"]) {
@@ -74,28 +71,26 @@ pub fn readings(device: &str, snapshot: &Value, now: i64) -> SyncRecord {
                     });
                     if let Some(rate) = q["metrics"]["burnRatePctPerHour"]
                         .as_f64()
-                        .filter(|n| n.is_finite() && *n >= 0.0)
+                        .filter(|n| *n >= 0.0)
                     {
                         quota["burnRatePercentPerHour"] = json!((rate * 10.0).round() / 10.0);
                     }
-                    if let Some(rate) = q["metrics"]["tokensPerHour"]
-                        .as_f64()
-                        .filter(|n| n.is_finite() && *n >= 0.0)
+                    if let Some(rate) = q["metrics"]["tokensPerHour"].as_f64().filter(|n| *n >= 0.0)
                     {
                         quota["tokensPerHour"] = json!(rate);
                     }
                     let outlook = &q["metrics"]["outlook"];
-                    match outlook["kind"].as_str().or_else(|| q["outlook"].as_str()) {
+                    match outlook["kind"].as_str() {
                         Some("exhausted") => {
                             quota["outlook"] = json!("exhausted");
                         }
-                        Some("no-estimate" | "noEstimate") => {
+                        Some("no-estimate") => {
                             quota["outlook"] = json!("noEstimate");
                         }
-                        Some("no-usage" | "noUsage") => {
+                        Some("no-usage") => {
                             quota["outlook"] = json!("noUsage");
                         }
-                        Some("insufficient-data" | "insufficientData") => {
+                        Some("insufficient-data") => {
                             quota["outlook"] = json!("insufficientData");
                         }
                         // The phone has no words for a forecast from the whole
@@ -106,43 +101,21 @@ pub fn readings(device: &str, snapshot: &Value, now: i64) -> SyncRecord {
                         }
                         Some("exhausts") => {
                             if outlook["beforeReset"] == false {
-                                if let Some(used_reset) = outlook["projectedUsedPercent"]
-                                    .as_f64()
-                                    .filter(|n| n.is_finite())
-                                {
+                                if let Some(used_reset) = outlook["projectedUsedPercent"].as_f64() {
                                     let rounded =
                                         ((used_reset * 10.0).round() / 10.0).clamp(0.0, 100.0);
                                     quota["outlook"] = json!("outlastsReset");
                                     quota["usedAtResetPercent"] = json!(rounded);
                                 }
-                            } else if let Some(at) = milliseconds(&outlook["exhaustsAt"])
-                                .or_else(|| milliseconds(&q["exhaustsAtMs"]))
-                                .filter(|at| *at > observed)
+                            } else if let Some(at) =
+                                milliseconds(&outlook["exhaustsAt"]).filter(|at| *at > observed)
                             {
                                 quota["outlook"] = json!("exhausts");
                                 quota["exhaustsAtMs"] = json!(at);
                             }
                         }
-                        Some("outlastsReset") => {
-                            if let Some(used_reset) =
-                                q["usedAtResetPercent"].as_f64().filter(|n| n.is_finite())
-                            {
-                                let rounded =
-                                    ((used_reset * 10.0).round() / 10.0).clamp(0.0, 100.0);
-                                quota["outlook"] = json!("outlastsReset");
-                                quota["usedAtResetPercent"] = json!(rounded);
-                            }
-                        }
                         _ => {}
                     }
-                }
-                let caps = if q["weeklyCaps"].is_object() {
-                    &q["weeklyCaps"]
-                } else {
-                    &q["metrics"]["weeklyCaps"]
-                };
-                if caps.is_object() {
-                    quota["weeklyCaps"] = caps.clone();
                 }
                 windows.push(quota);
             }
@@ -163,7 +136,7 @@ pub fn readings(device: &str, snapshot: &Value, now: i64) -> SyncRecord {
                 let Some(amount_str) = b["amount"]
                     .as_str()
                     .map(str::to_owned)
-                    .or_else(|| amount_f64.filter(|n| n.is_finite()).map(|n| n.to_string()))
+                    .or_else(|| amount_f64.map(|n| n.to_string()))
                 else {
                     continue;
                 };
@@ -214,19 +187,11 @@ pub fn readings(device: &str, snapshot: &Value, now: i64) -> SyncRecord {
             balances.sort_by(|a, b| a["currency"].as_str().cmp(&b["currency"].as_str()));
             let reset_credits = account["resetCredits"].as_object().and_then(|rc| {
                 let available_count = rc.get("availableCount").and_then(Value::as_i64)?.max(0);
-                let observed = rc
-                    .get("observedAtMs")
-                    .and_then(Value::as_i64)
-                    .or_else(|| rc.get("observedAt").and_then(milliseconds))
-                    .or_else(|| milliseconds(&account["checkedAt"]))
+                let observed = milliseconds(&account["checkedAt"])
                     .or_else(|| milliseconds(&p["accountStatus"]["checkedAt"]))
                     .unwrap_or(now);
                 let stale = account["stale"] == true || p["accountStatus"]["status"] == "error";
-                let status = rc
-                    .get("status")
-                    .and_then(Value::as_str)
-                    .filter(|s| matches!(*s, "normal" | "readFailed" | "unverified"))
-                    .unwrap_or(if stale { "readFailed" } else { "normal" });
+                let status = if stale { "readFailed" } else { "normal" };
                 let mut out = json!({
                     "availableCount": available_count,
                     "observedAtMs": observed,
@@ -236,12 +201,7 @@ pub fn readings(device: &str, snapshot: &Value, now: i64) -> SyncRecord {
                     let mapped = items
                         .iter()
                         .map(|item| {
-                            if let Some(exp) = item
-                                .get("expiresAtMs")
-                                .and_then(Value::as_i64)
-                                .or_else(|| item.get("expiresAt").and_then(milliseconds))
-                                .or_else(|| item.get("expirationDate").and_then(milliseconds))
-                            {
+                            if let Some(exp) = item.get("expiresAt").and_then(milliseconds) {
                                 json!({ "expiresAtMs": exp })
                             } else {
                                 json!({})

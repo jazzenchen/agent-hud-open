@@ -216,7 +216,7 @@ mod tests {
             config.to_string_lossy().as_ref()
         );
         assert_eq!(event.data["report"], reports[0]);
-        let inbox = inbox::Inbox::new(&data, std::sync::Arc::new(|| {})).unwrap();
+        let mut inbox = inbox::Inbox::new(&data, std::sync::Arc::new(|| {})).unwrap();
         assert_eq!(
             inbox.drain().len(),
             1,

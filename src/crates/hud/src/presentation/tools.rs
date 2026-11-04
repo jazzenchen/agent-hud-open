@@ -234,30 +234,22 @@ fn hold_for_edit(s: &mut State, id: &str) {
 
 pub(super) fn app_settings(app: &Value) -> Value {
     let mut v = Map::new();
-    for (k, to) in [
-        ("appearance", "appearance"),
-        ("matchScreen", "appearanceFollowsScreen"),
-        ("showMenuBarIcon", "showMenuBarIcon"),
-    ] {
-        if let Some(value) = app.get(k) {
-            v.insert(to.into(), value.clone());
+    for (field, saved, _) in app_rules::SAVED_AS.iter().filter(|(.., global)| !global) {
+        if let Some(value) = app.get(*field) {
+            v.insert((*saved).into(), value.clone());
         }
     }
     Value::Object(v)
 }
 
 pub(super) fn save_global_app(global: &mut Map<String, Value>, app: &Value) {
-    if let Some(value) = app.get("botLogos") {
-        global.insert("botLogos".into(), value.clone());
-    }
-    for (k, to) in [
-        ("delayMs", "hoverDelayMs"),
-        ("collapseDelayMs", "collapseDelayMs"),
-        ("pressOptionToOpen", "requiresOptionToOpen"),
-        ("openAtTopEdge", "openImmediatelyAtTop"),
-    ] {
-        if let Some(value) = app["hover"].get(k) {
-            global.insert(to.into(), value.clone());
+    for (field, saved, _) in app_rules::SAVED_AS.iter().filter(|(.., global)| *global) {
+        let value = match field.strip_prefix("hover.") {
+            Some(field) => app["hover"].get(field),
+            None => app.get(*field),
+        };
+        if let Some(value) = value {
+            global.insert((*saved).into(), value.clone());
         }
     }
 }
@@ -290,10 +282,11 @@ fn blocks(snapshot: &Value, layout: &Value) -> Vec<Value> {
         .iter()
         .map(|block| {
             let key = block.key.as_str();
-            let mut group = match block.kind {
-                rules::Kind::Quota => json!({"key":key,"kind":"quota","accounts":[],"rows":[],"widgets":["bar","rings","segments","number","chart"],"measures":["quota","burn","tokens","consumed","cost"]}),
-                rules::Kind::Balance => json!({"key":key,"kind":"balance","accounts":[],"rows":[],"widgets":["number","chart"],"measures":["quota","burn","cost"]}),
+            let kind = match block.kind {
+                rules::Kind::Quota => "quota",
+                rules::Kind::Balance => "balance",
             };
+            let mut group = json!({"key":key,"kind":kind,"accounts":[],"rows":[],"widgets":block.kind.widgets(),"measures":block.kind.measures("number")});
             if block.kind == rules::Kind::Quota {
                 for quota in snapshot["quotas"].as_array().into_iter().flatten() {
                     if quota["vendor"].as_str().unwrap_or("unknown") != key {
@@ -346,20 +339,6 @@ fn blocks(snapshot: &Value, layout: &Value) -> Vec<Value> {
     result
 }
 
-/// The agents whose sessions the panel lists now, the names `sessions.agents` takes.
-fn session_agents(snapshot: &Value) -> Vec<String> {
-    let mut agents: Vec<String> = vec![];
-    for session in snapshot["sessions"].as_array().into_iter().flatten() {
-        if let Some(source) = session["source"].as_str().filter(|s| !s.is_empty()) {
-            if !agents.iter().any(|a| a == source) {
-                agents.push(source.to_owned());
-            }
-        }
-    }
-    agents.sort();
-    agents
-}
-
 fn listing(
     s: &mut State,
     id: &str,
@@ -389,7 +368,7 @@ fn listing(
     view["appUnsaved"] = json!(s.app.is_some());
     view["unsaved"] = json!(s.layouts.contains_key(id) || s.styles.contains_key(id));
     view["screens"] = json!(screens);
-    view["sessions"] = json!({"offeredAgents":session_agents(snapshot),"offeredProjects":rules::offered_projects(snapshot).into_iter().map(|id|json!({"name":rules::project_title(&id),"id":id})).collect::<Vec<_>>(),"rows":snapshot["sessions"],"filter":layout["sessions"]});
+    view["sessions"] = json!({"offeredAgents":rules::session_agents(snapshot),"offeredProjects":rules::offered_projects(snapshot).into_iter().map(|id|json!({"name":rules::project_title(&id),"id":id})).collect::<Vec<_>>(),"rows":snapshot["sessions"],"filter":layout["sessions"]});
     view["tokens"] = json!({"filter":layout["tokens"],"total":snapshot["totals"]});
     match catalog {
         Some(catalog) if catalog["error"].is_null() => {

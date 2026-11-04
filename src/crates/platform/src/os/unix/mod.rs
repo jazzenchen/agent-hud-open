@@ -51,11 +51,7 @@ fn inspect(script: &str, args: &[&OsStr]) -> Result<String, String> {
         .stdout(Stdio::piped())
         .spawn()
         .map_err(|_| "Local service process inspection is unavailable.".to_owned())?;
-    let Some(output) = child.stdout.take() else {
-        let _ = child.kill();
-        let _ = child.wait();
-        return Err("Local service process inspection is unavailable.".into());
-    };
+    let output = child.stdout.take().unwrap();
     let (sender, receiver) = mpsc::sync_channel(1);
     const LIMIT: u64 = 2 * 1024 * 1024;
     if std::thread::Builder::new()

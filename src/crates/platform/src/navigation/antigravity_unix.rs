@@ -27,7 +27,7 @@ pub(super) fn open(home: &Path, id: &str, cwd: Option<&str>) -> Result<bool, Str
         return Ok(crate::os::registered_url(LINK) && crate::os::open_session_url(LINK).is_ok());
     }
     let mut opened = false;
-    if super::uuid(id) {
+    if super::is_uuid(id) {
         if let Some(port) = super::antigravity::devtools_port(home) {
             if let Ok(true) = super::antigravity::navigate(id, port) {
                 opened = true;

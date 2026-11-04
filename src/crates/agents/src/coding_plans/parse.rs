@@ -37,15 +37,8 @@ pub(super) fn parse(
                    reset: Value,
                    duration: Option<f64>,
                    all_models: bool,
-                   native: Option<(f64, Option<f64>, &str)>|
-     -> Result<(), String> {
-        if !used.is_finite() || used < 0.0 {
-            return Err(l10n::text(
-                "Coding Plan 额度的计数前后矛盾",
-                "Coding plan quota has inconsistent counters",
-            ));
-        }
-        let used = used.clamp(0.0, 100.0);
+                   native: Option<(f64, Option<f64>, &str)>| {
+        let used = used.min(100.0);
         let mut row = json!({"id":format!("{id}:{key}"),"vendor":entry.provider,"name":name,"shortLabel":short,"usedPercent":used,"resetAt":reset,"status":status(used),"account":plan,"accountId":id,"allModels":all_models});
         if let Some(duration) = duration {
             row["windowDurationSeconds"] = json!(duration);
@@ -54,7 +47,6 @@ pub(super) fn parse(
             row["nativeUsage"] = json!({"used":used,"capacity":capacity,"unit":unit});
         }
         windows.push(row);
-        Ok(())
     };
     match entry.provider {
         "kimi" => {
@@ -90,7 +82,7 @@ pub(super) fn parse(
                         duration,
                         true,
                         None,
-                    )?;
+                    );
                 }
             }
             if !current {
@@ -149,7 +141,7 @@ pub(super) fn parse(
                         Some(duration),
                         true,
                         Some((used, Some(limit), "units")),
-                    )?;
+                    );
                 }
             }
         }
@@ -190,7 +182,7 @@ pub(super) fn parse(
                     duration,
                     true,
                     None,
-                )?;
+                );
             }
         }
         "glm" => {
@@ -300,7 +292,7 @@ pub(super) fn parse(
                     duration,
                     kind != "TIME_LIMIT",
                     native,
-                )?;
+                );
             }
         }
         _ => unreachable!(),

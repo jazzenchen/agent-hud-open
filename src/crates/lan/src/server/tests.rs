@@ -16,8 +16,8 @@ impl Record for Item {
     fn modified_at_ms(&self) -> i64 {
         0
     }
-    fn content(&self) -> String {
-        self.0.clone()
+    fn same_content(&self, other: &Self) -> bool {
+        self == other
     }
 }
 

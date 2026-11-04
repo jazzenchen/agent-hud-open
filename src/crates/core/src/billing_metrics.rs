@@ -19,23 +19,18 @@ impl Cache {
         &mut self,
         db: &Connection,
         revision: u64,
-        paths: &[PathBuf],
+        paths: &[String],
         now: i64,
     ) -> Result<(), String> {
         if self.revision == Some(revision) {
             return Ok(());
         }
-        let rows = metering::query_deepseek_billing_events(db, paths, now - 31 * 86_400_000)?;
+        let rows = metering::query_deepseek_billing_events(db, paths, now - 31 * 86_400_000)
+            .map_err(|_| "Could not read billing usage")?;
         let mut events = Vec::with_capacity(rows.len());
         for row in rows {
             let usage = row.usage;
-            let tokens = pricing::PriceTokens {
-                tokens_in: usage.input + usage.write,
-                tokens_out: usage.output + usage.reasoning,
-                cache_read: usage.read,
-                cache_write: usage.write,
-                reasoning: usage.reasoning,
-            };
+            let tokens = metering::price_tokens(usage);
             let prices = [pricing::Region::International, pricing::Region::China].map(|region| {
                 pricing::cost_at("deepseek", &row.model, &tokens, true, region, Some(row.at))
                     .filter(|p| p.currency == region.currency())

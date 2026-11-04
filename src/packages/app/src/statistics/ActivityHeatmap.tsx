@@ -3,7 +3,10 @@ import { Tooltip } from "radix-ui";
 import { Card } from "@agent-hud/ui/components/card";
 import { HUDArtwork as HUDLogo } from "@agent-hud/hud/HUDArtwork";
 import { hourModels } from "../lib/statistics";
-import type { StatisticsHeatmap, StatisticsResponse } from "../lib/types";
+import type {
+  StatisticsHeatmap,
+  StatisticsResponse,
+} from "@agent-hud/protocol";
 import {
   card,
   Coverage,

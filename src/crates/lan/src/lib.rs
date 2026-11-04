@@ -16,20 +16,16 @@ pub mod identity;
 mod os;
 pub mod server;
 
-/// One replicated item. `id` is its stable key; `content` changes whenever a
-/// client would need to see a new version.
+/// One replicated item. `id` is its stable key.
 pub trait Record: Clone + PartialEq + Serialize {
     fn id(&self) -> String;
     fn device_id(&self) -> &str;
     fn modified_at_ms(&self) -> i64;
     /// False once the record has expired; expired records are not published.
     fn is_visible(&self, now_ms: i64) -> bool;
-    fn content(&self) -> String;
     /// Whether `other` publishes the same content, its modification time
-    /// aside. A record type can compare its fields instead of its `content`.
-    fn same_content(&self, other: &Self) -> bool {
-        self.content() == other.content()
-    }
+    /// aside: false whenever a client would need to see a new version.
+    fn same_content(&self, other: &Self) -> bool;
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
@@ -55,7 +51,7 @@ impl Cursor {
         (Self::new(ms, self.change_sequence)?.base_version == self.base_version).then_some(ms)
     }
     pub fn valid(&self) -> bool {
-        self.change_sequence >= 0 && self.base_ms().is_some()
+        self.base_ms().is_some()
     }
     pub fn query_value(&self) -> String {
         format!("{},{}", self.base_version, self.change_sequence)

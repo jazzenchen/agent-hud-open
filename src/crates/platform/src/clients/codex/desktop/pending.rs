@@ -24,7 +24,7 @@ pub(super) struct Pending {
 fn identity(prefix: &str, thread: &str, owner: &str, wire: &Value) -> String {
     format!(
         "{prefix}:{:x}",
-        Sha256::digest(serde_json::to_vec(&json!([thread, owner, wire])).unwrap_or_default())
+        Sha256::digest(json!([thread, owner, wire]).to_string())
     )
 }
 /// The website a browser approval is for.
@@ -56,6 +56,7 @@ fn view(thread: &str, summary: &str, tool: &str, cwd: &Value, kind: &str) -> Val
 
 pub(super) fn parse(state: &Value, thread: &str, owner: &str) -> Result<Vec<Pending>, IpcError> {
     let requests = state["requests"].as_array().ok_or(IpcError::Protocol)?;
+    let turn_store = turns(state, true)?;
     let mut found = Vec::new();
     for wire in requests {
         let params = &wire["params"];
@@ -105,13 +106,7 @@ pub(super) fn parse(state: &Value, thread: &str, owner: &str) -> Result<Vec<Pend
                 Some("browser-use") => {
                     let turn = params["turnId"]
                         .as_str()
-                        .map(|id| {
-                            turns(state, true).map(|values| {
-                                values.into_iter().rev().find(|turn| turn["turnId"] == id)
-                            })
-                        })
-                        .transpose()?
-                        .flatten();
+                        .and_then(|id| turn_store.iter().rev().find(|turn| turn["turnId"] == id));
                     // The turn's own settings; a turn without them shows no
                     // card. Only a request no turn is found for falls back on
                     // the thread's current permissions (agent-hud-native-open).
@@ -202,7 +197,6 @@ pub(super) fn parse(state: &Value, thread: &str, owner: &str) -> Result<Vec<Pend
             question: None,
         });
     }
-    let turn_store = turns(state, true)?;
     if let Some(turn) = turn_store
         .iter()
         .rev()
@@ -240,9 +234,7 @@ pub(super) fn parse(state: &Value, thread: &str, owner: &str) -> Result<Vec<Pend
                     };
                     labels
                 };
-                let key =
-                    serde_json::to_string(&json!(["request_user_input_async", source, index]))
-                        .map_err(|_| IpcError::Protocol)?;
+                let key = json!(["request_user_input_async", source, index]).to_string();
                 if answered.contains(&key) {
                     continue;
                 }
@@ -419,10 +411,7 @@ pub(super) fn answer(
         if text.is_empty() {
             return Err(IpcError::Protocol);
         }
-        let encoded = serde_json::to_string(
-            &json!([{"questionItemId":key,"question":question,"answer":text}]),
-        )
-        .map_err(|_| IpcError::Protocol)?;
+        let encoded = json!([{"questionItemId":key,"question":question,"answer":text}]).to_string();
         return Ok((QUESTION_METHOD,json!(format!("<send_user_message_question_reply>\n{encoded}\n</send_user_message_question_reply>"))));
     }
     let response = match kind {

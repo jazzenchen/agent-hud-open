@@ -5,7 +5,7 @@ use crate::vendors::Vendor;
 use serde_json::Value;
 use std::sync::Mutex;
 use tauri::{
-    menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem},
+    menu::{Menu, MenuItem, PredefinedMenuItem},
     tray::TrayIconBuilder,
 };
 
@@ -69,7 +69,6 @@ enum Entry {
         title: String,
         value: String,
         enabled: bool,
-        checked: Option<bool>,
     },
 }
 
@@ -78,7 +77,6 @@ fn item(title: &str, value: &str, enabled: bool) -> Entry {
         title: title.to_owned(),
         value: value.to_owned(),
         enabled,
-        checked: None,
     }
 }
 
@@ -252,18 +250,15 @@ pub(crate) fn apply(app: &tauri::AppHandle, state: Presentation) -> Result<(), S
         .tray_by_id("main")
         .ok_or("The menu bar item is unavailable")?;
     let chinese = state.language == "zh";
-    let value = state
-        .used_percent
-        .filter(|value| value.is_finite())
-        .map_or_else(
-            || "—".into(),
-            |value| {
-                format!(
-                    "{}%",
-                    crate::vendors::quota_percent(value, state.remaining).round()
-                )
-            },
-        );
+    let value = state.used_percent.map_or_else(
+        || "—".into(),
+        |value| {
+            format!(
+                "{}%",
+                crate::vendors::quota_percent(value, state.remaining).round()
+            )
+        },
+    );
     tray.set_icon_with_as_template(Some(status_icon(&state)), false)
         .map_err(|e| e.to_string())?;
     tray.set_title(Some(format!(" {value}")))
@@ -305,28 +300,16 @@ fn make_menu(app: &tauri::AppHandle, state: &Presentation) -> tauri::Result<Menu
                 title,
                 value,
                 enabled,
-                checked,
             } => {
                 let id = format!("tray-data-{index}");
                 // Native menu labels retain the source title/value relationship. The OS
-                // draws separators, disabled account headers, checkmarks and shortcuts.
+                // draws separators, disabled account headers and shortcuts.
                 let label = if value.is_empty() {
                     title.clone()
                 } else {
                     format!("{title}    {value}")
                 };
-                if let Some(checked) = checked {
-                    menu.append(&CheckMenuItem::with_id(
-                        app,
-                        id,
-                        label,
-                        *enabled,
-                        *checked,
-                        None::<&str>,
-                    )?)?;
-                } else {
-                    menu.append(&MenuItem::with_id(app, id, label, *enabled, None::<&str>)?)?;
-                }
+                menu.append(&MenuItem::with_id(app, id, label, *enabled, None::<&str>)?)?;
             }
         }
     }

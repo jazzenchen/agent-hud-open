@@ -18,6 +18,7 @@ import { MAX_USAGE_ITEMS, type RingStyle } from "../usage-meter/arcs";
 import { UsageRing } from "../usage-meter/UsageRing";
 import { FittingName } from "./FittingName";
 import { palette, type Measure } from "./theme";
+import { levelFill, markLevelText } from "../tokens";
 
 /** The ring's diameter and line for each `ringSize`. */
 const RINGS = {
@@ -45,7 +46,8 @@ export function QuotaRingCard({
   showReset: boolean;
   onStats?: () => void;
 }) {
-  const colors = palette(useGround(light)),
+  const ground = useGround(light),
+    colors = palette(ground),
     format = useFormat(),
     services = usePanelServices(),
     reduceMotion = useReducedMotion() ?? false,
@@ -56,19 +58,11 @@ export function QuotaRingCard({
   const fill = (row: Quota) =>
     row.status === "stale"
       ? colors.secondary
-      : row.status === "critical"
-        ? colors.critical
-        : row.status === "warning"
-          ? colors.warning
-          : colors.ok;
+      : levelFill(row.status === "normal" ? "ok" : row.status, ground);
   const figure = (row: Quota) =>
     row.status === "stale"
       ? colors.secondary
-      : row.status === "critical"
-        ? colors.criticalText
-        : row.status === "warning"
-          ? colors.warningText
-          : colors.okText;
+      : markLevelText(row.status, ground);
   const tightest = drawn.reduce<Quota | undefined>(
     (a, b) =>
       b.usedPercent != null && (!a || b.usedPercent > (a.usedPercent ?? -1))

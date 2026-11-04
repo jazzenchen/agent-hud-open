@@ -88,12 +88,8 @@ function zoneOffset(at: number, timeZone: string): number {
 
 /** The local midnight after `at` in `timeZone`: a calendar day can run 23 or 25 hours at a DST change. */
 function nextDayStart(at: number, timeZone: string): number {
-  try {
-    const wall = (Math.floor((at + zoneOffset(at, timeZone)) / day) + 1) * day;
-    let next = wall - zoneOffset(at, timeZone);
-    next = wall - zoneOffset(next, timeZone);
-    return wall - zoneOffset(next, timeZone);
-  } catch {
-    return at + day;
-  }
+  const wall = (Math.floor((at + zoneOffset(at, timeZone)) / day) + 1) * day;
+  let next = wall - zoneOffset(at, timeZone);
+  next = wall - zoneOffset(next, timeZone);
+  return wall - zoneOffset(next, timeZone);
 }

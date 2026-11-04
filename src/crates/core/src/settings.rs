@@ -148,9 +148,7 @@ impl crate::AgentHudCore {
                         && prices.iter().all(|(model, price)| {
                             let rate = |key: &str| {
                                 price[key].is_null()
-                                    || price[key]
-                                        .as_f64()
-                                        .is_some_and(|v| v.is_finite() && v >= 0.0)
+                                    || price[key].as_f64().is_some_and(|v| v >= 0.0)
                             };
                             !model.is_empty()
                                 && model.len() <= 300
@@ -166,9 +164,7 @@ impl crate::AgentHudCore {
                         && hosts.iter().all(|(host, times)| {
                             !host.is_empty()
                                 && host.len() <= 260
-                                && times
-                                    .as_f64()
-                                    .is_some_and(|v| v.is_finite() && v > 0.0 && v <= 100.0)
+                                && times.as_f64().is_some_and(|v| v > 0.0 && v <= 100.0)
                         })
                 }) => {}
             "localKinds"

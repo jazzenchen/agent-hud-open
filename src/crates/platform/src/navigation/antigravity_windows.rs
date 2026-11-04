@@ -119,7 +119,7 @@ unsafe extern "system" fn collect_window(window: Window, parameter: isize) -> i3
 }
 
 pub(super) fn open(home: &Path, id: &str, _cwd: Option<&str>) -> Result<bool, String> {
-    if !super::uuid(id) {
+    if !super::is_uuid(id) {
         return Ok(false);
     }
     let Some(port) = super::antigravity::devtools_port(home) else {

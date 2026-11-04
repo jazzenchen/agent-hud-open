@@ -49,7 +49,7 @@ impl crate::AgentHudCore {
     /// session list joins, and the notice the snapshot carries.
     pub(crate) fn collect(&mut self) {
         let previous_pending = self.reads.pending.len();
-        let notice = self.scan().err();
+        let notice = self.scan(None).err();
         if previous_pending != self.reads.pending.len() {
             self.usage_projection = None;
         }
@@ -268,7 +268,7 @@ impl crate::AgentHudCore {
                             .get(*path)
                             .is_some_and(|log| log.source == "deepseek")
                     })
-                    .cloned()
+                    .map(|path| path.to_string_lossy().into_owned())
                     .collect::<Vec<_>>();
                 self.meters.billing.prepare(
                     db,

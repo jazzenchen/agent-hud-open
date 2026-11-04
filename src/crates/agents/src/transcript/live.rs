@@ -2,8 +2,6 @@
 //! Agent-specific event reducers live under `crate::agents`.
 use crate::claude::project_origin::ClaudeProjectOrigin;
 use crate::claude::transcript::uuid;
-pub use crate::claude::transcript::{claude_prompt, claude_turn, request_copy};
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::{collections::VecDeque, path::Path};
@@ -14,13 +12,7 @@ const ABANDONED_MS: i64 = 1_800_000;
 pub fn timestamp(value: &Value) -> Option<i64> {
     value
         .as_str()
-        .and_then(|text| DateTime::parse_from_rfc3339(text).ok())
-        .map(|at| at.timestamp_millis())
-}
-
-fn iso(at: Option<i64>) -> Option<String> {
-    at.and_then(DateTime::<Utc>::from_timestamp_millis)
-        .map(|at| at.to_rfc3339())
+        .and_then(crate::transcript::metering::date_ms)
 }
 
 pub fn newer(target: &mut Option<i64>, at: i64) {
@@ -604,10 +596,10 @@ impl LiveLog {
         let turn = self.turns.back();
         let observed = self.last_event().into_iter().chain(subagents_at).max()?;
         let child_working = subagents_at.is_some();
-        let requests = self.requests(now).map(|call| json!({"id":format!("log:{source}:{id}:{}",call.id),"sessionId":id,"kind":call.request,"at":iso(Some(call.at))})).collect::<Vec<_>>();
+        let requests = self.requests(now).map(|call| json!({"id":format!("log:{source}:{id}:{}",call.id),"sessionId":id,"kind":call.request,"at":crate::iso(call.at)})).collect::<Vec<_>>();
         let activity = self.activity.as_ref().map(|activity| {
             let open = activity.calls.iter().rev().find(|call| call.work.is_some_and(Work::shown)).or_else(|| activity.calls.last());
-            json!({"work":activity.work,"openCall":open.map(|call| json!({"work":call.work,"at":iso(Some(call.at))})),"toolAt":iso(activity.tool_at),"delegating":subagents_at.is_some() || activity.calls.iter().any(|call|call.work==Some(Work::Agents)),"awaitsModel":activity.awaits_model(),"retrying":activity.retrying,"compactingSince":null})
+            json!({"work":activity.work,"openCall":open.map(|call| json!({"work":call.work,"at":crate::iso(call.at)})),"toolAt":activity.tool_at.and_then(crate::iso),"delegating":subagents_at.is_some() || activity.calls.iter().any(|call|call.work==Some(Work::Agents)),"awaitsModel":activity.awaits_model(),"retrying":activity.retrying,"compactingSince":null})
         });
         let turn_id = turn.and_then(|turn| {
             turn.id.clone().or_else(|| {
@@ -616,7 +608,7 @@ impl LiveLog {
             })
         });
         Some(
-            json!({"turnId":turn_id,"turnStartedAt":iso(turn.and_then(|turn|turn.started)),"outcome":turn.filter(|turn|!turn.running && !child_working).and_then(|turn|turn.outcome.as_ref()),"endedAt":iso(turn.filter(|turn|!turn.running && !child_working).map(|turn|turn.observed)),"message":turn.and_then(|turn|turn.message.as_ref()),"limitedUntil":iso(turn.and_then(|turn|turn.limited_until)),"observedAt":iso(Some(observed)),"lastEventAt":iso(Some(observed)),"activity":activity,"requests":requests}),
+            json!({"turnId":turn_id,"turnStartedAt":turn.and_then(|turn|turn.started).and_then(crate::iso),"outcome":turn.filter(|turn|!turn.running && !child_working).and_then(|turn|turn.outcome.as_ref()),"endedAt":turn.filter(|turn|!turn.running && !child_working).and_then(|turn|crate::iso(turn.observed)),"message":turn.and_then(|turn|turn.message.as_ref()),"limitedUntil":turn.and_then(|turn|turn.limited_until).and_then(crate::iso),"observedAt":crate::iso(observed),"lastEventAt":crate::iso(observed),"activity":activity,"requests":requests}),
         )
     }
 

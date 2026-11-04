@@ -19,40 +19,21 @@ use macos as target;
 #[cfg(target_os = "windows")]
 use windows as target;
 
-/// Where a client's command line may be installed: `dirs` in order, with the
-/// host's executable names, after any copy bundled inside its app.
-pub(crate) fn cli_candidates(
-    home: &std::path::Path,
-    command: &str,
-    dirs: Vec<std::path::PathBuf>,
-) -> Vec<std::path::PathBuf> {
-    target::cli_candidates(home, command, dirs)
-}
-
-/// A desktop app's own copy of a client's command line, where the host's
-/// account readers also look for it (none outside Windows).
-pub(crate) fn bundled_cli(command: &str) -> Option<std::path::PathBuf> {
-    target::bundled_cli(command)
-}
-
-/// A new file only this user can read, where the host has file modes.
-pub(crate) fn private_output(options: &mut std::fs::OpenOptions) {
-    target::private_output(options)
-}
-
-/// A command the user can copy into the host's normal interactive shell.
-pub(crate) fn client_command_line(arguments: &[String]) -> String {
-    target::client_command_line(arguments)
-}
-
-/// Client setup runs in the background even when its executable is a console app.
-pub(crate) fn configure_client_command(command: &mut std::process::Command) {
-    target::configure_client_command(command)
-}
-
-pub(crate) fn stop_client(child: &mut std::process::Child) {
-    target::stop_client(child)
-}
+// Each host file provides the same items:
+//   cli_candidates(home, command, dirs)  where a client's command line may be
+//                                        installed: `dirs` in order, with the host's
+//                                        executable names, after any bundled copy
+//   bundled_cli(command)                 a desktop app's own copy of a client's command
+//                                        line (none outside Windows)
+//   private_output(options)              a new file only this user can read
+//   client_command_line(arguments)       a command for the host's interactive shell
+//   configure_client_command(command)    client setup runs in the background, even
+//                                        for a console executable
+//   stop_client(child)
+pub(crate) use target::{
+    bundled_cli, cli_candidates, client_command_line, configure_client_command, private_output,
+    stop_client,
+};
 
 pub struct System {
     identifier: String,

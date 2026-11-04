@@ -6784,17 +6784,6 @@
       "error": "Unsupported client hook source"
     }
   },
-  "event/malformed/oversized": {
-    "input": {
-      "flag": "--attention-hook",
-      "nowMs": 1760000000000,
-      "payload": "A Notification payload whose message is 1,048,576 bytes of 'm'",
-      "source": "claude"
-    },
-    "output": {
-      "error": "Hook payload exceeds the supported size"
-    }
-  },
   "event/matrix/antigravity/--attention-hook": {
     "input": {
       "flag": "--attention-hook",
@@ -71998,17 +71987,6 @@
       }
     }
   },
-  "request/antigravity/oversized": {
-    "input": {
-      "payload": "A Bash payload whose tool_input.command is 1,048,576 bytes of 'x'",
-      "source": "antigravity"
-    },
-    "output": {
-      "request": {
-        "error": "Hook payload exceeds the supported size"
-      }
-    }
-  },
   "request/antigravity/session-not-string": {
     "input": {
       "payload": {
@@ -73578,17 +73556,6 @@
     "output": {
       "request": {
         "error": "Hook payload must be a JSON object"
-      }
-    }
-  },
-  "request/claude/oversized": {
-    "input": {
-      "payload": "A Bash payload whose tool_input.command is 1,048,576 bytes of 'x'",
-      "source": "claude"
-    },
-    "output": {
-      "request": {
-        "error": "Hook payload exceeds the supported size"
       }
     }
   },
@@ -82721,17 +82688,6 @@
       }
     }
   },
-  "request/codebuddy/oversized": {
-    "input": {
-      "payload": "A Bash payload whose tool_input.command is 1,048,576 bytes of 'x'",
-      "source": "codebuddy"
-    },
-    "output": {
-      "request": {
-        "error": "Hook payload exceeds the supported size"
-      }
-    }
-  },
   "request/codebuddy/session-not-string": {
     "input": {
       "payload": {
@@ -84866,17 +84822,6 @@
       }
     }
   },
-  "request/codex/oversized": {
-    "input": {
-      "payload": "A Bash payload whose tool_input.command is 1,048,576 bytes of 'x'",
-      "source": "codex"
-    },
-    "output": {
-      "request": {
-        "error": "Hook payload exceeds the supported size"
-      }
-    }
-  },
   "request/codex/session-not-string": {
     "input": {
       "payload": {
@@ -85633,17 +85578,6 @@
       }
     }
   },
-  "request/copilot/oversized": {
-    "input": {
-      "payload": "A Bash payload whose tool_input.command is 1,048,576 bytes of 'x'",
-      "source": "copilot"
-    },
-    "output": {
-      "request": {
-        "error": "Hook payload exceeds the supported size"
-      }
-    }
-  },
   "request/copilot/session-not-string": {
     "input": {
       "payload": {
@@ -85968,17 +85902,6 @@
     "output": {
       "request": {
         "error": "Hook payload must be a JSON object"
-      }
-    }
-  },
-  "request/cursor/oversized": {
-    "input": {
-      "payload": "A Bash payload whose tool_input.command is 1,048,576 bytes of 'x'",
-      "source": "cursor"
-    },
-    "output": {
-      "request": {
-        "error": "Hook payload exceeds the supported size"
       }
     }
   },
@@ -86394,17 +86317,6 @@
     "output": {
       "request": {
         "error": "Hook payload must be a JSON object"
-      }
-    }
-  },
-  "request/deepseek/oversized": {
-    "input": {
-      "payload": "A Bash payload whose tool_input.command is 1,048,576 bytes of 'x'",
-      "source": "deepseek"
-    },
-    "output": {
-      "request": {
-        "error": "Hook payload exceeds the supported size"
       }
     }
   },
@@ -88744,17 +88656,6 @@
     "output": {
       "request": {
         "error": "Hook payload must be a JSON object"
-      }
-    }
-  },
-  "request/devin/oversized": {
-    "input": {
-      "payload": "A Bash payload whose tool_input.command is 1,048,576 bytes of 'x'",
-      "source": "devin"
-    },
-    "output": {
-      "request": {
-        "error": "Hook payload exceeds the supported size"
       }
     }
   },
@@ -91702,17 +91603,6 @@
       }
     }
   },
-  "request/qoder-cn/oversized": {
-    "input": {
-      "payload": "A Bash payload whose tool_input.command is 1,048,576 bytes of 'x'",
-      "source": "qoder-cn"
-    },
-    "output": {
-      "request": {
-        "error": "Hook payload exceeds the supported size"
-      }
-    }
-  },
   "request/qoder-cn/session-not-string": {
     "input": {
       "payload": {
@@ -92510,17 +92400,6 @@
     "output": {
       "request": {
         "error": "Hook payload must be a JSON object"
-      }
-    }
-  },
-  "request/qoder-work/oversized": {
-    "input": {
-      "payload": "A Bash payload whose tool_input.command is 1,048,576 bytes of 'x'",
-      "source": "qoder-work"
-    },
-    "output": {
-      "request": {
-        "error": "Hook payload exceeds the supported size"
       }
     }
   },
@@ -94071,17 +93950,6 @@
       }
     }
   },
-  "request/qoder/oversized": {
-    "input": {
-      "payload": "A Bash payload whose tool_input.command is 1,048,576 bytes of 'x'",
-      "source": "qoder"
-    },
-    "output": {
-      "request": {
-        "error": "Hook payload exceeds the supported size"
-      }
-    }
-  },
   "request/qoder/session-not-string": {
     "input": {
       "payload": {
@@ -95626,17 +95494,6 @@
     "output": {
       "request": {
         "error": "Hook payload must be a JSON object"
-      }
-    }
-  },
-  "request/qoderCN/oversized": {
-    "input": {
-      "payload": "A Bash payload whose tool_input.command is 1,048,576 bytes of 'x'",
-      "source": "qoderCN"
-    },
-    "output": {
-      "request": {
-        "error": "Hook payload exceeds the supported size"
       }
     }
   },
@@ -97187,17 +97044,6 @@
       }
     }
   },
-  "request/qoderWork/oversized": {
-    "input": {
-      "payload": "A Bash payload whose tool_input.command is 1,048,576 bytes of 'x'",
-      "source": "qoderWork"
-    },
-    "output": {
-      "request": {
-        "error": "Hook payload exceeds the supported size"
-      }
-    }
-  },
   "request/qoderWork/session-not-string": {
     "input": {
       "payload": {
@@ -98358,17 +98204,6 @@
     "output": {
       "request": {
         "error": "Hook payload must be a JSON object"
-      }
-    }
-  },
-  "request/qwen/oversized": {
-    "input": {
-      "payload": "A Bash payload whose tool_input.command is 1,048,576 bytes of 'x'",
-      "source": "qwen"
-    },
-    "output": {
-      "request": {
-        "error": "Hook payload exceeds the supported size"
       }
     }
   },
@@ -101515,17 +101350,6 @@
       }
     }
   },
-  "request/unknown-client/oversized": {
-    "input": {
-      "payload": "A Bash payload whose tool_input.command is 1,048,576 bytes of 'x'",
-      "source": "unknown-client"
-    },
-    "output": {
-      "request": {
-        "error": "Unsupported client hook source"
-      }
-    }
-  },
   "request/unknown-client/session-not-string": {
     "input": {
       "payload": {
@@ -102331,17 +102155,6 @@
     "output": {
       "request": {
         "error": "Hook payload must be a JSON object"
-      }
-    }
-  },
-  "request/workbuddy/oversized": {
-    "input": {
-      "payload": "A Bash payload whose tool_input.command is 1,048,576 bytes of 'x'",
-      "source": "workbuddy"
-    },
-    "output": {
-      "request": {
-        "error": "Hook payload exceeds the supported size"
       }
     }
   },
@@ -103700,17 +103513,6 @@
     "output": {
       "request": {
         "error": "Hook payload must be a JSON object"
-      }
-    }
-  },
-  "request/zcode/oversized": {
-    "input": {
-      "payload": "A Bash payload whose tool_input.command is 1,048,576 bytes of 'x'",
-      "source": "zcode"
-    },
-    "output": {
-      "request": {
-        "error": "Hook payload exceeds the supported size"
       }
     }
   },

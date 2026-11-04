@@ -57,17 +57,12 @@ import {
 import { useHUDGeometry } from "./lib/use-hud-geometry";
 import { storageKeys } from "./lib/storage-keys";
 import type { HUDConfig } from "@agent-hud/hud/model";
-import type { NativeMethod, Session, Snapshot } from "./lib/types";
+import type { NativeMethod, Session, Snapshot } from "@agent-hud/protocol";
 import appIcon from "./assets/app-icon.png";
 import { snapshotLanguage } from "@agent-hud/ui/format";
 import type { AgentPluginItem } from "./settings/AgentPluginsPane";
 import { SettingsNavigation } from "./settings/SettingsNavigation";
 import { LoadingState } from "./LoadingState";
-
-export type {
-  AgentPluginContext,
-  AgentPluginItem,
-} from "./settings/AgentPluginsPane";
 
 // Windows load their own views. Statistics does not need the shader/bot renderer,
 // and a resting HUD does not need the historical charts and settings panes.
@@ -430,9 +425,7 @@ function AppContent({
   const [runningVersion, setRunningVersion] = useState(version);
   useEffect(() => {
     if (!isTauri()) return;
-    void getVersion()
-      .then(setRunningVersion)
-      .catch(() => {});
+    void getVersion().then(setRunningVersion);
   }, []);
   // A page the host asked for (the update notice opens Updates): taken when
   // Settings starts and whenever the host asks again. A product page that
@@ -446,9 +439,7 @@ function AppContent({
       if (allPages.some((page) => page.id === target)) setPage(target);
     };
     const take = () =>
-      void invoke<string | null>("take_settings_page")
-        .then(open)
-        .catch(() => {});
+      void invoke<string | null>("take_settings_page").then(open);
     take();
     const subscription = getCurrentWebviewWindow().listen<string>(
       "settings:page",
@@ -625,13 +616,11 @@ function AppContent({
     });
     void invoke<{ tab?: string | null; sessionId?: string | null } | null>(
       "take_statistics_target",
-    )
-      .then((target) => {
-        if (!target) return;
-        if (target.sessionId) applySession(target.sessionId);
-        else if (target.tab) setStatisticsTab(target.tab);
-      })
-      .catch(() => {});
+    ).then((target) => {
+      if (!target) return;
+      if (target.sessionId) applySession(target.sessionId);
+      else if (target.tab) setStatisticsTab(target.tab);
+    });
     return () => {
       void pendingSession.then((unlisten) => unlisten());
       void pendingProvider.then((unlisten) => unlisten());
@@ -662,12 +651,10 @@ function AppContent({
     },
     selectProvider: (provider) => {
       const payload = { provider, at: Date.now() };
-      try {
-        localStorage.setItem(
-          storageKeys.highlightProvider,
-          JSON.stringify(payload),
-        );
-      } catch {}
+      localStorage.setItem(
+        storageKeys.highlightProvider,
+        JSON.stringify(payload),
+      );
       setSelectedSession(null);
       setStatisticsTab("tokens");
       if (isTauri()) {
@@ -925,30 +912,21 @@ function AppContent({
                       {extensionPages
                         .find((item) => item.id === page)
                         ?.render({ snapshot, request: extensionRequest })}
-                      {(page === "general" ||
-                        page === "prices" ||
-                        page === "relays" ||
-                        page === "local-network" ||
-                        page === "display" ||
-                        page === "agents" ||
-                        page === "agent-plugins" ||
-                        page === "updates") && (
-                        <SettingsPane
-                          page={page}
-                          settingsProps={settingsProps}
-                          ready={ready}
-                          selectedId={selectedId}
-                          monitors={monitors}
-                          selectScreen={selectScreen}
-                          chinese={chinese}
-                          layout={config.panelLayout}
-                          onLayout={(layout) => setLayout(layout)}
-                          preferences={store.sources ?? {}}
-                          onPreferences={setSource}
-                          agentPlugins={agentPlugins}
-                          request={extensionRequest}
-                        />
-                      )}
+                      <SettingsPane
+                        page={page}
+                        settingsProps={settingsProps}
+                        ready={ready}
+                        selectedId={selectedId}
+                        monitors={monitors}
+                        selectScreen={selectScreen}
+                        chinese={chinese}
+                        layout={config.panelLayout}
+                        onLayout={(layout) => setLayout(layout)}
+                        preferences={store.sources ?? {}}
+                        onPreferences={setSource}
+                        agentPlugins={agentPlugins}
+                        request={extensionRequest}
+                      />
                     </Suspense>
                   )}
                 </div>

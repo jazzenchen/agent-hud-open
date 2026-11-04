@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import type { Approval, RequestDecision } from "@agent-hud/protocol";
 import { PermissionPlanCard } from "./permissions/PermissionPlanCard";
 import { PermissionQuestionCard } from "./permissions/PermissionQuestionCard";
@@ -29,10 +29,6 @@ export function RequestActions({
 }: RequestActionsProps) {
   const zh = language?.startsWith("zh") ?? false;
   const t = (en: string, cn: string) => (zh ? cn : en);
-  const identity = `${request.id}:${JSON.stringify(request.questions ?? [])}`;
-  const current = useRef(identity);
-  current.current = identity;
-  const pendingRef = useRef<string | null>(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const ground = useGround(light);
@@ -40,34 +36,21 @@ export function RequestActions({
     ? alertText("warning", ground)
     : "#e9a16d";
 
-  useEffect(() => {
-    pendingRef.current = null;
-    setPending(false);
-    setError(null);
-  }, [identity]);
-
   const answer = async (decision: RequestDecision) => {
-    if (!onDecision || pendingRef.current === identity) return;
-    const captured = identity;
-    pendingRef.current = captured;
+    if (!onDecision || pending) return;
     setPending(true);
     setError(null);
     try {
       await onDecision(decision);
     } catch (failure) {
-      if (current.current === captured)
-        setError(failure instanceof Error ? failure.message : String(failure));
+      setError(failure instanceof Error ? failure.message : String(failure));
     } finally {
-      if (current.current === captured) {
-        pendingRef.current = null;
-        setPending(false);
-      }
+      setPending(false);
     }
   };
 
   const disabled = !onDecision || pending;
-  const isQuestion =
-    request.kind === "question" || Boolean(request.questions?.length);
+  const isQuestion = request.kind === "question";
   const isPlan = request.kind === "plan";
 
   return (
@@ -78,7 +61,6 @@ export function RequestActions({
     >
       {isQuestion ? (
         <PermissionQuestionCard
-          key={identity}
           request={request}
           disabled={disabled}
           pending={pending}
@@ -89,7 +71,6 @@ export function RequestActions({
         />
       ) : isPlan ? (
         <PermissionPlanCard
-          key={identity}
           request={request}
           disabled={disabled}
           light={light}
@@ -98,7 +79,6 @@ export function RequestActions({
         />
       ) : (
         <PermissionToolCard
-          key={identity}
           request={request}
           disabled={disabled}
           pending={pending}

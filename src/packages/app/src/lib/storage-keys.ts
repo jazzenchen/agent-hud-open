@@ -27,6 +27,15 @@ export function adoptEarlierKeys(storage: Storage): void {
   }
 }
 
+/** The JSON value under `key`; null when there is none or it does not parse. */
+export function readJSON(key: string): unknown {
+  try {
+    return JSON.parse(localStorage.getItem(key) || "null");
+  } catch {
+    return null;
+  }
+}
+
 try {
   adoptEarlierKeys(localStorage);
 } catch {}

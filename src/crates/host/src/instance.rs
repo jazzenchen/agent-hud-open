@@ -67,11 +67,6 @@ fn same_file(a: &Path, b: Option<&Path>) -> bool {
     b.is_some_and(|b| canonical(a) == canonical(b))
 }
 
-/// Asks the running copy to show itself; true when it answered.
-pub(crate) fn hand_over(lock: &Path) -> bool {
-    instance::hand_over(lock)
-}
-
 /// Says which copy runs and that it must quit first. In the system's
 /// language, since the stored preferences are not read before the claim.
 pub(crate) fn refuse(holder: Option<&Path>) {

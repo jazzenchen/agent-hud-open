@@ -13,7 +13,6 @@ use serde_json::{json, Value};
 use std::{
     collections::{BTreeMap, HashMap},
     fs,
-    io::Write,
     path::{Path, PathBuf},
     time::Duration,
 };
@@ -108,21 +107,9 @@ pub(super) fn copy(
 
 /// Replaces the copy in `data_dir` with `copy`, readable by this user only.
 pub(super) fn save(data_dir: &Path, copy: &Value) {
-    let result = (|| -> Result<(), String> {
-        fs::create_dir_all(data_dir).map_err(|error| error.to_string())?;
-        let bytes = serde_json::to_vec(copy).map_err(|error| error.to_string())?;
-        let temporary = data_dir.join(format!(".{FILE}.{}.tmp", std::process::id()));
-        let written = crate::os::private_file(&temporary, false)
-            .and_then(|mut file| {
-                file.set_len(0)?;
-                file.write_all(&bytes).and_then(|_| file.sync_all())
-            })
-            .and_then(|_| fs::rename(&temporary, path(data_dir)));
-        if written.is_err() {
-            let _ = fs::remove_file(&temporary);
-        }
-        written.map_err(|error| error.to_string())
-    })();
+    let result = fs::create_dir_all(data_dir).and_then(|_| {
+        crate::claude_plugin::write_private(&path(data_dir), copy.to_string().as_bytes())
+    });
     if let Err(error) = result {
         eprintln!("The restart copy of account readings could not be saved: {error}");
     }

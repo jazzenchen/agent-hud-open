@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import type { NativeMethod, Snapshot } from "@agent-hud/protocol";
 import { failure, toolsSwitch } from "../../lib/agent-plugins";
 import type { Text } from "../SettingsPrimitives";
+import { usePending } from "../use-pending";
 import {
   cache,
   type ClaudePluginService,
@@ -30,9 +31,7 @@ export function useBriefly<T>(ms: number) {
 
 /** Whether the window is in its light theme, following changes. */
 export function useLightTheme() {
-  const read = () =>
-    typeof document !== "undefined" &&
-    document.documentElement.dataset.theme === "light";
+  const read = () => document.documentElement.dataset.theme === "light";
   const [light, setLight] = useState(read);
   useEffect(() => {
     const observer = new MutationObserver(() => setLight(read()));
@@ -185,8 +184,7 @@ export type McpClients = ReturnType<typeof useMcpClients>;
 
 /** The app-wide switch that lets agents with HUD tools arrange the HUD. */
 export function useHudTools(snapshot: Snapshot, action: Action) {
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { pending, error, run } = usePending();
   const local = snapshot.connection.localTools;
   const on = Boolean(snapshot.settings.hudTools);
   const listening = Boolean(local?.listening);
@@ -197,17 +195,8 @@ export function useHudTools(snapshot: Snapshot, action: Action) {
     notice: local?.notice ?? null,
     demo: snapshot.mode === "demo",
   });
-  async function set(value: boolean) {
-    setPending(true);
-    setError(null);
-    try {
-      await action("set_setting", { key: "hudTools", value });
-    } catch (failed) {
-      setError(String(failed));
-    } finally {
-      setPending(false);
-    }
-  }
+  const set = (value: boolean) =>
+    run(() => action("set_setting", { key: "hudTools", value }));
   return { on, listening, state, pending, error, set };
 }
 export type HudTools = ReturnType<typeof useHudTools>;

@@ -13,7 +13,7 @@ use std::{
 pub fn data_directory() -> Result<PathBuf, String> {
     let home = crate::os::home_dir()?;
     Ok(
-        crate::os::variable(&std::env::vars().collect(), "CODEX_HOME", &home)
+        crate::os::variable(&std::env::vars().collect(), "CODEX_HOME")
             .unwrap_or_else(|| home.join(".codex")),
     )
 }
@@ -28,8 +28,7 @@ pub(crate) fn daemon_terminal(
     if !crate::os::READS_PROCESS_ENVIRONMENT || !crate::hooks::origins::is_uuid(session) {
         return None;
     }
-    let origin = desktop::daemon_tui_origin(session, home, env)?;
-    let port = crate::hooks::origins::loopback_port(&origin)?;
+    let port = desktop::daemon_tui_port(session, home, env)?;
     let (args, env) =
         crate::os::codex_cli_on_port(port, &["TERM_PROGRAM", "ITERM_SESSION_ID", "TMUX"])?;
     if agent_hud_agents::codex::process::invocation(&args) != "cli" {

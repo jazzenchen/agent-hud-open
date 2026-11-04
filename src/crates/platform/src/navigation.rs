@@ -1,5 +1,6 @@
 //! Only typed client-owned destinations become fixed native URL schemes. No
 //! command, arbitrary URL or callback-declared host is accepted as navigation.
+use crate::hooks::origins::is_uuid;
 use agent_hud_agents::{Discovery, Os, ALL};
 use serde_json::{json, Value};
 mod antigravity;
@@ -56,7 +57,7 @@ fn resolve_claude_desktop_local_id(id: &str, cowork: bool) -> Option<String> {
                 let Some(stem) = path.file_stem().and_then(|s| s.to_str()) else {
                     continue;
                 };
-                if !stem.strip_prefix("local_").is_some_and(uuid) {
+                if !stem.strip_prefix("local_").is_some_and(is_uuid) {
                     continue;
                 }
                 let Ok(bytes) = std::fs::read(&path) else {
@@ -77,16 +78,6 @@ fn resolve_claude_desktop_local_id(id: &str, cowork: bool) -> Option<String> {
     matched.sort();
     matched.dedup();
     (matched.len() == 1).then(|| matched.pop()).flatten()
-}
-fn uuid(value: &str) -> bool {
-    value.len() == 36
-        && value.bytes().enumerate().all(|(i, b)| {
-            if matches!(i, 8 | 13 | 18 | 23) {
-                b == b'-'
-            } else {
-                b.is_ascii_hexdigit()
-            }
-        })
 }
 /// Token-shaped Claude Projects identifiers accepted by the project deep
 /// link. Keep project and thread identifiers separate from local session IDs.
@@ -143,7 +134,7 @@ fn session_url_on(target: &Value, os: Os, registered: impl Fn(&str) -> bool) -> 
         }
         // As Open does, the link also launches the Codex app when it is closed.
         "codex-thread" | "codexThread"
-            if uuid(id)
+            if is_uuid(id)
                 && (app_running("com.openai.codex")
                     || crate::os::registered_bundle("com.openai.codex")) =>
         {
@@ -159,9 +150,9 @@ fn session_url_on(target: &Value, os: Os, registered: impl Fn(&str) -> bool) -> 
                 target["kind"].as_str(),
                 Some("claude-cowork" | "claude-cowork-session" | "claudeCoworkSession")
             );
-            let local_id = if id.strip_prefix("local_").is_some_and(uuid) {
+            let local_id = if id.strip_prefix("local_").is_some_and(is_uuid) {
                 Some(id.to_owned())
-            } else if uuid(id) {
+            } else if is_uuid(id) {
                 resolve_claude_desktop_local_id(id, cowork)
             } else {
                 None

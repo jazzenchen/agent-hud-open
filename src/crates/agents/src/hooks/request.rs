@@ -310,12 +310,15 @@ impl Request {
             .filter(|s| !s.is_empty())
     }
     pub fn view(&self, id: &str, created_at_ms: i64) -> Value {
-        let mut questions = serde_json::to_value(&self.questions).unwrap_or_else(|_| json!([]));
-        if let Some(list) = questions.as_array_mut() {
-            for (item, question) in list.iter_mut().zip(&self.questions) {
+        let questions: Vec<Value> = self
+            .questions
+            .iter()
+            .map(|question| {
+                let mut item = json!(question);
                 item["answerKey"] = json!(question.id.as_deref().unwrap_or(&question.question));
-            }
-        }
+                item
+            })
+            .collect();
         json!({"id":id,"title":self.summary,"source":self.source,"vendor":display(&self.source),"toolName":self.tool_name.as_deref().unwrap_or(""),"input":self.detail.as_deref().unwrap_or(""),"detail":self.detail,"summary":self.summary,"sessionId":self.session_id,"createdAt":iso(created_at_ms),"allowsAlways":self.always().is_some(),"kind":self.kind,"cwd":self.cwd,"path":self.path,"removed":self.removed,"added":self.added,"suggestions":self.suggestions,"alwaysAllowRule":self.always().and_then(rules),"questions":questions,"plan":self.plan(),"answersQuestion":!self.questions.is_empty(),"answersPlan":self.plans()&&self.plan().is_some()})
     }
     /// None is an empty response: close the hook connection without writing JSON.

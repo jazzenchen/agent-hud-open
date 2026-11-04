@@ -269,8 +269,7 @@ fn plan_file(
     } else {
         return Ok(None);
     }
-    let bytes = crate::json_text::rewrite(original.as_deref(), &Value::Object(updated))
-        .map_err(|_| "CLI settings could not be encoded")?;
+    let bytes = crate::json_text::rewrite(original.as_deref(), &Value::Object(updated)).unwrap();
     Ok(Some(FileChange {
         configuration: path.to_owned(),
         target,

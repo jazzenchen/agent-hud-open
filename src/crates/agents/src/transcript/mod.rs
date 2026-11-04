@@ -48,7 +48,6 @@ pub const DATA_VERSION: &str = DATA_VERSIONS[DATA_VERSIONS.len() - 1].0;
 /// `DATA_VERSION` names.
 pub const PARSER_VERSION: u32 = DATA_VERSIONS[DATA_VERSIONS.len() - 1].1;
 
-use chrono::{DateTime, Utc};
 use rusqlite::Connection;
 use serde_json::{json, Value};
 use std::collections::HashSet;
@@ -84,9 +83,7 @@ pub fn at(value: &Value) -> Option<i64> {
 }
 
 pub fn iso(at: i64) -> String {
-    DateTime::<Utc>::from_timestamp_millis(at)
-        .map(|d| d.to_rfc3339())
-        .unwrap_or_default()
+    crate::iso(at).unwrap_or_default()
 }
 
 pub fn first<'a>(value: &'a Value, keys: &[&str]) -> Option<&'a Value> {

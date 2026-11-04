@@ -124,7 +124,7 @@ impl DesktopIpc {
         message: Value,
         mut on_write: Option<&mut dyn FnMut()>,
     ) -> Result<(), IpcError> {
-        let bytes = serde_json::to_vec(&message).map_err(|_| IpcError::Protocol)?;
+        let bytes = serde_json::to_vec(&message).unwrap();
         if bytes.len() > 64 * 1024 * 1024 {
             return Err(IpcError::Protocol);
         }

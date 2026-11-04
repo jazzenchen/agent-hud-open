@@ -173,9 +173,7 @@ impl LogHead {
         self.priced_cost.hash(&mut hash);
         self.unpriced_tokens.hash(&mut hash);
         self.account_cost.hash(&mut hash);
-        if let Ok(live) = serde_json::to_vec(&self.live) {
-            live.hash(&mut hash);
-        }
+        serde_json::to_vec(&self.live).unwrap().hash(&mut hash);
         self.live.hash_words(&mut hash);
         self.fact_hash = hash.finish();
     }
@@ -337,20 +335,6 @@ impl ParserCache {
         self.bytes += bytes;
         self.entries.push_back((log.path.clone(), log, bytes));
     }
-}
-
-pub(crate) fn open(
-    directory: &Path,
-) -> Result<
-    (
-        Connection,
-        HashMap<PathBuf, LogHead>,
-        HashMap<(String, String), PathBuf>,
-        i64,
-    ),
-    String,
-> {
-    super::open(directory)
 }
 
 pub(crate) fn read(database: &Connection, path: &Path) -> Result<(Log, usize), String> {
@@ -517,15 +501,16 @@ pub(crate) fn sync_since(
         "SELECT contribution, updated_at_ms FROM usage_meter_event WHERE updated_at_ms > ?1",
         "SELECT contribution, updated_at_ms FROM usage_meter_bucket WHERE updated_at_ms > ?1",
     ] {
-        let Ok(mut stmt) = db.prepare_cached(sql) else {
-            continue;
-        };
-        let Ok(rows) = stmt.query_map([since_ms], |r| {
-            Ok((r.get::<_, String>(0)?, r.get::<_, i64>(1)?))
-        }) else {
-            continue;
-        };
-        for (contribution, ts) in rows.flatten() {
+        let mut stmt = db
+            .prepare_cached(sql)
+            .map_err(|_| "Could not read updated usage")?;
+        let rows = stmt
+            .query_map([since_ms], |r| {
+                Ok((r.get::<_, String>(0)?, r.get::<_, i64>(1)?))
+            })
+            .map_err(|_| "Could not query updated usage")?;
+        for row in rows {
+            let (contribution, ts) = row.map_err(|_| "Could not decode updated usage")?;
             max_ts = max_ts.max(ts);
             changed |= !held.contains(&contribution.as_str());
         }

@@ -5,14 +5,11 @@
 //! Sessions and their tokens are read on this Mac (`sessions.rs`, the turn
 //! log), never from the dashboard.
 use crate::account::{
-    account_id, legacy_account, locate, Answer, DatabaseFailure, Host, HttpFailure, HttpRequest,
-    Provider, Reading, Unread,
+    account_id, legacy_account, locate, status, Answer, DatabaseFailure, Host, HttpFailure,
+    HttpRequest, Provider, Reading, Unread,
 };
 use crate::{l10n, Location, PerOs, Support};
-use base64::{
-    engine::general_purpose::{STANDARD, URL_SAFE_NO_PAD},
-    Engine,
-};
+use base64::{engine::general_purpose::STANDARD, Engine};
 use chrono::{DateTime, FixedOffset, Utc};
 use serde_json::{json, Value};
 use std::time::Duration;
@@ -244,15 +241,7 @@ pub(crate) fn sign_in(host: &dyn Host) -> Result<Option<SignIn>, Unread> {
     if token.bytes().any(|byte| matches!(byte, 0 | b'\r' | b'\n')) {
         return Err(auth_format().into());
     }
-    let parts = token.split('.').collect::<Vec<_>>();
-    if parts.len() != 3 {
-        return Err(auth_format().into());
-    }
-    let claims: Value = URL_SAFE_NO_PAD
-        .decode(parts[1].trim_end_matches('='))
-        .ok()
-        .and_then(|bytes| serde_json::from_slice(&bytes).ok())
-        .ok_or_else(auth_format)?;
+    let claims = crate::account::jwt_claims(&token).ok_or_else(auth_format)?;
     if !claims["exp"]
         .as_f64()
         .is_some_and(|expiry| expiry > Utc::now().timestamp() as f64 + 60.0)
@@ -403,7 +392,7 @@ pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
                 };
                 let mut quota = json!({
                     "id":format!("{id}:{key}"),"vendor":"cursor","name":name,"shortLabel":short,"usedPercent":used,
-                    "resetAt":reset,"status":if used>=90.0 {"critical"}else if used>=70.0 {"warning"}else{"normal"},
+                    "resetAt":reset,"status":status(used),
                     "account":email,"accountId":account_identity,"legacyWindowId":format!("{account_identity}/{window}"),
                     "allModels":!matches!(key,"models"|"third-party"),
                 });
@@ -442,6 +431,7 @@ mod tests {
     use super::*;
     use crate::account::fake::FakeHost;
     use crate::account::Answer;
+    use base64::engine::general_purpose::URL_SAFE_NO_PAD;
     use std::path::PathBuf;
 
     const SUMMARY: &str = "https://cursor.com/api/usage-summary";

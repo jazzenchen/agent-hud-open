@@ -64,16 +64,9 @@ fn deepseek_balances<'a>(snapshot: &'a Value, layout: &Value) -> (Option<String>
     } else {
         "stale"
     };
-    let zh = snapshot["language"] == "zh";
     let balance = (!rows.is_empty()).then(|| {
         rows.iter()
-            .map(|row| {
-                money_amount(
-                    &row["amount"],
-                    row["currency"].as_str().unwrap_or("USD"),
-                    zh,
-                )
-            })
+            .map(|row| money_amount(&row["amount"], row["currency"].as_str().unwrap_or("USD")))
             .collect::<Vec<_>>()
             .join(" · ")
     });
@@ -99,7 +92,7 @@ fn held(quotas: &[&Value], now_ms: i64) -> Option<f64> {
                 .and_then(|at| chrono::DateTime::parse_from_rfc3339(at).ok())
                 .is_none_or(|at| at.timestamp_millis() > now_ms)
         })
-        .filter_map(|q| q["usedPercent"].as_f64().filter(|used| used.is_finite()))
+        .filter_map(|q| q["usedPercent"].as_f64())
         .fold(None, |most: Option<f64>, used| {
             Some(most.map_or(used, |most| most.max(used)))
         })
@@ -107,7 +100,6 @@ fn held(quotas: &[&Value], now_ms: i64) -> Option<f64> {
 
 /// Every agent a resting HUD in `mode` shows without a list, one per mark.
 pub fn vendors<'a>(snapshot: &'a Value, mode: &str, now_ms: i64) -> Vec<Vendor<'a>> {
-    let zh = snapshot["language"] == "zh";
     resting_agents(snapshot, mode, now_ms)
         .into_iter()
         .map(|source| {
@@ -152,7 +144,7 @@ pub fn vendors<'a>(snapshot: &'a Value, mode: &str, now_ms: i64) -> Vec<Vendor<'
                     .count(),
                 balance: deepseek.and_then(|(label, _)| label).or_else(|| {
                     balance.map(|b| {
-                        money_amount(&b["amount"], b["currency"].as_str().unwrap_or("USD"), zh)
+                        money_amount(&b["amount"], b["currency"].as_str().unwrap_or("USD"))
                     })
                 }),
                 usage: (quotas.is_empty() && balance.is_none())
@@ -329,13 +321,13 @@ pub fn money_short(amount: f64, code: &str) -> String {
     let cents = format!("{amount:.2}");
     let rounded = cents.parse::<f64>().unwrap_or(0.0);
     if rounded == 0.0 && amount > 0.0 {
-        return format!("<{}", money_amount(&json!("0.01"), code, false));
+        return format!("<{}", money_amount(&json!("0.01"), code));
     }
     if rounded.abs() >= 100.0 {
-        let text = money_amount(&json!(format!("{rounded:.0}")), code, false);
+        let text = money_amount(&json!(format!("{rounded:.0}")), code);
         return text.strip_suffix(".00").map(str::to_owned).unwrap_or(text);
     }
-    money_amount(&json!(cents), code, false)
+    money_amount(&json!(cents), code)
 }
 
 /// agent-artwork.ts `agentVendorName`.
@@ -377,7 +369,7 @@ fn vendor_name(source: &str) -> String {
 /// A balance with its currency's narrow symbol and two decimals, rounded half
 /// to even, as format.ts `moneyAmount` writes it: "$12.99", "¥1,234.50",
 /// "-$3.00". Both languages write it the same way.
-pub fn money_amount(amount: &Value, code: &str, _zh: bool) -> String {
+pub fn money_amount(amount: &Value, code: &str) -> String {
     let decimal = match amount {
         Value::String(text) => text.trim().to_owned(),
         // The shortest form that reads back as the same number, as Intl reads it.
@@ -453,11 +445,7 @@ mod tests {
             }
             for language in ["en", "zh"] {
                 assert_eq!(
-                    money_amount(
-                        &args["amount"],
-                        args["currency"].as_str().unwrap(),
-                        language == "zh"
-                    ),
+                    money_amount(&args["amount"], args["currency"].as_str().unwrap()),
                     case["expected"][language],
                     "{}",
                     case["name"]
@@ -466,10 +454,10 @@ mod tests {
             checked += 1;
         }
         assert!(checked >= 7);
-        assert_eq!(money_amount(&json!(8.85), "CNY", false), "¥8.85");
-        assert_eq!(money_amount(&json!(0.125), "USD", false), "$0.12");
-        assert_eq!(money_amount(&json!(0.135), "USD", false), "$0.14");
-        assert_eq!(money_amount(&json!(1e-7), "USD", false), "$0.00");
+        assert_eq!(money_amount(&json!(8.85), "CNY"), "¥8.85");
+        assert_eq!(money_amount(&json!(0.125), "USD"), "$0.12");
+        assert_eq!(money_amount(&json!(0.135), "USD"), "$0.14");
+        assert_eq!(money_amount(&json!(1e-7), "USD"), "$0.00");
     }
 
     #[test]

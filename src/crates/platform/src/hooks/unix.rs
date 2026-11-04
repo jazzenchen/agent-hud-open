@@ -1,4 +1,4 @@
-use super::{now_ms, socket_path, Wake, PAYLOAD_LIMIT};
+use super::{socket_path, Wake, PAYLOAD_LIMIT};
 use agent_hud_core::requests::Requests;
 use serde_json::{json, Value};
 use std::{
@@ -7,14 +7,13 @@ use std::{
     os::{
         fd::AsRawFd,
         unix::{
-            fs::{DirBuilderExt, FileTypeExt, MetadataExt, OpenOptionsExt, PermissionsExt},
+            fs::{FileTypeExt, MetadataExt, OpenOptionsExt, PermissionsExt},
             net::{UnixListener, UnixStream},
         },
     },
     path::{Path, PathBuf},
     sync::{
         atomic::{AtomicBool, AtomicUsize, Ordering},
-        mpsc::RecvTimeoutError,
         Arc,
     },
     thread::JoinHandle,
@@ -23,21 +22,6 @@ use std::{
 
 fn identity(path: &Path) -> Option<(u64, u64)> {
     fs::symlink_metadata(path).ok().map(|m| (m.dev(), m.ino()))
-}
-fn directory(path: &Path) -> Result<(), String> {
-    fs::create_dir_all(path.parent().ok_or("Hooks directory unavailable")?)
-        .map_err(|_| "Hooks directory unavailable")?;
-    match fs::DirBuilder::new().mode(0o700).create(path) {
-        Ok(()) => {}
-        Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {}
-        Err(_) => return Err("Hooks directory unavailable".into()),
-    }
-    let metadata = fs::symlink_metadata(path).map_err(|_| "Hooks directory unavailable")?;
-    if !metadata.is_dir() || metadata.uid() != unsafe { libc::getuid() } {
-        return Err("Hooks directory must belong to the current user".into());
-    }
-    fs::set_permissions(path, fs::Permissions::from_mode(0o700))
-        .map_err(|_| "Hooks directory permissions unavailable".into())
 }
 
 pub(crate) struct Server {
@@ -56,7 +40,7 @@ impl Server {
         reminders: super::reminders::Reminders,
     ) -> Result<Self, String> {
         let path = socket_path(data);
-        directory(path.parent().ok_or("Hooks directory unavailable")?)?;
+        crate::os::private_directory(path.parent().ok_or("Hooks directory unavailable")?)?;
         let lock = File::options()
             .read(true)
             .write(true)
@@ -194,7 +178,6 @@ fn serve(
     if stream.set_nonblocking(false).is_err() {
         return;
     }
-    let _ = stream.set_read_timeout(Some(Duration::from_secs(2)));
     let _ = stream.set_write_timeout(Some(Duration::from_secs(2)));
     let Some(bytes) = read_frame(&mut stream, running) else {
         return;
@@ -224,38 +207,15 @@ fn serve(
         let _ = stream.write_all(b"{}\n");
         return;
     }
-    let Ok(Some(request)) = agent_hud_agents::parse_request(source, payload) else {
+    let Some(response) =
+        super::wait_for_answer(&requests, &reminders, source, flag, payload, || {
+            running.load(Ordering::Acquire) && !disconnected(&stream)
+        })
+    else {
         return;
     };
-    if request.requires_user_reviewer
-        && !super::reviewer::is_user(&requests, &request.source, payload)
-    {
-        return;
-    }
-    reminders.record(source, flag, payload);
-    let ticket = requests.register(request, now_ms());
-    loop {
-        if !running.load(Ordering::Acquire) || disconnected(&stream) {
-            break;
-        }
-        match ticket.response.recv_timeout(Duration::from_millis(100)) {
-            Ok(Some(response)) => {
-                let _ = serde_json::to_writer(&mut stream, &response);
-                let _ = stream.write_all(b"\n");
-                break;
-            }
-            Ok(None) | Err(RecvTimeoutError::Disconnected) => break,
-            Err(RecvTimeoutError::Timeout) => {
-                if requests
-                    .deadline(&ticket.id)
-                    .is_none_or(|deadline| now_ms() >= deadline)
-                {
-                    break;
-                }
-            }
-        }
-    }
-    requests.cancel(&ticket.id);
+    let _ = serde_json::to_writer(&mut stream, &response);
+    let _ = stream.write_all(b"\n");
 }
 fn read_frame(stream: &mut UnixStream, running: &AtomicBool) -> Option<Vec<u8>> {
     let deadline = std::time::Instant::now() + Duration::from_secs(2);
@@ -315,10 +275,9 @@ pub(crate) fn send(
     source: &str,
     flag: &str,
     payload: &Value,
-    origin: Option<Value>,
 ) -> Result<Option<Value>, String> {
-    let message = json!({"source":source,"flag":flag,"payload":payload,"origin":origin});
-    let mut bytes = serde_json::to_vec(&message).map_err(|_| "Invalid hook callback")?;
+    let message = json!({"source":source,"flag":flag,"payload":payload});
+    let mut bytes = serde_json::to_vec(&message).unwrap();
     bytes.push(b'\n');
     if bytes.len() > PAYLOAD_LIMIT {
         return Err("Hook callback is too large".into());
@@ -327,13 +286,6 @@ pub(crate) fn send(
         .map_err(|_| "Agent HUD hooks are disabled or not running")?;
     stream
         .set_write_timeout(Some(Duration::from_secs(2)))
-        .map_err(|_| "Hook timeout unavailable")?;
-    stream
-        .set_read_timeout(Some(Duration::from_secs(if flag == "--permission-hook" {
-            86_405
-        } else {
-            3
-        })))
         .map_err(|_| "Hook timeout unavailable")?;
     stream
         .write_all(&bytes)
@@ -382,6 +334,9 @@ pub(crate) fn send(
         }
     } else {
         stream
+            .set_read_timeout(Some(Duration::from_secs(3)))
+            .map_err(|_| "Hook timeout unavailable")?;
+        stream
             .take((PAYLOAD_LIMIT + 1) as u64)
             .read_to_end(&mut response)
             .map_err(|_| "Hook response did not complete")?;
@@ -401,6 +356,7 @@ pub(crate) fn send(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::hooks::now_ms;
     use agent_hud_agents::HookEvent;
 
     #[test]
@@ -427,7 +383,6 @@ mod tests {
                 source,
                 "--completion-hook",
                 &json!({"transcript_path":null,"event":event}),
-                None,
             )
             .unwrap()
         };

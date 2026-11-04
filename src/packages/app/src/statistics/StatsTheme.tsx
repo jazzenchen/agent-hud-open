@@ -1,4 +1,5 @@
 import {
+  useCallback,
   useEffect,
   useRef,
   useState,
@@ -12,7 +13,8 @@ import type {
   StatisticsModel,
   StatisticsTokenKind,
   StatisticsTotal,
-} from "../lib/types";
+} from "@agent-hud/protocol";
+import { tokenKindOrder, unpricedHelp } from "../lib/sessions";
 import {
   dateFormat,
   listCost,
@@ -36,13 +38,7 @@ export interface StatsTheme {
   selected: string;
 }
 
-export const kinds: StatisticsTokenKind[] = [
-  "cacheWrite",
-  "input",
-  "reasoning",
-  "output",
-  "cacheRead",
-];
+export const kinds: StatisticsTokenKind[] = [...tokenKindOrder];
 export const freshKinds = kinds.filter((kind) => kind !== "cacheRead");
 export const kindLabels: Record<StatisticsTokenKind, string> = {
   input: "Input",
@@ -206,10 +202,14 @@ export function costHelp(cost: StatisticsCost | null, zh = false) {
     return zh
       ? "当前筛选暂无目录价估算。"
       : "A list-price estimate is unavailable for this selection.";
-  const models = cost.unpricedNames ?? cost.unpricedModels;
+  const unpriced = unpricedHelp(
+    cost.unpricedTokens,
+    zh,
+    cost.unpricedNames ?? cost.unpricedModels,
+  );
   return zh
-    ? `按各厂商 API 目录价估算所选 Token 类型，不同币种不做换算。${cost.unpricedTokens ? `另有 ${integer(cost.unpricedTokens)} 个 Token 来自没有 API 价格的模型，未计入${models.length ? `：${models.join("、")}` : ""}。` : ""}`
-    : `Selected token kinds at the vendors' API list prices; currencies are not converted.${cost.unpricedTokens ? ` ${integer(cost.unpricedTokens)} more tokens came from models with no API list price and are not included${models.length ? `: ${models.join(", ")}` : ""}.` : ""}`;
+    ? `按各厂商 API 目录价估算所选 Token 类型，不同币种不做换算。${unpriced ? `${unpriced}。` : ""}`
+    : `Selected token kinds at the vendors' API list prices; currencies are not converted.${unpriced ? ` ${unpriced}.` : ""}`;
 }
 
 export function Coverage({
@@ -410,25 +410,12 @@ export function ModelBar({
 export function useAnimatedNumber(target: number, duration = 220): number {
   const [current, setCurrent] = useState(target);
   const currentRef = useRef(target);
-  const targetRef = useRef(target);
 
   useEffect(() => {
-    if (!Number.isFinite(target)) {
-      currentRef.current = target;
-      targetRef.current = target;
-      setCurrent(target);
-      return;
-    }
     const from = currentRef.current;
-    targetRef.current = target;
-    if (from === target || !Number.isFinite(from)) {
-      currentRef.current = target;
-      setCurrent(target);
-      return;
-    }
     if (
-      typeof window !== "undefined" &&
-      window.matchMedia?.("(prefers-reduced-motion: reduce)").matches
+      from === target ||
+      matchMedia("(prefers-reduced-motion: reduce)").matches
     ) {
       currentRef.current = target;
       setCurrent(target);
@@ -490,7 +477,10 @@ export function ModelList({
   );
 }
 
-export function useCanvasWidth() {
+/** A canvas that follows its laid-out width, and `context()`: its 2D context
+ * sized for `height` on this screen's pixel ratio and cleared, or null before
+ * the canvas is laid out. */
+export function useCanvas(height: number) {
   const ref = useRef<HTMLCanvasElement>(null);
   const [width, setWidth] = useState(0);
   useEffect(() => {
@@ -506,7 +496,22 @@ export function useCanvasWidth() {
     observer.observe(node);
     return () => observer.disconnect();
   }, []);
-  return { ref, width };
+  const context = useCallback(() => {
+    const canvas = ref.current,
+      ctx = canvas?.getContext("2d");
+    if (!canvas || !ctx || width <= 0) return null;
+    const scale = window.devicePixelRatio || 1;
+    const targetW = Math.round(width * scale),
+      targetH = Math.round(height * scale);
+    if (canvas.width !== targetW || canvas.height !== targetH) {
+      canvas.width = targetW;
+      canvas.height = targetH;
+    }
+    ctx.setTransform(scale, 0, 0, scale, 0, 0);
+    ctx.clearRect(0, 0, width, height);
+    return ctx;
+  }, [height, width]);
+  return { ref, width, context };
 }
 
 export function TotalSummary({

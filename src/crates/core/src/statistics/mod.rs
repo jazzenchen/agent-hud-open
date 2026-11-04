@@ -5,11 +5,11 @@ mod query;
 use crate::l10n;
 pub(crate) use query::Cache;
 use query::{
-    day_start, floor, iso, load, local_date, model_id, overlaps, periods, provider_name,
-    tokens_json, Context, Data, Query, Total, DAY,
+    day_start, floor, load, local_date, model_id, overlaps, periods, provider_name, tokens_json,
+    Context, Data, Query, Total, DAY,
 };
 
-use crate::{pricing, AgentHudCore, PARSER_VERSION};
+use crate::{iso, pricing, AgentHudCore};
 use chrono::{Datelike, TimeZone, Timelike, Utc};
 use serde_json::{json, Value};
 use std::{
@@ -72,17 +72,7 @@ impl AgentHudCore {
                 {
                     return None;
                 }
-                let latest = self.logs.get(path).and_then(|log| {
-                    if log.parser_version != PARSER_VERSION
-                        && log.length == file.length
-                        && log.modified == file.modified
-                    {
-                        crate::metering::date_ms(&log.updated)
-                    } else {
-                        log.meter_target_at
-                    }
-                });
-                Some((file.source.to_owned(), latest))
+                Some((file.source.to_owned(), self.pending_meter_bound(path, file)))
             })
             .collect();
         let context = Context {
@@ -168,13 +158,7 @@ fn build(
         let id = model_id(&bucket.source, &bucket.model);
         let selected = query.selected(bucket.tokens);
         let count = selected.total();
-        let price_tokens = pricing::PriceTokens {
-            tokens_in: selected.input + selected.write,
-            tokens_out: selected.output + selected.reasoning,
-            cache_read: selected.read,
-            cache_write: selected.write,
-            reasoning: selected.reasoning,
-        };
+        let price_tokens = crate::metering::price_tokens(selected);
         let cost = if count > 0 {
             pricing::cost_at(
                 &bucket.source,

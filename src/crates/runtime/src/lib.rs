@@ -28,6 +28,16 @@ pub use agent_hud_platform::local_tools;
 pub use agent_hud_platform::registered_applications;
 pub use agent_hud_platform::CollectionGate;
 
+/// The queries answered from committed facts alone (`local_query`).
+const LOCAL_QUERIES: &[&str] = &[
+    "statistics",
+    "session_detail",
+    "sessions",
+    "usage_buckets",
+    "quota_history",
+    "plan_value",
+];
+
 /// Every collecting entry point claims the data directory before constructing
 /// a Runtime. Owning client hooks additionally claims their shared resource.
 /// A preview may run beside a release only with a separate data directory.
@@ -73,8 +83,8 @@ pub fn home_directory() -> Result<PathBuf, String> {
 }
 
 /// Read-only startup seed discovery, with no Runtime, collector or account jobs.
-pub fn legacy_preferences() -> Result<Option<Value>, String> {
-    NativePlatform::new()?.legacy_preferences()
+pub fn legacy_preferences() -> Option<Value> {
+    NativePlatform::legacy_preferences()
 }
 
 pub struct Runtime {
@@ -97,15 +107,8 @@ impl Runtime {
     }
 
     pub fn new(data_dir: Option<PathBuf>) -> Result<Self, String> {
-        Self::new_with_accounts(data_dir, true)
-    }
-    /// The desktop's single startup-mode owner disables account I/O in --demo.
-    pub fn new_with_accounts(
-        data_dir: Option<PathBuf>,
-        read_accounts: bool,
-    ) -> Result<Self, String> {
-        let seed = legacy_preferences()?.and_then(|value| value.get("settings").cloned());
-        Self::new_with_preferences(data_dir, read_accounts, seed)
+        let seed = legacy_preferences().and_then(|value| value.get("settings").cloned());
+        Self::new_with_preferences(data_dir, true, seed)
     }
     /// The product host reads the legacy seed once and shares it with its
     /// presentation owner. An explicit None never triggers a second read.
@@ -291,11 +294,10 @@ impl Runtime {
     /// Read the facts the application already owns, without advancing ingestion
     /// or applying a newly completed account job as a side effect of an MCP call.
     pub fn local_query(&mut self, method: &str, params: Value) -> Result<Value, String> {
-        match method {
-            "statistics" | "session_detail" | "sessions" | "usage_buckets" | "quota_history"
-            | "plan_value" => self.core.request(method, params),
-            _ => Err("This operation is not a local cached query".into()),
+        if !LOCAL_QUERIES.contains(&method) {
+            return Err("This operation is not a local cached query".into());
         }
+        self.core.request(method, params)
     }
     pub fn set_presentation(&mut self, key: &str, value: &Value) -> Result<Value, String> {
         self.core.set_presentation(key, value)
@@ -424,16 +426,8 @@ impl Runtime {
         // All transports read these from committed facts. An on-demand query
         // must not consume the collector's file notifications or apply a newly
         // completed account job as an incidental side effect.
-        if matches!(
-            method,
-            "statistics"
-                | "session_detail"
-                | "sessions"
-                | "usage_buckets"
-                | "quota_history"
-                | "plan_value"
-        ) {
-            return self.local_query(method, params);
+        if LOCAL_QUERIES.contains(&method) {
+            return self.core.request(method, params);
         }
         // This boundary runs on the collector/blocking worker, not desktop setup.
         if let Some(path) = self.legacy_database.take() {

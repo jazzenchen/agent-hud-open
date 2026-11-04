@@ -2,7 +2,7 @@
 //! where Codex sends its calls besides OpenAI, and the key it sends there.
 //! Relays and vendor balances both start from these; each decides for
 //! itself which addresses are its own.
-use crate::account::{resolve, Host};
+use crate::account::{read_bounded, resolve, Host};
 use crate::Location;
 
 /// Codex's configuration, in `CODEX_HOME` when set, else in `~/.codex`.
@@ -89,8 +89,7 @@ pub fn parse(toml: &str) -> Vec<ModelProvider> {
 pub fn configured(host: &dyn Host) -> Vec<ModelProvider> {
     resolve(host, &CONFIG)
         .first()
-        .and_then(|path| host.read_file(path, LIMIT).found())
-        .filter(|bytes| bytes.len() as u64 <= LIMIT)
+        .and_then(|path| read_bounded(host, path, LIMIT).found())
         .map(|bytes| parse(&String::from_utf8_lossy(&bytes)))
         .unwrap_or_default()
 }

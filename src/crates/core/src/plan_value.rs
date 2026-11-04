@@ -61,10 +61,6 @@ fn plan_json(plan: &Plan) -> Value {
     json!({"id":plan.id,"name":plan.name,"monthlyUSD":plan.monthly_usd,"multiple":plan.multiple,"shortMultiple":plan.short_multiple})
 }
 
-fn iso(at: i64) -> Option<String> {
-    DateTime::<Utc>::from_timestamp_millis(at).map(|at| at.to_rfc3339())
-}
-
 /// A completed cycle of a window: its highest reading, whether its last
 /// reading came close enough to its end to be its peak, and whether every
 /// reading in it was taken under the plan asked about.

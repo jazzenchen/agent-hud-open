@@ -215,18 +215,13 @@ fn agent_mode(stored: &str) -> &str {
     }
 }
 
-/// A bound as a sentence writes it: 12, 0.1.
-fn written(value: f64) -> String {
-    format!("{value}")
-}
-
 /// A number's range as a sentence writes it, with the step it keeps to.
 fn numbered((low, high): (f64, f64), step: Option<f64>) -> String {
-    let bounds = format!("from {} to {}", written(low), written(high));
+    let bounds = format!("from {low} to {high}");
     match step {
         None => format!("a number {bounds}"),
         Some(1.) => format!("a whole number {bounds}"),
-        Some(step) => format!("a number {bounds} in steps of {}", written(step)),
+        Some(step) => format!("a number {bounds} in steps of {step}"),
     }
 }
 
@@ -238,9 +233,7 @@ fn keeps(value: f64, step: f64, start: f64) -> bool {
 }
 
 fn number_in(value: &Value, (low, high): (f64, f64)) -> bool {
-    value
-        .as_f64()
-        .is_some_and(|n| n.is_finite() && n >= low && n <= high)
+    value.as_f64().is_some_and(|n| n >= low && n <= high)
 }
 
 /// The names a hud takes beside `agents`.
@@ -364,8 +357,7 @@ fn look_key(key: &str) -> bool {
 /// the defaults, the notch mode on a screen with a notch and a dock on one without,
 /// the shared glow, then the screen's own settings.
 pub(super) fn drawn(saved: &Saved, key: &str, has_notch: bool) -> Map<String, Value> {
-    let defaults: Value = serde_json::from_str(DEFAULTS).expect("checked-in defaults");
-    let mut style = defaults.as_object().cloned().unwrap_or_default();
+    let mut style = DEFAULTS.clone();
     style.insert(
         "mode".into(),
         json!(if has_notch { "notch" } else { "logos" }),
@@ -397,8 +389,7 @@ pub(super) fn effective(s: &State, key: &str, has_notch: bool) -> Map<String, Va
 
 /// The default look a screen is given, as the HUD style's Reset to Default gives it.
 fn default_look(s: &State, has_notch: bool) -> Map<String, Value> {
-    let defaults: Value = serde_json::from_str(DEFAULTS).expect("checked-in defaults");
-    let mut style = defaults.as_object().cloned().unwrap_or_default();
+    let mut style = DEFAULTS.clone();
     merge(&mut style, &s.saved.screen_defaults);
     let screen_defaults = Value::Object(s.saved.screen_defaults.clone());
     style.insert(
@@ -535,10 +526,9 @@ fn issues(
         {
             if !keeps(number, step, range.0) {
                 found.push(format!(
-                    "{path}: {} is {}, as Settings sets it, which {} is not.",
+                    "{path}: {} is {}, as Settings sets it, which {number} is not.",
                     field.name,
                     numbered(range, Some(step)),
-                    written(number)
                 ));
             }
         }

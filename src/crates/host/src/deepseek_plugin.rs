@@ -83,7 +83,7 @@ pub(crate) fn repair_on_launch(app: &tauri::AppHandle) {
         let Ok(_owner) = state.owner.lock() else {
             return;
         };
-        let Ok(home) = super::mcp_clients::home() else {
+        let Ok(home) = agent_hud_runtime::home_directory() else {
             return;
         };
         let places = Places::current(&home);
@@ -124,7 +124,7 @@ pub async fn native_deepseek_plugin(
             .owner
             .lock()
             .map_err(|_| "The plugin's owner is unavailable")?;
-        let places = Places::current(&super::mcp_clients::home()?);
+        let places = Places::current(&agent_hud_runtime::home_directory()?);
         match action.as_str() {
             "status" => {}
             "install" => install(&state.channel, &state.folder, &places)?,

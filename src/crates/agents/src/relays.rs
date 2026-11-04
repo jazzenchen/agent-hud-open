@@ -139,10 +139,6 @@ pub static PROVIDER: Provider = Provider {
 };
 
 pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
-    read_text(host).map_err(Unread::from)
-}
-
-fn read_text(host: &dyn Host) -> Result<Reading, String> {
     let mut reading = Reading::empty("relay");
     for target in targets(host) {
         let consented = target.manual.is_some() || host.consented(&consent_key(&target.host));
@@ -313,17 +309,17 @@ fn balance(host: &dyn Host, target: &Target) -> Found {
     let status = matches!(kind, "auto" | "newapi")
         .then(|| ask(&format!("{}/api/status", target.origin), false).ok())
         .flatten()
-        .filter(|status| {
-            status["data"]["quota_per_unit"]
+        .and_then(|status| {
+            let per_unit = status["data"]["quota_per_unit"]
                 .as_f64()
-                .is_some_and(|per| per > 0.0)
+                .filter(|per| *per > 0.0)?;
+            Some((status, per_unit))
         })
         .or_else(|| {
-            (kind == "newapi")
-                .then(|| json!({"data": {"quota_per_unit": 500000, "quota_display_type": "USD"}}))
+            (kind == "newapi").then(|| (json!({"data": {"quota_display_type": "USD"}}), 500_000.0))
         });
-    if let Some(status) = status {
-        let balance = new_api(&status["data"], &target.host, &|url| {
+    if let Some((status, per_unit)) = status {
+        let balance = new_api(&status["data"], per_unit, &target.host, &|url| {
             ask(&format!("{}{url}", target.origin), true)
         });
         let prices = ask(&format!("{}/api/pricing", target.origin), false)
@@ -511,6 +507,7 @@ fn new_api_prices(body: &Value, status: &Value) -> Option<Value> {
 /// it, else what the key may still spend, in the money the site shows.
 fn new_api(
     status: &Value,
+    per_unit: f64,
     relay: &str,
     ask: &dyn Fn(&str) -> Result<Value, HttpFailure>,
 ) -> Result<Balance, String> {
@@ -527,7 +524,6 @@ fn new_api(
             "This key has no spending limit and the site does not share the account balance.",
         ));
     };
-    let per_unit = status["quota_per_unit"].as_f64().unwrap_or(500_000.0);
     let shown = status["quota_display_type"]
         .as_str()
         .map(str::to_ascii_uppercase)

@@ -53,16 +53,12 @@ export function layHairline(
     data[at + 3] = Math.round(Math.min(255, square[i] * 3) * 0.5);
   }
   const { canvas } = borrowCanvas(width, height);
-  try {
-    canvas.getContext("2d")!.putImageData(mask, 0, 0);
-    context.save();
-    context.resetTransform();
-    context.globalAlpha = 1;
-    context.globalCompositeOperation = "destination-over";
-    context.drawImage(canvas, 0, 0);
-    context.restore();
-  } finally {
-    giveBack(canvas);
-  }
+  canvas.getContext("2d")!.putImageData(mask, 0, 0);
+  context.save();
+  context.resetTransform();
+  context.globalAlpha = 1;
+  context.globalCompositeOperation = "destination-over";
+  context.drawImage(canvas, 0, 0);
+  context.restore();
+  giveBack(canvas);
 }
-export const BotHairline = { lay: layHairline };

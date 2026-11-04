@@ -245,7 +245,10 @@ fn claude_sessions_take_the_given_name_then_the_generated_title_then_the_prompt(
     log.parse(&json!({"sessionId":"s1","type":"custom-title","customTitle":"Release blocker"}));
     log.parse(&json!({"sessionId":"s1","type":"ai-title","aiTitle":"A newer generated title"}));
     assert_eq!(log.title(), "Release blocker");
-    assert_eq!(log.session(0, None)["title"], "Release blocker");
+    assert_eq!(
+        crate::sessions::log_session(&log, 0, None)["title"],
+        "Release blocker"
+    );
 }
 
 #[test]
@@ -680,7 +683,6 @@ fn a_session_opens_where_its_row_says_from_the_detail_too() {
     // `open_session` reads the session as its detail shows it, from the
     // parsed log; the list shows it from the log's head. Both must name the
     // same way back, or the click falls back to revealing the log in Finder.
-    use crate::ingestion::LogSession;
     let now = chrono::Utc::now().timestamp_millis();
     let cases = [
         (
@@ -720,7 +722,7 @@ fn a_session_opens_where_its_row_says_from_the_detail_too() {
         log.id = id.into();
         log.cwd = cwd.map(str::to_owned);
         log.client = client.map(str::to_owned);
-        let detail = LogSession::session(&log, now, None);
+        let detail = crate::sessions::log_session(&log, now, None);
         let row = crate::database::checkpoints::LogHead::from_log(&log).session(now, None);
         assert_eq!(row["navigationTarget"], expected, "{source} row");
         assert_eq!(detail["navigationTarget"], expected, "{source} detail");

@@ -41,9 +41,6 @@ pub(crate) fn codex_cli_on_port(
     wanted_env: &[&str],
 ) -> Option<(Vec<String>, HashMap<String, String>)> {
     const PROC_UID_ONLY: u32 = 5;
-    if port == 0 {
-        return None;
-    }
     let uid = unsafe { libc::getuid() };
     let needed = unsafe { libc::proc_listpids(PROC_UID_ONLY, uid, std::ptr::null_mut(), 0) };
     if needed <= 0 {
@@ -165,9 +162,6 @@ fn parse_procargs2(
     data: &[u8],
     wanted_env: &[&str],
 ) -> Option<(Vec<String>, HashMap<String, String>)> {
-    if !(5..=1024 * 1024).contains(&data.len()) {
-        return None;
-    }
     let count = i32::from_ne_bytes(data.get(..4)?.try_into().ok()?);
     if !(1..=4096).contains(&count) {
         return None;

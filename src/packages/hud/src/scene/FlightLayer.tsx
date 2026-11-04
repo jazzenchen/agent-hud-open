@@ -33,6 +33,7 @@ import {
   stillStory,
   story,
   type HUDFlightCommand,
+  type NotchStage,
   type Point,
   type Ride,
   type Story,
@@ -145,17 +146,11 @@ function FlightRun({
   const [plan, setPlan] = useState<{ ends: Ends; story: Story | null } | null>(
     null,
   );
-  const done = useRef(onDone);
-  done.current = onDone;
 
   // First: measure where it happens and plan the story (the trail's dashes
   // and the craft's size are drawn from it).
   useLayoutEffect(() => {
-    const measured = notch ? notchEnds() : dockEnds();
-    if (!measured) {
-      done.current();
-      return;
-    }
+    const measured = stage ? notchEnds(stage) : dockEnds();
     setSize(measured.size);
     const delay = notch ? STORY.enter : 0;
     const planned = reduceMotion
@@ -171,8 +166,7 @@ function FlightRun({
     setPlan({ ends: measured.ends, story: planned });
 
     /** Around the notch: from beside the sender's robot, under the notch, to beside the receiver's. */
-    function notchEnds() {
-      if (!stage) return null;
+    function notchEnds(stage: NotchStage) {
       const size = craftSize(34);
       const below = (robot: Point) => ({
         x: robot.x,
@@ -198,8 +192,7 @@ function FlightRun({
     }
     /** On a dock: beside the sender's mark and the receiver's, both found where the strip drew them. */
     function dockEnds() {
-      const root = scene.current;
-      if (!root) return null;
+      const root = scene.current!;
       const bounds = root.getBoundingClientRect();
       // The whole mark (its ring included), not the logo inside it.
       const mark = (source: string) => {
@@ -465,7 +458,7 @@ function FlightRun({
     const land = () => {
       if (ended) return;
       ended = true;
-      done.current();
+      onDone();
     };
     void Promise.allSettled(
       animations.map((animation) => animation.finished),

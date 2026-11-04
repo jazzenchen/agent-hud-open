@@ -24,15 +24,6 @@ fn answer<T>(error: std::io::Error) -> Answer<T> {
     }
 }
 
-/// A file in Agent HUD's data folder, when `name` is one plain file name.
-fn own_path(data_dir: &Path, name: &str) -> Option<PathBuf> {
-    let mut parts = Path::new(name).components();
-    match (parts.next(), parts.next()) {
-        (Some(std::path::Component::Normal(_)), None) => Some(data_dir.join(name)),
-        _ => None,
-    }
-}
-
 impl Host for AccountContext {
     fn os(&self) -> Os {
         crate::os::OS
@@ -144,27 +135,21 @@ impl Host for AccountContext {
         agent_hud_agents::sqlite::rows(path, sql, params, wait)
     }
     fn read_own(&self, name: &str, limit: u64) -> Answer<Vec<u8>> {
-        let Some(path) = own_path(&self.data_dir, name) else {
-            return Answer::Denied;
-        };
-        self.read_file(&path, limit)
+        self.read_file(&self.data_dir.join(name), limit)
     }
     fn write_own(&self, name: &str, bytes: &[u8]) -> Result<(), String> {
-        let path = own_path(&self.data_dir, name).ok_or("not a plain file name")?;
         fs::create_dir_all(&self.data_dir).map_err(|error| error.to_string())?;
-        fs::write(path, bytes).map_err(|error| error.to_string())
+        fs::write(self.data_dir.join(name), bytes).map_err(|error| error.to_string())
     }
     fn executable(&self, name: &str) -> Option<PathBuf> {
-        engine::find(self, name)
+        crate::os::find_engine(&self.home, &self.env, name)
     }
     fn start_engine(&self, start: &EngineStart) -> Result<Box<dyn Engine>, String> {
-        let folder = own_path(&self.data_dir.join("account-engines"), start.folder)
-            .ok_or("not a plain folder name")?;
         Ok(Box::new(engine::Engine::start(
             self,
             start.executable,
             start.args,
-            &folder,
+            &self.data_dir.join("account-engines").join(start.folder),
             start.env,
         )?))
     }

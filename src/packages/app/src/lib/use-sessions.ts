@@ -5,7 +5,7 @@ import type {
   SessionDetail,
   SessionsQuery,
   SessionsResponse,
-} from "./types";
+} from "@agent-hud/protocol";
 import { withMessagePage } from "./sessions";
 
 type Action = (
@@ -14,21 +14,6 @@ type Action = (
 ) => Promise<unknown>;
 type Page = SessionsResponse & { key: string };
 
-function response(value: unknown): SessionsResponse {
-  const result = value as SessionsResponse;
-  if (
-    !result ||
-    result.kind !== "sessions" ||
-    !Number.isFinite(result.revision) ||
-    !Array.isArray(result.items) ||
-    !Array.isArray(result.sources) ||
-    !Array.isArray(result.projects) ||
-    !Number.isFinite(result.total) ||
-    (result.nextOffset !== null && !Number.isInteger(result.nextOffset))
-  )
-    throw new Error("The runtime returned an unsupported sessions response.");
-  return result;
-}
 const message = (error: unknown) =>
   error instanceof Error ? error.message : String(error);
 
@@ -72,9 +57,9 @@ export function useSessions(
       );
       void actionRef
         .current("sessions", { ...JSON.parse(key), offset: 0, limit })
-        .then(response)
-        .then((result) => {
+        .then((value) => {
           if (sequence.current !== id) return;
+          const result = value as SessionsResponse;
           if (result.revision < revision)
             throw new Error("Session history is catching up. Try again.");
           setPage({ ...result, key });
@@ -120,13 +105,11 @@ export function useSessions(
     setLoadingMore(true);
     setError(null);
     try {
-      const result = response(
-        await actionRef.current("sessions", {
-          ...JSON.parse(key),
-          offset: before.nextOffset,
-          limit: 100,
-        }),
-      );
+      const result = (await actionRef.current("sessions", {
+        ...JSON.parse(key),
+        offset: before.nextOffset,
+        limit: 100,
+      })) as SessionsResponse;
       if (sequence.current !== id) return;
       if (result.revision !== before.revision) {
         // A page from another version can never be appended to this list.
@@ -221,13 +204,8 @@ export function useSessionDetail(
       .current("session_detail", turn ? { id, turn } : { id })
       .then((value) => {
         if (sequence.current !== version) return;
-        const next = value as SessionDetail;
-        if (next?.session?.id !== id || !Array.isArray(next.turns))
-          throw new Error(
-            "The runtime returned an unsupported session detail.",
-          );
         successful.current = { id, facts, refresh, turn };
-        setDetail(next);
+        setDetail(value as SessionDetail);
       })
       .catch((failure: unknown) => {
         if (sequence.current === version) setError(message(failure));

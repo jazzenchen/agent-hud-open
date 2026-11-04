@@ -221,8 +221,7 @@ pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
         append_notice(&mut reading, error.reason().to_owned());
         failures.push(error);
     }
-    let failure = (!succeeded)
-        .then(|| Unread::combined(failures).unwrap_or_else(|| Unread::Failed(String::new())));
+    let failure = (!succeeded).then(|| Unread::combined(failures).expect("a failure per folder"));
     let recorded = !records.is_empty();
     for mut record in records {
         // Beside folders that read, a failed folder's windows show as a
@@ -315,7 +314,7 @@ fn recorded(
 ) -> Option<Reading> {
     let windows = windows(record.utilization)?;
     let mut reading = plan_reading(host, windows, profile, profile_plan(profile), &folder.path);
-    let fetched = crate::iso(record.fetched_ms);
+    let fetched = json!(crate::iso(record.fetched_ms));
     for row in &mut reading.quotas {
         row["observedAt"] = fetched.clone();
     }
@@ -1417,7 +1416,7 @@ mod tests {
         for row in &reading.quotas {
             assert_eq!(
                 row["observedAt"],
-                crate::iso(fetched),
+                json!(crate::iso(fetched)),
                 "read when Claude Code read it"
             );
             assert_eq!(row["accountId"], identity.as_str());
@@ -1430,7 +1429,7 @@ mod tests {
         assert_eq!(account["id"], identity.as_str());
         assert_eq!(account["label"], "me@example.com");
         assert_eq!(account["plan"], "max_20x");
-        assert_eq!(account["checkedAt"], crate::iso(fetched));
+        assert_eq!(account["checkedAt"], json!(crate::iso(fetched)));
     }
 
     #[test]
@@ -1489,10 +1488,10 @@ mod tests {
             format!("{SIGNED_OUT} · Showing Claude Code's own reading from 2h ago")
         );
         assert_eq!(reading.quotas.len(), 3);
-        assert_eq!(reading.quotas[0]["observedAt"], crate::iso(fetched));
+        assert_eq!(reading.quotas[0]["observedAt"], json!(crate::iso(fetched)));
         assert_eq!(
             reading.account.as_ref().unwrap()["checkedAt"],
-            crate::iso(fetched)
+            json!(crate::iso(fetched))
         );
         assert_eq!(host.started.borrow()[1].1, ["auth", "status", "--json"]);
 
@@ -1563,10 +1562,10 @@ mod tests {
         let id = account_id("claude", &["work", "work-org"]);
         assert_eq!(reading.quotas[2]["id"], format!("{id}:claude-session"));
         assert_eq!(reading.quotas[2]["status"], "stale");
-        assert_eq!(reading.quotas[2]["observedAt"], crate::iso(fetched));
+        assert_eq!(reading.quotas[2]["observedAt"], json!(crate::iso(fetched)));
         let work_account = &reading.additional_accounts[0];
         assert_eq!(work_account["stale"], true);
-        assert_eq!(work_account["checkedAt"], crate::iso(fetched));
+        assert_eq!(work_account["checkedAt"], json!(crate::iso(fetched)));
         assert_eq!(
             reading.notice,
             Some(format!(

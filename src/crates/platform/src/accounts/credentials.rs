@@ -163,9 +163,7 @@ pub(super) fn save(ctx: &AccountContext, params: &Value) -> Result<Value, String
                 "Could not create private API credentials",
             )
         })?;
-        let bytes = serde_json::to_vec(credentials)
-            .map_err(|_| l10n::text("无法编码 API 凭据", "Could not encode API credentials"))?;
-        file.write_all(&bytes)
+        file.write_all(credentials.to_string().as_bytes())
             .and_then(|_| file.sync_all())
             .map_err(|_| {
                 l10n::text(
@@ -260,9 +258,7 @@ fn unreadable_relays() -> String {
 pub(super) fn add_relay_source(ctx: &AccountContext, params: &Value) -> Result<Value, String> {
     let mut source = relay_source(params)?;
     let mut sources = relay_sources(ctx)?;
-    let list = sources["sources"]
-        .as_array_mut()
-        .ok_or_else(unreadable_relays)?;
+    let list = sources["sources"].as_array_mut().unwrap();
     if list.len() >= RELAY_LIMIT {
         return Err(l10n::text(
             "手动添加的中转站已达上限",
@@ -290,9 +286,7 @@ pub(super) fn set_relay_kind(ctx: &AccountContext, params: &Value) -> Result<Val
     if !sources["kinds"].is_object() {
         sources["kinds"] = json!({});
     }
-    let kinds = sources["kinds"]
-        .as_object_mut()
-        .ok_or_else(unreadable_relays)?;
+    let kinds = sources["kinds"].as_object_mut().unwrap();
     match choice {
         Some(choice) => {
             if !kinds.contains_key(&host) && kinds.len() >= RELAY_LIMIT {
@@ -374,9 +368,7 @@ fn relay_kind(params: &Value) -> Result<(String, Option<Value>), String> {
 pub(super) fn remove_relay_source(ctx: &AccountContext, params: &Value) -> Result<Value, String> {
     let id = params["id"].as_str().ok_or("id is required")?;
     let mut sources = relay_sources(ctx)?;
-    let list = sources["sources"]
-        .as_array_mut()
-        .ok_or_else(unreadable_relays)?;
+    let list = sources["sources"].as_array_mut().unwrap();
     list.retain(|source| source["id"] != id);
     write_relays(ctx, &sources)?;
     Ok(json!({"kind": "ack", "id": id}))
@@ -417,31 +409,9 @@ fn relay_source(params: &Value) -> Result<Value, String> {
 
 /// Replaces the relays file, privately and at once.
 fn write_relays(ctx: &AccountContext, sources: &Value) -> Result<(), String> {
-    let directory = folder(ctx);
-    private_folder(&directory)?;
-    let temporary = directory.join(format!(
-        ".relays.{}.{}.tmp",
-        std::process::id(),
-        SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_nanos()
-    ));
-    let saved = (|| -> Result<(), String> {
-        let mut file = crate::os::private_file(&temporary, true)
-            .map_err(|_| l10n::text("无法保存中转站", "Could not save the relays"))?;
-        let bytes = serde_json::to_vec(sources)
-            .map_err(|_| l10n::text("无法保存中转站", "Could not save the relays"))?;
-        file.write_all(&bytes)
-            .and_then(|_| file.sync_all())
-            .map_err(|_| l10n::text("无法保存中转站", "Could not save the relays"))?;
-        fs::rename(&temporary, relays_path(ctx))
-            .map_err(|_| l10n::text("无法保存中转站", "Could not save the relays"))
-    })();
-    if saved.is_err() {
-        let _ = fs::remove_file(&temporary);
-    }
-    saved
+    private_folder(&folder(ctx))?;
+    crate::claude_plugin::write_private(&relays_path(ctx), sources.to_string().as_bytes())
+        .map_err(|_| l10n::text("无法保存中转站", "Could not save the relays"))
 }
 
 #[cfg(test)]

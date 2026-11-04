@@ -6,6 +6,7 @@ import { inlineMarkdown } from "@agent-hud/ui/text/inline-markdown";
 import { alertFill, onAlertFill, permissionColors } from "../tokens";
 import { useGround } from "../ground";
 import { cardColumn } from "../card-column";
+import { CardButton } from "./CardButton";
 
 /** Whether the user is writing what a plan should change, and what they wrote
  * so far, by request: the island redraws its cards as the pointer comes and
@@ -46,12 +47,10 @@ export function PermissionPlanCard({
   const canAnswerPlan = request.answersPlan === true;
   const vendor = request.vendor ?? clientDisplayName(request.source);
 
-  const text = (alpha: number) =>
+  const ink = (alpha: number) =>
     light ? `rgba(0,0,0,${alpha})` : `rgba(255,255,255,${alpha})`;
-  const stroke = (alpha: number) =>
-    light ? `rgba(0,0,0,${alpha})` : `rgba(255,255,255,${alpha})`;
-  const primary = text(0.92);
-  const secondary = text(0.55);
+  const primary = ink(0.92);
+  const secondary = ink(0.55);
   const inset = light ? "rgba(0,0,0,0.045)" : "rgba(255,255,255,0.055)";
   const ground = useGround(light);
   const controls = permissionColors(ground);
@@ -75,7 +74,7 @@ export function PermissionPlanCard({
             background: inset,
             fontSize: 11,
             lineHeight: 1.5,
-            color: text(0.86),
+            color: ink(0.86),
             whiteSpace: "pre-wrap",
             overflowWrap: "anywhere",
             userSelect: "text",
@@ -150,7 +149,7 @@ export function PermissionPlanCard({
                 height: 24,
                 padding: "0 8px",
                 borderRadius: 6,
-                border: `1px solid ${stroke(0.2)}`,
+                border: `1px solid ${ink(0.2)}`,
                 background: inset,
                 color: primary,
                 fontSize: 11,
@@ -158,122 +157,58 @@ export function PermissionPlanCard({
                 outline: 0,
               }}
             />
-            <button
-              type="button"
+            <CardButton
               disabled={disabled}
               onClick={() => setNoting(false)}
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                height: 22,
-                padding: "0 9px",
-                borderRadius: 6,
-                border: `1px solid ${stroke(0.18)}`,
-                background: "transparent",
-                color: secondary,
-                fontSize: 11,
-                fontWeight: 500,
-                cursor: disabled ? "default" : "pointer",
-              }}
+              edge={ink(0.18)}
+              color={secondary}
             >
               {t("Back", "返回")}
-            </button>
-            <button
-              type="button"
+            </CardButton>
+            <CardButton
               disabled={disabled}
               onClick={() => sendBack()}
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 4,
-                height: 22,
-                padding: "0 9px",
-                borderRadius: 6,
-                border: 0,
-                background: signal,
-                color: onSignal,
-                fontSize: 11,
-                fontWeight: 500,
-                cursor: disabled ? "default" : "pointer",
-              }}
+              fill={signal}
+              color={onSignal}
             >
               <ArrowUp size={9} strokeWidth={2.6} />
               {t("Send", "发送")}
-            </button>
+            </CardButton>
           </div>
         ) : (
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <button
-              type="button"
+            <CardButton
               disabled={disabled}
               onClick={() => setNoting(true)}
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 4,
-                height: 22,
-                padding: "0 9px",
-                borderRadius: 6,
-                border: `1px solid ${stroke(0.18)}`,
-                background: "transparent",
-                color: secondary,
-                fontSize: 11,
-                fontWeight: 500,
-                cursor: disabled ? "default" : "pointer",
-              }}
+              edge={ink(0.18)}
+              color={secondary}
             >
               <MessageSquare size={9} strokeWidth={2.6} />
               {t("Keep planning", "继续规划")}
-            </button>
+            </CardButton>
             <span style={{ flex: 1, minWidth: 8 }} />
-            <button
-              type="button"
+            <CardButton
               disabled={disabled}
               onClick={() =>
                 void answer({ kind: "approve_plan", acceptEdits: true })
               }
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 4,
-                height: 22,
-                padding: "0 9px",
-                borderRadius: 6,
-                border: `1px solid ${allowEdge}`,
-                background: "transparent",
-                color: allowText,
-                fontSize: 11,
-                fontWeight: 500,
-                cursor: disabled ? "default" : "pointer",
-              }}
+              edge={allowEdge}
+              color={allowText}
             >
               <CheckCheck size={9} strokeWidth={2.6} />
               {t("Approve, accept edits", "批准并自动接受编辑")}
-            </button>
-            <button
-              type="button"
+            </CardButton>
+            <CardButton
               disabled={disabled}
               onClick={() =>
                 void answer({ kind: "approve_plan", acceptEdits: false })
               }
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 4,
-                height: 22,
-                padding: "0 9px",
-                borderRadius: 6,
-                border: 0,
-                background: allow,
-                color: onAllow,
-                fontSize: 11,
-                fontWeight: 500,
-                cursor: disabled ? "default" : "pointer",
-              }}
+              fill={allow}
+              color={onAllow}
             >
               <Check size={9} strokeWidth={2.6} />
               {t("Approve", "批准")}
-            </button>
+            </CardButton>
           </div>
         )
       ) : (
@@ -285,28 +220,15 @@ export function PermissionPlanCard({
             )}
           </span>
           <span style={{ flex: 1, minWidth: 8 }} />
-          <button
-            type="button"
+          <CardButton
             disabled={disabled}
             onClick={() => void answer({ kind: "leave" })}
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 4,
-              height: 22,
-              padding: "0 9px",
-              borderRadius: 6,
-              border: `1px solid ${stroke(0.18)}`,
-              background: "transparent",
-              color: secondary,
-              fontSize: 11,
-              fontWeight: 500,
-              cursor: disabled ? "default" : "pointer",
-            }}
+            edge={ink(0.18)}
+            color={secondary}
           >
             <X size={9} strokeWidth={2.6} />
             {t("Dismiss", "知道了")}
-          </button>
+          </CardButton>
         </div>
       )}
     </div>

@@ -14,7 +14,6 @@ use crate::account::{
 };
 use crate::naming::window_names::Period;
 use crate::{l10n, Location};
-use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
 use serde_json::{json, Value};
 use std::time::Duration;
 
@@ -68,12 +67,7 @@ fn date_ms(value: &Value) -> Option<i64> {
 /// When a token expires: its JWT `exp`, else the entry's `expires_at` (a
 /// date, or seconds or milliseconds since 1970).
 fn expiry(key: &str, entry: &Value) -> Option<i64> {
-    let jwt = key
-        .split('.')
-        .nth(1)
-        .filter(|_| key.split('.').count() == 3)
-        .and_then(|claims| URL_SAFE_NO_PAD.decode(claims).ok())
-        .and_then(|claims| serde_json::from_slice::<Value>(&claims).ok())
+    let jwt = crate::account::jwt_claims(key)
         .and_then(|claims| number(&claims["exp"]))
         .map(|seconds| (seconds * 1000.0) as i64);
     jwt.or_else(|| date_ms(&entry["expires_at"])).or_else(|| {
@@ -268,6 +262,7 @@ fn parse(body: &Value, id: &str, email: Option<&str>) -> Option<Vec<Value>> {
 mod tests {
     use super::*;
     use crate::account::fake::FakeHost;
+    use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
 
     const AUTH_FILE: &str = "/u/.grok/auth.json";
 

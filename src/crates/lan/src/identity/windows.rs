@@ -20,9 +20,6 @@ fn checked(status: i32, operation: &str) -> Result<()> {
 }
 
 pub(super) fn load(device: &str, directory: &Path) -> Result<Identity> {
-    if !directory.is_absolute() || uuid::Uuid::parse_str(device).is_err() {
-        return Err("Explicit LAN identity path and installation UUID required".into());
-    }
     let key_name: Vec<u16> = format!("app.agenthud.local-network.{device}")
         .encode_utf16()
         .chain([0])

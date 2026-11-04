@@ -16,7 +16,7 @@ impl crate::AgentHudCore {
         });
         let utilization = session_quota
             .and_then(|q| q["usedPercent"].as_f64())
-            .filter(|v| v.is_finite() && *v > 0.0)
+            .filter(|v| *v > 0.0)
             .unwrap_or(0.0);
         if utilization <= 0.0 {
             return HashMap::new();

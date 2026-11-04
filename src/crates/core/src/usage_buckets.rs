@@ -63,7 +63,8 @@ impl AgentHudCore {
             &selected_paths,
             from.div_euclid(900_000) * 900_000,
             (to - 1).div_euclid(900_000) * 900_000 + 900_000,
-        )?;
+        )
+        .map_err(|_| "Could not query usage ledger")?;
         #[derive(Default)]
         struct Aggregate {
             tokens: Usage,
@@ -95,13 +96,7 @@ impl AgentHudCore {
                 ))
                 .or_default();
             group.tokens.add(usage);
-            let price_tokens = pricing::PriceTokens {
-                tokens_in: usage.input + usage.write,
-                tokens_out: usage.output + usage.reasoning,
-                cache_read: usage.read,
-                cache_write: usage.write,
-                reasoning: usage.reasoning,
-            };
+            let price_tokens = metering::price_tokens(usage);
             let priced = pricing::cost_at(
                 &source,
                 &model,
