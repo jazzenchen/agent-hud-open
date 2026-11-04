@@ -1,9 +1,14 @@
 use super::asks::{self, Kind};
 use super::*;
+use crate::claude_plugin::{PromptState, Refusal};
 use crate::hud_tools::{Client, Places};
 use agent_hud_core::requests::Requests;
 use serde_json::json;
-use std::{collections::HashMap, sync::Arc, time::Instant};
+use std::{
+    collections::HashMap,
+    sync::Arc,
+    time::{Instant, SystemTime},
+};
 
 fn places(root: &Path) -> Places {
     let dsh = root.join("dsh");
