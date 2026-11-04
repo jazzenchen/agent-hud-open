@@ -3,7 +3,7 @@
 //! Platform gathers the caller; each client's descriptor rules decide the host
 //! (`agents::process`).
 use agent_hud_agents::naming::surfaces::{self, Surface};
-use agent_hud_agents::process::{Ancestor, Caller};
+use agent_hud_agents::process::{self, Ancestor, Caller};
 use serde_json::{json, Value};
 use std::{
     cell::OnceCell,
@@ -28,10 +28,11 @@ fn agent_of(source: &str) -> Option<&'static agent_hud_agents::Agent> {
     agent_hud_agents::by_id(agent_hud_agents::hooks::hooks_of(source).ok()?.0)
 }
 /// Runs `rule` on the hook's caller. Whether a path is the client's
-/// installed program is worked out only if the rule asks.
+/// installed program is worked out only if the rule asks; without a home
+/// folder, none is.
 fn with_caller<T>(
     agent: &agent_hud_agents::Agent,
-    home: &Path,
+    home: Option<&Path>,
     env: &HashMap<String, String>,
     rule: impl FnOnce(&Caller) -> T,
 ) -> T {
@@ -41,7 +42,8 @@ fn with_caller<T>(
         let candidates = candidates.get_or_init(|| {
             agent
                 .program
-                .map(|program| crate::os::engine_candidates(home, env, program))
+                .zip(home)
+                .map(|(program, home)| crate::os::engine_candidates(home, env, program))
                 .unwrap_or_default()
                 .into_iter()
                 .filter_map(|path| path.canonicalize().ok())
@@ -68,7 +70,7 @@ pub(super) fn origin(
     else {
         return json!({"hostVerified":true,"host":"unsupported","navigationTarget":null});
     };
-    let (mut origin, app) = with_caller(agent, home, env, |caller| {
+    let (mut origin, app) = with_caller(agent, Some(home), env, |caller| {
         let origin = rule(caller, session);
         let app = origin.app.or_else(|| host_app(env, caller.ancestors));
         (origin, app)
@@ -129,7 +131,22 @@ pub(super) fn unattended(source: &str, home: &Path, env: &HashMap<String, String
     }) else {
         return false;
     };
-    with_caller(agent, home, env, rule)
+    with_caller(agent, Some(home), env, rule)
+}
+/// The client that ran this callback of `source`'s hooks from its own import
+/// of them (TRAE's or Devin's run of Claude Code's), by the client's rule
+/// (`agents::process::IMPORTERS`). The processes are read only for hooks
+/// another client imports.
+pub(super) fn imported_by(
+    source: &str,
+    home: Option<&Path>,
+    env: &HashMap<String, String>,
+    payload: &Value,
+) -> Option<&'static str> {
+    let agent = agent_of(source).filter(|agent| process::imported(agent.id))?;
+    with_caller(agent, home, env, |caller| {
+        process::imported_by(agent.id, caller, payload)
+    })
 }
 pub(crate) fn is_uuid(text: &str) -> bool {
     text.len() == 36
@@ -178,6 +195,21 @@ mod tests {
             Some("jetbrains")
         );
         assert_eq!(host_app(&env(&[("TERM_PROGRAM", "xterm")]), &[]), None);
+    }
+
+    #[test]
+    fn a_callback_another_client_ran_is_left_out() {
+        let env: HashMap<String, String> = [("DEVIN_PROJECT_DIR", "project")]
+            .iter()
+            .map(|(k, v)| ((*k).to_owned(), (*v).to_owned()))
+            .collect();
+        let devin = json!({"hook_event_name": "Stop", "session_id": "d1", "prompt_id": "p1"});
+        assert_eq!(imported_by("claude", None, &env, &devin), Some("devin"));
+        let claude = json!({"hook_event_name": "Stop", "session_id": "s1", "transcript_path": "/u/.claude/projects/p/s1.jsonl"});
+        assert_eq!(imported_by("claude", None, &env, &claude), None);
+        // Hooks no client imports are never looked at.
+        assert_eq!(imported_by("devin", None, &env, &devin), None);
+        assert_eq!(imported_by("no-such-client", None, &env, &devin), None);
     }
 
     #[test]

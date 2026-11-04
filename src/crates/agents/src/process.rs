@@ -85,31 +85,35 @@ pub type OriginRule = fn(&Caller, &str) -> Origin;
 pub type UnattendedRule = fn(&Caller) -> bool;
 
 /// A client that runs other clients' hooks it imports from their settings,
-/// with its own payloads (TRAE runs Claude Code's). Such a callback is not
-/// the named client's, and is not taken as its session's.
+/// with its own payloads (TRAE and Devin run Claude Code's). Such a callback
+/// is not the named client's, and is not taken as its session's.
 pub struct Imported {
     /// The client that runs them.
     pub by: &'static str,
     /// The clients whose hooks it imports.
     pub from: &'static [&'static str],
     /// Whether a callback of those hooks comes from it, by the callback's
-    /// own environment and payload.
-    pub rule: fn(&HashMap<String, String>, &Value) -> bool,
+    /// caller (its processes and own environment) and payload.
+    pub rule: fn(&Caller, &Value) -> bool,
 }
 
 /// Every client that runs other clients' hooks.
-pub static IMPORTERS: &[&Imported] = &[&crate::trae::IMPORTS];
+pub static IMPORTERS: &[&Imported] = &[&crate::trae::IMPORTS, &crate::devin::IMPORTS];
+
+/// Whether any client runs `source`'s hooks from its own import of them, so
+/// a callback of them needs its caller looked at.
+pub fn imported(source: &str) -> bool {
+    IMPORTERS
+        .iter()
+        .any(|imported| imported.from.contains(&source))
+}
 
 /// The client that ran this callback of `source`'s hooks from its own
 /// import of them, if one did.
-pub fn imported_by(
-    source: &str,
-    env: &HashMap<String, String>,
-    payload: &Value,
-) -> Option<&'static str> {
+pub fn imported_by(source: &str, caller: &Caller, payload: &Value) -> Option<&'static str> {
     IMPORTERS
         .iter()
-        .find(|imported| imported.from.contains(&source) && (imported.rule)(env, payload))
+        .find(|imported| imported.from.contains(&source) && (imported.rule)(caller, payload))
         .map(|imported| imported.by)
 }
 

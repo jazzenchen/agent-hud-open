@@ -99,11 +99,9 @@ fn handle_payload(arguments: &[String], data: &Path, input: &[u8], output: &mut 
     let env: HashMap<String, String> = std::env::vars().collect();
     let home = crate::os::home_dir().ok();
     // Another client running this one's hooks from its own import of them
-    // (TRAE running Claude Code's) is no session of this client: no opinion,
-    // nothing recorded.
-    if agent_hud_agents::hooks::hooks_of(source)
-        .is_ok_and(|(id, _)| agent_hud_agents::process::imported_by(id, &env, &payload).is_some())
-    {
+    // (TRAE or Devin running Claude Code's) is no session of this client: no
+    // opinion, nothing recorded.
+    if super::origins::imported_by(source, home.as_deref(), &env, &payload).is_some() {
         return 0;
     }
     if flag == "--permission-hook" {
