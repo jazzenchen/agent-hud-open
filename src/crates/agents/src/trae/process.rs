@@ -3,8 +3,8 @@
 //! "Import hooks from Claude"), and then runs Agent HUD's Claude Code hooks
 //! too, with its own payloads and with `CLAUDE_PROJECT_DIR` set as Claude Code
 //! sets it. Those callbacks are TRAE's, not a Claude Code session's.
+use crate::process::Caller;
 use serde_json::Value;
-use std::collections::HashMap;
 
 /// The bundles of the two builds (CodeIsland's `TerminalActivator`, the
 /// Homebrew casks); their helpers' identifiers start with them.
@@ -15,11 +15,12 @@ pub const BUNDLES: [&str; 2] = ["com.trae.app", "cn.trae.app"];
 /// `TRAE_PROJECT_DIR` for every hook it runs and lists `workspace_roots` in
 /// every payload. A transcript says Claude Code even inside TRAE's terminal,
 /// whose sessions are Claude Code's own.
-pub fn runs_imported(env: &HashMap<String, String>, payload: &Value) -> bool {
+pub fn runs_imported(caller: &Caller, payload: &Value) -> bool {
     if !payload["transcript_path"].is_null() {
         return false;
     }
-    env.get("TRAE_PROJECT_DIR")
+    caller
+        .env("TRAE_PROJECT_DIR")
         .is_some_and(|dir| !dir.is_empty())
         || payload["workspace_roots"].is_array()
 }
@@ -29,12 +30,23 @@ mod tests {
     use super::*;
     use crate::process::imported_by;
     use serde_json::json;
+    use std::{collections::HashMap, path::Path};
 
     fn env(pairs: &[(&str, &str)]) -> HashMap<String, String> {
         pairs
             .iter()
             .map(|(k, v)| ((*k).to_owned(), (*v).to_owned()))
             .collect()
+    }
+    /// The client that ran a callback with this environment and no known
+    /// processes above it.
+    fn by(source: &str, env: &HashMap<String, String>, payload: &Value) -> Option<&'static str> {
+        let caller = Caller {
+            ancestors: &[],
+            env,
+            installed: &|_: &Path| false,
+        };
+        imported_by(source, &caller, payload)
     }
 
     #[test]
@@ -44,21 +56,21 @@ mod tests {
             ("TRAE_PROJECT_DIR", "project"),
             ("CLAUDE_PROJECT_DIR", "project"),
         ]);
-        assert_eq!(imported_by("claude", &both, &trae), Some("trae"));
+        assert_eq!(by("claude", &both, &trae), Some("trae"));
         // Either sign alone is enough.
-        assert_eq!(imported_by("claude", &env(&[]), &trae), Some("trae"));
+        assert_eq!(by("claude", &env(&[]), &trae), Some("trae"));
         let mut bare = trae.clone();
         bare.as_object_mut().unwrap().remove("workspace_roots");
-        assert_eq!(imported_by("claude", &both, &bare), Some("trae"));
+        assert_eq!(by("claude", &both, &bare), Some("trae"));
         // Claude Code's own callback, in TRAE's terminal or anywhere else.
         let claude = json!({"session_id": "s1", "transcript_path": "/u/.claude/projects/p/s1.jsonl", "cwd": "/w", "hook_event_name": "UserPromptSubmit", "prompt": "hi"});
-        assert_eq!(imported_by("claude", &both, &claude), None);
+        assert_eq!(by("claude", &both, &claude), None);
         assert_eq!(
-            imported_by("claude", &env(&[("CLAUDE_PROJECT_DIR", "project")]), &bare),
+            by("claude", &env(&[("CLAUDE_PROJECT_DIR", "project")]), &bare),
             None
         );
         // Only the hooks TRAE imports: its own and the others' stay theirs.
-        assert_eq!(imported_by("trae", &both, &trae), None);
-        assert_eq!(imported_by("codex", &both, &trae), None);
+        assert_eq!(by("trae", &both, &trae), None);
+        assert_eq!(by("codex", &both, &trae), None);
     }
 }

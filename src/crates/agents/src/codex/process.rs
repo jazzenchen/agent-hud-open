@@ -150,7 +150,7 @@ fn surface(
         "cli" => (Some(Category::Cli), None),
         "daemon" if runs("app-server") && !managed => match parent_app() {
             Some(AGENT_HUD) => (Some(Category::Desktop), Some(AGENT_HUD)),
-            Some("vscode" | "vscodium" | "cursor" | "windsurf" | "zed" | "jetbrains" | "xcode") => {
+            Some("vscode" | "vscodium" | "cursor" | "devin" | "zed" | "jetbrains" | "xcode") => {
                 (Some(Category::Ide), None)
             }
             _ => (Some(Category::Others), None),

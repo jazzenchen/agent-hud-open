@@ -139,7 +139,7 @@ mod tests {
         );
         assert_eq!(named("devin", "cli:iterm").as_deref(), Some("Devin CLI"));
         // The Desktop's own terminal runs the CLI.
-        assert_eq!(named("devin", "cli:windsurf").as_deref(), Some("Devin CLI"));
+        assert_eq!(named("devin", "cli:devin").as_deref(), Some("Devin CLI"));
         assert_eq!(named("devin", "sdk:others").as_deref(), Some("Devin CLI"));
         // Another ACP client, and agents whose logs name their clients.
         assert_eq!(named("devin", "ide:zed"), None);

@@ -7,6 +7,8 @@ mod hooks;
 pub mod process;
 pub mod transcript;
 
+pub use hooks::IMPORTS;
+
 use crate::Agent;
 use crate::Discovery;
 use crate::{Location, Source};

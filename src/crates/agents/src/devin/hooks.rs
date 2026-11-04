@@ -3,6 +3,7 @@
 //! with the client. Devin Desktop's Devin Local is the same CLI, reading the
 //! same settings file, so these hooks cover both.
 use crate::hooks::{stop, Completed, Completion, Hooks, Layout, Permission, Reply, POSIX_ONLY};
+use crate::process::Imported;
 use crate::Location;
 use serde_json::Value;
 
@@ -34,6 +35,15 @@ pub static HOOKS: Hooks = Hooks {
     compaction: None,
     prefixed_sessions: true,
     launch: POSIX_ONLY,
+};
+
+/// Devin runs Claude Code's hooks too, from its default import of Claude
+/// Code's settings, with its own payloads (`process::runs_imported`). Its own
+/// hooks above are the ones that count.
+pub static IMPORTS: Imported = Imported {
+    by: "devin",
+    from: &["claude"],
+    rule: super::process::runs_imported,
 };
 
 /// Devin's `Stop`: the turn is the callback's prompt.
