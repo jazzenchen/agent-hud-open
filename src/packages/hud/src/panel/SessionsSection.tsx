@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import type {
   PanelLayout,
   SessionsResponse,
@@ -11,6 +12,14 @@ import { useGround } from "../ground";
 import { useFormat } from "@agent-hud/ui/format-context";
 import { useListedSessions } from "./listed-sessions";
 import { noSessionsMatch } from "./session-filters";
+
+/** One line of text that shortens with an ellipsis where it does not fit. */
+const clipped: CSSProperties = {
+  minWidth: 0,
+  whiteSpace: "nowrap",
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+};
 
 export function SourceSessions({
   snapshot,
@@ -102,6 +111,9 @@ export function SourceSessions({
       className="hud-source-sessions"
       style={{
         display: "grid",
+        // As wide as its place, never wider: in a row of sections its titles
+        // shorten instead of running into the next one.
+        gridTemplateColumns: "minmax(0, 1fr)",
         gap: "var(--hud-session-gap, 6px)",
         paddingTop: bare ? 0 : "var(--hud-divided-gap, 8px)",
         boxShadow: bare ? undefined : `inset 0 1px 0 ${colors.divider}`,
@@ -122,12 +134,15 @@ export function SourceSessions({
           lineHeight: "16px",
         }}
       >
-        <strong style={{ fontWeight: 600, color: colors.text }}>
+        <strong style={{ fontWeight: 600, color: colors.text, ...clipped }}>
           {zh ? "会话" : "Sessions"}
         </strong>
         <span
           style={{
             marginLeft: "auto",
+            ...clipped,
+            // The window shortens before the heading does.
+            flexShrink: 1000,
             ...tabular,
             fontSize: 12,
             color: colors.secondary,
@@ -174,19 +189,18 @@ export function SourceSessions({
           >
             <Logo source={session.source} size={14} light={light} />
           </span>
+          <RowTitle
+            parts={sessionTitleParts(session.title, session.cwd)}
+            untitled={zh ? "（未命名会话）" : "(untitled session)"}
+          />
           <span
             style={{
-              flex: 1,
-              minWidth: 0,
+              ...tabular,
+              fontSize: 12,
               whiteSpace: "nowrap",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
+              flexShrink: 0,
             }}
           >
-            {sessionTitle(session.title, session.cwd) ||
-              (zh ? "（未命名会话）" : "(untitled session)")}
-          </span>
-          <span style={{ ...tabular, fontSize: 12, whiteSpace: "nowrap" }}>
             {tokensShort(session.tokens)} tok
           </span>
         </button>
@@ -215,15 +229,62 @@ export function SourceSessions({
   );
 }
 
+/** A row's title and folder, shortening where the row is narrow so its tokens
+ * stay whole: the folder first, as it takes only the room the title leaves,
+ * while a few letters of it fit, and below that it leaves (a first item as tall
+ * as the line holds it, so the folder wraps onto a hidden second line instead
+ * of a stub); then the title. */
+function RowTitle({
+  parts: [task, folder],
+  untitled,
+}: {
+  parts: [string, string | null];
+  untitled: string;
+}) {
+  return (
+    <span style={{ display: "flex", flex: 1, minWidth: 0 }}>
+      <span style={clipped}>{task || untitled}</span>
+      {folder && (
+        <span
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            flex: "1 1 0",
+            height: 15,
+            minWidth: 0,
+            overflow: "hidden",
+          }}
+        >
+          <span style={{ height: 15 }} />
+          <span
+            style={{
+              ...clipped,
+              flex: "1 1 40px",
+              minWidth: 40,
+              maxWidth: "max-content",
+              whiteSpace: "pre",
+            }}
+          >
+            {` · ${folder}`}
+          </span>
+        </span>
+      )}
+    </span>
+  );
+}
+
 /** The row's title (Open's HoverPanelView.sessionTitle): the task cut short,
  * then the session's folder, so rows of one task in different folders differ. */
-export function sessionTitle(task: string, cwd: string | null) {
+export function sessionTitleParts(
+  task: string,
+  cwd: string | null,
+): [string, string | null] {
   const terminal = cwd?.split(/[\\/]/).filter(Boolean).pop();
-  if (!terminal || !task) return task;
+  if (!terminal || !task) return [task, null];
   const words = task.split(" ").filter(Boolean);
   const short =
     words.length > 3
       ? words.slice(0, 3).join(" ")
       : [...task].slice(0, 14).join("");
-  return `${short} · ${terminal}`;
+  return [short, terminal];
 }
