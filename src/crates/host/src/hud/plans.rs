@@ -183,6 +183,24 @@ fn label_width(text: &str, size: f64) -> f64 {
     (text.chars().count() as f64 * size * 0.75).ceil()
 }
 
+/// Which connected screens show a HUD. Each may turn its own off while
+/// another still shows one; when none would, every screen does, so a screen
+/// left alone after the others are unplugged always has its HUD back.
+fn shown_screens<'a>(
+    view: &Value,
+    screens: impl IntoIterator<Item = (&'a str, bool)>,
+) -> Vec<bool> {
+    let wanted: Vec<bool> = screens
+        .into_iter()
+        .map(|(id, has_notch)| Screen::new(view, id, has_notch).flag("showsHUD"))
+        .collect();
+    if wanted.contains(&true) {
+        wanted
+    } else {
+        vec![true; wanted.len()]
+    }
+}
+
 /// One screen's window (App.tsx's native window plan): wide enough for the
 /// strip beside the open panel, at least 940 points, as tall as the screen.
 fn plan(
@@ -312,8 +330,17 @@ impl Planner {
         now_ms: i64,
     ) {
         let visible = snapshot.is_none_or(|snapshot| snapshot["settings"]["hudVisible"] != false);
-        for display in &self.displays {
-            let config = plan(display, view, snapshot, visible, now_ms);
+        let shown = shown_screens(
+            view,
+            self.displays.iter().map(|display| {
+                (
+                    display.info.screen_id.as_str(),
+                    display.info.notch.is_some(),
+                )
+            }),
+        );
+        for (display, shown) in self.displays.iter().zip(shown) {
+            let config = plan(display, view, snapshot, visible && shown, now_ms);
             let id = display.info.screen_id.clone();
             let Ok(signature) =
                 serde_json::to_string(&(&config, display.info.bounds, display.info.scale_factor))
@@ -339,6 +366,18 @@ mod tests {
 
     fn view(screen: Value, layout: Value) -> Value {
         json!({"store": {"screens": {"a": screen}, "screenDefaults": {}}, "layouts": {"a": layout}, "sharedLayout": {}})
+    }
+
+    #[test]
+    fn a_screen_hides_its_hud_only_while_another_shows_one() {
+        let store = |screens: Value| json!({"store": {"screens": screens, "screenDefaults": {}}, "layouts": {}, "sharedLayout": {}});
+        let (a, b) = (("a", false), ("b", false));
+        let one_off = store(json!({"b": {"showsHUD": false}}));
+        assert_eq!(shown_screens(&one_off, [a, b]), [true, false]);
+        // The other screen unplugged: the one left shows its HUD again.
+        assert_eq!(shown_screens(&one_off, [b]), [true]);
+        let both_off = store(json!({"a": {"showsHUD": false}, "b": {"showsHUD": false}}));
+        assert_eq!(shown_screens(&both_off, [a, b]), [true, true]);
     }
 
     #[test]
