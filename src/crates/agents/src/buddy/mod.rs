@@ -1,6 +1,7 @@
 //! CodeBuddy and WorkBuddy, which share one log format.
 pub mod account;
 mod hooks;
+mod limits;
 pub mod transcript;
 
 use crate::Agent;
