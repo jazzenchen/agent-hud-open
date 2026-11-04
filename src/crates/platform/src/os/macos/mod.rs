@@ -30,6 +30,9 @@ pub(crate) const PORTABLE_VALIDATION: &str = "live-verified";
 /// The operating system whose facts the agents' descriptors give here.
 pub(crate) const OS: agent_hud_agents::Os = agent_hud_agents::Os::MacOs;
 pub(crate) const LEGACY_MAC_HISTORY: bool = true;
+pub(crate) fn launched_executable() -> std::io::Result<PathBuf> {
+    std::env::current_exe()
+}
 pub(crate) fn home_dir() -> Result<PathBuf, String> {
     std::env::var_os("HOME")
         .map(PathBuf::from)

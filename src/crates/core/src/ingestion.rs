@@ -695,6 +695,7 @@ impl AgentHudCore {
             let original = self.logs.get(&path).cloned();
             let reset = original.as_ref().is_none_or(|log| {
                 log.parser_version != PARSER_VERSION
+                    || log.reader_version != source_db::reader_version(&path, source)
                     || metadata.length < log.length
                     || (metadata.length == log.length && modified != log.modified)
             });
@@ -704,7 +705,9 @@ impl AgentHudCore {
                     previous.length == metadata.length && previous.modified == modified
                 }) {
                     draft.meter_target_at = metering::date_ms(&previous.updated);
-                    if previous.parser_version != PARSER_VERSION {
+                    if previous.parser_version != PARSER_VERSION
+                        || previous.reader_version != source_db::reader_version(&path, source)
+                    {
                         draft.carried = Some(carried_usage::CarriedUsage::default());
                     }
                 }
@@ -723,6 +726,7 @@ impl AgentHudCore {
                     }
                 }
             };
+            log.reader_version = source_db::reader_version(&path, source);
             if !reset
                 && !self.reads.forced.contains(&path)
                 && !original.as_ref().is_some_and(|head| head.gone)
@@ -1079,10 +1083,11 @@ impl AgentHudCore {
     }
 
     /// Up to when a pending log's usage is known: its last update when only
-    /// the parser changed, else its read's target.
+    /// the parser or reader changed, else its read's target.
     pub(crate) fn pending_meter_bound(&self, path: &Path, file: &FileStamp) -> Option<i64> {
         self.logs.get(path).and_then(|log| {
-            if log.parser_version != PARSER_VERSION
+            if (log.parser_version != PARSER_VERSION
+                || log.reader_version != source_db::reader_version(path, &log.source))
                 && log.length == file.length
                 && log.modified == file.modified
             {

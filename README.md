@@ -193,7 +193,7 @@ When your iPhone and the release share a network, iPhone and Apple Watch show yo
 
 ## Coming soon
 
-- **Windows and Linux out of preview**, with client hooks on Windows, and Linux packages that can install them. [Contributions are welcome](CONTRIBUTING.md).
+- **Windows and Linux out of preview**, with client hooks on Windows. [Contributions are welcome](CONTRIBUTING.md).
 - **More agents**, beyond the 18 in the table below.
 - **API keys billed by the token**: their usage, spend and balance, next to your plans' quotas.
 - **UI prompt templates.** Ready-made prompts that reshape your HUD in one go.

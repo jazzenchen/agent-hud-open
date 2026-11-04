@@ -2,6 +2,210 @@
 //! sub-agents and each Claude session's share of the 5-hour window.
 use super::*;
 
+fn project_worker_fixture(home: &Path, suffix: u8, managed: bool, known_origin: bool) -> String {
+    let cli = format!("11111111-1111-4111-8111-{suffix:012}");
+    let tab = format!("local_22222222-2222-4222-8222-{suffix:012}");
+    let folder = home.join("Library/Application Support/Claude/claude-code-sessions/org/account");
+    fs::create_dir_all(&folder).unwrap();
+    let mut metadata = json!({"sessionId":tab,"cliSessionId":cli,"isArchived":false});
+    if managed {
+        metadata["remoteControlSpawn"] =
+            json!({"projectThreadChild":true,"ccrSessionId":format!("cse_synthetic{suffix:06}")});
+    }
+    fs::write(folder.join(format!("{tab}.json")), metadata.to_string()).unwrap();
+    let root = home.join(".claude/projects/synthetic");
+    fs::create_dir_all(&root).unwrap();
+    let thread = if known_origin {
+        "cmsg_syntheticproject_thread"
+    } else {
+        "cmsg_conflicting_project"
+    };
+    let at = Utc::now().to_rfc3339();
+    let lines = [
+        json!({"sessionId":cli,"type":"user","uuid":"prompt","timestamp":at,"entrypoint":"claude-desktop","projectsUserTurn":true,"textNotTyped":true,"promptSource":"sdk","isSidechain":false,"message":{"role":"user","content":format!("<wake reason=\"mention\"><project type=\"project\" id=\"chan_syntheticproject\"><thread ts=\"{thread}\"><message trigger=\"true\">Synthetic task</message></thread></project></wake>")}}),
+        json!({"sessionId":cli,"type":"assistant","uuid":"reply","timestamp":at,"message":{"id":"reply","role":"assistant","model":"synthetic-model","content":[{"type":"text","text":"Synthetic reply"}],"usage":{"input_tokens":10,"output_tokens":3}}}),
+    ];
+    fs::write(
+        root.join(format!("{cli}.jsonl")),
+        lines
+            .iter()
+            .map(Value::to_string)
+            .collect::<Vec<_>>()
+            .join("\n")
+            + "\n",
+    )
+    .unwrap();
+    cli
+}
+
+#[test]
+fn unsupported_project_host_preserves_existing_local_session_routes() {
+    let temp = tempfile::tempdir().unwrap();
+    let worker = project_worker_fixture(temp.path(), 1, true, true);
+    let standalone = project_worker_fixture(temp.path(), 2, false, true);
+    let mut core = fixture(temp.path());
+    core.set_claude_projects_supported(false);
+    core.request("snapshot", json!({})).unwrap();
+    let page = core.request("sessions", json!({"scope":"all"})).unwrap();
+    let rows = page["items"].as_array().unwrap();
+    assert_eq!(rows.len(), 2);
+    for id in [worker, standalone] {
+        let row = rows.iter().find(|row| row["id"] == id).unwrap();
+        assert!(row["desktopProject"].is_null());
+        let detail = core.request("session_detail", json!({"id":id})).unwrap();
+        assert!(detail["session"]["desktopProject"].is_null());
+        assert_eq!(
+            detail["session"]["navigationTarget"]["kind"],
+            "claude-desktop"
+        );
+    }
+}
+
+#[test]
+fn project_workers_fold_into_original_conversation_and_never_fall_back_to_local() {
+    let temp = tempfile::tempdir().unwrap();
+    let home = temp.path();
+    let first = project_worker_fixture(home, 1, true, true);
+    let second = project_worker_fixture(home, 2, true, true);
+    let unresolved = project_worker_fixture(home, 3, true, false);
+    let standalone = project_worker_fixture(home, 4, false, true);
+    let mut core = fixture(home);
+    let snapshot = core.request("snapshot", json!({})).unwrap();
+    let key = "claude-project:chan_syntheticproject:cmsg_syntheticproject_thread";
+    let page = core.request("sessions", json!({"scope":"all"})).unwrap();
+    let rows = page["items"].as_array().unwrap();
+    assert_eq!(
+        rows.len(),
+        3,
+        "one Project, one unavailable Project, one independent Local"
+    );
+    assert!(!rows
+        .iter()
+        .any(|row| row["id"] == first || row["id"] == second));
+    let unknown = rows
+        .iter()
+        .find(|row| row["desktopProject"]["openAvailable"] == false)
+        .unwrap();
+    assert_eq!(unknown["desktopProject"]["localWorkerCount"], 1);
+    let unknown_detail = core
+        .request("session_detail", json!({"id":unknown["id"]}))
+        .unwrap();
+    assert_eq!(
+        unknown_detail["session"]["desktopProject"]["localWorkerCount"],
+        1
+    );
+    assert_eq!(unknown_detail["children"].as_array().unwrap().len(), 1);
+    let project = rows.iter().find(|row| row["id"] == key).unwrap();
+    assert_eq!(project["desktopProject"]["status"], "unknown");
+    assert_eq!(project["desktopProject"]["execution"], "local");
+    assert_eq!(project["desktopProject"]["kindLabel"], "Local");
+    assert_eq!(project["desktopProject"]["localWorkerCount"], 2);
+    assert_eq!(project["navigationTarget"]["kind"], "claude-project-thread");
+    assert!(!project["title"].as_str().unwrap().contains("wake"));
+    assert!(!snapshot["sessions"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|row| row["id"] == first));
+    let target = project["navigationTarget"].clone();
+    let detail = core.request("session_detail", json!({"id":key})).unwrap();
+    assert_eq!(detail["children"].as_array().unwrap().len(), 2);
+    for worker in [&first, &second] {
+        let detail = core
+            .request("session_detail", json!({"id":worker}))
+            .unwrap();
+        assert_eq!(detail["session"]["navigationTarget"], target);
+        assert_eq!(
+            detail["session"]["tokens"], 13,
+            "worker usage stays available exactly once"
+        );
+    }
+    let detail = core
+        .request("session_detail", json!({"id":unresolved}))
+        .unwrap();
+    assert!(detail["session"]["navigationTarget"].is_null());
+    assert_eq!(detail["session"]["desktopProject"]["openAvailable"], false);
+    let detail = core
+        .request("session_detail", json!({"id":standalone}))
+        .unwrap();
+    assert_eq!(
+        detail["session"]["navigationTarget"]["kind"],
+        "claude-desktop"
+    );
+    assert!(
+        detail["session"]["desktopProject"].is_null(),
+        "ordinary Local needs both provenance sources"
+    );
+
+    let page = core
+        .request(
+            "sessions",
+            json!({"scope":"all","project":"claude-project:chan_syntheticproject"}),
+        )
+        .unwrap();
+    assert_eq!(page["items"].as_array().unwrap().len(), 1);
+    assert_eq!(page["items"][0]["id"], key);
+    assert_eq!(page["items"][0]["desktopProject"]["localWorkerCount"], 2);
+}
+
+#[test]
+fn all_sessions_keeps_old_project_conversations() {
+    let temp = tempfile::tempdir().unwrap();
+    let cli = project_worker_fixture(temp.path(), 1, true, true);
+    let path = temp
+        .path()
+        .join(format!(".claude/projects/synthetic/{cli}.jsonl"));
+    let old = (Utc::now() - chrono::Duration::days(60)).to_rfc3339();
+    let contents = fs::read_to_string(&path)
+        .unwrap()
+        .lines()
+        .map(|line| {
+            let mut value: Value = serde_json::from_str(line).unwrap();
+            value["timestamp"] = json!(old);
+            value.to_string()
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+        + "\n";
+    fs::write(path, contents).unwrap();
+    let mut core = fixture(temp.path());
+    core.request("snapshot", json!({})).unwrap();
+    let all = core.request("sessions", json!({"scope":"all"})).unwrap();
+    assert_eq!(all["items"].as_array().unwrap().len(), 1);
+    assert_eq!(all["items"][0]["desktopProject"]["localWorkerCount"], 1);
+    let recent = core.request("sessions", json!({"scope":"recent"})).unwrap();
+    assert!(recent["items"].as_array().unwrap().is_empty());
+}
+
+#[test]
+fn existing_project_worker_checkpoints_reparse_without_changing_usage() {
+    let temp = tempfile::tempdir().unwrap();
+    let home = temp.path();
+    let cli = project_worker_fixture(home, 1, true, true);
+    let mut core = fixture(home);
+    core.request("snapshot", json!({})).unwrap();
+    drop(core);
+    let db = rusqlite::Connection::open(home.join("app/ingestion.sqlite")).unwrap();
+    db.execute("UPDATE ingestion_logs SET head=json_remove(json_set(head,'$.reader_version',1),'$.live.claude_project_origin'), payload=json_remove(json_set(payload,'$.reader_version',1),'$.live.claude_project_origin')", []).unwrap();
+    drop(db);
+    let mut core = fixture(home);
+    core.request("snapshot", json!({})).unwrap();
+    let detail = core.request("session_detail", json!({"id":cli})).unwrap();
+    assert_eq!(
+        detail["session"]["navigationTarget"]["kind"],
+        "claude-project-thread"
+    );
+    assert_eq!(detail["session"]["tokens"], 13);
+    let head = core.logs.values().find(|log| log.id == cli).unwrap();
+    assert_eq!(head.reader_version, 2);
+    assert!(head.live.claude_project_origin.is_some());
+    core.request("snapshot", json!({})).unwrap();
+    assert_eq!(
+        core.request("session_detail", json!({"id":cli})).unwrap()["session"]["tokens"],
+        13
+    );
+}
+
 #[test]
 fn claude_sessions_take_the_given_name_then_the_generated_title_then_the_prompt() {
     let mut log = Log::new("s.jsonl".into(), "claude");

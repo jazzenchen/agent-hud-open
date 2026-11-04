@@ -24,6 +24,11 @@ pub use navigation::session_url;
 #[cfg(target_os = "macos")]
 pub use os::registered_applications;
 
+/// The program client hooks run: this executable, or on Linux the AppImage it
+/// was started from, whose temporary mount changes with every launch (Open #11).
+pub fn launched_executable() -> std::io::Result<std::path::PathBuf> {
+    os::launched_executable()
+}
 /// A client's own command line (`claude`, `codex`), where the account readers
 /// find it: an app's bundled copy as well as one on PATH.
 pub fn client_executable(name: &str) -> Option<std::path::PathBuf> {
@@ -118,8 +123,15 @@ impl NativePlatform {
     pub fn claude_desktop_bases(&self) -> Vec<PathBuf> {
         os::claude_desktop_bases(&self.home, &std::env::vars().collect::<os::Environment>())
     }
+    pub fn claude_projects_supported(&self) -> bool {
+        clients::claude::PROJECTS_SUPPORTED
+    }
     /// The core resolves a known session and validates source membership before this call.
     pub fn navigate_session(&self, target: &serde_json::Value) -> Result<bool, String> {
+        if target["kind"] == "claude-project-thread" {
+            return navigation::session_url(target)
+                .map_or(Ok(false), |url| clients::claude::open_project(&url));
+        }
         if matches!(
             target["kind"].as_str(),
             Some("claude-background-job" | "claudeBackgroundJob")

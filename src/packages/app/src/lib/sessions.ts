@@ -34,12 +34,15 @@ export function sessionClient(
  * client that drives it.
  */
 export function sessionWhere(
-  session: PlaceFacts & { project?: string | null },
+  session: PlaceFacts & {
+    project?: string | null;
+    desktopProject?: { projectLabel?: string };
+  },
   client: string,
 ): string[] {
   return [
     session.modelName || session.model || "—",
-    session.project || session.cwd,
+    session.desktopProject?.projectLabel || session.project || session.cwd,
     client,
   ].filter((part): part is string => Boolean(part));
 }

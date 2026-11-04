@@ -1,6 +1,24 @@
 //! Lightweight paging over complete contribution heads. No source I/O or account
 //! collection is performed here; details decode only the requested checkpoint.
 use super::*;
+
+fn session_project(target: &Value, _project: Option<&str>, cwd: Option<&str>) -> Option<String> {
+    if target["kind"] == "claude-project-thread" {
+        target["projectId"]
+            .as_str()
+            .map(|id| format!("claude-project:{id}"))
+    } else {
+        crate::projects::project_id(cwd)
+    }
+}
+
+fn normalize_project_filter(project: &str) -> String {
+    if project.starts_with("claude-project:") {
+        project.to_owned()
+    } else {
+        crate::projects::normalize(project)
+    }
+}
 use std::hash::{Hash, Hasher};
 
 impl AgentHudCore {
@@ -290,6 +308,9 @@ impl AgentHudCore {
         let children = Self::active_subagents(&logs, now);
         let scoped = logs
             .into_iter()
+            // Internal Project executors remain available by id and for usage,
+            // but their original conversation is the root list entry.
+            .filter(|log| !roots || parent.is_some() || !self.is_claude_project_worker(log))
             .filter(|log| {
                 let related = if let Some(parent) = parent {
                     log.live.parent_id.as_deref() == Some(parent)
@@ -316,7 +337,7 @@ impl AgentHudCore {
                             .is_some_and(|at| at >= now - days * 86_400_000))
             })
             .collect::<Vec<_>>();
-        let extras = if parent.is_none() && self.hook_events.revision() != 0 {
+        let mut extras = if parent.is_none() && self.hook_events.revision() != 0 {
             let existing = self.known_sessions();
             self.hook_events
                 .extra_sessions(
@@ -331,6 +352,7 @@ impl AgentHudCore {
                     &existing,
                 )
                 .into_iter()
+                .map(|row| self.protect_claude_project_extra(row))
                 .filter(|row| {
                     self.enabled
                         .get(row["source"].as_str().unwrap_or(""))
@@ -341,6 +363,16 @@ impl AgentHudCore {
         } else {
             vec![]
         };
+        if parent.is_none() && self.enabled.get("claude").copied().unwrap_or(true) {
+            let max_age = if scope == "active" { 1 } else { 7 };
+            extras.extend(self.claude_project_rows().into_iter().filter(|row| {
+                scope == "all"
+                    || row["lastMessageAt"]
+                        .as_str()
+                        .and_then(metering::date_ms)
+                        .is_some_and(|at| at >= now - max_age * 86_400_000)
+            }));
+        }
         let mut sources = scoped.iter().map(|l| l.source.clone()).collect::<Vec<_>>();
         sources.extend(
             extras
@@ -356,18 +388,37 @@ impl AgentHudCore {
             .iter()
             .map(|l| project_of(l.cwd.as_deref()))
             .collect::<Vec<_>>();
-        projects.extend(extras.iter().map(|row| project_of(row["cwd"].as_str())));
+        projects.extend(extras.iter().map(|row| {
+            session_project(
+                &row["navigationTarget"],
+                row["project"].as_str(),
+                row["cwd"].as_str(),
+            )
+        }));
         projects.sort_by(crate::projects::compare);
         projects.dedup();
-        let wanted = project.map(|project| project.as_str().map(crate::projects::normalize));
+        let project_labels = extras
+            .iter()
+            .filter_map(|row| {
+                let project = session_project(
+                    &row["navigationTarget"],
+                    row["project"].as_str(),
+                    row["cwd"].as_str(),
+                )?;
+                let label = row["desktopProject"]["projectLabel"].as_str()?.trim();
+                (!label.is_empty()).then(|| (project, label.to_owned()))
+            })
+            .collect::<BTreeMap<_, _>>();
+        let wanted = project.map(|project| project.as_str().map(normalize_project_filter));
         let project_filter = project_filter.map(|projects| {
             projects
                 .iter()
-                .map(|entry| crate::projects::normalize(entry))
+                .map(|entry| normalize_project_filter(entry))
                 .collect::<Vec<_>>()
         });
-        let in_projects = |cwd: Option<&str>| {
-            let id = project_of(cwd).unwrap_or_else(|| crate::projects::UNASSIGNED.into());
+        let in_project = |target: &Value, project_name: Option<&str>, cwd: Option<&str>| {
+            let id = session_project(target, project_name, cwd)
+                .unwrap_or_else(|| crate::projects::UNASSIGNED.into());
             project_filter
                 .as_ref()
                 .is_none_or(|projects| projects.contains(&id))
@@ -380,7 +431,7 @@ impl AgentHudCore {
                         .as_ref()
                         .is_none_or(|sources| sources.contains(&log.source))
                     && wanted.as_ref().is_none_or(|wanted| project_of(log.cwd.as_deref()) == *wanted)
-                    && in_projects(log.cwd.as_deref())
+                    && in_project(&Value::Null, None, log.cwd.as_deref())
                     && (search.is_empty()
                         || [
                             Some(log.id.as_str()),
@@ -422,16 +473,26 @@ impl AgentHudCore {
                             && source_filter.as_ref().is_none_or(|sources| {
                                 sources.contains(row["source"].as_str().unwrap_or(""))
                             })
-                            && wanted
-                                .as_ref()
-                                .is_none_or(|wanted| project_of(row["cwd"].as_str()) == *wanted)
-                            && in_projects(row["cwd"].as_str())
+                            && wanted.as_ref().is_none_or(|wanted| {
+                                session_project(
+                                    &row["navigationTarget"],
+                                    row["project"].as_str(),
+                                    row["cwd"].as_str(),
+                                ) == *wanted
+                            })
+                            && in_project(
+                                &row["navigationTarget"],
+                                row["project"].as_str(),
+                                row["cwd"].as_str(),
+                            )
                             && (search.is_empty()
-                                || ["id", "source", "title", "model", "cwd"].iter().any(|key| {
-                                    row[*key]
-                                        .as_str()
-                                        .is_some_and(|field| field.to_lowercase().contains(&search))
-                                }))
+                                || ["id", "source", "title", "model", "cwd", "project"]
+                                    .iter()
+                                    .any(|key| {
+                                        row[*key].as_str().is_some_and(|field| {
+                                            field.to_lowercase().contains(&search)
+                                        })
+                                    }))
                     })
                     .map(Row::Extra),
             )
@@ -541,7 +602,7 @@ impl AgentHudCore {
             .collect::<Vec<_>>();
         let next = offset.saturating_add(items.len());
         Ok(
-            json!({"kind":"sessions","revision":self.sessions_revision,"generatedAt":Utc::now().to_rfc3339(),"items":items,"total":total,"nextOffset":(next<total).then_some(next),"sources":sources,"projects":projects}),
+            json!({"kind":"sessions","revision":self.sessions_revision,"generatedAt":Utc::now().to_rfc3339(),"items":items,"total":total,"nextOffset":(next<total).then_some(next),"sources":sources,"projects":projects,"projectLabels":project_labels}),
         )
     }
     pub(super) fn session_detail(&mut self, params: Value) -> Result<Value, String> {
@@ -551,6 +612,9 @@ impl AgentHudCore {
         let logs = self.listed_sessions();
         let selected = logs.iter().copied().find(|log| log.id == id);
         let Some(selected) = selected else {
+            if let Some(detail) = self.claude_project_detail(id, now) {
+                return Ok(detail);
+            }
             let existing = self.known_sessions();
             let session = self
                 .hook_events
@@ -565,6 +629,7 @@ impl AgentHudCore {
                             .unwrap_or(true)
                 })
                 .ok_or("Session was not found; refresh first")?;
+            let session = self.protect_claude_project_extra(session);
             return Ok(
                 json!({"session":session,"usage":Usage::default().json(),"turns":[],"calls":[],"parent":null,"children":[]}),
             );
@@ -645,6 +710,13 @@ impl AgentHudCore {
             log.client.as_deref(),
             &log.prompts,
         );
+        if self.claude_projects_supported {
+            crate::clients::claude_project::overlay_worker(
+                &self.claude_desktop.index,
+                &mut session,
+                log.live.claude_project_origin.as_ref(),
+            );
+        }
         if let Some(title) = title {
             session["title"] = json!(title);
         }

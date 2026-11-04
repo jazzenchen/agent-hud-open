@@ -79,6 +79,17 @@ fn resolve_claude_desktop_local_id(id: &str, cowork: bool) -> Option<String> {
     matched.dedup();
     (matched.len() == 1).then(|| matched.pop()).flatten()
 }
+/// Token-shaped Claude Projects identifiers accepted by the project deep
+/// link. Keep project and thread identifiers separate from local session IDs.
+fn claude_project_id<'a>(value: &'a str, prefix: &str) -> Option<&'a str> {
+    let suffix = value.strip_prefix(prefix)?;
+    (suffix.len() >= 6
+        && suffix.len() <= 120
+        && suffix
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b == b'_'))
+    .then_some(value)
+}
 /// The folder of a local Cursor session (one with no cloud `bc-` id), which
 /// opens in Cursor itself where the host can; its `cursor://file` link is
 /// the fallback, and Cursor asks before it follows one.
@@ -115,6 +126,12 @@ fn session_url_on(target: &Value, os: Os, registered: impl Fn(&str) -> bool) -> 
     }
     let id = target["id"].as_str()?;
     match kind {
+        "claude-project-thread" if os == Os::MacOs => {
+            let project = claude_project_id(target["projectId"].as_str()?, "chan_")?;
+            let thread = claude_project_id(id, "cmsg_")?;
+            (!thread.starts_with("cmsg_pending_"))
+                .then(|| format!("claude://claude.ai/code/project/{project}?thread={thread}"))
+        }
         // As Open does, the link also launches the Codex app when it is closed.
         "codex-thread" | "codexThread"
             if is_uuid(id)

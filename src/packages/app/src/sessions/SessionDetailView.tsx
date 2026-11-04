@@ -200,6 +200,10 @@ export function DetailFigures({
   const percent = (part: number) => `${Math.round(part * 100)}%`;
   // The session with its sub-agents, as Core counts it on its row too.
   const totals = detail?.usage ?? session.usage ?? null;
+  const projectUsageUnavailable =
+    (detail?.session.desktopProject?.localWorkerCount ??
+      session.desktopProject?.localWorkerCount ??
+      0) > 0;
   const language = zh ? "zh" : "en";
   // A priced account's own estimate comes first, as Open's SessionMoney.
   const account = session.accountCost !== undefined;
@@ -214,16 +218,25 @@ export function DetailFigures({
   const items = [
     {
       title: zh ? "Token" : "Tokens",
-      value: compact(totals?.total ?? session.tokens),
-      note: detail?.subagents
-        ? (zh ? "含子 agent " : "Sub-agents ") + compact(detail.subagents.total)
-        : totals
-          ? zh
-            ? `不含缓存读取 ${compact(totals.total - totals.cacheRead)}`
-            : `Excl. cache reads ${compact(totals.total - totals.cacheRead)}`
-          : zh
-            ? "不含缓存读取 —"
-            : "Excl. cache reads —",
+      value: projectUsageUnavailable
+        ? zh
+          ? "不可用"
+          : "Unavailable"
+        : compact(totals?.total ?? session.tokens),
+      note: projectUsageUnavailable
+        ? zh
+          ? "Project 總用量不可用"
+          : "Project total usage unavailable"
+        : detail?.subagents
+          ? (zh ? "含子 agent " : "Sub-agents ") +
+            compact(detail.subagents.total)
+          : totals
+            ? zh
+              ? `不含缓存读取 ${compact(totals.total - totals.cacheRead)}`
+              : `Excl. cache reads ${compact(totals.total - totals.cacheRead)}`
+            : zh
+              ? "不含缓存读取 —"
+              : "Excl. cache reads —",
       help: zh
         ? "五类合计，含缓存读取"
         : "All five kinds, cache reads included",
@@ -454,6 +467,7 @@ function DetailHeader({
   now,
   theme,
   reveal,
+  revealDisabled,
   revealLabel,
 }: {
   session: Session;
@@ -462,6 +476,7 @@ function DetailHeader({
   now: number;
   theme: Theme;
   reveal: (() => void) | null;
+  revealDisabled?: boolean;
   revealLabel: string;
 }) {
   const zh = Boolean(theme.zh);
@@ -497,10 +512,11 @@ function DetailHeader({
         >
           {session.title || (zh ? "未命名会话" : "Untitled session")}
         </h2>
-        {reveal && (
+        {(reveal || revealDisabled) && (
           <button
             type="button"
-            onClick={reveal}
+            disabled={revealDisabled}
+            onClick={reveal ?? undefined}
             style={{
               ...plain,
               color: theme.action,
@@ -1164,6 +1180,66 @@ function SubagentsCard({
   );
 }
 
+/** Local Project workers have their own usage, but the Project total is unavailable. */
+function ProjectExecutionsCard({
+  detail,
+  theme,
+  onSession,
+}: {
+  detail: SessionDetail;
+  theme: Theme;
+  onSession: (id: string) => void;
+}) {
+  const zh = Boolean(theme.zh);
+  const children = [...(detail.children ?? [])].sort(
+    (a, b) => b.tokens - a.tokens,
+  );
+  const count =
+    detail.session.desktopProject?.localWorkerCount ?? children.length;
+  return (
+    <Card style={{ ...card(theme), gap: 9 }}>
+      <CardTitle
+        title={
+          zh
+            ? `本機執行會話（${count}）`
+            : `Local execution sessions (${count})`
+        }
+        right={zh ? "Project 總用量不可用" : "Project total usage unavailable"}
+        theme={theme}
+      />
+      {children.map((child) => (
+        <button
+          key={child.id}
+          type="button"
+          onClick={() => onSession(child.id)}
+          title={child.title}
+          style={{
+            ...plain,
+            ...row,
+            width: "100%",
+            gap: 8,
+            color: theme.text,
+            textAlign: "left",
+            minWidth: 0,
+          }}
+        >
+          <span style={{ ...clipped, flex: 1, minWidth: 0 }}>
+            {child.title || (zh ? "本機執行會話" : "Local execution session")}
+          </span>
+          <span style={{ ...numeric, color: theme.secondary, flexShrink: 0 }}>
+            {compact(child.tokens)} {zh ? "Token" : "tok"}
+          </span>
+          <ChevronRight
+            size={10}
+            color={theme.tertiary}
+            style={{ flexShrink: 0 }}
+          />
+        </button>
+      ))}
+    </Card>
+  );
+}
+
 /** Which models did the work: each with its share, cache hits and tokens. */
 function ModelsCard({
   detail,
@@ -1358,6 +1434,10 @@ export function InlineDetail({
   const lastMessage = session.liveFacts?.message?.trim();
   const children = detail?.children ?? [];
   const helped = Boolean(detail?.subagents) || children.length > 0;
+  const projectHasLocalWorkers =
+    (detail?.session.desktopProject?.localWorkerCount ??
+      session.desktopProject?.localWorkerCount ??
+      0) > 0;
   // One model says nothing the figures do not (Open shows the card from two).
   const models = (detail?.models?.length ?? 0) > 1;
   return (
@@ -1368,11 +1448,21 @@ export function InlineDetail({
         client={client}
         now={now}
         theme={theme}
-        // The runtime's open_session goes back to the session where its client
-        // names a place, else shows its log; the label says which.
-        reveal={session.navigationTarget || session.logPath ? reveal : null}
+        // Project sessions use Core's return route and label. When Core marks
+        // that route unavailable, never fall back to revealing a local log.
+        reveal={
+          session.desktopProject && !session.desktopProject.openAvailable
+            ? null
+            : session.navigationTarget || session.logPath
+              ? reveal
+              : null
+        }
+        revealDisabled={Boolean(
+          session.desktopProject && !session.desktopProject.openAvailable,
+        )}
         revealLabel={
-          session.navigationTarget
+          session.desktopProject?.openLabel ??
+          (session.navigationTarget
             ? zh
               ? "回到会话"
               : "Return to session"
@@ -1382,7 +1472,7 @@ export function InlineDetail({
                 : "Reveal log in Finder"
               : zh
                 ? "显示日志"
-                : "Reveal log"
+                : "Reveal log")
         }
       />
       <DetailFigures session={session} detail={detail} theme={theme} />
@@ -1548,7 +1638,7 @@ export function InlineDetail({
               close={() => onEntry(null)}
             />
           )}
-          {/* Two columns: what the tokens were and which models, beside how much sub-agents added. */}
+          {/* Token/model breakdown beside the session's related workers. */}
           <div
             style={{
               display: "grid",
@@ -1563,7 +1653,13 @@ export function InlineDetail({
                 <ModelsCard detail={detail} session={session} theme={theme} />
               )}
             </div>
-            {helped ? (
+            {detail && projectHasLocalWorkers ? (
+              <ProjectExecutionsCard
+                detail={detail}
+                theme={theme}
+                onSession={onSession}
+              />
+            ) : helped ? (
               <SubagentsCard
                 detail={detail}
                 theme={theme}

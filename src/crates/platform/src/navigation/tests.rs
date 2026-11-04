@@ -47,6 +47,87 @@ fn app_links_do_not_accept_unknown_kinds_or_change_session_links() {
 }
 
 #[test]
+fn claude_project_threads_open_the_exact_project_and_thread() {
+    let first = json!({
+        "kind": "claude-project-thread",
+        "projectId": "chan_abcdefgh1234",
+        "id": "cmsg_abcdefgh1234",
+    });
+    let second = json!({
+        "kind": "claude-project-thread",
+        "projectId": "chan_abcdefgh1234",
+        "id": "cmsg_wxyz98765432",
+    });
+
+    assert_eq!(
+        session_url_on(&first, Os::MacOs, |_| panic!(
+            "Project thread routes do not use app-link discovery"
+        )),
+        Some("claude://claude.ai/code/project/chan_abcdefgh1234?thread=cmsg_abcdefgh1234".into())
+    );
+    assert_eq!(
+        session_url_on(&second, Os::MacOs, |_| panic!(
+            "Project thread routes do not use app-link discovery"
+        )),
+        Some("claude://claude.ai/code/project/chan_abcdefgh1234?thread=cmsg_wxyz98765432".into())
+    );
+}
+
+#[test]
+fn claude_project_threads_are_mac_only_and_reject_malformed_ids() {
+    let good_project = "chan_abcdefgh1234";
+    let good_thread = "cmsg_abcdefgh1234";
+    let target = |project: &str, thread: &str| {
+        json!({
+            "kind": "claude-project-thread",
+            "projectId": project,
+            "id": thread,
+        })
+    };
+
+    for os in [Os::Windows, Os::Linux] {
+        assert_eq!(
+            session_url_on(&target(good_project, good_thread), os, |_| panic!(
+                "unverified host"
+            )),
+            None
+        );
+    }
+
+    for (project, thread) in [
+        ("project/other", good_thread),
+        ("chan_short", good_thread),
+        ("chan_abcdefgh1234?x=y", good_thread),
+        (good_project, "local_abcdefgh1234"),
+        (good_project, "cmsg_pending_abcdefgh"),
+        (good_project, "cmsg_abcdefgh1234#fragment"),
+        (good_project, "cmsg_short"),
+    ] {
+        assert_eq!(
+            session_url_on(&target(project, thread), Os::MacOs, |_| panic!(
+                "Project thread routes do not use app-link discovery"
+            )),
+            None,
+            "{project} / {thread}"
+        );
+    }
+}
+
+#[test]
+fn claude_desktop_local_session_still_opens_its_existing_route() {
+    let target = json!({
+        "kind": "claude-desktop",
+        "id": "local_12345678-1234-1234-1234-123456789abc",
+    });
+    assert_eq!(
+        session_url_on(&target, Os::MacOs, |_| panic!(
+            "local Claude routes do not use app-link discovery"
+        )),
+        Some("claude://claude.ai/epitaxy/local_12345678-1234-1234-1234-123456789abc".into())
+    );
+}
+
+#[test]
 fn cursor_cloud_agent_opens_the_agents_window() {
     let target = json!({"kind":"cursor-agent","id":"bc-1234","cwd":null});
     assert_eq!(

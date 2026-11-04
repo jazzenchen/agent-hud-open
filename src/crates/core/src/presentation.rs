@@ -5,6 +5,7 @@ use crate::naming::surfaces;
 pub(super) struct Presentation<'a> {
     hooks: &'a hook_events::HookEvidence,
     claude_desktop: &'a agent_hud_agents::claude::transcript::ClaudeDesktopIndex,
+    claude_projects_supported: bool,
     claude_jobs: &'a claude_jobs::ClaudeJobs,
     discovery: &'a [ProviderDiscovery],
     pending: HashMap<String, HashMap<String, Vec<Value>>>,
@@ -16,6 +17,7 @@ impl AgentHudCore {
         Presentation {
             hooks: &self.hook_events,
             claude_desktop: &self.claude_desktop.index,
+            claude_projects_supported: self.claude_projects_supported,
             claude_jobs: &self.claude_desktop.jobs,
             discovery: &self.discovery,
             pending: self.requests.session_attention(),
@@ -186,6 +188,13 @@ impl Presentation<'_> {
             log.client.as_deref(),
             &log.prompts,
         );
+        if self.claude_projects_supported {
+            crate::clients::claude_project::overlay_worker(
+                self.claude_desktop,
+                &mut session,
+                log.live.claude_project_origin.as_ref(),
+            );
+        }
         session
     }
     /// The same evidence overlay as a rendered row, without serializing every
