@@ -140,7 +140,7 @@ pub static PROVIDER: Provider = Provider {
 
 pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
     let mut reading = Reading::empty("relay");
-    for target in targets(host) {
+    for target in targets(host)? {
         let consented = target.manual.is_some() || host.consented(&consent_key(&target.host));
         let mut service = json!({"provider": target.host, "product": "relay", "clients": target.clients, "routes": target.routes, "consented": consented});
         if let Some(manual) = &target.manual {
@@ -198,13 +198,9 @@ pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
 
 /// Every relay the owner added by hand, then every one the clients are
 /// configured with, once per address with the clients that use it.
-fn targets(host: &dyn Host) -> Vec<Target> {
+fn targets(host: &dyn Host) -> Result<Vec<Target>, Unread> {
     let mut found = Vec::<Target>::new();
-    let saved = host
-        .saved_credential(MANUAL)
-        .ok()
-        .flatten()
-        .unwrap_or(Value::Null);
+    let saved = host.saved_credential(MANUAL)?.unwrap_or(Value::Null);
     let kinds = &saved["kinds"];
     for source in saved["sources"].as_array().into_iter().flatten() {
         let text = |key: &str| source[key].as_str().map(str::to_owned);
@@ -270,7 +266,7 @@ fn targets(host: &dyn Host) -> Vec<Target> {
             Some(&provider.id),
         );
     }
-    found
+    Ok(found)
 }
 
 /// What the relay reports of the key's balance, and a New API site's price
@@ -786,6 +782,13 @@ mod tests {
             (row["amount"].as_f64(), row["label"].as_str()),
             (Some(12.5), Some("OpenRouter"))
         );
+    }
+
+    #[test]
+    fn unreadable_saved_relays_fail_the_reading() {
+        let mut host = claude_relay(FakeHost::new("/u"), "https://relay.example.com/api");
+        host.saved = Err("unreadable".into());
+        assert!(matches!(read(&host), Err(Unread::Failed(reason)) if reason == "unreadable"));
     }
 
     #[test]
