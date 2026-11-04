@@ -703,7 +703,7 @@ fn run(context: AccountContext, shared: Arc<Shared>, gate: CollectionGate, reade
             Job::Page(page) => {
                 let attempted = Instant::now();
                 let summary = {
-                    let _turn = gate.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+                    let _turn = gate.lock().unwrap_or_else(PoisonError::into_inner);
                     if context.cancelled.load(Ordering::Acquire) {
                         return;
                     }
@@ -741,7 +741,7 @@ fn run(context: AccountContext, shared: Arc<Shared>, gate: CollectionGate, reade
         let attempted_ms = chrono::Utc::now().timestamp_millis();
         // The gate, not the shared state or the Runtime, is held across the I/O.
         let result = {
-            let _turn = gate.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+            let _turn = gate.lock().unwrap_or_else(PoisonError::into_inner);
             if context.cancelled.load(Ordering::Acquire) {
                 return;
             }

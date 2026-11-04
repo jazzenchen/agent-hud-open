@@ -24,7 +24,7 @@ pub(super) fn work(shared: Arc<Shared>) {
                 shared
                     .state
                     .lock()
-                    .unwrap_or_else(|p| p.into_inner())
+                    .unwrap_or_else(PoisonError::into_inner)
                     .connection = Some(handle);
             }
             let _ = serve(&shared, &mut connection);
@@ -87,7 +87,7 @@ fn serve(shared: &Arc<Shared>, connection: &mut DesktopIpc) -> Result<(), IpcErr
             shared
                 .state
                 .lock()
-                .unwrap_or_else(|p| p.into_inner())
+                .unwrap_or_else(PoisonError::into_inner)
                 .known
                 .remove(&thread);
             shared.publish_waiting();
@@ -117,7 +117,7 @@ fn serve(shared: &Arc<Shared>, connection: &mut DesktopIpc) -> Result<(), IpcErr
             if !shared
                 .state
                 .lock()
-                .unwrap_or_else(|p| p.into_inner())
+                .unwrap_or_else(PoisonError::into_inner)
                 .known
                 .contains_key(thread)
                 && now.duration_since(entry.asked) >= RETRY
@@ -232,7 +232,7 @@ fn serve(shared: &Arc<Shared>, connection: &mut DesktopIpc) -> Result<(), IpcErr
                                 let Some(known) = shared
                                     .state
                                     .lock()
-                                    .unwrap_or_else(|p| p.into_inner())
+                                    .unwrap_or_else(PoisonError::into_inner)
                                     .known
                                     .remove(thread)
                                 else {
@@ -287,7 +287,7 @@ fn serve(shared: &Arc<Shared>, connection: &mut DesktopIpc) -> Result<(), IpcErr
     Ok(())
 }
 fn unknown(shared: &Shared, thread: &str) {
-    let mut state = shared.state.lock().unwrap_or_else(|p| p.into_inner());
+    let mut state = shared.state.lock().unwrap_or_else(PoisonError::into_inner);
     state.known.remove(thread);
     for (id, live) in &mut state.pending {
         if live.item.thread == thread {

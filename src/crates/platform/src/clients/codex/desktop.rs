@@ -22,7 +22,7 @@ use std::{
     path::PathBuf,
     sync::{
         atomic::{AtomicBool, Ordering},
-        Arc, Condvar, Mutex,
+        Arc, Condvar, Mutex, PoisonError,
     },
     thread::{self, JoinHandle},
     time::{Duration, Instant},
@@ -87,7 +87,11 @@ impl CodexDesktopObserver {
     }
     pub fn update_sessions(&self, sessions: &[Value]) {
         let now = Instant::now();
-        let mut state = self.shared.state.lock().unwrap_or_else(|p| p.into_inner());
+        let mut state = self
+            .shared
+            .state
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
         let mut changed = false;
         // Only threads Codex Desktop holds are followed: a session in flight
         // whose way back is its Desktop thread, sub-agents included (each is
@@ -126,7 +130,11 @@ impl CodexDesktopObserver {
             return;
         }
         {
-            let mut state = self.shared.state.lock().unwrap_or_else(|p| p.into_inner());
+            let mut state = self
+                .shared
+                .state
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner);
             if let Some(socket) = state.connection.take() {
                 socket.shutdown();
             }
@@ -157,7 +165,7 @@ impl Drop for CodexDesktopObserver {
 impl Shared {
     fn wanted(&self) -> Vec<String> {
         let now = Instant::now();
-        let mut state = self.state.lock().unwrap_or_else(|p| p.into_inner());
+        let mut state = self.state.lock().unwrap_or_else(PoisonError::into_inner);
         state
             .reported
             .retain(|_, at| now.duration_since(*at) < Duration::from_secs(600));
@@ -173,13 +181,13 @@ impl Shared {
         ids
     }
     fn pause(&self, duration: Duration) {
-        let state = self.state.lock().unwrap_or_else(|p| p.into_inner());
+        let state = self.state.lock().unwrap_or_else(PoisonError::into_inner);
         if self.active.load(Ordering::Acquire) {
             let _ = self.changed.wait_timeout(state, duration);
         }
     }
     fn forget_connection(&self) {
-        let mut state = self.state.lock().unwrap_or_else(|p| p.into_inner());
+        let mut state = self.state.lock().unwrap_or_else(PoisonError::into_inner);
         state.connection = None;
         state.known.clear();
         // Unknown/disconnected withdraws visible cards but does not settle dismissed
@@ -193,7 +201,7 @@ impl Shared {
         (self.wake)();
     }
     fn publish_waiting(&self) {
-        let state = self.state.lock().unwrap_or_else(|p| p.into_inner());
+        let state = self.state.lock().unwrap_or_else(PoisonError::into_inner);
         let mut sessions = if self.active.load(Ordering::Acquire) {
             state
                 .known
@@ -243,7 +251,7 @@ impl Shared {
             }
         }
         let parsed = pending::parse(&state_value, thread, owner);
-        let mut state = self.state.lock().unwrap_or_else(|p| p.into_inner());
+        let mut state = self.state.lock().unwrap_or_else(PoisonError::into_inner);
         if !self.active.load(Ordering::Acquire) {
             return;
         }
@@ -307,7 +315,7 @@ impl Shared {
     fn answers(self: &Arc<Self>) {
         let mut ready = Vec::new();
         {
-            let mut state = self.state.lock().unwrap_or_else(|p| p.into_inner());
+            let mut state = self.state.lock().unwrap_or_else(PoisonError::into_inner);
             for live in state.pending.values_mut() {
                 let Some(ticket) = live.ticket.as_ref() else {
                     continue;
@@ -336,7 +344,7 @@ impl Shared {
                     shared
                         .state
                         .lock()
-                        .unwrap_or_else(|p| p.into_inner())
+                        .unwrap_or_else(PoisonError::into_inner)
                         .answer_connections
                         .remove(&item.id);
                     if shared.active.load(Ordering::Acquire) {
@@ -377,7 +385,7 @@ impl Shared {
     }
     fn resolve(&self, item: &Pending, decision: &Value) -> Result<(), ReplyFailure> {
         let (response, method, state_value) = {
-            let state = self.state.lock().unwrap_or_else(|p| p.into_inner());
+            let state = self.state.lock().unwrap_or_else(PoisonError::into_inner);
             let known = state.known.get(&item.thread).ok_or(IpcError::Unavailable)?;
             if known.owner != item.owner {
                 return Err(IpcError::Unavailable.into());
@@ -398,7 +406,7 @@ impl Shared {
         }
         let mut connection = DesktopIpc::connect(&endpoint(&self.data), Duration::from_secs(3))?;
         {
-            let mut state = self.state.lock().unwrap_or_else(|p| p.into_inner());
+            let mut state = self.state.lock().unwrap_or_else(PoisonError::into_inner);
             if !self.active.load(Ordering::Acquire) {
                 return Err(ReplyFailure::Cancelled);
             }

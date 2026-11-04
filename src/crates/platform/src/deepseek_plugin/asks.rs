@@ -20,7 +20,7 @@ use std::{
     sync::{
         atomic::{AtomicBool, Ordering},
         mpsc::RecvTimeoutError,
-        Arc, Condvar, Mutex,
+        Arc, Condvar, Mutex, PoisonError,
     },
     thread,
     time::{Duration, SystemTime},
@@ -208,8 +208,13 @@ impl Drop for Observer {
     fn drop(&mut self) {
         self.shared.active.store(false, Ordering::Release);
         self.shared.changed.notify_all();
-        let known =
-            std::mem::take(&mut *self.shared.known.lock().unwrap_or_else(|p| p.into_inner()));
+        let known = std::mem::take(
+            &mut *self
+                .shared
+                .known
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner),
+        );
         for entry in known.values().filter(|entry| entry.shown) {
             self.shared.requests.settle_native(&entry.request);
         }
@@ -241,7 +246,7 @@ fn work(shared: Arc<Shared>) {
             swept = Some(now);
         }
         pass(&shared, now);
-        let guard = shared.sleep.lock().unwrap_or_else(|p| p.into_inner());
+        let guard = shared.sleep.lock().unwrap_or_else(PoisonError::into_inner);
         if shared.active.load(Ordering::Acquire) {
             let _ = shared.changed.wait_timeout(guard, POLL);
         }
@@ -256,7 +261,7 @@ fn pass(shared: &Arc<Shared>, now: SystemTime) {
     let mut present = HashSet::new();
     let mut started = Vec::new();
     {
-        let mut known = shared.known.lock().unwrap_or_else(|p| p.into_inner());
+        let mut known = shared.known.lock().unwrap_or_else(PoisonError::into_inner);
         for entry in fs::read_dir(&folder).into_iter().flatten().flatten() {
             let path = entry.path();
             if path.extension().and_then(|e| e.to_str()) != Some("json") {
@@ -341,7 +346,7 @@ fn publish(shared: &Shared) {
     let mut sessions: Vec<String> = shared
         .known
         .lock()
-        .unwrap_or_else(|p| p.into_inner())
+        .unwrap_or_else(PoisonError::into_inner)
         .values()
         .filter(|entry| entry.shown)
         .map(|entry| session_id(&entry.session))
