@@ -29,14 +29,6 @@ export function sessionClient(
 }
 
 /**
- * A session row's second line (Open's `SessionCard.place`): the model as
- * people read it, then the session's folder, else its client.
- */
-export function sessionPlace(session: PlaceFacts, client: string): string[] {
-  return [session.modelName || session.model || "—", session.cwd || client];
-}
-
-/**
  * A Sessions page row's second line (the phone's `SessionCard`): the model as
  * people read it, the project (Core writes it with ~) else the folder, and the
  * client that drives it.

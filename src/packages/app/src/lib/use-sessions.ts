@@ -5,7 +5,7 @@ import type {
   SessionDetail,
   SessionsQuery,
   SessionsResponse,
-} from "./types";
+} from "@agent-hud/protocol";
 import { withMessagePage } from "./sessions";
 
 type Action = (

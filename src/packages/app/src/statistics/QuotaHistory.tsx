@@ -15,7 +15,7 @@ import type {
   Quota,
   QuotaHistoryResponse,
   QuotaHistoryWindow,
-} from "../lib/types";
+} from "@agent-hud/protocol";
 import {
   card,
   dateLabel,

@@ -1,7 +1,7 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { HUDArtwork as HUDLogo } from "@agent-hud/hud/HUDArtwork";
 import { tokenPlot } from "../lib/statistics";
-import type { StatisticsResponse } from "../lib/types";
+import type { StatisticsResponse } from "@agent-hud/protocol";
 import {
   card,
   compact,

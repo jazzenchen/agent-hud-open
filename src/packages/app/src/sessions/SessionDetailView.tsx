@@ -22,7 +22,7 @@ import type {
   SessionCall,
   SessionDetail,
   Snapshot,
-} from "../lib/types";
+} from "@agent-hud/protocol";
 import { SubagentTimeline } from "./SubagentTimeline";
 import {
   ContextChart,

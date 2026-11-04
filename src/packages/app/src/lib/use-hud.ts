@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
-import type { NativeMethod, Snapshot } from "./types";
+import type { NativeMethod, Snapshot } from "@agent-hud/protocol";
 
 async function nativeRequest(
   method: NativeMethod,

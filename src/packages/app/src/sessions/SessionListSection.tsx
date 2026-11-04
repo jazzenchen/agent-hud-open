@@ -7,7 +7,7 @@ import {
   stackTurnBars,
   topSessions,
 } from "../lib/sessions";
-import type { Session } from "../lib/types";
+import type { Session } from "@agent-hud/protocol";
 import { useAnimatedNumber } from "../statistics/StatsTheme";
 import { moneyAmount, share } from "@agent-hud/ui/format";
 import { ShareRows, TurnSparkline } from "./SessionCharts";

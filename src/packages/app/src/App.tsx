@@ -57,17 +57,12 @@ import {
 import { useHUDGeometry } from "./lib/use-hud-geometry";
 import { storageKeys } from "./lib/storage-keys";
 import type { HUDConfig } from "@agent-hud/hud/model";
-import type { NativeMethod, Session, Snapshot } from "./lib/types";
+import type { NativeMethod, Session, Snapshot } from "@agent-hud/protocol";
 import appIcon from "./assets/app-icon.png";
 import { snapshotLanguage } from "@agent-hud/ui/format";
 import type { AgentPluginItem } from "./settings/AgentPluginsPane";
 import { SettingsNavigation } from "./settings/SettingsNavigation";
 import { LoadingState } from "./LoadingState";
-
-export type {
-  AgentPluginContext,
-  AgentPluginItem,
-} from "./settings/AgentPluginsPane";
 
 // Windows load their own views. Statistics does not need the shader/bot renderer,
 // and a resting HUD does not need the historical charts and settings panes.

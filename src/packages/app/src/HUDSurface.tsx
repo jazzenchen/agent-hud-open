@@ -14,7 +14,7 @@ import type {
   HUDUpdateNotice,
 } from "@agent-hud/hud/model";
 import type { Direction } from "@agent-hud/hud/bots/mark-director";
-import type { Snapshot, NativeMethod } from "./lib/types";
+import type { Snapshot, NativeMethod } from "@agent-hud/protocol";
 import type {
   NativeHUDGeometry,
   NativeHUDMonitor,

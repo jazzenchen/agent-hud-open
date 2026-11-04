@@ -1,6 +1,6 @@
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import type { MouseEvent as ReactMouseEvent, ReactNode } from "react";
-import type { SessionCall, SessionTurnAgent } from "../lib/types";
+import type { SessionCall, SessionTurnAgent } from "@agent-hud/protocol";
 import {
   clipped,
   compact,

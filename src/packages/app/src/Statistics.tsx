@@ -26,21 +26,13 @@ import type {
   StatisticsQuery,
   StatisticsResponse,
   StatisticsTokenKind,
-} from "./lib/types";
+} from "@agent-hud/protocol";
 import { readJSON, storageKeys } from "./lib/storage-keys";
 import {
-  ActivityHeatmap,
-  APIBillingCard,
   Coverage,
   IndexingProgress,
   Heading,
-  ProviderCard,
-  PlanValue,
-  QuotaHistory,
-  RecentUsage,
   TotalSummary,
-  UsageChart,
-  agentRows,
   compact,
   dimensionsLabel,
   freshKinds,
@@ -53,7 +45,17 @@ import {
   themeFor,
   truncate,
   type StatsTheme,
-} from "./StatisticsParts";
+} from "./statistics/StatsTheme";
+import { UsageChart } from "./statistics/UsageChart";
+import {
+  agentRows,
+  APIBillingCard,
+  ProviderCard,
+  RecentUsage,
+} from "./statistics/ProviderCard";
+import { ActivityHeatmap } from "./statistics/ActivityHeatmap";
+import { QuotaHistory } from "./statistics/QuotaHistory";
+import { PlanValue } from "./statistics/PlanValue";
 import { snapshotLanguage, systemTimeZone } from "@agent-hud/ui/format";
 import { indexingText } from "@agent-hud/ui/text/indexing";
 

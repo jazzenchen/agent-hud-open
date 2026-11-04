@@ -5,7 +5,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@agent-hud/ui/components/select";
-import type { Session, SessionDetail, Snapshot } from "../lib/types";
+import type { Session, SessionDetail, Snapshot } from "@agent-hud/protocol";
 import {
   age,
   dateFormat,
@@ -206,24 +206,6 @@ export function dayStart(at: number) {
   const date = new Date(at);
   date.setHours(0, 0, 0, 0);
   return date.getTime();
-}
-
-export function updatedLabel(session: Session, now: number, zh = false) {
-  const time = Date.parse(session.updatedAt);
-  if (!Number.isFinite(time)) return "—";
-  const seconds = Math.max(0, Math.floor((now - time) / 1000));
-  if (seconds < 60) return zh ? "刚刚更新" : "Updated just now";
-  if (seconds < 3600)
-    return zh
-      ? `${Math.floor(seconds / 60)} 分钟前更新`
-      : `Updated ${Math.floor(seconds / 60)}m ago`;
-  if (seconds < 86400)
-    return zh
-      ? `${Math.floor(seconds / 3600)} 小时前更新`
-      : `Updated ${Math.floor(seconds / 3600)}h ago`;
-  return zh
-    ? `${Math.floor(seconds / 86400)} 天前更新`
-    : `Updated ${Math.floor(seconds / 86400)}d ago`;
 }
 
 /** How long ago the session's last message was written ("2h ago"). */

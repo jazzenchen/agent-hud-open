@@ -12,7 +12,7 @@ import type {
   StatisticsModel,
   StatisticsTokenKind,
   StatisticsTotal,
-} from "../lib/types";
+} from "@agent-hud/protocol";
 import { unpricedHelp } from "../lib/sessions";
 import {
   dateFormat,

@@ -18,7 +18,7 @@ import type {
   Session,
   SessionsQuery,
   Snapshot,
-} from "./lib/types";
+} from "@agent-hud/protocol";
 import { InlineDetail } from "./sessions/SessionDetailView";
 import {
   DayHeader,

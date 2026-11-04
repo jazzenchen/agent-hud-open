@@ -7,7 +7,7 @@ import type {
   NativeMethod,
   PlanValueAccount,
   PlanValueResponse,
-} from "../lib/types";
+} from "@agent-hud/protocol";
 import {
   card,
   number,
