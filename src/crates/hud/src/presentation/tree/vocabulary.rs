@@ -85,7 +85,10 @@ pub(super) const COLLECTIONS: &[Collection] = &[
             ("short", "its short name, such as 5h or Weekly"),
             ("used", "the share used, 0 to 1; shown as a percentage"),
             ("level", "normal, warning, critical or stale"),
-            ("resetsAt", "when it resets; shown as a countdown"),
+            (
+                "resetsAt",
+                "when it resets; shown as the panel's rows show it: the time left within a day, else the weekday and time",
+            ),
             ("burn", "the share used per hour"),
             (
                 "runsOutAt",

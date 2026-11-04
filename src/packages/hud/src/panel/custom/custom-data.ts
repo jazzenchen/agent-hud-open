@@ -5,12 +5,13 @@
 import type { Quota, Snapshot } from "@agent-hud/protocol";
 import {
   age,
-  countdown,
   moneyShort,
   numberFormat,
   percent,
+  resetLabel,
   tokensShort,
   type Language,
+  type WeekCalendar,
 } from "@agent-hud/ui/format";
 import { agentArtworkKey } from "../../agent-artwork.ts";
 
@@ -43,6 +44,7 @@ export interface Scope {
   state: Record<string, string>;
   now: number;
   language: Language;
+  calendar: WeekCalendar;
 }
 
 const share = (used: number | null | undefined) =>
@@ -211,8 +213,18 @@ export function formatted(
     case "tokens":
       return Number.isFinite(number) ? tokensShort(number) : "—";
     case "countdown": {
+      // As the panel's rows write a reset: the time left within a day, else
+      // the weekday and time ("Next Tue 19:59", "下周二 19:59").
       const at = time(value);
-      return at == null ? "—" : countdown((at - scope.now) / 1000);
+      if (at == null) return "—";
+      if (at <= scope.now)
+        return path.endsWith(".resetsAt")
+          ? scope.language === "zh"
+            ? "等待更新"
+            : "Pending update"
+          : "—";
+      if (at - scope.now < 60_000) return "<1m";
+      return resetLabel(at, scope.now, scope.calendar, scope.language);
     }
     case "relative": {
       const at = time(value);

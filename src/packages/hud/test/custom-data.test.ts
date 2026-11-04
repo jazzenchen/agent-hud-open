@@ -112,6 +112,7 @@ const scope = (extra: Partial<Scope> = {}): Scope => ({
   state: {},
   now,
   language: "en",
+  calendar: { timeZone: "UTC", firstWeekday: 1 },
   ...extra,
 });
 
@@ -229,4 +230,21 @@ test("states start at their defaults and step round", () => {
   assert.equal(nextOption(node, "tab", "month"), "day");
   assert.equal(readsTime({ type: "text", text: "{now.time|clock}" }), true);
   assert.equal(readsTime({ type: "text", text: "{window.used}" }), false);
+});
+
+test("a reset reads as the panel's rows write it", () => {
+  const at = (iso: string) => ({ resetsAt: iso });
+  const read = (iso: string, extra: Partial<Scope> = {}) =>
+    fill("{window.resetsAt}", {
+      ...scope(extra),
+      items: [{ name: "window", item: at(iso) }],
+    });
+  assert.equal(read("2026-11-04T13:10:00Z"), "3h 10m");
+  assert.equal(read("2026-11-10T19:59:00Z"), "Next Tue 19:59");
+  assert.equal(
+    read("2026-11-10T19:59:00Z", { language: "zh" }),
+    "下周二 19:59",
+  );
+  assert.equal(read("2026-11-04T10:00:30Z"), "<1m");
+  assert.equal(read("2026-11-04T09:00:00Z"), "Pending update");
 });

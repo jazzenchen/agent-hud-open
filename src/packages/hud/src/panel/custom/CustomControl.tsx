@@ -588,7 +588,13 @@ export function CustomControl({
         ? undefined
         : setStates((current) => ({ ...current, [name]: value })),
   };
-  const scope: Scope = { items: [], state, now, language: format.language };
+  const scope: Scope = {
+    items: [],
+    state,
+    now,
+    language: format.language,
+    calendar: format.calendar,
+  };
   return (
     <DrawingContext.Provider value={drawing}>
       <div
