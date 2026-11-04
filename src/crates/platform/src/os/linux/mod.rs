@@ -21,6 +21,24 @@ pub(crate) const PORTABLE_VALIDATION: &str = "unverified";
 /// The operating system whose facts the agents' descriptors give here.
 pub(crate) const OS: agent_hud_agents::Os = agent_hud_agents::Os::Linux;
 pub(crate) const LEGACY_MAC_HISTORY: bool = false;
+/// An AppImage runs from a new temporary mount (`$APPDIR`) at every launch;
+/// the image file (`$APPIMAGE`) is the program that stays put.
+pub(crate) fn launched_executable() -> std::io::Result<PathBuf> {
+    let current = std::env::current_exe()?;
+    Ok(appimage(&current, &|key| std::env::var_os(key)).unwrap_or(current))
+}
+fn appimage(
+    current: &Path,
+    variable: &dyn Fn(&str) -> Option<std::ffi::OsString>,
+) -> Option<PathBuf> {
+    let image = variable("APPIMAGE")
+        .map(PathBuf::from)
+        .filter(|path| path.is_absolute() && path.is_file())?;
+    let mount = variable("APPDIR")
+        .map(PathBuf::from)
+        .filter(|path| path.is_absolute())?;
+    current.starts_with(&mount).then_some(image)
+}
 pub(crate) fn home_dir() -> Result<PathBuf, String> {
     std::env::var_os("HOME")
         .map(PathBuf::from)
@@ -171,5 +189,40 @@ mod tests {
     #[test]
     fn url_handler_discovery_is_unavailable() {
         assert!(!super::registered_url("dsh://open"));
+    }
+
+    #[test]
+    fn an_appimage_names_its_image_file_not_its_mount() {
+        let directory = tempfile::tempdir().unwrap();
+        let image = directory.path().join("Agent-HUD.AppImage");
+        std::fs::write(&image, b"fixture only").unwrap();
+        let mount = directory.path().join(".mount_AgentH1");
+        let current = mount.join("usr/bin/Agent HUD");
+        let variables = |image: std::path::PathBuf, mount: std::path::PathBuf| {
+            move |key: &str| match key {
+                "APPIMAGE" => Some(image.clone().into_os_string()),
+                "APPDIR" => Some(mount.clone().into_os_string()),
+                _ => None,
+            }
+        };
+        let found = super::appimage(&current, &variables(image.clone(), mount.clone()));
+        assert_eq!(found, Some(image.clone()));
+        // Not run from that mount, a missing image, or relative paths: the
+        // executable itself stays the program.
+        let elsewhere = directory.path().join("bin/Agent HUD");
+        assert_eq!(
+            super::appimage(&elsewhere, &variables(image.clone(), mount.clone())),
+            None
+        );
+        let missing = directory.path().join("gone.AppImage");
+        assert_eq!(
+            super::appimage(&current, &variables(missing, mount.clone())),
+            None
+        );
+        assert_eq!(
+            super::appimage(&current, &variables("Agent-HUD.AppImage".into(), mount)),
+            None
+        );
+        assert_eq!(super::appimage(&current, &|_: &str| None), None);
     }
 }

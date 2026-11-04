@@ -230,7 +230,7 @@ impl Runtime {
         let context = hooks::InstallContext {
             home: self.platform.home_dir().to_owned(),
             environment: std::env::vars().collect(),
-            executable: std::env::current_exe()
+            executable: agent_hud_platform::launched_executable()
                 .map_err(|_| "The application executable is unavailable")?,
             canonical_executable: Some(canonical_executable),
         };

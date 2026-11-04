@@ -193,7 +193,7 @@ iPhone 和发行版在同一个网络里，不订阅也能在 iPhone 与 Apple W
 
 ## 即将推出
 
-- **Windows 与 Linux 结束预览**：Windows 上的客户端回调，以及能安装回调的 Linux 安装包。[欢迎参与](CONTRIBUTING.md)。
+- **Windows 与 Linux 结束预览**：Windows 上的客户端回调。[欢迎参与](CONTRIBUTING.md)。
 - **支持更多 agent**，不止下面表格里的 18 款。
 - **按 Token 计费的 API**：用 API 密钥付费的账户，也能看到用量、花费与余额，和订阅的额度放在一起。
 - **UI 提示词模板。** 现成的提示词，一次就把 HUD 改成你想要的样子。

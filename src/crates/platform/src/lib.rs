@@ -24,6 +24,11 @@ pub use navigation::session_url;
 #[cfg(target_os = "macos")]
 pub use os::registered_applications;
 
+/// The program client hooks run: this executable, or on Linux the AppImage it
+/// was started from, whose temporary mount changes with every launch (Open #11).
+pub fn launched_executable() -> std::io::Result<std::path::PathBuf> {
+    os::launched_executable()
+}
 /// A client's own command line (`claude`, `codex`), where the account readers
 /// find it: an app's bundled copy as well as one on PATH.
 pub fn client_executable(name: &str) -> Option<std::path::PathBuf> {
