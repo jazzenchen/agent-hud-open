@@ -6,17 +6,21 @@
 //! edge HUD; on X11 it is an ordinary GTK/WebKit window whose placement depends
 //! on the window manager.
 pub(super) use super::generic::{measure_screens, panel_builder, screen, set_drag_cursor, shown};
-use super::{InteractiveRegion, LogicalRect, Point, PointerKeys, Rect};
-use gtk::{cairo, gdk, glib, prelude::*};
+use super::{InteractiveRegion, LogicalRect, Point, Rect};
+use gtk::{cairo, prelude::*};
 use gtk_layer_shell::{self as layer, LayerShell};
 use std::{
     collections::HashMap,
     sync::{
-        atomic::{AtomicBool, AtomicU8, Ordering},
+        atomic::{AtomicU8, Ordering},
         mpsc, Mutex, PoisonError,
     },
     time::Duration,
 };
+#[path = "linux/pointer.rs"]
+mod pointer;
+use pointer::track_pointer;
+pub(super) use pointer::{global_pointer, left_mouse_down, pointer_keys};
 
 pub(super) const GLOBAL_POINTS: bool = false;
 pub(super) const COORDINATE_SPACE: &str = "monitor-scaled-physical-top-left";
@@ -30,9 +34,6 @@ const MISSING: u8 = 2;
 
 /// Each layer HUD's canvas origin in monitor points and its scale, by window label.
 static SURFACES: Mutex<Option<HashMap<String, (Point, f64)>>> = Mutex::new(None);
-/// The cursor in global physical pixels while it is over a layer HUD.
-static POINTER: Mutex<Option<Point>> = Mutex::new(None);
-static PRIMARY_DOWN: AtomicBool = AtomicBool::new(false);
 
 fn wayland_session() -> bool {
     std::env::var("GDK_BACKEND").ok().as_deref() != Some("x11")
@@ -182,61 +183,6 @@ pub(super) fn place(
     Ok(canvas)
 }
 
-/// The WebView's own pointer events, translated to its toplevel surface and
-/// then to global physical pixels through the canvas origin.
-fn track_pointer(webview: &webkit2gtk::WebView, label: String) {
-    fn surface_point(window: Option<gdk::Window>, (mut x, mut y): (f64, f64)) -> (f64, f64) {
-        let mut current = window;
-        while let Some(window) = current {
-            if window.window_type() == gdk::WindowType::Toplevel {
-                break;
-            }
-            (x, y) = window.coords_to_parent(x, y);
-            current = window.parent();
-        }
-        (x, y)
-    }
-    let record = move |point: Option<(f64, f64)>| {
-        let global = point.and_then(|(x, y)| {
-            let (origin, scale) = surface(&label)?;
-            Some(Point {
-                x: (origin.x + x) * scale,
-                y: (origin.y + y) * scale,
-            })
-        });
-        *POINTER.lock().unwrap_or_else(PoisonError::into_inner) = global;
-    };
-    let moved = record.clone();
-    webview.connect_motion_notify_event(move |_, event| {
-        moved(Some(surface_point(event.window(), event.position())));
-        glib::Propagation::Proceed
-    });
-    let entered = record.clone();
-    webview.connect_enter_notify_event(move |_, event| {
-        entered(Some(surface_point(event.window(), event.position())));
-        glib::Propagation::Proceed
-    });
-    webview.connect_leave_notify_event(move |_, _| {
-        // A held button keeps an implicit grab: the drag still reports motion.
-        if !PRIMARY_DOWN.load(Ordering::Acquire) {
-            record(None);
-        }
-        glib::Propagation::Proceed
-    });
-    webview.connect_button_press_event(|_, event| {
-        if event.button() == 1 {
-            PRIMARY_DOWN.store(true, Ordering::Release);
-        }
-        glib::Propagation::Proceed
-    });
-    webview.connect_button_release_event(|_, event| {
-        if event.button() == 1 {
-            PRIMARY_DOWN.store(false, Ordering::Release);
-        }
-        glib::Propagation::Proceed
-    });
-}
-
 /// A layer HUD keeps taking input inside its regions while ignoring the
 /// cursor; otherwise it would never hear the pointer come back.
 pub(super) fn set_ignore_cursor(
@@ -276,28 +222,6 @@ pub(super) fn set_ignore_cursor(
         }
         Ok(())
     })
-}
-
-pub(super) fn global_pointer(app: &tauri::AppHandle) -> Result<Point, String> {
-    if !layer_shell() {
-        return super::generic::global_pointer(app);
-    }
-    POINTER
-        .lock()
-        .unwrap_or_else(PoisonError::into_inner)
-        .ok_or_else(|| "The pointer is not over a HUD surface".to_owned())
-}
-
-pub(super) fn left_mouse_down() -> Result<bool, String> {
-    if layer_shell() {
-        Ok(PRIMARY_DOWN.load(Ordering::Acquire))
-    } else {
-        Err("Native HUD dragging has no global mouse-button backend on X11".into())
-    }
-}
-
-pub(super) fn pointer_keys() -> PointerKeys {
-    PointerKeys::default()
 }
 
 /// A layer surface takes the keyboard only while a text field holds the lease.
