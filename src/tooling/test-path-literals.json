@@ -15,7 +15,7 @@
     "src/crates/host/src/instance.rs": 1,
     "src/crates/platform/src/deepseek_plugin/tests.rs": 6,
     "src/crates/platform/src/file_changes.rs": 4,
-    "src/crates/platform/src/hooks/install.rs": 8,
+    "src/crates/platform/src/hooks/install/tests.rs": 8,
     "src/crates/platform/src/hud_tools/tests.rs": 1,
     "src/crates/platform/src/instance/mod.rs": 2,
     "src/crates/platform/src/navigation/claude_job.rs": 2,

@@ -1,5 +1,5 @@
 use super::*;
-use std::os::unix::fs::PermissionsExt;
+use std::{fs, os::unix::fs::PermissionsExt, path::Path};
 
 fn context(home: &Path) -> InstallContext {
     let executable = home.join("fixed owner");
