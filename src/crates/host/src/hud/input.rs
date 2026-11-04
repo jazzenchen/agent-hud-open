@@ -1,14 +1,13 @@
-//! Native HUD pointer polling, hit-testing, cursor pass-through, and text-focus leases.
+//! Native HUD pointer sampling, hit-testing and cursor pass-through.
 use std::{
-    sync::{atomic::Ordering, Arc, PoisonError},
+    sync::PoisonError,
     time::{Duration, Instant},
 };
-use tauri::{Emitter, Manager};
+use tauri::Emitter;
 
 use super::{
-    emit_drag_end, emit_drag_preview, emit_geometry, host, owner_for_window, poll_drag,
-    restore_drag, DragTick, HudGeometry, HudInputStatus, HudPointer, HudState, HudWindows,
-    InteractiveRegion, Point, Shared,
+    ensure_worker, host, owner_for_window, HudGeometry, HudInputStatus, HudPointer, HudState,
+    HudWindows, InteractiveRegion, Point, Shared,
 };
 
 /// A single native owner follows every interactive rectangle. No GUI is created here.
@@ -61,199 +60,6 @@ pub async fn hud_report_regions(
     .map_err(|error| format!("HUD input worker failed: {error}"))?
 }
 
-/// Keyboard focus is an explicit text-editing lease, never a hover side effect.
-/// The injected caller window must be a registered, visible per-screen HUD.
-#[tauri::command]
-pub async fn hud_text_focus(
-    window: tauri::WebviewWindow,
-    active: bool,
-    lease_id: String,
-    windows: tauri::State<'_, HudWindows>,
-) -> Result<(), String> {
-    let shared = owner_for_window(&windows.0, &window)?;
-    if lease_id.is_empty() || lease_id.len() > 128 {
-        return Err("The HUD text-input lease is invalid".into());
-    }
-    tauri::async_runtime::spawn_blocking(move || {
-        let mut state = shared.state.lock().unwrap_or_else(PoisonError::into_inner);
-        if !active {
-            // A disposed React surface must not release a newer text-input owner.
-            return if state.text_focus.as_deref() == Some(lease_id.as_str()) {
-                release_text_focus(&window, &mut state)
-            } else {
-                Ok(())
-            };
-        }
-        shared.ensure_connected()?;
-        if !window.is_visible().map_err(|error| error.to_string())? {
-            return Err("A hidden HUD cannot obtain keyboard focus".into());
-        }
-        if state.drag.is_some() {
-            return Err("Text input is unavailable while moving the HUD".into());
-        }
-        if state.text_focus.is_some() {
-            state.text_focus = Some(lease_id);
-            return Ok(());
-        }
-        window
-            .set_focusable(true)
-            .map_err(|error| error.to_string())?;
-        match host::begin_text_focus(&window) {
-            Ok(previous) => state.text_focus_origin = previous,
-            Err(error) => {
-                let _ = window.set_focusable(false);
-                let _ = host::end_text_focus(&window, None);
-                return Err(error);
-            }
-        }
-        state.text_focus = Some(lease_id);
-        Ok(())
-    })
-    .await
-    .map_err(|error| format!("HUD keyboard focus worker failed: {error}"))?
-}
-
-pub(super) fn release_text_focus(
-    window: &tauri::WebviewWindow,
-    state: &mut HudState,
-) -> Result<(), String> {
-    if state.text_focus.take().is_none() {
-        return Ok(());
-    }
-    let focusable = window
-        .set_focusable(false)
-        .map_err(|error| error.to_string());
-    let resigned = host::end_text_focus(window, state.text_focus_origin.take());
-    focusable?;
-    resigned?;
-    Ok(())
-}
-
-pub(super) fn ensure_worker(
-    app: &tauri::AppHandle,
-    shared: &Arc<Shared>,
-    state: &mut HudState,
-) -> Result<(), String> {
-    if !state.worker_started {
-        let app = app.clone();
-        let worker_state = Arc::clone(shared);
-        std::thread::Builder::new()
-            .name("agenthud-hud-input".into())
-            .spawn(move || poll_pointer(app, worker_state))
-            .map_err(|error| format!("Could not start the HUD pointer watcher: {error}"))?;
-        state.worker_started = true;
-    }
-    Ok(())
-}
-
-fn poll_pointer(app: tauri::AppHandle, shared: Arc<Shared>) {
-    // A screen owner retains one native window until reconciliation stops its worker
-    // before destroying that window. Re-cloning the dispatcher every tick wakes Tao's
-    // main run loop even when the pointer and every HUD property are unchanged.
-    let Some(window) = app.get_webview_window(&shared.label) else {
-        return;
-    };
-    while !shared.stopped.load(Ordering::Acquire) {
-        let mut state = shared.state.lock().unwrap_or_else(PoisonError::into_inner);
-        while state.drag.is_none()
-            && state.regions.as_ref().is_none_or(Vec::is_empty)
-            && !shared.stopped.load(Ordering::Acquire)
-        {
-            // Timed wait also makes shutdown independent of a notification arriving just before wait.
-            (state, _) = shared
-                .changed
-                .wait_timeout(state, Duration::from_secs(1))
-                .unwrap_or_else(PoisonError::into_inner);
-        }
-        if shared.stopped.load(Ordering::Acquire) {
-            return;
-        }
-        let visible = host::shown(
-            &window,
-            state.config.as_ref().is_some_and(|config| config.visible),
-        );
-        let mut placement = None;
-        let mut preview = None;
-        let mut ended = None;
-        if visible {
-            if state.drag.is_some() {
-                match poll_drag(&app, &window, &mut state, &shared) {
-                    Ok(DragTick::Unchanged) => {}
-                    Ok(DragTick::Preview(value)) => preview = Some(value),
-                    Ok(DragTick::Dropped(value)) => {
-                        placement = Some(value);
-                        ended = Some(false);
-                    }
-                    Err(error) => {
-                        if let Err(rollback) = restore_drag(&app, &mut state, &shared) {
-                            eprintln!("Agent HUD drag rollback: {rollback}");
-                        }
-                        restore_input(&app, &window, &mut state);
-                        ended = Some(true);
-                        eprintln!("Agent HUD drag: {error}");
-                    }
-                }
-            }
-            let pointer = sample_pointer(&app, &window, &state, &shared);
-            let ignored = state.drag.is_none() && !pointer.inside;
-            let _ = apply_ignore_cursor(&window, &mut state, ignored, false);
-            publish_pointer(&app, &shared, &mut state, pointer, false);
-        } else if let Some(drag) = state.drag.take() {
-            let mut original = drag.config;
-            original.visible = false;
-            state.config = Some(original);
-            host::set_drag_cursor(&app, &shared, false);
-            ended = Some(true);
-            let _ = apply_ignore_cursor(&window, &mut state, true, true);
-        }
-        if state.text_focus.is_some() && (!visible || !window.is_focused().unwrap_or(true)) {
-            let _ = release_text_focus(&window, &mut state);
-        }
-        if !visible {
-            publish_pointer(
-                &app,
-                &shared,
-                &mut state,
-                HudPointer::outside(&shared),
-                false,
-            );
-        }
-        let pause = if state.drag.is_some() {
-            Duration::from_millis(16)
-        } else if visible {
-            Duration::from_millis(32)
-        } else {
-            Duration::from_millis(500)
-        };
-        let geometry = if placement.is_some() || preview.is_some() || ended.is_some() {
-            state.geometry.clone()
-        } else {
-            None
-        };
-        // emit() queues notifications without waiting for JS. Keep this owner's state lock
-        // through emission so preview, final commit and cancellation retain their native order.
-        if let Some(geometry) = geometry {
-            emit_geometry(&app, &geometry);
-        }
-        if let Some(placement) = placement {
-            // The dropped place becomes the screen's saved placement.
-            crate::coordinator::save_placement(&app, serde_json::json!(placement));
-        }
-        if let Some(preview) = preview {
-            emit_drag_preview(&app, &preview);
-        }
-        if let Some(cancelled) = ended {
-            emit_drag_end(&app, &shared, cancelled);
-        }
-        drop(
-            shared
-                .changed
-                .wait_timeout(state, pause)
-                .unwrap_or_else(PoisonError::into_inner),
-        );
-    }
-}
-
 pub(super) fn restore_input(
     app: &tauri::AppHandle,
     window: &tauri::WebviewWindow,
@@ -281,7 +87,7 @@ pub(super) fn global_units_per_point(scale: f64) -> f64 {
     }
 }
 
-fn sample_pointer(
+pub(super) fn sample_pointer(
     app: &tauri::AppHandle,
     window: &tauri::WebviewWindow,
     state: &HudState,

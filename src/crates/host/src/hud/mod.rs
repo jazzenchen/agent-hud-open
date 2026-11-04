@@ -13,7 +13,9 @@ mod displays;
 mod drag;
 mod input;
 mod plans;
+mod text_focus;
 mod types;
+mod worker;
 
 // The native HUD host. macos.rs, windows.rs and linux.rs each provide the same
 // items, and the rest of this folder never branches on the operating system:
@@ -47,10 +49,13 @@ pub use displays::hud_monitors;
 pub(super) use displays::*;
 pub use drag::hud_drag_start;
 pub(super) use drag::*;
+pub use input::hud_report_regions;
 pub(super) use input::*;
-pub use input::{hud_report_regions, hud_text_focus};
 pub(crate) use plans::{Planner, Screen};
+pub use text_focus::hud_text_focus;
+pub(super) use text_focus::*;
 pub use types::*;
+use worker::ensure_worker;
 
 #[derive(Default)]
 pub struct HudWindows(Arc<Mutex<HashMap<String, Arc<Shared>>>>);
