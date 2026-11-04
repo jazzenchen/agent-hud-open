@@ -134,6 +134,20 @@ pub enum Reply {
     HookSpecificOutput,
     /// `{"decision": "approve" | "block"}`.
     Decision,
+    /// The decision itself, `{"behavior": "allow" | "deny", "message"?}`:
+    /// Copilot CLI's `permissionRequest`, whose callback says `sessionId`,
+    /// `toolName` and `toolInput`.
+    Behavior,
+}
+
+impl Reply {
+    /// The event the permission hook is registered for.
+    pub fn event(&self) -> &'static str {
+        match self {
+            Self::Behavior => "permissionRequest",
+            Self::HookSpecificOutput | Self::Decision => "PermissionRequest",
+        }
+    }
 }
 
 /// The completion hook.

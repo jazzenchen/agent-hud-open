@@ -15,7 +15,9 @@ pub struct HookConfiguration {
 pub fn configuration(source_name: &str, flag: &str) -> Result<HookConfiguration, String> {
     let (source, hooks) = hooks_of(source_name)?;
     let events: Vec<&str> = match flag {
-        "--permission-hook" if hooks.permission.is_some() => vec!["PermissionRequest"],
+        "--permission-hook" if hooks.permission.is_some() => {
+            vec![hooks.permission.as_ref().unwrap().reply.event()]
+        }
         "--completion-hook" if hooks.completion.is_some() => hooks
             .completion
             .iter()

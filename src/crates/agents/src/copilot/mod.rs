@@ -2,13 +2,15 @@
 pub mod account;
 mod hooks;
 pub mod plans;
+pub mod process;
+pub mod store;
 pub mod transcript;
 
 use crate::Agent;
 use crate::Discovery;
 use crate::{Location, Source};
 
-static SOURCES: [Source; 3] = [
+static SOURCES: [Source; 4] = [
     Source {
         reads_as: "copilot",
         location: Location::home(&["COPILOT_HOME"], &[".copilot"], "session-state"),
@@ -20,6 +22,10 @@ static SOURCES: [Source; 3] = [
     Source {
         reads_as: "copilot",
         location: Location::named_by(&["COPILOT_OTEL_FILE_EXPORTER_PATH"], ""),
+    },
+    Source {
+        reads_as: "copilot",
+        location: Location::home(&["COPILOT_HOME"], &[".copilot"], "session-store.db"),
     },
 ];
 static DISCOVERY: Discovery = Discovery {
@@ -36,7 +42,10 @@ static DISCOVERY: Discovery = Discovery {
         Location::home(&["COPILOT_HOME"], &[".copilot"], "session-state"),
         Location::home(&["COPILOT_HOME"], &[".copilot"], "otel"),
     ],
-    usage_files: &[Location::named_by(&["COPILOT_OTEL_FILE_EXPORTER_PATH"], "")],
+    usage_files: &[
+        Location::named_by(&["COPILOT_OTEL_FILE_EXPORTER_PATH"], ""),
+        Location::home(&["COPILOT_HOME"], &[".copilot"], "session-store.db"),
+    ],
     commands: &["copilot"],
     ..Discovery::NONE
 };

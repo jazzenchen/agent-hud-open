@@ -7,6 +7,7 @@ use crate::{
     log_files::FileStamp,
     metering, source_batches, AgentHudCore, Log, Usage, PARSER_VERSION,
 };
+use agent_hud_agents::copilot::store::Counts;
 use serde_json::{json, Value};
 use std::{
     collections::{HashMap, HashSet},
@@ -44,6 +45,7 @@ pub(crate) fn accepts(path: &Path, source: &str) -> bool {
         "opencode" => name == "opencode.db",
         // Cursor's session headers, and the turn log its `stop` hook keeps.
         "cursor" => name == "state.vscdb" || agent_hud_agents::hooks::turn_log::accepts(path),
+        "copilot" => agent_hud_agents::copilot::store::accepts(path),
         "qoder-cn" => agent_hud_agents::qoder::legacy::accepts(path),
         _ => false,
     }
@@ -249,6 +251,7 @@ impl AgentHudCore {
                 }
                 "devin" => agent_hud_agents::devin::transcript::read(&reader.connection, cursor),
                 "cursor" => agent_hud_agents::cursor::sessions::read(&reader.connection, cursor),
+                "copilot" => agent_hud_agents::copilot::store::read(&reader.connection, cursor),
                 "qoder-cn" => agent_hud_agents::qoder::legacy::read(&reader.connection, cursor),
                 "antigravity" => crate::clients::antigravity::read(
                     &reader.connection,
@@ -337,7 +340,16 @@ impl AgentHudCore {
             if clean_model != "Unknown" || log.model == "Unknown" {
                 log.model = clean_model;
             }
-            if (is_batch || stamp.source == "antigravity")
+            // Copilot's session store counts a session's calls once read;
+            // the OTel export's and the shutdown totals give way to it.
+            if stamp.source == "copilot" && !is_batch {
+                if log.copilot_store_counts() == Counts::Replace && !log.messages.is_empty() {
+                    log.clear_usage();
+                    reset_contributions.insert(key.clone());
+                }
+            } else if stamp.source == "copilot" && !log.copilot_otel_counts() {
+                continue;
+            } else if (is_batch || stamp.source == "antigravity")
                 && record.usage.total() > 0
                 && log.source_state["hasInference"] != true
             {

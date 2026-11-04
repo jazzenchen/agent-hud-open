@@ -1,5 +1,11 @@
 //! GitHub Copilot JSONL session-state reducer (`events.jsonl`).
 //! OTel multi-session spans are reduced by `source_batches` and mapped onto the same session.
+//!
+//! A session's tokens come from one place, the best it has: the session
+//! store's rows, one per call (`store`); else the OTel export's chat spans,
+//! one per call; else the cumulative `session.shutdown` totals here, each
+//! counted by what it adds to the last. A better source, once read for a
+//! session, replaces what a lesser one counted.
 use crate::transcript::{at, n, text};
 use crate::{Log, Usage};
 use serde_json::{json, Value};
@@ -78,6 +84,11 @@ impl Log {
             return;
         };
         for (raw, value) in metrics {
+            // The same shutdown written twice is one: it adds nothing.
+            let key = format!("{}:shutdown:{turn}:{raw}", self.id);
+            if self.messages.contains_key(&key) {
+                continue;
+            }
             let u = &value["usage"];
             let next = Usage {
                 input: n(&u["inputTokens"]),
@@ -103,7 +114,7 @@ impl Log {
             }
             .to_owned();
             self.count_source(
-                format!("{}:shutdown:{turn}:{raw}", self.id),
+                key,
                 &model,
                 at,
                 Usage {

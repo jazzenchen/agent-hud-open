@@ -18,3 +18,5 @@ Facts about other clients' files, and the readers built on them, come from these
 
 - agentsview (kenn-io/agentsview, commit 3c4ccb4, MIT): Qoder's transcript folders, its sub-agent layout and the `<session>-session.json` beside a log.
 - Token Monitor (Javis603/token-monitor, commit 6c78d38, MIT) and its tokscale fork (Javis603/tokscale, commit f4abd58, MIT): Qoder CN's older `local.db` store, and Qoder's input holding its cache reads, which Qoder CLI's own package (`@qoder-ai/qodercli` 1.1.82, Apache-2.0) confirms with its folders and hook payload.
+- tokscale (junhoyeo/tokscale, commit b26c433, MIT): Copilot CLI's `session-store.db` layout, its input holding the cache's reads and writes, and a repeated `session.shutdown` counting once.
+- AgentBar (michalstrnadel/AgentBar, commit 97f4cf4, MIT): the payload of Copilot CLI's `permissionRequest` hook, as logged from a real CLI.

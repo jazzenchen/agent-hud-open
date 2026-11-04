@@ -41,7 +41,7 @@ struct QuestionOption {
 
 fn tool_kind(tool: &str) -> &str {
     match tool {
-        "run_command" | "run_shell_command" | "exec" => "Bash",
+        "run_command" | "run_shell_command" | "exec" | "bash" => "Bash",
         "edit" | "replace" => "Edit",
         "write_file" | "write" => "Write",
         "read_file" | "read" => "Read",
@@ -185,14 +185,31 @@ pub fn parse_request(source_name: &str, payload: &Value) -> Result<Option<Reques
     let Some(permission) = &hooks.permission else {
         return Err("This client does not use a permission hook".into());
     };
-    let Some(session) = text(&payload["session_id"]) else {
+    // Claude Code's names, or Copilot CLI's `permissionRequest` ones.
+    let field = |snake: &str, camel: &str| {
+        let value = &payload[snake];
+        if value.is_null() {
+            &payload[camel]
+        } else {
+            value
+        }
+    };
+    let Some(session) = text(field("session_id", "sessionId")) else {
         return Ok(None);
     };
-    let tool = payload["tool_name"].as_str();
+    let tool = field("tool_name", "toolName").as_str();
     if permission.unanswerable.contains(&tool.unwrap_or("")) {
         return Ok(None);
     }
-    let input = &payload["tool_input"];
+    // Copilot's older `toolArgs` may hold the arguments as JSON text.
+    let args = match &payload["toolArgs"] {
+        Value::String(text) => serde_json::from_str(text).unwrap_or(Value::Null),
+        other => other.clone(),
+    };
+    let input = match field("tool_input", "toolInput") {
+        Value::Null => &args,
+        input => input,
+    };
     let kind = tool.map(tool_kind);
     let questions = if kind == Some("AskUserQuestion") {
         let Some(q) = questions(&input["questions"]) else {
@@ -245,7 +262,7 @@ pub fn parse_request(source_name: &str, payload: &Value) -> Result<Option<Reques
         added: lines(&change["new_string"])
             .or_else(|| lines(&change["content"]))
             .or_else(|| lines(&change["new_source"])),
-        suggestions: payload["permission_suggestions"]
+        suggestions: field("permission_suggestions", "permissionSuggestions")
             .as_array()
             .cloned()
             .unwrap_or_default(),
@@ -402,13 +419,18 @@ impl Request {
             }
             _ => return Err("Unsupported decision kind".into()),
         }
-        if self
-            .permission()
-            .is_some_and(|permission| matches!(permission.reply, Reply::Decision))
-        {
-            return Ok(Some(
-                json!({"decision":if output["behavior"]=="allow"{"approve"}else{"block"}}),
-            ));
+        match self.permission().map(|permission| &permission.reply) {
+            Some(Reply::Decision) => {
+                return Ok(Some(
+                    json!({"decision":if output["behavior"]=="allow"{"approve"}else{"block"}}),
+                ));
+            }
+            // Only the decision and why: this hook takes no rule, plan or input.
+            Some(Reply::Behavior) => {
+                output.retain(|key, _| key == "behavior" || key == "message");
+                return Ok(Some(Value::Object(output)));
+            }
+            _ => {}
         }
         Ok(Some(
             json!({"hookSpecificOutput":{"hookEventName":"PermissionRequest","decision":output}}),

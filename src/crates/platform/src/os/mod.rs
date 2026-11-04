@@ -190,6 +190,7 @@ mod tests {
             ("grok-cli", ".grok/logs"),
             ("copilot", ".copilot/session-state"),
             ("copilot", ".copilot/otel"),
+            ("copilot", ".copilot/session-store.db"),
             ("openclaw", ".clawdbot/agents"),
             ("hermes", ".hermes"),
             ("zcode", ".zcode/cli/db"),

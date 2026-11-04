@@ -3328,7 +3328,12 @@
       "source": "copilot"
     },
     "output": {
-      "error": "This client does not support the requested hook"
+      "events": [
+        "permissionRequest"
+      ],
+      "flag": "--permission-hook",
+      "relativePath": ".copilot/hooks/agent-hud.json",
+      "source": "copilot"
     }
   },
   "configuration/copilot/--session-origin-hook": {
@@ -4089,7 +4094,8 @@
         "workbuddy",
         "zcode",
         "qwen",
-        "devin"
+        "devin",
+        "copilot"
       ]
     }
   },
@@ -6639,7 +6645,7 @@
       "source": "copilot"
     },
     "output": {
-      "error": "This client does not support the requested hook"
+      "error": "This flag is not a reporting hook"
     }
   },
   "event/matrix/copilot/--session-origin-hook": {
@@ -13928,6 +13934,251 @@
       "remove": {
         "hooks": {
           "agentStop": [
+            {
+              "bash": "afplay /System/Library/Sounds/Glass.aiff",
+              "timeoutSec": 5,
+              "type": "command"
+            }
+          ],
+          "sessionStart": [
+            {
+              "bash": "/usr/local/bin/audit-log",
+              "timeoutSec": 5,
+              "type": "command"
+            }
+          ]
+        },
+        "version": 1
+      },
+      "removeAgainChanges": false,
+      "removeRestoresStart": true,
+      "removedCommands": []
+    }
+  },
+  "patch-sequence/copilot/--permission-hook/custom-fields": {
+    "input": {
+      "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook copilot",
+      "flag": "--permission-hook",
+      "movedCommand": "'/Users/me/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook copilot",
+      "source": "copilot",
+      "start": {
+        "hooks": {
+          "permissionRequest": [
+            {
+              "bash": "'/Volumes/Agent HUD/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook copilot",
+              "comment": "Agent HUD",
+              "env": {
+                "AGENT_HUD_LOG": "1"
+              },
+              "timeoutSec": 30
+            }
+          ]
+        },
+        "version": 1
+      },
+      "steps": [
+        "install",
+        "install again",
+        "install moved",
+        "remove",
+        "remove again"
+      ]
+    },
+    "output": {
+      "install": {
+        "hooks": {
+          "permissionRequest": [
+            {
+              "bash": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook copilot",
+              "comment": "Agent HUD",
+              "env": {
+                "AGENT_HUD_LOG": "1"
+              },
+              "timeoutSec": 30
+            }
+          ]
+        },
+        "version": 1
+      },
+      "installedCommands": [
+        "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook copilot"
+      ],
+      "move": {
+        "hooks": {
+          "permissionRequest": [
+            {
+              "bash": "'/Users/me/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook copilot",
+              "comment": "Agent HUD",
+              "env": {
+                "AGENT_HUD_LOG": "1"
+              },
+              "timeoutSec": 30
+            }
+          ]
+        },
+        "version": 1
+      },
+      "movedCommands": [
+        "'/Users/me/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook copilot"
+      ],
+      "reinstallChanges": false,
+      "remove": {
+        "hooks": {},
+        "version": 1
+      },
+      "removeAgainChanges": false,
+      "removeRestoresStart": false,
+      "removedCommands": []
+    }
+  },
+  "patch-sequence/copilot/--permission-hook/empty": {
+    "input": {
+      "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook copilot",
+      "flag": "--permission-hook",
+      "movedCommand": "'/Users/me/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook copilot",
+      "source": "copilot",
+      "start": {},
+      "steps": [
+        "install",
+        "install again",
+        "install moved",
+        "remove",
+        "remove again"
+      ]
+    },
+    "output": {
+      "install": {
+        "hooks": {
+          "permissionRequest": [
+            {
+              "bash": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook copilot",
+              "timeoutSec": 86400,
+              "type": "command"
+            }
+          ]
+        },
+        "version": 1
+      },
+      "installedCommands": [
+        "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook copilot"
+      ],
+      "move": {
+        "hooks": {
+          "permissionRequest": [
+            {
+              "bash": "'/Users/me/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook copilot",
+              "timeoutSec": 86400,
+              "type": "command"
+            }
+          ]
+        },
+        "version": 1
+      },
+      "movedCommands": [
+        "'/Users/me/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook copilot"
+      ],
+      "reinstallChanges": false,
+      "remove": {
+        "hooks": {},
+        "version": 1
+      },
+      "removeAgainChanges": false,
+      "removeRestoresStart": false,
+      "removedCommands": []
+    }
+  },
+  "patch-sequence/copilot/--permission-hook/foreign-handlers": {
+    "input": {
+      "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook copilot",
+      "flag": "--permission-hook",
+      "movedCommand": "'/Users/me/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook copilot",
+      "source": "copilot",
+      "start": {
+        "hooks": {
+          "permissionRequest": [
+            {
+              "bash": "afplay /System/Library/Sounds/Glass.aiff",
+              "timeoutSec": 5,
+              "type": "command"
+            }
+          ],
+          "sessionStart": [
+            {
+              "bash": "/usr/local/bin/audit-log",
+              "timeoutSec": 5,
+              "type": "command"
+            }
+          ]
+        },
+        "version": 1
+      },
+      "steps": [
+        "install",
+        "install again",
+        "install moved",
+        "remove",
+        "remove again"
+      ]
+    },
+    "output": {
+      "install": {
+        "hooks": {
+          "permissionRequest": [
+            {
+              "bash": "afplay /System/Library/Sounds/Glass.aiff",
+              "timeoutSec": 5,
+              "type": "command"
+            },
+            {
+              "bash": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook copilot",
+              "timeoutSec": 86400,
+              "type": "command"
+            }
+          ],
+          "sessionStart": [
+            {
+              "bash": "/usr/local/bin/audit-log",
+              "timeoutSec": 5,
+              "type": "command"
+            }
+          ]
+        },
+        "version": 1
+      },
+      "installedCommands": [
+        "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook copilot"
+      ],
+      "move": {
+        "hooks": {
+          "permissionRequest": [
+            {
+              "bash": "afplay /System/Library/Sounds/Glass.aiff",
+              "timeoutSec": 5,
+              "type": "command"
+            },
+            {
+              "bash": "'/Users/me/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook copilot",
+              "timeoutSec": 86400,
+              "type": "command"
+            }
+          ],
+          "sessionStart": [
+            {
+              "bash": "/usr/local/bin/audit-log",
+              "timeoutSec": 5,
+              "type": "command"
+            }
+          ]
+        },
+        "version": 1
+      },
+      "movedCommands": [
+        "'/Users/me/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook copilot"
+      ],
+      "reinstallChanges": false,
+      "remove": {
+        "hooks": {
+          "permissionRequest": [
             {
               "bash": "afplay /System/Library/Sounds/Glass.aiff",
               "timeoutSec": 5,
@@ -32856,6 +33107,1024 @@
         "version": "1"
       },
       "flag": "--completion-hook",
+      "source": "copilot"
+    },
+    "output": {
+      "hookCommands": [],
+      "install": {
+        "error": "Unsupported hook configuration version"
+      },
+      "remove": {
+        "error": "Unsupported hook configuration version"
+      }
+    }
+  },
+  "patch/copilot/--permission-hook/custom-fields": {
+    "input": {
+      "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook copilot",
+      "current": {
+        "hooks": {
+          "permissionRequest": [
+            {
+              "bash": "'/Volumes/Agent HUD/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook copilot",
+              "comment": "Agent HUD",
+              "env": {
+                "AGENT_HUD_LOG": "1"
+              },
+              "timeoutSec": 30
+            }
+          ]
+        },
+        "version": 1
+      },
+      "flag": "--permission-hook",
+      "source": "copilot"
+    },
+    "output": {
+      "hookCommands": [
+        "'/Volumes/Agent HUD/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook copilot"
+      ],
+      "install": {
+        "hooks": {
+          "permissionRequest": [
+            {
+              "bash": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook copilot",
+              "comment": "Agent HUD",
+              "env": {
+                "AGENT_HUD_LOG": "1"
+              },
+              "timeoutSec": 30
+            }
+          ]
+        },
+        "version": 1
+      },
+      "remove": {
+        "hooks": {},
+        "version": 1
+      }
+    }
+  },
+  "patch/copilot/--permission-hook/duplicates": {
+    "input": {
+      "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook copilot",
+      "current": {
+        "hooks": {
+          "permissionRequest": [
+            {
+              "bash": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook copilot",
+              "timeoutSec": 5,
+              "type": "command"
+            },
+            {
+              "bash": "echo done",
+              "timeoutSec": 5,
+              "type": "command"
+            },
+            {
+              "bash": "'/Volumes/Agent HUD/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook copilot",
+              "timeoutSec": 5,
+              "type": "command"
+            },
+            {
+              "bash": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook copilot",
+              "timeoutSec": 5,
+              "type": "command"
+            }
+          ]
+        },
+        "version": 1
+      },
+      "flag": "--permission-hook",
+      "source": "copilot"
+    },
+    "output": {
+      "hookCommands": [
+        "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook copilot",
+        "'/Volumes/Agent HUD/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook copilot",
+        "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook copilot"
+      ],
+      "install": {
+        "hooks": {
+          "permissionRequest": [
+            {
+              "bash": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook copilot",
+              "timeoutSec": 5,
+              "type": "command"
+            },
+            {
+              "bash": "echo done",
+              "timeoutSec": 5,
+              "type": "command"
+            }
+          ]
+        },
+        "version": 1
+      },
+      "remove": {
+        "hooks": {
+          "permissionRequest": [
+            {
+              "bash": "echo done",
+              "timeoutSec": 5,
+              "type": "command"
+            }
+          ]
+        },
+        "version": 1
+      }
+    }
+  },
+  "patch/copilot/--permission-hook/empty": {
+    "input": {
+      "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook copilot",
+      "current": {},
+      "flag": "--permission-hook",
+      "source": "copilot"
+    },
+    "output": {
+      "hookCommands": [],
+      "install": {
+        "hooks": {
+          "permissionRequest": [
+            {
+              "bash": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook copilot",
+              "timeoutSec": 86400,
+              "type": "command"
+            }
+          ]
+        },
+        "version": 1
+      },
+      "remove": {
+        "hooks": {},
+        "version": 1
+      }
+    }
+  },
+  "patch/copilot/--permission-hook/empty-event-arrays": {
+    "input": {
+      "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook copilot",
+      "current": {
+        "hooks": {
+          "permissionRequest": []
+        },
+        "version": 1
+      },
+      "flag": "--permission-hook",
+      "source": "copilot"
+    },
+    "output": {
+      "hookCommands": [],
+      "install": {
+        "hooks": {
+          "permissionRequest": [
+            {
+              "bash": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook copilot",
+              "timeoutSec": 86400,
+              "type": "command"
+            }
+          ]
+        },
+        "version": 1
+      },
+      "remove": {
+        "hooks": {},
+        "version": 1
+      }
+    }
+  },
+  "patch/copilot/--permission-hook/empty-hooks": {
+    "input": {
+      "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook copilot",
+      "current": {
+        "hooks": {},
+        "version": 1
+      },
+      "flag": "--permission-hook",
+      "source": "copilot"
+    },
+    "output": {
+      "hookCommands": [],
+      "install": {
+        "hooks": {
+          "permissionRequest": [
+            {
+              "bash": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook copilot",
+              "timeoutSec": 86400,
+              "type": "command"
+            }
+          ]
+        },
+        "version": 1
+      },
+      "remove": {
+        "hooks": {},
+        "version": 1
+      }
+    }
+  },
+  "patch/copilot/--permission-hook/event-object": {
+    "input": {
+      "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook copilot",
+      "current": {
+        "hooks": {
+          "permissionRequest": {}
+        },
+        "version": 1
+      },
+      "flag": "--permission-hook",
+      "source": "copilot"
+    },
+    "output": {
+      "hookCommands": {
+        "error": "Unrecognized hook event layout"
+      },
+      "install": {
+        "error": "Unrecognized hook event layout"
+      },
+      "remove": {
+        "error": "Unrecognized hook event layout"
+      }
+    }
+  },
+  "patch/copilot/--permission-hook/event-string": {
+    "input": {
+      "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook copilot",
+      "current": {
+        "hooks": {
+          "permissionRequest": "agent-hud"
+        },
+        "version": 1
+      },
+      "flag": "--permission-hook",
+      "source": "copilot"
+    },
+    "output": {
+      "hookCommands": {
+        "error": "Unrecognized hook event layout"
+      },
+      "install": {
+        "error": "Unrecognized hook event layout"
+      },
+      "remove": {
+        "error": "Unrecognized hook event layout"
+      }
+    }
+  },
+  "patch/copilot/--permission-hook/foreign-handlers": {
+    "input": {
+      "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook copilot",
+      "current": {
+        "hooks": {
+          "permissionRequest": [
+            {
+              "bash": "afplay /System/Library/Sounds/Glass.aiff",
+              "timeoutSec": 5,
+              "type": "command"
+            }
+          ],
+          "sessionStart": [
+            {
+              "bash": "/usr/local/bin/audit-log",
+              "timeoutSec": 5,
+              "type": "command"
+            }
+          ]
+        },
+        "version": 1
+      },
+      "flag": "--permission-hook",
+      "source": "copilot"
+    },
+    "output": {
+      "hookCommands": [],
+      "install": {
+        "hooks": {
+          "permissionRequest": [
+            {
+              "bash": "afplay /System/Library/Sounds/Glass.aiff",
+              "timeoutSec": 5,
+              "type": "command"
+            },
+            {
+              "bash": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook copilot",
+              "timeoutSec": 86400,
+              "type": "command"
+            }
+          ],
+          "sessionStart": [
+            {
+              "bash": "/usr/local/bin/audit-log",
+              "timeoutSec": 5,
+              "type": "command"
+            }
+          ]
+        },
+        "version": 1
+      },
+      "remove": {
+        "hooks": {
+          "permissionRequest": [
+            {
+              "bash": "afplay /System/Library/Sounds/Glass.aiff",
+              "timeoutSec": 5,
+              "type": "command"
+            }
+          ],
+          "sessionStart": [
+            {
+              "bash": "/usr/local/bin/audit-log",
+              "timeoutSec": 5,
+              "type": "command"
+            }
+          ]
+        },
+        "version": 1
+      }
+    }
+  },
+  "patch/copilot/--permission-hook/hooks-array": {
+    "input": {
+      "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook copilot",
+      "current": {
+        "hooks": [],
+        "version": 1
+      },
+      "flag": "--permission-hook",
+      "source": "copilot"
+    },
+    "output": {
+      "hookCommands": {
+        "error": "Unrecognized hook configuration layout"
+      },
+      "install": {
+        "error": "Unrecognized hook configuration layout"
+      },
+      "remove": {
+        "error": "Unrecognized hook configuration layout"
+      }
+    }
+  },
+  "patch/copilot/--permission-hook/hooks-null": {
+    "input": {
+      "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook copilot",
+      "current": {
+        "hooks": null,
+        "version": 1
+      },
+      "flag": "--permission-hook",
+      "source": "copilot"
+    },
+    "output": {
+      "hookCommands": {
+        "error": "Unrecognized hook configuration layout"
+      },
+      "install": {
+        "error": "Unrecognized hook configuration layout"
+      },
+      "remove": {
+        "error": "Unrecognized hook configuration layout"
+      }
+    }
+  },
+  "patch/copilot/--permission-hook/lookalike-commands": {
+    "input": {
+      "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook copilot",
+      "current": {
+        "hooks": {
+          "permissionRequest": [
+            {
+              "bash": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook copilot --verbose",
+              "timeoutSec": 5,
+              "type": "command"
+            },
+            {
+              "bash": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook copilot-beta",
+              "timeoutSec": 5,
+              "type": "command"
+            },
+            {
+              "bash": "my-tool--permission-hook copilot",
+              "timeoutSec": 5,
+              "type": "command"
+            },
+            {
+              "bash": "~/bin/notify.sh --permission-hook copilot",
+              "timeoutSec": 5,
+              "type": "command"
+            }
+          ]
+        },
+        "version": 1
+      },
+      "flag": "--permission-hook",
+      "source": "copilot"
+    },
+    "output": {
+      "hookCommands": [
+        "~/bin/notify.sh --permission-hook copilot"
+      ],
+      "install": {
+        "hooks": {
+          "permissionRequest": [
+            {
+              "bash": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook copilot --verbose",
+              "timeoutSec": 5,
+              "type": "command"
+            },
+            {
+              "bash": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook copilot-beta",
+              "timeoutSec": 5,
+              "type": "command"
+            },
+            {
+              "bash": "my-tool--permission-hook copilot",
+              "timeoutSec": 5,
+              "type": "command"
+            },
+            {
+              "bash": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook copilot",
+              "timeoutSec": 5,
+              "type": "command"
+            }
+          ]
+        },
+        "version": 1
+      },
+      "remove": {
+        "hooks": {
+          "permissionRequest": [
+            {
+              "bash": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook copilot --verbose",
+              "timeoutSec": 5,
+              "type": "command"
+            },
+            {
+              "bash": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook copilot-beta",
+              "timeoutSec": 5,
+              "type": "command"
+            },
+            {
+              "bash": "my-tool--permission-hook copilot",
+              "timeoutSec": 5,
+              "type": "command"
+            }
+          ]
+        },
+        "version": 1
+      }
+    }
+  },
+  "patch/copilot/--permission-hook/odd-entries": {
+    "input": {
+      "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook copilot",
+      "current": {
+        "hooks": {
+          "permissionRequest": [
+            "text",
+            7,
+            null,
+            {
+              "bash": 5
+            },
+            {
+              "bash": "'/Volumes/Agent HUD/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook copilot",
+              "timeoutSec": 5,
+              "type": "command"
+            }
+          ]
+        },
+        "version": 1
+      },
+      "flag": "--permission-hook",
+      "source": "copilot"
+    },
+    "output": {
+      "hookCommands": [
+        "'/Volumes/Agent HUD/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook copilot"
+      ],
+      "install": {
+        "hooks": {
+          "permissionRequest": [
+            "text",
+            7,
+            null,
+            {
+              "bash": 5
+            },
+            {
+              "bash": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook copilot",
+              "timeoutSec": 5,
+              "type": "command"
+            }
+          ]
+        },
+        "version": 1
+      },
+      "remove": {
+        "hooks": {
+          "permissionRequest": [
+            "text",
+            7,
+            null,
+            {
+              "bash": 5
+            }
+          ]
+        },
+        "version": 1
+      }
+    }
+  },
+  "patch/copilot/--permission-hook/other-agent-hud-hooks": {
+    "input": {
+      "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook copilot",
+      "current": {
+        "hooks": {
+          "permissionRequest": [
+            {
+              "bash": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook copilot",
+              "timeoutSec": 5,
+              "type": "command"
+            },
+            {
+              "bash": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook codex",
+              "timeoutSec": 5,
+              "type": "command"
+            }
+          ]
+        },
+        "version": 1
+      },
+      "flag": "--permission-hook",
+      "source": "copilot"
+    },
+    "output": {
+      "hookCommands": [
+        "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook copilot"
+      ],
+      "install": {
+        "hooks": {
+          "permissionRequest": [
+            {
+              "bash": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook copilot",
+              "timeoutSec": 5,
+              "type": "command"
+            },
+            {
+              "bash": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook codex",
+              "timeoutSec": 5,
+              "type": "command"
+            }
+          ]
+        },
+        "version": 1
+      },
+      "remove": {
+        "hooks": {
+          "permissionRequest": [
+            {
+              "bash": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook codex",
+              "timeoutSec": 5,
+              "type": "command"
+            }
+          ]
+        },
+        "version": 1
+      }
+    }
+  },
+  "patch/copilot/--permission-hook/other-command-keys": {
+    "input": {
+      "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook copilot",
+      "current": {
+        "hooks": {
+          "permissionRequest": [
+            {
+              "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook copilot",
+              "type": "command"
+            },
+            {
+              "powershell": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook copilot",
+              "type": "command"
+            },
+            {
+              "args": [
+                "--permission-hook",
+                "copilot"
+              ],
+              "exec": "C:\\Program Files\\Agent HUD\\agent-hud.exe",
+              "type": "command"
+            }
+          ]
+        },
+        "version": 1
+      },
+      "flag": "--permission-hook",
+      "source": "copilot"
+    },
+    "output": {
+      "hookCommands": [],
+      "install": {
+        "hooks": {
+          "permissionRequest": [
+            {
+              "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook copilot",
+              "type": "command"
+            },
+            {
+              "powershell": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook copilot",
+              "type": "command"
+            },
+            {
+              "args": [
+                "--permission-hook",
+                "copilot"
+              ],
+              "exec": "C:\\Program Files\\Agent HUD\\agent-hud.exe",
+              "type": "command"
+            },
+            {
+              "bash": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook copilot",
+              "timeoutSec": 86400,
+              "type": "command"
+            }
+          ]
+        },
+        "version": 1
+      },
+      "remove": {
+        "hooks": {
+          "permissionRequest": [
+            {
+              "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook copilot",
+              "type": "command"
+            },
+            {
+              "powershell": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook copilot",
+              "type": "command"
+            },
+            {
+              "args": [
+                "--permission-hook",
+                "copilot"
+              ],
+              "exec": "C:\\Program Files\\Agent HUD\\agent-hud.exe",
+              "type": "command"
+            }
+          ]
+        },
+        "version": 1
+      }
+    }
+  },
+  "patch/copilot/--permission-hook/owned-current": {
+    "input": {
+      "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook copilot",
+      "current": {
+        "hooks": {
+          "permissionRequest": [
+            {
+              "bash": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook copilot",
+              "timeoutSec": 5,
+              "type": "command"
+            }
+          ]
+        },
+        "version": 1
+      },
+      "flag": "--permission-hook",
+      "source": "copilot"
+    },
+    "output": {
+      "hookCommands": [
+        "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook copilot"
+      ],
+      "install": {
+        "hooks": {
+          "permissionRequest": [
+            {
+              "bash": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook copilot",
+              "timeoutSec": 5,
+              "type": "command"
+            }
+          ]
+        },
+        "version": 1
+      },
+      "remove": {
+        "hooks": {},
+        "version": 1
+      }
+    }
+  },
+  "patch/copilot/--permission-hook/owned-moved": {
+    "input": {
+      "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook copilot",
+      "current": {
+        "hooks": {
+          "permissionRequest": [
+            {
+              "bash": "'/Volumes/Agent HUD/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook copilot",
+              "timeoutSec": 5,
+              "type": "command"
+            }
+          ]
+        },
+        "version": 1
+      },
+      "flag": "--permission-hook",
+      "source": "copilot"
+    },
+    "output": {
+      "hookCommands": [
+        "'/Volumes/Agent HUD/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook copilot"
+      ],
+      "install": {
+        "hooks": {
+          "permissionRequest": [
+            {
+              "bash": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook copilot",
+              "timeoutSec": 5,
+              "type": "command"
+            }
+          ]
+        },
+        "version": 1
+      },
+      "remove": {
+        "hooks": {},
+        "version": 1
+      }
+    }
+  },
+  "patch/copilot/--permission-hook/owned-unquoted": {
+    "input": {
+      "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook copilot",
+      "current": {
+        "hooks": {
+          "permissionRequest": [
+            {
+              "bash": "/usr/local/bin/agent-hud --permission-hook copilot",
+              "timeoutSec": 5,
+              "type": "command"
+            }
+          ]
+        },
+        "version": 1
+      },
+      "flag": "--permission-hook",
+      "source": "copilot"
+    },
+    "output": {
+      "hookCommands": [
+        "/usr/local/bin/agent-hud --permission-hook copilot"
+      ],
+      "install": {
+        "hooks": {
+          "permissionRequest": [
+            {
+              "bash": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook copilot",
+              "timeoutSec": 5,
+              "type": "command"
+            }
+          ]
+        },
+        "version": 1
+      },
+      "remove": {
+        "hooks": {},
+        "version": 1
+      }
+    }
+  },
+  "patch/copilot/--permission-hook/root-array": {
+    "input": {
+      "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook copilot",
+      "current": [],
+      "flag": "--permission-hook",
+      "source": "copilot"
+    },
+    "output": {
+      "hookCommands": {
+        "error": "Unrecognized hook configuration layout"
+      },
+      "install": {
+        "error": "Unrecognized hook configuration layout"
+      },
+      "remove": {
+        "error": "Unrecognized hook configuration layout"
+      }
+    }
+  },
+  "patch/copilot/--permission-hook/root-null": {
+    "input": {
+      "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook copilot",
+      "current": null,
+      "flag": "--permission-hook",
+      "source": "copilot"
+    },
+    "output": {
+      "hookCommands": {
+        "error": "Unrecognized hook configuration layout"
+      },
+      "install": {
+        "error": "Unrecognized hook configuration layout"
+      },
+      "remove": {
+        "error": "Unrecognized hook configuration layout"
+      }
+    }
+  },
+  "patch/copilot/--permission-hook/unrelated-settings": {
+    "input": {
+      "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook copilot",
+      "current": {
+        "hooks": {
+          "sessionStart": [
+            {
+              "bash": "/usr/local/bin/audit-log",
+              "timeoutSec": 5,
+              "type": "command"
+            }
+          ]
+        },
+        "version": 1
+      },
+      "flag": "--permission-hook",
+      "source": "copilot"
+    },
+    "output": {
+      "hookCommands": [],
+      "install": {
+        "hooks": {
+          "permissionRequest": [
+            {
+              "bash": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook copilot",
+              "timeoutSec": 86400,
+              "type": "command"
+            }
+          ],
+          "sessionStart": [
+            {
+              "bash": "/usr/local/bin/audit-log",
+              "timeoutSec": 5,
+              "type": "command"
+            }
+          ]
+        },
+        "version": 1
+      },
+      "remove": {
+        "hooks": {
+          "sessionStart": [
+            {
+              "bash": "/usr/local/bin/audit-log",
+              "timeoutSec": 5,
+              "type": "command"
+            }
+          ]
+        },
+        "version": 1
+      }
+    }
+  },
+  "patch/copilot/--permission-hook/version-2": {
+    "input": {
+      "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook copilot",
+      "current": {
+        "hooks": {},
+        "version": 2
+      },
+      "flag": "--permission-hook",
+      "source": "copilot"
+    },
+    "output": {
+      "hookCommands": [],
+      "install": {
+        "error": "Unsupported hook configuration version"
+      },
+      "remove": {
+        "error": "Unsupported hook configuration version"
+      }
+    }
+  },
+  "patch/copilot/--permission-hook/version-float": {
+    "input": {
+      "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook copilot",
+      "current": {
+        "hooks": {},
+        "version": 1.0
+      },
+      "flag": "--permission-hook",
+      "source": "copilot"
+    },
+    "output": {
+      "hookCommands": [],
+      "install": {
+        "error": "Unsupported hook configuration version"
+      },
+      "remove": {
+        "error": "Unsupported hook configuration version"
+      }
+    }
+  },
+  "patch/copilot/--permission-hook/version-missing-owned": {
+    "input": {
+      "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook copilot",
+      "current": {
+        "hooks": {
+          "permissionRequest": [
+            {
+              "bash": "'/Volumes/Agent HUD/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook copilot",
+              "timeoutSec": 5,
+              "type": "command"
+            }
+          ]
+        }
+      },
+      "flag": "--permission-hook",
+      "source": "copilot"
+    },
+    "output": {
+      "hookCommands": [
+        "'/Volumes/Agent HUD/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook copilot"
+      ],
+      "install": {
+        "hooks": {
+          "permissionRequest": [
+            {
+              "bash": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook copilot",
+              "timeoutSec": 5,
+              "type": "command"
+            }
+          ]
+        },
+        "version": 1
+      },
+      "remove": {
+        "hooks": {},
+        "version": 1
+      }
+    }
+  },
+  "patch/copilot/--permission-hook/version-null": {
+    "input": {
+      "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook copilot",
+      "current": {
+        "version": null
+      },
+      "flag": "--permission-hook",
+      "source": "copilot"
+    },
+    "output": {
+      "hookCommands": [],
+      "install": {
+        "error": "Unsupported hook configuration version"
+      },
+      "remove": {
+        "error": "Unsupported hook configuration version"
+      }
+    }
+  },
+  "patch/copilot/--permission-hook/version-only": {
+    "input": {
+      "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook copilot",
+      "current": {
+        "version": 1
+      },
+      "flag": "--permission-hook",
+      "source": "copilot"
+    },
+    "output": {
+      "hookCommands": [],
+      "install": {
+        "hooks": {
+          "permissionRequest": [
+            {
+              "bash": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook copilot",
+              "timeoutSec": 86400,
+              "type": "command"
+            }
+          ]
+        },
+        "version": 1
+      },
+      "remove": {
+        "hooks": {},
+        "version": 1
+      }
+    }
+  },
+  "patch/copilot/--permission-hook/version-string": {
+    "input": {
+      "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook copilot",
+      "current": {
+        "hooks": {},
+        "version": "1"
+      },
+      "flag": "--permission-hook",
       "source": "copilot"
     },
     "output": {
@@ -61758,13 +63027,105 @@
       "source": "copilot"
     },
     "output": {
-      "request": {
-        "error": "This client does not use a permission hook"
-      }
+      "request": null
     }
   },
   "request/copilot/ask-user-question-lowercase": {
     "input": {
+      "extraDecisions": {
+        "answer-all": {
+          "answers": {
+            "Which database should the service use?": {
+              "selected": [
+                "Postgres"
+              ]
+            },
+            "q-tests": {
+              "custom": "Also check the logs",
+              "selected": [
+                "Unit",
+                "Integration"
+              ]
+            }
+          },
+          "kind": "answer"
+        },
+        "answer-custom-not-string": {
+          "answers": {
+            "Which database should the service use?": {
+              "custom": 5
+            }
+          },
+          "kind": "answer"
+        },
+        "answer-custom-only": {
+          "answers": {
+            "Which database should the service use?": {
+              "custom": "Use a feature flag"
+            }
+          },
+          "kind": "answer"
+        },
+        "answer-empty-selection": {
+          "answers": {
+            "Which database should the service use?": {
+              "selected": []
+            }
+          },
+          "kind": "answer"
+        },
+        "answer-first-only": {
+          "answers": {
+            "Which database should the service use?": {
+              "selected": [
+                "Postgres"
+              ]
+            }
+          },
+          "kind": "answer"
+        },
+        "answer-not-object": {
+          "answers": {
+            "Which database should the service use?": "Postgres"
+          },
+          "kind": "answer"
+        },
+        "answer-null-custom": {
+          "answers": {
+            "Which database should the service use?": {
+              "custom": null,
+              "selected": [
+                "Postgres"
+              ]
+            }
+          },
+          "kind": "answer"
+        },
+        "answer-selected-not-array": {
+          "answers": {
+            "Which database should the service use?": {
+              "selected": "Postgres"
+            }
+          },
+          "kind": "answer"
+        },
+        "answer-selected-not-strings": {
+          "answers": {
+            "Which database should the service use?": {
+              "selected": [
+                1
+              ]
+            }
+          },
+          "kind": "answer"
+        },
+        "answers-not-object": {
+          "answers": [
+            "Postgres"
+          ],
+          "kind": "answer"
+        }
+      },
       "payload": {
         "cwd": "/Users/me/project",
         "hook_event_name": "PermissionRequest",
@@ -61813,13 +63174,128 @@
       "source": "copilot"
     },
     "output": {
+      "publicFields": {
+        "kind": "permission",
+        "requiresUserReviewer": false,
+        "sessionId": "copilot:sess-1",
+        "source": "copilot",
+        "turnId": null
+      },
       "request": {
-        "error": "This client does not use a permission hook"
-      }
+        "added": null,
+        "answerInput": null,
+        "cwd": "/Users/me/project",
+        "detail": "questions: [{\"header\":\"Database\",\"multiSelect\":false,\"options\":[{\"description\":\"Relational, already deployed\",\"label\":\"Postgres\"},{\"description\":\"Embedded single file\",\"label\":\"SQLite\"}],\"question\":\"Which database should the service use?\"},{\"header\":\"Tests\",\"id\":\"q-tests\",\"multiSelect\":true,\"options\":[{\"label\":\"Unit\"},{\"label\":\"Integration\"},{\"description\":\"\",\"label\":\"End-to-end\"}],\"question\":\"Which test suites should run before merging?\"}]",
+        "kind": "permission",
+        "path": null,
+        "questions": [],
+        "removed": null,
+        "requiresUserReviewer": false,
+        "sessionId": "copilot:sess-1",
+        "source": "copilot",
+        "suggestions": [],
+        "summary": "ask_user_question",
+        "toolName": "ask_user_question",
+        "turnId": null
+      },
+      "responses": {
+        "allow": {
+          "behavior": "allow"
+        },
+        "always": null,
+        "always-unoffered-rule": null,
+        "answer-all": null,
+        "answer-custom-not-string": null,
+        "answer-custom-only": null,
+        "answer-empty-selection": null,
+        "answer-first-only": null,
+        "answer-not-object": null,
+        "answer-null-custom": null,
+        "answer-selected-not-array": null,
+        "answer-selected-not-strings": null,
+        "answer-unknown-question": null,
+        "answer-without-answers": null,
+        "answers-not-object": null,
+        "approve-plan": null,
+        "approve-plan-accept-edits": null,
+        "approve-plan-accept-edits-false": null,
+        "approve-plan-accept-edits-not-boolean": null,
+        "decision-not-object": {
+          "error": "Decision kind is required"
+        },
+        "deny": {
+          "behavior": "deny"
+        },
+        "keep-planning": null,
+        "keep-planning-blank-message": null,
+        "keep-planning-message": null,
+        "keep-planning-message-not-string": null,
+        "keep-planning-null-message": null,
+        "kind-not-string": {
+          "error": "Decision kind is required"
+        },
+        "leave": null,
+        "missing-kind": {
+          "error": "Decision kind is required"
+        },
+        "unknown-kind": {
+          "error": "Unsupported decision kind"
+        }
+      },
+      "roundTripStable": true,
+      "view": {
+        "added": null,
+        "allowsAlways": false,
+        "alwaysAllowRule": null,
+        "answersPlan": false,
+        "answersQuestion": false,
+        "createdAt": "2025-10-09T08:53:20+00:00",
+        "cwd": "/Users/me/project",
+        "detail": "questions: [{\"header\":\"Database\",\"multiSelect\":false,\"options\":[{\"description\":\"Relational, already deployed\",\"label\":\"Postgres\"},{\"description\":\"Embedded single file\",\"label\":\"SQLite\"}],\"question\":\"Which database should the service use?\"},{\"header\":\"Tests\",\"id\":\"q-tests\",\"multiSelect\":true,\"options\":[{\"label\":\"Unit\"},{\"label\":\"Integration\"},{\"description\":\"\",\"label\":\"End-to-end\"}],\"question\":\"Which test suites should run before merging?\"}]",
+        "id": "request-1",
+        "input": "questions: [{\"header\":\"Database\",\"multiSelect\":false,\"options\":[{\"description\":\"Relational, already deployed\",\"label\":\"Postgres\"},{\"description\":\"Embedded single file\",\"label\":\"SQLite\"}],\"question\":\"Which database should the service use?\"},{\"header\":\"Tests\",\"id\":\"q-tests\",\"multiSelect\":true,\"options\":[{\"label\":\"Unit\"},{\"label\":\"Integration\"},{\"description\":\"\",\"label\":\"End-to-end\"}],\"question\":\"Which test suites should run before merging?\"}]",
+        "kind": "permission",
+        "path": null,
+        "plan": null,
+        "questions": [],
+        "removed": null,
+        "sessionId": "copilot:sess-1",
+        "source": "copilot",
+        "suggestions": [],
+        "summary": "ask_user_question",
+        "title": "ask_user_question",
+        "toolName": "ask_user_question",
+        "vendor": "GitHub Copilot"
+      },
+      "viewStableAfterRoundTrip": true
     }
   },
   "request/copilot/bash": {
     "input": {
+      "extraDecisions": {
+        "always-offered-0": {
+          "kind": "always",
+          "suggestion": {
+            "behavior": "allow",
+            "destination": "localSettings",
+            "rules": [
+              {
+                "ruleContent": "npm test:*",
+                "toolName": "Bash"
+              }
+            ],
+            "type": "addRules"
+          }
+        },
+        "always-offered-1": {
+          "kind": "always",
+          "suggestion": {
+            "destination": "session",
+            "mode": "acceptEdits",
+            "type": "setMode"
+          }
+        }
+      },
       "payload": {
         "cwd": "/Users/me/project",
         "hook_event_name": "PermissionRequest",
@@ -61854,9 +63330,126 @@
       "source": "copilot"
     },
     "output": {
+      "publicFields": {
+        "kind": "permission",
+        "requiresUserReviewer": false,
+        "sessionId": "copilot:sess-1",
+        "source": "copilot",
+        "turnId": "turn-1"
+      },
       "request": {
-        "error": "This client does not use a permission hook"
-      }
+        "added": null,
+        "answerInput": null,
+        "cwd": "/Users/me/project",
+        "detail": "npm test",
+        "kind": "permission",
+        "path": null,
+        "questions": [],
+        "removed": null,
+        "requiresUserReviewer": false,
+        "sessionId": "copilot:sess-1",
+        "source": "copilot",
+        "suggestions": [
+          {
+            "behavior": "allow",
+            "destination": "localSettings",
+            "rules": [
+              {
+                "ruleContent": "npm test:*",
+                "toolName": "Bash"
+              }
+            ],
+            "type": "addRules"
+          },
+          {
+            "destination": "session",
+            "mode": "acceptEdits",
+            "type": "setMode"
+          }
+        ],
+        "summary": "Run the tests",
+        "toolName": "Bash",
+        "turnId": "turn-1"
+      },
+      "responses": {
+        "allow": {
+          "behavior": "allow"
+        },
+        "always": null,
+        "always-offered-0": null,
+        "always-offered-1": null,
+        "always-unoffered-rule": null,
+        "answer-unknown-question": null,
+        "answer-without-answers": null,
+        "approve-plan": null,
+        "approve-plan-accept-edits": null,
+        "approve-plan-accept-edits-false": null,
+        "approve-plan-accept-edits-not-boolean": null,
+        "decision-not-object": {
+          "error": "Decision kind is required"
+        },
+        "deny": {
+          "behavior": "deny"
+        },
+        "keep-planning": null,
+        "keep-planning-blank-message": null,
+        "keep-planning-message": null,
+        "keep-planning-message-not-string": null,
+        "keep-planning-null-message": null,
+        "kind-not-string": {
+          "error": "Decision kind is required"
+        },
+        "leave": null,
+        "missing-kind": {
+          "error": "Decision kind is required"
+        },
+        "unknown-kind": {
+          "error": "Unsupported decision kind"
+        }
+      },
+      "roundTripStable": true,
+      "view": {
+        "added": null,
+        "allowsAlways": false,
+        "alwaysAllowRule": null,
+        "answersPlan": false,
+        "answersQuestion": false,
+        "createdAt": "2025-10-09T08:53:20+00:00",
+        "cwd": "/Users/me/project",
+        "detail": "npm test",
+        "id": "request-1",
+        "input": "npm test",
+        "kind": "permission",
+        "path": null,
+        "plan": null,
+        "questions": [],
+        "removed": null,
+        "sessionId": "copilot:sess-1",
+        "source": "copilot",
+        "suggestions": [
+          {
+            "behavior": "allow",
+            "destination": "localSettings",
+            "rules": [
+              {
+                "ruleContent": "npm test:*",
+                "toolName": "Bash"
+              }
+            ],
+            "type": "addRules"
+          },
+          {
+            "destination": "session",
+            "mode": "acceptEdits",
+            "type": "setMode"
+          }
+        ],
+        "summary": "Run the tests",
+        "title": "Run the tests",
+        "toolName": "Bash",
+        "vendor": "GitHub Copilot"
+      },
+      "viewStableAfterRoundTrip": true
     }
   },
   "request/copilot/empty-session": {
@@ -61895,9 +63488,7 @@
       "source": "copilot"
     },
     "output": {
-      "request": {
-        "error": "This client does not use a permission hook"
-      }
+      "request": null
     }
   },
   "request/copilot/exit-plan-mode": {
@@ -61916,9 +63507,7 @@
       "source": "copilot"
     },
     "output": {
-      "request": {
-        "error": "This client does not use a permission hook"
-      }
+      "request": null
     }
   },
   "request/copilot/exit-plan-mode-lowercase": {
@@ -61937,9 +63526,7 @@
       "source": "copilot"
     },
     "output": {
-      "request": {
-        "error": "This client does not use a permission hook"
-      }
+      "request": null
     }
   },
   "request/copilot/missing-session": {
@@ -61977,9 +63564,7 @@
       "source": "copilot"
     },
     "output": {
-      "request": {
-        "error": "This client does not use a permission hook"
-      }
+      "request": null
     }
   },
   "request/copilot/non-object": {
@@ -62043,9 +63628,7 @@
       "source": "copilot"
     },
     "output": {
-      "request": {
-        "error": "This client does not use a permission hook"
-      }
+      "request": null
     }
   },
   "request/cursor/ask-user-question": {
@@ -63672,12 +65255,7 @@
       },
       "responses": {
         "allow": {
-          "hookSpecificOutput": {
-            "decision": {
-              "behavior": "allow"
-            },
-            "hookEventName": "PermissionRequest"
-          }
+          "behavior": "allow"
         },
         "always": null,
         "always-offered-0": null,
@@ -63693,12 +65271,7 @@
           "error": "Decision kind is required"
         },
         "deny": {
-          "hookSpecificOutput": {
-            "decision": {
-              "behavior": "deny"
-            },
-            "hookEventName": "PermissionRequest"
-          }
+          "behavior": "deny"
         },
         "keep-planning": null,
         "keep-planning-blank-message": null,
@@ -80066,6 +81639,220 @@
       "removeRestoresStart": false
     }
   },
+  "windows-sequence/copilot/--permission-hook/empty": {
+    "input": {
+      "executable": "C:\\Program Files\\Agent HUD\\agent-hud.exe",
+      "flag": "--permission-hook",
+      "movedExecutable": "D:\\Apps\\Agent HUD\\agent-hud.exe",
+      "source": "copilot",
+      "start": {},
+      "steps": [
+        "install",
+        "install again",
+        "install moved",
+        "remove",
+        "remove again"
+      ]
+    },
+    "output": {
+      "install": {
+        "hooks": {
+          "permissionRequest": [
+            {
+              "args": [
+                "--permission-hook",
+                "copilot"
+              ],
+              "exec": "C:\\Program Files\\Agent HUD\\agent-hud.exe",
+              "timeoutSec": 86400,
+              "type": "command"
+            }
+          ]
+        },
+        "version": 1
+      },
+      "installedCommands": [],
+      "move": {
+        "hooks": {
+          "permissionRequest": [
+            {
+              "args": [
+                "--permission-hook",
+                "copilot"
+              ],
+              "exec": "D:\\Apps\\Agent HUD\\agent-hud.exe",
+              "timeoutSec": 86400,
+              "type": "command"
+            }
+          ]
+        },
+        "version": 1
+      },
+      "reinstallChanges": false,
+      "remove": {
+        "hooks": {},
+        "version": 1
+      },
+      "removeAgainChanges": false,
+      "removeRestoresStart": false
+    }
+  },
+  "windows-sequence/copilot/--permission-hook/foreign": {
+    "input": {
+      "executable": "C:\\Program Files\\Agent HUD\\agent-hud.exe",
+      "flag": "--permission-hook",
+      "movedExecutable": "D:\\Apps\\Agent HUD\\agent-hud.exe",
+      "source": "copilot",
+      "start": {
+        "hooks": {
+          "permissionRequest": [
+            {
+              "powershell": "Write-Host done",
+              "timeoutSec": 5,
+              "type": "command"
+            }
+          ]
+        },
+        "version": 1
+      },
+      "steps": [
+        "install",
+        "install again",
+        "install moved",
+        "remove",
+        "remove again"
+      ]
+    },
+    "output": {
+      "install": {
+        "hooks": {
+          "permissionRequest": [
+            {
+              "powershell": "Write-Host done",
+              "timeoutSec": 5,
+              "type": "command"
+            },
+            {
+              "args": [
+                "--permission-hook",
+                "copilot"
+              ],
+              "exec": "C:\\Program Files\\Agent HUD\\agent-hud.exe",
+              "timeoutSec": 86400,
+              "type": "command"
+            }
+          ]
+        },
+        "version": 1
+      },
+      "installedCommands": [],
+      "move": {
+        "hooks": {
+          "permissionRequest": [
+            {
+              "powershell": "Write-Host done",
+              "timeoutSec": 5,
+              "type": "command"
+            },
+            {
+              "args": [
+                "--permission-hook",
+                "copilot"
+              ],
+              "exec": "D:\\Apps\\Agent HUD\\agent-hud.exe",
+              "timeoutSec": 86400,
+              "type": "command"
+            }
+          ]
+        },
+        "version": 1
+      },
+      "reinstallChanges": false,
+      "remove": {
+        "hooks": {
+          "permissionRequest": [
+            {
+              "powershell": "Write-Host done",
+              "timeoutSec": 5,
+              "type": "command"
+            }
+          ]
+        },
+        "version": 1
+      },
+      "removeAgainChanges": false,
+      "removeRestoresStart": true
+    }
+  },
+  "windows-sequence/copilot/--permission-hook/owned-posix": {
+    "input": {
+      "executable": "C:\\Program Files\\Agent HUD\\agent-hud.exe",
+      "flag": "--permission-hook",
+      "movedExecutable": "D:\\Apps\\Agent HUD\\agent-hud.exe",
+      "source": "copilot",
+      "start": {
+        "hooks": {
+          "permissionRequest": [
+            {
+              "bash": "'C:\\Users\\me\\AppData\\Local\\Agent HUD\\agent-hud.exe' --permission-hook copilot",
+              "timeoutSec": 5,
+              "type": "command"
+            }
+          ]
+        },
+        "version": 1
+      },
+      "steps": [
+        "install",
+        "install again",
+        "install moved",
+        "remove",
+        "remove again"
+      ]
+    },
+    "output": {
+      "install": {
+        "hooks": {
+          "permissionRequest": [
+            {
+              "args": [
+                "--permission-hook",
+                "copilot"
+              ],
+              "exec": "C:\\Program Files\\Agent HUD\\agent-hud.exe",
+              "timeoutSec": 5,
+              "type": "command"
+            }
+          ]
+        },
+        "version": 1
+      },
+      "installedCommands": [],
+      "move": {
+        "hooks": {
+          "permissionRequest": [
+            {
+              "args": [
+                "--permission-hook",
+                "copilot"
+              ],
+              "exec": "D:\\Apps\\Agent HUD\\agent-hud.exe",
+              "timeoutSec": 5,
+              "type": "command"
+            }
+          ]
+        },
+        "version": 1
+      },
+      "reinstallChanges": false,
+      "remove": {
+        "hooks": {},
+        "version": 1
+      },
+      "removeAgainChanges": false,
+      "removeRestoresStart": false
+    }
+  },
   "windows/antigravity/--completion-hook/duplicates": {
     "input": {
       "current": {
@@ -90143,6 +91930,792 @@
       }
     }
   },
+  "windows/copilot/--permission-hook/duplicates": {
+    "input": {
+      "current": {
+        "hooks": {
+          "permissionRequest": [
+            {
+              "args": [
+                "--permission-hook",
+                "copilot"
+              ],
+              "exec": "C:\\Users\\me\\AppData\\Local\\Agent HUD\\agent-hud.exe",
+              "type": "command"
+            },
+            {
+              "bash": "'C:\\Users\\me\\AppData\\Local\\Agent HUD\\agent-hud.exe' --permission-hook copilot",
+              "type": "command"
+            },
+            "text"
+          ]
+        },
+        "version": 1
+      },
+      "executables": {
+        "install": "C:\\Program Files\\Agent HUD\\agent-hud.exe",
+        "install-empty-path": "",
+        "install-newline-path": "C:\\Agent HUD\nagent-hud.exe",
+        "install-quoted-path": "C:\\Users\\O'Brien\\Agent HUD\\agent-hud.exe",
+        "remove": null
+      },
+      "flag": "--permission-hook",
+      "source": "copilot"
+    },
+    "output": {
+      "install": {
+        "hooks": {
+          "permissionRequest": [
+            {
+              "args": [
+                "--permission-hook",
+                "copilot"
+              ],
+              "exec": "C:\\Program Files\\Agent HUD\\agent-hud.exe",
+              "type": "command"
+            },
+            "text"
+          ]
+        },
+        "version": 1
+      },
+      "install-empty-path": {
+        "error": "The Windows hook executable path is invalid"
+      },
+      "install-newline-path": {
+        "error": "The Windows hook executable path is invalid"
+      },
+      "install-quoted-path": {
+        "hooks": {
+          "permissionRequest": [
+            {
+              "args": [
+                "--permission-hook",
+                "copilot"
+              ],
+              "exec": "C:\\Users\\O'Brien\\Agent HUD\\agent-hud.exe",
+              "type": "command"
+            },
+            "text"
+          ]
+        },
+        "version": 1
+      },
+      "remove": {
+        "hooks": {
+          "permissionRequest": [
+            "text"
+          ]
+        },
+        "version": 1
+      }
+    }
+  },
+  "windows/copilot/--permission-hook/empty": {
+    "input": {
+      "current": {},
+      "executables": {
+        "install": "C:\\Program Files\\Agent HUD\\agent-hud.exe",
+        "install-empty-path": "",
+        "install-newline-path": "C:\\Agent HUD\nagent-hud.exe",
+        "install-quoted-path": "C:\\Users\\O'Brien\\Agent HUD\\agent-hud.exe",
+        "remove": null
+      },
+      "flag": "--permission-hook",
+      "source": "copilot"
+    },
+    "output": {
+      "install": {
+        "hooks": {
+          "permissionRequest": [
+            {
+              "args": [
+                "--permission-hook",
+                "copilot"
+              ],
+              "exec": "C:\\Program Files\\Agent HUD\\agent-hud.exe",
+              "timeoutSec": 86400,
+              "type": "command"
+            }
+          ]
+        },
+        "version": 1
+      },
+      "install-empty-path": {
+        "error": "The Windows hook executable path is invalid"
+      },
+      "install-newline-path": {
+        "error": "The Windows hook executable path is invalid"
+      },
+      "install-quoted-path": {
+        "hooks": {
+          "permissionRequest": [
+            {
+              "args": [
+                "--permission-hook",
+                "copilot"
+              ],
+              "exec": "C:\\Users\\O'Brien\\Agent HUD\\agent-hud.exe",
+              "timeoutSec": 86400,
+              "type": "command"
+            }
+          ]
+        },
+        "version": 1
+      },
+      "remove": {
+        "hooks": {},
+        "version": 1
+      }
+    }
+  },
+  "windows/copilot/--permission-hook/empty-path-args": {
+    "input": {
+      "current": {
+        "hooks": {
+          "permissionRequest": [
+            {
+              "args": [
+                "--permission-hook",
+                "copilot"
+              ],
+              "exec": "",
+              "type": "command"
+            }
+          ]
+        },
+        "version": 1
+      },
+      "executables": {
+        "install": "C:\\Program Files\\Agent HUD\\agent-hud.exe",
+        "install-empty-path": "",
+        "install-newline-path": "C:\\Agent HUD\nagent-hud.exe",
+        "install-quoted-path": "C:\\Users\\O'Brien\\Agent HUD\\agent-hud.exe",
+        "remove": null
+      },
+      "flag": "--permission-hook",
+      "source": "copilot"
+    },
+    "output": {
+      "install": {
+        "hooks": {
+          "permissionRequest": [
+            {
+              "args": [
+                "--permission-hook",
+                "copilot"
+              ],
+              "exec": "",
+              "type": "command"
+            },
+            {
+              "args": [
+                "--permission-hook",
+                "copilot"
+              ],
+              "exec": "C:\\Program Files\\Agent HUD\\agent-hud.exe",
+              "timeoutSec": 86400,
+              "type": "command"
+            }
+          ]
+        },
+        "version": 1
+      },
+      "install-empty-path": {
+        "error": "The Windows hook executable path is invalid"
+      },
+      "install-newline-path": {
+        "error": "The Windows hook executable path is invalid"
+      },
+      "install-quoted-path": {
+        "hooks": {
+          "permissionRequest": [
+            {
+              "args": [
+                "--permission-hook",
+                "copilot"
+              ],
+              "exec": "",
+              "type": "command"
+            },
+            {
+              "args": [
+                "--permission-hook",
+                "copilot"
+              ],
+              "exec": "C:\\Users\\O'Brien\\Agent HUD\\agent-hud.exe",
+              "timeoutSec": 86400,
+              "type": "command"
+            }
+          ]
+        },
+        "version": 1
+      },
+      "remove": {
+        "hooks": {
+          "permissionRequest": [
+            {
+              "args": [
+                "--permission-hook",
+                "copilot"
+              ],
+              "exec": "",
+              "type": "command"
+            }
+          ]
+        },
+        "version": 1
+      }
+    }
+  },
+  "windows/copilot/--permission-hook/foreign": {
+    "input": {
+      "current": {
+        "hooks": {
+          "permissionRequest": [
+            {
+              "powershell": "Write-Host done",
+              "timeoutSec": 5,
+              "type": "command"
+            }
+          ]
+        },
+        "version": 1
+      },
+      "executables": {
+        "install": "C:\\Program Files\\Agent HUD\\agent-hud.exe",
+        "install-empty-path": "",
+        "install-newline-path": "C:\\Agent HUD\nagent-hud.exe",
+        "install-quoted-path": "C:\\Users\\O'Brien\\Agent HUD\\agent-hud.exe",
+        "remove": null
+      },
+      "flag": "--permission-hook",
+      "source": "copilot"
+    },
+    "output": {
+      "install": {
+        "hooks": {
+          "permissionRequest": [
+            {
+              "powershell": "Write-Host done",
+              "timeoutSec": 5,
+              "type": "command"
+            },
+            {
+              "args": [
+                "--permission-hook",
+                "copilot"
+              ],
+              "exec": "C:\\Program Files\\Agent HUD\\agent-hud.exe",
+              "timeoutSec": 86400,
+              "type": "command"
+            }
+          ]
+        },
+        "version": 1
+      },
+      "install-empty-path": {
+        "error": "The Windows hook executable path is invalid"
+      },
+      "install-newline-path": {
+        "error": "The Windows hook executable path is invalid"
+      },
+      "install-quoted-path": {
+        "hooks": {
+          "permissionRequest": [
+            {
+              "powershell": "Write-Host done",
+              "timeoutSec": 5,
+              "type": "command"
+            },
+            {
+              "args": [
+                "--permission-hook",
+                "copilot"
+              ],
+              "exec": "C:\\Users\\O'Brien\\Agent HUD\\agent-hud.exe",
+              "timeoutSec": 86400,
+              "type": "command"
+            }
+          ]
+        },
+        "version": 1
+      },
+      "remove": {
+        "hooks": {
+          "permissionRequest": [
+            {
+              "powershell": "Write-Host done",
+              "timeoutSec": 5,
+              "type": "command"
+            }
+          ]
+        },
+        "version": 1
+      }
+    }
+  },
+  "windows/copilot/--permission-hook/foreign-exec-args": {
+    "input": {
+      "current": {
+        "hooks": {
+          "permissionRequest": [
+            {
+              "args": [
+                "--permission-hook",
+                "cursor"
+              ],
+              "exec": "C:\\Tools\\other.exe",
+              "type": "command"
+            },
+            {
+              "args": [
+                "--permission-hook",
+                "copilot"
+              ],
+              "command": "C:\\Users\\me\\AppData\\Local\\Agent HUD\\agent-hud.exe",
+              "type": "command"
+            }
+          ]
+        },
+        "version": 1
+      },
+      "executables": {
+        "install": "C:\\Program Files\\Agent HUD\\agent-hud.exe",
+        "install-empty-path": "",
+        "install-newline-path": "C:\\Agent HUD\nagent-hud.exe",
+        "install-quoted-path": "C:\\Users\\O'Brien\\Agent HUD\\agent-hud.exe",
+        "remove": null
+      },
+      "flag": "--permission-hook",
+      "source": "copilot"
+    },
+    "output": {
+      "install": {
+        "hooks": {
+          "permissionRequest": [
+            {
+              "args": [
+                "--permission-hook",
+                "cursor"
+              ],
+              "exec": "C:\\Tools\\other.exe",
+              "type": "command"
+            },
+            {
+              "args": [
+                "--permission-hook",
+                "copilot"
+              ],
+              "command": "C:\\Users\\me\\AppData\\Local\\Agent HUD\\agent-hud.exe",
+              "type": "command"
+            },
+            {
+              "args": [
+                "--permission-hook",
+                "copilot"
+              ],
+              "exec": "C:\\Program Files\\Agent HUD\\agent-hud.exe",
+              "timeoutSec": 86400,
+              "type": "command"
+            }
+          ]
+        },
+        "version": 1
+      },
+      "install-empty-path": {
+        "error": "The Windows hook executable path is invalid"
+      },
+      "install-newline-path": {
+        "error": "The Windows hook executable path is invalid"
+      },
+      "install-quoted-path": {
+        "hooks": {
+          "permissionRequest": [
+            {
+              "args": [
+                "--permission-hook",
+                "cursor"
+              ],
+              "exec": "C:\\Tools\\other.exe",
+              "type": "command"
+            },
+            {
+              "args": [
+                "--permission-hook",
+                "copilot"
+              ],
+              "command": "C:\\Users\\me\\AppData\\Local\\Agent HUD\\agent-hud.exe",
+              "type": "command"
+            },
+            {
+              "args": [
+                "--permission-hook",
+                "copilot"
+              ],
+              "exec": "C:\\Users\\O'Brien\\Agent HUD\\agent-hud.exe",
+              "timeoutSec": 86400,
+              "type": "command"
+            }
+          ]
+        },
+        "version": 1
+      },
+      "remove": {
+        "hooks": {
+          "permissionRequest": [
+            {
+              "args": [
+                "--permission-hook",
+                "cursor"
+              ],
+              "exec": "C:\\Tools\\other.exe",
+              "type": "command"
+            },
+            {
+              "args": [
+                "--permission-hook",
+                "copilot"
+              ],
+              "command": "C:\\Users\\me\\AppData\\Local\\Agent HUD\\agent-hud.exe",
+              "type": "command"
+            }
+          ]
+        },
+        "version": 1
+      }
+    }
+  },
+  "windows/copilot/--permission-hook/odd-entries": {
+    "input": {
+      "current": {
+        "hooks": {
+          "permissionRequest": [
+            "text",
+            7,
+            null,
+            {
+              "args": [
+                "--permission-hook",
+                "copilot"
+              ],
+              "exec": "C:\\Users\\me\\AppData\\Local\\Agent HUD\\agent-hud.exe",
+              "type": "command"
+            }
+          ]
+        },
+        "version": 1
+      },
+      "executables": {
+        "install": "C:\\Program Files\\Agent HUD\\agent-hud.exe",
+        "install-empty-path": "",
+        "install-newline-path": "C:\\Agent HUD\nagent-hud.exe",
+        "install-quoted-path": "C:\\Users\\O'Brien\\Agent HUD\\agent-hud.exe",
+        "remove": null
+      },
+      "flag": "--permission-hook",
+      "source": "copilot"
+    },
+    "output": {
+      "install": {
+        "hooks": {
+          "permissionRequest": [
+            "text",
+            7,
+            null,
+            {
+              "args": [
+                "--permission-hook",
+                "copilot"
+              ],
+              "exec": "C:\\Program Files\\Agent HUD\\agent-hud.exe",
+              "type": "command"
+            }
+          ]
+        },
+        "version": 1
+      },
+      "install-empty-path": {
+        "error": "The Windows hook executable path is invalid"
+      },
+      "install-newline-path": {
+        "error": "The Windows hook executable path is invalid"
+      },
+      "install-quoted-path": {
+        "hooks": {
+          "permissionRequest": [
+            "text",
+            7,
+            null,
+            {
+              "args": [
+                "--permission-hook",
+                "copilot"
+              ],
+              "exec": "C:\\Users\\O'Brien\\Agent HUD\\agent-hud.exe",
+              "type": "command"
+            }
+          ]
+        },
+        "version": 1
+      },
+      "remove": {
+        "hooks": {
+          "permissionRequest": [
+            "text",
+            7,
+            null
+          ]
+        },
+        "version": 1
+      }
+    }
+  },
+  "windows/copilot/--permission-hook/owned-command-windows": {
+    "input": {
+      "current": {
+        "hooks": {
+          "permissionRequest": [
+            {
+              "bash": "'C:\\Users\\me\\AppData\\Local\\Agent HUD\\agent-hud.exe' --permission-hook copilot",
+              "powershell": "stale",
+              "timeoutSec": 5,
+              "type": "command"
+            }
+          ]
+        },
+        "version": 1
+      },
+      "executables": {
+        "install": "C:\\Program Files\\Agent HUD\\agent-hud.exe",
+        "install-empty-path": "",
+        "install-newline-path": "C:\\Agent HUD\nagent-hud.exe",
+        "install-quoted-path": "C:\\Users\\O'Brien\\Agent HUD\\agent-hud.exe",
+        "remove": null
+      },
+      "flag": "--permission-hook",
+      "source": "copilot"
+    },
+    "output": {
+      "install": {
+        "hooks": {
+          "permissionRequest": [
+            {
+              "args": [
+                "--permission-hook",
+                "copilot"
+              ],
+              "exec": "C:\\Program Files\\Agent HUD\\agent-hud.exe",
+              "timeoutSec": 5,
+              "type": "command"
+            }
+          ]
+        },
+        "version": 1
+      },
+      "install-empty-path": {
+        "error": "The Windows hook executable path is invalid"
+      },
+      "install-newline-path": {
+        "error": "The Windows hook executable path is invalid"
+      },
+      "install-quoted-path": {
+        "hooks": {
+          "permissionRequest": [
+            {
+              "args": [
+                "--permission-hook",
+                "copilot"
+              ],
+              "exec": "C:\\Users\\O'Brien\\Agent HUD\\agent-hud.exe",
+              "timeoutSec": 5,
+              "type": "command"
+            }
+          ]
+        },
+        "version": 1
+      },
+      "remove": {
+        "hooks": {},
+        "version": 1
+      }
+    }
+  },
+  "windows/copilot/--permission-hook/owned-exec-args": {
+    "input": {
+      "current": {
+        "hooks": {
+          "permissionRequest": [
+            {
+              "args": [
+                "--permission-hook",
+                "copilot"
+              ],
+              "bash": "stale",
+              "exec": "C:\\Users\\me\\AppData\\Local\\Agent HUD\\agent-hud.exe",
+              "powershell": "stale",
+              "timeoutSec": 5,
+              "type": "command"
+            }
+          ]
+        },
+        "version": 1
+      },
+      "executables": {
+        "install": "C:\\Program Files\\Agent HUD\\agent-hud.exe",
+        "install-empty-path": "",
+        "install-newline-path": "C:\\Agent HUD\nagent-hud.exe",
+        "install-quoted-path": "C:\\Users\\O'Brien\\Agent HUD\\agent-hud.exe",
+        "remove": null
+      },
+      "flag": "--permission-hook",
+      "source": "copilot"
+    },
+    "output": {
+      "install": {
+        "hooks": {
+          "permissionRequest": [
+            {
+              "args": [
+                "--permission-hook",
+                "copilot"
+              ],
+              "exec": "C:\\Program Files\\Agent HUD\\agent-hud.exe",
+              "timeoutSec": 5,
+              "type": "command"
+            }
+          ]
+        },
+        "version": 1
+      },
+      "install-empty-path": {
+        "error": "The Windows hook executable path is invalid"
+      },
+      "install-newline-path": {
+        "error": "The Windows hook executable path is invalid"
+      },
+      "install-quoted-path": {
+        "hooks": {
+          "permissionRequest": [
+            {
+              "args": [
+                "--permission-hook",
+                "copilot"
+              ],
+              "exec": "C:\\Users\\O'Brien\\Agent HUD\\agent-hud.exe",
+              "timeoutSec": 5,
+              "type": "command"
+            }
+          ]
+        },
+        "version": 1
+      },
+      "remove": {
+        "hooks": {},
+        "version": 1
+      }
+    }
+  },
+  "windows/copilot/--permission-hook/owned-posix": {
+    "input": {
+      "current": {
+        "hooks": {
+          "permissionRequest": [
+            {
+              "bash": "'C:\\Users\\me\\AppData\\Local\\Agent HUD\\agent-hud.exe' --permission-hook copilot",
+              "timeoutSec": 5,
+              "type": "command"
+            }
+          ]
+        },
+        "version": 1
+      },
+      "executables": {
+        "install": "C:\\Program Files\\Agent HUD\\agent-hud.exe",
+        "install-empty-path": "",
+        "install-newline-path": "C:\\Agent HUD\nagent-hud.exe",
+        "install-quoted-path": "C:\\Users\\O'Brien\\Agent HUD\\agent-hud.exe",
+        "remove": null
+      },
+      "flag": "--permission-hook",
+      "source": "copilot"
+    },
+    "output": {
+      "install": {
+        "hooks": {
+          "permissionRequest": [
+            {
+              "args": [
+                "--permission-hook",
+                "copilot"
+              ],
+              "exec": "C:\\Program Files\\Agent HUD\\agent-hud.exe",
+              "timeoutSec": 5,
+              "type": "command"
+            }
+          ]
+        },
+        "version": 1
+      },
+      "install-empty-path": {
+        "error": "The Windows hook executable path is invalid"
+      },
+      "install-newline-path": {
+        "error": "The Windows hook executable path is invalid"
+      },
+      "install-quoted-path": {
+        "hooks": {
+          "permissionRequest": [
+            {
+              "args": [
+                "--permission-hook",
+                "copilot"
+              ],
+              "exec": "C:\\Users\\O'Brien\\Agent HUD\\agent-hud.exe",
+              "timeoutSec": 5,
+              "type": "command"
+            }
+          ]
+        },
+        "version": 1
+      },
+      "remove": {
+        "hooks": {},
+        "version": 1
+      }
+    }
+  },
+  "windows/copilot/--permission-hook/root-array": {
+    "input": {
+      "current": [],
+      "executables": {
+        "install": "C:\\Program Files\\Agent HUD\\agent-hud.exe",
+        "install-empty-path": "",
+        "install-newline-path": "C:\\Agent HUD\nagent-hud.exe",
+        "install-quoted-path": "C:\\Users\\O'Brien\\Agent HUD\\agent-hud.exe",
+        "remove": null
+      },
+      "flag": "--permission-hook",
+      "source": "copilot"
+    },
+    "output": {
+      "install": {
+        "error": "Unrecognized hook configuration layout"
+      },
+      "install-empty-path": {
+        "error": "Unrecognized hook configuration layout"
+      },
+      "install-newline-path": {
+        "error": "Unrecognized hook configuration layout"
+      },
+      "install-quoted-path": {
+        "error": "Unrecognized hook configuration layout"
+      },
+      "remove": {
+        "error": "Unrecognized hook configuration layout"
+      }
+    }
+  },
   "windows/cursor/--completion-hook/duplicates": {
     "input": {
       "current": {
@@ -92894,10 +95467,24 @@
     },
     "output": {
       "install": {
-        "error": "This client does not support the requested hook"
+        "hooks": {
+          "permissionRequest": [
+            {
+              "args": [
+                "--permission-hook",
+                "copilot"
+              ],
+              "exec": "C:\\Program Files\\Agent HUD\\agent-hud.exe",
+              "timeoutSec": 86400,
+              "type": "command"
+            }
+          ]
+        },
+        "version": 1
       },
       "remove": {
-        "error": "This client does not support the requested hook"
+        "hooks": {},
+        "version": 1
       }
     }
   },

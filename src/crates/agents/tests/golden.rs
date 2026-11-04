@@ -320,7 +320,7 @@ enum Layout {
     Nested,
     /// Antigravity completion: "agent-hud": {Stop: [handler]}
     Entry,
-    /// Cursor/Copilot completion: {version: 1, hooks: {<event>: [handler]}}
+    /// Cursor and Copilot: {version: 1, hooks: {<event>: [handler]}}
     Flat,
 }
 
@@ -328,7 +328,9 @@ impl Pair {
     fn layout(&self) -> Layout {
         match (self.source.as_str(), self.flag) {
             ("antigravity", _) => Layout::Entry,
-            ("cursor" | "copilot", "--completion-hook") => Layout::Flat,
+            ("cursor" | "copilot", "--completion-hook") | ("copilot", "--permission-hook") => {
+                Layout::Flat
+            }
             ("zcode", _) => Layout::Nested,
             _ => Layout::Grouped,
         }

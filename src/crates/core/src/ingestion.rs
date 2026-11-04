@@ -435,8 +435,10 @@ impl AgentHudCore {
             log.buckets = old_log.buckets;
             log.meter_events.clear();
             log.source_state["hasInference"] = json!(true);
-            if old_log.source_state["hasOtel"] == true {
-                log.source_state["hasOtel"] = json!(true);
+            for flag in ["hasOtel", "hasStore"] {
+                if old_log.source_state[flag] == true {
+                    log.source_state[flag] = json!(true);
+                }
             }
             if log.model == "Unknown" && old_log.model != "Unknown" {
                 log.model = old_log.model;

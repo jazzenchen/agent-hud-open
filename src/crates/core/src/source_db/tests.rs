@@ -619,6 +619,103 @@ fn grok_bot_session_works_while_a_message_has_no_reply_and_idles_once_answered()
     assert!(backend.reads.bot_poll.is_none());
 }
 
+/// A Copilot session reported three ways: its `session.shutdown` totals, two
+/// OTel chat spans and its session store's rows. Each call counts once, from
+/// the store, whichever source is read first.
+#[test]
+fn copilots_session_store_counts_a_session_once_over_otel_and_shutdown_totals() {
+    let root = tempfile::tempdir().unwrap();
+    let state = root.path().join("session-state");
+    let session = state.join("c1");
+    std::fs::create_dir_all(&session).unwrap();
+    let at = chrono::Utc::now() - chrono::Duration::minutes(5);
+    let stamp = |seconds: i64| (at + chrono::Duration::seconds(seconds)).to_rfc3339();
+    let shutdown = json!({"type":"session.shutdown","id":"e2","timestamp":stamp(30),"data":{
+        "modelMetrics":{"gpt-5":{"usage":{"inputTokens":9_000,"outputTokens":900,"cacheReadTokens":0}}}}});
+    std::fs::write(
+        session.join("events.jsonl"),
+        format!(
+            "{}\n{}\n{}\n",
+            json!({"type":"session.start","id":"e1","timestamp":stamp(0),"data":{"context":{"cwd":"/w/repo"}}}),
+            shutdown,
+            shutdown,
+        ),
+    )
+    .unwrap();
+    let otel = root.path().join("otel");
+    std::fs::create_dir_all(&otel).unwrap();
+    let span = |id: &str| {
+        json!({"type":"span","name":"chat gpt-5","traceId":"t1","spanId":id,
+            "startTime":[at.timestamp() + 1,0],"endTime":[at.timestamp() + 2,0],
+            "attributes":{"gen_ai.conversation.id":"c1","gen_ai.operation.name":"chat",
+                "gen_ai.response.model":"gpt-5",
+                "gen_ai.usage.input_tokens":4_000,"gen_ai.usage.output_tokens":400}})
+    };
+    std::fs::write(
+        otel.join("spans.jsonl"),
+        format!("{}\n{}\n", span("a"), span("b")),
+    )
+    .unwrap();
+    let store = root.path().join("session-store.db");
+    let db = Connection::open(&store).unwrap();
+    db.execute_batch(
+        "CREATE TABLE sessions(id TEXT PRIMARY KEY,cwd TEXT,created_at TEXT);
+         CREATE TABLE assistant_usage_events(id INTEGER PRIMARY KEY AUTOINCREMENT,
+           session_id TEXT,turn_index INTEGER,model TEXT,copilot_usage_model TEXT,
+           input_tokens INTEGER,output_tokens INTEGER,cache_read_tokens INTEGER,
+           cache_write_tokens INTEGER,reasoning_tokens INTEGER,total_nano_aiu INTEGER,
+           duration_ms INTEGER,created_at TEXT);",
+    )
+    .unwrap();
+    let row = |seconds: i64, input: i64, read: i64| {
+        db.execute(
+            "INSERT INTO assistant_usage_events(session_id,turn_index,model,input_tokens,
+               output_tokens,cache_read_tokens,cache_write_tokens,reasoning_tokens,duration_ms,
+               created_at) VALUES('c1',0,'gpt-5',?1,100,?2,0,0,1500,?3)",
+            params![input, read, stamp(seconds)],
+        )
+        .unwrap();
+    };
+    row(1, 1_000, 800);
+    row(2, 2_000, 0);
+    let roots = |order: &[&Path]| {
+        order
+            .iter()
+            .map(|path| SourceRoot {
+                path: path.to_path_buf(),
+                provider: "copilot",
+            })
+            .collect::<Vec<_>>()
+    };
+    // Without the store the spans count, and without them the shutdown
+    // totals, the repeated one once.
+    for (order, total) in [
+        (vec![state.as_path(), otel.as_path()], 8_800),
+        (vec![state.as_path()], 9_900),
+    ] {
+        let hud = tempfile::tempdir().unwrap();
+        let mut backend = AgentHudCore::new(roots(&order), hud.path().join("hud"));
+        assert_eq!(refresh(&mut backend)["totals"]["total"], total, "{order:?}");
+    }
+    for order in [
+        [state.as_path(), otel.as_path(), store.as_path()],
+        [store.as_path(), otel.as_path(), state.as_path()],
+    ] {
+        let hud = tempfile::tempdir().unwrap();
+        let mut backend = AgentHudCore::new(roots(&order), hud.path().join("hud"));
+        let snapshot = refresh(&mut backend);
+        // Two calls: 1,000 + 100 and 2,000 + 100, the cache read inside the first.
+        assert_eq!(snapshot["totals"]["total"], 3_200, "{order:?}");
+        assert_eq!(
+            timed_calls(&backend),
+            [(100, Some(1_500)), (100, Some(1_500))]
+        );
+        let sessions = backend.request("sessions", json!({"scope":"all"})).unwrap();
+        assert_eq!(sessions["total"], 1, "{order:?}: one session");
+        assert_eq!(sessions["items"][0]["id"], "copilot:c1");
+    }
+}
+
 /// Qoder and Qoder CN, each a client of its own: Claude Code's lines with
 /// Qoder's input, a sub-agent under its session, and Qoder CN's older store.
 #[test]
