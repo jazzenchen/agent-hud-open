@@ -28,6 +28,7 @@ mod shell;
 mod system;
 mod tools;
 mod tray;
+mod web_sign_in;
 
 struct Backend {
     runtime: Runtime,
@@ -880,36 +881,50 @@ pub fn run_with_options(
     tauri::Builder::default()
         .manage(options.clone())
         .manage(AppState { demo })
-        .invoke_handler(tauri::generate_handler![
-            native_request,
-            cached_snapshot,
-            startup_mode,
-            presentation_request,
-            mcp_clients::native_mcp_clients,
-            claude_plugin::native_claude_plugin,
-            deepseek_plugin::native_deepseek_plugin,
-            picture::picture_payload,
-            picture::picture_complete,
-            picture::picture_resize,
-            capture::native_capture_webview,
-            system::native_system_status,
-            activity::window_activity,
-            hud::hud_monitors,
-            hud::hud_geometry,
-            hud::hud_native_capabilities,
-            hud::hud_report_regions,
-            hud::hud_drag_start,
-            hud::hud_text_focus,
-            hud_show_main,
-            quit_app,
-            open_statistics,
-            take_statistics_target,
-            take_settings_page,
-            coordinator::hud_bot_directions,
-            coordinator::hud_bot_looked,
-            coordinator::hud_update_notice,
-            coordinator::open_update,
-        ])
+        .invoke_handler({
+            let commands: fn(tauri::ipc::Invoke<tauri::Wry>) -> bool = tauri::generate_handler![
+                native_request,
+                cached_snapshot,
+                startup_mode,
+                presentation_request,
+                mcp_clients::native_mcp_clients,
+                claude_plugin::native_claude_plugin,
+                deepseek_plugin::native_deepseek_plugin,
+                picture::picture_payload,
+                picture::picture_complete,
+                picture::picture_resize,
+                capture::native_capture_webview,
+                system::native_system_status,
+                activity::window_activity,
+                hud::hud_monitors,
+                hud::hud_geometry,
+                hud::hud_native_capabilities,
+                hud::hud_report_regions,
+                hud::hud_drag_start,
+                hud::hud_text_focus,
+                hud_show_main,
+                quit_app,
+                open_statistics,
+                take_statistics_target,
+                take_settings_page,
+                coordinator::hud_bot_directions,
+                coordinator::hud_bot_looked,
+                coordinator::hud_update_notice,
+                coordinator::open_update,
+                web_sign_in::web_sign_in,
+            ];
+            // A sign-in window shows another site's page: none of Agent
+            // HUD's commands answer it, whatever its capabilities say.
+            move |invoke| {
+                if web_sign_in::foreign(invoke.message.webview_ref().label()) {
+                    invoke
+                        .resolver
+                        .reject("Agent HUD's commands are not open to this page");
+                    return true;
+                }
+                commands(invoke)
+            }
+        })
         .setup(move |app| {
             app.manage(system::System::new(app.config().identifier.clone()));
             app.manage(mcp_clients::Clients::default());
@@ -1003,6 +1018,9 @@ pub fn run_with_options(
         })
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                if web_sign_in::foreign(window.label()) {
+                    return;
+                }
                 if matches!(window.label(), "main" | "statistics") {
                     // Closing Settings or Statistics ends its page and web
                     // content process; the next open builds it again.
@@ -1013,7 +1031,9 @@ pub fn run_with_options(
                 let _ = window.hide();
                 activity::notify(window.app_handle(), window.label());
             } else if let tauri::WindowEvent::Destroyed = event {
-                if matches!(window.label(), "main" | "statistics") {
+                if matches!(window.label(), "main" | "statistics")
+                    || web_sign_in::foreign(window.label())
+                {
                     shell::windows_changed(window.app_handle());
                 }
             } else if let tauri::WindowEvent::ThemeChanged(theme) = event {

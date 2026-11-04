@@ -24,6 +24,8 @@ The implementation follows the original Swift account readers:
 | Antigravity  | Connected CLI status-line reports and all running authenticated language servers | Identified quota callbacks, serial loopback `GetUserStatus`, anonymous `/usage` fallback |
 | Factory Droid | A Factory API key only: `FACTORY_API_KEY` in the environment, else in `~/.factory/.env` (CodexBar's place for it); Droid's own sign-in and the web app's cookies are never read. No key leaves a notice, not a sign-out; a key Factory refuses (401/403) is signed out | `GET api.factory.ai/api/billing/limits`, as the CLI's `/usage` does: the share used of the five-hour, weekly and monthly windows of the Standard pool and, where reported, the Droid Core pool (a positive `secondsRemaining` sets the reset, else a future `windowEnd`; a window whose end passed reads as reset), and the extra usage balance in US dollars. A plan with no windows there shows a notice. Shapes follow CodexBar's Factory probe (MIT) |
 | Cline (ClinePass) | Cline's own sign-in in `providers.json` (`providers.cline.settings`, under `CLINE_DATA_DIR`, else `CLINE_DIR`/`~/.cline` `data/settings`): its browser sign-in's access token, sent as `workos:<token>`, else a saved API key, else `CLINE_API_KEY`; never refreshed or rewritten. An expired token keeps the last reading until Cline runs again; a 401 is a sign-out, a 403 or 404 an account with no plan to read | `api.cline.bot/api/v1/users/me/plan/usage-limits`: the 5-hour, weekly and monthly share used and their resets |
+| Qoder        | A sign-in the user makes on qoder.com or qoder.com.cn in Agent HUD's own window (see below); Qoder, Qoder CN and QoderWork spend it | `GET /api/v2/me/usages/big_model_credits`: the plan's model credits, shared credits added, and their reset |
+| WorkBuddy    | A sign-in the user makes on www.workbuddy.cn in Agent HUD's own window | `POST /billing/meter/get-user-resource-summary`: credits and reward credits left of their cycle, the plan; the reset from the paid, then free, package lists |
 
 Each provider states its own facts in its folder under `src/crates/agents/src/`
 (`agents::account::Provider`, listed in `agents::ACCOUNTS`): how it is read,
@@ -64,6 +66,31 @@ from that service's process. External account requests retain normal TLS checks.
 The default native launch reads real accounts. Explicit `--demo` skips the real
 runtime and all account jobs. Closing Settings or opening a second HUD does not
 start another account reader.
+
+## Web sign-in
+
+Some quotas are shown only on the vendor's own site: Qoder's model credits and
+WorkBuddy's credits. A provider states where the user may sign in for one
+(`agents::account::WebSignIn`: each site's host, name and page). Nothing about
+it starts by itself:
+
+- The block of a detected agent says "Sign in to show the quota" with a button
+  per site, and the agent's settings page lists the sites with **Sign in** and
+  **Sign out**. Only those buttons open the window.
+- The window is Agent HUD's own, on the vendor's page, private (nothing the
+  site stores outlives it), limited to `https`, and none of Agent HUD's
+  commands answer it (`host/src/web_sign_in.rs`, `foreign`).
+- While it is open, each new set of the site's cookies is tried once with the
+  provider's own reader, in the collection queue, as the only session that
+  reading sees. Once the reader reads the quota with them, the cookies and the
+  window's browser identity are kept (`account-credentials/web/<provider>@<host>.json`,
+  owner-only), the window closes and the provider is read again. Closing the
+  window first keeps nothing.
+- The interface is told only where a session is kept (`webSignIn`), never the
+  session. Agent HUD never reads a browser's or another app's session for these.
+- A site that refuses the kept session makes the reading "signed out": the
+  sign-in reminder appears once a day and the block offers the sign-in again.
+  **Sign out** forgets the session.
 
 ## Quota display
 

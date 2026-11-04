@@ -234,6 +234,9 @@ pub struct Provider {
     pub reported: Option<Reported>,
     /// The vendor's public status page.
     pub status: Option<&'static StatusPage>,
+    /// Where the user may sign in on the vendor's site, inside Agent HUD's own
+    /// window, for a quota no client keeps (`WebSignIn`).
+    pub web: Option<&'static WebSignIn>,
 }
 impl Provider {
     pub const fn new(id: &'static str, read: Read) -> Self {
@@ -245,6 +248,7 @@ impl Provider {
             keeps_unreported_windows: false,
             reported: None,
             status: None,
+            web: None,
         }
     }
     /// The session sources whose work is this provider's.
@@ -441,6 +445,37 @@ impl HttpFailure {
     }
 }
 
+/// A quota the vendor shows only on its own site, read with a sign-in the
+/// user makes there inside Agent HUD's own window. The user starts it, from
+/// the agent's block or its settings; Agent HUD never opens it by itself,
+/// never reads a browser's or another app's session, and keeps only the
+/// session the window ends with, on this computer.
+pub struct WebSignIn {
+    /// The sites an account can be on, such as an international and a China
+    /// one; each keeps its own session.
+    pub sites: &'static [WebSite],
+}
+pub struct WebSite {
+    /// The host whose session is kept, such as `qoder.com`.
+    pub host: &'static str,
+    /// What the sign-in names, such as "Qoder" or "Qoder CN".
+    pub name: &'static str,
+    /// The page the window opens to sign in.
+    pub sign_in: &'static str,
+}
+/// The session the user signed in with in Agent HUD's window: the cookies
+/// the site set for its host, as one `Cookie` header, and the browser
+/// identity they were set for, which some sites bind them to.
+#[derive(Clone, Debug, PartialEq)]
+pub struct WebSession {
+    pub host: String,
+    pub cookie: String,
+    pub user_agent: String,
+}
+/// The browser identity Agent HUD's sign-in window presents, and every
+/// request made with its session after.
+pub const WEB_USER_AGENT: &str = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36";
+
 /// What an account reader may ask of the machine it runs on. Platform
 /// implements it once per operating system.
 pub trait Host {
@@ -487,6 +522,11 @@ pub trait Host {
     }
     /// The API credential the user saved in Agent HUD for this agent, if any.
     fn saved_credential(&self, agent: &str) -> Result<Option<Value>, String>;
+    /// The session the user signed in with on `host` in Agent HUD's window
+    /// for `provider` (`WebSignIn`), if any.
+    fn web_session(&self, _provider: &str, _host: &str) -> Option<WebSession> {
+        None
+    }
     /// Whether the user turned on a reading that needs their consent, by its
     /// setting key. Checked again during a reading, since it can change.
     fn consented(&self, setting: &str) -> bool;
@@ -738,6 +778,9 @@ pub(crate) mod fake {
         pub consent: AtomicBool,
         /// Answers by URL; a URL not listed is unreachable.
         pub web: HashMap<String, Result<Value, HttpFailure>>,
+        /// Sessions signed in in Agent HUD's window, by provider and host
+        /// joined with "|".
+        pub web_sessions: HashMap<String, WebSession>,
         /// Answers by URL and the `Authorization` sent, before `web`.
         pub web_for: HashMap<(String, String), Result<Value, HttpFailure>>,
         /// Every request: URL and authorization.
@@ -790,6 +833,7 @@ pub(crate) mod fake {
                 natives: HashMap::new(),
                 consent: AtomicBool::new(false),
                 web: HashMap::new(),
+                web_sessions: HashMap::new(),
                 web_for: HashMap::new(),
                 asked: RefCell::new(vec![]),
                 headers: RefCell::new(vec![]),
@@ -993,6 +1037,11 @@ pub(crate) mod fake {
         }
         fn saved_credential(&self, _agent: &str) -> Result<Option<Value>, String> {
             self.saved.clone()
+        }
+        fn web_session(&self, provider: &str, host: &str) -> Option<WebSession> {
+            self.web_sessions
+                .get(&format!("{provider}|{host}"))
+                .cloned()
         }
         fn consented(&self, _setting: &str) -> bool {
             self.consent.load(Ordering::Acquire)

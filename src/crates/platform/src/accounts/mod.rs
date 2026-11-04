@@ -30,6 +30,7 @@ mod host;
 pub(crate) mod http;
 mod restart_copy;
 mod status;
+mod web;
 
 #[derive(Clone)]
 pub(super) struct AccountContext {
@@ -43,6 +44,9 @@ pub(super) struct AccountContext {
     pub copilot_consent: Arc<AtomicBool>,
     /// The relay addresses the owner agreed to read (`relays::CONSENT`).
     pub relay_consent: Arc<Mutex<HashSet<String>>>,
+    /// A web sign-in being tried before it is kept (`WebSignInDesk::accepts`):
+    /// the provider and the session, the only one a reading then sees.
+    pub trial_web: Option<(String, agents::account::WebSession)>,
 }
 use agent_hud_agents::account::Reading as AccountReading;
 
@@ -154,6 +158,76 @@ pub struct AccountService {
     shared: Arc<Shared>,
     context: AccountContext,
     credential_lock: Mutex<()>,
+    gate: CollectionGate,
+}
+
+/// The sign-in window's side of a web sign-in (`agents::account::WebSignIn`),
+/// which the host holds while the window is open. A session the window
+/// collects is tried with the provider's own reader, in the collection
+/// queue, and kept only once that reader reads the quota with it.
+#[derive(Clone)]
+pub struct WebSignInDesk {
+    context: AccountContext,
+    shared: Arc<Shared>,
+    gate: CollectionGate,
+}
+
+impl WebSignInDesk {
+    /// The page to open and the name to show for `provider` on `host`.
+    pub fn site(&self, provider: &str, host: &str) -> Option<(&'static str, &'static str)> {
+        web::site(provider, host).map(|site| (site.sign_in, site.name))
+    }
+    /// The browser identity the window presents and the session is kept with.
+    pub fn user_agent(&self) -> &'static str {
+        agents::account::WEB_USER_AGENT
+    }
+    /// Tries the cookies the window holds for `host` as `provider`'s session
+    /// and keeps them once the provider's reader reads the quota with them:
+    /// true when the sign-in is done.
+    pub fn sign_in_with(&self, provider: &str, host: &str, cookie: &str) -> Result<bool, String> {
+        let session = agents::account::WebSession {
+            host: host.to_owned(),
+            cookie: cookie.to_owned(),
+            user_agent: agents::account::WEB_USER_AGENT.to_owned(),
+        };
+        if !self.accepts(provider, &session) {
+            return Ok(false);
+        }
+        self.keep(provider, &session)?;
+        Ok(true)
+    }
+    /// Whether the provider's reader reads its quota with `session` and no
+    /// other: the sign-in is done once it does.
+    fn accepts(&self, provider: &str, session: &agents::account::WebSession) -> bool {
+        let Some(facts) = agents::account_provider(provider) else {
+            return false;
+        };
+        if web::site(provider, &session.host).is_none() {
+            return false;
+        }
+        let mut context = self.context.clone();
+        context.trial_web = Some((provider.to_owned(), session.clone()));
+        let _turn = self
+            .gate
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        (facts.read)(&context).is_ok_and(|reading| reading.account.is_some())
+    }
+    /// Keeps `session` for `provider` and reads the provider again now.
+    fn keep(&self, provider: &str, session: &agents::account::WebSession) -> Result<(), String> {
+        web::save(&self.context, provider, session)?;
+        wake_provider(&self.shared, provider);
+        Ok(())
+    }
+}
+
+/// Reads `provider` again at once and tells the snapshot.
+fn wake_provider(shared: &Shared, provider: &str) {
+    if let Ok(mut state) = shared.state.lock() {
+        state.entries.remove(provider);
+        state.force.insert(provider.into());
+    }
+    shared.wake.notify_all();
 }
 
 impl AccountService {
@@ -220,6 +294,7 @@ impl AccountService {
             cancelled: Arc::clone(&cancelled),
             copilot_consent: Arc::new(AtomicBool::new(false)),
             relay_consent: Arc::new(Mutex::new(HashSet::new())),
+            trial_web: None,
         };
         let shared = Arc::new(Shared {
             state: Mutex::new(Control {
@@ -240,15 +315,33 @@ impl AccountService {
         });
         let worker = Arc::clone(&shared);
         let worker_context = context.clone();
+        let worker_gate = Arc::clone(&gate);
         std::thread::Builder::new()
             .name("agenthud-accounts".into())
-            .spawn(move || run(worker_context, worker, gate, readers))
+            .spawn(move || run(worker_context, worker, worker_gate, readers))
             .map_err(|_| l10n::text("账户读取线程无法启动", "Account worker could not start"))?;
         Ok(Self {
             shared,
             context,
             credential_lock: Mutex::new(()),
+            gate,
         })
+    }
+    /// What the host's sign-in window works with (`WebSignInDesk`).
+    pub fn web_sign_in_desk(&self) -> WebSignInDesk {
+        WebSignInDesk {
+            context: self.context.clone(),
+            shared: Arc::clone(&self.shared),
+            gate: Arc::clone(&self.gate),
+        }
+    }
+    /// Forgets the web sign-in of `provider` on `host` and reads it again.
+    pub fn web_sign_out(&self, params: &Value) -> Result<Value, String> {
+        let provider = params["provider"].as_str().ok_or("provider is required")?;
+        let host = params["host"].as_str().ok_or("host is required")?;
+        web::remove(&self.context, provider, host)?;
+        wake_provider(&self.shared, provider);
+        Ok(json!({"kind":"ack","provider":provider,"host":host,"signedIn":false}))
     }
     pub fn credentials_status(&self) -> Value {
         credentials::status(&self.context)
@@ -452,6 +545,13 @@ impl AccountService {
         // added by hand for any agent; with none, the reader reads two
         // configuration files and asks nothing.
         enabled.insert("relay".into());
+        // A quota read with a web sign-in is offered for every client that
+        // spends it; until the user signs in its reader asks nothing.
+        for &facts in agents::ACCOUNTS {
+            if facts.web.is_some() && facts.sources().iter().any(|s| enabled.contains(*s)) {
+                enabled.insert(facts.id.into());
+            }
+        }
         for provider in account_homes.keys() {
             if snapshot["providers"]
                 .as_array()
@@ -632,7 +732,17 @@ impl AccountService {
                 let read = state.pages.get(page.url)?;
                 status::service(page, read.summary.as_ref()?, read.checked_at.as_deref()?)
             });
-            result.providers.insert(entry.reading.provider.into(),json!({"status":if entry.failed {"error"}else if ready {"ready"}else{"unavailable"},"checkedAt":entry.checked_at,"notice":entry.notice,"failure":failure,"failingSince":failing_since,"service":service}));
+            // Where the user may sign in for this quota, and where they have;
+            // the other clients that spend it show the same.
+            let web_sign_in = web::status(&self.context, facts);
+            if let Some(status) = &web_sign_in {
+                for &source in facts.sources().iter().filter(|s| **s != facts.id) {
+                    result.providers.entry(source.into()).or_insert_with(|| {
+                        json!({"status":"unavailable","checkedAt":null,"notice":null,"webSignIn":status})
+                    });
+                }
+            }
+            result.providers.insert(entry.reading.provider.into(),json!({"status":if entry.failed {"error"}else if ready {"ready"}else{"unavailable"},"checkedAt":entry.checked_at,"notice":entry.notice,"failure":failure,"failingSince":failing_since,"service":service,"webSignIn":web_sign_in}));
         }
         for metadata in credentials::status(&self.context)["providers"]
             .as_array()

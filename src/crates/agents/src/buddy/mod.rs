@@ -1,4 +1,5 @@
 //! CodeBuddy and WorkBuddy, which share one log format.
+pub mod account;
 mod hooks;
 pub mod transcript;
 

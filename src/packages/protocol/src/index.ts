@@ -470,6 +470,13 @@ export interface Provider {
     } | null;
     configurableFields?: string[];
     configured?: boolean;
+    /** A quota only the vendor's site shows, read with a sign-in the user
+     * makes in Agent HUD's own window (`web_sign_in`): the provider that reads
+     * it, and on which of its sites a session is kept. Never the session. */
+    webSignIn?: {
+      provider: string;
+      sites: { host: string; name: string; signedIn: boolean }[];
+    } | null;
   };
   /** Finding an installed/configured client does not imply its data adapter is ported. */
   dataStatus?: "supported" | "account-only" | "detection-only";
@@ -1123,4 +1130,5 @@ export type NativeMethod =
   | "remove_credentials"
   | "add_relay_source"
   | "set_relay_kind"
-  | "remove_relay_source";
+  | "remove_relay_source"
+  | "web_sign_out";

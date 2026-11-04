@@ -29,6 +29,7 @@ import AntigravityAccounts from "../AntigravityAccounts";
 import { CodexModelSettings } from "../CodexModelSettings";
 import { PanelBlocks } from "./PanelBlocks";
 import { AgentRelays } from "./AgentRelays";
+import { AgentWebSignIn } from "./AgentWebSignIn";
 import { Connection } from "./Connection";
 
 export interface AgentDetailProps {
@@ -234,6 +235,13 @@ export function AgentDetail({
           />
         )}
         <AgentRelays t={t} snapshot={snapshot} source={source} />
+        <AgentWebSignIn
+          t={t}
+          source={source}
+          action={action}
+          perform={perform}
+          pending={pending}
+        />
         <Connection
           t={t}
           source={source}

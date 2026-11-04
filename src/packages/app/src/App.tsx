@@ -651,6 +651,9 @@ function AppContent({
     openSettingsPage: (page) => {
       if (isTauri()) void invoke("hud_show_main", { page });
     },
+    webSignIn: (provider, host) => {
+      if (isTauri()) void invoke("web_sign_in", { provider, host });
+    },
     selectSession: (session) => {
       setSelectedSession(session);
       if (isTauri()) {

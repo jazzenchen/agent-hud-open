@@ -21,8 +21,12 @@ import {
 import { quotaAccountKey, quotaShortName, vendorKey } from "../model";
 import { recentCost, recentUsage } from "../recent-usage";
 import { FittingName } from "./FittingName";
-import { AccountHeader, BlockNotice } from "./AccountHeader";
-import { missingReadingNotice, serviceNotice } from "./account-labels";
+import { AccountHeader, BlockNotice, WebSignInNotice } from "./AccountHeader";
+import {
+  missingReadingNotice,
+  serviceNotice,
+  webSignInOffer,
+} from "./account-labels";
 import { ResetCreditsRow } from "./ResetCreditsRow";
 import { usePanelServices } from "../PanelContext";
 import { useGround } from "../ground";
@@ -490,6 +494,7 @@ export const SourceProviderBlock = memo(function SourceProviderBlock({
   const [chosen, setMeasure] = useState<Measure>(offered[0]);
   const measure = offered.includes(chosen) ? chosen : offered[0];
   const format = useFormat();
+  const services = usePanelServices();
   const availability = useMemo(
     () =>
       Object.fromEntries(
@@ -540,6 +545,11 @@ export const SourceProviderBlock = memo(function SourceProviderBlock({
     vendor,
     format.language,
   );
+  // A quota only the vendor's site shows waits for the user to sign in.
+  const signInOffer = webSignInOffer(snapshot.providers, vendor);
+  const signInAgain =
+    snapshot.providers.find((p) => p.id === vendor)?.accountStatus?.failure ===
+    "signedOut";
   // Without a window, the block shows what the agent used in the last 24
   // hours instead (vendors.rs `recent_label`).
   const recent = missingReading
@@ -609,6 +619,14 @@ export const SourceProviderBlock = memo(function SourceProviderBlock({
       </div>
       {vendorStatus && (
         <BlockNotice text={vendorStatus} light={light} warning />
+      )}
+      {signInOffer && services?.webSignIn && (
+        <WebSignInNotice
+          sites={signInOffer.sites}
+          again={signInAgain}
+          light={light}
+          signIn={(host) => services.webSignIn?.(signInOffer.provider, host)}
+        />
       )}
       {layout.widget === "chart" ? (
         <SourceTokenChart

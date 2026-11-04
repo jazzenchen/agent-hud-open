@@ -61,6 +61,28 @@ export function missingReadingNotice(
   return notice?.trim() ? notice : null;
 }
 
+/** Where the block offers a sign-in for its quota: the provider and the
+ * sites to sign in on, while no site has a session or the one kept ended
+ * (the reading says the agent signed out). Null when nothing is offered. */
+export function webSignInOffer(
+  providers: readonly Pick<Provider, "id" | "accountStatus">[],
+  vendor: string,
+): { provider: string; sites: { host: string; name: string }[] } | null {
+  const status = providers.find((p) => p.id === vendor)?.accountStatus;
+  const web = status?.webSignIn;
+  if (!web?.sites.length) return null;
+  const ended = status?.failure === "signedOut";
+  if (!ended && web.sites.some((site) => site.signedIn)) return null;
+  const sites = ended ? web.sites.filter((site) => site.signedIn) : web.sites;
+  return {
+    provider: web.provider,
+    sites: (sites.length ? sites : web.sites).map(({ host, name }) => ({
+      host,
+      name,
+    })),
+  };
+}
+
 /** The earliest expiry, whole and short (Open's CodexResetCreditsView
  * nextExpiryLabel): the short form is the date alone; a label without a
  * date has none shorter than itself. */

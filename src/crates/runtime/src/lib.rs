@@ -1,5 +1,6 @@
 //! The application service shared by desktop, CLI and MCP transports.
 use agent_hud_core::{AccountProjection, AgentHudCore, SourceRoot};
+pub use agent_hud_platform::WebSignInDesk;
 use agent_hud_platform::{AccountService, FileChanges, NativePlatform};
 use serde_json::{json, Value};
 use std::{
@@ -302,6 +303,11 @@ impl Runtime {
     pub fn set_presentation_values(&mut self, values: &Value) -> Result<Value, String> {
         self.core.set_presentation_values(values)
     }
+    /// What the host's sign-in window works with (`WebSignInDesk`); none in
+    /// a runtime that reads no accounts.
+    pub fn web_sign_in_desk(&self) -> Option<WebSignInDesk> {
+        self.accounts.as_ref().map(AccountService::web_sign_in_desk)
+    }
     pub fn request(&mut self, method: &str, params: Value) -> Result<Value, String> {
         if matches!(
             method,
@@ -311,6 +317,7 @@ impl Runtime {
                 | "add_relay_source"
                 | "set_relay_kind"
                 | "remove_relay_source"
+                | "web_sign_out"
         ) {
             let accounts = self
                 .accounts
@@ -322,6 +329,7 @@ impl Runtime {
                 "add_relay_source" => accounts.add_relay_source(&params),
                 "set_relay_kind" => accounts.set_relay_kind(&params),
                 "remove_relay_source" => accounts.remove_relay_source(&params),
+                "web_sign_out" => accounts.web_sign_out(&params),
                 _ => accounts.remove_credentials(&params),
             };
         }

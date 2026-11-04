@@ -19,7 +19,7 @@ pub mod local_ipc;
 pub mod local_tools;
 mod navigation;
 mod os;
-pub use accounts::{AccountService, CollectionGate};
+pub use accounts::{AccountService, CollectionGate, WebSignInDesk};
 pub use navigation::session_url;
 #[cfg(target_os = "macos")]
 pub use os::registered_applications;

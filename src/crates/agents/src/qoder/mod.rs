@@ -9,7 +9,9 @@
 //! Claude Code's, which also has the engine read their lines with Claude
 //! Code's parser (`transcript::claude_lines`), with Qoder's own counting
 //! (`transcript::counters`). Each build stays a client of its own. No
-//! source is verified on a machine with Qoder.
+//! source is verified on a machine with Qoder. The credits the builds spend
+//! are read with a sign-in the user makes in Agent HUD (`account`).
+pub mod account;
 mod hooks;
 pub mod legacy;
 pub mod transcript;

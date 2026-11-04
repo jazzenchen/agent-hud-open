@@ -5,6 +5,7 @@ import {
   missingReadingNotice,
   serviceNotice,
   nextExpiryLabel,
+  webSignInOffer,
 } from "../src/panel/account-labels.ts";
 
 const now = Date.parse("2026-10-21T12:00:00Z");
@@ -122,4 +123,39 @@ test("a vendor status shows only while one of the agent's components is not oper
   );
   assert.equal(serviceNotice(providers, "codex", "en"), null);
   assert.equal(serviceNotice(providers, "cursor", "en"), null);
+});
+
+test("a sign-in is offered until a site has a session, and again when it ends", () => {
+  const sites = (signedIn: boolean[]) => [
+    { host: "qoder.com", name: "Qoder", signedIn: signedIn[0] },
+    { host: "qoder.com.cn", name: "Qoder CN", signedIn: signedIn[1] },
+  ];
+  const providers = (signedIn: boolean[], failure: string | null = null) => [
+    {
+      id: "qoder-cn",
+      accountStatus: {
+        status: "unavailable" as const,
+        checkedAt: null,
+        notice: null,
+        failure: failure as "signedOut" | null,
+        webSignIn: { provider: "qoder", sites: sites(signedIn) },
+      },
+    },
+  ];
+  // Nobody signed in: every site, offered for the provider that reads it.
+  assert.deepEqual(webSignInOffer(providers([false, false]), "qoder-cn"), {
+    provider: "qoder",
+    sites: [
+      { host: "qoder.com", name: "Qoder" },
+      { host: "qoder.com.cn", name: "Qoder CN" },
+    ],
+  });
+  // Signed in on one: nothing to offer.
+  assert.equal(webSignInOffer(providers([true, false]), "qoder-cn"), null);
+  // The kept session ended: that site again.
+  assert.deepEqual(
+    webSignInOffer(providers([true, false], "signedOut"), "qoder-cn"),
+    { provider: "qoder", sites: [{ host: "qoder.com", name: "Qoder" }] },
+  );
+  assert.equal(webSignInOffer(providers([false, false]), "claude"), null);
 });

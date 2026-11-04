@@ -15,11 +15,12 @@ pub(crate) fn window_opened(app: &tauri::AppHandle) {
     let _ = app.set_activation_policy(tauri::ActivationPolicy::Regular);
 }
 
-/// The app keeps a Dock icon only while Settings or Statistics is open.
+/// The app keeps a Dock icon only while Settings, Statistics or a sign-in
+/// window is open.
 pub(crate) fn windows_changed(app: &tauri::AppHandle) {
-    let any_open = ["main", "statistics"].iter().any(|label| {
-        app.get_webview_window(label)
-            .is_some_and(|w| w.is_visible().unwrap_or(false) || w.is_minimized().unwrap_or(false))
+    let any_open = app.webview_windows().iter().any(|(label, w)| {
+        (matches!(label.as_str(), "main" | "statistics") || crate::web_sign_in::foreign(label))
+            && (w.is_visible().unwrap_or(false) || w.is_minimized().unwrap_or(false))
     });
     let _ = app.set_activation_policy(if any_open {
         tauri::ActivationPolicy::Regular

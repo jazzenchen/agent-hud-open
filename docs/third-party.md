@@ -1,5 +1,13 @@
 # UI source provenance
 
+Borrowed implementation (MIT): the Qoder and WorkBuddy web quota requests, the
+WorkBuddy package codes and the China-time cycle ends follow CodexBar's
+providers (github.com/steipete/CodexBar, commit 897bff3,
+`Sources/CodexBarCore/Resources/Plugins/{qoder.js,workbuddy.ts}`), whose
+codes come from the WorkBuddy 5.6.2 client. Agent HUD signs in in its own
+window instead of importing browser cookies.
+
+
 - React, React DOM, Vite and the Tauri API/CLI are resolved from the npm `latest` stable tags and pinned by the lockfile.
 - shadcn/ui: current components generated with CLI `4.22.1` from https://ui.shadcn.com. MIT. Shared components live in `src/packages/ui/src/ui`.
 - MCP: official `@modelcontextprotocol/server` / `client` `2.3.1`, current stable v2 line for the `2026-07-28` specification. https://ts.sdk.modelcontextprotocol.io/v2/.

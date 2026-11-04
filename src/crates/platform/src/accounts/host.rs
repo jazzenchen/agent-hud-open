@@ -1,8 +1,9 @@
 //! The `Host` the agents' account readers read through: this machine's files,
 //! credential store, saved credentials, consents and HTTP client.
-use super::{credentials, engine, http, AccountContext};
+use super::{credentials, engine, http, web, AccountContext};
 use agent_hud_agents::account::{
     Answer, DatabaseFailure, Engine, EngineStart, FileInfo, Host, HttpFailure, HttpRequest,
+    WebSession,
 };
 use agent_hud_agents::{Base, Os};
 use reqwest::header::HeaderValue;
@@ -95,6 +96,13 @@ impl Host for AccountContext {
             return credentials::relay_sources(self).map(Some);
         }
         credentials::read(self, agent)
+    }
+    fn web_session(&self, provider: &str, host: &str) -> Option<WebSession> {
+        // A sign-in being tried is the only session that reading sees.
+        if let Some((trying, session)) = &self.trial_web {
+            return (trying == provider && session.host == host).then(|| session.clone());
+        }
+        web::read(self, provider, host)
     }
     fn consented(&self, setting: &str) -> bool {
         if let Some(relay) = setting
