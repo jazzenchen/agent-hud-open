@@ -16,6 +16,7 @@ pub static HOOKS: Hooks = Hooks {
         reviewer_gate: true,
         settles_in_transcript: false,
         unattended: None,
+        opt_in: false,
         reply: Reply::HookSpecificOutput,
     }),
     completion: None,

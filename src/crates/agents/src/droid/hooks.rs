@@ -40,6 +40,7 @@ pub static HOOKS: Hooks = Hooks {
         reviewer_gate: false,
         settles_in_transcript: false,
         unattended: Some(unattended),
+        opt_in: false,
         reply: Reply::PreToolUse {
             matcher: "Create|Edit|ApplyPatch|Execute|WebSearch|FetchUrl",
             asks,

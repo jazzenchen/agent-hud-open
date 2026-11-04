@@ -20,6 +20,7 @@ pub static HOOKS: Hooks = Hooks {
         reviewer_gate: false,
         settles_in_transcript: true,
         unattended: Some(super::process::unattended),
+        opt_in: false,
         reply: Reply::HookSpecificOutput,
     }),
     completion: None,

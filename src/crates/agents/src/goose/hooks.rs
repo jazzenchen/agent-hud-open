@@ -9,7 +9,7 @@
 //!
 //! Goose runs every hook with `sh -c`, on every system; platform leaves
 //! shells out of a hook caller's processes, so the caller is Goose itself.
-use crate::hooks::{Began, Begin, Completed, Completion, Hooks, Launch, Layout};
+use crate::hooks::{Began, Begin, Completed, Completion, Hooks, Layout};
 use crate::{text, Location, PerOs, Support};
 use serde_json::Value;
 
@@ -39,10 +39,13 @@ pub static HOOKS: Hooks = Hooks {
     attention: false,
     compaction: None,
     prefixed_sessions: true,
+    // Goose turns a plugin on by itself, without asking, so its hooks wait
+    // until they are checked against a running Goose; its sessions come from
+    // its database meanwhile.
     launch: PerOs {
-        macos: Support::Unverified(Launch::Command),
+        macos: Support::Unsupported("Goose's hooks are not yet checked against a running Goose"),
         windows: Support::Unsupported("Goose runs hooks with sh -c; no verified Windows launch"),
-        linux: Support::Unverified(Launch::Command),
+        linux: Support::Unsupported("Goose's hooks are not yet checked against a running Goose"),
     },
 };
 

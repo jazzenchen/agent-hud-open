@@ -40,7 +40,7 @@ impl Hooks {
     /// The hook flags this client is installed with, in install order.
     pub fn flags(&self) -> Vec<&'static str> {
         let mut flags = Vec::new();
-        if self.permission.is_some() {
+        if self.permission.as_ref().is_some_and(|hook| !hook.opt_in) {
             flags.push("--permission-hook");
         }
         if self.completion.is_some() {
@@ -130,6 +130,10 @@ pub struct Permission {
     pub settles_in_transcript: bool,
     /// A run nobody watches, whose requests stay with the client.
     pub unattended: Option<crate::process::UnattendedRule>,
+    /// Installed only once the user turns it on, which no setting does yet:
+    /// the client asks this hook before its own rules and the session's
+    /// approvals, so it would hold calls the user already allowed.
+    pub opt_in: bool,
     pub reply: Reply,
 }
 
@@ -346,6 +350,14 @@ mod tests {
             ["--permission-hook", "--completion-hook"]
         );
         assert_eq!(flags("workbuddy"), ["--permission-hook"]);
+        // Copilot's approvals wait for the user to turn them on.
+        assert!(hooks_by_id("copilot").unwrap().permission.is_some());
+        assert_eq!(flags("copilot"), ["--completion-hook"]);
+        // Goose's hooks wait for a check against a running Goose.
+        let goose = hooks_by_id("goose").unwrap();
+        for os in [crate::Os::MacOs, crate::Os::Windows, crate::Os::Linux] {
+            assert!(goose.launch.on(os).value().is_none(), "{os:?}");
+        }
         for agent in ALL {
             for flag in agent.hooks.map(Hooks::flags).unwrap_or_default() {
                 assert!(crate::HOOK_FLAGS.contains(&flag), "{} {flag}", agent.id);
