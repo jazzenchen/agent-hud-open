@@ -2,7 +2,7 @@ import { ChevronRight } from "lucide-react";
 import { Card } from "@agent-hud/ui/components/card";
 import { share } from "@agent-hud/ui/format";
 import type { SessionDetail } from "@agent-hud/protocol";
-import { ShareRows } from "./SessionCharts";
+import { ShareRows } from "./ShareRows";
 import {
   card,
   CardTitle,

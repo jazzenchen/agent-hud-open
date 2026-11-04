@@ -2,7 +2,8 @@ import { Layers, RotateCw } from "lucide-react";
 import { Card } from "@agent-hud/ui/components/card";
 import { Tabs, TabsList, TabsTrigger } from "@agent-hud/ui/components/tabs";
 import type { SessionDetail } from "@agent-hud/protocol";
-import { ContextChart, TurnBarsChart, type Measure } from "./SessionCharts";
+import { ContextChart } from "./ContextChart";
+import { TurnBarsChart, type Measure } from "./TurnBarsChart";
 import { TurnHover } from "./TurnHover";
 import {
   card,

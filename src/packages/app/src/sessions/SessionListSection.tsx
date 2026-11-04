@@ -9,7 +9,8 @@ import {
 import type { Session, SessionsDay } from "@agent-hud/protocol";
 import { useAnimatedNumber } from "../statistics/StatsTheme";
 import { moneyAmount, share } from "@agent-hud/ui/format";
-import { ShareRows, TurnSparkline } from "./SessionCharts";
+import { ShareRows } from "./ShareRows";
+import { TurnSparkline } from "./TurnSparkline";
 import {
   card,
   clipped,

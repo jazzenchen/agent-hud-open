@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Card } from "@agent-hud/ui/components/card";
 import { sessionClient } from "../lib/sessions";
 import type { Session, SessionDetail, Snapshot } from "@agent-hud/protocol";
-import type { Measure } from "./SessionCharts";
+import type { Measure } from "./TurnBarsChart";
 import { KindsCard, ModelsCard } from "./BreakdownCards";
 import { DetailFigures } from "./SessionDetailFigures";
 import { DetailHeader } from "./SessionDetailHeader";
