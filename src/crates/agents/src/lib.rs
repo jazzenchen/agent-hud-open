@@ -49,6 +49,7 @@ pub mod copilot;
 pub mod cursor;
 pub mod deepseek;
 pub mod devin;
+pub mod droid;
 pub mod glm;
 pub mod grok;
 pub mod hermes;

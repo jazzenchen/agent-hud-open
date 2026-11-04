@@ -86,3 +86,20 @@ Not read: Kilo Code's and MiMo Code's release-channel databases
 (`kilo-<channel>.db`, `mimocode-<channel>.db`), `KILO_DB`, `MIMOCODE_DB` and
 `MIMOCODE_HOME`; Oh My Pi's profiles, its XDG folders and a
 `PI_CODING_AGENT_DIR` it shares with Pi, which Pi reads.
+## Sessions kept as a running total
+
+Factory Droid keeps each session in `~/.factory/sessions/<folder>/<id>.jsonl`
+beside `<id>.settings.json`. The transcript holds no tokens; the settings file
+holds the session's own (`tokenUsage`: input, output, cache reads and writes,
+thinking as reasoning; a Task sub-agent's are in its own session, which names
+its parent by `callingSessionId`), a running total Droid rewrites in place after
+each call. The engine reads the settings file whole each time it changes, as one
+call keyed by the session and dated by the file's modification time, so a
+reading replaces the last one rather than adding to it: a session's tokens all
+fall at its latest change, and none is estimated per reply. The model is the
+router's pick (`effectiveFactoryRouterModel`) for `auto`, and a custom model by
+its display name without Droid's `[Provider]` label and index. The title,
+folder and parent come from the transcript's first line (`session_start`),
+which Droid rewrites when the title changes; the transcript is part of the
+settings file's stamp, and its last write is the session's activity time.
+`archivedAt` archives a session.

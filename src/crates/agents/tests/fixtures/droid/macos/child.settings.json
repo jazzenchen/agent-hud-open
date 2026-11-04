@@ -1,0 +1,1 @@
+{"model":"custom:GLM-5.1-[Proxy]-0","providerLock":"openai","archivedAt":"2026-11-03T10:00:00.000Z","tokenUsage":{"inputTokens":900,"outputTokens":400,"cacheCreationTokens":0,"cacheReadTokens":0,"thinkingTokens":200},"tags":["task-subagent-process"]}

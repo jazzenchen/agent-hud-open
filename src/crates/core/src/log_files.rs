@@ -385,7 +385,7 @@ pub(super) fn accepts_source(path: &Path, source: &str) -> bool {
                         && !name.ends_with(".zst")
                         && !name.ends_with(".tmp")))
         }
-        "hermes" | "zcode" | "devin" | "grok-bot" | "cursor" => false,
+        "hermes" | "zcode" | "devin" | "grok-bot" | "cursor" | "droid" => false,
         "antigravity" => {
             name == "transcript.jsonl" && path.components().any(|p| p.as_os_str() == "brain")
         }

@@ -16,6 +16,8 @@ use std::{
 };
 
 #[cfg(test)]
+mod droid_tests;
+#[cfg(test)]
 mod tests;
 
 pub(crate) fn virtual_path(path: &Path, id: &str) -> PathBuf {
@@ -43,6 +45,7 @@ pub(crate) fn accepts(path: &Path, source: &str) -> bool {
     if opencode_legacy(path, source)
         || source_batches::accepts(path, source)
         || (source == "grok-bot" && agent_hud_agents::grok::bot::accepts(path))
+        || (source == "droid" && agent_hud_agents::droid::transcript::accepts(path))
     {
         return true;
     }
@@ -222,10 +225,12 @@ impl AgentHudCore {
             *budget = budget.saturating_sub(2 * 1024 * 1024);
         }
         let is_bot = stamp.source == "grok-bot";
+        // A JSON document per session, read whole: Factory Droid's settings.
+        let is_document = stamp.source == "droid";
         let is_turn_log = agent_hud_agents::hooks::turn_log::accepts(path);
         let is_legacy = opencode_legacy(path, stamp.source);
         let replaces_sessions = opencode(stamp.source).is_some() && !is_legacy;
-        let reader = if is_batch || is_bot || is_legacy || is_turn_log {
+        let reader = if is_batch || is_bot || is_legacy || is_turn_log || is_document {
             None
         } else {
             Some(legacy_database::ReadOnlyDatabase::open(path).map_err(|_| {
@@ -240,6 +245,8 @@ impl AgentHudCore {
             agent_hud_agents::opencode::legacy::read(path)
         } else if is_bot {
             agent_hud_agents::grok::bot::read(path, cursor)
+        } else if is_document {
+            agent_hud_agents::droid::transcript::read(path, cursor)
         } else if is_turn_log {
             agent_hud_agents::hooks::turn_log::read(path, cursor)
         } else if is_batch {

@@ -22,3 +22,10 @@ Facts about other clients' files, and the readers built on them, come from these
 - AgentBar (michalstrnadel/AgentBar, commit 97f4cf4, MIT): the payload of Copilot CLI's `permissionRequest` hook, as logged from a real CLI.
 - Kilo Code's and MiMo Code's logos are unchanged copies of `light/kilocode.png` and `light/xiaomimimo.png` from `@lobehub/icons-static-png` 2.6.0 (MIT; LobeHub's notice is in src/packages/hud/src/assets/LobeIcons-LICENSE.txt). LobeHub has no mark for Oh My Pi.
 - Kilo Code, MiMo Code and Oh My Pi storage, plugin and extension facts come from their own MIT sources (Kilo-Org/kilocode 080ca6c, XiaomiMiMo/MiMo-Code 6b66e8c, can1357/oh-my-pi 33ea58a). Tokscale (MIT, junhoyeo/tokscale b26c433) informed guarding OpenCode-format rows with `json_valid` and leaving out Kilo Code's migrated tasks.
+## Factory Droid
+
+Factory Droid's reader (`src/crates/agents/src/droid/`) takes its facts from Droid 1.3.0's own code (the `@factory/cli` npm package, read, never run) and docs.factory.com, and borrows these MIT-licensed readers' rules:
+
+- tokscale (junhoyeo/tokscale, `crates/tokscale-core/src/sessions/droid.rs`, b26c433), ccusage (ccusage/ccusage, `rust/adapters/droid`, f674ef6) and codeburn (getagentseal/codeburn, `src/providers/droid.ts`, 3faea16): the session files, the `tokenUsage` fields and the model a router or custom session names.
+
+Copyright (c) their respective authors; each under the MIT license.

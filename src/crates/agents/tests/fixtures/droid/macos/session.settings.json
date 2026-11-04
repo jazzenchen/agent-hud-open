@@ -1,0 +1,43 @@
+{
+  "model": "auto",
+  "reasoningEffort": "medium",
+  "interactionMode": "auto",
+  "autonomyLevel": "low",
+  "autonomyMode": "auto-low",
+  "providerLock": "factory",
+  "providerLockTimestamp": "2026-11-03T09:12:00.000Z",
+  "assistantActiveTimeMs": 184000,
+  "effectiveFactoryRouterModel": {
+    "modelId": "claude-sonnet-4-5-20250929",
+    "reasoningEffort": "medium",
+    "reason": "default"
+  },
+  "tokenUsage": {
+    "inputTokens": 12400,
+    "outputTokens": 3100,
+    "cacheCreationTokens": 9600,
+    "cacheReadTokens": 88000,
+    "thinkingTokens": 1200,
+    "factoryCredits": 0.42
+  },
+  "inclusiveTokenUsage": {
+    "inputTokens": 13300,
+    "outputTokens": 3500,
+    "cacheCreationTokens": 9600,
+    "cacheReadTokens": 88000,
+    "thinkingTokens": 1400
+  },
+  "lastCallTokenUsage": {
+    "inputTokens": 800,
+    "outputTokens": 240,
+    "cacheReadTokens": 21000
+  },
+  "childInclusiveTokenUsageBySessionId": {
+    "c0ffee00-1111-4222-8333-444455556666": {
+      "inputTokens": 900,
+      "outputTokens": 400,
+      "thinkingTokens": 200
+    }
+  },
+  "tags": []
+}

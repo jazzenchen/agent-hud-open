@@ -14,6 +14,8 @@ use std::{
 const LIMIT: u64 = 1024 * 1024;
 
 /// The file beside a log that holds its session's name, if the client keeps one.
+/// Factory Droid's is its transcript, whose first line holds the title of
+/// the session its settings file counts.
 pub fn kept_name_file(path: &Path, source: &str) -> Option<PathBuf> {
     let dir = path.parent()?;
     match source {
@@ -27,6 +29,7 @@ pub fn kept_name_file(path: &Path, source: &str) -> Option<PathBuf> {
             let (folder, agent) = kimi_session(path);
             (agent == "main").then(|| folder.join("state.json"))
         }
+        "droid" => crate::droid::transcript::transcript_file(path),
         _ => None,
     }
 }

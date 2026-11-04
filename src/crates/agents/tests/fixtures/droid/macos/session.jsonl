@@ -1,0 +1,4 @@
+{"type":"session_start","id":"5e1f0c2a-9d7b-4c1e-8f3a-2b6d4e8a1c90","title":"Fix the flaky login test","owner":"me","cwd":"/Users/me/project","version":2,"isSessionTitleManuallySet":false}
+{"type":"message","id":"m-user-1","timestamp":"2026-11-03T09:12:03.000Z","message":{"role":"user","content":[{"type":"text","text":"The login test fails one run in ten. Find out why."}]}}
+{"type":"message","id":"m-assistant-1","parentId":"m-user-1","timestamp":"2026-11-03T09:12:20.000Z","message":{"role":"assistant","content":[{"type":"text","text":"I'll look at the test first."},{"type":"tool_use","id":"t1","name":"Read","input":{"file_path":"/Users/me/project/test/login.test.ts"}}]}}
+{"type":"agent_turn_outcome","turnId":"m-user-1","reason":"completed","resultKind":"success"}

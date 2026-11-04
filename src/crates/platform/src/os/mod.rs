@@ -214,6 +214,7 @@ mod tests {
             ("kilo", ".local/share/kilo"),
             ("mimocode", ".local/share/mimocode"),
             ("omp", ".omp/agent/sessions"),
+            ("droid", ".factory/sessions"),
         ];
         // The application data folder differs by OS.
         let app = folder(home, &Environment::new(), agent_hud_agents::Base::AppData);

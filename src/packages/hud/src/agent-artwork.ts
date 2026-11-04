@@ -89,9 +89,15 @@ export function agentArtworkKey(source: string): string {
   const key = normalize(source);
   return aliases[key] ?? key;
 }
+/** Vendors with no mark yet, shown with the generic icon: their own names. */
+const unmarked: Readonly<Record<string, string>> = {
+  droid: "Factory Droid",
+};
 export function agentVendorName(source: string): string {
   const key = agentArtworkKey(source);
-  return key === "openai" ? "OpenAI" : (vendors[key] ?? source);
+  return key === "openai"
+    ? "OpenAI"
+    : (vendors[key] ?? unmarked[key] ?? source);
 }
 const asset = (file: string) =>
   new URL(`./assets/${file}.png`, import.meta.url).href;
