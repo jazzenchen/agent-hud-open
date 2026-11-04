@@ -16,6 +16,8 @@ pub(crate) use secrets::{app_cookie, stored_secret, unseal_safe_storage};
 pub(crate) const READS_PROCESS_ENVIRONMENT: bool = false;
 /// Claude has no desktop app on this host to take a background job in.
 pub(crate) const MOVES_CLAUDE_JOBS: bool = false;
+/// Claude has no desktop app on this host to open a Project thread in.
+pub(crate) const OPENS_CLAUDE_PROJECTS: bool = false;
 pub(crate) const VALIDATION: &str = "unverified";
 pub(crate) const PORTABLE_VALIDATION: &str = "unverified";
 /// The operating system whose facts the agents' descriptors give here.
@@ -163,6 +165,11 @@ pub(crate) fn source_roots(home: &Path) -> Vec<agent_hud_core::SourceRoot> {
 
 /// Not implemented on this host: callers fall back to the client's link.
 pub(crate) fn open_folder_in_app(_bundle_id: &str, _folder: &std::path::Path) -> bool {
+    false
+}
+
+/// Not implemented on this host: nothing opens a link in a named app here.
+pub(crate) fn open_url_in_app(_bundle_id: &str, _url: &str) -> bool {
     false
 }
 

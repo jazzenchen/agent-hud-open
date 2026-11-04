@@ -126,13 +126,13 @@ impl NativePlatform {
         os::claude_desktop_bases(&self.home, &std::env::vars().collect::<os::Environment>())
     }
     pub fn claude_projects_supported(&self) -> bool {
-        clients::claude::PROJECTS_SUPPORTED
+        os::OPENS_CLAUDE_PROJECTS
     }
     /// The core resolves a known session and validates source membership before this call.
     pub fn navigate_session(&self, target: &serde_json::Value) -> Result<bool, String> {
         if target["kind"] == "claude-project-thread" {
-            return navigation::session_url(target)
-                .map_or(Ok(false), |url| clients::claude::open_project(&url));
+            return Ok(navigation::session_url(target)
+                .is_some_and(|url| os::open_url_in_app("com.anthropic.claudefordesktop", &url)));
         }
         if matches!(
             target["kind"].as_str(),

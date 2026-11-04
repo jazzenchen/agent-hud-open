@@ -236,7 +236,6 @@ impl Log {
                     self.title_from(text);
                 }
             }
-            Some("user") => {}
             _ => {}
         }
         if value["type"] != "assistant" {

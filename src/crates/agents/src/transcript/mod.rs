@@ -36,7 +36,10 @@ pub const MAX_TURNS: usize = 128;
 /// for and Codex's context window; 7 kept Claude Code's thinking tokens as
 /// reasoning, counted lines without a message id by request id or offset,
 /// and took the session's model from the most output.
-pub const DATA_VERSIONS: &[(&str, u32)] = &[("0.6.0", 7)];
+///
+/// 8 keeps the Project and thread a Claude Desktop Project worker was woken
+/// for (agent-hud-open #43).
+pub const DATA_VERSIONS: &[(&str, u32)] = &[("0.6.0", 7), ("0.6.0-beta.6", 8)];
 
 /// The data version this build reads logs by.
 pub const DATA_VERSION: &str = DATA_VERSIONS[DATA_VERSIONS.len() - 1].0;

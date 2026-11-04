@@ -20,7 +20,7 @@ The native Swift app, [agent-hud-native-open](https://github.com/jazzenchen/agen
 
 Deliberate differences:
 
-- Claude Desktop Project workers on macOS share a card for their original Project conversation and return to its exact thread. Unknown origins disable navigation; standalone Local behavior is preserved. Identification uses local files only, with unknown parent status and unavailable total usage. See [Project workers](../development/claude-project-workers.md).
+- Claude Desktop Project workers on macOS share a card for their original Project conversation and return to its exact thread. Unknown origins disable navigation; standalone Local behavior is preserved. Identification uses local files only; the card shows unknown status and counts only its workers' local usage. See [Project workers](../development/claude-project-workers.md).
 
 - Decided 2026-10-22 (issue #3): Settings → General → Usage display can show consumed (the default) or remaining quota. Percentages, rings and bars follow this choice, including the menu bar and reminders; source readings, warning levels, burn rates and exhaustion forecasts remain based on consumed usage.
 

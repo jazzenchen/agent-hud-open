@@ -51,9 +51,6 @@ pub(crate) fn accepts(path: &Path, source: &str) -> bool {
 pub(crate) fn reader_version(path: &Path, source: &str) -> u16 {
     if source == "opencode" && path.file_name().is_some_and(|name| name == "opencode.db") {
         2
-    } else if source == "claude" {
-        // 2: exact Project origins from managed Desktop deliveries.
-        2
     } else if source == "hermes" {
         // 2: calls carry the route their billing provider names.
         2

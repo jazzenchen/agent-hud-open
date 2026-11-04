@@ -232,7 +232,8 @@ export function DetailFigures({
   const percent = (part: number) => `${Math.round(part * 100)}%`;
   // The session with its sub-agents, as Core counts it on its row too.
   const totals = detail?.usage ?? session.usage ?? null;
-  const projectUsageUnavailable =
+  // A Project counts only what its workers ran on this Mac.
+  const localOnly =
     (detail?.session.desktopProject?.localWorkerCount ??
       session.desktopProject?.localWorkerCount ??
       0) > 0;
@@ -250,15 +251,11 @@ export function DetailFigures({
   const items = [
     {
       title: zh ? "Token" : "Tokens",
-      value: projectUsageUnavailable
+      value: compact(totals?.total ?? session.tokens),
+      note: localOnly
         ? zh
-          ? "不可用"
-          : "Unavailable"
-        : compact(totals?.total ?? session.tokens),
-      note: projectUsageUnavailable
-        ? zh
-          ? "Project 總用量不可用"
-          : "Project total usage unavailable"
+          ? "仅本机执行会话"
+          : "Local execution sessions only"
         : detail?.subagents
           ? (zh ? "含子 agent " : "Sub-agents ") +
             compact(detail.subagents.total)
@@ -1212,7 +1209,7 @@ function SubagentsCard({
   );
 }
 
-/** Local Project workers have their own usage, but the Project total is unavailable. */
+/** The Project's local workers and their usage; the Project's own usage is not on this Mac. */
 function ProjectExecutionsCard({
   detail,
   theme,
@@ -1233,10 +1230,10 @@ function ProjectExecutionsCard({
       <CardTitle
         title={
           zh
-            ? `本機執行會話（${count}）`
+            ? `本机执行会话（${count}）`
             : `Local execution sessions (${count})`
         }
-        right={zh ? "Project 總用量不可用" : "Project total usage unavailable"}
+        right={zh ? "不含 Project 本身" : "Project itself not included"}
         theme={theme}
       />
       {children.map((child) => (
@@ -1256,7 +1253,7 @@ function ProjectExecutionsCard({
           }}
         >
           <span style={{ ...clipped, flex: 1, minWidth: 0 }}>
-            {child.title || (zh ? "本機執行會話" : "Local execution session")}
+            {child.title || (zh ? "本机执行会话" : "Local execution session")}
           </span>
           <span style={{ ...numeric, color: theme.secondary, flexShrink: 0 }}>
             {compact(child.tokens)} {zh ? "Token" : "tok"}

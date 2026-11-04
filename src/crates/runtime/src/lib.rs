@@ -342,7 +342,7 @@ impl Runtime {
             }
             if detail["session"]["desktopProject"].is_object() {
                 return Err(l10n::text(
-                    "無法打開原來的 Project 對話",
+                    "无法打开原来的 Project 对话",
                     "The original Project session could not be opened",
                 ));
             }
