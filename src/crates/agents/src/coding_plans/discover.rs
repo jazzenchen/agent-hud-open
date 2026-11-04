@@ -269,14 +269,10 @@ pub(super) fn discover(host: &dyn Host, wanted: &str) -> Result<Vec<Credential>,
     {
         if let Some(saved) = host.saved_credential(provider)? {
             add(
-                service(
-                    "",
-                    Some(&crate::account::endpoint(
-                        provider,
-                        saved["baseUrl"].as_str(),
-                    )?),
-                    false,
-                ),
+                Some((
+                    provider,
+                    crate::account::endpoint(provider, saved["baseUrl"].as_str())?,
+                )),
                 saved["apiKey"].as_str(),
                 "Agent HUD",
                 saved["organization"].as_str(),
