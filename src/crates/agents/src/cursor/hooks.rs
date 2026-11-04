@@ -40,6 +40,7 @@ fn began(payload: &Value) -> Option<Began> {
         session: text(&payload["conversation_id"])?.into(),
         turn: text(&payload["generation_id"])?.into(),
         workspace: payload["workspace_roots"][0].as_str().map(str::to_owned),
+        waiting: false,
     })
 }
 

@@ -113,13 +113,28 @@ pub(crate) fn hook_configuration(
     current: &serde_json::Value,
     executable: Option<&Path>,
 ) -> Result<serde_json::Value, String> {
-    let command = executable.map(|executable| {
-        format!(
-            "'{}' {} {}",
-            executable.to_string_lossy().replace('\'', "'\\''"),
-            flag,
-            source
-        )
-    });
+    let command = executable.map(|executable| hook_command(executable, flag, source));
     agent_hud_agents::patch_configuration(source, flag, current, command.as_deref())
+}
+
+/// The same command, in a client's settings that are text, not JSON.
+pub(crate) fn hook_text(
+    source: &str,
+    flag: &str,
+    original: &str,
+    executable: Option<&Path>,
+) -> Result<String, String> {
+    let command = executable.map(|executable| hook_command(executable, flag, source));
+    agent_hud_agents::patch_text(source, flag, original, command.as_deref())
+}
+
+/// `'<executable>' <flag> <client>`, the executable single-quoted for a
+/// POSIX shell (and for `shlex.split`, which reads it the same).
+fn hook_command(executable: &Path, flag: &str, source: &str) -> String {
+    format!(
+        "'{}' {} {}",
+        executable.to_string_lossy().replace('\'', "'\\''"),
+        flag,
+        source
+    )
 }

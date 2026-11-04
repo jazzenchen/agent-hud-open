@@ -1,0 +1,23 @@
+# Hermes Agent settings
+model:
+  default: hermes-4-405b
+  provider: nous
+
+toolsets:
+  - hermes-cli
+
+# Shell hooks run with your own permissions.
+hooks:
+  pre_tool_call:
+    - matcher: "terminal"
+      command: "~/.hermes/agent-hooks/block-rm-rf.sh"
+      timeout: 10
+  # Formatter after every edit.
+  post_tool_call:
+    - matcher: "write_file|patch"
+      command: "~/.hermes/agent-hooks/auto-format.sh"
+
+hooks_auto_accept: false
+
+display:
+  skin: default

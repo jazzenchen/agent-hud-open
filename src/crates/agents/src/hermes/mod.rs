@@ -1,5 +1,7 @@
 //! Hermes.
 pub mod account;
+mod hooks;
+mod settings;
 pub mod transcript;
 
 use crate::Agent;
@@ -31,7 +33,7 @@ pub static AGENT: Agent = Agent {
     id: "hermes",
     name: "Hermes",
     sessions: true,
-    hooks: None,
+    hooks: Some(&hooks::HOOKS),
     observer: None,
     channel: None,
     program: None,

@@ -104,6 +104,22 @@ pub(crate) fn hook_configuration(
     )
 }
 
+/// A client whose settings are text has no Windows launch contract yet:
+/// its handlers can only be taken out here.
+pub(crate) fn hook_text(
+    source: &str,
+    flag: &str,
+    original: &str,
+    executable: Option<&Path>,
+) -> Result<String, String> {
+    if executable.is_some() {
+        return Err(format!(
+            "{source} has no verified Windows hook launch contract; its configuration was not changed"
+        ));
+    }
+    agent_hud_agents::patch_text(source, flag, original, None)
+}
+
 #[cfg(test)]
 mod tests {
     use super::complete_json;

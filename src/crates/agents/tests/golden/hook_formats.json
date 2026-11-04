@@ -4069,7 +4069,8 @@
         "copilot",
         "codebuddy",
         "qwen",
-        "devin"
+        "devin",
+        "hermes"
       ],
       "HOOK_FLAGS": [
         "--permission-hook",

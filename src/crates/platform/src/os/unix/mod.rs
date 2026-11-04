@@ -3,8 +3,8 @@
 use super::{Environment, ProcessInfo};
 mod files;
 pub(crate) use files::{
-    hook_configuration, owned_by_user, owner_only, private_append, private_directory, private_file,
-    read_stdin,
+    hook_configuration, hook_text, owned_by_user, owner_only, private_append, private_directory,
+    private_file, read_stdin,
 };
 use std::{
     collections::HashMap,

@@ -26,8 +26,15 @@ pub struct InstallPlan {
     pub enabled: bool,
     pub changed: bool,
     original: Option<Vec<u8>>,
-    updated: Value,
+    updated: Updated,
     target: PathBuf,
+}
+/// The settings as they will be written.
+enum Updated {
+    /// JSON, saved by `json_text::rewrite` so only changed values move.
+    Json(Value),
+    /// A text file the client's own editor changed (`agents::patch_text`).
+    Text(String),
 }
 impl InstallPlan {
     /// Never return the full settings object: client configuration may contain credentials.
@@ -149,6 +156,34 @@ pub fn install_plan(
     let configuration = configuration(context, &description.source, &description.relative_path);
     let target = target(&configuration)?;
     let original = contents(&target)?;
+    if agent_hud_agents::text_settings(&description.source) {
+        let current = match original.as_deref() {
+            None => String::new(),
+            Some(bytes) => String::from_utf8(bytes.to_vec()).map_err(|_| {
+                l10n::text(
+                    "客户端的回调设置不是有效的 UTF-8 文本",
+                    "Hook settings are not UTF-8 text",
+                )
+            })?,
+        };
+        let updated = crate::os::hook_text(
+            &description.source,
+            &description.flag,
+            &current,
+            enabled.then_some(context.executable.as_path()),
+        )?;
+        let changed = updated != current && (enabled || original.is_some());
+        return Ok(InstallPlan {
+            configuration,
+            source: description.source,
+            flag: description.flag,
+            enabled,
+            changed,
+            original,
+            updated: Updated::Text(updated),
+            target,
+        });
+    }
     let current = match original.as_deref() {
         None | Some([]) => json!({}),
         Some(bytes) => serde_json::from_slice::<Value>(bytes).map_err(|_| {
@@ -178,7 +213,7 @@ pub fn install_plan(
         enabled,
         changed,
         original,
-        updated,
+        updated: Updated::Json(updated),
         target,
     })
 }
@@ -194,8 +229,11 @@ pub fn apply_plan(plan: &InstallPlan) -> Result<bool, String> {
             "Client settings changed after this hook plan was prepared; prepare a new plan.",
         ));
     }
-    let bytes = crate::json_text::rewrite(plan.original.as_deref(), &plan.updated)
-        .map_err(|_| "Hook settings could not be saved")?;
+    let bytes = match &plan.updated {
+        Updated::Json(updated) => crate::json_text::rewrite(plan.original.as_deref(), updated)
+            .map_err(|_| "Hook settings could not be saved")?,
+        Updated::Text(updated) => updated.clone().into_bytes(),
+    };
     write_contents(&plan.target, Some(&bytes))?;
     Ok(true)
 }
@@ -309,3 +347,7 @@ mod tests {
         );
     }
 }
+
+#[cfg(all(test, unix))]
+#[path = "install_tests_unix.rs"]
+mod unix_tests;

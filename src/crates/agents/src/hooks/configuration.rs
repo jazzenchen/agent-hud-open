@@ -48,6 +48,41 @@ pub fn configuration(source_name: &str, flag: &str) -> Result<HookConfiguration,
         events: events.into_iter().map(str::to_owned).collect(),
     })
 }
+/// Whether the client's settings are text (`Layout::Text`): Agent HUD edits
+/// them with `patch_text`, not as JSON.
+pub fn text_settings(source_name: &str) -> bool {
+    hooks_of(source_name).is_ok_and(|(_, hooks)| matches!(hooks.layout, Layout::Text(_)))
+}
+fn json_settings(hooks: &Hooks) -> Result<(), String> {
+    match hooks.layout {
+        Layout::Text(_) => Err("This client's hook settings are not JSON".into()),
+        _ => Ok(()),
+    }
+}
+/// A text settings file's new text, with Agent HUD's handlers for `flag` set
+/// to `command`, or taken out (None). Foreign handlers stay, and so does
+/// every byte the client's own editor does not need to change.
+pub fn patch_text(
+    source_name: &str,
+    flag: &str,
+    original: &str,
+    command: Option<&str>,
+) -> Result<String, String> {
+    let (desc, source, hooks) = described(source_name, flag)?;
+    let Layout::Text(text) = &hooks.layout else {
+        return Err("This client's hook settings are JSON".into());
+    };
+    let owned = |command: &str| owns(Some(command), source, hooks, flag);
+    (text.patch)(
+        original,
+        &super::TextEdit {
+            events: &desc.events,
+            timeout: timeout(hooks, flag),
+            owns: &owned,
+            command,
+        },
+    )
+}
 /// The configuration, with the client's canonical id and its hooks.
 fn described(
     source_name: &str,
@@ -110,6 +145,7 @@ pub fn hook_commands(
     current: &Value,
 ) -> Result<Vec<String>, String> {
     let (desc, source, hooks) = described(source_name, flag)?;
+    json_settings(hooks)?;
     let root = object(current)?;
     if let Layout::OwnedEntry = hooks.layout {
         let entry = optional_object(&root, "agent-hud")?;
@@ -263,6 +299,7 @@ pub fn patch_configuration(
     command: Option<&str>,
 ) -> Result<Value, String> {
     let (desc, source, hooks) = described(source_name, flag)?;
+    json_settings(hooks)?;
     let mut root = object(current)?;
     if let Layout::OwnedEntry = hooks.layout {
         let Some(command) = command else {

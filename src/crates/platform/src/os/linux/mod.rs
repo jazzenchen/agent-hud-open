@@ -1,6 +1,6 @@
 pub(crate) use super::unix::{
-    environment_value, hook_configuration, is_shell, owned_by_user, owner_only, private_append,
-    private_directory, private_file, read_stdin,
+    environment_value, hook_configuration, hook_text, is_shell, owned_by_user, owner_only,
+    private_append, private_directory, private_file, read_stdin,
 };
 use super::{config_home, data_home, joined_path, path_entries, Environment, ProcessInfo};
 use std::{

@@ -63,7 +63,7 @@ pub mod zcode;
 
 pub use antigravity::permissions::{antigravity_permissions, AntigravityPermission};
 pub use hooks::configuration::{
-    configuration, hook_commands, patch_configuration, HookConfiguration,
+    configuration, hook_commands, patch_configuration, patch_text, text_settings, HookConfiguration,
 };
 pub use hooks::events::{enrich_codebuddy_completion, parse_event, HookEvent};
 pub use hooks::observer::parse_observation;
@@ -91,6 +91,7 @@ pub const COMPLETION_SOURCES: &[&str] = &[
     "codebuddy",
     "qwen",
     "devin",
+    "hermes",
 ];
 pub const HOOK_FLAGS: &[&str] = &[
     "--permission-hook",

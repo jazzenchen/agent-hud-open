@@ -133,7 +133,7 @@ pub fn parse_event(
                     &began.session,
                     now_ms,
                     "session-observation",
-                    json!({"turnId":began.turn,"state":"running","startedAtMs":now_ms,"observedAtMs":now_ms,"workspace":began.workspace,"outcome":null,"navigationTarget":target}),
+                    json!({"turnId":began.turn,"state":if began.waiting {"waiting"} else {"running"},"startedAtMs":now_ms,"observedAtMs":now_ms,"workspace":began.workspace,"outcome":null,"navigationTarget":target}),
                 )));
             }
             let Some(done) = (completion.read)(payload, now_ms) else {
