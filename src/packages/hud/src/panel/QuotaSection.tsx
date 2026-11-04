@@ -27,7 +27,11 @@ import { ResetCreditsRow } from "./ResetCreditsRow";
 import { usePanelServices } from "../PanelContext";
 import { useGround } from "../ground";
 import { agentVendorName } from "../agent-artwork";
-import { visibleBalances } from "../balance-rows";
+import {
+  balanceMeasuresOffered,
+  visibleBalances,
+  type BalanceMeasure,
+} from "../balance-rows";
 import {
   measures,
   noButtonChrome,
@@ -729,7 +733,9 @@ export function SourceBalances({
   const [period, setPeriod] = useState<"day" | "week" | "month">(
     layout.period ?? "day",
   );
-  const [measure, setMeasure] = useState<"quota" | "burn" | "cost">("quota");
+  const [measure, setMeasure] = useState<BalanceMeasure>("quota");
+  const offered = balanceMeasuresOffered(layout.measures);
+  const selected = offered.includes(measure) ? measure : offered[0];
   useEffect(() => setPeriod(layout.period ?? "day"), [layout.period]);
   const { language } = useFormat();
   const money = (amount: number, currency: string) =>
@@ -740,10 +746,6 @@ export function SourceBalances({
         const metrics = account.metrics?.periods[period],
           cost = metrics?.cost,
           burn = metrics?.burnRate;
-        const selected =
-          layout.measures?.find((value) =>
-            ["quota", "burn", "cost"].includes(value),
-          ) ?? measure;
         const points = metrics?.series ?? [],
           peak = Math.max(0.00001, ...points.map((point) => point.amount));
         const columns =
@@ -805,52 +807,53 @@ export function SourceBalances({
               <strong style={{ fontSize: 13, fontWeight: 700, flex: 1 }}>
                 {agentVendorName(account.vendor)}
               </strong>
-              {!layout.measures?.length && (
+              {offered.length > 1 && (
                 <div
                   role="group"
                   aria-label={language === "zh" ? "余额指标" : "Balance metric"}
                   style={{ display: "flex", gap: 2 }}
                 >
-                  {(
-                    [
-                      {
-                        key: "quota",
-                        Icon: Percent,
-                        title: language === "zh" ? "余额" : "Balance",
-                      },
-                      {
-                        key: "burn",
-                        Icon: Flame,
-                        title:
-                          language === "zh"
-                            ? "每日消耗"
-                            : "Consumption per day",
-                      },
-                      {
-                        key: "cost",
-                        Icon: DollarSign,
-                        title:
-                          language === "zh" ? "估算花费" : "Estimated cost",
-                      },
-                    ] as const
-                  ).map(({ key, Icon, title }) => (
-                    <button
-                      key={key}
-                      aria-pressed={selected === key}
-                      title={title}
-                      onClick={() => setMeasure(key)}
-                      style={{
-                        ...noButtonChrome,
-                        color: selected === key ? colors.text : colors.tertiary,
-                        background:
-                          selected === key ? colors.selected : "transparent",
-                        borderRadius: 4,
-                        padding: 3,
-                      }}
-                    >
-                      <Icon size={12} />
-                    </button>
-                  ))}
+                  {offered
+                    .map((key) => ({
+                      key,
+                      ...{
+                        quota: {
+                          Icon: Percent,
+                          title: language === "zh" ? "余额" : "Balance",
+                        },
+                        burn: {
+                          Icon: Flame,
+                          title:
+                            language === "zh"
+                              ? "每日消耗"
+                              : "Consumption per day",
+                        },
+                        cost: {
+                          Icon: DollarSign,
+                          title:
+                            language === "zh" ? "估算花费" : "Estimated cost",
+                        },
+                      }[key],
+                    }))
+                    .map(({ key, Icon, title }) => (
+                      <button
+                        key={key}
+                        aria-pressed={selected === key}
+                        title={title}
+                        onClick={() => setMeasure(key)}
+                        style={{
+                          ...noButtonChrome,
+                          color:
+                            selected === key ? colors.text : colors.tertiary,
+                          background:
+                            selected === key ? colors.selected : "transparent",
+                          borderRadius: 4,
+                          padding: 3,
+                        }}
+                      >
+                        <Icon size={12} />
+                      </button>
+                    ))}
                 </div>
               )}
             </div>
