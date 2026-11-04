@@ -16,13 +16,14 @@ import type {
 import { Button } from "@agent-hud/ui/components/button";
 import { HUD_METRICS, sourcesForMark } from "../model";
 import { usePanelQuery } from "../PanelContext";
-import { agentColor, palette, tabular, type Logo, type Period } from "./theme";
+import { palette, tabular, type Logo, type Period } from "./theme";
 import { useFormat } from "@agent-hud/ui/format-context";
 import { systemTimeZone, tokensShort } from "@agent-hud/ui/format";
 import { hexAlpha } from "../tokens";
 import { useGround } from "../ground";
 import { orderedModels, visibleModelCounts } from "./model-visibility";
 import { ColumnDetail } from "./ColumnDetail";
+import { TokenBar } from "./TokenBar";
 
 const moving: Transition = {
   duration: HUD_METRICS.duration,
@@ -136,8 +137,11 @@ export function SourceTokenChart({
   const heights = points.map(
     (point) => `${Math.max(0, (point.tokens / peak) * 95)}%`,
   );
+  // A column's key names its bucket; the snapshot's hourly points have keys of
+  // their own, so none is taken for the day that starts at the same hour.
+  const bucketKey = query.data ? String(bucketMs) : "snapshot";
   // Re-measure the columns' places only when the set of columns changes.
-  const arrangement = `${bucketMs}:${points.map((point) => point.timestamp).join()}`;
+  const arrangement = `${bucketKey}:${points.map((point) => point.timestamp).join()}`;
   // Models with usage somewhere in the range, each keeping its colour slot.
   const stacked = models
     .map((model, slot) => ({ model, slot }))
@@ -149,6 +153,8 @@ export function SourceTokenChart({
       className="hud-source-token-chart"
       style={{
         display: "grid",
+        // As wide as its place, never wider: a long total shortens instead.
+        gridTemplateColumns: "minmax(0, 1fr)",
         gap: 6,
         paddingTop: bare ? 0 : 8,
         boxShadow: bare ? undefined : `inset 0 1px 0 ${colors.divider}`,
@@ -211,6 +217,9 @@ export function SourceTokenChart({
             fontSize: 12,
             color: colors.secondary,
             whiteSpace: "nowrap",
+            minWidth: 0,
+            overflow: "hidden",
+            textOverflow: "ellipsis",
           }}
           title={
             notice ??
@@ -244,8 +253,10 @@ export function SourceTokenChart({
           {bars
             ? points.map((point, index) => (
                 <motion.div
-                  key={`${bucketMs}:${point.timestamp}`}
-                  layout="position"
+                  key={`${bucketKey}:${point.timestamp}`}
+                  // Still, a column stands where it is laid out: a move
+                  // waits for frames a picture never draws.
+                  layout={still ? false : "position"}
                   layoutDependency={arrangement}
                   exit={still ? undefined : { opacity: 0 }}
                   transition={moving}
@@ -263,39 +274,16 @@ export function SourceTokenChart({
                         : "transparent",
                   }}
                 >
-                  <motion.div
-                    initial={still ? false : { height: "0%" }}
-                    animate={still ? undefined : { height: heights[index] }}
-                    exit={still ? undefined : { height: "0%" }}
+                  <TokenBar
+                    height={heights[index]}
+                    models={point.models}
+                    stacked={stacked}
+                    still={still}
+                    faded={hovered != null && hovered !== index}
+                    fill={colors.secondary}
+                    light={light}
                     transition={moving}
-                    style={{
-                      height: still ? heights[index] : undefined,
-                      width: "100%",
-                      display: "flex",
-                      flexDirection: "column-reverse",
-                      borderRadius: "2px 2px 0 0",
-                      overflow: "hidden",
-                      opacity: hovered == null || hovered === index ? 1 : 0.55,
-                      background: point.models
-                        ? "transparent"
-                        : colors.secondary,
-                    }}
-                  >
-                    {point.models &&
-                      stacked.map(({ model, slot }) => (
-                        <i
-                          key={model.id}
-                          style={{
-                            display: "block",
-                            flex: `${point.models![model.id] ?? 0} 0 0`,
-                            background: agentColor(slot, light),
-                            transition: still
-                              ? undefined
-                              : `flex-grow ${HUD_METRICS.duration}s cubic-bezier(${HUD_METRICS.ease.join(",")})`,
-                          }}
-                        />
-                      ))}
-                  </motion.div>
+                  />
                 </motion.div>
               ))
             : (known || query.error) && (
