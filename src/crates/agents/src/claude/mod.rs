@@ -4,6 +4,7 @@ mod hooks;
 pub mod jobs;
 pub mod plans;
 pub mod process;
+pub mod project_origin;
 pub mod routes;
 pub mod transcript;
 

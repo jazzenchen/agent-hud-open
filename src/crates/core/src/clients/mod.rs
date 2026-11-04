@@ -5,4 +5,5 @@
 //! (docs/agent-contract.md).
 pub(crate) mod antigravity;
 pub(crate) mod claude_desktop;
+pub(crate) mod claude_project;
 pub(crate) mod workbuddy;

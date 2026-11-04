@@ -1,5 +1,6 @@
 //! Unified session and child-session live state machine.
 //! Agent-specific event reducers live under `crate::agents`.
+use crate::claude::project_origin::ClaudeProjectOrigin;
 use crate::claude::transcript::uuid;
 pub use crate::claude::transcript::{claude_prompt, claude_turn, request_copy};
 use chrono::{DateTime, Utc};
@@ -214,6 +215,10 @@ pub struct LiveLog {
     pub inherited_through: Option<u64>,
     #[serde(default)]
     pub owned_claude_id: Option<String>,
+    /// The channel and thread IDs from Claude Code's managed Project wake
+    /// header. The header is parsed in place; no prompt text is retained.
+    #[serde(default)]
+    pub claude_project_origin: Option<ClaudeProjectOrigin>,
     pub completed_responses: VecDeque<String>,
     /// The running Codex turn's explicitly final answer, kept apart from its
     /// progress messages; its completion falls back on it. Kept only while

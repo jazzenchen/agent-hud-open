@@ -133,6 +133,7 @@ impl Runtime {
         core.set_platform(platform.name());
         core.set_provider_discovery(platform.discover_providers());
         core.set_claude_desktop_bases(platform.claude_desktop_bases());
+        core.set_claude_projects_supported(platform.claude_projects_supported());
         let legacy_database = platform.legacy_quota_database();
         let gate = CollectionGate::default();
         let accounts = if read_accounts {
@@ -338,6 +339,12 @@ impl Runtime {
                 .navigate_session(&detail["session"]["navigationTarget"])?
             {
                 return Ok(json!({"opened":true,"action":"native_session"}));
+            }
+            if detail["session"]["desktopProject"].is_object() {
+                return Err(l10n::text(
+                    "無法打開原來的 Project 對話",
+                    "The original Project session could not be opened",
+                ));
             }
             let path = self.core.transcript_path(id)?;
             self.platform.reveal_transcript(&path)?;
