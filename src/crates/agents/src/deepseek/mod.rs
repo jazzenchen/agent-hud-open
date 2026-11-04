@@ -1,6 +1,8 @@
 //! DeepSeek.
 pub mod account;
+mod balance;
 mod hooks;
+mod platform;
 pub mod routes;
 pub mod transcript;
 
