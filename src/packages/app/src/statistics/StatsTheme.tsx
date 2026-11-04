@@ -410,25 +410,12 @@ export function ModelBar({
 export function useAnimatedNumber(target: number, duration = 220): number {
   const [current, setCurrent] = useState(target);
   const currentRef = useRef(target);
-  const targetRef = useRef(target);
 
   useEffect(() => {
-    if (!Number.isFinite(target)) {
-      currentRef.current = target;
-      targetRef.current = target;
-      setCurrent(target);
-      return;
-    }
     const from = currentRef.current;
-    targetRef.current = target;
-    if (from === target || !Number.isFinite(from)) {
-      currentRef.current = target;
-      setCurrent(target);
-      return;
-    }
     if (
-      typeof window !== "undefined" &&
-      window.matchMedia?.("(prefers-reduced-motion: reduce)").matches
+      from === target ||
+      matchMedia("(prefers-reduced-motion: reduce)").matches
     ) {
       currentRef.current = target;
       setCurrent(target);

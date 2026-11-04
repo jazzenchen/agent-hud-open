@@ -30,9 +30,7 @@ export function useBriefly<T>(ms: number) {
 
 /** Whether the window is in its light theme, following changes. */
 export function useLightTheme() {
-  const read = () =>
-    typeof document !== "undefined" &&
-    document.documentElement.dataset.theme === "light";
+  const read = () => document.documentElement.dataset.theme === "light";
   const [light, setLight] = useState(read);
   useEffect(() => {
     const observer = new MutationObserver(() => setLight(read()));

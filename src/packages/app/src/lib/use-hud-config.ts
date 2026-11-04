@@ -5,7 +5,7 @@ import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import type { PanelLayout, SourcePreferences } from "@agent-hud/protocol";
 import { defaultHUDConfig, type HUDConfig } from "@agent-hud/hud/model";
 import { usageStyle } from "@agent-hud/hud/usage-meter/arcs";
-import { storageKeys } from "./storage-keys";
+import { readJSON, storageKeys } from "./storage-keys";
 const configKey = storageKeys.hudConfig;
 const previousKey = storageKeys.hudConfigV2;
 const legacyKey = storageKeys.hudConfigV1;
@@ -221,13 +221,6 @@ export function migrateHUDConfigStore(
         ? { [previousScreen.id]: screenSettings(legacy) }
         : {},
   };
-}
-function readJSON(key: string): unknown {
-  try {
-    return JSON.parse(localStorage.getItem(key) || "null");
-  } catch {
-    return null;
-  }
 }
 function readStore() {
   return parseHUDConfigStore(readJSON(configKey));

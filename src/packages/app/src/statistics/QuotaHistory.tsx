@@ -80,13 +80,6 @@ function accent(theme: StatsTheme) {
   return theme.light ? "#007aff" : "#0a84ff";
 }
 
-function reducedMotion() {
-  return (
-    typeof window !== "undefined" &&
-    Boolean(window.matchMedia?.("(prefers-reduced-motion: reduce)").matches)
-  );
-}
-
 /** One window's line on a fixed 0–100% axis: its runs, never joined across a reset or a gap, the resets as dashed rules, and the current cycle's steady budget as a faint diagonal. */
 const QuotaLine = memo(function QuotaLine({
   window: quota,
@@ -221,7 +214,10 @@ const QuotaLine = memo(function QuotaLine({
     if (width <= 0) return;
     // A new stretch draws in from the left; new readings in the same one
     // land in place, and Reduce Motion draws it whole at once.
-    if (revealed.current === reveal || reducedMotion()) {
+    if (
+      revealed.current === reveal ||
+      matchMedia("(prefers-reduced-motion: reduce)").matches
+    ) {
       revealed.current = reveal;
       paint(1);
       return;

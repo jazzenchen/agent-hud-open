@@ -117,20 +117,7 @@ function lanes(
     .sort((a, b) => a.at - b.at);
   const ownCalls = timed.filter((entry) => !entry.call.subagent);
   const ownLog = ownCalls.find((entry) => entry.call.log)?.call.log ?? null;
-  // Sub-agent logs the engine did not describe (an older engine) still get a row.
   const known = new Map(agents.map((agent) => [agent.log, agent]));
-  let unnamed = 0;
-  for (const { call } of timed)
-    if (call.subagent && call.log && !known.has(call.log))
-      known.set(call.log, {
-        log: call.log,
-        name: zh ? `子 agent ${++unnamed}` : `Sub-agent ${++unnamed}`,
-        kind: null,
-        parent: ownLog,
-        startedAt: null,
-        lastAt: null,
-        running: false,
-      });
   // Depth-first under each parent, siblings by when they started.
   const children = new Map<string | null, SessionTurnAgent[]>();
   for (const agent of known.values()) {

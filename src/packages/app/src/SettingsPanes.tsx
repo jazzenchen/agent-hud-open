@@ -45,7 +45,7 @@ export default function SettingsPane({
   preferences: Record<string, SourcePreferences>;
   onPreferences: (source: string, patch: SourcePreferences) => Promise<unknown>;
   agentPlugins?: AgentPluginItem[];
-  request?: (method: string, params?: unknown) => Promise<unknown>;
+  request: (method: string, params?: unknown) => Promise<unknown>;
 }) {
   if (page === "general") return <GeneralPane {...settingsProps} />;
   if (page === "prices") return <PricesPane {...settingsProps} />;
@@ -83,9 +83,7 @@ export default function SettingsPane({
         action={settingsProps.action}
         active={settingsProps.active}
         items={agentPlugins}
-        request={
-          request ?? (() => Promise.reject(new Error("No product requests")))
-        }
+        request={request}
       />
     );
   return null;

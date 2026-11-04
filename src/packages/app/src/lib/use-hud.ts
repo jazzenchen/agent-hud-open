@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
@@ -35,42 +35,33 @@ export function useHUD({ active = true }: { active?: boolean } = {}) {
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const generation = useRef(0);
   useEffect(() => {
-    let disposed = false;
     const boot = async () => {
       try {
         const mode = isTauri()
           ? await invoke<{ demo: boolean }>("startup_mode")
           : { demo: false };
-        if (disposed) return;
         updateDemo(mode.demo);
       } catch (failure) {
-        if (!disposed) {
-          setError(String(failure));
-          setLoading(false);
-        }
+        setError(String(failure));
+        setLoading(false);
       }
     };
     void boot();
-    return () => {
-      disposed = true;
-    };
   }, []);
   const refresh = useCallback(async () => {
-    const version = generation.current;
     setLoading(true);
     try {
       const next = (await nativeRequest("refresh")) as Snapshot;
-      if (!isTauri() && version === generation.current) {
+      if (!isTauri()) {
         setSnapshot(next);
         setError(null);
       }
     } catch (err) {
-      if (!isTauri() && version === generation.current)
+      if (!isTauri())
         setError(String(err instanceof Error ? err.message : err));
     } finally {
-      if (version === generation.current) setLoading(false);
+      setLoading(false);
     }
   }, []);
   useEffect(() => {
@@ -156,20 +147,19 @@ export function useHUD({ active = true }: { active?: boolean } = {}) {
   useEffect(() => {
     if (demo === null || !ownsPolling || !active) return;
     let disposed = false;
-    const version = generation.current;
     let timer: ReturnType<typeof setTimeout>;
     const poll = async () => {
       try {
         const next = (await nativeRequest("snapshot")) as Snapshot;
-        if (!disposed && version === generation.current) {
+        if (!disposed) {
           setSnapshot(next);
           setError(null);
         }
       } catch (err) {
-        if (!disposed && version === generation.current)
+        if (!disposed)
           setError(String(err instanceof Error ? err.message : err));
       } finally {
-        if (!disposed && version === generation.current) {
+        if (!disposed) {
           setLoading(false);
           timer = setTimeout(poll, 5000);
         }
@@ -183,11 +173,9 @@ export function useHUD({ active = true }: { active?: boolean } = {}) {
   }, [demo, ownsPolling, active]);
   const act = useCallback(
     async (method: NativeMethod, params: Record<string, unknown> = {}) => {
-      const version = generation.current;
       const result = await nativeRequest(method, params);
       if (
         !isTauri() &&
-        version === generation.current &&
         result &&
         typeof result === "object" &&
         "schemaVersion" in result

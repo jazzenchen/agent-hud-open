@@ -867,10 +867,12 @@ export interface SessionMessage {
   id: string;
   parentId: string | null;
   role: string;
-  text: string;
+  text: string | null;
   timestamp: string | null;
   toolCallId: string | null;
   toolCall: unknown;
+  /** From Core: the user's own words, neither context a client hands the model nor its note of an interruption. */
+  isPrompt: boolean;
 }
 export interface SessionCall {
   id?: string;

@@ -659,12 +659,10 @@ function AppContent({
     },
     selectProvider: (provider) => {
       const payload = { provider, at: Date.now() };
-      try {
-        localStorage.setItem(
-          storageKeys.highlightProvider,
-          JSON.stringify(payload),
-        );
-      } catch {}
+      localStorage.setItem(
+        storageKeys.highlightProvider,
+        JSON.stringify(payload),
+      );
       setSelectedSession(null);
       setStatisticsTab("tokens");
       if (isTauri()) {

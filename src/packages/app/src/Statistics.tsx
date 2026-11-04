@@ -27,7 +27,7 @@ import type {
   StatisticsResponse,
   StatisticsTokenKind,
 } from "./lib/types";
-import { storageKeys } from "./lib/storage-keys";
+import { readJSON, storageKeys } from "./lib/storage-keys";
 import {
   ActivityHeatmap,
   APIBillingCard,
@@ -255,17 +255,9 @@ export default function Statistics({
   const [selectedProviders, setProviders] = useState<string[] | null>(null);
   const [selectedModels, setModels] = useState<string[] | null>(null);
   const [modelsExpanded, setModelsExpanded] = useState(false);
-  const [hiddenAgentCards, setHiddenAgentCards] = useState<string[]>(() => {
-    try {
-      const raw = localStorage.getItem(hiddenAgentCardsKey);
-      const parsed = raw ? JSON.parse(raw) : [];
-      return Array.isArray(parsed)
-        ? parsed.filter((x) => typeof x === "string")
-        : [];
-    } catch {
-      return [];
-    }
-  });
+  const [hiddenAgentCards, setHiddenAgentCards] = useState<string[]>(
+    () => (readJSON(hiddenAgentCardsKey) as string[] | null) ?? [],
+  );
   const [refresh, setRefresh] = useState(0);
   // generatedAt is a presentation/collector clock, not a ledger invalidation signal.
   const revision = snapshot.statisticsRevision ?? 0;
@@ -366,11 +358,8 @@ export default function Statistics({
     setProviders(null);
     setHiddenAgentCards((previous) => {
       const next = previous.filter((id) => vendorKey(id) !== key);
-      if (next.length !== previous.length) {
-        try {
-          localStorage.setItem(hiddenAgentCardsKey, JSON.stringify(next));
-        } catch {}
-      }
+      if (next.length !== previous.length)
+        localStorage.setItem(hiddenAgentCardsKey, JSON.stringify(next));
       return next;
     });
     if (highlightTimerRef.current !== null) {
@@ -384,18 +373,14 @@ export default function Statistics({
   useEffect(() => {
     if (!active) return;
     const consumePending = () => {
-      try {
-        const raw = localStorage.getItem(storageKeys.highlightProvider);
-        if (!raw) return;
-        localStorage.removeItem(storageKeys.highlightProvider);
-        const parsed = JSON.parse(raw) as { provider?: string; at?: number };
-        if (
-          parsed?.provider &&
-          (!parsed.at || Date.now() - parsed.at < 15_000)
-        ) {
-          applyProviderHighlight(parsed.provider);
-        }
-      } catch {}
+      const pending = readJSON(storageKeys.highlightProvider) as {
+        provider?: string;
+        at?: number;
+      } | null;
+      if (!pending) return;
+      localStorage.removeItem(storageKeys.highlightProvider);
+      if (pending.provider && (!pending.at || Date.now() - pending.at < 15_000))
+        applyProviderHighlight(pending.provider);
     };
     consumePending();
     window.addEventListener("focus", consumePending);
@@ -404,9 +389,7 @@ export default function Statistics({
       ? listen<{ provider: string; at: number }>(
           "statistics:provider",
           (event) => {
-            try {
-              localStorage.removeItem(storageKeys.highlightProvider);
-            } catch {}
+            localStorage.removeItem(storageKeys.highlightProvider);
             if (event.payload?.provider) {
               applyProviderHighlight(event.payload.provider);
             }

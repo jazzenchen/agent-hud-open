@@ -223,10 +223,10 @@ export const UsageChart = memo(function UsageChart({
   useEffect(() => {
     if (width <= 0) return;
     const prev = currentBarsRef.current;
-    const reduceMotion =
-      typeof window !== "undefined" &&
-      window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-    if (prev === null || reduceMotion) {
+    if (
+      prev === null ||
+      matchMedia("(prefers-reduced-motion: reduce)").matches
+    ) {
       currentBarsRef.current = targetBars;
       paint(targetBars, hoveredRef.current);
       return;
@@ -493,10 +493,10 @@ export const Sparkline = memo(function Sparkline({
   useEffect(() => {
     if (!width) return;
     const prev = currentRatiosRef.current;
-    const reduceMotion =
-      typeof window !== "undefined" &&
-      window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-    if (prev === null || reduceMotion) {
+    if (
+      prev === null ||
+      matchMedia("(prefers-reduced-motion: reduce)").matches
+    ) {
       currentRatiosRef.current = targetRatios;
       paint(targetRatios);
       return;

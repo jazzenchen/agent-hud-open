@@ -52,38 +52,6 @@ import {
   unpricedHelp,
 } from "./SessionTheme";
 
-function formatMessageText(value: unknown): string {
-  if (typeof value === "string") return value;
-  if (value == null) return "";
-  if (Array.isArray(value)) {
-    return value
-      .map((item) => {
-        if (typeof item === "string") return item;
-        if (item && typeof item === "object") {
-          const record = item as Record<string, unknown>;
-          if (typeof record.text === "string") return record.text;
-          if (record.content !== undefined)
-            return formatMessageText(record.content);
-          if (record.type === "image") return "[image]";
-          if (typeof record.tool_name === "string")
-            return `[tool: ${record.tool_name}]`;
-        }
-        try {
-          return JSON.stringify(item);
-        } catch {
-          return String(item);
-        }
-      })
-      .filter(Boolean)
-      .join("\n");
-  }
-  try {
-    return JSON.stringify(value, null, 2);
-  } catch {
-    return String(value);
-  }
-}
-
 /** An MCP tool by its own name, without its server's (Open's SessionCharts.toolName). */
 function toolName(name: string): string {
   return name.startsWith("mcp__") ? (name.split("__").at(-1) ?? name) : name;
@@ -786,7 +754,7 @@ function TurnPanel({
           ))}
         </div>
       )}
-      {entry.message != null && formatMessageText(entry.message) !== "" && (
+      {entry.message && (
         <div
           style={{
             fontSize: 12,
@@ -795,7 +763,7 @@ function TurnPanel({
             userSelect: "text",
           }}
         >
-          {formatMessageText(entry.message)}
+          {entry.message}
         </div>
       )}
       {calls?.some((call) => call.subagent) && (
@@ -1673,7 +1641,7 @@ export function InlineDetail({
                       paddingTop: 5,
                     }}
                   >
-                    {formatMessageText(message.text)}
+                    {message.text}
                   </div>
                   {message.toolCall != null && (
                     <details style={{ fontSize: 11, paddingTop: 5 }}>
