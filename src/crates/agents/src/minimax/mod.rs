@@ -3,6 +3,7 @@
 //! client: Claude Code, Codex, OpenCode and Pi send their calls to it with a
 //! plan key, and its quota is read with that key.
 pub mod account;
+mod remains;
 mod routes;
 
 use crate::Agent;
