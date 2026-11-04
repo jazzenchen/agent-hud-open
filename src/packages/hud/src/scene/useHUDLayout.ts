@@ -99,19 +99,12 @@ export function useHUDLayout({
 
   const delivery = useMemo(() => {
     const now = Date.parse(snapshot.generatedAt);
-    if (!Number.isFinite(now)) return undefined;
     const source = request?.source ?? focusedVendor?.key;
     let latest: RequestDelivery | undefined;
     let latestAt = -Infinity;
     for (const entry of snapshot.requestDeliveries ?? []) {
       const at = Date.parse(entry.at);
-      if (
-        entry.state === "confirmed" ||
-        !Number.isFinite(at) ||
-        at > now ||
-        now - at > 300_000
-      )
-        continue;
+      if (entry.state === "confirmed" || now - at > 300_000) continue;
       if (source && vendorKey(entry.source) !== vendorKey(source)) continue;
       if (request?.sessionId && entry.sessionId !== request.sessionId) continue;
       if (at > latestAt) {

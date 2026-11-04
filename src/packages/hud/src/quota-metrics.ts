@@ -29,11 +29,6 @@ export interface QuotaMetricReading {
    * share now, for a mark on the bar; null without one. */
   budgetPercent: number | null;
 }
-const finite = (value: number | null | undefined): value is number =>
-  value != null && Number.isFinite(value);
-const nonnegative = (value: number | null | undefined): value is number =>
-  finite(value) && value >= 0;
-
 /** TokenFormat.short; kept for callers that format a count of their own. */
 export const formatTokens = tokensShort;
 
@@ -125,17 +120,12 @@ export function quotaMetric(
     "额度读数已过期，请刷新这个账户。",
     "Last quota reading is stale; refresh this account.",
   );
-  const budget =
-    metrics?.budget &&
-    finite(metrics.budget.paceDelta) &&
-    finite(metrics.budget.expectedUsedPercent)
-      ? metrics.budget
-      : null;
+  const budget = metrics?.budget ?? null;
   const budgetLine = budget ? budgetText(budget, language) : null;
   if (measure === "quota") {
     result.value = "--";
     result.detail = rowResetLabel(row, now, settings);
-    if (finite(row.usedPercent)) {
+    if (row.usedPercent != null) {
       result.value = quotaPercentLabel(row.usedPercent, settings.quotaDisplay);
       result.available = true;
       result.hint =
@@ -145,7 +135,7 @@ export function quotaMetric(
     }
     return result;
   }
-  if (row.status === "stale" || !finite(row.usedPercent)) {
+  if (row.status === "stale" || row.usedPercent == null) {
     result.hint = row.status === "stale" ? stale : missing("quota", language);
     return result;
   }
@@ -157,30 +147,18 @@ export function quotaMetric(
     const exhaustsAt = outlook?.exhaustsAt
       ? Date.parse(outlook.exhaustsAt)
       : NaN;
-    const projected = finite(outlook?.projectedUsedPercent)
-      ? outlook.projectedUsedPercent
-      : null;
-    if (nonnegative(metrics?.burnRatePctPerHour)) {
+    const projected = outlook?.projectedUsedPercent ?? null;
+    if (metrics?.burnRatePctPerHour != null) {
       result.value = `${metrics.burnRatePctPerHour.toFixed(1)}%/h`;
       result.available = result.selectable = true;
-    } else if (
-      outlook?.basis === "window" &&
-      nonnegative(outlook.ratePctPerHour)
-    ) {
+    } else if (outlook?.basis === "window" && outlook.ratePctPerHour != null) {
       // The cycle's average pace so far, until recent readings give one.
       result.value = `~${outlook.ratePctPerHour.toFixed(1)}%/h`;
       result.available = result.selectable = true;
     }
     result.budgetPercent = budget ? budget.expectedUsedPercent : null;
-    const sample = metrics?.sampling;
     const sampling =
-      outlook?.kind === "insufficient-data" &&
-      sample &&
-      nonnegative(sample.elapsed) &&
-      nonnegative(sample.required) &&
-      sample.required > 0
-        ? sample
-        : null;
+      outlook?.kind === "insufficient-data" ? metrics?.sampling : null;
     if (sampling) result.selectable = true;
     const words = outlook
       ? outlookText(
@@ -236,12 +214,7 @@ export function quotaMetric(
       if (budgetLine) lines.push(budgetLine);
       result.hint = lines.filter(Boolean).join("\n");
     }
-  } else if (
-    measure === "tokens" &&
-    metrics?.replyRate &&
-    nonnegative(metrics.replyRate.tokensPerSecond) &&
-    metrics.replyRate.calls > 0
-  ) {
+  } else if (measure === "tokens" && metrics?.replyRate) {
     const rate = metrics.replyRate;
     // A rate timed by the gaps between calls holds tool runs and the
     // person's time, so it is a floor.
@@ -268,16 +241,17 @@ export function quotaMetric(
   } else if (
     measure === "consumed" &&
     metrics?.consumed &&
-    nonnegative(metrics.consumed.used)
+    metrics.consumed.used >= 0
   ) {
     const used = metrics.consumed;
     result.value = formatTokens(used.used);
     // With a capacity the line reads "used / cap"; without one, the pace.
-    result.detail = nonnegative(used.capacity)
-      ? `/ ${formatTokens(used.capacity)}`
-      : nonnegative(metrics.tokensPerHour)
-        ? `${formatTokens(Math.round(metrics.tokensPerHour))}/h`
-        : "—";
+    result.detail =
+      used.capacity != null && used.capacity >= 0
+        ? `/ ${formatTokens(used.capacity)}`
+        : metrics.tokensPerHour != null
+          ? `${formatTokens(Math.round(metrics.tokensPerHour))}/h`
+          : "—";
     result.available = result.selectable = true;
     const since = metrics.observedFrom ? Date.parse(metrics.observedFrom) : NaN;
     result.hint = Number.isFinite(since)
@@ -291,19 +265,9 @@ export function quotaMetric(
           "只计入已知周期内观察到的用量。",
           "Only observed usage in its known cycle is counted.",
         );
-  } else if (
-    measure === "cost" &&
-    metrics?.cost &&
-    finite(metrics.cost.hours) &&
-    metrics.cost.hours > 0
-  ) {
+  } else if (measure === "cost" && metrics?.cost) {
     const cost = metrics.cost;
-    const currencies = Object.keys(cost.amounts)
-      .filter(
-        (currency) =>
-          /^[A-Z]{3}$/.test(currency) && nonnegative(cost.amounts[currency]),
-      )
-      .sort();
+    const currencies = Object.keys(cost.amounts).sort();
     if (currencies.length) {
       const first = currencies[0];
       result.value = moneyShort(cost.amounts[first], first, language);
