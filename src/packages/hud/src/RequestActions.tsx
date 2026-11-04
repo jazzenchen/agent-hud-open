@@ -50,8 +50,7 @@ export function RequestActions({
   };
 
   const disabled = !onDecision || pending;
-  const isQuestion =
-    request.kind === "question" || Boolean(request.questions?.length);
+  const isQuestion = request.kind === "question";
   const isPlan = request.kind === "plan";
 
   return (

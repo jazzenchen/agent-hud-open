@@ -25,7 +25,11 @@ const event = (extra: object) =>
 
 test("quota cards say what Open says, measured from the reading", () => {
   const empty = quotaAlertCopy(
-    event({ usedPercent: 100, resetAt: "2026-10-23T09:00:00Z" }),
+    event({
+      usedPercent: 100,
+      crossing: "exhausted",
+      resetAt: "2026-10-23T09:00:00Z",
+    }),
     en,
   );
   assert.deepEqual(

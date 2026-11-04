@@ -31,10 +31,8 @@ export function permissionToolBadge(request: Approval): {
   badge: string;
   Icon: typeof Terminal;
 } {
-  if (request.kind === "question" || request.toolName === "AskUserQuestion")
-    return { badge: "ASK", Icon: HelpCircle };
-  if (request.kind === "plan" || request.toolName === "ExitPlanMode")
-    return { badge: "PLAN", Icon: ListTodo };
+  if (request.kind === "question") return { badge: "ASK", Icon: HelpCircle };
+  if (request.kind === "plan") return { badge: "PLAN", Icon: ListTodo };
   // A native approval's kind comes from Core (Open's PermissionRequest.badge).
   if (request.badge === "APP") return { badge: "APP", Icon: Monitor };
   if (request.badge === "WEB") return { badge: "WEB", Icon: Globe };
@@ -111,8 +109,7 @@ export function PermissionRowHead({
     clientDisplayName(request.source);
   const summary = request.summary ?? request.title;
   const detail = request.detail ?? request.input;
-  const isQuestion =
-    request.kind === "question" || Boolean(request.questions?.length);
+  const isQuestion = request.kind === "question";
   const isPlan = request.kind === "plan";
   const showsDetail = Boolean(
     request.removed || request.added || detail || isPlan,

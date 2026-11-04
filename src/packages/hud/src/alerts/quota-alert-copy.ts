@@ -15,9 +15,6 @@ import {
 const say = (language: Language, zh: string, en: string) =>
   language === "zh" ? zh : en;
 
-/** Remaining % at or below which a window is empty (Open's AlertPolicy.exhaustedRemaining). */
-const exhaustedRemaining = 0.5;
-
 /** The window's share left, from the share used the event carries; none without a reading. */
 function remainingOf(event: IslandEvent) {
   return event.usedPercent == null || !Number.isFinite(event.usedPercent)
@@ -31,6 +28,8 @@ export function quotaAlertCopy(event: IslandEvent, settings: FormatSettings) {
   const usedPct = remaining == null ? null : Math.max(0, 100 - remaining);
   const displayPct = quotaPercent(event.usedPercent, settings.quotaDisplay);
   const isReset = event.kind === "quota-reset";
+  // Core marks the reading that empties the window (Open's AlertPolicy.exhaustedRemaining).
+  const empty = event.crossing === "exhausted";
   const forecast = event.timeToExhaustSeconds;
   const exhaustion =
     remaining != null && forecast != null && Number.isFinite(forecast)
@@ -63,7 +62,7 @@ export function quotaAlertCopy(event: IslandEvent, settings: FormatSettings) {
         ? say(language, "额度不可用", "Quota unavailable")
         : isReset
           ? say(language, "已重置", "Reset")
-          : remaining <= exhaustedRemaining
+          : empty
             ? say(language, "已耗尽", "Empty")
             : exhaustion
               ? say(language, `${exhaustion} 后耗尽`, `${exhaustion} left`)
@@ -84,7 +83,7 @@ export function quotaAlertCopy(event: IslandEvent, settings: FormatSettings) {
                 "此窗口额度已重置。",
                 "This quota window has reset.",
               )
-          : remaining <= exhaustedRemaining
+          : empty
             ? say(
                 language,
                 "当前窗口额度已耗尽，等待重置。",
