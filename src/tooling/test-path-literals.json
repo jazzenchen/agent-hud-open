@@ -11,7 +11,6 @@
     "src/crates/agents/tests/golden.rs": 1,
     "src/crates/core/src/data_version.rs": 12,
     "src/crates/core/src/log_files/tests.rs": 9,
-    "src/crates/core/src/source_db.rs": 1,
     "src/crates/host/src/instance.rs": 1,
     "src/crates/platform/src/deepseek_plugin/tests.rs": 6,
     "src/crates/platform/src/file_changes.rs": 4,

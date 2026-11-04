@@ -1,6 +1,10 @@
 use super::*;
-use crate::SourceRoot;
+use crate::{
+    checkpoints::{self, LogHead},
+    metering, SourceRoot, Usage,
+};
 use rusqlite::{params, Connection};
+use serde_json::{json, Value};
 
 fn core(root: &Path) -> AgentHudCore {
     AgentHudCore::new(

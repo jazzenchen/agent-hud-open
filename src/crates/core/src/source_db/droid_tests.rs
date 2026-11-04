@@ -1,6 +1,7 @@
 //! Factory Droid's sessions, read whole from their settings files.
 use super::*;
 use crate::SourceRoot;
+use serde_json::{json, Value};
 use std::fs;
 
 const SETTINGS: &str =
