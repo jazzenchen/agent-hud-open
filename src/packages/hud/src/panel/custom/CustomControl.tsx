@@ -12,7 +12,7 @@ import {
   type CSSProperties,
   type ReactNode,
 } from "react";
-import { motion, useReducedMotion } from "motion/react";
+import { motion, useReducedMotionConfig } from "motion/react";
 import type { PanelNode, Quota, Snapshot } from "@agent-hud/protocol";
 import { useFormat } from "@agent-hud/ui/format-context";
 import { HUD_METRICS } from "../../model";
@@ -254,7 +254,8 @@ function Children({
 /** One node, drawn where its `when` holds. */
 function Control({ node, scope }: { node: Node; scope: Scope }) {
   const drawing = useContext(DrawingContext)!;
-  const reduceMotion = useReducedMotion() ?? false;
+  // The panel's own setting: pictures, which draw no frames, turn motion off.
+  const reduceMotion = useReducedMotionConfig() ?? false;
   const onClick = useClick(node, scope);
   if (node.hidden === true) return null;
   if (!holds(node.when as Record<string, unknown> | undefined, scope))
