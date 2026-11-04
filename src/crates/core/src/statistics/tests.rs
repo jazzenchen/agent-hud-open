@@ -8,7 +8,7 @@ fn a_clients_cache_reads_share_its_price_and_re_caching_costs_at_list() {
     let to = 1_790_000_000_000i64 / QUARTER * QUARTER;
     let query =
         Query::parse(&json!({"from": iso(to - DAY), "to": iso(to), "timeZone": "UTC"})).unwrap();
-    let bucket = |model: &str, at: i64, tokens: Usage| query::Bucket {
+    let bucket = |model: &str, at: i64, tokens: Usage| load::Bucket {
         contribution: "/logs/s.jsonl".into(),
         source: "claude".into(),
         model: model.into(),

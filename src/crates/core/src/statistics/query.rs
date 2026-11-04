@@ -1,49 +1,14 @@
-//! Statistics query parsing, ledger bucket loading, and calendar helpers.
+//! Statistics query parsing, and the totals and names a response is written with.
+use super::load::Bucket;
+use super::periods::{ceil, floor, local_date};
 use crate::{iso, pricing, Usage};
-use chrono::{NaiveDate, TimeZone, Timelike};
 use chrono_tz::Tz;
-use rusqlite::Connection;
 use serde_json::{json, Value};
-use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
+use std::collections::{BTreeMap, BTreeSet};
 
 pub(super) const QUARTER: i64 = 900_000;
 pub(super) const DAY: i64 = 86_400_000;
 const KINDS: [&str; 5] = ["cacheWrite", "input", "reasoning", "output", "cacheRead"];
-
-#[derive(Default)]
-pub(crate) struct Cache {
-    pub(super) data: Option<Data>,
-    pub(super) responses: VecDeque<(String, Value)>,
-}
-
-pub(super) struct Data {
-    pub(super) revision: u64,
-    pub(super) from: i64,
-    pub(super) to: i64,
-    pub(super) rows: Vec<Bucket>,
-    pub(super) models: BTreeMap<String, Model>,
-    pub(super) bounds: HashMap<String, (i64, i64)>,
-    pub(super) unknown: Vec<(String, String, i64, u64)>,
-    /// Prompt tokens sent again because the cache lapsed, by 15-minute bucket:
-    /// (bucket, source, model, sent, sent as cache writes).
-    pub(super) recached: Vec<(i64, String, String, u64, u64)>,
-}
-
-pub(super) struct Bucket {
-    pub(super) contribution: String,
-    pub(super) source: String,
-    pub(super) model: String,
-    pub(super) at: i64,
-    pub(super) tokens: Usage,
-}
-
-#[derive(Clone)]
-pub(super) struct Model {
-    pub(super) id: String,
-    pub(super) source: String,
-    pub(super) name: String,
-    pub(super) first: i64,
-}
 
 pub(super) struct Query {
     pub(super) from: i64,
@@ -252,99 +217,6 @@ pub(super) struct Context {
     pub(super) regions: crate::pricing::PriceRegions,
 }
 
-pub(super) fn load(
-    db: &Connection,
-    paths: &[String],
-    revision: u64,
-    from: i64,
-    to: i64,
-) -> Result<Data, String> {
-    let (model_bounds, bucket_rows, unknown) =
-        crate::metering::query_statistics_data(db, paths, from, to)?;
-    let mut data = Data {
-        revision,
-        from,
-        to,
-        rows: bucket_rows
-            .into_iter()
-            .map(|r| Bucket {
-                contribution: r.contribution,
-                source: r.source,
-                model: r.model,
-                at: r.at,
-                tokens: r.tokens,
-            })
-            .collect(),
-        models: BTreeMap::new(),
-        bounds: HashMap::new(),
-        unknown,
-        recached: crate::metering::recached(db, paths, from)
-            .map_err(|_| "Could not read re-cached usage")?,
-    };
-    for (source, name, first, last) in model_bounds {
-        let id = model_id(&source, &name);
-        data.models.insert(
-            id.clone(),
-            Model {
-                name: crate::naming::model_names::consumer_name(&id),
-                id,
-                source: source.clone(),
-                first,
-            },
-        );
-        data.bounds
-            .entry(source)
-            .and_modify(|b| {
-                b.0 = b.0.min(first);
-                b.1 = b.1.max(last)
-            })
-            .or_insert((first, last));
-    }
-    Ok(data)
-}
-
-pub(super) fn periods(query: &Query) -> Result<Vec<(i64, i64)>, String> {
-    let mut result = Vec::new();
-    if query.bucket == 1440 {
-        let mut start = day_start(query.zone, local_date(query.zone, query.from))?;
-        while start < query.to {
-            let date = local_date(query.zone, start).succ_opt().unwrap();
-            let end = day_start(query.zone, date)?;
-            result.push((start, end));
-            start = end;
-        }
-    } else {
-        let local = query
-            .zone
-            .timestamp_millis_opt(query.from)
-            .single()
-            .unwrap();
-        let residual = (i64::from(local.minute()) % query.bucket) * 60_000
-            + i64::from(local.second()) * 1000
-            + i64::from(local.timestamp_subsec_millis());
-        let mut start = query.from - residual;
-        let step = query.bucket * 60_000;
-        while start < query.to {
-            result.push((start, start + step));
-            start += step;
-        }
-    }
-    Ok(result)
-}
-
-pub(crate) fn day_start(zone: Tz, mut date: NaiveDate) -> Result<i64, String> {
-    for _ in 0..3 {
-        for minute in 0..1440 {
-            let local = date.and_hms_opt(minute / 60, minute % 60, 0).unwrap();
-            if let Some(at) = zone.from_local_datetime(&local).earliest() {
-                return Ok(at.timestamp_millis());
-            }
-        }
-        date = date.succ_opt().unwrap();
-    }
-    Err("No valid instant for this calendar day".into())
-}
-
 pub(super) fn tokens_json(t: Usage) -> Value {
     json!({"cacheWrite":t.write,"input":t.input,"reasoning":t.reasoning,"output":t.output,"cacheRead":t.read})
 }
@@ -365,27 +237,6 @@ pub(super) fn provider_name(id: &str) -> &str {
     agent_hud_agents::by_id(id)
         .map(|agent| agent.name)
         .unwrap_or(id)
-}
-
-pub(crate) fn local_date(zone: Tz, at: i64) -> NaiveDate {
-    zone.timestamp_millis_opt(at).single().unwrap().date_naive()
-}
-
-pub(super) fn floor(at: i64) -> i64 {
-    at.div_euclid(QUARTER) * QUARTER
-}
-
-fn ceil(at: i64) -> i64 {
-    floor(at)
-        + (if at.rem_euclid(QUARTER) == 0 {
-            0
-        } else {
-            QUARTER
-        })
-}
-
-pub(super) fn overlaps(at: i64, from: i64, to: i64) -> bool {
-    at + QUARTER > from && at < to
 }
 
 #[cfg(test)]

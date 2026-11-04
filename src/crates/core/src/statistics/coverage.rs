@@ -1,7 +1,9 @@
 //! What a statistics response covers: which clients it could read, when they
 //! were last read, and the answer when nothing is available.
 use super::build::build;
-use super::query::{floor, overlaps, Context, Data, Query, DAY};
+use super::load::Data;
+use super::periods::{floor, overlaps};
+use super::query::{Context, Query, DAY};
 use super::{day_start, local_date};
 use crate::iso;
 use crate::l10n;

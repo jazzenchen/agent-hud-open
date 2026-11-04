@@ -3,11 +3,16 @@
 //! session tail or a session's lifetime total.
 mod build;
 mod coverage;
+mod load;
+mod periods;
 mod query;
 use build::build;
 use coverage::{refresh_times, unavailable};
-pub(crate) use query::{day_start, local_date, Cache};
-use query::{floor, load, overlaps, Context, Data, Query, DAY};
+pub(crate) use load::Cache;
+use load::{load, Data};
+pub(crate) use periods::{day_start, local_date};
+use periods::{floor, overlaps};
+use query::{Context, Query, DAY};
 
 use crate::{pricing, AgentHudCore};
 use chrono::Utc;

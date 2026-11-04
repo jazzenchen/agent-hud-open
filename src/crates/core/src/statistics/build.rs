@@ -1,9 +1,9 @@
 //! Building a statistics response from the loaded buckets: totals, series and
 //! the ranked clients and models.
 use super::coverage::coverage;
-use super::query::{
-    model_id, overlaps, periods, provider_name, tokens_json, Context, Data, Query, Total, DAY,
-};
+use super::load::Data;
+use super::periods::{overlaps, periods};
+use super::query::{model_id, provider_name, tokens_json, Context, Query, Total, DAY};
 use super::{day_start, local_date, spending};
 use crate::{iso, pricing};
 use chrono::{Datelike, TimeZone, Timelike, Utc};
