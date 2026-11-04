@@ -103,9 +103,6 @@ impl agent_hud_lan::Record for SyncRecord {
     fn is_visible(&self, now_ms: i64) -> bool {
         SyncRecord::is_visible(self, now_ms)
     }
-    fn content(&self) -> String {
-        current_content(self)
-    }
     /// The fields `current_content` hashes, compared without hashing them.
     fn same_content(&self, other: &Self) -> bool {
         self.kind == other.kind

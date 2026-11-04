@@ -24,9 +24,6 @@ fn key(value: CFStringRef) -> CFType {
     unsafe { CFString::wrap_under_get_rule(value) }.as_CFType()
 }
 pub fn load(device: &str, directory: &Path) -> Result<Identity> {
-    if !directory.is_absolute() || uuid::Uuid::parse_str(device).is_err() {
-        return Err("Explicit LAN identity path and installation UUID required".into());
-    }
     let tag = CFData::from_buffer(format!("app.agenthud.local-network.{device}").as_bytes());
     let secret = unsafe {
         let query = CFDictionary::from_CFType_pairs(&[

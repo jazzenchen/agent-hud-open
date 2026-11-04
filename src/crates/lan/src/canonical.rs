@@ -65,10 +65,6 @@ fn number_text(number: &Number) -> String {
 /// A double as the phone writes it: a whole number in 64-bit range as an
 /// integer, others as Swift's `description` does.
 pub fn double_text(value: f64) -> String {
-    if !value.is_finite() {
-        // JSON has no such numbers; neither side ever writes one.
-        return "null".into();
-    }
     let sign = if value < 0.0 { "-" } else { "" };
     let (digits, exponent) = shortest(value.abs());
     if value.fract() == 0.0 {

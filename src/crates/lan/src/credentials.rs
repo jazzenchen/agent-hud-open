@@ -32,9 +32,6 @@ impl Credentials {
         directory: PathBuf,
         secrets: std::sync::Arc<dyn SecretStore>,
     ) -> Result<Self> {
-        if !directory.is_absolute() {
-            return Err("Explicit LAN credential directory required".into());
-        }
         let file = directory.join("clients.json");
         let clients = match std::fs::read(&file) {
             Ok(bytes) => {
@@ -90,9 +87,6 @@ impl Credentials {
         Ok(token)
     }
     pub fn authorization(&self, token: &str) -> Option<Authorization> {
-        if !valid_token(token) {
-            return None;
-        }
         let hash = digest(token);
         if self
             .automatic
