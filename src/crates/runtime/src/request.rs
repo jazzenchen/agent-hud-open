@@ -74,6 +74,17 @@ impl Runtime {
             self.platform.reveal_transcript(&path)?;
             return Ok(json!({"opened":true,"action":"reveal_transcript"}));
         }
+        if method == "open_client" {
+            // A step only the user can take in the client itself, such as
+            // allowing Agent HUD's hooks in Codex.
+            let source = params["source"]
+                .as_str()
+                .ok_or_else(|| l10n::text("缺少客户端", "Client is required"))?;
+            if self.is_demo() {
+                return Ok(json!({"opened":true,"action":"demo"}));
+            }
+            return Ok(json!({"opened":self.platform.open_client(source)}));
+        }
         if method == "answer_request" {
             return self.core.request(method, params);
         }

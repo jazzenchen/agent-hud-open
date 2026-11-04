@@ -156,7 +156,8 @@ pub enum Launch {
 }
 
 /// A step the user takes in a client itself before it runs the hooks Agent
-/// HUD put in its settings (TRAE asks to turn its hooks on).
+/// HUD put in its settings (TRAE asks to turn its hooks on, Codex to allow
+/// each one).
 pub struct Setup {
     pub clients: &'static [&'static str],
     /// What to tell the user, given the client's name.
@@ -164,7 +165,7 @@ pub struct Setup {
 }
 
 /// Every client that needs such a step.
-pub static SETUPS: &[&Setup] = &[&crate::trae::SETUP];
+pub static SETUPS: &[&Setup] = &[&crate::trae::SETUP, &crate::codex::SETUP];
 
 /// What the user does in the client with this id before its hooks run.
 pub fn setup_step(id: &str) -> Option<String> {

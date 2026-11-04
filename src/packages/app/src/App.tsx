@@ -159,6 +159,11 @@ function AppContent({
     openSettingsPage: (page) => {
       if (isTauri()) void invoke("hud_show_main", { page });
     },
+    openClient: (source) => {
+      void act("open_client", { source }).catch((failure) =>
+        toast.error(String(failure)),
+      );
+    },
     webSignIn: (provider, host) => {
       // The HUD has no place for a failure, so it shows as a toast.
       if (isTauri())

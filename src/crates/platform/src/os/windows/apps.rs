@@ -12,3 +12,7 @@ pub(crate) fn app_running(_bundle_id: &str) -> bool {
 pub(crate) fn activate_app(_bundle_id: &str) -> bool {
     false
 }
+
+pub(crate) fn launch_app(_bundle_id: &str) -> bool {
+    false
+}

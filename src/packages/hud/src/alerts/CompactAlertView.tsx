@@ -4,81 +4,14 @@ import {
   KeyRound,
   MessageSquareText,
   RotateCcw,
+  ShieldAlert,
 } from "lucide-react";
 import type { Approval, IslandEvent } from "@agent-hud/protocol";
 import { labelWidth } from "../geometry";
-import { agentVendorName } from "../model";
-import { clientDisplayName, projectName } from "../IslandNews";
 import { ReminderMark } from "./ReminderMark";
-import { quotaAlertCopy } from "./quota-alert-copy";
-import { systemCalendar } from "@agent-hud/ui/format";
+import { compactAlertLabels } from "./compact-alert-labels";
 import { alertInk, alertText } from "../tokens";
 import { useGround } from "../ground";
-
-/** What a quota reminder says beside its agent (Open's QuotaAlertCopy.compactTitle). */
-export function compactQuotaStatus(event: IslandEvent, zh = false): string {
-  return quotaAlertCopy(event, {
-    language: zh ? "zh" : "en",
-    calendar: systemCalendar(navigator.language),
-  }).compactTitle;
-}
-
-export function compactAlertLabels(
-  request: Approval | undefined,
-  event: IslandEvent | undefined,
-  requestCount: number,
-  zh: boolean,
-): { who: string; status: string; badge?: string } {
-  if (request) {
-    const who =
-      projectName(request.cwd) ??
-      request.vendor ??
-      clientDisplayName(request.source);
-    const status =
-      request.kind === "question"
-        ? zh
-          ? "待回答"
-          : "Question"
-        : request.kind === "plan"
-          ? zh
-            ? "计划待审"
-            : "Plan"
-          : zh
-            ? "待批准"
-            : "Waiting";
-    return {
-      who,
-      status,
-      badge: requestCount > 1 ? `×${requestCount}` : undefined,
-    };
-  }
-  if (!event) return { who: "", status: "" };
-  if (event.kind === "completion") {
-    return {
-      who: clientDisplayName(event.source),
-      status: zh ? "有新回复" : "New reply",
-    };
-  }
-  if (event.kind === "sign-in-needed") {
-    return {
-      who: event.title ?? agentVendorName(event.source),
-      status: zh ? "需要重新登录" : "Sign in again",
-    };
-  }
-  if (event.kind === "reset-credits") {
-    const added = event.added ?? 1;
-    return {
-      who: agentVendorName(event.source),
-      status: zh
-        ? `+${added} 次重置`
-        : `+${added} reset${added === 1 ? "" : "s"}`,
-    };
-  }
-  return {
-    who: agentVendorName(event.source),
-    status: compactQuotaStatus(event, zh),
-  };
-}
 
 export function compactAlertDockWidth(
   request: Approval | undefined,
@@ -154,7 +87,9 @@ export function CompactAlertView({
   // CompletionAlertCompactView opens the detail card; Quota / ResetCredit compact views open usage stats.
   const handleClick = request
     ? undefined
-    : event?.kind === "completion" || event?.kind === "sign-in-needed"
+    : event?.kind === "completion" ||
+        event?.kind === "sign-in-needed" ||
+        event?.kind === "hooks-review-needed"
       ? onOpen
       : onDismissAndStats;
 
@@ -171,9 +106,11 @@ export function CompactAlertView({
       ? { Icon: MessageSquareText, color: turnText, stroke: 2.2 }
       : event?.kind === "sign-in-needed"
         ? { Icon: KeyRound, color: warnAccent, stroke: 2.4 }
-        : event?.kind === "reset-credits" || event?.kind === "quota-reset"
-          ? { Icon: RotateCcw, color: calmAccent, stroke: 2.4 }
-          : { Icon: Flame, color: warnAccent, filled: true };
+        : event?.kind === "hooks-review-needed"
+          ? { Icon: ShieldAlert, color: warnAccent, stroke: 2.4 }
+          : event?.kind === "reset-credits" || event?.kind === "quota-reset"
+            ? { Icon: RotateCcw, color: calmAccent, stroke: 2.4 }
+            : { Icon: Flame, color: warnAccent, filled: true };
   const trailingWhat = (
     <>
       <look.Icon

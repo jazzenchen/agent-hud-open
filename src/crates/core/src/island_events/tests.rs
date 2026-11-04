@@ -50,3 +50,60 @@ fn a_reading_that_only_missed_an_answer_is_not_a_sign_out() {
         0
     );
 }
+
+fn codex(hooks: &[&str]) -> Value {
+    json!({"id":"codex","name":"Codex","enabled":true,"accountStatus":{"status":"ready","unreviewedHooks":hooks}})
+}
+fn reviews(tracker: &mut Tracker, row: Value, now: i64) -> Vec<Value> {
+    tracker.update(&[], &[], &[], &[row], now)["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|event| event["kind"] == "hooks-review-needed")
+        .cloned()
+        .collect()
+}
+
+#[test]
+fn hooks_waiting_for_the_user_are_told_after_launch_then_once_a_day() {
+    let mut tracker = Tracker::new();
+    let day = 86_400_000;
+    let start = tracker.started;
+    let waiting = || codex(&["permissionRequest", "stop"]);
+    // Right after launch the island would take it as already seen.
+    assert!(reviews(&mut tracker, waiting(), start + 1_000).is_empty());
+    let told = reviews(&mut tracker, waiting(), start + 30_000);
+    assert_eq!(told.len(), 1);
+    assert_eq!(told[0]["source"], "codex");
+    assert_eq!(told[0]["title"], "Codex");
+    assert_eq!(told[0]["islandAlert"], true);
+    assert_eq!(told[0]["hooks"], json!(["permissionRequest", "stop"]));
+    assert!(told[0]["message"].as_str().unwrap().contains("Codex"));
+    // Where to allow them, as Codex itself names it.
+    assert!(told[0]["step"].as_str().unwrap().contains("Allow all"));
+    assert_eq!(reviews(&mut tracker, waiting(), start + 60_000).len(), 1);
+    assert_eq!(
+        reviews(&mut tracker, waiting(), start + 30_000 + day).len(),
+        2
+    );
+    // Allowed, then changed again: told at once.
+    assert_eq!(
+        reviews(&mut tracker, codex(&[]), start + 30_001 + day).len(),
+        2
+    );
+    assert_eq!(
+        reviews(&mut tracker, waiting(), start + 30_002 + day).len(),
+        3
+    );
+}
+
+#[test]
+fn only_the_permission_hook_keeps_approvals_from_the_hud() {
+    let mut tracker = Tracker::new();
+    let at = tracker.started + 30_000;
+    let approvals = reviews(&mut tracker, codex(&["permissionRequest"]), at);
+    let mut tracker = Tracker::new();
+    let at = tracker.started + 30_000;
+    let progress = reviews(&mut tracker, codex(&["userPromptSubmit"]), at);
+    assert_ne!(approvals[0]["message"], progress[0]["message"]);
+}

@@ -91,7 +91,10 @@ export interface IslandEvent {
     | "quota-reset"
     | "reset-credits"
     /** The agent signed out; `message` is what its account reading says. */
-    | "sign-in-needed";
+    | "sign-in-needed"
+    /** The agent skips Agent HUD's hooks until the user allows them in the
+     * agent itself; `hooks` names the events, as the agent does. */
+    | "hooks-review-needed";
   at: string;
   startedAt?: string | null;
   source: string;
@@ -112,4 +115,7 @@ export interface IslandEvent {
   newCredits?: { id?: string; expiresAt?: string | null }[] | number;
   islandAlert?: boolean;
   navigationTarget?: unknown;
+  hooks?: string[];
+  /** Where in the agent the user allows its hooks. */
+  step?: string | null;
 }

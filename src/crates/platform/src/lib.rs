@@ -172,6 +172,18 @@ impl NativePlatform {
         os::open_session_url(&url)?;
         Ok(true)
     }
+    /// Brings a client's own app forward, starting it when it is closed, for
+    /// a step only the user can take there (allowing Agent HUD's hooks in
+    /// Codex). False where this host has no such app or cannot open it.
+    pub fn open_client(&self, source: &str) -> bool {
+        let Some(agent) = agent_hud_agents::by_id(source) else {
+            return false;
+        };
+        agent.discovery.bundles.iter().any(|bundle| {
+            (os::app_running(bundle) && os::activate_app(bundle))
+                || (os::registered_bundle(bundle) && os::launch_app(bundle))
+        })
+    }
     pub fn reveal_transcript(&self, path: &Path) -> Result<(), String> {
         os::reveal_transcript(path)
     }

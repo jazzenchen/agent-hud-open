@@ -237,6 +237,7 @@ pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
         account: Some(
             json!({"id":account_identity,"provider":"cursor","label":email,"plan":body["membershipType"],"checkedAt":Utc::now().to_rfc3339()}),
         ),
+        unreviewed_hooks: vec![],
     })
 }
 

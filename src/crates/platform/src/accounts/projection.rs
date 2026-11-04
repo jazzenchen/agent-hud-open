@@ -134,7 +134,9 @@ impl AccountService {
                     });
                 }
             }
-            result.providers.insert(entry.reading.provider.into(),json!({"status":if entry.failed {"error"}else if ready {"ready"}else{"unavailable"},"checkedAt":entry.checked_at,"notice":entry.notice,"failure":failure,"failingSince":failing_since,"service":service,"webSignIn":web_sign_in}));
+            // `unreviewedHooks`: Agent HUD's hooks the agent skips until the
+            // user allows them in the agent itself, as its last good reading said.
+            result.providers.insert(entry.reading.provider.into(),json!({"status":if entry.failed {"error"}else if ready {"ready"}else{"unavailable"},"checkedAt":entry.checked_at,"notice":entry.notice,"failure":failure,"failingSince":failing_since,"service":service,"webSignIn":web_sign_in,"unreviewedHooks":entry.reading.unreviewed_hooks}));
         }
         for metadata in credentials::status(&self.context)["providers"]
             .as_array()

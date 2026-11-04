@@ -2,13 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import type { Approval, IslandEvent, Snapshot } from "@agent-hud/protocol";
 import { usePanelServices } from "./PanelContext";
 import { agentVendorName, sourceID, vendorKey } from "./model";
-import { CompletionAlertView } from "./alerts/CompletionAlertView";
-import {
-  QuotaAlertView,
-  ResetCreditAlertView,
-  SignInAlertView,
-} from "./alerts/QuotaAlertViews";
-import { snapshotLanguage } from "@agent-hud/ui/format";
 
 export {
   PermissionClosedRow,
@@ -193,9 +186,13 @@ export const newsTitle = (event: IslandEvent, zh = false) =>
           ? zh
             ? "需要重新登录"
             : "Sign in again"
-          : zh
-            ? "额度预警"
-            : "Running low";
+          : event.kind === "hooks-review-needed"
+            ? zh
+              ? "回调待允许"
+              : "Allow its hooks"
+            : zh
+              ? "额度预警"
+              : "Running low";
 
 export const compactDuration = (seconds: number) => {
   const total = Math.max(0, Math.round(seconds)),
@@ -220,71 +217,4 @@ export function projectName(cwd?: string | null): string | null {
 export function shortenHomePath(path?: string | null): string | null {
   if (!path) return null;
   return path.replace(/^\/Users\/[^/]+/, "~").replace(/^\/home\/[^/]+/, "~");
-}
-
-export function NewsContent({
-  event,
-  snapshot,
-  dismiss,
-  onStats,
-  handoff,
-  light = false,
-  botLogos = true,
-}: {
-  event: IslandEvent;
-  snapshot: Snapshot;
-  dismiss: () => void;
-  onStats?: () => void;
-  handoff?: (callback?: () => void) => void;
-  light?: boolean;
-  botLogos?: boolean;
-}) {
-  const zh = snapshotLanguage(snapshot) === "zh";
-  if (event.kind === "completion") {
-    return (
-      <CompletionAlertView
-        event={event}
-        snapshot={snapshot}
-        dismiss={dismiss}
-        onStats={onStats}
-        handoff={handoff}
-        light={light}
-        botLogos={botLogos}
-      />
-    );
-  }
-  if (event.kind === "sign-in-needed") {
-    return (
-      <SignInAlertView
-        event={event}
-        dismiss={dismiss}
-        light={light}
-        botLogos={botLogos}
-        zh={zh}
-      />
-    );
-  }
-  if (event.kind === "reset-credits") {
-    return (
-      <ResetCreditAlertView
-        event={event}
-        snapshot={snapshot}
-        dismiss={dismiss}
-        onStats={onStats}
-        light={light}
-        botLogos={botLogos}
-        zh={zh}
-      />
-    );
-  }
-  return (
-    <QuotaAlertView
-      event={event}
-      dismiss={dismiss}
-      onStats={onStats}
-      light={light}
-      botLogos={botLogos}
-      zh={zh}
-    />
-  );
 }

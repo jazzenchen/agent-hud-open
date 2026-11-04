@@ -229,7 +229,8 @@ fn the_app_server_reports_limits_and_the_account() {
             "initialize",
             "initialized",
             "account/rateLimits/read",
-            "account/read"
+            "account/read",
+            "hooks/list"
         ]
     );
     let identity = legacy_account("Codex", "a@example.com", "ws").unwrap();
@@ -309,6 +310,30 @@ fn a_home_without_a_chatgpt_plan_says_why_instead_of_the_engine_error() {
         read(&host).err().unwrap(),
         "Codex: chatgpt authentication required to read rate limits"
     );
+}
+
+#[test]
+fn the_reading_says_which_agent_hud_hooks_codex_skips() {
+    let mut host = installed(limits(), Value::Null);
+    let hud = "'/Applications/Agent HUD.app/Contents/MacOS/Agent HUD'";
+    host.engine_replies.insert(
+        4,
+        json!({"id": 4, "result": {"data": [{"cwd": "/u", "hooks": [
+            {"eventName": "permissionRequest", "command": format!("{hud} --permission-hook codex"), "trustStatus": "modified", "enabled": true},
+            {"eventName": "stop", "command": format!("{hud} --remote-hook codex"), "trustStatus": "trusted", "enabled": true}
+        ]}]}}),
+    );
+    assert_eq!(read(&host).unwrap().unreviewed_hooks, ["permissionRequest"]);
+    let sent = host.engine_sent.borrow();
+    let list = sent.iter().find(|m| m["method"] == "hooks/list").unwrap();
+    assert_eq!(list["params"]["cwds"], json!(["/u"]));
+    drop(sent);
+    // An app-server without hooks/list still reports limits, with none waiting.
+    host.engine_replies
+        .insert(4, json!({"id": 4, "error": {"message": "unknown method"}}));
+    let reading = read(&host).unwrap();
+    assert_eq!(reading.quotas.len(), 2);
+    assert!(reading.unreviewed_hooks.is_empty());
 }
 
 #[test]

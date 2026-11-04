@@ -3,7 +3,7 @@ import { agentVendorName, quotaShortName } from "../model";
 import { alertInk } from "../tokens";
 import { useGround } from "../ground";
 import { cardColumn } from "../card-column";
-import { compactAlertLabels } from "./CompactAlertView";
+import { compactAlertLabels } from "./compact-alert-labels";
 import { ReminderMark } from "./ReminderMark";
 
 /** A quota or reset-credit event inside the open usage panel: one quiet

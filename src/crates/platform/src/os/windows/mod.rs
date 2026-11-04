@@ -7,7 +7,7 @@ mod files;
 pub(crate) mod pipe;
 mod process;
 mod secrets;
-pub(crate) use apps::{activate_app, app_running};
+pub(crate) use apps::{activate_app, app_running, launch_app};
 pub(crate) use process::{codex_cli_on_port, parent_processes};
 pub(crate) use secrets::{app_cookie, stored_secret, unseal_safe_storage};
 pub(crate) const READS_PROCESS_ENVIRONMENT: bool = false;

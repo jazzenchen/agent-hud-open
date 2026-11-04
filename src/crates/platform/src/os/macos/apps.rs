@@ -10,6 +10,16 @@ pub(crate) fn app_running(bundle_id: &str) -> bool {
         .is_empty()
 }
 
+/// Starts the application registered under `bundle_id`, or brings it
+/// forward when it runs.
+pub(crate) fn launch_app(bundle_id: &str) -> bool {
+    super::super::unix::spawn_script(
+        include_str!("../../../scripts/macos/launch-app.sh"),
+        &[std::ffi::OsStr::new(bundle_id)],
+    )
+    .is_ok()
+}
+
 pub(crate) fn activate_app(bundle_id: &str) -> bool {
     let apps = NSRunningApplication::runningApplicationsWithBundleIdentifier(&NSString::from_str(
         bundle_id,

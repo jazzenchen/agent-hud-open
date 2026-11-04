@@ -3,6 +3,7 @@
 //! then suppress facts rather than keeping another independent diff history.
 use super::*;
 
+mod hook_reviews;
 mod sign_ins;
 
 #[derive(Clone)]
@@ -32,6 +33,8 @@ pub(super) struct Tracker {
     quotas: HashMap<String, Observation>,
     credits: HashMap<String, Credits>,
     sign_ins: HashMap<String, SignIn>,
+    /// When each agent's waiting hooks were last told.
+    reviews: HashMap<String, i64>,
     revision: u64,
     events: VecDeque<Value>,
 }
@@ -46,6 +49,7 @@ impl Tracker {
             quotas: HashMap::new(),
             credits: HashMap::new(),
             sign_ins: HashMap::new(),
+            reviews: HashMap::new(),
             revision: 0,
             events: VecDeque::new(),
         }
@@ -71,6 +75,7 @@ impl Tracker {
         now: i64,
     ) -> Value {
         self.sign_ins(providers, now);
+        self.hook_reviews(providers, now);
         self.seen.retain(|_, at| *at >= now - 31 * 86_400_000);
         let mut completions = sessions
             .iter()

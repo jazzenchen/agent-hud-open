@@ -5,7 +5,8 @@ import type {
   Snapshot,
 } from "@agent-hud/protocol";
 import { snapshotLanguage } from "@agent-hud/ui/format";
-import { NewsContent, type useIslandNews } from "../IslandNews";
+import type { useIslandNews } from "../IslandNews";
+import { NewsContent } from "../alerts/NewsContent";
 import { PendingEventRows } from "../alerts/PendingEventRows";
 import { ApprovalContent } from "../permissions/ApprovalContent";
 

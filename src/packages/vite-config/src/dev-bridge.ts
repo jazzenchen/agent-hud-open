@@ -14,6 +14,7 @@ const methods = new Set([
   "answer_request",
   "session_detail",
   "open_session",
+  "open_client",
   "open_native",
   "toggle_hud",
 ]);

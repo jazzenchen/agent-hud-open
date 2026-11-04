@@ -1,5 +1,8 @@
 //! Codex's quota: its CLI's own `app-server` (account/rateLimits/read and
-//! account/read), and Pi's ChatGPT sign-in, which spends the same plan.
+//! account/read), and Pi's ChatGPT sign-in, which spends the same plan. The
+//! same app-server also says which of Agent HUD's hooks wait for the user to
+//! allow them (`hook_review`).
+use super::hook_review;
 use super::limits::parse;
 use super::pi_usage::{read_pi, PI_ROUTE};
 use crate::account::{
@@ -132,6 +135,8 @@ fn read_home(host: &dyn Host, executable: &Path, home: &Path) -> Result<Reading,
     let mut account = Value::Null;
     let mut requires_openai_auth = None;
     let mut answered = false;
+    // An app-server too old for hooks/list answers with an error: none wait.
+    let mut hooks = None::<Vec<String>>;
     while let Some(message) = process.next(deadline.min(grace)) {
         let Some(id) = message["id"].as_u64() else {
             continue;
@@ -141,6 +146,8 @@ fn read_home(host: &dyn Host, executable: &Path, home: &Path) -> Result<Reading,
             // without the signed-in email.
             if id == 3 {
                 answered = true;
+            } else if id == 4 {
+                hooks = Some(Vec::new());
             } else if id == 2 {
                 // Limits need a ChatGPT sign-in; account/read says why
                 // there is none.
@@ -166,6 +173,7 @@ fn read_home(host: &dyn Host, executable: &Path, home: &Path) -> Result<Reading,
                     process.send(&json!({"method":"initialized"}))?;
                     process.send(&json!({"id":2,"method":"account/rateLimits/read"}))?;
                     process.send(&json!({"id":3,"method":"account/read","params":{}}))?;
+                    process.send(&hook_review::request(4, host.home()))?;
                 }
                 2 => {
                     limits = Some(result.clone());
@@ -176,13 +184,15 @@ fn read_home(host: &dyn Host, executable: &Path, home: &Path) -> Result<Reading,
                     requires_openai_auth = result["requiresOpenaiAuth"].as_bool();
                     answered = true;
                 }
+                4 => hooks = Some(hook_review::unreviewed(result)),
                 _ => {}
             }
         }
-        if (limits.is_some() || refused.is_some()) && answered {
+        if (limits.is_some() || refused.is_some()) && answered && hooks.is_some() {
             break;
         }
     }
+    let unreviewed_hooks = hooks.unwrap_or_default();
     if let (None, Some(error)) = (&limits, refused) {
         // No sign-in at all is Codex's own state: the last windows stay.
         if requires_openai_auth == Some(true) && account.is_null() {
@@ -195,6 +205,7 @@ fn read_home(host: &dyn Host, executable: &Path, home: &Path) -> Result<Reading,
             Some(notice) => {
                 let mut reading = Reading::empty("codex");
                 reading.notice = Some(notice);
+                reading.unreviewed_hooks = unreviewed_hooks;
                 Ok(reading)
             }
             None => Err(format!("Codex: {error}").into()),
@@ -221,6 +232,10 @@ fn read_home(host: &dyn Host, executable: &Path, home: &Path) -> Result<Reading,
         &client_home_key(host, home, &host.home().join(".codex")),
         true,
     )
+    .map(|mut reading| {
+        reading.unreviewed_hooks = unreviewed_hooks;
+        reading
+    })
     .map_err(Unread::from)
 }
 

@@ -33,6 +33,9 @@ export interface PanelServices {
   openSettingsPage?(page: string): void;
   /** Agent HUD's own sign-in window on `host`, for `provider`'s quota. */
   webSignIn?(provider: string, host: string): void;
+  /** The client's own app, brought forward or started, for a step only the
+   * user can take there (allowing Agent HUD's hooks in Codex). */
+  openClient?(source: string): void;
   sources?: Record<string, SourcePreferences>;
   draft?: {
     unsaved: boolean;

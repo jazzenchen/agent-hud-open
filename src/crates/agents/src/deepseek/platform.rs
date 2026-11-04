@@ -137,5 +137,6 @@ pub(super) fn platform_balance(
         notice: None,
         session_records: Vec::new(),
         services: Vec::new(),
+        unreviewed_hooks: vec![],
     }))
 }

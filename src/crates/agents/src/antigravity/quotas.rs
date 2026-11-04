@@ -238,5 +238,6 @@ pub(super) fn parse(scope: &str, body: &Value, summary: &Value) -> Result<Readin
             "plan":user["userTier"]["name"].as_str().or_else(||user["planStatus"]["planInfo"]["planName"].as_str()),
             "checkedAt":Utc::now().to_rfc3339()}),
         ),
+        unreviewed_hooks: vec![],
     })
 }

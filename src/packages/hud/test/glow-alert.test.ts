@@ -38,6 +38,14 @@ test("accents follow Open's IslandAlert: blue turns, warm warnings, calm news", 
     true,
     "a signed-out agent is a warning",
   );
+  assert.equal(
+    glowAlert(
+      { id: "g", kind: "hooks-review-needed", vendor: "codex" },
+      vendors,
+    )?.warning,
+    true,
+    "an agent skipping Agent HUD's hooks is a warning",
+  );
   assert.equal(glowAlert(null, vendors), null);
 });
 

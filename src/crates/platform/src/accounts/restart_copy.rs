@@ -68,6 +68,7 @@ pub(super) fn load(data_dir: &Path, readers: Providers) -> Restored {
                 session_records: rows(&saved["sessionRecords"]),
                 services: rows(&saved["services"]),
                 failure: None,
+                unreviewed_hooks: vec![],
             };
             Some((reading, checked_at))
         })
