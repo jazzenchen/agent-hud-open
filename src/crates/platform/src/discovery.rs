@@ -302,6 +302,38 @@ mod tests {
     }
 
     #[test]
+    fn minimax_is_configured_by_a_client_sending_a_plan_key_to_its_api() {
+        let dir = tempfile::tempdir().unwrap();
+        let home = dir.path();
+        assert!(from_files(home, &[])["minimax"].is_empty());
+        assert_eq!(
+            from_files(home, &[("MINIMAX_API_KEY", "sk-cp-k")])["minimax"],
+            ["provider-environment"]
+        );
+        file(
+            &home.join(".claude/settings.json"),
+            r#"{"env":{"ANTHROPIC_BASE_URL":"https://api.minimax.io/anthropic","ANTHROPIC_AUTH_TOKEN":"sk-cp-k"}}"#,
+        );
+        file(
+            &home.join(".pi/agent/auth.json"),
+            r#"{"minimax-cn": {"type": "api_key", "key": "sk-cp-p"}}"#,
+        );
+        assert_eq!(
+            from_files(home, &[])["minimax"],
+            ["claude-provider-route", "pi-provider-route"]
+        );
+        file(
+            &home.join(".claude/settings.json"),
+            r#"{"env":{"ANTHROPIC_BASE_URL":"https://api.minimax.io/anthropic","ANTHROPIC_AUTH_TOKEN":"sk-api-paygo"}}"#,
+        );
+        assert_eq!(
+            from_files(home, &[])["minimax"],
+            ["pi-provider-route"],
+            "a pay-as-you-go key reads no plan"
+        );
+    }
+
+    #[test]
     fn claude_codes_local_settings_in_its_config_dir_route_to_glm() {
         let dir = tempfile::tempdir().unwrap();
         let home = dir.path();

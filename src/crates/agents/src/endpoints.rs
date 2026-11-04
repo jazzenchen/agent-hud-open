@@ -32,6 +32,8 @@ const VENDOR_HOSTS: &[&str] = &[
     "api.deepseek.com",
     "api.minimax.io",
     "api.minimaxi.com",
+    "api.minimax.cn",
+    "ark.cn-beijing.volces.com",
     "dashscope.aliyuncs.com",
     "dashscope-intl.aliyuncs.com",
 ];
@@ -131,6 +133,8 @@ mod tests {
             ("API.Anthropic.com.", HostKind::Official),
             ("api.z.ai", HostKind::Vendor),
             ("api.deepseek.com", HostKind::Vendor),
+            ("api.minimax.cn", HostKind::Vendor),
+            ("ark.cn-beijing.volces.com", HostKind::Vendor),
             ("localhost:11434", HostKind::Local),
             ("127.0.0.1:4000", HostKind::Local),
             ("[::1]:8080", HostKind::Local),

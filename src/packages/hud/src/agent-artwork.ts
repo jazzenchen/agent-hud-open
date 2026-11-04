@@ -22,6 +22,8 @@ export const ORIGINAL_ARTWORK_FILES = {
   Qoder: "qoder",
   "Qoder-dark": "qoder-dark",
   Devin: "devin",
+  MiniMax: "minimax",
+  "Volcengine Ark": "ark",
 } as const;
 type OriginalVendor = keyof typeof ORIGINAL_ARTWORK_FILES;
 const vendors: Readonly<Record<string, OriginalVendor>> = {
@@ -45,6 +47,8 @@ const vendors: Readonly<Record<string, OriginalVendor>> = {
   qwen: "Qwen",
   qoder: "Qoder",
   devin: "Devin",
+  minimax: "MiniMax",
+  ark: "Volcengine Ark",
 };
 const templates: ReadonlySet<OriginalVendor> = new Set([
   "Grok",

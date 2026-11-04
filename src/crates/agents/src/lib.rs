@@ -40,6 +40,7 @@ pub use transcript::{
 
 // One folder per client, or per family of clients that share a format.
 pub mod antigravity;
+pub mod ark;
 pub mod buddy;
 pub mod claude;
 pub mod codex;
@@ -52,6 +53,7 @@ pub mod glm;
 pub mod grok;
 pub mod hermes;
 pub mod kimi;
+pub mod minimax;
 pub mod openclaw;
 pub mod opencode;
 pub mod pi;

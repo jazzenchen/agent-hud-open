@@ -361,6 +361,8 @@ fn vendor_name(source: &str) -> String {
         "qwen" => "Qwen",
         "qoder" => "Qoder",
         "devin" => "Devin",
+        "minimax" => "MiniMax",
+        "ark" => "Volcengine Ark",
         _ => source,
     };
     name.to_owned()

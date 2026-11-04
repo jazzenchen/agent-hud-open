@@ -29,8 +29,8 @@ SOFTWARE.
 
 CodexBar
 Source: https://github.com/steipete/CodexBar/tree/05bb0e694afa93e234991bbd5eaab6afcd1b9e7d
-Additional reference revisions: 928166f899471bbdcb72210641cdec91324d0154 (OpenCode Go, Kimi and GLM quota parsing); 86a47f80a71e74c59dd2d4dd14de397348d36546 (GitHub Copilot quota).
-Antigravity protobuf reader adapted from AntigravityProtoReader.swift; local quota discovery, Cursor authentication and dashboard protocols, Grok credits protocols and GitHub Copilot quota snapshot semantics informed by CodexBar.
+Additional reference revisions: 928166f899471bbdcb72210641cdec91324d0154 (OpenCode Go, Kimi and GLM quota parsing); 86a47f80a71e74c59dd2d4dd14de397348d36546 (GitHub Copilot quota); 897bff31731bb4b21b105f6e8bf4c32a8a8bf095 (MiniMax and Doubao quota).
+Antigravity protobuf reader adapted from AntigravityProtoReader.swift; local quota discovery, Cursor authentication and dashboard protocols, Grok credits protocols, GitHub Copilot quota snapshot semantics, MiniMax plan quota fields and endpoints, and the arkcli usage failures informed by CodexBar.
 
 MIT License
 
