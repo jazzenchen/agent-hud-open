@@ -51,7 +51,7 @@ pub(crate) async fn web_sign_in(
     let desk = service
         .backend
         .lock()
-        .map_err(|_| "The account service is unavailable")?
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
         .runtime
         .web_sign_in_desk()
         .ok_or("Accounts are not read in this app")?;

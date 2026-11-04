@@ -52,10 +52,12 @@ export function AgentWebSignIn({
                 size="sm"
                 disabled={pending || !isTauri()}
                 onClick={() =>
-                  void invoke("web_sign_in", {
-                    provider: web.provider,
-                    host: site.host,
-                  })
+                  perform(() =>
+                    invoke("web_sign_in", {
+                      provider: web.provider,
+                      host: site.host,
+                    }),
+                  )
                 }
               >
                 {t("Sign in", "登录")}

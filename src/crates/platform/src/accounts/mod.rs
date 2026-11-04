@@ -190,10 +190,7 @@ impl WebSignInDesk {
         }
         let mut context = self.context.clone();
         context.trial_web = Some((provider.to_owned(), session.clone()));
-        let _turn = self
-            .gate
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let _turn = self.gate.lock().unwrap_or_else(PoisonError::into_inner);
         (facts.read)(&context).is_ok_and(|reading| reading.account.is_some())
     }
     /// Keeps `session` for `provider` and reads the provider again now.
@@ -206,7 +203,8 @@ impl WebSignInDesk {
 
 /// Reads `provider` again at once and tells the snapshot.
 fn wake_provider(shared: &Shared, provider: &str) {
-    if let Ok(mut state) = shared.state.lock() {
+    {
+        let mut state = shared.state.lock().unwrap_or_else(PoisonError::into_inner);
         state.entries.remove(provider);
         state.force.insert(provider.into());
     }
