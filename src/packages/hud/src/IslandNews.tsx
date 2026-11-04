@@ -10,21 +10,10 @@ import {
 } from "./alerts/QuotaAlertViews";
 import { snapshotLanguage } from "@agent-hud/ui/format";
 
-export { ReminderMark } from "./alerts/ReminderMark";
 export {
-  CompactAlertView,
-  compactAlertDockWidth,
-  compactAlertLabels,
-  compactQuotaStatus,
-} from "./alerts/CompactAlertView";
-export {
-  CompletionClosedRow,
-  PendingEventRows,
   PermissionClosedRow,
   PermissionRowHead,
-  WaitedLabel,
   WaitingHeader,
-  permissionToolBadge,
 } from "./alerts/PendingEventRows";
 
 /** Presentation only: Core is the sole producer/deduplicator of event facts. */

@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import type { Approval, IslandEvent, Snapshot } from "@agent-hud/protocol";
-import { CompactAlertView } from "../IslandNews";
+import { CompactAlertView } from "../alerts/CompactAlertView";
 import { horizontal, type HUDRect } from "../geometry";
 import {
   HUD_METRICS,

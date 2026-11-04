@@ -15,7 +15,8 @@ import type { Snapshot } from "@agent-hud/protocol";
 import { HUDArtwork as HUDLogo } from "./HUDArtwork";
 export { HUDArtwork as HUDLogo } from "./HUDArtwork";
 import { DockMemory, type Direction } from "./bots/mark-director";
-import { useIslandNews, NewsContent, PendingEventRows } from "./IslandNews";
+import { useIslandNews, NewsContent } from "./IslandNews";
+import { PendingEventRows } from "./alerts/PendingEventRows";
 import {
   ApprovalContent,
   RequestDeliveryNotice,
