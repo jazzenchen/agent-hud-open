@@ -29,9 +29,7 @@ pub use os::registered_applications;
 pub fn client_executable(name: &str) -> Option<std::path::PathBuf> {
     let home = os::home_dir().ok()?;
     let env = std::env::vars().collect::<os::Environment>();
-    os::engine_candidates(&home, &env, name)
-        .into_iter()
-        .find(|path| os::engine_executable(path))
+    os::find_engine(&home, &env, name)
 }
 use std::path::{Path, PathBuf};
 

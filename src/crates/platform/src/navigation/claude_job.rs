@@ -36,10 +36,7 @@ pub(super) fn open(home: &Path, session: &str, job: &str) -> Result<bool, String
     {
         return Ok(false);
     }
-    let Some(claude) = crate::os::engine_candidates(home, &env, "claude")
-        .into_iter()
-        .find(|path| crate::os::engine_executable(path))
-    else {
+    let Some(claude) = crate::os::find_engine(home, &env, "claude") else {
         return Ok(false);
     };
     let config = crate::os::variable(&env, "CLAUDE_CONFIG_DIR", home)

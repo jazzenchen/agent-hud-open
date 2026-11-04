@@ -99,9 +99,7 @@ mod running {
             return Ok(None);
         };
         let env = std::env::vars().collect::<crate::os::Environment>();
-        Ok(crate::os::engine_candidates(&home, &env, "agy")
-            .into_iter()
-            .find(|path| crate::os::engine_executable(path))
+        Ok(crate::os::find_engine(&home, &env, "agy")
             .and_then(|path| path.to_str().map(str::to_owned)))
     }
 
@@ -294,7 +292,8 @@ impl Service {
         if !response.status().is_success() {
             return Err(service_error(response));
         }
-        crate::accounts::http::response_json(response, "Antigravity")
+        crate::accounts::http::read_json(response)
+            .map_err(agent_hud_agents::account::HttpFailure::message)
     }
     fn cached(&self) -> Vec<Endpoint> {
         self.state

@@ -33,6 +33,13 @@ pub(crate) fn variable(env: &Environment, key: &str, _home: &Path) -> Option<Pat
         .filter(|value| !value.is_empty())
         .map(PathBuf::from)
 }
+/// A client's own command line (`claude`, `codex`, `agy`), where it is found
+/// on this host: an app's bundled copy as well as one on PATH.
+pub(crate) fn find_engine(home: &Path, env: &Environment, name: &str) -> Option<PathBuf> {
+    engine_candidates(home, env, name)
+        .into_iter()
+        .find(|path| engine_executable(path))
+}
 /// A base folder of the agents' locations on this host.
 pub(crate) fn folder(home: &Path, env: &Environment, base: agent_hud_agents::Base) -> PathBuf {
     match base {
