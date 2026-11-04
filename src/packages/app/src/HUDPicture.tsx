@@ -13,8 +13,8 @@ import {
   configuredVendors,
   quotaAccountKey,
 } from "@agent-hud/hud/model";
+import { getScreenHUDConfig } from "./lib/hud-config-store";
 import {
-  getScreenHUDConfig,
   presentationStore,
   type PresentationState,
 } from "./lib/use-hud-config";

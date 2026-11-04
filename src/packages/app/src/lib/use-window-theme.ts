@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { isTauri } from "@tauri-apps/api/core";
 import { currentMonitor, getCurrentWindow } from "@tauri-apps/api/window";
 import type { Snapshot } from "@agent-hud/protocol";
-import { getScreenHUDConfig, type HUDConfigStore } from "./use-hud-config";
+import { getScreenHUDConfig, type HUDConfigStore } from "./hud-config-store";
 import type { NativeHUDMonitor } from "./use-hud-geometry";
 
 /** The window's look: the Appearance setting, the system's while that says

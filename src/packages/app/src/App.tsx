@@ -10,7 +10,8 @@ import {
 import { useHUD } from "./lib/use-hud";
 import { useWindowActivity } from "./lib/use-window-activity";
 import { useBotDirections } from "./lib/use-bot-directions";
-import { useHUDConfig, type HUDScreenContext } from "./lib/use-hud-config";
+import type { HUDScreenContext } from "./lib/hud-config-store";
+import { useHUDConfig } from "./lib/use-hud-config";
 import { useHUDGeometry } from "./lib/use-hud-geometry";
 import { useRequestDeliveryToasts } from "./lib/use-request-delivery-toasts";
 import { useWindowTheme } from "./lib/use-window-theme";
