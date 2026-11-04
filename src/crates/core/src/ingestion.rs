@@ -15,6 +15,7 @@ use std::{
 mod lines;
 mod scan;
 mod sync;
+mod waiting;
 
 pub(crate) use lines::{line, read_lines};
 

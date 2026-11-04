@@ -3,6 +3,11 @@
 use super::*;
 
 impl crate::AgentHudCore {
+    /// The loaded preference, available before the first collection pass.
+    pub fn launch_at_login_enabled(&self) -> bool {
+        self.settings["launchAtLogin"] == true
+    }
+
     pub fn client_hooks_enabled(&self) -> bool {
         self.settings["clientHooks"] == true
     }

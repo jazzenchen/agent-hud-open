@@ -1,6 +1,7 @@
-//! Bringing the in-memory logs up to date with the database, and adopting a
-//! session whose mapping moved to another log.
-use crate::{checkpoints, source_batches, AgentHudCore, Log};
+//! Bringing the in-memory logs up to date with the database, adopting a
+//! session whose mapping moved to another log, and loading a log's parser
+//! from its checkpoint.
+use crate::{checkpoints, l10n, source_batches, AgentHudCore, Log};
 use serde_json::json;
 use std::path::{Path, PathBuf};
 
@@ -111,5 +112,25 @@ impl AgentHudCore {
             }
         }
         Ok(Some(old_path))
+    }
+
+    pub(crate) fn load_parser(&mut self, path: &Path) -> Result<(Log, usize), String> {
+        if let Some(log) = self.parser_cache.take(path) {
+            return Ok(log);
+        }
+        let (mut log, bytes) = checkpoints::read(
+            self.database.as_ref().ok_or_else(|| {
+                l10n::text(
+                    "会话解析进度暂时无法保存",
+                    "Parser checkpoint storage is unavailable",
+                )
+            })?,
+            path,
+        )?;
+        // A checkpoint keeps no turn text; this run's words come from its head.
+        if let Some(head) = self.logs.get(path) {
+            log.live.keep_words(&head.live);
+        }
+        Ok((log, bytes))
     }
 }
