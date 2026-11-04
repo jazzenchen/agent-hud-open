@@ -4,6 +4,8 @@
 //! The sessions' turns come from the same seeded generator, so the figures
 //! match Open's demo.
 
+use chrono::{DateTime, Datelike, FixedOffset, Timelike};
+
 /// A quota window as last read: the share used, the seconds to its reset and
 /// its length.
 pub(crate) struct Reading {
@@ -792,15 +794,97 @@ pub(crate) fn turns(plan: &Plan, now: i64, running: bool) -> Vec<DemoTurn> {
     turns
 }
 
-/// A month of tokens in quarter hours, 15 million a day before cache reads,
-/// with a model mix that changes through the day: (start, source, model,
-/// input, output, cache read).
+/// How busy each Beijing hour is when the sample person works at it.
+const HOUR_HEIGHTS: [u64; 24] = [
+    24, 0, 0, 0, 0, 0, 0, 0, 0, 18, 44, 50, 0, 0, 62, 70, 58, 40, 0, 0, 26, 56, 64, 40,
+];
+/// Which models work each hour, in `history`'s spender order; the third model's
+/// share is its lunchtime slot instead.
+const HOUR_MIXES: [[u64; 6]; 24] = [
+    [2, 1, 0, 0, 0, 1],
+    [1, 0, 0, 0, 0, 0],
+    [1, 0, 0, 0, 0, 0],
+    [1, 0, 0, 0, 0, 0],
+    [1, 0, 0, 0, 0, 0],
+    [1, 0, 0, 0, 0, 0],
+    [1, 0, 0, 0, 0, 0],
+    [1, 0, 0, 0, 0, 0],
+    [1, 0, 0, 0, 0, 0],
+    [3, 0, 0, 0, 0, 0],
+    [3, 1, 0, 0, 0, 0],
+    [2, 2, 0, 1, 0, 0],
+    [1, 0, 0, 0, 0, 0],
+    [1, 0, 0, 0, 0, 0],
+    [1, 3, 0, 2, 0, 0],
+    [1, 4, 0, 3, 1, 0],
+    [0, 3, 0, 2, 2, 1],
+    [0, 1, 0, 0, 3, 2],
+    [1, 0, 0, 0, 0, 0],
+    [1, 0, 0, 0, 0, 0],
+    [1, 1, 0, 0, 1, 1],
+    [2, 3, 0, 1, 0, 1],
+    [3, 2, 0, 1, 1, 0],
+    [2, 1, 0, 0, 0, 2],
+];
+/// The third model's tokens in each of its lunchtime quarter hours.
+const LUNCH_TOKENS: u64 = 40_000;
+
+fn beijing(ms: i64) -> DateTime<FixedOffset> {
+    let zone = FixedOffset::east_opt(8 * 3600).expect("Beijing's offset");
+    DateTime::from_timestamp_millis(ms)
+        .expect("a demo time")
+        .with_timezone(&zone)
+}
+
+/// A quarter hour's share of the month's work, by its Beijing time: the hours
+/// the person works that day, scaled a little day by day, and by half at the
+/// weekend. Weekdays count as the iPhone's sample does, Sunday 1 to Saturday 7.
+fn work_weight(start: i64) -> (usize, f64) {
+    let time = beijing(start);
+    let weekday = time.weekday().num_days_from_sunday() + 1;
+    let day = time.day();
+    let hour = time.hour() as usize;
+    let works = match weekday {
+        7 => (14..=16).contains(&hour),
+        1 => (20..=21).contains(&hour),
+        _ => {
+            [10, 11, 14, 15, 16, 21, 22].contains(&hour)
+                || (hour == 9 && day % 3 == 1)
+                || (hour == 17 && day.is_multiple_of(2))
+                || (hour == 23 && day % 4 != 3)
+                || (hour == 0 && day.is_multiple_of(3))
+        }
+    };
+    let scale = if weekday == 7 || weekday == 1 {
+        0.5
+    } else {
+        [1.0, 0.8, 1.2, 0.9, 1.1][(day % 5) as usize]
+    };
+    let weight = if works {
+        HOUR_HEIGHTS[hour] as f64 * scale
+    } else {
+        0.0
+    };
+    (hour, weight)
+}
+
+/// 11:30 to 13:30 Beijing time, every day.
+fn is_lunch(start: i64) -> bool {
+    let time = beijing(start);
+    (690..810).contains(&(time.hour() * 60 + time.minute()))
+}
+
+/// A month of tokens in quarter hours on the sample person's Beijing days:
+/// weekday mornings, afternoons and evenings that shift a little from day to
+/// day and now and then run past midnight, short weekends, quiet nights, and
+/// each model at the hours it is used: (start, source, model, input, output,
+/// cache read). deepseek-v4-flash takes the eight quarter hours from 11:30
+/// every day at a fixed size, which its peak pricing is pinned to. The month
+/// adds up to 15 million tokens a day before cache reads. The iPhone's
+/// `DemoFleet.buckets` is the same.
 pub(crate) fn history(now: i64) -> Vec<(i64, &'static str, &'static str, u64, u64, u64)> {
     const QUARTER: i64 = 900_000;
     let end = now.div_euclid(QUARTER) * QUARTER;
-    let heights: [u64; 24] = [
-        64, 16, 34, 4, 24, 48, 6, 6, 22, 24, 12, 20, 44, 62, 38, 4, 72, 16, 6, 24, 8, 44, 62, 72,
-    ];
     let spenders: [(&str, &str); 6] = [
         ("claude", "claude-fable-5-1"),
         ("claude", "claude-opus-5-5"),
@@ -809,54 +893,40 @@ pub(crate) fn history(now: i64) -> Vec<(i64, &'static str, &'static str, u64, u6
         ("codex", "gpt-6.1-sol"),
         ("claude", "claude-sonnet-5-5"),
     ];
-    let mixes: [[u64; 6]; 24] = [
-        [5, 3, 0, 0, 0, 0],
-        [1, 0, 0, 0, 0, 0],
-        [2, 0, 1, 0, 0, 0],
-        [0, 0, 1, 0, 0, 0],
-        [1, 0, 0, 0, 0, 0],
-        [3, 2, 0, 0, 0, 0],
-        [1, 0, 0, 0, 0, 0],
-        [1, 0, 0, 0, 0, 0],
-        [1, 0, 0, 0, 0, 0],
-        [1, 0, 0, 0, 0, 0],
-        [1, 0, 0, 0, 0, 0],
-        [1, 0, 0, 0, 0, 0],
-        [2, 3, 0, 1, 0, 0],
-        [1, 4, 0, 3, 0, 0],
-        [0, 3, 0, 2, 0, 0],
-        [0, 1, 0, 0, 0, 0],
-        [0, 2, 0, 1, 0, 0],
-        [0, 1, 0, 0, 0, 0],
-        [0, 0, 0, 0, 1, 0],
-        [0, 0, 0, 0, 3, 1],
-        [0, 0, 0, 0, 0, 1],
-        [1, 3, 0, 1, 0, 0],
-        [0, 3, 0, 1, 0, 0],
-        [0, 2, 0, 1, 0, 0],
-    ];
-    let multiplier = 15_000_000.0 / (heights.iter().sum::<u64>() * 4) as f64;
     let count = 30 * 96;
+    let starts: Vec<i64> = (0..count)
+        .map(|index| end - (count - index) as i64 * QUARTER)
+        .collect();
+    let work: Vec<(usize, f64)> = starts.iter().map(|start| work_weight(*start)).collect();
+    let lunch: Vec<bool> = starts.iter().map(|start| is_lunch(*start)).collect();
+    let weight: f64 = work.iter().map(|(_, weight)| weight).sum();
+    let lunches = lunch.iter().filter(|lunch| **lunch).count() as u64;
+    let multiplier = (15_000_000.0 * 30.0 - (lunches * LUNCH_TOKENS) as f64) / weight;
     let mut buckets = Vec::new();
-    for index in 0..count {
-        let start = end - (count - index) as i64 * QUARTER;
-        let hour = index / 4 % 24;
-        let mix = mixes[hour];
-        let weight: u64 = mix.iter().sum();
+    for ((start, (hour, weight)), lunch) in starts.iter().zip(&work).zip(&lunch) {
+        let mix = HOUR_MIXES[*hour];
+        let total: u64 = mix.iter().sum();
         for (position, (source, model)) in spenders.iter().enumerate() {
-            let total =
-                (heights[hour] as f64 * multiplier * mix[position] as f64 / weight as f64) as u64;
-            if total == 0 {
+            let tokens = if position == 2 {
+                if *lunch {
+                    LUNCH_TOKENS
+                } else {
+                    0
+                }
+            } else {
+                (weight * multiplier * mix[position] as f64 / total as f64) as u64
+            };
+            if tokens == 0 {
                 continue;
             }
-            let input = total * 4 / 5;
+            let input = tokens * 4 / 5;
             buckets.push((
-                start,
+                *start,
                 *source,
                 *model,
                 input,
-                total - input,
-                total * (position as u64 + 1),
+                tokens - input,
+                tokens * (position as u64 + 1),
             ));
         }
     }
@@ -920,6 +990,15 @@ mod tests {
             heard.tool.is_some() && heard.at < now && heard.at > now - 30_000
         }));
         assert_eq!(live[3].own, first[3].own);
+        // The 24 hours before the iPhone sample's morning, 2026-10-12 09:41 in
+        // Beijing: the same buckets as its DemoFleetTests pins.
+        let morning = 1_791_769_260_000;
+        let day: Vec<_> = history(morning)
+            .into_iter()
+            .filter(|row| row.0 >= morning - 86_400_000)
+            .collect();
+        let fresh: u64 = day.iter().map(|row| row.3 + row.4).sum();
+        assert_eq!((day.len(), fresh), (52, 3_355_172));
         // Fifteen million tokens a day before cache reads, over thirty days.
         let total: u64 = history(now).iter().map(|row| row.3 + row.4).sum();
         assert!(
