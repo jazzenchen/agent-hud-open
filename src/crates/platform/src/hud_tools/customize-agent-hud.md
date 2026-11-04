@@ -46,7 +46,7 @@ Agent HUD adds its tools to this client as an MCP server named `agent-hud`. This
 
 ## The panel tree
 
-- **The panel's own parts:** the root `panel` (spacing, separators, width, countdown), its sections `blocks`, `tokens` and `sessions`, and inside `blocks` one `quota` or `balance` block per agent, named by its block key (`claude`, `codex`, `api:deepseek`). They cannot be deleted; `hidden: true` hides one. Their fields are in `catalog.own`.
+- **The panel's own parts:** the root `panel` (spacing, separators, width, countdown), its sections `blocks`, `tokens` and `sessions`, and inside `blocks` one `quota` or `balance` block per agent, named by its block key (`claude`, `codex`, `api:deepseek`). The blocks' order is also the order of the agents on the resting HUD. They cannot be deleted; `hidden: true` hides one. Their fields are in `catalog.own`.
 - **Your own controls:** from `catalog.controls`: `row`, `column`, `grid`, `repeat`, `text`, `logo`, `bar`, `rings`, `segments`, `chart`, `divider` and `picker`. Put one in `panel` as a section of its own, or in `blocks` among the agents' blocks. A control placed there needs an `id`.
 - **Data:** text reads data through placeholders: `{window.used}`, `{session.title}`, `{now.time|clock}`. A `repeat` over `windows`, `balances`, `accounts`, `agents` or `sessions` draws its children once per item, and inside it the item is named `window`, `balance`, `account`, `agent` or `session`. `where`, `sort` and `limit` choose the items. Match windows by `agent` and `kind` (such as `claude-session`), not by account ids, so the panel works on any computer.
 - **Clicks:** `onClick` opens Statistics, a session or a Settings page, sets or steps a `state` the control placed in the panel declares, or copies text. A `picker` shows a state's options.
@@ -79,7 +79,7 @@ The same style name can mean the resting HUD or the panel. When the person talks
 
 **Panel:** `edit` or `panel`, as above. Every field of the panel's own parts and of your controls is in `get_hud`'s `catalog`. Two more layout fields stay outside the tree:
 
-- `hud.agents`: the agents the resting HUD shows. It is a layout field, so it is allowed with `"all"`, and it stays as it is unless you send it.
+- `hud.agents`: which agents the resting HUD shows. Their order is not this list's: the HUD and the panel share one order, the order of the blocks inside `blocks` (Settings' agent order). To move an agent on the HUD, `move` its block. It is a layout field, so it is allowed with `"all"`, and it stays as it is unless you send it.
 - The older spelling (`order`, `sections`, `blocks`, `style`, `sessions`, `tokens`) still works, but not together with `edit` or `panel`.
 
 **HUD style (display key only), under `hud`:**

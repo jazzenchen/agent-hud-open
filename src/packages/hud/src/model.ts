@@ -242,7 +242,7 @@ export function statusColor(level: HUDVendor["level"]): string {
         : "#8e8e93";
 }
 
-/** HUDAgentOrder.swift: named marks in order; an unavailable list never empties a HUD. */
+/** HUDAgentOrder.swift: the marks a layout picks, in Settings' agent order; an unavailable list never empties a HUD. */
 export function configuredVendors(
   snapshot: Snapshot,
   config: HUDConfig,

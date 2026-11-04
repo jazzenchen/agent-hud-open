@@ -158,10 +158,10 @@ pub fn vendors<'a>(snapshot: &'a Value, mode: &str, now_ms: i64) -> Vec<Vendor<'
         .collect()
 }
 
-/// The marks a screen's HUD names in its layout's `hud.agents`, in that order;
-/// a list naming none of the available agents never empties a HUD
-/// (HUDAgentOrder.swift). Without one, the layout's `order` sorts them
-/// (resting-agents.ts `layoutMarks`).
+/// The marks a screen's HUD shows, in Settings' agent order, the layout's `order`
+/// (resting-agents.ts `layoutMarks`). Its `hud.agents` picks which marks show but
+/// not their order; a list naming none of the available agents never empties a
+/// HUD (HUDAgentOrder.swift).
 pub fn configured<'a>(
     snapshot: &'a Value,
     mode: &str,
@@ -189,30 +189,25 @@ pub fn configured<'a>(
         .filter_map(Value::as_str)
         .map(mark)
         .collect();
-    if !available.iter().any(|vendor| marks.contains(&vendor.key)) {
-        // Without a list of its own, the HUD follows Settings' agent order: the panel's blocks, a balance block
-        // standing for its agent. An agent with no block keeps its place after them (Open #31).
-        let order: Vec<String> = layout["order"]
-            .as_array()
-            .into_iter()
-            .flatten()
-            .filter_map(Value::as_str)
-            .map(|key| mark(key.strip_prefix("api:").unwrap_or(key)))
-            .collect();
-        available.sort_by_key(|vendor| {
-            order
-                .iter()
-                .position(|key| *key == vendor.key)
-                .unwrap_or(order.len())
-        });
-        return available;
+    if available.iter().any(|vendor| marks.contains(&vendor.key)) {
+        available.retain(|vendor| marks.contains(&vendor.key));
     }
-    let mut named: Vec<Vendor> = available
+    // The panel and the HUD share one order, Settings' agent order: the panel's blocks, a balance block standing
+    // for its agent. An agent with no block keeps its place after them (Open #31).
+    let order: Vec<String> = layout["order"]
+        .as_array()
         .into_iter()
-        .filter(|vendor| marks.contains(&vendor.key))
+        .flatten()
+        .filter_map(Value::as_str)
+        .map(|key| mark(key.strip_prefix("api:").unwrap_or(key)))
         .collect();
-    named.sort_by_key(|vendor| marks.iter().position(|key| *key == vendor.key));
-    named
+    available.sort_by_key(|vendor| {
+        order
+            .iter()
+            .position(|key| *key == vendor.key)
+            .unwrap_or(order.len())
+    });
+    available
 }
 
 /// A display percentage; stored readings and quota severity always use consumed usage.
@@ -597,7 +592,8 @@ mod tests {
             now,
         );
         let keys: Vec<&str> = named.iter().map(|v| v.key.as_str()).collect();
-        assert_eq!(keys, ["deepseek", "claude"]);
+        // The list picks the marks; without an agent order they keep the resting order.
+        assert_eq!(keys, ["claude", "deepseek"]);
         let unknown = configured(
             &snapshot,
             "simple",
@@ -605,8 +601,8 @@ mod tests {
             now,
         );
         assert_eq!(unknown.len(), 3);
-        // Without a list of its own the HUD follows Settings' agent order, the panel's blocks (Open #31);
-        // a balance block stands for its agent, and an agent with no block keeps its place after them.
+        // The HUD follows Settings' agent order, the panel's blocks (Open #31); a balance block stands for its
+        // agent, and an agent with no block keeps its place after them.
         let keys = |layout: Value| -> Vec<String> {
             configured(&snapshot, "simple", &layout, now)
                 .iter()
@@ -621,8 +617,8 @@ mod tests {
             keys(
                 json!({"order": ["api:deepseek", "codex"], "hud": {"agents": ["Claude Code", "Codex"]}})
             ),
-            ["claude", "openai"],
-            "the HUD's own list still picks and orders"
+            ["openai", "claude"],
+            "the HUD's own list picks the marks, Settings' order sorts them"
         );
         assert_eq!(
             keys(json!({"order": ["codex"], "hud": {"agents": ["kimi"]}})),
