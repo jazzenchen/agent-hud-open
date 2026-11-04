@@ -80,11 +80,15 @@ export function flashMask(
   span: GlowAlert["span"],
   width: number,
   padding: number,
+  /** The canvas's box when it is wider than the silhouette, and where the
+   * silhouette starts inside it. */
+  box = width,
+  offset = 0,
 ): string | undefined {
   if (!span) return undefined;
-  const total = width + padding * 2;
+  const total = box + padding * 2;
   const at = (fraction: number) =>
-    `${+(((padding + fraction * width) / total) * 100).toFixed(4)}%`;
+    `${+(((offset + padding + fraction * width) / total) * 100).toFixed(4)}%`;
   const { from, to, feather } = span;
   return `linear-gradient(to right, transparent ${at(Math.max(0, from - feather))}, black ${at(from + feather)}, black ${at(to - feather)}, transparent ${at(Math.min(1, to + feather))})`;
 }

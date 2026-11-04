@@ -9,8 +9,10 @@
 export type PaintValues = Record<string, number | string>;
 
 export interface GpuPaint {
-  /** Sends the values that differ and draws one frame if any did. */
-  update(values: PaintValues): void;
+  /** Sends the values that differ and draws one frame if any did: on the
+   * next animation frame, or `now`, for a caller already inside the frame
+   * that moved what the paint follows. */
+  update(values: PaintValues, now?: boolean): void;
   dispose(): void;
 }
 
@@ -140,6 +142,12 @@ export function startGpuPaint(options: GpuPaintOptions): GpuPaint {
       draw?.();
     });
   };
+  const drawNow = () => {
+    if (disposed || !draw) return;
+    cancelAnimationFrame(frame);
+    frame = 0;
+    draw();
+  };
   const unavailable = () => {
     if (!disposed) options.onUnavailable();
   };
@@ -207,6 +215,9 @@ export function startGpuPaint(options: GpuPaintOptions): GpuPaint {
       }
     };
     // The backing store follows the element's size at the display's scale.
+    // A resize clears the canvas, so it is drawn again at once: observers
+    // run after layout and before paint, and a draw on the next frame would
+    // leave this one blank.
     observer = new ResizeObserver(([entry]) => {
       const scale = window.devicePixelRatio || 1;
       const box = entry.devicePixelContentBoxSize?.[0];
@@ -219,7 +230,7 @@ export function startGpuPaint(options: GpuPaintOptions): GpuPaint {
       if (width === canvas.width && height === canvas.height && drawn) return;
       canvas.width = Math.max(1, width);
       canvas.height = Math.max(1, height);
-      request();
+      drawNow();
     });
     try {
       observer.observe(canvas, { box: "device-pixel-content-box" });
@@ -229,8 +240,10 @@ export function startGpuPaint(options: GpuPaintOptions): GpuPaint {
   })();
 
   return {
-    update(values) {
-      if (write(values)) request();
+    update(values, now = false) {
+      if (!write(values)) return;
+      if (now) drawNow();
+      else request();
     },
     dispose() {
       disposed = true;

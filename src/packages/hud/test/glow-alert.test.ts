@@ -64,3 +64,11 @@ test("the mask keeps the flash to the sender's span inside the padding", () => {
   );
   assert.equal(flashMask(null, 100, 50), undefined);
 });
+
+test("a flash keeps to its sender's part of a rim moving inside a wider box", () => {
+  // The same 100-wide rim, 100 into a 300-wide box: 200 of 400 is the rim's start.
+  assert.equal(
+    flashMask({ from: 0.5, to: 1, feather: 0.075 }, 100, 50, 300, 100),
+    "linear-gradient(to right, transparent 48.125%, black 51.875%, black 60.625%, transparent 62.5%)",
+  );
+});
