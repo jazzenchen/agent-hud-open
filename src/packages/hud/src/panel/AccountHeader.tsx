@@ -32,6 +32,8 @@ export function AccountHeader({
       className="hud-source-account-heading"
       style={{
         display: "grid",
+        // As wide as the block, never its text: a long address shortens.
+        gridTemplateColumns: "minmax(0, 1fr)",
         gap: 2,
         padding: "2px 6px 0",
         fontSize: 11,
@@ -45,6 +47,7 @@ export function AccountHeader({
           justifyContent: compact ? "center" : undefined,
           gap: 6,
           minHeight: 15,
+          minWidth: 0,
         }}
       >
         <MiddleTruncated
