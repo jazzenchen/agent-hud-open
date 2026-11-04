@@ -140,11 +140,11 @@ fn canonical_async_question_answer_and_explicit_settlement() {
 #[test]
 fn immer_patch_operations_follow_source() {
     let mut state = json!({"items":[1,2,3],"nested":{"x":1}});
-    stream::apply_patches(&json!([{"op":"replace","path":["items","length"],"value":2},{"op":"add","path":["items","-"],"value":4},{"op":"replace","path":["items",3],"value":5},{"op":"remove","path":["items",0]},{"op":"add","path":["nested","y"],"value":2}]),&mut state).unwrap();
+    patches::apply_patches(&json!([{"op":"replace","path":["items","length"],"value":2},{"op":"add","path":["items","-"],"value":4},{"op":"replace","path":["items",3],"value":5},{"op":"remove","path":["items",0]},{"op":"add","path":["nested","y"],"value":2}]),&mut state).unwrap();
     assert_eq!(state, json!({"items":[2,4,5],"nested":{"x":1,"y":2}}));
-    stream::apply_patches(&json!([{"op":"nonsense","path":["missing"]},{"op":"replace","path":[],"value":{"ok":true}}]),&mut state).unwrap();
+    patches::apply_patches(&json!([{"op":"nonsense","path":["missing"]},{"op":"replace","path":[],"value":{"ok":true}}]),&mut state).unwrap();
     assert_eq!(state, json!({"ok":true}));
-    assert!(stream::apply_patches(
+    assert!(patches::apply_patches(
         &json!([{"op":"replace","path":["missing","child"],"value":1}]),
         &mut state
     )

@@ -7,6 +7,7 @@ mod daemon;
 #[cfg(windows)]
 #[path = "desktop/daemon_windows.rs"]
 mod daemon;
+mod patches;
 mod pending;
 mod reply;
 mod stream;

@@ -1,5 +1,5 @@
 //! The cards a followed thread's state asks for, kept in step with each
-//! state Codex Desktop streams for it.
+//! state Codex Desktop streams for it and withdrawn while it is unknown.
 use super::turns::turns;
 use super::{pending, LivePending, Shared, ThreadState};
 use agent_hud_agents::codex::AGENT;
@@ -90,4 +90,17 @@ impl Shared {
         drop(state);
         self.publish_waiting();
     }
+}
+
+pub(super) fn unknown(shared: &Shared, thread: &str) {
+    let mut state = shared.state.lock().unwrap_or_else(PoisonError::into_inner);
+    state.known.remove(thread);
+    for (id, live) in &mut state.pending {
+        if live.item.thread == thread {
+            shared.requests.cancel(id);
+            live.ticket = None;
+        }
+    }
+    drop(state);
+    shared.publish_waiting();
 }
