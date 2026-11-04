@@ -2,7 +2,7 @@
 //! constructing this owner. There are no system notifications: the HUD island
 //! is the alert surface on every platform.
 use serde_json::{json, Value};
-use std::sync::Mutex;
+use std::sync::{Mutex, PoisonError};
 use tauri::Manager;
 #[cfg(target_os = "linux")]
 mod linux;
@@ -48,18 +48,20 @@ impl System {
     }
     pub fn register_if_never_registered(&self) {
         if target::register_if_never_registered() {
-            if let Ok(mut cached) = self.cached.lock() {
-                *cached = None;
-            }
+            *self.cached.lock().unwrap_or_else(PoisonError::into_inner) = None;
         }
     }
     fn refresh(&self) -> Result<Value, String> {
         let status = target::status(&self.identifier)?;
-        *self.cached.lock().map_err(|_| "System state unavailable")? = Some(status.clone());
+        *self.cached.lock().unwrap_or_else(PoisonError::into_inner) = Some(status.clone());
         Ok(status)
     }
     pub fn project(&self, snapshot: &mut Value) {
-        let mut status = self.cached.lock().ok().and_then(|cached| cached.clone());
+        let mut status = self
+            .cached
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clone();
         if status.is_none() {
             status = self.refresh().ok();
         }

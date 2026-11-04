@@ -8,7 +8,11 @@ use objc2::{
 };
 use objc2_app_kit::NSApplicationDidChangeScreenParametersNotification;
 use objc2_foundation::{NSNotification, NSNotificationCenter};
-use std::{ptr::NonNull, sync::Mutex, time::Duration};
+use std::{
+    ptr::NonNull,
+    sync::{Mutex, PoisonError},
+    time::Duration,
+};
 use tauri::Manager;
 
 /// AppKit tells every change; nothing is measured on a timer.
@@ -60,7 +64,11 @@ pub fn install(app: &tauri::App) -> Result<(), String> {
 
 pub fn shutdown(app: &tauri::AppHandle) {
     if let Some(state) = app.try_state::<ScreenNotifications>() {
-        let observer = state.0.lock().ok().and_then(|mut slot| slot.take());
+        let observer = state
+            .0
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .take();
         // Release the state lock before running the main-thread destructor.
         drop(observer);
     }

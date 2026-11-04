@@ -10,7 +10,7 @@ use agent_hud_runtime::replies::SessionReplies;
 use serde_json::{json, Value};
 use std::{
     path::{Path, PathBuf},
-    sync::{Arc, Mutex},
+    sync::{Arc, Mutex, PoisonError},
     time::{Duration, SystemTime},
 };
 use tauri::Manager;
@@ -139,9 +139,7 @@ pub(crate) fn repair_on_launch(app: &tauri::AppHandle) {
     let app = app.clone();
     tauri::async_runtime::spawn_blocking(move || {
         let state = app.state::<ClaudePlugin>();
-        let Ok(_owner) = state.owner.lock() else {
-            return;
-        };
+        let _owner = state.owner.lock().unwrap_or_else(PoisonError::into_inner);
         let result = agent_hud_runtime::home_directory().and_then(|home| {
             let executable = super::mcp_clients::executable("claudeCode", &home);
             let config = plugin::claude_config_directory(&home);
@@ -218,10 +216,7 @@ pub async fn native_claude_plugin(
     }
     tauri::async_runtime::spawn_blocking(move || {
         let state = app.state::<ClaudePlugin>();
-        let _owner = state
-            .owner
-            .lock()
-            .map_err(|_| "The plugin's owner is unavailable")?;
+        let _owner = state.owner.lock().unwrap_or_else(PoisonError::into_inner);
         let home = agent_hud_runtime::home_directory()?;
         let executable = super::mcp_clients::executable("claudeCode", &home);
         let config = plugin::claude_config_directory(&home);
