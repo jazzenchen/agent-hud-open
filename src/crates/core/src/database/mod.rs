@@ -219,12 +219,6 @@ pub(crate) fn schema(db: &Connection) -> rusqlite::Result<()> {
         CREATE INDEX IF NOT EXISTS usage_meter_bucket_updated ON usage_meter_bucket(updated_at_ms);",
     )?;
 
-    // Clean up any legacy synthetic projection rows from older builds.
-    let _ = db.execute_batch(
-        "DELETE FROM usage_meter_event WHERE contribution LIKE '%/.agent-hud-projection-%';
-         DELETE FROM usage_meter_bucket WHERE contribution LIKE '%/.agent-hud-projection-%';
-         DELETE FROM ingestion_logs WHERE path LIKE '%/.agent-hud-projection-%';",
-    );
     remove_turn_text(db)?;
     forget_dashboard_usage(db)
 }

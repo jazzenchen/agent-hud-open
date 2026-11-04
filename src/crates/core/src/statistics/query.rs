@@ -308,13 +308,8 @@ pub(super) fn periods(query: &Query) -> Result<Vec<(i64, i64)>, String> {
     if query.bucket == 1440 {
         let mut start = day_start(query.zone, local_date(query.zone, query.from))?;
         while start < query.to {
-            let date = local_date(query.zone, start)
-                .succ_opt()
-                .ok_or("Statistics calendar overflow")?;
+            let date = local_date(query.zone, start).succ_opt().unwrap();
             let end = day_start(query.zone, date)?;
-            if end <= start {
-                return Err("Statistics calendar day did not advance".into());
-            }
             result.push((start, end));
             start = end;
         }
@@ -323,7 +318,7 @@ pub(super) fn periods(query: &Query) -> Result<Vec<(i64, i64)>, String> {
             .zone
             .timestamp_millis_opt(query.from)
             .single()
-            .ok_or("Statistics calendar timestamp is out of range")?;
+            .unwrap();
         let residual = (i64::from(local.minute()) % query.bucket) * 60_000
             + i64::from(local.second()) * 1000
             + i64::from(local.timestamp_subsec_millis());
@@ -340,14 +335,12 @@ pub(super) fn periods(query: &Query) -> Result<Vec<(i64, i64)>, String> {
 pub(super) fn day_start(zone: Tz, mut date: NaiveDate) -> Result<i64, String> {
     for _ in 0..3 {
         for minute in 0..1440 {
-            let local = date
-                .and_hms_opt(minute / 60, minute % 60, 0)
-                .ok_or("Invalid calendar midnight")?;
+            let local = date.and_hms_opt(minute / 60, minute % 60, 0).unwrap();
             if let Some(at) = zone.from_local_datetime(&local).earliest() {
                 return Ok(at.timestamp_millis());
             }
         }
-        date = date.succ_opt().ok_or("Statistics calendar overflow")?;
+        date = date.succ_opt().unwrap();
     }
     Err("No valid instant for this calendar day".into())
 }

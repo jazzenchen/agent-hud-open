@@ -414,7 +414,7 @@ pub(crate) fn user_prices_from(settings: &serde_json::Value) -> UserPrices {
             Some(currency @ ("USD" | "CNY")) => currency,
             _ => continue,
         };
-        let rate = |key: &str| price[key].as_f64().filter(|v| v.is_finite() && *v >= 0.0);
+        let rate = |key: &str| price[key].as_f64().filter(|v| *v >= 0.0);
         let (Some(input), Some(output)) = (rate("input"), rate("output")) else {
             continue;
         };
@@ -434,7 +434,7 @@ pub(crate) fn user_prices_from(settings: &serde_json::Value) -> UserPrices {
         .into_iter()
         .flatten()
     {
-        if let Some(times) = times.as_f64().filter(|v| v.is_finite() && *v > 0.0) {
+        if let Some(times) = times.as_f64().filter(|v| *v > 0.0) {
             prices.multipliers.insert(host.clone(), times);
         }
     }

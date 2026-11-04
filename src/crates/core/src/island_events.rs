@@ -120,7 +120,7 @@ impl Tracker {
             }
             let Some(used) = quota["usedPercent"]
                 .as_f64()
-                .filter(|n| n.is_finite() && (0.0..=100.0).contains(n))
+                .filter(|n| (0.0..=100.0).contains(n))
             else {
                 self.quotas.remove(id);
                 continue;

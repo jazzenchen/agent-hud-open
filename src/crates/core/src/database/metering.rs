@@ -1469,9 +1469,7 @@ impl View {
         samples: &Samples,
     ) -> Value {
         let reset = row["resetAt"].as_str().and_then(date_ms);
-        let duration = row["windowDurationSeconds"]
-            .as_f64()
-            .filter(|d| d.is_finite() && *d > 0.0);
+        let duration = row["windowDurationSeconds"].as_f64().filter(|d| *d > 0.0);
         let cycle = reset
             .zip(duration)
             .filter(|(reset, duration)| now < *reset && now >= *reset - (*duration * 1000.0) as i64)

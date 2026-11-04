@@ -215,7 +215,7 @@ pub(crate) fn read_workbuddy_metering(
                 let mut map = BTreeMap::new();
                 if let Some(obj) = val.as_object() {
                     for (k, v) in obj {
-                        if let Some(num) = v.as_f64().filter(|n| n.is_finite()) {
+                        if let Some(num) = v.as_f64() {
                             map.insert(k.clone(), num);
                         }
                     }

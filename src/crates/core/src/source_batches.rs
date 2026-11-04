@@ -35,8 +35,7 @@ fn otel_time(v: &Value) -> Option<i64> {
     }
     let s = a[0].as_f64()?;
     let n = a[1].as_f64()?;
-    (s > 0. && s.is_finite() && n.is_finite() && (0.0..1_000_000_000.0).contains(&n))
-        .then_some((s * 1000. + n / 1_000_000.) as i64)
+    (s > 0. && (0.0..1_000_000_000.0).contains(&n)).then_some((s * 1000. + n / 1_000_000.) as i64)
 }
 pub(super) fn resume(db: &Connection, path: &Path, g: &str) -> rusqlite::Result<Value> {
     let saved = staging::get_log_context(

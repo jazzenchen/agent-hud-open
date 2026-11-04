@@ -93,7 +93,7 @@ impl AgentHudCore {
             })?;
             let length = row["windowDurationSeconds"]
                 .as_f64()
-                .filter(|seconds| seconds.is_finite() && *seconds > 0.0)
+                .filter(|seconds| *seconds > 0.0)
                 .map(|seconds| (seconds * 1000.0) as i64);
             let reset = row["resetAt"].as_str().and_then(metering::date_ms);
             let cycle_start = reset.zip(length).map(|(reset, length)| reset - length);
