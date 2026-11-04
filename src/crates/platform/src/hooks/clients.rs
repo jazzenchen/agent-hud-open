@@ -61,11 +61,13 @@ impl Clients {
             // Removing ours stays possible everywhere; adding only where the
             // hooks can launch.
             let hooked = !enabled || launches(&source, crate::os::OS);
+            // Every settings file, one per profile where the client keeps
+            // them: a file that cannot be changed leaves the others to go in.
             for flag in flags(&source).into_iter().filter(|_| hooked) {
-                if let Err(error) = install::install_plan(context, &source, flag, enabled)
-                    .and_then(|plan| install::apply_plan(&plan))
-                {
-                    errors.push(format!("{source}: {error}"));
+                for plan in install::install_plans(context, &source, flag, enabled) {
+                    if let Err(error) = plan.and_then(|plan| install::apply_plan(&plan)) {
+                        errors.push(format!("{source}: {error}"));
+                    }
                 }
             }
         }
@@ -99,11 +101,13 @@ impl Clients {
             let hooked = launches(&source, crate::os::OS);
             for flag in flags(&source).into_iter().filter(|_| hooked) {
                 known = true;
-                match install::install_plan(context, &source, flag, true) {
-                    Ok(plan) => installed &= !plan.changed,
-                    Err(e) => {
-                        installed = false;
-                        error = Some(e);
+                for plan in install::install_plans(context, &source, flag, true) {
+                    match plan {
+                        Ok(plan) => installed &= !plan.changed,
+                        Err(e) => {
+                            installed = false;
+                            error = Some(e);
+                        }
                     }
                 }
             }

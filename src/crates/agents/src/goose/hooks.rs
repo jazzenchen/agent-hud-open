@@ -20,6 +20,7 @@ pub static HOOKS: Hooks = Hooks {
         "hooks/hooks.json",
     )),
     aliases: &[],
+    environment: &[],
     layout: Layout::Groups,
     permission: None,
     completion: Some(Completion {

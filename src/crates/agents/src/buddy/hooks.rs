@@ -11,6 +11,7 @@ pub static CODEBUDDY: Hooks = Hooks {
         ..Location::home(&["CODEBUDDY_CONFIG_DIR"], &[".codebuddy"], "settings.json")
     }),
     aliases: &[],
+    environment: &[],
     layout: Layout::Groups,
     permission: Some(Permission {
         timeout: 86_400,
@@ -41,6 +42,7 @@ pub static CODEBUDDY: Hooks = Hooks {
 pub static WORKBUDDY: Hooks = Hooks {
     settings: Some(Location::home(&[], &[".workbuddy"], "settings.json")),
     aliases: &[],
+    environment: &[],
     layout: Layout::Groups,
     permission: Some(Permission {
         timeout: 86_400,

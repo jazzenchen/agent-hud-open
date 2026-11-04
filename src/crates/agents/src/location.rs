@@ -40,15 +40,30 @@ pub struct Location {
     /// The folder's names under the base, the first that exists winning and
     /// the last when none does. Empty when only a variable names it.
     pub folders: &'static [&'static str],
-    /// Also every folder under the base whose name is this prefix and a
-    /// profile name, unless a variable names the folder.
-    pub profiles: Option<&'static str>,
+    /// The client's profiles, each a folder of its own that holds the same
+    /// path: also every profile's.
+    pub profiles: Option<Profiles>,
     /// The file or folder inside the folder; empty for the folder itself.
     pub path: &'static str,
     /// A folder under the base that a variable may name for another client:
     /// the variable is then ignored, as CodeBuddy's is when it names
     /// WorkBuddy's folder.
     pub not_if: Option<&'static str>,
+}
+
+/// Where a client keeps its profiles' folders.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Profiles {
+    /// Beside the folder: every folder under the base whose name is this
+    /// prefix and a profile name (OpenClaw's `~/.openclaw-<name>`), unless a
+    /// variable names the folder.
+    Beside(&'static str),
+    /// Inside the folder: every folder in this folder of it whose name is a
+    /// profile name and that holds the path (Hermes's
+    /// `~/.hermes/profiles/<name>/config.yaml`), whichever folder a variable
+    /// names. A profile that lacks the path is left out, so nothing is
+    /// made in a profile the client has not set up.
+    Inside(&'static str),
 }
 
 const fn plain(
@@ -147,7 +162,7 @@ impl Location {
                         .unwrap_or_else(|| base.join(last))
                 };
                 let mut folders = vec![first];
-                if let Some(prefix) = self.profiles {
+                if let Some(Profiles::Beside(prefix)) = self.profiles {
                     folders.extend(
                         places
                             .names(base)
@@ -161,16 +176,35 @@ impl Location {
                 folders
             }
         };
+        // The profiles a folder holds, each by its name.
+        let held = |folder: &Path| -> Vec<PathBuf> {
+            let Some(Profiles::Inside(subfolder)) = self.profiles else {
+                return Vec::new();
+            };
+            let profiles = folder.join(subfolder);
+            let mut paths = places
+                .names(&profiles)
+                .into_iter()
+                .filter(|name| profile(name))
+                .map(|name| self.at(&profiles.join(name)))
+                .filter(|path| places.exists(path))
+                .collect::<Vec<_>>();
+            paths.sort();
+            paths
+        };
         folders
-            .into_iter()
-            .map(|folder| {
-                if self.path.is_empty() {
-                    folder
-                } else {
-                    folder.join(self.path)
-                }
-            })
+            .iter()
+            .flat_map(|folder| std::iter::once(self.at(folder)).chain(held(folder)))
             .collect()
+    }
+
+    /// The path in `folder`.
+    fn at(&self, folder: &Path) -> PathBuf {
+        if self.path.is_empty() {
+            folder.to_owned()
+        } else {
+            folder.join(self.path)
+        }
     }
 }
 
@@ -299,7 +333,7 @@ mod tests {
     #[test]
     fn alternatives_and_profiles() {
         let claw = Location {
-            profiles: Some(".openclaw-"),
+            profiles: Some(Profiles::Beside(".openclaw-")),
             ..Location::home(
                 &["OPENCLAW_STATE_DIR"],
                 &[".openclaw", ".clawdbot"],
@@ -333,6 +367,50 @@ mod tests {
                 &["/h/.openclaw-work"]
             ),
             [PathBuf::from("/s/agents")]
+        );
+    }
+
+    #[test]
+    fn profiles_inside_the_folder_that_hold_the_path() {
+        let hermes = Location {
+            profiles: Some(Profiles::Inside("profiles")),
+            ..Location::home(&["HERMES_HOME"], &[".hermes"], "config.yaml")
+        };
+        let resolve = |named: Option<&str>, present: &[&str]| {
+            let disk = Disk {
+                present: present.iter().map(PathBuf::from).collect(),
+            };
+            let env = |key: &str| named.filter(|_| key == "HERMES_HOME").map(str::to_owned);
+            hermes.resolve(Path::new("h"), &env, &disk)
+        };
+        let paths = |list: &[&str]| list.iter().map(PathBuf::from).collect::<Vec<_>>();
+        assert_eq!(resolve(None, &[]), paths(&["h/.hermes/config.yaml"]));
+        let present = [
+            "h/.hermes/profiles/work",
+            "h/.hermes/profiles/work/config.yaml",
+            "h/.hermes/profiles/coder",
+            "h/.hermes/profiles/coder/config.yaml",
+            // Not set up yet: nothing is made in it.
+            "h/.hermes/profiles/fresh",
+            "h/.hermes/profiles/a b",
+            "h/.hermes/profiles/a b/config.yaml",
+            "h/.hermes/profiles/.cache",
+        ];
+        assert_eq!(
+            resolve(None, &present),
+            paths(&[
+                "h/.hermes/config.yaml",
+                "h/.hermes/profiles/coder/config.yaml",
+                "h/.hermes/profiles/work/config.yaml",
+            ])
+        );
+        // The folder a variable names holds its own profiles.
+        assert_eq!(
+            resolve(
+                Some("d"),
+                &["d/profiles/ops", "d/profiles/ops/config.yaml", present[1]]
+            ),
+            paths(&["d/config.yaml", "d/profiles/ops/config.yaml"])
         );
     }
 

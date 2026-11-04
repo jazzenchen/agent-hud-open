@@ -19,6 +19,7 @@ pub static HOOKS: Hooks = Hooks {
         "hooks/agent-hud.json",
     )),
     aliases: &[],
+    environment: &[],
     layout: Layout::Handlers(Handler {
         command_key: "bash",
         typed: true,

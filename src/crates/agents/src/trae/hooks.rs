@@ -17,6 +17,7 @@ const fn hooks(folder: &'static [&'static str]) -> Hooks {
     Hooks {
         settings: Some(Location::home(&[], folder, "hooks.json")),
         aliases: &[],
+        environment: &[],
         layout: Layout::Groups,
         permission: None,
         completion: Some(Completion {

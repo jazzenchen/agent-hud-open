@@ -3,12 +3,12 @@ pub mod transcript;
 
 use crate::Agent;
 use crate::Discovery;
-use crate::{Location, Source};
+use crate::{Location, Profiles, Source};
 
 static SOURCES: [Source; 1] = [Source {
     reads_as: "openclaw",
     location: Location {
-        profiles: Some(".openclaw-"),
+        profiles: Some(Profiles::Beside(".openclaw-")),
         ..Location::home(
             &["OPENCLAW_STATE_DIR"],
             &[".openclaw", ".clawdbot"],
@@ -18,7 +18,7 @@ static SOURCES: [Source; 1] = [Source {
 }];
 static DISCOVERY: Discovery = Discovery {
     storage: &[Location {
-        profiles: Some(".openclaw-"),
+        profiles: Some(Profiles::Beside(".openclaw-")),
         ..Location::home(
             &["OPENCLAW_STATE_DIR"],
             &[".openclaw", ".clawdbot"],
@@ -27,7 +27,7 @@ static DISCOVERY: Discovery = Discovery {
     }],
     settings: &[
         Location {
-            profiles: Some(".openclaw-"),
+            profiles: Some(Profiles::Beside(".openclaw-")),
             ..Location::home(
                 &["OPENCLAW_STATE_DIR"],
                 &[".openclaw", ".clawdbot"],
@@ -35,7 +35,7 @@ static DISCOVERY: Discovery = Discovery {
             )
         },
         Location {
-            profiles: Some(".openclaw-"),
+            profiles: Some(Profiles::Beside(".openclaw-")),
             ..Location::home(
                 &["OPENCLAW_STATE_DIR"],
                 &[".openclaw", ".clawdbot"],
@@ -44,7 +44,7 @@ static DISCOVERY: Discovery = Discovery {
         },
     ],
     sessions: &[Location {
-        profiles: Some(".openclaw-"),
+        profiles: Some(Profiles::Beside(".openclaw-")),
         ..Location::home(
             &["OPENCLAW_STATE_DIR"],
             &[".openclaw", ".clawdbot"],

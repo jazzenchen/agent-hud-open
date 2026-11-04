@@ -7,21 +7,35 @@
 //! after every turn; the session itself closes at `on_session_finalize`,
 //! which says nothing more about its state.
 //!
+//! Every profile is a Hermes home of its own (`HERMES_HOME`): the default
+//! one is `~/.hermes`, a named one `~/.hermes/profiles/<name>`
+//! (`hermes_cli/profiles.py`), chosen at run time by `-p <name>`, the
+//! profile's alias or `hermes profile use`, all of which set `HERMES_HOME`
+//! before Hermes reads anything. A profile reads its hooks from its own
+//! `config.yaml` and keeps its own approvals
+//! (`shell-hooks-allowlist.json`), so each profile's file gets the handlers
+//! and Hermes asks again in each profile.
+//!
 //! Hermes asks the person once for each `(event, command)` pair it has not
 //! seen before it runs it, so these five hooks are asked about the next time
 //! `hermes chat` starts. Its gateway never asks: it runs them once approved.
 use super::settings;
-use crate::hooks::{Began, Begin, Completed, Completion, Hooks, Layout, Text, POSIX_ONLY};
-use crate::{text, Location};
+use crate::hooks::{
+    Began, Begin, Completed, Completion, Hooks, Layout, Text, ENVIRONMENT, POSIX_ONLY,
+};
+use crate::{text, Location, Profiles};
 use serde_json::Value;
+use std::path::Path;
 
 pub static HOOKS: Hooks = Hooks {
-    settings: Some(Location::home(
-        &["HERMES_HOME"],
-        &[".hermes"],
-        "config.yaml",
-    )),
+    settings: Some(Location {
+        profiles: Some(Profiles::Inside("profiles")),
+        ..Location::home(&["HERMES_HOME"], &[".hermes"], "config.yaml")
+    }),
     aliases: &[],
+    // A hook runs with the profile's home in `HERMES_HOME`, which Hermes
+    // 0.19's payloads name in no other way.
+    environment: &["HERMES_HOME"],
     layout: Layout::Text(Text {
         patch: settings::patch,
     }),
@@ -59,12 +73,24 @@ fn session(payload: &Value) -> Option<String> {
     let id = text(&payload["session_id"])
         .or_else(|| text(&payload["extra"]["session_key"]))
         .filter(|id| *id != "default")?;
-    Some(
-        match text(&payload["profile"]).filter(|profile| *profile != "default") {
-            Some(profile) => format!("{profile}:{id}"),
-            None => id.to_owned(),
-        },
-    )
+    Some(match profile(payload) {
+        Some(profile) => format!("{profile}:{id}"),
+        None => id.to_owned(),
+    })
+}
+
+/// The named profile that fired a hook: the one the payload names (newer
+/// Hermes writes `profile`), else the one the hook's `HERMES_HOME` is the
+/// folder of, `profiles/<name>`, as the reader tells a profile's `state.db`.
+/// None for the default profile.
+fn profile(payload: &Value) -> Option<&str> {
+    let named = text(&payload["profile"]).or_else(|| {
+        let home = Path::new(text(&payload[ENVIRONMENT]["HERMES_HOME"])?);
+        (home.parent()?.file_name()? == "profiles")
+            .then(|| home.file_name()?.to_str())
+            .flatten()
+    });
+    named.filter(|profile| *profile != "default")
 }
 
 /// A turn under way, or waiting while the person is asked to approve a
@@ -106,7 +132,9 @@ mod tests {
 
     const NOW: i64 = 1_790_000_000_000;
 
-    /// The payloads Hermes 0.19 writes on stdin, one per line.
+    /// The payloads Hermes writes on stdin, one per line: Hermes 0.19's
+    /// shape, but for the sixth, a profile's, which names its profile as
+    /// Hermes's newer `shell_hooks.py` does.
     fn payloads() -> Vec<Value> {
         include_str!("../../tests/fixtures/hermes/macos/hook-payloads.jsonl")
             .lines()
@@ -152,6 +180,36 @@ mod tests {
         assert_eq!(smart["state"], "running");
         // A finalized session says nothing more.
         assert!(events[7].is_none());
+    }
+
+    #[test]
+    fn a_profile_is_told_by_the_hooks_hermes_home_where_the_payload_names_none() {
+        let first = &payloads()[0];
+        let session = |home: Option<&str>, profile: Option<&str>| {
+            let mut payload = first.clone();
+            if let Some(profile) = profile {
+                payload["profile"] = profile.into();
+            }
+            crate::hooks::add_environment("hermes", &mut payload, &|name| {
+                home.filter(|_| name == "HERMES_HOME").map(str::to_owned)
+            });
+            event(&payload).unwrap().session_id
+        };
+        let id = "20261104_101500_a1b2c3";
+        // Hermes 0.19 runs a profile's hooks with its home in HERMES_HOME.
+        let work = "/Users/me/.hermes/profiles/work";
+        assert_eq!(session(Some(work), None), format!("hermes:work:{id}"));
+        assert_eq!(
+            session(Some(&format!("{work}/")), None),
+            format!("hermes:work:{id}")
+        );
+        // The default profile, or a home that is no profile's.
+        for home in [None, Some("/Users/me/.hermes"), Some("/opt/hermes")] {
+            assert_eq!(session(home, None), format!("hermes:{id}"), "{home:?}");
+        }
+        // What the payload names comes first.
+        assert_eq!(session(Some(work), Some("default")), format!("hermes:{id}"));
+        assert_eq!(session(None, Some("ops")), format!("hermes:ops:{id}"));
     }
 
     #[test]

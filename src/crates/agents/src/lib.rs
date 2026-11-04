@@ -30,7 +30,7 @@ pub use agent_hud_l10n as l10n;
 pub use change::{Change, Why};
 pub use channel::{Carries, Channel};
 pub use discovery::{Discovery, Look, SessionTarget};
-pub use location::{everywhere, Base, Location, Places, Source};
+pub use location::{everywhere, Base, Location, Places, Profiles, Source};
 pub use os::{Os, PerOs, Support};
 pub use replies::Replies;
 pub use transcript::{

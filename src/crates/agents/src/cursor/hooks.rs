@@ -7,6 +7,7 @@ use serde_json::Value;
 pub static HOOKS: Hooks = Hooks {
     settings: Some(Location::home(&[], &[".cursor"], "hooks.json")),
     aliases: &[],
+    environment: &[],
     layout: Layout::Handlers(Handler {
         command_key: "command",
         typed: false,
