@@ -35,7 +35,7 @@ fn blocks(snapshot: &Value, layout: &Value) -> Vec<Value> {
                 rules::Kind::Quota => "quota",
                 rules::Kind::Balance => "balance",
             };
-            let mut group = json!({"key":key,"kind":kind,"accounts":[],"rows":[],"widgets":block.kind.widgets(),"measures":block.kind.measures("number")});
+            let mut group = json!({"key":key,"kind":kind,"accounts":[],"rows":[],"widgets":block.kind.widgets()});
             if block.kind == rules::Kind::Quota {
                 for quota in snapshot["quotas"].as_array().into_iter().flatten() {
                     if quota["vendor"].as_str().unwrap_or("unknown") != key {

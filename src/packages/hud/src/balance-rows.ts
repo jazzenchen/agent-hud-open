@@ -24,17 +24,3 @@ export function visibleBalances(
 /** What a balance card can show, in picker order. */
 export const balanceMeasures = ["quota", "burn", "cost"] as const;
 export type BalanceMeasure = (typeof balanceMeasures)[number];
-
-/**
- * The measures a balance card offers: the ones its layout names, in that
- * order, or every one when it names none. The card shows a picker when it
- * offers more than one.
- */
-export function balanceMeasuresOffered(
-  measures: readonly string[] | undefined,
-): readonly BalanceMeasure[] {
-  const named = (measures ?? []).filter((value): value is BalanceMeasure =>
-    (balanceMeasures as readonly string[]).includes(value),
-  );
-  return named.length ? named : balanceMeasures;
-}

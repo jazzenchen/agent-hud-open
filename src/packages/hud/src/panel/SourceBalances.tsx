@@ -7,7 +7,7 @@ import { usePanelServices } from "../PanelContext";
 import { useGround } from "../ground";
 import { agentVendorName } from "../agent-artwork";
 import {
-  balanceMeasuresOffered,
+  balanceMeasures,
   visibleBalances,
   type BalanceMeasure,
 } from "../balance-rows";
@@ -34,9 +34,7 @@ export function SourceBalances({
   const [period, setPeriod] = useState<"day" | "week" | "month">(
     layout.period ?? "day",
   );
-  const [measure, setMeasure] = useState<BalanceMeasure>("quota");
-  const offered = balanceMeasuresOffered(layout.measures);
-  const selected = offered.includes(measure) ? measure : offered[0];
+  const [selected, setMeasure] = useState<BalanceMeasure>("quota");
   useEffect(() => setPeriod(layout.period ?? "day"), [layout.period]);
   const { language } = useFormat();
   const money = (amount: number, currency: string) =>
@@ -108,55 +106,52 @@ export function SourceBalances({
               <strong style={{ fontSize: 13, fontWeight: 700, flex: 1 }}>
                 {agentVendorName(account.vendor)}
               </strong>
-              {offered.length > 1 && (
-                <div
-                  role="group"
-                  aria-label={language === "zh" ? "余额指标" : "Balance metric"}
-                  style={{ display: "flex", gap: 2 }}
-                >
-                  {offered
-                    .map((key) => ({
-                      key,
-                      ...{
-                        quota: {
-                          Icon: Percent,
-                          title: language === "zh" ? "余额" : "Balance",
-                        },
-                        burn: {
-                          Icon: Flame,
-                          title:
-                            language === "zh"
-                              ? "每日消耗"
-                              : "Consumption per day",
-                        },
-                        cost: {
-                          Icon: DollarSign,
-                          title:
-                            language === "zh" ? "估算花费" : "Estimated cost",
-                        },
-                      }[key],
-                    }))
-                    .map(({ key, Icon, title }) => (
-                      <button
-                        key={key}
-                        aria-pressed={selected === key}
-                        title={title}
-                        onClick={() => setMeasure(key)}
-                        style={{
-                          ...noButtonChrome,
-                          color:
-                            selected === key ? colors.text : colors.tertiary,
-                          background:
-                            selected === key ? colors.selected : "transparent",
-                          borderRadius: 4,
-                          padding: 3,
-                        }}
-                      >
-                        <Icon size={12} />
-                      </button>
-                    ))}
-                </div>
-              )}
+              <div
+                role="group"
+                aria-label={language === "zh" ? "余额指标" : "Balance metric"}
+                style={{ display: "flex", gap: 2 }}
+              >
+                {balanceMeasures
+                  .map((key) => ({
+                    key,
+                    ...{
+                      quota: {
+                        Icon: Percent,
+                        title: language === "zh" ? "余额" : "Balance",
+                      },
+                      burn: {
+                        Icon: Flame,
+                        title:
+                          language === "zh"
+                            ? "每日消耗"
+                            : "Consumption per day",
+                      },
+                      cost: {
+                        Icon: DollarSign,
+                        title:
+                          language === "zh" ? "估算花费" : "Estimated cost",
+                      },
+                    }[key],
+                  }))
+                  .map(({ key, Icon, title }) => (
+                    <button
+                      key={key}
+                      aria-pressed={selected === key}
+                      title={title}
+                      onClick={() => setMeasure(key)}
+                      style={{
+                        ...noButtonChrome,
+                        color: selected === key ? colors.text : colors.tertiary,
+                        background:
+                          selected === key ? colors.selected : "transparent",
+                        borderRadius: 4,
+                        padding: 3,
+                      }}
+                    >
+                      <Icon size={12} />
+                    </button>
+                  ))}
+              </div>
             </div>
             {account.notice && (
               <div

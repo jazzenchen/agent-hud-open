@@ -36,13 +36,9 @@ export const checkedByTheApp = <S extends z.ZodType>(
 
 const keys = z.array(z.string().min(1));
 const period = z.enum(["day", "week", "month"]);
-const measures = z.array(
-  z.enum(["quota", "burn", "tokens", "consumed", "cost"]),
-);
 const block = z
   .object({
     widget: z.enum(["bar", "rings", "segments", "number", "chart"]).optional(),
-    measures: measures.optional(),
     hidden: z.boolean().optional(),
     hiddenRows: keys.optional(),
     hiddenAccounts: keys.optional(),

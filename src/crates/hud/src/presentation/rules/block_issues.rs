@@ -5,7 +5,7 @@ use super::*;
 /// Every issue of a proposed layout against the blocks the panel has now
 /// (PanelLayoutRules.issues(against:holding:)), as "path: sentence": a block key or
 /// an order entry that names no block, a widget its block's kind does not accept, a
-/// measure not offered under the widget it is drawn with, a countdown on a balance,
+/// countdown on a balance,
 /// columns or a ring size where it has no cells or rings, half a line for bar rows, a
 /// period where it covers none, and a row or an account it does not have. What one of
 /// the `held` layouts already holds for a block, a row or an account that is away is
@@ -110,27 +110,8 @@ fn block_issues(
         ));
     }
     let widget = kind.widget(asked);
-    let offered = kind.measures(widget);
     let drawn = format!("The \"{widget}\" widget of \"{key}\"");
     let balance = format!("\"{key}\" is an API balance");
-    for (index, measure) in entries(&change["measures"]) {
-        if offered.contains(&measure) || kept("measures") {
-            continue;
-        }
-        let why = match (kind, widget) {
-            (Kind::Balance, "chart") => {
-                " The \"chart\" widget of an API balance draws its estimated cost over its period."
-            }
-            (Kind::Balance, _) if measure == "tokens" || measure == "consumed" => {
-                " An API balance's card does not draw its models' tokens yet; the token chart draws them."
-            }
-            _ => "",
-        };
-        found.push(format!(
-            "{path}.measures[{index}]: {drawn} does not offer the measure \"{measure}\".{why} It offers: {}.",
-            quoted(offered)
-        ));
-    }
     if change["countdown"].is_boolean() && !kind.takes_countdown() && !kept("countdown") {
         found.push(format!("{path}.countdown: {balance}, which has no reset to count down to. countdown applies to quota blocks."));
     }

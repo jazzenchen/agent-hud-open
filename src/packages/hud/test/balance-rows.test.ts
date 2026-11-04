@@ -1,9 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import {
-  balanceMeasuresOffered,
-  visibleBalances,
-} from "../src/balance-rows.ts";
+import { visibleBalances } from "../src/balance-rows.ts";
 
 const rows = [
   {
@@ -56,20 +53,4 @@ test("balance row settings hide and order currencies independently within an acc
     }).map((r) => r.currency),
     ["USD", "CNY"],
   );
-});
-
-test("a balance card offers the measures its layout names, and a picker for more than one", () => {
-  assert.deepEqual(balanceMeasuresOffered(undefined), [
-    "quota",
-    "burn",
-    "cost",
-  ]);
-  assert.deepEqual(balanceMeasuresOffered([]), ["quota", "burn", "cost"]);
-  assert.deepEqual(balanceMeasuresOffered(["burn"]), ["burn"]);
-  assert.deepEqual(balanceMeasuresOffered(["cost", "burn"]), ["cost", "burn"]);
-  assert.deepEqual(balanceMeasuresOffered(["tokens"]), [
-    "quota",
-    "burn",
-    "cost",
-  ]);
 });

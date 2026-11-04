@@ -30,7 +30,7 @@ Agent HUD adds its tools to this client as an MCP server named `agent-hud`. This
    - `revision`
    - `panel`: the hover panel as a tree of nodes, drafts included. Each node has an `id`, a `type` and its fields.
    - `catalog`: every control, data field, placeholder format, click action and edit step the tree can hold, with examples. It is the reference for building the tree; read it before adding controls.
-   - `blocks[]`: each block's `rows[].id`, `accounts[].id`, `widgets` and `measures`
+   - `blocks[]`: each block's `rows[].id`, `accounts[].id` and `widgets`. Every block offers all its measures; a layout does not choose them.
    - `screens[]`: `key`, `hasNotch`, `primary`, `hud` (the current style), `held`
    - `sessions.offeredAgents`, `sessions.offeredProjects`, `tokens.offeredAgents` and `tokens.offeredModels`
    - `app`, `unsaved` and `drafts`

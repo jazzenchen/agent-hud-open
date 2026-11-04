@@ -23,17 +23,6 @@ impl Kind {
             .and_then(|asked| self.widgets().iter().find(|w| **w == asked).copied())
             .unwrap_or(self.default_widget())
     }
-    /// The measures the kind offers under a widget, in picker order. A balance's card
-    /// offers what this build draws on it: its balance, its burn rate and its cost.
-    pub(in crate::presentation) fn measures(self, widget: &str) -> &'static [&'static str] {
-        match (self, widget) {
-            (Kind::Quota, "chart") => &["tokens"],
-            (Kind::Quota, _) => MEASURES,
-            (Kind::Balance, "number") => &["quota", "burn", "cost"],
-            (Kind::Balance, "chart") => &["cost"],
-            (Kind::Balance, _) => &[],
-        }
-    }
     pub(super) fn takes_countdown(self) -> bool {
         self == Kind::Quota
     }

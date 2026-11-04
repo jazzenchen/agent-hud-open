@@ -92,7 +92,6 @@ fn block_misreadings(value: &Value, path: &str) -> Vec<String> {
     for (property, value) in block {
         match property.as_str() {
             "widget" => found.extend(misnamed(value, &format!("{path}.widget"), WIDGETS)),
-            "measures" => found.extend(names(value, &format!("{path}.measures"), Some(MEASURES))),
             "hidden" | "countdown" | "legend" => {
                 if !value.is_null() && !value.is_boolean() {
                     found.push(format!("{path}.{property} is true or false."));
@@ -116,7 +115,7 @@ fn block_misreadings(value: &Value, path: &str) -> Vec<String> {
             "ringSize" => found.extend(misnamed(value, &format!("{path}.ringSize"), RING_SIZES)),
             "span" => found.extend(misnamed(value, &format!("{path}.span"), SPANS)),
             "period" => found.extend(misnamed(value, &format!("{path}.period"), PERIODS)),
-            _ => found.push(format!("{path} has no property \"{property}\"; a block takes widget, measures, hidden, hiddenRows, hiddenAccounts, rows, accounts, countdown, columns, ringSize, legend, span and period.")),
+            _ => found.push(format!("{path} has no property \"{property}\"; a block takes widget, hidden, hiddenRows, hiddenAccounts, rows, accounts, countdown, columns, ringSize, legend, span and period.")),
         }
     }
     found

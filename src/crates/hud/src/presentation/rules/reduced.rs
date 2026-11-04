@@ -26,7 +26,7 @@ fn reduced_order(order: &[String], present: &[String]) -> Vec<String> {
 /// The layout reduced to what it changes about the blocks the panel has now
 /// (PanelLayoutRules.reduced(against:)), so that two layouts that draw those blocks
 /// alike are the same layout: for a block the panel has, a widget that is its kind's
-/// default, measures that are every one its widget offers in its order, a countdown,
+/// default, a countdown,
 /// columns, a ring size, a span or a period the block draws none of or has as its
 /// default, and rows at the end of its order that come there anyway are left out;
 /// so are block keys at the end of `order` that come there anyway. What it holds for
@@ -47,19 +47,6 @@ pub(in crate::presentation) fn reduced(layout: &Value, present: &[Block]) -> Val
                 c.remove("widget");
             }
             let widget = kind.widget(c.get("widget").and_then(Value::as_str));
-            let offered = kind.measures(widget);
-            let kept: Vec<String> = c
-                .get("measures")
-                .map(strings)
-                .unwrap_or_default()
-                .into_iter()
-                .filter(|m| offered.contains(&m.as_str()))
-                .collect();
-            if kept.is_empty() || kept == offered {
-                c.remove("measures");
-            } else {
-                c.insert("measures".into(), json!(kept));
-            }
             if !kind.takes_countdown() {
                 c.remove("countdown");
             }

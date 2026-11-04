@@ -2,9 +2,10 @@
 use super::marks::merged_by_mark;
 use super::*;
 
-/// A block's fields as a layout keeps them: measures once each in the order named,
-/// hidden rows and accounts once each in key order, rows of its order once each in
-/// the order named, columns a whole number from 2 to 6, and nothing unset.
+/// A block's fields as a layout keeps them: hidden rows and accounts once each in
+/// key order, rows of its order once each in the order named, columns a whole number
+/// from 2 to 6, and nothing unset. A block offers every measure its widget draws, so
+/// the `measures` an earlier layout chose is dropped.
 pub(super) fn parse_block(block: &Value) -> Map<String, Value> {
     let mut v = Map::new();
     for (key, offered) in [
@@ -33,24 +34,6 @@ pub(super) fn parse_block(block: &Value) -> Map<String, Value> {
     }
     if block["countdown"].is_boolean() {
         v.insert("countdown".into(), block["countdown"].clone());
-    }
-    // The measure an earlier build called tokenTotal is the consumed one.
-    let measures = strings(&block["measures"])
-        .into_iter()
-        .map(|m| {
-            if m == "tokenTotal" {
-                "consumed".into()
-            } else {
-                m
-            }
-        })
-        .filter(|m| MEASURES.contains(&m.as_str()))
-        .fold(vec![], |mut out: Vec<String>, m| {
-            push_unique(&mut out, &m);
-            out
-        });
-    if !measures.is_empty() {
-        v.insert("measures".into(), json!(measures));
     }
     let rows = strings(&block["rows"]);
     if !rows.is_empty() {

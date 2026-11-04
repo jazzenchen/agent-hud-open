@@ -54,7 +54,7 @@ pub(super) fn layout(value: &Value) -> Value {
                         &["widget", "ringSize", "span", "period"],
                         &["columns"],
                         &["hidden", "countdown"],
-                        &["measures", "hiddenRows", "rows", "accounts"],
+                        &["hiddenRows", "rows", "accounts"],
                     )),
                 );
             }

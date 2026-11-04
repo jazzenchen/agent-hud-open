@@ -79,7 +79,7 @@ fn a_proposal_that_spells_out_the_default_leaves_no_draft() {
         &owner,
         json!({"screen": "all", "order": ["claude", "codex", "api:deepseek"], "countdown": true,
                "sections": ["blocks"], "style": {"spacing": "regular", "separators": true, "width": 540},
-               "blocks": {"claude": {"widget": "bar", "measures": ["quota", "burn", "tokens", "consumed", "cost"], "span": "full"},
+               "blocks": {"claude": {"widget": "bar", "span": "full"},
                           "api:deepseek": {"widget": "number", "period": "day"}},
                "sessions": {"limit": 5, "period": "day"}, "tokens": {"period": "day"}}),
     );
@@ -330,7 +330,11 @@ fn widgets_a_kind_rejects_and_half_bar_rows_are_refused() {
         &owner,
         json!({"blocks": {"claude": {"widget": "chart", "measures": ["quota"], "columns": 3}}}),
     );
-    assert!(error.contains("blocks.claude.measures[0]: The \"chart\" widget of \"claude\" does not offer the measure \"quota\". It offers: \"tokens\"."), "{error}");
+    // A layout no longer chooses measures: every block offers all of them.
+    assert!(
+        error.contains("blocks.claude has no property \"measures\""),
+        "{error}"
+    );
     assert!(
         error.contains("blocks.claude.columns: The \"chart\" widget of \"claude\" draws no cells."),
         "{error}"
@@ -1080,4 +1084,17 @@ fn no_proposal_makes_the_tools_panic() {
         let _ = call(&owner, "draft_hud", odd);
     }
     assert!(call(&owner, "get_hud", json!({})).is_ok());
+}
+
+#[test]
+fn a_layout_saved_with_measures_loads_without_them() {
+    // Every block offers all its measures; what an earlier layout chose is dropped.
+    let layout = super::rules::normalize_layout(&json!({"blocks": {"claude": {
+        "widget": "ring", "measures": ["quota", "burn"], "hiddenRows": ["acct1/claude-weekly"]
+    }}}))
+    .unwrap();
+    assert_eq!(
+        layout["blocks"]["claude"],
+        json!({"widget": "rings", "hiddenRows": ["acct1/claude-weekly"]})
+    );
 }

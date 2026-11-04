@@ -46,11 +46,9 @@ export const SourceProviderBlock = memo(function SourceProviderBlock({
   active?: boolean;
   onStats?: () => void;
 }) {
-  const offered = layout.measures?.length
-    ? layout.measures
-    : measures.map((m) => m.key);
-  const [chosen, setMeasure] = useState<Measure>(offered[0]);
-  const measure = offered.includes(chosen) ? chosen : offered[0];
+  // Every block offers every measure; the picker greys only those its
+  // readings cannot give.
+  const [measure, setMeasure] = useState<Measure>("quota");
   const format = useFormat();
   const services = usePanelServices();
   const availability = useMemo(
@@ -148,18 +146,7 @@ export const SourceProviderBlock = memo(function SourceProviderBlock({
               selected={measure}
               choose={setMeasure}
               light={light}
-              availability={
-                Object.fromEntries(
-                  Object.entries(availability).map(([key, value]) => [
-                    key,
-                    {
-                      ...value,
-                      selectable:
-                        value.selectable && offered.includes(key as Measure),
-                    },
-                  ]),
-                ) as typeof availability
-              }
+              availability={availability}
             />
           )
         }
