@@ -380,7 +380,7 @@ export function QuotaHistory({
           {quotaDisplayLabel(display, zh ? "zh" : "en")} · 0–100%
         </span>
       </div>
-      {error && !data && (
+      {error && (
         <div role="alert" style={{ color: theme.secondary, fontSize: 11 }}>
           {zh ? "额度历史暂不可用：" : "Quota history is unavailable: "}
           {error}
