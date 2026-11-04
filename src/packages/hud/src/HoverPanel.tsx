@@ -1,33 +1,24 @@
 import {
   memo,
   useEffect,
-  useMemo,
   useRef,
   useState,
   type CSSProperties,
   type ReactNode,
 } from "react";
-import {
-  ChartNoAxesColumnIncreasing,
-  CircleArrowDown,
-  Settings,
-} from "lucide-react";
-import { motion, MotionConfig } from "motion/react";
-import type { Quota, Snapshot } from "@agent-hud/protocol";
+import { MotionConfig } from "motion/react";
+import type { Snapshot } from "@agent-hud/protocol";
 import { Button } from "@agent-hud/ui/components/button";
 import {
-  blockRows,
   defaultHUDConfig,
-  quotaRowKey,
-  vendorKey,
   type HUDConfig,
   type HUDUpdateNotice,
 } from "./model";
 import { usePanelServices } from "./PanelContext";
 import { useGround } from "./ground";
-import { FittingName } from "./panel/FittingName";
-import { SourceProviderBlock } from "./panel/QuotaSection";
-import { SourceBalances } from "./panel/SourceBalances";
+import { PanelDraftBar } from "./panel/PanelDraftBar";
+import { PanelFooter } from "./panel/PanelFooter";
+import { QuotaBlocks, usePanelBlocks } from "./panel/QuotaBlocks";
 import { SourceSessions } from "./panel/SessionsSection";
 import {
   densityMetrics,
@@ -77,7 +68,6 @@ export const SourceHoverPanel = memo(function SourceHoverPanel({
 }: SourceHoverPanelProps) {
   const colors = palette(useGround(light));
   const services = usePanelServices();
-  const [draftError, setDraftError] = useState<string | null>(null);
   const panelElement = useRef<HTMLDivElement>(null),
     [contentWidth, setContentWidth] = useState<number>();
   useEffect(() => {
@@ -89,55 +79,6 @@ export const SourceHoverPanel = memo(function SourceHoverPanel({
     observer.observe(element);
     return () => observer.disconnect();
   }, []);
-  const rows = useMemo(
-    () =>
-      snapshot.quotas.filter(
-        (row) =>
-          !focusVendor || vendorKey(row.vendor) === vendorKey(focusVendor),
-      ),
-    [snapshot.quotas, focusVendor],
-  );
-  const rowsByVendor = useMemo(() => {
-    const groups = new Map<string, Quota[]>();
-    for (const row of rows) {
-      const group = groups.get(row.vendor) ?? [];
-      group.push(row);
-      groups.set(row.vendor, group);
-    }
-    return groups;
-  }, [rows]);
-  const vendorNames = useMemo(
-    () =>
-      [
-        ...new Set([
-          ...rows.map((row) => row.vendor),
-          ...snapshot.providers
-            .filter(
-              (provider) =>
-                provider.detected &&
-                provider.enabled &&
-                (!focusVendor ||
-                  vendorKey(provider.id) === vendorKey(focusVendor)) &&
-                !snapshot.billing.some(
-                  (account) =>
-                    vendorKey(account.vendor) === vendorKey(provider.id),
-                ),
-            )
-            .map((provider) => provider.id),
-        ]),
-      ].filter((vendor) => !config.panelLayout.blocks?.[vendor]?.hidden),
-    [
-      rows,
-      snapshot.providers,
-      snapshot.billing,
-      focusVendor,
-      config.panelLayout,
-    ],
-  );
-  const billing = snapshot.billing.filter(
-    (account) =>
-      !focusVendor || vendorKey(account.vendor) === vendorKey(focusVendor),
-  );
   const density = densityMetrics[config.layoutDensity] ?? densityMetrics.normal;
   const separated = config.panelLayout.style?.separators !== false;
   // A section the panel's lists follow: a hairline below it.
@@ -147,15 +88,6 @@ export const SourceHoverPanel = memo(function SourceHoverPanel({
         paddingBottom: "var(--hud-divided-gap)",
       }
     : undefined;
-  const footerButton = (color: string): CSSProperties => ({
-    width: 28,
-    height: 28,
-    minHeight: 28,
-    padding: 0,
-    borderRadius: 0,
-    color,
-    background: "transparent",
-  });
   // Controls an agent added, placed among the blocks by `order` or among the
   // sections by `sections`; an agent's own panel shows its blocks alone.
   const custom = focusVendor ? {} : (config.panelLayout.custom ?? {});
@@ -176,73 +108,17 @@ export const SourceHoverPanel = memo(function SourceHoverPanel({
       />
     ) : null;
   };
-  const blocks = inPanelOrder<{ key: string; content: ReactNode }>(
-    [
-      ...vendorNames.map((vendor) => ({
-        key: vendor,
-        content: (
-          <SourceProviderBlock
-            vendor={vendor}
-            rows={blockRows(
-              rowsByVendor.get(vendor) ?? [],
-              config.panelLayout.blocks?.[vendor],
-            ).map((row) => ({ ...row, key: quotaRowKey(row) }))}
-            layout={config.panelLayout.blocks?.[vendor]}
-            snapshot={snapshot}
-            active={active}
-            now={Date.parse(snapshot.generatedAt)}
-            light={light}
-            Logo={Logo}
-            showReset={config.resetCountdown}
-            accountInfo={snapshot.accounts}
-            onStats={onStats}
-          />
-        ),
-      })),
-      ...[...new Set(billing.map((account) => account.vendor))]
-        .filter(
-          (vendor) => !config.panelLayout.blocks?.[`api:${vendor}`]?.hidden,
-        )
-        .map((vendor) => ({
-          key: `api:${vendor}`,
-          content: (
-            <SourceBalances
-              billing={billing.filter((account) => account.vendor === vendor)}
-              layout={config.panelLayout.blocks?.[`api:${vendor}`]}
-              light={light}
-              Logo={Logo}
-              onStats={onStats}
-            />
-          ),
-        })),
-      ...(config.panelOrder ?? [])
-        .filter((key) => custom[key] && custom[key].hidden !== true)
-        .map((key) => ({ key, content: customAt(key) })),
-    ],
-    config.panelOrder ?? [],
-  );
-  const span = (key: string) =>
-    custom[key]?.span ?? config.panelLayout.blocks?.[key]?.span;
-  // Two half blocks share a line where the blocks' width holds both: the
-  // panel's, or the column's a row of an agent's gives them.
-  const linesFor = (width: number | undefined) => {
-    const lines: (typeof blocks)[] = [];
-    for (let i = 0; i < blocks.length; i++) {
-      const block = blocks[i],
-        next = blocks[i + 1];
-      if (
-        (width ?? contentWidth ?? config.panelWidth - 40) - density.section >=
-          460 &&
-        next &&
-        span(block.key) === "half" &&
-        span(next.key) === "half"
-      ) {
-        lines.push([block, next]);
-        i++;
-      } else lines.push([block]);
-    }
-    return lines;
-  };
+  const { blocks, vendorNames } = usePanelBlocks({
+    snapshot,
+    focusVendor,
+    config,
+    light,
+    Logo,
+    active,
+    onStats,
+    custom,
+    customAt,
+  });
   // The panel's own sections, at its top or at the width a row, column or grid
   // of an agent's gives them, there with no line above where they head a column.
   const sectionContent = (
@@ -254,42 +130,15 @@ export const SourceHoverPanel = memo(function SourceHoverPanel({
       return (
         config.quotaDetails &&
         blocks.length > 0 && (
-          <div
-            className="hud-source-blocks"
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              gap: "var(--hud-section-gap)",
-            }}
-          >
-            {linesFor(width).map((line, index) => (
-              <div
-                key={line.map((b) => b.key).join("+")}
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: line.length === 2 ? "1fr 1fr" : "1fr",
-                  gap: density.section,
-                  ...(index > 0 && separated
-                    ? {
-                        boxShadow: `inset 0 1px 0 ${colors.divider}`,
-                        paddingTop: "var(--hud-divided-gap)",
-                      }
-                    : {}),
-                }}
-              >
-                {line.map((block) => (
-                  <div
-                    key={block.key}
-                    data-hud-block={block.key}
-                    data-hud-half={line.length === 2 ? "true" : undefined}
-                    style={{ minWidth: 0 }}
-                  >
-                    {block.content}
-                  </div>
-                ))}
-              </div>
-            ))}
-          </div>
+          <QuotaBlocks
+            blocks={blocks}
+            custom={custom}
+            layouts={config.panelLayout.blocks}
+            width={width ?? contentWidth ?? config.panelWidth - 40}
+            density={density}
+            separated={separated}
+            colors={colors}
+          />
         )
       );
     if (key === "tokens")
@@ -413,137 +262,24 @@ export const SourceHoverPanel = memo(function SourceHoverPanel({
             ))}
         </div>
       </div>
-      {services?.draft?.unsaved && (
-        <div
-          style={{
-            display: "flex",
-            gap: 8,
-            alignItems: "center",
-            fontSize: 11,
-            color: colors.secondary,
-          }}
-        >
-          <div style={{ flex: 1, display: "grid", gap: 1, minWidth: 0 }}>
-            <strong style={{ fontWeight: 600, color: colors.text }}>
-              {draftTitle(services.draft!, snapshotLanguage(snapshot))}
-            </strong>
-            <FittingName
-              {...draftNote(services.draft!, snapshotLanguage(snapshot))}
-              style={{ fontSize: 10, color: colors.secondary }}
-            />
-          </div>
-          {draftError && <span role="alert">{draftError}</span>}
-          <Button
-            size="xs"
-            variant="ghost"
-            onClick={() =>
-              void services
-                .draft!.discard()
-                .catch((error) => setDraftError(String(error)))
-            }
-          >
-            {snapshotLanguage(snapshot) === "zh" ? "丢弃" : "Discard"}
-          </Button>
-          <Button
-            size="xs"
-            onClick={() =>
-              void services
-                .draft!.save()
-                .catch((error) => setDraftError(String(error)))
-            }
-          >
-            {snapshotLanguage(snapshot) === "zh" ? "保存" : "Save"}
-          </Button>
-        </div>
-      )}
+      <PanelDraftBar
+        draft={services?.draft}
+        language={snapshotLanguage(snapshot)}
+        colors={colors}
+      />
       {services?.draft?.heldUntil && (
         <Button size="xs" variant="ghost" onClick={services.draft.release}>
           {snapshotLanguage(snapshot) === "zh" ? "完成编辑" : "Finish editing"}
         </Button>
       )}
-      <footer
-        data-hud-footer
-        className="hud-source-footer"
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          flex: "0 0 auto",
-          paddingTop: 6,
-          boxShadow: `inset 0 1px 0 ${colors.divider}`,
-          color: colors.secondary,
-        }}
-      >
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          aria-label={snapshotLanguage(snapshot) === "zh" ? "设置" : "Settings"}
-          title={snapshotLanguage(snapshot) === "zh" ? "设置" : "Settings"}
-          disabled={!onConfigure}
-          onClick={onConfigure}
-          style={footerButton(colors.secondary)}
-        >
-          <Settings style={{ width: 14, height: 14 }} strokeWidth={1.7} />
-        </Button>
-        <div style={{ display: "flex", alignItems: "center" }}>
-          {update && (
-            // It arrives as the HUD's other changes do: it grows in, or with
-            // reduced motion only fades in.
-            <motion.span
-              key={update.version}
-              initial={{ opacity: 0, scale: 0.6 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.22, ease: "easeOut" }}
-              style={{ display: "inline-flex" }}
-            >
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                aria-label={
-                  snapshotLanguage(snapshot) === "zh"
-                    ? "发现新版本"
-                    : "New version available"
-                }
-                title={
-                  snapshotLanguage(snapshot) === "zh"
-                    ? `更新至 ${update.version}`
-                    : `Update to ${update.version}`
-                }
-                disabled={!onUpdate}
-                onClick={onUpdate}
-                style={footerButton(colors.accent)}
-              >
-                <CircleArrowDown
-                  style={{ width: 14, height: 14 }}
-                  strokeWidth={1.7}
-                />
-              </Button>
-            </motion.span>
-          )}
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            aria-label={
-              snapshotLanguage(snapshot) === "zh"
-                ? "用量统计"
-                : "Usage statistics"
-            }
-            title={
-              snapshotLanguage(snapshot) === "zh"
-                ? "用量统计"
-                : "Usage statistics"
-            }
-            disabled={!onStats}
-            onClick={onStats}
-            style={footerButton(colors.secondary)}
-          >
-            <ChartNoAxesColumnIncreasing
-              style={{ width: 14, height: 14 }}
-              strokeWidth={1.7}
-            />
-          </Button>
-        </div>
-      </footer>
+      <PanelFooter
+        language={snapshotLanguage(snapshot)}
+        colors={colors}
+        onConfigure={onConfigure}
+        onStats={onStats}
+        update={update}
+        onUpdate={onUpdate}
+      />
     </div>
   );
   // The panel's charts move as the HUD does: not at all when animations are
@@ -558,40 +294,3 @@ export const SourceHoverPanel = memo(function SourceHoverPanel({
     </MotionConfig>
   );
 });
-
-type DraftState = NonNullable<
-  NonNullable<ReturnType<typeof usePanelServices>>["draft"]
->;
-
-/** What waits (Open's PanelDraftBar.title): a layout, with or without a
- * style, a style alone, or the app's settings alone. */
-function draftTitle(draft: DraftState, language: "en" | "zh") {
-  const zh = language === "zh";
-  if (draft.layout) return zh ? "布局未保存" : "Unsaved layout";
-  if (draft.style) return zh ? "HUD 样式未保存" : "Unsaved HUD style";
-  return zh ? "应用设置未保存" : "Unsaved app settings";
-}
-
-/** When the draft goes, and whose it is (Open's PanelDraftBar.note): this
- * display's alone, or with the app's settings, which are every display's;
- * `short` where `name` does not fit. */
-function draftNote(draft: DraftState, language: "en" | "zh") {
-  const zh = language === "zh";
-  const restart = zh ? "重启后丢弃" : "Dropped on restart";
-  if (draft.app) {
-    if (!draft.layout && !draft.style) return { name: restart, short: restart };
-    return zh
-      ? { name: "含应用设置，重启后丢弃", short: "含应用设置" }
-      : {
-          name: "With app settings, dropped on restart",
-          short: "With app settings",
-        };
-  }
-  if (draft.layout === "shared") return { name: restart, short: restart };
-  return zh
-    ? { name: "仅此显示器，重启后丢弃", short: "仅此显示器" }
-    : {
-        name: "This display only, dropped on restart",
-        short: "This display only",
-      };
-}
