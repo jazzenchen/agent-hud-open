@@ -1,4 +1,5 @@
 //! Hermes.
+pub mod account;
 pub mod transcript;
 
 use crate::Agent;

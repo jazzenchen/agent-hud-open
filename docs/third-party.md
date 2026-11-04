@@ -10,3 +10,5 @@ Registry-generated utility imports are adapted to `@agent-hud/ui/lib/utils` so t
 - Original provider PNGs and the Clawd sprites are retained under src/packages/hud/src/assets with original notices; the Settings wallpaper is in src/packages/ui/src/assets and the application icon in src/packages/app/src/assets. Clawd sprites retain their separate Anthropic copyright; see src/packages/hud/src/assets/README.md and THIRD_PARTY_NOTICES.txt.
 
 shadcn visual overrides live in src/packages/ui/src/global.css; registry component behavior is unchanged. HUD geometry and timelines are product implementation code. The HUD rim's WGSL shader implements the original six glow styles and six effects and is drawn with WebGPU directly (`src/packages/hud/src/glow-gpu.ts`); it keeps a static fallback when WebGPU is unavailable.
+
+- Nous Portal credits (`src/crates/agents/src/hermes/account.rs`): the auth file shapes, the never-refresh rule and the trusted-portal rule follow CodexBar's Nous reader (`NousSettingsReader.swift`, `nous.ts`, commit 897bff3), MIT, Copyright (c) 2026 Peter Steinberger; re-implemented in Rust and checked against Hermes Agent 0.19 (MIT).

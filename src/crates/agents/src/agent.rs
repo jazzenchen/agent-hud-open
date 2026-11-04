@@ -83,6 +83,7 @@ pub static ACCOUNTS: &[&crate::account::Provider] = &[
     &grok::credits::PROVIDER,
     &copilot::account::PROVIDER,
     &devin::account::PROVIDER,
+    &hermes::account::PROVIDER,
     &crate::coding_plans::KIMI,
     &crate::coding_plans::GLM,
     &crate::coding_plans::OPENCODE_GO,
