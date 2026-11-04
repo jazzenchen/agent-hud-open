@@ -1,5 +1,5 @@
 //! Owner-only files on Windows: the owner SID and a protected per-user DACL.
-use super::pipe;
+use super::acl;
 use std::{
     fs,
     io::{self, Read},
@@ -9,11 +9,11 @@ use std::{
 /// A directory only this user can open, created when absent. A reparse point
 /// or another user's directory is refused.
 pub(crate) fn private_directory(path: &Path) -> Result<(), String> {
-    pipe::private_directory(path)
+    acl::private_directory(path)
 }
 
 pub(crate) fn owned_by_user(path: &Path, _metadata: &fs::Metadata) -> bool {
-    pipe::owned_path(path)
+    acl::owned_path(path)
 }
 
 /// Files inherit the private directory's protected DACL, so ownership is the check.
@@ -23,14 +23,14 @@ pub(crate) fn owner_only(path: &Path, metadata: &fs::Metadata) -> bool {
 
 /// New files have an explicit current-user owner even in elevated processes.
 pub(crate) fn private_file(path: &Path, create_new: bool) -> io::Result<fs::File> {
-    pipe::private_file(path, create_new)
+    acl::private_file(path, create_new)
 }
 
 /// A private file opened at its end for appending. No hook that appends
 /// (Cursor's) is launched on Windows yet, so writers do not overlap here.
 pub(crate) fn private_append(path: &Path) -> io::Result<fs::File> {
     use std::io::{Seek, SeekFrom};
-    let mut file = pipe::private_file(path, false)?;
+    let mut file = acl::private_file(path, false)?;
     file.seek(SeekFrom::End(0))?;
     Ok(file)
 }

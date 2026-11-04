@@ -1,4 +1,5 @@
 use super::{joined_path, path_entries, variable, Environment, ProcessInfo};
+mod acl;
 mod antigravity;
 mod apps;
 mod codex;
