@@ -48,12 +48,9 @@ import {
   truncate,
 } from "./statistics/StatsTheme";
 import { UsageChart } from "./statistics/UsageChart";
-import {
-  agentRows,
-  APIBillingCard,
-  ProviderCard,
-  RecentUsage,
-} from "./statistics/ProviderCard";
+import { agentRows, ProviderCard } from "./statistics/ProviderCard";
+import { APIBillingCard } from "./statistics/APIBillingCard";
+import { RecentUsage } from "./statistics/RecentUsage";
 import { ActivityHeatmap } from "./statistics/ActivityHeatmap";
 import { QuotaHistory } from "./statistics/QuotaHistory";
 import { PlanValue } from "./statistics/PlanValue";
