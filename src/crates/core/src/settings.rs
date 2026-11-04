@@ -7,6 +7,19 @@ impl crate::AgentHudCore {
         self.settings["clientHooks"] == true
     }
 
+    /// The clients whose opt-in approval hook the user turned on
+    /// (`optInApprovals`); it goes in while client hooks are on.
+    pub fn opt_in_approvals(&self) -> Vec<String> {
+        self.settings["optInApprovals"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter_map(Value::as_str)
+            .filter(|id| opts_in(id))
+            .map(str::to_owned)
+            .collect()
+    }
+
     pub fn antigravity_cli_settings(&self) -> Vec<PathBuf> {
         self.settings["antigravityCliSettings"]
             .as_array()
@@ -140,6 +153,14 @@ impl crate::AgentHudCore {
                 if value
                     .as_u64()
                     .is_some_and(|v| [1, 3, 5, 10, 30, 60].contains(&v)) => {}
+            // Clients whose approval hook waits for the user to turn it on
+            // (agents `Permission::opt_in`), each once.
+            "optInApprovals"
+                if value.as_array().is_some_and(|ids| {
+                    ids.iter().enumerate().all(|(index, id)| {
+                        id.as_str().is_some_and(opts_in) && !ids[..index].contains(id)
+                    })
+                }) => {}
             // The price page: the owner's prices per million tokens by model,
             // multipliers by relay host, and what a local host is.
             "customPrices"
@@ -242,6 +263,12 @@ impl crate::AgentHudCore {
     }
 }
 
+/// Whether the client with this id has a hook that goes in only once the
+/// user turns it on.
+fn opts_in(id: &str) -> bool {
+    agent_hud_agents::hooks::hooks_by_id(id).is_some_and(agent_hud_agents::hooks::Hooks::opt_in)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -290,6 +317,49 @@ mod tests {
             core.apply_setting(key, &json!([])).unwrap();
             assert_eq!(core.settings[key], json!([]));
         }
+    }
+
+    #[test]
+    fn opt_in_approvals_start_empty_and_take_only_clients_whose_hook_waits_for_the_user() {
+        let home = tempfile::tempdir().unwrap();
+        let mut core = AgentHudCore::new(vec![], home.path().to_owned());
+        assert_eq!(core.settings["optInApprovals"], json!([]));
+        assert!(core.opt_in_approvals().is_empty());
+        core.apply_setting("optInApprovals", &json!(["copilot"]))
+            .unwrap();
+        let reopened = AgentHudCore::new(vec![], home.path().to_owned());
+        assert_eq!(reopened.opt_in_approvals(), ["copilot"]);
+        for invalid in [
+            json!(null),
+            json!(true),
+            json!("copilot"),
+            json!([1]),
+            json!(["copilot", "copilot"]),
+            // Claude Code's approval hook goes in with client hooks already.
+            json!(["claude"]),
+            json!(["not-a-client"]),
+            json!(["Copilot"]),
+        ] {
+            assert!(
+                core.apply_setting("optInApprovals", &invalid).is_err(),
+                "{invalid}"
+            );
+            assert_eq!(core.opt_in_approvals(), ["copilot"]);
+        }
+        core.apply_setting("optInApprovals", &json!([])).unwrap();
+        assert!(core.opt_in_approvals().is_empty());
+    }
+
+    #[test]
+    fn opt_in_approvals_read_from_the_file_keep_only_clients_whose_hook_waits_for_the_user() {
+        let home = tempfile::tempdir().unwrap();
+        fs::write(
+            home.path().join("settings.json"),
+            br#"{"settings":{"optInApprovals":["claude",7,"copilot"]},"providers":{}}"#,
+        )
+        .unwrap();
+        let core = AgentHudCore::new(vec![], home.path().to_owned());
+        assert_eq!(core.opt_in_approvals(), ["copilot"]);
     }
 
     #[test]

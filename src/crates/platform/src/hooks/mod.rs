@@ -104,6 +104,17 @@ impl Hooks {
     pub fn delegate_owner(&mut self, context: InstallContext) -> Result<(), String> {
         self.clients.delegate(context)
     }
+    /// The clients whose opt-in approval hooks the user turned on.
+    pub fn opted_in(&self) -> Vec<String> {
+        self.clients.opted_in().to_vec()
+    }
+    /// Only an explicit preference action, or the saved preference at
+    /// delegation, changes the list. While client hooks are in, a changed
+    /// client's opt-in hooks go in or come out at once; on an error nothing
+    /// changed.
+    pub fn set_opted_in(&mut self, sources: Vec<String>) -> Result<(), String> {
+        self.clients.set_opted_in(sources)
+    }
     pub fn status(&self, desired: bool) -> serde_json::Value {
         self.clients.status(self.is_listening(), desired)
     }

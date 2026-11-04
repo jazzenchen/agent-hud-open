@@ -63,6 +63,10 @@ export interface AppSettings {
   appearance: "dark" | "light" | "system";
   language: string;
   clientHooks: boolean;
+  /** Client ids whose approval hook goes in only once the user turns it on
+   * (Copilot CLI's, which Copilot asks before its own rules); it goes in
+   * while client hooks are on. */
+  optInApprovals?: string[];
   readCopilotQuota?: boolean;
   /** The relay hosts whose balance may be read with the key the client already sends them. */
   relayReading?: string[];

@@ -37,25 +37,41 @@ pub struct Hooks {
 }
 
 impl Hooks {
-    /// The hook flags this client is installed with, in install order.
+    /// The hook flags this client is installed with, in install order: all
+    /// but the ones that wait for the user to turn them on.
     pub fn flags(&self) -> Vec<&'static str> {
+        self.all_flags()
+            .into_iter()
+            .filter(|(_, opt_in)| !opt_in)
+            .map(|(flag, _)| flag)
+            .collect()
+    }
+
+    /// Every hook flag this client has, in install order, each with whether
+    /// it goes in only once the user turns it on (`Permission::opt_in`).
+    pub fn all_flags(&self) -> Vec<(&'static str, bool)> {
         let mut flags = Vec::new();
-        if self.permission.as_ref().is_some_and(|hook| !hook.opt_in) {
-            flags.push("--permission-hook");
+        if let Some(permission) = &self.permission {
+            flags.push(("--permission-hook", permission.opt_in));
         }
         if self.completion.is_some() {
-            flags.push("--completion-hook");
+            flags.push(("--completion-hook", false));
         }
         if self.attention {
-            flags.push("--attention-hook");
+            flags.push(("--attention-hook", false));
         }
         if self.compaction.is_some() {
-            flags.push("--compaction-hook");
+            flags.push(("--compaction-hook", false));
         }
         if self.origin.is_some() {
-            flags.push("--session-origin-hook");
+            flags.push(("--session-origin-hook", false));
         }
         flags
+    }
+
+    /// Whether one of its hooks goes in only once the user turns it on.
+    pub fn opt_in(&self) -> bool {
+        self.all_flags().iter().any(|(_, opt_in)| *opt_in)
     }
 }
 
@@ -130,9 +146,10 @@ pub struct Permission {
     pub settles_in_transcript: bool,
     /// A run nobody watches, whose requests stay with the client.
     pub unattended: Option<crate::process::UnattendedRule>,
-    /// Installed only once the user turns it on, which no setting does yet:
-    /// the client asks this hook before its own rules and the session's
-    /// approvals, so it would hold calls the user already allowed.
+    /// Installed only once the user turns it on (the app's `optInApprovals`
+    /// setting lists the client): the client asks this hook before its own
+    /// rules and the session's approvals, so it holds calls the user would
+    /// otherwise have allowed.
     pub opt_in: bool,
     pub reply: Reply,
 }
@@ -350,16 +367,27 @@ mod tests {
             ["--permission-hook", "--completion-hook"]
         );
         assert_eq!(flags("workbuddy"), ["--permission-hook"]);
-        // Copilot's approvals wait for the user to turn them on.
-        assert!(hooks_by_id("copilot").unwrap().permission.is_some());
+        // Copilot's approvals wait for the user to turn them on; it is the
+        // only client whose hook does.
+        let copilot = hooks_by_id("copilot").unwrap();
         assert_eq!(flags("copilot"), ["--completion-hook"]);
+        assert_eq!(
+            copilot.all_flags(),
+            [("--permission-hook", true), ("--completion-hook", false)]
+        );
+        let opt_in: Vec<_> = ALL
+            .iter()
+            .filter(|agent| agent.hooks.is_some_and(Hooks::opt_in))
+            .map(|agent| agent.id)
+            .collect();
+        assert_eq!(opt_in, ["copilot"]);
         // Goose's hooks wait for a check against a running Goose.
         let goose = hooks_by_id("goose").unwrap();
         for os in [crate::Os::MacOs, crate::Os::Windows, crate::Os::Linux] {
             assert!(goose.launch.on(os).value().is_none(), "{os:?}");
         }
         for agent in ALL {
-            for flag in agent.hooks.map(Hooks::flags).unwrap_or_default() {
+            for (flag, _) in agent.hooks.map(Hooks::all_flags).unwrap_or_default() {
                 assert!(crate::HOOK_FLAGS.contains(&flag), "{} {flag}", agent.id);
             }
         }

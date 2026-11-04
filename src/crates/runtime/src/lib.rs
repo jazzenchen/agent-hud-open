@@ -240,6 +240,8 @@ impl Runtime {
             canonical_executable: Some(canonical_executable),
         };
         let mut hooks = self.hooks.lock().unwrap_or_else(PoisonError::into_inner);
+        // Nothing is in yet, so this only says which opt-in hooks go in.
+        hooks.set_opted_in(self.core.opt_in_approvals())?;
         hooks.delegate_owner(context)?;
         if self.core.client_hooks_enabled() {
             hooks.set_enabled(true)?;
