@@ -196,6 +196,7 @@ engine code that decides by client name. It goes in five slices:
    - `agents::process` holds the caller types: `Ancestor` and `Caller` (the kernel-reported parents and the callback's own environment) and `Origin`.
    - Each client's rules live in its folder. `claude/process.rs` holds Claude Code's argument grammar, the apps that host it, its entrypoints and headless runs. `codex/process.rs` holds Codex's invocation grammar and its desktop app.
    - `Hooks::origin` and `Permission::unattended` name the rules.
+   - `Permission::policy` names a client's rule for the user's own permission rules in its settings (Factory Droid's in `droid/rules.rs`). It reads files only through `hooks::Files`, which platform's `hooks/policy.rs` fills with the hook's home, environment and a size-limited read. A call a rule settles gets no answer; one a rule asks about is marked (`RULE_ASKS`) so the HUD holds it.
    - `process::IMPORTERS` names the clients that run another client's hooks from its settings (TRAE runs Claude Code's), with the rule that tells such a callback apart; it is dropped, never counted as the named client's session.
    - Platform's `hooks/origins.rs` gathers the caller and applies the result, including the iTerm target. Codex's daemon terminal lookup moved to `clients/codex/`.
 

@@ -5,9 +5,10 @@
 //!
 //! Droid has no permission event: `PreToolUse` runs before every tool call,
 //! and its `permissionDecision` allows or denies the call outright. Only a
-//! call Droid's own rules would ask about becomes a request
-//! (`asks`); the others pass with no answer. Its questions (`AskUser`) and
-//! its spec approval (`ExitSpecMode`) stay with the client.
+//! call Droid's own rules would ask about becomes a request: by its autonomy
+//! level (`asks`), or by the user's command rules, which the hook reads
+//! first (`rules`). The others pass with no answer. Its questions
+//! (`AskUser`) and its spec approval (`ExitSpecMode`) stay with the client.
 //!
 //! A turn starts at `UserPromptSubmit`, is renewed by each tool call and
 //! notification, and ends at `Stop`, or at the `idle_prompt` notification
@@ -41,6 +42,7 @@ pub static HOOKS: Hooks = Hooks {
         reviewer_gate: false,
         settles_in_transcript: false,
         unattended: Some(unattended),
+        policy: Some(super::rules::policy),
         opt_in: false,
         reply: Reply::PreToolUse {
             matcher: "Create|Edit|ApplyPatch|Execute|WebSearch|FetchUrl",
@@ -72,7 +74,7 @@ pub static HOOKS: Hooks = Hooks {
 /// The autonomy level a hook payload's `permission_mode` names: the highest
 /// risk that runs without asking. None in spec mode, which plans and does
 /// not say the level it will work at.
-fn level(payload: &Value) -> Option<u8> {
+pub(super) fn level(payload: &Value) -> Option<u8> {
     match payload["permission_mode"].as_str()? {
         "off" => Some(0),
         "auto-low" => Some(1),
@@ -99,20 +101,19 @@ const ALLOWED: &[&str] = &[
 /// Whether a command is one Droid allows by default: one of `ALLOWED`, with
 /// its own arguments and nothing chained after it.
 fn allowed(command: &str) -> bool {
-    let command = command.trim();
-    !command.contains([';', '&', '|', '<', '>', '`', '$', '\n'])
-        && ALLOWED.iter().any(|allowed| {
-            command
-                .strip_prefix(allowed)
-                .is_some_and(|rest| rest.is_empty() || rest.starts_with(' '))
-        })
+    super::rules::words(command).is_some_and(|words| {
+        ALLOWED
+            .iter()
+            .any(|allowed| super::rules::starts_with(&words, allowed.split(' ')))
+    })
 }
 
 /// Whether Droid's autonomy level would ask about this call: a file change
 /// or a web call at the lowest level, a command whose risk is above the
-/// level. Permission rules of the user's own are not known here, so a
-/// command one of them allows still asks; MCP tools, whose risk is not in
-/// the payload, never do.
+/// level. The hook reads the user's own command rules before this
+/// (`rules`): a command one of them allows or blocks never comes here, and
+/// one an `ask` rule names is held whatever this says. MCP tools, whose
+/// risk is not in the payload, never ask.
 fn asks(payload: &Value) -> bool {
     let Some(level) = level(payload) else {
         return false;

@@ -207,9 +207,9 @@ pub fn parse_request(source_name: &str, payload: &Value) -> Result<Option<Reques
         return Ok(None);
     }
     // A hook before every tool call holds only the calls the client would
-    // ask about.
+    // ask about: by its level, or by a rule of the user's the hook read.
     if let Reply::PreToolUse { asks, .. } = permission.reply {
-        if !asks(payload) {
+        if payload[super::RULE_ASKS] != true && !asks(payload) {
             return Ok(None);
         }
     }

@@ -111,6 +111,10 @@ fn handle_payload(arguments: &[String], data: &Path, input: &[u8], output: &mut 
         {
             return 0;
         }
+        // A call the user's own rules in the client settle stays with it.
+        if !super::policy::screen(source, &mut payload, home.as_deref(), &env) {
+            return 0;
+        }
         if let Ok(Some(response)) = super::transport::send(data, source, flag, &payload) {
             let _ = serde_json::to_writer(&mut *output, &response);
             let _ = output.write_all(b"\n");
