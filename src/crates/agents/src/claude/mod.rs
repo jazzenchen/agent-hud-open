@@ -1,12 +1,17 @@
 //! Claude Code.
 pub mod account;
+mod button_text;
+mod desktop_ask;
+mod desktop_index;
 mod hooks;
 pub mod jobs;
+mod live;
 pub mod plans;
 pub mod process;
 pub mod project_origin;
 pub mod routes;
 pub mod transcript;
+mod usage;
 mod usage_record;
 
 use crate::Discovery;
