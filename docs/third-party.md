@@ -24,8 +24,9 @@ Facts about other clients' files, and the readers built on them, come from these
 - Kilo Code, MiMo Code and Oh My Pi storage, plugin and extension facts come from their own MIT sources (Kilo-Org/kilocode 080ca6c, XiaomiMiMo/MiMo-Code 6b66e8c, can1357/oh-my-pi 33ea58a). Tokscale (MIT, junhoyeo/tokscale b26c433) informed guarding OpenCode-format rows with `json_valid` and leaving out Kilo Code's migrated tasks.
 ## Factory Droid
 
-Factory Droid's reader (`src/crates/agents/src/droid/`) takes its facts from Droid 1.3.0's own code (the `@factory/cli` npm package, read, never run) and docs.factory.com, and borrows these MIT-licensed readers' rules:
+Factory Droid's reader and limits (`src/crates/agents/src/droid/`) take their facts from Droid 1.3.0's own code (the `@factory/cli` npm package, read, never run) and docs.factory.com, and borrow these MIT-licensed readers' rules:
 
 - tokscale (junhoyeo/tokscale, `crates/tokscale-core/src/sessions/droid.rs`, b26c433), ccusage (ccusage/ccusage, `rust/adapters/droid`, f674ef6) and codeburn (getagentseal/codeburn, `src/providers/droid.ts`, 3faea16): the session files, the `tokenUsage` fields and the model a router or custom session names.
+- CodexBar (steipete/CodexBar, `Sources/CodexBarCore/Providers/Factory/`, 897bff3): `FACTORY_API_KEY` and `~/.factory/.env`, the `billing/limits` windows and their resets, a window whose end passed read as reset, and the extra usage balance.
 
 Copyright (c) their respective authors; each under the MIT license.

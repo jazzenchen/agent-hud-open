@@ -1,0 +1,20 @@
+{
+  "usesTokenRateLimitsBilling": true,
+  "hasActiveSubscription": true,
+  "limits": {
+    "standard": {
+      "fiveHour": { "usedPercent": 42.5, "windowEnd": "2099-01-01T05:00:00.000Z", "secondsRemaining": 7200 },
+      "weekly": { "usedPercent": 18, "windowEnd": "2099-01-08T00:00:00.000Z" },
+      "monthly": { "usedPercent": 64, "windowEnd": "2020-01-01T00:00:00.000Z" }
+    },
+    "core": {
+      "fiveHour": { "usedPercent": 130, "windowEnd": 4070926800 },
+      "weekly": { "usedPercent": 7, "windowEnd": "4071369600000" },
+      "monthly": { "usedPercent": 3, "windowEnd": null }
+    }
+  },
+  "extraUsageBalanceCents": 1250,
+  "overagePreference": "extraUsage",
+  "extraUsageAllowed": true,
+  "canManageOverage": true
+}

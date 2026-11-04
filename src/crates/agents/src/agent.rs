@@ -94,6 +94,7 @@ pub static ACCOUNTS: &[&crate::account::Provider] = &[
     &minimax::account::PROVIDER,
     &ark::account::PROVIDER,
     &crate::relays::PROVIDER,
+    &droid::account::PROVIDER,
 ];
 
 /// Where a session of `source` opens, as its agent says (`Discovery::session_target`):
