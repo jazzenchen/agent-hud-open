@@ -10,12 +10,15 @@ ChatGPT's mark is tinted `#10a37f`; Grok, Cursor, Kimi, Pi, GitHub Copilot, Herm
 and ZCode are template images tinted to their foreground. The source bitmaps
 are preserved here without applying those rendering transformations.
 
-Seven marks were added later, unchanged from LobeHub's
+Eight marks were added later, unchanged from LobeHub's
 `@lobehub/icons-static-png` 2.6.0 (MIT, the notice in `LobeIcons-LICENSE.txt`):
 `minimax.png` (`light/minimax-color.png`), `ark.png` (Volcengine's mark, for
 Volcengine Ark, `light/volcengine-color.png`), `cline.png`, `roo-code.png` and
-`goose.png` (their `light/` marks), `kilocode.png` (`light/kilocode.png`) and
-`xiaomimimo.png` (`light/xiaomimimo.png`, for MiMo Code).
+`goose.png` (their `light/` marks), `kilocode.png` (`light/kilocode.png`),
+`xiaomimimo.png` (`light/xiaomimimo.png`, for MiMo Code) and `trae.png`
+(`light/trae.png`, for TRAE and TRAE CN). All but MiniMax's and Volcengine's
+are single-colour and are tinted to the foreground, as the original Grok and
+Cursor marks are.
 
 The bundled `clawd-sprites.json` is consumed by the original Clawd bot renderer.
 It contains Anthropic's artwork copied unchanged from Claude for macOS

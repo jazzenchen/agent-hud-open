@@ -30,6 +30,7 @@ export const ORIGINAL_ARTWORK_FILES = {
   Cline: "cline",
   "Roo Code": "roo-code",
   Goose: "goose",
+  TRAE: "trae",
 } as const;
 type OriginalVendor = keyof typeof ORIGINAL_ARTWORK_FILES;
 const vendors: Readonly<Record<string, OriginalVendor>> = {
@@ -60,6 +61,7 @@ const vendors: Readonly<Record<string, OriginalVendor>> = {
   cline: "Cline",
   "roo-code": "Roo Code",
   goose: "Goose",
+  trae: "TRAE",
 };
 const templates: ReadonlySet<OriginalVendor> = new Set([
   "Grok",
@@ -74,6 +76,7 @@ const templates: ReadonlySet<OriginalVendor> = new Set([
   "Cline",
   "Roo Code",
   "Goose",
+  "TRAE",
 ]);
 const normalize = (source: string) =>
   source
@@ -103,7 +106,6 @@ export function agentArtworkKey(source: string): string {
 /** Vendors with no mark yet, shown with the generic icon: their own names. */
 const unmarked: Readonly<Record<string, string>> = {
   droid: "Factory Droid",
-  trae: "TRAE",
 };
 export function agentVendorName(source: string): string {
   const key = agentArtworkKey(source);
