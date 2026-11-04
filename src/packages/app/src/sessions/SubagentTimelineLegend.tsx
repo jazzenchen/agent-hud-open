@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { offset } from "./subagent-lanes";
 import { plain, row, type Theme } from "./SessionTheme";
 
-/** The timeline's key: a call's tick, a long step, the session waiting, a sub-agent sent and handed back; then how to zoom, or to return from a zoom. */
+/** The timeline's key: a call's tick, calls in a row, a long step, the session waiting, a sub-agent sent and handed back; then how to zoom, or how to pan and return from a zoom. */
 export function SubagentTimelineLegend({
   zoomed,
   onShowAll,
@@ -41,6 +41,17 @@ export function SubagentTimelineLegend({
           style={{
             width: 14,
             height: 8,
+            borderRadius: 2,
+            background: theme.secondary,
+          }}
+        />
+        {zh ? "连续调用" : "Calls in a row"}
+      </Key>
+      <Key>
+        <span
+          style={{
+            width: 14,
+            height: 8,
             background: `color-mix(in srgb, ${theme.secondary} 55%, transparent)`,
           }}
         />
@@ -64,15 +75,18 @@ export function SubagentTimelineLegend({
         {zh ? "派出 / 交回" : "Sent / handed back"}
       </Key>
       {zoomed !== null ? (
-        <button
-          type="button"
-          onClick={onShowAll}
-          style={{ ...plain, color: theme.action, marginLeft: "auto" }}
-        >
-          {zh
-            ? `已放大 ${offset(zoomed)} · 还原整轮`
-            : `Zoomed to ${offset(zoomed)} · Show the whole turn`}
-        </button>
+        <span style={{ ...row, gap: 14, marginLeft: "auto" }}>
+          {zh ? "左右滑动平移" : "Swipe sideways to pan"}
+          <button
+            type="button"
+            onClick={onShowAll}
+            style={{ ...plain, color: theme.action }}
+          >
+            {zh
+              ? `已放大 ${offset(zoomed)} · 还原整轮`
+              : `Zoomed to ${offset(zoomed)} · Show the whole turn`}
+          </button>
+        </span>
       ) : (
         <span style={{ marginLeft: "auto" }}>
           {zh ? "拖选一段放大" : "Drag across to zoom"}

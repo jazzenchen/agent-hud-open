@@ -150,3 +150,39 @@ export function contextRuns(
   if (run.length > 0) runs.push(run);
   return runs;
 }
+
+/**
+ * A timeline row's calls as runs: a call less than `gap` ms after the one
+ * before joins its run, so a busy stretch draws as one bar instead of a comb
+ * of ticks. A run of one call is a tick. Only runs that reach into
+ * `from`–`to` come back; they are grouped over every call, so panning never
+ * regroups them.
+ */
+export function callRuns(
+  calls: readonly { at: number }[],
+  from: number,
+  to: number,
+  gap: number,
+): { from: number; to: number; calls: number }[] {
+  const runs: { from: number; to: number; calls: number }[] = [];
+  for (const { at } of calls) {
+    const last = runs.at(-1);
+    if (last && at - last.to < gap) {
+      last.to = at;
+      last.calls += 1;
+    } else runs.push({ from: at, to: at, calls: 1 });
+  }
+  return runs.filter((run) => run.to >= from && run.from <= to);
+}
+
+/** A zoomed window moved `by` ms, kept inside `start`–`end` at the same length. */
+export function panWindow(
+  [from, to]: readonly [number, number],
+  by: number,
+  start: number,
+  end: number,
+): [number, number] {
+  const length = to - from;
+  const next = Math.max(start, Math.min(from + by, end - length));
+  return [next, next + length];
+}
