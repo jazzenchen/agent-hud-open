@@ -5,7 +5,7 @@
 //! command (`foreign`), and the cookies it ends up holding for the site are
 //! tried with the provider's reader; once they read the quota they are kept
 //! and the window closes. Closing it first keeps nothing.
-use crate::Service;
+use crate::service::Service;
 use serde_json::json;
 use std::time::{Duration, Instant};
 use tauri::{Emitter, Manager};

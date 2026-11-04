@@ -1,5 +1,5 @@
 //! Public local MCP channel, attached to the application's existing owners.
-use super::{presentation::Presentation, Backend};
+use super::{backend::Backend, presentation::Presentation};
 use agent_hud_runtime::local_tools::{self, Server};
 use serde_json::{json, Value};
 use std::{

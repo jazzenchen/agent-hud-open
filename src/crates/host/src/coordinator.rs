@@ -175,7 +175,7 @@ fn current_notice(app: &tauri::AppHandle) -> Option<UpdateNotice> {
 /// the notice names.
 pub(crate) fn open_update_page(app: &tauri::AppHandle) {
     if let Some(notice) = current_notice(app) {
-        crate::show_settings_page(app, notice.settings_page);
+        crate::auxiliary::show_settings_page(app, notice.settings_page);
     }
 }
 

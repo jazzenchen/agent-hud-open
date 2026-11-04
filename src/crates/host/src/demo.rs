@@ -3,7 +3,7 @@
 //! it, a built-in one by name (`showcase`) or a JSON file, and implies
 //! `--demo`. The player wakes for each step, plays it under the collection
 //! gate, republishes, and tells the HUD when a step opens or closes the panel.
-use crate::{wake_collector, Service, REQUEST};
+use crate::service::{wake_collector, Service, REQUEST};
 use agent_hud_runtime::DemoScript;
 use std::{
     sync::{Arc, PoisonError},

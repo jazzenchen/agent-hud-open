@@ -91,10 +91,10 @@ pub fn install(app: &tauri::App) -> tauri::Result<()> {
         .menu(&menu)
         .show_menu_on_left_click(true)
         .on_menu_event(|app, event| match event.id.as_ref() {
-            "tray-settings" => super::show(app),
+            "tray-settings" => crate::auxiliary::show(app),
             "tray-statistics" => statistics(app),
             "tray-toggle-glow" => crate::coordinator::toggle_glow(app),
-            "tray-refresh" => super::refresh_data(app),
+            "tray-refresh" => crate::auxiliary::refresh_data(app),
             "tray-update" => crate::coordinator::open_update_page(app),
             "tray-quit" => app.exit(0),
             id if id.starts_with("tray-data-") => statistics(app),
@@ -107,7 +107,7 @@ pub fn install(app: &tauri::App) -> tauri::Result<()> {
 fn statistics(app: &tauri::AppHandle) {
     let app = app.clone();
     tauri::async_runtime::spawn_blocking(move || {
-        if let Err(error) = super::show_statistics(&app) {
+        if let Err(error) = crate::auxiliary::show_statistics(&app) {
             eprintln!("Agent HUD Statistics: {error}");
         }
     });

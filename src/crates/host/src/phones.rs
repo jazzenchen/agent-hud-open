@@ -1,6 +1,6 @@
 //! The host's own sharing with paired phones: quota readings and token usage
 //! over the LAN link, for a run with no product that shares instead.
-use crate::{extension::ProductExtension, Backend};
+use crate::{backend::Backend, extension::ProductExtension};
 use agent_hud_share::PhoneShare;
 use std::{
     path::PathBuf,

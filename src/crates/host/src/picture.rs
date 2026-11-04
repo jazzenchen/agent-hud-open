@@ -1,5 +1,5 @@
 //! Offscreen pictures of this app's own masked UI, never desktop capture.
-use super::{presentation::Presentation, Service};
+use super::{presentation::Presentation, service::Service};
 use serde_json::{json, Value};
 use std::{
     sync::{
