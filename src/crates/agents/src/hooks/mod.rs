@@ -9,6 +9,7 @@ use std::{collections::HashMap, path::Path};
 pub mod configuration;
 pub mod events;
 pub mod observer;
+mod patch;
 pub mod request;
 pub mod turn_log;
 pub mod windows;
