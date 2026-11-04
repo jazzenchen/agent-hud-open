@@ -713,6 +713,60 @@ pub(crate) fn cost_in_tier(
     }
 }
 
+/// A call's list price split by token kind, in `KINDS` order (cache write,
+/// input, reasoning, output, cache read): the rates `cost_at` would use, so
+/// the call's tier and peak factor apply to every kind. The kinds can differ
+/// from `cost_at`'s total by rounding when a relay multiplier applies.
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct KindCost {
+    pub currency: String,
+    pub picos: [i128; 5],
+}
+
+pub(crate) fn kind_cost_at(
+    source: &str,
+    model: &str,
+    tokens: &PriceTokens,
+    region: Region,
+    at_ms: Option<i64>,
+) -> Option<KindCost> {
+    let kinds = KindTokens::from(tokens);
+    match quote(&format!("{source}-model:{model}"), region)?.1 {
+        Quote::Flat(currency, rates) => {
+            // route_cost: fresh input, output with reasoning, cache read, cache write.
+            let rate = |kind: TokenKind| match kind {
+                TokenKind::CacheWrite => rates[3],
+                TokenKind::Input => rates[0],
+                TokenKind::Reasoning | TokenKind::Output => rates[1],
+                TokenKind::CacheRead => rates[2],
+            };
+            let mut picos = [0_i128; 5];
+            for (index, kind) in KINDS.into_iter().enumerate() {
+                picos[index] = i128::try_from(kinds.0[index])
+                    .ok()?
+                    .checked_mul(rate(kind))?;
+            }
+            Some(KindCost { currency, picos })
+        }
+        Quote::Listed(listing, times) => {
+            let tier = listing.price.tier(kinds);
+            let rates = listing.price.rates(tier);
+            let factor = factor(listing.model, at_ms);
+            let mut picos = [0_i128; 5];
+            for (index, kind) in KINDS.into_iter().enumerate() {
+                let amount = i128::try_from(kinds.0[index].checked_mul(rates.rate(kind).into())?)
+                    .ok()?
+                    .checked_mul(factor)?;
+                picos[index] = scaled(amount, times);
+            }
+            Some(KindCost {
+                currency: listing.region.currency().to_owned(),
+                picos,
+            })
+        }
+    }
+}
+
 pub fn consumer_cost(
     consumer: &str,
     tokens: &PriceTokens,
@@ -979,6 +1033,46 @@ mod tests {
             cache_write: 2_000,
             reasoning: 1_000,
         }
+    }
+
+    #[test]
+    fn a_calls_kinds_add_up_to_its_list_price() {
+        let tokens = every_kind();
+        for (source, model) in [
+            ("claude", "claude-opus-4-5"),
+            ("claude", "claude-sonnet-4-5"),
+            ("codex", "gpt-5"),
+            ("codex", "gpt-oss:20b#ollama"),
+        ] {
+            let total = cost(source, model, &tokens);
+            let split = kind_cost_at(source, model, &tokens, Region::International, None);
+            assert_eq!(
+                split.map(|split| split.picos.iter().sum::<i128>()),
+                total,
+                "{source} {model}"
+            );
+        }
+        let split = kind_cost_at(
+            "claude",
+            "claude-opus-4-5",
+            &tokens,
+            Region::International,
+            None,
+        )
+        .unwrap();
+        assert_eq!(split.currency, "USD");
+        // Reasoning and output are both priced at the output rate.
+        assert_eq!(split.picos[2] * 2, split.picos[3]);
+        assert_eq!(
+            kind_cost_at(
+                "claude",
+                "no-such-model",
+                &tokens,
+                Region::International,
+                None
+            ),
+            None
+        );
     }
 
     #[test]

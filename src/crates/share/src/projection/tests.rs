@@ -49,6 +49,33 @@ fn usage_goes_out_one_record_a_day_with_each_consumer_named_once() {
 }
 
 #[test]
+fn a_priced_buckets_list_cost_reaches_the_phone_by_kind() {
+    let mut priced = bucket("claude", "opus", START, 10);
+    priced["listCost"] = json!({"currency": "USD", "cacheWrite": "0", "input": "0.5",
+                                "reasoning": "0", "output": "7", "cacheRead": "0"});
+    priced["costs"] = json!({"USD": 7.5});
+    priced["costStatus"] = json!("available");
+    let mut unpriced = bucket("claude", "mystery", START, 10);
+    unpriced["listCost"] = Value::Null;
+    unpriced["costStatus"] = json!("unavailable");
+    let facts = json!({"kind": "usage-buckets", "buckets": [priced, unpriced]});
+    let records = usage("mac", &facts, START).unwrap();
+    let tokens = &records.iter().find(|r| r.kind == "usage").unwrap().payload["tokens"];
+    let by = |agent: &str| {
+        tokens
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|t| t["agentId"] == agent)
+            .unwrap()
+            .clone()
+    };
+    assert_eq!(by("claude-model:opus")["listCost"]["output"], "7");
+    assert_eq!(by("claude-model:opus")["listCost"]["currency"], "USD");
+    assert!(by("claude-model:mystery").get("listCost").is_none());
+}
+
+#[test]
 fn readings_name_each_enabled_agents_windows() {
     let snapshot = json!({
         "providers": [{"id": "claude", "name": "Claude", "enabled": true,

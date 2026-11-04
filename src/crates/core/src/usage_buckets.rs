@@ -68,6 +68,9 @@ impl AgentHudCore {
         struct Aggregate {
             tokens: Usage,
             costs: BTreeMap<String, i128>,
+            kinds: BTreeMap<String, [i128; 5]>,
+            /// Calls priced in total but not by kind.
+            unsplit: u64,
             known: u64,
             unknown: u64,
         }
@@ -92,16 +95,17 @@ impl AgentHudCore {
                 ))
                 .or_default();
             group.tokens.add(usage);
+            let price_tokens = pricing::PriceTokens {
+                tokens_in: usage.input + usage.write,
+                tokens_out: usage.output + usage.reasoning,
+                cache_read: usage.read,
+                cache_write: usage.write,
+                reasoning: usage.reasoning,
+            };
             let priced = pricing::cost_at(
                 &source,
                 &model,
-                &pricing::PriceTokens {
-                    tokens_in: usage.input + usage.write,
-                    tokens_out: usage.output + usage.reasoning,
-                    cache_read: usage.read,
-                    cache_write: usage.write,
-                    reasoning: usage.reasoning,
-                },
+                &price_tokens,
                 true,
                 self.price_regions.region(&source, &model),
                 Some(at),
@@ -109,6 +113,20 @@ impl AgentHudCore {
             if let Some(cost) = priced {
                 *group.costs.entry(cost.currency).or_default() += cost.amount_pico;
                 group.known += 1;
+                if let Some(split) = pricing::kind_cost_at(
+                    &source,
+                    &model,
+                    &price_tokens,
+                    self.price_regions.region(&source, &model),
+                    Some(at),
+                ) {
+                    let sum = group.kinds.entry(split.currency).or_default();
+                    for (total, part) in sum.iter_mut().zip(split.picos) {
+                        *total += part;
+                    }
+                } else {
+                    group.unsplit += 1;
+                }
             } else {
                 group.unknown += 1;
             }
@@ -116,7 +134,14 @@ impl AgentHudCore {
         let buckets=output.into_iter().map(|((provider,model,at),entry)|{
             let costs=entry.costs.into_iter().map(|(currency,pico)|(currency,json!(pico as f64/1_000_000_000_000.0))).collect::<serde_json::Map<_,_>>();
             use crate::naming::model_names::{consumer_name,vendor_name};
-            json!({"provider":provider,"model":model,"vendorName":vendor_name(&provider),"modelName":consumer_name(&format!("{provider}-model:{model}")),"accountId":null,"timestamp":DateTime::<Utc>::from_timestamp_millis(at).map(|d|d.to_rfc3339()),"tokens":{"input":entry.tokens.input,"output":entry.tokens.output,"cacheRead":entry.tokens.read,"cacheWrite":entry.tokens.write,"reasoning":entry.tokens.reasoning,"total":entry.tokens.total()},"costs":costs,"costStatus":if entry.unknown==0{"available"}else if entry.known==0{"unavailable"}else{"partial"}})
+            // The phone's shape: one currency, each kind's exact decimal. Only a
+            // bucket whose every call is priced has one; the rest read as unpriced.
+            let list_cost = (entry.unknown == 0 && entry.unsplit == 0 && entry.kinds.len() == 1).then(|| {
+                let (currency, picos) = entry.kinds.iter().next().unwrap();
+                let text = |pico: i128| crate::session_usage::decimal_text(pico);
+                json!({"currency":currency,"cacheWrite":text(picos[0]),"input":text(picos[1]),"reasoning":text(picos[2]),"output":text(picos[3]),"cacheRead":text(picos[4])})
+            });
+            json!({"provider":provider,"model":model,"listCost":list_cost,"vendorName":vendor_name(&provider),"modelName":consumer_name(&format!("{provider}-model:{model}")),"accountId":null,"timestamp":DateTime::<Utc>::from_timestamp_millis(at).map(|d|d.to_rfc3339()),"tokens":{"input":entry.tokens.input,"output":entry.tokens.output,"cacheRead":entry.tokens.read,"cacheWrite":entry.tokens.write,"reasoning":entry.tokens.reasoning,"total":entry.tokens.total()},"costs":costs,"costStatus":if entry.unknown==0{"available"}else if entry.known==0{"unavailable"}else{"partial"}})
         }).collect::<Vec<_>>();
         let mut pending = self
             .pending_meter_bounds()
