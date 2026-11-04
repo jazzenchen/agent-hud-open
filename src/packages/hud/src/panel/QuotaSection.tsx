@@ -42,6 +42,7 @@ import {
 } from "./theme";
 import { SourceTokenChart } from "./TokenChartSection";
 import { QuotaRingCard } from "./QuotaRingCard";
+import { levelFill, levelText, markLevelText, type Level } from "../tokens";
 
 export function MetricPicker({
   selected,
@@ -133,7 +134,8 @@ export function SourceQuotaRow({
   showReset: boolean;
   onStats?: () => void;
 }) {
-  const colors = palette(useGround(light));
+  const ground = useGround(light);
+  const colors = palette(ground);
   const services = usePanelServices();
   const [hovered, setHovered] = useState(false);
   const clickable = Boolean(services?.selectProvider || onStats);
@@ -155,31 +157,18 @@ export function SourceQuotaRow({
       ? projection
       : pct;
   const budget = quotaPercent(reading.budgetPercent, format.quotaDisplay);
-  const quotaLevel =
-    row.status === "critical"
-      ? colors.critical
-      : row.status === "warning"
-        ? colors.warning
-        : colors.ok;
-  const level =
+  const quotaLevel: Level =
+    row.status === "critical" || row.status === "warning" ? row.status : "ok";
+  const level: Level =
     measure === "quota"
       ? quotaLevel
       : measure === "burn" && reading.runsOut
-        ? colors.warning
-        : colors.ok;
+        ? "warning"
+        : "ok";
   const known = reading.available && row.status !== "stale";
-  const color = known ? level : colors.tertiary;
+  const color = known ? levelFill(level, ground) : colors.tertiary;
   // The value is text: the level's text shade (darker on a light HUD).
-  const levelText =
-    measure === "quota"
-      ? row.status === "critical"
-        ? colors.criticalText
-        : row.status === "warning"
-          ? colors.warningText
-          : colors.okText
-      : measure === "burn" && reading.runsOut
-        ? colors.warningText
-        : colors.okText;
+  const valueColor = levelText(level, ground);
   const showsTrack = measure === "quota" || measure === "burn";
   return (
     <div
@@ -276,7 +265,9 @@ export function SourceQuotaRow({
               width: `${solidPercent ?? 0}%`,
               borderRadius: 4,
               background:
-                row.status === "stale" ? colors.secondary : quotaLevel,
+                row.status === "stale"
+                  ? colors.secondary
+                  : levelFill(quotaLevel, ground),
             }}
           />
           {measure === "burn" && budget != null && (
@@ -308,7 +299,7 @@ export function SourceQuotaRow({
           fontSize: reading.available ? 13 : 12,
           fontWeight: 600,
           whiteSpace: "nowrap",
-          color: known ? levelText : colors.secondary,
+          color: known ? valueColor : colors.secondary,
         }}
       >
         {reading.value}
@@ -356,7 +347,8 @@ export function QuotaWidgets({
   showReset: boolean;
   onStats?: () => void;
 }) {
-  const colors = palette(useGround(light)),
+  const ground = useGround(light),
+    colors = palette(ground),
     services = usePanelServices(),
     format = useFormat(),
     clickable = Boolean(services?.selectProvider || onStats),
@@ -397,11 +389,7 @@ export function QuotaWidgets({
         const figure =
           row.status === "stale"
             ? colors.secondary
-            : row.status === "critical"
-              ? colors.criticalText
-              : row.status === "warning"
-                ? colors.warningText
-                : colors.okText;
+            : markLevelText(row.status, ground);
         return (
           <div
             key={row.id}
