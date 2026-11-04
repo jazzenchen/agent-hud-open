@@ -16,7 +16,9 @@ pub(super) const SECTIONS: &[&str] = &["blocks", "tokens", "sessions"];
 const WIDGETS: &[&str] = &["bar", "rings", "segments", "number", "chart"];
 const MEASURES: &[&str] = &["quota", "burn", "tokens", "consumed", "cost"];
 const RING_SIZES: &[&str] = &["small", "medium", "large"];
-const SPANS: &[&str] = &["full", "half"];
+/// How much of a line a block takes; blocks that take less share it where each
+/// keeps enough room (QuotaBlocks.tsx).
+const SPANS: &[&str] = &["full", "half", "third", "quarter"];
 const PERIODS: &[&str] = &["day", "week", "month"];
 const SPACINGS: &[&str] = &["compact", "regular", "roomy"];
 const SESSION_PERIODS: &[&str] = &["day", "week"];
@@ -333,6 +335,10 @@ fn parse_block(block: &Value) -> Map<String, Value> {
     if block["hidden"] == true {
         v.insert("hidden".into(), json!(true));
     }
+    // A ring drawn alone, its windows' lines left out; drawn with them by default.
+    if block["legend"] == false {
+        v.insert("legend".into(), json!(false));
+    }
     if block["countdown"].is_boolean() {
         v.insert("countdown".into(), block["countdown"].clone());
     }
@@ -577,6 +583,9 @@ pub(super) fn reduced(layout: &Value, present: &[Block]) -> Value {
             if !kind.takes_ring_size(widget) || c.get("ringSize") == Some(&json!("medium")) {
                 c.remove("ringSize");
             }
+            if !kind.takes_ring_size(widget) {
+                c.remove("legend");
+            }
             if !kind.takes_half(widget) || c.get("span") == Some(&json!("full")) {
                 c.remove("span");
             }
@@ -759,8 +768,12 @@ fn block_issues(
         };
         found.push(format!("{path}.ringSize: {message}"));
     }
-    if change["span"] == "half" && !kind.takes_half(widget) && !kept("span") {
-        found.push(format!("{path}.span: Bar rows need the full width of the panel, so the \"{widget}\" widget of \"{key}\" cannot take half a line. span \"half\" applies to the \"rings\", \"segments\", \"number\" and \"chart\" widgets and to API balances."));
+    let shared = change["span"].as_str().is_some_and(|s| s != "full");
+    if shared && !kind.takes_half(widget) && !kept("span") {
+        found.push(format!("{path}.span: Bar rows need the full width of the panel, so the \"{widget}\" widget of \"{key}\" cannot share a line. span \"half\", \"third\" and \"quarter\" apply to the \"rings\", \"segments\", \"number\" and \"chart\" widgets and to API balances."));
+    }
+    if change["legend"] == false && !kind.takes_ring_size(widget) && !kept("legend") {
+        found.push(format!("{path}.legend: {drawn} has no legend to leave out. legend applies to the \"rings\" and \"segments\" widgets."));
     }
     if change["period"].is_string() && !kind.takes_period(widget) && !kept("period") {
         found.push(format!("{path}.period: {drawn} draws no chart. period applies to the \"chart\" widget, whose bars cover it, and to API balances, whose estimated cost, burn rate and chart cover it."));
@@ -1130,7 +1143,7 @@ fn block_misreadings(value: &Value, path: &str) -> Vec<String> {
         match property.as_str() {
             "widget" => found.extend(misnamed(value, &format!("{path}.widget"), WIDGETS)),
             "measures" => found.extend(names(value, &format!("{path}.measures"), Some(MEASURES))),
-            "hidden" | "countdown" => {
+            "hidden" | "countdown" | "legend" => {
                 if !value.is_null() && !value.is_boolean() {
                     found.push(format!("{path}.{property} is true or false."));
                 }
@@ -1153,7 +1166,7 @@ fn block_misreadings(value: &Value, path: &str) -> Vec<String> {
             "ringSize" => found.extend(misnamed(value, &format!("{path}.ringSize"), RING_SIZES)),
             "span" => found.extend(misnamed(value, &format!("{path}.span"), SPANS)),
             "period" => found.extend(misnamed(value, &format!("{path}.period"), PERIODS)),
-            _ => found.push(format!("{path} has no property \"{property}\"; a block takes widget, measures, hidden, hiddenRows, hiddenAccounts, rows, accounts, countdown, columns, ringSize, span and period.")),
+            _ => found.push(format!("{path} has no property \"{property}\"; a block takes widget, measures, hidden, hiddenRows, hiddenAccounts, rows, accounts, countdown, columns, ringSize, legend, span and period.")),
         }
     }
     found

@@ -16,7 +16,12 @@ export interface PanelBlockLayout {
   countdown?: boolean;
   columns?: number;
   ringSize?: "small" | "medium" | "large";
-  span?: "full" | "half";
+  /** false draws `rings` and `segments` as the ring alone, the most used
+   * window's figure inside, the header and picker kept. */
+  legend?: boolean;
+  /** How much of a line it takes; blocks asking the same share one where each
+   * keeps enough room. */
+  span?: "full" | "half" | "third" | "quarter";
   period?: "day" | "week" | "month";
 }
 export interface PanelLayout {

@@ -144,11 +144,17 @@ export const SourceProviderBlock = memo(function SourceProviderBlock({
           <Logo source={vendor} size={14} light={light} />
         </span>
         <strong
+          title={agentVendorName(vendor)}
           style={{
             fontSize: 13,
             fontWeight: 700,
             lineHeight: "16px",
             color: colors.text,
+            // One line in a block a third or a quarter wide: cut short, never wrapped.
+            minWidth: 0,
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
           }}
         >
           {agentVendorName(vendor)}

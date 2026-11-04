@@ -79,6 +79,14 @@ function placing(width: unknown, shares: boolean): CSSProperties | null {
   return shares ? { flex: "1 1 0", minWidth: 0 } : null;
 }
 
+/** The cells a control covers in its grid. */
+function spanning(node: Node, parent: string): CSSProperties | null {
+  if (parent !== "grid" || !(node.colSpan || node.rowSpan)) return null;
+  const span = (value: unknown) =>
+    typeof value === "number" && value > 1 ? `span ${value}` : undefined;
+  return { gridColumn: span(node.colSpan), gridRow: span(node.rowSpan) };
+}
+
 export function Placed({
   node,
   scope,
@@ -96,10 +104,12 @@ export function Placed({
   if (SECTIONS.includes(String(node.type)))
     return <Slot node={node} parent={parent} index={index} lined={lined} />;
   const control = <Control node={node} scope={scope} parent={parent} />;
-  const place = placing(
+  const placed = placing(
     node.width,
     parent === "row" && SHARING.includes(String(node.type)),
   );
+  const spans = spanning(node, parent);
+  const place = placed || spans ? { ...placed, ...spans } : null;
   if (
     (!place && !lined) ||
     node.hidden === true ||
@@ -236,6 +246,8 @@ function Control({
           style={{
             display: "grid",
             gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
+            // A cell that spans more leaves gaps the smaller ones after it fill.
+            gridAutoFlow: "dense",
             gap,
           }}
         >
@@ -270,6 +282,13 @@ function Control({
       );
     }
     default:
-      return <LeafControl node={node} scope={scope} onClick={onClick} />;
+      return (
+        <LeafControl
+          node={node}
+          scope={scope}
+          onClick={onClick}
+          parent={parent}
+        />
+      );
   }
 }

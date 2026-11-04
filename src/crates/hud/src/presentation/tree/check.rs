@@ -15,6 +15,8 @@ pub(super) struct Check {
 #[derive(Clone, Default)]
 struct Scope {
     items: Vec<&'static str>,
+    /// It stands in a grid, directly or through repeats, where it can span cells.
+    in_grid: bool,
     states: Vec<(String, Vec<String>)>,
 }
 
@@ -168,7 +170,12 @@ impl Check {
             self.ids.push(id.clone());
             out.insert("id".into(), json!(id));
         }
+        let in_grid = scope.in_grid;
         let mut scope = scope.clone();
+        // A repeat's items stand where it does; any other parent's children in it.
+        if kind != "repeat" {
+            scope.in_grid = kind == "grid";
+        }
         if kind == "repeat" {
             match fields
                 .get("over")
@@ -193,6 +200,14 @@ impl Check {
                 "hidden" => self.boolean(value, &at),
                 "span" if root && in_blocks => self.named(value, &at, SPANS),
                 "width" => self.number_in(value, &at, CONTROL_WIDTHS.0, CONTROL_WIDTHS.1),
+                "colSpan" | "rowSpan" if !in_grid => {
+                    self.issues.push(format!(
+                        "{at}: {key} applies to a control inside a grid, which it makes cover more cells."
+                    ));
+                    false
+                }
+                "colSpan" => self.number_in(value, &at, 1, SPANS_IN_GRID.0),
+                "rowSpan" => self.number_in(value, &at, 1, SPANS_IN_GRID.1),
                 "state" if root => true,
                 "children" if PARENTS.contains(&kind) => {
                     let Some(children) = value.as_array() else {
@@ -317,7 +332,9 @@ impl Check {
             ("text", "style") => self.named(value, at, TEXT_STYLES),
             ("text", "color") => self.named(value, at, COLORS),
             ("text", "align") => self.named(value, at, TEXT_ALIGNS),
-            ("logo", "size") | ("rings" | "segments", "size") => self.named(value, at, SIZES),
+            ("logo", "size") => self.named(value, at, SIZES),
+            ("rings" | "segments", "size") => self.named(value, at, RING_SIZES),
+            ("rings" | "segments", "center") => self.named(value, at, CENTERS),
             ("bar", "value") => self.share(value, at, scope),
             ("bar", "level") => {
                 if value.as_str().is_some_and(|s| s.starts_with('{')) {
@@ -780,6 +797,7 @@ mod tests {
         let scope = Scope {
             items: vec!["window"],
             states: vec![("tab".into(), vec!["day".into(), "week".into()])],
+            ..Scope::default()
         };
         assert!(readable("window.used", &scope).is_ok());
         assert!(readable("now.time", &scope).is_ok());

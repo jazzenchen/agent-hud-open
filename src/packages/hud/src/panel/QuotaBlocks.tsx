@@ -8,6 +8,7 @@ import type {
 import { blockRows, quotaRowKey, vendorKey, type HUDConfig } from "../model";
 import { SourceProviderBlock } from "./QuotaSection";
 import { SourceBalances } from "./SourceBalances";
+import { blockLines } from "./block-lines";
 import {
   inPanelOrder,
   type densityMetrics,
@@ -34,23 +35,14 @@ export function QuotaBlocks({
   separated: boolean;
   colors: ReturnType<typeof palette>;
 }) {
-  const span = (key: string) => custom[key]?.span ?? layouts?.[key]?.span;
-  // Two half blocks share a line where the blocks' width holds both: the
-  // panel's, or the column's a row of an agent's gives them.
-  const lines: (typeof blocks)[] = [];
-  for (let i = 0; i < blocks.length; i++) {
-    const block = blocks[i],
-      next = blocks[i + 1];
-    if (
-      width - density.section >= 460 &&
-      next &&
-      span(block.key) === "half" &&
-      span(next.key) === "half"
-    ) {
-      lines.push([block, next]);
-      i++;
-    } else lines.push([block]);
-  }
+  const span = (key: string) => {
+    const asked = custom[key]?.span ?? layouts?.[key]?.span;
+    return typeof asked === "string" ? asked : undefined;
+  };
+  // Blocks that ask for a half, a third or a quarter share a line where the
+  // blocks' width holds them: the panel's, or the column's a row of an
+  // agent's gives them.
+  const lines = blockLines(blocks, span, width, density.section);
   return (
     <div
       className="hud-source-blocks"
@@ -60,12 +52,12 @@ export function QuotaBlocks({
         gap: "var(--hud-section-gap)",
       }}
     >
-      {lines.map((line, index) => (
+      {lines.map(({ blocks: line, columns }, index) => (
         <div
           key={line.map((b) => b.key).join("+")}
           style={{
             display: "grid",
-            gridTemplateColumns: line.length === 2 ? "1fr 1fr" : "1fr",
+            gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
             gap: density.section,
             ...(index > 0 && separated
               ? {
@@ -79,7 +71,7 @@ export function QuotaBlocks({
             <div
               key={block.key}
               data-hud-block={block.key}
-              data-hud-half={line.length === 2 ? "true" : undefined}
+              data-hud-half={columns > 1 ? "true" : undefined}
               style={{ minWidth: 0 }}
             >
               {block.content}

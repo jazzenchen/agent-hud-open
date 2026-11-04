@@ -4,10 +4,10 @@ import type { Quota } from "@agent-hud/protocol";
 import { HUD_METRICS } from "../../model";
 import { QuotaRingCard } from "../QuotaRingCard";
 import { SourceTokenChart } from "../TokenChartSection";
-import { UsageRing } from "../../usage-meter/UsageRing";
 import { noButtonChrome, tabular } from "../theme";
 import { fill, pick, valueOf, type Scope } from "./custom-data";
 import { Clickable } from "./Clickable";
+import { RingCell } from "./RingCell";
 import {
   DrawingContext,
   levelColor,
@@ -36,10 +36,13 @@ export function LeafControl({
   node,
   scope,
   onClick,
+  parent,
 }: {
   node: Node;
   scope: Scope;
   onClick?: () => void;
+  /** The control it stands in: a grid's cell centres a ring. */
+  parent: string;
 }) {
   const drawing = useContext(DrawingContext)!;
   // The panel's own setting: pictures, which draw no frames, turn motion off.
@@ -134,28 +137,18 @@ export function LeafControl({
       const size = (["small", "medium", "large"] as const).find(
         (s) => s === node.size,
       );
-      if (node.legend === false) {
-        const ring = { small: 40, medium: 52, large: 60 }[size ?? "medium"];
+      if (node.legend === false)
         return (
-          <Clickable onClick={onClick} style={{ width: ring, height: ring }}>
-            <UsageRing
-              style={node.type}
-              items={rows.map((row) => ({
-                percent: row.usedPercent,
-                color: levelColor(row.status, drawing.colors, false),
-              }))}
-              spec={{
-                size: ring,
-                width: ring / 10,
-                hole: ring * 0.56,
-                gap: 3,
-              }}
-              track={drawing.colors.track}
-              reduceMotion={reduceMotion}
-            />
-          </Clickable>
+          <RingCell
+            rows={rows}
+            style={node.type}
+            size={node.size === "fill" ? "fill" : (size ?? "medium")}
+            center={String(node.center ?? "none")}
+            onClick={onClick}
+            scope={scope}
+            centered={parent === "grid"}
+          />
         );
-      }
       return rows.length ? (
         <Clickable onClick={onClick}>
           <QuotaRingCard

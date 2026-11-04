@@ -898,6 +898,69 @@ fn a_proposal_in_the_older_spelling_keeps_sections_in_their_row() {
     assert_eq!(tree["children"][1]["children"][1]["id"], "tokens");
 }
 
+/// Ring cells: a ring with its agent's logo inside, as big as its grid cell, and
+/// cells that cover more of the grid; as the skill's example writes them.
+#[test]
+fn rings_make_compact_cells_that_span_a_grid() {
+    let (_folder, owner) = owner();
+    draft(
+        &owner,
+        json!({"edit": [
+            {"update": "claude", "hidden": true},
+            {"insert": {"id": "cells", "type": "grid", "columns": 4, "gap": "medium", "children": [
+                {"type": "rings", "items": {"over": "windows", "where": {"agent": "claude"}}, "legend": false, "center": "percent", "size": "fill", "colSpan": 2, "rowSpan": 2},
+                {"type": "repeat", "over": "agents", "where": {"id": ["codex", "cursor", "antigravity"]}, "children": [
+                    {"type": "rings", "items": {"over": "windows", "where": {"agent": "{agent.id}"}}, "legend": false, "center": "percent", "onClick": {"open": "statistics", "tab": "tokens", "agent": "{agent.id}"}}
+                ]}
+            ]}, "into": "blocks", "at": 0}
+        ]}),
+    );
+    let cells = &layout_of(&owner)["custom"]["cells"];
+    assert_eq!(cells["children"][0]["colSpan"], 2);
+    assert_eq!(cells["children"][0]["size"], "fill");
+    assert_eq!(cells["children"][1]["children"][0]["center"], "percent");
+    let error = refused(
+        &owner,
+        json!({"edit": [{"insert": {"id": "lone", "type": "rings", "items": {"over": "windows"}, "legend": false, "center": "face", "colSpan": 2}, "into": "panel"}]}),
+    );
+    assert!(
+        error.contains("colSpan applies to a control inside a grid"),
+        "{error}"
+    );
+    assert!(
+        error.contains("lone.center is one of \"percent\", \"none\""),
+        "{error}"
+    );
+}
+
+/// A compact block: rings without their lines, sharing a line with its neighbour.
+/// Bars have no legend to leave out and cannot share a line.
+#[test]
+fn compact_blocks_leave_out_their_lines_and_share_a_line() {
+    let (_folder, owner) = owner();
+    let error = refused(
+        &owner,
+        json!({"edit": [{"update": "codex", "widget": "bar", "legend": false, "span": "quarter"}]}),
+    );
+    assert!(error.contains("has no legend to leave out"), "{error}");
+    assert!(error.contains("cannot share a line"), "{error}");
+    draft(
+        &owner,
+        json!({"edit": [
+            {"update": "claude", "widget": "rings", "legend": false, "span": "third"},
+            {"update": "codex", "widget": "segments", "legend": false, "span": "third"}
+        ]}),
+    );
+    let layout = layout_of(&owner);
+    assert_eq!(
+        layout["blocks"]["claude"],
+        json!({"widget": "rings", "legend": false, "span": "third"})
+    );
+    let tree = call(&owner, "get_hud", json!({})).unwrap()["panel"].clone();
+    let blocks = &tree["children"][0]["children"];
+    assert_eq!(blocks[0]["legend"], false);
+}
+
 /// Settings keeps a block's columns when its widget changes to rings; an edit that
 /// leaves the block alone sends that back and is not refused for it, in the tree and
 /// in the older spelling. A value the layout does not hold yet still is.

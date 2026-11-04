@@ -29,7 +29,13 @@ pub(super) const COLORS: &[&str] = &[
     "critical",
 ];
 pub(super) const SIZES: &[&str] = &["small", "medium", "large"];
-pub(super) const SPANS: &[&str] = &["full", "half"];
+/// A ring's sizes: `fill` is as wide as its place, up to 200 points (CustomControl.tsx).
+pub(super) const RING_SIZES: &[&str] = &["small", "medium", "large", "fill"];
+/// What a ring without a legend shows inside it.
+pub(super) const CENTERS: &[&str] = &["percent", "none"];
+/// How many columns and rows a control inside a grid covers at most.
+pub(super) const SPANS_IN_GRID: (i64, i64) = (6, 4);
+pub(super) const SPANS: &[&str] = &["full", "half", "third", "quarter"];
 pub(super) const LEVELS: &[&str] = &["normal", "warning", "critical", "stale"];
 pub(super) const FORMATS: &[&str] = &[
     "percent",
@@ -204,22 +210,22 @@ pub(in crate::presentation) fn catalog() -> Value {
         ],
         "own": {
             "panel": {"fields": {"spacing": "compact, regular or roomy", "separators": "true or false: lines between parts", "width": "480 to 960 points (540 by default)", "countdown": "true or false: the reset countdowns"}, "children": "the sections blocks, tokens and sessions, and your own controls; a row, column or grid of yours placed here may hold sections"},
-            "blocks": {"fields": {"hidden": "true or false", "width": "points, for the section inside a row, column or grid of yours"}, "children": "one quota or balance block per agent, and your own controls; span: half puts two on a line when there is room"},
-            "quota": {"fields": {"widget": "bar, rings, segments, number or chart", "measures": "what the picker offers, the first shown: quota, burn, tokens, consumed, cost", "rows": "the order of its row ids", "hiddenRows": "row ids to hide", "accounts": "show only these account ids", "hiddenAccounts": "account ids to hide", "countdown": "true or false", "columns": "2 to 6, for number", "ringSize": "small, medium or large, for rings and segments", "span": "full or half (not for bar)", "period": "day, week or month, for chart", "hidden": "true or false"}},
-            "balance": {"fields": {"widget": "number or chart", "measures": "quota, burn, cost", "period": "day, week or month", "span": "full or half", "hidden": "true or false"}},
+            "blocks": {"fields": {"hidden": "true or false", "width": "points, for the section inside a row, column or grid of yours"}, "children": "one quota or balance block per agent, and your own controls; span half, third or quarter puts two, three or four on a line when there is room"},
+            "quota": {"fields": {"widget": "bar, rings, segments, number or chart", "measures": "what the picker offers, the first shown: quota, burn, tokens, consumed, cost", "rows": "the order of its row ids", "hiddenRows": "row ids to hide", "accounts": "show only these account ids", "hiddenAccounts": "account ids to hide", "countdown": "true or false", "columns": "2 to 6, for number", "ringSize": "small, medium or large, for rings and segments", "legend": "false draws rings and segments as the ring alone, the most used window's figure inside, its header and picker kept: a compact block", "span": "full, half, third or quarter of a line (not for bar); blocks share a line where each keeps about 200 points, else take one each", "period": "day, week or month, for chart", "hidden": "true or false"}},
+            "balance": {"fields": {"widget": "number or chart", "measures": "quota, burn, cost", "period": "day, week or month", "span": "full, half, third or quarter", "hidden": "true or false"}},
             "tokens": {"fields": {"period": "day, week or month", "agents": "agent names from get_hud's tokens.offeredAgents", "models": "model ids from tokens.offeredModels", "hiddenModels": "model ids to hide", "modelOrder": "model ids in order", "hidden": "true or false", "width": "points, for the section inside a row, column or grid of yours"}},
             "sessions": {"fields": {"limit": "1 to 10", "period": "day or week", "agents": "agent names from sessions.offeredAgents", "projects": "project ids from sessions.offeredProjects", "hidden": "true or false", "width": "points, for the section inside a row, column or grid of yours"}}
         },
         "controls": {
             "row": {"fields": {"gap": "none, small, medium or large", "align": "where the children sit along it: start (the default), center, end, or spread to both ends", "valign": "top, center or bottom: where they sit top to bottom; left out, centred, or at the top when it holds a section, column or grid"}, "children": "side by side; bars, columns, grids and sections share the room left equally, and a control with a width keeps it"},
             "column": {"fields": {"gap": "none, small, medium or large", "align": "start, center or end; left out, the children take its whole width"}, "children": "one under another"},
-            "grid": {"fields": {"columns": "2 to 6", "gap": "none, small, medium or large"}, "children": "in cells, left to right"},
+            "grid": {"fields": {"columns": "2 to 6", "gap": "none, small, medium or large"}, "children": "in cells, left to right, filling gaps; a child's colSpan and rowSpan make it cover more cells, for a big ring among small ones"},
             "repeat": {"fields": {"over": "windows, balances, accounts, agents or sessions", "where": "only items whose fields have these values, such as {\"agent\": \"claude\"}; a list allows several", "sort": "a field to sort by; -used sorts largest first", "limit": "1 to 20"}, "children": "drawn once for each item, in the repeat's parent"},
             "text": {"fields": {"text": "words and placeholders, up to 200 characters", "style": "title, body, caption or figure (a large number)", "color": "primary, secondary, tertiary, level (the item's level), agent (its agent's colour), ok, warning or critical", "align": "start, center or end"}},
             "logo": {"fields": {"agent": "an agent's id, or {window.agent}", "size": "small, medium or large"}},
             "bar": {"fields": {"value": "0 to 1, or a placeholder such as {window.used}", "level": "normal, warning, critical, or {window.level}; sets the colour"}},
-            "rings": {"fields": {"items": "which windows: {\"over\": \"windows\", \"where\": {...}, \"sort\": ..., \"limit\": up to 4}; one ring each, the first outermost", "size": "small, medium or large", "legend": "true or false: the windows' names and percentages beside it"}},
-            "segments": {"fields": {"items": "as for rings; one segment each, the first on top", "size": "small, medium or large", "legend": "true or false"}},
+            "rings": {"fields": {"items": "which windows: {\"over\": \"windows\", \"where\": {...}, \"sort\": ..., \"limit\": up to 4}; one ring each, the first outermost", "size": "small, medium, large, or fill: as wide as its place, up to 200 points", "legend": "true or false: the windows' names and percentages beside it; without them, pointing at the ring shows them", "center": "with legend false: percent (the most used window's share) or none (the default)"}},
+            "segments": {"fields": {"items": "as for rings; one segment each, the first on top", "size": "as for rings", "legend": "as for rings", "center": "as for rings"}},
             "chart": {"fields": {"period": "day, week or month", "agent": "an agent's id, or all agents when left out"}, "draws": "the tokens over the period, by model"},
             "divider": {"fields": {}},
             "picker": {"fields": {"state": "the name of a state its block declares", "options": "2 to 6 of {\"value\": ..., \"text\": ...}; the value shown is the state's"}}
@@ -229,8 +235,10 @@ pub(in crate::presentation) fn catalog() -> Value {
             "when": "show it only when a condition holds: {\"value\": \"{window.level}\", \"in\": [\"warning\", \"critical\"]}; one of is, in, not, above, below or present",
             "onClick": "what a click does; see actions",
             "hidden": "true or false",
-            "span": "full or half; for a control placed in blocks",
+            "span": "full, half, third or quarter of a line; for a control placed in blocks",
             "width": "16 to 960 points: a fixed width, so controls in different rows line up; left out, it takes what it needs",
+            "colSpan": "1 to 6: how many columns it covers, inside a grid",
+            "rowSpan": "1 to 4: how many rows it covers, inside a grid",
             "state": "for a control placed in panel or blocks: {\"name\": {\"options\": [...], \"default\": ...}}, read as {state.name} by everything inside it"
         },
         "data": data,

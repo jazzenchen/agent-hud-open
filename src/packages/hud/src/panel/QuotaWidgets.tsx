@@ -40,6 +40,7 @@ export function QuotaWidgets({
       <QuotaRingCard
         style={widget}
         ringSize={layout.ringSize}
+        legend={layout.legend !== false}
         {...{ rows, measure, now, light, showReset, onStats }}
       />
     );

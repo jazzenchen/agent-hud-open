@@ -17,6 +17,12 @@ import { useGround } from "../ground";
 import { MAX_USAGE_ITEMS, type RingStyle } from "../usage-meter/arcs";
 import { UsageRing } from "../usage-meter/UsageRing";
 import { FittingName } from "./FittingName";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@agent-hud/ui/components/tooltip";
 import { palette, type Measure } from "./theme";
 import { levelFill, markLevelText } from "../tokens";
 
@@ -36,10 +42,13 @@ export function QuotaRingCard({
   light,
   showReset,
   onStats,
+  legend = true,
 }: {
   rows: Quota[];
   style: RingStyle;
   ringSize?: keyof typeof RINGS;
+  /** false draws the ring alone, its windows' lines shown on pointing at it. */
+  legend?: boolean;
   measure: Measure;
   now: number;
   light: boolean;
@@ -70,12 +79,30 @@ export function QuotaRingCard({
         : a,
     undefined,
   );
+  // Alone, the ring's figure is the picked measure's, as the lines' would be.
+  const figureText = tightest
+    ? !legend && measure !== "quota"
+      ? quotaMetric(tightest, measure, now, format).value
+      : quotaPercentLabel(tightest.usedPercent, format.quotaDisplay)
+    : "--";
+  const lines = rows
+    .map((row) => {
+      const metric = quotaMetric(row, measure, now, format);
+      return [
+        quotaShortName(row),
+        metric.value,
+        showReset || measure !== "quota" ? metric.detail : "",
+      ]
+        .filter(Boolean)
+        .join("  ");
+    })
+    .join("\n");
   const clickable = Boolean(services?.selectProvider || onStats);
   const open = () => {
     services?.selectProvider?.(rows[0].vendor);
     onStats?.();
   };
-  return (
+  const card = (
     <div
       className="hud-quota-ring-card"
       role={clickable ? "button" : undefined}
@@ -84,6 +111,7 @@ export function QuotaRingCard({
       style={{
         display: "flex",
         alignItems: "center",
+        justifyContent: legend ? undefined : "center",
         gap: 20,
         padding: "2px 4px",
         borderRadius: 6,
@@ -128,75 +156,87 @@ export function QuotaRingCard({
             inset: 0,
             display: "grid",
             placeItems: "center",
-            fontSize: ring.size >= 60 ? 13 : 11,
+            fontSize: figureText.length > 4 ? 10 : ring.size >= 60 ? 13 : 11,
             fontWeight: 600,
             fontVariantNumeric: "tabular-nums",
             color: tightest ? figure(tightest) : colors.secondary,
           }}
         >
-          {tightest
-            ? quotaPercentLabel(tightest.usedPercent, format.quotaDisplay)
-            : "--"}
+          {figureText}
         </span>
       </div>
-      <div
-        onMouseLeave={() => setLit(null)}
-        style={{
-          flex: 1,
-          minWidth: 0,
-          display: "grid",
-          gridTemplateColumns: "minmax(0, 1fr) auto auto",
-          columnGap: 18,
-          rowGap: 3,
-          alignItems: "center",
-          fontSize: 12,
-        }}
-      >
-        {rows.map((row, i) => {
-          const metric = quotaMetric(row, measure, now, format),
-            dim = lit != null && lit !== i,
-            cell = {
-              opacity: dim ? 0.45 : 1,
-              transition: reduceMotion ? undefined : "opacity 0.18s",
-            };
-          return (
-            <div
-              key={row.id}
-              title={metric.hint}
-              onMouseEnter={() => setLit(i < MAX_USAGE_ITEMS ? i : null)}
-              style={{ display: "contents" }}
-            >
-              <FittingName
-                name={row.name}
-                short={quotaShortName(row)}
-                style={{ ...cell, color: colors.text }}
-              />
-              <strong
-                style={{
-                  ...cell,
-                  color: figure(row),
-                  fontWeight: 600,
-                  fontVariantNumeric: "tabular-nums",
-                  textAlign: "right",
-                }}
+      {legend && (
+        <div
+          onMouseLeave={() => setLit(null)}
+          style={{
+            flex: 1,
+            minWidth: 0,
+            display: "grid",
+            gridTemplateColumns: "minmax(0, 1fr) auto auto",
+            columnGap: 18,
+            rowGap: 3,
+            alignItems: "center",
+            fontSize: 12,
+          }}
+        >
+          {rows.map((row, i) => {
+            const metric = quotaMetric(row, measure, now, format),
+              dim = lit != null && lit !== i,
+              cell = {
+                opacity: dim ? 0.45 : 1,
+                transition: reduceMotion ? undefined : "opacity 0.18s",
+              };
+            return (
+              <div
+                key={row.id}
+                title={metric.hint}
+                onMouseEnter={() => setLit(i < MAX_USAGE_ITEMS ? i : null)}
+                style={{ display: "contents" }}
               >
-                {metric.value}
-              </strong>
-              <span
-                style={{
-                  ...cell,
-                  fontSize: 11,
-                  color: colors.secondary,
-                  textAlign: "right",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                {showReset || measure !== "quota" ? metric.detail : ""}
-              </span>
-            </div>
-          );
-        })}
-      </div>
+                <FittingName
+                  name={row.name}
+                  short={quotaShortName(row)}
+                  style={{ ...cell, color: colors.text }}
+                />
+                <strong
+                  style={{
+                    ...cell,
+                    color: figure(row),
+                    fontWeight: 600,
+                    fontVariantNumeric: "tabular-nums",
+                    textAlign: "right",
+                  }}
+                >
+                  {metric.value}
+                </strong>
+                <span
+                  style={{
+                    ...cell,
+                    fontSize: 11,
+                    color: colors.secondary,
+                    textAlign: "right",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {showReset || measure !== "quota" ? metric.detail : ""}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
+  if (!legend)
+    return (
+      <TooltipProvider delayDuration={200}>
+        <Tooltip>
+          <TooltipTrigger asChild>{card}</TooltipTrigger>
+          <TooltipContent side="top" style={{ whiteSpace: "pre-line" }}>
+            {lines}
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    );
+  return card;
 }
