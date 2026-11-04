@@ -9,7 +9,7 @@ The implementation follows the original Swift account readers:
 
 | Provider     | Existing source                                     | Read operation                                                       |
 | ------------ | --------------------------------------------------- | -------------------------------------------------------------------- |
-| Claude       | Installed Claude Code and its current account       | SDK `get_usage`, hooks disabled, `skip_behaviors`, no prompt         |
+| Claude       | Installed Claude Code, its current folder and selected additional folders | SDK `get_usage`, hooks disabled, `skip_behaviors`, no prompt |
 | Codex        | Installed Codex, its current home and selected additional homes | `initialize`, `account/rateLimits/read`, `account/read`, no turn |
 | Pi / ChatGPT | Existing, unexpired Pi OAuth home                   | Official ChatGPT usage endpoint; no OAuth flow or credential rewrite |
 | Cursor       | Read-only Cursor account SQLite database; a sealed sign-in (`cursor-safe-storage:v1:`) opens with Cursor's "Cursor Safe Storage" keychain item, which macOS asks about once (Electron files it under "Cursor Key", older builds under "Cursor") | Current usage-summary endpoint and billing-cycle reset; for an account merged into SuperGrok (plan `super`), or when the summary is refused, the period Cursor itself shows (`DashboardService/GetCurrentPeriodUsage`): its percentages where it reports them (a merged plan), else the cents spent of each limit (a plan metered in dollars), as Cursor's usage bar works them out; a meter with neither is not shown |
@@ -90,6 +90,31 @@ previous list, including results still in flight.
 These additional homes provide subscription quotas. They do not change the
 client's active account, install hooks, or add transcript directories to token
 statistics.
+
+## Multiple Claude Code accounts
+
+In **Settings → Agents → Claude Code → More Claude Code accounts**, add the
+`CLAUDE_CONFIG_DIR` folders for accounts already signed in through Claude Code,
+one per line. Absolute paths and `~/` paths are accepted. The current
+`CLAUDE_CONFIG_DIR` (or `~/.claude` when unset) remains included. Clear the
+list to return to that default account only. The list is saved locally as
+`settings.claudeHomes`.
+
+The account worker reads the folders sequentially, running Claude Code's engine
+with the selected `CLAUDE_CONFIG_DIR` only for that child process. Claude Code
+uses its own sign-in for that folder; Agent HUD reads no credentials. Each
+folder's account is the one its `.claude.json` names, and a login that names
+none is keyed by its folder. Duplicate folders, including the default one, are
+read once, and an account signed in from two folders appears once. A failed
+folder reports a notice while the other folders still appear; if every reading
+fails, the last reading remains marked stale. The Claude desktop app's sign-in
+stands in only for the default folder, never for an added one. Saving a changed
+list discards readings from the previous list, including results still in
+flight.
+
+As with Codex, these folders provide subscription quotas only. They do not
+change Claude Code's active account, install hooks, or add transcript folders to
+token statistics.
 
 ## Antigravity accounts
 

@@ -923,14 +923,20 @@ fn failed_reading(entry: &mut Entry, unread: Unread, attempted: Instant, attempt
 /// An absent reading is not a reset (agent-hud-native-open
 /// RetainedUsageProvider.retainingReadings): a Claude window this reading
 /// left out keeps its last reading, and the time it was read, while the same
-/// account is signed in and for at most 30 days. Codex's app-server reports
-/// its complete window inventory, so a window it leaves out retires at once;
-/// the other providers' rules belong to their own readers.
+/// account is signed in (any of the reading's accounts, one per folder) and
+/// for at most 30 days. Codex's app-server reports its complete window
+/// inventory, so a window it leaves out retires at once; the other
+/// providers' rules belong to their own readers.
 fn retain_windows(previous: Option<&Entry>, reading: &mut AccountReading, now: i64) {
-    let (Some(previous), Some(account)) = (previous, reading.account.as_ref()) else {
+    let Some(previous) = previous else {
         return;
     };
-    let account = account["id"].clone();
+    let accounts = reading
+        .account
+        .iter()
+        .chain(&reading.additional_accounts)
+        .map(|account| account["id"].clone())
+        .collect::<Vec<_>>();
     let reported = reading
         .quotas
         .iter()
@@ -941,7 +947,7 @@ fn retain_windows(previous: Option<&Entry>, reading: &mut AccountReading, now: i
         .quotas
         .iter()
         .filter(|row| row["id"].as_str().is_some_and(|id| !reported.contains(id)))
-        .filter(|row| row["accountId"] == account)
+        .filter(|row| accounts.contains(&row["accountId"]))
         .filter_map(|row| {
             let mut row = row.clone();
             if row["observedAt"].is_null() {
@@ -1339,62 +1345,77 @@ mod tests {
 
     #[test]
     fn configured_homes_enable_undetected_accounts_and_changes_retire_old_readings() {
-        let directory = tempfile::tempdir().unwrap();
-        let service = AccountService::with_readers(
-            directory.path().into(),
-            directory.path().into(),
-            HashSet::new(),
-            CollectionGate::default(),
-            &[],
-        )
-        .unwrap();
-        let mut snapshot = json!({
-            "settings": {"codexHomes": ["~/work"]},
-            "providers": [{"id":"codex", "enabled":true, "detected":false}],
-            "sessions": [],
-        });
-        service.update_sources(&snapshot);
-        {
-            let mut state = service.shared.state.lock().unwrap();
-            assert!(state.enabled.contains("codex"));
-            assert_eq!(
-                state.account_homes["codex"],
-                vec![directory.path().join("work")]
-            );
-            state
+        for (provider, setting) in [("codex", "codexHomes"), ("claude", "claudeHomes")] {
+            let directory = tempfile::tempdir().unwrap();
+            let service = AccountService::with_readers(
+                directory.path().into(),
+                directory.path().into(),
+                HashSet::new(),
+                CollectionGate::default(),
+                &[],
+            )
+            .unwrap();
+            let mut snapshot = json!({
+                "settings": {},
+                "providers": [{"id":provider, "enabled":true, "detected":false}],
+                "sessions": [],
+            });
+            snapshot["settings"][setting] = json!(["~/work"]);
+            service.update_sources(&snapshot);
+            {
+                let mut state = service.shared.state.lock().unwrap();
+                assert!(state.enabled.contains(provider));
+                assert_eq!(
+                    state.account_homes[provider],
+                    vec![directory.path().join("work")]
+                );
+                state.entries.insert(
+                    provider,
+                    entry(AccountReading::empty(provider), None, false),
+                );
+            }
+            // Routine snapshot updates preserve the cache; edits retire its old homes.
+            service.update_sources(&snapshot);
+            assert!(service
+                .shared
+                .state
+                .lock()
+                .unwrap()
                 .entries
-                .insert("codex", entry(AccountReading::empty("codex"), None, false));
+                .contains_key(provider));
+            snapshot["settings"][setting] = json!(["~/other"]);
+            service.update_sources(&snapshot);
+            {
+                let mut state = service.shared.state.lock().unwrap();
+                assert!(!state.entries.contains_key(provider), "{provider}");
+                assert!(state.force.contains(provider), "{provider}");
+                state.entries.insert(
+                    provider,
+                    entry(AccountReading::empty(provider), None, false),
+                );
+            }
+            snapshot["settings"][setting] = json!([]);
+            service.update_sources(&snapshot);
+            {
+                let state = service.shared.state.lock().unwrap();
+                assert!(!state.entries.contains_key(provider), "{provider}");
+                assert!(!state.enabled.contains(provider), "{provider}");
+                assert!(state.account_homes.is_empty());
+            }
+            snapshot["settings"][setting] = json!(["~/work"]);
+            snapshot["providers"][0]["enabled"] = json!(false);
+            service.update_sources(&snapshot);
+            assert!(!service
+                .shared
+                .state
+                .lock()
+                .unwrap()
+                .enabled
+                .contains(provider));
+            assert!(service
+                .validate_account_homes(&json!(["relative"]))
+                .is_err());
         }
-        // Routine snapshot updates preserve the cache; edits retire its old homes.
-        service.update_sources(&snapshot);
-        assert!(service
-            .shared
-            .state
-            .lock()
-            .unwrap()
-            .entries
-            .contains_key("codex"));
-        snapshot["settings"]["codexHomes"] = json!([]);
-        service.update_sources(&snapshot);
-        {
-            let state = service.shared.state.lock().unwrap();
-            assert!(!state.entries.contains_key("codex"));
-            assert!(!state.enabled.contains("codex"));
-            assert!(state.account_homes.is_empty());
-        }
-        snapshot["settings"]["codexHomes"] = json!(["~/work"]);
-        snapshot["providers"][0]["enabled"] = json!(false);
-        service.update_sources(&snapshot);
-        assert!(!service
-            .shared
-            .state
-            .lock()
-            .unwrap()
-            .enabled
-            .contains("codex"));
-        assert!(service
-            .validate_account_homes(&json!(["relative"]))
-            .is_err());
     }
 
     #[test]
@@ -1459,10 +1480,12 @@ mod tests {
             panic!("the collection gate keeps this fixture read-only")
         }
         static CODEX: Provider = Provider::new("codex", unread);
+        static CLAUDE: Provider = Provider::new("claude", unread);
         static ANTIGRAVITY: Provider = Provider::new("antigravity", unread);
-        static READERS: [&Provider; 2] = [&CODEX, &ANTIGRAVITY];
+        static READERS: [&Provider; 3] = [&CODEX, &CLAUDE, &ANTIGRAVITY];
         for (provider, setting) in [
             ("codex", "codexHomes"),
+            ("claude", "claudeHomes"),
             ("antigravity", "antigravityCliSettings"),
         ] {
             let directory = tempfile::tempdir().unwrap();
@@ -1737,6 +1760,18 @@ mod tests {
             1,
             "another account's windows are not kept"
         );
+
+        // An account read from another Claude folder keeps its windows too.
+        let mut both = AccountReading::empty("claude");
+        both.account = Some(json!({"id":"acct-b"}));
+        both.additional_accounts = vec![json!({"id":"acct-a"})];
+        both.quotas = vec![
+            row("b:claude-session", 1, "acct-b"),
+            row("a:claude-session", 12, "acct-a"),
+        ];
+        retain_windows(Some(&previous), &mut both, now);
+        assert_eq!(both.quotas.len(), 3);
+        assert_eq!(both.quotas[2]["id"], "a:claude-weekly-opus");
 
         let mut late = AccountReading::empty("claude");
         late.account = Some(json!({"id":"acct-a"}));

@@ -3,31 +3,57 @@
 //! engine from an API-key login. The signed-in account is the one Claude
 //! Code's .claude.json names, read before and after. Without a Claude Code
 //! sign-in, the Claude desktop app's own claude.ai sign-in answers instead.
+//! Folders added in Settings (`claudeHomes`) are read after the default one,
+//! one at a time, each as its own account.
 use crate::account::{
-    account_id, client_home_key, legacy_account, legacy_unresolved, read_json, status, variable,
-    Answer, EngineStart, Host, HttpFailure, HttpRequest, Provider, Reading, StatusPage, Unread,
+    account_id, append_notice, client_home_key, legacy_account, legacy_unresolved, merge,
+    read_json, status, variable, Answer, EngineStart, Host, HttpFailure, HttpRequest, Provider,
+    Reading, StatusPage, Unread,
 };
 use crate::l10n;
 use crate::naming::window_names;
 use crate::Base;
 use serde_json::{json, Value};
 use std::{
-    path::PathBuf,
+    collections::HashSet,
+    path::{Path, PathBuf},
     time::{Duration, Instant},
 };
 
+/// A Claude Code configuration folder to read. The default one is
+/// `CLAUDE_CONFIG_DIR`, or `~/.claude`. An added one is a folder chosen in
+/// Settings: its engine runs with `CLAUDE_CONFIG_DIR` set to it, and it
+/// never falls back to the desktop app's sign-in, which is the default
+/// folder's.
+struct Folder {
+    path: PathBuf,
+    added: bool,
+}
+
 /// What Claude Code's engine gets on top of the user's environment.
-fn engine_env() -> [(&'static str, String); 1] {
-    [("CLAUDE_CODE_ENTRYPOINT", "agent-hud".into())]
+fn engine_env(folder: &Folder) -> Vec<(&'static str, String)> {
+    let mut env = vec![("CLAUDE_CODE_ENTRYPOINT", "agent-hud".into())];
+    if folder.added {
+        env.push((
+            "CLAUDE_CONFIG_DIR",
+            folder.path.to_string_lossy().into_owned(),
+        ));
+    }
+    env
 }
 /// Claude Code's configuration folder: `CLAUDE_CONFIG_DIR`, or `~/.claude`.
 fn config_dir(host: &dyn Host) -> PathBuf {
     variable(host, "CLAUDE_CONFIG_DIR").unwrap_or_else(|| host.home().join(".claude"))
 }
-fn profile(host: &dyn Host) -> Value {
-    let path = variable(host, "CLAUDE_CONFIG_DIR")
-        .unwrap_or_else(|| host.home().to_path_buf())
-        .join(".claude.json");
+/// The account a folder's `.claude.json` names. Claude Code keeps that file
+/// in `CLAUDE_CONFIG_DIR` when it is set, and in the home folder otherwise.
+fn profile(host: &dyn Host, folder: &Folder) -> Value {
+    let path = if folder.added {
+        folder.path.clone()
+    } else {
+        variable(host, "CLAUDE_CONFIG_DIR").unwrap_or_else(|| host.home().to_path_buf())
+    }
+    .join(".claude.json");
     read_json(host, &path).unwrap_or(Value::Null)["oauthAccount"].clone()
 }
 fn identity(value: &Value) -> Option<String> {
@@ -127,22 +153,81 @@ static STATUS: StatusPage = StatusPage {
     components: &["Claude Code", "Claude API (api.anthropic.com)"],
 };
 
+/// The default folder, then each folder added in Settings that is another
+/// folder, one at a time. With more than one, each notice and failure names
+/// its folder, and the reading fails only when every folder does.
 pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
-    match from_engine(host) {
+    let default = config_dir(host);
+    let canonical = |path: &Path| host.canonical(path).unwrap_or_else(|| path.to_path_buf());
+    let mut seen = HashSet::from([canonical(&default)]);
+    let folders: Vec<_> = std::iter::once(Folder {
+        path: default,
+        added: false,
+    })
+    .chain(
+        host.account_homes("claude")
+            .iter()
+            .map(|path| canonical(path))
+            .filter(|path| seen.insert(path.clone()))
+            .map(|path| Folder { path, added: true }),
+    )
+    .collect();
+    if folders.len() == 1 {
+        return read_folder(host, &folders[0]);
+    }
+    let mut reading = Reading::empty("claude");
+    let mut succeeded = false;
+    let mut failures = Vec::new();
+    for folder in &folders {
+        if host.cancelled() {
+            return Err(l10n::text("账户读取已停止", "Account reading was stopped").into());
+        }
+        let prefix = format!("{}: ", folder.path.display());
+        match read_folder(host, folder) {
+            Ok(mut account) => {
+                succeeded = true;
+                let notice = account.notice.take();
+                merge(&mut reading, account);
+                if let Some(notice) = notice {
+                    append_notice(&mut reading, format!("{prefix}{notice}"));
+                }
+            }
+            Err(error) => {
+                let error = error.prefixed(&prefix);
+                append_notice(&mut reading, error.reason().to_owned());
+                failures.push(error);
+            }
+        }
+    }
+    if succeeded {
+        Ok(reading)
+    } else {
+        Err(Unread::combined(failures).unwrap_or_else(|| Unread::Failed(String::new())))
+    }
+}
+
+fn read_folder(host: &dyn Host, folder: &Folder) -> Result<Reading, Unread> {
+    match from_engine(host, folder) {
         Ok(reading) => Ok(reading),
         Err(EngineUnread::Failed(unread)) => Err(unread),
         // A Claude Code that is installed and signed out is the agent's own
         // state; no Claude Code at all is not a sign-out.
-        Err(EngineUnread::NoLogin { reason, installed }) => from_desktop(host, installed)
-            .unwrap_or(Err(if installed {
+        Err(EngineUnread::NoLogin { reason, installed }) => {
+            let desktop = if folder.added {
+                None
+            } else {
+                from_desktop(host, folder, installed)
+            };
+            desktop.unwrap_or(Err(if installed {
                 Unread::SignedOut(reason)
             } else {
                 Unread::Failed(reason)
-            })),
+            }))
+        }
     }
 }
 
-fn from_engine(host: &dyn Host) -> Result<Reading, EngineUnread> {
+fn from_engine(host: &dyn Host, folder: &Folder) -> Result<Reading, EngineUnread> {
     let executable = host
         .executable("claude")
         .ok_or_else(|| EngineUnread::NoLogin {
@@ -152,7 +237,8 @@ fn from_engine(host: &dyn Host) -> Result<Reading, EngineUnread> {
             ),
             installed: false,
         })?;
-    let before = profile(host);
+    let env = engine_env(folder);
+    let before = profile(host, folder);
     let mut process = host.start_engine(&EngineStart {
         executable: &executable,
         args: &[
@@ -166,7 +252,7 @@ fn from_engine(host: &dyn Host) -> Result<Reading, EngineUnread> {
             r#"{"disableAllHooks":true}"#,
         ],
         folder: "claude",
-        env: &engine_env(),
+        env: &env,
     })?;
     process.send(&json!({"type":"control_request","request_id":"agent-hud-usage","request":{"subtype":"get_usage","skip_behaviors":true}}))?;
     let deadline = Instant::now() + Duration::from_secs(40);
@@ -186,7 +272,7 @@ fn from_engine(host: &dyn Host) -> Result<Reading, EngineUnread> {
         if !payload.is_object() {
             return Err(engine_failed("empty get_usage response").into());
         }
-        let after = profile(host);
+        let after = profile(host, folder);
         if identity(&before) != identity(&after) {
             return Err(Unread::transient(l10n::text(
                 "读取额度时 Claude 登录账户发生了变化，稍后自动重试",
@@ -214,7 +300,7 @@ fn from_engine(host: &dyn Host) -> Result<Reading, EngineUnread> {
                     executable: &executable,
                     args: &["auth", "status", "--json"],
                     folder: "claude",
-                    env: &engine_env(),
+                    env: &env,
                 })
                 .ok()
                 .and_then(|mut engine| engine.joined(Instant::now() + Duration::from_secs(10)))
@@ -245,7 +331,7 @@ fn from_engine(host: &dyn Host) -> Result<Reading, EngineUnread> {
         }
         let windows = windows(&payload["rate_limits"]).ok_or_else(malformed)?;
         let plan = plan(&after, payload["subscription_type"].as_str());
-        return Ok(plan_reading(host, windows, &after, plan));
+        return Ok(plan_reading(host, windows, &after, plan, &folder.path));
     }
     let reason = process.stderr_preview(200).unwrap_or_else(|| {
         l10n::text(
@@ -290,7 +376,12 @@ fn desktop_challenged(signed_out: bool) -> String {
 /// claude.ai's own usage page reads them. None when the desktop app has no
 /// sign-in to offer, or the user did not allow reading it: the engine's
 /// reason then stands. `signed_out`: Claude Code is installed but signed out.
-fn from_desktop(host: &dyn Host, signed_out: bool) -> Option<Result<Reading, Unread>> {
+/// Only the default `folder` is read this way.
+fn from_desktop(
+    host: &dyn Host,
+    folder: &Folder,
+    signed_out: bool,
+) -> Option<Result<Reading, Unread>> {
     let session = match host.app_cookie(DESKTOP, SITE, "sessionKey") {
         Answer::Found(value) if !value.trim().is_empty() => value,
         Answer::Failed => return Some(Err(Unread::transient(desktop_unreadable()))),
@@ -330,7 +421,7 @@ fn from_desktop(host: &dyn Host, signed_out: bool) -> Option<Result<Reading, Unr
         .found()
         .map(|organization| organization.trim().to_owned())
         .filter(|organization| !organization.is_empty());
-    let cli = profile(host);
+    let cli = profile(host, folder);
     let same = user.is_some()
         && cli["accountUuid"].as_str() == user
         && cli["organizationUuid"].is_string()
@@ -385,24 +476,23 @@ fn from_desktop(host: &dyn Host, signed_out: bool) -> Option<Result<Reading, Unr
         .into()));
     };
     let plan = profile_plan(&who);
-    Some(Ok(plan_reading(host, windows, &who, plan)))
+    Some(Ok(plan_reading(host, windows, &who, plan, &folder.path)))
 }
 
 /// A reading of `windows` for the account `who` names in Claude Code's
 /// profile fields (accountUuid, organizationUuid, emailAddress). Both
 /// sign-ins name one account the same way, so its windows carry on from one
-/// to the other.
+/// to the other. A login that names no account is the configuration
+/// `folder`'s.
 fn plan_reading(
     host: &dyn Host,
     windows: Vec<Window>,
     who: &Value,
     plan: Option<String>,
+    folder: &Path,
 ) -> Reading {
     let id = identity(who).unwrap_or_else(|| {
-        account_id(
-            "claude",
-            &["unresolved", config_dir(host).to_string_lossy().as_ref()],
-        )
+        account_id("claude", &["unresolved", folder.to_string_lossy().as_ref()])
     });
     let label = who["emailAddress"].as_str();
     let legacy = legacy_account(
@@ -413,7 +503,7 @@ fn plan_reading(
     let account_identity = legacy.unwrap_or_else(|| {
         legacy_unresolved(
             "Claude",
-            &client_home_key(host, &config_dir(host), &host.home().join(".claude")),
+            &client_home_key(host, folder, &host.home().join(".claude")),
         )
     });
     let mut reading = Reading::empty("claude");
@@ -549,6 +639,7 @@ fn windows(limits: &Value) -> Option<Vec<Window>> {
 mod tests {
     use super::*;
     use crate::account::fake::FakeHost;
+    use std::collections::HashMap;
 
     fn installed(usage: Value) -> FakeHost {
         let mut host = FakeHost::new("/u").file(
@@ -942,6 +1033,201 @@ mod tests {
             read(&desktop_only).err().as_ref().map(Unread::reason),
             Some("claude.ai asked for a browser check, so the Claude desktop app's sign-in can't read the quota; retrying shortly")
         );
+    }
+
+    /// A folder added in Settings, signed in to `user`'s own account, whose
+    /// engine answers `usage`.
+    fn added(host: &mut FakeHost, folder: &Path, user: &str, usage: Value) {
+        host.account_homes
+            .entry("claude".into())
+            .or_default()
+            .push(folder.to_path_buf());
+        let profile = json!({"oauthAccount": {
+            "accountUuid": user, "organizationUuid": format!("{user}-org"),
+            "emailAddress": format!("{user}@example.com"), "organizationType": "claude_pro",
+        }});
+        host.files.insert(
+            folder.join(".claude.json"),
+            Answer::Found(profile.to_string().into_bytes()),
+        );
+        host.engine_output_by_home.insert(
+            folder.to_path_buf(),
+            HashMap::from([(
+                "-p".to_owned(),
+                vec![
+                    json!({"type": "system"}),
+                    json!({"type": "control_response", "response": usage}),
+                ],
+            )]),
+        );
+    }
+
+    #[test]
+    fn each_added_folder_is_its_own_account_with_its_own_windows() {
+        let mut host = installed(limits());
+        let work = host.home().join("claude-work");
+        let mut usage = limits();
+        usage["response"]["rate_limits"]["five_hour"]["utilization"] = json!(75.0);
+        added(&mut host, &work, "work", usage);
+
+        let reading = read(&host).unwrap();
+        let started = host.started.borrow();
+        assert_eq!(started.len(), 2);
+        let entrypoint = ("CLAUDE_CODE_ENTRYPOINT".to_owned(), "agent-hud".to_owned());
+        // The default folder's engine keeps the user's own environment.
+        assert_eq!(started[0].3, std::slice::from_ref(&entrypoint));
+        assert_eq!(
+            started[1].3,
+            [
+                entrypoint,
+                (
+                    "CLAUDE_CONFIG_DIR".to_owned(),
+                    work.to_string_lossy().into_owned()
+                )
+            ]
+        );
+        assert_eq!(reading.account.unwrap()["label"], "me@example.com");
+        assert_eq!(reading.additional_accounts.len(), 1);
+        assert_eq!(reading.additional_accounts[0]["label"], "work@example.com");
+        assert_eq!(reading.additional_accounts[0]["plan"], "pro");
+        assert_eq!(reading.quotas.len(), 4);
+        assert_eq!(reading.quotas[0]["usedPercent"], 12.0);
+        assert_eq!(reading.quotas[2]["usedPercent"], 75.0);
+        let id = account_id("claude", &["work", "work-org"]);
+        assert_eq!(reading.quotas[2]["id"], format!("{id}:claude-session"));
+        assert_ne!(reading.quotas[0]["id"], reading.quotas[2]["id"]);
+        assert_ne!(
+            reading.quotas[0]["accountId"],
+            reading.quotas[2]["accountId"]
+        );
+        assert!(reading.notice.is_none());
+    }
+
+    #[test]
+    fn an_added_folder_never_reads_the_desktop_apps_sign_in() {
+        // The default folder is signed out and reads through the desktop
+        // app's sign-in; a signed-out added folder stays signed out.
+        let mut host = signed_out_with_desktop()
+            .file(
+                "/u/.claude.json",
+                &json!({"oauthAccount": {
+                    "accountUuid": "user-1", "organizationUuid": "0a1b-2c3d",
+                    "emailAddress": "me@example.com", "organizationType": "claude_max",
+                }})
+                .to_string(),
+            )
+            .file(
+                "/u/AppData/Claude/config.json",
+                &json!({"lastKnownAccountUuid": "user-1"}).to_string(),
+            )
+            .answer(
+                "https://claude.ai/api/organizations/0a1b-2c3d/usage",
+                Ok(web_limits()),
+            );
+        let work = host.home().join("claude-work");
+        added(
+            &mut host,
+            &work,
+            "work",
+            json!({"subtype": "success", "response": {"rate_limits_available": false}}),
+        );
+        host.engine_output_by_home
+            .get_mut(&work)
+            .unwrap()
+            .insert("auth".into(), vec![json!({"loggedIn": false})]);
+        let signed_out =
+            "Claude Code is signed out. Run claude to sign in again to update the quota";
+
+        let reading = read(&host).unwrap();
+        assert_eq!(reading.account.unwrap()["label"], "me@example.com");
+        assert_eq!(reading.quotas.len(), 3);
+        assert!(reading.additional_accounts.is_empty());
+        assert_eq!(
+            host.asked.borrow().len(),
+            1,
+            "only the default folder asks claude.ai"
+        );
+        assert_eq!(
+            reading.notice,
+            Some(format!("{}: {signed_out}", work.display()))
+        );
+        {
+            let started = host.started.borrow();
+            assert_eq!(started.len(), 4);
+            assert_eq!(started[3].1, ["auth", "status", "--json"]);
+            assert!(started[3].3.contains(&(
+                "CLAUDE_CONFIG_DIR".to_owned(),
+                work.to_string_lossy().into_owned()
+            )));
+        }
+
+        // Without the desktop app's sign-in both folders are signed out.
+        host.cookies.clear();
+        let error = read(&host).err().unwrap();
+        assert!(matches!(error, Unread::SignedOut(_)));
+        assert_eq!(error.reason().matches(signed_out).count(), 2);
+        assert!(error.reason().contains(&*work.to_string_lossy()));
+        assert_eq!(host.asked.borrow().len(), 1);
+    }
+
+    #[test]
+    fn the_default_folder_added_again_is_read_once() {
+        let mut host = installed(limits());
+        let default = host.home().join(".claude");
+        let alias = host.home().join("claude-alias");
+        host.canonical_paths.insert(alias.clone(), default.clone());
+        host.account_homes
+            .insert("claude".into(), vec![default, alias]);
+        let reading = read(&host).unwrap();
+        assert_eq!(reading.quotas.len(), 2);
+        assert!(reading.notice.is_none());
+        assert_eq!(host.started.borrow().len(), 1);
+        assert_eq!(
+            host.started.borrow()[0].3.len(),
+            1,
+            "the default folder's engine gets no CLAUDE_CONFIG_DIR"
+        );
+
+        // A CLAUDE_CONFIG_DIR of the user's own is the default folder too.
+        let mut host = installed(limits());
+        let configured = host.home().join("claude-config");
+        host.env.insert(
+            "CLAUDE_CONFIG_DIR".into(),
+            configured.to_string_lossy().into_owned(),
+        );
+        host.account_homes.insert("claude".into(), vec![configured]);
+        assert_eq!(read(&host).unwrap().quotas.len(), 2);
+        assert_eq!(host.started.borrow().len(), 1);
+    }
+
+    #[test]
+    fn the_same_account_in_two_folders_is_not_duplicated() {
+        let mut host = installed(limits());
+        let work = host.home().join("claude-work");
+        added(&mut host, &work, "work", limits());
+        let profile = host.files[&host.home().join(".claude.json")].clone();
+        host.files.insert(work.join(".claude.json"), profile);
+        let reading = read(&host).unwrap();
+        assert_eq!(host.started.borrow().len(), 2);
+        assert_eq!(reading.quotas.len(), 2);
+        assert!(reading.additional_accounts.is_empty());
+    }
+
+    #[test]
+    fn an_added_folder_without_an_account_is_that_folders() {
+        let mut host = installed(limits());
+        let work = host.home().join("claude-work");
+        added(&mut host, &work, "work", limits());
+        host.files.remove(&work.join(".claude.json"));
+        let reading = read(&host).unwrap();
+        let key = client_home_key(&host, &work, &host.home().join(".claude"));
+        assert!(!key.is_empty());
+        assert_eq!(
+            reading.additional_accounts[0]["id"],
+            legacy_unresolved("Claude", &key).as_str()
+        );
+        let id = account_id("claude", &["unresolved", &work.to_string_lossy()]);
+        assert_eq!(reading.quotas[2]["id"], format!("{id}:claude-session"));
     }
 
     #[test]

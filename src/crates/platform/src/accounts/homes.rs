@@ -38,6 +38,7 @@ pub(super) fn configured(home: &Path, settings: &Value) -> HashMap<String, Vec<P
     let mut homes = HashMap::new();
     for (provider, key) in [
         ("codex", "codexHomes"),
+        ("claude", "claudeHomes"),
         ("antigravity", "antigravityCliSettings"),
     ] {
         if let Ok(paths) = paths(home, &settings[key]) {
@@ -71,6 +72,10 @@ mod tests {
         assert_eq!(
             configured(home, &json!({"codexHomes":["~/work"]}))["codex"],
             vec![home.join("work")]
+        );
+        assert_eq!(
+            configured(home, &json!({"claudeHomes":["~/.claude-work"]}))["claude"],
+            vec![home.join(".claude-work")]
         );
     }
 }

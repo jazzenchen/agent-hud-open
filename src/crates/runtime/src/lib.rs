@@ -388,7 +388,7 @@ impl Runtime {
                 drop(hooks);
                 return result.map(|result| self.decorate_snapshot(result, true));
             }
-            if params["key"] == "codexHomes" {
+            if matches!(params["key"].as_str(), Some("codexHomes" | "claudeHomes")) {
                 if let Some(accounts) = &self.accounts {
                     accounts.validate_account_homes(&params["value"])?;
                 }

@@ -633,6 +633,8 @@ export interface AppSettings {
   quotaDisplay?: "consumed" | "remaining";
   /** Additional Codex CLI homes whose signed-in accounts should be read. */
   codexHomes?: string[];
+  /** Additional Claude Code CLAUDE_CONFIG_DIR folders whose signed-in accounts should be read. */
+  claudeHomes?: string[];
   /** CLI settings files connected to Antigravity's account status callback. */
   antigravityCliSettings?: string[];
   appearance: "dark" | "light" | "system";

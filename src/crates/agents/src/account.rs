@@ -40,6 +40,46 @@ impl Reading {
     }
 }
 
+/// `notice` on a line of its own after the reading's notice.
+pub fn append_notice(reading: &mut Reading, notice: String) {
+    match &mut reading.notice {
+        Some(current) => {
+            current.push('\n');
+            current.push_str(&notice);
+        }
+        None => reading.notice = Some(notice),
+    }
+}
+
+/// Another home's reading of the same provider added to `reading`: its
+/// windows and accounts that `reading` does not have yet, by id, and its
+/// notice.
+pub fn merge(reading: &mut Reading, other: Reading) {
+    for quota in other.quotas {
+        if !reading.quotas.iter().any(|row| row["id"] == quota["id"]) {
+            reading.quotas.push(quota);
+        }
+    }
+    for account in other.account.into_iter().chain(other.additional_accounts) {
+        if reading
+            .account
+            .iter()
+            .chain(&reading.additional_accounts)
+            .any(|row| row["id"] == account["id"])
+        {
+            continue;
+        }
+        if reading.account.is_none() {
+            reading.account = Some(account);
+        } else {
+            reading.additional_accounts.push(account);
+        }
+    }
+    if let Some(notice) = other.notice {
+        append_notice(reading, notice);
+    }
+}
+
 /// Why a reading brought nothing back. The kinds keep apart what belongs to
 /// the agent (its sign-in) from what belongs to Agent HUD's own reading (no
 /// answer this time), because the engine treats them differently: an agent
@@ -714,10 +754,13 @@ pub(crate) mod fake {
         pub executables: HashMap<String, PathBuf>,
         /// What every engine answers, by the id of the request it answers.
         pub engine_replies: HashMap<u64, Value>,
-        /// Codex engine replies for a particular account home.
+        /// Engine replies for a particular account home, the one an engine
+        /// is started with in `CODEX_HOME` or `CLAUDE_CONFIG_DIR`.
         pub engine_replies_by_home: HashMap<PathBuf, HashMap<u64, Value>>,
         /// What an engine prints as soon as it starts, by its first argument.
         pub engine_output: HashMap<String, Vec<Value>>,
+        /// `engine_output` for a particular account home, as for replies.
+        pub engine_output_by_home: HashMap<PathBuf, HashMap<String, Vec<Value>>>,
         /// Engine start failures, by the first argument.
         pub engine_start_errors: HashMap<String, String>,
         /// Whether an engine's output ends once it has nothing more to say,
@@ -757,6 +800,7 @@ pub(crate) mod fake {
                 engine_replies: HashMap::new(),
                 engine_replies_by_home: HashMap::new(),
                 engine_output: HashMap::new(),
+                engine_output_by_home: HashMap::new(),
                 engine_start_errors: HashMap::new(),
                 engine_ends: true,
                 started: RefCell::new(vec![]),
@@ -874,18 +918,24 @@ pub(crate) mod fake {
             {
                 return Err(error.clone());
             }
+            let home = start
+                .env
+                .iter()
+                .find(|(name, _)| matches!(*name, "CODEX_HOME" | "CLAUDE_CONFIG_DIR"))
+                .map(|(_, home)| Path::new(home));
             let printed = start
                 .args
                 .first()
-                .and_then(|first| self.engine_output.get(*first))
+                .and_then(|first| {
+                    home.and_then(|home| self.engine_output_by_home.get(home))
+                        .unwrap_or(&self.engine_output)
+                        .get(*first)
+                })
                 .cloned()
                 .unwrap_or_default();
             Ok(Box::new(FakeEngine {
-                replies: start
-                    .env
-                    .iter()
-                    .find(|(name, _)| *name == "CODEX_HOME")
-                    .and_then(|(_, home)| self.engine_replies_by_home.get(Path::new(home)))
+                replies: home
+                    .and_then(|home| self.engine_replies_by_home.get(home))
                     .unwrap_or(&self.engine_replies)
                     .clone(),
                 ends: self.engine_ends,

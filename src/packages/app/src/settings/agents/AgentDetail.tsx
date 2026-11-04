@@ -24,7 +24,7 @@ import {
   ToggleRow,
   type Text,
 } from "../SettingsPrimitives";
-import CodexAccountHomes from "../CodexAccountHomes";
+import AccountHomes from "../AccountHomes";
 import AntigravityAccounts from "../AntigravityAccounts";
 import { CodexModelSettings } from "../CodexModelSettings";
 import { PanelBlocks } from "./PanelBlocks";
@@ -167,11 +167,26 @@ export function AgentDetail({
         inert={!enabled}
       >
         {source.id === "codex" && (
-          <CodexAccountHomes
+          <AccountHomes
             t={t}
+            label={t("More Codex accounts", "更多 Codex 账户")}
+            variable="CODEX_HOME"
+            placeholder="~/.codex-work"
             homes={snapshot.settings.codexHomes ?? []}
             onSave={(homes) =>
               action("set_setting", { key: "codexHomes", value: homes })
+            }
+          />
+        )}
+        {source.id === "claude" && (
+          <AccountHomes
+            t={t}
+            label={t("More Claude Code accounts", "更多 Claude Code 账户")}
+            variable="CLAUDE_CONFIG_DIR"
+            placeholder="~/.claude-work"
+            homes={snapshot.settings.claudeHomes ?? []}
+            onSave={(homes) =>
+              action("set_setting", { key: "claudeHomes", value: homes })
             }
           />
         )}

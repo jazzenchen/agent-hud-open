@@ -1,8 +1,9 @@
 //! Codex's quota: its CLI's own `app-server` (account/rateLimits/read and
 //! account/read), and Pi's ChatGPT sign-in, which spends the same plan.
 use crate::account::{
-    account_id, client_home_key, legacy_account, legacy_unresolved, read_json, status, variable,
-    EngineStart, Host, HttpFailure, HttpRequest, Provider, Reading, StatusPage, Unread,
+    account_id, append_notice, client_home_key, legacy_account, legacy_unresolved, merge,
+    read_json, status, variable, EngineStart, Host, HttpFailure, HttpRequest, Provider, Reading,
+    StatusPage, Unread,
 };
 use crate::l10n;
 use crate::naming::{vendor_windows, window_names};
@@ -60,42 +61,6 @@ pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
         }
         (Err(native), Err(pi)) => Err(Unread::combined(vec![native, pi]).expect("two failures")),
         (Err(error), _) => Err(error),
-    }
-}
-
-fn append_notice(reading: &mut Reading, notice: String) {
-    match &mut reading.notice {
-        Some(current) => {
-            current.push('\n');
-            current.push_str(&notice);
-        }
-        None => reading.notice = Some(notice),
-    }
-}
-
-fn merge(reading: &mut Reading, other: Reading) {
-    for quota in other.quotas {
-        if !reading.quotas.iter().any(|row| row["id"] == quota["id"]) {
-            reading.quotas.push(quota);
-        }
-    }
-    for account in other.account.into_iter().chain(other.additional_accounts) {
-        if reading
-            .account
-            .iter()
-            .chain(&reading.additional_accounts)
-            .any(|row| row["id"] == account["id"])
-        {
-            continue;
-        }
-        if reading.account.is_none() {
-            reading.account = Some(account);
-        } else {
-            reading.additional_accounts.push(account);
-        }
-    }
-    if let Some(notice) = other.notice {
-        append_notice(reading, notice);
     }
 }
 

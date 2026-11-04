@@ -1,14 +1,21 @@
 import { useEffect, useState } from "react";
 import { Notice, Section, SmallButton, type Text } from "./SettingsPrimitives";
 
-/** Extra CODEX_HOME folders, one per signed-in account, read beside the
- * default one. */
-export default function CodexAccountHomes({
+/** Extra client folders (CODEX_HOME, CLAUDE_CONFIG_DIR), one per signed-in
+ * account, read beside the default one. */
+export default function AccountHomes({
   t,
+  label,
+  variable,
+  placeholder,
   homes,
   onSave,
 }: {
   t: Text;
+  label: string;
+  /** The variable that names the client's folder. */
+  variable: string;
+  placeholder: string;
   homes: string[];
   onSave: (homes: string[]) => Promise<unknown>;
 }) {
@@ -17,7 +24,6 @@ export default function CodexAccountHomes({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => setText(saved), [saved]);
-  const label = t("More Codex accounts", "更多 Codex 账户");
 
   async function save() {
     setPending(true);
@@ -44,8 +50,8 @@ export default function CodexAccountHomes({
     <Section
       title={label}
       footer={t(
-        "One CODEX_HOME folder per line. Your default account is always read.",
-        "每行一个 CODEX_HOME 文件夹，默认账户总会读取。",
+        `One ${variable} folder per line. Your default account is always read.`,
+        `每行一个 ${variable} 文件夹，默认账户总会读取。`,
       )}
     >
       <div className="settings-field">
@@ -56,7 +62,7 @@ export default function CodexAccountHomes({
           disabled={pending}
           rows={3}
           spellCheck={false}
-          placeholder="~/.codex-work"
+          placeholder={placeholder}
         />
         <div className="settings-actions">
           <SmallButton

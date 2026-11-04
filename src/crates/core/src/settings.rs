@@ -117,7 +117,7 @@ impl crate::AgentHudCore {
             "appearance" if ["dark", "light", "system"].contains(&value.as_str().unwrap_or("")) => {
             }
             "quotaDisplay" if matches!(value.as_str(), Some("consumed" | "remaining")) => {}
-            "codexHomes" | "antigravityCliSettings"
+            "codexHomes" | "claudeHomes" | "antigravityCliSettings"
                 if value.as_array().is_some_and(|homes| {
                     homes.iter().all(|home| {
                         home.as_str().is_some_and(|home| {
@@ -270,7 +270,7 @@ mod tests {
 
     #[test]
     fn account_source_paths_persist_and_reject_invalid_entries() {
-        for key in ["codexHomes", "antigravityCliSettings"] {
+        for key in ["codexHomes", "claudeHomes", "antigravityCliSettings"] {
             let home = tempfile::tempdir().unwrap();
             let mut core = AgentHudCore::new(vec![], home.path().to_owned());
             assert_eq!(core.settings[key], json!([]));
