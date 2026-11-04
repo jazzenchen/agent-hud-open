@@ -152,6 +152,7 @@ The same style name can mean the resting HUD or the panel. When the person talks
 - **Masking:** accounts are masked, and session titles and notices are left out.
 - **Display key required:** `show: "hud"` and `agent` need one. `agent` also needs a `dynamic` or `simple` HUD with `separateAgents` on.
 - **One at a time:** it renders one picture at a time and times out after 25 s.
+- **Slow data:** a panel picture waits about 12 s for the token chart and the sessions list. If a section has not loaded by then, it is drawn as it looks while loading and is named in `loading`. Take the picture again to see it filled.
 - **Motion:** an animated glow may not show in a still picture.
 
 ## Other tools

@@ -18,6 +18,7 @@ import {
   presentationStore,
   type PresentationState,
 } from "./lib/use-hud-config";
+import { PictureQueries, QUERY_DEADLINE_MS } from "./lib/picture-queries";
 interface Job {
   id: string;
   params: { screen?: string; show?: string; agent?: string };
@@ -85,7 +86,7 @@ export default function HUDPicture() {
   const [job, setJob] = useState<Job | null>(null);
   const root = useRef<HTMLDivElement>(null),
     started = useRef(false);
-  const queries = useRef(new Set<Promise<unknown>>());
+  const queries = useRef(new PictureQueries());
   const services = useMemo(
     () => ({
       query: (
@@ -107,11 +108,7 @@ export default function HUDPicture() {
             };
           },
         );
-        queries.current.add(promise);
-        void promise
-          .finally(() => queries.current.delete(promise))
-          .catch(() => {});
-        return promise;
+        return queries.current.track(method, promise);
       },
     }),
     [],
@@ -182,7 +179,9 @@ export default function HUDPicture() {
           throw new Error("The requested agent has no mark on this screen");
         await document.fonts.ready;
         await new Promise((resolve) => setTimeout(resolve, 150));
-        await Promise.allSettled([...queries.current]);
+        const loading = await queries.current.settle(
+          QUERY_DEADLINE_MS - performance.now(),
+        );
         await new Promise((resolve) => setTimeout(resolve, 60));
         const height = Math.min(
           2400,
@@ -206,6 +205,7 @@ export default function HUDPicture() {
             pixelWidth: image.width,
             pixelHeight: image.height,
             identityMasked: true,
+            ...(loading.length ? { loading } : {}),
             images: [{ mimeType: image.mimeType, data: image.pngBase64 }],
           },
         });
