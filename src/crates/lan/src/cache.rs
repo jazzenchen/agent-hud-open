@@ -170,6 +170,8 @@ impl<R: Record> SnapshotCache<R> {
         let mut previous = std::mem::take(&mut self.previous);
         let mut named = BTreeMap::new();
         let mut changed = Vec::new();
+        // What a changed record replaced, to put back should the commit fail.
+        let mut replaced = BTreeMap::new();
         for record in records
             .into_iter()
             .filter(|r| r.device_id() == self.device && r.is_visible(now))
@@ -179,19 +181,52 @@ impl<R: Record> SnapshotCache<R> {
                 Some(old) if old.same_content(record) => {
                     named.insert(id, old);
                 }
-                _ => {
+                old => {
+                    if let Some(old) = old {
+                        replaced.insert(id.clone(), old);
+                    }
                     changed.push(id.clone());
                     named.insert(id, record.clone());
                 }
             }
         }
         // Records not named again are deleted.
-        let deleted: Vec<String> = previous.into_keys().collect();
+        let deleted: Vec<String> = previous.keys().cloned().collect();
         if self.head.is_some() && changed.is_empty() && deleted.is_empty() {
             self.previous = named;
             return Ok(false);
         }
-        let cursor = if let Some(head) = &self.head {
+        // Until the version is committed the published records stay as they
+        // were, so a failed commit is found changed again on the next update.
+        let mut restore = |cache: &mut Self, mut named: BTreeMap<String, R>| {
+            for id in &changed {
+                match replaced.remove(id) {
+                    Some(old) => named.insert(id.clone(), old),
+                    None => named.remove(id),
+                };
+            }
+            named.append(&mut previous);
+            cache.previous = named;
+        };
+        let cursor = match self.next_cursor(now, &named) {
+            Ok(cursor) => cursor,
+            Err(error) => {
+                restore(self, named);
+                return Err(error);
+            }
+        };
+        self.previous = named;
+        if let Err(error) = self.commit(&changed, &deleted, cursor, now) {
+            let named = std::mem::take(&mut self.previous);
+            restore(self, named);
+            return Err(error);
+        }
+        Ok(true)
+    }
+    /// The cursor of the next version over `named`: the next change on the
+    /// published base, or a new base.
+    fn next_cursor(&self, now: i64, named: &BTreeMap<String, R>) -> Result<Cursor> {
+        Ok(if let Some(head) = &self.head {
             let mut cursor = head.cursor.clone();
             cursor.change_sequence = cursor
                 .change_sequence
@@ -199,11 +234,8 @@ impl<R: Record> SnapshotCache<R> {
                 .ok_or("LAN cursor exhausted")?;
             cursor
         } else {
-            self.next_baseline(now, &named)?
-        };
-        self.previous = named;
-        self.commit(&changed, &deleted, cursor, now)?;
-        Ok(true)
+            self.next_baseline(now, named)?
+        })
     }
     /// A new major version over the published records, for the next business
     /// upload; returned with copies of them.
@@ -287,19 +319,21 @@ impl<R: Record> SnapshotCache<R> {
         cursor: Cursor,
         now: i64,
     ) -> Result<()> {
+        // Everything that can fail runs before any state moves.
+        let mut bodies = Vec::with_capacity(changed.len());
         for id in changed {
             if let Some(record) = self.previous.get(id) {
                 let value = serde_json::to_value(record).map_err(|_| "LAN record encoding")?;
-                self.bodies
-                    .insert(id.clone(), crate::canonical::to_vec(&value));
+                bodies.push((id.clone(), crate::canonical::to_vec(&value)));
             }
-        }
-        for id in deleted {
-            self.bodies.remove(id);
         }
         let cursor_value = serde_json::to_value(&cursor).map_err(|_| "LAN cursor encoding")?;
         let cursor_body = crate::canonical::to_vec(&cursor_value);
         crate::fs::atomic_json(&self.file, &cursor).map_err(|e| e.to_string())?;
+        self.bodies.extend(bodies);
+        for id in deleted {
+            self.bodies.remove(id);
+        }
         self.persisted = Some(cursor.clone());
         self.version += 1;
         for id in changed {
@@ -516,6 +550,41 @@ mod tests {
             served,
             serde_json::to_value(cache.snapshot().unwrap()).unwrap()
         );
+        std::fs::remove_dir_all(&folder).unwrap();
+    }
+
+    #[test]
+    fn a_version_that_could_not_be_saved_goes_out_on_the_next_update() {
+        let folder = std::env::temp_dir().join(format!("lan-unsaved-{}", std::process::id()));
+        crate::fs::private_dir(&folder).unwrap();
+        let file = folder.join("cursor.json");
+        let mut cache =
+            SnapshotCache::<Item>::new("mac".into(), "Mac".into(), file.clone()).unwrap();
+        assert!(cache
+            .update(&[item("a", 1.0, 10), item("c", 3.0, 10)], 1_000)
+            .unwrap());
+        let start = cache.head().unwrap();
+        // A folder where the cursor goes makes saving it fail.
+        std::fs::remove_file(&file).unwrap();
+        std::fs::create_dir_all(file.join("blocked")).unwrap(); // plain directory
+        let next = [item("a", 2.0, 20)];
+        assert!(cache.update(&next, 2_000).is_err());
+        // What is served is still the saved version, whole.
+        let head = cache.head().unwrap();
+        assert_eq!(head.cursor, start.cursor);
+        assert_eq!(head.revision, start.revision);
+        assert_eq!(head.revision, whole(&cache));
+        assert_eq!(
+            cache.snapshot().unwrap().records,
+            vec![item("a", 1.0, 10), item("c", 3.0, 10)]
+        );
+        // Once saving works, the same update publishes the change.
+        std::fs::remove_dir_all(&file).unwrap();
+        assert!(cache.update(&next, 3_000).unwrap());
+        let changes = cache.changes(&start.cursor).unwrap();
+        assert_eq!(changes.records, vec![item("a", 2.0, 20)]);
+        assert_eq!(changes.deleted_ids, vec!["c".to_string()]);
+        assert_eq!(cache.head().unwrap().revision, whole(&cache));
         std::fs::remove_dir_all(&folder).unwrap();
     }
 
