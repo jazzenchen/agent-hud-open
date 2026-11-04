@@ -26,12 +26,18 @@ jobs:
           RUN_ID: ${{ github.event.workflow_run.id }}
           RUN_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
         run: |
-          jobs=$(gh api "repos/$GH_REPO/actions/runs/$RUN_ID/attempts/$RUN_ATTEMPT/jobs?per_page=100")
-          failed=$(jq '[.jobs[] | select(.conclusion == "failure" or .conclusion == "cancelled" or .conclusion == "timed_out")]' <<<"$jobs")
+          # GitHub can mark the run failed while a dropped job still reads as
+          # queued, so give the job records up to five minutes to catch up.
+          for try in 1 2 3 4 5 6 7 8 9 10; do
+            jobs=$(gh api "repos/$GH_REPO/actions/runs/$RUN_ID/attempts/$RUN_ATTEMPT/jobs?per_page=100")
+            jq -e 'all(.jobs[]; .status == "completed")' <<<"$jobs" >/dev/null && break
+            sleep 30
+          done
+          failed=$(jq '[.jobs[] | select(.conclusion != "success" and .conclusion != "skipped" and .conclusion != "neutral")]' <<<"$jobs")
           unstarted=$(jq '[.[] | select((.steps | length) == 0 and (.runner_name // "") == "")]' <<<"$failed")
-          jq -r '.[] | "\(.name): \(.conclusion), \(.steps | length) steps"' <<<"$failed"
+          jq -r '.[] | "\(.name): \(.status), \(.conclusion), \(.steps | length) steps"' <<<"$failed"
           if [ "$(jq length <<<"$failed")" -gt 0 ] && [ "$(jq length <<<"$failed")" = "$(jq length <<<"$unstarted")" ]; then
             gh run rerun "$RUN_ID" --failed
           else
-            echo "A job ran and failed, so the run stays failed."
+            echo "Not rerun: a job that did not pass had run on a runner."
           fi
