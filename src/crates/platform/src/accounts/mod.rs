@@ -18,7 +18,7 @@ use std::{
     process::Child,
     sync::{
         atomic::{AtomicBool, Ordering},
-        Arc, Condvar, Mutex, Weak,
+        Arc, Condvar, Mutex, PoisonError, Weak,
     },
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
@@ -232,11 +232,14 @@ impl AccountService {
         homes::paths(&self.context.home, value).map(|_| ())
     }
     pub fn account_changed(&self, provider: &str) {
-        if let Ok(mut state) = self.shared.state.lock() {
-            if state.enabled.contains(provider) {
-                state.force.insert(provider.into());
-                self.shared.wake.notify_all();
-            }
+        let mut state = self
+            .shared
+            .state
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
+        if state.enabled.contains(provider) {
+            state.force.insert(provider.into());
+            self.shared.wake.notify_all();
         }
     }
     pub fn set_credentials(&self, params: &Value) -> Result<Value, String> {
@@ -269,7 +272,12 @@ impl AccountService {
         Ok(result)
     }
     fn credentials_changed(&self, params: &Value) {
-        let wake = if let Ok(mut state) = self.shared.state.lock() {
+        let wake = {
+            let mut state = self
+                .shared
+                .state
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner);
             if let Some(provider) = params["provider"].as_str() {
                 state.entries.remove(provider);
                 state.force.insert(provider.into());
@@ -277,22 +285,27 @@ impl AccountService {
             }
             self.shared.wake.notify_all();
             state.waker.clone()
-        } else {
-            None
         };
         if let Some(wake) = wake {
             wake();
         }
     }
     pub fn set_waker(&self, waker: Waker) {
-        if let Ok(mut state) = self.shared.state.lock() {
-            state.waker = Some(waker);
-        }
+        self.shared
+            .state
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .waker = Some(waker);
     }
     pub fn stop(&self) {
         self.context.cancelled.store(true, Ordering::Release);
         let mut copy = None;
-        if let Ok(mut state) = self.shared.state.lock() {
+        {
+            let mut state = self
+                .shared
+                .state
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner);
             // The next launch starts from what the app shows now.
             if !state.stopped {
                 copy = Some(restart_copy::copy(&state.entries, &state.account_homes));
@@ -307,34 +320,35 @@ impl AccountService {
             .context
             .children
             .lock()
-            .map(|children| {
-                children
-                    .iter()
-                    .filter_map(Weak::upgrade)
-                    .collect::<Vec<_>>()
-            })
-            .unwrap_or_default();
+            .unwrap_or_else(PoisonError::into_inner)
+            .iter()
+            .filter_map(Weak::upgrade)
+            .collect::<Vec<_>>();
         for child in children {
-            if let Ok(mut child) = child.lock() {
-                let _ = child.kill();
-            }
+            let _ = child.lock().unwrap_or_else(PoisonError::into_inner).kill();
         }
     }
     pub fn refresh(&self) {
-        if let Ok(mut state) = self.shared.state.lock() {
-            let enabled = state.enabled.clone();
-            state.force.extend(enabled);
-            self.shared.wake.notify_all();
-        }
+        let mut state = self
+            .shared
+            .state
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
+        let enabled = state.enabled.clone();
+        state.force.extend(enabled);
+        self.shared.wake.notify_all();
     }
     pub fn update_sources(&self, snapshot: &Value) {
         let account_homes = homes::configured(&self.context.home, &snapshot["settings"]);
         let consent = snapshot["settings"][agent_hud_agents::copilot::account::CONSENT] == true;
         if self.context.copilot_consent.swap(consent, Ordering::AcqRel) != consent {
-            if let Ok(mut state) = self.shared.state.lock() {
-                state.entries.remove("copilot");
-                state.force.insert("copilot".into());
-            }
+            let mut state = self
+                .shared
+                .state
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner);
+            state.entries.remove("copilot");
+            state.force.insert("copilot".into());
         }
         let relays: HashSet<String> = snapshot["settings"][agent_hud_agents::relays::CONSENT]
             .as_array()
@@ -342,20 +356,23 @@ impl AccountService {
             .flatten()
             .filter_map(|host| host.as_str().map(str::to_owned))
             .collect();
-        let relays_changed = self
-            .context
-            .relay_consent
-            .lock()
-            .map(|mut held| {
-                let changed = *held != relays;
-                *held = relays;
-                changed
-            })
-            .unwrap_or(false);
+        let relays_changed = {
+            let mut held = self
+                .context
+                .relay_consent
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner);
+            let changed = *held != relays;
+            *held = relays;
+            changed
+        };
         if relays_changed {
-            if let Ok(mut state) = self.shared.state.lock() {
-                state.force.insert("relay".into());
-            }
+            self.shared
+                .state
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner)
+                .force
+                .insert("relay".into());
         }
         let mut enabled: HashSet<String> = snapshot["providers"]
             .as_array()
@@ -434,39 +451,44 @@ impl AccountService {
                     .or_insert(at);
             }
         }
-        if let Ok(mut state) = self.shared.state.lock() {
-            if state.account_homes != account_homes {
-                let changed = state
-                    .account_homes
-                    .keys()
-                    .chain(account_homes.keys())
-                    .filter(|key| state.account_homes.get(*key) != account_homes.get(*key))
-                    .cloned()
-                    .collect::<HashSet<_>>();
-                for provider in changed {
-                    state.entries.remove(provider.as_str());
-                    state.force.insert(provider);
-                }
-                state.account_homes = account_homes;
-                self.shared.wake.notify_all();
+        let mut state = self
+            .shared
+            .state
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
+        if state.account_homes != account_homes {
+            let changed = state
+                .account_homes
+                .keys()
+                .chain(account_homes.keys())
+                .filter(|key| state.account_homes.get(*key) != account_homes.get(*key))
+                .cloned()
+                .collect::<HashSet<_>>();
+            for provider in changed {
+                state.entries.remove(provider.as_str());
+                state.force.insert(provider);
             }
-            if state.enabled != enabled
-                || state.running != running
-                || state.live != live
-                || state.finished != finished
-            {
-                state.enabled = enabled;
-                state.running = running;
-                state.live = live;
-                state.finished = finished;
-                self.shared.wake.notify_all();
-            }
+            state.account_homes = account_homes;
+            self.shared.wake.notify_all();
+        }
+        if state.enabled != enabled
+            || state.running != running
+            || state.live != live
+            || state.finished != finished
+        {
+            state.enabled = enabled;
+            state.running = running;
+            state.live = live;
+            state.finished = finished;
+            self.shared.wake.notify_all();
         }
     }
     pub fn projection(&self) -> AccountProjection {
-        let Ok(state) = self.shared.state.lock() else {
-            return AccountProjection::default();
-        };
+        let state = self
+            .shared
+            .state
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
         let mut result = AccountProjection::default();
         let now = chrono::Utc::now().timestamp_millis();
         // Every provider the app knows, whatever this service reads.
@@ -605,9 +627,7 @@ fn run(context: AccountContext, shared: Arc<Shared>, gate: CollectionGate, reade
     let mut saved: Option<Instant> = None;
     loop {
         let selected = {
-            let Ok(mut state) = shared.state.lock() else {
-                return;
-            };
+            let mut state = shared.state.lock().unwrap_or_else(PoisonError::into_inner);
             loop {
                 if state.stopped {
                     return;
@@ -670,10 +690,11 @@ fn run(context: AccountContext, shared: Arc<Shared>, gate: CollectionGate, reade
                 } else {
                     burst = None;
                 }
-                let Ok((next, _)) = shared.wake.wait_timeout(state, pause) else {
-                    return;
-                };
-                state = next;
+                state = shared
+                    .wake
+                    .wait_timeout(state, pause)
+                    .unwrap_or_else(PoisonError::into_inner)
+                    .0;
             }
         };
         burst.get_or_insert_with(Instant::now);
@@ -689,9 +710,7 @@ fn run(context: AccountContext, shared: Arc<Shared>, gate: CollectionGate, reade
                     status::read(&context.http, page.url)
                 };
                 let waker = {
-                    let Ok(mut state) = shared.state.lock() else {
-                        return;
-                    };
+                    let mut state = shared.state.lock().unwrap_or_else(PoisonError::into_inner);
                     // A page that could not be read keeps what it said last.
                     let old = state.pages.remove(page.url);
                     let changed = summary.is_some()
@@ -731,9 +750,7 @@ fn run(context: AccountContext, shared: Arc<Shared>, gate: CollectionGate, reade
             (selected.1.read)(&reading_context)
         };
         let (waker, copy) = {
-            let Ok(mut state) = shared.state.lock() else {
-                return;
-            };
+            let mut state = shared.state.lock().unwrap_or_else(PoisonError::into_inner);
             if state.stopped {
                 return;
             }

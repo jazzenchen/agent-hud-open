@@ -11,7 +11,7 @@ use std::{
     fs,
     io::{ErrorKind, Read},
     path::{Path, PathBuf},
-    sync::atomic::Ordering,
+    sync::{atomic::Ordering, PoisonError},
     time::{Duration, UNIX_EPOCH},
 };
 
@@ -95,7 +95,8 @@ impl Host for AccountContext {
             return self
                 .relay_consent
                 .lock()
-                .is_ok_and(|agreed| agreed.contains(relay));
+                .unwrap_or_else(PoisonError::into_inner)
+                .contains(relay);
         }
         setting == agent_hud_agents::copilot::account::CONSENT
             && self.copilot_consent.load(Ordering::Acquire)
