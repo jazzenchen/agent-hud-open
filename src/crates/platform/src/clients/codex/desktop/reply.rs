@@ -1,11 +1,12 @@
 //! The HUD's decisions on Codex Desktop's cards, each sent once to the
 //! thread's owner, and how a failed or unconfirmed send is reported.
 use super::super::desktop_io::{endpoint, DesktopIpc, IpcError};
-use super::pending::{self, Pending};
+use super::pending::{self, Pending, ELICITATION_METHOD, QUESTION_METHOD};
+use super::turns::current_turn;
 use super::Shared;
 use agent_hud_agents::codex::AGENT;
 use agent_hud_core::l10n;
-use serde_json::Value;
+use serde_json::{json, Value};
 use std::{
     sync::{atomic::Ordering, Arc, PoisonError},
     thread,
@@ -99,7 +100,7 @@ impl Shared {
             {
                 return Err(IpcError::Unavailable.into());
             }
-            let (method, response) = pending::answer(item, decision, &known.state)?;
+            let (method, response) = answer(item, decision, &known.state)?;
             (response, method, known.state["cwd"].clone())
         };
         if response.is_null() {
@@ -218,4 +219,66 @@ impl From<IpcError> for ReplyFailure {
     fn from(error: IpcError) -> Self {
         Self::Failed(error.to_string())
     }
+}
+
+pub(super) fn answer(
+    item: &Pending,
+    decision: &Value,
+    state: &Value,
+) -> Result<(&'static str, Value), IpcError> {
+    let kind = decision["kind"].as_str().ok_or(IpcError::Protocol)?;
+    if kind == "leave" {
+        return Ok((ELICITATION_METHOD, Value::Null));
+    }
+    if let Some((question, labels)) = &item.question {
+        if kind != "answer" || current_turn(state)? != item.turn_id.as_deref() {
+            return Err(IpcError::Protocol);
+        }
+        let key = item.request_id.as_str().ok_or(IpcError::Protocol)?;
+        let answers = decision["answers"].as_object().ok_or(IpcError::Protocol)?;
+        if answers.keys().any(|v| v != key) {
+            return Err(IpcError::Protocol);
+        }
+        let Some(answer) = answers.get(key) else {
+            return Ok((QUESTION_METHOD, Value::Null));
+        };
+        let selected = match answer.get("selected") {
+            None => &[][..],
+            Some(value) => value.as_array().ok_or(IpcError::Protocol)?.as_slice(),
+        };
+        let mut words = selected
+            .iter()
+            .map(|value| {
+                value
+                    .as_str()
+                    .filter(|v| labels.iter().any(|label| label == v))
+                    .map(str::to_owned)
+                    .ok_or(IpcError::Protocol)
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        if let Some(custom) = answer.get("custom").filter(|v| !v.is_null()) {
+            words.push(custom.as_str().ok_or(IpcError::Protocol)?.into());
+        }
+        let text = words.join(", ");
+        let text = text.trim();
+        if text.is_empty() {
+            return Err(IpcError::Protocol);
+        }
+        let encoded = json!([{"questionItemId":key,"question":question,"answer":text}]).to_string();
+        return Ok((QUESTION_METHOD,json!(format!("<send_user_message_question_reply>\n{encoded}\n</send_user_message_question_reply>"))));
+    }
+    let response = match kind {
+        "allow" if item.scopes.iter().any(|v| v == "session") => {
+            json!({"action":"accept","content":{},"_meta":{"persist":"session"}})
+        }
+        "allow" if item.view["toolName"] != "computer_use_app" => {
+            json!({"action":"accept","content":{},"_meta":null})
+        }
+        "always" if item.scopes.iter().any(|v| v == "always") => {
+            json!({"action":"accept","content":{},"_meta":{"persist":"always"}})
+        }
+        "deny" => json!({"action":"decline","content":null,"_meta":null}),
+        _ => return Err(IpcError::Protocol),
+    };
+    Ok((ELICITATION_METHOD, response))
 }

@@ -25,19 +25,19 @@ fn scopes_and_browser_reviewer_match_source() {
     assert_eq!(found.len(), 1);
     assert_eq!(found[0].view["allowsAlways"], true);
     assert_eq!(
-        pending::answer(&found[0], &json!({"kind":"allow"}), &state)
+        reply::answer(&found[0], &json!({"kind":"allow"}), &state)
             .unwrap()
             .1["_meta"]["persist"],
         "session"
     );
     assert_eq!(
-        pending::answer(&found[0], &json!({"kind":"always"}), &state)
+        reply::answer(&found[0], &json!({"kind":"always"}), &state)
             .unwrap()
             .1["_meta"]["persist"],
         "always"
     );
     assert_eq!(
-        pending::answer(&found[0], &json!({"kind":"deny"}), &state)
+        reply::answer(&found[0], &json!({"kind":"deny"}), &state)
             .unwrap()
             .1,
         json!({"action":"decline","content":null,"_meta":null})
@@ -52,13 +52,11 @@ fn scopes_and_browser_reviewer_match_source() {
     let mut browser = snapshot(vec![permission("browser-use", Value::Null)]);
     let found = pending::parse(&browser, THREAD, "owner").unwrap();
     assert_eq!(found.len(), 1);
-    assert!(
-        pending::answer(&found[0], &json!({"kind":"allow"}), &browser)
-            .unwrap()
-            .1["_meta"]
-            .is_null()
-    );
-    assert!(pending::answer(&found[0], &json!({"kind":"always"}), &browser).is_err());
+    assert!(reply::answer(&found[0], &json!({"kind":"allow"}), &browser)
+        .unwrap()
+        .1["_meta"]
+        .is_null());
+    assert!(reply::answer(&found[0], &json!({"kind":"always"}), &browser).is_err());
     browser["currentPermissions"]["approvalsReviewer"] = json!("auto");
     assert!(pending::parse(&browser, THREAD, "owner")
         .unwrap()
@@ -120,7 +118,7 @@ fn canonical_async_question_answer_and_explicit_settlement() {
     let found = pending::parse(&state, THREAD, "owner").unwrap();
     assert_eq!(found.len(), 1);
     let key = found[0].request_id.as_str().unwrap();
-    let (method, response) = pending::answer(
+    let (method, response) = reply::answer(
         &found[0],
         &json!({"kind":"answer","answers":{key:{"selected":["First"],"custom":"extra"}}}),
         &state,
@@ -128,7 +126,7 @@ fn canonical_async_question_answer_and_explicit_settlement() {
     .unwrap();
     assert_eq!(method, "thread-follower-steer-turn");
     assert!(response.as_str().unwrap().contains("First, extra"));
-    assert!(pending::answer(
+    assert!(reply::answer(
         &found[0],
         &json!({"kind":"answer","answers":{key:{"selected":["Invalid"]}}}),
         &state

@@ -1,5 +1,6 @@
 //! The cards a followed thread's state asks for, kept in step with each
 //! state Codex Desktop streams for it.
+use super::turns::turns;
 use super::{pending, LivePending, Shared, ThreadState};
 use agent_hud_agents::codex::AGENT;
 use serde_json::Value;
@@ -10,7 +11,7 @@ impl Shared {
         if !self.active.load(Ordering::Acquire) {
             return;
         }
-        if let Ok(turns) = pending::turns(&state_value, true) {
+        if let Ok(turns) = turns(&state_value, true) {
             for turn in turns {
                 if let (Some(id), Some(params)) = (
                     turn["turnId"].as_str(),

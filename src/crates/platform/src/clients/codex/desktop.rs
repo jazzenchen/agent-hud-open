@@ -10,6 +10,7 @@ mod daemon;
 mod pending;
 mod reply;
 mod stream;
+mod turns;
 pub(crate) use daemon::daemon_tui_port_for as daemon_tui_port;
 
 use super::desktop_io::{endpoint, DesktopIpc, IpcError, ShutdownHandle};
