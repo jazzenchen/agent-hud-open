@@ -9,17 +9,15 @@ import type {
 } from "@agent-hud/protocol";
 import {
   card,
-  Coverage,
-  Heading,
   integer,
   modelColor,
   number,
   raisedCard,
   row,
-  Swatch,
   truncate,
   type StatsTheme,
 } from "./StatsTheme";
+import { Coverage, Heading, Swatch } from "./StatsParts";
 
 function HeatmapRow({
   day,

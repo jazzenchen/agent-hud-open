@@ -14,11 +14,8 @@ import {
   compact,
   costHelp,
   costText,
-  Coverage,
-  Heading,
   integer,
   kindLabel,
-  ModelList,
   number,
   plain,
   row,
@@ -26,6 +23,8 @@ import {
   useAnimatedNumber,
   type StatsTheme,
 } from "./StatsTheme";
+import { Coverage, Heading } from "./StatsParts";
+import { ModelList } from "./ModelList";
 import { Sparkline } from "./UsageChart";
 import {
   dateFormat,

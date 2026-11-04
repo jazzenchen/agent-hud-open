@@ -10,12 +10,12 @@ import {
   modelColor,
   number,
   row,
-  Swatch,
   truncate,
   useAnimatedNumber,
-  useCanvas,
   type StatsTheme,
 } from "./StatsTheme";
+import { Swatch } from "./StatsParts";
+import { useCanvas } from "./use-canvas";
 
 interface BarSegment {
   id: string;

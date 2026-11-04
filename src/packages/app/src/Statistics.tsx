@@ -33,6 +33,8 @@ import {
   IndexingProgress,
   Heading,
   TotalSummary,
+} from "./statistics/StatsParts";
+import {
   compact,
   dimensionsLabel,
   freshKinds,

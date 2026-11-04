@@ -23,9 +23,9 @@ import {
   number,
   row,
   truncate,
-  useCanvas,
   type StatsTheme,
 } from "./StatsTheme";
+import { useCanvas } from "./use-canvas";
 
 type Action = (
   method: NativeMethod,
