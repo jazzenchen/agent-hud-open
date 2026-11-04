@@ -223,13 +223,19 @@ export function KnownClientCard({
           </Pill>
         ) : (
           <>
-            {pluginState && <StatePill state={pluginState} t={t} />}
+            {pluginState && (
+              <StatePill state={pluginState} label={["Plugin", "插件"]} t={t} />
+            )}
             {answersOff && (
               <Pill tone="orange" dot>
                 {t("Answers off", "回答已关闭")}
               </Pill>
             )}
-            <StatePill state={hud.state} t={t} />
+            <StatePill
+              state={hud.state}
+              label={["HUD tools", "HUD 工具"]}
+              t={t}
+            />
           </>
         )
       }
