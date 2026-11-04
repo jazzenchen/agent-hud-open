@@ -1,0 +1,20 @@
+{
+  "src/crates/agents/src/account/fake.rs": 393,
+  "src/crates/agents/src/claude/live.rs": 353,
+  "src/crates/agents/src/coding_plans/parse.rs": 335,
+  "src/crates/core/src/demo/data.rs": 348,
+  "src/crates/core/src/ingestion/scan.rs": 546,
+  "src/crates/core/src/sessions/list.rs": 527,
+  "src/crates/core/src/source_db/scan.rs": 425,
+  "src/crates/platform/src/deepseek_plugin/agent-hud.mjs": 455,
+  "src/packages/app/src/sessions/SubagentTimeline.tsx": 524,
+  "src/packages/app/src/sessions/TurnBarsChart.tsx": 329,
+  "src/packages/hud/src/HUDScene.tsx": 667,
+  "src/packages/hud/src/bots/bot-motion.ts": 463,
+  "src/packages/hud/src/bots/bot-spec.ts": 393,
+  "src/packages/hud/src/bots/clawd-clips.ts": 301,
+  "src/packages/hud/src/bots/clawd-player.ts": 526,
+  "src/packages/hud/src/panel/TokenChartSection.tsx": 362,
+  "src/packages/hud/src/scene/flight-plan.ts": 395,
+  "src/packages/hud/src/scene/useHUDLayout.ts": 320
+}

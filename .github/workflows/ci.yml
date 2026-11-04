@@ -28,6 +28,7 @@ jobs:
       - run: node src/tooling/check-package-boundary.mjs
       - run: node src/tooling/check-clients.mjs
       - run: node src/tooling/check-test-paths.mjs
+      - run: node src/tooling/check-file-size.mjs
       - run: pnpm run typecheck
       - run: pnpm run test:ts
       - run: pnpm run test:mcp
