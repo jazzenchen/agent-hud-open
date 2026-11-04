@@ -25,7 +25,7 @@ import {
 } from "./StatsTheme";
 import { Coverage, Heading } from "./StatsParts";
 import { ModelList } from "./ModelList";
-import { Sparkline } from "./UsageChart";
+import { Sparkline } from "./Sparkline";
 import {
   dateFormat,
   localeDateTime,

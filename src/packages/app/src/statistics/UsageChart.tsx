@@ -1,97 +1,18 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { HUDArtwork as HUDLogo } from "@agent-hud/hud/HUDArtwork";
 import { tokenPlot } from "../lib/statistics";
 import type { StatisticsResponse } from "@agent-hud/protocol";
 import {
-  card,
   compact,
   dateLabel,
   integer,
   modelColor,
   number,
-  row,
-  truncate,
   useAnimatedNumber,
   type StatsTheme,
 } from "./StatsTheme";
-import { Swatch } from "./StatsParts";
 import { useCanvas } from "./use-canvas";
-
-interface BarSegment {
-  id: string;
-  color: string;
-  ratio: number;
-}
-
-interface NormalizedBar {
-  leftRatio: number;
-  rightRatio: number;
-  totalRatio: number;
-  segments: BarSegment[];
-}
-
-function interpolateBars(
-  from: NormalizedBar[],
-  to: NormalizedBar[],
-  t: number,
-): NormalizedBar[] {
-  if (t >= 1 || !from.length) return to;
-  if (!to.length) {
-    return from.map((bar) => ({
-      ...bar,
-      totalRatio: bar.totalRatio * (1 - t),
-      segments: bar.segments.map((seg) => ({
-        ...seg,
-        ratio: seg.ratio * (1 - t),
-      })),
-    }));
-  }
-  return to.map((target, index) => {
-    const source =
-      from.length === to.length
-        ? from[index]
-        : from[
-            Math.min(
-              from.length - 1,
-              Math.floor((index / Math.max(1, to.length)) * from.length),
-            )
-          ];
-    if (!source) {
-      return {
-        ...target,
-        totalRatio: target.totalRatio * t,
-        segments: target.segments.map((seg) => ({
-          ...seg,
-          ratio: seg.ratio * t,
-        })),
-      };
-    }
-    const seen = new Set<string>();
-    const segments: BarSegment[] = [];
-    for (const seg of target.segments) {
-      seen.add(seg.id);
-      const prev = source.segments.find((s) => s.id === seg.id)?.ratio ?? 0;
-      const ratio = prev + (seg.ratio - prev) * t;
-      if (ratio > 0.0005) {
-        segments.push({ id: seg.id, color: seg.color, ratio });
-      }
-    }
-    for (const seg of source.segments) {
-      if (seen.has(seg.id)) continue;
-      const ratio = seg.ratio * (1 - t);
-      if (ratio > 0.0005) {
-        segments.push({ id: seg.id, color: seg.color, ratio });
-      }
-    }
-    return {
-      leftRatio: target.leftRatio,
-      rightRatio: target.rightRatio,
-      totalRatio:
-        source.totalRatio + (target.totalRatio - source.totalRatio) * t,
-      segments,
-    };
-  });
-}
+import { interpolateBars, usageBars, type NormalizedBar } from "./usage-bars";
+import { UsageChartTip } from "./UsageChartTip";
 
 /** The original chart draws dense model stacks on one surface, rather than a view per segment. */
 export const UsageChart = memo(function UsageChart({
@@ -125,28 +46,10 @@ export const UsageChart = memo(function UsageChart({
       })),
     [data.models],
   );
-  const targetBars = useMemo<NormalizedBar[]>(() => {
-    const span = plot.end - plot.start;
-    if (span <= 0 || peak <= 0) return [];
-    return data.buckets.map((bucket, index) => {
-      const column = plot.columns[index];
-      const leftRatio = (column.start - plot.start) / span;
-      const rightRatio = (column.end - plot.start) / span;
-      const totalRatio = bucket.selectedTokens / peak;
-      const segments: BarSegment[] = [];
-      for (const model of chartModels) {
-        const value = bucket.models[model.id] ?? 0;
-        if (value > 0) {
-          segments.push({
-            id: model.id,
-            color: model.color,
-            ratio: value / peak,
-          });
-        }
-      }
-      return { leftRatio, rightRatio, totalRatio, segments };
-    });
-  }, [chartModels, data.buckets, peak, plot]);
+  const targetBars = useMemo(
+    () => usageBars(data.buckets, plot, peak, chartModels),
+    [chartModels, data.buckets, peak, plot],
+  );
 
   const currentBarsRef = useRef<NormalizedBar[] | null>(null);
   const hoveredRef = useRef<number | null>(hovered);
@@ -346,64 +249,15 @@ export const UsageChart = memo(function UsageChart({
           </div>
         )}
         {inspected && inspectedColumn && (
-          <div
-            role="tooltip"
-            style={{
-              ...card(theme),
-              position: "absolute",
-              zIndex: 10,
-              pointerEvents: "none",
-              bottom: 108,
-              left: Math.max(
-                0,
-                Math.min(
-                  width - Math.min(width, 280),
-                  ((inspectedColumn.start - plot.start) /
-                    (plot.end - plot.start)) *
-                    width -
-                    130,
-                ),
-              ),
-              width: Math.min(width, 280),
-              background: theme.ground,
-              boxShadow: "0 5px 18px #0002",
-              fontSize: 11,
-            }}
-          >
-            <div style={{ color: theme.secondary, marginBottom: 5 }}>
-              {dateLabel(
-                Math.max(inspectedColumn.start, start),
-                data.query.timeZone,
-                zh,
-              )}
-            </div>
-            <strong style={{ ...number, fontSize: 14 }}>
-              {integer(inspected.selectedTokens)} {zh ? "Token" : "tokens"}
-            </strong>
-            {data.models
-              .filter((model) => (inspected.models[model.id] ?? 0) > 0)
-              .map((model) => (
-                <div key={model.id} style={{ ...row, marginTop: 5 }}>
-                  <Swatch color={modelColor(model.id)} />
-                  <HUDLogo
-                    source={model.provider}
-                    size={11}
-                    light={theme.light}
-                  />
-                  <span style={truncate}>{model.name}</span>
-                  <span style={{ marginLeft: "auto", ...number }}>
-                    {integer(inspected.models[model.id])}
-                  </span>
-                </div>
-              ))}
-            {inspectedColumn.partial && (
-              <div style={{ color: theme.secondary, marginTop: 5 }}>
-                {zh
-                  ? "仅统计所选范围内的部分时段"
-                  : "Partial period within the selected range"}
-              </div>
-            )}
-          </div>
+          <UsageChartTip
+            data={data}
+            inspected={inspected}
+            inspectedColumn={inspectedColumn}
+            plot={plot}
+            start={start}
+            width={width}
+            theme={theme}
+          />
         )}
       </div>
       {/* The labels name the selected range and sit where it lies on the
@@ -426,95 +280,5 @@ export const UsageChart = memo(function UsageChart({
         ))}
       </div>
     </div>
-  );
-});
-
-export const Sparkline = memo(function Sparkline({
-  values,
-  color,
-}: {
-  values: number[];
-  color: string;
-}) {
-  const height = 28;
-  const { ref, width, context } = useCanvas(height);
-  const targetRatios = useMemo(() => {
-    const peak = Math.max(0, ...values);
-    return peak > 0
-      ? values.map((v) => Math.max(0, v / peak))
-      : values.map(() => 0);
-  }, [values]);
-  const currentRatiosRef = useRef<number[] | null>(null);
-
-  const paint = useCallback(
-    (ratios: number[]) => {
-      const ctx = context();
-      if (!ctx || !ratios.length) return;
-      const slot = width / ratios.length;
-      ctx.fillStyle = color;
-      ctx.globalAlpha = 0.85;
-      for (const [index, ratio] of ratios.entries()) {
-        if (ratio > 0.001) {
-          const h = Math.max(1.5, height * ratio);
-          ctx.fillRect(
-            index * slot + slot * 0.2,
-            height - h,
-            Math.max(1, slot * 0.6),
-            h,
-          );
-        }
-      }
-    },
-    [color, context, width],
-  );
-
-  useEffect(() => {
-    if (!width) return;
-    const prev = currentRatiosRef.current;
-    if (
-      prev === null ||
-      matchMedia("(prefers-reduced-motion: reduce)").matches
-    ) {
-      currentRatiosRef.current = targetRatios;
-      paint(targetRatios);
-      return;
-    }
-    const from = prev;
-    const duration = 240;
-    const startTime = performance.now();
-    let frame = 0;
-    const animate = (now: number) => {
-      const t = Math.min(1, Math.max(0, (now - startTime) / duration));
-      const eased = 1 - Math.pow(1 - t, 3);
-      const next = targetRatios.map((target, idx) => {
-        const src =
-          from.length === targetRatios.length
-            ? (from[idx] ?? 0)
-            : (from[
-                Math.min(
-                  from.length - 1,
-                  Math.floor(
-                    (idx / Math.max(1, targetRatios.length)) * from.length,
-                  ),
-                )
-              ] ?? 0);
-        return src + (target - src) * eased;
-      });
-      currentRatiosRef.current = next;
-      paint(next);
-      if (t < 1) {
-        frame = requestAnimationFrame(animate);
-      }
-    };
-    frame = requestAnimationFrame(animate);
-    return () => cancelAnimationFrame(frame);
-  }, [targetRatios, paint, width]);
-
-  return (
-    <canvas
-      ref={ref}
-      aria-hidden
-      style={{ width: "100%", height, display: "block" }}
-    />
   );
 });
