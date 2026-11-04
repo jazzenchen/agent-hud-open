@@ -119,7 +119,6 @@ function WholeOrNothing({
     const measure = () =>
       setFits(element.scrollWidth <= element.clientWidth + 0.5);
     measure();
-    if (typeof ResizeObserver === "undefined") return;
     const observer = new ResizeObserver(measure);
     observer.observe(element);
     return () => observer.disconnect();

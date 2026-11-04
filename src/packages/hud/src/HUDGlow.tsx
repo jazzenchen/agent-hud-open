@@ -506,10 +506,6 @@ function GpuRim({
 }) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const live = useRef<GpuPaint | null>(null);
-  const latest = useRef(values);
-  latest.current = values;
-  const callbacks = useRef({ onReady, onUnavailable });
-  callbacks.current = { onReady, onUnavailable };
   const start = useRef(0);
   useEffect(() => {
     const element = canvas.current;
@@ -520,9 +516,9 @@ function GpuRim({
       numbers: RIM_NUMBERS,
       colors: RIM_COLORS,
       paint: RIM_PAINT,
-      values: { ...latest.current, clock: 0 },
-      onReady: () => callbacks.current.onReady(),
-      onUnavailable: () => callbacks.current.onUnavailable(),
+      values: { ...values, clock: 0 },
+      onReady,
+      onUnavailable,
     });
     live.current = paint;
     return () => {
@@ -588,9 +584,7 @@ export const HUDGlow = memo(function HUDGlow({
   className,
 }: HUDGlowProps) {
   const [systemReduced, setSystemReduced] = useState(
-    () =>
-      typeof window !== "undefined" &&
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+    () => window.matchMedia("(prefers-reduced-motion: reduce)").matches,
   );
   const [gpuReady, setGpuReady] = useState(false);
   const [gpuFailed, setGpuFailed] = useState(false);
@@ -634,8 +628,7 @@ export const HUDGlow = memo(function HUDGlow({
   );
   useEffect(() => {
     const element = breath.current;
-    if (!motion.pulse || !element || typeof element.animate !== "function")
-      return;
+    if (!motion.pulse || !element) return;
     const animation = element.animate(
       breathFrames(amplitude),
       breathTiming(cycle),
@@ -670,13 +663,11 @@ export const HUDGlow = memo(function HUDGlow({
   const [flashing, setFlashing] = useState<GlowAlert | null>(null);
   useEffect(() => {
     // A new alert flashes; one that is gone stops its flash at once.
-    setFlashing(
-      alert && alert.id !== flashing?.id ? alert : alert ? flashing : null,
-    );
+    setFlashing(alert);
   }, [alert?.id]);
   useEffect(() => {
     const element = flash.current;
-    if (!flashing || !element || typeof element.animate !== "function") return;
+    if (!flashing || !element) return;
     const animation = element.animate(
       pulseFrames(flashing.warning, reduceMotion || systemReduced),
       {

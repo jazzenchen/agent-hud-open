@@ -585,7 +585,6 @@ export function HUDScene({
     open,
     hoverPhase: state.phase,
     hovered,
-    pinned,
     pointerInside,
     dragVisual,
     dragPreview,
@@ -1021,7 +1020,6 @@ export function HUDScene({
               marginStyle={marginStyle}
               dragVisual={dragVisual}
               hovered={hovered}
-              pinned={pinned}
               pointerInside={pointerInside}
               open={open}
               sender={sender}
@@ -1033,7 +1031,6 @@ export function HUDScene({
               hasAlert={Boolean(request || event)}
               suppressHover={suppressHover}
               setHovered={setHovered}
-              setPinned={setPinned}
               forceOpen={forceOpen}
               pin={pin}
             />

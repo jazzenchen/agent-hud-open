@@ -36,7 +36,6 @@ export interface UseHUDInteractionArgs {
   open: boolean;
   hoverPhase?: string;
   hovered: string | null;
-  pinned: boolean;
   pointerInside: boolean;
   dragVisual: boolean;
   dragPreview?: HUDDragPreview | null;
@@ -74,7 +73,6 @@ export function useHUDInteraction({
   open,
   hoverPhase,
   hovered,
-  pinned: _pinned,
   pointerInside,
   dragVisual,
   dragPreview,

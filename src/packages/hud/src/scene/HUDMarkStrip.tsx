@@ -42,7 +42,6 @@ export function HUDMarkStrip({
   marginStyle,
   dragVisual,
   hovered,
-  pinned: _pinned,
   pointerInside,
   open,
   sender,
@@ -54,7 +53,6 @@ export function HUDMarkStrip({
   hasAlert,
   suppressHover,
   setHovered,
-  setPinned: _setPinned,
   forceOpen,
   pin,
 }: {
@@ -75,7 +73,6 @@ export function HUDMarkStrip({
   marginStyle: CSSProperties;
   dragVisual: boolean;
   hovered: string | null;
-  pinned: boolean;
   pointerInside: boolean;
   open: boolean;
   sender?: { source: string };
@@ -87,7 +84,6 @@ export function HUDMarkStrip({
   hasAlert: boolean;
   suppressHover: MutableRefObject<boolean>;
   setHovered: (key: string | null) => void;
-  setPinned: (pinned: boolean) => void;
   forceOpen: () => void;
   pin: (key?: string) => void;
 }) {
@@ -207,7 +203,7 @@ export function HUDMarkStrip({
               edge="top"
               flare={8}
               radius={metrics.radius}
-              fill={config.hasNotch ? "#000" : fill}
+              fill="#000"
               outline={outline}
             />
           )}

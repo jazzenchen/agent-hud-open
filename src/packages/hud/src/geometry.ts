@@ -93,10 +93,7 @@ const clamp = (n: number, lo: number, hi: number) =>
   Math.max(lo, Math.min(hi, n));
 
 export function labelWidth(text: string, size: number): number {
-  if (typeof document === "undefined")
-    return Math.ceil(text.length * size * 0.62);
-  const context = document.createElement("canvas").getContext("2d");
-  if (!context) return Math.ceil(text.length * size * 0.62);
+  const context = document.createElement("canvas").getContext("2d")!;
   context.font = `${size}px -apple-system, BlinkMacSystemFont, sans-serif`;
   const tabularDigit = Math.max(
     ..."0123456789".split("").map((digit) => context.measureText(digit).width),
