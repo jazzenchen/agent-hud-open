@@ -179,7 +179,10 @@ another account or none, and reads no identity field or credential to do so.
   Claude Code read them, with the failure's reason followed by how old they
   are ("Showing Claude Code's own reading from 2h ago"). The failure stays
   what it was, so a signed-out Claude Code is still told on the island to sign
-  in again.
+  in again. When the reading was the desktop app's, the record stands in only
+  if the desktop app last signed in to the same account (its
+  `lastKnownAccountUuid`); another account's record is never shown in its
+  place.
 
 Each window gets the id the engine's reading gives it: the session, the week
 across models, and a model's week (`seven_day_<family>`, or a `limits[]` entry
