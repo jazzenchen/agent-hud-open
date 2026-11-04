@@ -1,6 +1,6 @@
 use super::{socket_path, Wake, PAYLOAD_LIMIT};
 use agent_hud_core::requests::Requests;
-use serde_json::{json, Value};
+use serde_json::Value;
 use std::{
     fs::{self, File},
     io::{Read, Write},
@@ -19,6 +19,10 @@ use std::{
     thread::JoinHandle,
     time::Duration,
 };
+
+mod send;
+
+pub(crate) use send::send;
 
 fn identity(path: &Path) -> Option<(u64, u64)> {
     fs::symlink_metadata(path).ok().map(|m| (m.dev(), m.ino()))
@@ -270,141 +274,5 @@ fn disconnected(stream: &UnixStream) -> bool {
         )
 }
 
-pub(crate) fn send(
-    data: &Path,
-    source: &str,
-    flag: &str,
-    payload: &Value,
-) -> Result<Option<Value>, String> {
-    let message = json!({"source":source,"flag":flag,"payload":payload});
-    let mut bytes = serde_json::to_vec(&message).unwrap();
-    bytes.push(b'\n');
-    if bytes.len() > PAYLOAD_LIMIT {
-        return Err("Hook callback is too large".into());
-    }
-    let mut stream = UnixStream::connect(socket_path(data))
-        .map_err(|_| "Agent HUD hooks are disabled or not running")?;
-    stream
-        .set_write_timeout(Some(Duration::from_secs(2)))
-        .map_err(|_| "Hook timeout unavailable")?;
-    stream
-        .write_all(&bytes)
-        .map_err(|_| "Hook callback failed")?;
-    // Keep the write side open: EOF means the waiting CLI was cancelled. The
-    // JSONL request already frames its payload without requiring a half-close.
-    let mut response = Vec::new();
-    if flag == "--permission-hook" {
-        let mut transcript = if super::settles_in_transcript(source) {
-            super::transcript::Transcript::new(payload)
-        } else {
-            None
-        };
-        stream
-            .set_read_timeout(Some(Duration::from_millis(100)))
-            .map_err(|_| "Hook timeout unavailable")?;
-        let deadline = std::time::Instant::now() + Duration::from_secs(86_405);
-        loop {
-            if transcript.as_mut().is_some_and(|watch| watch.settled()) {
-                return Ok(None);
-            }
-            if std::time::Instant::now() >= deadline {
-                return Ok(None);
-            }
-            let mut chunk = [0u8; 8192];
-            match stream.read(&mut chunk) {
-                Ok(0) => break,
-                Ok(n) => {
-                    response.extend_from_slice(&chunk[..n]);
-                    if response.len() > PAYLOAD_LIMIT {
-                        return Err("Hook response is too large".into());
-                    }
-                }
-                Err(e)
-                    if matches!(
-                        e.kind(),
-                        std::io::ErrorKind::WouldBlock
-                            | std::io::ErrorKind::TimedOut
-                            | std::io::ErrorKind::Interrupted
-                    ) =>
-                {
-                    continue
-                }
-                Err(_) => return Err("Hook response did not complete".into()),
-            }
-        }
-    } else {
-        stream
-            .set_read_timeout(Some(Duration::from_secs(3)))
-            .map_err(|_| "Hook timeout unavailable")?;
-        stream
-            .take((PAYLOAD_LIMIT + 1) as u64)
-            .read_to_end(&mut response)
-            .map_err(|_| "Hook response did not complete")?;
-    }
-    if response.len() > PAYLOAD_LIMIT {
-        return Err("Hook response is too large".into());
-    }
-    if response.is_empty() {
-        Ok(None)
-    } else {
-        serde_json::from_slice(&response)
-            .map(Some)
-            .map_err(|_| "Invalid hook response".into())
-    }
-}
-
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::hooks::now_ms;
-    use agent_hud_agents::HookEvent;
-
-    #[test]
-    fn an_event_a_callback_could_not_write_is_kept_by_the_app() {
-        let root = tempfile::tempdir().unwrap();
-        let data = root.path().join("data");
-        let _server = Server::start(
-            &data,
-            Requests::default(),
-            Arc::new(|| {}),
-            super::super::reminders::Reminders::default(),
-        )
-        .unwrap();
-        let event = |source: &str| HookEvent {
-            source: source.into(),
-            session_id: format!("{source}:c1"),
-            at_ms: now_ms(),
-            kind: "session-observation".into(),
-            data: json!({"turnId":"c1","state":"running","title":"Fix the login"}),
-        };
-        let hand = |source: &str, event: HookEvent| {
-            send(
-                &data,
-                source,
-                "--completion-hook",
-                &json!({"transcript_path":null,"event":event}),
-            )
-            .unwrap()
-        };
-        // Another client's event, or one no hook reports, is not taken.
-        hand("trae", event("trae-cn"));
-        hand(
-            "trae",
-            HookEvent {
-                kind: "delivery".into(),
-                ..event("trae")
-            },
-        );
-        hand("trae", event("trae"));
-        let records = fs::read_dir(data.join("hooks/inbox"))
-            .unwrap()
-            .flatten()
-            .filter(|entry| super::super::inbox::is_record(&entry.path()))
-            .map(|entry| fs::read(entry.path()).unwrap())
-            .collect::<Vec<_>>();
-        assert_eq!(records.len(), 1);
-        let kept: HookEvent = serde_json::from_slice(&records[0]).unwrap();
-        assert_eq!(kept.session_id, "trae:c1");
-        assert_eq!(kept.data["title"], "Fix the login");
-    }
-}
+mod tests;

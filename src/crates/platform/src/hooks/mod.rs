@@ -27,7 +27,7 @@ mod transcript;
 mod turn_log;
 // The callback channel: a Unix socket, or a named pipe on Windows.
 #[cfg(unix)]
-#[path = "unix.rs"]
+#[path = "unix/mod.rs"]
 mod transport;
 #[cfg(windows)]
 #[path = "windows.rs"]
