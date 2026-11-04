@@ -19,13 +19,14 @@ impl Cache {
         &mut self,
         db: &Connection,
         revision: u64,
-        paths: &[PathBuf],
+        paths: &[String],
         now: i64,
     ) -> Result<(), String> {
         if self.revision == Some(revision) {
             return Ok(());
         }
-        let rows = metering::query_deepseek_billing_events(db, paths, now - 31 * 86_400_000)?;
+        let rows = metering::query_deepseek_billing_events(db, paths, now - 31 * 86_400_000)
+            .map_err(|_| "Could not read billing usage")?;
         let mut events = Vec::with_capacity(rows.len());
         for row in rows {
             let usage = row.usage;

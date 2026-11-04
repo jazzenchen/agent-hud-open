@@ -63,7 +63,8 @@ impl AgentHudCore {
             &selected_paths,
             from.div_euclid(900_000) * 900_000,
             (to - 1).div_euclid(900_000) * 900_000 + 900_000,
-        )?;
+        )
+        .map_err(|_| "Could not query usage ledger")?;
         #[derive(Default)]
         struct Aggregate {
             tokens: Usage,

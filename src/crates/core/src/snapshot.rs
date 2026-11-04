@@ -268,7 +268,7 @@ impl crate::AgentHudCore {
                             .get(*path)
                             .is_some_and(|log| log.source == "deepseek")
                     })
-                    .cloned()
+                    .map(|path| path.to_string_lossy().into_owned())
                     .collect::<Vec<_>>();
                 self.meters.billing.prepare(
                     db,
