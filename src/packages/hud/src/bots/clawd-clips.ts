@@ -1,5 +1,6 @@
 // Direct port of Bots/Clawd/ClawdClip.swift and ClawdClips.swift. Art stays unchanged.
 import type { BotSign } from "./bot-state";
+import { easeInOut } from "./bot-moves";
 export type ClawdLook =
   | "thinking"
   | "retrying"
@@ -66,6 +67,9 @@ export interface ClawdShot {
   steps: ClawdShotStep[];
 }
 export const CLAWD_FPS = 12;
+/** The first frame of Clawd's 12 fps grid at or after `time`. */
+export const frameAfter = (time: number) =>
+  Math.ceil((time - 0.004) * CLAWD_FPS) / CLAWD_FPS;
 export const clawdTicks = (seconds: number) =>
   Math.max(1, swiftRound(seconds * CLAWD_FPS));
 /** Swift's .rounded(): half away from zero, including negative offsets. */
@@ -81,8 +85,7 @@ export const sameFrame = (
     ? one == null && other == null
     : one.name === other.name && one.index === other.index;
 export function easedOffset(offset: ClawdOffset, share: number): ClawdOffset {
-  const x = Math.max(0, Math.min(1, share));
-  const ease = x < 0.5 ? 2 * x * x : 1 - (-2 * x + 2) ** 2 / 2;
+  const ease = easeInOut(Math.max(0, Math.min(1, share)));
   return { x: swiftRound(offset.x * ease), y: swiftRound(offset.y * ease) };
 }
 export const isClawdAttention = (look: ClawdLook) =>

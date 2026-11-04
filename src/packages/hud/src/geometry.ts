@@ -14,6 +14,10 @@ import {
 } from "./usage-meter/arcs";
 import { markWindows } from "./usage-meter/mark-windows";
 
+/** Whether a HUD on `edge` runs across the screen. */
+export const horizontal = (edge: HUDEdge) =>
+  edge === "top" || edge === "bottom";
+
 export interface HUDRect {
   x: number;
   y: number;

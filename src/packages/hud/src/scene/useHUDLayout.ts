@@ -9,6 +9,7 @@ import { compactAlertDockWidth } from "../IslandNews";
 import {
   cardRect,
   dragSurfaceGeometry,
+  horizontal,
   parkedRect,
   type HUDRect,
   type StripMetrics,
@@ -25,7 +26,6 @@ import { SIMPLE_EDGE_MARGIN } from "./simple-panel";
 import { useNotchGeometry } from "./NotchSurface";
 import { snapshotLanguage } from "@agent-hud/ui/format";
 
-const horizontal = (edge: HUDEdge) => edge === "top" || edge === "bottom";
 export interface UseHUDLayoutArgs {
   config: HUDConfig;
   snapshot: Snapshot;

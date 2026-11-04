@@ -570,6 +570,7 @@ export function HUDScene({
     entered,
     domExited,
     pin,
+    openAtTop,
     handoff,
     configurePanel,
     showPanelStats,
@@ -965,21 +966,7 @@ export function HUDScene({
             onPointerMove={(event) => {
               if (nativePointer) return;
               followMark(event);
-              if (
-                config.openImmediatelyAtTop &&
-                edge === "top" &&
-                (state.phase === "opening" || state.phase === "collapsed") &&
-                !suppressHover.current &&
-                (!config.requiresOptionToOpen ||
-                  event.altKey ||
-                  hover.inside.current)
-              ) {
-                const bounds = scene.current?.getBoundingClientRect();
-                const x = event.clientX - (bounds?.left ?? 0);
-                const y = event.clientY - (bounds?.top ?? 0);
-                if (x >= strip.x && x <= strip.x + strip.width && y <= 1)
-                  forceOpen();
-              }
+              openAtTop(event);
             }}
           >
             {onDragStart && (

@@ -2,7 +2,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import type { Approval, IslandEvent, Snapshot } from "@agent-hud/protocol";
 import { CompactAlertView } from "../IslandNews";
-import type { HUDRect } from "../geometry";
+import { horizontal, type HUDRect } from "../geometry";
 import {
   HUD_METRICS,
   type HUDConfig,
@@ -13,8 +13,6 @@ import { AgentPeek } from "./AgentPeek";
 import { Silhouette, type useNotchGeometry } from "./NotchSurface";
 import { outsideSimplePanel } from "./simple-panel";
 import { snapshotLanguage } from "@agent-hud/ui/format";
-
-const horizontal = (edge: HUDEdge) => edge === "top" || edge === "bottom";
 
 export function HUDExpandedSurface({
   config,

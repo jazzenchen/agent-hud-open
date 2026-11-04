@@ -1,5 +1,5 @@
 import { HUD_METRICS } from "../model";
-import type { RingItem } from "./mark-windows";
+import { itemShare, type RingItem } from "./mark-windows";
 
 /** Horizontal bars for `items`, the first on top, stacked in the middle of a
  * `length` × `height` box; each fills from the left and slides to a new value
@@ -50,7 +50,7 @@ export function UsageBars({
             style={{
               display: "block",
               height: "100%",
-              width: `${share(item.percent)}%`,
+              width: `${itemShare(item.percent)}%`,
               borderRadius: "inherit",
               background: item.color,
               transition: reduceMotion
@@ -63,8 +63,3 @@ export function UsageBars({
     </span>
   );
 }
-
-const share = (percent: number | null) =>
-  percent == null || !Number.isFinite(percent)
-    ? 0
-    : Math.max(0, Math.min(100, percent));

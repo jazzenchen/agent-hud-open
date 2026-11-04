@@ -7,7 +7,7 @@ import {
   type RefObject,
 } from "react";
 import type { Approval, IslandEvent } from "@agent-hud/protocol";
-import type { HUDRect, StripMetrics } from "../geometry";
+import { horizontal, type HUDRect, type StripMetrics } from "../geometry";
 import type { HUDConfig, HUDEdge, HUDVendor } from "../model";
 import type { HUDDragPreview } from "./useHUDDrag";
 
@@ -21,8 +21,6 @@ export interface HUDNativePointer {
   metaKey: boolean | null;
   shiftKey: boolean | null;
 }
-
-const horizontal = (edge: HUDEdge) => edge === "top" || edge === "bottom";
 
 export interface UseHUDInteractionArgs {
   config: HUDConfig;
@@ -213,6 +211,26 @@ export function useHUDInteraction({
     }
   }
 
+  /** At the very top of the screen, the pointer opens the panel at once. */
+  function openAtTop(event: {
+    clientX: number;
+    clientY: number;
+    altKey: boolean | null;
+  }) {
+    if (
+      !config.openImmediatelyAtTop ||
+      edge !== "top" ||
+      (hoverPhase !== "opening" && hoverPhase !== "collapsed") ||
+      suppressHover.current ||
+      (config.requiresOptionToOpen && !event.altKey && !hoverInside.current)
+    )
+      return;
+    const bounds = scene.current?.getBoundingClientRect();
+    const x = event.clientX - (bounds?.left ?? 0);
+    const y = event.clientY - (bounds?.top ?? 0);
+    if (x >= strip.x && x <= strip.x + strip.width && y <= 1) forceOpen();
+  }
+
   function entered(optionDown = false) {
     setPointerInside(true);
     if (
@@ -240,25 +258,13 @@ export function useHUDInteraction({
     }
     if (dragVisual || dragCandidate.current) return;
     const bounds = scene.current?.getBoundingClientRect();
-    const point = nativePointer.point;
-    followMark({
-      clientX: point.x + (bounds?.left ?? 0),
-      clientY: point.y + (bounds?.top ?? 0),
-    });
+    const client = {
+      clientX: nativePointer.point.x + (bounds?.left ?? 0),
+      clientY: nativePointer.point.y + (bounds?.top ?? 0),
+    };
+    followMark(client);
     entered(nativePointer.altKey === true);
-    if (
-      config.openImmediatelyAtTop &&
-      edge === "top" &&
-      (hoverPhase === "opening" || hoverPhase === "collapsed") &&
-      point.x >= strip.x &&
-      point.x <= strip.x + strip.width &&
-      point.y <= 1 &&
-      !suppressHover.current &&
-      (!config.requiresOptionToOpen ||
-        nativePointer.altKey ||
-        hoverInside.current)
-    )
-      forceOpen();
+    openAtTop({ ...client, altKey: nativePointer.altKey });
   }, [
     nativePointer,
     dragVisual,
@@ -323,6 +329,7 @@ export function useHUDInteraction({
     entered,
     domExited,
     pin,
+    openAtTop,
     handoff,
     configurePanel,
     showPanelStats,

@@ -11,9 +11,8 @@ import {
 } from "./bot-state";
 import { ClawdPlayer } from "./clawd-player";
 import { SplitMix } from "./bot-motion";
-import type { ClawdLook } from "./clawd-clips";
+import { frameAfter, type ClawdLook } from "./clawd-clips";
 
-const onGrid = (time: number) => Math.ceil((time - 0.004) * 12) / 12;
 const following = (time: number) => (Math.floor((time + 0.004) * 12) + 1) / 12;
 export interface ClawdPerformerOptions {
   staysBot?: boolean;
@@ -74,7 +73,7 @@ export class ClawdPerformer {
     this.state = { ...next };
     this.told = true;
     if (this.staysBot && this.arrival === null)
-      this.arrival = onGrid(now + this.arrivesAfter);
+      this.arrival = frameAfter(now + this.arrivesAfter);
     if (this.onStage) this.apply(before, now);
     this.findDue(now);
   }
@@ -175,7 +174,7 @@ export class ClawdPerformer {
     } else this.player.show(look, now, state.subagents);
     this.player.setBadge(this.logoSign, now);
     if (state.hovered !== (before?.hovered ?? false)) {
-      if (state.hovered) this.greetAt = onGrid(now + 0.3);
+      if (state.hovered) this.greetAt = frameAfter(now + 0.3);
       else {
         this.greetAt = null;
         this.watching = false;
@@ -197,7 +196,7 @@ export class ClawdPerformer {
     );
   }
   private scheduleVisit(now: number) {
-    this.nextVisit = onGrid(
+    this.nextVisit = frameAfter(
       now +
         (this.state.look === "asleep"
           ? 180 + this.random.unit() * 120

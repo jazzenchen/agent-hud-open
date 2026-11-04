@@ -8,7 +8,7 @@ import {
   type RingStyle,
   type UsageArc,
 } from "./arcs";
-import type { RingItem } from "./mark-windows";
+import { itemShare, type RingItem } from "./mark-windows";
 
 export type { RingItem } from "./mark-windows";
 
@@ -44,7 +44,7 @@ export function UsageRing({
 }) {
   const target = usageArcs(style, items.length, spec).map((arc, i): Drawn => ({
     ...arc,
-    percent: clampShare(items[i].percent),
+    percent: itemShare(items[i].percent),
     opacity: 1,
     color: items[i].color,
   }));
@@ -95,11 +95,6 @@ export function UsageRing({
     </svg>
   );
 }
-
-const clampShare = (percent: number | null) =>
-  percent == null || !Number.isFinite(percent)
-    ? 0
-    : Math.max(0, Math.min(100, percent));
 
 /** `target` as drawn this frame: the arcs move from where they were to where
  * they go over the HUD's own duration and curve, at once under reduced motion. */

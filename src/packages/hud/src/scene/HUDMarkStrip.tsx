@@ -3,7 +3,7 @@ import { BotMark } from "../BotMark";
 import HUDGlow, { type GlowAlert } from "../HUDGlow";
 import { botState, facingFromEdge, isAttention } from "../bots/bot-state";
 import { DockMemory, type Direction } from "../bots/mark-director";
-import type { HUDRect, stripMetrics } from "../geometry";
+import { horizontal, type HUDRect, type stripMetrics } from "../geometry";
 import {
   markUsed,
   meterLabel,
@@ -21,8 +21,6 @@ import { isRingStyle } from "../usage-meter/arcs";
 import { MarkBars, MarkRing, markItems } from "../usage-meter/mark-usage";
 
 const clampedSize = (size: number) => Math.max(20, Math.min(60, size));
-
-const horizontal = (edge: HUDEdge) => edge === "top" || edge === "bottom";
 
 export function HUDMarkStrip({
   id,

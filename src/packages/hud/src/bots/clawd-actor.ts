@@ -6,6 +6,7 @@ import {
   type SpritePicture,
 } from "./clawd";
 import { ClawdPerformer, type ClawdPerformerOptions } from "./clawd-performer";
+import { frameAfter } from "./clawd-clips";
 
 interface Seen {
   picture: SpritePicture | null;
@@ -25,7 +26,6 @@ export interface ClawdActorFrame {
   due: number;
 }
 const logo: Seen = { picture: null };
-const frameAfter = (time: number) => Math.ceil((time - 0.004) * 12) / 12;
 /** IslandAnimation.mediaCurve, ClawdActor's exact original crossfade curve. */
 function fadeCurve(progress: number) {
   const x = Math.max(0, Math.min(1, progress));

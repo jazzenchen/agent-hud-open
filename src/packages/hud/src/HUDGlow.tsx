@@ -1,5 +1,5 @@
 import { memo, useEffect, useMemo, useRef, useState } from "react";
-import { startGpuPaint, type GpuPaint } from "./glow-gpu";
+import { cssChannels, startGpuPaint, type GpuPaint } from "./glow-gpu";
 import { flashMask, pulseFrames, type GlowAlert } from "./glow-alert";
 import {
   breathFrames,
@@ -314,23 +314,14 @@ function StaticRim({
   >
 > & { padding: number; stopCount: number }) {
   const ref = useRef<HTMLCanvasElement>(null);
-  const rgb = useMemo<RGB[]>(() => {
-    const probe = document.createElement("canvas");
-    probe.width = colors.length;
-    probe.height = 1;
-    const context = probe.getContext("2d", { willReadFrequently: true });
-    if (!context) return colors.map(() => [110, 110, 115]);
-    colors.forEach((color, index) => {
-      context.fillStyle = color;
-      context.fillRect(index, 0, 1, 1);
-    });
-    const pixels = context.getImageData(0, 0, colors.length, 1).data;
-    return colors.map((_, index) => [
-      pixels[index * 4],
-      pixels[index * 4 + 1],
-      pixels[index * 4 + 2],
-    ]);
-  }, [colors]);
+  const rgb = useMemo<RGB[]>(
+    () =>
+      colors.map((color) => {
+        const [r, g, b] = cssChannels(color);
+        return [r, g, b];
+      }),
+    [colors],
+  );
   useEffect(() => {
     const canvas = ref.current;
     const context = canvas?.getContext("2d");
