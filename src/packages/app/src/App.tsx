@@ -425,9 +425,7 @@ function AppContent({
   const [runningVersion, setRunningVersion] = useState(version);
   useEffect(() => {
     if (!isTauri()) return;
-    void getVersion()
-      .then(setRunningVersion)
-      .catch(() => {});
+    void getVersion().then(setRunningVersion);
   }, []);
   // A page the host asked for (the update notice opens Updates): taken when
   // Settings starts and whenever the host asks again. A product page that
@@ -441,9 +439,7 @@ function AppContent({
       if (allPages.some((page) => page.id === target)) setPage(target);
     };
     const take = () =>
-      void invoke<string | null>("take_settings_page")
-        .then(open)
-        .catch(() => {});
+      void invoke<string | null>("take_settings_page").then(open);
     take();
     const subscription = getCurrentWebviewWindow().listen<string>(
       "settings:page",
@@ -620,13 +616,11 @@ function AppContent({
     });
     void invoke<{ tab?: string | null; sessionId?: string | null } | null>(
       "take_statistics_target",
-    )
-      .then((target) => {
-        if (!target) return;
-        if (target.sessionId) applySession(target.sessionId);
-        else if (target.tab) setStatisticsTab(target.tab);
-      })
-      .catch(() => {});
+    ).then((target) => {
+      if (!target) return;
+      if (target.sessionId) applySession(target.sessionId);
+      else if (target.tab) setStatisticsTab(target.tab);
+    });
     return () => {
       void pendingSession.then((unlisten) => unlisten());
       void pendingProvider.then((unlisten) => unlisten());

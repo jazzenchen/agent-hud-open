@@ -415,11 +415,9 @@ export default function NativeHUDSurface({
         setUpdate(payload);
       },
     );
-    void invoke<HUDUpdateNotice | null>("hud_update_notice")
-      .then((notice) => {
-        if (!heard) setUpdate(notice);
-      })
-      .catch(() => {});
+    void invoke<HUDUpdateNotice | null>("hud_update_notice").then((notice) => {
+      if (!heard) setUpdate(notice);
+    });
     return () => void subscription.then((unlisten) => unlisten());
   }, []);
   const openUpdate = useCallback(() => {

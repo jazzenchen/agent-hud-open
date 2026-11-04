@@ -263,14 +263,7 @@ export function listCost(amounts: Record<string, Amount>, language: Language) {
     a === b ? 0 : a === "USD" ? -1 : b === "USD" ? 1 : a < b ? -1 : 1;
   return Object.keys(amounts)
     .sort(order)
-    .map((code) => {
-      try {
-        return "≈" + moneyAmount(amounts[code], code, language);
-      } catch {
-        // A code Intl does not know still reads as an amount.
-        return "≈" + moneyPrice(amounts[code], code);
-      }
-    })
+    .map((code) => "≈" + moneyAmount(amounts[code], code, language))
     .join(" · ");
 }
 

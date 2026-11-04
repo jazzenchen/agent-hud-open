@@ -27,10 +27,6 @@ test("list costs read as Open's ListCost.text: ≈ each currency, US dollars fir
   assert.equal(listCost({}, "en"), "");
 });
 
-test("a currency code Intl does not know still reads as an amount", () => {
-  assert.equal(listCost({ usd1: 3 }, "en"), "≈usd1 3.00");
-});
-
 const providers = [
   { id: "claude", name: "Claude Code" },
   { id: "deepseek", name: "DeepSeek" },
