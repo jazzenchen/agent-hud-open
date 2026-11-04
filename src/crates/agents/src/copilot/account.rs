@@ -411,7 +411,7 @@ pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
         .unwrap_or_else(|| {
             format!(
                 "account:{}",
-                crate::grok::cache::hash(&[
+                crate::account::hash(&[
                     "Copilot",
                     "",
                     &format!("home:{}", host.home().to_string_lossy())
@@ -566,7 +566,7 @@ mod tests {
         let reading = read(&host).unwrap();
         let expected = format!(
             "account:{}",
-            crate::grok::cache::hash(&["Copilot", "", "home:/h"])
+            crate::account::hash(&["Copilot", "", "home:/h"])
         );
         assert_eq!(reading.account.unwrap()["id"], expected.as_str());
     }

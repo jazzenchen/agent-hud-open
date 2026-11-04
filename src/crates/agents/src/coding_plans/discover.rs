@@ -3,9 +3,8 @@
 //! sign-ins, WorkBuddy's models and keys saved in Agent HUD. Discovery only
 //! reads: no key resolver runs, no token is refreshed, nobody signs in.
 use super::{nonempty, numeric, Credential};
-use crate::account::{account_id, variable, Host};
+use crate::account::{account_id, jwt_claims, variable, Host};
 use crate::l10n;
-use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::{
@@ -37,14 +36,7 @@ fn present(host: &dyn Host, path: &Path, json5: bool) -> Option<Value> {
     })
 }
 fn usable(key: &str, now: i64) -> bool {
-    let parts = key.split('.').collect::<Vec<_>>();
-    if parts.len() != 3 {
-        return true;
-    }
-    URL_SAFE_NO_PAD
-        .decode(parts[1])
-        .ok()
-        .and_then(|p| serde_json::from_slice::<Value>(&p).ok())
+    jwt_claims(key)
         .and_then(|p| p["exp"].as_f64())
         .is_none_or(|expiry| expiry > now as f64 / 1000.0 + 60.0)
 }

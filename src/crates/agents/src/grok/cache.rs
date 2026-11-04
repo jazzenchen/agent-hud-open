@@ -1,5 +1,6 @@
 //! Original Grok Bot plaintext cache framing. Authentication/safeStorage files
 //! are not opened. Every account-scoped read must verify the marker afterwards.
+pub use crate::account::hash;
 use crate::account::Host;
 use serde_json::Value;
 use sha2::{Digest, Sha256};
@@ -153,14 +154,6 @@ pub fn agent_id(id: &str) -> bool {
         && id
             .bytes()
             .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
-}
-pub fn hash(parts: &[&str]) -> String {
-    let mut h = Sha256::new();
-    for part in parts {
-        h.update(format!("{}:", part.len()).as_bytes());
-        h.update(part.as_bytes());
-    }
-    format!("{:x}", h.finalize())
 }
 pub fn session_id(account: &str, agent: &str) -> String {
     format!("grok-bot:{}:{agent}", hash(&[account]))
