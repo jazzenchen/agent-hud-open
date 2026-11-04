@@ -1,4 +1,5 @@
 //! Kimi JSONL session & child-session reducer.
+use crate::transcript::live::{Activity, Call, Work};
 use crate::transcript::{at, n, text};
 use crate::{Log, Usage};
 use serde_json::Value;
@@ -49,6 +50,9 @@ impl Log {
             }
             if let Some(at) = at(&v["time"]) {
                 self.clock(at);
+                if matches!(kind, "interaction.request" | "interaction.resolved") {
+                    self.kimi_interaction(v, at);
+                }
                 if kind == "context.append_loop_event" && agent == "main" {
                     let e = &v["event"];
                     if let Some(turn) = text(&e["turnId"]) {
@@ -136,6 +140,33 @@ impl Log {
             );
         }
     }
+
+    /// An approval or a question Kimi asks the person, until it is answered:
+    /// the session waits meanwhile. Kimi writes both lines the moment they
+    /// happen, so its hooks would say nothing more (their `PermissionRequest`
+    /// only observes); a turn's end settles anything it left asking.
+    fn kimi_interaction(&mut self, v: &Value, at: i64) {
+        let Some(id) = text(&v["id"]) else {
+            return;
+        };
+        let activity = self.live.activity.get_or_insert_with(Activity::default);
+        if v["type"] == "interaction.resolved" {
+            activity.close(id, at, false);
+            return;
+        }
+        let request = match (v["kind"].as_str(), v["request"]["display"]["kind"].as_str()) {
+            (Some("approval"), Some("plan_review")) => "plan",
+            (Some("approval"), _) => "permission",
+            (Some("question"), _) => "question",
+            _ => return,
+        };
+        activity.open(Call {
+            id: id.into(),
+            work: (request == "question").then_some(Work::Question),
+            at,
+            request: Some(request.into()),
+        });
+    }
 }
 
 /// A Kimi turn starts at the loop's `step.begin` event.
@@ -152,3 +183,62 @@ pub static TURNS: crate::transcript::turns::Turns = crate::transcript::turns::Tu
     },
     may_name: |line| crate::transcript::turns::has(line, b"step.begin"),
 };
+
+#[cfg(test)]
+mod tests {
+    use crate::Log;
+    use serde_json::Value;
+
+    const T0: i64 = 1_792_470_000_000;
+
+    /// A turn that asks for an approval, then a question, and is cancelled.
+    fn lines() -> Vec<Value> {
+        include_str!("../../tests/fixtures/kimi/macos/approval-wire.jsonl")
+            .lines()
+            .map(|line| serde_json::from_str(line).unwrap())
+            .collect()
+    }
+
+    /// The session's state and its open requests' kinds after `count` lines.
+    fn after(count: usize) -> (&'static str, Vec<String>) {
+        let mut log = Log::new(
+            "sessions/wd_project/session_7d1e/agents/main/wire.jsonl".into(),
+            "kimi",
+        );
+        for line in &lines()[..count] {
+            log.parse(line);
+        }
+        let now = T0 + 20_000;
+        let facts = log.live.facts(&log.id, "kimi", now, None).unwrap();
+        let kinds = facts["requests"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|request| request["kind"].as_str().unwrap().to_owned())
+            .collect();
+        (log.live.session_state(now, "kimi", None), kinds)
+    }
+
+    #[test]
+    fn the_session_waits_while_kimi_asks_and_runs_once_answered() {
+        assert_eq!(after(6), ("running", vec![]));
+        assert_eq!(after(7), ("waiting", vec!["permission".to_owned()]));
+        assert_eq!(after(10), ("running", vec![]));
+        assert_eq!(after(11), ("waiting", vec!["question".to_owned()]));
+        // The turn's end settles what it left asking.
+        assert_eq!(after(12), ("idle", vec![]));
+    }
+
+    #[test]
+    fn the_waiting_session_is_the_one_its_usage_is_counted_under() {
+        let mut log = Log::new(
+            "sessions/wd_project/session_7d1e/agents/main/wire.jsonl".into(),
+            "kimi",
+        );
+        for line in &lines()[..7] {
+            log.parse(line);
+        }
+        assert_eq!(log.id, "kimi:session_7d1e:main");
+        assert_eq!(log.meter_events.len(), 1);
+    }
+}

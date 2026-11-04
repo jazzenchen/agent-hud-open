@@ -1,0 +1,12 @@
+{"type": "metadata", "protocol_version": "1.5", "created_at": 1792470000000}
+{"type": "prompt.accepted", "agentId": "main", "promptId": "msg_01", "content": [{"type": "text", "text": "clean the build folder"}], "time": 1792470000010}
+{"type": "turn.prompt", "agentId": "main", "input": [{"type": "text", "text": "clean the build folder"}], "origin": {"kind": "user"}, "promptId": "msg_01", "time": 1792470000012}
+{"type": "context.append_loop_event", "agentId": "main", "event": {"type": "step.begin", "uuid": "u1", "turnId": "0", "step": 1}, "time": 1792470000020}
+{"type": "llm.request", "agentId": "main", "kind": "loop", "model": "kimi-for-coding", "turnStep": "0.1", "time": 1792470000025}
+{"type": "usage.record", "agentId": "main", "model": "kimi-for-coding", "usage": {"inputOther": 900, "output": 40, "inputCacheRead": 12000, "inputCacheCreation": 0}, "usageScope": "turn", "time": 1792470002000}
+{"type": "interaction.request", "agentId": "main", "id": "approval_8a3c2b1e-0d4f-4e6a-9b7c-5f1e2d3c4b5a", "kind": "approval", "toolCallId": "tool_1", "request": {"id": "approval_8a3c2b1e-0d4f-4e6a-9b7c-5f1e2d3c4b5a", "sessionId": "session_7d1e", "agentId": "main", "turnId": 0, "toolCallId": "tool_1", "toolName": "Bash", "action": "Run rm -rf build", "display": {"kind": "command", "command": "rm -rf build", "cwd": "/Users/me/project", "language": "bash"}}, "time": 1792470002100}
+{"type": "interaction.resolved", "agentId": "main", "id": "approval_8a3c2b1e-0d4f-4e6a-9b7c-5f1e2d3c4b5a", "response": {"decision": "approved"}, "time": 1792470009000}
+{"type": "permission.record_approval_result", "turnId": 0, "toolCallId": "tool_1", "toolName": "Bash", "action": "Run rm -rf build", "result": {"decision": "approved"}, "agentId": "main", "time": 1792470009000}
+{"type": "context.append_loop_event", "agentId": "main", "event": {"type": "tool.call", "uuid": "u2", "turnId": "0", "step": 1, "toolCallId": "tool_1", "name": "Bash", "args": {"command": "rm -rf build"}}, "time": 1792470009001}
+{"type": "interaction.request", "agentId": "main", "id": "question_1f2e3d4c-5b6a-4978-8a9b-0c1d2e3f4a5b", "kind": "question", "toolCallId": "tool_2", "request": {"questions": [{"question": "Also clear the cache?", "options": [{"label": "Yes"}, {"label": "No"}]}]}, "time": 1792470012000}
+{"type": "turn.ended", "agentId": "main", "turnId": 0, "reason": "cancelled", "durationMs": 12500, "time": 1792470012500}
