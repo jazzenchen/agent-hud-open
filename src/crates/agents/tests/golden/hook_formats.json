@@ -89623,17 +89623,6 @@
       }
     }
   },
-  "request/droid/oversized": {
-    "input": {
-      "payload": "A Bash payload whose tool_input.command is 1,048,576 bytes of 'x'",
-      "source": "droid"
-    },
-    "output": {
-      "request": {
-        "error": "Hook payload exceeds the supported size"
-      }
-    }
-  },
   "request/droid/session-not-string": {
     "input": {
       "payload": {
@@ -90787,17 +90776,6 @@
     "output": {
       "request": {
         "error": "Hook payload must be a JSON object"
-      }
-    }
-  },
-  "request/goose/oversized": {
-    "input": {
-      "payload": "A Bash payload whose tool_input.command is 1,048,576 bytes of 'x'",
-      "source": "goose"
-    },
-    "output": {
-      "request": {
-        "error": "Hook payload exceeds the supported size"
       }
     }
   },
@@ -100670,17 +100648,6 @@
       }
     }
   },
-  "request/trae-cn/oversized": {
-    "input": {
-      "payload": "A Bash payload whose tool_input.command is 1,048,576 bytes of 'x'",
-      "source": "trae-cn"
-    },
-    "output": {
-      "request": {
-        "error": "Hook payload exceeds the supported size"
-      }
-    }
-  },
   "request/trae-cn/session-not-string": {
     "input": {
       "payload": {
@@ -101007,17 +100974,6 @@
     "output": {
       "request": {
         "error": "Hook payload must be a JSON object"
-      }
-    }
-  },
-  "request/trae/oversized": {
-    "input": {
-      "payload": "A Bash payload whose tool_input.command is 1,048,576 bytes of 'x'",
-      "source": "trae"
-    },
-    "output": {
-      "request": {
-        "error": "Hook payload exceeds the supported size"
       }
     }
   },

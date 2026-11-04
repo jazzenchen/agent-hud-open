@@ -96,10 +96,6 @@ const aliases: Readonly<Record<string, string>> = {
   "qoder-dark": "qoder",
   "trae-cn": "trae",
 };
-/** Vendors without their own artwork yet, drawn with the fallback mark. */
-const unmarked: Readonly<Record<string, string>> = {
-  trae: "TRAE",
-};
 export function agentArtworkKey(source: string): string {
   const key = normalize(source);
   return aliases[key] ?? key;
@@ -107,6 +103,7 @@ export function agentArtworkKey(source: string): string {
 /** Vendors with no mark yet, shown with the generic icon: their own names. */
 const unmarked: Readonly<Record<string, string>> = {
   droid: "Factory Droid",
+  trae: "TRAE",
 };
 export function agentVendorName(source: string): string {
   const key = agentArtworkKey(source);
