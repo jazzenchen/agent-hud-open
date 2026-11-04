@@ -11,7 +11,7 @@ pub use os::computer_name;
 use serde_json::Value;
 use std::{
     path::PathBuf,
-    sync::{mpsc, Arc, Mutex},
+    sync::{mpsc, Arc, Mutex, PoisonError},
     thread::JoinHandle,
     time::Duration,
 };
@@ -79,7 +79,12 @@ impl PhoneShare {
     /// Disconnects the phones and ends the thread; their grants stay.
     pub fn stop(&self) {
         let _ = self.commands.send(Command::Stop);
-        if let Some(thread) = self.thread.lock().ok().and_then(|mut t| t.take()) {
+        let thread = self
+            .thread
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .take();
+        if let Some(thread) = thread {
             let _ = thread.join();
         }
     }
