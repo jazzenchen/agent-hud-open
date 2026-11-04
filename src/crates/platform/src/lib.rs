@@ -63,8 +63,8 @@ impl NativePlatform {
             gate,
         )
     }
-    pub fn legacy_preferences(&self) -> Result<Option<serde_json::Value>, String> {
-        Ok(os::legacy_preferences())
+    pub fn legacy_preferences() -> Option<serde_json::Value> {
+        os::legacy_preferences()
     }
     pub fn legacy_quota_database(&self) -> Option<PathBuf> {
         os::legacy_quota_database(&self.home)

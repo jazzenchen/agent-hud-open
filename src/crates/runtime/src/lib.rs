@@ -82,8 +82,8 @@ pub fn home_directory() -> Result<PathBuf, String> {
 }
 
 /// Read-only startup seed discovery, with no Runtime, collector or account jobs.
-pub fn legacy_preferences() -> Result<Option<Value>, String> {
-    NativePlatform::new()?.legacy_preferences()
+pub fn legacy_preferences() -> Option<Value> {
+    NativePlatform::legacy_preferences()
 }
 
 pub struct Runtime {
@@ -106,7 +106,7 @@ impl Runtime {
     }
 
     pub fn new(data_dir: Option<PathBuf>) -> Result<Self, String> {
-        let seed = legacy_preferences()?.and_then(|value| value.get("settings").cloned());
+        let seed = legacy_preferences().and_then(|value| value.get("settings").cloned());
         Self::new_with_preferences(data_dir, true, seed)
     }
     /// The product host reads the legacy seed once and shares it with its

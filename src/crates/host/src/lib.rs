@@ -897,10 +897,7 @@ pub fn run_with_options(
             let legacy = if app.state::<AppState>().demo {
                 None
             } else {
-                agent_hud_runtime::legacy_preferences().unwrap_or_else(|error| {
-                    eprintln!("Legacy preferences could not be imported: {error}");
-                    None
-                })
+                agent_hud_runtime::legacy_preferences()
             };
             let presentation = presentation::Presentation::new(if app.state::<AppState>().demo {
                 directory.join("demo")
