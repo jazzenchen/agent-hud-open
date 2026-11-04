@@ -4,7 +4,9 @@ import { Button } from "@agent-hud/ui/components/button";
 import type { Session, Snapshot } from "@agent-hud/protocol";
 import { sessionClient } from "../lib/sessions";
 import type { useSessions } from "../lib/use-sessions";
-import { DayHeader, SessionRow, TodayCard } from "./SessionListSection";
+import { DayHeader } from "./SessionListSection";
+import { SessionRow } from "./SessionRow";
+import { TodayCard } from "./TodayCard";
 import {
   card,
   compact,
