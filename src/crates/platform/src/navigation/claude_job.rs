@@ -27,7 +27,7 @@ const GONE: Duration = Duration::from_secs(10);
 
 /// False when this host cannot move the job; the caller then falls back.
 pub(super) fn open(home: &Path, session: &str, job: &str) -> Result<bool, String> {
-    if !crate::os::MOVES_CLAUDE_JOBS || !super::uuid(session) || !job_name(job) {
+    if !crate::os::MOVES_CLAUDE_JOBS || !super::is_uuid(session) || !job_name(job) {
         return Ok(false);
     }
     let env = std::env::vars().collect::<Environment>();

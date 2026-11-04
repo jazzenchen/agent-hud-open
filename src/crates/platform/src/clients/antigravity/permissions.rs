@@ -28,7 +28,6 @@ struct Shared {
 }
 pub(crate) struct Observer {
     shared: Arc<Shared>,
-    worker: Option<JoinHandle<()>>,
 }
 impl Observer {
     pub fn start(requests: Requests) -> Result<Self, String> {
@@ -39,14 +38,11 @@ impl Observer {
             requests,
         });
         let owned = shared.clone();
-        let worker = thread::Builder::new()
+        thread::Builder::new()
             .name("Antigravity approvals".into())
             .spawn(move || work(owned))
             .map_err(|_| "Antigravity approval observer could not start")?;
-        Ok(Self {
-            shared,
-            worker: Some(worker),
-        })
+        Ok(Self { shared })
     }
 }
 impl Drop for Observer {
@@ -70,11 +66,6 @@ impl Drop for Observer {
         // Blocking discovery/HTTP has its own bounded deadlines. Do not make a UI
         // disable/shutdown wait for that I/O; the invalidated generation checks its
         // active flag before publishing and again before writing any answer.
-        if let Some(worker) = self.worker.take() {
-            if worker.is_finished() {
-                let _ = worker.join();
-            }
-        }
     }
 }
 fn read(endpoints: &[Endpoint], active: &AtomicBool) -> Result<Vec<Pending>, String> {
@@ -116,9 +107,6 @@ fn work(shared: Arc<Shared>) {
     let mut waiters: Vec<JoinHandle<()>> = Vec::new();
     while shared.active.load(Ordering::Acquire) {
         let fetched = fetch(&shared.active);
-        if !shared.active.load(Ordering::Acquire) {
-            break;
-        }
         let mut known = shared.pending.lock().unwrap_or_else(|p| p.into_inner());
         if !shared.active.load(Ordering::Acquire) {
             break;

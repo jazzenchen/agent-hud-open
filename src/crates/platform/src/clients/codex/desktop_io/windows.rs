@@ -112,12 +112,6 @@ pub struct LocalSocket {
 
 impl LocalSocket {
     pub fn connect(path: &Path, timeout: Duration) -> Result<Self, IpcError> {
-        if timeout.is_zero() {
-            return Err(IpcError::TimedOut);
-        }
-        if !path.to_string_lossy().starts_with(r"\\.\pipe\") {
-            return Err(IpcError::Unavailable);
-        }
         let deadline = Instant::now() + timeout;
         let runtime = tokio::runtime::Builder::new_current_thread()
             .enable_all()

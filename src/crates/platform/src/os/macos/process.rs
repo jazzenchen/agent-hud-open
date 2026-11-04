@@ -41,9 +41,6 @@ pub(crate) fn codex_cli_on_port(
     wanted_env: &[&str],
 ) -> Option<(Vec<String>, HashMap<String, String>)> {
     const PROC_UID_ONLY: u32 = 5;
-    if port == 0 {
-        return None;
-    }
     let uid = unsafe { libc::getuid() };
     let needed = unsafe { libc::proc_listpids(PROC_UID_ONLY, uid, std::ptr::null_mut(), 0) };
     if needed <= 0 {
