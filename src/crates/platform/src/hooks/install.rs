@@ -82,6 +82,36 @@ fn configuration(context: &InstallContext, source: &str, relative: &str) -> Path
         })
         .unwrap_or_else(|| context.home.join(relative))
 }
+/// What a hooks-only file holds before Agent HUD's hook joins it: for a
+/// client that reads the `hooks` of another settings file for the events this
+/// one leaves out (`Layout::Events`), those events' groups copied in, so they
+/// keep running. The other file is only read.
+fn with_shadowed(
+    context: &InstallContext,
+    source: &str,
+    flag: &str,
+    current: &Value,
+) -> Result<Value, String> {
+    let shadowed =
+        agent_hud_agents::hooks::hooks_by_id(source).and_then(|hooks| match hooks.layout {
+            agent_hud_agents::hooks::Layout::Events { shadowed } => shadowed,
+            _ => None,
+        });
+    let Some(path) = shadowed.and_then(|location| {
+        crate::os::resolve(&context.home, &context.environment, &location)
+            .into_iter()
+            .next()
+    }) else {
+        return Ok(current.clone());
+    };
+    // A file the client cannot read holds no hooks it runs.
+    let settings = contents(&target(&path)?)?
+        .and_then(|bytes| {
+            serde_json::from_slice::<Value>(&agent_hud_agents::discovery::jsonc(&bytes)).ok()
+        })
+        .unwrap_or(Value::Null);
+    agent_hud_agents::hooks::configuration::seed_shadowed(source, flag, current, &settings)
+}
 pub(crate) fn target(path: &Path) -> Result<PathBuf, String> {
     let mut path = path.to_owned();
     for _ in 0..32 {
@@ -199,10 +229,15 @@ pub fn install_plan(
             "Hook settings must be a JSON object",
         ));
     }
+    let base = if enabled {
+        with_shadowed(context, &description.source, &description.flag, &current)?
+    } else {
+        current.clone()
+    };
     let updated = crate::os::hook_configuration(
         &description.source,
         &description.flag,
-        &current,
+        &base,
         enabled.then_some(context.executable.as_path()),
     )?;
     let changed = updated != current && (enabled || original.is_some());
@@ -307,6 +342,42 @@ mod tests {
             executable: PathBuf::new(),
             canonical_executable: None,
         }
+    }
+
+    #[test]
+    fn droid_hooks_copy_the_settings_hooks_they_would_shadow() {
+        let temp = tempfile::tempdir().unwrap();
+        let home = temp.path().join("home");
+        let factory = home.join(".factory");
+        fs::create_dir_all(&factory).unwrap(); // plain directory
+        fs::write(
+            factory.join("settings.json"),
+            r#"{
+  // Droid's own settings, with a comment
+  "model": "auto",
+  "hooks": {"PreToolUse": [{"matcher": "Execute", "hooks": [{"type": "command", "command": "/opt/audit.sh"}]}]}
+}"#,
+        )
+        .unwrap();
+        let context = context(&home, &[]);
+        let current = json!({});
+        let seeded = with_shadowed(&context, "droid", "--permission-hook", &current).unwrap();
+        assert_eq!(
+            seeded["PreToolUse"][0]["hooks"][0]["command"],
+            "/opt/audit.sh"
+        );
+        assert_eq!(
+            with_shadowed(&context, "droid", "--completion-hook", &current).unwrap(),
+            json!({})
+        );
+        assert_eq!(
+            with_shadowed(&context, "claude", "--permission-hook", &current).unwrap(),
+            current
+        );
+        assert_eq!(
+            configuration(&context, "droid", ".factory/hooks.json"),
+            factory.join("hooks.json")
+        );
     }
 
     #[test]

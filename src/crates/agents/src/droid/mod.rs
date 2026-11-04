@@ -1,10 +1,11 @@
 //! Factory Droid: Factory's coding agent, its CLI (`droid`) and the Factory
 //! App, which keep their sessions in `~/.factory/sessions`.
 //!
-//! Its sessions and limits are known from Droid 1.3.0's own code and
+//! Its sessions, hooks and limits are known from Droid 1.3.0's own code and
 //! docs.factory.com, not yet from a machine that runs it: every OS's entry
 //! is unverified.
 pub mod account;
+mod hooks;
 pub mod transcript;
 
 use crate::Agent;
@@ -32,7 +33,7 @@ pub static AGENT: Agent = Agent {
     id: "droid",
     name: "Factory Droid",
     sessions: true,
-    hooks: None,
+    hooks: Some(&hooks::HOOKS),
     observer: None,
     channel: None,
     program: None,

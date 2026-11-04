@@ -74,6 +74,11 @@ pub enum Layout {
     /// client's own function edits as text, so every byte that is not Agent
     /// HUD's stays as the user wrote it.
     Text(Text),
+    /// A hooks-only file: `<Event>` at the top level holds the groups of
+    /// `Groups`. `shadowed` is a settings file whose `hooks` the client reads
+    /// for any event this file leaves out; installing copies that event's
+    /// groups here first, so they keep running beside Agent HUD's.
+    Events { shadowed: Option<crate::Location> },
 }
 
 /// A settings file the client's own code edits as text.
@@ -138,6 +143,15 @@ pub enum Reply {
     /// Copilot CLI's `permissionRequest`, whose callback says `sessionId`,
     /// `toolName` and `toolInput`.
     Behavior,
+    /// A `PreToolUse` callback, which runs before every tool call `matcher`
+    /// names, answered with `{"hookSpecificOutput": {"hookEventName":
+    /// "PreToolUse", "permissionDecision": "allow" | "deny"}}`. Only a call
+    /// `asks` says the client would ask about is held; the others pass with
+    /// no answer.
+    PreToolUse {
+        matcher: &'static str,
+        asks: fn(&Value) -> bool,
+    },
 }
 
 impl Reply {
@@ -145,8 +159,16 @@ impl Reply {
     pub fn event(&self) -> &'static str {
         match self {
             Self::Behavior => "permissionRequest",
+            Self::PreToolUse { .. } => "PreToolUse",
             Self::HookSpecificOutput | Self::Decision => "PermissionRequest",
         }
+    }
+}
+
+impl Permission {
+    /// The event the permission hook is registered for.
+    pub fn event(&self) -> &'static str {
+        self.reply.event()
     }
 }
 
@@ -349,7 +371,7 @@ mod tests {
         ] {
             assert!(settles(name), "{name}");
         }
-        for name in ["codex", "codebuddy", "zcode", "qwen", "devin"] {
+        for name in ["codex", "codebuddy", "zcode", "qwen", "devin", "droid"] {
             assert!(!settles(name), "{name}");
         }
     }

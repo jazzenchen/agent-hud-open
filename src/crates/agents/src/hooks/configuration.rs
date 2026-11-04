@@ -1,4 +1,4 @@
-use super::{hooks_of, Hooks, Layout};
+use super::{hooks_of, Hooks, Layout, Reply};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value};
 
@@ -16,7 +16,10 @@ pub fn configuration(source_name: &str, flag: &str) -> Result<HookConfiguration,
     let (source, hooks) = hooks_of(source_name)?;
     let events: Vec<&str> = match flag {
         "--permission-hook" if hooks.permission.is_some() => {
-            vec![hooks.permission.as_ref().unwrap().reply.event()]
+            vec![hooks
+                .permission
+                .as_ref()
+                .map_or("PermissionRequest", |p| p.event())]
         }
         "--completion-hook" if hooks.completion.is_some() => hooks
             .completion
@@ -169,7 +172,11 @@ pub fn hook_commands(
         }
         return Ok(commands);
     }
-    let mut events = optional_object(&root, "hooks")?;
+    let mut events = if let Layout::Events { .. } = hooks.layout {
+        root
+    } else {
+        optional_object(&root, "hooks")?
+    };
     if let Layout::NestedGroups = hooks.layout {
         if events.get("enabled").is_some_and(|v| !v.is_boolean()) {
             return Err("Unrecognized hook enabled state".into());
@@ -193,11 +200,15 @@ pub fn hook_commands(
     }
     Ok(commands)
 }
-fn fixed(flag: &str) -> Map<String, Value> {
-    if matches!(
-        flag,
-        "--session-origin-hook" | "--attention-hook" | "--compaction-hook"
-    ) {
+/// Keys every handler of this hook carries. A hooks-only file's client
+/// (`Layout::Events`) runs its hooks one way and takes no `async`.
+fn fixed(hooks: &Hooks, flag: &str) -> Map<String, Value> {
+    if !matches!(hooks.layout, Layout::Events { .. })
+        && matches!(
+            flag,
+            "--session-origin-hook" | "--attention-hook" | "--compaction-hook"
+        )
+    {
         Map::from_iter([("async".into(), json!(true))])
     } else {
         Map::new()
@@ -214,17 +225,23 @@ fn timeout(hooks: &Hooks, flag: &str) -> u64 {
 }
 fn new_group(hooks: &Hooks, flag: &str, command: &str) -> Value {
     let mut handler = json!({"type":"command","command":command,"timeout":timeout(hooks, flag)});
-    for (key, value) in fixed(flag) {
+    for (key, value) in fixed(hooks, flag) {
         handler[&key] = value;
     }
     let mut group = json!({"hooks":[handler]});
     if flag == "--permission-hook" && !matches!(hooks.layout, Layout::NestedGroups) {
-        group["matcher"] = json!("");
+        group["matcher"] = match hooks.permission.as_ref().map(|p| &p.reply) {
+            Some(Reply::PreToolUse { matcher, .. }) => json!(matcher),
+            _ => json!(""),
+        };
     }
-    if flag == "--attention-hook" {
+    // A hooks-only file's client matches no notification or compaction
+    // kind; its hooks read the payload's.
+    let kinds = !matches!(hooks.layout, Layout::Events { .. });
+    if flag == "--attention-hook" && kinds {
         group["matcher"] = json!("permission_prompt|agent_needs_input");
     }
-    if flag == "--compaction-hook" {
+    if flag == "--compaction-hook" && kinds {
         group["matcher"] = json!("auto");
     }
     group
@@ -249,7 +266,7 @@ fn setting_handlers(
             let mut fields = handler.as_object()?.clone();
             *placed = true;
             fields.insert(key.into(), json!(command));
-            fields.extend(fixed(flag));
+            fields.extend(fixed(hooks, flag));
             Some(Value::Object(fields))
         })
         .collect()
@@ -339,6 +356,18 @@ pub fn patch_configuration(
         root.insert("agent-hud".into(), Value::Object(entry));
         return Ok(Value::Object(root));
     }
+    if let Layout::Events { .. } = hooks.layout {
+        for event in &desc.events {
+            let groups = optional_array(&root, event)?;
+            let result = setting_groups(groups, (source, hooks, flag), command);
+            if result.is_empty() {
+                root.remove(event);
+            } else {
+                root.insert(event.clone(), Value::Array(result));
+            }
+        }
+        return Ok(Value::Object(root));
+    }
     let originally_hooks = root.contains_key("hooks");
     let mut hooks_object = optional_object(&root, "hooks")?;
     if let Layout::Handlers(handler) = &hooks.layout {
@@ -405,6 +434,37 @@ pub fn patch_configuration(
         root.remove("hooks");
     } else {
         root.insert("hooks".into(), Value::Object(hooks_object));
+    }
+    Ok(Value::Object(root))
+}
+
+/// For a hooks-only file (`Layout::Events`) about to take this hook: each of
+/// its events that `current` leaves out, with the groups the shadowed
+/// settings file's `hooks` holds for it, as the client's own hook manager
+/// copies them when it saves. Without this the client would stop reading
+/// them once Agent HUD's group is the event's. Other layouts, and events
+/// `current` has, are unchanged.
+pub fn seed_shadowed(
+    source_name: &str,
+    flag: &str,
+    current: &Value,
+    shadowed: &Value,
+) -> Result<Value, String> {
+    let (desc, _, hooks) = described(source_name, flag)?;
+    if !matches!(hooks.layout, Layout::Events { shadowed: Some(_) }) {
+        return Ok(current.clone());
+    }
+    let mut root = object(current)?;
+    for event in &desc.events {
+        if root.contains_key(event) {
+            continue;
+        }
+        if let Some(groups) = shadowed["hooks"][event]
+            .as_array()
+            .filter(|g| !g.is_empty())
+        {
+            root.insert(event.clone(), Value::Array(groups.clone()));
+        }
     }
     Ok(Value::Object(root))
 }

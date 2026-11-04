@@ -84,6 +84,7 @@ pub const PERMISSION_SOURCES: &[&str] = &[
     "qwen",
     "devin",
     "copilot",
+    "droid",
 ];
 /// The clients with a completion hook, from their descriptors (see the test).
 pub const COMPLETION_SOURCES: &[&str] = &[
@@ -94,6 +95,7 @@ pub const COMPLETION_SOURCES: &[&str] = &[
     "qwen",
     "devin",
     "hermes",
+    "droid",
 ];
 pub const HOOK_FLAGS: &[&str] = &[
     "--permission-hook",

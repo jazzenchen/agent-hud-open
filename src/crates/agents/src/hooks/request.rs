@@ -52,6 +52,11 @@ fn tool_kind(tool: &str) -> &str {
         "notebook_edit" => "NotebookEdit",
         "agent" => "Agent",
         "task" => "Task",
+        // Factory Droid's tools.
+        "Execute" => "Bash",
+        "Create" => "Write",
+        "ApplyPatch" => "apply_patch",
+        "FetchUrl" => "WebFetch",
         _ => tool,
     }
 }
@@ -201,6 +206,13 @@ pub fn parse_request(source_name: &str, payload: &Value) -> Result<Option<Reques
     if permission.unanswerable.contains(&tool.unwrap_or("")) {
         return Ok(None);
     }
+    // A hook before every tool call holds only the calls the client would
+    // ask about.
+    if let Reply::PreToolUse { asks, .. } = permission.reply {
+        if !asks(payload) {
+            return Ok(None);
+        }
+    }
     // Copilot's older `toolArgs` may hold the arguments as JSON text.
     let args = match &payload["toolArgs"] {
         Value::String(text) => serde_json::from_str(text).unwrap_or(Value::Null),
@@ -258,8 +270,9 @@ pub fn parse_request(source_name: &str, payload: &Value) -> Result<Option<Reques
         detail: detail(kind, input),
         cwd: payload["cwd"].as_str().map(str::to_owned),
         path,
-        removed: lines(&change["old_string"]),
+        removed: lines(&change["old_string"]).or_else(|| lines(&change["old_str"])),
         added: lines(&change["new_string"])
+            .or_else(|| lines(&change["new_str"]))
             .or_else(|| lines(&change["content"]))
             .or_else(|| lines(&change["new_source"])),
         suggestions: field("permission_suggestions", "permissionSuggestions")
@@ -420,6 +433,14 @@ impl Request {
             _ => return Err("Unsupported decision kind".into()),
         }
         match self.permission().map(|permission| &permission.reply) {
+            Some(Reply::PreToolUse { .. }) => {
+                let allow = output["behavior"] == "allow";
+                return Ok(Some(json!({"hookSpecificOutput":{
+                    "hookEventName":"PreToolUse",
+                    "permissionDecision":if allow {"allow"} else {"deny"},
+                    "permissionDecisionReason":if allow {"The user allowed this tool call in Agent HUD."} else {"The user denied this tool call in Agent HUD."},
+                }})));
+            }
             Some(Reply::Decision) => {
                 return Ok(Some(
                     json!({"decision":if output["behavior"]=="allow"{"approve"}else{"block"}}),

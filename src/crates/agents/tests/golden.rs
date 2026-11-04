@@ -51,6 +51,7 @@ const SOURCES: &[&str] = &[
     "deepseek",
     "cursor",
     "copilot",
+    "droid",
     "unknown-client",
 ];
 /// Every hook flag, and one the crate does not know.
@@ -322,6 +323,8 @@ enum Layout {
     Entry,
     /// Cursor and Copilot: {version: 1, hooks: {<event>: [handler]}}
     Flat,
+    /// Factory Droid's hooks.json: <Event>: [ group ] at the top level
+    Events,
 }
 
 impl Pair {
@@ -332,6 +335,7 @@ impl Pair {
                 Layout::Flat
             }
             ("zcode", _) => Layout::Nested,
+            ("droid", _) => Layout::Events,
             _ => Layout::Grouped,
         }
     }
@@ -391,7 +395,11 @@ fn group(matcher: Option<&str>, handlers: Vec<Value>) -> Value {
 /// The matcher a fresh install writes, so owned inputs look installed.
 fn default_matcher(source: &str, flag: &str) -> Option<&'static str> {
     match flag {
+        "--permission-hook" if source == "droid" => {
+            Some("Create|Edit|ApplyPatch|Execute|WebSearch|FetchUrl")
+        }
         "--permission-hook" if source != "zcode" => Some(""),
+        "--attention-hook" | "--compaction-hook" if source == "droid" => None,
         "--attention-hook" => Some("permission_prompt|agent_needs_input"),
         "--compaction-hook" => Some("auto"),
         _ => None,
@@ -408,7 +416,7 @@ fn unrelated_settings() -> Value {
 
 fn scenarios(pair: &Pair) -> Vec<(String, Value)> {
     match pair.layout() {
-        Layout::Grouped | Layout::Nested => grouped_scenarios(pair),
+        Layout::Grouped | Layout::Nested | Layout::Events => grouped_scenarios(pair),
         Layout::Flat => flat_scenarios(pair),
         Layout::Entry => entry_scenarios(pair),
     }
@@ -420,8 +428,13 @@ fn grouped_scenarios(pair: &Pair) -> Vec<(String, Value)> {
     let own = pair.command(EXE);
     let old = pair.command(OLD_EXE);
     let first = pair.first().to_owned();
+    let top = pair.layout() == Layout::Events;
     let wrap = |extras: Value, events: Value| -> Value {
         let mut root = extras.as_object().cloned().unwrap_or_default();
+        if top {
+            root.extend(events.as_object().cloned().unwrap_or_default());
+            return Value::Object(root);
+        }
         root.insert(
             "hooks".into(),
             if nested {
@@ -2017,6 +2030,15 @@ fn requests(golden: &mut Golden) {
         &codex_patch,
         None,
     );
+    for (name, payload) in droid_tool_payloads() {
+        request_case(
+            golden,
+            format!("request/droid/tool/{name}"),
+            "droid",
+            &payload,
+            None,
+        );
+    }
     deserialized_requests(golden);
     let request = parse_request("claude", &bash_payload()).unwrap().unwrap();
     let at = [0, -1_000, NOW_MS, i64::MAX, i64::MIN];
@@ -2136,6 +2158,125 @@ fn pre_compact(trigger: &str) -> Value {
         "trigger": trigger,
         "custom_instructions": "",
     })
+}
+
+/// Factory Droid's `PreToolUse` calls at an autonomy level: held only where
+/// the level would ask.
+fn droid_tool_payloads() -> Vec<(String, Value)> {
+    let call = |mode: &str, tool: &str, input: Value| {
+        json!({
+            "session_id": "sess-1",
+            "transcript_path": "/Users/me/.factory/sessions/-Users-me-project/sess-1.jsonl",
+            "cwd": "/Users/me/project",
+            "permission_mode": mode,
+            "hook_event_name": "PreToolUse",
+            "tool_name": tool,
+            "tool_input": input,
+        })
+    };
+    let execute = |command: &str, risk: &str| json!({"command": command, "riskLevel": risk, "riskLevelReason": "Changes the workspace"});
+    vec![
+        (
+            "execute-medium-at-low".into(),
+            call("auto-low", "Execute", execute("npm install", "medium")),
+        ),
+        (
+            "execute-low-at-low".into(),
+            call("auto-low", "Execute", execute("rg login", "low")),
+        ),
+        (
+            "execute-low-at-off".into(),
+            call("off", "Execute", execute("rg login", "low")),
+        ),
+        (
+            "execute-allowed-at-off".into(),
+            call("off", "Execute", execute("git status", "low")),
+        ),
+        (
+            "execute-high-at-high".into(),
+            call("auto-high", "Execute", execute("git push", "high")),
+        ),
+        (
+            "execute-in-spec".into(),
+            call("spec", "Execute", execute("git push", "high")),
+        ),
+        (
+            "edit-at-off".into(),
+            call(
+                "off",
+                "Edit",
+                json!({"file_path": "/Users/me/project/src/login.ts", "old_str": "retry(2)", "new_str": "retry(3)"}),
+            ),
+        ),
+        (
+            "edit-at-low".into(),
+            call(
+                "auto-low",
+                "Edit",
+                json!({"file_path": "/Users/me/project/src/login.ts", "old_str": "a", "new_str": "b"}),
+            ),
+        ),
+        (
+            "create-at-off".into(),
+            call(
+                "off",
+                "Create",
+                json!({"file_path": "/Users/me/project/notes.md", "content": "# Notes\nRetry twice"}),
+            ),
+        ),
+        (
+            "apply-patch-at-off".into(),
+            call(
+                "off",
+                "ApplyPatch",
+                json!({"input": "*** Begin Patch\n*** Update File: src/main.rs\n@@\n-old\n+new\n*** End Patch"}),
+            ),
+        ),
+        (
+            "fetch-at-off".into(),
+            call(
+                "off",
+                "FetchUrl",
+                json!({"url": "https://docs.factory.com"}),
+            ),
+        ),
+        (
+            "read-at-off".into(),
+            call(
+                "off",
+                "Read",
+                json!({"file_path": "/Users/me/project/a.ts"}),
+            ),
+        ),
+        (
+            "ask-user-at-off".into(),
+            call(
+                "off",
+                "AskUser",
+                json!({"questionnaire": "[question] Which?"}),
+            ),
+        ),
+        (
+            "mcp-at-off".into(),
+            call("off", "mcp__github__create_issue", json!({"title": "x"})),
+        ),
+    ]
+}
+
+/// Factory Droid's lifecycle callbacks.
+fn droid_lifecycle(name: &str, extra: Value) -> Value {
+    let mut payload = json!({
+        "session_id": "sess-1",
+        "transcript_path": "/Users/me/.factory/sessions/-Users-me-project/sess-1.jsonl",
+        "cwd": "/Users/me/project",
+        "permission_mode": "auto-low",
+        "hook_event_name": name,
+    });
+    payload
+        .as_object_mut()
+        .unwrap()
+        .extend(extra.as_object().unwrap().clone());
+    payload
 }
 
 fn claude_style_stop() -> Value {
@@ -2658,6 +2799,69 @@ fn events(golden: &mut Golden) {
             "devin",
             completion,
             without(claude_style_stop(), "cwd"),
+        ),
+        (
+            "completion/droid/prompt",
+            "droid",
+            completion,
+            droid_lifecycle(
+                "UserPromptSubmit",
+                json!({"message_id": "u1", "prompt": "Fix it", "has_images": false}),
+            ),
+        ),
+        (
+            "completion/droid/tool-done",
+            "droid",
+            completion,
+            droid_lifecycle(
+                "PostToolUse",
+                json!({"tool_name": "Read", "tool_input": {}, "tool_response": "ok"}),
+            ),
+        ),
+        (
+            "completion/droid/permission-prompt",
+            "droid",
+            completion,
+            droid_lifecycle(
+                "Notification",
+                json!({"message": "Factory CLI needs permission to execute 1 tool(s)", "notification_type": "permission_prompt"}),
+            ),
+        ),
+        (
+            "completion/droid/stopped-by-user",
+            "droid",
+            completion,
+            droid_lifecycle(
+                "Notification",
+                json!({"message": "Agent stopped by user and is waiting for input", "notification_type": "idle_prompt", "message_id": "u1"}),
+            ),
+        ),
+        (
+            "completion/droid/stop",
+            "droid",
+            completion,
+            droid_lifecycle(
+                "Stop",
+                json!({"message_id": "a9", "stop_hook_active": false, "tool_execution_count": 3, "elapsed_time": 41000}),
+            ),
+        ),
+        (
+            "attention/droid/permission-prompt",
+            "droid",
+            attention,
+            droid_lifecycle(
+                "Notification",
+                json!({"message": "Factory CLI needs permission to execute 1 tool(s)", "notification_type": "permission_prompt"}),
+            ),
+        ),
+        (
+            "compaction/droid/auto",
+            "droid",
+            "--compaction-hook",
+            droid_lifecycle(
+                "PreCompact",
+                json!({"trigger": "auto", "message_count": 80, "estimated_tokens": 150000}),
+            ),
         ),
         // Malformed payloads.
         (
