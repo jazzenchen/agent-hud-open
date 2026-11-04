@@ -6,14 +6,8 @@ import type {
   Snapshot,
 } from "@agent-hud/protocol";
 import { compactAlertDockWidth } from "../IslandNews";
-import {
-  cardRect,
-  dragSurfaceGeometry,
-  horizontal,
-  parkedRect,
-  type HUDRect,
-  type StripMetrics,
-} from "../geometry";
+import { horizontal, type HUDRect, type StripMetrics } from "../geometry";
+import { cardRect, dragSurfaceGeometry, parkedRect } from "../placement";
 import {
   HUD_METRICS,
   vendorKey,

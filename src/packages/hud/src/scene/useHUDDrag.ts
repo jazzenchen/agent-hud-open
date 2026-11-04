@@ -7,7 +7,8 @@ import {
   type RefObject,
 } from "react";
 import type { Snapshot } from "@agent-hud/protocol";
-import { parkedRect, stripMetrics, type HUDRect } from "../geometry";
+import { stripMetrics, type HUDRect } from "../geometry";
+import { parkedRect } from "../placement";
 import { configuredVendors, type HUDConfig, type HUDEdge } from "../model";
 
 export interface HUDDragStartArgs {
