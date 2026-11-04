@@ -448,20 +448,11 @@ impl AgentHudCore {
         Ok(Some(old_path))
     }
 
-    pub(crate) fn scan(&mut self) -> Result<(), String> {
-        self.scan_impl(None)
-    }
-
-    pub fn read_reminded(&mut self) -> Result<Value, String> {
-        self.read_reminded_logs();
-        self.render_snapshot()
-    }
-
     /// Reads the logs a hook reminded of, without rendering.
     pub(crate) fn read_reminded_logs(&mut self) {
         let paths = self.reads.forced.clone();
         if !paths.is_empty() {
-            if let Err(error) = self.scan_impl(Some(paths)) {
+            if let Err(error) = self.scan(Some(paths)) {
                 self.source_notice = Some(error);
             }
             if self.usage_projection.is_none() {
@@ -533,7 +524,7 @@ impl AgentHudCore {
         paths
     }
 
-    pub(crate) fn scan_impl(&mut self, only: Option<HashSet<PathBuf>>) -> Result<(), String> {
+    pub(crate) fn scan(&mut self, only: Option<HashSet<PathBuf>>) -> Result<(), String> {
         let reminder_only = only.is_some();
         let mut errors = self.storage_issue.iter().cloned().collect::<Vec<_>>();
         let mut budget: u64 = 16 * 1024 * 1024;
@@ -832,7 +823,8 @@ impl AgentHudCore {
                     None
                 }
             };
-            if !needs_read(Some(&LogHead::from_log(&log)), &metadata) {
+            let whole = !needs_read(Some(&LogHead::from_log(&log)), &metadata);
+            if whole {
                 log.meter_target_at = None;
             }
             let projection_changed = original.as_ref().is_none_or(|previous| {
@@ -864,7 +856,6 @@ impl AgentHudCore {
             }
             let carried_before = log.carried.is_some();
             let replaced = if let Some(carried) = &log.carried {
-                let whole = !needs_read(Some(&LogHead::from_log(&log)), &metadata);
                 // Marks are covered source time too: a prompt read before its
                 // first call must outlive the handover's final sweep.
                 let (replaced, next) = carried.writing(
@@ -879,6 +870,19 @@ impl AgentHudCore {
             } else {
                 Vec::new()
             };
+            let should_map = log.observed
+                && source != "codex-index"
+                && !log.live.is_internal
+                && self
+                    .session_map
+                    .get(&(log.source.clone(), log.id.clone()))
+                    .and_then(|existing| self.logs.get(existing))
+                    .filter(|existing| {
+                        !existing.gone
+                            && existing.path != path
+                            && !existing.path.to_string_lossy().contains("#hud-session-")
+                    })
+                    .is_none_or(|existing| log.usage.total() >= existing.usage.total());
             let mut head = LogHead::from_log(&log);
             let mut payload_bytes = 0;
             let mut costs = (None, None);
@@ -943,19 +947,6 @@ impl AgentHudCore {
                         now_ms,
                     )
                     .map_err(|e| e.to_string())?;
-                    let should_map = log.observed
-                        && source != "codex-index"
-                        && !log.live.is_internal
-                        && self
-                            .session_map
-                            .get(&(log.source.clone(), log.id.clone()))
-                            .and_then(|existing| self.logs.get(existing))
-                            .filter(|existing| {
-                                !existing.gone
-                                    && existing.path != path
-                                    && !existing.path.to_string_lossy().contains("#hud-session-")
-                            })
-                            .is_none_or(|existing| log.usage.total() >= existing.usage.total());
                     if should_map {
                         checkpoints::upsert_session_mapping(
                             &transaction,
@@ -1007,28 +998,9 @@ impl AgentHudCore {
             }
             log.meter_events.clear();
             log.meter_marks.clear();
-            if log.updated.is_empty() {
-                if let Some(modified) = modified {
-                    log.updated = DateTime::<Utc>::from(modified).to_rfc3339();
-                }
-            }
-            if !needs_read(Some(&LogHead::from_log(&log)), &metadata) {
+            if whole {
                 self.reads.pending.remove(&path);
-                log.meter_target_at = None;
             }
-            let should_map = log.observed
-                && source != "codex-index"
-                && !log.live.is_internal
-                && self
-                    .session_map
-                    .get(&(log.source.clone(), log.id.clone()))
-                    .and_then(|existing| self.logs.get(existing))
-                    .filter(|existing| {
-                        !existing.gone
-                            && existing.path != path
-                            && !existing.path.to_string_lossy().contains("#hud-session-")
-                    })
-                    .is_none_or(|existing| log.usage.total() >= existing.usage.total());
             if should_map
                 && self
                     .session_map
@@ -1283,55 +1255,5 @@ impl AgentHudCore {
                 .map(|log| log.source.clone())
                 .collect(),
         });
-    }
-}
-
-/// A log as the session list shows it, before its head is written. The
-/// session view needs core's projects and demo, so it lives here.
-pub(crate) trait LogSession {
-    fn session(&self, now: i64, subagents_at: Option<i64>) -> Value;
-}
-
-impl LogSession for Log {
-    fn session(&self, now: i64, subagents_at: Option<i64>) -> Value {
-        let updated = self
-            .live
-            .activity_at(metering::date_ms(&self.updated), subagents_at)
-            .and_then(DateTime::<Utc>::from_timestamp_millis)
-            .map(|at| at.to_rfc3339())
-            .unwrap_or_else(|| self.updated.clone());
-        let mut session = json!({"id":self.id,"title":self.title(),"source":self.source,"model":self.model,"vendorName":crate::naming::model_names::vendor_name(&self.source),"modelName":(!self.model.is_empty()).then(||crate::naming::model_names::consumer_name(&format!("{}-model:{}",self.source,self.model))),"cwd":self.cwd,"updatedAt":updated,"state":self.live.session_state(now,&self.source,subagents_at),"tokens":self.usage.total(),"cost":null,"contextPercent":null,"logPath":self.origin_path.as_ref().unwrap_or(&self.path),"parentId":self.live.parent_id});
-        session["project"] = json!(crate::projects::project_id(self.cwd.as_deref()));
-        if let Some(client) =
-            crate::naming::clients::client_name(&self.source, self.client.as_deref())
-        {
-            session["client"] = json!(client);
-        }
-        session["origins"] = crate::naming::surfaces::resolve(
-            &self.source,
-            &self.prompts,
-            self.client.as_deref(),
-            &Default::default(),
-        )
-        .json();
-        // The same way back as its row in the list (`LogHead::session`):
-        // `open_session` goes where this says.
-        if let Some(target) = agent_hud_agents::session_target(
-            &self.source,
-            &self.id,
-            self.cwd.as_deref(),
-            self.client.as_deref(),
-        ) {
-            session["navigationTarget"] = target;
-        }
-        // A demo session has a way back, so its reply card shows "Return to
-        // session" as a real one does; the demo runtime goes nowhere with it.
-        if crate::demo::is_demo(&self.path) {
-            session["navigationTarget"] = json!({"kind":"demo","id":self.id});
-        }
-        if let Some(facts) = self.live.facts(&self.id, &self.source, now, subagents_at) {
-            session["liveFacts"] = facts;
-        }
-        session
     }
 }

@@ -339,20 +339,6 @@ impl ParserCache {
     }
 }
 
-pub(crate) fn open(
-    directory: &Path,
-) -> Result<
-    (
-        Connection,
-        HashMap<PathBuf, LogHead>,
-        HashMap<(String, String), PathBuf>,
-        i64,
-    ),
-    String,
-> {
-    super::open(directory)
-}
-
 pub(crate) fn read(database: &Connection, path: &Path) -> Result<(Log, usize), String> {
     let payload: String = database
         .query_row(

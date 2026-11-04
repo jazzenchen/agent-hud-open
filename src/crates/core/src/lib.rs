@@ -63,7 +63,7 @@ pub(crate) use database::{
     metering, staging,
 };
 pub use discovery::ProviderDiscovery;
-pub(crate) use ingestion::{due, line, LogSession};
+pub(crate) use ingestion::{due, line};
 pub(crate) use legacy::{carried_usage, legacy_database, legacy_quota};
 pub(crate) use log_files::{FileStamp, LogFiles};
 pub(crate) use usage::UsageProjection;
@@ -177,7 +177,7 @@ impl AgentHudCore {
             }
         }
         let enabled = serde_json::from_value(stored["providers"].clone()).unwrap_or_default();
-        let opened = checkpoints::open(&app_data);
+        let opened = database::open(&app_data);
         let (database, logs, session_map, last_synced_at_ms, storage_issue) = match opened {
             Ok((database, logs, session_map, last_synced_at_ms)) => {
                 (Some(database), logs, session_map, last_synced_at_ms, None)

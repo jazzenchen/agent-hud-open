@@ -19,16 +19,8 @@ impl AgentHudCore {
             self.reword_desktop_asks(now);
             // Every pass prepares the projection first; its selection saves
             // choosing among each session's copies again.
-            let listed = match &self.usage_projection {
-                Some(projection) => projection
-                    .selected
-                    .iter()
-                    .filter_map(|path| self.logs.get(path))
-                    .filter(|head| !head.gone && !head.archived && !head.live.is_internal)
-                    .collect(),
-                None => self.listed_sessions(),
-            };
-            let candidates = listed
+            let candidates = self
+                .listed_sessions()
                 .into_iter()
                 .filter(|log| log.source == claude)
                 .filter_map(|log| {
@@ -646,7 +638,7 @@ impl AgentHudCore {
             .and_then(|p| p.titles.get(id))
             .cloned();
         let (log, bytes) = self.load_parser(&path)?;
-        let mut session = log.session(now, child);
+        let mut session = log_session(&log, now, child);
         self.presentation(now).overlay(
             &mut session,
             metering::date_ms(&log.updated),
@@ -743,6 +735,48 @@ impl AgentHudCore {
         self.parser_cache.insert(log, bytes);
         Ok(result)
     }
+}
+
+/// A log as the session list shows it, before its head is written. The
+/// session view needs core's projects and demo, so it lives in core.
+pub(crate) fn log_session(log: &Log, now: i64, subagents_at: Option<i64>) -> Value {
+    let updated = log
+        .live
+        .activity_at(metering::date_ms(&log.updated), subagents_at)
+        .and_then(DateTime::<Utc>::from_timestamp_millis)
+        .map(|at| at.to_rfc3339())
+        .unwrap_or_else(|| log.updated.clone());
+    let mut session = json!({"id":log.id,"title":log.title(),"source":log.source,"model":log.model,"vendorName":crate::naming::model_names::vendor_name(&log.source),"modelName":(!log.model.is_empty()).then(||crate::naming::model_names::consumer_name(&format!("{}-model:{}",log.source,log.model))),"cwd":log.cwd,"updatedAt":updated,"state":log.live.session_state(now,&log.source,subagents_at),"tokens":log.usage.total(),"cost":null,"contextPercent":null,"logPath":log.origin_path.as_ref().unwrap_or(&log.path),"parentId":log.live.parent_id});
+    session["project"] = json!(crate::projects::project_id(log.cwd.as_deref()));
+    if let Some(client) = crate::naming::clients::client_name(&log.source, log.client.as_deref()) {
+        session["client"] = json!(client);
+    }
+    session["origins"] = crate::naming::surfaces::resolve(
+        &log.source,
+        &log.prompts,
+        log.client.as_deref(),
+        &Default::default(),
+    )
+    .json();
+    // The same way back as its row in the list (`LogHead::session`):
+    // `open_session` goes where this says.
+    if let Some(target) = agent_hud_agents::session_target(
+        &log.source,
+        &log.id,
+        log.cwd.as_deref(),
+        log.client.as_deref(),
+    ) {
+        session["navigationTarget"] = target;
+    }
+    // A demo session has a way back, so its reply card shows "Return to
+    // session" as a real one does; the demo runtime goes nowhere with it.
+    if crate::demo::is_demo(&log.path) {
+        session["navigationTarget"] = json!({"kind":"demo","id":log.id});
+    }
+    if let Some(facts) = log.live.facts(&log.id, &log.source, now, subagents_at) {
+        session["liveFacts"] = facts;
+    }
+    session
 }
 
 impl crate::AgentHudCore {
