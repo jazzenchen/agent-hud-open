@@ -14,12 +14,16 @@ import type {
   StatisticsResponse,
 } from "@agent-hud/protocol";
 import { Button } from "@agent-hud/ui/components/button";
-import { formatTokens } from "../quota-metrics";
 import { HUD_METRICS, sourcesForMark } from "../model";
 import { usePanelQuery } from "../PanelContext";
 import { agentColor, palette, tabular, type Logo, type Period } from "./theme";
 import { useFormat } from "@agent-hud/ui/format-context";
-import { dateFormat, numberFormat, systemTimeZone } from "@agent-hud/ui/format";
+import {
+  dateFormat,
+  numberFormat,
+  systemTimeZone,
+  tokensShort,
+} from "@agent-hud/ui/format";
 import { hexAlpha } from "../tokens";
 import { useGround } from "../ground";
 import { orderedModels, visibleModelCounts } from "./model-visibility";
@@ -346,7 +350,7 @@ export function SourceTokenChart({
 /** The range's total, counting to each new value as the bars move. */
 function TokenCount({ tokens, still }: { tokens: number; still: boolean }) {
   const count = useMotionValue(tokens);
-  const text = useTransform(count, (value) => formatTokens(Math.round(value)));
+  const text = useTransform(count, (value) => tokensShort(Math.round(value)));
   useEffect(() => {
     if (still) {
       count.jump(tokens);
@@ -355,7 +359,7 @@ function TokenCount({ tokens, still }: { tokens: number; still: boolean }) {
     const controls = animate(count, tokens, moving);
     return () => controls.stop();
   }, [count, tokens, still]);
-  return still ? formatTokens(tokens) : <motion.span>{text}</motion.span>;
+  return still ? tokensShort(tokens) : <motion.span>{text}</motion.span>;
 }
 
 /** A column's detail, raised over the chart while the pointer is on it

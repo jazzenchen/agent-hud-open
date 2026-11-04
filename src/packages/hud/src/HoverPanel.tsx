@@ -136,6 +136,23 @@ export const SourceHoverPanel = memo(function SourceHoverPanel({
       !focusVendor || vendorKey(account.vendor) === vendorKey(focusVendor),
   );
   const density = densityMetrics[config.layoutDensity] ?? densityMetrics.normal;
+  const separated = config.panelLayout.style?.separators !== false;
+  // A section the panel's lists follow: a hairline below it.
+  const dividedBelow = separated
+    ? {
+        boxShadow: `inset 0 -1px 0 ${colors.divider}`,
+        paddingBottom: "var(--hud-divided-gap)",
+      }
+    : undefined;
+  const footerButton = (color: string): CSSProperties => ({
+    width: 28,
+    height: 28,
+    minHeight: 28,
+    padding: 0,
+    borderRadius: 0,
+    color,
+    background: "transparent",
+  });
   const blocks = inPanelOrder<{ key: string; content: ReactNode }>(
     [
       ...vendorNames.map((vendor) => ({
@@ -212,8 +229,7 @@ export const SourceHoverPanel = memo(function SourceHoverPanel({
                   display: "grid",
                   gridTemplateColumns: line.length === 2 ? "1fr 1fr" : "1fr",
                   gap: density.section,
-                  ...(index > 0 &&
-                  config.panelLayout.style?.separators !== false
+                  ...(index > 0 && separated
                     ? {
                         boxShadow: `inset 0 1px 0 ${colors.divider}`,
                         paddingTop: "var(--hud-divided-gap)",
@@ -310,32 +326,12 @@ export const SourceHoverPanel = memo(function SourceHoverPanel({
           }}
         >
           {inlineAlert && (
-            <div
-              data-hud-section="inline-alert"
-              style={
-                config.panelLayout.style?.separators !== false
-                  ? {
-                      boxShadow: `inset 0 -1px 0 ${colors.divider}`,
-                      paddingBottom: "var(--hud-divided-gap)",
-                    }
-                  : undefined
-              }
-            >
+            <div data-hud-section="inline-alert" style={dividedBelow}>
               {inlineAlert}
             </div>
           )}
           {snapshot.indexing?.kind && (
-            <div
-              data-hud-section="indexing"
-              style={
-                config.panelLayout.style?.separators !== false
-                  ? {
-                      boxShadow: `inset 0 -1px 0 ${colors.divider}`,
-                      paddingBottom: "var(--hud-divided-gap)",
-                    }
-                  : undefined
-              }
-            >
+            <div data-hud-section="indexing" style={dividedBelow}>
               <SourceIndexing snapshot={snapshot} light={light} />
             </div>
           )}
@@ -421,15 +417,7 @@ export const SourceHoverPanel = memo(function SourceHoverPanel({
           title={snapshotLanguage(snapshot) === "zh" ? "设置" : "Settings"}
           disabled={!onConfigure}
           onClick={onConfigure}
-          style={{
-            width: 28,
-            height: 28,
-            minHeight: 28,
-            padding: 0,
-            borderRadius: 0,
-            color: colors.secondary,
-            background: "transparent",
-          }}
+          style={footerButton(colors.secondary)}
         >
           <Settings style={{ width: 14, height: 14 }} strokeWidth={1.7} />
         </Button>
@@ -459,15 +447,7 @@ export const SourceHoverPanel = memo(function SourceHoverPanel({
                 }
                 disabled={!onUpdate}
                 onClick={onUpdate}
-                style={{
-                  width: 28,
-                  height: 28,
-                  minHeight: 28,
-                  padding: 0,
-                  borderRadius: 0,
-                  color: colors.accent,
-                  background: "transparent",
-                }}
+                style={footerButton(colors.accent)}
               >
                 <CircleArrowDown
                   style={{ width: 14, height: 14 }}
@@ -491,15 +471,7 @@ export const SourceHoverPanel = memo(function SourceHoverPanel({
             }
             disabled={!onStats}
             onClick={onStats}
-            style={{
-              width: 28,
-              height: 28,
-              minHeight: 28,
-              padding: 0,
-              borderRadius: 0,
-              color: colors.secondary,
-              background: "transparent",
-            }}
+            style={footerButton(colors.secondary)}
           >
             <ChartNoAxesColumnIncreasing
               style={{ width: 14, height: 14 }}

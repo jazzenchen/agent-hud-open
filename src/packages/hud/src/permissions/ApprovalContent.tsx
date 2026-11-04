@@ -9,6 +9,7 @@ import {
   PermissionClosedRow,
   PermissionRowHead,
   shortenHomePath,
+  WaitingHeader,
 } from "../IslandNews";
 import { alertText } from "../tokens";
 import { useGround } from "../ground";
@@ -74,38 +75,17 @@ export function ApprovalContent({
   language?: string;
 }) {
   const zh = language?.startsWith("zh") ?? false;
-  const signalText = alertText("warning", useGround(light));
-  const secondary = light ? "rgba(0,0,0,0.55)" : "rgba(255,255,255,0.55)";
   const tertiary = light ? "rgba(0,0,0,0.38)" : "rgba(255,255,255,0.38)";
   const cardSurface = light ? "rgba(0,0,0,0.035)" : "rgba(255,255,255,0.045)";
 
   return (
     <div className="hud-approval-content" style={cardColumn(0)}>
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          padding: "0 4px 8px",
-        }}
-      >
-        <span style={{ fontSize: 11, fontWeight: 600, color: secondary }}>
-          {zh ? "待审批" : "Waiting"}
-        </span>
-        <span
-          style={{
-            fontSize: 10,
-            fontWeight: 600,
-            fontVariantNumeric: "tabular-nums",
-            color: signalText,
-            padding: "2px 6px",
-            borderRadius: 999,
-            background: "rgba(233, 161, 109, 0.16)",
-          }}
-        >
-          {requests.length}
-        </span>
-      </div>
+      <WaitingHeader
+        count={requests.length}
+        padding="0 4px 8px"
+        light={light}
+        zh={zh}
+      />
       <div style={cardColumn(2)}>
         {requests.map((request) => {
           const contextPath = shortenHomePath(request.path ?? request.cwd);

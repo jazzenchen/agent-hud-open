@@ -29,14 +29,6 @@ export interface QuotaMetricReading {
    * share now, for a mark on the bar; null without one. */
   budgetPercent: number | null;
 }
-/** TokenFormat.short; kept for callers that format a count of their own. */
-export const formatTokens = tokensShort;
-
-const englishUTC: FormatSettings = {
-  language: "en",
-  calendar: { timeZone: "UTC", firstWeekday: 1 },
-};
-
 const say = (language: Language, zh: string, en: string) =>
   language === "zh" ? zh : en;
 
@@ -101,7 +93,7 @@ export function quotaMetric(
   row: Quota,
   measure: QuotaMeasure,
   now: number,
-  settings: FormatSettings = englishUTC,
+  settings: FormatSettings,
 ): QuotaMetricReading {
   const { language, calendar } = settings;
   const metrics = row.metrics;
@@ -244,13 +236,13 @@ export function quotaMetric(
     metrics.consumed.used >= 0
   ) {
     const used = metrics.consumed;
-    result.value = formatTokens(used.used);
+    result.value = tokensShort(used.used);
     // With a capacity the line reads "used / cap"; without one, the pace.
     result.detail =
       used.capacity != null && used.capacity >= 0
-        ? `/ ${formatTokens(used.capacity)}`
+        ? `/ ${tokensShort(used.capacity)}`
         : metrics.tokensPerHour != null
-          ? `${formatTokens(Math.round(metrics.tokensPerHour))}/h`
+          ? `${tokensShort(Math.round(metrics.tokensPerHour))}/h`
           : "—";
     result.available = result.selectable = true;
     const since = metrics.observedFrom ? Date.parse(metrics.observedFrom) : NaN;
@@ -296,7 +288,7 @@ export function quotaMetricAvailability(
   rows: readonly Quota[],
   measure: QuotaMeasure,
   now: number,
-  settings: FormatSettings = englishUTC,
+  settings: FormatSettings,
 ) {
   const readings = rows.map((row) => quotaMetric(row, measure, now, settings));
   const selectable = readings.some((reading) => reading.selectable);
