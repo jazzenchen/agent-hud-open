@@ -1,0 +1,37 @@
+{
+  "name": "agent-hud",
+  "version": "1.0.0",
+  "description": "Installs Agent HUD, the HUD for your coding agents, or updates it to the newest release",
+  "keywords": [
+    "agent-hud",
+    "claude-code",
+    "codex",
+    "coding-agents",
+    "hud",
+    "quota",
+    "tokens"
+  ],
+  "homepage": "https://agenthud.app",
+  "bugs": "https://github.com/jazzenchen/agent-hud-open/issues",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jazzenchen/agent-hud-open.git",
+    "directory": "src/apps/installer"
+  },
+  "license": "Apache-2.0",
+  "author": "Jazzen Chen",
+  "type": "module",
+  "bin": {
+    "agent-hud": "bin/agent-hud.mjs"
+  },
+  "files": [
+    "bin",
+    "lib"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.mjs"
+  }
+}

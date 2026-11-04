@@ -19,6 +19,7 @@ This app may differ from the Swift app only when the difference is deliberate (s
 | HUD rules | `src/crates/hud` | What the HUD shows: the panel's saved layout and the rules an agent's draft must meet, Bot directions, vendor rows. No windows, no OS calls. |
 | Host | `src/crates/host` | The Tauri host as a library: windows, tray, HUD windows and input, the menu bar, the extension interface (`ProductExtension`). OS-specific parts live in its host files. |
 | Desktop | `src/apps/desktop` | The app: `src-tauri` is the binary, its Tauri configuration, icons and capabilities; `src/main.tsx` mounts `@agent-hud/app`. |
+| Installer | `src/apps/installer` | `npx agent-hud`: downloads the newest release's build for the system, checks it against the release's `SHA256SUMS` and installs it. Published to npm on its own as `agent-hud`; it has no dependencies and stays outside the pnpm workspace. |
 | App | `src/packages/app` (`@agent-hud/app`) | The React windows: Settings, Statistics, Sessions and the HUD surface. `@agent-hud/app/extension` is what a product adds pages through. |
 | HUD | `src/packages/hud` (`@agent-hud/hud`) | The HUD scene, hover panel, Bots, alerts and permission cards, with the agents' artwork. |
 | UI | `src/packages/ui` (`@agent-hud/ui`) | Components, the theme, number and date formatting. |

@@ -1,6 +1,9 @@
 packages:
   - src/apps/*
   - src/packages/*
+  # Published to npm on its own as `agent-hud` (npx agent-hud), with no
+  # dependencies; the root package already has that name.
+  - "!src/apps/installer"
 
 # One version of each shared dependency for every package. A package names
 # it with "catalog:" instead of a version.
