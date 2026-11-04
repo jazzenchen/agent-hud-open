@@ -4,7 +4,7 @@ import type { Snapshot } from "@agent-hud/protocol";
 import type { HUDConfig } from "@agent-hud/hud/model";
 import { Row, Section } from "../SettingsPrimitives";
 import { Segments } from "../SettingsControls";
-import { SmallHUDPreview } from "../SettingsSamples";
+import { SmallHUDPreview } from "../SmallHUDPreview";
 import { displayControls, type DisplayProps } from "./controls";
 
 /** What a Simple mark draws, in a sentence. */

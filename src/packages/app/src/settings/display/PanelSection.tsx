@@ -11,7 +11,7 @@ import {
 } from "@agent-hud/hud/model";
 import { MoreRows, Row, Section } from "../SettingsPrimitives";
 import { Segments, ToggleRow } from "../SettingsControls";
-import { PartSample } from "../SettingsSamples";
+import { PartSample } from "../PartSample";
 import type { DisplayProps } from "./controls";
 import { ReorderButtons } from "./ReorderButtons";
 
