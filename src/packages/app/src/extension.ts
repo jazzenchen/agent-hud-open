@@ -1,6 +1,7 @@
 /** What a product built on Agent HUD uses to add its own Settings pages and
  * agent plugin rows to the app. */
-export type { AppExtensionPage, AppProps } from "./App";
+export type { AppProps } from "./App";
+export type { AppExtensionPage } from "./settings/pages";
 export type {
   AgentPluginContext,
   AgentPluginItem,
