@@ -350,7 +350,7 @@ fn glow_misreadings(value: &Value) -> Vec<String> {
 /// The keys of a screen's settings that make up its look: every display setting but
 /// its hardware, the app's own settings and the panel's.
 fn look_key(key: &str) -> bool {
-    !HARDWARE.contains(&key) && !GLOBAL.contains(&key) && !super::tools::panel_key(key)
+    !HARDWARE.contains(&key) && !GLOBAL.contains(&key) && !super::panel_keys::panel_key(key)
 }
 
 /// The look a screen draws from `saved` (ui/use-hud-config.ts `getScreenHUDConfig`):

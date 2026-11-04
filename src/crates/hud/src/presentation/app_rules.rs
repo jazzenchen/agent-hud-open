@@ -54,6 +54,28 @@ pub(super) fn saved(s: &State, snapshot: &Value) -> Value {
     })
 }
 
+pub(super) fn app_settings(app: &Value) -> Value {
+    let mut v = Map::new();
+    for (field, saved, _) in SAVED_AS.iter().filter(|(.., global)| !global) {
+        if let Some(value) = app.get(*field) {
+            v.insert((*saved).into(), value.clone());
+        }
+    }
+    Value::Object(v)
+}
+
+pub(super) fn save_global_app(global: &mut Map<String, Value>, app: &Value) {
+    for (field, saved, _) in SAVED_AS.iter().filter(|(.., global)| *global) {
+        let value = match field.strip_prefix("hover.") {
+            Some(field) => app["hover"].get(field),
+            None => app.get(*field),
+        };
+        if let Some(value) = value {
+            global.insert((*saved).into(), value.clone());
+        }
+    }
+}
+
 /// The app part of a proposal (HUDTools.AppProposal). A call that names no app leaves
 /// the app's draft as it is; one that names it is whole, so a field it leaves out is
 /// what is saved, and a field set to what is saved changes nothing and is no issue.

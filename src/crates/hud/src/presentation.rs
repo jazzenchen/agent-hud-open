@@ -1,6 +1,7 @@
 //! One durable presentation owner for all windows and MCP. Drafts and edit holds
 //! are memory-only; a tool cannot turn its proposal into the user's saved choice.
 mod app_rules;
+mod panel_keys;
 mod rules;
 mod simple_style;
 mod style_rules;
@@ -195,7 +196,7 @@ impl Presentation {
                     DEFAULTS.contains_key(key)
                         && !HARDWARE.contains(&key.as_str())
                         && !GLOBAL.contains(&key.as_str())
-                        && !tools::panel_key(key)
+                        && !panel_keys::panel_key(key)
                 });
             } else {
                 *value = json!({});
@@ -363,7 +364,7 @@ impl Presentation {
         let before = s.saved.clone();
         let id = params["screen"].as_str().unwrap_or("all");
         let patch = object(&params["patch"], "patch")?;
-        if patch.keys().any(|key| tools::panel_key(key)) {
+        if patch.keys().any(|key| panel_keys::panel_key(key)) {
             let mut layout = if id == "all" {
                 s.saved.shared_layout.clone()
             } else {
@@ -373,7 +374,7 @@ impl Presentation {
                     .cloned()
                     .unwrap_or_else(|| s.saved.shared_layout.clone())
             };
-            tools::panel_patch(&mut layout, patch);
+            panel_keys::panel_patch(&mut layout, patch);
             if id == "all" {
                 s.saved.shared_layout = layout;
             } else {
@@ -383,7 +384,7 @@ impl Presentation {
         }
         for (k, v) in patch {
             clear_app_field(&mut s, k);
-            if HARDWARE.contains(&k.as_str()) || tools::panel_key(k) {
+            if HARDWARE.contains(&k.as_str()) || panel_keys::panel_key(k) {
                 continue;
             }
             if GLOBAL.contains(&k.as_str()) {
@@ -418,15 +419,15 @@ impl Presentation {
                 s.saved.screens = store["screens"].as_object().cloned().unwrap_or_default();
                 for (id, settings) in s.saved.screens.clone() {
                     if let Some(fields) = settings.as_object() {
-                        if fields.keys().any(|key| tools::panel_key(key)) {
+                        if fields.keys().any(|key| panel_keys::panel_key(key)) {
                             let mut layout = json!({});
-                            tools::panel_patch(&mut layout, fields);
+                            panel_keys::panel_patch(&mut layout, fields);
                             s.saved.layouts.insert(id.clone(), layout);
                         }
                         if let Some(settings) =
                             s.saved.screens.get_mut(&id).and_then(Value::as_object_mut)
                         {
-                            settings.retain(|key, _| !tools::panel_key(key));
+                            settings.retain(|key, _| !panel_keys::panel_key(key));
                         }
                     }
                 }
@@ -485,7 +486,11 @@ impl Presentation {
         let mut s = self.state.lock().unwrap_or_else(PoisonError::into_inner);
         let checkpoint = s.clone();
         let before = s.saved.clone();
-        let patch = s.app.as_ref().map(tools::app_settings).unwrap_or(json!({}));
+        let patch = s
+            .app
+            .as_ref()
+            .map(app_rules::app_settings)
+            .unwrap_or(json!({}));
         commit(&patch)?;
         let scope = if s.layouts.contains_key(screen) {
             screen
@@ -513,7 +518,7 @@ impl Presentation {
             );
         }
         if let Some(app) = s.app.take() {
-            tools::save_global_app(&mut s.saved.global, &app);
+            app_rules::save_global_app(&mut s.saved.global, &app);
         }
         s.holds.remove(screen);
         if let Err(error) = self.persist(&mut s, before) {
