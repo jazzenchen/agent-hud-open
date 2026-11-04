@@ -88,7 +88,7 @@ fn install(
     if plugin::installed(claude_config) || plugin::marketplace_folder(claude_config).is_some() {
         take_out(executable, claude_config, home)?;
     }
-    super::mcp_clients::run_client(
+    super::client_cli::run_client(
         executable,
         &plugin::install_arguments(folder),
         home,
@@ -141,7 +141,7 @@ pub(crate) fn repair_on_launch(app: &tauri::AppHandle) {
         let state = app.state::<ClaudePlugin>();
         let _owner = state.owner.lock().unwrap_or_else(PoisonError::into_inner);
         let result = agent_hud_runtime::home_directory().and_then(|home| {
-            let executable = super::mcp_clients::executable("claudeCode", &home);
+            let executable = super::client_cli::executable("claudeCode", &home);
             let config = plugin::claude_config_directory(&home);
             repair(
                 &state.channel,
@@ -199,9 +199,9 @@ fn remove(
 fn take_out(executable: &Path, claude_config: &Path, home: &Path) -> Result<(), String> {
     let [uninstall, marketplace] = plugin::remove_arguments();
     if plugin::installed(claude_config) {
-        super::mcp_clients::run_client(executable, &uninstall, home, COMMAND_TIME)?;
+        super::client_cli::run_client(executable, &uninstall, home, COMMAND_TIME)?;
     }
-    let _ = super::mcp_clients::run_client(executable, &marketplace, home, COMMAND_TIME);
+    let _ = super::client_cli::run_client(executable, &marketplace, home, COMMAND_TIME);
     Ok(())
 }
 
@@ -218,7 +218,7 @@ pub async fn native_claude_plugin(
         let state = app.state::<ClaudePlugin>();
         let _owner = state.owner.lock().unwrap_or_else(PoisonError::into_inner);
         let home = agent_hud_runtime::home_directory()?;
-        let executable = super::mcp_clients::executable("claudeCode", &home);
+        let executable = super::client_cli::executable("claudeCode", &home);
         let config = plugin::claude_config_directory(&home);
         match action.as_str() {
             "status" => {}

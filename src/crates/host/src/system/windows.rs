@@ -171,7 +171,7 @@ mod tests {
             "@echo off\r\nif \"%~1\"==\"expected value\" exit /b 0\r\necho wrong argument\r\nexit /b 7\r\n",
         )
         .unwrap();
-        crate::mcp_clients::run_client(
+        crate::client_cli::run_client(
             &launcher,
             &["expected value".into()],
             temp.path(),
@@ -179,7 +179,7 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            crate::mcp_clients::run_client(
+            crate::client_cli::run_client(
                 &launcher,
                 &["wrong value".into()],
                 temp.path(),

@@ -10,6 +10,7 @@ mod backend;
 mod capture;
 mod claude_plugin;
 mod cli;
+mod client_cli;
 mod coordinator;
 mod deepseek_plugin;
 mod demo;
