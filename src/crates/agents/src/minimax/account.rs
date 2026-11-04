@@ -48,6 +48,12 @@ fn refused() -> String {
         "MiniMax refused the existing plan key; check the M Plan API key in the source client",
     )
 }
+fn no_plan() -> String {
+    l10n::text(
+        "这个 MiniMax Key 没有生效中的套餐",
+        "This MiniMax key has no active plan",
+    )
+}
 fn no_usage() -> String {
     l10n::text(
         "MiniMax 没有返回可核实的套餐额度",
@@ -75,8 +81,8 @@ pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
         // Every client configured with the key reaches the plan on its
         // platform, read or not; the platform picks the models' price list.
         let region = match &result {
-            Ok((_, region)) => Some(*region),
-            Err(_) => key.region,
+            Ok(Some((_, region))) => Some(*region),
+            _ => key.region,
         };
         let id = region.map(|region| account_id("minimax", &[region.name(), &key.key]));
         if let (Some(region), Some(id)) = (region, &id) {
@@ -87,7 +93,7 @@ pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
             }
         }
         match result {
-            Ok((parsed, _)) => {
+            Ok(Some((parsed, _))) => {
                 let id = id.unwrap_or_default();
                 let account = json!({"id":id,"provider":"minimax","label":parsed.plan,"plan":parsed.plan,"clients":key.clients,"identityEvidence":"credential-scope"});
                 for window in parsed.windows {
@@ -99,11 +105,19 @@ pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
                     reading.additional_accounts.push(account);
                 }
             }
+            // A key MiniMax bills by use has no plan to read: nothing failed.
+            Ok(None) => {}
             Err(unread) => failures.push(unread),
         }
     }
     if reading.account.is_none() {
-        return Err(Unread::combined(failures).unwrap_or_else(|| no_usage().into()));
+        return match Unread::combined(failures) {
+            Some(why) => Err(why),
+            None => {
+                reading.notice = Some(no_plan());
+                Ok(reading)
+            }
+        };
     }
     if !failures.is_empty() {
         reading.notice = Some(if l10n::chinese() {
@@ -123,10 +137,11 @@ pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
     Ok(reading)
 }
 
-/// One key's answer and the platform that gave it. A key is tried on its own
-/// platform, or on both in turn when that is not known; the next platform is
-/// asked only when this one refused the key.
-fn read_key(host: &dyn Host, key: &Key) -> Result<(Parsed, Region), Unread> {
+/// One key's answer and the platform that gave it, or None when MiniMax says
+/// the key has no active plan. A key is tried on its own platform, or on both
+/// in turn when that is not known; the next platform is asked only when this
+/// one refused the key.
+fn read_key(host: &dyn Host, key: &Key) -> Result<Option<(Parsed, Region)>, Unread> {
     let regions = match key.region {
         Some(region) => vec![region],
         None => vec![Region::Global, Region::China],
@@ -148,7 +163,7 @@ fn read_key(host: &dyn Host, key: &Key) -> Result<(Parsed, Region), Unread> {
             });
             match answer {
                 Ok(body) => match parse(&body, now) {
-                    Ok(parsed) => return Ok((parsed, region)),
+                    Ok(parsed) => return Ok(Some((parsed, region))),
                     Err(Answer::Refused) => refused_here = true,
                     Err(Answer::Status(code)) => {
                         status.get_or_insert(code);
@@ -170,12 +185,10 @@ fn read_key(host: &dyn Host, key: &Key) -> Result<(Parsed, Region), Unread> {
         }
         refused_any = true;
     }
+    if status == Some(2062) {
+        return Ok(None);
+    }
     Err(match status {
-        Some(2062) => l10n::text(
-            "这个 MiniMax Key 没有生效中的套餐",
-            "This MiniMax key has no active plan",
-        )
-        .into(),
         Some(code) => if l10n::chinese() {
             format!("MiniMax 额度服务返回状态 {code}")
         } else {
@@ -630,10 +643,10 @@ mod tests {
                 Ok(json!({"base_resp": {"status_code": 2062, "status_msg": "no active token plan subscription"}})),
             )
             .answer(GLOBAL_OLD, Err(HttpFailure::Status(404)));
-        assert_eq!(
-            read(&ended).err().unwrap(),
-            "This MiniMax key has no active plan"
-        );
+        // A key with no plan is not a failed reading: nothing to show, and why.
+        let reading = read(&ended).unwrap();
+        assert!(reading.quotas.is_empty() && reading.account.is_none());
+        assert_eq!(reading.notice, Some(no_plan()));
     }
 
     #[test]
