@@ -23,7 +23,7 @@ import {
   number,
   row,
   truncate,
-  useCanvasWidth,
+  useCanvas,
   type StatsTheme,
 } from "./StatsTheme";
 
@@ -57,7 +57,7 @@ const QuotaLine = memo(function QuotaLine({
   reveal: string;
   timeZone: string;
 }) {
-  const { ref, width } = useCanvasWidth();
+  const { ref, width, context } = useCanvas(HEIGHT);
   const zh = Boolean(theme.zh);
   const language = zh ? "zh" : "en";
   const [hovered, setHovered] = useState<[number, number] | null>(null);
@@ -81,18 +81,8 @@ const QuotaLine = memo(function QuotaLine({
   }, [quota.resetAt, quota.windowDurationSeconds]);
   const paint = useCallback(
     (progress: number) => {
-      const canvas = ref.current,
-        ctx = canvas?.getContext("2d");
-      if (!canvas || !ctx || width <= 0) return;
-      const scale = window.devicePixelRatio || 1;
-      const targetW = Math.round(width * scale),
-        targetH = Math.round(HEIGHT * scale);
-      if (canvas.width !== targetW || canvas.height !== targetH) {
-        canvas.width = targetW;
-        canvas.height = targetH;
-      }
-      ctx.setTransform(scale, 0, 0, scale, 0, 0);
-      ctx.clearRect(0, 0, width, HEIGHT);
+      const ctx = context();
+      if (!ctx) return;
       // The axis: its top, middle and bottom.
       ctx.fillStyle = theme.divider;
       for (const level of [0, 0.5, 1])
@@ -165,7 +155,17 @@ const QuotaLine = memo(function QuotaLine({
         ctx.stroke();
       }
     },
-    [budget, hovered, quota.resets, quota.segments, ref, theme, width, x, y],
+    [
+      budget,
+      context,
+      hovered,
+      quota.resets,
+      quota.segments,
+      theme,
+      width,
+      x,
+      y,
+    ],
   );
   const revealed = useRef<string | null>(null);
   useEffect(() => {
