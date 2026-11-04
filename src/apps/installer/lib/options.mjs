@@ -2,7 +2,7 @@ import { homedir } from "node:os";
 import { resolve } from "node:path";
 import { parseArgs } from "node:util";
 
-export const HELP = `Usage: npx agent-hud [options]
+export const HELP = `Usage: npx @agenthud/install [options]
 
 Installs Agent HUD, or updates it to the newest release, betas included.
 

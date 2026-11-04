@@ -1,5 +1,5 @@
 {
-  "name": "agent-hud",
+  "name": "@agenthud/install",
   "version": "1.0.0",
   "description": "Installs Agent HUD, the HUD for your coding agents, or updates it to the newest release",
   "keywords": [
@@ -28,6 +28,9 @@
     "bin",
     "lib"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
   "engines": {
     "node": ">=20"
   },

@@ -1,9 +1,9 @@
-# agent-hud
+# @agenthud/install
 
 Installs [Agent HUD](https://agenthud.app), the HUD for your coding agents, or updates it to the newest release.
 
 ```sh
-npx agent-hud
+npx @agenthud/install
 ```
 
 It downloads the build for your system from [the releases](https://github.com/jazzenchen/agent-hud-open/releases), betas included, and checks it against the release's `SHA256SUMS` before installing.
@@ -14,7 +14,7 @@ It downloads the build for your system from [the releases](https://github.com/ja
 | Windows | Runs the setup program. |
 | Linux, x86_64 | `~/Applications/Agent-HUD.AppImage`. Some systems need FUSE 2 (`libfuse2`) to run AppImages. |
 
-The Windows and Linux builds are unsigned test builds that have not been checked on real machines yet. On those systems, run `npx agent-hud` again to update.
+The Windows and Linux builds are unsigned test builds that have not been checked on real machines yet. On those systems, run `npx @agenthud/install` again to update.
 
 ## Options
 

@@ -9,5 +9,5 @@ export async function installWindows({ installer, log }) {
   if (result.status !== 0) {
     throw new Error(`The installer exited with code ${result.status}`);
   }
-  log("Done. Run npx agent-hud again to update.");
+  log("Done. Run npx @agenthud/install again to update.");
 }

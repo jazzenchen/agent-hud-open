@@ -28,6 +28,8 @@ export async function installLinux({ image, folder, open, log }) {
     rmSync(staged, { force: true });
   }
   log(`Installed ${destination}`);
-  log("This test build is not signed yet. Run npx agent-hud again to update.");
+  log(
+    "This test build is not signed yet. Run npx @agenthud/install again to update.",
+  );
   if (open) spawn(destination, [], { detached: true, stdio: "ignore" }).unref();
 }
