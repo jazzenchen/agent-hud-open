@@ -196,7 +196,8 @@ pub fn bundle_app(bundle: &str) -> Option<&'static str> {
         ("com.microsoft.VSCode", "vscode"),
         ("com.vscodium", "vscodium"),
         ("com.todesktop.230313mzl4w4u92", "cursor"),
-        ("com.exafunction.windsurf", "windsurf"),
+        // Windsurf renamed in place; the id is Devin Desktop's now.
+        (crate::devin::process::DESKTOP_BUNDLE, "devin"),
         ("dev.zed.Zed-Preview", "zed"),
         ("dev.zed.Zed", "zed"),
         ("com.apple.dt.Xcode", "xcode"),

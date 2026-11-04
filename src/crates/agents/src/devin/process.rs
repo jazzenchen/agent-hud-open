@@ -12,7 +12,9 @@ use serde_json::Value;
 /// Devin's command-line program, the Desktop's bundled copy included.
 pub const PROGRAM: &str = "devin";
 /// Devin Desktop's bundle identifier, kept from its Windsurf days; its
-/// helpers' identifiers extend it.
+/// helpers' identifiers extend it. Devin Desktop is Windsurf renamed in
+/// place: its `product.json` (3.11.238) names the app `Devin`, with
+/// `oldNameShort` `Windsurf` and `windsurfVersion` its own version.
 pub const DESKTOP_BUNDLE: &str = "com.exafunction.windsurf";
 /// The shells Devin runs commands with (its `ShellFlavor`s). The macOS build
 /// runs each hook command as `bash -c <command>`, with `bash` found on the

@@ -86,6 +86,11 @@ fn apps_are_named_by_bundle_and_terminal_program() {
     );
     assert_eq!(bundle_app("com.microsoft.VSCodeInsiders"), Some("vscode"));
     assert_eq!(bundle_app("com.todesktop.230313mzl4w4u92"), Some("cursor"));
+    // Devin Desktop keeps Windsurf's identifier; its terminal's helper too.
+    assert_eq!(
+        bundle_app("com.exafunction.windsurf.helper.plugin"),
+        Some("devin")
+    );
     assert_eq!(bundle_app("com.jetbrains.pycharm"), Some("jetbrains"));
     assert_eq!(bundle_app("app.agenthud.mac"), Some(AGENT_HUD));
     assert_eq!(bundle_app("com.apple.Terminally"), None);
