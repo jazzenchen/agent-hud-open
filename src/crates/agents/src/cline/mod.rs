@@ -18,6 +18,8 @@
 //! own database: they belong to that client, which would count them twice
 //! if they were read here as well.
 pub mod account;
+mod session;
+mod task;
 pub mod transcript;
 
 use crate::{Agent, Discovery, Location, PerOs, Source, Support};
