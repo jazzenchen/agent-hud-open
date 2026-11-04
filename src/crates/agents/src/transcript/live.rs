@@ -1,7 +1,6 @@
 //! Unified session and child-session live state machine.
 //! Agent-specific event reducers live under `crate::agents`.
 use crate::claude::transcript::uuid;
-pub use crate::claude::transcript::{claude_prompt, claude_turn, request_copy};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::{collections::VecDeque, path::Path};
