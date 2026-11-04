@@ -523,7 +523,7 @@ async fn native_request(
         let mut params=params;
         // The demo never reaches outside its own folder: no login item, no
         // client's hooks.
-        if method=="set_setting" && app.state::<AppState>().demo && matches!(params["key"].as_str(),Some("launchAtLogin"|"clientHooks")) {
+        if method=="set_setting" && app.state::<AppState>().demo && matches!(params["key"].as_str(),Some("launchAtLogin"|"clientHooks"|"optInApprovals")) {
             return Err(agent_hud_runtime::l10n::text("演示模式不会更改这项设置。","The demo leaves this setting alone."));
         }
         if method=="set_setting" {if let Some(value)=app.state::<system::System>().set_setting(params["key"].as_str().ok_or("Setting key is required")?,&params["value"])? {params["value"]=value;}}
@@ -541,6 +541,22 @@ async fn native_request(
             if result.is_err(){
                 let mut hooks=hooks.lock().unwrap_or_else(PoisonError::into_inner);
                 if hooks.set_enabled(previous).is_err(){return Err("The hook setting failed and its previous listener state could not be restored".into());}
+            }
+            return result;
+        }
+        // A changed client's opt-in approval hook goes in or comes out as
+        // client hooks do: before the setting is saved, and back when it is not.
+        if method=="set_setting" && params["key"]=="optInApprovals" {
+            let sources:Vec<String>=serde_json::from_value(params["value"].clone()).map_err(|_|"optInApprovals must be a list of client ids")?;
+            let _action=hook_actions.lock().unwrap_or_else(PoisonError::into_inner);
+            if stopped.load(Ordering::Acquire){return Err("The application is stopping".into());}
+            let previous={
+                let mut hooks=hooks.lock().unwrap_or_else(PoisonError::into_inner);
+                let previous=hooks.opted_in();hooks.set_opted_in(sources)?;previous
+            };
+            let result=backend.lock().unwrap_or_else(PoisonError::into_inner).request(&app,&method,params);
+            if result.is_err() && hooks.lock().unwrap_or_else(PoisonError::into_inner).set_opted_in(previous).is_err(){
+                return Err("The approval setting failed and its previous hooks could not be restored".into());
             }
             return result;
         }

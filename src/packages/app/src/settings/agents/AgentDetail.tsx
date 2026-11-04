@@ -87,6 +87,8 @@ export function AgentDetail({
     snapshot.connection.clientHooks?.clients?.find(
       (client) => client.source === source.id && client.installed,
     )?.notice ?? null;
+  // The clients whose approval hook goes in only once the user turns it on.
+  const optInApprovals = snapshot.settings.optInApprovals ?? [];
   const live = preferences[source.id]?.live !== false;
   const reminders = preferences[source.id]?.reminders !== false;
   const offReason = t("Turn on Enabled first.", "请先启用。");
@@ -217,6 +219,42 @@ export function AgentDetail({
               change={(value) =>
                 void perform(() =>
                   action("set_setting", { key: "readCopilotQuota", value }),
+                )
+              }
+            />
+          </Section>
+        )}
+        {source.id === "copilot" && (
+          <Section
+            footer={
+              snapshot.settings.clientHooks
+                ? undefined
+                : t(
+                    "Takes effect once client hooks are on in Agent plugins.",
+                    "在「智能体插件」里打开客户端回调后生效。",
+                  )
+            }
+          >
+            <ToggleRow
+              title={t(
+                "Answer permission requests in the HUD",
+                "在 HUD 上回答权限请求",
+              )}
+              subtitle={t(
+                "Copilot then asks Agent HUD before its own rules and this session's approvals, so every tool call it would run or ask about waits for your answer in the HUD. Runs started with -p, --allow-all-tools, --allow-all or --yolo stay with Copilot.",
+                "Copilot 会先问 Agent HUD，再看自己的规则和本会话的批准，所以它要运行或询问的每次工具调用都会在 HUD 上等你回答。用 -p、--allow-all-tools、--allow-all 或 --yolo 启动的运行仍由 Copilot 自己处理。",
+              )}
+              checked={optInApprovals.includes(source.id)}
+              disabled={pending}
+              change={(value) =>
+                void perform(() =>
+                  action("set_setting", {
+                    key: "optInApprovals",
+                    value: [
+                      ...optInApprovals.filter((id) => id !== source.id),
+                      ...(value ? [source.id] : []),
+                    ],
+                  }),
                 )
               }
             />
