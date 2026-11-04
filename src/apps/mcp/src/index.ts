@@ -291,7 +291,7 @@ const proposal = z
       .object({
         spacing: z.enum(["compact", "regular", "roomy"]).optional(),
         separators: z.boolean().optional(),
-        width: z.number().int().min(480).max(720).optional(),
+        width: z.number().int().min(480).max(960).optional(),
       })
       .strict()
       .optional(),

@@ -415,16 +415,16 @@ fn misreadings_are_refused_with_open_sentences() {
     let (_folder, owner) = owner();
     let error = refused(
         &owner,
-        json!({"style": {"appearance": "light", "width": 900}, "blocks": {"claude": {"colour": "red"}}, "wat": 1}),
+        json!({"style": {"appearance": "light", "width": 1000}, "blocks": {"claude": {"colour": "red"}}, "wat": 1}),
     );
     assert_eq!(error, "Nothing was changed. Unknown: \"wat\". It takes: \"blocks\", \"order\", \"sections\", \"hiddenSections\", \"countdown\", \"style\", \"hud\", \"sessions\", \"tokens\", \"panel\", \"edit\", \"app\", \"from\", \"revision\", \"screen\".");
     let error = refused(
         &owner,
-        json!({"style": {"appearance": "light", "width": 900}, "blocks": {"claude": {"colour": "red"}}}),
+        json!({"style": {"appearance": "light", "width": 1000}, "blocks": {"claude": {"colour": "red"}}}),
     );
     assert!(error.contains("style has no property \"appearance\"; the style takes spacing, separators and width. The HUD's appearance is hud.appearance, for one screen."), "{error}");
     assert!(
-        error.contains("style.width is a whole number from 480 to 720."),
+        error.contains("style.width is a whole number from 480 to 960."),
         "{error}"
     );
     assert!(
@@ -768,6 +768,134 @@ fn a_click_needs_only_the_fields_its_action_takes() {
         layout_of(&owner)["custom"]["open-token-stats"]["onClick"],
         json!({"open": "statistics", "tab": "tokens"})
     );
+}
+
+/// A row in the panel puts sections side by side: the layout keeps a slot for each in
+/// the row and the sections' fields where they always are; the tree shows them in
+/// the row, drawn there instead of at the panel's top.
+#[test]
+fn a_row_puts_the_panels_sections_side_by_side() {
+    let (_folder, owner) = owner();
+    draft(
+        &owner,
+        json!({"edit": [
+            {"update": "panel", "width": 900},
+            {"insert": {"id": "main", "type": "row", "children": []}, "into": "panel", "at": 0},
+            {"move": "blocks", "into": "main"},
+            {"insert": {"id": "side", "type": "column", "children": []}, "into": "main"},
+            {"move": "sessions", "into": "side"},
+            {"update": "sessions", "limit": 8, "width": 320},
+            {"insert": {"id": "clock", "type": "text", "text": "{now.time|clock}", "width": 80}, "into": "side", "at": 0}
+        ]}),
+    );
+    let layout = layout(&owner);
+    assert_eq!(layout["style"]["width"], 900);
+    assert_eq!(layout["sessions"], json!({"limit": 8}));
+    assert_eq!(
+        layout["custom"]["main"]["children"][0],
+        json!({"id": "blocks", "type": "blocks"})
+    );
+    assert_eq!(
+        layout["custom"]["main"]["children"][1]["children"][1],
+        json!({"id": "sessions", "type": "sessions", "width": 320})
+    );
+    let tree = &call(&owner, "get_hud", json!({})).unwrap()["panel"];
+    let top: Vec<&str> = tree["children"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|n| n["id"].as_str().unwrap())
+        .collect();
+    assert_eq!(top, ["main", "tokens"]);
+    let main = &tree["children"][0];
+    assert_eq!(main["children"][0]["id"], "blocks");
+    assert!(main["children"][0]["children"].as_array().unwrap().len() >= 2);
+    assert_eq!(main["children"][1]["children"][1]["limit"], 8);
+    assert_eq!(main["children"][1]["children"][1]["width"], 320);
+    // Moving it back out puts it in the panel's list again, and sending the tree back
+    // as it is changes nothing.
+    draft(
+        &owner,
+        json!({"edit": [{"move": "sessions", "after": "tokens"}]}),
+    );
+    let tree = call(&owner, "get_hud", json!({})).unwrap()["panel"].clone();
+    assert_eq!(tree["children"][2]["id"], "sessions");
+    assert_eq!(tree["children"][2]["limit"], 8);
+    let revision = owner.view()["revision"].clone();
+    draft(&owner, json!({"revision": revision, "panel": tree}));
+    assert_eq!(
+        layout_of(&owner)["custom"]["main"]["children"]
+            .as_array()
+            .unwrap()
+            .len(),
+        2
+    );
+}
+
+/// A section sits in the panel or in a row, column or grid placed there: not in a
+/// repeat, not among the blocks, and once.
+#[test]
+fn a_section_goes_only_where_it_can_be_drawn() {
+    let (_folder, owner) = owner();
+    let error = refused(
+        &owner,
+        json!({"edit": [
+            {"insert": {"id": "list", "type": "repeat", "over": "agents", "children": []}, "into": "panel"},
+            {"move": "tokens", "into": "list"}
+        ]}),
+    );
+    assert!(
+        error.contains("\"tokens\" stays in the panel, or in a row"),
+        "{error}"
+    );
+    let error = refused(
+        &owner,
+        json!({"edit": [
+            {"insert": {"id": "pair", "type": "row", "children": []}, "into": "blocks"},
+            {"move": "sessions", "into": "pair"}
+        ]}),
+    );
+    assert!(
+        error.contains("not among the blocks or inside a repeat"),
+        "{error}"
+    );
+    let error = refused(
+        &owner,
+        json!({"edit": [{"update": "tokens", "width": 300}]}),
+    );
+    assert!(
+        error.contains("a section takes a width only inside a row"),
+        "{error}"
+    );
+    let error = refused(&owner, json!({"edit": [{"update": "panel", "width": 961}]}));
+    assert!(error.contains("480 to 960"), "{error}");
+}
+
+/// The older spelling keeps the sections a row holds where they are.
+#[test]
+fn a_proposal_in_the_older_spelling_keeps_sections_in_their_row() {
+    let (_folder, owner) = owner();
+    draft(
+        &owner,
+        json!({"edit": [
+            {"insert": {"id": "main", "type": "row", "children": []}, "into": "panel", "at": 0},
+            {"move": "blocks", "into": "main"},
+            {"move": "tokens", "into": "main"}
+        ]}),
+    );
+    draft(
+        &owner,
+        json!({"sections": ["sessions", "blocks", "tokens"], "countdown": false}),
+    );
+    let tree = &call(&owner, "get_hud", json!({})).unwrap()["panel"];
+    let top: Vec<&str> = tree["children"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|n| n["id"].as_str().unwrap())
+        .collect();
+    assert_eq!(top, ["sessions", "main"]);
+    assert_eq!(tree["children"][1]["children"][1]["id"], "tokens");
 }
 
 /// Settings keeps a block's columns when its widget changes to rings; an edit that

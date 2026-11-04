@@ -7,7 +7,9 @@ import {
   Fragment,
   useContext,
   useEffect,
+  useLayoutEffect,
   useMemo,
+  useRef,
   useState,
   type CSSProperties,
   type ReactNode,
@@ -39,6 +41,7 @@ import {
   pick,
   readsTime,
   sameAgent,
+  SECTIONS,
   valueOf,
   type Collections,
   type Item,
@@ -59,6 +62,13 @@ interface Drawing {
   onStats?: () => void;
   root: Node;
   setState(name: string, value: string | undefined): void;
+  /** One of the panel's own sections, drawn in a row, column or grid of this control. */
+  section?: (
+    key: string,
+    width: number | undefined,
+    bare: boolean,
+  ) => ReactNode;
+  separated: boolean;
 }
 const DrawingContext = createContext<Drawing | null>(null);
 
@@ -74,6 +84,13 @@ const JUSTIFY: Record<string, CSSProperties["justifyContent"]> = {
   end: "flex-end",
   spread: "space-between",
 };
+const VALIGN: Record<string, CSSProperties["alignItems"]> = {
+  top: "flex-start",
+  center: "center",
+  bottom: "flex-end",
+};
+/** What shares a row's room with the others, as a bar takes what is left. */
+const SHARING = ["column", "grid", ...SECTIONS];
 const ALIGN: Record<string, CSSProperties["alignItems"]> = {
   start: "flex-start",
   center: "center",
@@ -238,21 +255,139 @@ function Clickable({
 function Children({
   nodes,
   scope,
+  parent,
+  lined = false,
 }: {
   nodes: Node[] | undefined;
   scope: Scope;
+  parent: string;
+  /** A line between the children, as between sections side by side. */
+  lined?: boolean;
 }) {
   return (
     <>
       {(nodes ?? []).map((child, index) => (
-        <Control key={child.id ?? index} node={child} scope={scope} />
+        <Placed
+          key={child.id ?? index}
+          node={child}
+          scope={scope}
+          parent={parent}
+          index={index}
+          lined={lined && index > 0}
+        />
       ))}
     </>
   );
 }
 
+/** The line beside a part that follows another in a row of sections. */
+const besideLine = (colors: Colors): CSSProperties => ({
+  boxShadow: `inset 1px 0 0 ${colors.divider}`,
+  paddingLeft: "var(--hud-section-gap)",
+});
+
+/** Where a control sits in its parent: a width of its own, or in a row an equal
+ * share of the room left for a column, a grid or a section. */
+function placing(width: unknown, shares: boolean): CSSProperties | null {
+  if (typeof width === "number")
+    return { flex: `0 0 ${width}px`, width, minWidth: 0, maxWidth: "100%" };
+  return shares ? { flex: "1 1 0", minWidth: 0 } : null;
+}
+
+function Placed({
+  node,
+  scope,
+  parent,
+  index,
+  lined = false,
+}: {
+  node: Node;
+  scope: Scope;
+  parent: string;
+  index: number;
+  lined?: boolean;
+}) {
+  const drawing = useContext(DrawingContext)!;
+  if (SECTIONS.includes(String(node.type)))
+    return <Slot node={node} parent={parent} index={index} lined={lined} />;
+  const control = <Control node={node} scope={scope} parent={parent} />;
+  const place = placing(
+    node.width,
+    parent === "row" && SHARING.includes(String(node.type)),
+  );
+  if (
+    (!place && !lined) ||
+    node.hidden === true ||
+    !holds(node.when as Record<string, unknown> | undefined, scope)
+  )
+    return control;
+  return (
+    <div style={{ ...place, ...(lined ? besideLine(drawing.colors) : {}) }}>
+      {control}
+    </div>
+  );
+}
+
+/** One of the panel's own sections where a control of an agent's holds it: drawn
+ * by the panel at the width it is given here, with no line above it where it heads
+ * a column, and a line beside it after another in a row. */
+function Slot({
+  node,
+  parent,
+  index,
+  lined,
+}: {
+  node: Node;
+  parent: string;
+  index: number;
+  lined: boolean;
+}) {
+  const drawing = useContext(DrawingContext)!;
+  const element = useRef<HTMLDivElement>(null);
+  const [measured, setMeasured] = useState<number>();
+  const section = String(node.type);
+  const bare = parent !== "column" || index === 0;
+  const content = drawing.section?.(section, measured, bare);
+  const shown = Boolean(content);
+  useLayoutEffect(() => {
+    const box = element.current;
+    if (!box) return;
+    const measure = () =>
+      setMeasured(
+        box.getBoundingClientRect().width -
+          (parseFloat(getComputedStyle(box).paddingLeft) || 0),
+      );
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(box);
+    return () => observer.disconnect();
+  }, [shown]);
+  if (!content) return null;
+  return (
+    <div
+      ref={element}
+      data-hud-section={section}
+      style={{
+        minWidth: 0,
+        ...placing(node.width, parent === "row"),
+        ...(lined ? besideLine(drawing.colors) : {}),
+      }}
+    >
+      {content}
+    </div>
+  );
+}
+
 /** One node, drawn where its `when` holds. */
-function Control({ node, scope }: { node: Node; scope: Scope }) {
+function Control({
+  node,
+  scope,
+  parent,
+}: {
+  node: Node;
+  scope: Scope;
+  parent: string;
+}) {
   const drawing = useContext(DrawingContext)!;
   // The panel's own setting: pictures, which draw no frames, turn motion off.
   const reduceMotion = useReducedMotionConfig() ?? false;
@@ -265,9 +400,13 @@ function Control({ node, scope }: { node: Node; scope: Scope }) {
   switch (node.type) {
     case "row":
     case "column": {
-      // A row places its children along it and centres them across it; a
-      // column stretches them to its width unless it says where they go.
+      // A row places its children along it and centres them across it, or
+      // tops them when it holds a section, column or grid; a column stretches
+      // them to its width unless it says where they go.
       const align = typeof node.align === "string" ? node.align : null;
+      const tall = (children ?? []).some((child) =>
+        SHARING.includes(String(child.type)),
+      );
       return (
         <Clickable
           onClick={onClick}
@@ -279,7 +418,9 @@ function Control({ node, scope }: { node: Node; scope: Scope }) {
             ...(node.type === "row"
               ? {
                   justifyContent: JUSTIFY[align ?? "start"] ?? "flex-start",
-                  alignItems: "center",
+                  alignItems:
+                    VALIGN[String(node.valign)] ??
+                    (tall ? "flex-start" : "center"),
                 }
               : {
                   alignItems:
@@ -289,7 +430,18 @@ function Control({ node, scope }: { node: Node; scope: Scope }) {
                 }),
           }}
         >
-          <Children nodes={children} scope={scope} />
+          <Children
+            nodes={children}
+            scope={scope}
+            parent={node.type}
+            lined={
+              node.type === "row" &&
+              drawing.separated &&
+              (children ?? []).some((child) =>
+                SECTIONS.includes(String(child.type)),
+              )
+            }
+          />
         </Clickable>
       );
     }
@@ -304,7 +456,7 @@ function Control({ node, scope }: { node: Node; scope: Scope }) {
             gap,
           }}
         >
-          <Children nodes={children} scope={scope} />
+          <Children nodes={children} scope={scope} parent="grid" />
         </Clickable>
       );
     }
@@ -327,6 +479,7 @@ function Control({ node, scope }: { node: Node; scope: Scope }) {
               <Children
                 nodes={children}
                 scope={{ ...scope, items: [...scope.items, { name, item }] }}
+                parent={parent}
               />
             </Fragment>
           ))}
@@ -553,6 +706,8 @@ export function CustomControl({
   showReset,
   onStats,
   divided,
+  section,
+  separated = true,
 }: {
   node: PanelNode;
   snapshot: Snapshot;
@@ -563,6 +718,14 @@ export function CustomControl({
   onStats?: () => void;
   /** A line above it, as the panel's other sections draw one. */
   divided?: boolean;
+  /** Draws one of the panel's own sections that a row, column or grid holds. */
+  section?: (
+    key: string,
+    width: number | undefined,
+    bare: boolean,
+  ) => ReactNode;
+  /** The panel draws lines between its parts. */
+  separated?: boolean;
 }) {
   const colors = palette(useGround(light));
   const format = useFormat();
@@ -583,6 +746,8 @@ export function CustomControl({
     showReset,
     onStats,
     root,
+    section,
+    separated,
     setState: (name, value) =>
       value === undefined
         ? undefined
@@ -610,7 +775,7 @@ export function CustomControl({
             : {}),
         }}
       >
-        <Control node={root} scope={scope} />
+        <Placed node={root} scope={scope} parent="panel" index={0} />
       </div>
     </DrawingContext.Provider>
   );

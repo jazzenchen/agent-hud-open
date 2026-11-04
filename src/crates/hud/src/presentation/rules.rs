@@ -27,6 +27,8 @@ const STORED_SESSION_PERIODS: &[&str] = &[
 ];
 const DEFAULT_COLUMNS: i64 = 4;
 const DEFAULT_WIDTH: i64 = 540;
+/// The panel's widths: two columns of sections side by side need about twice the narrowest.
+pub(super) const WIDTHS: std::ops::RangeInclusive<i64> = 480..=960;
 
 // MARK: Small helpers
 
@@ -434,7 +436,7 @@ pub(super) fn normalize_layout(value: &Value) -> Result<Value, String> {
         v.insert("separators".into(), json!(false));
     }
     if let Some(width) =
-        whole(&style["width"]).filter(|w| (480..=720).contains(w) && *w != DEFAULT_WIDTH)
+        whole(&style["width"]).filter(|w| WIDTHS.contains(w) && *w != DEFAULT_WIDTH)
     {
         v.insert("width".into(), json!(width));
     }
@@ -1174,8 +1176,12 @@ fn style_misreadings(value: &Value) -> Vec<String> {
                 }
             }
             "width" => {
-                if !value.is_null() && !whole(value).is_some_and(|n| (480..=720).contains(&n)) {
-                    found.push("style.width is a whole number from 480 to 720.".into());
+                if !value.is_null() && !whole(value).is_some_and(|n| WIDTHS.contains(&n)) {
+                    found.push(format!(
+                        "style.width is a whole number from {} to {}.",
+                        WIDTHS.start(),
+                        WIDTHS.end()
+                    ));
                 }
             }
             // The panel's style is no place for the HUD's look, which is one screen's.

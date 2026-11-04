@@ -48,6 +48,8 @@ Agent HUD adds its tools to this client as an MCP server named `agent-hud`. This
 
 - **The panel's own parts:** the root `panel` (spacing, separators, width, countdown), its sections `blocks`, `tokens` and `sessions`, and inside `blocks` one `quota` or `balance` block per agent, named by its block key (`claude`, `codex`, `api:deepseek`). The blocks' order is also the order of the agents on the resting HUD. They cannot be deleted; `hidden: true` hides one. Their fields are in `catalog.own`.
 - **Your own controls:** from `catalog.controls`: `row`, `column`, `grid`, `repeat`, `text`, `logo`, `bar`, `rings`, `segments`, `chart`, `divider` and `picker`. Put one in `panel` as a section of its own, or in `blocks` among the agents' blocks. A control placed there needs an `id`.
+- **Side by side:** a `row` (or a `column` or `grid` inside it) that you place in `panel` can hold the sections `blocks`, `tokens` and `sessions`: `move` them into it. Sections, columns and grids in a row share its width equally; give one a `width` in points to fix it. A row of sections wants a wider panel: set `panel.width` (480–960) to 720 or more. Moving a section back into `panel` puts it under the others again.
+- **Lining up:** any control takes a `width` in points, so the same column in different rows lines up (a name column of `"width": 90` in every row of a list). A row centres its children top to bottom, or tops them when it holds sections, columns or grids; `valign` overrides that.
 - **Data:** text reads data through placeholders: `{window.used}`, `{session.title}`, `{now.time|clock}`. A `repeat` over `windows`, `balances`, `accounts`, `agents` or `sessions` draws its children once per item, and inside it the item is named `window`, `balance`, `account`, `agent` or `session`. `where`, `sort` and `limit` choose the items. Match windows by `agent` and `kind` (such as `claude-session`), not by account ids, so the panel works on any computer.
 - **Clicks:** `onClick` opens Statistics, a session or a Settings page, sets or steps a `state` the control placed in the panel declares, or copies text. A `picker` shows a state's options.
 - **Checks:** a draft that cannot be drawn is refused whole; the error lists every reason with the values that would work. Fix them all and send again.
@@ -63,6 +65,8 @@ Agent HUD adds its tools to this client as an MCP server named `agent-hud`. This
 | 用量画法 (Settings, Simple mode) | `hud.simpleStyle` |
 | 刘海 / 动态 / 简约 | `hud.mode` `notch` / `dynamic` / `simple` |
 | 悬停面板, the panel, 展开后 | the `panel` tree |
+| 两栏, 并排, 横向布局, side by side | a `row` in `panel` holding sections or columns, with a wider `panel.width` |
+| 对齐, line up | the same `width` on the matching control in each row |
 | 会话列表 / Token 图 / 额度 | the `sessions` / `tokens` sections, the quota blocks |
 
 The same style name can mean the resting HUD or the panel. When the person talks about the logos at the screen's edge, or Simple mode, change `hud.simpleStyle` for that display. When they talk about the panel that opens on hover, change the block's `widget`. If it is unclear, ask which one.
@@ -72,6 +76,7 @@ The same style name can mean the resting HUD or the panel. When the person talks
 - "Show Claude as rings in the panel": `{"edit": [{"update": "claude", "widget": "rings"}]}`
 - "简约模式换成年轮": `{"screen": "<display key>", "hud": {"mode": "simple", "simpleStyle": "rings"}}`. `simpleStyle` draws only in Simple mode, so send `mode` too unless `screens[].hud.mode` is already `simple`.
 - "Hide Codex and put Cursor first": `{"edit": [{"update": "codex", "hidden": true}, {"move": "cursor", "before": "claude"}]}`
+- "Put the sessions beside the agents, two columns": `{"edit": [{"update": "panel", "width": 880}, {"insert": {"id": "main", "type": "row", "children": []}, "into": "panel", "at": 0}, {"move": "blocks", "into": "main"}, {"move": "sessions", "into": "main"}, {"update": "sessions", "width": 320}]}`
 - "Add a clock above the agents": `{"edit": [{"insert": {"id": "clock", "type": "text", "text": "{now.time|clock}", "style": "title"}, "into": "blocks", "at": 0}]}`
 - "A list of the windows that are nearly used up, above the token chart": `{"edit": [{"insert": {"id": "tight", "type": "column", "children": [{"type": "repeat", "over": "windows", "where": {"level": ["warning", "critical"]}, "sort": "-used", "limit": 5, "children": [{"type": "row", "align": "spread", "children": [{"type": "text", "text": "{window.agent} {window.short}"}, {"type": "text", "text": "{window.used}", "color": "level"}]}]}]}, "before": "tokens"}]}`
 

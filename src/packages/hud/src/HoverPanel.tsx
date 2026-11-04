@@ -37,6 +37,7 @@ import {
 import { SourceTokenChart } from "./panel/TokenChartSection";
 import { SourceIndexing } from "./panel/IndexingSection";
 import { CustomControl } from "./panel/custom/CustomControl";
+import { heldSections } from "./panel/custom/custom-data";
 import { snapshotLanguage } from "@agent-hud/ui/format";
 
 export { SOURCE_PANEL } from "./panel/theme";
@@ -169,6 +170,8 @@ export const SourceHoverPanel = memo(function SourceHoverPanel({
         showReset={config.resetCountdown}
         onStats={onStats}
         divided={divided}
+        section={(key, width, bare) => sectionContent(key, width, bare)}
+        separated={separated}
       />
     ) : null;
   };
@@ -219,29 +222,37 @@ export const SourceHoverPanel = memo(function SourceHoverPanel({
   );
   const span = (key: string) =>
     custom[key]?.span ?? config.panelLayout.blocks?.[key]?.span;
-  const blockLines: (typeof blocks)[] = [];
-  for (let i = 0; i < blocks.length; i++) {
-    const block = blocks[i],
-      next = blocks[i + 1];
-    if (
-      (contentWidth ?? config.panelWidth - 40) - density.section >= 460 &&
-      next &&
-      span(block.key) === "half" &&
-      span(next.key) === "half"
-    ) {
-      blockLines.push([block, next]);
-      i++;
-    } else blockLines.push([block]);
-  }
-  const sections = inPanelOrder<{
-    key: string;
-    content: ReactNode;
-    custom?: boolean;
-  }>(
-    [
-      {
-        key: "blocks",
-        content: config.quotaDetails && blocks.length > 0 && (
+  // Two half blocks share a line where the blocks' width holds both: the
+  // panel's, or the column's a row of an agent's gives them.
+  const linesFor = (width: number | undefined) => {
+    const lines: (typeof blocks)[] = [];
+    for (let i = 0; i < blocks.length; i++) {
+      const block = blocks[i],
+        next = blocks[i + 1];
+      if (
+        (width ?? contentWidth ?? config.panelWidth - 40) - density.section >=
+          460 &&
+        next &&
+        span(block.key) === "half" &&
+        span(next.key) === "half"
+      ) {
+        lines.push([block, next]);
+        i++;
+      } else lines.push([block]);
+    }
+    return lines;
+  };
+  // The panel's own sections, at its top or at the width a row, column or grid
+  // of an agent's gives them, there with no line above where they head a column.
+  const sectionContent = (
+    key: string,
+    width?: number,
+    bare = false,
+  ): ReactNode => {
+    if (key === "blocks")
+      return (
+        config.quotaDetails &&
+        blocks.length > 0 && (
           <div
             className="hud-source-blocks"
             style={{
@@ -250,7 +261,7 @@ export const SourceHoverPanel = memo(function SourceHoverPanel({
               gap: "var(--hud-section-gap)",
             }}
           >
-            {blockLines.map((line, index) => (
+            {linesFor(width).map((line, index) => (
               <div
                 key={line.map((b) => b.key).join("+")}
                 style={{
@@ -278,11 +289,11 @@ export const SourceHoverPanel = memo(function SourceHoverPanel({
               </div>
             ))}
           </div>
-        ),
-      },
-      {
-        key: "tokens",
-        content: config.tokenUsage && (
+        )
+      );
+    if (key === "tokens")
+      return (
+        config.tokenUsage && (
           <SourceTokenChart
             snapshot={snapshot}
             focusVendor={focusVendor}
@@ -290,12 +301,13 @@ export const SourceHoverPanel = memo(function SourceHoverPanel({
             Logo={Logo}
             layout={config.panelLayout.tokens}
             active={active}
+            bare={bare}
           />
-        ),
-      },
-      {
-        key: "sessions",
-        content: config.sessionList && (
+        )
+      );
+    if (key === "sessions")
+      return (
+        config.sessionList && (
           <SourceSessions
             snapshot={snapshot}
             focusVendor={focusVendor}
@@ -304,9 +316,27 @@ export const SourceHoverPanel = memo(function SourceHoverPanel({
             onStats={onStats}
             layout={config.panelLayout.sessions}
             active={active}
+            bare={bare}
           />
-        ),
-      },
+        )
+      );
+    return null;
+  };
+  // A section a row, column or grid of an agent's holds is drawn there instead.
+  const held = new Set(
+    ((config.panelSections ?? []) as string[]).flatMap((key) =>
+      custom[key] ? heldSections(custom[key]) : [],
+    ),
+  );
+  const sections = inPanelOrder<{
+    key: string;
+    content: ReactNode;
+    custom?: boolean;
+  }>(
+    [
+      ...["blocks", "tokens", "sessions"]
+        .filter((key) => !held.has(key))
+        .map((key) => ({ key, content: sectionContent(key) })),
       ...((config.panelSections ?? []) as string[])
         .filter((key) => custom[key] && custom[key].hidden !== true)
         .map((key) => ({ key, content: true, custom: true })),

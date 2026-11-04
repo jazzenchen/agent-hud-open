@@ -119,6 +119,7 @@ fn put(tree: &mut Value, node: Value, place: &Place, index: usize) -> Result<(),
     let fits = match parent_kind.as_str() {
         "panel" => !own_block,
         "blocks" => !own_section,
+        p if HOLDERS.contains(&p) => !own_block,
         p if PARENTS.contains(&p) => !own_block && !own_section,
         _ => false,
     };
@@ -134,7 +135,7 @@ fn put(tree: &mut Value, node: Value, place: &Place, index: usize) -> Result<(),
                 if own_block {
                     "inside blocks"
                 } else {
-                    "inside panel"
+                    "in the panel, or in a row, column or grid of yours placed there"
                 }
             )
         } else {
@@ -142,6 +143,13 @@ fn put(tree: &mut Value, node: Value, place: &Place, index: usize) -> Result<(),
                 "edit[{index}]: nothing goes into \"{into}\", a {parent_kind}. Controls go into panel, blocks, or a row, column, grid or repeat."
             )
         });
+    }
+    // A section's width is its column's in a row of yours; at the panel's top it has none.
+    let mut node = node;
+    if own_section && parent_kind == "panel" {
+        if let Some(fields) = node.as_object_mut() {
+            fields.remove("width");
+        }
     }
     let children = parent_node
         .as_object_mut()

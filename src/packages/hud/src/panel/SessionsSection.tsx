@@ -20,6 +20,7 @@ export function SourceSessions({
   onStats,
   layout = {},
   active = true,
+  bare = false,
 }: {
   snapshot: Snapshot;
   focusVendor?: string;
@@ -27,6 +28,8 @@ export function SourceSessions({
   Logo: Logo;
   onStats?: () => void;
   layout?: PanelLayout["sessions"];
+  /** No line above it: it heads a column of its own. */
+  bare?: boolean;
   active?: boolean;
 }) {
   const zh = useFormat().language === "zh";
@@ -100,8 +103,8 @@ export function SourceSessions({
       style={{
         display: "grid",
         gap: "var(--hud-session-gap, 6px)",
-        paddingTop: "var(--hud-divided-gap, 8px)",
-        boxShadow: `inset 0 1px 0 ${colors.divider}`,
+        paddingTop: bare ? 0 : "var(--hud-divided-gap, 8px)",
+        boxShadow: bare ? undefined : `inset 0 1px 0 ${colors.divider}`,
         fontSize: 12,
       }}
     >

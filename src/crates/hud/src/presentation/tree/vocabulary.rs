@@ -9,6 +9,11 @@ pub(super) const CONTROLS: &[&str] = &[
     "divider", "picker",
 ];
 pub(super) const PARENTS: &[&str] = &["row", "column", "grid", "repeat"];
+/// The controls that can hold the panel's own sections: a repeat cannot.
+pub(super) const HOLDERS: &[&str] = &["row", "column", "grid"];
+pub(super) const VALIGNS: &[&str] = &["top", "center", "bottom"];
+/// A control's own width in points, for lining controls up across rows.
+pub(super) const CONTROL_WIDTHS: (i64, i64) = (16, 960);
 pub(super) const GAPS: &[&str] = &["none", "small", "medium", "large"];
 pub(super) const ALIGNS: &[&str] = &["start", "center", "end", "spread"];
 pub(super) const TEXT_ALIGNS: &[&str] = &["start", "center", "end"];
@@ -192,20 +197,21 @@ pub(in crate::presentation) fn catalog() -> Value {
             "get_hud's panel is the hover panel as a tree. Each node has an id, a type and its fields; parents have children.",
             "The panel's own parts are the sections blocks, tokens and sessions, and one quota or balance block per agent inside blocks. They cannot be deleted; hide one with hidden: true.",
             "Add your own controls from controls below: as a section of the panel (inside panel), or as a block among the agents' blocks (inside blocks).",
+            "To put sections side by side, insert a row into panel and move blocks, tokens or sessions into it, or into a column or grid inside it. Each section still appears once, and no repeat holds one. Two columns want a panel width of 720 or more.",
             "Change the panel with edit, a list of steps that each name a node by its id. Or send the whole tree back as panel.",
             "Text shows data with placeholders such as {window.used}. Inside a repeat over windows, each item is window; now and state can be read anywhere.",
             "Nothing is saved until the person presses Save in the panel."
         ],
         "own": {
-            "panel": {"fields": {"spacing": "compact, regular or roomy", "separators": "true or false: lines between parts", "width": "480 to 720 points", "countdown": "true or false: the reset countdowns"}, "children": "the sections blocks, tokens and sessions, and your own controls"},
-            "blocks": {"children": "one quota or balance block per agent, and your own controls; span: half puts two on a line"},
+            "panel": {"fields": {"spacing": "compact, regular or roomy", "separators": "true or false: lines between parts", "width": "480 to 960 points (540 by default)", "countdown": "true or false: the reset countdowns"}, "children": "the sections blocks, tokens and sessions, and your own controls; a row, column or grid of yours placed here may hold sections"},
+            "blocks": {"fields": {"hidden": "true or false", "width": "points, for the section inside a row, column or grid of yours"}, "children": "one quota or balance block per agent, and your own controls; span: half puts two on a line when there is room"},
             "quota": {"fields": {"widget": "bar, rings, segments, number or chart", "measures": "what the picker offers, the first shown: quota, burn, tokens, consumed, cost", "rows": "the order of its row ids", "hiddenRows": "row ids to hide", "accounts": "show only these account ids", "hiddenAccounts": "account ids to hide", "countdown": "true or false", "columns": "2 to 6, for number", "ringSize": "small, medium or large, for rings and segments", "span": "full or half (not for bar)", "period": "day, week or month, for chart", "hidden": "true or false"}},
             "balance": {"fields": {"widget": "number or chart", "measures": "quota, burn, cost", "period": "day, week or month", "span": "full or half", "hidden": "true or false"}},
-            "tokens": {"fields": {"period": "day, week or month", "agents": "agent names from get_hud's tokens.offeredAgents", "models": "model ids from tokens.offeredModels", "hiddenModels": "model ids to hide", "modelOrder": "model ids in order", "hidden": "true or false"}},
-            "sessions": {"fields": {"limit": "1 to 10", "period": "day or week", "agents": "agent names from sessions.offeredAgents", "projects": "project ids from sessions.offeredProjects", "hidden": "true or false"}}
+            "tokens": {"fields": {"period": "day, week or month", "agents": "agent names from get_hud's tokens.offeredAgents", "models": "model ids from tokens.offeredModels", "hiddenModels": "model ids to hide", "modelOrder": "model ids in order", "hidden": "true or false", "width": "points, for the section inside a row, column or grid of yours"}},
+            "sessions": {"fields": {"limit": "1 to 10", "period": "day or week", "agents": "agent names from sessions.offeredAgents", "projects": "project ids from sessions.offeredProjects", "hidden": "true or false", "width": "points, for the section inside a row, column or grid of yours"}}
         },
         "controls": {
-            "row": {"fields": {"gap": "none, small, medium or large", "align": "where the children sit along it: start (the default), center, end, or spread to both ends"}, "children": "side by side, centred top to bottom; a bar takes the room left"},
+            "row": {"fields": {"gap": "none, small, medium or large", "align": "where the children sit along it: start (the default), center, end, or spread to both ends", "valign": "top, center or bottom: where they sit top to bottom; left out, centred, or at the top when it holds a section, column or grid"}, "children": "side by side; bars, columns, grids and sections share the room left equally, and a control with a width keeps it"},
             "column": {"fields": {"gap": "none, small, medium or large", "align": "start, center or end; left out, the children take its whole width"}, "children": "one under another"},
             "grid": {"fields": {"columns": "2 to 6", "gap": "none, small, medium or large"}, "children": "in cells, left to right"},
             "repeat": {"fields": {"over": "windows, balances, accounts, agents or sessions", "where": "only items whose fields have these values, such as {\"agent\": \"claude\"}; a list allows several", "sort": "a field to sort by; -used sorts largest first", "limit": "1 to 20"}, "children": "drawn once for each item, in the repeat's parent"},
@@ -224,6 +230,7 @@ pub(in crate::presentation) fn catalog() -> Value {
             "onClick": "what a click does; see actions",
             "hidden": "true or false",
             "span": "full or half; for a control placed in blocks",
+            "width": "16 to 960 points: a fixed width, so controls in different rows line up; left out, it takes what it needs",
             "state": "for a control placed in panel or blocks: {\"name\": {\"options\": [...], \"default\": ...}}, read as {state.name} by everything inside it"
         },
         "data": data,

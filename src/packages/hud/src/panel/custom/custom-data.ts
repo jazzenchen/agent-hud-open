@@ -341,6 +341,24 @@ export function holds(
   return true;
 }
 
+/** The panel's own sections, which a row, column or grid of an agent's may hold. */
+export const SECTIONS = ["blocks", "tokens", "sessions"];
+const HOLDERS = ["row", "column", "grid"];
+
+/** The sections a control holds in its rows, columns and grids (tree.rs `held_sections`). */
+export function heldSections(node: {
+  type?: unknown;
+  children?: unknown;
+}): string[] {
+  if (!HOLDERS.includes(String(node.type))) return [];
+  return ((node.children as (typeof node)[] | undefined) ?? []).flatMap(
+    (child) =>
+      SECTIONS.includes(String(child.type))
+        ? [String(child.type)]
+        : heldSections(child),
+  );
+}
+
 /** Whether a tree reads the time, so it is drawn again as the minute turns. */
 export function readsTime(node: unknown): boolean {
   return JSON.stringify(node ?? null).includes("now.time");

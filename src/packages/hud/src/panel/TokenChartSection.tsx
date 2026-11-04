@@ -40,6 +40,7 @@ export function SourceTokenChart({
   Logo,
   layout = {},
   active = true,
+  bare = false,
 }: {
   snapshot: Snapshot;
   focusVendor?: string;
@@ -47,6 +48,8 @@ export function SourceTokenChart({
   Logo?: Logo;
   layout?: PanelLayout["tokens"];
   active?: boolean;
+  /** No line above it: it heads a column of its own. */
+  bare?: boolean;
 }) {
   const zh = useFormat().language === "zh";
   const initial =
@@ -151,8 +154,8 @@ export function SourceTokenChart({
       style={{
         display: "grid",
         gap: 6,
-        paddingTop: 8,
-        boxShadow: `inset 0 1px 0 ${colors.divider}`,
+        paddingTop: bare ? 0 : 8,
+        boxShadow: bare ? undefined : `inset 0 1px 0 ${colors.divider}`,
       }}
     >
       <div

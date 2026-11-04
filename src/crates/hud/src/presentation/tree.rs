@@ -4,8 +4,12 @@
 //! layout's (`tree`, `layout_from`), so every rule a layout has holds for a tree
 //! too. Controls an agent adds from the catalog are kept in the layout's `custom`,
 //! by id, and placed by the id in `sections` (among the panel's sections) or in
-//! `order` (among the blocks). A tree is changed whole (`panel`) or by edits that
-//! name a node by its id (`edit`).
+//! `order` (among the blocks). A row, column or grid placed in the panel may hold
+//! the panel's own sections, which puts them side by side: the control keeps a slot
+//! for each (`{"id": "sessions", "type": "sessions"}`, with its width), the layout's
+//! own fields keep the rest, and the section is drawn there instead of in
+//! `sections`. A tree is changed whole (`panel`) or by edits that name a node by its
+//! id (`edit`).
 mod check;
 mod edits;
 mod vocabulary;
@@ -91,6 +95,51 @@ fn block_node(key: &str, kind: Option<Kind>, fields: &Value) -> Value {
     Value::Object(node)
 }
 
+/// The sections a control of an agent's own holds in its rows, columns and grids.
+fn held_sections(node: &Value, out: &mut Vec<String>) {
+    if !HOLDERS.contains(&kind_of(node)) {
+        return;
+    }
+    for child in node["children"].as_array().into_iter().flatten() {
+        match SECTIONS.iter().find(|s| kind_of(child) == **s) {
+            Some(section) => out.push((*section).to_owned()),
+            None => held_sections(child, out),
+        }
+    }
+}
+
+/// A control of an agent's own with the sections it holds drawn in: each slot
+/// becomes the section as the tree shows it, with the slot's width.
+fn expand(
+    node: &Value,
+    layout: &Value,
+    hidden: &[String],
+    order: &[String],
+    custom: &Map<String, Value>,
+    present: &[Block],
+) -> Value {
+    let mut node = node.clone();
+    if !HOLDERS.contains(&kind_of(&node)) {
+        return node;
+    }
+    for child in node["children"].as_array_mut().into_iter().flatten() {
+        let kind = kind_of(child).to_owned();
+        if !SECTIONS.contains(&kind.as_str()) {
+            *child = expand(child, layout, hidden, order, custom, present);
+            continue;
+        }
+        let mut section = section_node(layout, &kind, hidden.contains(&kind));
+        if let Some(width) = child.get("width").filter(|w| !w.is_null()) {
+            section["width"] = width.clone();
+        }
+        if kind == "blocks" {
+            section["children"] = json!(blocks(layout, order, custom, present));
+        }
+        *child = section;
+    }
+    node
+}
+
 fn custom_of(layout: &Value) -> Map<String, Value> {
     layout["custom"].as_object().cloned().unwrap_or_default()
 }
@@ -114,11 +163,21 @@ pub(super) fn tree(layout: &Value, present: &[Block]) -> Value {
             sections.push(id.clone());
         }
     }
+    // A section a control holds is drawn there, not again where `sections` lists it.
+    let mut held = vec![];
+    for id in &sections {
+        if let Some(node) = custom.get(id) {
+            held_sections(node, &mut held);
+        }
+    }
     let hidden = strings(&layout["hiddenSections"]);
     let mut children = vec![];
     for id in &sections {
+        if held.contains(id) {
+            continue;
+        }
         if let Some(node) = custom.get(id) {
-            children.push(node.clone());
+            children.push(expand(node, &layout, &hidden, &order, &custom, present));
             continue;
         }
         let mut node = section_node(&layout, id, hidden.contains(id));
@@ -187,6 +246,103 @@ pub(super) fn kind_of(node: &Value) -> &str {
     node["type"].as_str().unwrap_or("")
 }
 
+/// What reading a tree back gathers for its layout.
+struct Reader<'a> {
+    present: &'a [Block],
+    layout: Map<String, Value>,
+    sections: Vec<String>,
+    hidden_sections: Vec<String>,
+    custom: Map<String, Value>,
+    order: Vec<String>,
+    blocks: Map<String, Value>,
+    seen_blocks: bool,
+    check: Check,
+    issues: Vec<String>,
+}
+
+/// The panel's section a node is, named by its id, or by its type when it has none.
+fn section_of(node: &Value) -> Option<&'static str> {
+    let id = node["id"].as_str().unwrap_or("");
+    SECTIONS
+        .iter()
+        .copied()
+        .find(|s| *s == id || (id.is_empty() && kind_of(node) == *s))
+}
+
+impl Reader<'_> {
+    /// One of the panel's own sections, at the panel's top or inside a control of
+    /// yours (`nested`), where alone it takes a width.
+    fn section(&mut self, section: &str, child: &Value, path: &str, nested: bool) {
+        if self.sections.iter().any(|s| s == section) {
+            self.issues
+                .push(format!("{path}: the panel has one \"{section}\" section."));
+            return;
+        }
+        self.sections.push(section.to_owned());
+        if child["hidden"] == true {
+            self.hidden_sections.push(section.to_owned());
+        }
+        if !nested && !child["width"].is_null() {
+            self.issues.push(format!(
+                "{path}.width: a section takes a width only inside a row, column or grid of yours."
+            ));
+        }
+        if section == "blocks" {
+            self.seen_blocks = true;
+            let mut child = child.clone();
+            if let Some(fields) = child.as_object_mut() {
+                fields.remove("width");
+            }
+            read_blocks(
+                &child,
+                self.present,
+                &mut self.order,
+                &mut self.blocks,
+                &mut self.custom,
+                &mut self.check,
+                &mut self.issues,
+            );
+            return;
+        }
+        let mut fields = Map::new();
+        for (key, value) in child.as_object().into_iter().flatten() {
+            if !["id", "type", "hidden", "width"].contains(&key.as_str()) {
+                fields.insert(key.clone(), value.clone());
+            }
+        }
+        if !fields.is_empty() {
+            self.layout.insert(section.into(), Value::Object(fields));
+        }
+    }
+
+    /// The panel's own sections in a row, column or grid of yours, read where they
+    /// stand and left in it as slots that keep their width.
+    fn lift(&mut self, node: &mut Value, path: &str) {
+        if !HOLDERS.contains(&kind_of(node)) {
+            return;
+        }
+        let Some(children) = node.get_mut("children").and_then(Value::as_array_mut) else {
+            return;
+        };
+        for (index, child) in children.iter_mut().enumerate() {
+            let child_path = match child["id"].as_str() {
+                Some(id) if !id.is_empty() => id.to_owned(),
+                _ => format!("{path}.children[{index}]"),
+            };
+            let Some(section) = section_of(child) else {
+                self.lift(child, &child_path);
+                continue;
+            };
+            let mut slot = json!({"id": section, "type": section});
+            if let Some(width) = child.get("width").filter(|w| !w.is_null()) {
+                slot["width"] = width.clone();
+            }
+            let taken = std::mem::replace(child, slot);
+            self.section(section, &taken, &child_path, true);
+        }
+    }
+}
+
 /// The layout a tree spells, read as a layout proposal reads: the panel's own parts
 /// as the layout's fields, and an agent's own controls checked and kept in `custom`.
 pub(super) fn layout_from(tree: &Value, present: &[Block]) -> FromTree {
@@ -200,12 +356,28 @@ pub(super) fn layout_from(tree: &Value, present: &[Block]) -> FromTree {
             .push("panel is the tree get_hud returns as panel, an object.".into());
         return found;
     };
+    let mut reader = Reader {
+        present,
+        layout: Map::new(),
+        sections: vec![],
+        hidden_sections: vec![],
+        custom: Map::new(),
+        order: vec![],
+        blocks: Map::new(),
+        seen_blocks: false,
+        check: Check::default(),
+        issues: vec![],
+    };
     // The panel's own ids are taken before any control of an agent's is read.
-    let mut check = Check::default();
-    check.ids.push("panel".into());
-    check.ids.extend(SECTIONS.iter().map(|s| (*s).to_owned()));
-    check.ids.extend(present.iter().map(|b| b.key.clone()));
-    let mut layout = Map::new();
+    reader.check.ids.push("panel".into());
+    reader
+        .check
+        .ids
+        .extend(SECTIONS.iter().map(|s| (*s).to_owned()));
+    reader
+        .check
+        .ids
+        .extend(present.iter().map(|b| b.key.clone()));
     let mut style = Map::new();
     for (key, value) in root {
         match key.as_str() {
@@ -214,108 +386,83 @@ pub(super) fn layout_from(tree: &Value, present: &[Block]) -> FromTree {
                 style.insert(key.clone(), value.clone());
             }
             "countdown" => {
-                layout.insert("countdown".into(), value.clone());
+                reader.layout.insert("countdown".into(), value.clone());
             }
-            _ => found.issues.push(format!(
+            _ => reader.issues.push(format!(
                 "panel has no field \"{key}\"; it takes spacing, separators, width, countdown and children."
             )),
         }
     }
     if !root.get("type").is_none_or(|t| t == "panel") {
-        found
+        reader
             .issues
             .push("panel is the tree's root, of type \"panel\".".into());
     }
     if !style.is_empty() {
-        layout.insert("style".into(), Value::Object(style));
+        reader.layout.insert("style".into(), Value::Object(style));
     }
     let Some(children) = root.get("children").and_then(Value::as_array) else {
+        found.issues = reader.issues;
         found.issues.push(
             "panel.children is the list of the panel's sections and your own controls.".into(),
         );
         return found;
     };
-    let mut sections: Vec<String> = vec![];
-    let mut hidden_sections: Vec<String> = vec![];
-    let mut custom = Map::new();
-    let mut order: Vec<String> = vec![];
-    let mut blocks = Map::new();
-    let mut seen_blocks = false;
     for (index, child) in children.iter().enumerate() {
         let path = format!("panel.children[{index}]");
-        let id = child["id"].as_str().unwrap_or("");
-        let section = SECTIONS
-            .iter()
-            .find(|s| **s == id || (id.is_empty() && kind_of(child) == **s));
-        if let Some(section) = section {
-            if sections.iter().any(|s| s == section) {
-                found
-                    .issues
-                    .push(format!("{path}: the panel has one \"{section}\" section."));
-                continue;
-            }
-            sections.push((*section).to_owned());
-            if child["hidden"] == true {
-                hidden_sections.push((*section).to_owned());
-            }
-            match *section {
-                "blocks" => {
-                    seen_blocks = true;
-                    read_blocks(
-                        child,
-                        present,
-                        &mut order,
-                        &mut blocks,
-                        &mut custom,
-                        &mut check,
-                        &mut found.issues,
-                    );
-                }
-                other => {
-                    let mut fields = Map::new();
-                    for (key, value) in child.as_object().into_iter().flatten() {
-                        if !["id", "type", "hidden"].contains(&key.as_str()) {
-                            fields.insert(key.clone(), value.clone());
-                        }
-                    }
-                    if !fields.is_empty() {
-                        layout.insert(other.into(), Value::Object(fields));
-                    }
-                }
-            }
+        if let Some(section) = section_of(child) {
+            reader.section(section, child, &path, false);
             continue;
         }
         if OWN.contains(&kind_of(child)) {
-            found.issues.push(format!(
+            reader.issues.push(format!(
                 "{path}: a \"{}\" node belongs {}; the panel's children are the sections blocks, tokens and sessions, and your own controls.",
                 kind_of(child),
                 if matches!(kind_of(child), "quota" | "balance") { "inside blocks" } else { "only once, as the root" }
             ));
             continue;
         }
-        if let Some((id, node)) = check.root(child, &path, false) {
-            sections.push(id.clone());
-            custom.insert(id, node);
+        let mut child = child.clone();
+        let named = child["id"]
+            .as_str()
+            .filter(|id| !id.is_empty())
+            .map_or(path.clone(), str::to_owned);
+        reader.lift(&mut child, &named);
+        if let Some((id, node)) = reader.check.root(&child, &path, false) {
+            reader.sections.push(id.clone());
+            reader.custom.insert(id, node);
         }
     }
     for section in SECTIONS {
-        if !sections.iter().any(|s| s == section) {
-            found.issues.push(format!(
+        if !reader.sections.iter().any(|s| s == section) {
+            reader.issues.push(format!(
                 "panel.children has no \"{section}\" section. The panel always has blocks, tokens and sessions: hide one with hidden: true."
             ));
         }
     }
-    if seen_blocks {
+    if reader.seen_blocks {
         for block in present {
-            if !order.contains(&block.key) {
-                found.issues.push(format!(
+            if !reader.order.contains(&block.key) {
+                reader.issues.push(format!(
                     "blocks.children has no \"{}\". Every agent's block stays in the panel: hide it with hidden: true.",
                     block.key
                 ));
             }
         }
     }
-    found.issues.extend(check.issues);
+    let Reader {
+        mut layout,
+        sections,
+        hidden_sections,
+        custom,
+        order,
+        blocks,
+        check,
+        mut issues,
+        ..
+    } = reader;
+    issues.extend(check.issues);
+    found.issues = issues;
     layout.insert("sections".into(), json!(sections));
     if !hidden_sections.is_empty() {
         layout.insert("hiddenSections".into(), json!(hidden_sections));

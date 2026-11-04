@@ -6,6 +6,7 @@ import type { Snapshot } from "@agent-hud/protocol";
 import {
   collections,
   fill,
+  heldSections,
   holds,
   initialState,
   nextOption,
@@ -247,4 +248,22 @@ test("a reset reads as the panel's rows write it", () => {
   );
   assert.equal(read("2026-11-04T10:00:30Z"), "<1m");
   assert.equal(read("2026-11-04T09:00:00Z"), "Pending update");
+});
+
+test("a row, column or grid holds sections, a repeat does not", () => {
+  assert.deepEqual(
+    heldSections({
+      type: "row",
+      children: [
+        { type: "blocks" },
+        {
+          type: "column",
+          children: [{ type: "text" }, { type: "sessions" }],
+        },
+        { type: "repeat", children: [{ type: "tokens" }] },
+      ],
+    }),
+    ["blocks", "sessions"],
+  );
+  assert.deepEqual(heldSections({ type: "text" }), []);
 });

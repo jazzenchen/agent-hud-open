@@ -127,6 +127,9 @@ impl Check {
             return None;
         }
         let kind = fields.get("type").and_then(Value::as_str).unwrap_or("");
+        if SECTIONS.contains(&kind) && !root {
+            return self.slot(fields, kind, path, scope, in_blocks);
+        }
         if !CONTROLS.contains(&kind) {
             let why = if kind.is_empty() {
                 "has no type".to_owned()
@@ -189,6 +192,7 @@ impl Check {
                 "onClick" => self.action(value, &at, &scope),
                 "hidden" => self.boolean(value, &at),
                 "span" if root && in_blocks => self.named(value, &at, SPANS),
+                "width" => self.number_in(value, &at, CONTROL_WIDTHS.0, CONTROL_WIDTHS.1),
                 "state" if root => true,
                 "children" if PARENTS.contains(&kind) => {
                     let Some(children) = value.as_array() else {
@@ -243,6 +247,35 @@ impl Check {
         Some(Value::Object(out))
     }
 
+    /// One of the panel's own sections inside a control of yours: lifted out of a row,
+    /// column or grid placed in the panel (`tree::layout_from`), it stays as a slot that
+    /// keeps only its width. Among the blocks or inside a repeat it has no place.
+    fn slot(
+        &mut self,
+        fields: &Map<String, Value>,
+        kind: &str,
+        path: &str,
+        scope: &Scope,
+        in_blocks: bool,
+    ) -> Option<Value> {
+        if in_blocks || !scope.items.is_empty() {
+            self.issues.push(format!(
+                "{path}: the \"{kind}\" section goes in the panel, or in a row, column or grid of yours placed in the panel; not among the blocks or inside a repeat."
+            ));
+            return None;
+        }
+        let mut out = Map::new();
+        out.insert("id".into(), json!(kind));
+        out.insert("type".into(), json!(kind));
+        if let Some(width) = fields.get("width").filter(|w| !w.is_null()) {
+            let at = format!("{path}.width");
+            if self.number_in(width, &at, CONTROL_WIDTHS.0, CONTROL_WIDTHS.1) {
+                out.insert("width".into(), width.clone());
+            }
+        }
+        Some(Value::Object(out))
+    }
+
     fn named(&mut self, value: &Value, at: &str, allowed: &[&str]) -> bool {
         if value.as_str().is_some_and(|s| allowed.contains(&s)) {
             return true;
@@ -274,6 +307,7 @@ impl Check {
         match (kind, key) {
             ("row" | "column", "gap") | ("grid", "gap") => self.named(value, at, GAPS),
             ("row" | "column", "align") => self.named(value, at, ALIGNS),
+            ("row", "valign") => self.named(value, at, VALIGNS),
             ("grid", "columns") => self.number_in(value, at, 2, 6),
             ("repeat", "over") => true,
             ("repeat", "where") => self.filter(value, at, scope, collection_of(scope)),
