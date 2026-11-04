@@ -1,4 +1,5 @@
 //! Native HUD drag pickup, movement preview, rollback, and drop snapping.
+use std::sync::PoisonError;
 use tauri::Emitter;
 
 use super::{
@@ -66,10 +67,7 @@ pub async fn hud_drag_start(
         );
     }
     tauri::async_runtime::spawn_blocking(move || {
-        let mut state = shared
-            .state
-            .lock()
-            .map_err(|_| "HUD input owner is unavailable")?;
+        let mut state = shared.state.lock().unwrap_or_else(PoisonError::into_inner);
         shared.ensure_connected()?;
         if state.drag.is_some() {
             return Err("A HUD drag is already active".into());
