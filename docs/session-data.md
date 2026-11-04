@@ -35,6 +35,15 @@ authoritative event exists. Scope membership, ordering and non-running day
 groups use this time. Raw checkpoint timestamps remain separate for ingestion
 and duplicate resolution; this presentation rule does not change token accounting.
 
+A session's `client` is the client that drives it, as its log names it
+("Codex Desktop", "Claude Code IDE extension"). Devin CLI and Devin Desktop's
+Devin Local write one store, `~/.local/share/devin/cli/sessions.db`, which
+names no client: each call there is read once, and a Devin session's `client`
+and `origins` come from its latest verified origin hook ("Devin Desktop",
+`desktop:devin`; "Devin CLI", `cli:iterm`). The ACP `usage_update`
+notifications the desktop app receives carry running totals of the same calls,
+not one record per call, and are not read.
+
 The response has `kind: "sessions"`, `revision`, `generatedAt`, `items`, `total`,
 `nextOffset`, `sources` and `projects`. A changed revision restarts pagination
 at offset zero; clients never combine pages from different revisions.

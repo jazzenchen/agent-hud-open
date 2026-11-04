@@ -53,6 +53,15 @@ impl Presentation<'_> {
             .hooks
             .reports(&source, session["id"].as_str().unwrap_or(""));
         session["origins"] = surfaces::resolve(&source, prompts, client, &reports).json();
+        // A client the log does not name, its latest hook may: Devin CLI or
+        // Devin Desktop, which share one session store.
+        if session["client"].is_null() {
+            if let Some(name) = reports.hook.as_ref().and_then(|report| {
+                agent_hud_agents::naming::clients::reported_client(&source, &report.surface)
+            }) {
+                session["client"] = json!(name);
+            }
+        }
         let claude = session["source"].as_str() == Some("claude");
         let desktop = claude
             .then(|| session["id"].as_str())

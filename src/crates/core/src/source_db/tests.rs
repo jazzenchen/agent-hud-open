@@ -974,3 +974,84 @@ fn goose_calls_come_from_its_ledger_and_its_names_from_its_sessions() {
     assert_eq!(listed["items"][0]["title"], "Tidy the repo");
     assert_eq!(listed["items"][0]["model"], "claude-sonnet-4-5");
 }
+
+#[test]
+fn devin_sessions_take_their_client_from_the_hooks_and_count_once() {
+    // Devin Desktop's Devin Local is the Devin CLI over ACP: both write this
+    // one store, and only a session's hook origin says which drove it.
+    let root = tempfile::tempdir().unwrap();
+    let now = chrono::Utc::now();
+    let store = root.path().join("sessions.db");
+    let db = Connection::open(&store).unwrap();
+    db.execute_batch(
+        "CREATE TABLE sessions(id TEXT PRIMARY KEY,working_directory TEXT NOT NULL,backend_type TEXT NOT NULL,model TEXT NOT NULL,agent_mode TEXT NOT NULL,created_at INTEGER NOT NULL,last_activity_at INTEGER NOT NULL,title TEXT,hidden INTEGER NOT NULL DEFAULT 0);
+         CREATE TABLE message_nodes(row_id INTEGER PRIMARY KEY AUTOINCREMENT,session_id TEXT NOT NULL,node_id INTEGER NOT NULL,parent_node_id INTEGER,chat_message TEXT NOT NULL,created_at INTEGER NOT NULL);",
+    )
+    .unwrap();
+    let at = now.timestamp();
+    for (id, title) in [
+        ("d1", "Desktop task"),
+        ("c1", "Terminal task"),
+        ("q1", "No hooks"),
+    ] {
+        db.execute(
+            "INSERT INTO sessions VALUES(?1,'/repo','windsurf','swe-1.6','normal',?2,?2,?3,0)",
+            params![id, at, title],
+        )
+        .unwrap();
+        db.execute(
+            "INSERT INTO message_nodes(session_id,node_id,chat_message,created_at) VALUES(?1,1,?2,?3)",
+            params![
+                id,
+                json!({"role":"assistant","message_id":format!("m-{id}"),"metadata":{"request_id":format!("r-{id}"),"generation_model":"swe-1.6","created_at":now.to_rfc3339(),"metrics":{"input_tokens":100,"output_tokens":20}}}).to_string(),
+                at
+            ],
+        )
+        .unwrap();
+    }
+    drop(db);
+    let mut backend = AgentHudCore::new(
+        vec![SourceRoot {
+            path: store,
+            provider: "devin",
+        }],
+        root.path().join("hud"),
+    );
+    let origin = |id: &str, host: &str, surface: &str| agent_hud_agents::HookEvent {
+        source: "devin".into(),
+        session_id: format!("devin:{id}"),
+        at_ms: now.timestamp_millis() - 5_000,
+        kind: "origin".into(),
+        data: json!({"hostVerified":true,"host":host,"navigationTarget":null,"surface":surface}),
+    };
+    backend.ingest_hook_events(vec![
+        origin("d1", "desktop", "desktop:devin"),
+        origin("c1", "cli", "cli:iterm"),
+    ]);
+    // Each call once, whichever client drove it.
+    assert_eq!(refresh(&mut backend)["totals"]["total"], 3 * 120);
+    let sessions = backend.request("sessions", json!({"scope":"all"})).unwrap();
+    let listed = |id: &str| {
+        sessions["items"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|s| s["id"] == format!("devin:{id}"))
+            .cloned()
+            .unwrap()
+    };
+    let desktop = listed("d1");
+    assert_eq!(desktop["client"], "Devin Desktop");
+    assert_eq!(
+        desktop["origins"],
+        json!({"init":"desktop:devin","latest":"desktop:devin"})
+    );
+    assert_eq!(desktop["tokens"], 120);
+    let cli = listed("c1");
+    assert_eq!(cli["client"], "Devin CLI");
+    assert_eq!(cli["origins"]["latest"], "cli:iterm");
+    // With hooks off nothing tells the two apart: the agent's own name.
+    let unknown = listed("q1");
+    assert!(unknown["client"].is_null(), "{unknown}");
+    assert_eq!(unknown["origins"]["latest"], "others:devin");
+}

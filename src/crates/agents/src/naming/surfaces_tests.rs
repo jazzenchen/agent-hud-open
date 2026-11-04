@@ -243,6 +243,30 @@ fn a_client_without_clients_of_its_own_is_its_one_interface() {
 }
 
 #[test]
+fn a_log_naming_neither_prompts_nor_client_is_named_by_its_hooks() {
+    // Devin's store is the CLI's and Devin Desktop's alike.
+    let reports = Reports {
+        first_hook: report("desktop:devin", T),
+        hook: report("cli:iterm", T + 5),
+        ..Reports::default()
+    };
+    assert_eq!(
+        origins(resolve("devin", &PromptStamps::default(), None, &reports)),
+        (Some("desktop:devin".into()), Some("cli:iterm".into()))
+    );
+    // A client the log names still decides.
+    assert_eq!(
+        origins(resolve(
+            "claude",
+            &PromptStamps::default(),
+            Some("claude-desktop"),
+            &reports
+        )),
+        (Some("desktop:claude".into()), Some("desktop:claude".into()))
+    );
+}
+
+#[test]
 fn hook_records_carry_their_first_surface() {
     let data = json!({"surface":"cli:ghostty","first":{"surface":"cli:iterm","at":T}});
     assert_eq!(

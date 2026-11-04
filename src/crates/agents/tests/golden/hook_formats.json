@@ -3522,7 +3522,13 @@
       "source": "devin"
     },
     "output": {
-      "error": "This client does not support the requested hook"
+      "events": [
+        "SessionStart",
+        "UserPromptSubmit"
+      ],
+      "flag": "--session-origin-hook",
+      "relativePath": ".config/devin/config.json",
+      "source": "devin"
     }
   },
   "configuration/devin/--unknown-hook": {
@@ -7721,7 +7727,14 @@
       "source": "devin"
     },
     "output": {
-      "error": "This client does not support the requested hook"
+      "atMs": 1760000000000,
+      "data": {
+        "cwd": "/Users/me/project",
+        "eventName": "SessionStart"
+      },
+      "kind": "origin",
+      "sessionId": "devin:sess-1",
+      "source": "devin"
     }
   },
   "event/matrix/devin/--unknown-hook": {
@@ -16336,6 +16349,490 @@
                 }
               ],
               "matcher": "Edit|Write"
+            }
+          ]
+        },
+        "model": "opus",
+        "permissions": {
+          "allow": [
+            "Bash(npm test)"
+          ],
+          "deny": []
+        },
+        "statusLine": {
+          "command": "~/.claude/statusline.sh",
+          "type": "command"
+        }
+      },
+      "removeAgainChanges": false,
+      "removeRestoresStart": true,
+      "removedCommands": []
+    }
+  },
+  "patch-sequence/devin/--session-origin-hook/custom-fields": {
+    "input": {
+      "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+      "flag": "--session-origin-hook",
+      "movedCommand": "'/Users/me/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+      "source": "devin",
+      "start": {
+        "hooks": {
+          "SessionStart": [
+            {
+              "description": "Agent HUD approvals",
+              "hooks": [
+                {
+                  "async": false,
+                  "command": "'/Volumes/Agent HUD/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+                  "env": {
+                    "AGENT_HUD_LOG": "1"
+                  },
+                  "statusMessage": "Waiting for Agent HUD",
+                  "timeout": 42,
+                  "type": "command"
+                }
+              ],
+              "matcher": "Edit|Write"
+            }
+          ]
+        }
+      },
+      "steps": [
+        "install",
+        "install again",
+        "install moved",
+        "remove",
+        "remove again"
+      ]
+    },
+    "output": {
+      "install": {
+        "hooks": {
+          "SessionStart": [
+            {
+              "description": "Agent HUD approvals",
+              "hooks": [
+                {
+                  "async": true,
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+                  "env": {
+                    "AGENT_HUD_LOG": "1"
+                  },
+                  "statusMessage": "Waiting for Agent HUD",
+                  "timeout": 42,
+                  "type": "command"
+                }
+              ],
+              "matcher": "Edit|Write"
+            }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "async": true,
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+                  "timeout": 5,
+                  "type": "command"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "installedCommands": [
+        "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+        "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin"
+      ],
+      "move": {
+        "hooks": {
+          "SessionStart": [
+            {
+              "description": "Agent HUD approvals",
+              "hooks": [
+                {
+                  "async": true,
+                  "command": "'/Users/me/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+                  "env": {
+                    "AGENT_HUD_LOG": "1"
+                  },
+                  "statusMessage": "Waiting for Agent HUD",
+                  "timeout": 42,
+                  "type": "command"
+                }
+              ],
+              "matcher": "Edit|Write"
+            }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "async": true,
+                  "command": "'/Users/me/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+                  "timeout": 5,
+                  "type": "command"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "movedCommands": [
+        "'/Users/me/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+        "'/Users/me/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin"
+      ],
+      "reinstallChanges": false,
+      "remove": {
+        "hooks": {}
+      },
+      "removeAgainChanges": false,
+      "removeRestoresStart": false,
+      "removedCommands": []
+    }
+  },
+  "patch-sequence/devin/--session-origin-hook/empty": {
+    "input": {
+      "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+      "flag": "--session-origin-hook",
+      "movedCommand": "'/Users/me/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+      "source": "devin",
+      "start": {},
+      "steps": [
+        "install",
+        "install again",
+        "install moved",
+        "remove",
+        "remove again"
+      ]
+    },
+    "output": {
+      "install": {
+        "hooks": {
+          "SessionStart": [
+            {
+              "hooks": [
+                {
+                  "async": true,
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+                  "timeout": 5,
+                  "type": "command"
+                }
+              ]
+            }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "async": true,
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+                  "timeout": 5,
+                  "type": "command"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "installedCommands": [
+        "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+        "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin"
+      ],
+      "move": {
+        "hooks": {
+          "SessionStart": [
+            {
+              "hooks": [
+                {
+                  "async": true,
+                  "command": "'/Users/me/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+                  "timeout": 5,
+                  "type": "command"
+                }
+              ]
+            }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "async": true,
+                  "command": "'/Users/me/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+                  "timeout": 5,
+                  "type": "command"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "movedCommands": [
+        "'/Users/me/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+        "'/Users/me/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin"
+      ],
+      "reinstallChanges": false,
+      "remove": {
+        "hooks": {}
+      },
+      "removeAgainChanges": false,
+      "removeRestoresStart": false,
+      "removedCommands": []
+    }
+  },
+  "patch-sequence/devin/--session-origin-hook/foreign-handlers": {
+    "input": {
+      "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+      "flag": "--session-origin-hook",
+      "movedCommand": "'/Users/me/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+      "source": "devin",
+      "start": {
+        "hooks": {
+          "PostToolUse": [
+            {
+              "hooks": [
+                {
+                  "command": "prettier --write .",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ],
+              "matcher": "Edit|Write"
+            }
+          ],
+          "SessionStart": [
+            {
+              "hooks": [
+                {
+                  "command": "/usr/local/bin/audit-log --event SessionStart",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ],
+              "matcher": "Bash"
+            }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "command": "/usr/local/bin/audit-log --event UserPromptSubmit",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ],
+              "matcher": "Bash"
+            }
+          ]
+        },
+        "model": "opus",
+        "permissions": {
+          "allow": [
+            "Bash(npm test)"
+          ],
+          "deny": []
+        },
+        "statusLine": {
+          "command": "~/.claude/statusline.sh",
+          "type": "command"
+        }
+      },
+      "steps": [
+        "install",
+        "install again",
+        "install moved",
+        "remove",
+        "remove again"
+      ]
+    },
+    "output": {
+      "install": {
+        "hooks": {
+          "PostToolUse": [
+            {
+              "hooks": [
+                {
+                  "command": "prettier --write .",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ],
+              "matcher": "Edit|Write"
+            }
+          ],
+          "SessionStart": [
+            {
+              "hooks": [
+                {
+                  "command": "/usr/local/bin/audit-log --event SessionStart",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ],
+              "matcher": "Bash"
+            },
+            {
+              "hooks": [
+                {
+                  "async": true,
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+                  "timeout": 5,
+                  "type": "command"
+                }
+              ]
+            }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "command": "/usr/local/bin/audit-log --event UserPromptSubmit",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ],
+              "matcher": "Bash"
+            },
+            {
+              "hooks": [
+                {
+                  "async": true,
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+                  "timeout": 5,
+                  "type": "command"
+                }
+              ]
+            }
+          ]
+        },
+        "model": "opus",
+        "permissions": {
+          "allow": [
+            "Bash(npm test)"
+          ],
+          "deny": []
+        },
+        "statusLine": {
+          "command": "~/.claude/statusline.sh",
+          "type": "command"
+        }
+      },
+      "installedCommands": [
+        "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+        "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin"
+      ],
+      "move": {
+        "hooks": {
+          "PostToolUse": [
+            {
+              "hooks": [
+                {
+                  "command": "prettier --write .",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ],
+              "matcher": "Edit|Write"
+            }
+          ],
+          "SessionStart": [
+            {
+              "hooks": [
+                {
+                  "command": "/usr/local/bin/audit-log --event SessionStart",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ],
+              "matcher": "Bash"
+            },
+            {
+              "hooks": [
+                {
+                  "async": true,
+                  "command": "'/Users/me/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+                  "timeout": 5,
+                  "type": "command"
+                }
+              ]
+            }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "command": "/usr/local/bin/audit-log --event UserPromptSubmit",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ],
+              "matcher": "Bash"
+            },
+            {
+              "hooks": [
+                {
+                  "async": true,
+                  "command": "'/Users/me/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+                  "timeout": 5,
+                  "type": "command"
+                }
+              ]
+            }
+          ]
+        },
+        "model": "opus",
+        "permissions": {
+          "allow": [
+            "Bash(npm test)"
+          ],
+          "deny": []
+        },
+        "statusLine": {
+          "command": "~/.claude/statusline.sh",
+          "type": "command"
+        }
+      },
+      "movedCommands": [
+        "'/Users/me/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+        "'/Users/me/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin"
+      ],
+      "reinstallChanges": false,
+      "remove": {
+        "hooks": {
+          "PostToolUse": [
+            {
+              "hooks": [
+                {
+                  "command": "prettier --write .",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ],
+              "matcher": "Edit|Write"
+            }
+          ],
+          "SessionStart": [
+            {
+              "hooks": [
+                {
+                  "command": "/usr/local/bin/audit-log --event SessionStart",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ],
+              "matcher": "Bash"
+            }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "command": "/usr/local/bin/audit-log --event UserPromptSubmit",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ],
+              "matcher": "Bash"
             }
           ]
         },
@@ -40762,11 +41259,33 @@
               "matcher": ""
             }
           ],
+          "SessionStart": [
+            {
+              "hooks": [
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ]
+            }
+          ],
           "Stop": [
             {
               "hooks": [
                 {
                   "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook devin",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ]
+            }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
                   "timeout": 600,
                   "type": "command"
                 }
@@ -40807,11 +41326,33 @@
               "matcher": ""
             }
           ],
+          "SessionStart": [
+            {
+              "hooks": [
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ]
+            }
+          ],
           "Stop": [
             {
               "hooks": [
                 {
                   "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook devin",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ]
+            }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
                   "timeout": 600,
                   "type": "command"
                 }
@@ -40843,6 +41384,28 @@
                 }
               ],
               "matcher": ""
+            }
+          ],
+          "SessionStart": [
+            {
+              "hooks": [
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ]
+            }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ]
             }
           ]
         },
@@ -42071,11 +42634,33 @@
               "matcher": ""
             }
           ],
+          "SessionStart": [
+            {
+              "hooks": [
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ]
+            }
+          ],
           "Stop": [
             {
               "hooks": [
                 {
                   "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook devin",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ]
+            }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
                   "timeout": 600,
                   "type": "command"
                 }
@@ -42116,11 +42701,33 @@
               "matcher": ""
             }
           ],
+          "SessionStart": [
+            {
+              "hooks": [
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ]
+            }
+          ],
           "Stop": [
             {
               "hooks": [
                 {
                   "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook devin",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ]
+            }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
                   "timeout": 600,
                   "type": "command"
                 }
@@ -42142,11 +42749,33 @@
       },
       "remove": {
         "hooks": {
+          "SessionStart": [
+            {
+              "hooks": [
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ]
+            }
+          ],
           "Stop": [
             {
               "hooks": [
                 {
                   "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook devin",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ]
+            }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
                   "timeout": 600,
                   "type": "command"
                 }
@@ -43015,6 +43644,1872 @@
                 }
               ],
               "matcher": ""
+            }
+          ]
+        },
+        "model": "opus",
+        "permissions": {
+          "allow": [
+            "Bash(npm test)"
+          ],
+          "deny": []
+        },
+        "statusLine": {
+          "command": "~/.claude/statusline.sh",
+          "type": "command"
+        }
+      },
+      "remove": {
+        "model": "opus",
+        "permissions": {
+          "allow": [
+            "Bash(npm test)"
+          ],
+          "deny": []
+        },
+        "statusLine": {
+          "command": "~/.claude/statusline.sh",
+          "type": "command"
+        }
+      }
+    }
+  },
+  "patch/devin/--session-origin-hook/custom-fields": {
+    "input": {
+      "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+      "current": {
+        "hooks": {
+          "SessionStart": [
+            {
+              "description": "Agent HUD approvals",
+              "hooks": [
+                {
+                  "async": false,
+                  "command": "'/Volumes/Agent HUD/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+                  "env": {
+                    "AGENT_HUD_LOG": "1"
+                  },
+                  "statusMessage": "Waiting for Agent HUD",
+                  "timeout": 42,
+                  "type": "command"
+                }
+              ],
+              "matcher": "Edit|Write"
+            }
+          ]
+        }
+      },
+      "flag": "--session-origin-hook",
+      "source": "devin"
+    },
+    "output": {
+      "hookCommands": [
+        "'/Volumes/Agent HUD/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin"
+      ],
+      "install": {
+        "hooks": {
+          "SessionStart": [
+            {
+              "description": "Agent HUD approvals",
+              "hooks": [
+                {
+                  "async": true,
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+                  "env": {
+                    "AGENT_HUD_LOG": "1"
+                  },
+                  "statusMessage": "Waiting for Agent HUD",
+                  "timeout": 42,
+                  "type": "command"
+                }
+              ],
+              "matcher": "Edit|Write"
+            }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "async": true,
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+                  "timeout": 5,
+                  "type": "command"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "remove": {
+        "hooks": {}
+      }
+    }
+  },
+  "patch/devin/--session-origin-hook/duplicates": {
+    "input": {
+      "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+      "current": {
+        "hooks": {
+          "SessionStart": [
+            {
+              "hooks": [
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            },
+            {
+              "hooks": [
+                {
+                  "command": "'/Volumes/Agent HUD/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+                  "timeout": 600,
+                  "type": "command"
+                },
+                {
+                  "command": "/usr/local/bin/audit-log",
+                  "timeout": 600,
+                  "type": "command"
+                },
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ],
+              "matcher": "Bash"
+            },
+            {
+              "hooks": [
+                {
+                  "command": "'/Volumes/Agent HUD/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "flag": "--session-origin-hook",
+      "source": "devin"
+    },
+    "output": {
+      "hookCommands": [
+        "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+        "'/Volumes/Agent HUD/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+        "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+        "'/Volumes/Agent HUD/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin"
+      ],
+      "install": {
+        "hooks": {
+          "SessionStart": [
+            {
+              "hooks": [
+                {
+                  "async": true,
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            },
+            {
+              "hooks": [
+                {
+                  "command": "/usr/local/bin/audit-log",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ],
+              "matcher": "Bash"
+            }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "async": true,
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+                  "timeout": 5,
+                  "type": "command"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "remove": {
+        "hooks": {
+          "SessionStart": [
+            {
+              "hooks": [
+                {
+                  "command": "/usr/local/bin/audit-log",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ],
+              "matcher": "Bash"
+            }
+          ]
+        }
+      }
+    }
+  },
+  "patch/devin/--session-origin-hook/empty": {
+    "input": {
+      "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+      "current": {},
+      "flag": "--session-origin-hook",
+      "source": "devin"
+    },
+    "output": {
+      "hookCommands": [],
+      "install": {
+        "hooks": {
+          "SessionStart": [
+            {
+              "hooks": [
+                {
+                  "async": true,
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+                  "timeout": 5,
+                  "type": "command"
+                }
+              ]
+            }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "async": true,
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+                  "timeout": 5,
+                  "type": "command"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "remove": {}
+    }
+  },
+  "patch/devin/--session-origin-hook/empty-event-arrays": {
+    "input": {
+      "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+      "current": {
+        "hooks": {
+          "SessionStart": [],
+          "UserPromptSubmit": []
+        }
+      },
+      "flag": "--session-origin-hook",
+      "source": "devin"
+    },
+    "output": {
+      "hookCommands": [],
+      "install": {
+        "hooks": {
+          "SessionStart": [
+            {
+              "hooks": [
+                {
+                  "async": true,
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+                  "timeout": 5,
+                  "type": "command"
+                }
+              ]
+            }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "async": true,
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+                  "timeout": 5,
+                  "type": "command"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "remove": {
+        "hooks": {}
+      }
+    }
+  },
+  "patch/devin/--session-origin-hook/empty-hooks": {
+    "input": {
+      "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+      "current": {
+        "hooks": {}
+      },
+      "flag": "--session-origin-hook",
+      "source": "devin"
+    },
+    "output": {
+      "hookCommands": [],
+      "install": {
+        "hooks": {
+          "SessionStart": [
+            {
+              "hooks": [
+                {
+                  "async": true,
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+                  "timeout": 5,
+                  "type": "command"
+                }
+              ]
+            }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "async": true,
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+                  "timeout": 5,
+                  "type": "command"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "remove": {
+        "hooks": {}
+      }
+    }
+  },
+  "patch/devin/--session-origin-hook/event-null": {
+    "input": {
+      "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+      "current": {
+        "hooks": {
+          "SessionStart": null
+        }
+      },
+      "flag": "--session-origin-hook",
+      "source": "devin"
+    },
+    "output": {
+      "hookCommands": {
+        "error": "Unrecognized hook event layout"
+      },
+      "install": {
+        "error": "Unrecognized hook event layout"
+      },
+      "remove": {
+        "error": "Unrecognized hook event layout"
+      }
+    }
+  },
+  "patch/devin/--session-origin-hook/event-object": {
+    "input": {
+      "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+      "current": {
+        "hooks": {
+          "SessionStart": {
+            "hooks": []
+          }
+        }
+      },
+      "flag": "--session-origin-hook",
+      "source": "devin"
+    },
+    "output": {
+      "hookCommands": {
+        "error": "Unrecognized hook event layout"
+      },
+      "install": {
+        "error": "Unrecognized hook event layout"
+      },
+      "remove": {
+        "error": "Unrecognized hook event layout"
+      }
+    }
+  },
+  "patch/devin/--session-origin-hook/event-string": {
+    "input": {
+      "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+      "current": {
+        "hooks": {
+          "SessionStart": "agent-hud"
+        }
+      },
+      "flag": "--session-origin-hook",
+      "source": "devin"
+    },
+    "output": {
+      "hookCommands": {
+        "error": "Unrecognized hook event layout"
+      },
+      "install": {
+        "error": "Unrecognized hook event layout"
+      },
+      "remove": {
+        "error": "Unrecognized hook event layout"
+      }
+    }
+  },
+  "patch/devin/--session-origin-hook/every-agent-hud-hook": {
+    "input": {
+      "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+      "current": {
+        "hooks": {
+          "PermissionRequest": [
+            {
+              "hooks": [
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook devin",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
+          ],
+          "SessionStart": [
+            {
+              "hooks": [
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ]
+            }
+          ],
+          "Stop": [
+            {
+              "hooks": [
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook devin",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ]
+            }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ]
+            }
+          ]
+        },
+        "model": "opus",
+        "permissions": {
+          "allow": [
+            "Bash(npm test)"
+          ],
+          "deny": []
+        },
+        "statusLine": {
+          "command": "~/.claude/statusline.sh",
+          "type": "command"
+        }
+      },
+      "flag": "--session-origin-hook",
+      "source": "devin"
+    },
+    "output": {
+      "hookCommands": [
+        "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+        "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin"
+      ],
+      "install": {
+        "hooks": {
+          "PermissionRequest": [
+            {
+              "hooks": [
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook devin",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
+          ],
+          "SessionStart": [
+            {
+              "hooks": [
+                {
+                  "async": true,
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ]
+            }
+          ],
+          "Stop": [
+            {
+              "hooks": [
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook devin",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ]
+            }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "async": true,
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ]
+            }
+          ]
+        },
+        "model": "opus",
+        "permissions": {
+          "allow": [
+            "Bash(npm test)"
+          ],
+          "deny": []
+        },
+        "statusLine": {
+          "command": "~/.claude/statusline.sh",
+          "type": "command"
+        }
+      },
+      "remove": {
+        "hooks": {
+          "PermissionRequest": [
+            {
+              "hooks": [
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook devin",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
+          ],
+          "Stop": [
+            {
+              "hooks": [
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook devin",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ]
+            }
+          ]
+        },
+        "model": "opus",
+        "permissions": {
+          "allow": [
+            "Bash(npm test)"
+          ],
+          "deny": []
+        },
+        "statusLine": {
+          "command": "~/.claude/statusline.sh",
+          "type": "command"
+        }
+      }
+    }
+  },
+  "patch/devin/--session-origin-hook/foreign-handlers": {
+    "input": {
+      "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+      "current": {
+        "hooks": {
+          "PostToolUse": [
+            {
+              "hooks": [
+                {
+                  "command": "prettier --write .",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ],
+              "matcher": "Edit|Write"
+            }
+          ],
+          "SessionStart": [
+            {
+              "hooks": [
+                {
+                  "command": "/usr/local/bin/audit-log --event SessionStart",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ],
+              "matcher": "Bash"
+            }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "command": "/usr/local/bin/audit-log --event UserPromptSubmit",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ],
+              "matcher": "Bash"
+            }
+          ]
+        },
+        "model": "opus",
+        "permissions": {
+          "allow": [
+            "Bash(npm test)"
+          ],
+          "deny": []
+        },
+        "statusLine": {
+          "command": "~/.claude/statusline.sh",
+          "type": "command"
+        }
+      },
+      "flag": "--session-origin-hook",
+      "source": "devin"
+    },
+    "output": {
+      "hookCommands": [],
+      "install": {
+        "hooks": {
+          "PostToolUse": [
+            {
+              "hooks": [
+                {
+                  "command": "prettier --write .",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ],
+              "matcher": "Edit|Write"
+            }
+          ],
+          "SessionStart": [
+            {
+              "hooks": [
+                {
+                  "command": "/usr/local/bin/audit-log --event SessionStart",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ],
+              "matcher": "Bash"
+            },
+            {
+              "hooks": [
+                {
+                  "async": true,
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+                  "timeout": 5,
+                  "type": "command"
+                }
+              ]
+            }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "command": "/usr/local/bin/audit-log --event UserPromptSubmit",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ],
+              "matcher": "Bash"
+            },
+            {
+              "hooks": [
+                {
+                  "async": true,
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+                  "timeout": 5,
+                  "type": "command"
+                }
+              ]
+            }
+          ]
+        },
+        "model": "opus",
+        "permissions": {
+          "allow": [
+            "Bash(npm test)"
+          ],
+          "deny": []
+        },
+        "statusLine": {
+          "command": "~/.claude/statusline.sh",
+          "type": "command"
+        }
+      },
+      "remove": {
+        "hooks": {
+          "PostToolUse": [
+            {
+              "hooks": [
+                {
+                  "command": "prettier --write .",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ],
+              "matcher": "Edit|Write"
+            }
+          ],
+          "SessionStart": [
+            {
+              "hooks": [
+                {
+                  "command": "/usr/local/bin/audit-log --event SessionStart",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ],
+              "matcher": "Bash"
+            }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "command": "/usr/local/bin/audit-log --event UserPromptSubmit",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ],
+              "matcher": "Bash"
+            }
+          ]
+        },
+        "model": "opus",
+        "permissions": {
+          "allow": [
+            "Bash(npm test)"
+          ],
+          "deny": []
+        },
+        "statusLine": {
+          "command": "~/.claude/statusline.sh",
+          "type": "command"
+        }
+      }
+    }
+  },
+  "patch/devin/--session-origin-hook/hooks-array": {
+    "input": {
+      "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+      "current": {
+        "hooks": []
+      },
+      "flag": "--session-origin-hook",
+      "source": "devin"
+    },
+    "output": {
+      "hookCommands": {
+        "error": "Unrecognized hook configuration layout"
+      },
+      "install": {
+        "error": "Unrecognized hook configuration layout"
+      },
+      "remove": {
+        "error": "Unrecognized hook configuration layout"
+      }
+    }
+  },
+  "patch/devin/--session-origin-hook/hooks-null": {
+    "input": {
+      "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+      "current": {
+        "hooks": null
+      },
+      "flag": "--session-origin-hook",
+      "source": "devin"
+    },
+    "output": {
+      "hookCommands": {
+        "error": "Unrecognized hook configuration layout"
+      },
+      "install": {
+        "error": "Unrecognized hook configuration layout"
+      },
+      "remove": {
+        "error": "Unrecognized hook configuration layout"
+      }
+    }
+  },
+  "patch/devin/--session-origin-hook/hooks-string": {
+    "input": {
+      "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+      "current": {
+        "hooks": "none"
+      },
+      "flag": "--session-origin-hook",
+      "source": "devin"
+    },
+    "output": {
+      "hookCommands": {
+        "error": "Unrecognized hook configuration layout"
+      },
+      "install": {
+        "error": "Unrecognized hook configuration layout"
+      },
+      "remove": {
+        "error": "Unrecognized hook configuration layout"
+      }
+    }
+  },
+  "patch/devin/--session-origin-hook/lookalike-commands": {
+    "input": {
+      "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+      "current": {
+        "hooks": {
+          "SessionStart": [
+            {
+              "hooks": [
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin --verbose",
+                  "timeout": 600,
+                  "type": "command"
+                },
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin-beta",
+                  "timeout": 600,
+                  "type": "command"
+                },
+                {
+                  "command": "my-tool--session-origin-hook devin",
+                  "timeout": 600,
+                  "type": "command"
+                },
+                {
+                  "command": "~/bin/notify.sh --session-origin-hook devin",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin --verbose",
+                  "timeout": 600,
+                  "type": "command"
+                },
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin-beta",
+                  "timeout": 600,
+                  "type": "command"
+                },
+                {
+                  "command": "my-tool--session-origin-hook devin",
+                  "timeout": 600,
+                  "type": "command"
+                },
+                {
+                  "command": "~/bin/notify.sh --session-origin-hook devin",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
+          ]
+        }
+      },
+      "flag": "--session-origin-hook",
+      "source": "devin"
+    },
+    "output": {
+      "hookCommands": [
+        "~/bin/notify.sh --session-origin-hook devin",
+        "~/bin/notify.sh --session-origin-hook devin"
+      ],
+      "install": {
+        "hooks": {
+          "SessionStart": [
+            {
+              "hooks": [
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin --verbose",
+                  "timeout": 600,
+                  "type": "command"
+                },
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin-beta",
+                  "timeout": 600,
+                  "type": "command"
+                },
+                {
+                  "command": "my-tool--session-origin-hook devin",
+                  "timeout": 600,
+                  "type": "command"
+                },
+                {
+                  "async": true,
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin --verbose",
+                  "timeout": 600,
+                  "type": "command"
+                },
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin-beta",
+                  "timeout": 600,
+                  "type": "command"
+                },
+                {
+                  "command": "my-tool--session-origin-hook devin",
+                  "timeout": 600,
+                  "type": "command"
+                },
+                {
+                  "async": true,
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
+          ]
+        }
+      },
+      "remove": {
+        "hooks": {
+          "SessionStart": [
+            {
+              "hooks": [
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin --verbose",
+                  "timeout": 600,
+                  "type": "command"
+                },
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin-beta",
+                  "timeout": 600,
+                  "type": "command"
+                },
+                {
+                  "command": "my-tool--session-origin-hook devin",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin --verbose",
+                  "timeout": 600,
+                  "type": "command"
+                },
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin-beta",
+                  "timeout": 600,
+                  "type": "command"
+                },
+                {
+                  "command": "my-tool--session-origin-hook devin",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
+          ]
+        }
+      }
+    }
+  },
+  "patch/devin/--session-origin-hook/mixed-group": {
+    "input": {
+      "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+      "current": {
+        "hooks": {
+          "SessionStart": [
+            {
+              "hooks": [
+                {
+                  "command": "/usr/local/bin/audit-log",
+                  "timeout": 600,
+                  "type": "command"
+                },
+                {
+                  "command": "'/Volumes/Agent HUD/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+                  "timeout": 600,
+                  "type": "command"
+                },
+                {
+                  "command": "osascript -e 'beep'",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
+          ]
+        }
+      },
+      "flag": "--session-origin-hook",
+      "source": "devin"
+    },
+    "output": {
+      "hookCommands": [
+        "'/Volumes/Agent HUD/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin"
+      ],
+      "install": {
+        "hooks": {
+          "SessionStart": [
+            {
+              "hooks": [
+                {
+                  "command": "/usr/local/bin/audit-log",
+                  "timeout": 600,
+                  "type": "command"
+                },
+                {
+                  "async": true,
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+                  "timeout": 600,
+                  "type": "command"
+                },
+                {
+                  "command": "osascript -e 'beep'",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "async": true,
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+                  "timeout": 5,
+                  "type": "command"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "remove": {
+        "hooks": {
+          "SessionStart": [
+            {
+              "hooks": [
+                {
+                  "command": "/usr/local/bin/audit-log",
+                  "timeout": 600,
+                  "type": "command"
+                },
+                {
+                  "command": "osascript -e 'beep'",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
+          ]
+        }
+      }
+    }
+  },
+  "patch/devin/--session-origin-hook/odd-entries": {
+    "input": {
+      "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+      "current": {
+        "hooks": {
+          "SessionStart": [
+            "not-a-group",
+            7,
+            null,
+            {
+              "matcher": "Bash"
+            },
+            {
+              "hooks": "not-a-list"
+            },
+            {
+              "hooks": [
+                "text-handler",
+                {
+                  "command": 5
+                },
+                {
+                  "type": "command"
+                },
+                {
+                  "command": "'/Volumes/Agent HUD/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
+          ]
+        }
+      },
+      "flag": "--session-origin-hook",
+      "source": "devin"
+    },
+    "output": {
+      "hookCommands": [
+        "'/Volumes/Agent HUD/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin"
+      ],
+      "install": {
+        "hooks": {
+          "SessionStart": [
+            "not-a-group",
+            7,
+            null,
+            {
+              "matcher": "Bash"
+            },
+            {
+              "hooks": "not-a-list"
+            },
+            {
+              "hooks": [
+                "text-handler",
+                {
+                  "command": 5
+                },
+                {
+                  "type": "command"
+                },
+                {
+                  "async": true,
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "async": true,
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+                  "timeout": 5,
+                  "type": "command"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "remove": {
+        "hooks": {
+          "SessionStart": [
+            "not-a-group",
+            7,
+            null,
+            {
+              "matcher": "Bash"
+            },
+            {
+              "hooks": "not-a-list"
+            },
+            {
+              "hooks": [
+                "text-handler",
+                {
+                  "command": 5
+                },
+                {
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
+          ]
+        }
+      }
+    }
+  },
+  "patch/devin/--session-origin-hook/other-agent-hud-hooks": {
+    "input": {
+      "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+      "current": {
+        "hooks": {
+          "SessionStart": [
+            {
+              "hooks": [
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook devin",
+                  "timeout": 600,
+                  "type": "command"
+                },
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook devin",
+                  "timeout": 600,
+                  "type": "command"
+                },
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --attention-hook devin",
+                  "timeout": 600,
+                  "type": "command"
+                },
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --compaction-hook devin",
+                  "timeout": 600,
+                  "type": "command"
+                },
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook codex",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook devin",
+                  "timeout": 600,
+                  "type": "command"
+                },
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook devin",
+                  "timeout": 600,
+                  "type": "command"
+                },
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --attention-hook devin",
+                  "timeout": 600,
+                  "type": "command"
+                },
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --compaction-hook devin",
+                  "timeout": 600,
+                  "type": "command"
+                },
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook codex",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
+          ]
+        }
+      },
+      "flag": "--session-origin-hook",
+      "source": "devin"
+    },
+    "output": {
+      "hookCommands": [],
+      "install": {
+        "hooks": {
+          "SessionStart": [
+            {
+              "hooks": [
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook devin",
+                  "timeout": 600,
+                  "type": "command"
+                },
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook devin",
+                  "timeout": 600,
+                  "type": "command"
+                },
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --attention-hook devin",
+                  "timeout": 600,
+                  "type": "command"
+                },
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --compaction-hook devin",
+                  "timeout": 600,
+                  "type": "command"
+                },
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook codex",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            },
+            {
+              "hooks": [
+                {
+                  "async": true,
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+                  "timeout": 5,
+                  "type": "command"
+                }
+              ]
+            }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook devin",
+                  "timeout": 600,
+                  "type": "command"
+                },
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook devin",
+                  "timeout": 600,
+                  "type": "command"
+                },
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --attention-hook devin",
+                  "timeout": 600,
+                  "type": "command"
+                },
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --compaction-hook devin",
+                  "timeout": 600,
+                  "type": "command"
+                },
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook codex",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            },
+            {
+              "hooks": [
+                {
+                  "async": true,
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+                  "timeout": 5,
+                  "type": "command"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "remove": {
+        "hooks": {
+          "SessionStart": [
+            {
+              "hooks": [
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook devin",
+                  "timeout": 600,
+                  "type": "command"
+                },
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook devin",
+                  "timeout": 600,
+                  "type": "command"
+                },
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --attention-hook devin",
+                  "timeout": 600,
+                  "type": "command"
+                },
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --compaction-hook devin",
+                  "timeout": 600,
+                  "type": "command"
+                },
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook codex",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook devin",
+                  "timeout": 600,
+                  "type": "command"
+                },
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook devin",
+                  "timeout": 600,
+                  "type": "command"
+                },
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --attention-hook devin",
+                  "timeout": 600,
+                  "type": "command"
+                },
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --compaction-hook devin",
+                  "timeout": 600,
+                  "type": "command"
+                },
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook codex",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
+          ]
+        }
+      }
+    }
+  },
+  "patch/devin/--session-origin-hook/owned-current": {
+    "input": {
+      "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+      "current": {
+        "hooks": {
+          "SessionStart": [
+            {
+              "hooks": [
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ]
+            }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "flag": "--session-origin-hook",
+      "source": "devin"
+    },
+    "output": {
+      "hookCommands": [
+        "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+        "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin"
+      ],
+      "install": {
+        "hooks": {
+          "SessionStart": [
+            {
+              "hooks": [
+                {
+                  "async": true,
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ]
+            }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "async": true,
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "remove": {
+        "hooks": {}
+      }
+    }
+  },
+  "patch/devin/--session-origin-hook/owned-first-event-only": {
+    "input": {
+      "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+      "current": {
+        "hooks": {
+          "SessionStart": [
+            {
+              "hooks": [
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ]
+            }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "command": "/usr/local/bin/audit-log",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "flag": "--session-origin-hook",
+      "source": "devin"
+    },
+    "output": {
+      "hookCommands": [
+        "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin"
+      ],
+      "install": {
+        "hooks": {
+          "SessionStart": [
+            {
+              "hooks": [
+                {
+                  "async": true,
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ]
+            }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "command": "/usr/local/bin/audit-log",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ]
+            },
+            {
+              "hooks": [
+                {
+                  "async": true,
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+                  "timeout": 5,
+                  "type": "command"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "remove": {
+        "hooks": {
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "command": "/usr/local/bin/audit-log",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    }
+  },
+  "patch/devin/--session-origin-hook/owned-moved": {
+    "input": {
+      "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+      "current": {
+        "hooks": {
+          "SessionStart": [
+            {
+              "hooks": [
+                {
+                  "command": "'/Volumes/Agent HUD/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ]
+            }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "command": "'/Volumes/Agent HUD/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "flag": "--session-origin-hook",
+      "source": "devin"
+    },
+    "output": {
+      "hookCommands": [
+        "'/Volumes/Agent HUD/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+        "'/Volumes/Agent HUD/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin"
+      ],
+      "install": {
+        "hooks": {
+          "SessionStart": [
+            {
+              "hooks": [
+                {
+                  "async": true,
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ]
+            }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "async": true,
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "remove": {
+        "hooks": {}
+      }
+    }
+  },
+  "patch/devin/--session-origin-hook/owned-unquoted": {
+    "input": {
+      "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+      "current": {
+        "hooks": {
+          "SessionStart": [
+            {
+              "hooks": [
+                {
+                  "command": "/usr/local/bin/agent-hud --session-origin-hook devin",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ]
+            }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "command": "/usr/local/bin/agent-hud --session-origin-hook devin",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "flag": "--session-origin-hook",
+      "source": "devin"
+    },
+    "output": {
+      "hookCommands": [
+        "/usr/local/bin/agent-hud --session-origin-hook devin",
+        "/usr/local/bin/agent-hud --session-origin-hook devin"
+      ],
+      "install": {
+        "hooks": {
+          "SessionStart": [
+            {
+              "hooks": [
+                {
+                  "async": true,
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ]
+            }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "async": true,
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "remove": {
+        "hooks": {}
+      }
+    }
+  },
+  "patch/devin/--session-origin-hook/root-array": {
+    "input": {
+      "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+      "current": [],
+      "flag": "--session-origin-hook",
+      "source": "devin"
+    },
+    "output": {
+      "hookCommands": {
+        "error": "Unrecognized hook configuration layout"
+      },
+      "install": {
+        "error": "Unrecognized hook configuration layout"
+      },
+      "remove": {
+        "error": "Unrecognized hook configuration layout"
+      }
+    }
+  },
+  "patch/devin/--session-origin-hook/root-null": {
+    "input": {
+      "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+      "current": null,
+      "flag": "--session-origin-hook",
+      "source": "devin"
+    },
+    "output": {
+      "hookCommands": {
+        "error": "Unrecognized hook configuration layout"
+      },
+      "install": {
+        "error": "Unrecognized hook configuration layout"
+      },
+      "remove": {
+        "error": "Unrecognized hook configuration layout"
+      }
+    }
+  },
+  "patch/devin/--session-origin-hook/root-string": {
+    "input": {
+      "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+      "current": "settings",
+      "flag": "--session-origin-hook",
+      "source": "devin"
+    },
+    "output": {
+      "hookCommands": {
+        "error": "Unrecognized hook configuration layout"
+      },
+      "install": {
+        "error": "Unrecognized hook configuration layout"
+      },
+      "remove": {
+        "error": "Unrecognized hook configuration layout"
+      }
+    }
+  },
+  "patch/devin/--session-origin-hook/unrelated-settings": {
+    "input": {
+      "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+      "current": {
+        "model": "opus",
+        "permissions": {
+          "allow": [
+            "Bash(npm test)"
+          ],
+          "deny": []
+        },
+        "statusLine": {
+          "command": "~/.claude/statusline.sh",
+          "type": "command"
+        }
+      },
+      "flag": "--session-origin-hook",
+      "source": "devin"
+    },
+    "output": {
+      "hookCommands": [],
+      "install": {
+        "hooks": {
+          "SessionStart": [
+            {
+              "hooks": [
+                {
+                  "async": true,
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+                  "timeout": 5,
+                  "type": "command"
+                }
+              ]
+            }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "async": true,
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook devin",
+                  "timeout": 5,
+                  "type": "command"
+                }
+              ]
             }
           ]
         },
@@ -118888,6 +121383,659 @@
       }
     }
   },
+  "windows/devin/--session-origin-hook/duplicates": {
+    "input": {
+      "current": {
+        "hooks": {
+          "SessionStart": [
+            {
+              "hooks": [
+                {
+                  "args": [
+                    "--session-origin-hook",
+                    "devin"
+                  ],
+                  "command": "C:\\Users\\me\\AppData\\Local\\Agent HUD\\agent-hud.exe",
+                  "type": "command"
+                },
+                {
+                  "command": "'C:\\Users\\me\\AppData\\Local\\Agent HUD\\agent-hud.exe' --session-origin-hook devin",
+                  "type": "command"
+                },
+                "text"
+              ],
+              "matcher": ""
+            }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "args": [
+                    "--session-origin-hook",
+                    "devin"
+                  ],
+                  "command": "C:\\Users\\me\\AppData\\Local\\Agent HUD\\agent-hud.exe",
+                  "type": "command"
+                },
+                {
+                  "command": "'C:\\Users\\me\\AppData\\Local\\Agent HUD\\agent-hud.exe' --session-origin-hook devin",
+                  "type": "command"
+                },
+                "text"
+              ],
+              "matcher": ""
+            }
+          ]
+        }
+      },
+      "executables": {
+        "install": "C:\\Program Files\\Agent HUD\\agent-hud.exe",
+        "remove": null
+      },
+      "flag": "--session-origin-hook",
+      "source": "devin"
+    },
+    "output": {
+      "install": {
+        "error": "devin has no verified Windows hook launch contract; its configuration was not changed"
+      },
+      "remove": {
+        "hooks": {
+          "SessionStart": [
+            {
+              "hooks": [
+                "text"
+              ],
+              "matcher": ""
+            }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                "text"
+              ],
+              "matcher": ""
+            }
+          ]
+        }
+      }
+    }
+  },
+  "windows/devin/--session-origin-hook/empty": {
+    "input": {
+      "current": {},
+      "executables": {
+        "install": "C:\\Program Files\\Agent HUD\\agent-hud.exe",
+        "remove": null
+      },
+      "flag": "--session-origin-hook",
+      "source": "devin"
+    },
+    "output": {
+      "install": {
+        "error": "devin has no verified Windows hook launch contract; its configuration was not changed"
+      },
+      "remove": {}
+    }
+  },
+  "windows/devin/--session-origin-hook/empty-path-args": {
+    "input": {
+      "current": {
+        "hooks": {
+          "SessionStart": [
+            {
+              "hooks": [
+                {
+                  "args": [
+                    "--session-origin-hook",
+                    "devin"
+                  ],
+                  "command": "",
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "args": [
+                    "--session-origin-hook",
+                    "devin"
+                  ],
+                  "command": "",
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
+          ]
+        }
+      },
+      "executables": {
+        "install": "C:\\Program Files\\Agent HUD\\agent-hud.exe",
+        "remove": null
+      },
+      "flag": "--session-origin-hook",
+      "source": "devin"
+    },
+    "output": {
+      "install": {
+        "error": "devin has no verified Windows hook launch contract; its configuration was not changed"
+      },
+      "remove": {
+        "hooks": {
+          "SessionStart": [
+            {
+              "hooks": [
+                {
+                  "args": [
+                    "--session-origin-hook",
+                    "devin"
+                  ],
+                  "command": "",
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "args": [
+                    "--session-origin-hook",
+                    "devin"
+                  ],
+                  "command": "",
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
+          ]
+        }
+      }
+    }
+  },
+  "windows/devin/--session-origin-hook/foreign": {
+    "input": {
+      "current": {
+        "hooks": {
+          "SessionStart": [
+            {
+              "hooks": [
+                {
+                  "args": [
+                    "--hook"
+                  ],
+                  "command": "C:\\Tools\\audit.exe",
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "args": [
+                    "--hook"
+                  ],
+                  "command": "C:\\Tools\\audit.exe",
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
+          ]
+        }
+      },
+      "executables": {
+        "install": "C:\\Program Files\\Agent HUD\\agent-hud.exe",
+        "remove": null
+      },
+      "flag": "--session-origin-hook",
+      "source": "devin"
+    },
+    "output": {
+      "install": {
+        "error": "devin has no verified Windows hook launch contract; its configuration was not changed"
+      },
+      "remove": {
+        "hooks": {
+          "SessionStart": [
+            {
+              "hooks": [
+                {
+                  "args": [
+                    "--hook"
+                  ],
+                  "command": "C:\\Tools\\audit.exe",
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "args": [
+                    "--hook"
+                  ],
+                  "command": "C:\\Tools\\audit.exe",
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
+          ]
+        }
+      }
+    }
+  },
+  "windows/devin/--session-origin-hook/foreign-exec-args": {
+    "input": {
+      "current": {
+        "hooks": {
+          "SessionStart": [
+            {
+              "hooks": [
+                {
+                  "args": [
+                    "--session-origin-hook",
+                    "other-client"
+                  ],
+                  "command": "C:\\Tools\\other.exe",
+                  "type": "command"
+                },
+                {
+                  "args": [
+                    "--session-origin-hook"
+                  ],
+                  "command": "C:\\Tools\\other.exe",
+                  "type": "command"
+                },
+                {
+                  "args": [
+                    "--session-origin-hook",
+                    "devin"
+                  ],
+                  "exec": "C:\\Users\\me\\AppData\\Local\\Agent HUD\\agent-hud.exe",
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "args": [
+                    "--session-origin-hook",
+                    "other-client"
+                  ],
+                  "command": "C:\\Tools\\other.exe",
+                  "type": "command"
+                },
+                {
+                  "args": [
+                    "--session-origin-hook"
+                  ],
+                  "command": "C:\\Tools\\other.exe",
+                  "type": "command"
+                },
+                {
+                  "args": [
+                    "--session-origin-hook",
+                    "devin"
+                  ],
+                  "exec": "C:\\Users\\me\\AppData\\Local\\Agent HUD\\agent-hud.exe",
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
+          ]
+        }
+      },
+      "executables": {
+        "install": "C:\\Program Files\\Agent HUD\\agent-hud.exe",
+        "remove": null
+      },
+      "flag": "--session-origin-hook",
+      "source": "devin"
+    },
+    "output": {
+      "install": {
+        "error": "devin has no verified Windows hook launch contract; its configuration was not changed"
+      },
+      "remove": {
+        "hooks": {
+          "SessionStart": [
+            {
+              "hooks": [
+                {
+                  "args": [
+                    "--session-origin-hook",
+                    "other-client"
+                  ],
+                  "command": "C:\\Tools\\other.exe",
+                  "type": "command"
+                },
+                {
+                  "args": [
+                    "--session-origin-hook"
+                  ],
+                  "command": "C:\\Tools\\other.exe",
+                  "type": "command"
+                },
+                {
+                  "args": [
+                    "--session-origin-hook",
+                    "devin"
+                  ],
+                  "exec": "C:\\Users\\me\\AppData\\Local\\Agent HUD\\agent-hud.exe",
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "args": [
+                    "--session-origin-hook",
+                    "other-client"
+                  ],
+                  "command": "C:\\Tools\\other.exe",
+                  "type": "command"
+                },
+                {
+                  "args": [
+                    "--session-origin-hook"
+                  ],
+                  "command": "C:\\Tools\\other.exe",
+                  "type": "command"
+                },
+                {
+                  "args": [
+                    "--session-origin-hook",
+                    "devin"
+                  ],
+                  "exec": "C:\\Users\\me\\AppData\\Local\\Agent HUD\\agent-hud.exe",
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
+          ]
+        }
+      }
+    }
+  },
+  "windows/devin/--session-origin-hook/odd-entries": {
+    "input": {
+      "current": {
+        "hooks": {
+          "SessionStart": [
+            "text",
+            {
+              "matcher": "Bash"
+            },
+            {
+              "hooks": "not-a-list"
+            },
+            {
+              "hooks": [
+                {
+                  "args": [
+                    "--session-origin-hook",
+                    "devin"
+                  ],
+                  "command": "C:\\Users\\me\\AppData\\Local\\Agent HUD\\agent-hud.exe",
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
+          ],
+          "UserPromptSubmit": [
+            "text",
+            {
+              "matcher": "Bash"
+            },
+            {
+              "hooks": "not-a-list"
+            },
+            {
+              "hooks": [
+                {
+                  "args": [
+                    "--session-origin-hook",
+                    "devin"
+                  ],
+                  "command": "C:\\Users\\me\\AppData\\Local\\Agent HUD\\agent-hud.exe",
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
+          ]
+        }
+      },
+      "executables": {
+        "install": "C:\\Program Files\\Agent HUD\\agent-hud.exe",
+        "remove": null
+      },
+      "flag": "--session-origin-hook",
+      "source": "devin"
+    },
+    "output": {
+      "install": {
+        "error": "devin has no verified Windows hook launch contract; its configuration was not changed"
+      },
+      "remove": {
+        "hooks": {
+          "SessionStart": [
+            "text",
+            {
+              "matcher": "Bash"
+            },
+            {
+              "hooks": "not-a-list"
+            }
+          ],
+          "UserPromptSubmit": [
+            "text",
+            {
+              "matcher": "Bash"
+            },
+            {
+              "hooks": "not-a-list"
+            }
+          ]
+        }
+      }
+    }
+  },
+  "windows/devin/--session-origin-hook/owned-command-windows": {
+    "input": {
+      "current": {
+        "hooks": {
+          "SessionStart": [
+            {
+              "hooks": [
+                {
+                  "command": "'C:\\Users\\me\\AppData\\Local\\Agent HUD\\agent-hud.exe' --session-origin-hook devin",
+                  "commandWindows": "powershell.exe -NoLogo -NoProfile -NonInteractive -EncodedCommand c3RhbGU=",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "command": "'C:\\Users\\me\\AppData\\Local\\Agent HUD\\agent-hud.exe' --session-origin-hook devin",
+                  "commandWindows": "powershell.exe -NoLogo -NoProfile -NonInteractive -EncodedCommand c3RhbGU=",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
+          ]
+        }
+      },
+      "executables": {
+        "install": "C:\\Program Files\\Agent HUD\\agent-hud.exe",
+        "remove": null
+      },
+      "flag": "--session-origin-hook",
+      "source": "devin"
+    },
+    "output": {
+      "install": {
+        "error": "devin has no verified Windows hook launch contract; its configuration was not changed"
+      },
+      "remove": {
+        "hooks": {}
+      }
+    }
+  },
+  "windows/devin/--session-origin-hook/owned-exec-args": {
+    "input": {
+      "current": {
+        "hooks": {
+          "SessionStart": [
+            {
+              "hooks": [
+                {
+                  "args": [
+                    "--session-origin-hook",
+                    "devin"
+                  ],
+                  "command": "C:\\Users\\me\\AppData\\Local\\Agent HUD\\agent-hud.exe",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "args": [
+                    "--session-origin-hook",
+                    "devin"
+                  ],
+                  "command": "C:\\Users\\me\\AppData\\Local\\Agent HUD\\agent-hud.exe",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
+          ]
+        }
+      },
+      "executables": {
+        "install": "C:\\Program Files\\Agent HUD\\agent-hud.exe",
+        "remove": null
+      },
+      "flag": "--session-origin-hook",
+      "source": "devin"
+    },
+    "output": {
+      "install": {
+        "error": "devin has no verified Windows hook launch contract; its configuration was not changed"
+      },
+      "remove": {
+        "hooks": {}
+      }
+    }
+  },
+  "windows/devin/--session-origin-hook/owned-posix": {
+    "input": {
+      "current": {
+        "hooks": {
+          "SessionStart": [
+            {
+              "hooks": [
+                {
+                  "command": "'C:\\Users\\me\\AppData\\Local\\Agent HUD\\agent-hud.exe' --session-origin-hook devin",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "command": "'C:\\Users\\me\\AppData\\Local\\Agent HUD\\agent-hud.exe' --session-origin-hook devin",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
+          ]
+        }
+      },
+      "executables": {
+        "install": "C:\\Program Files\\Agent HUD\\agent-hud.exe",
+        "remove": null
+      },
+      "flag": "--session-origin-hook",
+      "source": "devin"
+    },
+    "output": {
+      "install": {
+        "error": "devin has no verified Windows hook launch contract; its configuration was not changed"
+      },
+      "remove": {
+        "hooks": {}
+      }
+    }
+  },
+  "windows/devin/--session-origin-hook/root-array": {
+    "input": {
+      "current": [],
+      "executables": {
+        "install": "C:\\Program Files\\Agent HUD\\agent-hud.exe",
+        "remove": null
+      },
+      "flag": "--session-origin-hook",
+      "source": "devin"
+    },
+    "output": {
+      "install": {
+        "error": "devin has no verified Windows hook launch contract; its configuration was not changed"
+      },
+      "remove": {
+        "error": "Unrecognized hook configuration layout"
+      }
+    }
+  },
   "windows/droid/--attention-hook/duplicates": {
     "input": {
       "current": {
@@ -123638,11 +126786,9 @@
     },
     "output": {
       "install": {
-        "error": "This client does not support the requested hook"
+        "error": "devin has no verified Windows hook launch contract; its configuration was not changed"
       },
-      "remove": {
-        "error": "This client does not support the requested hook"
-      }
+      "remove": {}
     }
   },
   "windows/matrix/devin/--unknown-hook": {

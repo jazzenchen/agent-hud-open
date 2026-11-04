@@ -33,6 +33,7 @@ reference.
 - `cline.png`, `roo-code.png` and `goose.png` in src/packages/hud/src/assets are the `light/` marks of `@lobehub/icons-static-png` 2.6.0 (MIT, the notice in `LobeIcons-LICENSE.txt`), unchanged.
 - Nous Portal credits (`src/crates/agents/src/hermes/account.rs`): the auth file shapes, the never-refresh rule and the trusted-portal rule follow CodexBar's Nous reader (`NousSettingsReader.swift`, `nous.ts`, commit 897bff3), MIT, Copyright (c) 2026 Peter Steinberger; re-implemented in Rust and checked against Hermes Agent 0.19 (MIT). Hermes's hook payloads and `config.yaml` layout, and Kimi Code's log records, were read from those clients themselves; no code was taken from them.
 - Reading Claude Code's own usage record (`cachedUsageUtilization` in `.claude.json`) only for the account the same file names, as of when Claude Code fetched it, follows QuotaView (https://github.com/duoasa/quotaview, `ClaudeCodeAccountProfile.decode`), MIT. The Rust reader is `src/crates/agents/src/claude/usage_record.rs`.
+- Devin Desktop: what runs Devin Local (`devin acp`, the bundled CLI), its session store and its ACP usage events were checked against Devin Desktop 3.11.238's own package and Devin CLI 3000.11.234, read without installing or running them. QuotaView (MIT, github.com/duoasa/quotaview) and tokscale (MIT, github.com/junhoyeo/tokscale) pointed to these facts; no code was copied from either.
 
 ## Client formats
 

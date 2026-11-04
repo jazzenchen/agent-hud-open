@@ -403,6 +403,17 @@ pub fn resolve(
     client: Option<&str>,
     reports: &Reports,
 ) -> Origins {
+    // A log that marks no prompts and names no client (Devin's, which the
+    // CLI and Devin Desktop share): its hooks name them, as they name a
+    // session with no log.
+    if prompts.first.is_none() && prompts.last.is_none() && client.is_none_or(str::is_empty) {
+        let mut origins = from_reports(reports);
+        let only = from_log(agent, None, None);
+        origins.latest = origins.latest.or_else(|| origins.init.clone());
+        origins.init.get_or_insert_with(|| only.clone());
+        origins.latest.get_or_insert(only);
+        return origins;
+    }
     let fallback = || Some(from_log(agent, client, None));
     let init = match &prompts.first {
         Some(stamp) => Some(prompt_surface(

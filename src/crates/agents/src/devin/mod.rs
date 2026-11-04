@@ -1,6 +1,10 @@
-//! Devin.
+//! Devin: the Devin CLI, and Devin Local, the same CLI that Devin Desktop
+//! bundles and runs over ACP (`devin acp`). Both keep their sessions in one
+//! `sessions.db`, read the same hooks and cache the same account status, so
+//! they are one agent whose sessions say which client drives them.
 pub mod account;
 mod hooks;
+pub mod process;
 pub mod transcript;
 
 use crate::Agent;
@@ -28,7 +32,7 @@ pub static AGENT: Agent = Agent {
     hooks: Some(&hooks::HOOKS),
     observer: None,
     channel: None,
-    program: None,
+    program: Some(process::PROGRAM),
     replies: None,
     turns: None,
     items: None,

@@ -2,6 +2,7 @@
 //! catalog's client names): Codex Desktop, CLI or IDE extension; Claude Code
 //! CLI, Desktop or IDE extension, or the Agent SDK. A name the catalog does
 //! not know is shown as written.
+use super::surfaces::{Category, Surface};
 
 /// The Codex client a rollout's `session_meta` names. A CLI launched from
 /// Desktop can inherit its originator, so the rollout's `source` decides;
@@ -55,6 +56,18 @@ pub fn client_name(source: &str, client: Option<&str>) -> Option<String> {
             None | Some("Antigravity") => None,
             Some(other) => Some(other.into()),
         },
+        _ => None,
+    }
+}
+
+/// The name of a session's client that its log does not name and its latest
+/// hook does, by where that hook's caller runs (`naming::surfaces`). Devin
+/// Desktop's Devin Local is the Devin CLI over ACP, writing the same session
+/// store, so only the hook tells the two apart.
+pub fn reported_client(source: &str, surface: &Surface) -> Option<String> {
+    match (source, surface.category) {
+        ("devin", Category::Desktop) if surface.source == "devin" => Some("Devin Desktop".into()),
+        ("devin", Category::Cli | Category::Sdk) => Some("Devin CLI".into()),
         _ => None,
     }
 }
@@ -115,6 +128,23 @@ mod tests {
         );
         assert_eq!(client_name("claude", None).as_deref(), Some("Claude Code"));
         assert_eq!(client_name("deepseek", None), None);
+    }
+
+    #[test]
+    fn devins_hooks_name_the_client_its_store_does_not() {
+        let named = |source, tag| reported_client(source, &Surface::parse(tag).unwrap());
+        assert_eq!(
+            named("devin", "desktop:devin").as_deref(),
+            Some("Devin Desktop")
+        );
+        assert_eq!(named("devin", "cli:iterm").as_deref(), Some("Devin CLI"));
+        // The Desktop's own terminal runs the CLI.
+        assert_eq!(named("devin", "cli:windsurf").as_deref(), Some("Devin CLI"));
+        assert_eq!(named("devin", "sdk:others").as_deref(), Some("Devin CLI"));
+        // Another ACP client, and agents whose logs name their clients.
+        assert_eq!(named("devin", "ide:zed"), None);
+        assert_eq!(named("devin", "desktop:agenthud"), None);
+        assert_eq!(named("codex", "desktop:codex"), None);
     }
 
     #[test]

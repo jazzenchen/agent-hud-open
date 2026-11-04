@@ -1,5 +1,7 @@
-//! Devin's hooks: permission requests, answered with a bare decision, and
-//! completed turns. Its questions and plans stay with the client.
+//! Devin's hooks: permission requests, answered with a bare decision,
+//! completed turns, and where a session runs. Its questions and plans stay
+//! with the client. Devin Desktop's Devin Local is the same CLI, reading the
+//! same settings file, so these hooks cover both.
 use crate::hooks::{stop, Completed, Completion, Hooks, Layout, Permission, Reply, POSIX_ONLY};
 use crate::Location;
 use serde_json::Value;
@@ -26,7 +28,7 @@ pub static HOOKS: Hooks = Hooks {
         enrich: None,
         reply: None,
     }),
-    origin: None,
+    origin: Some(super::process::origin),
     attention: false,
     compaction: None,
     prefixed_sessions: true,
