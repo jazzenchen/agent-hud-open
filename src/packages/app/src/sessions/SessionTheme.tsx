@@ -1,10 +1,4 @@
 import type { CSSProperties, ReactNode } from "react";
-import {
-  Select,
-  SelectContent,
-  SelectTrigger,
-  SelectValue,
-} from "@agent-hud/ui/components/select";
 import type { Session, SessionDetail, Snapshot } from "@agent-hud/protocol";
 import {
   age,
@@ -280,45 +274,5 @@ export function ColorKey({
       />
       {children}
     </span>
-  );
-}
-
-export function SourceSelect({
-  value,
-  onChange,
-  width,
-  label,
-  children,
-  theme,
-}: {
-  value: string;
-  onChange: (value: string) => void;
-  width: number;
-  label: string;
-  children: ReactNode;
-  theme: Theme;
-}) {
-  return (
-    <Select value={value} onValueChange={onChange}>
-      <SelectTrigger
-        aria-label={label}
-        size="sm"
-        style={{
-          width,
-          minWidth: 0,
-          height: 26,
-          padding: "2px 8px",
-          fontSize: 11,
-          borderRadius: 6,
-          borderColor: theme.border,
-          color: theme.text,
-          background: theme.card,
-          boxShadow: "none",
-        }}
-      >
-        <SelectValue />
-      </SelectTrigger>
-      <SelectContent>{children}</SelectContent>
-    </Select>
   );
 }

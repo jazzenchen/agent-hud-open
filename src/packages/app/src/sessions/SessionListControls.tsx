@@ -1,5 +1,12 @@
+import type { ReactNode } from "react";
 import { Search, X } from "lucide-react";
-import { SelectItem } from "@agent-hud/ui/components/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@agent-hud/ui/components/select";
 import { Input } from "@agent-hud/ui/components/input";
 import type { SessionsResponse } from "@agent-hud/protocol";
 import { Segments } from "../statistics/Segments";
@@ -9,10 +16,49 @@ import {
   plain,
   projectName,
   row,
-  SourceSelect,
   type Arrangement,
   type Theme,
 } from "./SessionTheme";
+
+function SourceSelect({
+  value,
+  onChange,
+  width,
+  label,
+  children,
+  theme,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  width: number;
+  label: string;
+  children: ReactNode;
+  theme: Theme;
+}) {
+  return (
+    <Select value={value} onValueChange={onChange}>
+      <SelectTrigger
+        aria-label={label}
+        size="sm"
+        style={{
+          width,
+          minWidth: 0,
+          height: 26,
+          padding: "2px 8px",
+          fontSize: 11,
+          borderRadius: 6,
+          borderColor: theme.border,
+          color: theme.text,
+          background: theme.card,
+          boxShadow: "none",
+        }}
+      >
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>{children}</SelectContent>
+    </Select>
+  );
+}
 
 /** The Sessions list's controls, held at the top as it scrolls: by day or active and how many, the source, the project and a search. */
 export function SessionListControls({
