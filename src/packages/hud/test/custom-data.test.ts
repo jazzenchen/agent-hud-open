@@ -4,7 +4,6 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { Snapshot } from "@agent-hud/protocol";
 import {
-  collections,
   fill,
   heldSections,
   holds,
@@ -12,9 +11,12 @@ import {
   nextOption,
   pick,
   readsTime,
-  windowKind,
   type Scope,
 } from "../src/panel/custom/custom-data.ts";
+import {
+  collections,
+  windowKind,
+} from "../src/panel/custom/custom-collections.ts";
 
 const now = Date.parse("2026-11-04T10:00:00Z");
 const snapshot = {

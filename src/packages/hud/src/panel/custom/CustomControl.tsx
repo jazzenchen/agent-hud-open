@@ -7,12 +7,8 @@ import type { PanelNode, Snapshot } from "@agent-hud/protocol";
 import { useFormat } from "@agent-hud/ui/format-context";
 import { useGround } from "../../ground";
 import { palette, type Logo } from "../theme";
-import {
-  collections,
-  initialState,
-  readsTime,
-  type Scope,
-} from "./custom-data";
+import { collections } from "./custom-collections";
+import { initialState, readsTime, type Scope } from "./custom-data";
 import { Placed } from "./Control";
 import { DrawingContext, type Drawing, type Node } from "./drawing";
 

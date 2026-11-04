@@ -4,12 +4,8 @@
 import { createContext, type ReactNode } from "react";
 import type { PanelNode, Snapshot } from "@agent-hud/protocol";
 import { agentColor, palette, type Logo } from "../theme";
-import {
-  sameAgent,
-  type Collections,
-  type Item,
-  type Scope,
-} from "./custom-data";
+import { sameAgent, type Collections, type Item } from "./custom-collections";
+import type { Scope } from "./custom-data";
 
 export type Node = PanelNode & Record<string, unknown>;
 export type Colors = ReturnType<typeof palette>;

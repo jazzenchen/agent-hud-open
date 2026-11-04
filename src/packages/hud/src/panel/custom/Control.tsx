@@ -6,7 +6,8 @@ import {
   useState,
   type CSSProperties,
 } from "react";
-import { holds, itemName, pick, SECTIONS, type Scope } from "./custom-data";
+import { itemName } from "./custom-collections";
+import { holds, pick, SECTIONS, type Scope } from "./custom-data";
 import { Clickable, useClick } from "./Clickable";
 import { DrawingContext, type Colors, type Node } from "./drawing";
 import { LeafControl } from "./LeafControl";
