@@ -770,6 +770,30 @@ fn a_click_needs_only_the_fields_its_action_takes() {
     );
 }
 
+/// Settings keeps a block's columns when its widget changes to rings; an edit that
+/// leaves the block alone sends that back and is not refused for it, in the tree and
+/// in the older spelling. A value the layout does not hold yet still is.
+#[test]
+fn a_field_settings_kept_through_a_change_of_widget_is_no_issue() {
+    let (_folder, owner) = owner();
+    owner
+        .set_layout(json!({"screen": "main", "layout": {"blocks": {"claude": {"widget": "ring", "columns": 3, "ringSize": "small"}}}}))
+        .unwrap();
+    draft(
+        &owner,
+        json!({"screen": "main", "edit": [{"insert": {"id": "clock", "type": "text", "text": "{now.time|clock}"}, "into": "blocks", "at": 0}]}),
+    );
+    draft(
+        &owner,
+        json!({"screen": "main", "blocks": {"claude": {"widget": "rings", "columns": 3}, "codex": {"hidden": true}}}),
+    );
+    let error = refused(
+        &owner,
+        json!({"screen": "main", "edit": [{"update": "claude", "columns": 4}]}),
+    );
+    assert!(error.contains("blocks.claude.columns"), "{error}");
+}
+
 /// Whatever an agent sends, the tools answer: a malformed node, edit or tree is
 /// refused, never a panic in the app.
 #[test]

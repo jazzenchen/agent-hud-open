@@ -606,7 +606,9 @@ pub(super) fn reduced(layout: &Value, present: &[Block]) -> Value {
 /// columns or a ring size where it has no cells or rings, half a line for bar rows, a
 /// period where it covers none, and a row or an account it does not have. What one of
 /// the `held` layouts already holds for a block, a row or an account that is away is
-/// no issue when it comes back as held.
+/// no issue when it comes back as held, and neither is a field a block keeps as one
+/// of them holds it: Settings keeps columns, a ring size or a period through a change
+/// of widget, and the panel draws past them.
 pub(super) fn issues(document: &Value, present: &[Block], held: &[Value]) -> Vec<String> {
     let keys: Vec<&str> = present.iter().map(|b| b.key.as_str()).collect();
     let unknown = if present.is_empty() {
@@ -629,7 +631,7 @@ pub(super) fn issues(document: &Value, present: &[Block], held: &[Value]) -> Vec
                     accounts.extend(strings(&kept["accounts"]));
                     accounts.extend(strings(&kept["hiddenAccounts"]));
                 }
-                found.extend(block_issues(change, block, &rows, &accounts));
+                found.extend(block_issues(change, block, &held_as, &rows, &accounts));
             } else if held_as.is_empty() {
                 found.push(format!(
                     "blocks.{key}: No block has the key \"{key}\". {unknown}"
@@ -686,10 +688,13 @@ fn entries(v: &Value) -> impl Iterator<Item = (usize, &str)> {
 fn block_issues(
     change: &Value,
     block: &Block,
+    held: &[&Value],
     held_rows: &[String],
     held_accounts: &[String],
 ) -> Vec<String> {
     let (kind, key) = (block.kind, block.key.as_str());
+    // A field as a held layout keeps it for this block is no issue.
+    let kept = |field: &str| held.iter().any(|block| block[field] == change[field]);
     let path = format!("blocks.{key}");
     let mut found = vec![];
     let asked = change["widget"].as_str();
@@ -711,7 +716,7 @@ fn block_issues(
     let drawn = format!("The \"{widget}\" widget of \"{key}\"");
     let balance = format!("\"{key}\" is an API balance");
     for (index, measure) in entries(&change["measures"]) {
-        if offered.contains(&measure) {
+        if offered.contains(&measure) || kept("measures") {
             continue;
         }
         let why = match (kind, widget) {
@@ -728,10 +733,10 @@ fn block_issues(
             quoted(offered)
         ));
     }
-    if change["countdown"].is_boolean() && !kind.takes_countdown() {
+    if change["countdown"].is_boolean() && !kind.takes_countdown() && !kept("countdown") {
         found.push(format!("{path}.countdown: {balance}, which has no reset to count down to. countdown applies to quota blocks."));
     }
-    if whole(&change["columns"]).is_some() && !kind.takes_columns(widget) {
+    if whole(&change["columns"]).is_some() && !kind.takes_columns(widget) && !kept("columns") {
         let message = if kind == Kind::Balance {
             let drawn_as = if widget == "chart" {
                 "a chart of its estimated cost"
@@ -744,7 +749,7 @@ fn block_issues(
         };
         found.push(format!("{path}.columns: {message}"));
     }
-    if change["ringSize"].is_string() && !kind.takes_ring_size(widget) {
+    if change["ringSize"].is_string() && !kind.takes_ring_size(widget) && !kept("ringSize") {
         let message = if kind == Kind::Balance {
             format!("{balance}, which draws no ring.")
         } else {
@@ -752,10 +757,10 @@ fn block_issues(
         };
         found.push(format!("{path}.ringSize: {message}"));
     }
-    if change["span"] == "half" && !kind.takes_half(widget) {
+    if change["span"] == "half" && !kind.takes_half(widget) && !kept("span") {
         found.push(format!("{path}.span: Bar rows need the full width of the panel, so the \"{widget}\" widget of \"{key}\" cannot take half a line. span \"half\" applies to the \"rings\", \"segments\", \"number\" and \"chart\" widgets and to API balances."));
     }
-    if change["period"].is_string() && !kind.takes_period(widget) {
+    if change["period"].is_string() && !kind.takes_period(widget) && !kept("period") {
         found.push(format!("{path}.period: {drawn} draws no chart. period applies to the \"chart\" widget, whose bars cover it, and to API balances, whose estimated cost, burn rate and chart cover it."));
     }
     let rows = if block.rows.is_empty() {
