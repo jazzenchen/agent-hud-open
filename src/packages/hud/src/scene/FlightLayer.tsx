@@ -20,26 +20,28 @@ import { botState, type BotCue } from "../bots/bot-state";
 import { islandPath, type HUDRect } from "../geometry";
 import type { HUDEdge, HUDMode } from "../model";
 import {
-  dockRoute,
   ENVELOPE,
-  FLIGHT_FRESHNESS_MS,
-  FlightQueue,
-  inward,
-  notchRoute,
-  notchStage,
   PLANE_CREASES,
   PLANE_POINTS,
   STORY,
   stillStory,
   story,
-  type HUDFlightCommand,
-  type NotchStage,
-  type Point,
-  type Ride,
   type Story,
 } from "./flight-plan";
-
-export type { HUDFlight, HUDFlightCommand } from "./flight-plan";
+import {
+  FLIGHT_FRESHNESS_MS,
+  FlightQueue,
+  type HUDFlightCommand,
+  type Ride,
+} from "./flight-queue";
+import {
+  dockRoute,
+  inward,
+  notchRoute,
+  notchStage,
+  type NotchStage,
+  type Point,
+} from "./flight-route";
 
 interface LayerProps {
   /** The host's recent flights, oldest first; each is taken once, by its sequence. */

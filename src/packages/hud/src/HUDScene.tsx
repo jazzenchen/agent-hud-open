@@ -14,7 +14,8 @@ import { DockMemory, type Direction } from "./bots/mark-director";
 import { AlertStack } from "./scene/AlertStack";
 import { HUDExpandedSurface } from "./scene/HUDExpandedSurface";
 import { HUDMarkStrip } from "./scene/HUDMarkStrip";
-import { FlightLayer, type HUDFlightCommand } from "./scene/FlightLayer";
+import { FlightLayer } from "./scene/FlightLayer";
+import type { HUDFlightCommand } from "./scene/flight-queue";
 import { NotchGlow } from "./scene/NotchSurface";
 import {
   useHUDDrag,
@@ -63,7 +64,7 @@ export type {
 export { defaultHUDConfig, HUD_METRICS } from "./model";
 export type { HUDDragPreview, HUDDragStartArgs } from "./scene/useHUDDrag";
 export type { HUDNativePointer } from "./scene/useHUDInteraction";
-export type { HUDFlight, HUDFlightCommand } from "./scene/FlightLayer";
+export type { HUDFlight, HUDFlightCommand } from "./scene/flight-queue";
 
 export interface HUDSceneProps {
   snapshot: Snapshot;

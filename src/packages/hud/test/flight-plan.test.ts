@@ -1,18 +1,15 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { STORY, stillStory, story } from "../src/scene/flight-plan.ts";
+import { FlightQueue, type HUDFlight } from "../src/scene/flight-queue.ts";
 import {
   dockRoute,
-  FlightQueue,
   measure,
   notchRoute,
   notchStage,
-  STORY,
-  stillStory,
-  story,
   type Cubic,
-  type HUDFlight,
   type Point,
-} from "../src/scene/flight-plan.ts";
+} from "../src/scene/flight-route.ts";
 
 const flight = (patch: Partial<HUDFlight> = {}): HUDFlight => ({
   lane: "claude:a|codex:b",
