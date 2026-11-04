@@ -1,10 +1,6 @@
 import type { BotCue, BotEvent, BotSign, BotState } from "./bot-state";
-import {
-  canonicalClawdFrame,
-  ClawdBaker,
-  type ClawdSheet,
-  type SpritePicture,
-} from "./clawd";
+import { ClawdBaker, type SpritePicture } from "./clawd";
+import { canonicalClawdFrame, type ClawdSheet } from "./clawd-sheet";
 import { ClawdPerformer, type ClawdPerformerOptions } from "./clawd-performer";
 import { frameAfter } from "./clawd-clips";
 

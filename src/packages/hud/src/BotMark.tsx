@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { botKey, loadArtwork } from "./bots/artwork";
-import { drawsClawdSprites, loadClawd, type MarkState } from "./bots/clawd";
+import { drawsClawdSprites, type MarkState } from "./bots/clawd";
+import { loadClawd } from "./bots/clawd-sheet";
 import { BotActor } from "./bots/bot-actor";
 import {
   botPhaseState,
