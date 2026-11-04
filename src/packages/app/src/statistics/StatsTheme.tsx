@@ -13,6 +13,7 @@ import type {
   StatisticsTokenKind,
   StatisticsTotal,
 } from "../lib/types";
+import { unpricedHelp } from "../lib/sessions";
 import {
   dateFormat,
   listCost,
@@ -206,10 +207,14 @@ export function costHelp(cost: StatisticsCost | null, zh = false) {
     return zh
       ? "当前筛选暂无目录价估算。"
       : "A list-price estimate is unavailable for this selection.";
-  const models = cost.unpricedNames ?? cost.unpricedModels;
+  const unpriced = unpricedHelp(
+    cost.unpricedTokens,
+    zh,
+    cost.unpricedNames ?? cost.unpricedModels,
+  );
   return zh
-    ? `按各厂商 API 目录价估算所选 Token 类型，不同币种不做换算。${cost.unpricedTokens ? `另有 ${integer(cost.unpricedTokens)} 个 Token 来自没有 API 价格的模型，未计入${models.length ? `：${models.join("、")}` : ""}。` : ""}`
-    : `Selected token kinds at the vendors' API list prices; currencies are not converted.${cost.unpricedTokens ? ` ${integer(cost.unpricedTokens)} more tokens came from models with no API list price and are not included${models.length ? `: ${models.join(", ")}` : ""}.` : ""}`;
+    ? `按各厂商 API 目录价估算所选 Token 类型，不同币种不做换算。${unpriced ? `${unpriced}。` : ""}`
+    : `Selected token kinds at the vendors' API list prices; currencies are not converted.${unpriced ? ` ${unpriced}.` : ""}`;
 }
 
 export function Coverage({
