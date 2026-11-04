@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import type { QuotaDisplay } from "@agent-hud/ui/format";
 import {
   HUD_METRICS,
@@ -24,6 +25,14 @@ export interface HUDRect {
   width: number;
   height: number;
 }
+/** A rect as an absolutely placed element's box. */
+export const position = (rect: HUDRect): CSSProperties => ({
+  position: "absolute",
+  left: rect.x,
+  top: rect.y,
+  width: rect.width,
+  height: rect.height,
+});
 export interface StripMetrics {
   width: number;
   height: number;
