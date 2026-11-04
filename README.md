@@ -282,7 +282,7 @@ The workspace layout, the MCP client configuration and the other commands are in
 
 ## Documentation
 
-[Development](docs/development.md) · [Platform architecture](docs/platform-architecture.md) · [Platform builds](docs/platform-builds.md) · [Accounts](docs/accounts.md) · [Client hooks](docs/client-hooks.md) · [Session data](docs/session-data.md) · [Performance](docs/performance.md) · [Parity ledger](docs/parity/README.md) · [Tao patch](docs/tao-panel-patch.md) · [Third-party sources](docs/third-party.md) · [Contributing](CONTRIBUTING.md)
+[Development](docs/development.md) · [Platform architecture](docs/platform-architecture.md) · [Platform builds](docs/platform-builds.md) · [Accounts](docs/accounts.md) · [Client hooks](docs/client-hooks.md) · [Session data](docs/session-data.md) · [Local network](docs/local-network.md) · [Performance](docs/performance.md) · [Parity ledger](docs/parity/README.md) · [Tao patch](docs/tao-panel-patch.md) · [Third-party sources](docs/third-party.md) · [Contributing](CONTRIBUTING.md)
 
 ## License
 

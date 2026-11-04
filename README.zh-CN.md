@@ -282,7 +282,7 @@ pnpm run build:macos -- --bundle
 
 ## 文档
 
-[开发](docs/development.md) · [平台架构](docs/platform-architecture.md) · [平台构建](docs/platform-builds.md) · [账户](docs/accounts.md) · [客户端回调](docs/client-hooks.md) · [会话数据](docs/session-data.md) · [性能](docs/performance.md) · [对齐清单](docs/parity/README.md) · [Tao 补丁](docs/tao-panel-patch.md) · [第三方来源](docs/third-party.md) · [贡献指南](CONTRIBUTING.md)
+[开发](docs/development.md) · [平台架构](docs/platform-architecture.md) · [平台构建](docs/platform-builds.md) · [账户](docs/accounts.md) · [客户端回调](docs/client-hooks.md) · [会话数据](docs/session-data.md) · [局域网协议](docs/local-network.md) · [性能](docs/performance.md) · [对齐清单](docs/parity/README.md) · [Tao 补丁](docs/tao-panel-patch.md) · [第三方来源](docs/third-party.md) · [贡献指南](CONTRIBUTING.md)
 
 ## 许可证
 
