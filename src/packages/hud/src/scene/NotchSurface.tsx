@@ -10,7 +10,6 @@ import HUDGlow, { type GlowAlert } from "../HUDGlow";
 import { islandPath, type HUDRect } from "../geometry";
 import {
   HUD_METRICS,
-  statusColor,
   type HUDConfig,
   type HUDEdge,
   type HUDVendor,
@@ -151,12 +150,15 @@ export const NotchGlow = memo(function NotchGlow({
   geometry,
   config,
   vendors,
+  colors,
   reduceMotion,
   alert = null,
 }: {
   geometry: ReturnType<typeof useNotchGeometry>;
   config: HUDConfig;
   vendors: HUDVendor[];
+  /** The rim's colours: the vendors' with readings, none while detection is paused. */
+  colors: string[];
   reduceMotion: boolean;
   alert?: GlowAlert | null;
 }) {
@@ -193,9 +195,7 @@ export const NotchGlow = memo(function NotchGlow({
         outwardOnly={config.glowOutwardOnly}
         style={config.glowStyle}
         effect={config.glowEffect}
-        colors={vendors
-          .filter((vendor) => vendor.used != null)
-          .map((vendor) => statusColor(vendor.level))}
+        colors={colors}
         active={active}
         period={active ? config.breathSeconds : config.idleBreathSeconds}
         amplitude={config.breathAmplitude}

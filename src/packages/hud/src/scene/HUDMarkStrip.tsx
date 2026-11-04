@@ -3,7 +3,7 @@ import { BotMark } from "../BotMark";
 import HUDGlow, { type GlowAlert } from "../HUDGlow";
 import { botState, facingFromEdge, isAttention } from "../bots/bot-state";
 import { DockMemory, type Direction } from "../bots/mark-director";
-import { labelWidth, type HUDRect, type stripMetrics } from "../geometry";
+import type { HUDRect, stripMetrics } from "../geometry";
 import {
   markUsed,
   meterLabel,
@@ -417,16 +417,7 @@ export function HUDMarkStrip({
                       fontVariantNumeric: "tabular-nums",
                       whiteSpace: "nowrap",
                       textAlign: "right",
-                      minWidth: horizontal(edge)
-                        ? undefined
-                        : Math.max(
-                            ...vendors.map((v) =>
-                              labelWidth(
-                                meterLabel(v, quotaDisplay),
-                                metrics.font,
-                              ),
-                            ),
-                          ),
+                      minWidth: horizontal(edge) ? undefined : metrics.label,
                     }}
                   >
                     {meterLabel(vendor, quotaDisplay)}

@@ -869,7 +869,8 @@ export function HUDScene({
             <NotchGlow
               geometry={notchGeometry}
               config={config}
-              vendors={detectionPaused ? [] : vendors}
+              vendors={vendors}
+              colors={glowColors}
               reduceMotion={reduceMotion}
               alert={glowFlash}
             />

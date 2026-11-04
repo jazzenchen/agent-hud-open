@@ -83,6 +83,8 @@ export interface StripMetrics {
   mark: number;
   font: number;
   labelGap: number;
+  /** The widest of the Simple marks' number labels; 0 when they draw none. */
+  label: number;
   /** A Simple mark's bars beside its logo, how long; 0 when it draws none. */
   bar: number;
   padding: { top: number; right: number; bottom: number; left: number };
@@ -124,6 +126,7 @@ export function stripMetrics(
       mark: 0,
       font: 0,
       labelGap: 0,
+      label: 0,
       bar: 0,
       padding: { top: 0, right: 0, bottom: 0, left: 0 },
       radius: config.hasNotch ? 12 : 10,
@@ -142,6 +145,7 @@ export function stripMetrics(
       mark: logo,
       font: 0,
       labelGap: 0,
+      label: 0,
       bar: 0,
       padding: { top: 0, right: 0, bottom: 0, left: 0 },
       radius: 10,
@@ -187,11 +191,12 @@ export function stripMetrics(
     bottom: tight + (horizontal ? 0 : 3),
     left,
   };
-  const widths = vendors.map(
-    (v) =>
-      mark +
-      (bar ? labelGap + bar : 0) +
-      (numbers ? labelGap + labelWidth(meterLabel(v, display), font) : 0),
+  const labels = vendors.map((v) =>
+    numbers ? labelWidth(meterLabel(v, display), font) : 0,
+  );
+  const widths = labels.map(
+    (label) =>
+      mark + (bar ? labelGap + bar : 0) + (numbers ? labelGap + label : 0),
   );
   const run = n
     ? (horizontal ? widths.reduce((a, b) => a + b, 0) : n * mark) +
@@ -221,6 +226,7 @@ export function stripMetrics(
     mark,
     font,
     labelGap,
+    label: Math.max(0, ...labels),
     bar,
     padding,
     radius: Math.min(Math.round(size * 0.73), Math.min(width, height) / 2),
