@@ -4,6 +4,7 @@
 import { Fragment } from "react";
 import type { Snapshot } from "@agent-hud/protocol";
 import { Switch } from "@agent-hud/ui/components/switch";
+import { HUDArtwork as HUDLogo } from "@agent-hud/hud/HUDArtwork";
 import {
   agentVendorName,
   defaultHUDConfig,
@@ -14,6 +15,7 @@ import { Segments, ToggleRow } from "../SettingsControls";
 import { PartSample } from "../PartSample";
 import type { DisplayProps } from "./controls";
 import { ReorderButtons } from "./ReorderButtons";
+import { useLightTheme } from "../agent-plugins/use-status";
 
 type PanelSectionKey = HUDConfig["panelSections"][number];
 
@@ -29,6 +31,7 @@ export function PanelSection({
   update,
   t,
 }: DisplayProps & { snapshot: Snapshot }) {
+  const light = useLightTheme();
   const sectionNames: Record<PanelSectionKey, string> = {
     blocks: t("Quota details", "额度明细"),
     tokens: t("Token usage", "Token 消耗"),
@@ -50,7 +53,11 @@ export function PanelSection({
         (row) =>
           [
             row.vendor,
-            { id: row.vendor, title: agentVendorName(row.vendor) },
+            {
+              id: row.vendor,
+              source: row.vendor,
+              title: agentVendorName(row.vendor),
+            },
           ] as const,
       ),
       ...snapshot.billing.map(
@@ -59,6 +66,7 @@ export function PanelSection({
             `api:${account.vendor}`,
             {
               id: `api:${account.vendor}`,
+              source: account.vendor,
               title: `${agentVendorName(account.vendor)} · ${t("Balance", "余额")}`,
             },
           ] as const,
@@ -143,7 +151,11 @@ export function PanelSection({
       {orderedBlocks.length > 1 && (
         <MoreRows label={t("Agent order", "智能体顺序")}>
           {orderedBlocks.map((block, index) => (
-            <Row key={block.id} title={block.title}>
+            <Row
+              key={block.id}
+              title={block.title}
+              icon={<HUDLogo source={block.source} size={18} light={light} />}
+            >
               <ReorderButtons
                 name={block.title}
                 index={index}
