@@ -4,6 +4,7 @@ mod hooks;
 pub mod plans;
 pub mod process;
 pub mod store;
+mod tokens;
 pub mod transcript;
 
 use crate::Agent;
