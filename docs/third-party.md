@@ -7,7 +7,11 @@ providers (github.com/steipete/CodexBar, commit 897bff3,
 codes come from the WorkBuddy 5.6.2 client. Agent HUD signs in in its own
 window instead of importing browser cookies.
 
-TRAE's hook events, their settings files and the two builds' bundle identifiers
+TRAE CN's credit requests and fields (the `GetUserToken` exchange, the
+entitlement list, `code` 1001 as signed out, the plan from `display_desc`)
+follow CodexBar's Trae CN provider (MIT,
+`Sources/CodexBarCore/Resources/Plugins/traecn.js`, `docs/traecn.md`). TRAE's
+hook events, their settings files and the two builds' bundle identifiers
 were checked against CodeIsland (github.com/wxtsky/CodeIsland, MIT,
 `ConfigInstaller.swift`, `TerminalActivator.swift`) and TRAE's own hook
 reference.

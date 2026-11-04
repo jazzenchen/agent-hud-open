@@ -103,6 +103,7 @@ pub static ACCOUNTS: &[&crate::account::Provider] = &[
     &droid::account::PROVIDER,
     &crate::qoder::account::PROVIDER,
     &crate::buddy::account::PROVIDER,
+    &trae::account::PROVIDER,
 ];
 
 /// Where a session of `source` opens, as its agent says (`Discovery::session_target`):

@@ -2,7 +2,9 @@
 //! app), and its China build TRAE CN. Each keeps its conversations encrypted
 //! with a key only the running app holds, so no session file is read: a
 //! session is what its hooks report (`hooks.rs`), titled by its first
-//! prompt, with no tokens.
+//! prompt, with no tokens. The credits show only on trae.ai and trae.cn
+//! (`account.rs`).
+pub mod account;
 mod hooks;
 pub mod process;
 

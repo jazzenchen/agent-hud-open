@@ -26,6 +26,7 @@ The implementation follows the original Swift account readers:
 | Cline (ClinePass) | Cline's own sign-in in `providers.json` (`providers.cline.settings`, under `CLINE_DATA_DIR`, else `CLINE_DIR`/`~/.cline` `data/settings`): its browser sign-in's access token, sent as `workos:<token>`, else a saved API key, else `CLINE_API_KEY`; never refreshed or rewritten. An expired token keeps the last reading until Cline runs again; a 401 is a sign-out, a 403 or 404 an account with no plan to read | `api.cline.bot/api/v1/users/me/plan/usage-limits`: the 5-hour, weekly and monthly share used and their resets |
 | Qoder        | A sign-in the user makes on qoder.com or qoder.com.cn in Agent HUD's own window (see below); Qoder, Qoder CN and QoderWork spend it | `GET /api/v2/me/usages/big_model_credits`: the plan's model credits, shared credits added, and their reset |
 | WorkBuddy    | A sign-in the user makes on www.workbuddy.cn in Agent HUD's own window | `POST /billing/meter/get-user-resource-summary`: credits and reward credits left of their cycle, the plan; the reset from the paid, then free, package lists |
+| TRAE         | A sign-in the user makes on www.trae.ai (TRAE) or www.trae.cn (TRAE CN) in Agent HUD's own window; TRAE's own stored sign-in is encrypted and never read | Each reading trades the session for a short-lived token (`POST /cloudide/api/v3/common/GetUserToken`, never kept), then `POST /trae/api/v{1,2}/pay/user_current_entitlement_list` with `Authorization: Cloud-IDE-JWT`: TRAE CN's credits used of their total (`usage_summary`), TRAE's dollar usage as a share of its plan's allowance, the plan; no reset, since credit packs lapse on their own dates. International accounts are asked at `ug-normal.trae.ai`, then, if it refuses the session, `ug-normal.us.trae.ai`; TRAE CN at `api.trae.cn` |
 
 Each provider states its own facts in its folder under `src/crates/agents/src/`
 (`agents::account::Provider`, listed in `agents::ACCOUNTS`): how it is read,
@@ -69,8 +70,8 @@ start another account reader.
 
 ## Web sign-in
 
-Some quotas are shown only on the vendor's own site: Qoder's model credits and
-WorkBuddy's credits. A provider states where the user may sign in for one
+Some quotas are shown only on the vendor's own site: Qoder's model credits,
+WorkBuddy's credits and TRAE's usage. A provider states where the user may sign in for one
 (`agents::account::WebSignIn`: each site's host, name and page). Nothing about
 it starts by itself:
 

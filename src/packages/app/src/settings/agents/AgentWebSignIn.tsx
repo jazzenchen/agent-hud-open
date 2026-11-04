@@ -30,8 +30,8 @@ export function AgentWebSignIn({
     <Section
       title={t("Quota sign-in", "额度登录")}
       footer={t(
-        "This quota is shown only on the vendor's site. Sign in there in Agent HUD's own window; Agent HUD keeps that sign-in on this computer and never reads your browser's.",
-        "这项额度只在厂商网站上显示。在 Agent HUD 自己的窗口里登录后，Agent HUD 只在这台电脑上保存这次登录，不会读取浏览器里的登录。",
+        "This quota is shown only on the vendor's site. Sign in there in Agent HUD's own window; Agent HUD keeps that sign-in on this computer and never reads your browser's. Google may refuse to sign in inside such a window; another way the site offers works.",
+        "这项额度只在厂商网站上显示。在 Agent HUD 自己的窗口里登录后，Agent HUD 只在这台电脑上保存这次登录，不会读取浏览器里的登录。Google 可能拒绝在这种窗口里登录，可改用网站提供的其他方式。",
       )}
     >
       {web.sites.map((site) => (
