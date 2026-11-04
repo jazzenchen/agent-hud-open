@@ -333,9 +333,9 @@ pub fn text(value: Value) -> Option<String> {
                         if let Some(name) = map.get("tool_name").and_then(Value::as_str) {
                             return Some(format!("[tool: {name}]"));
                         }
-                        serde_json::to_string(&Value::Object(map)).ok()
+                        Some(Value::Object(map).to_string())
                     }
-                    other => serde_json::to_string(&other).ok(),
+                    other => Some(other.to_string()),
                 })
                 .collect::<Vec<_>>();
             if parts.is_empty() {
@@ -344,7 +344,7 @@ pub fn text(value: Value) -> Option<String> {
                 Some(parts.join("\n"))
             }
         }
-        other => serde_json::to_string(&other).ok(),
+        other => Some(other.to_string()),
     }
 }
 

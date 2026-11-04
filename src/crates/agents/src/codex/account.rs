@@ -363,9 +363,7 @@ fn remember_identity(
         let key = format!("{prefix}{ws}");
         if map.get(&key).and_then(Value::as_str) != Some(em.as_str()) {
             map.insert(key, json!(em));
-            if let Ok(bytes) = serde_json::to_vec(&Value::Object(map)) {
-                let _ = host.write_own(IDENTITIES, &bytes);
-            }
+            let _ = host.write_own(IDENTITIES, Value::Object(map).to_string().as_bytes());
         }
     } else if !ws.is_empty() && em.is_empty() {
         if let Some(saved) = map
