@@ -6,6 +6,7 @@ pub mod permissions;
 pub mod process;
 pub mod proto;
 mod quotas;
+mod reducer;
 pub mod statusline;
 pub mod transcript;
 
