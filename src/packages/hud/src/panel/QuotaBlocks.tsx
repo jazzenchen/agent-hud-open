@@ -8,7 +8,7 @@ import type {
 import { blockRows, quotaRowKey, vendorKey, type HUDConfig } from "../model";
 import { SourceProviderBlock } from "./QuotaSection";
 import { SourceBalances } from "./SourceBalances";
-import { blockLines } from "./block-lines";
+import { blockLines, COMPACT_LEAST } from "./block-lines";
 import {
   inPanelOrder,
   type densityMetrics,
@@ -42,7 +42,15 @@ export function QuotaBlocks({
   // Blocks that ask for a half, a third or a quarter share a line where the
   // blocks' width holds them: the panel's, or the column's a row of an
   // agent's gives them.
-  const lines = blockLines(blocks, span, width, density.section);
+  // A ring with no legend makes a compact block, as narrow as its picker.
+  const least = (key: string) => {
+    const layout = layouts?.[key];
+    return layout?.legend === false &&
+      ["rings", "segments", "ring"].includes(layout.widget ?? "")
+      ? COMPACT_LEAST
+      : undefined;
+  };
+  const lines = blockLines(blocks, span, width, density.section, least);
   return (
     <div
       className="hud-source-blocks"

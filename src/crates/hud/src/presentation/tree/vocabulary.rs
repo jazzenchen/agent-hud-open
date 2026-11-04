@@ -35,7 +35,7 @@ pub(super) const RING_SIZES: &[&str] = &["small", "medium", "large", "fill"];
 pub(super) const CENTERS: &[&str] = &["percent", "none"];
 /// How many columns and rows a control inside a grid covers at most.
 pub(super) const SPANS_IN_GRID: (i64, i64) = (6, 4);
-pub(super) const SPANS: &[&str] = &["full", "half", "third", "quarter"];
+pub(super) const SPANS: &[&str] = &["full", "half", "third", "quarter", "fifth", "sixth"];
 pub(super) const LEVELS: &[&str] = &["normal", "warning", "critical", "stale"];
 pub(super) const FORMATS: &[&str] = &[
     "percent",
@@ -210,9 +210,9 @@ pub(in crate::presentation) fn catalog() -> Value {
         ],
         "own": {
             "panel": {"fields": {"spacing": "compact, regular or roomy", "separators": "true or false: lines between parts", "width": "480 to 960 points (540 by default)", "countdown": "true or false: the reset countdowns"}, "children": "the sections blocks, tokens and sessions, and your own controls; a row, column or grid of yours placed here may hold sections"},
-            "blocks": {"fields": {"hidden": "true or false", "width": "points, for the section inside a row, column or grid of yours"}, "children": "one quota or balance block per agent, and your own controls; span half, third or quarter puts two, three or four on a line when there is room"},
-            "quota": {"fields": {"widget": "bar, rings, segments, number or chart", "measures": "what the picker offers, the first shown: quota, burn, tokens, consumed, cost", "rows": "the order of its row ids", "hiddenRows": "row ids to hide", "accounts": "show only these account ids", "hiddenAccounts": "account ids to hide", "countdown": "true or false", "columns": "2 to 6, for number", "ringSize": "small, medium or large, for rings and segments", "legend": "false draws rings and segments as the ring alone, the most used window's figure inside, its header and picker kept: a compact block", "span": "full, half, third or quarter of a line (not for bar); blocks share a line where each keeps about 200 points, else take one each", "period": "day, week or month, for chart", "hidden": "true or false"}},
-            "balance": {"fields": {"widget": "number or chart", "measures": "quota, burn, cost", "period": "day, week or month", "span": "full, half, third or quarter", "hidden": "true or false"}},
+            "blocks": {"fields": {"hidden": "true or false", "width": "points, for the section inside a row, column or grid of yours"}, "children": "one quota or balance block per agent, and your own controls; span half to sixth puts two to six on a line when there is room"},
+            "quota": {"fields": {"widget": "bar, rings, segments, number or chart", "measures": "what the picker offers, the first shown: quota, burn, tokens, consumed, cost", "rows": "the order of its row ids", "hiddenRows": "row ids to hide", "accounts": "show only these account ids", "hiddenAccounts": "account ids to hide", "countdown": "true or false", "columns": "2 to 6, for number", "ringSize": "small, medium or large, for rings and segments", "legend": "false makes a compact block, about square: the name, then the picker, then the ring alone with the most used window's figure inside, then the account and when that window resets", "span": "full, half, third, quarter, fifth or sixth of a line (not for bar); blocks next to each other asking the same share it where each keeps about 200 points, a compact block about 130, else fewer to a line", "period": "day, week or month, for chart", "hidden": "true or false"}},
+            "balance": {"fields": {"widget": "number or chart", "measures": "quota, burn, cost", "period": "day, week or month", "span": "full, half, third, quarter, fifth or sixth", "hidden": "true or false"}},
             "tokens": {"fields": {"period": "day, week or month", "agents": "agent names from get_hud's tokens.offeredAgents", "models": "model ids from tokens.offeredModels", "hiddenModels": "model ids to hide", "modelOrder": "model ids in order", "hidden": "true or false", "width": "points, for the section inside a row, column or grid of yours"}},
             "sessions": {"fields": {"limit": "1 to 10", "period": "day or week", "agents": "agent names from sessions.offeredAgents", "projects": "project ids from sessions.offeredProjects", "hidden": "true or false", "width": "points, for the section inside a row, column or grid of yours"}}
         },
@@ -235,7 +235,7 @@ pub(in crate::presentation) fn catalog() -> Value {
             "when": "show it only when a condition holds: {\"value\": \"{window.level}\", \"in\": [\"warning\", \"critical\"]}; one of is, in, not, above, below or present",
             "onClick": "what a click does; see actions",
             "hidden": "true or false",
-            "span": "full, half, third or quarter of a line; for a control placed in blocks",
+            "span": "full, half, third, quarter, fifth or sixth of a line; for a control placed in blocks",
             "width": "16 to 960 points: a fixed width, so controls in different rows line up; left out, it takes what it needs",
             "colSpan": "1 to 6: how many columns it covers, inside a grid",
             "rowSpan": "1 to 4: how many rows it covers, inside a grid",

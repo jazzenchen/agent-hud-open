@@ -15,10 +15,13 @@ export function AccountHeader({
   account,
   now,
   light,
+  compact = false,
 }: {
   account: Account;
   now: number;
   light: boolean;
+  /** Under a compact block's ring: the name and plan in the middle, no more. */
+  compact?: boolean;
 }) {
   const colors = palette(useGround(light));
   const { language } = useFormat();
@@ -36,7 +39,13 @@ export function AccountHeader({
       }}
     >
       <div
-        style={{ display: "flex", alignItems: "center", gap: 6, minHeight: 15 }}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: compact ? "center" : undefined,
+          gap: 6,
+          minHeight: 15,
+        }}
       >
         <MiddleTruncated
           text={name}
@@ -57,10 +66,14 @@ export function AccountHeader({
             {account.planLabel}
           </span>
         )}
-        <span style={{ flex: "1 1 8px", minWidth: 8 }} />
-        <WholeOrNothing color={colors.tertiary}>
-          {accountReadLabel(account, now, language)}
-        </WholeOrNothing>
+        {!compact && (
+          <>
+            <span style={{ flex: "1 1 8px", minWidth: 8 }} />
+            <WholeOrNothing color={colors.tertiary}>
+              {accountReadLabel(account, now, language)}
+            </WholeOrNothing>
+          </>
+        )}
       </div>
       {account.warning && (
         <Notice text={account.warning} color={colors.warningText} />

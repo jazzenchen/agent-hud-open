@@ -17,6 +17,10 @@ test("a half needs 230 points, a third or a quarter 200", () => {
   assert.equal(perLine("quarter", 920, 10), 4);
   assert.equal(perLine("quarter", 680, 10), 3);
   assert.equal(perLine(undefined, 920, 10), 1);
+  // A compact block keeps 130 points: six at 960 points, four at 720, three at 540.
+  assert.equal(perLine("sixth", 920, 10, 130), 6);
+  assert.equal(perLine("sixth", 680, 10, 130), 4);
+  assert.equal(perLine("sixth", 500, 10, 130), 3);
 });
 
 test("blocks asking the same share fill lines, the rest keep their cells", () => {

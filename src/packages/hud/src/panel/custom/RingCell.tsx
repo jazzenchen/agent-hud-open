@@ -16,6 +16,7 @@ import {
 import { UsageRing } from "../../usage-meter/UsageRing";
 import type { RingStyle } from "../../usage-meter/arcs";
 import { tabular } from "../theme";
+import { mostUsed } from "../QuotaRingCard";
 import { sameAgent } from "./custom-collections";
 import { formatted, type Scope } from "./custom-data";
 import { Clickable } from "./Clickable";
@@ -26,17 +27,6 @@ const RING_PX = { small: 40, medium: 52, large: 60 } as const;
 const FILL_LIMIT = 200;
 
 export type RingSize = keyof typeof RING_PX | "fill";
-
-/** The window with the largest share, which a ring's figure shows. */
-export function tightest(rows: Quota[]): Quota | undefined {
-  return rows.reduce<Quota | undefined>(
-    (a, b) =>
-      b.usedPercent != null && (!a || b.usedPercent > (a.usedPercent ?? -1))
-        ? b
-        : a,
-    undefined,
-  );
-}
 
 export function RingCell({
   rows,
@@ -74,7 +64,7 @@ export function RingCell({
     size === "fill"
       ? Math.max(32, Math.min(FILL_LIMIT, Math.floor(room ?? 60)))
       : RING_PX[size];
-  const most = tightest(rows);
+  const most = mostUsed(rows);
   const agent = rows[0]?.vendor;
   const name =
     drawing.snapshot.providers.find((p) => sameAgent(p.id, agent))?.name ??

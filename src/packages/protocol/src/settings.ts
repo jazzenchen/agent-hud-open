@@ -21,7 +21,7 @@ export interface PanelBlockLayout {
   legend?: boolean;
   /** How much of a line it takes; blocks asking the same share one where each
    * keeps enough room. */
-  span?: "full" | "half" | "third" | "quarter";
+  span?: "full" | "half" | "third" | "quarter" | "fifth" | "sixth";
   period?: "day" | "week" | "month";
 }
 export interface PanelLayout {

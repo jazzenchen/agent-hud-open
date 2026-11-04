@@ -18,7 +18,7 @@ const MEASURES: &[&str] = &["quota", "burn", "tokens", "consumed", "cost"];
 const RING_SIZES: &[&str] = &["small", "medium", "large"];
 /// How much of a line a block takes; blocks that take less share it where each
 /// keeps enough room (QuotaBlocks.tsx).
-const SPANS: &[&str] = &["full", "half", "third", "quarter"];
+const SPANS: &[&str] = &["full", "half", "third", "quarter", "fifth", "sixth"];
 const PERIODS: &[&str] = &["day", "week", "month"];
 const SPACINGS: &[&str] = &["compact", "regular", "roomy"];
 const SESSION_PERIODS: &[&str] = &["day", "week"];
@@ -770,7 +770,7 @@ fn block_issues(
     }
     let shared = change["span"].as_str().is_some_and(|s| s != "full");
     if shared && !kind.takes_half(widget) && !kept("span") {
-        found.push(format!("{path}.span: Bar rows need the full width of the panel, so the \"{widget}\" widget of \"{key}\" cannot share a line. span \"half\", \"third\" and \"quarter\" apply to the \"rings\", \"segments\", \"number\" and \"chart\" widgets and to API balances."));
+        found.push(format!("{path}.span: Bar rows need the full width of the panel, so the \"{widget}\" widget of \"{key}\" cannot share a line. span \"half\" to \"sixth\" apply to the \"rings\", \"segments\", \"number\" and \"chart\" widgets and to API balances."));
     }
     if change["legend"] == false && !kind.takes_ring_size(widget) && !kept("legend") {
         found.push(format!("{path}.legend: {drawn} has no legend to leave out. legend applies to the \"rings\" and \"segments\" widgets."));

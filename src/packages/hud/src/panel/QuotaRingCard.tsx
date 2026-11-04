@@ -33,6 +33,49 @@ const RINGS = {
   large: { size: 60, width: 6 },
 } as const;
 
+/** The window with the largest share: the one a ring's figure shows. */
+export function mostUsed(rows: Quota[]): Quota | undefined {
+  return rows.reduce<Quota | undefined>(
+    (a, b) =>
+      b.usedPercent != null && (!a || b.usedPercent > (a.usedPercent ?? -1))
+        ? b
+        : a,
+    undefined,
+  );
+}
+
+/** Under a compact block's ring: when its most used window resets. */
+export function RingReset({
+  rows,
+  now,
+  light,
+}: {
+  rows: Quota[];
+  now: number;
+  light: boolean;
+}) {
+  const colors = palette(useGround(light));
+  const format = useFormat();
+  const most = mostUsed(rows);
+  const reset = most ? quotaMetric(most, "quota", now, format).detail : "";
+  if (!reset) return null;
+  return (
+    <span
+      style={{
+        fontSize: 11,
+        lineHeight: "13px",
+        textAlign: "center",
+        color: colors.secondary,
+        whiteSpace: "nowrap",
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+      }}
+    >
+      {reset}
+    </span>
+  );
+}
+
 export function QuotaRingCard({
   rows,
   style,
@@ -72,13 +115,7 @@ export function QuotaRingCard({
     row.status === "stale"
       ? colors.secondary
       : markLevelText(row.status, ground);
-  const tightest = drawn.reduce<Quota | undefined>(
-    (a, b) =>
-      b.usedPercent != null && (!a || b.usedPercent > (a.usedPercent ?? -1))
-        ? b
-        : a,
-    undefined,
-  );
+  const tightest = mostUsed(drawn);
   // Alone, the ring's figure is the picked measure's, as the lines' would be.
   const figureText = tightest
     ? !legend && measure !== "quota"

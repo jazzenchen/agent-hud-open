@@ -15,10 +15,13 @@ export function ResetCreditsRow({
   resets,
   showExpiry,
   light,
+  compact = false,
 }: {
   resets: ResetCredits;
   showExpiry: boolean;
   light: boolean;
+  /** In a compact block: the icon and the count in the middle; the card tells the rest. */
+  compact?: boolean;
 }) {
   const colors = palette(useGround(light));
   const { language } = useFormat();
@@ -38,7 +41,8 @@ export function ResetCreditsRow({
       style={{
         display: "flex",
         alignItems: "center",
-        gap: 12,
+        justifyContent: compact ? "center" : undefined,
+        gap: compact ? 6 : 12,
         padding: "2px 6px",
         fontSize: 12,
         lineHeight: "16px",
@@ -54,9 +58,11 @@ export function ResetCreditsRow({
         strokeWidth={2.4}
         style={{ flex: "0 0 8px", width: 8 }}
       />
-      <span style={{ flex: "0 0 152px", width: 152, fontWeight: 500 }}>
-        {say(language, "额度重置", "Usage resets")}
-      </span>
+      {!compact && (
+        <span style={{ flex: "0 0 152px", width: 152, fontWeight: 500 }}>
+          {say(language, "额度重置", "Usage resets")}
+        </span>
+      )}
       <span
         style={{
           fontWeight: 600,
@@ -70,7 +76,7 @@ export function ResetCreditsRow({
           `${resets.availableCount} available`,
         )}
       </span>
-      {available && showExpiry ? (
+      {compact ? null : available && showExpiry ? (
         <ExpiryLabel full={label.full} short={label.short} />
       ) : (
         <span style={{ flex: "1 1 8px", minWidth: 8 }} />

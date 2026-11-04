@@ -14,10 +14,11 @@ import {
 import { ResetCreditsRow } from "./ResetCreditsRow";
 import { usePanelServices } from "../PanelContext";
 import { useGround } from "../ground";
-import { agentVendorName } from "../agent-artwork";
 import { measures, palette, type Logo, type Measure } from "./theme";
 import { SourceTokenChart } from "./TokenChartSection";
 import { MetricPicker } from "./MetricPicker";
+import { BlockHeading } from "./BlockHeading";
+import { RingReset } from "./QuotaRingCard";
 import { QuotaWidgets } from "./QuotaWidgets";
 
 export const SourceProviderBlock = memo(function SourceProviderBlock({
@@ -114,6 +115,11 @@ export const SourceProviderBlock = memo(function SourceProviderBlock({
     : null;
   const recentMoney = recent ? recentCost(recent, format.language) : null;
   const countdown = layout.countdown ?? showReset;
+  // A ring with no legend makes a compact block: stacked, the account and the
+  // reset under the ring.
+  const compact =
+    layout.legend === false &&
+    ["rings", "segments", "ring"].includes(layout.widget ?? "");
   return (
     <section
       className="hud-source-provider"
@@ -123,63 +129,35 @@ export const SourceProviderBlock = memo(function SourceProviderBlock({
         gap: "var(--hud-block-gap, 8px)",
       }}
     >
-      <div
-        className="hud-source-provider-heading"
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 6,
-          padding: "1px 0",
-          minHeight: 20,
-        }}
-      >
-        <span
-          style={{
-            width: 20,
-            flex: "0 0 20px",
-            display: "inline-flex",
-            justifyContent: "center",
-          }}
-        >
-          <Logo source={vendor} size={14} light={light} />
-        </span>
-        <strong
-          title={agentVendorName(vendor)}
-          style={{
-            fontSize: 13,
-            fontWeight: 700,
-            lineHeight: "16px",
-            color: colors.text,
-            // One line in a block a third or a quarter wide: cut short, never wrapped.
-            minWidth: 0,
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            whiteSpace: "nowrap",
-          }}
-        >
-          {agentVendorName(vendor)}
-        </strong>
-        <span style={{ flex: 1 }} />
-        {layout.widget !== "chart" && !missingReading && (
-          <MetricPicker
-            selected={measure}
-            choose={setMeasure}
-            light={light}
-            availability={
-              Object.fromEntries(
-                Object.entries(availability).map(([key, value]) => [
-                  key,
-                  {
-                    ...value,
-                    selectable:
-                      value.selectable && offered.includes(key as Measure),
-                  },
-                ]),
-              ) as typeof availability
-            }
-          />
-        )}
-      </div>
+      <BlockHeading
+        vendor={vendor}
+        Logo={Logo}
+        light={light}
+        color={colors.text}
+        compact={compact}
+        picker={
+          layout.widget !== "chart" &&
+          !missingReading && (
+            <MetricPicker
+              selected={measure}
+              choose={setMeasure}
+              light={light}
+              availability={
+                Object.fromEntries(
+                  Object.entries(availability).map(([key, value]) => [
+                    key,
+                    {
+                      ...value,
+                      selectable:
+                        value.selectable && offered.includes(key as Measure),
+                    },
+                  ]),
+                ) as typeof availability
+              }
+            />
+          )
+        }
+      />
       {vendorStatus && (
         <BlockNotice text={vendorStatus} light={light} warning />
       )}
@@ -260,7 +238,7 @@ export const SourceProviderBlock = memo(function SourceProviderBlock({
                 gap: "var(--hud-block-gap, 8px)",
               }}
             >
-              {account && (
+              {account && !compact && (
                 <AccountHeader account={account} now={now} light={light} />
               )}
               <div
@@ -280,11 +258,23 @@ export const SourceProviderBlock = memo(function SourceProviderBlock({
                   onStats={onStats}
                 />
               </div>
+              {account && compact && (
+                <AccountHeader
+                  account={account}
+                  now={now}
+                  light={light}
+                  compact
+                />
+              )}
+              {compact && countdown && (
+                <RingReset rows={sectionRows} now={now} light={light} />
+              )}
               {resets && (
                 <ResetCreditsRow
                   resets={resets}
                   showExpiry={countdown}
                   light={light}
+                  compact={compact}
                 />
               )}
             </div>

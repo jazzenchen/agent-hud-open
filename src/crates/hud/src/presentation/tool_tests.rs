@@ -948,7 +948,7 @@ fn compact_blocks_leave_out_their_lines_and_share_a_line() {
         &owner,
         json!({"edit": [
             {"update": "claude", "widget": "rings", "legend": false, "span": "third"},
-            {"update": "codex", "widget": "segments", "legend": false, "span": "third"}
+            {"update": "codex", "widget": "segments", "legend": false, "span": "sixth"}
         ]}),
     );
     let layout = layout_of(&owner);
