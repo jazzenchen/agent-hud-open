@@ -1,10 +1,11 @@
 //! Latest client-reported evidence beside the transcript. This is not another
 //! transcript reducer or usage ledger: origins never imply work, attention never
 //! creates an actionable approval, and callbacks never mint token/cost facts.
+use crate::iso;
 use crate::naming::session_title::{self, TitleEvidence};
 use crate::naming::surfaces;
 use agent_hud_agents::{HookEvent, COMPLETION_SOURCES};
-use chrono::{DateTime, Utc};
+use chrono::DateTime;
 use serde_json::{json, Value};
 use std::collections::{HashMap, HashSet};
 const DAY: i64 = 86_400_000;
@@ -34,11 +35,6 @@ fn date(value: &Value) -> Option<i64> {
         .as_str()
         .and_then(|s| DateTime::parse_from_rfc3339(s).ok())
         .map(|d| d.timestamp_millis())
-}
-fn iso(at: i64) -> Value {
-    DateTime::<Utc>::from_timestamp_millis(at)
-        .map(|d| json!(d.to_rfc3339()))
-        .unwrap_or(Value::Null)
 }
 fn valid(event: &HookEvent, now: i64, retention: i64) -> bool {
     event.at_ms > now.saturating_sub(retention) && event.at_ms <= now.saturating_add(FUTURE)

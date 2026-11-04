@@ -3,7 +3,7 @@
 //! and `quota_sample` live here.
 
 use crate::l10n;
-use crate::{pricing, Usage};
+use crate::{iso, pricing, Usage};
 pub(crate) use agent_hud_agents::transcript::metering::{date_ms, event_key, Event, Mark};
 use chrono::{DateTime, Utc};
 use rusqlite::{params, Connection};
@@ -398,13 +398,7 @@ pub(crate) fn list_cost(db: &Connection, path: &str) -> rusqlite::Result<Option<
         while let Some(row) = rows.next()? {
             let tier = usize::try_from(row.get::<_, i64>(0)?).ok();
             let used = usage(row, 1)?;
-            let tokens = pricing::PriceTokens {
-                tokens_in: used.input + used.write,
-                tokens_out: used.output + used.reasoning,
-                cache_read: used.read,
-                cache_write: used.write,
-                reasoning: used.reasoning,
-            };
+            let tokens = price_tokens(used);
             // Session costs are US dollars; a relay that prices in another
             // currency leaves its calls unpriced there.
             match pricing::cost_in_tier(&source, &model, &tokens, tier)
@@ -1291,12 +1285,7 @@ impl View {
         let mut sums = BTreeMap::<(i64, u32), Usage>::new();
         for part in self.parts.values() {
             for (key, at, u) in &part.buckets {
-                let sum = sums.entry((*at, *key)).or_default();
-                sum.input += u.input;
-                sum.output += u.output;
-                sum.read += u.read;
-                sum.write += u.write;
-                sum.reasoning += u.reasoning;
+                sums.entry((*at, *key)).or_default().add(*u);
             }
         }
         self.buckets = sums
@@ -1304,13 +1293,7 @@ impl View {
             .filter(|(_, u)| u.total() > 0)
             .map(|((at, key), u)| {
                 let (source, model) = &self.keys[key as usize];
-                let tokens = pricing::PriceTokens {
-                    tokens_in: u.input + u.write,
-                    tokens_out: u.output + u.reasoning,
-                    cache_read: u.read,
-                    cache_write: u.write,
-                    reasoning: u.reasoning,
-                };
+                let tokens = price_tokens(u);
                 let cost = pricing::cost_at(
                     source,
                     model,
@@ -1579,7 +1562,7 @@ impl View {
                 // rows have it: a reading with no newer one never forecasts a
                 // run-out that has already passed.
                 let interval = remaining / rate * 3_600_000.0;
-                outlook = json!({"kind":"exhausts","basis":basis,"ratePctPerHour":rate,"exhaustsAt":now.checked_add(interval as i64).and_then(iso),"beforeReset":interval<(reset-now)as f64,"projectedUsedPercent":(100.0-remaining+rate*(reset-now)as f64/3_600_000.0).min(100.0)});
+                outlook = json!({"kind":"exhausts","basis":basis,"ratePctPerHour":rate,"exhaustsAt":now.checked_add(interval as i64).map(iso),"beforeReset":interval<(reset-now)as f64,"projectedUsedPercent":(100.0-remaining+rate*(reset-now)as f64/3_600_000.0).min(100.0)});
             }
         }
         let source = row["consumerSource"].as_str();
@@ -1600,7 +1583,7 @@ impl View {
         let mut consumed = Value::Null;
         let mut cost = Value::Null;
         let mut reply = Value::Null;
-        let mut observed = None;
+        let mut observed = Value::Null;
         let mut unavailable = serde_json::Map::new();
         let reason = if !complete {
             l10n::text(
@@ -1734,10 +1717,6 @@ fn model_family(model: &str) -> Option<&str> {
         .find(|family| model.split(['-', '_', '.']).any(|part| part == *family))
 }
 
-fn iso(at: i64) -> Option<String> {
-    DateTime::<Utc>::from_timestamp_millis(at).map(|date| date.to_rfc3339())
-}
-
 #[cfg(test)]
 mod retention_tests {
     use super::*;
@@ -1782,8 +1761,8 @@ mod retention_tests {
         for at in [observed + 10_000, observed + 50 * 60_000] {
             let metrics = view.metrics(&row, at, false, false, &samples);
             assert_eq!(
-                metrics["outlook"]["exhaustsAt"].as_str(),
-                iso(at + 6 * 3_600_000).as_deref(),
+                metrics["outlook"]["exhaustsAt"],
+                iso(at + 6 * 3_600_000),
                 "{metrics}"
             );
             assert_eq!(metrics["outlook"]["basis"], "recent");
@@ -1808,10 +1787,7 @@ mod retention_tests {
         assert_eq!(outlook["kind"], "exhausts", "{metrics}");
         assert_eq!(outlook["basis"], "window");
         assert_eq!(outlook["ratePctPerHour"], 25.0);
-        assert_eq!(
-            outlook["exhaustsAt"].as_str(),
-            iso(now + 3 * 3_600_000).as_deref()
-        );
+        assert_eq!(outlook["exhaustsAt"], iso(now + 3 * 3_600_000));
         assert_eq!(outlook["beforeReset"], true);
         assert!(
             metrics["burnRatePctPerHour"].is_null(),

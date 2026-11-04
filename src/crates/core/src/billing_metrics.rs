@@ -29,13 +29,7 @@ impl Cache {
         let mut events = Vec::with_capacity(rows.len());
         for row in rows {
             let usage = row.usage;
-            let tokens = pricing::PriceTokens {
-                tokens_in: usage.input + usage.write,
-                tokens_out: usage.output + usage.reasoning,
-                cache_read: usage.read,
-                cache_write: usage.write,
-                reasoning: usage.reasoning,
-            };
+            let tokens = metering::price_tokens(usage);
             let prices = [pricing::Region::International, pricing::Region::China].map(|region| {
                 pricing::cost_at("deepseek", &row.model, &tokens, true, region, Some(row.at))
                     .filter(|p| p.currency == region.currency())

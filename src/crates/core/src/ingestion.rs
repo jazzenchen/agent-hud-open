@@ -1078,22 +1078,28 @@ impl AgentHudCore {
         }
     }
 
+    /// Up to when a pending log's usage is known: its last update when only
+    /// the parser changed, else its read's target.
+    pub(crate) fn pending_meter_bound(&self, path: &Path, file: &FileStamp) -> Option<i64> {
+        self.logs.get(path).and_then(|log| {
+            if log.parser_version != PARSER_VERSION
+                && log.length == file.length
+                && log.modified == file.modified
+            {
+                metering::date_ms(&log.updated)
+            } else {
+                log.meter_target_at
+            }
+        })
+    }
+
     pub(crate) fn pending_meter_bounds(&self) -> HashMap<&str, Option<i64>> {
         let mut bounds = HashMap::<&str, Option<i64>>::new();
         for path in &self.reads.pending {
             let Some(file) = self.reads.listing.files.get(path) else {
                 continue;
             };
-            let latest = self.logs.get(path).and_then(|log| {
-                if log.parser_version != PARSER_VERSION
-                    && log.length == file.length
-                    && log.modified == file.modified
-                {
-                    metering::date_ms(&log.updated)
-                } else {
-                    log.meter_target_at
-                }
-            });
+            let latest = self.pending_meter_bound(path, file);
             bounds
                 .entry(file.source)
                 .and_modify(|current| {

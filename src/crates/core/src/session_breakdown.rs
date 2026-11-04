@@ -5,17 +5,6 @@ use super::*;
 use crate::session_usage::{self, Builder, Call};
 use std::hash::{Hash, Hasher};
 
-/// One call of a session's logs as the breakdown takes it. Only the session's
-/// own log (`own_key`) marks its turns; a sub-agent's prompts are steps of the
-/// turn that started it. Its own log records every call.
-fn own_call<'a>(row: &'a metering::CallRow, own_key: &str) -> Call<'a> {
-    Call {
-        row,
-        own: row.contribution == own_key,
-        call_log: row.contribution == own_key,
-    }
-}
-
 /// The sub-agents with calls in a turn, for the session page's timeline: each
 /// one's log (the calls' `log`), name and type, the log that started it, when
 /// it began and was last heard from, and whether it still runs. Claude Code
@@ -262,7 +251,10 @@ impl AgentHudCore {
         let rows = metering::calls_of(db, &paths, None, None).map_err(failed)?;
         let mut builder = Builder::new(prompts, compactions);
         for row in &rows {
-            builder.add(own_call(row, &own_paths[0]));
+            builder.add(Call {
+                row,
+                own: row.contribution == own_paths[0],
+            });
         }
         if builder.is_empty() {
             return Ok(None);
@@ -323,7 +315,6 @@ impl AgentHudCore {
         };
         let own_paths = vec![own.path.to_string_lossy().into_owned()];
         let failed = |_| l10n::text("无法读取会话用量", "Could not read session usage");
-        let call = |row| own_call(row, &own_paths[0]);
         let mut value = usage.json();
         // The session at its account's own prices (agent-hud-native-open
         // `UsageLedger` costs): a currency only when every priced log of the
@@ -354,7 +345,10 @@ impl AgentHudCore {
             let calls = rows
                 .iter()
                 .filter(|row| row.at >= turn.start && row.at <= turn.end)
-                .map(call)
+                .map(|row| Call {
+                    row,
+                    own: row.contribution == own_paths[0],
+                })
                 .collect::<Vec<_>>();
             let summary = session_usage::turn_summary(&calls);
             let agents = turn_agents(own, subagents, &calls, Utc::now().timestamp_millis());

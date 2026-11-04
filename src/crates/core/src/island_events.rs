@@ -38,11 +38,6 @@ pub(super) struct Tracker {
 fn date(value: &Value) -> Option<i64> {
     value.as_str().and_then(metering::date_ms)
 }
-fn iso(at: i64) -> Value {
-    DateTime::<Utc>::from_timestamp_millis(at)
-        .map(|d| json!(d.to_rfc3339()))
-        .unwrap_or(Value::Null)
-}
 impl Tracker {
     pub fn new() -> Self {
         Self {

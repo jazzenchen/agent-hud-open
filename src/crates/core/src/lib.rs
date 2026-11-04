@@ -78,6 +78,11 @@ pub(crate) const MAX_LINE: usize = 1024 * 1024;
 /// How often a working Grok Bot turn is looked at again, in ms.
 pub(crate) const BOT_POLL_MS: i64 = 10_000;
 
+/// A time in Unix ms as RFC 3339 text; null out of range.
+pub(crate) fn iso(at: i64) -> Value {
+    json!(DateTime::<Utc>::from_timestamp_millis(at).map(|at| at.to_rfc3339()))
+}
+
 pub struct AgentHudCore {
     requests: requests::Requests,
     hook_events: hook_events::HookEvidence,

@@ -1,6 +1,6 @@
 //! Statistics query parsing, ledger bucket loading, and calendar helpers.
-use crate::{pricing, Usage};
-use chrono::{DateTime, NaiveDate, TimeZone, Timelike, Utc};
+use crate::{iso, pricing, Usage};
+use chrono::{NaiveDate, TimeZone, Timelike};
 use chrono_tz::Tz;
 use rusqlite::Connection;
 use serde_json::{json, Value};
@@ -369,12 +369,6 @@ pub(super) fn provider_name(id: &str) -> &str {
 
 pub(super) fn local_date(zone: Tz, at: i64) -> NaiveDate {
     zone.timestamp_millis_opt(at).single().unwrap().date_naive()
-}
-
-pub(super) fn iso(at: i64) -> String {
-    DateTime::<Utc>::from_timestamp_millis(at)
-        .unwrap()
-        .to_rfc3339()
 }
 
 pub(super) fn floor(at: i64) -> i64 {

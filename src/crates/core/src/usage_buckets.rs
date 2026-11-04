@@ -95,13 +95,7 @@ impl AgentHudCore {
                 ))
                 .or_default();
             group.tokens.add(usage);
-            let price_tokens = pricing::PriceTokens {
-                tokens_in: usage.input + usage.write,
-                tokens_out: usage.output + usage.reasoning,
-                cache_read: usage.read,
-                cache_write: usage.write,
-                reasoning: usage.reasoning,
-            };
+            let price_tokens = metering::price_tokens(usage);
             let priced = pricing::cost_at(
                 &source,
                 &model,

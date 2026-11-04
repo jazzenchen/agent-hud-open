@@ -3,8 +3,7 @@
 //! sub-agents spent (agent-hud-native-open `SessionUsage` and `SessionUsageBuilder`).
 //! It is built on demand from the ledger's calls and marks, never from the
 //! logs themselves.
-use crate::{metering, pricing, Usage};
-use chrono::{DateTime, Utc};
+use crate::{iso, metering, pricing, Usage};
 use serde_json::{json, Value};
 use std::collections::{BTreeMap, HashMap};
 
@@ -104,10 +103,11 @@ impl ListTally {
 /// One call as the builder takes it.
 pub(crate) struct Call<'a> {
     pub row: &'a metering::CallRow,
-    /// The session's own log rather than a sub-agent's.
+    /// The session's own log rather than a sub-agent's. Only it marks the
+    /// session's turns (a sub-agent's prompts are steps of the turn that
+    /// started it), and it records every call, so its prompt is the session's
+    /// context.
     pub own: bool,
-    /// A log that records every call, so its prompt is the session's context.
-    pub call_log: bool,
 }
 
 #[derive(Clone)]
@@ -252,12 +252,10 @@ impl Builder {
         }
         let sent = prompt(tokens);
         let mut again = 0;
-        if call.call_log {
+        if call.own {
             again = recached(tokens, self.previous_prompt);
             self.previous_prompt = Some(sent);
             self.context = Some(sent);
-        }
-        if call.own {
             if let Some(reported) = row.context_window {
                 self.window = Some(reported);
             }
@@ -299,7 +297,7 @@ impl Builder {
                 .get_or_insert_with(Usage::default)
                 .add(tokens);
         }
-        if call.call_log {
+        if call.own {
             turn.context = Some(sent);
             turn.peak = turn.peak.max(sent);
         }
@@ -389,10 +387,6 @@ impl Builder {
             list_cost: self.tally.cost(),
         }
     }
-}
-
-fn iso(at: i64) -> Value {
-    json!(DateTime::<Utc>::from_timestamp_millis(at).map(|at| at.to_rfc3339()))
 }
 
 fn usd(pico: Option<i128>) -> Value {
@@ -739,7 +733,7 @@ pub(crate) fn turn_calls(calls: &[Call<'_>], mut previous: Option<u64>) -> Vec<V
         .map(|call| {
             let row = call.row;
             let (mut context, mut again) = (Value::Null, Value::Null);
-            if call.call_log {
+            if call.own {
                 let sent = recached(row.usage, previous);
                 again = json!((sent > 0).then_some(sent));
                 context = json!(prompt(row.usage));
@@ -860,13 +854,11 @@ mod tests {
             builder.add(Call {
                 row: call,
                 own: true,
-                call_log: true,
             });
             if index == 1 {
                 builder.add(Call {
                     row: &helper,
                     own: false,
-                    call_log: false,
                 });
             }
         }
@@ -953,22 +945,18 @@ mod tests {
         builder.add(Call {
             row: &calls[0],
             own: true,
-            call_log: true,
         });
         builder.add(Call {
             row: &helper,
             own: false,
-            call_log: false,
         });
         builder.add(Call {
             row: &calls[1],
             own: true,
-            call_log: true,
         });
         builder.add(Call {
             row: &calls[2],
             own: true,
-            call_log: true,
         });
         let usage = builder.build(|_, _, _| Some(10_000));
         let page = usage.json();
@@ -1010,11 +998,7 @@ mod tests {
             .collect::<Vec<_>>();
         let mut builder = Builder::new(prompts, vec![69_500]);
         for row in &rows {
-            builder.add(Call {
-                row,
-                own: true,
-                call_log: true,
-            });
+            builder.add(Call { row, own: true });
         }
         let bars = builder.build(|_, _, _| None).row()["turnBars"].clone();
         assert_eq!(bars["count"], ROW_BARS);
@@ -1027,12 +1011,10 @@ mod tests {
         builder.add(Call {
             row: &rows[0],
             own: true,
-            call_log: true,
         });
         builder.add(Call {
             row: &rows[1],
             own: true,
-            call_log: true,
         });
         let glance = builder.build(|_, _, _| None).row();
         assert_eq!(glance["turnCount"], 0);
@@ -1054,17 +1036,14 @@ mod tests {
             Call {
                 row: &own,
                 own: true,
-                call_log: true,
             },
             Call {
                 row: &helper,
                 own: false,
-                call_log: false,
             },
             Call {
                 row: &large,
                 own: true,
-                call_log: true,
             },
         ];
         let summary = turn_summary(&calls);
@@ -1092,12 +1071,10 @@ mod tests {
             Call {
                 row: &own,
                 own: true,
-                call_log: true,
             },
             Call {
                 row: &unpriced,
                 own: true,
-                call_log: true,
             },
         ];
         assert_eq!(
@@ -1115,11 +1092,7 @@ mod tests {
             .collect::<Vec<_>>();
         let mut builder = Builder::new(prompts, Vec::new());
         for row in &rows {
-            builder.add(Call {
-                row,
-                own: true,
-                call_log: true,
-            });
+            builder.add(Call { row, own: true });
         }
         let usage = builder.build(|_, _, _| None);
         assert_eq!((usage.turns.len(), usage.turn_count), (TURN_LIMIT, 250));
@@ -1128,11 +1101,7 @@ mod tests {
 
         let mut builder = Builder::new(Vec::new(), Vec::new());
         for row in &rows[..3] {
-            builder.add(Call {
-                row,
-                own: true,
-                call_log: true,
-            });
+            builder.add(Call { row, own: true });
         }
         let usage = builder.build(|_, _, _| None);
         assert_eq!(usage.turn_count, 0);
@@ -1149,12 +1118,10 @@ mod tests {
         builder.add(Call {
             row: &priced,
             own: true,
-            call_log: true,
         });
         builder.add(Call {
             row: &unpriced,
             own: true,
-            call_log: true,
         });
         let usage = builder.build(|_, _, _| None);
         assert_eq!(usage.list_cost.complete(), None);
