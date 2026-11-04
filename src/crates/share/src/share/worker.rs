@@ -18,6 +18,10 @@ use std::{
 };
 
 const USAGE_EVERY_MS: i64 = 30_000;
+/// How often a changed ledger is read again over every day kept, for the
+/// changes that land before yesterday: a new client's history, a rescan, a
+/// new price. Records that come out the same are not sent again.
+const USAGE_FULL_EVERY_MS: i64 = 30 * 60_000;
 const ADDRESS_EVERY_MS: i64 = 30_000;
 /// Usage goes out for the last 30 days, as every other copy of it does.
 const RETENTION_MS: i64 = 30 * keys::DAY_MS;
@@ -37,6 +41,9 @@ pub(super) struct Worker {
     usage_revision: Option<u64>,
     usage_seeded: bool,
     usage_tried_at: i64,
+    /// The revision and time of the last read over every day kept.
+    usage_full_revision: Option<u64>,
+    usage_full_at: i64,
     address_at: i64,
     error: Option<String>,
 }
@@ -70,6 +77,8 @@ impl Worker {
             usage_revision: None,
             usage_seeded: false,
             usage_tried_at: 0,
+            usage_full_revision: None,
+            usage_full_at: 0,
             address_at: 0,
             error: None,
         })
@@ -236,15 +245,19 @@ impl Worker {
     }
     fn project_usage(&mut self, snapshot: &Value, now: i64) -> Result<(), String> {
         let revision = snapshot["statisticsRevision"].as_u64();
-        if revision.is_some() && revision == self.usage_revision {
+        let full_due = self.usage_seeded
+            && revision != self.usage_full_revision
+            && now - self.usage_full_at >= USAGE_FULL_EVERY_MS;
+        if revision.is_some() && revision == self.usage_revision && !full_due {
             return Ok(());
         }
         if self.usage_tried_at != 0 && now - self.usage_tried_at < USAGE_EVERY_MS {
             return Ok(());
         }
         self.usage_tried_at = now;
-        // The first read covers every day kept; later ones yesterday and today.
-        let full = !self.usage_seeded;
+        // The first read covers every day kept; later ones yesterday and today,
+        // and every day again now and then while the ledger keeps changing.
+        let full = !self.usage_seeded || full_due;
         let retention_start = now - RETENTION_MS;
         let window_start = if full {
             retention_start
@@ -272,6 +285,10 @@ impl Worker {
         }
         self.usage_seeded = true;
         self.usage_revision = revision;
+        if full {
+            self.usage_full_revision = revision;
+            self.usage_full_at = now;
+        }
         Ok(())
     }
 }

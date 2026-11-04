@@ -127,6 +127,30 @@ fn usage_is_read_again_only_once_the_ledger_moved_and_then_from_yesterday() {
 }
 
 #[test]
+fn a_changed_ledger_is_read_over_every_day_again_within_half_an_hour() {
+    let asked = Arc::new(Mutex::new(Vec::new()));
+    let (mut worker, _directory) = worker(&asked, true);
+    worker.observe_for_test(snapshot(1));
+    worker.project(NOW).unwrap();
+    worker.observe_for_test(snapshot(2));
+    worker.project(NOW + 60_000).unwrap();
+    // Nothing moved since: the ledger is still read once more over every
+    // day kept, for a change that landed before yesterday.
+    worker.project(NOW + 29 * 60_000).unwrap();
+    assert_eq!(asked.lock().unwrap().len(), 2, "not before half an hour");
+    let later = NOW + 30 * 60_000;
+    worker.project(later).unwrap();
+    {
+        let asked = asked.lock().unwrap();
+        assert_eq!(asked.len(), 3);
+        assert_eq!(asked[2]["from"], iso(later - 30 * keys::DAY_MS));
+    }
+    // Once read over every day at this revision, it rests.
+    worker.project(later + 60 * 60_000).unwrap();
+    assert_eq!(asked.lock().unwrap().len(), 3);
+}
+
+#[test]
 fn usage_waits_for_indexing_to_cover_whole_days() {
     let asked = Arc::new(Mutex::new(Vec::new()));
     let (mut worker, _directory) = worker(&asked, false);
