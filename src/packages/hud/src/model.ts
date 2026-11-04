@@ -75,7 +75,9 @@ export interface HUDConfig {
   botLogos: boolean;
   panelWidth: number;
   layoutDensity: "comfortable" | "normal" | "compact";
-  panelSections: ("blocks" | "tokens" | "sessions")[];
+  /** The panel's sections in order: blocks, tokens and sessions, and the id
+   * of each section an agent added to the panel. */
+  panelSections: string[];
   panelOrder: string[];
   /** Native host measurements; the defaults are a non-notched display's stand-in. */
   hasNotch: boolean;

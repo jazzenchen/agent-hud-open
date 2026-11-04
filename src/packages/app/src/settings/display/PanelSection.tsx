@@ -17,13 +17,16 @@ import type { DisplayProps } from "./controls";
 import { ReorderButtons } from "./ReorderButtons";
 import { useLightTheme } from "../agent-plugins/use-status";
 
-type PanelSectionKey = HUDConfig["panelSections"][number];
-
 const sectionSettings = {
   blocks: { setting: "quotaDetails", sample: "quota" },
   tokens: { setting: "tokenUsage", sample: "tokens" },
   sessions: { setting: "sessionList", sample: "sessions" },
 } as const;
+
+type PanelSectionKey = keyof typeof sectionSettings;
+
+const builtIn = (key: string): key is PanelSectionKey =>
+  Object.hasOwn(sectionSettings, key);
 
 export function PanelSection({
   snapshot,
@@ -38,12 +41,17 @@ export function PanelSection({
     sessions: t("Session list", "会话列表"),
   };
   // Saved order first; a section the saved order lacks keeps its default place.
-  const sections = [
+  // A section an agent added to the panel has no row here and keeps its place
+  // when the others move.
+  const order = [
     ...new Set([...config.panelSections, ...defaultHUDConfig.panelSections]),
   ];
+  const sections = order.filter(builtIn);
   const moveSection = (index: number, by: -1 | 1) => {
-    const next = [...sections];
-    [next[index], next[index + by]] = [next[index + by], next[index]];
+    const next = [...order],
+      from = next.indexOf(sections[index]),
+      to = next.indexOf(sections[index + by]);
+    [next[from], next[to]] = [next[to], next[from]];
     update({ panelSections: next });
   };
 

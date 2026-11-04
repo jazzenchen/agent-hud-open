@@ -14,7 +14,12 @@ export class ViewErrorBoundary extends Component<
     return (
       <div
         className="connection-placeholder"
-        style={{ flexDirection: "column", gap: 10 }}
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: 10,
+        }}
       >
         <span>
           {this.props.chinese

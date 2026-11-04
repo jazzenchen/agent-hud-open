@@ -26,6 +26,7 @@ import type {
 import appIcon from "../assets/app-icon.png";
 import type { NativeHUDMonitor } from "../lib/use-hud-geometry";
 import { LoadingState } from "../LoadingState";
+import { ViewErrorBoundary } from "../ViewErrorBoundary";
 import type { AgentPluginItem } from "./AgentPluginsPane";
 import {
   chinesePages,
@@ -233,26 +234,30 @@ export function SettingsWindow({
                     onRetry={() => void refresh()}
                   />
                 ) : (
-                  <Suspense fallback={null}>
-                    {extensionPages
-                      .find((item) => item.id === page)
-                      ?.render({ snapshot, request: extensionRequest })}
-                    <SettingsPane
-                      page={page}
-                      settingsProps={settingsProps}
-                      ready={ready}
-                      selectedId={selectedId}
-                      monitors={monitors}
-                      selectScreen={selectScreen}
-                      chinese={chinese}
-                      layout={layout}
-                      onLayout={onLayout}
-                      preferences={preferences}
-                      onPreferences={onPreferences}
-                      agentPlugins={agentPlugins}
-                      request={extensionRequest}
-                    />
-                  </Suspense>
+                  // A page that fails to draw shows its error under its own
+                  // header; the sidebar stays, and another page clears it.
+                  <ViewErrorBoundary key={page} chinese={chinese}>
+                    <Suspense fallback={null}>
+                      {extensionPages
+                        .find((item) => item.id === page)
+                        ?.render({ snapshot, request: extensionRequest })}
+                      <SettingsPane
+                        page={page}
+                        settingsProps={settingsProps}
+                        ready={ready}
+                        selectedId={selectedId}
+                        monitors={monitors}
+                        selectScreen={selectScreen}
+                        chinese={chinese}
+                        layout={layout}
+                        onLayout={onLayout}
+                        preferences={preferences}
+                        onPreferences={onPreferences}
+                        agentPlugins={agentPlugins}
+                        request={extensionRequest}
+                      />
+                    </Suspense>
+                  </ViewErrorBoundary>
                 )}
               </div>
             </div>
