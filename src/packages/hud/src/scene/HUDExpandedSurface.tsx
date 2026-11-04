@@ -84,10 +84,11 @@ export function HUDExpandedSurface({
     opacity: 0,
   };
 
-  // A card beside the Simple panel is cut where the panel is: the line grows from behind it, and over a see-through
-  // look the two would darken each other (Open IslandRootView.outsidePanel). A full card never reaches the panel.
+  // What opens beside a Simple dock is cut where the dock is: it grows from behind the dock, the dock keeps its own
+  // ground whatever is open, and over a see-through look the two would darken each other (Open
+  // IslandRootView.outsidePanel). The usage panel too: it can be shorter than the dock, which then reaches past it.
   const cut =
-    config.mode === "simple" && detached
+    config.mode === "simple"
       ? outsideSimplePanel(strip, edge, metricsRadius)
       : undefined;
 

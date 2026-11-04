@@ -142,12 +142,11 @@ export function HUDMarkStrip({
                   paddingBottom: metrics.padding.bottom,
                   paddingLeft: metrics.padding.left,
                   borderRadius: metrics.radius,
-                  background: !cardVisible || detached ? fill : "transparent",
+                  // The dock keeps its own ground while a panel or card is
+                  // open; what opens is cut where the dock is.
+                  background: fill,
                   border: 0,
-                  boxShadow:
-                    !cardVisible || detached
-                      ? `inset 0 0 0 1px ${outline}`
-                      : undefined,
+                  boxShadow: `inset 0 0 0 1px ${outline}`,
                   backdropFilter: undefined,
                 }
               : {
