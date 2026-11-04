@@ -77,7 +77,7 @@ pub fn content(record: &SyncRecord) -> String {
         &record.kind,
         &record.device_id,
         &record.key,
-        &serde_json::to_string(&record.payload).unwrap_or_default(),
+        &record.payload.to_string(),
     ])
 }
 /// What a record says, its expiry included: a new value means a new version.
