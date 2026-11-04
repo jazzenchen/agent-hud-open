@@ -627,13 +627,17 @@ pub fn variable(host: &dyn Host, key: &str) -> Option<PathBuf> {
         .filter(|value| !value.is_empty())
         .map(PathBuf::from)
 }
+/// A file of at most `limit` bytes; a larger one fails to read.
+pub fn read_bounded(host: &dyn Host, path: &Path, limit: u64) -> Answer<Vec<u8>> {
+    match host.read_file(path, limit) {
+        Answer::Found(bytes) if bytes.len() as u64 > limit => Answer::Failed,
+        answer => answer,
+    }
+}
+
 /// A JSON file of at most 16 MiB; None when it is missing, larger or not JSON.
 pub fn read_json(host: &dyn Host, path: &Path) -> Option<Value> {
-    const LIMIT: u64 = 16 * 1024 * 1024;
-    let bytes = host.read_file(path, LIMIT).found()?;
-    if bytes.len() as u64 > LIMIT {
-        return None;
-    }
+    let bytes = read_bounded(host, path, 16 * 1024 * 1024).found()?;
     serde_json::from_slice(&bytes).ok()
 }
 

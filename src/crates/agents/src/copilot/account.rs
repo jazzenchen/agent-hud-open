@@ -3,8 +3,8 @@
 //! the one GitHub's own Copilot clients keep. No gh or client is launched and
 //! no token is refreshed.
 use crate::account::{
-    legacy_account, locate, read_json, status, Answer, Host, HttpFailure, HttpRequest, Provider,
-    Reading, StatusPage, Unread,
+    legacy_account, locate, read_bounded, read_json, status, Answer, Host, HttpFailure,
+    HttpRequest, Provider, Reading, StatusPage, Unread,
 };
 use crate::naming::vendor_windows;
 use crate::{l10n, Location, PerOs, Support};
@@ -140,13 +140,7 @@ fn file_token(host: &dyn Host) -> Option<String> {
             _ => None,
         })
         .unwrap_or_else(|| host.home().join(".config/gh"));
-    const LIMIT: u64 = 1024 * 1024;
-    let bytes = host
-        .read_file(&directory.join("hosts.yml"), LIMIT)
-        .found()?;
-    if bytes.len() as u64 > LIMIT {
-        return None;
-    }
+    let bytes = read_bounded(host, &directory.join("hosts.yml"), 1024 * 1024).found()?;
     let text = String::from_utf8(bytes).ok()?;
     let mut inside = false;
     for line in text.lines() {

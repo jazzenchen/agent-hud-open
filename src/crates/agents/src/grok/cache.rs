@@ -119,10 +119,7 @@ pub fn value_through(host: &dyn Host, directory: &Path, key: &str, schema: u64) 
     if host.file_info(&file).found()?.symlink {
         return None;
     }
-    let data = host.read_file(&file, LIMIT).found()?;
-    if data.len() as u64 > LIMIT {
-        return None;
-    }
+    let data = crate::account::read_bounded(host, &file, LIMIT).found()?;
     entry(&data, key, schema)
 }
 fn slot(value: Value) -> Option<String> {

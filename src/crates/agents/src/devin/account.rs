@@ -1,7 +1,9 @@
 //! Devin's quota, from the account status the Devin CLI caches. When the CLI
 //! fetched it stays the observation time: reading the file now does not make
 //! old data fresh.
-use crate::account::{legacy_account, legacy_unresolved, status, Host, Provider, Reading, Unread};
+use crate::account::{
+    legacy_account, legacy_unresolved, read_bounded, status, Host, Provider, Reading, Unread,
+};
 use crate::naming::window_names;
 use crate::{l10n, protobuf};
 use base64::Engine;
@@ -56,10 +58,8 @@ pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
     // The newest first.
     candidates.sort_by(|a, b| b.cmp(a));
     for (modified, path) in candidates {
-        let Some(parsed) = host
-            .read_file(&path, LIMIT)
+        let Some(parsed) = read_bounded(host, &path, LIMIT)
             .found()
-            .filter(|bytes| bytes.len() as u64 <= LIMIT)
             .and_then(|b| serde_json::from_slice::<Value>(&b).ok())
         else {
             continue;

@@ -3,7 +3,7 @@
 //! sign-ins, WorkBuddy's models and keys saved in Agent HUD. Discovery only
 //! reads: no key resolver runs, no token is refreshed, nobody signs in.
 use super::{nonempty, numeric, Credential};
-use crate::account::{account_id, jwt_claims, variable, Host};
+use crate::account::{account_id, jwt_claims, read_bounded, variable, Host};
 use crate::l10n;
 use serde_json::Value;
 use sha2::{Digest, Sha256};
@@ -22,13 +22,11 @@ fn file(host: &dyn Host, path: &Path, json5: bool) -> Value {
 }
 /// `file`, or None when nothing is at `path`.
 fn present(host: &dyn Host, path: &Path, json5: bool) -> Option<Value> {
-    let bytes = match host.read_file(path, LIMIT) {
+    let bytes = match read_bounded(host, path, LIMIT) {
         crate::Answer::Missing => return None,
         answer => answer.found(),
     };
-    let text = bytes
-        .filter(|bytes| bytes.len() as u64 <= LIMIT)
-        .and_then(|bytes| String::from_utf8(bytes).ok());
+    let text = bytes.and_then(|bytes| String::from_utf8(bytes).ok());
     Some(match text {
         Some(text) if json5 => json5::from_str(&text).unwrap_or(Value::Null),
         Some(text) => serde_json::from_str(&text).unwrap_or(Value::Null),
@@ -224,10 +222,8 @@ pub(super) fn discover(host: &dyn Host, wanted: &str) -> Result<Vec<Credential>,
         }
         let auth = file(host, &kimi.join(format!("credentials/{slot}.json")), false);
         if numeric(&auth["expires_at"]).is_some_and(|n| n > now as f64 / 1000.0 + 60.0) {
-            let device = host
-                .read_file(&kimi.join("device_id"), 4096)
+            let device = read_bounded(host, &kimi.join("device_id"), 4096)
                 .found()
-                .filter(|bytes| bytes.len() <= 4096)
                 .and_then(|bytes| String::from_utf8(bytes).ok())
                 .map(|s| s.trim().to_owned())
                 .filter(|s| nonempty(Some(s)).is_some());
