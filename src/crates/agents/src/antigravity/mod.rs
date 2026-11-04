@@ -5,6 +5,7 @@ mod hooks;
 pub mod permissions;
 pub mod process;
 pub mod proto;
+mod quotas;
 pub mod statusline;
 pub mod transcript;
 
