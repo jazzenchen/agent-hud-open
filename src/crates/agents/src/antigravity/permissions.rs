@@ -1,5 +1,6 @@
 //! Public native request schemas. Acquisition and transport stay in platform;
 //! these records never grant permission or create a tool call by themselves.
+use crate::text;
 use serde_json::{json, Value};
 #[derive(Clone)]
 pub struct AntigravityPermission {
@@ -25,9 +26,6 @@ fn canonical(value: &Value) -> Value {
         Value::Array(values) => Value::Array(values.iter().map(canonical).collect()),
         _ => value.clone(),
     }
-}
-fn text(value: &Value) -> Option<&str> {
-    value.as_str().filter(|s| !s.is_empty())
 }
 fn clipped(value: &str) -> String {
     value.chars().take(2048).collect()

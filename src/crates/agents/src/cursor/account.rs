@@ -5,8 +5,8 @@
 //! Sessions and their tokens are read on this Mac (`sessions.rs`, the turn
 //! log), never from the dashboard.
 use crate::account::{
-    account_id, legacy_account, locate, Answer, DatabaseFailure, Host, HttpFailure, HttpRequest,
-    Provider, Reading, Unread,
+    account_id, legacy_account, locate, status, Answer, DatabaseFailure, Host, HttpFailure,
+    HttpRequest, Provider, Reading, Unread,
 };
 use crate::{l10n, Location, PerOs, Support};
 use base64::{engine::general_purpose::STANDARD, Engine};
@@ -392,7 +392,7 @@ pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
                 };
                 let mut quota = json!({
                     "id":format!("{id}:{key}"),"vendor":"cursor","name":name,"shortLabel":short,"usedPercent":used,
-                    "resetAt":reset,"status":if used>=90.0 {"critical"}else if used>=70.0 {"warning"}else{"normal"},
+                    "resetAt":reset,"status":status(used),
                     "account":email,"accountId":account_identity,"legacyWindowId":format!("{account_identity}/{window}"),
                     "allModels":!matches!(key,"models"|"third-party"),
                 });

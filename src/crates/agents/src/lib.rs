@@ -98,10 +98,8 @@ pub const HOOK_FLAGS: &[&str] = &[
     "--compaction-hook",
 ];
 
-pub fn iso(at: i64) -> Value {
-    chrono::DateTime::<chrono::Utc>::from_timestamp_millis(at)
-        .map(|date| Value::String(date.to_rfc3339()))
-        .unwrap_or(Value::Null)
+pub fn iso(at: i64) -> Option<String> {
+    chrono::DateTime::<chrono::Utc>::from_timestamp_millis(at).map(|date| date.to_rfc3339())
 }
 pub fn text(value: &Value) -> Option<&str> {
     value.as_str().filter(|s| !s.is_empty())

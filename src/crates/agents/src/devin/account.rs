@@ -5,7 +5,7 @@ use crate::account::{
     legacy_account, legacy_unresolved, read_bounded, status, Host, Provider, Reading, Unread,
 };
 use crate::naming::window_names;
-use crate::{l10n, protobuf};
+use crate::{iso, l10n, protobuf};
 use base64::Engine;
 use serde_json::{json, Value};
 use std::collections::HashMap;
@@ -13,10 +13,6 @@ use std::collections::HashMap;
 /// A status file's size limit.
 const LIMIT: u64 = 2 * 1024 * 1024;
 
-fn iso(ms: i64) -> Option<String> {
-    chrono::DateTime::from_timestamp_millis(ms)
-        .map(|d: chrono::DateTime<chrono::Utc>| d.to_rfc3339())
-}
 fn fields(bytes: &[u8]) -> Option<HashMap<u32, protobuf::Field<'_>>> {
     let mut map = HashMap::new();
     protobuf::fields(bytes, |f| {

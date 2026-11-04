@@ -202,7 +202,7 @@ impl Log {
         // interruption, recorded as a user line, does not), and a compact
         // boundary marks a compaction (agent-hud-native-open TranscriptAccumulator).
         if !self.live.is_subagent && value["isSidechain"] != true {
-            let at = value["timestamp"].as_str().and_then(metering::date_ms);
+            let at = timestamp(&value["timestamp"]);
             if value["type"] == "system" && value["subtype"] == "compact_boundary" {
                 self.mark(at, metering::MarkKind::Compaction);
             } else if claude_prompt(value) && !interruption(value) {
@@ -217,7 +217,7 @@ impl Log {
         // are no request time: Claude Code often writes them as the
         // response arrives.
         let chain = usize::from(value["isSidechain"] == true);
-        let line_at = value["timestamp"].as_str().and_then(metering::date_ms);
+        let line_at = timestamp(&value["timestamp"]);
         if value["type"] == "user" {
             if let Some(at) = line_at {
                 self.call_timing.request_at[chain] = Some(at);
