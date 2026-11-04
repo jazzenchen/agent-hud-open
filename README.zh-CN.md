@@ -264,7 +264,7 @@ iPhone 和发行版在同一个网络里，不订阅也能在 iPhone 与 Apple W
 brew install --cask jazzenchen/tap/agent-hud
 ```
 
-之后 Agent HUD 会自己更新。
+之后 Agent HUD 会自己更新。`/Applications` 里已经装了的话，加上 `--adopt`，Homebrew 会接管现有的那份。
 
 ## 从源码构建
 

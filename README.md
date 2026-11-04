@@ -264,7 +264,7 @@ Download the [release](https://agenthud.app/mac), or install the newest release,
 brew install --cask jazzenchen/tap/agent-hud
 ```
 
-Agent HUD updates itself after that.
+Agent HUD updates itself after that. If it is already in `/Applications`, add `--adopt` and Homebrew takes over that copy.
 
 ## Build from source
 
