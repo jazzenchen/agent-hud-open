@@ -3,13 +3,12 @@ import assert from "node:assert/strict";
 import {
   contextRuns,
   largestPositions,
-  lastMessageTime,
   niceScale,
-  sessionWhere,
   stackTurn,
   stackTurnBars,
   turnTicks,
-} from "../src/lib/sessions.ts";
+} from "../src/lib/session-charts.ts";
+import { lastMessageTime, sessionWhere } from "../src/lib/sessions.ts";
 
 test("a chart's scale steps in round numbers up to the first step at or above its peak", () => {
   assert.deepEqual(

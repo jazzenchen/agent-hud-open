@@ -1,7 +1,8 @@
 import { useMemo, useState, type CSSProperties } from "react";
 import type { Session } from "@agent-hud/protocol";
 import { moneyAmount } from "@agent-hud/ui/format";
-import { sessionHelp, sessionWhere, stackTurnBars } from "../lib/sessions";
+import { stackTurnBars } from "../lib/session-charts";
+import { sessionHelp, sessionWhere } from "../lib/sessions";
 import { useAnimatedNumber } from "../statistics/StatsTheme";
 import { rowColumns, rowGap } from "./SessionListSection";
 import { TurnSparkline } from "./TurnSparkline";

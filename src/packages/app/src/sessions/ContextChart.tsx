@@ -1,4 +1,4 @@
-import { contextRuns, niceScale } from "../lib/sessions";
+import { contextRuns, niceScale } from "../lib/session-charts";
 import { axis, Halo, labelFont, useWidth } from "./SessionCharts";
 import { compact, numeric, type Entry, type Theme } from "./SessionTheme";
 

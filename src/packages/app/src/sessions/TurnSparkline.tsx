@@ -1,4 +1,4 @@
-import { largestPositions, type StackedBar } from "../lib/sessions";
+import { largestPositions, type StackedBar } from "../lib/session-charts";
 import { Halo, stackedRects, useWidth } from "./SessionCharts";
 import { compact, numeric, type Theme } from "./SessionTheme";
 

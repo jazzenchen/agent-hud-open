@@ -6,7 +6,7 @@ import {
   type ReactNode,
   type SVGProps,
 } from "react";
-import type { StackedBar } from "../lib/sessions";
+import type { StackedBar } from "../lib/session-charts";
 import { kindColor, type Theme } from "./SessionTheme";
 
 /** How strongly the sub-agents' part of a bar is drawn (Open's `subagentOpacity`). */

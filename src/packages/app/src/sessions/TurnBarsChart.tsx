@@ -6,7 +6,7 @@ import {
   stackTurn,
   turnTicks,
   type StackedBar,
-} from "../lib/sessions";
+} from "../lib/session-charts";
 import { moneyShort } from "@agent-hud/ui/format";
 import {
   axis,
