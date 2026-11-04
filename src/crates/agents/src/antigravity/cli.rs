@@ -109,6 +109,8 @@ fn parse(scope: &str, body: &Value) -> Result<Reading, String> {
     for quota in &mut reading.quotas {
         let all = active_groups.len() == 1;
         quota["allModels"] = json!(all);
+        // Its calls are logged by model, which picks the pool.
+        quota["consumerSource"] = json!("antigravity");
         if all {
             if let Some(period) = Period::from_seconds(quota["windowDurationSeconds"].as_f64()) {
                 quota["shortLabel"] = json!(period.short_name());

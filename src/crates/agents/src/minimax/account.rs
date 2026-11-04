@@ -10,7 +10,7 @@ use super::remains::{parse, Answer, Parsed};
 use super::routes::{self, Key, Region};
 use crate::account::{account_id, Host, HttpFailure, HttpRequest, Provider, Reading, Unread};
 use crate::l10n;
-use serde_json::json;
+use serde_json::{json, Value};
 use std::time::Duration;
 
 /// Work in Claude Code, Codex, OpenCode and Pi spends the plan, as the
@@ -99,7 +99,9 @@ pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
                 let id = id.unwrap_or_default();
                 let account = json!({"id":id,"provider":"minimax","label":parsed.plan,"plan":parsed.plan,"clients":key.clients,"identityEvidence":"credential-scope"});
                 for window in parsed.windows {
-                    reading.quotas.push(window.row(&id, parsed.plan.as_deref()));
+                    let mut row = window.row(&id, parsed.plan.as_deref());
+                    link(&mut row, key);
+                    reading.quotas.push(row);
                 }
                 if reading.account.is_none() {
                     reading.account = Some(account);
@@ -200,6 +202,21 @@ fn read_key(host: &dyn Host, key: &Key) -> Result<Option<(Parsed, Region)>, Unre
         None if refused_any => refused().into(),
         None => no_usage().into(),
     })
+}
+
+/// The logged calls that spend the plan: those through the provider ids
+/// the key is kept under (a plan key is never pay-as-you-go), and Claude
+/// Code's calls to MiniMax's models when it sends the key.
+fn link(row: &mut Value, key: &Key) {
+    if !key.routes.is_empty() {
+        row["consumerRoutes"] = json!(key.routes);
+    }
+    if key.clients.contains(&"Claude") {
+        row["consumerSource"] = json!("claude");
+        if row["allModels"] == true {
+            row["modelFamilies"] = json!(["minimax"]);
+        }
+    }
 }
 
 #[cfg(test)]

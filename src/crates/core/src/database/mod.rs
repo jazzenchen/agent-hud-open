@@ -6,6 +6,7 @@
 pub(crate) mod checkpoints;
 pub(crate) mod endpoints;
 pub(crate) mod metering;
+pub(crate) mod quota_link;
 mod schema;
 pub(crate) mod staging;
 #[cfg(windows)]

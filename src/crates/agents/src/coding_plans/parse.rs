@@ -303,5 +303,33 @@ pub(super) fn parse(
             "Coding plan did not return a verifiable quota window",
         ));
     }
+    for row in &mut windows {
+        link(row, entry);
+    }
     Ok((windows, plan))
+}
+
+/// The logged calls that spend a plan: those through its own provider ids,
+/// which no pay-as-you-go key uses ("pi#zai" is Pi's alone: OpenCode's `zai`
+/// is pay-as-you-go), and, when Claude Code's address is the plan's,
+/// Claude Code's calls to the vendor's models.
+pub(super) fn link(row: &mut Value, entry: &Credential) {
+    let china = entry.base.contains("bigmodel.cn");
+    let (routes, family): (&[&str], Option<&str>) = match entry.provider {
+        "kimi" => (
+            &["kimi-code", "kimi-for-coding", "kimi-coding"],
+            Some("kimi"),
+        ),
+        "glm" if china => (&["zhipuai-coding-plan", "pi#zai-coding-cn"], Some("glm")),
+        "glm" => (&["zai-coding-plan", "pi#zai"], Some("glm")),
+        "opencode" => (&["opencode-go"], None),
+        _ => return,
+    };
+    row["consumerRoutes"] = json!(routes);
+    if let Some(family) = family.filter(|_| entry.clients.contains("Claude")) {
+        row["consumerSource"] = json!("claude");
+        if row["allModels"] == true {
+            row["modelFamilies"] = json!([family]);
+        }
+    }
 }

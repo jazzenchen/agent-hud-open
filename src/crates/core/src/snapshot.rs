@@ -2,6 +2,7 @@
 //! pass, then sessions, quotas, balances, accounts and providers as of the
 //! metrics clock.
 use super::*;
+use crate::database::quota_link::QuotaLink;
 
 /// A pass that changed nothing the snapshot shows, before any time it shows
 /// falls due, renders nothing: the collector then sends pages the time alone.
@@ -543,11 +544,18 @@ impl crate::AgentHudCore {
         now: i64,
         pending_meter: &HashMap<&str, Option<i64>>,
     ) -> Vec<Value> {
-        let metering_complete = |source: &str, cutoff: i64| {
+        // A window linked to some clients waits for their logs; one that a
+        // route links to any client's calls waits for every log.
+        let metering_complete = |value: &Value, cutoff: i64| {
+            let read = |latest: &Option<i64>| latest.is_some_and(|latest| latest < cutoff);
             self.database.is_some()
-                && pending_meter
-                    .get(source)
-                    .is_none_or(|latest| latest.is_some_and(|latest| latest < cutoff))
+                && match QuotaLink::of(value).map(|link| link.sources()) {
+                    None => true,
+                    Some(Some(sources)) => sources
+                        .iter()
+                        .all(|source| pending_meter.get(source).is_none_or(read)),
+                    Some(None) => pending_meter.values().all(read),
+                }
         };
         let mut quotas = self
             .accounts
@@ -557,7 +565,6 @@ impl crate::AgentHudCore {
             .map(|value| {
                 let mut row = value.clone();
                 if let Some(view) = &self.meters.view {
-                    let source = value["consumerSource"].as_str().unwrap_or("");
                     let cycle_start = value["resetAt"]
                         .as_str()
                         .and_then(metering::date_ms)
@@ -567,15 +574,15 @@ impl crate::AgentHudCore {
                     row["metrics"] = view.metrics(
                         value,
                         at,
-                        metering_complete(source, cycle_start),
-                        metering_complete(source, at - 7 * 86_400_000),
+                        metering_complete(value, cycle_start),
+                        metering_complete(value, at - 7 * 86_400_000),
                         self.meters.samples.as_ref().unwrap_or(&Default::default()),
                     );
                 }
                 // legacyWindowId stays: panel layouts, Settings and get_hud name a
                 // row by it (src/packages/hud/src/quota-rows.ts).
                 if let Some(object) = row.as_object_mut() {
-                    for key in ["consumerSource", "modelFamilies"] {
+                    for key in ["consumerSource", "consumerRoutes", "modelFamilies"] {
                         object.remove(key);
                     }
                 }

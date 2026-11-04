@@ -259,7 +259,7 @@ fn parse(body: &Value, user: &str) -> Result<Reading, Unread> {
         let spent = (monthly - remaining.max(0.0)).max(0.0);
         let used = (spent / monthly * 100.0).clamp(0.0, 100.0);
         reading.quotas.push(json!({
-            "id": format!("{id}/hermes:credits"), "vendor": "hermes", "accountId": id, "account": email,
+            "id": format!("{id}/hermes:credits"), "vendor": "hermes", "consumerRoutes": ["hermes#nous"], "accountId": id, "account": email,
             "name": "Monthly credits", "shortLabel": Period::Month.short_name(), "usedPercent": used,
             "resetAt": reset, "allModels": true, "status": status(used),
             "nativeUsage": {"used": spent, "capacity": monthly, "unit": "credits"},

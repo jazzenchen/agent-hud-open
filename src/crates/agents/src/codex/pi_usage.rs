@@ -14,6 +14,10 @@ fn pi_signed_out() -> Unread {
     ))
 }
 
+/// The route Pi logs its calls through a ChatGPT sign-in under; they spend
+/// that account's Codex windows.
+pub(super) const PI_ROUTE: &str = "openai-codex";
+
 pub(super) fn read_pi(host: &dyn Host) -> Result<Option<Reading>, Unread> {
     if host.cancelled() {
         return Ok(None);

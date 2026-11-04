@@ -95,6 +95,8 @@ fn parse_summary_quotas(
     let all = active_groups.len() == 1;
     for quota in &mut quotas {
         quota["allModels"] = json!(all);
+        // Its calls are logged by model, which picks the pool.
+        quota["consumerSource"] = json!("antigravity");
         if all {
             if let Some(period) = Period::from_seconds(quota["windowDurationSeconds"].as_f64()) {
                 quota["shortLabel"] = json!(period.short_name());
@@ -209,6 +211,8 @@ pub(super) fn parse(scope: &str, body: &Value, summary: &Value) -> Result<Readin
             .into_values()
             .map(|mut quota| {
                 quota["allModels"] = json!(all_models);
+                // Its calls are logged by model, which picks the pool.
+                quota["consumerSource"] = json!("antigravity");
                 quota
             })
             .collect::<Vec<_>>()

@@ -50,7 +50,7 @@ fn parse(body: &Value, id: &str, label: Option<&str>) -> Reading {
                     native: Option<(f64, f64)>| {
         let (name, short) = vendor_windows::copilot_names(key, credits);
         let used = used.clamp(0., 100.);
-        let mut row = json!({"id":format!("{id}/copilot:{key}"),"vendor":"copilot","accountId":id,"account":label,"name":name,"shortLabel":short,"usedPercent":used,"resetAt":reset,"allModels":credits||(key!="chat"&&key!="completions"),"status":status(used)});
+        let mut row = json!({"id":format!("{id}/copilot:{key}"),"vendor":"copilot","consumerSource":"copilot","accountId":id,"account":label,"name":name,"shortLabel":short,"usedPercent":used,"resetAt":reset,"allModels":credits||(key!="chat"&&key!="completions"),"status":status(used)});
         if let Some((used, total)) = native {
             row["nativeUsage"] =
                 json!({"used":used,"capacity":total,"unit":if credits{"credits"}else{"requests"}})

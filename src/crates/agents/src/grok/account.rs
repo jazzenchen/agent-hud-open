@@ -182,7 +182,7 @@ fn quota(u: &Value, slot: &str, observed: i64, email: Option<&str>) -> Result<Re
     }
     let observed = iso(observed);
     let trial = u["isSandTrial"] == true;
-    r.quotas.push(json!({"id":format!("{id}/grok"),"vendor":"grok-bot","accountId":id,"legacyWindowId":format!("{id}/grok"),"name":if trial{"Trial usage limit"}else{"Weekly usage limit"},"shortLabel":if trial{"Trial".to_owned()}else{window_names::Period::Week.short_name()},"usedPercent":used,"resetAt":reset,"windowDurationSeconds":if trial{None}else{Some(604800)},"allModels":true,"observedAt":observed,"status":used.map(status).unwrap_or("unknown")}));
+    r.quotas.push(json!({"id":format!("{id}/grok"),"vendor":"grok-bot","consumerSource":"grok-bot","accountId":id,"legacyWindowId":format!("{id}/grok"),"name":if trial{"Trial usage limit"}else{"Weekly usage limit"},"shortLabel":if trial{"Trial".to_owned()}else{window_names::Period::Week.short_name()},"usedPercent":used,"resetAt":reset,"windowDurationSeconds":if trial{None}else{Some(604800)},"allModels":true,"observedAt":observed,"status":used.map(status).unwrap_or("unknown")}));
     let cap = u["onDemand"]["limitCents"].as_f64();
     let extra = u["onDemand"]["usedCents"].as_f64();
     if cap.is_some_and(|n| n > 0.) {

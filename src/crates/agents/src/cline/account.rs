@@ -206,7 +206,7 @@ fn parse(body: &Value, id: &str, email: Option<&str>) -> Option<Vec<Value>> {
         };
         let short = Period::from_seconds(Some(seconds as f64)).map(Period::short_name);
         rows.push(json!({
-            "id": format!("{id}/cline:{kind}"), "vendor": "cline", "accountId": id, "account": email,
+            "id": format!("{id}/cline:{kind}"), "vendor": "cline", "consumerRoutes": ["cline#cline"], "accountId": id, "account": email,
             "name": name, "shortLabel": short, "usedPercent": used, "resetAt": reset,
             "windowDurationSeconds": seconds, "allModels": true, "status": status(used),
         }));

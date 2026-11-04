@@ -240,7 +240,7 @@ fn parse(body: &Value, id: &str, email: Option<&str>) -> Option<Vec<Value>> {
         None => ("Usage limit".to_owned(), "Usage".to_owned()),
     };
     let mut rows = vec![json!({
-        "id": format!("{id}/grok-cli:credits"), "vendor": "grok-cli", "accountId": id, "account": email,
+        "id": format!("{id}/grok-cli:credits"), "vendor": "grok-cli", "consumerSource": "grok-cli", "accountId": id, "account": email,
         "name": name, "shortLabel": short, "usedPercent": used, "resetAt": reset,
         "windowDurationSeconds": seconds, "allModels": true, "status": status(used),
     })];

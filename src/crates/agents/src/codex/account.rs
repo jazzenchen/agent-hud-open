@@ -1,7 +1,7 @@
 //! Codex's quota: its CLI's own `app-server` (account/rateLimits/read and
 //! account/read), and Pi's ChatGPT sign-in, which spends the same plan.
 use super::limits::parse;
-use super::pi_usage::read_pi;
+use super::pi_usage::{read_pi, PI_ROUTE};
 use crate::account::{
     append_notice, client_home_key, merge, variable, EngineStart, Host, Provider, Reading,
     StatusPage, Unread,
@@ -40,6 +40,16 @@ pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
     let pi = read_pi(host);
     match (native, pi) {
         (Ok(mut native), Ok(Some(pi))) => {
+            // Pi signed in to the same ChatGPT account spends the same windows.
+            for row in &mut native.quotas {
+                if pi
+                    .quotas
+                    .iter()
+                    .any(|quota| quota["accountId"] == row["accountId"])
+                {
+                    row["consumerRoutes"] = json!([PI_ROUTE]);
+                }
+            }
             merge(&mut native, pi);
             Ok(native)
         }

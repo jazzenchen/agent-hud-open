@@ -124,7 +124,7 @@ pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
             if used.is_none() && reset.is_none() {
                 continue;
             }
-            quotas.push(json!({"id":format!("{id}/devin:{key}"),"vendor":"devin","accountId":id,"account":email,"name":label,"shortLabel":window_names::Period::from_seconds(Some(duration as f64)).map(|period|period.short_name()),"usedPercent":used,"resetAt":reset,"windowDurationSeconds":duration,"allModels":true,"observedAt":observed.and_then(iso),"status":used.map(status).unwrap_or("unknown")}));
+            quotas.push(json!({"id":format!("{id}/devin:{key}"),"vendor":"devin","consumerSource":"devin","accountId":id,"account":email,"name":label,"shortLabel":window_names::Period::from_seconds(Some(duration as f64)).map(|period|period.short_name()),"usedPercent":used,"resetAt":reset,"windowDurationSeconds":duration,"allModels":true,"observedAt":observed.and_then(iso),"status":used.map(status).unwrap_or("unknown")}));
         }
         if plan.is_none() && quotas.is_empty() {
             continue;

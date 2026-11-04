@@ -224,7 +224,7 @@ fn windows(body: &Value, id: &str, now: i64) -> Vec<Value> {
                 short.to_owned()
             };
             rows.push(json!({
-                "id": format!("{id}/droid:{pool}:{key}"), "vendor": "droid", "accountId": id,
+                "id": format!("{id}/droid:{pool}:{key}"), "vendor": "droid", "consumerSource": "droid", "accountId": id,
                 "account": null, "name": name, "shortLabel": short, "usedPercent": used,
                 "resetAt": reset.and_then(chrono::DateTime::from_timestamp_millis).map(|at| at.to_rfc3339()),
                 "windowDurationSeconds": seconds, "allModels": pool == "standard", "status": status(used),

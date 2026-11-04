@@ -63,13 +63,15 @@ impl Region {
 }
 
 /// One key, the platform the clients send it to (None when only the
-/// environment holds it, or two clients disagree), and the clients that send
-/// it, by their names.
+/// environment holds it, or two clients disagree), the clients that send
+/// it, by their names, and the routes their calls with it are logged under
+/// (`client#provider id`; Claude Code's calls have none).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(super) struct Key {
     pub key: String,
     pub region: Option<Region>,
     pub clients: Vec<&'static str>,
+    pub routes: Vec<String>,
 }
 
 /// A key as written, when it can read a plan: not empty, not a command that
@@ -109,31 +111,45 @@ fn provider_region(id: &str, base: Option<&str>, pi: bool) -> Option<Region> {
     }
 }
 
-/// Every key found, with the client that holds it and its platform where
-/// that is known, in the order they are read.
-fn found(machine: &Machine) -> Vec<(&'static str, String, Option<Region>)> {
+/// Every key found, with the client that holds it, its platform where that
+/// is known and the route the client logs its calls with it under, in the
+/// order they are read.
+type Found = (&'static str, String, Option<Region>, Option<String>);
+fn found(machine: &Machine) -> Vec<Found> {
     let mut found = Vec::new();
-    let mut add = |client: &'static str, key: Option<&str>, region: Option<Region>| {
-        if let Some(key) = usable(key) {
-            found.push((client, key.to_owned(), region));
-        }
-    };
+    let mut add =
+        |client: &'static str, key: Option<&str>, region: Option<Region>, route: Option<String>| {
+            if let Some(key) = usable(key) {
+                found.push((client, key.to_owned(), region, route));
+            }
+        };
     let env = machine.env;
-    add("MiniMax", env("MINIMAX_CODING_API_KEY").as_deref(), None);
-    add("MiniMax", env("MINIMAX_API_KEY").as_deref(), None);
+    add(
+        "MiniMax",
+        env("MINIMAX_CODING_API_KEY").as_deref(),
+        None,
+        None,
+    );
+    add("MiniMax", env("MINIMAX_API_KEY").as_deref(), None, None);
     add(
         "MiniMax",
         env("MINIMAX_CN_API_KEY").as_deref(),
         Some(Region::China),
+        None,
     );
     for route in &machine.claude {
         if let Some(region) = Region::of_url(&route.base_url) {
-            add("Claude", route.key.as_deref(), Some(region));
+            add("Claude", route.key.as_deref(), Some(region), None);
         }
     }
     for provider in &machine.codex {
         if let Some(region) = Region::of_url(&provider.base_url) {
-            add("Codex", provider.key(env).as_deref(), Some(region));
+            add(
+                "Codex",
+                provider.key(env).as_deref(),
+                Some(region),
+                Some(format!("codex#{}", provider.id)),
+            );
         }
     }
     // OpenCode: its sign-ins, once every config it has is readable, since a
@@ -151,7 +167,12 @@ fn found(machine: &Machine) -> Vec<(&'static str, String, Option<Region>)> {
                 .find_map(|config| config["provider"][id]["options"]["baseURL"].as_str());
             if value["type"] == "api" {
                 if let Some(region) = provider_region(id, base, false) {
-                    add("OpenCode", value["key"].as_str(), Some(region));
+                    add(
+                        "OpenCode",
+                        value["key"].as_str(),
+                        Some(region),
+                        Some(format!("opencode#{id}")),
+                    );
                 }
             }
         }
@@ -165,7 +186,7 @@ fn found(machine: &Machine) -> Vec<(&'static str, String, Option<Region>)> {
             if let Some(region) = provider_region(id, base, true) {
                 let raw = value["key"].as_str();
                 let key = raw.map(|raw| env(raw).unwrap_or_else(|| raw.to_owned()));
-                add("Pi", key.as_deref(), Some(region));
+                add("Pi", key.as_deref(), Some(region), Some(format!("pi#{id}")));
             }
         }
     }
@@ -198,7 +219,7 @@ pub(super) fn keys(host: &dyn Host) -> Vec<Key> {
     };
     // Each key once, with every platform a client named for it.
     let mut found_keys = Vec::<(Key, Vec<Region>)>::new();
-    for (client, key, region) in found(&machine) {
+    for (client, key, region, route) in found(&machine) {
         let index = match found_keys.iter().position(|(known, _)| known.key == key) {
             Some(index) => index,
             None => {
@@ -207,6 +228,7 @@ pub(super) fn keys(host: &dyn Host) -> Vec<Key> {
                         key,
                         region: None,
                         clients: Vec::new(),
+                        routes: Vec::new(),
                     },
                     Vec::new(),
                 ));
@@ -216,6 +238,9 @@ pub(super) fn keys(host: &dyn Host) -> Vec<Key> {
         let (known, regions) = &mut found_keys[index];
         if !known.clients.contains(&client) {
             known.clients.push(client);
+        }
+        if let Some(route) = route.filter(|route| !known.routes.contains(route)) {
+            known.routes.push(route);
         }
         if let Some(region) = region.filter(|region| !regions.contains(region)) {
             regions.push(region);
@@ -252,7 +277,7 @@ pub(super) fn configured(look: &dyn Look) -> Vec<&'static str> {
             .unwrap_or_default(),
     };
     let mut evidence = Vec::new();
-    for (client, _, _) in found(&machine) {
+    for (client, ..) in found(&machine) {
         let name = match client {
             "Claude" => "claude-provider-route",
             "Codex" => "codex-provider-route",
@@ -305,6 +330,14 @@ mod tests {
         assert_eq!(key("sk-cp-codex").region, Some(Region::China));
         assert_eq!(key("sk-cp-open").region, Some(Region::China));
         assert_eq!(key("sk-cp-open").clients, ["OpenCode"]);
+        // The provider ids each client logs its calls with the key under.
+        assert_eq!(key("sk-cp-claude").routes, ["pi#minimax"]);
+        assert_eq!(key("sk-cp-codex").routes, ["codex#minimax"]);
+        assert_eq!(
+            key("sk-cp-open").routes,
+            ["opencode#minimax-cn-coding-plan"]
+        );
+        assert!(key("sk-cp-env").routes.is_empty());
     }
 
     #[test]

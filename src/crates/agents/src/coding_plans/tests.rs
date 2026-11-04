@@ -323,3 +323,47 @@ fn older_kimi_answers_count_units() {
     let odd = json!({"limits": [{"window": {"duration": 1, "timeUnit": "TIME_UNIT_YEAR"}}]});
     assert!(parse::parse(&odd, &entry, "id").is_err());
 }
+
+#[test]
+fn a_plans_rows_count_the_calls_through_its_own_provider_ids() {
+    let entry = |provider, base: &str, clients: &[&str]| Credential {
+        provider,
+        base: base.into(),
+        key: "k".into(),
+        organization: None,
+        project: None,
+        clients: clients.iter().map(|client| client.to_string()).collect(),
+        device: None,
+    };
+    let root = json!({"usage": {"limit": 100, "used": 25}});
+    let kimi = entry("kimi", "https://api.kimi.com/coding/v1", &["Kimi", "Pi"]);
+    let (windows, _) = parse::parse(&root, &kimi, "id").unwrap();
+    assert_eq!(
+        windows[0]["consumerRoutes"],
+        json!(["kimi-code", "kimi-for-coding", "kimi-coding"])
+    );
+    assert!(windows[0]["consumerSource"].is_null());
+    assert!(windows[0]["modelFamilies"].is_null());
+
+    // Claude Code sending the key to the plan: its calls to Kimi's models count.
+    let claude = entry("kimi", "https://api.kimi.com/coding/v1", &["Claude"]);
+    let (windows, _) = parse::parse(&root, &claude, "id").unwrap();
+    assert_eq!(windows[0]["consumerSource"], "claude");
+    assert_eq!(windows[0]["modelFamilies"], json!(["kimi"]));
+
+    // Pi's `zai` is the plan, OpenCode's is pay-as-you-go; each region has its own ids.
+    let mut glm = entry(
+        "glm",
+        "https://open.bigmodel.cn/api/coding/paas/v4",
+        &["OpenCode"],
+    );
+    let mut row = json!({"allModels": true});
+    parse::link(&mut row, &glm);
+    assert_eq!(
+        row["consumerRoutes"],
+        json!(["zhipuai-coding-plan", "pi#zai-coding-cn"])
+    );
+    glm.base = "https://api.z.ai/api/coding/paas/v4".into();
+    parse::link(&mut row, &glm);
+    assert_eq!(row["consumerRoutes"], json!(["zai-coding-plan", "pi#zai"]));
+}

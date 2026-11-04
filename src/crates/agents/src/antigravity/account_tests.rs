@@ -41,6 +41,7 @@ fn families_keep_their_most_used_model() {
     assert_eq!(gemini["resetAt"], "2026-10-23T00:00:00Z");
     assert_eq!(gemini["accountId"], identity.as_str());
     assert_eq!(gemini["allModels"], false);
+    assert_eq!(gemini["consumerSource"], "antigravity");
     let id = account_id("antigravity", &["me@example.com", ""]);
     assert_eq!(gemini["id"], format!("{id}:legacy:gemini"));
     assert_eq!(reading.quotas[0]["modelFamilies"], json!(["claude", "gpt"]));

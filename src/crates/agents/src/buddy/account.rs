@@ -104,7 +104,7 @@ pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
         let spent = (total - left).max(0.0);
         let used = (spent / total * 100.0).clamp(0.0, 100.0);
         reading.quotas.push(json!({
-            "id": format!("{id}:credits"), "vendor": "workbuddy", "accountId": id, "account": "WorkBuddy",
+            "id": format!("{id}:credits"), "vendor": "workbuddy", "consumerSource": "workbuddy", "accountId": id, "account": "WorkBuddy",
             "name": "Credits", "shortLabel": "Credits", "usedPercent": used, "resetAt": reset,
             "allModels": true, "status": status(used),
             "nativeUsage": {"used": spent, "capacity": total, "unit": "credits"},

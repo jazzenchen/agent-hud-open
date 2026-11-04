@@ -147,6 +147,14 @@ fn the_saved_sign_in_reads_the_usage_summary() {
     assert_eq!(reading.quotas[0]["id"], format!("{id}:included"));
     assert_eq!(reading.quotas[2]["status"], "warning");
     assert_eq!(reading.quotas[1]["allModels"], false);
+    // Its logged calls: all of them in the included pool, by maker in its halves.
+    assert!(reading
+        .quotas
+        .iter()
+        .all(|q| q["consumerSource"] == "cursor"));
+    assert!(reading.quotas[0]["modelFamilies"].is_null());
+    assert_eq!(reading.quotas[1]["modelFamilies"], json!(["cursor"]));
+    assert_eq!(reading.quotas[2]["modelFamilies"][0], "claude");
     assert_eq!(reading.quotas[0]["windowDurationSeconds"], 2_678_400.0);
     let sent = host.sent.borrow();
     assert_eq!(

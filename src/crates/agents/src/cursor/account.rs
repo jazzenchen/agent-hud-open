@@ -193,6 +193,23 @@ pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
                     "account":email,"accountId":account_identity,"legacyWindowId":format!("{account_identity}/{window}"),
                     "allModels":!matches!(key,"models"|"third-party"),
                 });
+                // Cursor's calls from its stop hook: the included pool counts
+                // them all, its halves by the model's maker. A spending pool
+                // takes only what overflows, which the log does not tell.
+                let families = match key {
+                    "included" => Some(Value::Null),
+                    "models" => Some(json!(["cursor"])),
+                    "third-party" => Some(json!([
+                        "claude", "gpt", "gemini", "grok", "deepseek", "kimi", "glm", "qwen", "minimax"
+                    ])),
+                    _ => None,
+                };
+                if let Some(families) = families {
+                    quota["consumerSource"] = json!("cursor");
+                    if !families.is_null() {
+                        quota["modelFamilies"] = families;
+                    }
+                }
                 if let Some(duration) = duration {
                     quota["windowDurationSeconds"] = json!(duration);
                 }

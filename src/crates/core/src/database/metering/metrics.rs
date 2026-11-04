@@ -1,6 +1,7 @@
 //! A quota window's metrics: its pace, forecast and budget, from the meter view.
 
 use super::{date_ms, reply_rate, Samples, View};
+use crate::database::quota_link::QuotaLink;
 use crate::iso;
 use crate::l10n;
 use serde_json::{json, Value};
@@ -136,18 +137,10 @@ impl View {
                 outlook = json!({"kind":"exhausts","basis":basis,"ratePctPerHour":rate,"exhaustsAt":now.checked_add(interval as i64).map(iso),"beforeReset":interval<(reset-now)as f64,"projectedUsedPercent":(100.0-remaining+rate*(reset-now)as f64/3_600_000.0).min(100.0)});
             }
         }
-        let source = row["consumerSource"].as_str();
-        let families = row["modelFamilies"].as_array();
-        let matches = |source_value: &str, model: &str| {
-            source == Some(source_value)
-                && (row["allModels"] == true
-                    || families.is_some_and(|values| {
-                        values.iter().any(|family| {
-                            family
-                                .as_str()
-                                .is_some_and(|family| model_family(model) == Some(family))
-                        })
-                    }))
+        let link = QuotaLink::of(row);
+        let matches = |source: &str, model: &str| {
+            link.as_ref()
+                .is_some_and(|link| link.matches(source, model))
         };
         let consumer = self.buckets.iter().any(|b| matches(&b.source, &b.model));
         let mut token_rate = None;
@@ -161,10 +154,10 @@ impl View {
                 "本地用量账本仍在索引",
                 "The local usage ledger is still indexing.",
             )
-        } else if source.is_none() {
+        } else if link.is_none() {
             l10n::text(
-                "此服务还没有本地用量账本",
-                "This provider has no migrated local usage ledger.",
+                "这台电脑上没有记下这个服务的 token 用量",
+                "This provider's token usage isn't logged on this computer.",
             )
         } else if !consumer {
             l10n::text(
@@ -279,10 +272,4 @@ impl View {
         }
         json!({"burnRatePctPerHour":rate,"tokensPerHour":token_rate,"replyRate":reply,"consumed":consumed,"cost":cost,"sampling":sampling,"outlook":outlook,"budget":budget,"unavailable":unavailable,"observedFrom":observed})
     }
-}
-fn model_family(model: &str) -> Option<&str> {
-    let model = model.strip_prefix("claude-").unwrap_or(model);
-    ["opus", "sonnet", "haiku", "fable", "gemini", "gpt"]
-        .into_iter()
-        .find(|family| model.split(['-', '_', '.']).any(|part| part == *family))
 }

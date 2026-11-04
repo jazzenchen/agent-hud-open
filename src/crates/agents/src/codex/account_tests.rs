@@ -358,6 +358,7 @@ fn pi_reads_the_same_plan_without_codex() {
     assert_eq!(reading.quotas.len(), 1);
     assert_eq!(reading.quotas[0]["usedPercent"], 30.0);
     assert!(reading.quotas[0]["consumerSource"].is_null());
+    assert_eq!(reading.quotas[0]["consumerRoutes"], json!(["openai-codex"]));
     assert_eq!(
         reading.account.unwrap()["id"],
         legacy_account("Codex", "p@example.com", "acc")
@@ -414,6 +415,13 @@ fn pi_does_not_duplicate_an_account_in_an_additional_home() {
         .quotas
         .iter()
         .all(|quota| quota["consumerSource"] == "codex"));
+    // Pi's calls spend only the windows of the account it is signed in to.
+    let shared = reading
+        .quotas
+        .iter()
+        .filter(|quota| quota["consumerRoutes"] == json!(["openai-codex"]))
+        .count();
+    assert_eq!(shared, 2);
 }
 
 #[test]

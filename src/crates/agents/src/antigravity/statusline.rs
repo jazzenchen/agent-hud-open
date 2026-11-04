@@ -100,6 +100,8 @@ fn parse_at(report: &Value, now: DateTime<Utc>) -> Option<Reading> {
         // An unknown bucket does not establish which models it covers.
         let all = groups.len() == 1 && !quota["modelFamilies"].is_null();
         quota["allModels"] = json!(all);
+        // Its calls are logged by model, which picks the pool.
+        quota["consumerSource"] = json!("antigravity");
         if all {
             if let Some(period) = Period::from_seconds(quota["windowDurationSeconds"].as_f64()) {
                 quota["shortLabel"] = json!(period.short_name());

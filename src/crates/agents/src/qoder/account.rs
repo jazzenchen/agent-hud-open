@@ -110,7 +110,8 @@ fn credits(
     })?;
     let id = account_id("qoder", &[site.host]);
     let mut quota = json!({
-        "id": format!("{id}:credits"), "vendor": "qoder", "accountId": id, "account": site.name,
+        "id": format!("{id}:credits"), "vendor": "qoder", "accountId": id,
+        "consumerSource": if site.host == "qoder.com.cn" { json!(["qoder-cn"]) } else { json!(["qoder", "qoder-work"]) }, "account": site.name,
         "name": "Model credits", "shortLabel": "Credits", "usedPercent": summary.percent,
         "resetAt": summary.reset, "allModels": true, "status": status(summary.percent),
         "nativeUsage": {"used": summary.used, "capacity": summary.total, "unit": "credits"},
