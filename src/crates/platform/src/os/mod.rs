@@ -26,8 +26,8 @@ pub(crate) use target::*;
 /// The directory a client's variable moves its files to: the value without
 /// the whitespace around it, used as written, as the clients themselves read
 /// it (agent-hud-native-open ClientHome.variable); None when unset, empty or only
-/// whitespace. `home` is kept for callers that resolve relative defaults.
-pub(crate) fn variable(env: &Environment, key: &str, _home: &Path) -> Option<PathBuf> {
+/// whitespace.
+pub(crate) fn variable(env: &Environment, key: &str) -> Option<PathBuf> {
     environment_value(env, key)
         .map(|value| value.trim())
         .filter(|value| !value.is_empty())
@@ -107,10 +107,10 @@ pub(crate) fn agent_source_roots(
     roots
 }
 pub(crate) fn config_home(home: &Path, env: &Environment) -> PathBuf {
-    variable(env, "XDG_CONFIG_HOME", home).unwrap_or_else(|| home.join(".config"))
+    variable(env, "XDG_CONFIG_HOME").unwrap_or_else(|| home.join(".config"))
 }
 pub(crate) fn data_home(home: &Path, env: &Environment) -> PathBuf {
-    variable(env, "XDG_DATA_HOME", home).unwrap_or_else(|| home.join(".local/share"))
+    variable(env, "XDG_DATA_HOME").unwrap_or_else(|| home.join(".local/share"))
 }
 pub(crate) fn path_entries(env: &Environment) -> Vec<PathBuf> {
     environment_value(env, "PATH")

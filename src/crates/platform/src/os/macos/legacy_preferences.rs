@@ -600,7 +600,7 @@ pub(super) fn normalize(settings: &Value, layouts: &Value, agents: &Value) -> Va
     );
     json!({"settings":app,"presentation":{"global":global,"screenDefaults":defaults,"screens":screens,"sharedLayout":shared,"layouts":own_layouts,"sources":sources}})
 }
-pub(crate) fn read() -> Result<Option<Value>, String> {
+pub(crate) fn read() -> Option<Value> {
     use objc2_foundation::{NSData, NSString, NSUserDefaults};
     let defaults = NSUserDefaults::standardUserDefaults();
     for name in ["app.agenthud.mac", "app.agenthud.open"] {
@@ -619,12 +619,12 @@ pub(crate) fn read() -> Result<Option<Value>, String> {
         let layouts = decode("panelLayout.v2").filter(Value::is_object);
         let agents = decode("agents.v5").filter(Value::is_array);
         if settings.is_some() || layouts.is_some() || agents.is_some() {
-            return Ok(Some(normalize(
+            return Some(normalize(
                 settings.as_ref().unwrap_or(&Value::Null),
                 layouts.as_ref().unwrap_or(&Value::Null),
                 agents.as_ref().unwrap_or(&Value::Null),
-            )));
+            ));
         }
     }
-    Ok(None)
+    None
 }

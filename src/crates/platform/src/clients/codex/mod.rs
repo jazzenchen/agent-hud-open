@@ -13,7 +13,7 @@ use std::{
 pub fn data_directory() -> Result<PathBuf, String> {
     let home = crate::os::home_dir()?;
     Ok(
-        crate::os::variable(&std::env::vars().collect(), "CODEX_HOME", &home)
+        crate::os::variable(&std::env::vars().collect(), "CODEX_HOME")
             .unwrap_or_else(|| home.join(".codex")),
     )
 }

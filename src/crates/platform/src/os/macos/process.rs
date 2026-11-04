@@ -162,9 +162,6 @@ fn parse_procargs2(
     data: &[u8],
     wanted_env: &[&str],
 ) -> Option<(Vec<String>, HashMap<String, String>)> {
-    if !(5..=1024 * 1024).contains(&data.len()) {
-        return None;
-    }
     let count = i32::from_ne_bytes(data.get(..4)?.try_into().ok()?);
     if !(1..=4096).contains(&count) {
         return None;

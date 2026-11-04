@@ -18,7 +18,7 @@ pub(crate) fn daemon_tui_port_for(
 
 fn daemon_socket_path(home: &Path, env: &HashMap<String, String>) -> Option<PathBuf> {
     use std::os::unix::fs::{FileTypeExt, MetadataExt};
-    let root = crate::os::variable(env, "CODEX_HOME", home).unwrap_or_else(|| home.join(".codex"));
+    let root = crate::os::variable(env, "CODEX_HOME").unwrap_or_else(|| home.join(".codex"));
     let uid = unsafe { libc::getuid() };
     for relative in [
         "app-server-control/app-server-control.sock",

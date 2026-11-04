@@ -157,8 +157,8 @@ pub(crate) fn open_session_url(url: &str) -> Result<(), String> {
 }
 
 /// Swift UserDefaults has no native source on this host.
-pub(crate) fn legacy_preferences() -> Result<Option<serde_json::Value>, String> {
-    Ok(None)
+pub(crate) fn legacy_preferences() -> Option<serde_json::Value> {
+    None
 }
 
 pub(crate) fn prepare_socket_address(_address: &mut libc::sockaddr_un) {}

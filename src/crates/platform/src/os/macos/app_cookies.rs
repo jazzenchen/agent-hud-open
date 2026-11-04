@@ -82,9 +82,9 @@ pub(crate) fn app_cookie(app_data: &Path, app: &str, site: &str, name: &str) -> 
 /// it starts with `v10` and opens with the app's "<App> Safe Storage"
 /// keychain item.
 pub(crate) fn unseal_safe_storage(app: &str, encrypted: &[u8]) -> Answer<String> {
-    if !encrypted.starts_with(b"v10") {
+    let Some(sealed) = encrypted.strip_prefix(b"v10") else {
         return Answer::Failed;
-    }
+    };
     let key = match safe_storage_key(app) {
         Answer::Found(key) => key,
         Answer::Missing => return Answer::Missing,
@@ -92,12 +92,9 @@ pub(crate) fn unseal_safe_storage(app: &str, encrypted: &[u8]) -> Answer<String>
         Answer::Denied => return Answer::Denied,
         Answer::Failed => return Answer::Failed,
     };
-    unseal_with_key(&key, encrypted).map_or(Answer::Failed, Answer::Found)
-}
-
-fn unseal_with_key(key: &[u8; 16], encrypted: &[u8]) -> Option<String> {
-    let sealed = encrypted.strip_prefix(b"v10")?;
-    String::from_utf8(decrypt(key, sealed)?).ok()
+    decrypt(&key, sealed)
+        .and_then(|plain| String::from_utf8(plain).ok())
+        .map_or(Answer::Failed, Answer::Found)
 }
 
 struct Stored {
@@ -362,13 +359,11 @@ mod tests {
         );
         let sealed = encrypt(&key, b"sk-ant-sid01-example");
         assert_eq!(decrypt(&key, &sealed).unwrap(), b"sk-ant-sid01-example");
-        let mut blob = b"v10".to_vec();
-        blob.extend_from_slice(&sealed);
-        assert_eq!(
-            unseal_with_key(&key, &blob).as_deref(),
-            Some("sk-ant-sid01-example")
-        );
-        assert!(unseal_with_key(&key, b"v11nope").is_none());
+        // Refused before its key is asked for.
+        assert!(matches!(
+            unseal_safe_storage("Example", b"v11nope"),
+            Answer::Failed
+        ));
         assert!(decrypt(&derive(b"other").unwrap(), &sealed)
             .is_none_or(|plain| plain != b"sk-ant-sid01-example"));
     }

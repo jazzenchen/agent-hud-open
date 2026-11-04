@@ -412,12 +412,10 @@ async fn serve(
         return;
     }
     if let Some(response) = response {
-        if let Ok(mut bytes) = serde_json::to_vec(&response) {
-            bytes.push(b'\n');
-            if bytes.len() <= response_limit {
-                let _ =
-                    tokio::time::timeout(Duration::from_secs(5), stream.write_all(&bytes)).await;
-            }
+        let mut bytes = serde_json::to_vec(&response).unwrap();
+        bytes.push(b'\n');
+        if bytes.len() <= response_limit {
+            let _ = tokio::time::timeout(Duration::from_secs(5), stream.write_all(&bytes)).await;
         }
     }
 }
@@ -430,7 +428,7 @@ pub fn request(
     timeout: Duration,
     mut settled: impl FnMut() -> bool,
 ) -> Result<Option<Value>, String> {
-    let mut bytes = serde_json::to_vec(message).map_err(|_| "Invalid local IPC request")?;
+    let mut bytes = serde_json::to_vec(message).unwrap();
     bytes.push(b'\n');
     if bytes.len() > request_limit {
         return Err("The local IPC request is too large".into());
