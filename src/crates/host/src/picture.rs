@@ -4,7 +4,7 @@ use serde_json::{json, Value};
 use std::{
     sync::{
         atomic::{AtomicU64, Ordering},
-        mpsc, Mutex,
+        mpsc, Mutex, PoisonError,
     },
     time::Duration,
 };
@@ -23,7 +23,7 @@ pub fn capture(app: &tauri::AppHandle, params: Value) -> Result<Value, String> {
         let backend = service
             .backend
             .lock()
-            .map_err(|_| "Application state unavailable")?;
+            .unwrap_or_else(PoisonError::into_inner);
         let snapshot = backend
             .snapshot
             .as_ref()
@@ -62,7 +62,7 @@ pub fn capture(app: &tauri::AppHandle, params: Value) -> Result<Value, String> {
     let payload = json!({"id":id,"params":params,"metadata":metadata});
     {
         let pictures = app.state::<Pictures>();
-        let mut pending = pictures.0.lock().map_err(|_| "Picture owner unavailable")?;
+        let mut pending = pictures.0.lock().unwrap_or_else(PoisonError::into_inner);
         if pending.is_some() {
             return Err("Another HUD picture is being rendered".into());
         }
@@ -104,7 +104,9 @@ pub fn capture(app: &tauri::AppHandle, params: Value) -> Result<Value, String> {
         .recv_timeout(Duration::from_secs(25))
         .map_err(|_| "HUD picture rendering timed out".to_string())
         .and_then(|r| r);
-    if let Ok(mut pending) = app.state::<Pictures>().0.lock() {
+    {
+        let pictures = app.state::<Pictures>();
+        let mut pending = pictures.0.lock().unwrap_or_else(PoisonError::into_inner);
         if pending.as_ref().is_some_and(|job| job.id == id) {
             *pending = None;
         }
@@ -119,13 +121,12 @@ pub fn capture(app: &tauri::AppHandle, params: Value) -> Result<Value, String> {
 }
 fn complete(app: &tauri::AppHandle, id: &str, result: Result<Value, String>) {
     let pictures = app.state::<Pictures>();
-    if let Ok(mut pending) = pictures.0.lock() {
-        if pending.as_ref().is_some_and(|job| job.id == id) {
-            if let Some(job) = pending.take() {
-                let _ = job.reply.send(result);
-            }
+    let mut pending = pictures.0.lock().unwrap_or_else(PoisonError::into_inner);
+    if pending.as_ref().is_some_and(|job| job.id == id) {
+        if let Some(job) = pending.take() {
+            let _ = job.reply.send(result);
         }
-    };
+    }
 }
 #[tauri::command]
 pub fn picture_payload(window: tauri::WebviewWindow, id: String) -> Result<Value, String> {
@@ -135,7 +136,7 @@ pub fn picture_payload(window: tauri::WebviewWindow, id: String) -> Result<Value
     let app = window.app_handle();
     let mut payload = {
         let pictures = app.state::<Pictures>();
-        let pending = pictures.0.lock().map_err(|_| "Picture owner unavailable")?;
+        let pending = pictures.0.lock().unwrap_or_else(PoisonError::into_inner);
         pending
             .as_ref()
             .filter(|job| job.id == id)
@@ -147,7 +148,7 @@ pub fn picture_payload(window: tauri::WebviewWindow, id: String) -> Result<Value
     let backend = service
         .backend
         .lock()
-        .map_err(|_| "Application state unavailable")?;
+        .unwrap_or_else(PoisonError::into_inner);
     let snapshot = backend
         .snapshot
         .as_ref()
@@ -190,7 +191,7 @@ pub fn picture_resize(
     }
     {
         let pictures = window.app_handle().state::<Pictures>();
-        let pending = pictures.0.lock().map_err(|_| "Picture owner unavailable")?;
+        let pending = pictures.0.lock().unwrap_or_else(PoisonError::into_inner);
         if pending.as_ref().is_none_or(|job| job.id != id) {
             return Err("Picture is no longer requested".into());
         }

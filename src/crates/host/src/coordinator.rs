@@ -10,7 +10,7 @@ use crate::{
 };
 use serde_json::{json, Value};
 use std::{
-    sync::{Arc, Condvar, Mutex},
+    sync::{Arc, Condvar, Mutex, PoisonError},
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 use tauri::Manager;
@@ -83,15 +83,15 @@ fn wake(app: &tauri::AppHandle, changed: u8, update: impl FnOnce(&mut Pending)) 
 
 impl Coordinator {
     fn wake(&self, changed: u8, update: impl FnOnce(&mut Pending)) {
-        if let Ok(mut pending) = self.pending.lock() {
-            pending.changed |= changed;
-            update(&mut pending);
-            self.wake.notify_one();
-        }
+        let mut pending = self.pending.lock().unwrap_or_else(PoisonError::into_inner);
+        pending.changed |= changed;
+        update(&mut pending);
+        self.wake.notify_one();
     }
 
     fn update_notice(&self, notice: Option<UpdateNotice>) {
-        if let Ok(mut shown) = self.notice.lock() {
+        {
+            let mut shown = self.notice.lock().unwrap_or_else(PoisonError::into_inner);
             if *shown == notice {
                 return;
             }
@@ -164,7 +164,11 @@ pub(crate) fn update_notice(app: &tauri::AppHandle, notice: Option<UpdateNotice>
 }
 
 fn current_notice(app: &tauri::AppHandle) -> Option<UpdateNotice> {
-    app.try_state::<Coordinator>()?.notice.lock().ok()?.clone()
+    app.try_state::<Coordinator>()?
+        .notice
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner)
+        .clone()
 }
 
 /// The menu bar's New Version… and the HUD's arrow: Settings, on the page
@@ -191,8 +195,8 @@ pub(crate) fn hud_bot_directions(owner: tauri::State<'_, Coordinator>) -> Value 
     owner
         .directions
         .lock()
-        .map(|directions| directions.clone())
-        .unwrap_or(Value::Null)
+        .unwrap_or_else(PoisonError::into_inner)
+        .clone()
 }
 
 /// The user looked at Bots, which clears their failed badges.
@@ -227,9 +231,7 @@ fn run(app: &tauri::AppHandle) {
     let mut bots_at: Option<Instant> = None;
     loop {
         let (mut changed, looked) = {
-            let Ok(mut pending) = owner.pending.lock() else {
-                return;
-            };
+            let mut pending = owner.pending.lock().unwrap_or_else(PoisonError::into_inner);
             loop {
                 if pending.stopped {
                     return;
@@ -244,14 +246,17 @@ fn run(app: &tauri::AppHandle) {
                     .min();
                 pending = match due {
                     Some(at) if at <= now => break,
-                    Some(at) => match owner.wake.wait_timeout(pending, at - now) {
-                        Ok((pending, _)) => pending,
-                        Err(_) => return,
-                    },
-                    None => match owner.wake.wait(pending) {
-                        Ok(pending) => pending,
-                        Err(_) => return,
-                    },
+                    Some(at) => {
+                        owner
+                            .wake
+                            .wait_timeout(pending, at - now)
+                            .unwrap_or_else(PoisonError::into_inner)
+                            .0
+                    }
+                    None => owner
+                        .wake
+                        .wait(pending)
+                        .unwrap_or_else(PoisonError::into_inner),
                 };
             }
             if let Some(next) = pending.snapshot.take() {
@@ -305,7 +310,11 @@ fn run(app: &tauri::AppHandle) {
             director.advance(seconds);
         }
         let wire = director.wire();
-        if let Ok(mut shown) = owner.directions.lock() {
+        {
+            let mut shown = owner
+                .directions
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner);
             if *shown != wire {
                 activity::publish(app, "hud:bot-directions", &wire);
                 *shown = wire;
