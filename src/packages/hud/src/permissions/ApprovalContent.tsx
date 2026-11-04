@@ -135,8 +135,9 @@ export function ApprovalContent({
                   {contextPath}
                 </div>
               )}
+              {/* A request whose questions change is a new card. */}
               <RequestActions
-                key={request.id}
+                key={`${request.id}:${JSON.stringify(request.questions ?? [])}`}
                 request={request}
                 light={light}
                 language={language}
