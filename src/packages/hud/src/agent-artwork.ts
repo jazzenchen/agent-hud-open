@@ -24,6 +24,8 @@ export const ORIGINAL_ARTWORK_FILES = {
   Devin: "devin",
   MiniMax: "minimax",
   "Volcengine Ark": "ark",
+  "Kilo Code": "kilocode",
+  "MiMo Code": "xiaomimimo",
 } as const;
 type OriginalVendor = keyof typeof ORIGINAL_ARTWORK_FILES;
 const vendors: Readonly<Record<string, OriginalVendor>> = {
@@ -49,6 +51,8 @@ const vendors: Readonly<Record<string, OriginalVendor>> = {
   devin: "Devin",
   minimax: "MiniMax",
   ark: "Volcengine Ark",
+  kilo: "Kilo Code",
+  mimocode: "MiMo Code",
 };
 const templates: ReadonlySet<OriginalVendor> = new Set([
   "Grok",
@@ -58,6 +62,8 @@ const templates: ReadonlySet<OriginalVendor> = new Set([
   "GitHub Copilot",
   "Hermes",
   "ZCode",
+  "Kilo Code",
+  "MiMo Code",
 ]);
 const normalize = (source: string) =>
   source

@@ -70,3 +70,19 @@ a call in more than one place, the best one counts it and the others give way.
 | --- | --- | --- |
 | Qoder, Qoder CN, QoderWork | Claude Code's lines in `projects/<folder>/<session>.jsonl` under `~/.qoder` (`QODER_CONFIG_DIR`), `~/.qoder-cn` (`QODERCN_CONFIG_DIR`), `~/.qoderwork` and the Qoder app's `SharedClientCache/cli/projects`; sub-agents in `<session>/subagents/`. A session's id is the one its hooks report. Each build is a client of its own. | Each response's usage; Qoder's `input_tokens` holds its cache reads, which count apart. Qoder CN's older `QoderCN/SharedClientCache/cache/db/local.db` adds its assistant messages. A response billed only in credits has no tokens. |
 | Copilot CLI | `session-state/<session>/events.jsonl` under `~/.copilot` (`COPILOT_HOME`). | `session-store.db`'s `assistant_usage_events`, one row per call (its input holds the cache's reads and writes, its output the reasoning); else the OTel export's chat spans; else the `session.shutdown` totals, each counted by what it adds. The first store row of a session replaces what the others counted. The Copilot desktop app's `data.db` is not read: its sessions keep `session-state` too. |
+## Forks read with their parents' readers
+
+Kilo Code and MiMo Code keep OpenCode's database, and Oh My Pi keeps Pi's
+logs, each under folders of its own. Each is its own source, with its own
+session ids (`kilo:`, `mimocode:`, `omp:`), read by its parent's reader:
+
+| Client | Sessions | Left out |
+| --- | --- | --- |
+| Kilo Code | `$XDG_DATA_HOME/kilo/kilo.db` | Tasks moved in from the VS Code extension (`ses_migrated_*`, no tokens); the JSON files it copied into the database; rows whose data is not JSON |
+| MiMo Code | `$XDG_DATA_HOME/mimocode/mimocode.db` | Messages imported from Claude Code, Codex or OpenCode (`external_import`), which are read where they were made; the made-up title "Untitled" |
+| Oh My Pi | `~/.omp/agent/sessions` | Entries a moved or forked session copied from the one it continues (older than its header); the copies `omp gc --compress` stages in `.omp-gc-compress-*`; calls outside the conversation (`model_usage`) count, without changing the session's model |
+
+Not read: Kilo Code's and MiMo Code's release-channel databases
+(`kilo-<channel>.db`, `mimocode-<channel>.db`), `KILO_DB`, `MIMOCODE_DB` and
+`MIMOCODE_HOME`; Oh My Pi's profiles, its XDG folders and a
+`PI_CODING_AGENT_DIR` it shares with Pi, which Pi reads.

@@ -1,11 +1,12 @@
-// Agent HUD Pi session observer
+// SOURCE, NAME, FOLDER, VARIABLE and ENDS, above, name the client: its sessions' id prefix, its name, its folder in
+// the home folder, the variable that moves it, and the event that ends a run.
 import { mkdirSync, writeFileSync, renameSync, readdirSync, statSync, unlinkSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { createHash, randomUUID } from "node:crypto";
 
 export default function (pi) {
-  const directory = join(process.env.PI_CODING_AGENT_DIR || join(homedir(), ".pi", "agent"), "agent-hud", "turns");
+  const directory = join((VARIABLE && process.env[VARIABLE]) || join(homedir(), FOLDER, "agent"), "agent-hud", "turns");
   let active;
   let heartbeat;
   let lastStopReason;
@@ -18,10 +19,10 @@ export default function (pi) {
 
   function publish(ctx, state = "running", stopReason) {
     if (!active) return;
-    const sessionID = "pi:" + ctx.sessionManager.getSessionId();
+    const sessionID = SOURCE + ":" + ctx.sessionManager.getSessionId();
     const record = {
       version: 1, sessionID, sessionFile: ctx.sessionManager.getSessionFile(),
-      workspace: ctx.cwd, title: ctx.sessionManager.getSessionName() || "Pi",
+      workspace: ctx.cwd, title: ctx.sessionManager.getSessionName() || NAME,
       model: ctx.model?.id, providerID: ctx.model?.provider,
       turnID: active.id, state, startedAtMs: active.startedAtMs, observedAtMs: Date.now(),
       navigationTarget: navigationTarget(), stopReason,
@@ -33,7 +34,7 @@ export default function (pi) {
       const temporary = file + "." + process.pid + ".tmp";
       writeFileSync(temporary, JSON.stringify(record), { mode: 0o600 });
       renameSync(temporary, file);
-    } catch { /* Observability must never interrupt Pi's agent loop. */ }
+    } catch { /* Observability must never interrupt the agent loop. */ }
   }
 
   function finish(ctx, state, stopReason) {
@@ -41,6 +42,11 @@ export default function (pi) {
     clearInterval(heartbeat);
     heartbeat = undefined;
     active = undefined;
+  }
+
+  // The last message's stop reason says how the run ended: an answer, the user's abort or an error.
+  function settle(ctx) {
+    finish(ctx, lastStopReason === "stop" ? "completed" : "ended", lastStopReason);
   }
 
   pi.on("session_start", () => {
@@ -62,8 +68,13 @@ export default function (pi) {
     lastStopReason = undefined;
     publish(ctx);
   });
-  // A build without agent_settled never settles the run: its heartbeat stops here, and the run goes quiet.
-  pi.on("agent_end", () => {
+  pi.on("agent_end", (event, ctx) => {
+    // Oh My Pi has no agent_settled: its agent_end says whether the run goes on, and the heartbeat goes on with it.
+    if (ENDS === "agent_end") {
+      if (!event?.willContinue) settle(ctx);
+      return;
+    }
+    // A Pi build without agent_settled never settles the run: its heartbeat stops here, and the run goes quiet.
     clearInterval(heartbeat);
     heartbeat = undefined;
   });
@@ -73,7 +84,6 @@ export default function (pi) {
   });
   pi.on("tool_execution_start", (_event, ctx) => publish(ctx));
   pi.on("tool_execution_end", (_event, ctx) => publish(ctx));
-  // The last message's stop reason says how the run ended: an answer, the user's abort or an error.
-  pi.on("agent_settled", (_event, ctx) => finish(ctx, lastStopReason === "stop" ? "completed" : "ended", lastStopReason));
+  pi.on("agent_settled", (_event, ctx) => settle(ctx));
   pi.on("session_shutdown", (_event, ctx) => finish(ctx, "ended"));
 }

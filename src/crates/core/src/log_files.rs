@@ -311,10 +311,14 @@ fn accepts(path: &Path, roots: &[(PathBuf, &'static str)]) -> bool {
             accepts_source(path, source) && !(hides_files(source) && hidden_below(path, root))
         })
 }
-/// Whether a client's hidden files and folders are never listed: Codex's, and
-/// Claude Code's and those of every client that writes its lines.
+/// Whether a client's hidden files and folders are never listed: Codex's,
+/// Claude Code's and those of every client that writes its lines
+/// (agent-hud-native-open LogFiles), and those whose agent keeps copies there
+/// that are no sessions.
 fn hides_files(source: &str) -> bool {
-    source == "codex" || agent_hud_agents::transcript::claude_lines(source)
+    source == "codex"
+        || agent_hud_agents::transcript::claude_lines(source)
+        || agent_hud_agents::pi::hides_copies(source)
 }
 /// Whether a file or a folder it lies in, below its root, is hidden.
 fn hidden_below(path: &Path, root: &Path) -> bool {
@@ -326,6 +330,10 @@ fn hidden_below(path: &Path, root: &Path) -> bool {
 pub(super) fn accepts_source(path: &Path, source: &str) -> bool {
     if super::source_db::accepts(path, source) {
         return true;
+    }
+    // A client of OpenCode's database keeps no logs beside it.
+    if agent_hud_agents::opencode::store(source).is_some() {
+        return false;
     }
     let name = path.file_name().unwrap_or_default().to_string_lossy();
     match source {
@@ -377,7 +385,7 @@ pub(super) fn accepts_source(path: &Path, source: &str) -> bool {
                         && !name.ends_with(".zst")
                         && !name.ends_with(".tmp")))
         }
-        "hermes" | "zcode" | "devin" | "opencode" | "grok-bot" | "cursor" => false,
+        "hermes" | "zcode" | "devin" | "grok-bot" | "cursor" => false,
         "antigravity" => {
             name == "transcript.jsonl" && path.components().any(|p| p.as_os_str() == "brain")
         }
@@ -434,12 +442,13 @@ fn walk(
     {
         return;
     }
-    if source == "opencode"
-        && !path.join("opencode.db").is_file()
-        && name != "storage"
-        && !path.components().any(|c| c.as_os_str() == "message")
-    {
-        return;
+    if let Some(store) = agent_hud_agents::opencode::store(source) {
+        if !path.join(store.database).is_file()
+            && !(store.legacy
+                && (name == "storage" || path.components().any(|c| c.as_os_str() == "message")))
+        {
+            return;
+        }
     }
     if matches!(source, "zcode" | "devin")
         && !path
@@ -463,13 +472,12 @@ fn walk(
             return;
         }
     };
+    // Hidden files and folders are never listed where `hides_files` says so;
+    // other readers keep their own rules.
+    let skips = hides_files(source);
     for entry in entries {
         match entry {
-            // Claude Code's and Codex's hidden files and folders are never
-            // listed (agent-hud-native-open LogFiles); other readers keep their own
-            // rules.
-            Ok(entry)
-                if hides_files(source) && entry.file_name().to_string_lossy().starts_with('.') => {}
+            Ok(entry) if skips && entry.file_name().to_string_lossy().starts_with('.') => {}
             Ok(entry) => walk(&entry.path(), source, files, errors),
             Err(error) => errors.push(format!("Could not list {source} logs: {error}")),
         }

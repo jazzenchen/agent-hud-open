@@ -1,4 +1,5 @@
-//! OpenCode SQLite session & child-session reader (`opencode.db`).
+//! The SQLite session & child-session reader of OpenCode's database
+//! (`opencode.db`), and of its forks' (`Store`).
 use crate::transcript::{sql_column, sql_columns, sql_tables, sql_text, unsigned};
 use crate::{
     transcript::records::{Page, Record},
@@ -19,7 +20,8 @@ pub fn reply_time(finish: &Value, time: &Value) -> Option<u64> {
     (took.is_finite() && took >= 1.0).then_some(took as u64)
 }
 
-pub fn read(db: &Connection, cursor: &Value) -> rusqlite::Result<Page> {
+pub fn read(db: &Connection, cursor: &Value, store: &super::Store) -> rusqlite::Result<Page> {
+    let source = store.agent.id;
     let tables = sql_tables(db)?;
     let stage = cursor["stage"].as_u64().unwrap_or(0);
     let after_rowid = cursor["after"].as_i64().unwrap_or(0);
@@ -55,8 +57,13 @@ pub fn read(db: &Connection, cursor: &Value) -> rusqlite::Result<Page> {
         .map(|table| sql_columns(db, table))
         .transpose()?
         .unwrap_or_default();
-    let meta = ["title", "directory", "time_archived", "parent_id"]
+    let mut meta = ["title", "directory", "time_archived", "parent_id"]
         .map(|field| sql_column(&s, "s", field, "NULL"));
+    // A title the client made up for an untitled session (MiMo Code's
+    // "Untitled") names nothing.
+    if s.contains("title") && s.contains("title_source") {
+        meta[0] = "CASE WHEN s.title_source='fallback' THEN NULL ELSE s.title END".into();
+    }
     let fields = [
         "role",
         "time",
@@ -69,7 +76,7 @@ pub fn read(db: &Connection, cursor: &Value) -> rusqlite::Result<Page> {
     ]
     .map(|field| format!("'{field}',json_extract(m.data,'$.{field}')"))
     .join(",");
-    let filter = if *messages == "session_message" {
+    let mut filter = if *messages == "session_message" {
         "m.type='assistant'".into()
     } else {
         format!(
@@ -81,6 +88,30 @@ pub fn read(db: &Connection, cursor: &Value) -> rusqlite::Result<Page> {
             }
         )
     };
+    // One malformed row would fail the whole statement, so it is left out
+    // before its fields are read.
+    filter.insert_str(0, "json_valid(m.data) AND ");
+    if let Some(prefix) = store.copies {
+        filter.push_str(&format!(
+            " AND IFNULL(substr(m.session_id,1,{}),'')<>'{prefix}'",
+            prefix.len()
+        ));
+    }
+    for table in store.imports.iter().filter(|t| tables.contains(**t)) {
+        let columns = sql_columns(db, table)?;
+        if !columns.contains("session_id") {
+            continue;
+        }
+        if columns.contains("message_ids") {
+            filter.push_str(&format!(
+                " AND m.id NOT IN (SELECT j.value FROM {table} i, json_each(i.message_ids) j WHERE json_valid(i.message_ids)) AND m.session_id NOT IN (SELECT session_id FROM {table} WHERE message_ids IS NULL OR NOT json_valid(message_ids))"
+            ));
+        } else {
+            filter.push_str(&format!(
+                " AND m.session_id NOT IN (SELECT session_id FROM {table})"
+            ));
+        }
+    }
     let join = title_table
         .map(|t| format!("LEFT JOIN {t} s ON s.id=m.session_id"))
         .unwrap_or_default();
@@ -125,12 +156,12 @@ pub fn read(db: &Connection, cursor: &Value) -> rusqlite::Result<Page> {
                 && s.ends_with('Z'))
         });
         records.push(Record {
-            id: format!("opencode:{raw}"),
+            id: format!("{source}:{raw}"),
             title,
             title_fallback: None,
             cwd: sql_text(row, 5).or_else(|| v["path"]["root"].as_str().map(str::to_owned)),
             model: format!("{model}#{provider}"),
-            key: format!("opencode:{msg_id}"),
+            key: format!("{source}:{msg_id}"),
             at,
             usage: Usage {
                 input: unsigned(&t["input"]),
@@ -139,7 +170,7 @@ pub fn read(db: &Connection, cursor: &Value) -> rusqlite::Result<Page> {
                 write: unsigned(&t["cache"]["write"]),
                 reasoning: unsigned(&t["reasoning"]),
             },
-            parent: sql_text(row, 7).map(|id| format!("opencode:{id}")),
+            parent: sql_text(row, 7).map(|id| format!("{source}:{id}")),
             archived: Some(!matches!(row.get_ref(6)?, rusqlite::types::ValueRef::Null)),
             updated: v["time"]["completed"].as_i64(),
             duration_ms: reply_time(&v["finish"], &v["time"]),

@@ -148,7 +148,8 @@ fn agent_category(agent: &str) -> (Category, Option<&'static str>) {
         "qoder" | "qoder-cn" => (Category::Ide, Some("qoder")),
         "qoder-work" => (Category::Desktop, Some("qoderwork")),
         "workbuddy" => (Category::Desktop, Some("workbuddy")),
-        "grok-cli" | "hermes" | "kimi" | "opencode" | "pi" | "qwen" => (Category::Cli, None),
+        "grok-cli" | "hermes" | "kimi" | "opencode" | "pi" | "qwen" | "kilo" | "mimocode"
+        | "omp" => (Category::Cli, None),
         _ => (Category::Others, None),
     }
 }

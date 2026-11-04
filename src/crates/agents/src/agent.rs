@@ -66,6 +66,9 @@ pub static ALL: &[&Agent] = &[
     &glm::AGENT,
     &minimax::AGENT,
     &ark::AGENT,
+    &opencode::KILO,
+    &opencode::MIMO_CODE,
+    &pi::OH_MY_PI,
 ];
 
 /// Every account reader, in the order the engine reads them, one at a
@@ -148,6 +151,9 @@ mod tests {
                 "glm",
                 "minimax",
                 "ark",
+                "kilo",
+                "mimocode",
+                "omp",
             ]
         );
         for agent in ALL {

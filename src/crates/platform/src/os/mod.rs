@@ -211,6 +211,9 @@ mod tests {
             ),
             ("qoder-work", ".qoderwork/projects"),
             ("devin", ".local/share/devin/cli"),
+            ("kilo", ".local/share/kilo"),
+            ("mimocode", ".local/share/mimocode"),
+            ("omp", ".omp/agent/sessions"),
         ];
         // The application data folder differs by OS.
         let app = folder(home, &Environment::new(), agent_hud_agents::Base::AppData);

@@ -242,9 +242,10 @@ impl Log {
     }
 
     pub fn parse_source(&mut self, v: &Value) {
+        let pi = crate::pi::family(&self.source);
         match self.source.as_str() {
             "antigravity" => self.antigravity(v),
-            "pi" => self.pi(v),
+            _ if pi => self.pi(v),
             "qwen" => self.qwen(v),
             "codebuddy" | "workbuddy" => self.buddy(v),
             "kimi" => self.kimi(v),

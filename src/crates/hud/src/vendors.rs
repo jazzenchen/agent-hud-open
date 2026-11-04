@@ -363,7 +363,8 @@ fn vendor_name(source: &str) -> String {
         "devin" => "Devin",
         "minimax" => "MiniMax",
         "ark" => "Volcengine Ark",
-        _ => source,
+        // Agents with no mark of their own here, by their own names.
+        _ => agent_hud_core::naming::model_names::vendor_name(source),
     };
     name.to_owned()
 }

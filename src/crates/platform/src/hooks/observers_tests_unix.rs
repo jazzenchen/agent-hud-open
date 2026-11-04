@@ -88,3 +88,75 @@ fn one_client_that_cannot_take_its_observer_is_no_failure_of_the_switch() {
         "{notice}"
     );
 }
+
+#[test]
+fn each_fork_takes_its_parents_observer_in_its_own_folder_and_reports_as_itself() {
+    use serde_json::json;
+    use std::sync::Arc;
+    let temp = tempfile::tempdir().unwrap();
+    let home = temp.path().join("home");
+    fs::create_dir_all(&home).unwrap();
+    let context = context(&home);
+    for (source, script, marker) in [
+        (
+            "kilo",
+            ".config/kilo/plugins/agent-hud.js",
+            "// Agent HUD Kilo Code session observer\nconst SOURCE = \"kilo\"",
+        ),
+        (
+            "mimocode",
+            ".config/mimocode/plugins/agent-hud.js",
+            "// Agent HUD MiMo Code session observer\nconst SOURCE = \"mimocode\"",
+        ),
+        (
+            "omp",
+            ".omp/agent/extensions/agent-hud.ts",
+            "// Agent HUD Oh My Pi session observer\nconst SOURCE = \"omp\"",
+        ),
+    ] {
+        let plan = observer_plan(&context, source, true).unwrap();
+        assert_eq!(plan.path, home.join(script));
+        assert!(apply_observer_plan(&plan).unwrap());
+        assert!(fs::read_to_string(home.join(script))
+            .unwrap()
+            .starts_with(marker));
+        assert!(!observer_plan(&context, source, true).unwrap().changed);
+    }
+
+    // What the plugins write comes back as their own clients' turns.
+    let now = super::super::now_ms();
+    let mut observers = Observers::new(&home, &HashMap::new(), Arc::new(|| {}));
+    for (folder, record) in [
+        (
+            ".local/share/kilo/agent-hud/turns",
+            json!({"version":1,"sessionID":"kilo:ses_1","turnID":"msg_1","startedAtMs":now - 5_000,"completedAtMs":now - 1_000}),
+        ),
+        (
+            ".omp/agent/agent-hud/turns",
+            json!({"version":1,"sessionID":"omp:s1","turnID":"t1","state":"running","startedAtMs":now - 5_000,"observedAtMs":now - 1_000}),
+        ),
+    ] {
+        fs::create_dir_all(home.join(folder)).unwrap();
+        fs::write(
+            home.join(folder).join(format!("{}.json", "a".repeat(64))),
+            record.to_string(),
+        )
+        .unwrap();
+    }
+    let mut events = observers
+        .drain()
+        .into_iter()
+        .map(|event| {
+            let state = event.data["state"].as_str().unwrap_or_default().to_owned();
+            (event.source, event.session_id, state)
+        })
+        .collect::<Vec<_>>();
+    events.sort();
+    assert_eq!(
+        events,
+        [
+            ("kilo".into(), "kilo:ses_1".into(), "completed".into()),
+            ("omp".into(), "omp:s1".into(), "running".into()),
+        ]
+    );
+}

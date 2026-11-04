@@ -1,11 +1,11 @@
-// Agent HUD OpenCode session observer
+// SOURCE and FOLDER, above, name the client: its sessions' id prefix and its data folder.
 import { mkdirSync, writeFileSync, renameSync, readdirSync, readFileSync, statSync, unlinkSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { createHash } from "node:crypto";
 
 export const AgentHUDSessionObserver = async (input) => {
-  const directory = join(process.env.XDG_DATA_HOME || join(homedir(), ".local", "share"), "opencode", "agent-hud", "turns");
+  const directory = join(process.env.XDG_DATA_HOME || join(homedir(), ".local", "share"), FOLDER, "agent-hud", "turns");
   const sessions = new Map();
   try {
     for (const name of readdirSync(directory)) {
@@ -21,13 +21,13 @@ export const AgentHUDSessionObserver = async (input) => {
     return value;
   }
 
-  // A session deleted in OpenCode takes its records along, so it leaves Agent HUD's list as it left OpenCode's.
+  // A session deleted in the client takes its records along, so it leaves Agent HUD's list as it left the client's.
   function forget(id) {
     try {
       for (const name of readdirSync(directory)) {
         if (!/^[a-f0-9]{64}\.json$/.test(name)) continue;
         try {
-          if (JSON.parse(readFileSync(join(directory, name), "utf8")).sessionID === "opencode:" + id) unlinkSync(join(directory, name));
+          if (JSON.parse(readFileSync(join(directory, name), "utf8")).sessionID === SOURCE + ":" + id) unlinkSync(join(directory, name));
         } catch { /* A record that cannot be read is pruned with the week's. */ }
       }
     } catch { /* There are no records yet. */ }
@@ -49,7 +49,7 @@ export const AgentHUDSessionObserver = async (input) => {
     if (!reply || value.child || reply.error || reply.summary || reply.finish !== "stop") return;
     if (prompt && reply.parentID !== prompt.id) return;
     const record = {
-      version: 1, sessionID: "opencode:" + id, workspace: value.directory || input.directory, title: value.title,
+      version: 1, sessionID: SOURCE + ":" + id, workspace: value.directory || input.directory, title: value.title,
       model: reply.modelID, providerID: reply.providerID, turnID: reply.parentID,
       startedAtMs: startedAtMs || reply.createdAtMs || reply.completedAtMs, completedAtMs: Date.now(),
       navigationTarget: navigationTarget(),
@@ -61,11 +61,11 @@ export const AgentHUDSessionObserver = async (input) => {
       const temporary = file + "." + process.pid + ".tmp";
       writeFileSync(temporary, JSON.stringify(record), { mode: 0o600 });
       renameSync(temporary, file);
-    } catch { /* Observability must never interrupt OpenCode. */ }
+    } catch { /* Observability must never interrupt the client. */ }
   }
 
   return {
-    // Never throws or rejects: OpenCode 1.18 runs this inside the call that marks a session idle.
+    // Never throws or rejects: OpenCode 1.18 (and its forks) runs this inside the call that marks a session idle.
     event: async (payload) => {
       try {
         const event = payload?.event, properties = event?.properties || {}, info = properties.info || {};
@@ -78,7 +78,7 @@ export const AgentHUDSessionObserver = async (input) => {
             if (info.id) { sessions.delete(info.id); forget(info.id); }
             break;
           case "message.updated": {
-            // OpenCode updates earlier messages too, so the newest prompt and reply go by when they were created. The
+            // The client updates earlier messages too, so the newest prompt and reply go by when they were created. The
             // message is live and keeps changing, so the fields are copied now.
             if (!info.sessionID || !info.id) break;
             const value = session(info.sessionID), createdAtMs = info.time?.created || 0;
@@ -111,7 +111,7 @@ export const AgentHUDSessionObserver = async (input) => {
             break;
           }
         }
-      } catch { /* Observability must never interrupt OpenCode. */ }
+      } catch { /* Observability must never interrupt the client. */ }
     },
   };
 };

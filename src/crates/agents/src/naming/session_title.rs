@@ -187,6 +187,8 @@ fn folder_named(source: &str) -> bool {
             | "qoder"
             | "qoder-cn"
             | "qoder-work"
+            | "kilo"
+            | "mimocode"
     )
 }
 
@@ -209,7 +211,7 @@ fn client_name(source: &str) -> &str {
         "hermes" => "Hermes",
         "antigravity" => "Antigravity",
         "cursor" => "Cursor",
-        other => other,
+        other => crate::by_id(other).map_or(other, |agent| agent.name),
     }
 }
 

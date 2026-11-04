@@ -27,8 +27,20 @@ pub(crate) fn virtual_path(path: &Path, id: &str) -> PathBuf {
     PathBuf::from(format!("{}#hud-session-{key}", path.to_string_lossy()))
 }
 
+/// The client of OpenCode's database `source` is: OpenCode or a fork.
+fn opencode(source: &str) -> Option<&'static agent_hud_agents::opencode::Store> {
+    agent_hud_agents::opencode::store(source)
+}
+
+/// Whether `path` is one of the JSON message files OpenCode kept before its
+/// database.
+fn opencode_legacy(path: &Path, source: &str) -> bool {
+    opencode(source).is_some_and(|store| store.legacy)
+        && agent_hud_agents::opencode::legacy::accepts(path)
+}
+
 pub(crate) fn accepts(path: &Path, source: &str) -> bool {
-    if (source == "opencode" && agent_hud_agents::opencode::legacy::accepts(path))
+    if opencode_legacy(path, source)
         || source_batches::accepts(path, source)
         || (source == "grok-bot" && agent_hud_agents::grok::bot::accepts(path))
     {
@@ -42,7 +54,7 @@ pub(crate) fn accepts(path: &Path, source: &str) -> bool {
         }
         "zcode" => name == "db.sqlite",
         "devin" => name == "sessions.db",
-        "opencode" => name == "opencode.db",
+        _ if opencode(source).is_some_and(|store| name == store.database) => true,
         // Cursor's session headers, and the turn log its `stop` hook keeps.
         "cursor" => name == "state.vscdb" || agent_hud_agents::hooks::turn_log::accepts(path),
         "copilot" => agent_hud_agents::copilot::store::accepts(path),
@@ -52,7 +64,9 @@ pub(crate) fn accepts(path: &Path, source: &str) -> bool {
 }
 
 pub(crate) fn reader_version(path: &Path, source: &str) -> u16 {
-    if source == "opencode" && path.file_name().is_some_and(|name| name == "opencode.db") {
+    if opencode(source)
+        .is_some_and(|store| path.file_name().is_some_and(|name| name == store.database))
+    {
         2
     } else if source == "hermes" {
         // 2: calls carry the route their billing provider names.
@@ -74,14 +88,14 @@ impl AgentHudCore {
         superseded: &mut HashSet<PathBuf>,
     ) -> Option<PathBuf> {
         let map_key = (source.to_owned(), session_id.to_owned());
-        if source == "opencode" {
-            let is_db = origin_path.file_name().is_some_and(|n| n == "opencode.db");
+        if let Some(store) = opencode(source) {
+            let is_db = origin_path.file_name().is_some_and(|n| n == store.database);
             let vpath = virtual_path(origin_path, session_id);
             if let Some(existing) = self.session_map.get(&map_key) {
                 if !is_db
                     && existing
                         .to_string_lossy()
-                        .contains("opencode.db#hud-session-")
+                        .contains(&format!("{}#hud-session-", store.database))
                     && self.logs.get(existing).is_some_and(|h| !h.gone)
                 {
                     return None;
@@ -209,9 +223,8 @@ impl AgentHudCore {
         }
         let is_bot = stamp.source == "grok-bot";
         let is_turn_log = agent_hud_agents::hooks::turn_log::accepts(path);
-        let is_legacy =
-            stamp.source == "opencode" && agent_hud_agents::opencode::legacy::accepts(path);
-        let replaces_sessions = stamp.source == "opencode" && !is_legacy;
+        let is_legacy = opencode_legacy(path, stamp.source);
+        let replaces_sessions = opencode(stamp.source).is_some() && !is_legacy;
         let reader = if is_batch || is_bot || is_legacy || is_turn_log {
             None
         } else {
@@ -246,9 +259,6 @@ impl AgentHudCore {
                 "hermes" => {
                     agent_hud_agents::hermes::transcript::read(&reader.connection, path, cursor)
                 }
-                "opencode" => {
-                    agent_hud_agents::opencode::transcript::read(&reader.connection, cursor)
-                }
                 "devin" => agent_hud_agents::devin::transcript::read(&reader.connection, cursor),
                 "cursor" => agent_hud_agents::cursor::sessions::read(&reader.connection, cursor),
                 "copilot" => agent_hud_agents::copilot::store::read(&reader.connection, cursor),
@@ -262,7 +272,14 @@ impl AgentHudCore {
                         .ok_or("Missing generation")?,
                     cursor,
                 ),
-                _ => Err(rusqlite::Error::InvalidQuery),
+                source => match opencode(source) {
+                    Some(store) => agent_hud_agents::opencode::transcript::read(
+                        &reader.connection,
+                        cursor,
+                        store,
+                    ),
+                    None => Err(rusqlite::Error::InvalidQuery),
+                },
             }
         }
         .map_err(|_| {
