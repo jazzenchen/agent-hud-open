@@ -28,6 +28,22 @@
 
 Agent 在 Mac 上工作，HUD 把进展带到你身边。看一眼状态，接上一段对话，给出下一个决定——在电脑前，也在离开电脑之后。
 
+## 安装
+
+在 Mac 上用 Homebrew：
+
+```sh
+brew install --cask jazzenchen/tap/agent-hud
+```
+
+在 Mac、Windows 或 Linux 上用 Node.js（[安装方式](src/apps/installer/README.md)）：
+
+```sh
+npx @agenthud/install
+```
+
+也可以直接下载[发行版](https://agenthud.app/mac)。两条命令都会安装最新的版本（包括 Beta），在 Mac 上之后 Agent HUD 会自己更新。`/Applications` 里已经装了的话，给 Homebrew 命令加上 `--adopt`。
+
 ## 在屏幕上
 
 **你的 agents，一目了然。** 你在写代码、读文档或处理别的事情，agents 继续工作。屏幕边缘告诉你：谁还在忙，谁已经完成，谁正在等你。
@@ -255,22 +271,6 @@ iPhone 和发行版在同一个网络里，不订阅也能在 iPhone 与 Apple W
   - **同一局域网内**走 HTTPS，手机配对时固定这台 Mac 的证书。
   - **任何网络下，借助 Agent HUD Remote**，经由你自己的 iCloud。记录正文端到端加密，密钥在你的 iCloud 钥匙串里；只有提醒要显示的文字不在加密范围内，以便系统弹出提醒。
   - **运行中会话的实时活动**同样需要 Remote，经 Agent HUD 的中转服务交给 Apple 的推送服务。中转只保留转发所需的内容，即每台 Mac 最新的会话与每部手机的卡片，不保留账户身份；30 天没有请求的账户会被删除。
-
-## 安装
-
-下载[发行版](https://agenthud.app/mac)，或在终端里安装最新的版本（包括 Beta）。用 Homebrew：
-
-```sh
-brew install --cask jazzenchen/tap/agent-hud
-```
-
-`/Applications` 里已经装了的话，加上 `--adopt`，Homebrew 会接管现有的那份。或者用 Node.js，它也能安装 Windows 与 Linux 的测试版（[安装方式](src/apps/installer/README.md)）：
-
-```sh
-npx @agenthud/install
-```
-
-在 Mac 上，之后 Agent HUD 会自己更新。
 
 ## 从源码构建
 

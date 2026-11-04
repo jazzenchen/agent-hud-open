@@ -28,6 +28,22 @@
 
 Your agents work on your Mac. Agent HUD brings their progress to you. Check where they are at a glance, pick up a conversation, make the next decision: at your desk, and after you leave it.
 
+## Install
+
+With Homebrew on a Mac:
+
+```sh
+brew install --cask jazzenchen/tap/agent-hud
+```
+
+With Node.js on a Mac, Windows or Linux ([how it installs](src/apps/installer/README.md)):
+
+```sh
+npx @agenthud/install
+```
+
+Or download the [release](https://agenthud.app/mac). Either command installs the newest release, betas included, and on a Mac Agent HUD then updates itself. If it is already in `/Applications`, add `--adopt` to the Homebrew command.
+
 ## On your screen.
 
 **Your agents, at a glance.** You write code, read docs or deal with something else while your agents keep working. The edge of your screen tells you who is still busy, who is done and who is waiting for you.
@@ -255,22 +271,6 @@ Also: the **GLM Coding Plan**, **MiniMax** and **Volcengine Ark** plan quotas. Q
   - **On the same network**, over HTTPS, with the Mac's certificate pinned when the phone pairs.
   - **Anywhere, with Agent HUD Remote**, through your own iCloud. Record contents are end-to-end encrypted with keys in your iCloud Keychain; only the text an alert shows stays outside that encryption, so iOS can display it.
   - **Live Activities of running sessions**, also with Remote, pass through Agent HUD's relay to Apple's push service. The relay keeps only what forwarding needs, each Mac's latest sessions and each phone's card, with no account identity, and deletes an account it hasn't heard from in 30 days.
-
-## Install
-
-Download the [release](https://agenthud.app/mac), or install the newest release, betas included, from a terminal. With Homebrew:
-
-```sh
-brew install --cask jazzenchen/tap/agent-hud
-```
-
-If Agent HUD is already in `/Applications`, add `--adopt` and Homebrew takes over that copy. Or with Node.js, which also installs the Windows and Linux test builds ([how it installs](src/apps/installer/README.md)):
-
-```sh
-npx @agenthud/install
-```
-
-On a Mac, Agent HUD updates itself after that.
 
 ## Build from source
 
