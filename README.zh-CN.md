@@ -194,7 +194,7 @@ iPhone 和发行版在同一个网络里，不订阅也能在 iPhone 与 Apple W
 ## 即将推出
 
 - **Windows 与 Linux 结束预览**：Windows 上的客户端回调。[欢迎参与](CONTRIBUTING.md)。
-- **支持更多 agent**，不止下面表格里的 18 款。
+- **支持更多 agent**，不止下面表格里的 27 款。
 - **按 Token 计费的 API**：用 API 密钥付费的账户，也能看到用量、花费与余额，和订阅的额度放在一起。
 - **UI 提示词模板。** 现成的提示词，一次就把 HUD 改成你想要的样子。
 - **子 agent 甘特图。** 在会话页上，一轮里的每个子 agent 各占一条泳道，排在同一条时间轴上：何时开始、跑了多久、用了多少，哪些在同时进行。
@@ -203,7 +203,7 @@ iPhone 和发行版在同一个网络里，不订阅也能在 iPhone 与 Apple W
 - **文件双向传送。** agent 可以把文件发到你的 iPhone，你也可以从 iPhone 把文件发给 agent。
 - **录音直接发给 agent。** Apple Watch 或 iPhone 上的录音，原样交给 agent。
 - **HUD 上更多由你决定**：简约形态的圆环显示什么（消耗速率、距重置的时间或费用），以及哪些 agent 可以提醒你。
-- **每个 agent 更完整**：Grok CLI 的额度与一键回到会话，OpenClaw 的实时状态与回复，Devin 的实时状态。
+- **每个 agent 更完整**：Grok CLI 的一键回到会话，OpenClaw 的实时状态与回复，Devin 与 Goose 的实时状态，以及 Goose 的回复。
 - **从源码构建的版本也能在 HUD 上处理请求与回复**，在客户端回调结束预览之后。
 - **鸿蒙版。** 鸿蒙手机的 App 正在提交审核：与[发行版](https://agenthud.app/mac)在同一局域网内时，查看额度、Token 统计与会话，桌面上还有服务卡片。
 
@@ -219,22 +219,31 @@ iPhone 和发行版在同一个网络里，不订阅也能在 iPhone 与 Apple W
 | **Codex** | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | **DeepSeek&nbsp;Harness** | ✓ | 余额 | ✓ | ✓ | ✓ | ✓ |  | ✓ |
 | **Antigravity** | ✓ | ✓ |  | ✓ | ✓ | ✓ | ✓ |  |
-| **Cursor** | ✓ | ✓ |  |  |  | ✓ |  |  |
-| **Grok&nbsp;CLI** | ✓ |  | ✓ |  |  | ✓ |  |  |
+| **Cursor** | ✓ | ✓ | ✓ |  |  | ✓ | ✓ |  |
+| **Grok&nbsp;CLI** | ✓ | ✓ | ✓ |  |  | ✓ |  |  |
 | **Grok&nbsp;Bot** | ✓ | ✓ |  |  |  |  | ✓ |  |
-| **GitHub&nbsp;Copilot&nbsp;CLI** | ✓ | ✓ | ✓ |  |  | ✓ |  |  |
+| **GitHub&nbsp;Copilot&nbsp;CLI** | ✓ | ✓ | ✓ | ✓ |  | ✓ |  |  |
 | **OpenCode** | ✓ | ✓ |  |  |  | ✓ | ✓ |  |
+| **Kilo&nbsp;Code** | ✓ |  |  |  |  | ✓ | ✓ |  |
+| **MiMo&nbsp;Code** | ✓ |  |  |  |  | ✓ | ✓ |  |
 | **Kimi** | ✓ | ✓ | ✓ |  |  | ✓ |  |  |
 | **Pi** | ✓ | ✓ | ✓ |  |  | ✓ | ✓ |  |
+| **Oh&nbsp;My&nbsp;Pi** | ✓ |  | ✓ |  |  | ✓ | ✓ |  |
 | **OpenClaw** | ✓ |  |  |  |  |  |  |  |
-| **Hermes&nbsp;Agent** | ✓ |  |  |  |  |  |  |  |
+| **Hermes&nbsp;Agent** | ✓ | ✓ | ✓ |  |  | ✓ |  |  |
+| **Factory&nbsp;Droid** | ✓ | ✓ | ✓ | ✓ |  | ✓ |  |  |
+| **TRAE** | 会话 | ✓ | ✓ |  |  | ✓ |  |  |
+| **Qoder** | ✓ | ✓ |  | ✓ |  |  |  |  |
 | **ZCode** | ✓ |  |  | ✓ | ✓ |  |  |  |
 | **CodeBuddy** | ✓ |  |  | ✓ |  | ✓ |  |  |
-| **WorkBuddy** | ✓ |  |  | ✓ |  |  |  |  |
+| **WorkBuddy** | ✓ | ✓ |  | ✓ |  |  |  |  |
 | **Qwen&nbsp;Code** | ✓ |  |  | ✓ |  | ✓ |  |  |
-| **Devin&nbsp;CLI** | ✓ | ✓ |  | ✓ |  | ✓ |  |  |
+| **Devin** | ✓ | ✓ |  | ✓ |  | ✓ |  |  |
+| **Cline** | ✓ | ✓ |  |  |  |  |  |  |
+| **Roo&nbsp;Code** | ✓ |  |  |  |  |  |  |  |
+| **Goose** | ✓ |  |  |  |  |  |  |  |
 
-另外还读取 **GLM Coding Plan** 的额度，并支持批准 **Qoder** 系列的请求。Codex 的批准需先在 Codex 中信任回调，DeepSeek Harness 的批准和提问需先安装 Agent HUD 插件（设置 → 智能体插件），Copilot 的额度需先在设置中同意读取，Devin 的额度来自其 CLI 的本机缓存。Cursor 的 Token 需要 Cursor 3.27 或更新版本。Grok Bot 的 Bot 运行在 Cursor 的服务器上，由服务器给出每个 Bot 每天的 Token；已合并到 SuperGrok 的账户没有这项数据，只显示会话。Cursor 与 Grok Bot 登录同一账户时，Grok Bot 的周额度也从这些服务器读取；否则读取 Bot 自己的缓存，而 Bot 只在使用时刷新它。已合并到 SuperGrok 的账户由 Cursor 和 Grok Bot 共用一个周额度，Cursor 一栏按 Cursor 自己的显示读取它。
+另外还读取 **GLM Coding Plan**、**MiniMax** 与 **火山方舟** 的套餐额度。Qoder 包括 Qoder CN 与 QoderWork，TRAE 包括 TRAE CN，Devin 包括 CLI 与 Devin Desktop。Codex 的批准需先在 Codex 中信任回调，DeepSeek Harness 的批准和提问需先安装 Agent HUD 插件（设置 → 智能体插件），Copilot 的批准与额度分别在设置中打开。Qoder、WorkBuddy 与 TRAE 的额度需先在 Agent HUD 自己的窗口里登录厂商网站。TRAE 不提供 Token，只显示会话；打开它的全局 Hooks 后才会运行 Agent HUD 的回调。Factory Droid 的额度需要 Factory API Key，Devin 的额度来自其 CLI 的本机缓存。Cursor 的 Token 需要 Cursor 3.27 或更新版本。Grok Bot 的 Bot 运行在 Cursor 的服务器上，由服务器给出每个 Bot 每天的 Token；已合并到 SuperGrok 的账户没有这项数据，只显示会话。Cursor 与 Grok Bot 登录同一账户时，Grok Bot 的周额度也从这些服务器读取；否则读取 Bot 自己的缓存，而 Bot 只在使用时刷新它。已合并到 SuperGrok 的账户由 Cursor 和 Grok Bot 共用一个周额度，Cursor 一栏按 Cursor 自己的显示读取它。
 
 ## 保护你的数据
 

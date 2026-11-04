@@ -194,7 +194,7 @@ When your iPhone and the release share a network, iPhone and Apple Watch show yo
 ## Coming soon
 
 - **Windows and Linux out of preview**, with client hooks on Windows. [Contributions are welcome](CONTRIBUTING.md).
-- **More agents**, beyond the 18 in the table below.
+- **More agents**, beyond the 27 in the table below.
 - **API keys billed by the token**: their usage, spend and balance, next to your plans' quotas.
 - **UI prompt templates.** Ready-made prompts that reshape your HUD in one go.
 - **A Gantt view of sub-agents.** On a session's page, each sub-agent of a turn in its own lane on one time axis: when it started, how long it ran, what it used, and what ran side by side.
@@ -203,7 +203,7 @@ When your iPhone and the release share a network, iPhone and Apple Watch show yo
 - **Files both ways.** Your agents send files to your iPhone, and you send files from your iPhone to your agents.
 - **Recordings straight to your agents.** A recording from your Apple Watch or iPhone reaches your agent as it is.
 - **More of the HUD is your call**: what Simple mode's rings show (burn rate, time to reset or cost), and which agents may alert you.
-- **More from each agent**: Grok CLI's quota and one click back, OpenClaw's live status and replies, Devin's live status.
+- **More from each agent**: Grok CLI's one click back, OpenClaw's live status and replies, Devin's and Goose's live status, and Goose's replies.
 - **Requests and replies on the HUD in builds from source**, once client hooks leave the preview.
 - **HarmonyOS.** An app for HarmonyOS phones is in review: on the same network as the [release](https://agenthud.app/mac), your quotas, token statistics and sessions, with service cards on the home screen.
 
@@ -219,22 +219,31 @@ Install and sign in to the agents you want to follow; Agent HUD finds them by it
 | **Codex** | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | **DeepSeek&nbsp;Harness** | ✓ | Balance | ✓ | ✓ | ✓ | ✓ |  | ✓ |
 | **Antigravity** | ✓ | ✓ |  | ✓ | ✓ | ✓ | ✓ |  |
-| **Cursor** | ✓ | ✓ |  |  |  | ✓ |  |  |
-| **Grok&nbsp;CLI** | ✓ |  | ✓ |  |  | ✓ |  |  |
+| **Cursor** | ✓ | ✓ | ✓ |  |  | ✓ | ✓ |  |
+| **Grok&nbsp;CLI** | ✓ | ✓ | ✓ |  |  | ✓ |  |  |
 | **Grok&nbsp;Bot** | ✓ | ✓ |  |  |  |  | ✓ |  |
-| **GitHub&nbsp;Copilot&nbsp;CLI** | ✓ | ✓ | ✓ |  |  | ✓ |  |  |
+| **GitHub&nbsp;Copilot&nbsp;CLI** | ✓ | ✓ | ✓ | ✓ |  | ✓ |  |  |
 | **OpenCode** | ✓ | ✓ |  |  |  | ✓ | ✓ |  |
+| **Kilo&nbsp;Code** | ✓ |  |  |  |  | ✓ | ✓ |  |
+| **MiMo&nbsp;Code** | ✓ |  |  |  |  | ✓ | ✓ |  |
 | **Kimi** | ✓ | ✓ | ✓ |  |  | ✓ |  |  |
 | **Pi** | ✓ | ✓ | ✓ |  |  | ✓ | ✓ |  |
+| **Oh&nbsp;My&nbsp;Pi** | ✓ |  | ✓ |  |  | ✓ | ✓ |  |
 | **OpenClaw** | ✓ |  |  |  |  |  |  |  |
-| **Hermes&nbsp;Agent** | ✓ |  |  |  |  |  |  |  |
+| **Hermes&nbsp;Agent** | ✓ | ✓ | ✓ |  |  | ✓ |  |  |
+| **Factory&nbsp;Droid** | ✓ | ✓ | ✓ | ✓ |  | ✓ |  |  |
+| **TRAE** | Sessions | ✓ | ✓ |  |  | ✓ |  |  |
+| **Qoder** | ✓ | ✓ |  | ✓ |  |  |  |  |
 | **ZCode** | ✓ |  |  | ✓ | ✓ |  |  |  |
 | **CodeBuddy** | ✓ |  |  | ✓ |  | ✓ |  |  |
-| **WorkBuddy** | ✓ |  |  | ✓ |  |  |  |  |
+| **WorkBuddy** | ✓ | ✓ |  | ✓ |  |  |  |  |
 | **Qwen&nbsp;Code** | ✓ |  |  | ✓ |  | ✓ |  |  |
-| **Devin&nbsp;CLI** | ✓ | ✓ |  | ✓ |  | ✓ |  |  |
+| **Devin** | ✓ | ✓ |  | ✓ |  | ✓ |  |  |
+| **Cline** | ✓ | ✓ |  |  |  |  |  |  |
+| **Roo&nbsp;Code** | ✓ |  |  |  |  |  |  |  |
+| **Goose** | ✓ |  |  |  |  |  |  |  |
 
-Also: the **GLM Coding Plan** quota, and approvals for the **Qoder** builds. Codex approvals need its hook trusted in Codex, DeepSeek Harness approvals and questions need Agent HUD's plugin (Settings → Agent plugins), Copilot's quota needs your consent in Settings, and Devin's quotas come from its CLI's local cache. Cursor's tokens come from Cursor 3.27 or later. Grok Bot's bots run on Cursor's servers, which report each bot's daily tokens; an account merged into SuperGrok reports none, so only its sessions show. Grok Bot's weekly quota comes from the same servers when Cursor is signed in to the Bot's account, otherwise from the Bot's own cache, which it refreshes only while in use. An account merged into SuperGrok has one weekly limit for Cursor and Grok Bot, and Cursor's block shows it as Cursor does.
+Also: the **GLM Coding Plan**, **MiniMax** and **Volcengine Ark** plan quotas. Qoder includes Qoder CN and QoderWork, TRAE includes TRAE CN, and Devin includes the CLI and Devin Desktop. Codex approvals need its hook trusted in Codex, DeepSeek Harness approvals and questions need Agent HUD's plugin (Settings → Agent plugins), and Copilot's approvals and quota are each turned on in Settings. Qoder's, WorkBuddy's and TRAE's quotas show once you sign in to the vendor's site in Agent HUD's own window. TRAE reports no tokens, so only its sessions show, and it runs Agent HUD's hooks once you turn on its global hooks. Factory Droid's quota needs a Factory API key, and Devin's quotas come from its CLI's local cache. Cursor's tokens come from Cursor 3.27 or later. Grok Bot's bots run on Cursor's servers, which report each bot's daily tokens; an account merged into SuperGrok reports none, so only its sessions show. Grok Bot's weekly quota comes from the same servers when Cursor is signed in to the Bot's account, otherwise from the Bot's own cache, which it refreshes only while in use. An account merged into SuperGrok has one weekly limit for Cursor and Grok Bot, and Cursor's block shows it as Cursor does.
 
 ## Keep your data safe.
 
