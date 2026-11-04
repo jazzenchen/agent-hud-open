@@ -9,7 +9,7 @@ The implementation follows the original Swift account readers:
 
 | Provider     | Existing source                                     | Read operation                                                       |
 | ------------ | --------------------------------------------------- | -------------------------------------------------------------------- |
-| Claude       | Installed Claude Code, its current folder and selected additional folders | SDK `get_usage`, hooks disabled, `skip_behaviors`, no prompt |
+| Claude       | Installed Claude Code, its current folder and selected additional folders; Claude Code's own usage record in each folder's `.claude.json`; for the current folder, the Claude desktop app's claude.ai sign-in | The usage record while it is under a minute old; else SDK `get_usage`, hooks disabled, `skip_behaviors`, no prompt; signed out or not installed: claude.ai's usage page with the desktop app's sign-in; when every way fails, the record's windows as old as they are (see [Claude Code's usage record](#claude-codes-usage-record)) |
 | Codex        | Installed Codex, its current home and selected additional homes | `initialize`, `account/rateLimits/read`, `account/read`, no turn |
 | Pi / ChatGPT | Existing, unexpired Pi OAuth home                   | Official ChatGPT usage endpoint; no OAuth flow or credential rewrite |
 | Cursor       | Read-only Cursor account SQLite database; a sealed sign-in (`cursor-safe-storage:v1:`) opens with Cursor's "Cursor Safe Storage" keychain item, which macOS asks about once (Electron files it under "Cursor Key", older builds under "Cursor") | Current usage-summary endpoint and billing-cycle reset; for an account merged into SuperGrok (plan `super`), or when the summary is refused, the period Cursor itself shows (`DashboardService/GetCurrentPeriodUsage`): its percentages where it reports them (a merged plan), else the cents spent of each limit (a plan metered in dollars), as Cursor's usage bar works them out; a meter with neither is not shown |
@@ -42,6 +42,10 @@ Everything else is the same for every provider:
 - A reading that only missed an answer, while the last good one is under 10
   minutes old, changes nothing on screen. Any other failure shows at once with
   its reason, and the last reading stays, marked stale.
+- A failed reading may bring what the agent itself last recorded
+  (`Reading::failure`). It is still that failure in every way above; its
+  windows and accounts take the place of the ones shown only where they are
+  newer, or not shown yet, and each keeps the time it was read.
 - After a failed reading the next try waits 60 s, then twice as long each time,
   up to 15 minutes. A refresh the user asks for, or this computer's work
   finishing, tries at once. A service's `Retry-After` is followed (at most an
@@ -139,8 +143,9 @@ uses its own sign-in for that folder; Agent HUD reads no credentials. Each
 folder's account is the one its `.claude.json` names, and a login that names
 none is keyed by its folder. Duplicate folders, including the default one, are
 read once, and an account signed in from two folders appears once. A failed
-folder reports a notice while the other folders still appear; if every reading
-fails, the last reading remains marked stale. The Claude desktop app's sign-in
+folder reports a notice while the other folders still appear, with the windows
+Claude Code last recorded in that folder, marked stale; if every reading fails,
+the last reading remains marked stale. The Claude desktop app's sign-in
 stands in only for the default folder, never for an added one. Saving a changed
 list discards readings from the previous list, including results still in
 flight.
@@ -148,6 +153,41 @@ flight.
 As with Codex, these folders provide subscription quotas only. They do not
 change Claude Code's active account, install hooks, or add transcript folders to
 token statistics.
+
+## Claude Code's usage record
+
+Claude Code keeps its last usage answer in its global configuration,
+`.claude.json` (in `CLAUDE_CONFIG_DIR` when it is set, else in the home
+folder), as `cachedUsageUtilization`: when it was fetched (`fetchedAtMs`), for
+which account (`accountUuid`), and the answer itself, the same object
+`get_usage` returns as `rate_limits`. Claude Code writes it after each usage
+read made with its own sign-in (`/usage`, or the `get_usage` Agent HUD asks
+for), at most once a minute, and clears it when it signs out. The Claude
+desktop app's engine leaves it alone. Agent HUD reads the record only for the
+account the same file names (`oauthAccount.accountUuid`), never one that names
+another account or none, and reads no identity field or credential to do so.
+
+- **Under a minute old**, the record is the reading, and Claude Code's engine is
+  not started. Claude Code's engine answers `get_usage` from the record itself
+  while it is that young, so this is what the engine would answer. A longer
+  bound would mostly read back Agent HUD's own previous answer, since Agent
+  HUD's readings are what write the record most of the time, and would halve
+  how often the quota is really read.
+- **When every way fails** (Claude Code signed out, claude.ai's browser check,
+  an engine that does not answer), the record's windows stand in, up to 30
+  days old, as a failed reading's last windows do: marked stale and read when
+  Claude Code read them, with the failure's reason followed by how old they
+  are ("Showing Claude Code's own reading from 2h ago"). The failure stays
+  what it was, so a signed-out Claude Code is still told on the island to sign
+  in again.
+
+Each window gets the id the engine's reading gives it: the session, the week
+across models, and a model's week (`seven_day_<family>`, or a `limits[]` entry
+of kind `weekly_scoped` naming a model). Windows that are null or unknown,
+extra usage, and weeks scoped to a surface rather than a model are left out,
+never shown as 0. The plan comes from `oauthAccount` (`organizationType`, then
+the rate-limit tier). Reading the record this way follows QuotaView
+([third-party notes](third-party.md)).
 
 ## Antigravity accounts
 

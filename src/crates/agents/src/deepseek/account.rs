@@ -198,6 +198,7 @@ fn platform_balance(
     }
     Ok(Some(Reading {
         provider: "deepseek",
+        failure: None,
         quotas: Vec::new(),
         billing,
         account: Some(
@@ -505,6 +506,7 @@ fn read_text(host: &dyn Host, routed: &mut Vec<Routed>) -> Result<Reading, Unrea
     }
     Ok(Reading {
         provider: "deepseek",
+        failure: None,
         quotas: Vec::new(),
         billing,
         notice: None,

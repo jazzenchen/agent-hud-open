@@ -424,6 +424,7 @@ pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
     });
     Ok(Reading {
         provider: "cursor",
+        failure: None,
         quotas,
         billing: Vec::new(),
         notice,

@@ -5,6 +5,13 @@
 //! sign-in, the Claude desktop app's own claude.ai sign-in answers instead.
 //! Folders added in Settings (`claudeHomes`) are read after the default one,
 //! one at a time, each as its own account.
+//!
+//! Claude Code's own record of its last usage answer (`usage_record`) comes
+//! first while it is under a minute old, which is what the engine would
+//! answer then, so the engine is not started for it. When every way fails,
+//! the record's windows stand in, as old as they are, and the failure stays
+//! what it was: a signed-out Claude Code is still told to sign in again.
+use super::usage_record;
 use crate::account::{
     account_id, append_notice, client_home_key, legacy_account, legacy_unresolved, merge,
     read_json, status, variable, Answer, EngineStart, Host, HttpFailure, HttpRequest, Provider,
@@ -45,16 +52,22 @@ fn engine_env(folder: &Folder) -> Vec<(&'static str, String)> {
 fn config_dir(host: &dyn Host) -> PathBuf {
     variable(host, "CLAUDE_CONFIG_DIR").unwrap_or_else(|| host.home().join(".claude"))
 }
-/// The account a folder's `.claude.json` names. Claude Code keeps that file
-/// in `CLAUDE_CONFIG_DIR` when it is set, and in the home folder otherwise.
-fn profile(host: &dyn Host, folder: &Folder) -> Value {
+/// A folder's `.claude.json`, Claude Code's global configuration: the
+/// signed-in account (`oauthAccount`) and Claude Code's own usage record.
+/// Claude Code keeps it in `CLAUDE_CONFIG_DIR` when that is set, and in the
+/// home folder otherwise.
+fn global_config(host: &dyn Host, folder: &Folder) -> Value {
     let path = if folder.added {
         folder.path.clone()
     } else {
         variable(host, "CLAUDE_CONFIG_DIR").unwrap_or_else(|| host.home().to_path_buf())
     }
     .join(".claude.json");
-    read_json(host, &path).unwrap_or(Value::Null)["oauthAccount"].clone()
+    read_json(host, &path).unwrap_or(Value::Null)
+}
+/// The account a folder's `.claude.json` names.
+fn profile(host: &dyn Host, folder: &Folder) -> Value {
+    global_config(host, folder)["oauthAccount"].clone()
 }
 fn identity(value: &Value) -> Option<String> {
     let user = value["accountUuid"].as_str().unwrap_or_default();
@@ -155,7 +168,9 @@ static STATUS: StatusPage = StatusPage {
 
 /// The default folder, then each folder added in Settings that is another
 /// folder, one at a time. With more than one, each notice and failure names
-/// its folder, and the reading fails only when every folder does.
+/// its folder, and the reading fails only when every folder does. A failed
+/// folder's last record shows stale beside the folders that read; when every
+/// folder fails, the records come with the failures.
 pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
     let default = config_dir(host);
     let canonical = |path: &Path| host.canonical(path).unwrap_or_else(|| path.to_path_buf());
@@ -178,36 +193,79 @@ pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
     let mut reading = Reading::empty("claude");
     let mut succeeded = false;
     let mut failures = Vec::new();
+    let mut records = Vec::new();
     for folder in &folders {
         if host.cancelled() {
             return Err(l10n::text("账户读取已停止", "Account reading was stopped").into());
         }
         let prefix = format!("{}: ", folder.path.display());
-        match read_folder(host, folder) {
-            Ok(mut account) => {
-                succeeded = true;
-                let notice = account.notice.take();
-                merge(&mut reading, account);
-                if let Some(notice) = notice {
-                    append_notice(&mut reading, format!("{prefix}{notice}"));
+        let error = match read_folder(host, folder) {
+            Ok(mut account) => match account.failure.take() {
+                None => {
+                    succeeded = true;
+                    let notice = account.notice.take();
+                    merge(&mut reading, account);
+                    if let Some(notice) = notice {
+                        append_notice(&mut reading, format!("{prefix}{notice}"));
+                    }
+                    continue;
                 }
-            }
-            Err(error) => {
-                let error = error.prefixed(&prefix);
-                append_notice(&mut reading, error.reason().to_owned());
-                failures.push(error);
-            }
-        }
+                Some(error) => {
+                    records.push(account);
+                    error
+                }
+            },
+            Err(error) => error,
+        };
+        let error = error.prefixed(&prefix);
+        append_notice(&mut reading, error.reason().to_owned());
+        failures.push(error);
     }
-    if succeeded {
-        Ok(reading)
-    } else {
-        Err(Unread::combined(failures).unwrap_or_else(|| Unread::Failed(String::new())))
+    let failure = (!succeeded)
+        .then(|| Unread::combined(failures).unwrap_or_else(|| Unread::Failed(String::new())));
+    let recorded = !records.is_empty();
+    for mut record in records {
+        // Beside folders that read, a failed folder's windows show as a
+        // failed reading's do.
+        if failure.is_none() {
+            stale(&mut record);
+        }
+        merge(&mut reading, record);
+    }
+    match failure {
+        None => Ok(reading),
+        Some(failure) if recorded => {
+            reading.failure = Some(failure);
+            Ok(reading)
+        }
+        Some(failure) => Err(failure),
+    }
+}
+
+/// A reading's windows and accounts marked stale.
+fn stale(reading: &mut Reading) {
+    for row in &mut reading.quotas {
+        row["status"] = json!("stale");
+    }
+    for account in reading
+        .account
+        .iter_mut()
+        .chain(&mut reading.additional_accounts)
+    {
+        account["stale"] = json!(true);
     }
 }
 
 fn read_folder(host: &dyn Host, folder: &Folder) -> Result<Reading, Unread> {
-    match from_engine(host, folder) {
+    let config = global_config(host, folder);
+    let now = chrono::Utc::now().timestamp_millis();
+    if let Some(reading) = usage_record::read(&config, now)
+        .filter(|record| record.fresh(now))
+        .and_then(|record| recorded(host, folder, &config["oauthAccount"], &record))
+    {
+        return Ok(reading);
+    }
+    let read = match from_engine(host, folder, &config["oauthAccount"]) {
         Ok(reading) => Ok(reading),
         Err(EngineUnread::Failed(unread)) => Err(unread),
         // A Claude Code that is installed and signed out is the agent's own
@@ -224,10 +282,51 @@ fn read_folder(host: &dyn Host, folder: &Folder) -> Result<Reading, Unread> {
                 Unread::Failed(reason)
             }))
         }
-    }
+    };
+    read.or_else(|failure| kept(host, folder, failure))
 }
 
-fn from_engine(host: &dyn Host, folder: &Folder) -> Result<Reading, EngineUnread> {
+/// `failure`, with the windows Claude Code last recorded for the folder's
+/// account when it has any, as old as they are; the failure's reason says
+/// how old. The file is read again: Claude Code may have written a newer
+/// record while the reading ran.
+fn kept(host: &dyn Host, folder: &Folder, failure: Unread) -> Result<Reading, Unread> {
+    let config = global_config(host, folder);
+    let now = chrono::Utc::now().timestamp_millis();
+    let Some((record, mut reading)) = usage_record::read(&config, now).and_then(|record| {
+        let reading = recorded(host, folder, &config["oauthAccount"], &record)?;
+        Some((record, reading))
+    }) else {
+        return Err(failure);
+    };
+    let shown = record.shown(now);
+    reading.failure = Some(failure.reworded(|reason| format!("{reason} · {shown}")));
+    Ok(reading)
+}
+
+/// The windows of Claude Code's own `record` for the account `profile`
+/// names, as of when Claude Code fetched them, under the same ids as the
+/// engine's. None when it holds neither the session nor the weekly window.
+fn recorded(
+    host: &dyn Host,
+    folder: &Folder,
+    profile: &Value,
+    record: &usage_record::Record,
+) -> Option<Reading> {
+    let windows = windows(record.utilization)?;
+    let mut reading = plan_reading(host, windows, profile, profile_plan(profile), &folder.path);
+    let fetched = crate::iso(record.fetched_ms);
+    for row in &mut reading.quotas {
+        row["observedAt"] = fetched.clone();
+    }
+    if let Some(account) = &mut reading.account {
+        account["checkedAt"] = fetched;
+    }
+    Some(reading)
+}
+
+/// The engine's reading of `folder`, whose account was `before` when it started.
+fn from_engine(host: &dyn Host, folder: &Folder, before: &Value) -> Result<Reading, EngineUnread> {
     let executable = host
         .executable("claude")
         .ok_or_else(|| EngineUnread::NoLogin {
@@ -238,7 +337,6 @@ fn from_engine(host: &dyn Host, folder: &Folder) -> Result<Reading, EngineUnread
             installed: false,
         })?;
     let env = engine_env(folder);
-    let before = profile(host, folder);
     let mut process = host.start_engine(&EngineStart {
         executable: &executable,
         args: &[
@@ -273,7 +371,7 @@ fn from_engine(host: &dyn Host, folder: &Folder) -> Result<Reading, EngineUnread
             return Err(engine_failed("empty get_usage response").into());
         }
         let after = profile(host, folder);
-        if identity(&before) != identity(&after) {
+        if identity(before) != identity(&after) {
             return Err(Unread::transient(l10n::text(
                 "读取额度时 Claude 登录账户发生了变化，稍后自动重试",
                 "The Claude account changed during the quota query; retrying shortly",
@@ -1228,6 +1326,278 @@ mod tests {
         );
         let id = account_id("claude", &["unresolved", &work.to_string_lossy()]);
         assert_eq!(reading.quotas[2]["id"], format!("{id}:claude-session"));
+    }
+
+    /// A usage answer shaped as Claude Code records it: windows the plan
+    /// has, the ones it does not as null, extra usage, and `limits[]` with a
+    /// model-scoped week and one scoped to a surface.
+    fn usage() -> Value {
+        let window = |used: f64, reset: &str| {
+            json!({"utilization": used, "resets_at": reset, "limit_dollars": null,
+                   "used_dollars": null, "remaining_dollars": null, "locked_reason": null})
+        };
+        json!({
+            "five_hour": window(21.0, "2026-11-04T15:00:00.000000+00:00"),
+            "seven_day": window(63.0, "2026-11-08T12:00:00.000000+00:00"),
+            "seven_day_opus": null, "seven_day_sonnet": null, "seven_day_cowork": null,
+            "extra_usage": {"is_enabled": true, "monthly_limit": 5000, "used_credits": 1200,
+                            "utilization": 24.0, "currency": "USD", "disabled_reason": null},
+            "limits": [
+                {"kind": "session", "group": "session", "percent": 21, "severity": "normal",
+                 "resets_at": "2026-11-04T15:00:00.000000+00:00", "scope": null, "is_active": true},
+                {"kind": "weekly_all", "group": "weekly", "percent": 63, "severity": "normal",
+                 "resets_at": "2026-11-08T12:00:00.000000+00:00", "scope": null, "is_active": true},
+                {"kind": "weekly_scoped", "group": "weekly", "percent": 40, "severity": "normal",
+                 "resets_at": "2026-11-08T12:00:00.000000+00:00", "is_active": true,
+                 "scope": {"model": {"id": "claude-fable-5", "display_name": "Fable"}, "surface": null}},
+                {"kind": "weekly_scoped", "group": "weekly", "percent": 12, "severity": "normal",
+                 "resets_at": null, "is_active": true,
+                 "scope": {"model": null, "surface": {"display_name": "Cowork"}}}
+            ],
+            "spend": {"used": {"amount_minor": 0, "currency": "USD", "exponent": 2}, "percent": 0},
+        })
+    }
+
+    /// Claude Code's record of `utilization`, fetched `age_ms` ago, written
+    /// into the `.claude.json` at `file` for the account that file names (or
+    /// for `account`).
+    fn record(host: &mut FakeHost, file: &str, age_ms: i64, account: Option<&str>) -> i64 {
+        let fetched = chrono::Utc::now().timestamp_millis() - age_ms;
+        let mut config = read_json(host, Path::new(file)).unwrap();
+        let account = account
+            .map(Value::from)
+            .unwrap_or_else(|| config["oauthAccount"]["accountUuid"].clone());
+        config["cachedUsageUtilization"] =
+            json!({"fetchedAtMs": fetched, "accountUuid": account, "utilization": usage()});
+        host.files
+            .insert(file.into(), Answer::Found(config.to_string().into_bytes()));
+        fetched
+    }
+
+    fn signed_out() -> FakeHost {
+        let mut host =
+            installed(json!({"subtype": "success", "response": {"rate_limits_available": false}}));
+        host.engine_output
+            .insert("auth".into(), vec![json!({"loggedIn": false})]);
+        host
+    }
+
+    const SIGNED_OUT: &str =
+        "Claude Code is signed out. Run claude to sign in again to update the quota";
+
+    #[test]
+    fn a_fresh_record_stands_for_the_engine_without_starting_it() {
+        let mut host = installed(limits());
+        let fetched = record(&mut host, "/u/.claude.json", 10_000, None);
+        let reading = read(&host).unwrap();
+        assert!(host.started.borrow().is_empty(), "no engine was started");
+        assert!(reading.failure.is_none());
+        let id = account_id("claude", &["user-1", "org-1"]);
+        let identity = legacy_account("Claude", "user-1", "org-1").unwrap();
+        let ids = reading
+            .quotas
+            .iter()
+            .map(|row| row["id"].clone())
+            .collect::<Vec<_>>();
+        assert_eq!(
+            ids,
+            [
+                format!("{id}:claude-session"),
+                format!("{id}:claude-weekly"),
+                format!("{id}:claude-weekly-fable")
+            ],
+            "null windows, extra usage and a week scoped to a surface are left out"
+        );
+        let used = reading
+            .quotas
+            .iter()
+            .map(|row| row["usedPercent"].clone())
+            .collect::<Vec<_>>();
+        assert_eq!(used, [21.0, 63.0, 40.0]);
+        for row in &reading.quotas {
+            assert_eq!(
+                row["observedAt"],
+                crate::iso(fetched),
+                "read when Claude Code read it"
+            );
+            assert_eq!(row["accountId"], identity.as_str());
+        }
+        assert_eq!(
+            reading.quotas[2]["legacyWindowId"],
+            format!("{identity}/claude-weekly-fable")
+        );
+        let account = reading.account.unwrap();
+        assert_eq!(account["id"], identity.as_str());
+        assert_eq!(account["label"], "me@example.com");
+        assert_eq!(account["plan"], "max_20x");
+        assert_eq!(account["checkedAt"], crate::iso(fetched));
+    }
+
+    #[test]
+    fn the_record_and_the_engine_name_each_window_alike() {
+        let mut engine = limits();
+        engine["response"]["rate_limits"] = usage();
+        let engine = read(&installed(engine)).unwrap();
+        let mut host = installed(limits());
+        record(&mut host, "/u/.claude.json", 0, None);
+        let recorded = read(&host).unwrap();
+        let rows = |reading: &Reading| {
+            reading
+                .quotas
+                .iter()
+                .map(|row| {
+                    let mut row = row.clone();
+                    row.as_object_mut().unwrap().remove("observedAt");
+                    row
+                })
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(rows(&recorded), rows(&engine));
+        assert_eq!(
+            recorded.account.unwrap()["id"],
+            engine.account.unwrap()["id"]
+        );
+    }
+
+    #[test]
+    fn a_minute_old_record_or_another_accounts_is_not_taken_for_a_reading() {
+        let mut old = installed(limits());
+        record(&mut old, "/u/.claude.json", usage_record::FRESH_MS, None);
+        assert_eq!(read(&old).unwrap().quotas[0]["usedPercent"], 12.0);
+        assert_eq!(old.started.borrow().len(), 1, "the engine is asked");
+
+        let mut other = installed(limits());
+        record(&mut other, "/u/.claude.json", 0, Some("user-2"));
+        let reading = read(&other).unwrap();
+        assert_eq!(reading.quotas[0]["usedPercent"], 12.0);
+        assert!(reading.quotas[0]["observedAt"].is_null());
+        assert_eq!(other.started.borrow().len(), 1);
+    }
+
+    #[test]
+    fn a_signed_out_claude_code_shows_its_last_record_and_stays_signed_out() {
+        let mut host = signed_out();
+        let fetched = record(&mut host, "/u/.claude.json", 2 * 3_600_000, None);
+        let reading = read(&host).unwrap();
+        let failure = reading.failure.as_ref().unwrap();
+        assert!(
+            matches!(failure, Unread::SignedOut(_)),
+            "still told to sign in"
+        );
+        assert_eq!(
+            failure.reason(),
+            format!("{SIGNED_OUT} · Showing Claude Code's own reading from 2h ago")
+        );
+        assert_eq!(reading.quotas.len(), 3);
+        assert_eq!(reading.quotas[0]["observedAt"], crate::iso(fetched));
+        assert_eq!(
+            reading.account.as_ref().unwrap()["checkedAt"],
+            crate::iso(fetched)
+        );
+        assert_eq!(host.started.borrow()[1].1, ["auth", "status", "--json"]);
+
+        // Another account's record is not shown for this one.
+        let mut other = signed_out();
+        record(&mut other, "/u/.claude.json", 60_000, Some("user-2"));
+        let error = read(&other).err().unwrap();
+        assert!(matches!(error, Unread::SignedOut(_)));
+        assert_eq!(error.reason(), SIGNED_OUT);
+    }
+
+    #[test]
+    fn a_failure_that_passes_keeps_its_kind_beside_the_record() {
+        let mut silent = installed(limits());
+        silent.engine_output.clear();
+        record(&mut silent, "/u/.claude.json", 30 * 60_000, None);
+        let failure = read(&silent).unwrap().failure.unwrap();
+        assert!(matches!(failure, Unread::Transient { .. }));
+        assert_eq!(
+            failure.reason(),
+            "Claude Code engine query failed: The engine returned no usage within 40 s · Showing Claude Code's own reading from 30m ago"
+        );
+
+        // Signed out, and claude.ai asked the desktop app's sign-in for a
+        // browser check.
+        let mut challenged = signed_out_with_desktop()
+            .file(
+                "/u/AppData/Claude/config.json",
+                &json!({"lastKnownAccountUuid": "user-1"}).to_string(),
+            )
+            .answer(
+                "https://claude.ai/api/account",
+                Err(HttpFailure::Challenged),
+            );
+        record(&mut challenged, "/u/.claude.json", 5 * 86_400_000, None);
+        let reading = read(&challenged).unwrap();
+        let failure = reading.failure.unwrap();
+        assert!(matches!(failure, Unread::SignedOut(_)));
+        assert!(failure
+            .reason()
+            .starts_with("Claude Code is signed out and claude.ai asked for a browser check"));
+        assert!(failure
+            .reason()
+            .ends_with(" · Showing Claude Code's own reading from 5d ago"));
+        assert_eq!(reading.quotas.len(), 3);
+    }
+
+    #[test]
+    fn a_failed_folder_shows_its_record_stale_beside_the_folders_that_read() {
+        let mut host = installed(limits());
+        let work = host.home().join("claude-work");
+        added(
+            &mut host,
+            &work,
+            "work",
+            json!({"subtype": "success", "response": {"rate_limits_available": false}}),
+        );
+        host.engine_output_by_home
+            .get_mut(&work)
+            .unwrap()
+            .insert("auth".into(), vec![json!({"loggedIn": false})]);
+        let file = work.join(".claude.json");
+        let fetched = record(&mut host, &file.to_string_lossy(), 3_600_000, None);
+        let reading = read(&host).unwrap();
+        assert!(reading.failure.is_none(), "the default folder read");
+        assert_eq!(reading.quotas.len(), 5);
+        assert_eq!(reading.quotas[0]["status"], "normal");
+        let id = account_id("claude", &["work", "work-org"]);
+        assert_eq!(reading.quotas[2]["id"], format!("{id}:claude-session"));
+        assert_eq!(reading.quotas[2]["status"], "stale");
+        assert_eq!(reading.quotas[2]["observedAt"], crate::iso(fetched));
+        let work_account = &reading.additional_accounts[0];
+        assert_eq!(work_account["stale"], true);
+        assert_eq!(work_account["checkedAt"], crate::iso(fetched));
+        assert_eq!(
+            reading.notice,
+            Some(format!(
+                "{}: {SIGNED_OUT} · Showing Claude Code's own reading from 1h ago",
+                work.display()
+            ))
+        );
+
+        // When every folder fails, the records come with the failures.
+        let mut both = signed_out();
+        added(
+            &mut both,
+            &work,
+            "work",
+            json!({"subtype": "success", "response": {"rate_limits_available": false}}),
+        );
+        both.engine_output_by_home
+            .get_mut(&work)
+            .unwrap()
+            .insert("auth".into(), vec![json!({"loggedIn": false})]);
+        record(&mut both, &file.to_string_lossy(), 3_600_000, None);
+        let reading = read(&both).unwrap();
+        let failure = reading.failure.unwrap();
+        assert!(matches!(failure, Unread::SignedOut(_)));
+        assert_eq!(failure.reason().matches(SIGNED_OUT).count(), 2);
+        assert_eq!(reading.quotas.len(), 3, "only the folder with a record");
+        assert_eq!(
+            reading.quotas[0]["status"], "normal",
+            "stale once the engine files the failure"
+        );
+        assert_eq!(reading.account.unwrap()["label"], "work@example.com");
     }
 
     #[test]

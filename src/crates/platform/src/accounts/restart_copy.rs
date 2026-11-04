@@ -68,6 +68,7 @@ pub(super) fn load(data_dir: &Path, readers: Providers) -> Restored {
                 notice: saved["notice"].as_str().map(str::to_owned),
                 session_records: rows(&saved["sessionRecords"]),
                 services: rows(&saved["services"]),
+                failure: None,
             };
             Some((reading, checked_at))
         })

@@ -24,6 +24,12 @@ pub struct Reading {
     /// Which clients reach this provider's plans or APIs, and on which
     /// platform: `{client, provider, product, accountId, region}`.
     pub services: Vec<Value>,
+    /// Set when the reading failed but brings what the agent itself last
+    /// recorded (Claude Code's own usage record): the engine takes it for
+    /// this failure in every way (how it is shown, retried and told), and
+    /// shows the windows and accounts it brings where they are newer than
+    /// the ones it has, each as old as it says (`observedAt`, `checkedAt`).
+    pub failure: Option<Unread>,
 }
 impl Reading {
     pub fn empty(provider: &'static str) -> Self {
@@ -36,6 +42,7 @@ impl Reading {
             notice: None,
             session_records: vec![],
             services: vec![],
+            failure: None,
         }
     }
 }
@@ -161,7 +168,10 @@ impl Unread {
     }
     /// The same kind, with `prefix` before the reason.
     pub fn prefixed(self, prefix: &str) -> Unread {
-        let reason = |reason: String| format!("{prefix}{reason}");
+        self.reworded(|reason| format!("{prefix}{reason}"))
+    }
+    /// The same kind, with the reason `reason` makes of it.
+    pub fn reworded(self, reason: impl FnOnce(String) -> String) -> Unread {
         match self {
             Unread::SignedOut(text) => Unread::SignedOut(reason(text)),
             Unread::Transient {

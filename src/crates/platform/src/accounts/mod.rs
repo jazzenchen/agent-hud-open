@@ -911,49 +911,13 @@ fn run(context: AccountContext, shared: Arc<Shared>, gate: CollectionGate, reade
                 .unwrap_or_default()
                 .subsec_nanos() as u64
                 % 61;
-            match result {
-                Ok(mut reading) => {
-                    if selected.1.keeps_unreported_windows {
-                        retain_windows(state.entries.get(selected.0), &mut reading, attempted_ms);
-                    }
-                    let notice = reading.notice.clone();
-                    state.entries.insert(
-                        selected.0,
-                        Entry {
-                            reading,
-                            checked_at: Some(chrono::Utc::now().to_rfc3339()),
-                            attempted,
-                            attempted_ms,
-                            notice,
-                            failed: false,
-                            spread,
-                            restored: false,
-                            failures: 0,
-                            failure: None,
-                            failing_since: None,
-                            retry_at: None,
-                        },
-                    );
-                }
-                Err(unread) => {
-                    let entry = state.entries.entry(selected.0).or_insert_with(|| Entry {
-                        reading: AccountReading::empty(selected.0),
-                        checked_at: None,
-                        attempted,
-                        attempted_ms,
-                        notice: None,
-                        failed: true,
-                        spread,
-                        restored: false,
-                        failures: 0,
-                        failure: None,
-                        failing_since: None,
-                        retry_at: None,
-                    });
-                    failed_reading(entry, unread, attempted, attempted_ms);
-                    entry.spread = spread;
-                }
-            }
+            settle(
+                &mut state.entries,
+                selected.1,
+                result,
+                (attempted, attempted_ms),
+                spread,
+            );
             let copy = saved
                 .is_none_or(|at| at.elapsed() >= restart_copy::SAVE_INTERVAL)
                 .then(|| restart_copy::copy(&state.entries, &state.account_homes));
@@ -965,6 +929,110 @@ fn run(context: AccountContext, shared: Arc<Shared>, gate: CollectionGate, reade
         }
         if let Some(waker) = waker {
             waker();
+        }
+    }
+}
+
+/// A provider's reading, as its entry keeps it. A good one replaces the
+/// entry. A failed one goes through `failed_reading`, with the windows the
+/// agent itself last recorded where it brings them (`Reading::failure`).
+fn settle(
+    entries: &mut BTreeMap<&'static str, Entry>,
+    facts: &'static Provider,
+    result: Result<AccountReading, Unread>,
+    (attempted, attempted_ms): (Instant, i64),
+    spread: u64,
+) {
+    let (record, result) = match result {
+        Ok(mut reading) => match reading.failure.take() {
+            Some(unread) => (Some(reading), Err(unread)),
+            None => (None, Ok(reading)),
+        },
+        Err(unread) => (None, Err(unread)),
+    };
+    match result {
+        Ok(mut reading) => {
+            if facts.keeps_unreported_windows {
+                retain_windows(entries.get(facts.id), &mut reading, attempted_ms);
+            }
+            let notice = reading.notice.clone();
+            entries.insert(
+                facts.id,
+                Entry {
+                    reading,
+                    checked_at: Some(chrono::Utc::now().to_rfc3339()),
+                    attempted,
+                    attempted_ms,
+                    notice,
+                    failed: false,
+                    spread,
+                    restored: false,
+                    failures: 0,
+                    failure: None,
+                    failing_since: None,
+                    retry_at: None,
+                },
+            );
+        }
+        Err(unread) => {
+            let entry = entries.entry(facts.id).or_insert_with(|| Entry {
+                reading: AccountReading::empty(facts.id),
+                checked_at: None,
+                attempted,
+                attempted_ms,
+                notice: None,
+                failed: true,
+                spread,
+                restored: false,
+                failures: 0,
+                failure: None,
+                failing_since: None,
+                retry_at: None,
+            });
+            if let Some(record) = record {
+                take_record(entry, record);
+            }
+            failed_reading(entry, unread, attempted, attempted_ms);
+            entry.spread = spread;
+        }
+    }
+}
+
+/// What the agent itself last recorded, brought by a failed reading: each
+/// window and account newer than the one the entry shows, or that it does
+/// not show, takes its place, keeping the time it was read. A row without
+/// its own time was read when the entry was.
+fn take_record(entry: &mut Entry, record: AccountReading) {
+    let checked = entry.checked_at.clone();
+    let read_at =
+        |row: &Value, key: &str| row[key].as_str().or(checked.as_deref()).and_then(date_ms);
+    for row in record.quotas {
+        match entry
+            .reading
+            .quotas
+            .iter_mut()
+            .find(|old| old["id"] == row["id"])
+        {
+            Some(old) if read_at(old, "observedAt") >= read_at(&row, "observedAt") => {}
+            Some(old) => *old = row,
+            None => entry.reading.quotas.push(row),
+        }
+    }
+    for account in record.account.into_iter().chain(record.additional_accounts) {
+        let reading = &mut entry.reading;
+        let shown = reading
+            .account
+            .iter_mut()
+            .chain(&mut reading.additional_accounts)
+            .find(|old| old["id"] == account["id"]);
+        if let Some(old) = shown {
+            if read_at(old, "checkedAt") < read_at(&account, "checkedAt") {
+                *old = account;
+            }
+        } else if reading.account.is_none() {
+            reading.account = Some(account);
+        } else {
+            reading.additional_accounts.push(account);
         }
     }
 }
@@ -1802,6 +1870,88 @@ mod tests {
         assert!(signed_out.failed, "the agent's own state is not hidden");
         assert_eq!(signed_out.failure, Some("signedOut"));
         assert_eq!(signed_out.failing_since, Some(now_ms));
+    }
+
+    #[test]
+    fn a_failed_reading_brings_the_agents_own_record_where_it_is_newer() {
+        let facts = &agents::claude::account::PROVIDER;
+        let now = chrono::Utc::now();
+        let ago = |minutes: i64| (now - chrono::Duration::minutes(minutes)).to_rfc3339();
+        // The windows the agent recorded `minutes` ago, brought by a failure.
+        let record = |minutes: i64, used: u64, failure: Unread| {
+            let mut record = AccountReading::empty("claude");
+            record.account = Some(json!({"id":"acct","label":"me","checkedAt":ago(minutes)}));
+            record.quotas = vec![
+                json!({"id":"acct:claude-session","usedPercent":used,"accountId":"acct","observedAt":ago(minutes)}),
+                json!({"id":"acct:claude-weekly-fable","usedPercent":3,"accountId":"acct","observedAt":ago(minutes)}),
+            ];
+            record.failure = Some(failure);
+            Ok(record)
+        };
+        let attempted = (Instant::now(), now.timestamp_millis());
+
+        // Nothing read yet: the record shows, with the failure as it is.
+        let mut entries = BTreeMap::new();
+        let signed_out = || Unread::SignedOut("sign in again".into());
+        settle(
+            &mut entries,
+            facts,
+            record(120, 30, signed_out()),
+            attempted,
+            0,
+        );
+        let kept = &entries["claude"];
+        assert!(kept.failed);
+        assert_eq!(kept.failure, Some("signedOut"));
+        assert_eq!(kept.notice.as_deref(), Some("sign in again"));
+        assert_eq!(kept.checked_at, None, "no good reading yet");
+        assert_eq!(kept.reading.quotas.len(), 2);
+        assert_eq!(
+            kept.reading.account.as_ref().unwrap()["checkedAt"],
+            ago(120)
+        );
+
+        // An older record leaves the last good reading as it was.
+        let mut good = AccountReading::empty("claude");
+        good.account = Some(json!({"id":"acct","label":"me"}));
+        good.quotas = vec![json!({"id":"acct:claude-session","usedPercent":40,"accountId":"acct"})];
+        let mut entries = BTreeMap::from([("claude", entry(good, Some(&ago(2)), false))]);
+        settle(
+            &mut entries,
+            facts,
+            record(3, 35, signed_out()),
+            attempted,
+            0,
+        );
+        let kept = &entries["claude"];
+        assert_eq!(kept.reading.quotas[0]["usedPercent"], 40);
+        assert!(kept.reading.quotas[0]["observedAt"].is_null());
+        assert!(kept.reading.account.as_ref().unwrap()["checkedAt"].is_null());
+        assert_eq!(
+            kept.reading.quotas[1]["id"], "acct:claude-weekly-fable",
+            "a window it does not show is added"
+        );
+        assert!(kept.failed, "a sign-out shows at once");
+
+        // A newer one takes its place; a failure that passes still changes
+        // nothing else within the grace.
+        let mut good = AccountReading::empty("claude");
+        good.account = Some(json!({"id":"acct","label":"me"}));
+        good.quotas = vec![json!({"id":"acct:claude-session","usedPercent":40,"accountId":"acct"})];
+        let mut entries = BTreeMap::from([("claude", entry(good, Some(&ago(2)), false))]);
+        settle(
+            &mut entries,
+            facts,
+            record(1, 45, Unread::transient("busy")),
+            attempted,
+            0,
+        );
+        let kept = &entries["claude"];
+        assert_eq!(kept.reading.quotas[0]["usedPercent"], 45);
+        assert_eq!(kept.reading.quotas[0]["observedAt"], ago(1));
+        assert_eq!(kept.reading.account.as_ref().unwrap()["checkedAt"], ago(1));
+        assert!(!kept.failed);
+        assert_eq!(kept.failures, 1, "and the next try backs off");
     }
 
     #[test]

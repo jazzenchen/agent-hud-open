@@ -50,3 +50,4 @@ Factory Droid's reader, hooks and limits (`src/crates/agents/src/droid/`) take t
 - CodexBar (steipete/CodexBar, `Sources/CodexBarCore/Providers/Factory/`, 897bff3): `FACTORY_API_KEY` and `~/.factory/.env`, the `billing/limits` windows and their resets, a window whose end passed read as reset, and the extra usage balance.
 
 Copyright (c) their respective authors; each under the MIT license.
+- Reading Claude Code's own usage record (`cachedUsageUtilization` in `.claude.json`) only for the account the same file names, as of when Claude Code fetched it, follows QuotaView (https://github.com/duoasa/quotaview, `ClaudeCodeAccountProfile.decode`), MIT. The Rust reader is `src/crates/agents/src/claude/usage_record.rs`.

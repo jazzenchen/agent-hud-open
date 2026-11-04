@@ -229,6 +229,7 @@ fn parse(scope: &str, body: &Value, summary: &Value) -> Result<Reading, String> 
     });
     Ok(Reading {
         provider: "antigravity",
+        failure: None,
         quotas,
         billing: Vec::new(),
         notice,
