@@ -1,26 +1,13 @@
 import type { CSSProperties, MutableRefObject } from "react";
-import { BotMark } from "../BotMark";
-import HUDGlow, { type GlowAlert } from "../HUDGlow";
-import { botState, facingFromEdge, isAttention } from "../bots/bot-state";
-import { DockMemory, type Direction } from "../bots/mark-director";
+import type { GlowAlert } from "../HUDGlow";
+import type { DockMemory, Direction } from "../bots/mark-director";
 import { horizontal, type HUDRect, type stripMetrics } from "../geometry";
-import {
-  markUsed,
-  meterLabel,
-  vendorKey,
-  type HUDConfig,
-  type HUDEdge,
-  type HUDVendor,
-} from "../model";
+import type { HUDConfig, HUDEdge, HUDVendor } from "../model";
 import { Silhouette } from "./NotchSurface";
-import type { HUDNativePointer } from "../HUDScene";
+import type { HUDNativePointer } from "./useHUDInteraction";
 import { useFormat } from "@agent-hud/ui/format-context";
-import { quotaDisplayLabel } from "@agent-hud/ui/format";
-import { useMarkLevelText } from "../ground";
-import { isRingStyle } from "../usage-meter/arcs";
-import { MarkBars, MarkRing, markItems } from "../usage-meter/mark-usage";
-
-const clampedSize = (size: number) => Math.max(20, Math.min(60, size));
+import { AgentMark } from "./AgentMark";
+import { DockGlowBackdrop } from "./DockGlowBackdrop";
 
 export function HUDMarkStrip({
   id,
@@ -86,91 +73,20 @@ export function HUDMarkStrip({
   pin: (key?: string) => void;
 }) {
   const format = useFormat();
-  const { quotaDisplay } = format;
   const zh = format.language === "zh";
-  // A ring's figure is text: on a see-through ground, its level's see-through shade.
-  const figureColor = useMarkLevelText(light);
-  // ScreenHUD.surface: a Dynamic backdrop is a flat lip, clipped to the marks' column.
-  const backdropOverhang = config.glowRange + config.glowBlur * 3 + 200;
-  const backdropReach =
-    config.glowStyle === "blur"
-      ? config.glowRange + config.glowBlur * 3
-      : (config.glowGridCore + config.glowGridFade + 1) * config.glowGridPitch;
-  // The glow is drawn for a top dock and turned to the edge so its agent
-  // colours stay in mark order: left to right on a bottom dock (a vertical
-  // flip, not a half turn), top to bottom on the side docks (Open
-  // GlowWindowController's canvas orientation).
-  const backdropTransform =
-    edge === "bottom"
-      ? `matrix(1,0,0,-1,0,${strip.height})`
-      : edge === "left"
-        ? "matrix(0,1,1,0,0,0)"
-        : edge === "right"
-          ? `matrix(0,1,-1,0,${strip.width},0)`
-          : undefined;
 
   return (
     <>
       {config.mode === "logos" && !glowHidden && (!cardVisible || detached) && (
-        <div
-          aria-hidden="true"
-          style={{
-            position: "absolute",
-            inset: 0,
-            pointerEvents: "none",
-            clipPath: horizontal(edge)
-              ? `inset(-${backdropReach}px 0 -${backdropReach}px 0)`
-              : `inset(0 -${backdropReach}px 0 -${backdropReach}px)`,
-          }}
-        >
-          <div
-            style={{
-              position: "absolute",
-              left: 0,
-              top: 0,
-              transformOrigin: "0 0",
-              transform: backdropTransform,
-            }}
-          >
-            <div
-              style={{
-                position: "absolute",
-                left: -backdropOverhang,
-                top: -2,
-              }}
-            >
-              <HUDGlow
-                outwardOnly={config.glowOutwardOnly}
-                style={config.glowStyle}
-                effect={config.glowEffect}
-                width={
-                  (horizontal(edge) ? strip.width : strip.height) +
-                  backdropOverhang * 2
-                }
-                height={2}
-                radius={0}
-                attached
-                colors={glowColors}
-                alert={glowAlert}
-                active={vendors.some((v) => v.working > 0)}
-                period={
-                  vendors.some((v) => v.working > 0)
-                    ? config.breathSeconds
-                    : config.idleBreathSeconds
-                }
-                amplitude={config.breathAmplitude}
-                brightness={config.glowBrightness}
-                range={config.glowRange}
-                blur={config.glowBlur}
-                pitch={config.glowGridPitch}
-                core={config.glowGridCore}
-                fade={config.glowGridFade}
-                density={config.glowGridDensity}
-                reduceMotion={reduceMotion}
-              />
-            </div>
-          </div>
-        </div>
+        <DockGlowBackdrop
+          config={config}
+          edge={edge}
+          strip={strip}
+          vendors={vendors}
+          glowColors={glowColors}
+          glowAlert={glowAlert}
+          reduceMotion={reduceMotion}
+        />
       )}
       {config.mode === "notch" ? (
         <div
@@ -243,185 +159,31 @@ export function HUDMarkStrip({
           }}
         >
           {vendors.map((vendor, index) => (
-            <button
+            <AgentMark
               key={vendor.key}
-              type="button"
-              className="hud-agent-mark"
-              aria-label={`${vendor.name}, ${meterLabel(vendor, quotaDisplay)} ${markUsed(vendor) == null ? "" : quotaDisplayLabel(quotaDisplay, format.language)}`}
-              onPointerEnter={() => {
-                if (hovered !== vendor.key) {
-                  setHovered(vendor.key);
-                }
-              }}
-              onFocus={() => {
-                setHovered(vendor.key);
-                if (!hasAlert && !suppressHover.current) forceOpen();
-              }}
-              onClick={() => pin(vendor.key)}
-              style={{
-                position: "relative",
-                zIndex: 1,
-                border: 0,
-                padding: 0,
-                color: "inherit",
-                background: "transparent",
-                display: "flex",
-                alignItems: "center",
-                gap: metrics.labelGap,
-                flexShrink: 0,
-                cursor: dragVisual
-                  ? "grabbing"
-                  : config.separatesAgents
-                    ? "pointer"
-                    : "default",
-                visibility:
-                  config.mode === "logos" && !config.showsLogos
-                    ? "hidden"
-                    : "visible",
-              }}
-            >
-              <span
-                style={{
-                  width: metrics.mark,
-                  height: metrics.mark,
-                  display: "inline-grid",
-                  placeItems: "center",
-                  position: "relative",
-                }}
-              >
-                {config.mode === "simple" &&
-                  isRingStyle(config.simpleStyle) && (
-                    <MarkRing
-                      style={config.simpleStyle}
-                      items={markItems(
-                        vendor,
-                        quotaDisplay,
-                        config.panelLayout,
-                      )}
-                      size={metrics.mark}
-                      ringWidth={config.ringWidth}
-                      light={light}
-                      reduceMotion={reduceMotion}
-                    />
-                  )}
-                <BotMark
-                  source={vendor.name}
-                  size={metrics.logo}
-                  light={light}
-                  enabled={config.botLogos}
-                  hovered={
-                    ((hovered === vendor.key && pointerInside) ||
-                      (open &&
-                        !sender &&
-                        (!focusedVendor ||
-                          focusedVendor.key === vendor.key))) &&
-                    !dragVisual
-                  }
-                  state={(() => {
-                    const state =
-                      botDirections?.[vendor.key]?.state ??
-                      botState({
-                        look:
-                          vendor.waiting > 0
-                            ? "permission"
-                            : vendor.working > 0
-                              ? "plain"
-                              : "idle",
-                      });
-                    const facesCard = sender
-                      ? vendorKey(sender.source) === vendor.key
-                      : open &&
-                        (!focusedVendor || focusedVendor.key === vendor.key);
-                    return {
-                      ...state,
-                      facing:
-                        isAttention(state.look) && facesCard
-                          ? facingFromEdge(edge)
-                          : null,
-                    };
-                  })()}
-                  cue={(() => {
-                    const direction = botDirections?.[vendor.key];
-                    return direction
-                      ? dockMemory.current.cue(
-                          vendor.key,
-                          direction.cue,
-                          direction.state.badge,
-                          performance.now() / 1000,
-                        )
-                      : null;
-                  })()}
-                  staysBot={false}
-                  aim={
-                    nativePointer?.point
-                      ? (() => {
-                          const centerX =
-                            strip.x +
-                            (horizontal(edge)
-                              ? metrics.centers[index]
-                              : metrics.padding.left + metrics.mark / 2);
-                          const centerY =
-                            strip.y +
-                            (horizontal(edge)
-                              ? metrics.padding.top + metrics.mark / 2
-                              : metrics.centers[index]);
-                          const dx = nativePointer.point!.x - centerX,
-                            dy = nativePointer.point!.y - centerY,
-                            distance = Math.hypot(dx, dy);
-                          return distance < 1
-                            ? ([0, 0] as const)
-                            : ([
-                                dx / (distance + 120),
-                                dy / (distance + 120),
-                              ] as const);
-                        })()
-                      : undefined
-                  }
-                />
-                {vendor.waiting > 0 && (
-                  <span
-                    aria-hidden="true"
-                    style={{
-                      position: "absolute",
-                      right: -2,
-                      bottom: -2,
-                      width: 8,
-                      height: 8,
-                      borderRadius: "50%",
-                      background: "#e9a16d",
-                      boxShadow: `0 0 0 2px ${light ? "#f8f8fa" : "#000"}`,
-                    }}
-                  />
-                )}
-              </span>
-              {config.mode === "simple" && metrics.bar > 0 && (
-                <MarkBars
-                  items={markItems(vendor, quotaDisplay, config.panelLayout)}
-                  length={metrics.bar}
-                  height={metrics.mark}
-                  size={clampedSize(config.simpleSize)}
-                  ringWidth={config.ringWidth}
-                  light={light}
-                  reduceMotion={reduceMotion}
-                />
-              )}
-              {config.mode === "simple" &&
-                (config.showsNumbers || config.simpleStyle === "numbers") && (
-                  <span
-                    style={{
-                      color: figureColor(vendor.level),
-                      fontSize: metrics.font,
-                      fontWeight: 400,
-                      fontVariantNumeric: "tabular-nums",
-                      whiteSpace: "nowrap",
-                      textAlign: "right",
-                      minWidth: horizontal(edge) ? undefined : metrics.label,
-                    }}
-                  >
-                    {meterLabel(vendor, quotaDisplay)}
-                  </span>
-                )}
-            </button>
+              vendor={vendor}
+              index={index}
+              config={config}
+              edge={edge}
+              strip={strip}
+              metrics={metrics}
+              light={light}
+              dragVisual={dragVisual}
+              hovered={hovered}
+              pointerInside={pointerInside}
+              open={open}
+              sender={sender}
+              focusedVendor={focusedVendor}
+              botDirections={botDirections}
+              dockMemory={dockMemory}
+              nativePointer={nativePointer}
+              reduceMotion={reduceMotion}
+              hasAlert={hasAlert}
+              suppressHover={suppressHover}
+              setHovered={setHovered}
+              forceOpen={forceOpen}
+              pin={pin}
+            />
           ))}
         </div>
       )}
