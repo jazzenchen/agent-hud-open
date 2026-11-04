@@ -16,10 +16,10 @@ import {
   type Text,
 } from "./SettingsPrimitives";
 import {
-  KnownClientCard,
   OtherAgentsCard,
   ProductClientCard,
 } from "./agent-plugins/ClientCards";
+import { KnownClientCard } from "./agent-plugins/KnownClientCard";
 import { DetailsSection } from "./agent-plugins/DetailsSection";
 import { HooksSection } from "./agent-plugins/HooksSection";
 import { ToolsSection } from "./agent-plugins/ToolsSection";
