@@ -1,0 +1,273 @@
+//! The ledger's tables, columns and indexes, and the one-off migrations of
+//! rows earlier builds wrote.
+
+use rusqlite::Connection;
+
+fn ensure_column(db: &Connection, table: &str, column: &str, def: &str) -> rusqlite::Result<()> {
+    let exists = db
+        .prepare(&format!("PRAGMA table_info({table})"))?
+        .query_map([], |row| row.get::<_, String>(1))?
+        .filter_map(Result::ok)
+        .any(|name| name == column);
+    if !exists {
+        db.execute_batch(&format!("ALTER TABLE {table} ADD COLUMN {column} {def}"))?;
+    }
+    Ok(())
+}
+
+/// Initializes all database tables, columns, and indexes in one place.
+pub(crate) fn schema(db: &Connection) -> rusqlite::Result<()> {
+    // A large one-off write (a migration, an import) grows the WAL file, and
+    // SQLite keeps that size after checkpointing unless a limit is set.
+    db.execute_batch(
+        "PRAGMA journal_mode=WAL;
+        PRAGMA journal_size_limit=16777216;
+        CREATE TABLE IF NOT EXISTS ingestion_logs(
+            path TEXT PRIMARY KEY,
+            payload TEXT NOT NULL,
+            head TEXT,
+            updated_at_ms INTEGER NOT NULL DEFAULT 0
+        );
+        CREATE TABLE IF NOT EXISTS ingestion_meta(
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        ) WITHOUT ROWID;
+        CREATE TABLE IF NOT EXISTS session_mapping(
+            source TEXT NOT NULL,
+            session_id TEXT NOT NULL,
+            canonical_path TEXT NOT NULL,
+            parent_id TEXT,
+            updated_at_ms INTEGER NOT NULL DEFAULT 0,
+            PRIMARY KEY(source, session_id)
+        );
+        CREATE INDEX IF NOT EXISTS session_mapping_updated ON session_mapping(updated_at_ms);
+        CREATE TABLE IF NOT EXISTS session_endpoint(
+            source TEXT NOT NULL,
+            session_id TEXT NOT NULL,
+            endpoint TEXT NOT NULL,
+            updated_at_ms INTEGER NOT NULL DEFAULT 0,
+            PRIMARY KEY(source, session_id)
+        );
+
+        CREATE TABLE IF NOT EXISTS quota_sample(
+            window_id TEXT NOT NULL,
+            observed_at_ms INTEGER NOT NULL,
+            remaining REAL NOT NULL,
+            PRIMARY KEY(window_id, observed_at_ms)
+        );
+        CREATE TABLE IF NOT EXISTS usage_meter_event(
+            contribution TEXT NOT NULL,
+            event_key TEXT NOT NULL,
+            source TEXT NOT NULL,
+            model TEXT NOT NULL,
+            at_ms INTEGER NOT NULL,
+            input INTEGER NOT NULL,
+            output INTEGER NOT NULL,
+            cache_read INTEGER NOT NULL,
+            cache_write INTEGER NOT NULL,
+            reasoning INTEGER NOT NULL,
+            gap_ms INTEGER,
+            updated_at_ms INTEGER NOT NULL DEFAULT 0,
+            PRIMARY KEY(contribution, event_key)
+        );
+        CREATE INDEX IF NOT EXISTS usage_meter_event_order ON usage_meter_event(contribution, at_ms, event_key);
+        CREATE INDEX IF NOT EXISTS usage_meter_event_date ON usage_meter_event(at_ms);
+        CREATE TABLE IF NOT EXISTS usage_meter_bucket(
+            contribution TEXT NOT NULL,
+            source TEXT NOT NULL,
+            model TEXT NOT NULL,
+            at_ms INTEGER NOT NULL,
+            input INTEGER NOT NULL,
+            output INTEGER NOT NULL,
+            cache_read INTEGER NOT NULL,
+            cache_write INTEGER NOT NULL,
+            reasoning INTEGER NOT NULL,
+            updated_at_ms INTEGER NOT NULL DEFAULT 0,
+            PRIMARY KEY(contribution, model, at_ms)
+        );
+        CREATE INDEX IF NOT EXISTS usage_meter_bucket_date ON usage_meter_bucket(at_ms);
+        CREATE TEMP TABLE IF NOT EXISTS meter_selected(contribution TEXT PRIMARY KEY);
+
+        CREATE TABLE IF NOT EXISTS source_log_context(
+            path TEXT NOT NULL,
+            generation TEXT NOT NULL,
+            kind TEXT NOT NULL,
+            key TEXT NOT NULL,
+            offset INTEGER NOT NULL,
+            value TEXT,
+            aux TEXT,
+            PRIMARY KEY(path, generation, kind, key, offset)
+        );
+        CREATE INDEX IF NOT EXISTS source_log_context_match ON source_log_context(path, generation, kind, key, offset);
+        CREATE TABLE IF NOT EXISTS source_log_record(
+            path TEXT NOT NULL,
+            generation TEXT NOT NULL,
+            offset INTEGER NOT NULL,
+            id TEXT NOT NULL,
+            event_key TEXT NOT NULL,
+            at_ms INTEGER NOT NULL,
+            input INTEGER NOT NULL,
+            output INTEGER NOT NULL,
+            cache_read INTEGER NOT NULL,
+            model TEXT,
+            context TEXT,
+            candidate TEXT,
+            PRIMARY KEY(path, generation, offset)
+        );
+        CREATE TABLE IF NOT EXISTS source_proto_identity(
+            path TEXT NOT NULL,
+            generation TEXT NOT NULL,
+            kind INTEGER NOT NULL,
+            idx INTEGER NOT NULL,
+            message TEXT,
+            execution TEXT,
+            at_ms INTEGER,
+            label TEXT,
+            model TEXT,
+            response TEXT,
+            PRIMARY KEY(path, generation, kind, idx)
+        );
+        CREATE INDEX IF NOT EXISTS source_proto_message ON source_proto_identity(path, generation, kind, message);
+        CREATE INDEX IF NOT EXISTS source_proto_execution ON source_proto_identity(path, generation, kind, execution);
+        CREATE INDEX IF NOT EXISTS source_proto_label ON source_proto_identity(path, generation, kind, label);
+        CREATE INDEX IF NOT EXISTS source_proto_response ON source_proto_identity(path, generation, kind, response);",
+    )?;
+
+    ensure_column(db, "ingestion_logs", "head", "TEXT")?;
+    ensure_column(
+        db,
+        "ingestion_logs",
+        "updated_at_ms",
+        "INTEGER NOT NULL DEFAULT 0",
+    )?;
+    ensure_column(
+        db,
+        "usage_meter_event",
+        "updated_at_ms",
+        "INTEGER NOT NULL DEFAULT 0",
+    )?;
+    ensure_column(
+        db,
+        "usage_meter_bucket",
+        "updated_at_ms",
+        "INTEGER NOT NULL DEFAULT 0",
+    )?;
+    // The context window a client reported for a call, and the tools the call
+    // asked for (a JSON array), as the log's lines said.
+    ensure_column(db, "usage_meter_event", "context_window", "INTEGER")?;
+    ensure_column(db, "usage_meter_event", "tools", "TEXT")?;
+    // How long the call itself took, where its log records it (NULL where
+    // not); calls read before the column existed keep NULL.
+    ensure_column(db, "usage_meter_event", "duration_ms", "INTEGER")?;
+    ensure_column(db, "source_log_record", "duration_ms", "INTEGER")?;
+    // The plan a quota reading was taken under (`plan_value::plan_key`);
+    // readings from before the column, or of an account with no plan, have
+    // none and are never compared across plans.
+    ensure_column(db, "quota_sample", "plan", "TEXT")?;
+    // Prompt (0) and compaction (1) marks drive a session's turns.
+    db.execute_batch(
+        "CREATE TABLE IF NOT EXISTS usage_meter_mark(
+            contribution TEXT NOT NULL,
+            at_ms INTEGER NOT NULL,
+            kind INTEGER NOT NULL,
+            PRIMARY KEY(contribution, at_ms, kind)
+        ) WITHOUT ROWID;
+        CREATE INDEX IF NOT EXISTS usage_meter_mark_date ON usage_meter_mark(at_ms);",
+    )?;
+    // The largest prompt each model was seen with, kept past the retention;
+    // seeded once from the calls already recorded.
+    let seeded = db
+        .prepare(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='usage_meter_model_context'",
+        )?
+        .exists([])?;
+    if !seeded {
+        db.execute_batch(
+            "CREATE TABLE usage_meter_model_context(
+                source TEXT NOT NULL,
+                model TEXT NOT NULL,
+                largest INTEGER NOT NULL,
+                PRIMARY KEY(source, model)
+            ) WITHOUT ROWID;
+            INSERT OR REPLACE INTO usage_meter_model_context(source,model,largest)
+                SELECT source,model,MAX(input+cache_write+cache_read) FROM usage_meter_event
+                WHERE model<>'' GROUP BY source,model;",
+        )?;
+    }
+
+    db.execute_batch(
+        "CREATE INDEX IF NOT EXISTS ingestion_logs_updated ON ingestion_logs(updated_at_ms);
+        CREATE INDEX IF NOT EXISTS usage_meter_event_updated ON usage_meter_event(updated_at_ms);
+        CREATE INDEX IF NOT EXISTS usage_meter_bucket_updated ON usage_meter_bucket(updated_at_ms);",
+    )?;
+
+    remove_turn_text(db)?;
+    forget_dashboard_usage(db)
+}
+
+/// Until 2026-10-26 Cursor's and Grok Bot's sessions and tokens came from
+/// Cursor's dashboard, which stopped listing Grok Bot's usage after a plan
+/// change and counted Grok Bot's daily spend a second time as a Cursor
+/// session. Cursor is read on this Mac now (its sessions in its database,
+/// its tokens in its turn log) and Grok Bot keeps no tokens on this Mac, so
+/// everything the dashboard gave leaves once, by `user_version` 2; the
+/// sessions are read again from their local sources.
+fn forget_dashboard_usage(db: &Connection) -> rusqlite::Result<()> {
+    let version: i64 = db.query_row("PRAGMA user_version", [], |row| row.get(0))?;
+    if version >= 2 {
+        return Ok(());
+    }
+    let dashboard = "SELECT path FROM ingestion_logs
+        WHERE CASE WHEN json_valid(coalesce(head,payload))
+              THEN json_extract(coalesce(head,payload),'$.source') END IN ('cursor','grok-bot')";
+    db.execute_batch(&format!(
+        "BEGIN;
+         DELETE FROM usage_meter_event WHERE source IN ('cursor','grok-bot');
+         DELETE FROM usage_meter_bucket WHERE source IN ('cursor','grok-bot');
+         DELETE FROM usage_meter_mark WHERE contribution IN ({dashboard});
+         DELETE FROM usage_meter_model_context WHERE source IN ('cursor','grok-bot');
+         DELETE FROM session_mapping WHERE source IN ('cursor','grok-bot');
+         DELETE FROM ingestion_logs WHERE path IN ({dashboard});
+         PRAGMA user_version=2;
+         COMMIT;"
+    ))
+}
+
+/// Checkpoints keep no conversation text since 2026-10-21 (agent-hud-native-open's
+/// ledger stores none); the turn messages, final answers and desktop asks'
+/// words earlier builds wrote leave them once, by `user_version` 1.
+fn remove_turn_text(db: &Connection) -> rusqlite::Result<()> {
+    let version: i64 = db.query_row("PRAGMA user_version", [], |row| row.get(0))?;
+    if version >= 1 {
+        return Ok(());
+    }
+    let words = (0..32)
+        .map(|turn| format!("'$.live.turns[{turn}].message'"))
+        .chain(
+            [
+                "final_answer",
+                "activity.desktop_ask.question",
+                "activity.desktop_ask.recap",
+                "activity.desktop_ask.options",
+            ]
+            .map(|field| format!("'$.live.{field}'")),
+        )
+        .collect::<Vec<_>>()
+        .join(",");
+    let holds = |column: &str| {
+        ["\"message\":\"", "\"final_answer\":\"", "\"question\":\""]
+            .map(|key| format!("instr({column},'{key}')>0"))
+            .join(" OR ")
+    };
+    db.execute_batch(&format!(
+        "BEGIN;
+         UPDATE ingestion_logs
+         SET payload=CASE WHEN json_valid(payload) THEN json_remove(payload,{words}) ELSE payload END,
+             head=CASE WHEN json_valid(head) THEN json_remove(head,{words}) ELSE head END
+         WHERE {} OR {};
+         PRAGMA user_version=1;
+         COMMIT;",
+        holds("payload"),
+        holds("head"),
+    ))
+}
