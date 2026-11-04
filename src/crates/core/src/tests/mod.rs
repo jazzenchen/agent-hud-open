@@ -35,6 +35,7 @@ fn launch_at_login_reads_saved_and_imported_choices_before_any_snapshot() {
 
 fn fixture(home: &Path) -> AgentHudCore {
     let mut backend = AgentHudCore::new(vec![], home.join("app"));
+    backend.set_claude_projects_supported(true);
     backend.provider_roots = vec![
         (home.join(".claude/projects"), "claude"),
         (home.join(".codex/sessions"), "codex"),

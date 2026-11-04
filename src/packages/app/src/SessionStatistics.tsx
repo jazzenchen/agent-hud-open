@@ -372,7 +372,7 @@ export default function SessionStatistics({
                 </SelectItem>
                 {projects.map((path) => (
                   <SelectItem key={path} value={path}>
-                    {projectName(path, zh)}
+                    {list.page?.projectLabels?.[path] ?? projectName(path, zh)}
                   </SelectItem>
                 ))}
                 {list.page?.projects.includes(null) && (

@@ -1,4 +1,7 @@
 //! Claude Code transcript usage and live activity reducer.
+use crate::claude::project_origin::{
+    is_managed_project_prompt, managed_origin, ClaudeProjectOrigin,
+};
 use crate::{
     number,
     transcript::items::{self, Items, LineItem},
@@ -228,11 +231,12 @@ impl Log {
         match value["type"].as_str() {
             Some("custom-title") => self.naming.name(0, value["customTitle"].as_str()),
             Some("ai-title") => self.naming.name(1, value["aiTitle"].as_str()),
-            Some("user") => {
+            Some("user") if !is_managed_project_prompt(value) => {
                 if let Some(text) = value["message"]["content"].as_str() {
                     self.title_from(text);
                 }
             }
+            Some("user") => {}
             _ => {}
         }
         if value["type"] != "assistant" {
@@ -445,6 +449,15 @@ impl Log {
 
 impl LiveLog {
     pub fn claude(&mut self, value: &Value) {
+        if let Some(origin) = managed_origin(value) {
+            let next = origin.unwrap_or(ClaudeProjectOrigin::Unknown);
+            self.claude_project_origin = Some(match self.claude_project_origin.take() {
+                None => next,
+                Some(ClaudeProjectOrigin::Unknown) => ClaudeProjectOrigin::Unknown,
+                Some(existing) if existing == next => existing,
+                Some(_) => ClaudeProjectOrigin::Unknown,
+            });
+        }
         if let Some(id) = value["sessionId"].as_str() {
             if self.is_subagent {
                 self.parent_id.get_or_insert_with(|| id.into());
@@ -1144,6 +1157,9 @@ pub fn desktop_ask_words(view: &Value, decision: &Value) -> Option<String> {
 pub struct ClaudeDesktopIndex {
     pub archived: HashSet<String>,
     pub targets: HashMap<String, Value>,
+    /// Active Code Project child workers keyed by the CLI session UUID. An
+    /// Unknown value deliberately blocks falling back to the Local tab.
+    pub project_workers: HashMap<String, ClaudeDesktopProjectWorker>,
     /// Each metadata file as last read, by its modification time and size, so
     /// a pass re-reads only the files that changed (agent-hud-native-open
     /// ClaudeDesktopSessions keeps the same cache).
@@ -1153,12 +1169,27 @@ pub struct ClaudeDesktopIndex {
     bases: Vec<PathBuf>,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum ClaudeDesktopProjectWorker {
+    Identified { ccr_session_id: String },
+    Unknown,
+}
+
 #[derive(Clone)]
 struct DesktopFile {
     stamp: (Option<std::time::SystemTime>, u64),
     /// The tab's kind, its own id, the Claude Code session it holds and
     /// whether it is archived; None for a file that is not such a record.
-    tab: Option<(&'static str, String, String, bool)>,
+    tab: Option<DesktopTab>,
+}
+
+#[derive(Clone)]
+struct DesktopTab {
+    kind: &'static str,
+    stem: String,
+    cli_id: String,
+    archived: bool,
+    project_worker: Option<ClaudeDesktopProjectWorker>,
 }
 
 impl ClaudeDesktopIndex {
@@ -1223,36 +1254,62 @@ impl ClaudeDesktopIndex {
         let mut tabs: HashMap<&str, (usize, usize)> = HashMap::new();
         let mut targets: HashMap<String, Value> = HashMap::new();
         let mut ambiguous: HashSet<String> = HashSet::new();
+        let mut project_workers: HashMap<String, ClaudeDesktopProjectWorker> = HashMap::new();
+        let mut ambiguous_project_workers = HashSet::new();
         let mut paths = self.files.keys().collect::<Vec<_>>();
         paths.sort();
         for path in paths {
-            let Some((kind, stem, cli_id, archived)) = &self.files[path].tab else {
+            let Some(tab) = &self.files[path].tab else {
                 continue;
             };
-            let counts = tabs.entry(cli_id).or_insert((0, 0));
+            let counts = tabs.entry(&tab.cli_id).or_insert((0, 0));
             counts.0 += 1;
-            if *archived {
+            if tab.archived {
                 counts.1 += 1;
             } else {
-                let target = json!({"kind": kind, "id": stem});
+                let target = json!({"kind": tab.kind, "id": tab.stem});
                 if targets
-                    .get(cli_id)
+                    .get(&tab.cli_id)
                     .is_some_and(|existing| existing != &target)
                 {
-                    ambiguous.insert(cli_id.clone());
+                    ambiguous.insert(tab.cli_id.clone());
                 }
-                targets.insert(cli_id.clone(), target);
+                targets.insert(tab.cli_id.clone(), target);
+                if tab.kind == "claude-desktop" {
+                    if let Some(worker) = &tab.project_worker {
+                        match project_workers.get(&tab.cli_id) {
+                            Some(existing) if existing != worker => {
+                                ambiguous_project_workers.insert(tab.cli_id.clone());
+                            }
+                            None => {
+                                project_workers.insert(tab.cli_id.clone(), worker.clone());
+                            }
+                            _ => {}
+                        }
+                    }
+                }
             }
         }
         targets.retain(|id, _| !ambiguous.contains(id));
+        for id in &ambiguous {
+            if project_workers.contains_key(id) {
+                ambiguous_project_workers.insert(id.clone());
+            }
+        }
+        for id in ambiguous_project_workers {
+            project_workers.insert(id, ClaudeDesktopProjectWorker::Unknown);
+        }
         let archived = tabs
             .into_iter()
             .filter(|(_, (all, arch))| *all > 0 && all == arch)
             .map(|(id, _)| id.to_owned())
             .collect::<HashSet<_>>();
-        let changed = archived != self.archived || targets != self.targets;
+        let changed = archived != self.archived
+            || targets != self.targets
+            || project_workers != self.project_workers;
         self.archived = archived;
         self.targets = targets;
+        self.project_workers = project_workers;
         changed
     }
 }
@@ -1293,7 +1350,7 @@ fn desktop_metadata_files(root: &Path) -> Vec<PathBuf> {
 }
 
 /// The tab a metadata file records: only its ids and archive flag are read.
-fn desktop_tab(path: &Path, kind: &'static str) -> Option<(&'static str, String, String, bool)> {
+fn desktop_tab(path: &Path, kind: &'static str) -> Option<DesktopTab> {
     let stem = path.file_stem()?.to_str()?.to_owned();
     let value = serde_json::from_slice::<Value>(&fs::read(path).ok()?).ok()?;
     if value["sessionId"].as_str() != Some(stem.as_str()) {
@@ -1303,7 +1360,33 @@ fn desktop_tab(path: &Path, kind: &'static str) -> Option<(&'static str, String,
         .as_str()
         .filter(|id| uuid(id))?
         .to_owned();
-    Some((kind, stem, cli_id, value["isArchived"] == true))
+    let project_worker = (kind == "claude-desktop"
+        && value["remoteControlSpawn"]["projectThreadChild"] == true)
+        .then(|| {
+            value["remoteControlSpawn"]["ccrSessionId"]
+                .as_str()
+                .filter(|id| ccr_session_id(id))
+                .map(|ccr_session_id| ClaudeDesktopProjectWorker::Identified {
+                    ccr_session_id: ccr_session_id.to_owned(),
+                })
+                .unwrap_or(ClaudeDesktopProjectWorker::Unknown)
+        });
+    Some(DesktopTab {
+        kind,
+        stem,
+        cli_id,
+        archived: value["isArchived"] == true,
+        project_worker,
+    })
+}
+
+fn ccr_session_id(value: &str) -> bool {
+    value.strip_prefix("cse_").is_some_and(|suffix| {
+        (6..=120).contains(&suffix.len())
+            && suffix
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_')
+    })
 }
 
 /// The desktop tab kind a Claude Code session's client opens in: the
@@ -1349,6 +1432,27 @@ fn claude_work(name: &str) -> Option<Work> {
 mod tests {
     use super::*;
 
+    fn write_desktop_tab(
+        base: &Path,
+        folder: &str,
+        stem: &str,
+        cli_id: &str,
+        archived: bool,
+        spawn: Option<Value>,
+    ) {
+        let account = base.join(folder).join("org/acct");
+        fs::create_dir_all(&account).unwrap();
+        let mut metadata = json!({
+            "sessionId": stem,
+            "cliSessionId": cli_id,
+            "isArchived": archived
+        });
+        if let Some(spawn) = spawn {
+            metadata["remoteControlSpawn"] = spawn;
+        }
+        fs::write(account.join(format!("{stem}.json")), metadata.to_string()).unwrap();
+    }
+
     fn assistant(id: Option<&str>, request: Option<&str>, model: &str, usage: Value) -> Value {
         let mut message = json!({"role":"assistant","model":model,"usage":usage,"content":[{"type":"text","text":"ok"}]});
         if let Some(id) = id {
@@ -1359,6 +1463,26 @@ mod tests {
             line["requestId"] = json!(request);
         }
         line
+    }
+
+    #[test]
+    fn a_managed_project_wake_does_not_become_the_session_title() {
+        let mut log = Log::new("s1.jsonl".into(), "claude");
+        let line = json!({
+            "type":"user",
+            "sessionId":"s1",
+            "timestamp":"2026-11-03T08:00:00Z",
+            "projectsUserTurn":true,
+            "textNotTyped":true,
+            "promptSource":"sdk",
+            "entrypoint":"claude-desktop",
+            "isSidechain":false,
+            "message":{"role":"user","content":"<wake><project id=\"chan_abcdef123456\" type=\"project\"><thread ts=\"cmsg_abcdef123456_789\">"}
+        });
+        log.parse_claude(&line);
+
+        assert_eq!(log.title(), "Claude Code");
+        assert_eq!(log.meter_marks.len(), 1, "the wake still marks real work");
     }
 
     #[test]
@@ -1629,5 +1753,119 @@ mod tests {
             index.targets.get(cli),
             Some(&json!({"kind":"claude-desktop","id":tab}))
         );
+    }
+
+    #[test]
+    fn project_child_metadata_distinguishes_standalone_invalid_archived_and_cowork_tabs() {
+        let temp = tempfile::tempdir().unwrap();
+        let base = temp.path().join("AppData/Roaming/Claude");
+        let standalone = "66666666-6666-4666-8666-666666666661";
+        let valid = "66666666-6666-4666-8666-666666666662";
+        let invalid = "66666666-6666-4666-8666-666666666663";
+        let missing = "66666666-6666-4666-8666-666666666664";
+        let archived = "66666666-6666-4666-8666-666666666665";
+        let cowork = "66666666-6666-4666-8666-666666666666";
+        write_desktop_tab(
+            &base,
+            "claude-code-sessions",
+            "local_88888888-8888-4888-8888-888888888881",
+            standalone,
+            false,
+            None,
+        );
+        write_desktop_tab(
+            &base,
+            "claude-code-sessions",
+            "local_88888888-8888-4888-8888-888888888882",
+            valid,
+            false,
+            Some(json!({"projectThreadChild":true,"ccrSessionId":"cse_synthetic01"})),
+        );
+        write_desktop_tab(
+            &base,
+            "claude-code-sessions",
+            "local_88888888-8888-4888-8888-888888888883",
+            invalid,
+            false,
+            Some(json!({"projectThreadChild":true,"ccrSessionId":"local_synthetic01"})),
+        );
+        write_desktop_tab(
+            &base,
+            "claude-code-sessions",
+            "local_88888888-8888-4888-8888-888888888884",
+            missing,
+            false,
+            Some(json!({"projectThreadChild":true})),
+        );
+        write_desktop_tab(
+            &base,
+            "claude-code-sessions",
+            "local_88888888-8888-4888-8888-888888888885",
+            archived,
+            true,
+            Some(json!({"projectThreadChild":true,"ccrSessionId":"cse_synthetic02"})),
+        );
+        write_desktop_tab(
+            &base,
+            "local-agent-mode-sessions",
+            "local_88888888-8888-4888-8888-888888888886",
+            cowork,
+            false,
+            Some(json!({"projectThreadChild":true,"ccrSessionId":"cse_synthetic03"})),
+        );
+
+        let mut index = ClaudeDesktopIndex::default();
+        index.set_bases(vec![base]);
+        assert!(index.refresh(&[]));
+        assert!(!index.project_workers.contains_key(standalone));
+        assert_eq!(
+            index.project_workers.get(valid),
+            Some(&ClaudeDesktopProjectWorker::Identified {
+                ccr_session_id: "cse_synthetic01".into()
+            })
+        );
+        assert_eq!(
+            index.project_workers.get(invalid),
+            Some(&ClaudeDesktopProjectWorker::Unknown)
+        );
+        assert_eq!(
+            index.project_workers.get(missing),
+            Some(&ClaudeDesktopProjectWorker::Unknown)
+        );
+        assert!(!index.project_workers.contains_key(archived));
+        assert!(index.archived.contains(archived));
+        assert!(!index.project_workers.contains_key(cowork));
+    }
+
+    #[test]
+    fn conflicting_active_project_child_records_are_unknown() {
+        let temp = tempfile::tempdir().unwrap();
+        let base = temp.path().join("AppData/Roaming/Claude");
+        let cli = "66666666-6666-4666-8666-666666666677";
+        write_desktop_tab(
+            &base,
+            "claude-code-sessions",
+            "local_88888888-8888-4888-8888-888888888887",
+            cli,
+            false,
+            Some(json!({"projectThreadChild":true,"ccrSessionId":"cse_synthetic11"})),
+        );
+        write_desktop_tab(
+            &base,
+            "claude-code-sessions",
+            "local_88888888-8888-4888-8888-888888888888",
+            cli,
+            false,
+            Some(json!({"projectThreadChild":true,"ccrSessionId":"cse_synthetic12"})),
+        );
+
+        let mut index = ClaudeDesktopIndex::default();
+        index.set_bases(vec![base]);
+        assert!(index.refresh(&[]));
+        assert_eq!(
+            index.project_workers.get(cli),
+            Some(&ClaudeDesktopProjectWorker::Unknown)
+        );
+        assert!(!index.targets.contains_key(cli));
     }
 }

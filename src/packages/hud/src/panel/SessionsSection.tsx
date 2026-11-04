@@ -11,6 +11,7 @@ import { useGround } from "../ground";
 import { useFormat } from "@agent-hud/ui/format-context";
 import { useListedSessions } from "./listed-sessions";
 import { noSessionsMatch } from "./session-filters";
+import { useState } from "react";
 
 export function SourceSessions({
   snapshot,
@@ -31,6 +32,9 @@ export function SourceSessions({
 }) {
   const zh = useFormat().language === "zh";
   const services = usePanelServices();
+  const [failedProjectOpen, setFailedProjectOpen] = useState<string | null>(
+    null,
+  );
   const listed = useListedSessions();
   // The Sessions page: the list, or one session's usage.
   const openSessions = (sessionId?: string) =>
@@ -136,20 +140,54 @@ export function SourceSessions({
         </span>
       </button>
       {sessions.slice(0, limit).map((session) => (
-        // The whole row opens the session's page, as its heading opens the list.
+        // Project rows return to their native thread; other rows open the details page.
         <button
           key={session.id}
-          disabled={!onStats && !listed}
-          title={`${session.title}\n${
-            zh ? "查看会话详情" : "Show session details"
-          }`}
-          onClick={() =>
-            listed
-              ? openSessions(session.id)
-              : services?.selectSession
-                ? services.selectSession(session)
-                : onStats?.()
+          disabled={
+            session.desktopProject
+              ? session.desktopProject.openAvailable !== true ||
+                !services?.openSession
+              : !onStats && !listed
           }
+          title={
+            session.desktopProject
+              ? [
+                  session.title,
+                  session.desktopProject.projectLabel,
+                  session.desktopProject.kindLabel,
+                  session.desktopProject.label,
+                  session.desktopProject.openLabel,
+                ]
+                  .filter(Boolean)
+                  .join(" · ")
+              : `${session.title}\n${zh ? "查看会话详情" : "Show session details"}`
+          }
+          aria-label={
+            session.desktopProject
+              ? `${session.title}, ${session.desktopProject.kindLabel}, ${session.desktopProject.label}. ${session.desktopProject.openLabel}`
+              : undefined
+          }
+          onClick={() => {
+            if (session.desktopProject) {
+              if (
+                session.desktopProject.openAvailable !== true ||
+                !services?.openSession
+              )
+                return;
+              setFailedProjectOpen(null);
+              void Promise.resolve(services.openSession(session))
+                .then((opened) =>
+                  setFailedProjectOpen(opened === false ? session.id : null),
+                )
+                .catch(() => setFailedProjectOpen(session.id));
+            } else if (listed) {
+              openSessions(session.id);
+            } else if (services?.selectSession) {
+              services.selectSession(session);
+            } else {
+              onStats?.();
+            }
+          }}
           style={{
             ...noButtonChrome,
             display: "flex",
@@ -183,8 +221,17 @@ export function SourceSessions({
             {sessionTitle(session.title, session.cwd) ||
               (zh ? "（未命名会话）" : "(untitled session)")}
           </span>
-          <span style={{ ...tabular, fontSize: 12, whiteSpace: "nowrap" }}>
-            {formatTokens(session.tokens)} tok
+          <span
+            style={{ ...tabular, fontSize: 12, whiteSpace: "nowrap" }}
+            role={failedProjectOpen === session.id ? "status" : undefined}
+          >
+            {session.desktopProject
+              ? failedProjectOpen === session.id
+                ? zh
+                  ? "無法開啟專案"
+                  : "Couldn't reopen Project"
+                : `${session.desktopProject.kindLabel} · ${session.desktopProject.label}`
+              : `${formatTokens(session.tokens)} tok`}
           </span>
         </button>
       ))}

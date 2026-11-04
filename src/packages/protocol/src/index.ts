@@ -7,6 +7,23 @@ export type Page =
   | "settings"
   | "migration";
 export type SessionState = "running" | "waiting" | "idle" | "unverified";
+/** A local Claude Desktop Code Project thread. */
+export interface DesktopProjectSession {
+  execution: "local" | "unknown";
+  status: "unknown";
+  /** Core's localized status label. */
+  label: string;
+  /** Core's localized Project worker label. */
+  kindLabel: string;
+  /** Human-readable Project name. */
+  projectLabel?: string;
+  /** Core's localized name for the native return action. */
+  openLabel: string;
+  /** False when the local origin cannot be identified safely. */
+  openAvailable: boolean;
+  /** Related local executors, retained separately for usage and detail. */
+  localWorkerCount?: number;
+}
 /**
  * How far the usage ledger has been read. `kind` is set while the ledger is
  * read through: "first" for a ledger with no logs yet, "reindex" for one
@@ -157,6 +174,8 @@ export interface Session {
   logPath: string | null;
   parentId: string | null;
   navigationTarget?: unknown;
+  /** Present for Claude Desktop Code Project threads. */
+  desktopProject?: DesktopProjectSession;
   /** Authoritative client events, when the provider supplies them; absent is unknown. */
   liveFacts?: SessionLiveFacts;
 }
@@ -1077,6 +1096,8 @@ export interface SessionsResponse {
   /** Scope/root facets before source, project and search filters are applied. */
   sources: string[];
   projects: (string | null)[];
+  /** Readable labels for stable local Project keys. */
+  projectLabels?: Record<string, string>;
 }
 export type NativeMethod =
   | "snapshot"

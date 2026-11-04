@@ -397,11 +397,24 @@ impl crate::AgentHudCore {
             let extras = self
                 .hook_events
                 .extra_sessions(now, 1, &self.known_sessions());
-            sessions.extend(extras.into_iter().filter(|value| {
-                self.enabled
-                    .get(value["source"].as_str().unwrap_or(""))
-                    .copied()
-                    .unwrap_or(true)
+            sessions.extend(
+                extras
+                    .into_iter()
+                    .filter(|value| {
+                        self.enabled
+                            .get(value["source"].as_str().unwrap_or(""))
+                            .copied()
+                            .unwrap_or(true)
+                    })
+                    .map(|row| self.protect_claude_project_extra(row)),
+            );
+        }
+        if self.enabled.get("claude").copied().unwrap_or(true) {
+            sessions.extend(self.claude_project_rows().into_iter().filter(|row| {
+                row["lastMessageAt"]
+                    .as_str()
+                    .and_then(metering::date_ms)
+                    .is_some_and(|timestamp| timestamp >= presented_at - 86_400_000)
             }));
         }
         presentation::sort_sessions(&mut sessions);
@@ -437,6 +450,7 @@ impl crate::AgentHudCore {
         let family = session_breakdown::Family::new(&every);
         let rows = logs
             .iter()
+            .filter(|log| !self.is_claude_project_worker(log))
             .filter(|log| {
                 presentation.recent(
                     log,

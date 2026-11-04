@@ -138,6 +138,7 @@ pub struct AgentHudCore {
     /// (`render_if_changed`).
     render: snapshot::Rendered,
     claude_desktop: crate::clients::claude_desktop::ClaudeDesktop,
+    claude_projects_supported: bool,
     /// The host's way into a session (`replies`); None in the public build.
     session_replies: Option<std::sync::Arc<dyn replies::SessionReplies>>,
     /// The store that keeps conversations (`conversation_feed`); None in the
@@ -249,6 +250,7 @@ impl AgentHudCore {
             metrics_clock: None,
             render: Default::default(),
             claude_desktop: Default::default(),
+            claude_projects_supported: false,
             session_replies: None,
             conversation_sink: None,
             conversation_positions: None,
@@ -293,6 +295,16 @@ impl AgentHudCore {
     /// The Claude desktop app's data folders on this host, beyond the macOS default.
     pub fn set_claude_desktop_bases(&mut self, bases: Vec<PathBuf>) {
         self.claude_desktop.index.set_bases(bases);
+    }
+
+    /// Enable Project projection only when this host can return to its threads.
+    pub fn set_claude_projects_supported(&mut self, supported: bool) {
+        if self.claude_projects_supported != supported {
+            self.claude_projects_supported = supported;
+            self.projection_sources = self.projection_sources.wrapping_add(1);
+            self.sessions_checked = None;
+            self.render.last = None;
+        }
     }
 
     /// Whether logs are still waiting to be read: while indexing, the

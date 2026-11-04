@@ -120,8 +120,15 @@ impl NativePlatform {
     pub fn claude_desktop_bases(&self) -> Vec<PathBuf> {
         os::claude_desktop_bases(&self.home, &std::env::vars().collect::<os::Environment>())
     }
+    pub fn claude_projects_supported(&self) -> bool {
+        clients::claude::PROJECTS_SUPPORTED
+    }
     /// The core resolves a known session and validates source membership before this call.
     pub fn navigate_session(&self, target: &serde_json::Value) -> Result<bool, String> {
+        if target["kind"] == "claude-project-thread" {
+            return navigation::session_url(target)
+                .map_or(Ok(false), |url| clients::claude::open_project(&url));
+        }
         if matches!(
             target["kind"].as_str(),
             Some("claude-background-job" | "claudeBackgroundJob")
