@@ -9,30 +9,15 @@ import {
   type BotSign,
   type BotState,
 } from "./bot-state";
-import { ClawdPlayer, type ClawdPlayerOptions } from "./clawd-player";
-import { canonicalClawdFrame, type ClawdSheet } from "./clawd";
+import { ClawdPlayer } from "./clawd-player";
+import { SplitMix } from "./bot-motion";
 import type { ClawdLook } from "./clawd-clips";
 
 const onGrid = (time: number) => Math.ceil((time - 0.004) * 12) / 12;
 const following = (time: number) => (Math.floor((time + 0.004) * 12) + 1) / 12;
-const mask64 = (1n << 64n) - 1n;
-function splitMix(seed: bigint) {
-  let state = seed;
-  return () => {
-    state = (state + 0x9e3779b97f4a7c15n) & mask64;
-    let z = state;
-    z = ((z ^ (z >> 30n)) * 0xbf58476d1ce4e5b9n) & mask64;
-    z = ((z ^ (z >> 27n)) * 0x94d049bb133111ebn) & mask64;
-    z ^= z >> 31n;
-    return Number(z >> 11n) / 9007199254740992;
-  };
-}
-export interface ClawdPerformerOptions extends ClawdPlayerOptions {
-  sheet?: ClawdSheet;
+export interface ClawdPerformerOptions {
   staysBot?: boolean;
   arrivesAfter?: number;
-  seed?: number | bigint;
-  random?: () => number;
 }
 
 /** Full ClawdPerformer.swift: presentation inputs never restart a clip already acting out that look. */
@@ -51,7 +36,7 @@ export class ClawdPerformer {
   private watching = false;
   private asked: { event: BotEvent; at: number } | null = null;
   private lastCue: BotCue | null = null;
-  private readonly random: () => number;
+  private readonly random = new SplitMix();
 
   constructor(options: ClawdPerformerOptions = {}) {
     this.staysBot = options.staysBot ?? false;
@@ -59,23 +44,7 @@ export class ClawdPerformer {
       ? Math.max(0, options.arrivesAfter ?? 0)
       : 0;
     this.onStage = !this.staysBot;
-    const canonical =
-      options.canonical ??
-      (options.sheet
-        ? (frame) => canonicalClawdFrame(options.sheet!, frame)
-        : undefined);
-    this.player = new ClawdPlayer({
-      clips: options.clips,
-      canonical,
-      rest: this.staysBot ? "standing" : "logo",
-    });
-    this.random =
-      options.random ??
-      splitMix(
-        BigInt(
-          options.seed ?? Math.floor(Math.random() * Number.MAX_SAFE_INTEGER),
-        ),
-      );
+    this.player = new ClawdPlayer(this.staysBot ? "standing" : "logo");
   }
   get picture() {
     return this.onStage ? this.player.picture : null;
@@ -171,7 +140,7 @@ export class ClawdPerformer {
       this.player.visit(
         this.state.look === "asleep"
           ? "dozing"
-          : idle[Math.floor(this.random() * idle.length)],
+          : idle[Math.floor(this.random.unit() * idle.length)],
         now,
       );
       this.visiting = this.player.picture !== null;
@@ -231,8 +200,8 @@ export class ClawdPerformer {
     this.nextVisit = onGrid(
       now +
         (this.state.look === "asleep"
-          ? 180 + this.random() * 120
-          : 20 + this.random() * 15),
+          ? 180 + this.random.unit() * 120
+          : 20 + this.random.unit() * 15),
     );
   }
   private letGoOfStaleEvent(now: number) {

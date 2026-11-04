@@ -296,4 +296,3 @@ export const clawdClips = {
     ClawdOffset
   >,
 };
-export type ClawdClips = typeof clawdClips;

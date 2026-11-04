@@ -12,7 +12,6 @@ interface Seen {
   sign?: BotSign;
 }
 export interface ClawdActorOptions extends ClawdPerformerOptions {
-  showing?: boolean;
   resumes?: boolean;
   restsHidden?: boolean;
 }
@@ -48,7 +47,7 @@ export class ClawdActor {
   static readonly fade = 0.3;
   static readonly keepsFrames = 60;
   readonly performer: ClawdPerformer;
-  baker: ClawdBaker | null;
+  baker: ClawdBaker | null = null;
   restsHidden: boolean;
   private seen: Seen | null;
   private back: Seen | null = null;
@@ -62,10 +61,9 @@ export class ClawdActor {
 
   constructor(options: ClawdActorOptions = {}) {
     this.performer = new ClawdPerformer(options);
-    this.baker = options.sheet ? new ClawdBaker(options.sheet) : null;
     this.restsHidden = options.restsHidden ?? true;
     this.resumes = options.resumes ?? false;
-    this.seen = options.showing || this.resumes ? null : logo;
+    this.seen = this.resumes ? null : logo;
   }
   get state() {
     return this.performer.state;

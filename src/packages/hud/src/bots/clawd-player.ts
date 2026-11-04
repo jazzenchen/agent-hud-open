@@ -10,7 +10,6 @@ import {
   zeroOffset,
   type ClawdCard,
   type ClawdClip,
-  type ClawdClips,
   type ClawdEvent,
   type ClawdFrame,
   type ClawdLook,
@@ -40,11 +39,6 @@ type Activity =
   | { kind: "resting" | "visit" | "greeting" | "gazing" | "card" | "at-card" }
   | { kind: "entering" | "looping" | "leaving"; shown: Shown }
   | { kind: "event"; event: ClawdEvent; resume: Shown | null };
-export interface ClawdPlayerOptions {
-  clips?: ClawdClips;
-  canonical?: (frame: ClawdFrame) => ClawdFrame;
-  rest?: "logo" | "standing";
-}
 const tickAt = (time: number) => Math.floor((time + 0.004) * 12);
 const frameStep = (
   frame: ClawdFrame | null,
@@ -55,9 +49,9 @@ const samePicture = (a: SpritePicture | null, b: SpritePicture | null) =>
 
 /** Full source ClawdPlayer: clips, not renders, own every state transition on the absolute 12fps grid. */
 export class ClawdPlayer {
-  readonly clips: ClawdClips;
+  readonly clips = clawdClips;
   readonly restMode: "logo" | "standing";
-  private canonical: (frame: ClawdFrame) => ClawdFrame;
+  private canonical = (frame: ClawdFrame) => frame;
   target: ClawdLook | null = null;
   subagents = false;
   pendingEvent: ClawdEvent | null = null;
@@ -72,10 +66,8 @@ export class ClawdPlayer {
   private showing: boolean;
   private appearanceSince = 0;
 
-  constructor(options: ClawdPlayerOptions = {}) {
-    this.clips = options.clips ?? clawdClips;
-    this.restMode = options.rest ?? "logo";
-    this.canonical = options.canonical ?? ((frame) => frame);
+  constructor(rest: "logo" | "standing") {
+    this.restMode = rest;
     this.script = [this.restStep()];
     this.showing = this.restMode === "standing";
   }
@@ -341,11 +333,8 @@ export class ClawdPlayer {
     return null;
   }
   private clone() {
-    const probe = new ClawdPlayer({
-      clips: this.clips,
-      canonical: this.canonical,
-      rest: this.restMode,
-    });
+    const probe = new ClawdPlayer(this.restMode);
+    probe.canonical = this.canonical;
     probe.target = this.target;
     probe.subagents = this.subagents;
     probe.pendingEvent = this.pendingEvent;
