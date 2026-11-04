@@ -2,114 +2,15 @@
 //! display preferences and the agents its strip draws. Settings planned the
 //! windows while it stayed open; the app plans them itself, so Settings can close.
 use super::{
-    configure_display, display_catalog, reconcile, Display, Edge, HudConfig, HudMonitor, Mode, Rect,
+    configure_display, display_catalog, reconcile, Display, Edge, HudConfig, HudMonitor, Mode,
+    Rect, Screen,
 };
 use crate::vendors;
 use serde_json::{json, Value};
-use std::{
-    collections::{HashMap, HashSet},
-    sync::OnceLock,
-};
+use std::collections::{HashMap, HashSet};
 
 /// HUD_METRICS.expandedFlare: the open panel's flare on each side.
 const EXPANDED_FLARE: f64 = 16.0;
-
-fn defaults() -> &'static Value {
-    static DEFAULTS: OnceLock<Value> = OnceLock::new();
-    DEFAULTS.get_or_init(|| {
-        serde_json::from_str(include_str!(
-            "../../../../packages/protocol/hud-defaults.json"
-        ))
-        .expect("checked-in HUD defaults")
-    })
-}
-
-/// A screen's display preferences as its HUD draws them (use-hud-config.ts
-/// `getScreenHUDConfig`): the screen's own, else the screens' defaults, else the
-/// app's; a value of the wrong type is no value.
-pub(crate) struct Screen<'a> {
-    view: &'a Value,
-    id: &'a str,
-    has_notch: bool,
-}
-
-impl<'a> Screen<'a> {
-    /// `view` is the presentation owner's view, drafts included.
-    pub(crate) fn new(view: &'a Value, id: &'a str, has_notch: bool) -> Self {
-        Self {
-            view,
-            id,
-            has_notch,
-        }
-    }
-
-    fn value(&self, key: &str) -> Value {
-        let fallback = &defaults()[key];
-        let fits = |value: &&Value| match fallback {
-            Value::Number(_) => value.as_f64().is_some_and(f64::is_finite),
-            Value::Bool(_) => value.is_boolean(),
-            Value::String(_) => value.is_string(),
-            _ => false,
-        };
-        let store = &self.view["store"];
-        [
-            &store["screens"][self.id][key],
-            &store["screenDefaults"][key],
-        ]
-        .into_iter()
-        .find(fits)
-        .cloned()
-        .unwrap_or_else(|| match key {
-            "mode" => json!(if self.has_notch { "notch" } else { "logos" }),
-            _ => fallback.clone(),
-        })
-    }
-
-    fn number(&self, key: &str) -> f64 {
-        self.value(key).as_f64().unwrap_or(0.0)
-    }
-
-    fn flag(&self, key: &str) -> bool {
-        self.value(key).as_bool().unwrap_or(false)
-    }
-
-    pub(crate) fn text(&self, key: &str) -> String {
-        self.value(key).as_str().unwrap_or("").to_owned()
-    }
-
-    /// How the screen's Simple marks draw usage, read as Settings reads it.
-    fn simple_style(&self) -> &'static str {
-        let store = &self.view["store"];
-        agent_hud_hud::presentation::simple_style([
-            &store["screens"][self.id],
-            &store["screenDefaults"],
-        ])
-    }
-
-    pub(crate) fn mode(&self) -> Mode {
-        serde_json::from_value(self.value("mode")).unwrap_or(if self.has_notch {
-            Mode::Notch
-        } else {
-            Mode::Logos
-        })
-    }
-
-    pub(crate) fn mode_name(&self) -> &'static str {
-        match self.mode() {
-            Mode::Notch => "notch",
-            Mode::Logos => "logos",
-            Mode::Simple => "simple",
-        }
-    }
-
-    /// The panel layout the screen draws: its own, else the shared one.
-    pub(crate) fn layout(&self) -> &'a Value {
-        match &self.view["layouts"][self.id] {
-            Value::Null => &self.view["sharedLayout"],
-            layout => layout,
-        }
-    }
-}
 
 /// The resting strip's width in points (geometry.ts `stripMetrics`).
 fn strip_width(
@@ -331,63 +232,5 @@ impl Planner {
         }
     }
 }
-
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn view(screen: Value, layout: Value) -> Value {
-        json!({"store": {"screens": {"a": screen}, "screenDefaults": {}}, "layouts": {"a": layout}, "sharedLayout": {}})
-    }
-
-    #[test]
-    fn a_screen_reads_its_own_value_then_the_defaults() {
-        let shared = json!({"store": {"screens": {}, "screenDefaults": {"edge": "left"}}, "layouts": {}, "sharedLayout": {"style": {"width": 600}}});
-        let screen = Screen::new(&shared, "a", false);
-        assert!(screen.mode() == Mode::Logos);
-        assert!(Screen::new(&shared, "a", true).mode() == Mode::Notch);
-        assert_eq!(screen.text("edge"), "left");
-        assert_eq!(screen.layout()["style"]["width"], 600);
-        let own = view(
-            json!({"mode": "simple", "offset": "far", "logoSize": 30}),
-            json!({"hud": {}}),
-        );
-        let screen = Screen::new(&own, "a", true);
-        assert!(screen.mode() == Mode::Simple);
-        // A value of the wrong type falls back to the default.
-        assert_eq!(screen.number("offset"), 0.5);
-        assert_eq!(screen.number("logoSize"), 30.0);
-        assert_eq!(screen.layout(), &json!({"hud": {}}));
-    }
-
-    #[test]
-    fn a_strip_is_as_wide_as_geometry_ts_draws_it() {
-        let defaults = view(json!({}), json!({}));
-        let screen = Screen::new(&defaults, "a", false);
-        let labels = |n: usize| vec!["72%".to_owned(); n];
-        assert_eq!(
-            strip_width(&screen, Mode::Notch, Edge::Top, &labels(3), 185.0),
-            185.0
-        );
-        // Logos: 20 pt marks 8 pt apart, or one 24 pt column on a side.
-        assert_eq!(
-            strip_width(&screen, Mode::Logos, Edge::Top, &labels(3), 0.0),
-            76.0
-        );
-        assert_eq!(strip_width(&screen, Mode::Logos, Edge::Top, &[], 0.0), 32.0);
-        assert_eq!(
-            strip_width(&screen, Mode::Logos, Edge::Left, &labels(3), 0.0),
-            24.0
-        );
-        // Simple, 22 pt with rings and numbers: 5 + 3 × (22 + 5 + 21) + 2 × 10 + 10,
-        // or a column as wide as its widest row and 3 pt of margin.
-        assert_eq!(
-            strip_width(&screen, Mode::Simple, Edge::Top, &labels(3), 0.0),
-            179.0
-        );
-        assert_eq!(
-            strip_width(&screen, Mode::Simple, Edge::Right, &labels(3), 0.0),
-            66.0
-        );
-    }
-}
+mod tests;
