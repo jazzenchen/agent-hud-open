@@ -5,6 +5,7 @@ mod rules;
 mod simple_style;
 mod style_rules;
 mod tools;
+mod tree;
 pub use rules::{mark, resting_agents};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value};

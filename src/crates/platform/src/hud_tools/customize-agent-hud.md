@@ -1,6 +1,6 @@
 ---
 name: customize-agent-hud
-description: Rearrange or restyle Agent HUD, the notch or dock HUD on the Mac and its hover panel, with Agent HUD's HUD tools (get_hud, draft_hud, get_hud_screenshot, discard_hud_draft, finish_hud_edit). Use it when the person asks to change, customize, tidy, simplify, reorder, hide or show anything in Agent HUD, such as quota or balance blocks, rows, accounts, widgets (bar, rings, segments, number, chart), panel sections, the sessions or token lists, panel width or spacing, or the resting HUD's mode (notch, dynamic, simple), edge, position, size, glow, appearance or transparency. It also covers hover timing and other app settings when the person asks for them. Use it for "make the HUD smaller", "show only Codex", "move the HUD to the left", "改一下 HUD", "刘海/动态/简约模式", and to explain what the HUD shows now or why a change was refused. Your changes are drafts, and only the person can save them in the panel.
+description: Rearrange, restyle or add to Agent HUD, the notch or dock HUD at the screen's edge and its hover panel, with Agent HUD's HUD tools (get_hud, draft_hud, get_hud_screenshot, discard_hud_draft, finish_hud_edit). Use it when the person asks to change, customize, tidy, reorder, hide or show anything in Agent HUD, such as quota or balance blocks, rows, accounts, widgets (bar, rings, segments, number, chart), panel sections, the sessions or token lists, panel width or spacing, controls of their own in the panel (a clock, a list, a picker, text), or the resting HUD's mode (notch, dynamic, simple), usage style, edge, position, size, glow, appearance or transparency. Also hover timing and other app settings when asked. Use it for "make the HUD smaller", "show only Codex", "add a clock", "改一下 HUD", "换成年轮/分段环", "刘海/动态/简约模式", and to explain what the HUD shows or why a change was refused. Changes are drafts that only the person can save.
 metadata:
   managed-by: agent-hud
 ---
@@ -28,53 +28,59 @@ Agent HUD adds its tools to this client as an MCP server named `agent-hud`. This
 
 1. **Read** with `get_hud` (pass `screen` to read one display). Keep these fields:
    - `revision`
-   - `layout`: what that scope draws now, drafts included
-   - `blocks[]`: `key`, `kind` (quota or balance), `widgets`, `measures`, `rows[].id`, `accounts[].id`
+   - `panel`: the hover panel as a tree of nodes, drafts included. Each node has an `id`, a `type` and its fields.
+   - `catalog`: every control, data field, placeholder format, click action and edit step the tree can hold, with examples. It is the reference for building the tree; read it before adding controls.
+   - `blocks[]`: each block's `rows[].id`, `accounts[].id`, `widgets` and `measures`
    - `screens[]`: `key`, `hasNotch`, `primary`, `hud` (the current style), `held`
-   - `sessions.offeredAgents` and `sessions.offeredProjects`
-   - `tokens.offeredAgents` and `tokens.offeredModels`
+   - `sessions.offeredAgents`, `sessions.offeredProjects`, `tokens.offeredAgents` and `tokens.offeredModels`
    - `app`, `unsaved` and `drafts`
 
-   The reply is large, mostly because of `sessions.rows`. If your client writes it to a file, pull out these fields (with `jq`, for example) rather than reading the whole file.
-2. **Build one whole proposal:**
-   - **Layout:** start from the `layout` that `get_hud` returned, change only what was asked, and send all of it back. A layout field you leave out returns to its default.
+   The reply is large, mostly because of `sessions.rows`. If your client writes it to a file, pull out these fields (with `jq`, for example) rather than reading the whole file. `layout` is the same panel in an older spelling; you do not need it.
+2. **Build the change:**
+   - **Panel:** write `edit`, a list of steps that each name a node by its `id`. Change only what was asked; everything you do not name stays. `{"update": "claude", "widget": "rings"}` sets fields, `insert` adds a control, `move` reorders, `remove` deletes your own control or hides one of the panel's own parts, `replace` swaps your own control. Sending the whole tree back as `panel` works too.
    - **HUD style:** each style call replaces that display's style draft. Send every style field that should differ from what is saved, including the ones from your earlier style draft, which would otherwise be dropped. A style field you leave out keeps its saved value. `screens[].hud` shows the style with drafts included, and `store.screens` the saved one.
-3. **Propose** with `draft_hud`, passing `screen`, the `revision` you read and the proposal.
+3. **Propose** with `draft_hud`, passing `screen`, the `revision` you read and `edit` (or `panel`), `hud` or both.
 4. **Read the `note`** in the reply. It says where the draft shows and what happened.
 5. **Look** with `get_hud_screenshot` when the result matters visually, then iterate.
 6. **Finish** with `finish_hud_edit`, which lets the panel close. Then tell the person in plain words what changed and that it waits for them to hover the HUD and press Save. If they want your draft gone, use `discard_hud_draft` for that `screen`. It drops that scope's layout and style drafts and keeps the app draft.
 
+## The panel tree
+
+- **The panel's own parts:** the root `panel` (spacing, separators, width, countdown), its sections `blocks`, `tokens` and `sessions`, and inside `blocks` one `quota` or `balance` block per agent, named by its block key (`claude`, `codex`, `api:deepseek`). They cannot be deleted; `hidden: true` hides one. Their fields are in `catalog.own`.
+- **Your own controls:** from `catalog.controls`: `row`, `column`, `grid`, `repeat`, `text`, `logo`, `bar`, `rings`, `segments`, `chart`, `divider` and `picker`. Put one in `panel` as a section of its own, or in `blocks` among the agents' blocks. A control placed there needs an `id`.
+- **Data:** text reads data through placeholders: `{window.used}`, `{session.title}`, `{now.time|clock}`. A `repeat` over `windows`, `balances`, `accounts`, `agents` or `sessions` draws its children once per item, and inside it the item is named `window`, `balance`, `account`, `agent` or `session`. `where`, `sort` and `limit` choose the items. Match windows by `agent` and `kind` (such as `claude-session`), not by account ids, so the panel works on any computer.
+- **Clicks:** `onClick` opens Statistics, a session, a Settings page or a web address, sets or steps a `state` the control placed in the panel declares, or copies text. A `picker` shows a state's options.
+- **Checks:** a draft that cannot be drawn is refused whole; the error lists every reason with the values that would work. Fix them all and send again.
+
+### Words people use
+
+| The person says | What it is |
+| --- | --- |
+| 年轮, concentric rings | `rings`: a block's `widget` in the panel, or `hud.simpleStyle` on the resting HUD |
+| 分段环, 组合圆, split ring | `segments`, in the same two places |
+| 进度条, bars | a block's `widget` `bar`, or `hud.simpleStyle` `bars` |
+| 数字, numbers | a block's `widget` `number`, or `hud.simpleStyle` `numbers` |
+| 用量画法 (Settings, Simple mode) | `hud.simpleStyle` |
+| 刘海 / 动态 / 简约 | `hud.mode` `notch` / `dynamic` / `simple` |
+| 悬停面板, the panel, 展开后 | the `panel` tree |
+| 会话列表 / Token 图 / 额度 | the `sessions` / `tokens` sections, the quota blocks |
+
+The same style name can mean the resting HUD or the panel. When the person talks about the logos at the screen's edge, or Simple mode, change `hud.simpleStyle` for that display. When they talk about the panel that opens on hover, change the block's `widget`. If it is unclear, ask which one.
+
+### Examples
+
+- "Show Claude as rings in the panel": `{"edit": [{"update": "claude", "widget": "rings"}]}`
+- "简约模式换成年轮": `{"screen": "<display key>", "hud": {"mode": "simple", "simpleStyle": "rings"}}`. `simpleStyle` draws only in Simple mode, so send `mode` too unless `screens[].hud.mode` is already `simple`.
+- "Hide Codex and put Cursor first": `{"edit": [{"update": "codex", "hidden": true}, {"move": "cursor", "before": "claude"}]}`
+- "Add a clock above the agents": `{"edit": [{"insert": {"id": "clock", "type": "text", "text": "{now.time|clock}", "style": "title"}, "into": "blocks", "at": 0}]}`
+- "A list of the windows that are nearly used up, above the token chart": `{"edit": [{"insert": {"id": "tight", "type": "column", "children": [{"type": "repeat", "over": "windows", "where": {"level": ["warning", "critical"]}, "sort": "-used", "limit": 5, "children": [{"type": "row", "align": "spread", "children": [{"type": "text", "text": "{window.agent} {window.short}"}, {"type": "text", "text": "{window.used}", "color": "level"}]}]}]}, "before": "tokens"}]}`
+
 ## draft_hud fields
 
-**Layout:**
+**Panel:** `edit` or `panel`, as above. Every field of the panel's own parts and of your controls is in `get_hud`'s `catalog`. Two more layout fields stay outside the tree:
 
-- `order`: block keys, top first.
-- `sections`: the order of `"blocks"`, `"tokens"` and `"sessions"`. `hiddenSections` hides some of them.
-- `countdown`: `false` hides the reset countdowns.
-- `blocks.<key>` takes these fields:
-  - `widget`: `bar`, `rings`, `segments`, `number` or `chart`. `rings` draws an account's windows as concentric rings, the first outermost; `segments` splits one ring into a segment per window (two: top and bottom; three: thirds; four: quarters), the first on top. Both show at most four windows, with a legend of every window beside the ring. Balances (`api:…`) take only `number` or `chart`.
-  - `measures`: from `quota`, `burn`, `tokens`, `consumed` and `cost`. A quota `chart` takes only `tokens`. A balance `number` takes `quota`, `burn` and `cost`, and a balance `chart` takes `cost`.
-  - `hidden`
-  - `rows` sets the order of row ids, and `hiddenRows` hides rows.
-  - `accounts` shows only the accounts listed, and `hiddenAccounts` hides accounts. Use `accounts[].id`.
-  - `countdown`: quota blocks only.
-  - `columns`: 2–6, for a quota block's `number`.
-  - `ringSize`: `small`, `medium` or `large`, for `rings` and `segments`.
-  - `span`: `full` or `half`. Bar rows cannot be `half`.
-  - `period`: `day`, `week` or `month`, for a quota `chart` or a balance.
-- `style`:
-  - `spacing`: `compact`, `regular` or `roomy`
-  - `separators`
-  - `width`: 480–720 (default 540)
-- `sessions`:
-  - `limit`: 1–10 (default 5)
-  - `period`: `day` or `week`
-  - `agents`: names from `offeredAgents`
-  - `projects`: an id from `offeredProjects`, or a path inside one
-- `tokens`:
-  - `period`: `day`, `week` or `month`
-  - `agents` and `models`: names from `tokens.offered*`
-- `hud.agents`: the agents the resting HUD shows. This is a layout field, so it is allowed with `"all"`.
+- `hud.agents`: the agents the resting HUD shows. It is a layout field, so it is allowed with `"all"`, and it stays as it is unless you send it.
+- The older spelling (`order`, `sections`, `blocks`, `style`, `sessions`, `tokens`) still works, but not together with `edit` or `panel`.
 
 **HUD style (display key only), under `hud`:**
 
@@ -115,8 +121,9 @@ Agent HUD adds its tools to this client as an MCP server named `agent-hud`. This
 - **What kind of call it is:**
   - Only HUD style fields: only the style changes. The layout is untouched, and the panel closes so the restyled HUD is visible.
   - Only `app`: only the app draft changes.
-  - Anything else is a layout proposal, `hud.agents` included. It replaces the whole layout of that scope. For a display, any pending style draft you do not send again is dropped, so send layout and style together when you want both.
+  - Anything else is a layout proposal, `edit`, `panel` and `hud.agents` included. It becomes the whole layout draft of that scope. For a display, any pending style draft you do not send again is dropped, so send layout and style together when you want both.
 - **Sending back what is saved leaves no draft.** The note says so.
+- **Edits apply in order** to the tree as it is now, drafts included; every step that cannot be done is a reason, and then nothing is changed.
 - **A refused call changes nothing.** The error starts with `Nothing was changed.` and lists every reason, with the valid keys or values. Fix all of them and send again.
 - **"The layout changed since you read it":** call `get_hud` again, rebuild the proposal, then propose.
 - **Displays with their own layout do not show a shared (`"all"`) draft.** The note names them. Draft for that display's key instead, or use `from: "shared"`.

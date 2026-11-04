@@ -177,7 +177,7 @@ impl Kind {
         self.widgets()[0]
     }
     /// The widget that draws a block a layout asks to draw with `asked`.
-    fn widget(self, asked: Option<&str>) -> &'static str {
+    pub(super) fn widget(self, asked: Option<&str>) -> &'static str {
         asked
             .and_then(|asked| self.widgets().iter().find(|w| **w == asked).copied())
             .unwrap_or(self.default_widget())
@@ -376,13 +376,21 @@ fn parse_block(block: &Value) -> Map<String, Value> {
 pub(super) fn normalize_layout(value: &Value) -> Result<Value, String> {
     object(value, "layout")?;
     let mut out = Map::new();
+    // An agent's own controls, by id; `sections` and `order` place them.
+    let custom: Map<String, Value> = value["custom"]
+        .as_object()
+        .into_iter()
+        .flatten()
+        .filter(|(id, node)| !id.is_empty() && node["type"].is_string())
+        .map(|(id, node)| (id.clone(), node.clone()))
+        .collect();
     let order = strings(&value["order"]);
     if !order.is_empty() {
         out.insert("order".into(), json!(order));
     }
     let mut sections: Vec<String> = strings(&value["sections"])
         .into_iter()
-        .filter(|s| SECTIONS.contains(&s.as_str()))
+        .filter(|s| SECTIONS.contains(&s.as_str()) || custom.contains_key(s))
         .collect();
     for section in SECTIONS {
         push_unique(&mut sections, section);
@@ -482,6 +490,9 @@ pub(super) fn normalize_layout(value: &Value) -> Result<Value, String> {
     }
     if !v.is_empty() {
         out.insert("tokens".into(), Value::Object(v));
+    }
+    if !custom.is_empty() {
+        out.insert("custom".into(), Value::Object(custom));
     }
     Ok(Value::Object(out))
 }
@@ -651,7 +662,10 @@ pub(super) fn issues(document: &Value, present: &[Block], held: &[Value]) -> Vec
         .enumerate()
     {
         let Some(key) = key.as_str() else { continue };
-        if !keys.contains(&key) && !held_keys.iter().any(|k| k == key) {
+        if !keys.contains(&key)
+            && !held_keys.iter().any(|k| k == key)
+            && document["custom"].get(key).is_none()
+        {
             found.push(format!(
                 "order[{index}]: No block has the key \"{key}\". {unknown}"
             ));
@@ -726,9 +740,7 @@ fn block_issues(
             };
             format!("{balance}, drawn as {drawn_as}, which has no cells to set in columns.")
         } else {
-            format!(
-                "{drawn} draws no cells. columns applies to the \"ring\" and \"number\" widgets."
-            )
+            format!("{drawn} draws no cells. columns applies to the \"number\" widget.")
         };
         found.push(format!("{path}.columns: {message}"));
     }
@@ -736,12 +748,12 @@ fn block_issues(
         let message = if kind == Kind::Balance {
             format!("{balance}, which draws no ring.")
         } else {
-            format!("{drawn} draws no ring. ringSize applies to the \"ring\" widget.")
+            format!("{drawn} draws no ring. ringSize applies to the \"rings\" and \"segments\" widgets.")
         };
         found.push(format!("{path}.ringSize: {message}"));
     }
     if change["span"] == "half" && !kind.takes_half(widget) {
-        found.push(format!("{path}.span: Bar rows need the full width of the panel, so the \"{widget}\" widget of \"{key}\" cannot take half a line. span \"half\" applies to the \"ring\", \"number\" and \"chart\" widgets and to API balances."));
+        found.push(format!("{path}.span: Bar rows need the full width of the panel, so the \"{widget}\" widget of \"{key}\" cannot take half a line. span \"half\" applies to the \"rings\", \"segments\", \"number\" and \"chart\" widgets and to API balances."));
     }
     if change["period"].is_string() && !kind.takes_period(widget) {
         found.push(format!("{path}.period: {drawn} draws no chart. period applies to the \"chart\" widget, whose bars cover it, and to API balances, whose estimated cost, burn rate and chart cover it."));
@@ -1026,7 +1038,15 @@ pub fn resting_agents(snapshot: &Value, mode: &str, now: i64) -> Vec<String> {
 /// `style_rules::misreadings`. A value given as null is not given.
 pub(super) fn misreadings(document: &Value) -> Vec<String> {
     let mut found = names(&document["order"], "order", None);
-    found.extend(names(&document["sections"], "sections", Some(SECTIONS)));
+    let mut sections: Vec<&str> = SECTIONS.to_vec();
+    sections.extend(
+        document["custom"]
+            .as_object()
+            .into_iter()
+            .flatten()
+            .map(|(id, _)| id.as_str()),
+    );
+    found.extend(names(&document["sections"], "sections", Some(&sections)));
     found.extend(names(
         &document["hiddenSections"],
         "hiddenSections",

@@ -46,6 +46,17 @@ export interface PanelLayout {
     modelOrder?: string[];
   };
   hud?: { agents?: string[] };
+  /** Controls an agent added from get_hud's catalog, by id; `sections` and `order`
+   * place them among the panel's sections or its blocks. */
+  custom?: Record<string, PanelNode>;
+}
+/** One control of an agent's own: its type, its fields and, for a row, column,
+ * grid or repeat, its children. */
+export interface PanelNode {
+  id?: string;
+  type: string;
+  children?: PanelNode[];
+  [field: string]: unknown;
 }
 export interface SourcePreferences {
   live?: boolean;

@@ -417,7 +417,7 @@ fn misreadings_are_refused_with_open_sentences() {
         &owner,
         json!({"style": {"appearance": "light", "width": 900}, "blocks": {"claude": {"colour": "red"}}, "wat": 1}),
     );
-    assert_eq!(error, "Nothing was changed. Unknown: \"wat\". It takes: \"blocks\", \"order\", \"sections\", \"hiddenSections\", \"countdown\", \"style\", \"hud\", \"sessions\", \"tokens\", \"app\", \"from\", \"revision\", \"screen\".");
+    assert_eq!(error, "Nothing was changed. Unknown: \"wat\". It takes: \"blocks\", \"order\", \"sections\", \"hiddenSections\", \"countdown\", \"style\", \"hud\", \"sessions\", \"tokens\", \"panel\", \"edit\", \"app\", \"from\", \"revision\", \"screen\".");
     let error = refused(
         &owner,
         json!({"style": {"appearance": "light", "width": 900}, "blocks": {"claude": {"colour": "red"}}}),
@@ -590,4 +590,279 @@ fn detected_clients_without_readings_have_configurable_empty_blocks() {
     ).unwrap();
     assert_eq!(proposed["layout"]["blocks"]["codex"]["hidden"], true);
     assert_eq!(proposed["blocks"][0]["hidden"], true);
+}
+
+// MARK: The panel as a tree
+
+fn layout(owner: &Presentation) -> Value {
+    call(owner, "get_hud", json!({"screen": "all"})).unwrap()["layout"].clone()
+}
+
+#[test]
+fn get_hud_shows_the_panel_as_a_tree_and_sending_it_back_changes_nothing() {
+    let (_folder, owner) = owner();
+    let read = call(&owner, "get_hud", json!({})).unwrap();
+    let panel = &read["panel"];
+    assert_eq!(panel["type"], "panel");
+    let sections: Vec<&str> = panel["children"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|c| c["id"].as_str().unwrap())
+        .collect();
+    assert_eq!(sections, ["blocks", "tokens", "sessions"]);
+    let blocks = &panel["children"][0]["children"];
+    assert_eq!(
+        blocks[0],
+        json!({"id": "claude", "type": "quota", "widget": "bar"})
+    );
+    assert_eq!(blocks[2]["id"], "api:deepseek");
+    assert_eq!(blocks[2]["type"], "balance");
+    assert!(read["catalog"]["controls"]["rings"].is_object());
+    let sent = draft(
+        &owner,
+        json!({"panel": panel, "revision": read["revision"]}),
+    );
+    assert_eq!(
+        sent["note"],
+        "This is the layout already saved, so there is no draft."
+    );
+    assert_eq!(drafts(&owner)["layouts"], json!([]));
+}
+
+#[test]
+fn edits_change_the_nodes_they_name() {
+    let (_folder, owner) = owner();
+    draft(
+        &owner,
+        json!({"edit": [
+            {"update": "claude", "widget": "rings", "ringSize": "large"},
+            {"move": "codex", "before": "claude"},
+            {"update": "sessions", "limit": 3},
+            {"update": "panel", "spacing": "compact"}
+        ]}),
+    );
+    let layout = layout(&owner);
+    assert_eq!(
+        layout["blocks"]["claude"],
+        json!({"widget": "rings", "ringSize": "large"})
+    );
+    assert_eq!(layout["order"], json!(["codex"]));
+    assert_eq!(layout["sessions"], json!({"limit": 3}));
+    assert_eq!(layout["style"], json!({"spacing": "compact"}));
+    // Removing one of the panel's own parts hides it, and says so.
+    let result = draft(&owner, json!({"edit": [{"remove": "tokens"}]}));
+    assert!(
+        result["note"]
+            .as_str()
+            .unwrap()
+            .contains("hidden, not deleted"),
+        "{result}"
+    );
+    assert_eq!(layout_of(&owner)["hiddenSections"], json!(["tokens"]));
+}
+
+fn layout_of(owner: &Presentation) -> Value {
+    layout(owner)
+}
+
+#[test]
+fn an_agents_own_controls_are_checked_kept_and_named_for_later_edits() {
+    let (_folder, owner) = owner();
+    let result = draft(
+        &owner,
+        json!({"edit": [{"insert": {"id": "clock", "type": "column", "children": [
+            {"type": "text", "text": "{now.time|clock}", "style": "title"},
+            {"type": "repeat", "over": "windows", "where": {"agent": "claude"}, "sort": "-used", "limit": 2, "children": [
+                {"type": "text", "text": "{window.short} {window.used}", "color": "level"}
+            ]}
+        ]}, "into": "blocks", "at": 0}]}),
+    );
+    assert!(
+        result["note"]
+            .as_str()
+            .unwrap()
+            .contains("does not draw them yet"),
+        "{result}"
+    );
+    let layout = layout(&owner);
+    assert_eq!(layout["order"][0], "clock");
+    let clock = &layout["custom"]["clock"];
+    assert_eq!(clock["children"][0]["id"], "clock-1");
+    assert_eq!(clock["children"][1]["children"][0]["id"], "clock-3");
+    // The tree shows it among the blocks, and its inner ids take edits.
+    let read = call(&owner, "get_hud", json!({})).unwrap();
+    assert_eq!(read["panel"]["children"][0]["children"][0]["id"], "clock");
+    draft(
+        &owner,
+        json!({"edit": [{"update": "clock-1", "style": "figure"}]}),
+    );
+    assert_eq!(
+        layout_of(&owner)["custom"]["clock"]["children"][0]["style"],
+        "figure"
+    );
+    // A proposal in the layout's own fields keeps the control where it stood.
+    draft(&owner, json!({"blocks": {"codex": {"hidden": true}}}));
+    let kept = layout_of(&owner);
+    assert_eq!(kept["order"][0], "clock");
+    assert_eq!(kept["custom"]["clock"]["children"][0]["style"], "figure");
+    assert_eq!(kept["blocks"]["codex"]["hidden"], true);
+}
+
+#[test]
+fn controls_that_read_what_is_not_there_are_refused_with_what_is() {
+    let (_folder, owner) = owner();
+    let error = refused(
+        &owner,
+        json!({"edit": [{"insert": {"id": "x", "type": "column", "children": [
+            {"type": "text", "text": "{window.used}"},
+            {"type": "repeat", "over": "windows", "children": [{"type": "text", "text": "{window.percent}"}]},
+            {"type": "bar", "value": 2},
+            {"type": "picker", "state": "tab", "options": [{"value": "a", "text": "A"}, {"value": "b", "text": "B"}]},
+            {"type": "button", "text": "hi"}
+        ]}, "after": "tokens"}]}),
+    );
+    assert!(
+        error.contains("window is read only inside a repeat over windows"),
+        "{error}"
+    );
+    assert!(
+        error.contains("a window has no field \"percent\""),
+        "{error}"
+    );
+    assert!(error.contains("is a share from 0 to 1"), "{error}");
+    assert!(error.contains("there is no state \"tab\""), "{error}");
+    assert!(error.contains("\"button\", which is no control"), "{error}");
+}
+
+#[test]
+fn a_tree_without_the_panels_own_parts_or_mixed_with_the_older_fields_is_refused() {
+    let (_folder, owner) = owner();
+    let read = call(&owner, "get_hud", json!({})).unwrap();
+    let mut panel = read["panel"].clone();
+    panel["children"].as_array_mut().unwrap().pop();
+    let error = refused(&owner, json!({"panel": panel}));
+    assert!(error.contains("no \"sessions\" section"), "{error}");
+    let error = refused(
+        &owner,
+        json!({"edit": [{"remove": "nothing"}], "order": ["codex"]}),
+    );
+    assert!(error.contains("spell the layout the older way"), "{error}");
+    let error = refused(&owner, json!({"edit": [{"remove": "nothing"}]}));
+    assert!(error.contains("no node has the id \"nothing\""), "{error}");
+    let error = refused(
+        &owner,
+        json!({"edit": [{"insert": {"id": "q", "type": "text", "text": "hi"}, "into": "claude"}]}),
+    );
+    assert!(error.contains("nothing goes into \"claude\""), "{error}");
+}
+
+#[test]
+fn a_click_needs_only_the_fields_its_action_takes() {
+    let (_folder, owner) = owner();
+    draft(
+        &owner,
+        json!({"edit": [{"insert": {"id": "open-token-stats", "type": "text", "text": "打开 Token 统计 →", "style": "body", "color": "agent", "align": "center", "onClick": {"open": "statistics", "tab": "tokens"}}, "after": "tokens"}]}),
+    );
+    assert_eq!(
+        layout_of(&owner)["custom"]["open-token-stats"]["onClick"],
+        json!({"open": "statistics", "tab": "tokens"})
+    );
+}
+
+/// Whatever an agent sends, the tools answer: a malformed node, edit or tree is
+/// refused, never a panic in the app.
+#[test]
+fn no_proposal_makes_the_tools_panic() {
+    let (_folder, owner) = owner();
+    let nodes = [
+        json!({"id": "a", "type": "text", "text": "x", "onClick": {"open": "session"}}),
+        json!({"id": "a", "type": "text", "text": "x", "onClick": {"open": "settings"}}),
+        json!({"id": "a", "type": "text", "text": "x", "onClick": {"open": "url"}}),
+        json!({"id": "a", "type": "text", "text": "x", "onClick": {"set": "tab"}}),
+        json!({"id": "a", "type": "text", "text": "x", "onClick": {"next": 7}}),
+        json!({"id": "a", "type": "text", "text": "x", "onClick": {"copy": 1}}),
+        json!({"id": "a", "type": "text", "text": "x", "onClick": {"open": 3, "set": "b"}}),
+        json!({"id": "a", "type": "text", "text": "x", "when": {"above": 1}}),
+        json!({"id": "a", "type": "text", "text": "x", "when": {"value": "{window.used}", "in": 4}}),
+        json!({"id": "a", "type": "row", "children": [1, "x", null, [], {"type": "repeat"}, {"type": "text"}]}),
+        json!({"id": "a", "type": "rings", "items": {"where": []}}),
+        json!({"id": "a", "type": "rings", "items": {"over": "windows", "where": {"nope": 1}, "limit": 9}}),
+        json!({"id": "a", "type": "picker", "state": 3, "options": [1, 2]}),
+        json!({"id": "a", "type": "repeat", "over": "windows", "where": {"used": {"a": 1}}, "sort": 5, "children": [{"type": "text", "text": "{window.}"}]}),
+        json!({"id": "a", "type": "text", "text": "}{", "state": "x", "span": 2}),
+        json!({"id": "a", "type": "column", "state": {"t": {"options": "x"}, "": {}, "u": 3}}),
+        json!({"id": "bad id", "type": "text", "text": "x"}),
+        json!({"id": "claude", "type": "text", "text": "x"}),
+        json!({"id": "a", "type": "quota"}),
+        json!("text"),
+        json!(null),
+        json!([1]),
+    ];
+    let places = [
+        json!({"into": "blocks"}),
+        json!({"into": "panel", "at": -1}),
+        json!({"into": "panel", "at": 99}),
+        json!({"before": "claude"}),
+        json!({"after": "panel"}),
+        json!({"into": "sessions"}),
+        json!({}),
+    ];
+    for node in &nodes {
+        for place in &places {
+            let mut step = place.as_object().unwrap().clone();
+            step.insert("insert".into(), node.clone());
+            let _ = call(&owner, "draft_hud", json!({"edit": [step]}));
+        }
+    }
+    let deep = (0..12).fold(
+        json!({"type": "text", "text": "x"}),
+        |inner, _| json!({"type": "column", "children": [inner]}),
+    );
+    let _ = call(
+        &owner,
+        "draft_hud",
+        json!({"edit": [{"insert": {"id": "deep", "type": "column", "children": [deep]}, "into": "panel"}]}),
+    );
+    for edit in [
+        json!({"update": "panel", "children": []}),
+        json!({"move": "panel", "into": "blocks"}),
+        json!({"move": "blocks", "into": "claude"}),
+        json!({"move": "claude", "before": "claude"}),
+        json!({"move": "tokens", "into": "blocks"}),
+        json!({"remove": "panel"}),
+        json!({"replace": "claude", "with": {}}),
+        json!({"replace": "nothing", "with": {"type": "text"}}),
+        json!({"update": "claude", "type": "x", "id": "y"}),
+        json!({"update": "claude", "widget": 4}),
+        json!({"update": "sessions", "limit": "x", "children": 1}),
+        json!({"insert": {"type": "text", "text": "x"}, "into": "blocks", "before": "claude"}),
+        json!({}),
+        json!(3),
+        json!({"update": 1}),
+        json!({"update": "claude", "remove": "codex"}),
+    ] {
+        let _ = call(&owner, "draft_hud", json!({"edit": [edit]}));
+    }
+    for panel in [
+        json!({}),
+        json!({"children": 5}),
+        json!({"type": "row", "children": []}),
+        json!({"type": "panel", "children": [{"id": "blocks", "children": 7}]}),
+        json!({"children": [{"id": "blocks", "type": "blocks", "children": [{"id": "claude", "type": "balance"}, {"type": "quota"}, {"id": "codex"}, {"id": "codex"}]}, {"id": "tokens"}, {"id": "sessions"}, {"id": "tokens"}, {"type": "sessions", "children": [1]}]}),
+        json!([]),
+        json!("panel"),
+    ] {
+        let _ = call(&owner, "draft_hud", json!({"panel": panel}));
+    }
+    for odd in [
+        json!({"edit": "x"}),
+        json!({"edit": [], "hud": "simple"}),
+        json!({"edit": [{"remove": "codex"}], "hud": {"agents": "x"}}),
+        json!({"panel": {}, "edit": []}),
+        json!({"edit": [], "from": "default"}),
+    ] {
+        let _ = call(&owner, "draft_hud", odd);
+    }
+    assert!(call(&owner, "get_hud", json!({})).is_ok());
 }

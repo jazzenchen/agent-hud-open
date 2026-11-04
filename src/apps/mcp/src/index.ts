@@ -21,12 +21,28 @@ const localWrite = {
   idempotentHint: true,
   openWorldHint: false,
 };
+/** A panel tree node with its id and type first and its children last, so the tree
+ * reads top down; the engine's JSON comes with its keys sorted. */
+const readable = (node: unknown): unknown => {
+  if (Array.isArray(node)) return node.map(readable);
+  if (typeof node !== "object" || node === null) return node;
+  const { id, type, children, ...rest } = node as Record<string, unknown>;
+  return {
+    ...(id === undefined ? {} : { id }),
+    ...(type === undefined ? {} : { type }),
+    ...Object.fromEntries(
+      Object.entries(rest).map(([key, value]) => [key, readable(value)]),
+    ),
+    ...(children === undefined ? {} : { children: readable(children) }),
+  };
+};
 const result = (data: unknown) => {
   const object =
     typeof data === "object" && data !== null
       ? (data as Record<string, unknown>)
       : { value: data };
   const { images, ...fields } = object;
+  if (fields.panel !== undefined) fields.panel = readable(fields.panel);
   const content: (
     | { type: "text"; text: string }
     | { type: "image"; data: string; mimeType: string }
@@ -251,6 +267,18 @@ const proposal = z
   .object({
     screen,
     revision: z.number().int().nonnegative().optional(),
+    edit: z
+      .array(z.record(z.string(), z.unknown()))
+      .optional()
+      .describe(
+        "Steps that change the panel tree get_hud returns as panel, each naming a node by its id: update, insert, move, remove or replace, as get_hud's catalog.edits shows. Everything not named stays.",
+      ),
+    panel: z
+      .record(z.string(), z.unknown())
+      .optional()
+      .describe(
+        "The whole panel tree, as get_hud returns it in panel, changed. Use it or edit, not both, and not with order, sections, blocks, style, sessions or tokens.",
+      ),
     from: z.enum(["default", "previous", "shared"]).optional(),
     order: keys.optional(),
     sections: z.array(z.enum(["blocks", "tokens", "sessions"])).optional(),
@@ -294,7 +322,7 @@ serveStdio(() => {
     "get_hud",
     {
       description:
-        "Read the current hover panel, exact block/account/row keys, attached screens, layout, resting HUD and app settings. Includes unsaved drafts. Call before editing; source keys remain valid when their readings temporarily disappear.",
+        "Read the current hover panel as a tree of controls (panel) with the catalog of every control, data field and action it can hold (catalog), plus exact block/account/row keys, attached screens, the layout, resting HUD and app settings. Includes unsaved drafts. Call before editing; source keys remain valid when their readings temporarily disappear.",
       inputSchema: z.object({ screen }).strict(),
       annotations: readOnly,
     },
@@ -304,7 +332,7 @@ serveStdio(() => {
     "draft_hud",
     {
       description:
-        "Propose a complete panel layout or one screen's HUD style. A proposal is shown immediately and is saved only when the user presses Save in the panel; it is discarded on restart. A proposal is whole: omitted layout fields use defaults, omitted HUD style fields keep saved values, and one that draws what is saved leaves no draft. A proposal the panel or the HUD cannot draw as asked is refused whole with every reason, and nothing is changed. from (default, previous or shared) proposes a version instead of a layout. app changes app settings only when explicitly requested by the user. Layout edits hold the panel open for two minutes; finish_hud_edit releases it.",
+        "Propose a change to the panel as edit steps on its tree (preferred), the whole tree as panel, a complete panel layout, or one screen's HUD style. A proposal is shown immediately and is saved only when the user presses Save in the panel; it is discarded on restart. Edit steps change only the nodes they name. Otherwise a proposal is whole: omitted layout fields use defaults, omitted HUD style fields keep saved values, and one that draws what is saved leaves no draft. A proposal the panel or the HUD cannot draw as asked is refused whole with every reason, and nothing is changed. from (default, previous or shared) proposes a version instead of a layout. app changes app settings only when explicitly requested by the user. Layout edits hold the panel open for two minutes; finish_hud_edit releases it.",
       inputSchema: checkedByTheApp(proposal),
       annotations: localWrite,
     },

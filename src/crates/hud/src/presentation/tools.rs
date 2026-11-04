@@ -6,7 +6,7 @@
 //! draft.
 use super::rules::{self, normalize_layout, quoted, same, strings};
 use super::*;
-use super::{app_rules, style_rules};
+use super::{app_rules, style_rules, tree};
 
 /// The keys of a layout in a proposal.
 const LAYOUT_KEYS: &[&str] = &[
@@ -22,6 +22,9 @@ const LAYOUT_KEYS: &[&str] = &[
 ];
 const DRAFT_NOTE: &str = "Shown in the panel as an unsaved draft. The user keeps it by hovering the Agent HUD and pressing Save in the panel; it is dropped when Agent HUD restarts.";
 const SAVED_NOTE: &str = "This is the layout already saved, so there is no draft.";
+const CUSTOM_NOTE: &str = "Your own controls are checked and kept with the layout, but this build does not draw them yet.";
+/// The two ways a proposal spells the panel as a tree: whole, or as edits of it.
+const TREE_KEYS: &[&str] = &["panel", "edit"];
 /// How long an edit holds a panel open, renewed by each edit.
 const HOLD_MS: i64 = 120_000;
 
@@ -363,6 +366,8 @@ fn listing(
     }
     view["screen"] = json!(id);
     view["layout"] = layout.clone();
+    view["panel"] = tree::tree(&layout, &rules::present_blocks(snapshot));
+    view["catalog"] = tree::catalog();
     view["blocks"] = json!(blocks(snapshot, &layout));
     view["app"] = app_listing(s, snapshot);
     view["appUnsaved"] = json!(s.app.is_some());
@@ -494,7 +499,11 @@ fn draft(
     let present = rules::present_blocks(snapshot);
     let checked = catalog.filter(|c| c["error"].is_null());
     if let Some(from) = params.get("from").filter(|v| !v.is_null()) {
-        if LAYOUT_KEYS.iter().any(|k| !params[*k].is_null()) {
+        if LAYOUT_KEYS
+            .iter()
+            .chain(TREE_KEYS)
+            .any(|k| !params[*k].is_null())
+        {
             return Err("Nothing was changed. Pass either from or a layout, not both.".into());
         }
         if !app.reasons.is_empty() {
@@ -570,13 +579,67 @@ fn draft(
         }
         return Ok(listing(s, id, snapshot, catalog, Some(&note)));
     }
-    let mut document = Value::Object(
-        arguments
+    let current = effective(s, id).clone();
+    let whole_tree = params.get("panel").filter(|v| !v.is_null());
+    let edits = params.get("edit").filter(|v| !v.is_null());
+    let mut tree_reasons = vec![];
+    let mut tree_notes = vec![];
+    let mut document = if whole_tree.is_some() || edits.is_some() {
+        if whole_tree.is_some() && edits.is_some() {
+            return Err(
+                "Nothing was changed. Pass either panel, the whole tree, or edit, steps that change it, not both."
+                    .into(),
+            );
+        }
+        let spelled: Vec<&str> = LAYOUT_KEYS
             .iter()
-            .filter(|(k, _)| LAYOUT_KEYS.contains(&k.as_str()))
-            .map(|(k, v)| (k.clone(), v.clone()))
-            .collect(),
-    );
+            .copied()
+            .filter(|k| *k != "hud" && !params[*k].is_null())
+            .collect();
+        if !spelled.is_empty() {
+            return Err(format!(
+                "Nothing was changed. {} spell the layout the older way; with panel or edit, set them in the tree: the panel's spacing, separators, width and countdown, the blocks' and sections' fields, and their order as the children's order.",
+                quoted(&spelled)
+            ));
+        }
+        let mut panel = match whole_tree {
+            Some(given) => given.clone(),
+            None => tree::tree(&current, &present),
+        };
+        if let Some(edits) = edits {
+            let (issues, notes) = tree::apply(&mut panel, edits);
+            tree_reasons.extend(issues);
+            tree_notes = notes;
+        }
+        let read = tree::layout_from(&panel, &present);
+        tree_reasons.extend(read.issues);
+        if read.custom {
+            tree_notes.push(CUSTOM_NOTE.into());
+        }
+        let mut document = read.layout;
+        // The tree does not spell the resting HUD's agents: they stay unless given.
+        let mut hud = params["hud"].clone();
+        if hud["agents"].is_null() && !current["hud"]["agents"].is_null() {
+            if !hud.is_object() {
+                hud = json!({});
+            }
+            hud["agents"] = current["hud"]["agents"].clone();
+        }
+        if !hud.is_null() {
+            document["hud"] = hud;
+        }
+        document
+    } else {
+        let mut document = Value::Object(
+            arguments
+                .iter()
+                .filter(|(k, _)| LAYOUT_KEYS.contains(&k.as_str()))
+                .map(|(k, v)| (k.clone(), v.clone()))
+                .collect(),
+        );
+        tree::carry(&mut document, &current);
+        document
+    };
     let name = screen_name(s, id, false);
     let held = [canonical(effective(s, id)), canonical(saved_layout(s, id))];
     // A project named by a path inside it, an agent's own working directory among
@@ -584,7 +647,8 @@ fn draft(
     let projects = rules::project_match(&document["sessions"]["projects"], snapshot, &held);
     // Every reason at once: what reading would forgive, then what the rest asks that
     // the panel, the screen's resting HUD or the app cannot draw as asked.
-    let mut reasons = rules::misreadings(&document);
+    let mut reasons = tree_reasons;
+    reasons.extend(rules::misreadings(&document));
     let style = style_rules::proposal(
         &params["hud"],
         id,
@@ -642,6 +706,9 @@ fn draft(
         return Ok(listing(s, id, snapshot, catalog, Some(&note)));
     }
     let mut note = proposal_note(s, id);
+    for added in &tree_notes {
+        note += &format!(" {added}");
+    }
     if style.placed_clear {
         note += " The dock it becomes starts at position 0, the top left, clear of the notch, as Settings places one; another position can be proposed once the user has saved it.";
     }
@@ -685,6 +752,7 @@ pub(super) fn call(
         let taken: Vec<&str> = LAYOUT_KEYS
             .iter()
             .copied()
+            .chain(TREE_KEYS.iter().copied())
             .chain(["app", "from", "revision", "screen"])
             .collect();
         if let Some(fields) = params.as_object() {
