@@ -51,7 +51,11 @@ export function BlockHeading({
           fontWeight: 700,
           lineHeight: "16px",
           color,
-          // One line in a narrow block: cut short, never wrapped.
+          // One line in a narrow block: cut short, never wrapped. A compact
+          // block's name keeps its whole width first; its plan gives way.
+          ...(compact
+            ? { flex: "0 0 auto", maxWidth: "calc(100% - 24px)" }
+            : null),
           minWidth: 0,
           overflow: "hidden",
           textOverflow: "ellipsis",
@@ -142,8 +146,31 @@ export function PlanBadge({
             }}
           >
             {account.planLabel && (
-              <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
-                {account.planLabel}
+              // The plan shortens while a few letters fit and leaves below
+              // that: an empty first item holds the one line shown, so the
+              // plan wraps onto a hidden second line instead of a stub.
+              <span
+                style={{
+                  display: "flex",
+                  flexWrap: "wrap",
+                  height: 16,
+                  minWidth: 0,
+                  overflow: "hidden",
+                }}
+              >
+                <span />
+                <span
+                  style={{
+                    flex: "1 1 28px",
+                    minWidth: 28,
+                    maxWidth: "max-content",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    textAlign: "end",
+                  }}
+                >
+                  {account.planLabel}
+                </span>
               </span>
             )}
             {notes.length > 0 && (
