@@ -915,30 +915,21 @@ function AppContent({
                       {extensionPages
                         .find((item) => item.id === page)
                         ?.render({ snapshot, request: extensionRequest })}
-                      {(page === "general" ||
-                        page === "prices" ||
-                        page === "relays" ||
-                        page === "local-network" ||
-                        page === "display" ||
-                        page === "agents" ||
-                        page === "agent-plugins" ||
-                        page === "updates") && (
-                        <SettingsPane
-                          page={page}
-                          settingsProps={settingsProps}
-                          ready={ready}
-                          selectedId={selectedId}
-                          monitors={monitors}
-                          selectScreen={selectScreen}
-                          chinese={chinese}
-                          layout={config.panelLayout}
-                          onLayout={(layout) => setLayout(layout)}
-                          preferences={store.sources ?? {}}
-                          onPreferences={setSource}
-                          agentPlugins={agentPlugins}
-                          request={extensionRequest}
-                        />
-                      )}
+                      <SettingsPane
+                        page={page}
+                        settingsProps={settingsProps}
+                        ready={ready}
+                        selectedId={selectedId}
+                        monitors={monitors}
+                        selectScreen={selectScreen}
+                        chinese={chinese}
+                        layout={config.panelLayout}
+                        onLayout={(layout) => setLayout(layout)}
+                        preferences={store.sources ?? {}}
+                        onPreferences={setSource}
+                        agentPlugins={agentPlugins}
+                        request={extensionRequest}
+                      />
                     </Suspense>
                   )}
                 </div>
