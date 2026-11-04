@@ -12,8 +12,7 @@ import {
   useText,
   type SettingsPaneProps,
 } from "./SettingsPrimitives";
-
-type Failure = { key: string; message: string };
+import { usePending } from "./use-pending";
 
 const appearanceKeys = ["appearance", "appearanceFollowsScreen", "language"];
 const usageKeys = ["quotaDisplay"];
@@ -27,30 +26,20 @@ export function GeneralPane({ snapshot, action }: SettingsPaneProps) {
       );
   }, []);
   const t = useText(snapshot);
-  const [pending, setPending] = useState(false);
-  const [failure, setFailure] = useState<Failure | null>(null);
+  const { pending, error, run } = usePending();
+  const [savedKey, setSavedKey] = useState("");
 
   /** One save at a time; a failure shows in the card of the setting that
    * failed. */
-  const save = async (key: string, value: unknown) => {
+  const save = (key: string, value: unknown) => {
     if (pending) return;
-    setPending(true);
-    setFailure(null);
-    try {
-      await action("set_setting", { key, value });
-    } catch (error) {
-      setFailure({
-        key,
-        message: error instanceof Error ? error.message : String(error),
-      });
-    } finally {
-      setPending(false);
-    }
+    setSavedKey(key);
+    void run(() => action("set_setting", { key, value }));
   };
-  const setting = (key: string) => (value: unknown) => void save(key, value);
+  const setting = (key: string) => (value: unknown) => save(key, value);
   const problem = (keys: string[]) =>
-    failure && keys.includes(failure.key) ? (
-      <Notice tone="error">{failure.message}</Notice>
+    error && keys.includes(savedKey) ? (
+      <Notice tone="error">{error}</Notice>
     ) : null;
 
   const settings = snapshot.settings;

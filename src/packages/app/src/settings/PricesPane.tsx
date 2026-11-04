@@ -20,6 +20,7 @@ import {
   type SettingsPaneProps,
 } from "./SettingsPrimitives";
 import { MultiplierInput, PriceEditor } from "./PriceFields";
+import { usePending } from "./use-pending";
 
 /**
  * The price page: every model used in the last 30 days, folded under the
@@ -33,9 +34,8 @@ export function PricesPane({ snapshot, action }: SettingsPaneProps) {
   const t = useText(snapshot);
   const language = snapshotLanguage(snapshot);
   const [list, setList] = useState<PriceList | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
-  const [pending, setPending] = useState(false);
+  const { pending, error, setError, run } = usePending();
   const load = useCallback(
     () =>
       action("price_list")
@@ -50,20 +50,11 @@ export function PricesPane({ snapshot, action }: SettingsPaneProps) {
   useEffect(() => {
     void load();
   }, [load]);
-  const save = async (key: string, value: unknown) => {
-    setPending(true);
-    setError(null);
-    try {
+  const save = (key: string, value: unknown) =>
+    run(async () => {
       await action("set_setting", { key, value });
       await load();
-      return true;
-    } catch (failure) {
-      setError(failure instanceof Error ? failure.message : String(failure));
-      return false;
-    } finally {
-      setPending(false);
-    }
-  };
+    });
   const customPrices = snapshot.settings.customPrices ?? {};
   const multipliers = snapshot.settings.relayMultipliers ?? {};
   const localKinds = snapshot.settings.localKinds ?? {};
