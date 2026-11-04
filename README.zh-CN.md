@@ -256,6 +256,16 @@ iPhone 和发行版在同一个网络里，不订阅也能在 iPhone 与 Apple W
   - **任何网络下，借助 Agent HUD Remote**，经由你自己的 iCloud。记录正文端到端加密，密钥在你的 iCloud 钥匙串里；只有提醒要显示的文字不在加密范围内，以便系统弹出提醒。
   - **运行中会话的实时活动**同样需要 Remote，经 Agent HUD 的中转服务交给 Apple 的推送服务。中转只保留转发所需的内容，即每台 Mac 最新的会话与每部手机的卡片，不保留账户身份；30 天没有请求的账户会被删除。
 
+## 安装
+
+下载[发行版](https://agenthud.app/mac)，或用 Homebrew 安装最新的版本（包括 Beta）：
+
+```sh
+brew install --cask jazzenchen/tap/agent-hud
+```
+
+之后 Agent HUD 会自己更新。
+
 ## 从源码构建
 
 **环境要求：** Node.js 24+、pnpm、较新的 Rust 工具链（1.90+），以及你所在系统的 [Tauri 前置依赖](https://v2.tauri.app/start/prerequisites/)。

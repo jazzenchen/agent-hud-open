@@ -256,6 +256,16 @@ Also: the **GLM Coding Plan**, **MiniMax** and **Volcengine Ark** plan quotas. Q
   - **Anywhere, with Agent HUD Remote**, through your own iCloud. Record contents are end-to-end encrypted with keys in your iCloud Keychain; only the text an alert shows stays outside that encryption, so iOS can display it.
   - **Live Activities of running sessions**, also with Remote, pass through Agent HUD's relay to Apple's push service. The relay keeps only what forwarding needs, each Mac's latest sessions and each phone's card, with no account identity, and deletes an account it hasn't heard from in 30 days.
 
+## Install
+
+Download the [release](https://agenthud.app/mac), or install the newest release, betas included, with Homebrew:
+
+```sh
+brew install --cask jazzenchen/tap/agent-hud
+```
+
+Agent HUD updates itself after that.
+
 ## Build from source
 
 **Requirements:** Node.js 24+, pnpm, a current Rust toolchain (1.90+), and [Tauri's prerequisites](https://v2.tauri.app/start/prerequisites/) for your system.
