@@ -2,7 +2,7 @@
 //! display preferences and the agents its strip draws. Settings planned the
 //! windows while it stayed open; the app plans them itself, so Settings can close.
 use super::{
-    configure_display, display_catalog, reconcile, Display, Edge, HudConfig, HudMonitor, Mode,
+    configure_display, display_catalog, reconcile, Display, Edge, HudConfig, HudMonitor, Mode, Rect,
 };
 use crate::vendors;
 use serde_json::{json, Value};
@@ -245,8 +245,8 @@ fn plan(
 #[derive(Default)]
 pub(crate) struct Planner {
     displays: Vec<Display>,
-    measured: String,
-    configured: HashMap<String, String>,
+    measured: Vec<HudMonitor>,
+    configured: HashMap<String, (HudConfig, Rect, f64)>,
 }
 
 impl Planner {
@@ -261,9 +261,8 @@ impl Planner {
             .iter()
             .map(|display| display.info.clone())
             .collect();
-        let signature = serde_json::to_string(&monitors).map_err(|error| error.to_string())?;
         self.displays = displays;
-        if signature == self.measured {
+        if monitors == self.measured {
             return Ok(None);
         }
         let connected: HashSet<String> = monitors
@@ -272,7 +271,7 @@ impl Planner {
             .collect();
         reconcile(app, &connected);
         self.configured.retain(|id, _| connected.contains(id));
-        self.measured = signature;
+        self.measured = monitors.clone();
         Ok(Some(monitors))
     }
 
@@ -280,11 +279,11 @@ impl Planner {
     pub(crate) fn screens(&self) -> Vec<Value> {
         self.displays
             .iter()
-            .filter_map(|display| {
-                let mut value = serde_json::to_value(&display.info).ok()?;
+            .map(|display| {
+                let mut value = json!(display.info);
                 value["id"] = json!(display.info.screen_id);
                 value["hasNotch"] = json!(display.info.notch.is_some());
-                Some(value)
+                value
             })
             .collect()
     }
@@ -315,11 +314,11 @@ impl Planner {
         for display in &self.displays {
             let config = plan(display, view, snapshot, visible, now_ms);
             let id = display.info.screen_id.clone();
-            let Ok(signature) =
-                serde_json::to_string(&(&config, display.info.bounds, display.info.scale_factor))
-            else {
-                continue;
-            };
+            let signature = (
+                config.clone(),
+                display.info.bounds,
+                display.info.scale_factor,
+            );
             if self.configured.get(&id) == Some(&signature) {
                 continue;
             }

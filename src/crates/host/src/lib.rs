@@ -896,7 +896,6 @@ pub fn run_with_options(
             activity::window_activity,
             hud::hud_monitors,
             hud::hud_geometry,
-            hud::hud_native_capabilities,
             hud::hud_report_regions,
             hud::hud_drag_start,
             hud::hud_text_focus,

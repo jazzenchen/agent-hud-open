@@ -7,8 +7,8 @@ use tauri::{Emitter, Manager};
 
 use super::{
     emit_drag_end, emit_drag_preview, emit_geometry, host, owner_for_window, poll_drag,
-    restore_drag, set_drag_cursor, DragTick, HudGeometry, HudInputStatus, HudPointer, HudState,
-    HudWindows, InteractiveRegion, Point, PointerKeys, Shared,
+    restore_drag, DragTick, HudGeometry, HudInputStatus, HudPointer, HudState, HudWindows,
+    InteractiveRegion, Point, Shared,
 };
 
 /// A single native owner follows every interactive rectangle. No GUI is created here.
@@ -210,7 +210,7 @@ fn poll_pointer(app: tauri::AppHandle, shared: Arc<Shared>) {
             let mut original = drag.config;
             original.visible = false;
             state.config = Some(original);
-            set_drag_cursor(&app, &shared, false);
+            host::set_drag_cursor(&app, &shared, false);
             ended = Some(true);
             let _ = apply_ignore_cursor(&window, &mut state, true, true);
         }
@@ -245,10 +245,7 @@ fn poll_pointer(app: tauri::AppHandle, shared: Arc<Shared>) {
         }
         if let Some(placement) = placement {
             // The dropped place becomes the screen's saved placement.
-            match serde_json::to_value(&placement) {
-                Ok(placement) => crate::coordinator::save_placement(&app, placement),
-                Err(error) => eprintln!("Agent HUD placement: {error}"),
-            }
+            crate::coordinator::save_placement(&app, serde_json::json!(placement));
         }
         if let Some(preview) = preview {
             emit_drag_preview(&app, &preview);
@@ -289,22 +286,6 @@ pub(super) fn global_units_per_point(scale: f64) -> f64 {
     }
 }
 
-pub(super) fn global_pointer(app: &tauri::AppHandle) -> Result<Point, String> {
-    let pointer = host::global_pointer(app)?;
-    if !pointer.x.is_finite() || !pointer.y.is_finite() {
-        return Err("The native pointer reported invalid global coordinates".into());
-    }
-    Ok(pointer)
-}
-
-pub(super) fn left_mouse_down() -> Result<bool, String> {
-    host::left_mouse_down()
-}
-
-fn pointer_keys() -> PointerKeys {
-    host::pointer_keys()
-}
-
 fn sample_pointer(
     app: &tauri::AppHandle,
     window: &tauri::WebviewWindow,
@@ -321,7 +302,7 @@ fn sample_pointer(
     if !region_contains(regions, point) {
         return outside;
     }
-    let keys = pointer_keys();
+    let keys = host::pointer_keys();
     HudPointer {
         inside: true,
         point: Some(point),
@@ -385,7 +366,7 @@ fn pointer_in_viewport(
     window: &tauri::WebviewWindow,
     geometry: Option<&HudGeometry>,
 ) -> Result<Point, String> {
-    let pointer = global_pointer(app)?;
+    let pointer = host::global_pointer(app)?;
     if let Some(geometry) = geometry {
         // configure() records the actual native content rectangle, including every
         // drag preview and constrained placement. Keep the same coordinate planes:
@@ -400,9 +381,6 @@ fn pointer_in_viewport(
     // Their infrequent checks must use the live native frame instead of old geometry.
     let position = window.inner_position().map_err(|error| error.to_string())?;
     let scale = window.scale_factor().map_err(|error| error.to_string())?;
-    if !scale.is_finite() || scale <= 0.0 {
-        return Err("The HUD window reported an invalid scale".into());
-    }
     let divisor = if host::GLOBAL_POINTS { scale } else { 1.0 };
     let units = global_units_per_point(scale);
     let x = (pointer.x - f64::from(position.x) / divisor) / units;

@@ -1,4 +1,4 @@
-//! Shared HUD data types, configuration contracts, and native capability reports.
+//! Shared HUD data types and configuration contracts.
 use serde::{Deserialize, Serialize};
 
 use super::Shared;
@@ -135,8 +135,7 @@ pub(super) struct DragEnd {
     pub(super) cancelled: bool,
 }
 
-#[derive(Clone, Deserialize, Serialize)]
-#[serde(default, rename_all = "camelCase", deny_unknown_fields)]
+#[derive(Clone, PartialEq)]
 pub struct HudConfig {
     pub mode: Mode,
     pub edge: Edge,
@@ -153,23 +152,7 @@ pub struct HudConfig {
     pub screen_id: Option<String>,
 }
 
-impl Default for HudConfig {
-    fn default() -> Self {
-        Self {
-            mode: Mode::Logos,
-            edge: Edge::Top,
-            width: 360.0,
-            height: 36.0,
-            offset: 0.5,
-            ignore_cursor: true,
-            visible: true,
-            monitor_index: 0,
-            screen_id: None,
-        }
-    }
-}
-
-#[derive(Clone, Copy, Serialize)]
+#[derive(Clone, Copy, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct Rect {
     pub(super) x: i32,
@@ -182,7 +165,7 @@ pub struct Rect {
 /// other hosts divide both screen and canvas physical coordinates by the selected monitor's
 /// scale, which preserves local differences but is not a uniform global logical desktop.
 /// Viewport rectangles use the same point units, relative to the actual HUD canvas top-left.
-#[derive(Clone, Copy, Serialize)]
+#[derive(Clone, Copy, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct LogicalRect {
     pub(super) x: f64,
@@ -219,7 +202,7 @@ pub(super) struct ScreenMeasurement {
     pub(super) notch: Option<LogicalRect>,
 }
 
-#[derive(Clone, Serialize)]
+#[derive(Clone, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct HudMonitor {
     pub(super) screen_id: String,
@@ -235,58 +218,4 @@ pub struct HudMonitor {
     /// Global logical points, top-left origin; bounds/workArea remain native physical coordinates.
     pub(super) notch: Option<LogicalRect>,
     pub(super) notch_coordinate_space: &'static str,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct HudCapabilities {
-    pub(super) platform: &'static str,
-    pub(super) backend: &'static str,
-    pub(super) lazy_creation: bool,
-    pub(super) single_window: bool,
-    pub(super) per_screen_windows: bool,
-    pub(super) transparent_surface: bool,
-    pub(super) native_material: bool,
-    pub(super) non_focusing_window: bool,
-    pub(super) native_nonactivating_panel: bool,
-    pub(super) keyboard_handoff: bool,
-    pub(super) cursor_passthrough: bool,
-    pub(super) interactive_regions: bool,
-    pub(super) native_drag: bool,
-    pub(super) global_pointer: &'static str,
-    pub(super) absolute_edge_position: &'static str,
-    pub(super) all_workspaces: &'static str,
-    pub(super) fullscreen_overlay: &'static str,
-    pub(super) hardware_notch: bool,
-    pub(super) persistent_display_identity: bool,
-    pub(super) limitations: Vec<&'static str>,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct HudWindowState {
-    pub(super) screen_id: String,
-    pub(super) window_label: String,
-    pub(super) created: bool,
-    pub(super) visible: bool,
-    pub(super) config: HudConfig,
-    pub(super) frame: Option<Rect>,
-    pub(super) requested_frame: Option<Rect>,
-    pub(super) capabilities: HudCapabilities,
-    pub(super) geometry: Option<HudGeometry>,
-}
-
-#[tauri::command]
-pub fn hud_native_capabilities() -> HudCapabilities {
-    super::host::capabilities()
-}
-
-/// Limitations every host reports before its own.
-pub(super) fn base_limitations() -> Vec<&'static str> {
-    vec![
-        "Native focus, fullscreen and Spaces behavior requires platform GUI qualification; compile checks do not certify it.",
-        "Monitor indices are session-only. A non-null persistentId identifies the host's display device; hardware or driver changes can alter it.",
-        "Each configured connected screen owns a separate lazy HUD window and pointer worker.",
-        "Reported rectangles control input using a native 32 ms pointer poll; this is not the original event-driven hover state machine or per-pixel hit testing.",
-    ]
 }
