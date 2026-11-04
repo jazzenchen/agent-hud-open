@@ -49,8 +49,8 @@ prompt and tool-call hooks, idle at its `Stop` or two minutes after the last
 renewal, titled by its first prompt, else its folder. A permission
 notification newer than the running turn holds it waiting until the next
 hook, for up to 30 minutes, since a turn that asked for the user reports
-nothing until they answer. They carry `usageStatus: "unavailable"` and no tokens, and
-leave the lists like any other session.
+nothing until they answer. They carry `usageStatus: "unavailable"` and no
+tokens, and leave the lists like any other session.
 
 `session_detail {id}` loads only the requested parser checkpoint and returns
 its session, recorded usage entries, parent and children, including relationships
@@ -79,6 +79,7 @@ a call in more than one place, the best one counts it and the others give way.
 | --- | --- | --- |
 | Qoder, Qoder CN, QoderWork | Claude Code's lines in `projects/<folder>/<session>.jsonl` under `~/.qoder` (`QODER_CONFIG_DIR`), `~/.qoder-cn` (`QODERCN_CONFIG_DIR`), `~/.qoderwork` and the Qoder app's `SharedClientCache/cli/projects`; sub-agents in `<session>/subagents/`. A session's id is the one its hooks report. Each build is a client of its own. | Each response's usage; Qoder's `input_tokens` holds its cache reads, which count apart. Qoder CN's older `QoderCN/SharedClientCache/cache/db/local.db` adds its assistant messages. A response billed only in credits has no tokens. |
 | Copilot CLI | `session-state/<session>/events.jsonl` under `~/.copilot` (`COPILOT_HOME`). | `session-store.db`'s `assistant_usage_events`, one row per call (its input holds the cache's reads and writes, its output the reasoning); else the OTel export's chat spans; else the `session.shutdown` totals, each counted by what it adds. The first store row of a session replaces what the others counted. The Copilot desktop app's `data.db` is not read: its sessions keep `session-state` too. |
+
 ## Forks read with their parents' readers
 
 Kilo Code and MiMo Code keep OpenCode's database, and Oh My Pi keeps Pi's
@@ -95,6 +96,7 @@ Not read: Kilo Code's and MiMo Code's release-channel databases
 (`kilo-<channel>.db`, `mimocode-<channel>.db`), `KILO_DB`, `MIMOCODE_DB` and
 `MIMOCODE_HOME`; Oh My Pi's profiles, its XDG folders and a
 `PI_CODING_AGENT_DIR` it shares with Pi, which Pi reads.
+
 ## Sessions kept as a running total
 
 Factory Droid keeps each session in `~/.factory/sessions/<folder>/<id>.jsonl`
@@ -112,6 +114,7 @@ folder and parent come from the transcript's first line (`session_start`),
 which Droid rewrites when the title changes; the transcript is part of the
 settings file's stamp, and its last write is the session's activity time.
 `archivedAt` archives a session.
+
 ## Whole-file and database sources
 
 Most clients append to their logs, which are read from where the last read
