@@ -1,11 +1,7 @@
-import { useMemo, type CSSProperties } from "react";
-import type {
-  Approval,
-  IslandEvent,
-  RequestDelivery,
-  Snapshot,
-} from "@agent-hud/protocol";
+import type { CSSProperties } from "react";
+import type { Approval, IslandEvent, Snapshot } from "@agent-hud/protocol";
 import { compactAlertDockWidth } from "../alerts/CompactAlertView";
+import { dockEnds, endAnchor, type EndSide } from "../ends/end-geometry";
 import { horizontal, type HUDRect, type StripMetrics } from "../geometry";
 import { cardRect, dragSurfaceGeometry, parkedRect } from "../placement";
 import {
@@ -18,6 +14,7 @@ import {
 import { peekLineWidth } from "./AgentPeek";
 import { SIMPLE_EDGE_MARGIN } from "./simple-panel";
 import { useNotchGeometry } from "./NotchSurface";
+import { useRequestDelivery } from "./request-delivery";
 import { snapshotLanguage } from "@agent-hud/ui/format";
 
 export interface UseHUDLayoutArgs {
@@ -38,6 +35,8 @@ export interface UseHUDLayoutArgs {
   event?: IslandEvent;
   inUsagePanel?: boolean;
   requestsCount: number;
+  /** The end whose panel shows, and how many each end shows. */
+  ends: { view: EndSide | null; counts: Record<EndSide, number> };
 }
 
 export function useHUDLayout({
@@ -58,6 +57,7 @@ export function useHUDLayout({
   event,
   inUsagePanel = false,
   requestsCount,
+  ends,
 }: UseHUDLayoutArgs) {
   const edge: HUDEdge = config.mode === "notch" ? "top" : config.edge;
   const strip =
@@ -65,6 +65,9 @@ export function useHUDLayout({
       ? notchFrame
       : parkedRect(screen, metrics, config);
   const grab = dragSurfaceGeometry(strip, config, metrics.radius, screen);
+  const endRects = dockEnds(strip, edge, config, metrics, screen, ends.counts);
+  // A card an end opens comes out of that end, not out of its agent's mark.
+  const fromEnd = ends.view ? endRects[ends.view] : undefined;
   const light =
     config.appearance === "light" ||
     (config.appearance === "system" && systemLight);
@@ -82,38 +85,17 @@ export function useHUDLayout({
 
   // The agent the card is for: the sender of the event on show, otherwise the hovered mark. A dock never gives
   // its marks up to an event, so hovering another mark does not move an event's card (ScreenHUD.focus).
-  const sender = request ?? event;
+  const sender = fromEnd ? undefined : (request ?? event);
   const standaloneAlert = Boolean(request || (event && !inUsagePanel));
-  const focusedVendor =
-    sender && config.mode !== "notch" && !inUsagePanel
+  const focusedVendor = fromEnd
+    ? undefined
+    : sender && config.mode !== "notch" && !inUsagePanel
       ? vendors.find((v) => v.key === vendorKey(sender.source))
       : config.separatesAgents && config.mode !== "notch"
         ? vendors.find((v) => v.key === hovered)
         : undefined;
 
-  const delivery = useMemo(() => {
-    const now = Date.parse(snapshot.generatedAt);
-    const source = request?.source ?? focusedVendor?.key;
-    let latest: RequestDelivery | undefined;
-    let latestAt = -Infinity;
-    for (const entry of snapshot.requestDeliveries ?? []) {
-      const at = Date.parse(entry.at);
-      if (entry.state === "confirmed" || now - at > 300_000) continue;
-      if (source && vendorKey(entry.source) !== vendorKey(source)) continue;
-      if (request?.sessionId && entry.sessionId !== request.sessionId) continue;
-      if (at > latestAt) {
-        latest = entry;
-        latestAt = at;
-      }
-    }
-    return latest;
-  }, [
-    snapshot.generatedAt,
-    snapshot.requestDeliveries,
-    request?.source,
-    request?.sessionId,
-    focusedVendor?.key,
-  ]);
+  const delivery = useRequestDelivery(snapshot, request, focusedVendor?.key);
 
   const detached =
     config.mode !== "notch" && Boolean(focusedVendor || standaloneAlert);
@@ -200,8 +182,9 @@ export function useHUDLayout({
 
   const focusedIndex = vendors.findIndex((v) => v.key === focusedVendor?.key);
   // ScreenHUD.eventMark: when an alert's vendor isn't on the dock strip, anchor to the middle of the strip.
-  const anchor =
-    focusedIndex >= 0
+  const anchor = fromEnd
+    ? endAnchor(fromEnd, edge)
+    : focusedIndex >= 0
       ? (horizontal(edge) ? strip.x : strip.y) + metrics.centers[focusedIndex]
       : sender && config.mode !== "notch" && !inUsagePanel
         ? horizontal(edge)
@@ -233,7 +216,13 @@ export function useHUDLayout({
         }
       : placed;
   const cardVisible = !dragging && (open || Boolean(request || event));
-  const collapsedCanvas = { ...strip, x: strip.x - 8, width: strip.width + 16 };
+  // The notch grows sideways for the ends that show.
+  const { head: headWing, tail: tailWing } = endRects.wings;
+  const collapsedCanvas = {
+    ...strip,
+    x: strip.x - 8 - headWing,
+    width: strip.width + 16 + headWing + tailWing,
+  };
   const notchTarget = cardVisible ? frame : collapsedCanvas;
   const notchRadius = cardVisible
     ? open
@@ -293,6 +282,7 @@ export function useHUDLayout({
   return {
     edge,
     strip,
+    endRects,
     grab,
     light,
     fill,

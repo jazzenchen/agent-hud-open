@@ -1,4 +1,4 @@
-import { memo, useLayoutEffect, useRef, type ReactNode } from "react";
+import { memo, useLayoutEffect, useMemo, useRef, type ReactNode } from "react";
 import type { Snapshot } from "@agent-hud/protocol";
 import { PanelServicesProvider, type PanelServices } from "../PanelContext";
 import {
@@ -11,6 +11,23 @@ export function useLatestWhile<T>(value: T, live: boolean): T {
   const latest = useRef(value);
   if (live) latest.current = value;
   return latest.current;
+}
+
+/** What the measuring copy draws: the snapshot and services as they were
+ * while `live` last held, taken again whenever one of `shown` changes. */
+export function useMeasured(
+  snapshot: Snapshot,
+  services: PanelServices | null,
+  listed: ListedSessions,
+  live: boolean,
+  shown: unknown[],
+) {
+  const shownSnapshot = useLatestWhile(snapshot, live);
+  const shownServices = useLatestWhile(services, live);
+  return useMemo(
+    () => ({ snapshot: shownSnapshot, services: shownServices, listed }),
+    [shownSnapshot, shownServices, ...shown],
+  );
 }
 
 /** Draws again only when `version` changes; between, React keeps what it drew. */

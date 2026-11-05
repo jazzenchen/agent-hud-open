@@ -30,13 +30,17 @@ import { useHUDLayout } from "./scene/useHUDLayout";
 import { useDomTyping } from "./scene/useDomTyping";
 import { useEditHold } from "./scene/useEditHold";
 import { useHeldFrame } from "./scene/useHeldFrame";
-import { MeasuringCopy, useLatestWhile } from "./scene/MeasuringCopy";
+import { MeasuringCopy, useMeasured } from "./scene/MeasuringCopy";
+import { DockEnds } from "./ends/DockEnds";
+import { useDockEnds } from "./ends/useDockEnds";
 import { PanelBody } from "./scene/PanelBody";
 import { RestingStrip } from "./scene/RestingStrip";
+import { HoverFloor, SceneBackdrop } from "./scene/SceneFloors";
 import { usePanelHandoffs } from "./scene/usePanelHandoffs";
 import { useSceneAlerts } from "./scene/useSceneAlerts";
+import { useStripMetrics } from "./scene/useStripMetrics";
 import { usePanelServices } from "./PanelContext";
-import { position, stripMetrics, type HUDRect } from "./geometry";
+import type { HUDRect } from "./geometry";
 import { useHoverMachine } from "./hover";
 import {
   defaultHUDConfig,
@@ -147,6 +151,7 @@ export function HUDScene({
   const reduceMotion = Boolean(
     reduced || !config.animations || !snapshot.settings.animations,
   );
+  const ends = useDockEnds(reduceMotion);
   const id = useId().replaceAll(":", "");
   const scene = useRef<HTMLElement>(null);
   const dockMemory = useRef(new DockMemory());
@@ -245,28 +250,12 @@ export function HUDScene({
             .map((vendor) => statusColor(vendor.level)),
     [vendors, detectionPaused],
   );
-  const metrics = useMemo(
-    () => stripMetrics(config, vendors, snapshot.settings.quotaDisplay),
-    [
-      vendors,
-      snapshot.settings.quotaDisplay,
-      config.mode,
-      config.edge,
-      config.logoSize,
-      config.logoEdgeDistance,
-      config.gapScale,
-      config.simpleSize,
-      config.simpleGapScale,
-      config.ringWidth,
-      config.showsNumbers,
-      config.simpleStyle,
-      config.panelLayout,
-      config.notchWidth,
-      config.notchHeight,
-      config.hasNotch,
-    ],
+  const metrics = useStripMetrics(
+    config,
+    vendors,
+    snapshot.settings.quotaDisplay,
   );
-  const { requests, news, request, event, glowFlash, inUsagePanel } =
+  const { requests, news, request, event, glowFlash, inUsagePanel, endCounts } =
     useSceneAlerts({
       snapshot,
       config,
@@ -275,11 +264,13 @@ export function HUDScene({
       silenced: glowHidden || Boolean(snapshot.status?.paused),
       underPointer,
       open,
+      ends,
     });
 
   const {
     edge,
     strip,
+    endRects,
     grab,
     light,
     fill,
@@ -321,6 +312,7 @@ export function HUDScene({
     event,
     inUsagePanel,
     requestsCount: requests.length,
+    ends: { view: news.ends.view, counts: endCounts },
   });
 
   const { heldFrame, trackPointer } = useHeldFrame({
@@ -394,6 +386,7 @@ export function HUDScene({
     onConfigure,
     onStats,
     onEscape: endHold,
+    ends: { showing: Boolean(news.ends.view), hovered: ends.hovered },
   });
 
   const { openSettings, listedSessions, footer } = usePanelHandoffs({
@@ -452,19 +445,14 @@ export function HUDScene({
     state.phase !== "collapsed" ||
     pointerInside ||
     Boolean(request || event);
-  const measuredSnapshot = useLatestWhile(snapshot, measuring);
-  const measuredServices = useLatestWhile(panelServices, measuring);
   const configKey = useMemo(() => JSON.stringify(config), [config]);
   // What the copy draws, taken when something it shows changes.
-  const measured = useMemo(
-    () => ({
-      snapshot: measuredSnapshot,
-      services: measuredServices,
-      listed: listedSessions,
-    }),
+  const measured = useMeasured(
+    snapshot,
+    panelServices,
+    listedSessions,
+    measuring,
     [
-      measuredSnapshot,
-      measuredServices,
       configKey,
       light,
       open,
@@ -472,6 +460,7 @@ export function HUDScene({
       request,
       event,
       news.queue,
+      news.ends.tail,
       inUsagePanel,
       delivery,
     ],
@@ -511,18 +500,7 @@ export function HUDScene({
             padding={bodyPadding}
             onHeight={setContentHeight}
           />
-          {renderBackdrop && (
-            <div
-              style={{
-                position: "absolute",
-                inset: 0,
-                pointerEvents: "none",
-                zIndex: -2,
-              }}
-            >
-              {renderBackdrop}
-            </div>
-          )}
+          <SceneBackdrop>{renderBackdrop}</SceneBackdrop>
           {config.mode === "notch" && !glowHidden && (
             <NotchGlow
               geometry={notchGeometry}
@@ -533,21 +511,12 @@ export function HUDScene({
               alert={glowFlash}
             />
           )}
-          {heldFrame && cardVisible && pointerInside && !dragging && (
-            <div
-              className="hud-hover-floor"
-              aria-hidden="true"
-              onPointerEnter={(e) => {
-                if (!nativePointer) entered(e.altKey);
-              }}
-              onPointerLeave={domExited}
-              style={{
-                ...position(heldFrame),
-                zIndex: 1,
-                background: "transparent",
-              }}
-            />
-          )}
+          <HoverFloor
+            frame={cardVisible && pointerInside && !dragging ? heldFrame : null}
+            native={Boolean(nativePointer)}
+            entered={entered}
+            domExited={domExited}
+          />
           <HUDExpandedSurface
             config={config}
             edge={edge}
@@ -643,6 +612,30 @@ export function HUDScene({
               pin={pin}
             />
           </RestingStrip>
+          <DockEnds
+            ends={ends}
+            geometry={endRects}
+            counts={endCounts}
+            fade={news.ends.fade}
+            config={config}
+            edge={edge}
+            strip={strip}
+            frame={frame}
+            cardVisible={cardVisible}
+            showing={Boolean(news.ends.view)}
+            dragging={dragging}
+            light={light}
+            fill={fill}
+            outline={outline}
+            reduceMotion={reduceMotion}
+            nativePointer={nativePointer}
+            scene={scene}
+            collapsed={state.phase === "collapsed"}
+            pointerInside={pointerInside}
+            entered={entered}
+            domExited={domExited}
+            forceOpen={forceOpen}
+          />
           <FlightLayer
             flights={flights}
             mode={config.mode}

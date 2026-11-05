@@ -57,6 +57,7 @@ export interface UseHUDInteractionArgs {
   onStats?: () => void;
   /** Escape only ends an agent's edit hold; the panel is left to the hover. */
   onEscape?: () => void;
+  ends?: { showing: boolean; hovered: string | null };
 }
 
 export function useHUDInteraction({
@@ -93,6 +94,7 @@ export function useHUDInteraction({
   onConfigure,
   onStats,
   onEscape,
+  ends,
 }: UseHUDInteractionArgs) {
   useEffect(() => {
     if (typing) {
@@ -128,6 +130,7 @@ export function useHUDInteraction({
     request,
     event,
     inUsagePanel,
+    ends,
   });
 
   useEffect(() => {
@@ -239,7 +242,7 @@ export function useHUDInteraction({
     if (
       event?.relatedTarget instanceof Element &&
       event.relatedTarget.closest(
-        ".hud-resting-strip, .hud-expanded-surface, .hud-grab-surface, .hud-hover-floor",
+        ".hud-resting-strip, .hud-expanded-surface, .hud-grab-surface, .hud-hover-floor, .hud-dock-end",
       )
     ) {
       return;

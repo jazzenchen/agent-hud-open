@@ -21,6 +21,7 @@ export function useAlertPresentation({
   request,
   event,
   inUsagePanel,
+  ends,
 }: {
   config: HUDConfig;
   open: boolean;
@@ -37,16 +38,21 @@ export function useAlertPresentation({
   request?: Approval;
   event?: IslandEvent;
   inUsagePanel: boolean;
+  /** Whether the alert on show is an end's, and which end the pointer is on
+   * (none once it moved onto the dock). */
+  ends?: { showing: boolean; hovered: string | null };
 }) {
   const lastAlertId = useRef<string | null>(null);
   const lastAlertInUsagePanel = useRef(false);
+  const lastFromEnd = useRef(false);
   const activeAlertId = (request ?? event)?.id ?? null;
 
   useEffect(() => {
     if (activeAlertId !== null) {
       lastAlertInUsagePanel.current = Boolean(inUsagePanel);
+      lastFromEnd.current = Boolean(ends?.showing);
     }
-  }, [activeAlertId, inUsagePanel]);
+  }, [activeAlertId, inUsagePanel, ends?.showing]);
 
   useEffect(() => {
     const previousId = lastAlertId.current;
@@ -55,7 +61,10 @@ export function useAlertPresentation({
     if (activeAlertId !== null) {
       // ScreenHUD.present: cancel a pending hover timer so an alert arriving mid-delay
       // does not immediately pop open into the usage panel; if pointer is inside, restart delay.
-      if (!open) {
+      // A card after one that was forced open, with the pointer away from
+      // the HUD, starts small as well.
+      const forced = open && previousId !== null && !pointerInside && !typing;
+      if (!open || forced) {
         collapse();
         if (pointerInside && !suppressHover.current && !dragVisual) enter();
       }
@@ -70,7 +79,10 @@ export function useAlertPresentation({
         forceOpen();
       }
     } else if (previousId !== null) {
-      if (lastAlertInUsagePanel.current) {
+      if (lastFromEnd.current && pointerInside && !ends?.hovered) {
+        // From an end's panel onto the dock: the panel stays open for it.
+        lastFromEnd.current = false;
+      } else if (lastAlertInUsagePanel.current) {
         lastAlertInUsagePanel.current = false;
         // A card inside the usage panel closes at once when the pointer is elsewhere.
         if (!pointerInside && !typing) collapse();

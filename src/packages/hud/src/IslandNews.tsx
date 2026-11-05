@@ -2,6 +2,9 @@ import { useEffect, useRef, useState } from "react";
 import type { Approval, IslandEvent, Snapshot } from "@agent-hud/protocol";
 import { usePanelServices } from "./PanelContext";
 import { agentVendorName, sourceID, vendorKey } from "./model";
+import type { EndSide } from "./ends/end-geometry";
+import { PARK_AFTER_MS, type ParkedCard } from "./ends/end-queue";
+import { useParkedEnds } from "./ends/useParkedEnds";
 
 export {
   PermissionClosedRow,
@@ -89,11 +92,20 @@ export function useIslandNews(
   silenced = false,
   underPointer = true,
   inUsagePanel = false,
+  ends?: {
+    /** The end whose panel is open. */
+    hovered: EndSide | null;
+    /** A card leaves its place beside a mark for its end. */
+    onPark?: (card: ParkedCard, source: string) => void;
+  },
 ) {
   const services = usePanelServices(),
     seen = useRef<Set<string> | null>(null),
     seenRequests = useRef<Set<string> | null>(null);
   const [queue, setQueue] = useState<IslandCard[]>([]);
+  const parked = useParkedEnds({ requests, hovered: ends?.hovered ?? null });
+  const latestRequests = useRef(requests);
+  latestRequests.current = requests;
   const items = snapshot.islandEvents?.items ?? [];
   const requestIDs = requests.map((request) => request.id).join("\0");
   useEffect(() => {
@@ -105,10 +117,16 @@ export function useIslandNews(
     for (const event of items) seen.current.add(event.id);
     if (seen.current.size > 128)
       seen.current = new Set(items.map((event) => event.id));
+    // Requests that wait from before the HUD started, or that come while the
+    // pointer is on another screen, go straight to the head.
+    const quiet = seenRequests.current === null || !underPointer;
     const freshRequests =
       seenRequests.current === null
         ? requests
         : requests.filter((request) => !seenRequests.current!.has(request.id));
+    if (quiet)
+      for (const request of freshRequests)
+        parked.park({ type: "request", id: request.id });
     if (seenRequests.current === null) seenRequests.current = new Set();
     const activeRequestIds = new Set(requests.map((request) => request.id));
     for (const id of [...seenRequests.current]) {
@@ -135,19 +153,33 @@ export function useIslandNews(
           : previous,
         requests,
         visible,
-        underPointer ? freshRequests : [],
+        quiet ? [] : freshRequests,
         inUsagePanel,
       ),
     );
   }, [snapshot.islandEvents?.revision, requestIDs, silenced, underPointer]);
   const current = queue[0];
   const dismiss = () => setQueue(dismissIslandCard);
+  // A card has its moment beside its agent's mark, then parks at its end.
   useEffect(() => {
-    if (!current || held || current.type === "request") return;
-    const timer = setTimeout(dismiss, 4000);
+    if (!current || held) return;
+    const timer = setTimeout(() => {
+      const card: ParkedCard =
+        current.type === "request"
+          ? { type: "request", id: current.id }
+          : { ...current, type: "news" };
+      const source =
+        current.type === "news"
+          ? current.event.source
+          : latestRequests.current.find((r) => r.id === current.id)?.source;
+      ends?.onPark?.(card, source ?? "");
+      parked.park(card);
+      dismiss();
+    }, PARK_AFTER_MS[current.type]);
     return () => clearTimeout(timer);
   }, [current?.id, held]);
-  const select = (id: string) =>
+  const select = (id: string) => {
+    if (parked.view) return parked.pick(id);
     setQueue((previous) => {
       const at = previous.findIndex((card) => card.id === id);
       if (at <= 0) return previous;
@@ -155,17 +187,31 @@ export function useIslandNews(
       [next[0], next[at]] = [next[at], next[0]];
       return next;
     });
-  return {
+  };
+  // The card on show beside a mark, whatever an end shows.
+  const fresh = {
     event: current?.type === "news" ? current.event : undefined,
-    inUsagePanel:
-      current?.type === "news" ? Boolean(current.inUsagePanel) : false,
     request:
       current?.type === "request"
         ? requests.find((request) => request.id === current.id)
         : undefined,
+  };
+  const message = parked.message;
+  return {
+    event: parked.view ? message?.event : fresh.event,
+    inUsagePanel:
+      !parked.view && current?.type === "news"
+        ? Boolean(current.inUsagePanel)
+        : false,
+    request: parked.view ? parked.request : fresh.request,
+    fresh,
     queue,
     select,
-    dismiss,
+    dismiss:
+      parked.view === "tail"
+        ? () => message && parked.drop(message.id)
+        : dismiss,
+    ends: parked,
   };
 }
 

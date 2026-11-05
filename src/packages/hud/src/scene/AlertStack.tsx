@@ -9,9 +9,11 @@ import type { useIslandNews } from "../IslandNews";
 import { NewsContent } from "../alerts/NewsContent";
 import { PendingEventRows } from "../alerts/PendingEventRows";
 import { ApprovalContent } from "../permissions/ApprovalContent";
+import { MessageRows, MessagesHeader } from "../ends/MessageRows";
 
 /** The panel's body while an alert is on show: the request or the event, and
- * the ones waiting behind it. */
+ * the ones waiting behind it. An open end shows what waits there: the head
+ * its requests, the tail its messages, newest first. */
 export function AlertStack({
   requests,
   request,
@@ -37,8 +39,18 @@ export function AlertStack({
   snapshot: Snapshot;
   botLogos: boolean;
 }) {
+  const zh = snapshotLanguage(snapshot) === "zh";
+  const ends = news.ends;
   return (
     <>
+      {ends.view === "tail" && (
+        <MessagesHeader
+          count={ends.tail.length}
+          clear={ends.clear}
+          light={light}
+          zh={zh}
+        />
+      )}
       {request ? (
         <ApprovalContent
           requests={requests}
@@ -60,15 +72,28 @@ export function AlertStack({
           botLogos={botLogos}
         />
       ) : null}
-      <PendingEventRows
-        queue={news.queue}
-        currentID={(request ?? event)!.id}
-        requests={requests}
-        select={news.select}
-        includeRequests={!request}
-        light={light}
-        zh={snapshotLanguage(snapshot) === "zh"}
-      />
+      {ends.view === "tail" ? (
+        <MessageRows
+          items={ends.tail}
+          currentID={(request ?? event)!.id}
+          select={news.select}
+          drop={ends.drop}
+          light={light}
+          zh={zh}
+        />
+      ) : (
+        !ends.view && (
+          <PendingEventRows
+            queue={news.queue}
+            currentID={(request ?? event)!.id}
+            requests={requests}
+            select={news.select}
+            includeRequests={!request}
+            light={light}
+            zh={zh}
+          />
+        )
+      )}
     </>
   );
 }
