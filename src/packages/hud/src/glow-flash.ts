@@ -32,8 +32,16 @@ export function useGlowFlash({
       easing: "linear",
       fill: "forwards",
     });
-    animation.onfinish = () =>
-      setFlashing((current) => (current?.id === flashing.id ? null : current));
+    // Through `finished`, not onfinish: a handler on the animation that
+    // reaches the flash keeps it alive in WebKit (issue 47). Cancelled when
+    // the flash goes away first.
+    animation.finished.then(
+      () =>
+        setFlashing((current) =>
+          current?.id === flashing.id ? null : current,
+        ),
+      () => {},
+    );
     return () => animation.cancel();
   }, [flashing?.id]);
   const maskAt = (at: RimShape) =>

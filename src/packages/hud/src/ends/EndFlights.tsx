@@ -67,7 +67,12 @@ function EndFlight({
         fill: "forwards",
       },
     );
-    animation.onfinish = () => land(flight.id);
+    // Through `finished`, not onfinish, which keeps the chip alive in WebKit
+    // (issue 47); cancelled when the chip goes away before it lands.
+    animation.finished.then(
+      () => land(flight.id),
+      () => {},
+    );
     return () => animation.cancel();
   }, [flight.id]);
   return (

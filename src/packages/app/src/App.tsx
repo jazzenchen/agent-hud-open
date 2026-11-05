@@ -25,6 +25,7 @@ import { SettingsWindow } from "./settings/SettingsWindow";
 import { SourceMenu } from "./SourceMenu";
 import { StatisticsWindow } from "./StatisticsWindow";
 import { hudEndsLink } from "./lib/hud-ends-link";
+import "./lib/animation-handlers";
 
 // Windows load their own views. Statistics does not need the shader/bot renderer,
 // and a resting HUD does not need the historical charts and settings panes.
