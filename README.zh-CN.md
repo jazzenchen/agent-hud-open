@@ -12,7 +12,7 @@
 </p>
 
 <p align="center">
-  <a href="#从源码构建"><img src="docs/badges/macos.svg" alt="macOS 12+" height="22"></a>
+  <a href="#安装"><img src="docs/badges/macos.svg" alt="macOS 14+" height="22"></a>
   <a href="#跨平台一套核心"><img src="docs/badges/windows-linux.svg" alt="Windows 与 Linux 预览" height="22"></a>
   <a href="docs/platform-architecture.md"><img src="docs/badges/rust-tauri.svg" alt="Rust 与 Tauri 2" height="22"></a>
   <a href="LICENSE"><img src="docs/badges/license.svg" alt="Apache-2.0 许可证" height="22"></a>
@@ -25,6 +25,8 @@
 <p align="center">
   <img src="docs/videos/agent-hud-loop.zh-CN.webp" alt="灵动岛上的 Agent HUD 演示。光晕呼吸着红、黄、绿的额度色段；悬停后面板展开，显示 Claude 与 Codex 的额度、DeepSeek 的余额、过去 24 小时的 Token 与会话，点击后 Claude 的额度切换为消耗速率。随后 Claude 请求运行测试，用「批准一次」回应；它的回复以「有新回复」提醒出现，卡片上有「回到会话」" width="640">
 </p>
+
+<p align="center">如果 Agent HUD 对你有用，点个 Star，能让更多人找到它。</p>
 
 Agent 在 Mac 上工作，HUD 把进展带到你身边。看一眼状态，接上一段对话，给出下一个决定——在电脑前，也在离开电脑之后。
 

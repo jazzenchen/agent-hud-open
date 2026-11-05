@@ -12,7 +12,7 @@
 </p>
 
 <p align="center">
-  <a href="#build-from-source"><img src="docs/badges/macos.svg" alt="macOS 12+" height="22"></a>
+  <a href="#install"><img src="docs/badges/macos.svg" alt="macOS 14+" height="22"></a>
   <a href="#built-for-every-desktop"><img src="docs/badges/windows-linux.svg" alt="Windows and Linux in preview" height="22"></a>
   <a href="docs/platform-architecture.md"><img src="docs/badges/rust-tauri.svg" alt="Rust and Tauri 2" height="22"></a>
   <a href="LICENSE"><img src="docs/badges/license.svg" alt="Apache-2.0 license" height="22"></a>
@@ -25,6 +25,8 @@
 <p align="center">
   <img src="docs/videos/agent-hud-loop.webp" alt="A tour of Agent HUD at a MacBook's notch. The glow breathes in red, yellow and green quota segments. A hover opens the panel on Claude's and Codex's quotas, a DeepSeek balance, the last 24 hours of tokens and the sessions, and a click turns Claude's quotas into burn rates. Claude then asks to run the test suite and is answered with Allow once, and its reply arrives as a New reply reminder whose card offers Return to session" width="640">
 </p>
+
+<p align="center">If Agent HUD is useful to you, a star helps other people find it.</p>
 
 Your agents work on your Mac. Agent HUD brings their progress to you. Check where they are at a glance, pick up a conversation, make the next decision: at your desk, and after you leave it.
 
