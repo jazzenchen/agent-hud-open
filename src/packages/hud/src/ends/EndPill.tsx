@@ -118,7 +118,7 @@ export function EndPill({
 }) {
   const ground = useGround(light);
   const thick = Math.min(rect.width, rect.height);
-  const badge = endBadge(thick, count);
+  const badge = endBadge(thick, count, mode === "logos");
   const head = side === "head";
   const Icon = head ? Hand : MessageSquareText;
   const accent = alertText(head ? "warning" : "turn", ground);
@@ -163,7 +163,7 @@ export function EndPill({
         userSelect: "none",
       }}
     >
-      {!head && (
+      {!head && fade.ms > 0 && (
         <FadeRing
           width={rect.width}
           height={rect.height}

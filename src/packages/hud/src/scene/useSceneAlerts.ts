@@ -50,7 +50,11 @@ export function useSceneAlerts({
     silenced,
     underPointer,
     open && allowsInlineUsageAlert,
-    { hovered: open ? ends.hovered : null, onPark: ends.onPark },
+    {
+      hovered: open ? ends.hovered : null,
+      onPark: ends.onPark,
+      fadeMs: config.messageFadeSeconds * 1000,
+    },
   );
   const event = news.event;
   const request = news.request;

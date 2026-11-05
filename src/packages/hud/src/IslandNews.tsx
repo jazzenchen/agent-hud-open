@@ -98,6 +98,8 @@ export function useIslandNews(
     hovered: EndSide | null;
     /** A card leaves its place beside a mark for its end. */
     onPark?: (card: ParkedCard, source: string) => void;
+    /** How often the tail lets its oldest message go; 0, never. */
+    fadeMs?: number;
   },
 ) {
   const services = usePanelServices(),
@@ -108,6 +110,7 @@ export function useIslandNews(
     requests,
     hovered: ends?.hovered ?? null,
     link: services?.ends,
+    fadeMs: ends?.fadeMs,
   });
   const latestRequests = useRef(requests);
   latestRequests.current = requests;

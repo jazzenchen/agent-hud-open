@@ -13,25 +13,31 @@ import {
 import type { EndsLink } from "./ends-link";
 import { useEndsSharing } from "./useEndsSharing";
 
-/** The time left of the tail's round: one message goes every TAIL_FADE_MS,
- * the oldest first, and the clock stops while `paused`. `cycle` changes
- * whenever a round starts, for the ring that shows it. */
-export function useTailFade(count: number, paused: boolean, fade: () => void) {
+/** The time left of the tail's round: one message goes every `ms`, the
+ * oldest first, and the clock stops while `paused`. `cycle` changes
+ * whenever a round starts, for the ring that shows it. An `ms` of 0 keeps
+ * every message until the person lets it go. */
+export function useTailFade(
+  count: number,
+  paused: boolean,
+  fade: () => void,
+  ms = TAIL_FADE_MS,
+) {
   const [cycle, setCycle] = useState(0);
-  const left = useRef(TAIL_FADE_MS);
-  const active = count > 0;
+  const left = useRef(ms);
+  const active = count > 0 && ms > 0;
   useEffect(() => {
     if (!active) return;
-    left.current = TAIL_FADE_MS;
+    left.current = ms;
     setCycle((n) => n + 1);
-  }, [active]);
+  }, [active, ms]);
   useEffect(() => {
     if (!active || paused) return;
     const start = performance.now();
     let fired = false;
     const timer = setTimeout(() => {
       fired = true;
-      left.current = TAIL_FADE_MS;
+      left.current = ms;
       fade();
       setCycle((n) => n + 1);
     }, left.current);
@@ -41,7 +47,7 @@ export function useTailFade(count: number, paused: boolean, fade: () => void) {
         left.current = Math.max(0, left.current - (performance.now() - start));
     };
   }, [active, paused, cycle]);
-  return { cycle, paused: paused || !active, ms: TAIL_FADE_MS };
+  return { cycle, paused: paused || !active, ms: ms > 0 ? ms : 0 };
 }
 
 export type EndFade = ReturnType<typeof useTailFade>;
@@ -54,11 +60,14 @@ export function useParkedEnds({
   requests,
   hovered,
   link,
+  fadeMs,
 }: {
   requests: Approval[];
   /** The end whose panel is open. */
   hovered: EndSide | null;
   link?: EndsLink;
+  /** How often the tail lets its oldest message go; 0, never. */
+  fadeMs?: number;
 }) {
   const [parked, setParked] = useState(emptyEnds);
   const [picked, setPicked] = useState<string | null>(null);
@@ -89,6 +98,7 @@ export function useParkedEnds({
     parked.tail.length,
     view === "tail" || heldElsewhere,
     () => setParked(fadeOldest),
+    fadeMs,
   );
   const request =
     view === "head"

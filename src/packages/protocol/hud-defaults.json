@@ -31,6 +31,7 @@
   "solidTransparency": 0,
   "hoverDelayMs": 400,
   "collapseDelayMs": 200,
+  "messageFadeSeconds": 5,
   "requiresOptionToOpen": false,
   "openImmediatelyAtTop": false,
   "sessionList": true,

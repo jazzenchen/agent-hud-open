@@ -17,6 +17,7 @@ const globalKeys = [
   "botLogos",
   "hoverDelayMs",
   "collapseDelayMs",
+  "messageFadeSeconds",
   "requiresOptionToOpen",
   "openImmediatelyAtTop",
   "animations",

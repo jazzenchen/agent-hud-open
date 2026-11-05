@@ -22,6 +22,7 @@ const screen = { width: 1600, height: 1000 };
 const logos = {
   logo: 30,
   mark: 30,
+  gap: 6,
   padding: { top: 0, right: 0, bottom: 0, left: 0 },
 };
 const both = { head: 1, tail: 1 };
@@ -111,6 +112,7 @@ test("a Simple dock's ends are as thick as its row of rings, on its ring column"
   const rings = {
     logo: 14,
     mark: 26,
+    gap: 6,
     padding: { top: 5, right: 12, bottom: 5, left: 6 },
   };
   const config = { mode: "simple" as const, simpleSize: 26 };
@@ -235,4 +237,27 @@ test("a screen that starts late takes what the others hold, once each", () => {
     ["3", "2", "1"],
   );
   assert.equal(mergeEnds(merged, theirs), merged);
+});
+
+test("a Dynamic dock's ends grow with its logos, spaced as its marks", () => {
+  const strip = { x: 1520, y: 300, width: 80, height: 400 };
+  const big = {
+    logo: 60,
+    mark: 60,
+    gap: 18,
+    padding: { top: 0, right: 0, bottom: 0, left: 0 },
+  };
+  const ends = dockEnds(
+    strip,
+    "right",
+    { mode: "logos", simpleSize: 26 },
+    big,
+    screen,
+    both,
+  );
+  assert.equal(ends.thick, 60);
+  assert.equal(strip.y - (ends.head.y + ends.head.height), 18);
+  // Bare, the icon stands nearly as large as a logo.
+  assert.ok(endBadge(60, 1, true).icon >= 36);
+  assert.ok(endBadge(60, 1, true).icon > endBadge(60, 1).icon);
 });

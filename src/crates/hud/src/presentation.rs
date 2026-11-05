@@ -29,6 +29,7 @@ const GLOBAL: &[&str] = &[
     "botLogos",
     "hoverDelayMs",
     "collapseDelayMs",
+    "messageFadeSeconds",
     "requiresOptionToOpen",
     "openImmediatelyAtTop",
     "animations",

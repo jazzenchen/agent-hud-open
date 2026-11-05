@@ -66,6 +66,9 @@ export interface HUDConfig {
   solidTransparency: number;
   hoverDelayMs: number;
   collapseDelayMs: number;
+  /** How often the dock's tail lets its oldest message go, in seconds;
+   * 0 keeps them until the person lets them go. */
+  messageFadeSeconds: number;
   requiresOptionToOpen: boolean;
   openImmediatelyAtTop: boolean;
   sessionList: boolean;
@@ -88,29 +91,7 @@ export interface HUDConfig {
 
 export const defaultHUDConfig: HUDConfig = hudDefaults as HUDConfig;
 
-export const HUD_METRICS = {
-  duration: 0.4,
-  ease: [0.2, 0.8, 0.2, 1] as [number, number, number, number],
-  entryDistance: 5,
-  collapsedFlare: 8,
-  expandedFlare: 16,
-  notchRadius: 12,
-  fallbackRadius: 10,
-  panelRadius: 26,
-  agentPanelMinimum: 440,
-  agentPanelInset: 100,
-  defaultPanelHeight: 326,
-  cardGap: 6,
-  cardRadius: 22,
-  bubbleWidth: 196,
-  bubbleRadius: 14,
-  dockHeight: 26,
-  dockTextSize: 9,
-  edgeMargin: 3,
-  alertWidth: 470,
-  alertWing: 112,
-  alertPadding: 16,
-} as const;
+export { HUD_METRICS } from "./hud-metrics.ts";
 
 export interface HUDVendor {
   key: string;
