@@ -1,5 +1,5 @@
-// SOURCE and FOLDER, above, name the client: its sessions' id prefix and its data folder. The line after the script
-// exports `server`, the plugin.
+// SOURCE and FOLDER, above, name the client: its sessions' id prefix and its data folder. What follows the script
+// exports `server`, OpenCode 1's plugin, and for OpenCode itself also `setup`, OpenCode 2's (`export.js`).
 import { mkdirSync, writeFileSync, renameSync, readdirSync, readFileSync, statSync, unlinkSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -43,6 +43,7 @@ function inbox() {
   };
 }
 
+// OpenCode 1 and its forks.
 async function server(input) {
   const turns = inbox();
   const sessions = new Map();
@@ -126,4 +127,50 @@ async function server(input) {
       } catch { /* Observability must never interrupt the client. */ }
     },
   };
+}
+
+// OpenCode 2. An execution runs a session from a prompt until it settles, through tool calls, retries and queued
+// prompts. It completed when it succeeded and its newest prompt, reply or compaction is a reply that stopped on its own
+// and carries no error; a compaction or a shell command run on its own is no turn, and neither is a child session's
+// run. OpenCode 2 runs plugins in one background service for every terminal, so a record names no terminal.
+function setup(ctx) {
+  if (!ctx?.event?.subscribe || !ctx.session) return;
+  const turns = inbox(), started = new Map(), controller = new AbortController();
+  // Messages a person or OpenCode put in a session, as against marks such as when it went idle.
+  const prompts = ["user", "synthetic", "skill", "shell"], entries = [...prompts, "assistant", "compaction"];
+
+  async function complete(id, at) {
+    const startedAtMs = started.get(id);
+    started.delete(id);
+    // Each folder OpenCode serves loads the plugin, and each sees every session: the folder a session runs in records it.
+    const info = await ctx.session.get({ sessionID: id }), directory = info?.location?.directory || ctx.location?.directory;
+    if (!info || info.parentID || (ctx.location?.directory && directory !== ctx.location.directory)) return;
+    // A prompt sent after the execution ended belongs to the next one.
+    const messages = (await ctx.session.context({ sessionID: id })).filter((message) => !(message.time?.created > at));
+    const last = messages.findLastIndex((message) => entries.includes(message.type));
+    const reply = messages[last];
+    if (reply?.type !== "assistant" || reply.error || reply.finish !== "stop" || !reply.time?.completed) return;
+    const prompt = messages.slice(0, last).findLast((message) => prompts.includes(message.type));
+    turns.write({
+      version: 1, sessionID: SOURCE + ":" + id, workspace: directory,
+      title: info.title, model: reply.model?.id, providerID: reply.model?.providerID, turnID: prompt?.id || reply.id,
+      startedAtMs: startedAtMs || info.time?.busy || prompt?.time?.created || reply.time.created, completedAtMs: Date.now(),
+    });
+  }
+
+  (async () => {
+    const types = ["session.execution.started", "session.execution.succeeded", "session.execution.failed",
+      "session.execution.interrupted", "session.deleted"];
+    for await (const event of ctx.event.subscribe({ types, signal: controller.signal })) {
+      try {
+        const id = event?.data?.sessionID;
+        if (!id) continue;
+        if (event.type === "session.execution.started") started.set(id, event.created || Date.now());
+        else if (event.type === "session.execution.succeeded") complete(id, event.created || Date.now()).catch(() => {});
+        else if (event.type === "session.deleted") { started.delete(id); turns.forget(id); }
+        else started.delete(id);
+      } catch { /* Observability must never interrupt the client. */ }
+    }
+  })().catch(() => {});
+  return () => controller.abort();
 }

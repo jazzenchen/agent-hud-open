@@ -90,8 +90,11 @@ pub static AGENT: Agent = Agent {
     discovery: &DISCOVERY,
 };
 
-/// OpenCode's plugin records each turn when it completes. Its forks load the
-/// same plugin, written for their own folders and ids (`observer.js`).
+/// OpenCode's plugin records each turn when it completes (`observer.js`).
+/// OpenCode 1 and OpenCode 2 both load every script in `plugin/` and
+/// `plugins/`, so one script serves both, exporting the plugin of the
+/// version that loads it (`export.js`). Its forks load OpenCode 1's plugin,
+/// written for their own folders and ids.
 static OBSERVER: Observer = Observer {
     turns: Location::data_home(&["opencode"], "agent-hud/turns"),
     script: Location::config_home(&["opencode"], "plugin/agent-hud.js"),
@@ -100,7 +103,7 @@ static OBSERVER: Observer = Observer {
         "// Agent HUD OpenCode session observer\n",
         "const SOURCE = \"opencode\", FOLDER = \"opencode\";\n",
         include_str!("observer.js"),
-        "export const AgentHUDSessionObserver = server;\n"
+        include_str!("export.js")
     ),
     at_key: "completedAtMs",
     states: false,

@@ -29,15 +29,19 @@ fn every_client_of_the_database_has_its_store_and_its_own_plugin() {
     for client in STORES {
         assert!(std::ptr::eq(store(client.agent.id).unwrap(), client));
         let observer = client.agent.observer.unwrap();
-        // The plugin is OpenCode's, written for this client's ids and folder.
+        // The plugin is OpenCode's, written for this client's ids and folder
+        // and exported the way the client loads it.
         assert!(observer.body.starts_with(observer.marker));
+        let export = match client.agent.id {
+            "opencode" => include_str!("export.js"),
+            _ => "export const AgentHUDSessionObserver = server;\n",
+        };
         assert_eq!(
             observer.body,
             format!(
-                "{}const SOURCE = \"{id}\", FOLDER = \"{id}\";\n{}{}",
+                "{}const SOURCE = \"{id}\", FOLDER = \"{id}\";\n{}{export}",
                 observer.marker,
                 include_str!("observer.js"),
-                "export const AgentHUDSessionObserver = server;\n",
                 id = client.agent.id
             ),
             "{}",
@@ -48,6 +52,60 @@ fn every_client_of_the_database_has_its_store_and_its_own_plugin() {
     }
     assert!(!include_str!("observer.js").contains("\"opencode"));
     assert!(store("pi").is_none());
+}
+
+#[test]
+fn opencode_1_and_2_load_the_same_file_and_the_forks_load_it_as_before() {
+    // Open #46: OpenCode 2 refused the plugin, which exported only OpenCode
+    // 1's function. Both versions load every script in `plugin/` and
+    // `plugins/`, so the one script exports the plugin of the version that
+    // loads it: OpenCode 1 calls a function, and an object stopped OpenCode
+    // before 1.2.11; OpenCode 2 needs an object with an id and `setup`, and
+    // only it gives its plugins `@opencode/plugin`.
+    let exports = |body: &str| {
+        body.lines()
+            .filter(|line| line.starts_with("export "))
+            .map(str::to_owned)
+            .collect::<Vec<_>>()
+    };
+    assert!(exports(include_str!("observer.js")).is_empty());
+    assert_eq!(exports(OBSERVER.body), ["export { plugin as default };"]);
+    let export = include_str!("export.js");
+    for line in [
+        "let plugin = server;",
+        "  await import(\"@opencode/plugin\");",
+        "  plugin = { id: \"agent-hud\", setup, server };",
+    ] {
+        assert!(export.lines().any(|l| l == line), "{line}");
+    }
+    // Where earlier releases wrote it, so their script is replaced rather
+    // than left behind for OpenCode 2 to refuse.
+    assert_eq!(OBSERVER.script.path, "plugin/agent-hud.js");
+    // Kilo Code and MiMo Code load OpenCode 1's plugin, named as before.
+    for fork in [&KILO_OBSERVER, &MIMO_CODE_OBSERVER] {
+        assert_eq!(
+            exports(fork.body),
+            ["export const AgentHUDSessionObserver = server;"]
+        );
+    }
+}
+
+#[test]
+fn a_turn_recorded_under_opencode_2_is_a_completed_turn_without_a_terminal() {
+    // OpenCode 2's plugin runs in its background service, which belongs to no
+    // terminal, so its records carry no navigation target.
+    let record = json!({
+        "version": 1, "sessionID": "opencode:ses_e5415bdccffe", "workspace": "/repo", "title": "Fix the login form",
+        "model": "mock-1", "providerID": "mock", "turnID": "msg_1abea442f001",
+        "startedAtMs": 1_793_885_619_559i64, "completedAtMs": 1_793_885_619_686i64,
+    });
+    let event = crate::parse_observation("opencode", &record).unwrap();
+    assert_eq!(event.session_id, "opencode:ses_e5415bdccffe");
+    assert_eq!(event.data["turnId"], "msg_1abea442f001");
+    assert_eq!(event.data["state"], "completed");
+    assert_eq!(event.data["outcome"], "completed");
+    assert_eq!(event.data["workspace"], "/repo");
+    assert_eq!(event.data["navigationTarget"], Value::Null);
 }
 
 #[test]

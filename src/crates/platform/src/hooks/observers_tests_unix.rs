@@ -53,6 +53,30 @@ fn a_config_folder_linked_to_a_real_folder_still_takes_the_observer() {
 }
 
 #[test]
+fn an_opencode_observer_from_an_earlier_release_gives_way_to_the_one_opencode_2_loads() {
+    // Open #46: earlier releases wrote a plugin that OpenCode 2 refuses.
+    let temp = tempfile::tempdir().unwrap();
+    let home = temp.path().join("home");
+    let script = home.join(".config/opencode/plugin/agent-hud.js");
+    fs::create_dir_all(script.parent().unwrap()).unwrap();
+    fs::write(
+        &script,
+        "// Agent HUD OpenCode session observer\nconst SOURCE = \"opencode\", FOLDER = \"opencode\";\n\
+         export const AgentHUDSessionObserver = async (input) => ({});\n",
+    )
+    .unwrap();
+    let context = context(&home);
+
+    let plan = observer_plan(&context, "opencode", true).unwrap();
+    assert!(plan.changed);
+    assert!(apply_observer_plan(&plan).unwrap());
+    let written = fs::read_to_string(&script).unwrap();
+    assert!(written.ends_with("export { plugin as default };\n"));
+    assert!(!written.contains("export const"));
+    assert!(!observer_plan(&context, "opencode", true).unwrap().changed);
+}
+
+#[test]
 fn one_client_that_cannot_take_its_observer_is_no_failure_of_the_switch() {
     let temp = tempfile::tempdir().unwrap();
     let home = temp.path().join("home");
