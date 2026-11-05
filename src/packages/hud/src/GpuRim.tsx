@@ -18,8 +18,9 @@ function shapeValues(shape: RimShape): RimValues {
 }
 
 /**
- * The rim on its own WebGPU canvas, drawing only when asked: a change of size
- * or value draws one frame, and a moving pattern advances `clock` at
+ * The rim on a WebGPU canvas of its own while it is shown (one a rim before it
+ * gave back, when there is one), drawing only when asked: a change of size or
+ * value draws one frame, and a moving pattern advances `clock` at
  * `framesPerSecond`.
  */
 export function GpuRim({
@@ -37,7 +38,7 @@ export function GpuRim({
   onReady: () => void;
   onUnavailable: () => void;
 }) {
-  const canvas = useRef<HTMLCanvasElement>(null);
+  const host = useRef<HTMLDivElement>(null);
   const live = useRef<GpuPaint | null>(null);
   const latest = useRef(values);
   latest.current = values;
@@ -47,11 +48,11 @@ export function GpuRim({
   callbacks.current = { onReady, onUnavailable };
   const start = useRef(0);
   useEffect(() => {
-    const element = canvas.current;
+    const element = host.current;
     if (!element) return;
     start.current = performance.now();
     const paint = startGpuPaint({
-      canvas: element,
+      host: element,
       numbers: RIM_NUMBERS,
       colors: RIM_COLORS,
       paint: RIM_PAINT,
@@ -94,6 +95,7 @@ export function GpuRim({
   }, [framesPerSecond]);
   return (
     <div
+      ref={host}
       style={{
         position: "absolute",
         inset: 0,
@@ -101,12 +103,6 @@ export function GpuRim({
         height: "100%",
         opacity: shown ? 1 : 0,
       }}
-    >
-      <canvas
-        ref={canvas}
-        data-renderer="webgpu"
-        style={{ width: "100%", height: "100%", display: "block" }}
-      />
-    </div>
+    />
   );
 }

@@ -6,6 +6,8 @@
  * linear sRGB; the output is encoded back to sRGB and premultiplied, as the
  * canvas expects.
  */
+import { device, giveBack, pipeline, takeCanvas } from "./glow-gpu-device.ts";
+
 export type PaintValues = Record<string, number | string>;
 
 export interface GpuPaint {
@@ -13,11 +15,13 @@ export interface GpuPaint {
    * next animation frame, or `now`, for a caller already inside the frame
    * that moved what the paint follows. */
   update(values: PaintValues, now?: boolean): void;
+  /** Stops drawing and gives the canvas back for the next paint. */
   dispose(): void;
 }
 
 export interface GpuPaintOptions {
-  canvas: HTMLCanvasElement;
+  /** The element the paint's canvas fills. */
+  host: HTMLElement;
   numbers: readonly string[];
   colors: readonly string[];
   paint: string;
@@ -31,22 +35,6 @@ export interface GpuPaintOptions {
 // GPUBufferUsage flags; the DOM lib in use does not declare the namespace.
 const UNIFORM = 0x40;
 const COPY_DST = 0x08;
-
-let sharedDevice: Promise<GPUDevice | null> | undefined;
-
-/** Every glow shares one device; a lost one is replaced on the next request. */
-function device(): Promise<GPUDevice | null> {
-  sharedDevice ??= (async () => {
-    const adapter = await navigator.gpu?.requestAdapter();
-    const created = await adapter?.requestDevice();
-    if (!created) return null;
-    void created.lost.then(() => {
-      sharedDevice = undefined;
-    });
-    return created;
-  })().catch(() => null);
-  return sharedDevice;
-}
 
 function layout(numbers: readonly string[], colors: readonly string[]) {
   // Colours first (16-byte aligned), then the canvas size, then the numbers.
@@ -115,7 +103,11 @@ function linearColor(css: string): [number, number, number, number] {
 }
 
 export function startGpuPaint(options: GpuPaintOptions): GpuPaint {
-  const { canvas, numbers, colors, paint } = options;
+  const { host, numbers, colors, paint } = options;
+  const canvas = takeCanvas();
+  canvas.dataset.renderer = "webgpu";
+  canvas.style.cssText = "display:block;width:100%;height:100%";
+  host.append(canvas);
   const plan = layout(numbers, colors);
   const data = new Float32Array(plan.floats);
   const sent: PaintValues = {};
@@ -125,6 +117,8 @@ export function startGpuPaint(options: GpuPaintOptions): GpuPaint {
   let draw: (() => void) | undefined;
   let observer: ResizeObserver | undefined;
   let buffer: GPUBuffer | undefined;
+  let configured: GPUCanvasContext | undefined;
+  let leave: (() => void) | undefined;
 
   const write = (values: PaintValues) => {
     let changed = false;
@@ -158,38 +152,39 @@ export function startGpuPaint(options: GpuPaintOptions): GpuPaint {
 
   write(options.values);
   void (async () => {
-    const gpu = await device();
+    const shared = await device();
     if (disposed) return;
     const context = canvas.getContext("webgpu") as GPUCanvasContext | null;
-    if (!gpu || !context) return unavailable();
+    if (!shared || !context) return unavailable();
+    const { gpu } = shared;
     const format = navigator.gpu.getPreferredCanvasFormat();
     context.configure({ device: gpu, format, alphaMode: "premultiplied" });
-    let pipeline: GPURenderPipeline;
+    configured = context;
+    let drawing: GPURenderPipeline;
     try {
-      const module = gpu.createShaderModule({
-        code: shader(plan.fields, plan.names, paint),
-      });
-      pipeline = await gpu.createRenderPipelineAsync({
-        layout: "auto",
-        vertex: { module, entryPoint: "vertexMain" },
-        fragment: { module, entryPoint: "fragmentMain", targets: [{ format }] },
-      });
+      drawing = await pipeline(
+        shared,
+        shader(plan.fields, plan.names, paint),
+        format,
+      );
     } catch {
       return unavailable();
     }
-    if (disposed) return context.unconfigure();
+    if (disposed) return;
     buffer = gpu.createBuffer({
       size: data.byteLength,
       usage: UNIFORM | COPY_DST,
     });
     const group = gpu.createBindGroup({
-      layout: pipeline.getBindGroupLayout(0),
+      layout: drawing.getBindGroupLayout(0),
       entries: [{ binding: 0, resource: { buffer } }],
     });
-    void gpu.lost.then(() => {
+    const lost = () => {
       draw = undefined;
       unavailable();
-    });
+    };
+    shared.lost.add(lost);
+    leave = () => shared.lost.delete(lost);
     draw = () => {
       if (!buffer || !canvas.width || !canvas.height) return;
       data[plan.resolution] = canvas.width;
@@ -206,7 +201,7 @@ export function startGpuPaint(options: GpuPaintOptions): GpuPaint {
           },
         ],
       });
-      pass.setPipeline(pipeline);
+      pass.setPipeline(drawing);
       pass.setBindGroup(0, group);
       pass.draw(3);
       pass.end();
@@ -250,11 +245,15 @@ export function startGpuPaint(options: GpuPaintOptions): GpuPaint {
       else request();
     },
     dispose() {
+      if (disposed) return;
       disposed = true;
       draw = undefined;
       cancelAnimationFrame(frame);
       observer?.disconnect();
+      leave?.();
       buffer?.destroy();
+      configured?.unconfigure();
+      giveBack(canvas);
     },
   };
 }
