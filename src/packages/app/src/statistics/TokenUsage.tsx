@@ -1,17 +1,15 @@
-import { useState, type Dispatch, type SetStateAction } from "react";
-import { ChevronDown, ChevronRight } from "lucide-react";
-import {
-  DropdownMenu,
-  DropdownMenuCheckboxItem,
-  DropdownMenuContent,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@agent-hud/ui/components/dropdown-menu";
-import { HUDArtwork as HUDLogo } from "@agent-hud/hud/HUDArtwork";
+import type { Dispatch, SetStateAction } from "react";
 import type { StatisticsResponse } from "@agent-hud/protocol";
-import { number, plain, row, type StatsTheme } from "./StatsTheme";
+import {
+  compact,
+  modelColor,
+  number,
+  row,
+  type StatsTheme,
+} from "./StatsTheme";
 import { TotalSummary } from "./StatsParts";
-import { ModelFilter } from "./ModelFilter";
+import { SectionFilter } from "./SectionFilter";
+import { selectionFilter } from "./section-filter";
 import { UsageChart } from "./UsageChart";
 
 /** The Tokens page's token section: the total, the model and agent filters, and the usage chart. */
@@ -36,7 +34,6 @@ export function TokenUsage({
 }) {
   const zh = Boolean(theme.zh);
   const t = (en: string, cn: string) => (zh ? cn : en);
-  const [modelsExpanded, setModelsExpanded] = useState(false);
   const available = data?.available;
   const providerChoices = available?.providers ?? [];
   const modelChoices = available?.models ?? [];
@@ -68,114 +65,27 @@ export function TokenUsage({
           </span>
         )}
       </div>
-      <div
-        style={{
-          ...row,
-          justifyContent: "space-between",
-          color: theme.secondary,
-          fontSize: 11,
-        }}
-      >
-        <div style={{ ...row, gap: 14 }}>
-          <button
-            type="button"
-            onClick={() => setModelsExpanded((value) => !value)}
-            aria-expanded={modelsExpanded}
-            style={{ ...plain, ...row, gap: 4 }}
-          >
-            <ChevronRight
-              size={10}
-              style={{
-                transform: modelsExpanded ? "rotate(90deg)" : "rotate(0deg)",
-                transition: "transform 180ms cubic-bezier(0.22, 1, 0.36, 1)",
-              }}
-            />
-            {t("Models", "模型")} ·{" "}
-            {selectedModels === null
-              ? t("All", "全部")
-              : t(
-                  `${selectedModels.length} selected`,
-                  `已选 ${selectedModels.length} 个`,
-                )}
-          </button>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                type="button"
-                style={{ ...plain, ...row, gap: 4 }}
-                aria-label={t("Filter statistics by agent", "按智能体筛选")}
-              >
-                {t("Agents", "智能体")} ·{" "}
-                {selectedProviders === null
-                  ? t("All", "全部")
-                  : t(
-                      `${selectedProviders.length} selected`,
-                      `已选 ${selectedProviders.length} 个`,
-                    )}
-                <ChevronDown size={10} />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start">
-              <DropdownMenuCheckboxItem
-                checked={selectedProviders === null}
-                onSelect={(event) => event.preventDefault()}
-                onCheckedChange={() => setProviders(null)}
-              >
-                {t("All agents", "全部智能体")}
-              </DropdownMenuCheckboxItem>
-              <DropdownMenuSeparator />
-              {providerChoices.map((provider) => (
-                <DropdownMenuCheckboxItem
-                  key={provider.id}
-                  checked={
-                    selectedProviders === null ||
-                    selectedProviders.includes(provider.id)
-                  }
-                  onSelect={(event) => event.preventDefault()}
-                  onCheckedChange={(checked) =>
-                    setProviders((previous) => {
-                      const values =
-                        previous ?? providerChoices.map((entry) => entry.id);
-                      return checked
-                        ? [...new Set([...values, provider.id])].sort()
-                        : values.filter((value) => value !== provider.id);
-                    })
-                  }
-                >
-                  <HUDLogo source={provider.id} size={12} light={light} />
-                  {provider.name}
-                </DropdownMenuCheckboxItem>
-              ))}
-              {!providerChoices.length && (
-                <span
-                  style={{ padding: 8, color: theme.secondary, fontSize: 11 }}
-                >
-                  {t("No recorded agents", "暂无已记录的智能体")}
-                </span>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-        {(selectedModels !== null || selectedProviders !== null) && (
-          <button
-            type="button"
-            onClick={() => {
-              setModels(null);
-              setProviders(null);
-            }}
-            style={{ ...plain, color: theme.secondary, fontSize: 11 }}
-          >
-            {t("Clear filter", "清除筛选")}
-          </button>
+      <SectionFilter
+        agents={providerChoices}
+        models={modelChoices.map((model) => {
+          const value = data?.models.find((entry) => entry.id === model.id);
+          return {
+            id: model.id,
+            name: model.name,
+            agent: model.provider,
+            color: modelColor(model.id),
+            figure: value ? compact(value.selectedTokens) : "—",
+          };
+        })}
+        state={selectionFilter(
+          selectedProviders,
+          setProviders,
+          providerChoices.map((provider) => provider.id),
+          selectedModels,
+          setModels,
+          modelChoices.map((model) => model.id),
         )}
-      </div>
-      <ModelFilter
-        expanded={modelsExpanded}
-        data={data}
-        modelChoices={modelChoices}
         loading={loading}
-        selectedModels={selectedModels}
-        setModels={setModels}
         theme={theme}
         light={light}
       />

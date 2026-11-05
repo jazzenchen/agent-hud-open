@@ -7,6 +7,8 @@ export const storageKeys = {
   selectedScreen: "agenthud.selected-screen",
   highlightProvider: "agenthud.highlight-provider",
   hiddenAgentCards: "agenthud.hidden-agent-cards",
+  quotaHistoryFilter: "agenthud.quota-history-filter",
+  planValueFilter: "agenthud.plan-value-filter",
   hudConfig: "agenthud.hud-config.v3",
   hudConfigV2: "agenthud.hud-config.v2",
   hudConfigV1: "agenthud.hud-config",

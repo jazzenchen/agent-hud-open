@@ -1,49 +1,114 @@
-import type { Dispatch, SetStateAction } from "react";
-import { Check } from "lucide-react";
+import type { CSSProperties } from "react";
+import { Check, Minus } from "lucide-react";
 import { HUDArtwork as HUDLogo } from "@agent-hud/hud/HUDArtwork";
-import type { StatisticsResponse } from "@agent-hud/protocol";
-import {
-  compact,
-  modelColor,
-  number,
-  plain,
-  row,
-  truncate,
-  type StatsTheme,
-} from "./StatsTheme";
+import type { FilterChoice } from "@agent-hud/protocol";
+import { number, plain, row, truncate, type StatsTheme } from "./StatsTheme";
+import type { FilterState } from "./section-filter";
 
-/** The Tokens section's model checklist, folded under its Models button:
- * each recorded model with its colour and its tokens in the range. */
+/** A model as a filter lists it, under the agent it belongs to. */
+export interface ModelOption {
+  id: string;
+  name: string;
+  /** The agent it is listed under. */
+  agent: string;
+  /** Its colour where a chart draws it in that colour. */
+  color?: string;
+  /** A figure at the end of its line, such as its tokens. */
+  figure?: string;
+}
+
+/** One agent's models, in the order they were given. */
+export interface ModelGroup {
+  agent: FilterChoice;
+  models: ModelOption[];
+}
+
+/** The agents' models, under the agents in `agents`' order; an agent the
+ * models name but `agents` does not comes last, by its id. */
+export function modelGroups(
+  agents: FilterChoice[],
+  models: ModelOption[],
+): ModelGroup[] {
+  const groups = new Map<string, ModelGroup>(
+    agents.map((agent) => [agent.id, { agent, models: [] }]),
+  );
+  for (const model of models) {
+    const group = groups.get(model.agent) ?? {
+      agent: { id: model.agent, name: model.agent },
+      models: [],
+    };
+    if (!group.models.some((entry) => entry.id === model.id))
+      group.models.push(model);
+    groups.set(model.agent, group);
+  }
+  return [...groups.values()].filter((group) => group.models.length > 0);
+}
+
+function Box({
+  state,
+  theme,
+}: {
+  state: boolean | "mixed";
+  theme: StatsTheme;
+}) {
+  const on = state !== false;
+  return (
+    <span
+      aria-hidden
+      style={{
+        width: 13,
+        height: 13,
+        flexShrink: 0,
+        borderRadius: 3.5,
+        border: `1px solid ${on ? "#007aff" : theme.divider}`,
+        background: on ? "#007aff" : "transparent",
+        color: "#fff",
+        display: "inline-grid",
+        placeItems: "center",
+      }}
+    >
+      {state === "mixed" ? (
+        <Minus size={9} strokeWidth={3} />
+      ) : (
+        state && <Check size={9} strokeWidth={3} />
+      )}
+    </span>
+  );
+}
+
+/** A section's model checklist, folded under its Models button: each shown
+ * agent's models under its name, where one click shows or hides them all. */
 export function ModelFilter({
   expanded,
-  data,
-  modelChoices,
+  groups,
+  state,
   loading,
-  selectedModels,
-  setModels,
   theme,
   light,
 }: {
   expanded: boolean;
-  data: StatisticsResponse | null;
-  modelChoices: StatisticsResponse["available"]["models"];
-  loading: boolean;
-  selectedModels: string[] | null;
-  setModels: Dispatch<SetStateAction<string[] | null>>;
+  groups: ModelGroup[];
+  state: FilterState;
+  loading?: boolean;
   theme: StatsTheme;
   light: boolean;
 }) {
   const zh = Boolean(theme.zh);
   const t = (en: string, cn: string) => (zh ? cn : en);
-  const pickModel = (id: string) =>
-    setModels((previous) => {
-      if (previous === null) return [id];
-      if (previous.includes(id)) {
-        const next = previous.filter((value) => value !== id);
-        return next.length ? next : null;
-      }
-      return [...previous, id].sort();
-    });
+  const ids = [
+    ...new Set(groups.flatMap((group) => group.models.map(({ id }) => id))),
+  ];
+  const everything = ids.every(state.modelShown);
+  const line = (on: boolean): CSSProperties => ({
+    ...plain,
+    ...row,
+    width: "100%",
+    textAlign: "left",
+    color: on ? theme.text : theme.secondary,
+    fontSize: 11,
+    padding: "3px 4px",
+    borderRadius: 4,
+  });
   return (
     <div
       style={{
@@ -57,92 +122,108 @@ export function ModelFilter({
       }}
     >
       <div style={{ overflow: "hidden", minHeight: 0 }}>
-        <div style={{ display: "grid", gap: 6, paddingTop: 8 }}>
-          <button
-            type="button"
-            onClick={() => setModels(null)}
-            style={{
-              ...plain,
-              ...row,
-              color: theme.secondary,
-              fontSize: 11,
-            }}
-          >
-            <Check
-              size={11}
-              style={{ opacity: selectedModels === null ? 1 : 0 }}
-            />
-            {t("All models", "全部模型")}
-            {selectedModels !== null &&
-              (zh ? " · 清除筛选" : " · Clear filter")}
-          </button>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit,minmax(190px,1fr))",
-              gap: "6px 16px",
-            }}
-          >
-            {modelChoices.map((model) => {
-              const value = data?.models.find((entry) => entry.id === model.id);
-              const checked = selectedModels?.includes(model.id) ?? false;
-              return (
+        <div style={{ display: "grid", gap: 8, paddingTop: 8 }}>
+          {ids.length > 0 && (
+            <button
+              type="button"
+              onClick={() => state.setModels(ids, true)}
+              style={{ ...plain, ...row, color: theme.secondary, fontSize: 11 }}
+            >
+              <Check size={11} style={{ opacity: everything ? 1 : 0 }} />
+              {t("All models", "全部模型")}
+              {!everything && t(" · Show all", " · 全部显示")}
+            </button>
+          )}
+          {groups.map(({ agent, models }) => {
+            const shown = models.filter((model) => state.modelShown(model.id));
+            const all = shown.length === models.length;
+            const mark = all ? true : shown.length ? "mixed" : false;
+            return (
+              <div key={agent.id} style={{ display: "grid", gap: 2 }}>
                 <button
-                  key={model.id}
                   type="button"
                   role="checkbox"
-                  aria-checked={checked}
-                  aria-label={`Include ${model.name} from ${model.provider}`}
-                  title={`${model.provider} · ${model.name}`}
-                  onClick={() => pickModel(model.id)}
-                  style={{
-                    ...plain,
-                    ...row,
-                    width: "100%",
-                    textAlign: "left",
-                    color: checked ? theme.text : theme.secondary,
-                    fontSize: 11,
-                    padding: "3px 4px",
-                    borderRadius: 4,
-                    background: checked ? theme.segment : "transparent",
-                  }}
+                  aria-checked={mark}
+                  aria-label={t(
+                    `Show ${agent.name}'s models`,
+                    `显示 ${agent.name} 的模型`,
+                  )}
+                  onClick={() =>
+                    state.setModels(
+                      models.map((model) => model.id),
+                      !all,
+                    )
+                  }
+                  style={{ ...line(true), fontWeight: 600 }}
                 >
+                  <Box state={mark} theme={theme} />
+                  <HUDLogo source={agent.id} size={12} light={light} />
+                  <span style={truncate}>{agent.name}</span>
                   <span
-                    aria-hidden
                     style={{
-                      width: 13,
-                      height: 13,
-                      flexShrink: 0,
-                      borderRadius: 3.5,
-                      border: `1px solid ${checked ? "#007aff" : theme.divider}`,
-                      background: checked ? "#007aff" : "transparent",
-                      color: "#fff",
-                      display: "inline-grid",
-                      placeItems: "center",
+                      marginLeft: "auto",
+                      color: theme.secondary,
+                      fontWeight: 400,
+                      ...number,
                     }}
                   >
-                    {checked && <Check size={9} strokeWidth={3} />}
-                  </span>
-                  <span
-                    aria-hidden
-                    style={{
-                      width: 6,
-                      height: 6,
-                      flexShrink: 0,
-                      borderRadius: 2,
-                      background: modelColor(model.id),
-                    }}
-                  />
-                  <HUDLogo source={model.provider} size={12} light={light} />
-                  <span style={truncate}>{model.name}</span>
-                  <span style={{ marginLeft: "auto", ...number }}>
-                    {value ? compact(value.selectedTokens) : "—"}
+                    {shown.length}/{models.length}
                   </span>
                 </button>
-              );
-            })}
-          </div>
-          {!modelChoices.length && (
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fit,minmax(190px,1fr))",
+                    gap: "2px 16px",
+                    paddingLeft: 17,
+                  }}
+                >
+                  {models.map((model) => {
+                    const checked = state.modelShown(model.id);
+                    return (
+                      <button
+                        key={model.id}
+                        type="button"
+                        role="checkbox"
+                        aria-checked={checked}
+                        aria-label={t(
+                          `Show ${model.name} from ${agent.name}`,
+                          `显示 ${agent.name} 的 ${model.name}`,
+                        )}
+                        title={`${agent.name} · ${model.name}`}
+                        onClick={() => state.setModels([model.id], !checked)}
+                        style={{
+                          ...line(checked),
+                          background: checked ? theme.segment : "transparent",
+                        }}
+                      >
+                        <Box state={checked} theme={theme} />
+                        {model.color && (
+                          <span
+                            aria-hidden
+                            style={{
+                              width: 6,
+                              height: 6,
+                              flexShrink: 0,
+                              borderRadius: 2,
+                              background: model.color,
+                            }}
+                          />
+                        )}
+                        <span style={truncate}>{model.name}</span>
+                        {model.figure && (
+                          <span style={{ marginLeft: "auto", ...number }}>
+                            {model.figure}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+          {!groups.length && (
             <span style={{ color: theme.secondary, fontSize: 11 }}>
               {loading
                 ? t("Loading models…", "正在加载模型…")

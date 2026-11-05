@@ -23,6 +23,10 @@ import {
   type StatsTheme,
 } from "./StatsTheme";
 import { QuotaLine } from "./QuotaLine";
+import { SectionFilter } from "./SectionFilter";
+import type { ModelOption } from "./ModelFilter";
+import { useHiddenFilter } from "./section-filter";
+import { storageKeys } from "../lib/storage-keys";
 
 type Action = (
   method: NativeMethod,
@@ -105,6 +109,33 @@ export function QuotaHistory({
   const shownTo = data ? Date.parse(data.to) : to;
   // A stretch of another length, once it has come, draws the lines in again.
   const reveal = String(shownTo - shownFrom);
+  const filter = useHiddenFilter(storageKeys.quotaHistoryFilter);
+  // Each vendor lists the models whose calls spend one of its windows.
+  const choices = useMemo(() => {
+    const names = new Map(
+      (data?.models ?? []).map((model) => [model.id, model.name]),
+    );
+    const agents =
+      data?.agents ??
+      [...new Set((data?.windows ?? []).map((quota) => quota.vendor))].map(
+        (id) => ({ id, name: id }),
+      );
+    const models: ModelOption[] = (data?.windows ?? []).flatMap((quota) =>
+      (quota.models ?? []).map((id) => ({
+        id,
+        name: names.get(id) ?? id,
+        agent: quota.vendor,
+      })),
+    );
+    return { agents, models };
+  }, [data]);
+  // A window shows while its vendor does and, when calls spent it in the
+  // stretch, while one of their models does.
+  const windows = (data?.windows ?? []).filter(
+    (quota) =>
+      filter.agentShown(quota.vendor) &&
+      (!quota.models?.length || quota.models.some(filter.modelShown)),
+  );
   const accounts = useMemo(() => {
     const ids = new Map<string, Set<string>>();
     for (const quota of data?.windows ?? []) {
@@ -134,6 +165,15 @@ export function QuotaHistory({
           {quotaDisplayLabel(display, zh ? "zh" : "en")} · 0–100%
         </span>
       </div>
+      {data && data.windows.length > 0 && (
+        <SectionFilter
+          agents={choices.agents}
+          models={choices.models}
+          state={filter}
+          theme={theme}
+          light={light}
+        />
+      )}
       {error && (
         <div role="alert" style={{ color: theme.secondary, fontSize: 11 }}>
           {zh ? "额度历史暂不可用：" : "Quota history is unavailable: "}
@@ -150,8 +190,13 @@ export function QuotaHistory({
           {zh ? "暂无可显示的额度窗口" : "No quota windows to show"}
         </div>
       )}
-      <div style={{ display: "grid", gap: 14 }}>
-        {data?.windows.map((quota) => {
+      {data && data.windows.length > 0 && !windows.length && (
+        <div style={{ color: theme.secondary, fontSize: 11, padding: "8px 0" }}>
+          {zh ? "筛选隐藏了全部额度窗口" : "The filter hides every window"}
+        </div>
+      )}
+      <div style={{ display: "grid", gap: 14, paddingTop: 8 }}>
+        {windows.map((quota) => {
           const reading = nowLine(live.get(quota.id), display, now, zh);
           const several = (accounts.get(quota.vendor)?.size ?? 0) > 1;
           return (
@@ -196,7 +241,7 @@ export function QuotaHistory({
           );
         })}
       </div>
-      {data && data.windows.length > 0 && (
+      {windows.length > 0 && (
         <div
           style={{
             display: "flex",

@@ -10,8 +10,12 @@ import type {
   PlanValueResponse,
 } from "@agent-hud/protocol";
 import { useCoreQuery } from "../lib/use-core-query";
+import { storageKeys } from "../lib/storage-keys";
+import { SectionFilter } from "./SectionFilter";
+import { useHiddenFilter } from "./section-filter";
 import {
   card,
+  compact,
   number,
   row,
   truncate,
@@ -104,11 +108,13 @@ export function PlanValue({
   theme: StatsTheme;
   light: boolean;
 }) {
+  const filter = useHiddenFilter(storageKeys.planValueFilter);
   // Only the latest request publishes; a failure keeps the last answer shown.
+  // Core leaves the hidden models out of the value.
   const { data, error } = useCoreQuery<PlanValueResponse>(
     action,
     "plan_value",
-    {},
+    { hiddenModels: filter.hidden.models },
     active,
     refresh,
   );
@@ -120,6 +126,28 @@ export function PlanValue({
   const zh = Boolean(theme.zh);
   if (!data?.accounts.length) return null;
   const from = Date.parse(data.from);
+  const agents = [
+    ...new Map(
+      data.accounts.map((account) => [
+        account.provider,
+        {
+          id: account.provider,
+          name: account.providerName ?? account.provider,
+        },
+      ]),
+    ).values(),
+  ];
+  const models = data.accounts.flatMap((account) =>
+    (account.models ?? []).map((model) => ({
+      id: model.id,
+      name: model.name,
+      agent: account.provider,
+      figure: compact(model.tokens),
+    })),
+  );
+  const accounts = data.accounts.filter((account) =>
+    filter.agentShown(account.provider),
+  );
   return (
     <div
       className="statistics-plan-value"
@@ -142,7 +170,21 @@ export function PlanValue({
             : `Monthly list prices, checked ${data.checked}`}
         </span>
       </div>
-      {data.accounts.map((account) => {
+      <div>
+        <SectionFilter
+          agents={agents}
+          models={models}
+          state={filter}
+          theme={theme}
+          light={light}
+        />
+      </div>
+      {!accounts.length && (
+        <div style={{ color: theme.secondary, fontSize: 11 }}>
+          {zh ? "筛选隐藏了全部订阅" : "The filter hides every plan"}
+        </div>
+      )}
+      {accounts.map((account) => {
         const value = account.value;
         const since = value ? Date.parse(value.from) : NaN;
         const later = Number.isFinite(since) && since > from + 86_400_000;
