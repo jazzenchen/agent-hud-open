@@ -61,6 +61,7 @@ impl crate::AgentHudCore {
                     at,
                     (100.0 - used).clamp(0.0, 100.0),
                     plan.as_deref(),
+                    row["resetAt"].as_str().and_then(metering::date_ms),
                 ) {
                     Ok(count) => {
                         changed |= count > 0;

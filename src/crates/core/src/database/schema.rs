@@ -164,6 +164,9 @@ pub(crate) fn schema(db: &Connection) -> rusqlite::Result<()> {
     // readings from before the column, or of an account with no plan, have
     // none and are never compared across plans.
     ensure_column(db, "quota_sample", "plan", "TEXT")?;
+    // The reset the reading reported, so the quota history can tell exactly
+    // where one cycle ended; readings from before the column have none.
+    ensure_column(db, "quota_sample", "reset_at_ms", "INTEGER")?;
     // Prompt (0) and compaction (1) marks drive a session's turns.
     db.execute_batch(
         "CREATE TABLE IF NOT EXISTS usage_meter_mark(

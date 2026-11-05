@@ -105,6 +105,22 @@ export interface QuotaHistoryWindow {
   /** The recorded models whose calls in the stretch spend the window, by
    * their statistics ids (`<source>-model:<model>`). */
   models?: string[];
+  /** The window's cycles that end in the stretch, oldest first. */
+  cycles?: QuotaCycle[];
+}
+/** One cycle of a quota window, from Core: from its start to its reset, with
+ * the highest used share read in it, which is what it consumed. */
+export interface QuotaCycle {
+  /** Epoch ms. */
+  start: number;
+  /** Its reset, epoch ms; ahead of now for the running cycle. */
+  end: number;
+  used: number;
+  readings: number;
+  /** Still running. */
+  current: boolean;
+  /** Last read well before its reset: it may have used more. */
+  partial: boolean;
 }
 /** A filter choice Core names: an agent, or a recorded model by its statistics id. */
 export interface FilterChoice {

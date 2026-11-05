@@ -1,7 +1,7 @@
-import type { QuotaHistoryWindow } from "@agent-hud/protocol";
+import type { QuotaCycle, QuotaHistoryWindow } from "@agent-hud/protocol";
 
-/** One agent's windows drawn in one chart; an agent signed in with several
- * accounts has one chart per account. */
+/** One agent's windows drawn together; an agent signed in with several
+ * accounts has one group per account. */
 export interface QuotaGroup {
   key: string;
   vendor: string;
@@ -37,29 +37,32 @@ export function quotaGroups(windows: QuotaHistoryWindow[]): QuotaGroup[] {
   return [...groups.values()];
 }
 
-/** A window's line colour by its place in its chart: the accent first, then
- * hues far from it and from each other. */
-export function windowColor(index: number, light: boolean): string {
-  const colors = light
-    ? ["#007aff", "#e8590c", "#0ca678", "#9c36b5", "#d6336c", "#5c940d"]
-    : ["#0a84ff", "#ff9f0a", "#30d158", "#bf5af2", "#ff6482", "#a3e635"];
-  return colors[index % colors.length];
+/** A cycle's level by what it used, at the account readers' thresholds:
+ * warning from 70%, critical from 90%. */
+export function cycleLevel(used: number): "normal" | "warning" | "critical" {
+  return used >= 90 ? "critical" : used >= 70 ? "warning" : "normal";
 }
 
-/** Each window's reading nearest to `at`, where one lies within `reach`
- * (epoch ms) of it; null for a window with none there, so no reading is
- * offered across a gap. */
-export function readingsAt(
-  windows: Pick<QuotaHistoryWindow, "segments">[],
-  at: number,
-  reach: number,
-): ([number, number] | null)[] {
-  return windows.map((window) => {
-    let nearest: [number, number] | null = null;
-    for (const run of window.segments)
-      for (const point of run)
-        if (!nearest || Math.abs(point[0] - at) < Math.abs(nearest[0] - at))
-          nearest = point;
-    return nearest && Math.abs(nearest[0] - at) <= reach ? nearest : null;
-  });
+/** A cycle that used its whole quota. */
+export const usedUp = (cycle: Pick<QuotaCycle, "used">) => cycle.used >= 99.5;
+
+/** What a window's finished cycles add up to: how many, the average of those
+ * it was used in, and how many used it up. */
+export function cycleSummary(cycles: QuotaCycle[]) {
+  const done = cycles.filter((cycle) => !cycle.current);
+  const used = done.filter((cycle) => cycle.used > 0);
+  return {
+    count: done.length,
+    average: used.length
+      ? used.reduce((sum, cycle) => sum + cycle.used, 0) / used.length
+      : null,
+    full: done.filter(usedUp).length,
+  };
+}
+
+/** The stretch a cycle chart draws: the range up to `to`, then a little past
+ * it so the running cycles show up to their resets. */
+export function cycleSpan(to: number, days: number) {
+  const length = days * 86_400_000;
+  return { from: to - length, until: to + length * 0.18 };
 }

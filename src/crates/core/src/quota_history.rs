@@ -3,13 +3,16 @@
 //! without a break, thinned to a point or two a bin, and the resets between
 //! its cycles. One window is read at a time by its key, never the whole
 //! table, and only when a page asks. Each window also names the recorded
-//! models whose calls in the stretch spend it, for the page's model filter.
+//! models whose calls in the stretch spend it, for the page's model filter,
+//! and its cycles with what each used (`cycles`).
 use super::*;
 use crate::database::quota_link::QuotaLink;
 use crate::naming::model_names::{consumer_name, vendor_name};
 use crate::statistics::model_id;
 use rusqlite::params;
 use std::collections::BTreeSet;
+
+pub(crate) mod cycles;
 
 /// The furthest a history reaches back: what `quota_sample` keeps.
 const KEPT_MS: i64 = 30 * 86_400_000;
@@ -80,6 +83,24 @@ impl AgentHudCore {
             }
             Ok(samples)
         };
+        // A window's readings back to a whole length before the stretch, so
+        // the cycle it starts in is whole.
+        let read_since = |id: &str, since: i64| -> rusqlite::Result<Vec<cycles::Reading>> {
+            let mut statement = db.prepare_cached(
+                "SELECT observed_at_ms,remaining,reset_at_ms FROM quota_sample
+                 WHERE window_id=?1 AND observed_at_ms>=?2 AND observed_at_ms<=?3
+                 ORDER BY observed_at_ms",
+            )?;
+            let rows = statement.query_map(params![id, since, to], |r| {
+                Ok((
+                    r.get::<_, i64>(0)?,
+                    (100.0 - r.get::<_, f64>(1)?).clamp(0.0, 100.0),
+                    r.get::<_, Option<i64>>(2)?,
+                ))
+            })?;
+            rows.collect()
+        };
+        let now = Utc::now().timestamp_millis();
         // The models the ledger recorded calls of in the stretch, by source
         // and model as recorded.
         let recorded = self
@@ -136,6 +157,17 @@ impl AgentHudCore {
             let reset = row["resetAt"].as_str().and_then(metering::date_ms);
             let cycle_start = reset.zip(length).map(|(reset, length)| reset - length);
             let (segments, resets) = history(&samples, from, to, bin, cycle_start, length);
+            let span = read_since(id, from - length.unwrap_or(7 * 86_400_000)).map_err(|_| {
+                l10n::text(
+                    "无法从本地数据库读取额度记录",
+                    "Quota history could not be read from SQLite",
+                )
+            })?;
+            let cycles = cycles::cycles(&span, length, reset)
+                .into_iter()
+                .filter(|cycle| cycle.end > from)
+                .map(|cycle| cycle.json(now))
+                .collect::<Vec<_>>();
             windows.push(json!({
                 "id": id,
                 "vendor": row["vendor"],
@@ -153,6 +185,7 @@ impl AgentHudCore {
                         .collect::<Vec<_>>())
                     .collect::<Vec<_>>(),
                 "resets": resets,
+                "cycles": cycles,
                 "models": spending,
             }));
         }

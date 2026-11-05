@@ -7,18 +7,20 @@ use rusqlite::{params, Connection};
 use serde_json::json;
 use std::collections::HashMap;
 
-/// A window's reading: what remained when, and the plan it was read under
-/// (`plan_value::plan_key`), where the account named one.
+/// A window's reading: what remained when, the plan it was read under
+/// (`plan_value::plan_key`) where the account named one, and the reset it
+/// reported.
 pub(crate) fn insert_quota_sample(
     db: &Connection,
     window_id: &str,
     observed_at_ms: i64,
     remaining: f64,
     plan: Option<&str>,
+    reset_at_ms: Option<i64>,
 ) -> rusqlite::Result<usize> {
     db.execute(
-        "INSERT OR IGNORE INTO quota_sample(window_id,observed_at_ms,remaining,plan) VALUES(?1,?2,?3,?4)",
-        params![window_id, observed_at_ms, remaining, plan],
+        "INSERT OR IGNORE INTO quota_sample(window_id,observed_at_ms,remaining,plan,reset_at_ms) VALUES(?1,?2,?3,?4,?5)",
+        params![window_id, observed_at_ms, remaining, plan, reset_at_ms],
     )
 }
 

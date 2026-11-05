@@ -131,6 +131,7 @@ fn a_history_reads_each_shown_windows_readings_by_its_key() {
             now - minutes_ago * 60_000,
             100.0 - used,
             None,
+            None,
         )
         .unwrap();
     }
@@ -184,6 +185,16 @@ fn a_history_reads_each_shown_windows_readings_by_its_key() {
         ],
         "the old cycle, then the new one with gaps where the share moved unread"
     );
+    let cycles = window["cycles"].as_array().unwrap();
+    assert_eq!(
+        cycles
+            .iter()
+            .map(|cycle| (cycle["used"].as_f64().unwrap(), cycle["current"] == true))
+            .collect::<Vec<_>>(),
+        [(80.0, false), (30.0, true)],
+        "the old cycle used 80%, the running one 30% so far"
+    );
+    assert_eq!(minute(&cycles[1]["start"]), 110);
     assert!(core
         .request(
             "quota_history",

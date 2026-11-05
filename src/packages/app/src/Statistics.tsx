@@ -243,7 +243,6 @@ export default function Statistics({
       {snapshot.quotas.length > 0 && (
         <QuotaHistory
           quotas={snapshot.quotas}
-          from={historyEnd - durations[range] * 3_600_000}
           to={historyEnd}
           action={action}
           active={active}

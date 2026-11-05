@@ -1,15 +1,15 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useCoreQuery } from "../lib/use-core-query";
 import { useFormat } from "@agent-hud/ui/format-context";
-import { quotaDisplayLabel } from "@agent-hud/ui/format";
 import type {
   NativeMethod,
   Quota,
   QuotaHistoryResponse,
 } from "@agent-hud/protocol";
-import { dateLabel, row, type StatsTheme } from "./StatsTheme";
+import { row, type StatsTheme } from "./StatsTheme";
 import { QuotaAgentChart } from "./QuotaAgentChart";
-import { quotaGroups } from "@agent-hud/hud/panel/quota-groups";
+import { Segments } from "./Segments";
+import { cycleSpan, quotaGroups } from "@agent-hud/hud/panel/quota-groups";
 import { SectionFilter } from "./SectionFilter";
 import type { ModelOption } from "./ModelFilter";
 import { useHiddenFilter } from "./section-filter";
@@ -20,12 +20,12 @@ type Action = (
   params?: Record<string, unknown>,
 ) => Promise<unknown>;
 
-/** The Statistics window's quota history: one chart per agent (per account
- * where it has several) over the selected range, its windows' lines on one
- * fixed 0–100% axis. */
+/** The Statistics window's quota history: for each agent (each account
+ * where it has several), a lane per window with a bar per cycle over the last
+ * week or month, its height the share that cycle used. It keeps its own
+ * range: a cycle can be a week long, longer than the page's shorter ones. */
 export function QuotaHistory({
   quotas,
-  from,
   to,
   action,
   active,
@@ -34,7 +34,7 @@ export function QuotaHistory({
   timeZone,
 }: {
   quotas: Quota[];
-  from: number;
+  /** The latest reading: the history runs up to it. */
   to: number;
   action: Action;
   active: boolean;
@@ -42,6 +42,8 @@ export function QuotaHistory({
   light: boolean;
   timeZone: string;
 }) {
+  const [days, setDays] = useState(30);
+  const from = to - days * 86_400_000;
   // Only the latest stretch publishes; a failure keeps the last one drawn.
   const { data, error } = useCoreQuery<QuotaHistoryResponse>(
     action,
@@ -56,10 +58,11 @@ export function QuotaHistory({
     () => new Map(quotas.map((quota) => [quota.id, quota])),
     [quotas],
   );
-  const shownFrom = data ? Date.parse(data.from) : from;
   const shownTo = data ? Date.parse(data.to) : to;
-  // A stretch of another length, once it has come, draws the lines in again.
-  const reveal = String(shownTo - shownFrom);
+  const shownDays = data
+    ? Math.round((shownTo - Date.parse(data.from)) / 86_400_000)
+    : days;
+  const { from: shownFrom, until } = cycleSpan(shownTo, shownDays);
   const filter = useHiddenFilter(storageKeys.quotaHistoryFilter);
   // Each vendor lists the models whose calls spend one of its windows.
   const choices = useMemo(() => {
@@ -105,8 +108,20 @@ export function QuotaHistory({
         <strong style={{ fontSize: 13, fontWeight: 600 }}>
           {zh ? "额度历史" : "Quota history"}
         </strong>
-        <span style={{ color: theme.secondary, fontSize: 11 }}>
-          {quotaDisplayLabel(display, zh ? "zh" : "en")} · 0–100%
+        <span style={{ ...row, gap: 10, color: theme.secondary, fontSize: 11 }}>
+          {zh
+            ? "每个周期用掉的份额 · 0–100%"
+            : "Share each cycle used · 0–100%"}
+          <Segments
+            label={zh ? "额度历史范围" : "Quota history range"}
+            value={String(days)}
+            onChange={(value) => setDays(Number(value))}
+            choices={[
+              { value: "7", label: zh ? "7 天" : "7 days" },
+              { value: "30", label: zh ? "30 天" : "30 days" },
+            ]}
+            theme={theme}
+          />
         </span>
       </div>
       {data && data.windows.length > 0 && (
@@ -149,35 +164,14 @@ export function QuotaHistory({
             display={display}
             now={now}
             from={shownFrom}
-            to={shownTo}
-            reveal={reveal}
+            until={until}
+            days={shownDays}
             timeZone={timeZone}
             theme={theme}
             light={light}
           />
         ))}
       </div>
-      {windows.length > 0 && (
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            paddingTop: 7,
-            color: theme.secondary,
-            fontSize: 10,
-          }}
-        >
-          {[0, 1 / 3, 2 / 3, 1].map((part) => (
-            <span key={part} style={{ maxWidth: "26%" }}>
-              {dateLabel(
-                shownFrom + (shownTo - shownFrom) * part,
-                timeZone,
-                zh,
-              )}
-            </span>
-          ))}
-        </div>
-      )}
     </div>
   );
 }
