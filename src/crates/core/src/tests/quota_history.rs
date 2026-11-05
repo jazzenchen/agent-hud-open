@@ -191,3 +191,74 @@ fn a_history_reads_each_shown_windows_readings_by_its_key() {
         )
         .is_err());
 }
+
+#[test]
+fn a_history_names_the_models_whose_calls_spend_each_window() {
+    let temp = tempfile::tempdir().unwrap();
+    let root = temp.path().join(".claude/projects/p");
+    fs::create_dir_all(&root).unwrap();
+    let now = Utc::now().timestamp_millis();
+    let iso = |at: i64| {
+        DateTime::<Utc>::from_timestamp_millis(at)
+            .unwrap()
+            .to_rfc3339()
+    };
+    let id = "41111111-2222-3333-4444-555555555555";
+    let call = |message: &str, model: &str| {
+        json!({"type":"assistant","sessionId":id,"timestamp":iso(now - 600_000),
+            "message":{"id":message,"model":model,"role":"assistant","content":[{"type":"text","text":"Done."}],
+            "usage":{"input_tokens":1_000,"output_tokens":100,"cache_creation_input_tokens":0,"cache_read_input_tokens":0}}})
+    };
+    fs::write(
+        root.join(format!("{id}.jsonl")),
+        format!(
+            "{}\n{}\n",
+            call("m1", "claude-opus-4-5"),
+            call("m2", "claude-sonnet-4-5")
+        ),
+    )
+    .unwrap();
+    let mut core = fixture(temp.path());
+    let window = |key: &str, more: Value| {
+        let mut row = json!({"id":format!("claude:a:{key}"),"vendor":"claude","accountId":"claude:a",
+            "name":key,"usedPercent":10.0,"observedAt":iso(now - 60_000),"consumerSource":"claude"});
+        row.as_object_mut()
+            .unwrap()
+            .extend(more.as_object().unwrap().clone());
+        row
+    };
+    core.set_account_projection(AccountProjection {
+        quotas: vec![
+            window("weekly", json!({"allModels": true})),
+            window("opus", json!({"modelFamilies": ["opus"]})),
+            json!({"id":"cursor:a:plan","vendor":"cursor","accountId":"cursor:a","name":"Plan",
+                   "usedPercent":5.0,"observedAt":iso(now - 60_000)}),
+        ],
+        ..Default::default()
+    });
+    core.request("snapshot", json!({})).unwrap();
+    let history = core
+        .request(
+            "quota_history",
+            json!({"from": iso(now - 3_600_000), "to": iso(now)}),
+        )
+        .unwrap();
+    let models = |index: usize| history["windows"][index]["models"].clone();
+    assert_eq!(
+        models(0),
+        json!([
+            "claude-model:claude-opus-4-5",
+            "claude-model:claude-sonnet-4-5"
+        ]),
+        "every model spends a window that covers them all"
+    );
+    assert_eq!(models(1), json!(["claude-model:claude-opus-4-5"]));
+    assert_eq!(models(2), json!([]), "no logged call spends Cursor's plan");
+    assert_eq!(
+        history["agents"],
+        json!([{"id":"claude","name":"Claude"},{"id":"cursor","name":"Cursor"}])
+    );
+    let named = history["models"].as_array().unwrap();
+    assert_eq!(named.len(), 2);
+    assert!(named[0]["name"].as_str().unwrap().contains("Opus"));
+}

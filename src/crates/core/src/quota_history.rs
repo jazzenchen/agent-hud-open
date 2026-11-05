@@ -2,9 +2,14 @@
 //! Statistics window's quota chart: each window's used share in runs drawn
 //! without a break, thinned to a point or two a bin, and the resets between
 //! its cycles. One window is read at a time by its key, never the whole
-//! table, and only when a page asks.
+//! table, and only when a page asks. Each window also names the recorded
+//! models whose calls in the stretch spend it, for the page's model filter.
 use super::*;
+use crate::database::quota_link::QuotaLink;
+use crate::naming::model_names::{consumer_name, vendor_name};
+use crate::statistics::model_id;
 use rusqlite::params;
+use std::collections::BTreeSet;
 
 /// The furthest a history reaches back: what `quota_sample` keeps.
 const KEPT_MS: i64 = 30 * 86_400_000;
@@ -75,7 +80,22 @@ impl AgentHudCore {
             }
             Ok(samples)
         };
+        // The models the ledger recorded calls of in the stretch, by source
+        // and model as recorded.
+        let recorded = self
+            .meters
+            .view
+            .as_ref()
+            .map(|view| view.models_between(from, to))
+            .unwrap_or_default()
+            .into_iter()
+            .filter(|(_, tokens)| *tokens > 0)
+            .map(|(model, _)| model)
+            .collect::<Vec<_>>();
         let mut windows = Vec::new();
+        let mut agents = Vec::new();
+        let mut vendors = BTreeSet::new();
+        let mut models = BTreeMap::<String, Value>::new();
         for row in self
             .accounts
             .quotas
@@ -85,6 +105,24 @@ impl AgentHudCore {
             let Some(id) = row["id"].as_str() else {
                 continue;
             };
+            let vendor = row["vendor"].as_str().unwrap_or_default();
+            if vendors.insert(vendor) {
+                agents.push(json!({"id": vendor, "name": vendor_name(vendor)}));
+            }
+            let spending = QuotaLink::of(row)
+                .map(|link| {
+                    recorded
+                        .iter()
+                        .filter(|(source, model)| link.matches(source, model))
+                        .map(|(source, model)| model_id(source, model))
+                        .collect::<BTreeSet<_>>()
+                })
+                .unwrap_or_default();
+            for model in &spending {
+                models
+                    .entry(model.clone())
+                    .or_insert_with(|| json!({"id": model, "name": consumer_name(model)}));
+            }
             let samples = read(id).map_err(|_| {
                 l10n::text(
                     "无法从本地数据库读取额度记录",
@@ -115,6 +153,7 @@ impl AgentHudCore {
                         .collect::<Vec<_>>())
                     .collect::<Vec<_>>(),
                 "resets": resets,
+                "models": spending,
             }));
         }
         naming::window_names::settle_short_names(&mut windows);
@@ -125,6 +164,8 @@ impl AgentHudCore {
             "to": DateTime::<Utc>::from_timestamp_millis(to).map(|at| at.to_rfc3339()),
             "binSeconds": bin / 1000,
             "windows": windows,
+            "agents": agents,
+            "models": models.into_values().collect::<Vec<_>>(),
         }))
     }
 }

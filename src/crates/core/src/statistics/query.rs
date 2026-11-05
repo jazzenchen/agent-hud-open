@@ -221,7 +221,8 @@ pub(super) fn tokens_json(t: Usage) -> Value {
     json!({"cacheWrite":t.write,"input":t.input,"reasoning":t.reasoning,"output":t.output,"cacheRead":t.read})
 }
 
-pub(super) fn model_id(source: &str, name: &str) -> String {
+/// The id a recorded model goes by on every page: `<source>-model:<model>`.
+pub(crate) fn model_id(source: &str, name: &str) -> String {
     format!("{source}-model:{}", display_model(name))
 }
 

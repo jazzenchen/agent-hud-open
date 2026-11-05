@@ -4,10 +4,14 @@
 //! days at list prices, that as a multiple of the tier's monthly price, and,
 //! only where the quota readings plainly show it, a tier that fits better.
 //! The rules are the same for every provider; the catalogs hold each one's
-//! facts.
+//! facts. Models the page's filter hides (`hiddenModels`, ids as the
+//! statistics name them) are left out of the value.
 use super::*;
+use crate::naming::model_names::{consumer_name, vendor_name};
+use crate::statistics::model_id;
 use agent_hud_agents::plans::{self, Catalog, Plan};
 use rusqlite::params;
+use std::collections::BTreeSet;
 
 mod advice;
 
@@ -64,7 +68,19 @@ struct Cycle {
 }
 
 impl AgentHudCore {
-    pub(super) fn plan_value(&self, _params: Value) -> Result<Value, String> {
+    pub(super) fn plan_value(&self, params: Value) -> Result<Value, String> {
+        let hidden = match &params["hiddenModels"] {
+            Value::Null => BTreeSet::new(),
+            Value::Array(items) => items
+                .iter()
+                .map(|item| item.as_str().map(str::to_owned))
+                .collect::<Option<BTreeSet<_>>>()
+                .ok_or("plan_value.hiddenModels must be a list of model ids")?,
+            _ => return Err("plan_value.hiddenModels must be a list of model ids".into()),
+        };
+        let keep = |source: &str, model: &str| {
+            hidden.is_empty() || !hidden.contains(&model_id(source, model))
+        };
         let now = Utc::now().timestamp_millis();
         let since = now - VALUE_MS;
         let db = self.database.as_ref().ok_or("Plan value is unavailable")?;
@@ -113,6 +129,29 @@ impl AgentHudCore {
                 .filter(|other| other["provider"] == provider)
                 .count()
                 > 1;
+            // The provider's models over the stretch, as the value counts
+            // them, most used first.
+            let mut models = self
+                .meters
+                .view
+                .as_ref()
+                .map(|view| view.models_between(since, now))
+                .unwrap_or_default()
+                .into_iter()
+                .filter(|((source, model), tokens)| {
+                    *tokens > 0 && sources.contains(&source.as_str()) && !model.contains('#')
+                })
+                .map(|((source, model), tokens)| (model_id(&source, &model), tokens))
+                .fold(
+                    BTreeMap::<String, u64>::new(),
+                    |mut models, (id, tokens)| {
+                        *models.entry(id).or_default() += tokens;
+                        models
+                    },
+                )
+                .into_iter()
+                .collect::<Vec<_>>();
+            models.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
             let mut value = Value::Null;
             let mut ratio = Value::Null;
             let mut partial = false;
@@ -122,8 +161,13 @@ impl AgentHudCore {
                     "This Mac's usage cannot be told apart between this provider's accounts",
                 ))
             } else if let Some(view) = &self.meters.view {
-                let (spent, oldest) = view.spent(sources, since, now);
-                if spent.tokens == 0 {
+                let (spent, oldest) = view.spent(sources, since, now, keep);
+                if spent.tokens == 0 && !models.is_empty() {
+                    Some(l10n::text(
+                        "它用过的模型都被筛选隐藏了",
+                        "Every model it used is hidden by the filter",
+                    ))
+                } else if spent.tokens == 0 {
                     Some(l10n::text(
                         "这台 Mac 近 30 天没有记录到用量",
                         "No usage was recorded on this Mac in the last 30 days",
@@ -188,8 +232,12 @@ impl AgentHudCore {
                 _ => None,
             };
             let heading = self.account_heading(account);
+            let models = models
+                .iter()
+                .map(|(id, tokens)| json!({"id":id,"name":consumer_name(id),"tokens":tokens}))
+                .collect::<Vec<_>>();
             rows.push(
-                json!({"id":account["id"],"provider":provider,"name":heading["name"],
+                json!({"id":account["id"],"provider":provider,"providerName":vendor_name(provider),"models":models,"name":heading["name"],
                 "planLabel":heading["planLabel"],"plan":plan.map(plan_json),"value":value,
                 "ratio":ratio,"partial":partial,"unavailable":unavailable,"advice":advice}),
             );

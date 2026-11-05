@@ -12,6 +12,7 @@ pub(crate) use load::Cache;
 use load::{load, Data};
 pub(crate) use periods::{day_start, local_date};
 use periods::{floor, overlaps};
+pub(crate) use query::model_id;
 use query::{Context, Query, DAY};
 
 use crate::{pricing, AgentHudCore};

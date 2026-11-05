@@ -634,11 +634,19 @@ fn a_plans_spend_leaves_out_calls_through_a_route_and_other_sources() {
     .unwrap();
     let paths = vec!["logs/a.jsonl".to_string(), "logs/b.jsonl".to_string()];
     let view = View::load(&db, &paths, now, &pricing::PriceRegions::default()).unwrap();
-    let (spent, oldest) = view.spent(&["claude"], now - 30 * 86_400_000, now);
+    let (spent, oldest) = view.spent(&["claude"], now - 30 * 86_400_000, now, |_, _| true);
     assert_eq!(
         (spent.tokens, spent.unpriced_tokens),
         (2 * used.total(), used.total()),
         "the old call, the relayed one and Codex's are left out"
+    );
+    let (kept, _) = view.spent(&["claude"], now - 30 * 86_400_000, now, |_, model| {
+        model != "qwen3-coder:30b"
+    });
+    assert_eq!(
+        (kept.tokens, kept.unpriced_tokens),
+        (used.total(), 0),
+        "a model the filter turns down is left out"
     );
     let price = pricing::cost_at(
         "claude",

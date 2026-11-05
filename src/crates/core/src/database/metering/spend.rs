@@ -36,8 +36,18 @@ impl View {
     /// The models the selected logs' calls used since `since`, by client
     /// source and model as recorded, with their tokens.
     pub fn models_since(&self, since: i64) -> BTreeMap<(String, String), u64> {
+        self.models_between(since, i64::MAX)
+    }
+
+    /// The models the selected logs' calls used from `since` to `until`, by
+    /// client source and model as recorded, with their tokens.
+    pub fn models_between(&self, since: i64, until: i64) -> BTreeMap<(String, String), u64> {
         let mut models = BTreeMap::<(String, String), u64>::new();
-        for bucket in self.buckets.iter().filter(|bucket| bucket.at >= since) {
+        for bucket in self
+            .buckets
+            .iter()
+            .filter(|bucket| bucket.at >= since && bucket.at <= until)
+        {
             *models
                 .entry((bucket.source.clone(), bucket.model.clone()))
                 .or_default() += bucket.usage.total();
@@ -98,15 +108,23 @@ impl View {
 
     /// What the calls of `sources` from `since` to `now` used and cost at
     /// list prices, leaving out the calls recorded through a route (a relay
-    /// or a coding plan, which is paid for apart from any subscription), and
-    /// when the selected logs' buckets begin.
-    pub fn spent(&self, sources: &[&str], since: i64, now: i64) -> (Recent, Option<i64>) {
+    /// or a coding plan, which is paid for apart from any subscription) and
+    /// those `keep` turns down by source and model, and when the selected
+    /// logs' buckets begin.
+    pub fn spent(
+        &self,
+        sources: &[&str],
+        since: i64,
+        now: i64,
+        keep: impl Fn(&str, &str) -> bool,
+    ) -> (Recent, Option<i64>) {
         let mut spent = Recent::default();
         for bucket in self.buckets.iter().filter(|bucket| {
             bucket.at >= since
                 && bucket.at <= now
                 && sources.contains(&bucket.source.as_str())
                 && !bucket.model.contains('#')
+                && keep(&bucket.source, &bucket.model)
         }) {
             let tokens = bucket.usage.total();
             spent.tokens += tokens;

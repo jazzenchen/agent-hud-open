@@ -14,10 +14,20 @@ fn an_accounts_plan_is_valued_from_its_providers_calls_and_kept_with_its_reading
             .to_rfc3339()
     };
     let id = "31111111-2222-3333-4444-555555555555";
-    let call = json!({"type":"assistant","sessionId":id,"timestamp":iso(now - 600_000),
-        "message":{"id":"m1","model":"claude-opus-4-5","role":"assistant","content":[{"type":"text","text":"Done."}],
-        "usage":{"input_tokens":1_000_000,"output_tokens":100_000,"cache_creation_input_tokens":0,"cache_read_input_tokens":0}}});
-    fs::write(root.join(format!("{id}.jsonl")), format!("{call}\n")).unwrap();
+    let call = |message: &str, model: &str, input: u64| {
+        json!({"type":"assistant","sessionId":id,"timestamp":iso(now - 600_000),
+            "message":{"id":message,"model":model,"role":"assistant","content":[{"type":"text","text":"Done."}],
+            "usage":{"input_tokens":input,"output_tokens":100_000,"cache_creation_input_tokens":0,"cache_read_input_tokens":0}}})
+    };
+    fs::write(
+        root.join(format!("{id}.jsonl")),
+        format!(
+            "{}\n{}\n",
+            call("m1", "claude-opus-4-5", 1_000_000),
+            call("m2", "claude-sonnet-4-5", 200_000)
+        ),
+    )
+    .unwrap();
     let mut core = fixture(temp.path());
     core.set_account_projection(AccountProjection {
         accounts: vec![
@@ -68,4 +78,42 @@ fn an_accounts_plan_is_valued_from_its_providers_calls_and_kept_with_its_reading
     );
     assert!(account["advice"].is_null(), "no completed cycles yet");
     assert!(account["unavailable"].is_null());
+    assert_eq!(account["providerName"], "Claude");
+    let models = account["models"].as_array().unwrap();
+    assert_eq!(
+        models.iter().map(|model| &model["id"]).collect::<Vec<_>>(),
+        [
+            "claude-model:claude-opus-4-5",
+            "claude-model:claude-sonnet-4-5"
+        ],
+        "the provider's models, most used first"
+    );
+    assert_eq!(models[0]["tokens"], 1_100_000);
+    assert!(models[0]["name"].as_str().unwrap().contains("Opus"));
+
+    // A model the page hides is left out of the value; with every one
+    // hidden there is none.
+    let mut without = |hidden: Value| {
+        core.request("plan_value", json!({ "hiddenModels": hidden }))
+            .unwrap()["accounts"][0]
+            .clone()
+    };
+    let sonnet = without(json!(["claude-model:claude-opus-4-5"]));
+    let sonnet_usd = sonnet["value"]["amounts"]["USD"].as_f64().unwrap();
+    assert!(sonnet_usd > 0.0 && sonnet_usd < usd, "{sonnet}");
+    assert_eq!(sonnet["value"]["tokens"], 300_000);
+    assert_eq!(
+        sonnet["models"].as_array().unwrap().len(),
+        2,
+        "hidden models stay listed"
+    );
+    let none = without(json!([
+        "claude-model:claude-opus-4-5",
+        "claude-model:claude-sonnet-4-5"
+    ]));
+    assert!(none["value"].is_null() && none["ratio"].is_null(), "{none}");
+    assert!(none["unavailable"].as_str().unwrap().contains("hidden"));
+    assert!(core
+        .request("plan_value", json!({"hiddenModels": "claude"}))
+        .is_err());
 }

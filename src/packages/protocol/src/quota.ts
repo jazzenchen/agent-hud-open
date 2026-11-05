@@ -102,6 +102,14 @@ export interface QuotaHistoryWindow {
   segments: [number, number][][];
   /** Where a new cycle began in the stretch, epoch ms. */
   resets: number[];
+  /** The recorded models whose calls in the stretch spend the window, by
+   * their statistics ids (`<source>-model:<model>`). */
+  models?: string[];
+}
+/** A filter choice Core names: an agent, or a recorded model by its statistics id. */
+export interface FilterChoice {
+  id: string;
+  name: string;
 }
 export interface QuotaHistoryResponse {
   kind: "quota_history";
@@ -110,6 +118,10 @@ export interface QuotaHistoryResponse {
   to: string;
   binSeconds: number;
   windows: QuotaHistoryWindow[];
+  /** Each window's vendor, once, in the windows' order. */
+  agents?: FilterChoice[];
+  /** Every model a window names. */
+  models?: FilterChoice[];
 }
 /** A subscription tier with a published monthly price, from the provider's catalog. */
 export interface PlanTier {
@@ -126,6 +138,11 @@ export interface PlanTier {
 export interface PlanValueAccount {
   id: string;
   provider: string;
+  /** The provider's name as the page shows it. */
+  providerName?: string;
+  /** The provider's models over the stretch as the value counts them, most
+   * used first, hidden ones included. */
+  models?: (FilterChoice & { tokens: number })[];
   name: string;
   /** The reported plan in words, for a plan the catalog does not price. */
   planLabel: string | null;
@@ -168,6 +185,11 @@ export interface PlanValueAccount {
     /** Upgrade: the longest window's busiest cycle; downgrade: the busiest use of any window. */
     busiestPercent: number;
   } | null;
+}
+/** What `plan_value` is asked for: the models, by statistics id, whose
+ * calls the value leaves out. */
+export interface PlanValueQuery {
+  hiddenModels?: string[];
 }
 export interface PlanValueResponse {
   kind: "plan_value";
