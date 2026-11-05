@@ -31,13 +31,18 @@ fn every_client_of_the_database_has_its_store_and_its_own_plugin() {
         let observer = client.agent.observer.unwrap();
         // The plugin is OpenCode's, written for this client's ids and folder.
         assert!(observer.body.starts_with(observer.marker));
-        let prelude = format!(
-            "{}const SOURCE = \"{id}\", FOLDER = \"{id}\";\n",
-            observer.marker,
-            id = client.agent.id
+        assert_eq!(
+            observer.body,
+            format!(
+                "{}const SOURCE = \"{id}\", FOLDER = \"{id}\";\n{}{}",
+                observer.marker,
+                include_str!("observer.js"),
+                "export const AgentHUDSessionObserver = server;\n",
+                id = client.agent.id
+            ),
+            "{}",
+            client.agent.id
         );
-        assert!(observer.body.starts_with(&prelude), "{}", client.agent.id);
-        assert!(observer.body.ends_with(include_str!("observer.js")));
         assert_eq!(observer.at_key, "completedAtMs");
         assert!(!observer.states);
     }

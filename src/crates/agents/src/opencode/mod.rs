@@ -99,7 +99,8 @@ static OBSERVER: Observer = Observer {
     body: concat!(
         "// Agent HUD OpenCode session observer\n",
         "const SOURCE = \"opencode\", FOLDER = \"opencode\";\n",
-        include_str!("observer.js")
+        include_str!("observer.js"),
+        "export const AgentHUDSessionObserver = server;\n"
     ),
     at_key: "completedAtMs",
     states: false,
@@ -163,7 +164,8 @@ static KILO_OBSERVER: Observer = Observer {
     body: concat!(
         "// Agent HUD Kilo Code session observer\n",
         "const SOURCE = \"kilo\", FOLDER = \"kilo\";\n",
-        include_str!("observer.js")
+        include_str!("observer.js"),
+        "export const AgentHUDSessionObserver = server;\n"
     ),
     at_key: "completedAtMs",
     states: false,
@@ -225,7 +227,8 @@ static MIMO_CODE_OBSERVER: Observer = Observer {
     body: concat!(
         "// Agent HUD MiMo Code session observer\n",
         "const SOURCE = \"mimocode\", FOLDER = \"mimocode\";\n",
-        include_str!("observer.js")
+        include_str!("observer.js"),
+        "export const AgentHUDSessionObserver = server;\n"
     ),
     at_key: "completedAtMs",
     states: false,

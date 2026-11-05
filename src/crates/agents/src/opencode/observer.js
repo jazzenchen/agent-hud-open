@@ -1,12 +1,14 @@
-// SOURCE and FOLDER, above, name the client: its sessions' id prefix and its data folder.
+// SOURCE and FOLDER, above, name the client: its sessions' id prefix and its data folder. The line after the script
+// exports `server`, the plugin.
 import { mkdirSync, writeFileSync, renameSync, readdirSync, readFileSync, statSync, unlinkSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { createHash } from "node:crypto";
 
-export const AgentHUDSessionObserver = async (input) => {
+// Each completed turn is one file, named by its session and its prompt, so a turn reported twice is written once.
+// Records older than a week are pruned when the plugin loads.
+function inbox() {
   const directory = join(process.env.XDG_DATA_HOME || join(homedir(), ".local", "share"), FOLDER, "agent-hud", "turns");
-  const sessions = new Map();
   try {
     for (const name of readdirSync(directory)) {
       if (/^[a-f0-9]{64}\.json$/.test(name) && statSync(join(directory, name)).mtimeMs < Date.now() - 7 * 86400000) {
@@ -15,22 +17,40 @@ export const AgentHUDSessionObserver = async (input) => {
     }
   } catch { /* The inbox is created on the first completion. */ }
 
+  return {
+    write(record) {
+      try {
+        mkdirSync(directory, { recursive: true, mode: 0o700 });
+        const name = createHash("sha256").update(record.sessionID + "\0" + record.turnID).digest("hex");
+        const file = join(directory, name + ".json");
+        const temporary = file + "." + process.pid + ".tmp";
+        writeFileSync(temporary, JSON.stringify(record), { mode: 0o600 });
+        renameSync(temporary, file);
+      } catch { /* Observability must never interrupt the client. */ }
+    },
+
+    // A session deleted in the client takes its records along, so it leaves Agent HUD's list as it left the client's.
+    forget(id) {
+      try {
+        for (const name of readdirSync(directory)) {
+          if (!/^[a-f0-9]{64}\.json$/.test(name)) continue;
+          try {
+            if (JSON.parse(readFileSync(join(directory, name), "utf8")).sessionID === SOURCE + ":" + id) unlinkSync(join(directory, name));
+          } catch { /* A record that cannot be read is pruned with the week's. */ }
+        }
+      } catch { /* There are no records yet. */ }
+    },
+  };
+}
+
+async function server(input) {
+  const turns = inbox();
+  const sessions = new Map();
+
   function session(id) {
     let value = sessions.get(id);
     if (!value) sessions.set(id, value = {});
     return value;
-  }
-
-  // A session deleted in the client takes its records along, so it leaves Agent HUD's list as it left the client's.
-  function forget(id) {
-    try {
-      for (const name of readdirSync(directory)) {
-        if (!/^[a-f0-9]{64}\.json$/.test(name)) continue;
-        try {
-          if (JSON.parse(readFileSync(join(directory, name), "utf8")).sessionID === SOURCE + ":" + id) unlinkSync(join(directory, name));
-        } catch { /* A record that cannot be read is pruned with the week's. */ }
-      }
-    } catch { /* There are no records yet. */ }
   }
 
   function navigationTarget() {
@@ -48,20 +68,12 @@ export const AgentHUDSessionObserver = async (input) => {
     value.reply = value.prompt = value.startedAtMs = value.waiting = undefined;
     if (!reply || value.child || reply.error || reply.summary || reply.finish !== "stop") return;
     if (prompt && reply.parentID !== prompt.id) return;
-    const record = {
+    turns.write({
       version: 1, sessionID: SOURCE + ":" + id, workspace: value.directory || input.directory, title: value.title,
       model: reply.modelID, providerID: reply.providerID, turnID: reply.parentID,
       startedAtMs: startedAtMs || reply.createdAtMs || reply.completedAtMs, completedAtMs: Date.now(),
       navigationTarget: navigationTarget(),
-    };
-    try {
-      mkdirSync(directory, { recursive: true, mode: 0o700 });
-      const name = createHash("sha256").update(record.sessionID + "\0" + record.turnID).digest("hex");
-      const file = join(directory, name + ".json");
-      const temporary = file + "." + process.pid + ".tmp";
-      writeFileSync(temporary, JSON.stringify(record), { mode: 0o600 });
-      renameSync(temporary, file);
-    } catch { /* Observability must never interrupt the client. */ }
+    });
   }
 
   return {
@@ -75,7 +87,7 @@ export const AgentHUDSessionObserver = async (input) => {
             if (info.id) Object.assign(session(info.id), { child: !!info.parentID, title: info.title, directory: info.directory });
             break;
           case "session.deleted":
-            if (info.id) { sessions.delete(info.id); forget(info.id); }
+            if (info.id) { sessions.delete(info.id); turns.forget(info.id); }
             break;
           case "message.updated": {
             // The client updates earlier messages too, so the newest prompt and reply go by when they were created. The
@@ -114,4 +126,4 @@ export const AgentHUDSessionObserver = async (input) => {
       } catch { /* Observability must never interrupt the client. */ }
     },
   };
-};
+}
