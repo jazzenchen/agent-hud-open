@@ -52,9 +52,16 @@ export function useHoverMachine(config: HoverTiming) {
   );
   useEffect(() => {
     if (state.phase !== "opening" && state.phase !== "closing") return;
+    // A timer's delay is cut to whole milliseconds and can fire a moment
+    // before the deadline; it was set for the deadline, so it has come.
+    const deadline = state.deadline;
     const timer = setTimeout(
-      () => send({ type: "timer", now: performance.now() }),
-      Math.max(1, state.deadline - performance.now()),
+      () =>
+        send({
+          type: "timer",
+          now: Math.max(performance.now(), deadline),
+        }),
+      Math.max(1, Math.ceil(deadline - performance.now())),
     );
     return () => clearTimeout(timer);
   }, [state, send]);
