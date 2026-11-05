@@ -74,9 +74,33 @@ impl crate::AgentHudCore {
         // So is Claude Code's process registry, so that a session whose
         // process has gone stops running or waiting within a pass, not after
         // the transcript's half hour.
+        let now = wall_clock_ms();
         self.claude_desktop
             .processes
-            .refresh(&self.provider_roots, wall_clock_ms());
+            .refresh(&self.provider_roots, now);
+        // A session its log says runs or waits that no running process
+        // claims has ended, from a Claude Code that registers every process:
+        // its own terminal, desktop app or headless run. Sub-agents and
+        // other clients keep the transcript's clock.
+        let unclaimed = self
+            .logs
+            .values()
+            .filter(|log| {
+                log.source == "claude"
+                    && !log.gone
+                    && log.live.parent_id.is_none()
+                    && !crate::demo::is_demo(&log.path)
+                    && matches!(
+                        log.client.as_deref(),
+                        Some("cli" | "sdk-cli" | "claude-desktop" | "claude-desktop-3p")
+                    )
+                    && matches!(
+                        log.live.session_state(now, &log.source, None),
+                        "running" | "waiting"
+                    )
+            })
+            .map(|log| (log.id.as_str(), log.path.as_path()));
+        self.claude_desktop.processes.unclaimed(unclaimed, now);
         if self.usage_projection.is_none() {
             self.read_projection_sources();
         }

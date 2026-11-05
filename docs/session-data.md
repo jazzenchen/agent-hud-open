@@ -62,14 +62,27 @@ nothing until they answer. They carry `usageStatus: "unavailable"` and no
 tokens, and leave the lists like any other session.
 
 Claude Code registers each live process in `sessions/<pid>.json` under its
-config home. It removes the file as it exits cleanly; a process killed
-outright, as a closed terminal tab kills it, leaves the file with a pid that
-no longer runs. Every collection pass reads that registry (a file again only
-when it changed) and asks each file's pid whether it still runs (signal 0, on
-Unix). A session with no running process left, after it had one or with only
-dead files naming it, and no event after that was seen, stops running or
-waiting at once: it is idle, with no requests and no attention, as the
-transcript's abandonment would show it 30 minutes later.
+config home: its pid, when it started (`procStart`), the session it runs, the
+version that wrote the file, and what it does now (`status`: `waiting` for the
+user, `busy`, `idle`). Every Claude Code process of a registering version
+writes one, a headless `-p` run too, and `/clear` and `--resume` rename its
+session in place. It removes the file as it exits cleanly; a process killed
+outright, as a closed terminal tab kills it, leaves the file behind. Every
+collection pass reads the registry (a file again only when it changed) and
+asks each pid whether it still runs, the process that started when the file
+says (on macOS; signal 0 elsewhere on Unix).
+
+What a Claude session's process says comes before the transcript's clock:
+- A running process that says the session waits holds it waiting for as long
+  as it says so, past 30 minutes; one that says it is busy holds it running
+  unless something says it waits.
+- A session no running process claims has ended: it is idle, with no requests
+  and no attention, when its process left after its last event, or, for a
+  root session of the terminal, the desktop app or a headless run written by
+  a version the registry shows registering, when its transcript says it runs
+  or waits and no running process names it (after a relaunch of Agent HUD,
+  say). Sub-agents, other clients and older versions keep the transcript's
+  30 minutes.
 
 `session_detail {id}` loads only the requested parser checkpoint and returns
 its session, recorded usage entries, parent and children, including relationships

@@ -222,12 +222,21 @@ impl Presentation<'_> {
     /// The same evidence overlay as a rendered row, without serializing every
     /// head during list filtering. Only hook-backed heads need a temporary row.
     pub(super) fn session_state(&self, log: &LogHead, child: Option<i64>) -> &'static str {
-        if log.source == "claude" && self.claude_processes.ended(&log.id, log.live.last_event()) {
-            return match log.live.session_state(self.now, &log.source, child) {
-                "unverified" => "unverified",
-                _ => "idle",
-            };
+        let state = self.evidence_state(log, child);
+        if log.source == "claude" {
+            if let Some(told) = crate::clients::claude_processes::state(
+                self.claude_processes,
+                &log.id,
+                log.live.last_event(),
+                state,
+            ) {
+                return told;
+            }
         }
+        state
+    }
+    /// The state the log and the hooks give, before a process says otherwise.
+    fn evidence_state(&self, log: &LogHead, child: Option<i64>) -> &'static str {
         if self.pending(&log.source, &log.id).is_some() || self.native_waiting(&log.source, &log.id)
         {
             return "waiting";
