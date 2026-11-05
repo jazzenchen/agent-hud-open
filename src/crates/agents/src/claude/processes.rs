@@ -1,11 +1,12 @@
 //! Claude Code's process registry: every live Claude Code process, in a
 //! terminal or in the desktop app, writes `sessions/<pid>.json` under its
-//! config home naming its session, and removes it as it exits, a closed
-//! terminal tab included. A session that had a process and has none left has
-//! no one to go on with it: what it waited for will not come. A process
-//! killed outright leaves its file behind, so this tells only of the exits
-//! Claude Code saw; the transcript's own abandonment covers the rest.
-//! Read on every collection pass, each file again only when it changed.
+//! config home naming its session. It removes the file as it exits cleanly;
+//! a process killed outright, as a closed terminal tab kills it, leaves the
+//! file behind with a pid that no longer runs (Claude Code clears such files
+//! the next time it starts). A session with no file whose process runs has no
+//! one to go on with it: what it waited for will not come.
+//! Read on every collection pass, each file again only when it changed; each
+//! file's process is asked whether it still runs every pass.
 use serde_json::Value;
 use std::{
     collections::{HashMap, HashSet},
@@ -22,6 +23,7 @@ const GONE_KEPT_MS: i64 = 3_600_000;
 #[derive(Clone)]
 struct Entry {
     stamp: (Option<SystemTime>, u64),
+    pid: Option<i32>,
     session: Option<String>,
     kind: Option<String>,
     entrypoint: Option<String>,
@@ -36,6 +38,9 @@ impl Entry {
         let text = |key: &str| value[key].as_str().map(str::to_owned);
         Self {
             stamp,
+            pid: value["pid"]
+                .as_i64()
+                .and_then(|pid| i32::try_from(pid).ok()),
             session: text("sessionId").filter(|id| super::jobs::uuid(id)),
             kind: text("kind"),
             entrypoint: text("entrypoint"),
@@ -43,7 +48,7 @@ impl Entry {
     }
 }
 
-/// A live process as the registry names it.
+/// A process as the registry names it, running or not.
 pub struct Process<'a> {
     pub session: &'a str,
     pub kind: Option<&'a str>,
@@ -53,9 +58,9 @@ pub struct Process<'a> {
 #[derive(Clone, Default)]
 pub struct ClaudeProcesses {
     files: HashMap<PathBuf, Entry>,
-    /// Sessions a live process names now.
+    /// Sessions a running process names now.
     held: HashSet<String>,
-    /// Sessions whose last process left, and when that was seen.
+    /// Sessions whose last process left, and when that was first seen.
     gone: HashMap<String, i64>,
     revision: u64,
 }
@@ -86,21 +91,33 @@ impl ClaudeProcesses {
             }
         }
         self.files = files;
-        let held = self
-            .files
-            .values()
-            .filter_map(|entry| entry.session.clone())
-            .collect::<HashSet<_>>();
+        let (mut held, mut dead) = (HashSet::new(), HashSet::new());
+        for entry in self.files.values() {
+            let Some(session) = entry.session.clone() else {
+                continue;
+            };
+            // A file without a pid says nothing of its process: it holds.
+            if entry.pid.is_none_or(running) {
+                held.insert(session);
+            } else {
+                dead.insert(session);
+            }
+        }
         let mut changed = false;
-        for session in self.held.difference(&held) {
-            self.gone.insert(session.clone(), now);
-            changed = true;
+        // Gone: held before and not now, or named only by files whose process
+        // no longer runs. A session already gone keeps the time it went.
+        for session in self.held.iter().chain(&dead) {
+            if !held.contains(session) && !self.gone.contains_key(session) {
+                self.gone.insert(session.clone(), now);
+                changed = true;
+            }
         }
         for session in &held {
             changed |= self.gone.remove(session).is_some();
         }
         self.held = held;
-        self.gone.retain(|_, at| now - *at < GONE_KEPT_MS);
+        self.gone
+            .retain(|session, at| now - *at < GONE_KEPT_MS || dead.contains(session));
         if changed {
             self.revision = self.revision.wrapping_add(1);
         }
@@ -120,7 +137,7 @@ impl ClaudeProcesses {
         self.revision
     }
 
-    /// The live processes, for the background jobs' places.
+    /// The processes the registry names, for the background jobs' places.
     pub fn processes(&self) -> impl Iterator<Item = Process<'_>> {
         self.files.values().filter_map(|entry| {
             Some(Process {
@@ -130,6 +147,24 @@ impl ClaudeProcesses {
             })
         })
     }
+}
+
+/// Whether a process runs, as signal 0 tells it: sent nowhere, only checked.
+/// A reused pid reads as running, which keeps the transcript's half hour.
+#[cfg(unix)]
+fn running(pid: i32) -> bool {
+    if pid <= 0 {
+        return true;
+    }
+    // SAFETY: kill with signal 0 delivers nothing; it only checks the pid.
+    let sent = unsafe { libc::kill(pid, 0) } == 0;
+    // Another user's process cannot be signalled, but it runs.
+    sent || std::io::Error::last_os_error().raw_os_error() == Some(libc::EPERM)
+}
+/// Where no signal can ask, every process the registry names is running.
+#[cfg(not(unix))]
+fn running(_pid: i32) -> bool {
+    true
 }
 
 /// The Claude config homes the provider roots lie in, each once.
@@ -159,6 +194,10 @@ mod tests {
         fs::create_dir_all(path.parent().unwrap()).unwrap();
         fs::write(path, serde_json::to_vec(&value).unwrap()).unwrap();
     }
+    /// A pid that runs for as long as the test does: its own.
+    fn live() -> u32 {
+        std::process::id()
+    }
 
     #[test]
     fn a_session_whose_process_left_has_ended_until_one_takes_it_again() {
@@ -168,7 +207,7 @@ mod tests {
         let first = config.join("sessions").join("7.json");
         write(
             &first,
-            json!({"pid":7,"sessionId":A,"kind":"interactive","entrypoint":"cli"}),
+            json!({"pid":live(),"sessionId":A,"kind":"interactive","entrypoint":"cli"}),
         );
         write(
             &config.join("sessions").join("8.json"),
@@ -199,7 +238,7 @@ mod tests {
         // Resumed in a new process: no longer ended.
         write(
             &config.join("sessions").join("9.json"),
-            json!({"pid":9,"sessionId":A}),
+            json!({"pid":live(),"sessionId":A}),
         );
         assert!(processes.refresh(&roots, 4_000));
         assert!(!processes.ended(A, Some(1_500)));
@@ -211,7 +250,7 @@ mod tests {
         let config = temp.path().join(".claude");
         let roots = vec![(config.join("projects"), "claude")];
         let file = config.join("sessions").join("7.json");
-        write(&file, json!({"pid":7,"sessionId":A}));
+        write(&file, json!({"pid":live(),"sessionId":A}));
         let mut processes = ClaudeProcesses::default();
         processes.refresh(&roots, 0);
         fs::remove_file(&file).unwrap();
@@ -219,6 +258,38 @@ mod tests {
         assert!(processes.ended(A, None));
         processes.refresh(&roots, 1_000 + GONE_KEPT_MS);
         assert!(!processes.ended(A, None));
+    }
+
+    /// A closed terminal tab kills Claude Code before it can take its file
+    /// away: the file stays, naming a pid that no longer runs.
+    #[cfg(unix)]
+    #[test]
+    fn a_file_whose_process_no_longer_runs_ends_its_session() {
+        let temp = tempfile::tempdir().unwrap();
+        let config = temp.path().join(".claude");
+        let roots = vec![(config.join("projects"), "claude")];
+        let mut finished = std::process::Command::new("true").spawn().unwrap();
+        finished.wait().unwrap();
+        let dead = finished.id();
+        let file = config.join("sessions").join(format!("{dead}.json"));
+        write(&file, json!({"pid":live(),"sessionId":A}));
+        let mut processes = ClaudeProcesses::default();
+        processes.refresh(&roots, 0);
+        assert!(!processes.ended(A, None));
+        // Its process was killed: the same file now names a dead pid.
+        write(&file, json!({"pid":dead,"sessionId":A}));
+        assert!(processes.refresh(&roots, 1_000));
+        assert!(processes.ended(A, Some(500)));
+        assert!(!processes.refresh(&roots, 2_000), "it ended once");
+        // A stale file found at first sight ends its session too, and stays
+        // ended past the usual hour while the file is there.
+        let b = config.join("sessions").join("b.json");
+        write(&b, json!({"pid":dead,"sessionId":B}));
+        assert!(processes.refresh(&roots, 3_000));
+        assert!(processes.ended(B, Some(2_500)));
+        processes.refresh(&roots, 3_000 + GONE_KEPT_MS);
+        assert!(processes.ended(B, Some(2_500)));
+        assert!(processes.ended(A, Some(500)));
     }
 
     #[test]

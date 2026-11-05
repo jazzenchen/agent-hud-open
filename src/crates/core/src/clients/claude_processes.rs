@@ -51,7 +51,7 @@ mod tests {
         fs::create_dir_all(file.parent().unwrap()).unwrap();
         fs::write(
             &file,
-            serde_json::to_vec(&json!({"pid":7,"sessionId":ID})).unwrap(),
+            serde_json::to_vec(&json!({"pid":std::process::id(),"sessionId":ID})).unwrap(),
         )
         .unwrap();
         let mut processes = ClaudeProcesses::default();
@@ -122,7 +122,7 @@ mod tests {
         fs::write(
             &process,
             serde_json::to_vec(
-                &json!({"pid":7,"sessionId":ID,"kind":"interactive","entrypoint":"cli"}),
+                &json!({"pid":std::process::id(),"sessionId":ID,"kind":"interactive","entrypoint":"cli"}),
             )
             .unwrap(),
         )

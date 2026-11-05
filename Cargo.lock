@@ -25,6 +25,7 @@ dependencies = [
  "base64 0.22.1",
  "chrono",
  "json5",
+ "libc",
  "rusqlite",
  "serde",
  "serde-saphyr",

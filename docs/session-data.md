@@ -62,13 +62,14 @@ nothing until they answer. They carry `usageStatus: "unavailable"` and no
 tokens, and leave the lists like any other session.
 
 Claude Code registers each live process in `sessions/<pid>.json` under its
-config home and removes the file as it exits, a closed terminal tab included.
-Every collection pass reads that registry (a file again only when it changed).
-A session that had a process and has none left, with no event after the exit
-was seen, stops running or waiting at once: it is idle, with no requests and no
-attention, as the transcript's abandonment would show it 30 minutes later. A
-process killed outright leaves its file behind, so that session still waits
-for the 30 minutes.
+config home. It removes the file as it exits cleanly; a process killed
+outright, as a closed terminal tab kills it, leaves the file with a pid that
+no longer runs. Every collection pass reads that registry (a file again only
+when it changed) and asks each file's pid whether it still runs (signal 0, on
+Unix). A session with no running process left, after it had one or with only
+dead files naming it, and no event after that was seen, stops running or
+waiting at once: it is idle, with no requests and no attention, as the
+transcript's abandonment would show it 30 minutes later.
 
 `session_detail {id}` loads only the requested parser checkpoint and returns
 its session, recorded usage entries, parent and children, including relationships
