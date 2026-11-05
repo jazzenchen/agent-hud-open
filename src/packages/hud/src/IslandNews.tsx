@@ -4,6 +4,7 @@ import { usePanelServices } from "./PanelContext";
 import { agentVendorName, sourceID, vendorKey } from "./model";
 import type { EndSide } from "./ends/end-geometry";
 import { PARK_AFTER_MS, type ParkedCard } from "./ends/end-queue";
+import { CLAIM_GRACE_MS } from "./ends/ends-link";
 import { useParkedEnds } from "./ends/useParkedEnds";
 
 export {
@@ -103,7 +104,11 @@ export function useIslandNews(
     seen = useRef<Set<string> | null>(null),
     seenRequests = useRef<Set<string> | null>(null);
   const [queue, setQueue] = useState<IslandCard[]>([]);
-  const parked = useParkedEnds({ requests, hovered: ends?.hovered ?? null });
+  const parked = useParkedEnds({
+    requests,
+    hovered: ends?.hovered ?? null,
+    link: services?.ends,
+  });
   const latestRequests = useRef(requests);
   latestRequests.current = requests;
   const items = snapshot.islandEvents?.items ?? [];
@@ -117,14 +122,12 @@ export function useIslandNews(
     for (const event of items) seen.current.add(event.id);
     if (seen.current.size > 128)
       seen.current = new Set(items.map((event) => event.id));
-    // Requests that wait from before the HUD started, or that come while the
-    // pointer is on another screen, go straight to the head.
-    const quiet = seenRequests.current === null || !underPointer;
-    const freshRequests =
-      seenRequests.current === null
-        ? requests
-        : requests.filter((request) => !seenRequests.current!.has(request.id));
-    if (quiet)
+    // Requests that wait from before the HUD started go straight to the head.
+    const startup = seenRequests.current === null;
+    const freshRequests = startup
+      ? requests
+      : requests.filter((request) => !seenRequests.current!.has(request.id));
+    if (startup)
       for (const request of freshRequests)
         parked.park({ type: "request", id: request.id });
     if (seenRequests.current === null) seenRequests.current = new Set();
@@ -133,19 +136,39 @@ export function useIslandNews(
       if (!activeRequestIds.has(id)) seenRequests.current.delete(id);
     }
     for (const request of requests) seenRequests.current.add(request.id);
-    const visible =
-      silenced || !underPointer
-        ? []
-        : fresh.filter(
-            (event) =>
-              event.islandAlert !== false &&
-              shown.includes(vendorKey(event.source)) &&
-              (event.kind !== "completion" ||
-                (services?.sources?.[sourceID(snapshot, event.source)]?.live !==
-                  false &&
-                  services?.sources?.[sourceID(snapshot, event.source)]
-                    ?.reminders !== false)),
-          );
+    const eligible = silenced
+      ? []
+      : fresh.filter(
+          (event) =>
+            event.islandAlert !== false &&
+            shown.includes(vendorKey(event.source)) &&
+            (event.kind !== "completion" ||
+              (services?.sources?.[sourceID(snapshot, event.source)]?.live !==
+                false &&
+                services?.sources?.[sourceID(snapshot, event.source)]
+                  ?.reminders !== false)),
+        );
+    const coming = startup ? [] : freshRequests;
+    const visible = underPointer ? eligible : [];
+    // The pointer's screen shows the new cards and parks them, on every
+    // screen. Should no screen with a HUD have the pointer, each parks them
+    // itself once none has claimed them.
+    if (underPointer) parked.claim([...visible, ...coming].map((c) => c.id));
+    else if (eligible.length || coming.length) {
+      const cards: ParkedCard[] = [
+        ...coming.map((r) => ({ type: "request" as const, id: r.id })),
+        ...eligible.map((e) => ({
+          type: "news" as const,
+          id: e.id,
+          at: e.at,
+          event: e,
+        })),
+      ];
+      setTimeout(() => {
+        for (const card of cards)
+          if (!parked.claimed(card.id)) parked.park(card);
+      }, CLAIM_GRACE_MS);
+    }
     setQueue((previous) =>
       reconcileIslandCards(
         silenced
@@ -153,7 +176,7 @@ export function useIslandNews(
           : previous,
         requests,
         visible,
-        quiet ? [] : freshRequests,
+        underPointer ? coming : [],
         inUsagePanel,
       ),
     );

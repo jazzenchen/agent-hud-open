@@ -6,6 +6,8 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import type { EndsLink } from "./ends/ends-link";
+export type { EndsLink, EndsOp } from "./ends/ends-link";
 import type {
   Session,
   SourcePreferences,
@@ -37,6 +39,8 @@ export interface PanelServices {
    * user can take there (allowing Agent HUD's hooks in Codex). */
   openClient?(source: string): void;
   sources?: Record<string, SourcePreferences>;
+  /** The other screens' HUDs, for one set of dock ends on all of them. */
+  ends?: EndsLink;
   draft?: {
     unsaved: boolean;
     /** What waits: this display's own layout or the shared one, a HUD style, the app's settings. */

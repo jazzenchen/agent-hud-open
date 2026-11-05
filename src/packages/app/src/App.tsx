@@ -24,6 +24,7 @@ import type { AppExtensionPage } from "./settings/pages";
 import { SettingsWindow } from "./settings/SettingsWindow";
 import { SourceMenu } from "./SourceMenu";
 import { StatisticsWindow } from "./StatisticsWindow";
+import { hudEndsLink } from "./lib/hud-ends-link";
 
 // Windows load their own views. Statistics does not need the shader/bot renderer,
 // and a resting HUD does not need the historical charts and settings panes.
@@ -147,6 +148,7 @@ function AppContent({
   );
   const panelServices: PanelServices = {
     sources: snapshot?.sourcePreferences ?? store.sources,
+    ends: surface ? hudEndsLink : undefined,
     openSession: async (session) => {
       try {
         await act("open_session", { id: session.id });

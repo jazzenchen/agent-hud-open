@@ -50,9 +50,28 @@ export function fadeOldest(ends: EndQueues): EndQueues {
   return ends.tail.length ? { ...ends, tail: ends.tail.slice(0, -1) } : ends;
 }
 
-export function dropMessage(ends: EndQueues, id: string): EndQueues {
-  const tail = ends.tail.filter((item) => item.id !== id);
+export function dropMessages(
+  ends: EndQueues,
+  ids: readonly string[],
+): EndQueues {
+  const tail = ends.tail.filter((item) => !ids.includes(item.id));
   return tail.length === ends.tail.length ? ends : { ...ends, tail };
+}
+
+/** This screen's ends with what another screen says waits there: every
+ * request and message either knows of, messages newest first. */
+export function mergeEnds(ends: EndQueues, other: EndQueues): EndQueues {
+  const head = [
+    ...ends.head,
+    ...other.head.filter((id) => !ends.head.includes(id)),
+  ];
+  const known = new Set(ends.tail.map((item) => item.id));
+  const extra = other.tail.filter((item) => !known.has(item.id));
+  if (!extra.length && head.length === ends.head.length) return ends;
+  const tail = [...ends.tail, ...extra]
+    .sort((a, b) => Date.parse(b.at) - Date.parse(a.at))
+    .slice(0, TAIL_LIMIT);
+  return { head, tail };
 }
 
 export function clearMessages(ends: EndQueues): EndQueues {

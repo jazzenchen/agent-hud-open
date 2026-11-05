@@ -9,7 +9,8 @@ import {
 } from "../src/ends/end-geometry.ts";
 import {
   clearMessages,
-  dropMessage,
+  dropMessages,
+  mergeEnds,
   emptyEnds,
   fadeOldest,
   keepWaiting,
@@ -186,7 +187,7 @@ test("the tail keeps messages newest first and lets the oldest go", () => {
     ends.tail.map((item) => item.id),
     ["3", "2"],
   );
-  ends = dropMessage(ends, "3");
+  ends = dropMessages(ends, ["3"]);
   assert.deepEqual(
     ends.tail.map((item) => item.id),
     ["2"],
@@ -212,4 +213,26 @@ test("a request answered anywhere leaves the head", () => {
   const ends = { head: ["a", "b"], tail: [] };
   assert.deepEqual(keepWaiting(ends, ["b"]).head, ["b"]);
   assert.equal(keepWaiting(ends, ["a", "b", "c"]), ends);
+});
+
+test("a screen that starts late takes what the others hold, once each", () => {
+  const mine = {
+    head: ["a"],
+    tail: [{ id: "2", at: "2026-11-05T10:00:02Z", event: message("2") }],
+  };
+  const theirs = {
+    head: ["a", "b"],
+    tail: [
+      { id: "3", at: "2026-11-05T10:00:03Z", event: message("3") },
+      { id: "2", at: "2026-11-05T10:00:02Z", event: message("2") },
+      { id: "1", at: "2026-11-05T10:00:01Z", event: message("1") },
+    ],
+  };
+  const merged = mergeEnds(mine, theirs);
+  assert.deepEqual(merged.head, ["a", "b"]);
+  assert.deepEqual(
+    merged.tail.map((item) => item.id),
+    ["3", "2", "1"],
+  );
+  assert.equal(mergeEnds(merged, theirs), merged);
 });
