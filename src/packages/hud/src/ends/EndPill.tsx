@@ -43,7 +43,13 @@ function FadeRing({
       kept.current = { cycle: fade.cycle, time: 0 };
     const animation = element.animate(
       [{ strokeDashoffset: 0 }, { strokeDashoffset: ring.length }],
-      { duration: fade.ms, easing: "linear", fill: "forwards" },
+      // In small steps, about 20 a second: a hairline this slow needs no
+      // more, and each step repaints it.
+      {
+        duration: fade.ms,
+        easing: `steps(${Math.round(fade.ms / 50)}, end)`,
+        fill: "forwards",
+      },
     );
     animation.currentTime = kept.current.time;
     if (fade.paused) animation.pause();
@@ -134,8 +140,10 @@ export function EndPill({
             ? `${count} 条消息`
             : `${count} messages`
       }
-      initial={reduceMotion ? false : { opacity: 0, scale: 0.55, ...box(rect) }}
-      animate={{ opacity: 1, scale: 1, ...box(rect) }}
+      // Only opacity and scale move: they run on the compositor, so the pop
+      // keeps its pace while the page is busy.
+      initial={reduceMotion ? false : { opacity: 0, scale: 0.55 }}
+      animate={{ opacity: 1, scale: 1 }}
       exit={reduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.55 }}
       transition={{
         duration: reduceMotion ? 0 : HUD_METRICS.duration,

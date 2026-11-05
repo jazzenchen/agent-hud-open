@@ -139,7 +139,6 @@ export function DockEnds({
         flights={ends.flights}
         rects={geometry}
         edge={edge}
-        thick={geometry.thick}
         ground={rowDark ? "#000" : fill}
         outline={outline}
         light={rowDark ? false : light}

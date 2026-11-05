@@ -1,4 +1,11 @@
-import { memo, useLayoutEffect, useMemo, useRef, type ReactNode } from "react";
+import {
+  memo,
+  useDeferredValue,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  type ReactNode,
+} from "react";
 import type { Snapshot } from "@agent-hud/protocol";
 import { PanelServicesProvider, type PanelServices } from "../PanelContext";
 import {
@@ -39,7 +46,9 @@ const Redraw = memo(
 );
 
 /** The panel's body, drawn out of sight at its natural height for the panel's
- * next opening; it draws again only when `measured` changes. */
+ * next opening; it draws again only when `measured` changes, and then in the
+ * background: React draws it in small slices after what shows has changed,
+ * so a card leaving or flying to its end never waits for the whole panel. */
 export function MeasuringCopy({
   measured,
   body,
@@ -57,6 +66,7 @@ export function MeasuringCopy({
   padding: { top: number; right: number; bottom: number; left: number };
   onHeight: (height: number) => void;
 }) {
+  const shown = useDeferredValue(measured);
   const content = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
     const element = content.current;
@@ -96,15 +106,15 @@ export function MeasuringCopy({
       }}
     >
       <Redraw
-        version={measured}
+        version={shown}
         draw={() => {
           const drawn = (
-            <ListedSessionsContext.Provider value={measured.listed}>
-              {body(measured.snapshot)}
+            <ListedSessionsContext.Provider value={shown.listed}>
+              {body(shown.snapshot)}
             </ListedSessionsContext.Provider>
           );
-          return measured.services ? (
-            <PanelServicesProvider value={measured.services}>
+          return shown.services ? (
+            <PanelServicesProvider value={shown.services}>
               {drawn}
             </PanelServicesProvider>
           ) : (

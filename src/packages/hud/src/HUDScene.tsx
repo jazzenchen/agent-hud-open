@@ -460,7 +460,7 @@ export function HUDScene({
       request,
       event,
       news.queue,
-      news.ends.tail,
+      news.ends.view === "tail" ? news.ends.tail : news.ends.view,
       inUsagePanel,
       delivery,
     ],

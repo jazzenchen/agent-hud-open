@@ -1,4 +1,4 @@
-import { motion } from "motion/react";
+import { useLayoutEffect, useRef } from "react";
 import { HUDArtwork } from "../HUDArtwork";
 import type { HUDRect } from "../geometry";
 import type { HUDEdge } from "../model";
@@ -7,21 +7,107 @@ import type { EndFlightPlan } from "./useDockEnds";
 
 /** How far a flight bows away from the edge, and how long it takes. */
 const BOW = 18;
-const FLIGHT_SECONDS = 0.62;
+const FLIGHT_MS = 620;
 
 const centre = (rect: HUDRect) => ({
   x: rect.x + rect.width / 2,
   y: rect.y + rect.height / 2,
 });
 
+/** One card on its way: a circle with its agent's mark, drawn where it lands
+ * and moved there by transform and opacity alone. Web Animations hand those
+ * to the compositor, so the flight keeps its pace while the page is busy
+ * with the card it left. */
+function EndFlight({
+  flight,
+  to,
+  inward,
+  ground,
+  outline,
+  light,
+  land,
+}: {
+  flight: EndFlightPlan;
+  to: HUDRect;
+  inward: { x: number; y: number };
+  ground: string;
+  outline: string;
+  light: boolean;
+  land: (id: string) => void;
+}) {
+  const chip = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const element = chip.current;
+    if (!element?.animate) return land(flight.id);
+    const from = centre(flight.from);
+    const at = centre(to);
+    const dx = from.x - at.x,
+      dy = from.y - at.y;
+    const start = Math.min(
+      1.2,
+      Math.max(0.6, Math.min(flight.from.height, 34) / to.width),
+    );
+    const mid = (start + 1) / 2;
+    const animation = element.animate(
+      [
+        {
+          transform: `translate(${dx}px, ${dy}px) scale(${start})`,
+          opacity: 0,
+        },
+        {
+          transform: `translate(${dx / 2 + inward.x}px, ${dy / 2 + inward.y}px) scale(${mid})`,
+          opacity: 1,
+          offset: 0.45,
+        },
+        { transform: "translate(0px, 0px) scale(1)", opacity: 0.85 },
+      ],
+      {
+        duration: FLIGHT_MS,
+        easing: "cubic-bezier(0.45, 0, 0.2, 1)",
+        fill: "forwards",
+      },
+    );
+    animation.onfinish = () => land(flight.id);
+    return () => animation.cancel();
+  }, [flight.id]);
+  return (
+    <div
+      ref={chip}
+      aria-hidden="true"
+      style={{
+        position: "absolute",
+        left: to.x,
+        top: to.y,
+        width: to.width,
+        height: to.height,
+        zIndex: 4,
+        pointerEvents: "none",
+        opacity: 0,
+        willChange: "transform, opacity",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        borderRadius: "50%",
+        background: ground,
+        boxShadow: `inset 0 0 0 1px ${outline}`,
+      }}
+    >
+      <HUDArtwork
+        source={flight.source}
+        size={Math.round(to.width * 0.5)}
+        light={light}
+      />
+    </div>
+  );
+}
+
 /** Cards on their way to the dock's ends: each leaves the card's place as a
- * small chip with its agent's mark, slides along the dock in a low arc and
- * shrinks into its end, which counts it once it lands. */
+ * small circle with its agent's mark, slides along the dock in a low arc
+ * and settles into its end, which counts it once it lands. */
 export function EndFlights({
   flights,
   rects,
   edge,
-  thick,
   ground,
   outline,
   light,
@@ -30,7 +116,6 @@ export function EndFlights({
   flights: EndFlightPlan[];
   rects: Record<EndSide, HUDRect>;
   edge: HUDEdge;
-  thick: number;
   /** The chip's fill: the HUD's ground, the notch's black in its row. */
   ground: string;
   outline: string;
@@ -43,62 +128,18 @@ export function EndFlights({
   };
   return (
     <>
-      {flights.map((flight) => {
-        const to = rects[flight.side];
-        const from = centre(flight.from);
-        const at = centre(to);
-        const size = Math.min(Math.max(flight.from.height, thick), thick * 1.4);
-        const width = Math.min(flight.from.width, size * 2.4);
-        const mid = {
-          x: (from.x + at.x) / 2 + inward.x,
-          y: (from.y + at.y) / 2 + inward.y,
-          width: (width + to.width) / 2,
-          height: (size + to.height) / 2,
-        };
-        return (
-          <motion.div
-            key={flight.id}
-            aria-hidden="true"
-            initial={{
-              left: from.x - width / 2,
-              top: from.y - size / 2,
-              width,
-              height: size,
-              opacity: 0,
-            }}
-            animate={{
-              left: [from.x - width / 2, mid.x - mid.width / 2, to.x],
-              top: [from.y - size / 2, mid.y - mid.height / 2, to.y],
-              width: [width, mid.width, to.width],
-              height: [size, mid.height, to.height],
-              opacity: [0, 1, 0.85],
-            }}
-            transition={{
-              duration: FLIGHT_SECONDS,
-              ease: [0.45, 0, 0.2, 1],
-              times: [0, 0.45, 1],
-            }}
-            onAnimationComplete={() => land(flight.id)}
-            style={{
-              position: "absolute",
-              zIndex: 4,
-              pointerEvents: "none",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              borderRadius: 999,
-              background: ground,
-              boxShadow: `inset 0 0 0 1px ${outline}, 0 4px 12px rgba(0,0,0,0.18)`,
-            }}
-          >
-            <HUDArtwork
-              source={flight.source}
-              size={Math.round(thick * 0.55)}
-              light={light}
-            />
-          </motion.div>
-        );
-      })}
+      {flights.map((flight) => (
+        <EndFlight
+          key={flight.id}
+          flight={flight}
+          to={rects[flight.side]}
+          inward={inward}
+          ground={ground}
+          outline={outline}
+          light={light}
+          land={land}
+        />
+      ))}
     </>
   );
 }
