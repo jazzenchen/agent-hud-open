@@ -21,6 +21,15 @@ impl AgentHudCore {
         self.claude_desktop.index.set_bases(bases);
     }
 
+    /// Lets the host tell whether the processes Claude Code registers still
+    /// run; without it, every registered process runs.
+    pub fn set_claude_pids(
+        &mut self,
+        pids: std::sync::Arc<dyn agent_hud_agents::claude::processes::Pids>,
+    ) {
+        self.claude_desktop.processes.set_pids(pids);
+    }
+
     /// Enable Project projection only when this host can return to its threads.
     pub fn set_claude_projects_supported(&mut self, supported: bool) {
         if self.claude_projects_supported != supported {

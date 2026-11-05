@@ -59,3 +59,11 @@ pub(crate) fn codex_cli_on_port(
 ) -> Option<(Vec<String>, HashMap<String, String>)> {
     None
 }
+
+/// Whether a process runs on `pid`, for Claude Code's process registry:
+/// signal 0 only. No start is read yet, so a reused pid passes for the
+/// registered process; `/proc/<pid>/stat`'s start time (clock ticks after
+/// boot) would tell them apart.
+pub(crate) fn process_runs(pid: i32, started: Option<i64>) -> bool {
+    super::super::unix::pid_runs(pid, started, |_| None)
+}

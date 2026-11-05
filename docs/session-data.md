@@ -70,7 +70,9 @@ session in place. It removes the file as it exits cleanly; a process killed
 outright, as a closed terminal tab kills it, leaves the file behind. Every
 collection pass reads the registry (a file again only when it changed) and
 asks each pid whether it still runs, the process that started when the file
-says (on macOS; signal 0 elsewhere on Unix).
+says (on macOS; signal 0 elsewhere on Unix; on Windows every registered
+process still counts as running). The platform layer answers that question
+(`Pids`); the registry itself holds no OS code.
 
 What a Claude session's process says comes before the transcript's clock:
 - A running process that says the session waits holds it waiting for as long

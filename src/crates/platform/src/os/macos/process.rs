@@ -227,9 +227,45 @@ fn bundle(executable: &Path) -> Option<String> {
         .map(str::to_owned)
 }
 
+/// Whether a process runs on `pid` that started when `started` says, for
+/// Claude Code's process registry: signal 0, and the start proc_pidinfo reads.
+pub(crate) fn process_runs(pid: i32, started: Option<i64>) -> bool {
+    super::super::unix::pid_runs(pid, started, start_of)
+}
+
+/// When a process of this user started, in Unix seconds.
+fn start_of(pid: i32) -> Option<i64> {
+    // SAFETY: proc_pidinfo fills at most `size` bytes of the zeroed struct.
+    unsafe {
+        let mut info: libc::proc_bsdinfo = std::mem::zeroed();
+        let size = std::mem::size_of_val(&info) as i32;
+        (libc::proc_pidinfo(
+            pid,
+            libc::PROC_PIDTBSDINFO,
+            0,
+            (&mut info as *mut libc::proc_bsdinfo).cast(),
+            size,
+        ) == size
+            && info.pbi_uid == libc::getuid())
+        .then_some(info.pbi_start_tvsec as i64)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A pid another program now runs on is not the process a file named.
+    #[test]
+    fn a_pid_whose_process_started_at_another_time_is_another_program() {
+        let own = std::process::id() as i32;
+        let began = start_of(own).unwrap();
+        assert!(process_runs(own, Some(began)), "the same process");
+        assert!(!process_runs(own, Some(began - 86_400)), "a reused pid");
+        let mut finished = std::process::Command::new("true").spawn().unwrap();
+        finished.wait().unwrap();
+        assert!(!process_runs(finished.id() as i32, None));
+    }
 
     #[test]
     fn procargs_environment_keeps_only_named_variables() {

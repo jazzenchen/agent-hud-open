@@ -17,7 +17,7 @@ pub(crate) use app_cookies::{app_cookie, unseal_safe_storage};
 pub(crate) use apps::{activate_app, app_running, launch_app, ACTIVATES_APPS};
 pub use launch_services::registered_applications;
 pub(crate) use launch_services::{registered_bundle, registered_url};
-pub(crate) use process::{codex_cli_on_port, parent_processes};
+pub(crate) use process::{codex_cli_on_port, parent_processes, process_runs};
 pub(crate) use secrets::stored_secret;
 /// Darwin exposes another process's environment through KERN_PROCARGS2.
 pub(crate) const READS_PROCESS_ENVIRONMENT: bool = true;

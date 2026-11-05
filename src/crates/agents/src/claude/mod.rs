@@ -13,6 +13,7 @@ pub mod process;
 pub mod processes;
 pub mod project_origin;
 mod quota_windows;
+mod registry_file;
 pub mod routes;
 pub mod transcript;
 mod usage;

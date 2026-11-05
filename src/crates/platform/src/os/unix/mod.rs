@@ -2,10 +2,12 @@
 //! each host module; provider identity/flags remain in the account adapter.
 use super::{Environment, ProcessInfo};
 mod files;
+mod pids;
 pub(crate) use files::{
     hook_configuration, hook_text, owned_by_user, owner_only, private_append, private_directory,
     private_file, read_stdin,
 };
+pub(crate) use pids::pid_runs;
 use std::{
     collections::HashMap,
     ffi::OsStr,

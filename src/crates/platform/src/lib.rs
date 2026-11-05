@@ -123,6 +123,10 @@ impl NativePlatform {
     pub fn claude_desktop_bases(&self) -> Vec<PathBuf> {
         os::claude_desktop_bases(&self.home, &std::env::vars().collect::<os::Environment>())
     }
+    /// This host's word on whether the processes Claude Code registers still run.
+    pub fn claude_pids(&self) -> std::sync::Arc<dyn agent_hud_agents::claude::processes::Pids> {
+        std::sync::Arc::new(os::HostPids)
+    }
     pub fn claude_projects_supported(&self) -> bool {
         os::OPENS_CLAUDE_PROJECTS
     }

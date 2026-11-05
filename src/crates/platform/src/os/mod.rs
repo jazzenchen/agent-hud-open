@@ -125,6 +125,16 @@ pub(crate) fn joined_path(paths: Vec<PathBuf>) -> String {
         .to_string_lossy()
         .into_owned()
 }
+/// This host's processes, as Claude Code's process registry asks after them.
+pub(crate) struct HostPids;
+impl agent_hud_agents::claude::processes::Pids for HostPids {
+    fn os(&self) -> agent_hud_agents::Os {
+        OS
+    }
+    fn runs(&self, pid: i32, started: Option<i64>) -> bool {
+        process_runs(pid, started)
+    }
+}
 /// A parent process of this one, as the kernel reports it.
 pub(crate) struct ProcessAncestor {
     pub executable: PathBuf,

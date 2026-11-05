@@ -207,6 +207,14 @@ pub(crate) fn codex_cli_on_port(
     None
 }
 
+/// Not asked on Windows yet: every process Claude Code's registry names
+/// runs, so a killed one keeps the transcript's half hour. An adapter would
+/// open the pid (`OpenProcess`) and compare `GetProcessTimes`' creation time
+/// with `started`.
+pub(crate) fn process_runs(_pid: i32, _started: Option<i64>) -> bool {
+    true
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
