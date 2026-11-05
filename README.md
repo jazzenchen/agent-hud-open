@@ -62,13 +62,12 @@ The details are close at hand, and what needs your approval is answered right th
 - **Requests**: approve, deny or always allow, and answer an agent's questions, all on the HUD, the questions Claude asks in its desktop app included. Agent HUD never decides for you: a request you leave goes back to the agent after 10 minutes.
 - **Jump back**: one click takes you to a session's thread, tab or terminal pane.
 
-**Three modes.** Each display runs one: Notch by default where there is a notch, Dynamic elsewhere.
+**Two modes.** Each display runs one: Notch by default where there is a notch, Simple elsewhere.
 
 | Mode | On screen |
 | --- | --- |
 | **Notch** | At the notch, with the glow around it. |
-| **Simple** | A small floating panel on any screen edge: each agent's logo in a ring of its most used quota, with the percentage beside it. |
-| **Dynamic** | A row of agent logos on any screen edge, with the glow behind them. A logo becomes its bot while its agent works. |
+| **Simple** | A small floating panel on any screen edge: each agent's logo in a ring of its most used quota, with the percentage beside it. A logo becomes its bot while its agent works. |
 
 ## On your phone.
 
