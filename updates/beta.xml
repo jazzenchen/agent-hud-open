@@ -3,16 +3,16 @@
   <channel>
     <title>Agent HUD</title>
     <item>
-      <title>0.6.0-beta.6</title>
-      <pubDate>Wed, 04 Nov 2026 21:12:31 +0800</pubDate>
-      <link>https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.6</link>
+      <title>0.6.0-beta.7</title>
+      <pubDate>Thu, 05 Nov 2026 10:59:57 +0800</pubDate>
+      <link>https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.7</link>
       <sparkle:channel>beta</sparkle:channel>
-      <sparkle:minimumAutoupdateVersion>494</sparkle:minimumAutoupdateVersion>
-      <sparkle:version>494</sparkle:version>
-      <sparkle:shortVersionString>0.6.0-beta.6</sparkle:shortVersionString>
+      <sparkle:minimumAutoupdateVersion>495</sparkle:minimumAutoupdateVersion>
+      <sparkle:version>495</sparkle:version>
+      <sparkle:shortVersionString>0.6.0-beta.7</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
       <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-      <description sparkle:format="markdown"># Agent HUD 0.6.0-beta.6
+      <description sparkle:format="markdown"># Agent HUD 0.6.0-beta.7
 
 ## Compatibility
 
@@ -28,99 +28,42 @@ Requires an Apple Silicon Mac running macOS 14 or later.
 
 ### Coming from 0.5.5
 
-- Includes everything in [0.6.0-beta.1](https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.1), which moves Agent HUD to a new cross-platform app and brings your settings and 30 days of quota history with it, and the changes in [0.6.0-beta.2](https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.2), [0.6.0-beta.3](https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.3), [0.6.0-beta.4](https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.4) and [0.6.0-beta.5](https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.5).
+- Includes everything in [0.6.0-beta.1](https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.1), which moves Agent HUD to a new cross-platform app and brings your settings and 30 days of quota history with it, and the changes in [0.6.0-beta.2](https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.2), [0.6.0-beta.3](https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.3), [0.6.0-beta.4](https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.4), [0.6.0-beta.5](https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.5) and [0.6.0-beta.6](https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.6).
 
 ### New
 
-- Follows more agents. Each one appears only once Agent HUD finds it on this computer:
-  - Qoder, Qoder CN and QoderWork: their sessions and tokens, in the same session as the live state and approvals their hooks already brought.
-  - TRAE and TRAE CN: sessions running, waiting for a permission and done, from TRAE's hooks once TRAE's global hooks are on. TRAE's own runs of Claude Code's hooks no longer show up as Claude Code sessions.
-  - Factory Droid: sessions and tokens, and its turns as they run. The tool calls Droid's autonomy level would ask about are answered from the HUD; questions and spec approvals stay in Droid. With a Factory API key, its five-hour, weekly and monthly limits and its extra usage balance.
-  - Hermes: sessions running, waiting for a command approval, and done, through its hooks. Hermes asks once to allow them. When Hermes is signed in to Nous Portal, its block shows the month's subscription credits used and the top-up credits left.
-  - Kilo Code, MiMo Code and Oh My Pi, each as its own agent, with sessions, tokens and live state.
-  - Cline and Roo Code: sessions and tokens wherever Cline keeps them, a task copied into several editors counted once. ClinePass's 5-hour, weekly and monthly limits come from Cline's own sign-in.
-  - Goose: sessions and tokens.
-  - Qoder, Factory Droid, Cline, Roo Code and Goose are read from their published formats and have not been checked on a real install yet.
-- Shows more plans and balances beside the agents that use them:
-  - MiniMax's plans, read with the key Claude Code, Codex, OpenCode or Pi sends to MiniMax: each model family's 5-hour and weekly windows. A key with no active plan shows nothing, with a notice.
-  - Volcengine Ark's Coding Plan and Agent Plan, personal and team, through Ark's own arkcli: 5-hour, weekly and monthly windows. MiniMax's and Ark's API addresses are no longer listed as relays.
-  - Grok CLI's own credits: the share of the period's credits used, on-demand credits and the plan. Between runs of the CLI its last credits stay.
-  - DeepSeek's balance for the key Claude Code or Codex sends to DeepSeek's API, one balance per key, named with the clients that use it.
-  - Copilot's quota through the sign-in Copilot's own apps keep when the GitHub CLI's is missing or refused. The plan is named from the subscription, so Free and Pro no longer both read as Individual, and premium requests beyond the plan show as an estimated charge at GitHub's US$0.04 each.
-- Shows Qoder's, WorkBuddy's and TRAE's credits after you sign in to their site in Agent HUD's own window. The window opens only from Sign in on the agent's block or its settings page. Agent HUD keeps the site's session once the quota reads; closing the window first keeps nothing. Google may refuse to sign in inside such a window. These sign-ins have not been checked with real accounts yet.
-- Draws usage on the Simple HUD and in the panel as rings, segments, bars or numbers, chosen under Usage in Settings → Display:
-  - A Simple mark shows the windows of the account nearest its limit, up to four, in the panel's order. Segments, one ring split into thirds or quarters, is the default; numbers shows the tightest percentage alone.
-  - The panel's ring widget comes as rings or segments, one ring per account with a legend of every window. Pointing at a line lights its arc.
-  - Arcs move between styles and values. A screen saved with rings off shows numbers. Agents can choose the style through the HUD tools.
-- Adds Quota history to the Statistics window: every shown window's readings over the chosen range, up to 30 days, one row per window on a fixed 0–100% scale. A line breaks at a reset and at a gap in the readings.
-- Adds Plan value to the Statistics window for Claude, Codex, Copilot, Cursor and Grok accounts: the plan and its monthly list price, what this Mac's calls of the last 30 days would cost at API list prices, and that as a multiple of the plan's price. Where several cycles of readings support it, it suggests a higher or lower plan. Claude's plans are named Max and Ultra, as Anthropic now names them.
-- Forecasts a quota window from the cycle so far until there are enough recent readings, marked "Estimated from the whole window". That forecast never raises an alert. In the burn view, a line on the bar shows where a steady pace through the cycle would be, and the window says how many points ahead of or under that budget it is. A reply rate now needs at least three timed replies, five seconds in all.
-- Reads Claude's quota in more ways:
-  - For more Claude Code accounts: Settings → Agents → Claude Code → More Claude Code accounts takes extra `CLAUDE_CONFIG_DIR` folders, and each shows as its own account with its own windows. Sessions started from them are not counted in the token statistics yet.
-  - Through the Claude desktop app's sign-in when Claude Code is signed out or not installed. macOS asks once whether Agent HUD may read the desktop app's key.
-  - From the usage record Claude Code keeps, while it is under a minute old, without starting Claude Code.
-- Tells you in the HUD, at most once a day, when an agent has signed out; its last quota stays until you sign in again. While Claude's, Codex's or Copilot's status page reports a problem with a part the agent uses, its quota block says so.
-- Files the local work a Claude desktop app Project runs under its Project conversation, instead of listing each piece as a session of its own:
-  - A Project row opens the session's details and shows the usage of its local work, marked as local only. Each Project's label carries the start of its id, so two Projects never look alike.
-  - Return to Project thread opens the exact thread in the Claude desktop app.
-  - The first launch reads your logs once more for this, with its progress in the HUD panel and the Statistics window.
-- Shows more of what the agents it already follows are doing:
-  - A Cursor session shows running while it works, from Cursor's hooks, and opens in Cursor: a cloud agent in Cursor's Agents window, a local one by its folder.
-  - A Grok Bot session shows working until its turn has replied and gone quiet for 30 seconds.
-  - A Kimi session shows waiting while Kimi asks for an approval, a plan review or an answer.
-  - Devin sessions are named Devin Desktop or Devin CLI, after the app that runs them.
-  - Copilot CLI's tokens come from its session store: input, output, cache reads and writes, reasoning and each call's time, every call counted once.
-- Offers a picker on a balance card set to show more than one measure.
-- For your iPhone:
-  - Sends the cost of each day's usage at API list prices, by token kind. Usage from this Mac reached the iPhone unpriced.
-  - Brings older days' usage up to date within half an hour after Agent HUD reads new history for them, such as a newly found agent's logs or a re-index.
-  - Once every iPhone on your account runs Agent HUD for iPhone 1.7.6 or later, keeps the words of approval and reminder banners only in the end-to-end encrypted part of their iCloud records. The other fields carry a neutral line such as "An approval is waiting".
+- Lets an agent build the hover panel through the HUD tools, not only rearrange it:
+  - Controls of its own: rows, columns, grids, text, logos, bars, rings, segments, the token chart, dividers and pickers, in the panel's own fonts and colours in both looks, among the agents' blocks or as sections of their own. A list can repeat for each window, balance, account, agent or session, with figures and reset times written as the panel's rows write them, and a clock that turns with the minute. A click opens Statistics, a session or a Settings page, or copies text.
+  - The panel's sections side by side: Quota details, Token usage and the Session list can share a row as columns, and the panel can be 480 to 960 points wide (up to 720 before).
+  - Compact quota blocks: a block drawn as rings or segments can drop its list of windows and become a square tile with the logo, name and plan, the measure picker, one ring with the most used window's figure, and when that window resets. Up to six tiles share a line. Pointing at the ring shows each window.
+- Offers Reply rate, Consumed and Est. cost for more agents than Claude and Codex, wherever Agent HUD logs the calls that spend a window:
+  - Antigravity, Cursor, Copilot, Devin, Factory Droid, Grok Bot, Grok CLI, Qoder, WorkBuddy, Cline and Hermes's Nous Portal credits; Kimi's, GLM's, OpenCode Go's and MiniMax's plans, Claude Code's calls with the plan's key included; and Pi's calls with its ChatGPT sign-in, in that account's Codex windows.
+  - Claude's all-models windows count only Claude models, and a call through a relay or a local model server no longer counts toward its client's own plan.
+  - Every quota and balance block offers all its measures, and greys one only when its readings can't give it. A saved layout that limited the picker no longer does.
+- Tells you in the HUD when Codex skips Agent HUD's hooks until you allow them, and what is missing meanwhile: its approvals, or only its sessions' progress. Codex runs them once you click Review hooks above its message box, then Allow all. On macOS the notice's button brings Codex forward or opens it. The notice comes 20 seconds after launch, then at most once a day.
+- Answers Copilot CLI's permission requests in the HUD once you turn on Settings → Agents → Copilot → Answer permission requests in the HUD. It is off by default and works while client hooks are on. Every tool call Copilot would run or ask about then waits for your answer in the HUD; runs started with `-p`, `--allow-all-tools`, `--allow-all` or `--yolo` stay with Copilot.
+- Draws the sub-agent timeline on a session's page more calmly: calls close together join one run instead of a row of ticks, and split again as you zoom in. A sideways trackpad swipe, or Shift with a mouse wheel, pans a zoomed view, and zooming and panning glide instead of jumping.
+- Shows TRAE and TRAE CN with TRAE's own logo instead of a generic icon, and each agent's logo in Settings → Display → Panel → Agent order.
+- Installs from a terminal: `brew install --cask jazzenchen/tap/agent-hud` on a Mac, or `npx @agenthud/install` on a Mac, Windows or Linux. Both install the newest release, betas included. The npx installer checks the download against the release's checksums, and on a Mac also Agent HUD's signature. If Agent HUD is already in Applications, add `--adopt` to the Homebrew command.
 
 ### Fixes
 
-- Keeps a Simple mark's ring and number at the last reading, in grey, while its agent's quota read fails, instead of emptying them. A new reading or the window's reset replaces it.
-- Orders the HUD's marks and the menu bar's agents by the agent order in Settings; it ordered only the panel's blocks. An agent with no block in the panel, such as one a Dynamic dock shows for its sessions alone, comes after them. A list an agent set through the HUD tools still comes first.
-- Starts Agent HUD when one client's hooks can't go in, such as when its config folder links to a place that no longer exists. That client is left out and named in Settings, and the others still get their hooks.
-- Uses less CPU:
-  - With Remote on but no Remote access, Agent HUD no longer sits near 180% CPU while idle.
-  - Works out what to send a phone on the local network only when a phone asks. This took about 5% of a core while agents worked.
-  - Sends Live Activity updates only when something changed, not every few seconds while an agent works.
-- Keeps Claude's last quota, in grey with the time it was read, when Claude Code signs out or its sign-in status can't be read; before, the Claude block emptied. When every way of reading fails, the usage record Claude Code keeps stands in, with its age. The reason shows under the account:
-  - A signed-out Claude Code is named as the command-line Claude Code, apart from the desktop app.
-  - When claude.ai asks for a browser check, as it does from some proxy and datacenter addresses, the notice says so instead of calling Claude Code signed out.
-- Treats every agent's quota reading alike: a missed answer leaves a reading under 10 minutes old on screen unchanged, failed reads retry from one minute out to 15, and a vendor's rate limit is waited out.
-- Reads Cursor's quota in more cases:
-  - Cursor 3's encrypted sign-in is read on macOS, so Cursor's block, and Grok Bot's readings that use Cursor's sign-in, work again. macOS asks once whether Agent HUD may read Cursor's key, and a refusal holds until Agent HUD restarts.
-  - When cursor.com refuses the usage summary, the period Cursor itself shows stands in. A plan billed in dollars is read by its spend of each limit, so its rings no longer read 0%.
-- Keeps Grok Bot's last reading through a missed answer instead of going back to an older number, and names the account by its email.
-- Opens sessions where their row says:
-  - Return to session opens a Grok Bot session in Grok Bot, which showed its cache file in Finder, and a Cursor session by its cloud agent or folder.
-  - On macOS, a local Cursor session's folder opens in Cursor without Cursor's link warning, and Antigravity's folder opens the same way. A Cursor session with nothing more exact to open brings Cursor forward.
-  - A DeepSeek Harness session's reminder brings Harness forward on macOS; Harness has no link to a session.
-- Finds the Codex command line inside a Codex or ChatGPT app that was renamed or moved out of Applications.
-- Shows Codex's Usage resets row in its quota block again.
-- Finds coding plans such as GLM's in Claude Code's `settings.local.json` and its `CLAUDE_CONFIG_DIR` folder, not only in `~/.claude/settings.json`.
-- Reads OpenCode's sessions past a row that isn't JSON instead of failing the whole read.
-- Says the relay reading failed when the relays you saved can't be read, instead of quietly leaving out the ones you added by hand.
-- Fixes the open HUD panel, which was drawn apart from the copy that measures it:
-  - It shows the "Update to" arrow, which it never did.
-  - Opening Settings, Statistics or the update ends an agent's HUD edit first.
-  - A quota alert inside the open panel is the quiet one-line row, not a full card.
-- Keeps the notch's glow on the notch while the panel opens and closes. Closing the panel left a gap.
-- On a light HUD, draws the compact alert's agent name in its row's colour; it was dark on the black notch. A window running out in the burn view shows its time in the warning colour.
-- Counts the Sessions page's day totals and its Today card over every matching session, not only the rows loaded so far, so they can read higher than before.
-- Keeps a selected turn's calls on the session page when more messages load.
-- Shows a failed action once: on the page that asked for it, or as a toast where there is no place for it. A web sign-in that can't open its window now says so.
-- Names the row behind each status in a closed client card in Settings → Agent plugins: "Plugin: Not installed", "HUD tools: Not added".
-- Keeps Chinese and other non-English text whole in the HUD tools' answers. A character split between two parts of an answer came out garbled.
-- Gives up on a message to Codex at its time limit when Codex stops reading it, instead of holding up Agent HUD's other work.
-- Keeps a long turn on the Lock Screen after it ends. It was timed from the turn's start, so a long turn left the Lock Screen as soon as it ended.
-- Sends a local-network update that could not be saved with the next one, instead of losing it.
-- Keeps working after an internal error in one part: quota readings, file watching, Settings changes, the HUD windows and the plugins carry on instead of failing.
-- Names Agent HUD in messages that still said Next or 预览版.
-- Writes the Chinese hint for a Claude Code too old to install the plugin with full-width parentheses.
+- Orders the HUD's marks by the agent order in Settings also after an agent chose through the HUD tools which marks show. The marks kept the agent's order, so reordering in Settings moved only the panel's blocks. The menu bar's agents follow the same order.
+- Lets the HUD tools change a panel whose saved layout keeps a setting from a block's earlier look, such as columns on a rings block. Every edit to such a panel was refused.
+- Takes the HUD tools' picture of the panel on a busy Mac: after 8 seconds of waiting for the token chart and the session list, it takes the picture and says what had not loaded, instead of timing out. A picture that still times out says which step it was waiting for.
+- Stops adding a second, stale Claude account when Claude Code is signed out and the Claude desktop app is signed in to another account. Claude Code's usage record now stands in only for the account it belongs to.
+- Follows some agents more closely:
+  - Devin: one card for each Devin request. Devin also runs Claude Code's hooks, so a request could reach the HUD a second time as a Claude Code session. A session in Devin Desktop's terminal names Devin, not Windsurf, as where its messages were typed. Not yet checked with an installed Devin.
+  - Factory Droid: a command that Droid's own settings already allow or block no longer waits in the HUD; Droid decides it alone. A command an ask rule names waits for your answer at every autonomy level, High included. Read from Factory's docs and not yet checked with a running Droid.
+  - Hermes: its hooks go into every Hermes profile that is set up, not only the default one, so a profile's sessions show live, each under its profile. Hermes asks once in each profile to allow them.
+  - Hermes: when its Nous Portal sign-in has expired, the last credits stay, then show as stale with a note that they update the next time Hermes runs. It showed a failure at once.
+  - Qoder and Qoder CN: their hooks go to the folder `QODER_CONFIG_DIR` or `QODERCN_CONFIG_DIR` names, where Qoder keeps its settings, instead of always `~/.qoder` and `~/.qoder-cn`.
+  - MiniMax and Volcengine Ark: their plans are read every five minutes, also while no agent works on this computer. Other apps and devices spend them too, so a reading could stay hours behind.
+- Keeps the Simple dock's background and outline while its usage panel is open. A panel shorter than the dock left the dock's ends bare, its bots drawn over whatever was behind.
+- Keeps the Settings window still when a trackpad scroll runs past its end. macOS sometimes left the page drawn about 20 points higher, with the sidebar taking clicks one row from where it was drawn.
+- Shows a page that fails to draw in Settings or Statistics as an error under the page's header, with the sidebar still there, instead of a blank window.
 </description>
-      <enclosure url="https://github.com/jazzenchen/agent-hud-open/releases/download/v0.6.0-beta.6/Agent-HUD-0.6.0-beta.6-arm64.dmg" length="52305001" type="application/octet-stream" sparkle:edSignature="0GTngBEj3S3fK/pC3iPLlXE57yrMXnV18U3EmgPAZOtUB6A5ixvNjWZUNV6Mf6IM3k7dBmJ6pkGzVHaM5qz+BA==" />
+      <enclosure url="https://github.com/jazzenchen/agent-hud-open/releases/download/v0.6.0-beta.7/Agent-HUD-0.6.0-beta.7-arm64.dmg" length="52451856" type="application/octet-stream" sparkle:edSignature="Aq5sA0soSU2s0/a5Aw65qicHcllm3eh6aPYT6KjCW4Br7HIc3AvWeDf9m9uwsTzUdNtnFjFcs4jp/lsSNxnGCg==" />
       <agenthudMacOnly>false</agenthudMacOnly>
       <agenthudMinimumIOSVersion>1.7.2</agenthudMinimumIOSVersion>
     </item>
