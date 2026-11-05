@@ -17,6 +17,13 @@ import {
   SectionNote,
 } from "./AddedSectionParts";
 import { historyWindowShown } from "./added-sections";
+import { quotaGroups, windowColor } from "./quota-groups";
+
+const ellipsis = {
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+  whiteSpace: "nowrap",
+} as const;
 
 const durations: Record<Period, number> = {
   "24h": 86_400_000,
@@ -25,31 +32,33 @@ const durations: Record<Period, number> = {
 };
 type Colors = ReturnType<typeof palette>;
 
-/** One window's used share over the stretch on a fixed 0–100% axis: its runs
- * as lines with the area under them, and a dashed line where a cycle began. */
-function HistoryLine({
-  window,
+/** One agent's windows over the stretch on a fixed 0–100% axis, a line each
+ * in its colour. A chart of one window fills the area under it and marks its
+ * resets with dashed rules; with several, a reset is a tick at the foot. */
+function HistoryChart({
+  windows,
+  lineColors,
   from,
   to,
-  color,
   colors,
 }: {
-  window: QuotaHistoryWindow;
+  windows: QuotaHistoryWindow[];
+  lineColors: string[];
   from: number;
   to: number;
-  color: string;
   colors: Colors;
 }) {
+  const single = windows.length === 1;
   const x = (at: number) =>
-    (Math.min(Math.max(at, from), to) - from) / (to - from || 1);
+    ((Math.min(Math.max(at, from), to) - from) / (to - from || 1)) * 1000;
   const point = ([at, used]: [number, number]) =>
-    `${(x(at) * 1000).toFixed(1)},${(100 - used).toFixed(1)}`;
+    `${x(at).toFixed(1)},${(100 - used).toFixed(1)}`;
   return (
     <svg
       viewBox="0 0 1000 100"
       preserveAspectRatio="none"
       aria-hidden
-      style={{ display: "block", width: "100%", height: 22 }}
+      style={{ display: "block", width: "100%", height: single ? 22 : 32 }}
     >
       <line
         x1={0}
@@ -59,48 +68,53 @@ function HistoryLine({
         stroke={colors.divider}
         vectorEffect="non-scaling-stroke"
       />
-      {window.resets.map((at) => (
-        <line
-          key={at}
-          x1={x(at) * 1000}
-          x2={x(at) * 1000}
-          y1={0}
-          y2={100}
-          stroke={colors.divider}
-          strokeDasharray="2 2"
-          vectorEffect="non-scaling-stroke"
-        />
-      ))}
-      {window.segments
-        .filter((run) => run.length > 0)
-        .map((run, index) => {
-          const line = run.map(point).join(" ");
-          const first = x(run[0][0]) * 1000;
-          const last = x(run[run.length - 1][0]) * 1000;
-          return (
-            <g key={index}>
-              <polygon
-                points={`${first},100 ${line} ${last},100`}
-                fill={hexAlpha(color, 0.14)}
-              />
-              <polyline
-                points={line}
-                fill="none"
-                stroke={color}
-                strokeWidth={1.5}
-                strokeLinejoin="round"
-                vectorEffect="non-scaling-stroke"
-              />
-            </g>
-          );
-        })}
+      {windows.map((window, index) =>
+        window.resets.map((at) => (
+          <line
+            key={`${window.id}-${at}`}
+            x1={x(at)}
+            x2={x(at)}
+            y1={single ? 0 : 88}
+            y2={100}
+            stroke={single ? colors.divider : lineColors[index]}
+            strokeDasharray={single ? "2 2" : undefined}
+            vectorEffect="non-scaling-stroke"
+          />
+        )),
+      )}
+      {windows.map((window, index) =>
+        window.segments
+          .filter((run) => run.length > 0)
+          .map((run, step) => {
+            const line = run.map(point).join(" ");
+            return (
+              <g key={`${window.id}-${step}`}>
+                {single && (
+                  <polygon
+                    points={`${x(run[0][0])},100 ${line} ${x(run[run.length - 1][0])},100`}
+                    fill={hexAlpha(lineColors[index], 0.14)}
+                  />
+                )}
+                <polyline
+                  points={line}
+                  fill="none"
+                  stroke={lineColors[index]}
+                  strokeWidth={1.5}
+                  strokeLinejoin="round"
+                  vectorEffect="non-scaling-stroke"
+                />
+              </g>
+            );
+          }),
+      )}
     </svg>
   );
 }
 
-/** The hover panel's quota history: each shown window's used share over the
- * last day, week or month, with its reading now; the layout's agents and
- * hidden models choose the windows, as the Statistics window's filter does. */
+/** The hover panel's quota history: one chart per agent of its shown
+ * windows' used share over the last day, week or month, with each window's
+ * reading now; the layout's agents and hidden models choose the windows, as
+ * the Statistics window's filter does. */
 export function QuotaHistorySection({
   snapshot,
   focusVendor,
@@ -141,13 +155,10 @@ export function QuotaHistorySection({
     historyWindowShown(window, layout, focusVendor),
   );
   const live = new Map(snapshot.quotas.map((quota) => [quota.id, quota]));
-  // An account is named where its vendor has more than one.
-  const accounts = new Map<string, Set<string>>();
-  for (const window of query.data?.windows ?? [])
-    accounts.set(
-      window.vendor,
-      (accounts.get(window.vendor) ?? new Set()).add(window.accountId ?? ""),
-    );
+  const names = new Map(
+    (query.data?.agents ?? []).map((agent) => [agent.id, agent.name]),
+  );
+  const display = quotaDisplay ?? "consumed";
   const from = query.data
     ? Date.parse(query.data.from)
     : to - durations[period];
@@ -185,18 +196,12 @@ export function QuotaHistorySection({
           {zh ? "暂无可显示的额度窗口" : "No quota windows to show"}
         </SectionNote>
       )}
-      {windows.map((window) => {
-        const quota = live.get(window.id);
-        const level =
-          quota?.status === "critical" || quota?.status === "warning"
-            ? quota.status
-            : null;
-        const used =
-          quota?.usedPercent != null && quota.status !== "stale"
-            ? quotaPercentLabel(quota.usedPercent, quotaDisplay ?? "consumed")
-            : "—";
+      {quotaGroups(windows).map((group) => {
+        const lineColors = group.windows.map((_, index) =>
+          windowColor(index, light),
+        );
         return (
-          <div key={window.id} style={{ display: "grid", gap: 3 }}>
+          <div key={group.key} style={{ display: "grid", gap: 3 }}>
             <div
               style={{
                 display: "flex",
@@ -206,47 +211,69 @@ export function QuotaHistorySection({
                 minWidth: 0,
               }}
             >
-              {Logo && <Logo source={window.vendor} size={12} light={light} />}
+              {Logo && <Logo source={group.vendor} size={12} light={light} />}
               <span
-                title={window.name}
-                style={{
-                  color: colors.text,
-                  fontWeight: 600,
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  whiteSpace: "nowrap",
-                }}
+                style={{ ...ellipsis, color: colors.text, fontWeight: 600 }}
               >
-                {window.shortLabel ?? window.name}
+                {names.get(group.vendor) ?? group.vendor}
               </span>
-              {window.account &&
-                (accounts.get(window.vendor)?.size ?? 0) > 1 && (
-                  <span
-                    style={{
-                      color: colors.secondary,
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {window.account}
-                  </span>
-                )}
-              <span style={{ flex: 1 }} />
-              <span
-                style={{
-                  ...tabular,
-                  color: level ? fill[level] : colors.secondary,
-                }}
-              >
-                {used}
-              </span>
+              {group.account && (
+                <span style={{ ...ellipsis, color: colors.secondary }}>
+                  {group.account}
+                </span>
+              )}
             </div>
-            <HistoryLine
-              window={window}
+            <div
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
+                gap: "2px 12px",
+                fontSize: 11,
+              }}
+            >
+              {group.windows.map((window, index) => {
+                const quota = live.get(window.id);
+                const level =
+                  quota?.status === "critical" || quota?.status === "warning"
+                    ? quota.status
+                    : null;
+                return (
+                  <span
+                    key={window.id}
+                    title={window.name}
+                    style={{ display: "flex", alignItems: "center", gap: 4 }}
+                  >
+                    <span
+                      aria-hidden
+                      style={{
+                        width: 8,
+                        height: 3,
+                        borderRadius: 2,
+                        background: lineColors[index],
+                      }}
+                    />
+                    <span style={{ color: colors.secondary }}>
+                      {window.shortLabel ?? window.name}
+                    </span>
+                    <span
+                      style={{
+                        ...tabular,
+                        color: level ? fill[level] : colors.text,
+                      }}
+                    >
+                      {quota?.usedPercent != null && quota.status !== "stale"
+                        ? quotaPercentLabel(quota.usedPercent, display)
+                        : "—"}
+                    </span>
+                  </span>
+                );
+              })}
+            </div>
+            <HistoryChart
+              windows={group.windows}
+              lineColors={lineColors}
               from={from}
               to={until}
-              color={level ? fill[level] : colors.ok}
               colors={colors}
             />
           </div>

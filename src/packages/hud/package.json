@@ -18,6 +18,7 @@
     "./ground": "./src/ground.tsx",
     "./model": "./src/model.ts",
     "./panel/added-sections": "./src/panel/added-sections.ts",
+    "./panel/quota-groups": "./src/panel/quota-groups.ts",
     "./usage-meter/arcs": "./src/usage-meter/arcs.ts",
     "./usage-meter/mark-usage": "./src/usage-meter/mark-usage.tsx"
   },
