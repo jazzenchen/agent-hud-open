@@ -212,10 +212,10 @@ fn a_style_is_kept_as_what_it_changes() {
     let hud = read["screens"][0]["hud"].clone();
     assert_eq!(hud["mode"], "notch");
     assert_eq!(
-        read["screens"][1]["hud"]["mode"], "dynamic",
-        "a screen without a notch draws a dock"
+        read["screens"][1]["hud"]["mode"], "simple",
+        "a screen without a notch draws a Simple dock"
     );
-    // The listed style sent back whole is no draft, logo fields on a notch HUD included.
+    // The listed style sent back whole is no draft, Simple fields on a notch HUD included.
     draft(&owner, json!({"screen": "main", "hud": hud}));
     assert_eq!(drafts(&owner)["styles"], json!([]));
     // A change keeps only what it changes; reset on a default screen is no draft.
@@ -240,13 +240,10 @@ fn a_style_is_kept_as_what_it_changes() {
 #[test]
 fn a_dock_leaving_the_notch_is_placed_clear_of_it() {
     let (_folder, owner) = owner();
-    let result = draft(
-        &owner,
-        json!({"screen": "main", "hud": {"mode": "dynamic"}}),
-    );
+    let result = draft(&owner, json!({"screen": "main", "hud": {"mode": "simple"}}));
     assert_eq!(
         owner.view()["store"]["screens"]["main"],
-        json!({"mode": "logos", "offset": 0})
+        json!({"mode": "simple", "offset": 0})
     );
     assert!(result["note"]
         .as_str()
@@ -376,9 +373,9 @@ fn style_fields_the_mode_or_glow_does_not_draw_are_refused() {
     let (_folder, owner) = owner();
     let error = refused(
         &owner,
-        json!({"screen": "main", "hud": {"logoSize": 30, "glow": {"gridPitch": 6}}}),
+        json!({"screen": "main", "hud": {"simpleSize": 30, "glow": {"gridPitch": 6}}}),
     );
-    assert!(error.contains("hud.logoSize: logoSize sets a \"dynamic\" HUD, and the HUD of \"Built-in display\" would be \"notch\". Leave it out, or set mode to \"dynamic\"."), "{error}");
+    assert!(error.contains("hud.simpleSize: simpleSize sets a \"simple\" HUD, and the HUD of \"Built-in display\" would be \"notch\". Leave it out, or set mode to \"simple\"."), "{error}");
     assert!(error.contains("hud.glow.gridPitch: gridPitch sets a grid glow style, one of \"dots\", \"ascii\", \"blocks\", \"braille\", \"binary\", and the glow of \"Built-in display\" would be \"blur\"."), "{error}");
     let error = refused(
         &owner,
@@ -388,7 +385,7 @@ fn style_fields_the_mode_or_glow_does_not_draw_are_refused() {
     assert!(error.contains("hud.glow.gridDensity: gridDensity is a number from 0.5 to 1.5 in steps of 0.05, as Settings sets it, which 0.53 is not."), "{error}");
     assert!(error.contains("hud.glow.idleSpeed: idleSpeed is a number from 1 to 24 in steps of 0.5, as Settings sets it, which 2.2 is not."), "{error}");
     let error = refused(&owner, json!({"screen": "side", "hud": {"mode": "notch"}}));
-    assert!(error.contains("hud.mode: \"Display 2\" has no notch, so its HUD cannot be \"notch\". It can be \"dynamic\" or \"simple\"."), "{error}");
+    assert!(error.contains("hud.mode: \"Display 2\" has no notch, so its HUD cannot be \"notch\". It can only be \"simple\"."), "{error}");
     let error = refused(
         &owner,
         json!({"screen": "side", "hud": {"mode": "simple", "glow": {"brightness": 0.5}}}),
@@ -438,10 +435,10 @@ fn misreadings_are_refused_with_open_sentences() {
     );
     let error = refused(
         &owner,
-        json!({"screen": "main", "hud": {"logoSize": 90, "glow": {"hue": 3}}}),
+        json!({"screen": "main", "hud": {"simpleSize": 90, "glow": {"hue": 3}}}),
     );
     assert!(
-        error.contains("hud.logoSize is a number from 20 to 60."),
+        error.contains("hud.simpleSize is a number from 20 to 60."),
         "{error}"
     );
     assert!(
@@ -456,8 +453,45 @@ fn misreadings_are_refused_with_open_sentences() {
     // Null is not given.
     draft(
         &owner,
-        json!({"screen": "main", "hud": {"logoSize": null}, "order": null}),
+        json!({"screen": "main", "hud": {"simpleSize": null}, "order": null}),
     );
+}
+
+#[test]
+fn the_retired_dynamic_mode_is_refused_and_its_saved_screens_draw_simple() {
+    let (_folder, owner) = owner();
+    for mode in ["dynamic", "logos"] {
+        let error = refused(&owner, json!({"screen": "side", "hud": {"mode": mode}}));
+        assert!(error.contains("hud.mode: Dynamic mode was retired. It can be \"notch\" (only on a display with a notch) or \"simple\"."), "{error}");
+    }
+    let error = refused(
+        &owner,
+        json!({"screen": "side", "hud": {"logoSize": 30, "showLogos": false}}),
+    );
+    assert!(
+        error.contains("hud.logoSize set the Dynamic mode, which was retired; leave it out."),
+        "{error}"
+    );
+    assert!(
+        error.contains("hud.showLogos set the Dynamic mode, which was retired; leave it out."),
+        "{error}"
+    );
+    // A screen saved as Dynamic reads, and is drafted against, as Simple.
+    owner
+        .update(
+            json!({"screen": "side", "patch": {"mode": "logos", "edge": "left", "offset": 0.3}}),
+        )
+        .unwrap();
+    let read = call(&owner, "get_hud", json!({})).unwrap();
+    assert_eq!(read["screens"][1]["hud"]["mode"], "simple");
+    assert_eq!(read["screens"][1]["hud"]["edge"], "left");
+    assert_eq!(read["screens"][1]["hud"]["position"], 0.3);
+    assert!(read["screens"][1]["hud"].get("logoSize").is_none());
+    draft(
+        &owner,
+        json!({"screen": "side", "hud": read["screens"][1]["hud"].clone()}),
+    );
+    assert_eq!(drafts(&owner)["styles"], json!([]));
 }
 
 #[test]

@@ -56,10 +56,10 @@ export function pipeline(
 /** Canvases a paint drew on and gave back, for the next paint. WebKit keeps a
  * canvas it has configured for WebGPU, with its drawing surfaces, for as long
  * as the page lives: unconfiguring it, destroying its textures or even its
- * device frees none of it. The Dynamic dock's rim goes away under every card
- * and comes back after, so a new canvas each time grew the HUD's web process
- * by 2.6 MB a card for as long as the app ran (issue 47). Reused, a page keeps
- * no more canvases than the rims it shows at once. */
+ * device frees none of it. A rim that goes away and comes back with a new
+ * canvas each time grew the HUD's web process by 2.6 MB a time for as long as
+ * the app ran (issue 47). Reused, a page keeps no more canvases than the rims
+ * it shows at once. */
 const spareCanvases: HTMLCanvasElement[] = [];
 
 /** A canvas for a new paint: one a paint gave back, or a new one. */

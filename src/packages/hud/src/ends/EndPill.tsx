@@ -85,7 +85,7 @@ function FadeRing({
 
 /** One end of the dock: a circle with its icon, and how many wait there in a
  * badge on its edge. On a Simple dock the circle has the dock's own ground
- * and hairline; on a Dynamic dock and in the notch it has none of its own.
+ * and hairline; in the notch it has none of its own.
  * The tail's hairline runs down to when its oldest message goes. */
 export function EndPill({
   side,
@@ -118,14 +118,11 @@ export function EndPill({
 }) {
   const ground = useGround(light);
   const thick = Math.min(rect.width, rect.height);
-  const badge = endBadge(thick, count, mode === "logos");
+  const badge = endBadge(thick, count);
   const head = side === "head";
   const Icon = head ? Hand : MessageSquareText;
   const accent = alertText(head ? "warning" : "turn", ground);
-  const bare = mode === "logos";
   const grounded = mode === "simple";
-  // On a bare dock the desktop shows behind: a soft shade keeps it legible.
-  const shade = bare ? "drop-shadow(0 0 2px rgba(0,0,0,0.55))" : undefined;
   return (
     <motion.div
       className="hud-dock-end"
@@ -179,7 +176,6 @@ export function EndPill({
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          filter: shade,
         }}
       >
         <Icon

@@ -77,25 +77,18 @@ pub(super) fn glow(from: &Value, flat: bool) -> Map<String, Value> {
 }
 pub(super) fn placement(from: &Value) -> Map<String, Value> {
     let mut out = Map::new();
-    out.insert("mode".into(), json!("logos"));
-    copy_enum(&mut out, from, "mode", &["notch", "logos", "simple"]);
+    // A screen saved in the retired Dynamic mode (`logos`) comes over as Simple.
+    out.insert("mode".into(), json!("simple"));
+    copy_enum(&mut out, from, "mode", &["notch", "simple"]);
     copy_enum(&mut out, from, "edge", &["top", "right", "bottom", "left"]);
     copy_enum(&mut out, from, "appearance", &["dark", "light", "system"]);
     copy_bool(
         &mut out,
         from,
-        &[
-            "showsLogos",
-            "showsRings",
-            "showsNumbers",
-            "separatesAgents",
-        ],
+        &["showsRings", "showsNumbers", "separatesAgents"],
     );
     for (key, min, max) in [
         ("offset", 0., 1.),
-        ("logoSize", 20., 60.),
-        ("logoEdgeDistance", 0., 20.),
-        ("gapScale", 0.1, 0.6),
         ("simpleSize", 20., 60.),
         ("simpleGapScale", 0.1, 0.6),
         ("ringWidth", 1., 4.),

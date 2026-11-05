@@ -24,17 +24,6 @@ fn strip_width(
     let n = labels.len() as f64;
     match mode {
         Mode::Notch => notch_width,
-        Mode::Logos => {
-            let logo = screen.number("logoSize").clamp(20.0, 60.0);
-            let gap = logo * screen.number("gapScale").clamp(0.1, 0.6);
-            if !horizontal {
-                logo + screen.number("logoEdgeDistance").clamp(0.0, 20.0) * 2.0
-            } else if labels.is_empty() {
-                logo.max(32.0)
-            } else {
-                n * logo + (n - 1.0) * gap
-            }
-        }
         Mode::Simple => {
             let size = screen.number("simpleSize").clamp(20.0, 60.0);
             let style = screen.simple_style();

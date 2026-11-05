@@ -104,17 +104,12 @@ export function useHUDLayout({
   );
   const scale = Math.max(
     1,
-    (config.mode === "simple"
-      ? config.simpleSize
-      : config.mode === "logos"
-        ? config.logoSize
-        : 26) / 26,
+    (config.mode === "simple" ? config.simpleSize : 26) / 26,
   );
   const simplePeek = Boolean(peek && config.mode === "simple");
-  const surfaceFlare =
-    open || config.mode === "logos"
-      ? HUD_METRICS.expandedFlare
-      : HUD_METRICS.collapsedFlare;
+  const surfaceFlare = open
+    ? HUD_METRICS.expandedFlare
+    : HUD_METRICS.collapsedFlare;
   const flared = !detached && config.mode !== "simple";
   const fullWidth = standaloneAlert
     ? 470
@@ -191,18 +186,11 @@ export function useHUDLayout({
           ? strip.x + strip.width / 2
           : strip.y + strip.height / 2
         : undefined;
-  const canvasSize =
-    config.mode === "logos" && flared
-      ? {
-          width: targetSize.width + (horizontal(edge) ? surfaceFlare * 2 : 0),
-          height: targetSize.height + (horizontal(edge) ? 0 : surfaceFlare * 2),
-        }
-      : targetSize;
   const placed = cardRect(
     screen,
     strip,
     edge,
-    canvasSize,
+    targetSize,
     detached,
     anchor,
     simplePeek && !horizontal(edge) ? -strip.width / 2 : 6,
@@ -268,16 +256,7 @@ export function useHUDLayout({
           : edge === "left"
             ? { marginLeft: SIMPLE_EDGE_MARGIN }
             : { marginRight: SIMPLE_EDGE_MARGIN };
-  const measurementWidth = Math.max(
-    1,
-    Math.min(
-      fullWidth,
-      screen.width -
-        (config.mode === "logos" && !detached && horizontal(edge)
-          ? HUD_METRICS.expandedFlare * 2
-          : 0),
-    ),
-  );
+  const measurementWidth = Math.max(1, Math.min(fullWidth, screen.width));
 
   return {
     edge,

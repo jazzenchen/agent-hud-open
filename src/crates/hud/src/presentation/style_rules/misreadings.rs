@@ -21,6 +21,13 @@ pub(in crate::presentation) fn misreadings(value: &Value) -> Vec<String> {
                 }
             }
             "glow" => found.extend(glow_misreadings(value)),
+            name if RETIRED_FIELDS.contains(&name) => {
+                if !value.is_null() {
+                    found.push(format!(
+                        "hud.{name} set the Dynamic mode, which was retired; leave it out. A \"simple\" HUD takes simpleSize, simpleGap, ringWidth, simpleStyle and showNumbers."
+                    ));
+                }
+            }
             name => {
                 let Some(field) = FIELDS.iter().find(|f| f.name == name) else {
                     let taken: Vec<&str> = ["agents"]
@@ -45,7 +52,9 @@ pub(in crate::presentation) fn misreadings(value: &Value) -> Vec<String> {
                     "simpleStyle" => Some(super::SIMPLE_STYLES),
                     _ => None,
                 };
-                if let Some(choices) = choices {
+                if name == "mode" && value.as_str().is_some_and(|s| RETIRED_MODES.contains(&s)) {
+                    found.push(format!("{path}: Dynamic mode was retired. It can be \"notch\" (only on a display with a notch) or \"simple\"."));
+                } else if let Some(choices) = choices {
                     if !value.as_str().is_some_and(|s| choices.contains(&s)) {
                         found.push(format!("{path} is one of {}.", quoted(choices)));
                     }

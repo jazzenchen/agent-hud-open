@@ -125,8 +125,8 @@ export function useHUDDrag({
       sourceConfig.mode === "notch" && notchFrame
         ? notchFrame
         : parkedRect(screen, sourceMetrics, sourceConfig);
-    const targetMode =
-      sourceConfig.mode === "notch" ? "logos" : sourceConfig.mode;
+    // A notch dragged away from the notch becomes a Simple dock.
+    const targetMode = "simple";
     const targetVendors = configuredVendors(snapshot, {
       ...sourceConfig,
       mode: targetMode,

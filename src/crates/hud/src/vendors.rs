@@ -103,7 +103,8 @@ fn held(quotas: &[&Value], now_ms: i64) -> Option<f64> {
         })
 }
 
-/// Every agent a resting HUD in `mode` shows without a list, one per mark.
+/// Every agent a resting HUD in `mode` shows without a list, one per mark; `mode` is
+/// "notch", "simple" or the bots' [`crate::presentation::QUEUE`].
 pub fn vendors<'a>(snapshot: &'a Value, mode: &str, now_ms: i64) -> Vec<Vendor<'a>> {
     resting_agents(snapshot, mode, now_ms)
         .into_iter()

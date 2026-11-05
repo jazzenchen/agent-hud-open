@@ -1,6 +1,6 @@
 ---
 name: customize-agent-hud
-description: Rearrange, restyle or add to Agent HUD, the notch or dock HUD at the screen's edge and its hover panel, with Agent HUD's HUD tools (get_hud, draft_hud, get_hud_screenshot, discard_hud_draft, finish_hud_edit). Use it when the person asks to change, customize, tidy, reorder, hide or show anything in Agent HUD, such as quota or balance blocks, rows, accounts, widgets (bar, rings, segments, number, chart), panel sections, the sessions or token lists, the quota history or the plan value in the panel, panel width or spacing, controls of their own in the panel (a clock, a list, a picker, text), or the resting HUD's mode (notch, dynamic, simple), usage style, edge, position, size, glow, appearance or transparency. Also hover timing and other app settings when asked. Use it for "make the HUD smaller", "show only Codex", "add a clock", "put the quota history in the HUD", "改一下 HUD", "换成年轮/分段环", "刘海/动态/简约模式", and to explain what the HUD shows or why a change was refused. Changes are drafts that only the person can save.
+description: Rearrange, restyle or add to Agent HUD, the notch or dock HUD at the screen's edge and its hover panel, with Agent HUD's HUD tools (get_hud, draft_hud, get_hud_screenshot, discard_hud_draft, finish_hud_edit). Use it when the person asks to change, customize, tidy, reorder, hide or show anything in Agent HUD, such as quota or balance blocks, rows, accounts, widgets (bar, rings, segments, number, chart), panel sections, the sessions or token lists, the quota history or the plan value in the panel, panel width or spacing, controls of their own in the panel (a clock, a list, a picker, text), or the resting HUD's mode (notch, simple), usage style, edge, position, size, glow, appearance or transparency. Also hover timing and other app settings when asked. Use it for "make the HUD smaller", "show only Codex", "add a clock", "put the quota history in the HUD", "改一下 HUD", "换成年轮/分段环", "刘海/简约模式", and to explain what the HUD shows or why a change was refused. Changes are drafts that only the person can save.
 metadata:
   managed-by: agent-hud
 ---
@@ -66,7 +66,7 @@ Agent HUD adds its tools to this client as an MCP server named `agent-hud`. This
 | 进度条, bars | a block's `widget` `bar`, or `hud.simpleStyle` `bars` |
 | 数字, numbers | a block's `widget` `number`, or `hud.simpleStyle` `numbers` |
 | 用量画法 (Settings, Simple mode) | `hud.simpleStyle` |
-| 刘海 / 动态 / 简约 | `hud.mode` `notch` / `dynamic` / `simple` |
+| 刘海 / 简约 | `hud.mode` `notch` / `simple` |
 | 悬停面板, the panel, 展开后 | the `panel` tree |
 | 两栏, 并排, 横向布局, side by side | a `row` in `panel` holding sections or columns, with a wider `panel.width` |
 | 对齐, line up | the same `width` on the matching control in each row |
@@ -98,12 +98,10 @@ The same style name can mean the resting HUD or the panel. When the person talks
 **HUD style (display key only), under `hud`:**
 
 - **Every mode:**
-  - `mode`: `notch` (only on a display with a notch), `dynamic` or `simple`
+  - `mode`: `notch` (only on a display with a notch) or `simple`. Dynamic mode (动态) was retired; a screen saved in it shows as `simple`.
   - `appearance`: `dark`, `light` or `system`
   - `transparency`: 0–1
-- **`dynamic` and `simple`:** `edge` (top, right, bottom or left), `position` (0–1) and `separateAgents`.
-- **`dynamic` only:** `logoSize` (20–60), `logoGap` (0.1–0.6), `edgeDistance` (0–20) and `showLogos`.
-- **`simple` only:** `simpleSize` (20–60), `simpleGap` (0.1–0.6), `ringWidth` (1–4), `simpleStyle` and `showNumbers`. `simpleStyle` is how each logo shows its usage: `rings` (concentric rings round it), `segments` (one ring split per window, the default), `bars` (bars beside it) or `numbers` (the most used window's percentage alone). `ringWidth` is also the bars' thickness, and `showNumbers` adds the percentage beside rings, segments or bars.
+- **`simple` only:** `edge` (top, right, bottom or left), `position` (0–1), `separateAgents`, `simpleSize` (20–60), `simpleGap` (0.1–0.6), `ringWidth` (1–4), `simpleStyle` and `showNumbers`. `simpleStyle` is how each logo shows its usage: `rings` (concentric rings round it), `segments` (one ring split per window, the default), `bars` (bars beside it) or `numbers` (the most used window's percentage alone). `ringWidth` is also the bars' thickness, and `showNumbers` adds the percentage beside rings, segments or bars.
 - **`reset: true`:** restores the default look. Send it alone, with no other style field.
 - **`glow` (not drawn in `simple`):**
   - `style`: `blur`, `dots`, `ascii`, `blocks`, `braille` or `binary`
@@ -152,7 +150,7 @@ The same style name can mean the resting HUD or the panel. When the person talks
 
 - **What it shows:** the app's own panel, or one display's resting HUD, with drafts included. It renders offscreen and never captures the desktop.
 - **Masking:** accounts are masked, and session titles and notices are left out.
-- **Display key required:** `show: "hud"` and `agent` need one. `agent` also needs a `dynamic` or `simple` HUD with `separateAgents` on.
+- **Display key required:** `show: "hud"` and `agent` need one. `agent` also needs a `simple` HUD with `separateAgents` on.
 - **One at a time:** it renders one picture at a time and times out after 25 s, naming the step it was waiting for.
 - **Slow data:** a panel picture waits about 8 s for the token chart, the sessions list, the quota history and the plan value. If a section has not loaded by then, it is drawn as it looks while loading and is named in `loading`. Take the picture again to see it filled.
 - **Motion:** an animated glow may not show in a still picture.

@@ -476,7 +476,7 @@ export function HUDScene({
           data-hover={state.phase}
           data-pinned={pinned}
           data-appearance={light ? "light" : "dark"}
-          aria-label={`Agent HUD ${config.mode === "notch" ? "Classic" : config.mode === "logos" ? "Dynamic" : "Simple"} preview`}
+          aria-label={`Agent HUD ${config.mode === "notch" ? "Classic" : "Simple"} preview`}
           style={{
             position: "relative",
             height: safeSceneHeight,
@@ -586,11 +586,7 @@ export function HUDScene({
               strip={strip}
               metrics={metrics}
               vendors={vendors}
-              glowColors={glowColors}
-              glowAlert={glowFlash}
-              glowHidden={glowHidden}
               cardVisible={cardVisible}
-              detached={detached}
               light={light}
               fill={fill}
               outline={outline}

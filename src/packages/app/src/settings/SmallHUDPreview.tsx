@@ -158,7 +158,6 @@ export function SmallHUDPreview({
                 </svg>
               )}
               {sample.mode !== "notch" &&
-                (sample.mode !== "logos" || sample.showsLogos) &&
                 vendors.map((vendor, index) => (
                   <div
                     key={vendor.key}

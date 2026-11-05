@@ -29,10 +29,6 @@ const styleKeys = [
   "glowGridDensity",
   "edge",
   "offset",
-  "logoSize",
-  "logoEdgeDistance",
-  "gapScale",
-  "showsLogos",
   "simpleSize",
   "simpleGapScale",
   "ringWidth",
@@ -77,7 +73,7 @@ export function ResetSection({
       ...Object.fromEntries(
         styleKeys.map((key) => [key, defaultHUDConfig[key]]),
       ),
-      mode: config.hasNotch ? "notch" : "logos",
+      mode: config.hasNotch ? "notch" : "simple",
     });
     setRevision(revision + 1);
   };

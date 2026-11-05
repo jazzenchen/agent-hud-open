@@ -104,8 +104,6 @@ export function AgentMark({
           : config.separatesAgents
             ? "pointer"
             : "default",
-        visibility:
-          config.mode === "logos" && !config.showsLogos ? "hidden" : "visible",
       }}
     >
       <span

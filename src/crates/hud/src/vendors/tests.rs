@@ -254,7 +254,10 @@ fn detected_clients_without_readings_keep_their_marks_and_unknown_meter() {
     for (mode, expected) in [
         ("notch", vec!["claude", "deepseek", "openai"]),
         ("simple", vec!["claude", "deepseek", "openai"]),
-        ("logos", vec!["claude", "opencode", "openai"]),
+        (
+            crate::presentation::QUEUE,
+            vec!["claude", "opencode", "openai"],
+        ),
     ] {
         let rows = vendors(&snapshot, mode, now);
         assert_eq!(

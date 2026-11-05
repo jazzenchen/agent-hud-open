@@ -1,5 +1,4 @@
 import type { CSSProperties, MutableRefObject } from "react";
-import type { GlowAlert } from "../HUDGlow";
 import type { DockMemory, Direction } from "../bots/mark-director";
 import { horizontal, type HUDRect, type stripMetrics } from "../geometry";
 import type { HUDConfig, HUDEdge, HUDVendor } from "../model";
@@ -7,7 +6,6 @@ import { Silhouette } from "./NotchSurface";
 import type { HUDNativePointer } from "./useHUDInteraction";
 import { useFormat } from "@agent-hud/ui/format-context";
 import { AgentMark } from "./AgentMark";
-import { DockGlowBackdrop } from "./DockGlowBackdrop";
 
 export function HUDMarkStrip({
   id,
@@ -16,11 +14,7 @@ export function HUDMarkStrip({
   strip,
   metrics,
   vendors,
-  glowColors,
-  glowAlert,
-  glowHidden,
   cardVisible,
-  detached,
   light,
   fill,
   outline,
@@ -47,11 +41,7 @@ export function HUDMarkStrip({
   strip: HUDRect;
   metrics: ReturnType<typeof stripMetrics>;
   vendors: HUDVendor[];
-  glowColors: string[];
-  glowAlert?: GlowAlert | null;
-  glowHidden: boolean;
   cardVisible: boolean;
-  detached: boolean;
   light: boolean;
   fill: string;
   outline: string;
@@ -77,17 +67,6 @@ export function HUDMarkStrip({
 
   return (
     <>
-      {config.mode === "logos" && !glowHidden && (!cardVisible || detached) && (
-        <DockGlowBackdrop
-          config={config}
-          edge={edge}
-          strip={strip}
-          vendors={vendors}
-          glowColors={glowColors}
-          glowAlert={glowAlert}
-          reduceMotion={reduceMotion}
-        />
-      )}
       {config.mode === "notch" ? (
         <div
           className="hud-classic-silhouette"

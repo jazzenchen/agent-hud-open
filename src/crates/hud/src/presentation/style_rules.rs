@@ -12,8 +12,8 @@ pub(super) use look::{effective, listing, restoring};
 pub(super) use misreadings::misreadings;
 pub(super) use proposal::{gives_style_alone, proposal, StyleProposal};
 
-const ALL: &[&str] = &["notch", "logos", "simple"];
-const DOCKS: &[&str] = &["logos", "simple"];
+const ALL: &[&str] = &["notch", "simple"];
+const DOCKS: &[&str] = &["simple"];
 
 /// A style field: its name in a hud, the setting it writes, the modes whose HUD it
 /// changes as Settings shows it for them, and the range a number keeps within.
@@ -42,30 +42,6 @@ const FIELDS: &[Field] = &[
         stored: "offset",
         modes: DOCKS,
         range: Some((0., 1.)),
-    },
-    Field {
-        name: "logoSize",
-        stored: "logoSize",
-        modes: &["logos"],
-        range: Some((20., 60.)),
-    },
-    Field {
-        name: "logoGap",
-        stored: "gapScale",
-        modes: &["logos"],
-        range: Some((0.1, 0.6)),
-    },
-    Field {
-        name: "edgeDistance",
-        stored: "logoEdgeDistance",
-        modes: &["logos"],
-        range: Some((0., 20.)),
-    },
-    Field {
-        name: "showLogos",
-        stored: "showsLogos",
-        modes: &["logos"],
-        range: None,
     },
     Field {
         name: "simpleSize",
@@ -207,16 +183,23 @@ const GLOW: &[GlowField] = &[
     },
 ];
 
-const MODES: &[&str] = &["notch", "dynamic", "simple"];
+const MODES: &[&str] = &["notch", "simple"];
 const EDGES: &[&str] = &["top", "right", "bottom", "left"];
 const APPEARANCES: &[&str] = &["dark", "light", "system"];
 const GLOW_STYLES: &[&str] = &["blur", "dots", "ascii", "blocks", "braille", "binary"];
 const GLOW_EFFECTS: &[&str] = &["breathe", "flow", "scan", "ripple", "shimmer", "boot"];
 
-/// A mode as an agent names it.
-fn agent_mode(stored: &str) -> &str {
-    if stored == "logos" {
-        "dynamic"
+/// The modes Agent HUD no longer draws, as an agent or a saved screen may still
+/// name them: Dynamic, saved as `logos`. A saved screen in one draws as Simple.
+const RETIRED_MODES: &[&str] = &["dynamic", "logos"];
+
+/// The hud fields that set only the retired Dynamic mode.
+const RETIRED_FIELDS: &[&str] = &["logoSize", "logoGap", "edgeDistance", "showLogos"];
+
+/// A saved mode as the screen draws it: a retired one draws as Simple.
+fn drawn_mode(stored: &str) -> &str {
+    if RETIRED_MODES.contains(&stored) {
+        "simple"
     } else {
         stored
     }

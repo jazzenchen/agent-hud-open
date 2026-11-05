@@ -66,8 +66,9 @@ pub(super) struct PointerKeys {
 #[serde(rename_all = "lowercase")]
 pub enum Mode {
     Notch,
+    /// A screen saved in the retired Dynamic mode (`logos`) draws as Simple.
     #[default]
-    Logos,
+    #[serde(alias = "logos")]
     Simple,
 }
 

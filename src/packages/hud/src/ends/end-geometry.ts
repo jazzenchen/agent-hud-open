@@ -17,7 +17,7 @@ export interface DockEndsGeometry {
 }
 
 /** Between the dock and an end, and between the two ends. */
-const BASE_GAP = 6;
+const GAP = 6;
 /** Room around an end inside the notch's wing. */
 const WING_PADDING = 7;
 
@@ -25,13 +25,11 @@ const clamp = (value: number, low: number, high: number) =>
   Math.min(high, Math.max(low, value));
 
 /** An end of `thick` holds its icon alone, a little smaller than the dock's
- * logos; the number sits in a small badge on its top-right edge. On a bare
- * Dynamic dock (`bare`) the circle has no ground, so the icon stands as
- * large as a logo would beside it, with the badge in proportion. */
-export function endBadge(thick: number, count: number, bare = false) {
-  const size = Math.max(12, Math.round(thick * (bare ? 0.36 : 0.46)));
+ * logos; the number sits in a small badge on its top-right edge. */
+export function endBadge(thick: number, count: number) {
+  const size = Math.max(12, Math.round(thick * 0.46));
   return {
-    icon: Math.max(8, Math.round(thick * (bare ? 0.62 : 0.4))),
+    icon: Math.max(8, Math.round(thick * 0.4)),
     size,
     font: Math.max(8, Math.round(size * 0.68)),
     label: count > 99 ? "99+" : String(count),
@@ -49,7 +47,7 @@ export function dockEnds(
   strip: HUDRect,
   edge: HUDEdge,
   config: Pick<HUDConfig, "mode" | "simpleSize">,
-  metrics: Pick<StripMetrics, "logo" | "mark" | "padding" | "gap">,
+  metrics: Pick<StripMetrics, "mark" | "padding">,
   screen: { width: number; height: number },
   counts: Record<EndSide, number>,
 ): DockEndsGeometry {
@@ -60,26 +58,17 @@ export function dockEnds(
   // A Simple dock's circle is as thick as its row of rings with their
   // padding, which a side edge's wider panel (numbers beside the rings)
   // leaves the same.
-  const simple =
-    metrics.mark +
-    2 * Math.max(3, Math.round(clamp(config.simpleSize, 20, 60) * 0.18));
   const thick = notch
     ? clamp(strip.height - 12, 18, 26)
-    : config.mode === "simple"
-      ? simple
-      : Math.max(18, metrics.logo);
+    : metrics.mark +
+      2 * Math.max(3, Math.round(clamp(config.simpleSize, 20, 60) * 0.18));
   // Each end is a circle as thick as the dock.
   const length = { head: thick, tail: thick };
   // The circle's place across the dock: centred on the dock's own band, or
   // on a side edge's Simple panel, on its column of rings.
   const cross = across
     ? band.y + band.height / 2 - thick / 2
-    : config.mode === "simple"
-      ? band.x + metrics.padding.left + metrics.mark / 2 - thick / 2
-      : band.x + band.width / 2 - thick / 2;
-  // A Dynamic dock spaces its ends as it spaces its marks.
-  const GAP =
-    config.mode === "logos" ? Math.max(BASE_GAP, metrics.gap) : BASE_GAP;
+    : band.x + metrics.padding.left + metrics.mark / 2 - thick / 2;
   const start = across ? strip.x : strip.y;
   const end = across ? strip.x + strip.width : strip.y + strip.height;
   const limit = across ? screen.width : screen.height;

@@ -19,7 +19,7 @@ import {
 } from "@agent-hud/ui/format";
 export { agentVendorName } from "./agent-artwork";
 
-export type HUDMode = "notch" | "logos" | "simple";
+export type HUDMode = "notch" | "simple";
 export type HUDEdge = "top" | "right" | "bottom" | "left";
 export type HUDDecision = RequestDecision;
 
@@ -51,10 +51,6 @@ export interface HUDConfig {
   offset: number;
   /** Native runtime display index; this is not a persistent hardware identity. */
   monitorIndex: number;
-  logoSize: number;
-  logoEdgeDistance: number;
-  gapScale: number;
-  showsLogos: boolean;
   simpleSize: number;
   simpleGapScale: number;
   ringWidth: number;
@@ -116,10 +112,7 @@ export function vendorKey(source: string): string {
 
 export { restingAgents, sourceID } from "./resting-agents.ts";
 
-const vendorProjections = new WeakMap<
-  Snapshot,
-  Map<HUDMode, { value: HUDVendor[]; observedAt: number; expiresAt: number }>
->();
+const vendorProjections = new WeakMap<Snapshot, Map<HUDMode, HUDVendor[]>>();
 
 export function vendorsFromSnapshot(
   snapshot: Snapshot,
@@ -128,10 +121,8 @@ export function vendorsFromSnapshot(
   const now = Date.now();
   let byMode = vendorProjections.get(snapshot);
   const cached = byMode?.get(mode);
-  if (cached && now >= cached.observedAt && now <= cached.expiresAt)
-    return cached.value;
-  const { order: sources, expiresAt } = restingAgents(snapshot, mode, now);
-  const value = sources.map((name) => {
+  if (cached) return cached;
+  const value = restingAgents(snapshot, mode).map((name) => {
     const key = vendorKey(name);
     const quotas = snapshot.quotas.filter((q) => vendorKey(q.vendor) === key);
     const measured = quotas.filter(
@@ -190,7 +181,7 @@ export function vendorsFromSnapshot(
     };
   });
   if (!byMode) vendorProjections.set(snapshot, (byMode = new Map()));
-  byMode.set(mode, { value, observedAt: now, expiresAt });
+  byMode.set(mode, value);
   return value;
 }
 

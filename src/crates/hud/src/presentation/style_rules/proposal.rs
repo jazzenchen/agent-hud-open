@@ -27,15 +27,15 @@ fn issues(
     let mode = text("mode");
     let mut found = vec![];
     if changes.get("mode") == Some(&json!("notch")) && !has_notch {
-        found.push(format!("hud.mode: {screen} has no notch, so its HUD cannot be \"notch\". It can be \"dynamic\" or \"simple\"."));
+        found.push(format!("hud.mode: {screen} has no notch, so its HUD cannot be \"notch\". It can only be \"simple\"."));
     }
-    let named = format!("the HUD of {screen} would be \"{}\"", agent_mode(&mode));
+    let named = format!("the HUD of {screen} would be \"{mode}\"");
     for field in FIELDS.iter().filter(|f| f.name != "mode") {
         if changes.contains_key(field.stored) && !field.modes.contains(&mode.as_str()) {
             let modes = field
                 .modes
                 .iter()
-                .map(|m| format!("\"{}\"", agent_mode(m)))
+                .map(|m| format!("\"{m}\""))
                 .collect::<Vec<_>>()
                 .join(" or ");
             found.push(format!(

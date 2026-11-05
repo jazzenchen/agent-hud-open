@@ -140,8 +140,8 @@ function rim(host: FakeHost) {
 const settle = () => new Promise((resolve) => setTimeout(resolve, 5));
 
 test("a rim that comes back draws on the canvas the last one gave back", async () => {
-  // WebKit never frees a canvas once configured for WebGPU (issue 47): the
-  // Dynamic dock's rim, gone under every card, must not make a new one each time.
+  // WebKit never frees a canvas once configured for WebGPU (issue 47): a rim
+  // that goes away and comes back must not make a new one each time.
   const first = new FakeHost();
   const a = rim(first);
   await a.shown;

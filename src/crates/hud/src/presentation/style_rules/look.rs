@@ -9,18 +9,23 @@ fn look_key(key: &str) -> bool {
 }
 
 /// The look a screen draws from `saved` (ui/use-hud-config.ts `getScreenHUDConfig`):
-/// the defaults, the notch mode on a screen with a notch and a dock on one without,
-/// the shared glow, then the screen's own settings.
+/// the defaults, the notch mode on a screen with a notch and Simple on one without,
+/// the shared glow, then the screen's own settings. A screen saved in the retired
+/// Dynamic mode draws as Simple.
 pub(super) fn drawn(saved: &Saved, key: &str, has_notch: bool) -> Map<String, Value> {
     let mut style = DEFAULTS.clone();
     style.insert(
         "mode".into(),
-        json!(if has_notch { "notch" } else { "logos" }),
+        json!(if has_notch { "notch" } else { "simple" }),
     );
     merge(&mut style, &saved.screen_defaults);
     let own = saved.screens.get(key).cloned().unwrap_or(Value::Null);
     if let Some(own) = own.as_object() {
         merge(&mut style, own);
+    }
+    if let Some(mode) = style.get("mode").and_then(Value::as_str) {
+        let mode = drawn_mode(mode).to_owned();
+        style.insert("mode".into(), json!(mode));
     }
     // A screen saved before the Simple style existed keeps what its rings switch drew.
     let screen_defaults = Value::Object(saved.screen_defaults.clone());
@@ -59,7 +64,7 @@ pub(super) fn default_look(s: &State, has_notch: bool) -> Map<String, Value> {
     style.retain(|key, _| look_key(key));
     style.insert(
         "mode".into(),
-        json!(if has_notch { "notch" } else { "logos" }),
+        json!(if has_notch { "notch" } else { "simple" }),
     );
     style
 }
@@ -97,11 +102,7 @@ pub(super) fn patch(hud: &Value) -> Map<String, Value> {
         let Some(value) = hud.get(field.name).filter(|v| !v.is_null()) else {
             continue;
         };
-        let value = match field.name {
-            "mode" if value == "dynamic" => json!("logos"),
-            _ => value.clone(),
-        };
-        patch.insert(field.stored.into(), value);
+        patch.insert(field.stored.into(), value.clone());
     }
     for field in GLOW {
         if let Some(value) = hud["glow"].get(field.name).filter(|v| !v.is_null()) {
@@ -116,10 +117,6 @@ pub(in crate::presentation) fn listing(style: &Map<String, Value>) -> Value {
     let mut hud = Map::new();
     for field in FIELDS {
         let value = style.get(field.stored).cloned().unwrap_or(Value::Null);
-        let value = match (field.name, value.as_str()) {
-            ("mode", Some(mode)) => json!(agent_mode(mode)),
-            _ => value,
-        };
         hud.insert(field.name.into(), value);
     }
     let mut glow = Map::new();

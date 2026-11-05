@@ -1,6 +1,9 @@
 //! What the director reads of a session and of a mark's agent in a snapshot.
 use super::*;
-use crate::{presentation::mark, vendors::vendors};
+use crate::{
+    presentation::{mark, QUEUE},
+    vendors::vendors,
+};
 
 /// UTC seconds of an RFC 3339 date, to the millisecond as Date.parse reads it;
 /// none when absent or unreadable.
@@ -67,10 +70,11 @@ pub(super) fn holds(session: &Facts, now: f64) -> bool {
             && now - session.observed_at >= 180.0
 }
 
-/// Each mark's agent in a snapshot, in the Dynamic dock's order: its sessions
+/// Each mark's agent in a snapshot, in the queue's order (windows' agents, then
+/// agents with a live session heard from in the last day, newest first): its sessions
 /// heard from in the last day, its requests, and when its used-up windows reset.
 pub(super) fn bot_queue(snapshot: &Value, now: f64) -> Vec<QueueMark> {
-    vendors(snapshot, "logos", (now * 1000.0) as i64)
+    vendors(snapshot, QUEUE, (now * 1000.0) as i64)
         .into_iter()
         .map(|vendor| {
             let requests: Vec<Request> = snapshot["approvals"]

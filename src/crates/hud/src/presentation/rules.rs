@@ -21,7 +21,7 @@ pub(super) use block_issues::issues;
 pub(super) use blocks::{present_blocks, Block, Kind};
 pub(super) use filter_issues::{filter_issues, hud_issues, session_agents};
 pub(super) use layout::normalize_layout;
-pub use marks::{mark, resting_agents};
+pub use marks::{mark, resting_agents, QUEUE};
 pub(super) use misreadings::{hud_agent_misreadings, misreadings};
 pub(super) use projects::{offered_projects, project_match, project_title};
 pub(super) use reduced::reduced;

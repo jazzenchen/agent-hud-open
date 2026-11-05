@@ -90,26 +90,6 @@ export function stripMetrics(
       radius: config.hasNotch ? 12 : 10,
       centers: [],
     };
-  if (config.mode === "logos") {
-    const logo = clamp(config.logoSize, 20, 60),
-      gap = logo * clamp(config.gapScale, 0.1, 0.6);
-    const thick = logo + clamp(config.logoEdgeDistance, 0, 20) * 2;
-    const run = n ? n * logo + (n - 1) * gap : Math.max(32, logo);
-    return {
-      width: horizontal ? run : thick,
-      height: horizontal ? thick : run,
-      gap,
-      logo,
-      mark: logo,
-      font: 0,
-      labelGap: 0,
-      label: 0,
-      bar: 0,
-      padding: { top: 0, right: 0, bottom: 0, left: 0 },
-      radius: 10,
-      centers: vendors.map((_, i) => i * (logo + gap) + logo / 2),
-    };
-  }
   const size = clamp(config.simpleSize, 20, 60),
     style = config.simpleStyle,
     ringed = isRingStyle(style),

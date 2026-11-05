@@ -10,7 +10,7 @@ mod simple_style;
 mod style_rules;
 mod tools;
 mod tree;
-pub use rules::{mark, resting_agents};
+pub use rules::{mark, resting_agents, QUEUE};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value};
 pub use simple_style::{simple_style, SIMPLE_STYLES};

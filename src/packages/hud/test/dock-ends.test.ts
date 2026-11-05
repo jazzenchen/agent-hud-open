@@ -17,12 +17,11 @@ import {
   parkCard,
   TAIL_LIMIT,
 } from "../src/ends/end-queue.ts";
+import { simplePanelRect } from "../src/scene/simple-panel.ts";
 
 const screen = { width: 1600, height: 1000 };
-const logos = {
-  logo: 30,
+const marks = {
   mark: 30,
-  gap: 6,
   padding: { top: 0, right: 0, bottom: 0, left: 0 },
 };
 const both = { head: 1, tail: 1 };
@@ -32,8 +31,8 @@ test("an end is a circle as thick as the dock, its number in a badge on the edge
   const ends = dockEnds(
     strip,
     "bottom",
-    { mode: "logos", simpleSize: 26 },
-    logos,
+    { mode: "simple", simpleSize: 26 },
+    marks,
     screen,
     {
       head: 3,
@@ -53,15 +52,16 @@ test("on a bottom dock the head sits before the first mark, the tail after the l
   const ends = dockEnds(
     strip,
     "bottom",
-    { mode: "logos", simpleSize: 26 },
-    logos,
+    { mode: "simple", simpleSize: 26 },
+    marks,
     screen,
     both,
   );
   assert.ok(ends.head.x + ends.head.width <= strip.x - 6);
   assert.ok(ends.tail.x >= strip.x + strip.width + 6);
-  // Centred across the dock.
-  assert.equal(ends.head.y + ends.head.height / 2, strip.y + strip.height / 2);
+  // Centred across the dock's panel.
+  const panel = simplePanelRect(strip, "bottom");
+  assert.equal(ends.head.y + ends.head.height / 2, panel.y + panel.height / 2);
   assert.deepEqual(ends.wings, { head: 0, tail: 0 });
 });
 
@@ -70,8 +70,8 @@ test("on a side dock the head is above and the tail below, standing upright", ()
   const ends = dockEnds(
     strip,
     "right",
-    { mode: "logos", simpleSize: 26 },
-    logos,
+    { mode: "simple", simpleSize: 26 },
+    marks,
     screen,
     both,
   );
@@ -85,8 +85,8 @@ test("a dock against the screen's start keeps both ends after it, head first", (
   const ends = dockEnds(
     strip,
     "bottom",
-    { mode: "logos", simpleSize: 26 },
-    logos,
+    { mode: "simple", simpleSize: 26 },
+    marks,
     screen,
     both,
   );
@@ -99,8 +99,8 @@ test("a dock against the screen's end keeps both ends before it, head first", ()
   const ends = dockEnds(
     strip,
     "bottom",
-    { mode: "logos", simpleSize: 26 },
-    logos,
+    { mode: "simple", simpleSize: 26 },
+    marks,
     screen,
     both,
   );
@@ -133,7 +133,7 @@ test("the notch grows sideways only for the ends that show, holding them inside"
     strip,
     "top",
     { mode: "notch", simpleSize: 26 },
-    logos,
+    marks,
     screen,
     {
       head: 0,
@@ -237,27 +237,4 @@ test("a screen that starts late takes what the others hold, once each", () => {
     ["3", "2", "1"],
   );
   assert.equal(mergeEnds(merged, theirs), merged);
-});
-
-test("a Dynamic dock's ends grow with its logos, spaced as its marks", () => {
-  const strip = { x: 1520, y: 300, width: 80, height: 400 };
-  const big = {
-    logo: 60,
-    mark: 60,
-    gap: 18,
-    padding: { top: 0, right: 0, bottom: 0, left: 0 },
-  };
-  const ends = dockEnds(
-    strip,
-    "right",
-    { mode: "logos", simpleSize: 26 },
-    big,
-    screen,
-    both,
-  );
-  assert.equal(ends.thick, 60);
-  assert.equal(strip.y - (ends.head.y + ends.head.height), 18);
-  // Bare, the icon stands nearly as large as a logo.
-  assert.ok(endBadge(60, 1, true).icon >= 36);
-  assert.ok(endBadge(60, 1, true).icon > endBadge(60, 1).icon);
 });

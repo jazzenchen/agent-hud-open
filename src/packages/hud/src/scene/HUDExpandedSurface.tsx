@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { horizontal, type HUDRect } from "../geometry";
 import { HUD_METRICS } from "../model";
-import { Silhouette, type useNotchGeometry } from "./NotchSurface";
+import type { useNotchGeometry } from "./NotchSurface";
 import { outsideSimplePanel } from "./simple-panel";
 import { SurfaceContent, type SurfaceContentProps } from "./SurfaceContent";
 
@@ -216,24 +216,6 @@ export function HUDExpandedSurface({
                   strokeWidth={0.7}
                 />
               </svg>
-            )}
-            {!detached && config.mode === "logos" && (
-              <Silhouette
-                width={frame.width}
-                height={frame.height}
-                edge={edge}
-                flare={surfaceFlare}
-                radius={open ? 26 : 14}
-                fill={fill}
-                outline={outline}
-                duration={reduceMotion || dragging ? 0 : HUD_METRICS.duration}
-                initialShape={{
-                  width: from.width,
-                  height: from.height,
-                  flare: 8,
-                  radius: metricsRadius,
-                }}
-              />
             )}
             <AnimatePresence initial={false}>
               {cardVisible && (

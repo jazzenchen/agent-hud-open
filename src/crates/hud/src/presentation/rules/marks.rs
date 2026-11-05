@@ -60,12 +60,21 @@ pub(super) fn merged_by_mark(names: Vec<String>) -> Vec<String> {
     out
 }
 
-/// How long after its last event an agent still belongs on a Dynamic dock.
+/// How long after its last event an agent still belongs in the bots' queue.
 const QUEUE_RECENCY_MS: i64 = 86_400_000;
 
-/// The agents a resting HUD in `mode` (notch, logos or simple) shows without a list,
-/// one per mark, in order (src/packages/hud/src/resting-agents.ts
-/// `restingAgents`).
+/// The roster that is no HUD mode: the bots' queue (bots/facts.rs `bot_queue`).
+pub const QUEUE: &str = "queue";
+
+/// The agents a resting HUD in `mode` ("notch" or "simple") shows without a list, one
+/// per mark, in order (src/packages/hud/src/resting-agents.ts `restingAgents`):
+/// - notch: each window whose reading shows a level, then each balance;
+/// - simple, and any mode it does not know: every window's agent, then the agents
+///   billed by balance alone;
+/// - [`QUEUE`], the bots' roster: every window's agent, then any agent with a live
+///   session heard from in the last day, newest first.
+///
+/// Each includes detected, enabled clients without a reading.
 pub fn resting_agents(snapshot: &Value, mode: &str, now: i64) -> Vec<String> {
     let mut order: Vec<String> = vec![];
     let mut add = |source: &str| {
@@ -86,7 +95,7 @@ pub fn resting_agents(snapshot: &Value, mode: &str, now: i64) -> Vec<String> {
         for q in quotas {
             add(q["vendor"].as_str().unwrap_or(""));
         }
-        if mode == "simple" {
+        if mode != QUEUE {
             for b in billing {
                 add(b["vendor"].as_str().unwrap_or(""));
             }

@@ -113,11 +113,8 @@ pub async fn hud_drag_start(
             config,
             display,
             edge,
-            mode: if mode == Mode::Notch {
-                Mode::Logos
-            } else {
-                mode
-            },
+            // The notch HUD leaves the notch as a Simple dock, and a dock stays one.
+            mode: Mode::Simple,
             runs,
             grab_fraction: (grip / run).clamp(0.0, 1.0),
             preview: None,

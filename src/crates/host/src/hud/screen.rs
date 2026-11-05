@@ -50,7 +50,7 @@ impl<'a> Screen<'a> {
         .find(fits)
         .cloned()
         .unwrap_or_else(|| match key {
-            "mode" => json!(if self.has_notch { "notch" } else { "logos" }),
+            "mode" => json!(if self.has_notch { "notch" } else { "simple" }),
             _ => fallback.clone(),
         })
     }
@@ -80,14 +80,13 @@ impl<'a> Screen<'a> {
         serde_json::from_value(self.value("mode")).unwrap_or(if self.has_notch {
             Mode::Notch
         } else {
-            Mode::Logos
+            Mode::Simple
         })
     }
 
     pub(crate) fn mode_name(&self) -> &'static str {
         match self.mode() {
             Mode::Notch => "notch",
-            Mode::Logos => "logos",
             Mode::Simple => "simple",
         }
     }

@@ -106,6 +106,11 @@ function pickSettings<K extends keyof HUDConfig>(
 }
 function screenSettings(value: unknown): HUDScreenSettings {
   const settings = pickSettings(value, settingKeys);
+  // Dynamic mode (`logos`) was retired: a screen saved in it opens as Simple,
+  // at the same edge and place (screen.rs reads it the same way).
+  const mode: string | undefined = settings.mode;
+  if (mode === "logos") settings.mode = "simple";
+  else if (mode !== "notch" && mode !== "simple") delete settings.mode;
   // `simpleStyle` took over from `showsRings`: a screen saved with its rings
   // off draws the number alone (plans.rs reads it the same way).
   if (!usageStyle(settings.simpleStyle)) {
@@ -183,7 +188,7 @@ export function getScreenHUDConfig(
   const hidden = new Set(layout.hiddenSections ?? []);
   return {
     ...defaultHUDConfig,
-    mode: screen.hasNotch ? "notch" : "logos",
+    mode: screen.hasNotch ? "notch" : "simple",
     ...screenSettings(store.screenDefaults),
     ...screenSettings(store.screens[screen.id]),
     ...pickSettings(store.global, globalKeys),

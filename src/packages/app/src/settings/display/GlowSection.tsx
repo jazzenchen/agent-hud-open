@@ -1,5 +1,5 @@
-/* The glow round the notch or behind the Dynamic logos: a style and an effect
- * up front, every slider behind Fine-tune. Simple mode has no glow. */
+/* The glow round the notch: a style and an effect up front, every slider
+ * behind Fine-tune. Simple mode has no glow. */
 import type { HUDConfig } from "@agent-hud/hud/model";
 import { Menu } from "../SettingsControls";
 import { MoreRows, Row, Section } from "../SettingsPrimitives";
@@ -15,13 +15,7 @@ export function GlowSection({ config, update, t }: DisplayProps) {
   // Every style but Soft draws a grid of marks, with its own sliders.
   const grid = config.glowStyle !== "blur";
   return (
-    <Section
-      title={
-        config.mode === "logos"
-          ? t("Backdrop glow", "背景光晕")
-          : t("Notch glow", "刘海光晕")
-      }
-    >
+    <Section title={t("Notch glow", "刘海光晕")}>
       <Row title={t("Style", "样式")}>
         <Menu
           label={t("Glow style", "光晕样式")}

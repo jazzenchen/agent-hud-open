@@ -52,34 +52,23 @@ export function HUDSection({
   const modeSubtitle =
     config.mode === "simple"
       ? t("A small floating panel, with no glow.", "悬浮的小面板，没有光晕。")
-      : config.mode === "logos"
-        ? t(
-            "Docks on a screen edge and opens inward.",
-            "停靠在屏幕边缘，向内展开。",
-          )
-        : config.hasNotch
-          ? t("Uses this screen's notch.", "使用这块屏幕的刘海。")
-          : t(
-              "No notch here, so it draws a stand-in bar.",
-              "这块屏幕没有刘海，画一条替代条。",
-            );
+      : config.hasNotch
+        ? t("Uses this screen's notch.", "使用这块屏幕的刘海。")
+        : t(
+            "No notch here, so it draws a stand-in bar.",
+            "这块屏幕没有刘海，画一条替代条。",
+          );
 
   const dragHint =
     config.mode === "notch"
       ? t(
-          "Drag the HUD on screen to move it. Dragging the notch switches to Dynamic.",
-          "直接拖动屏幕上的 HUD 来移动它；拖动刘海会切换为「动态」。",
+          "Drag the HUD on screen to move it. Dragging the notch switches to Simple.",
+          "直接拖动屏幕上的 HUD 来移动它；拖动刘海会切换为「简约」。",
         )
       : t(
           "Drag the HUD on screen to move it.",
           "直接拖动屏幕上的 HUD 来移动它。",
         );
-
-  const separateAgents = toggle(
-    "separatesAgents",
-    t("Separate agents", "按智能体分开"),
-    t("Hovering a logo opens only its agent.", "悬停标志只展开该智能体。"),
-  );
 
   return (
     <Section title="HUD" footer={dragHint}>
@@ -91,7 +80,6 @@ export function HUDSection({
           options={[
             ["notch", t("Notch", "刘海")],
             ["simple", t("Simple", "简约")],
-            ["logos", t("Dynamic", "动态")],
           ]}
           change={(value) =>
             update({
@@ -157,34 +145,14 @@ export function HUDSection({
                 "标志旁写出用得最多那项的百分比。",
               ),
             )}
-          {separateAgents}
-        </>
-      )}
-      {config.mode === "logos" && (
-        <>
-          {slider("logoSize", t("Logo size", "Logo 大小"), 20, 60, 1, pt)}
-          {slider(
-            "logoEdgeDistance",
-            t("Edge distance", "边缘距离"),
-            0,
-            20,
-            1,
-            pt,
-          )}
-          {slider(
-            "gapScale",
-            t("Logo spacing", "Logo 间距"),
-            0.1,
-            0.6,
-            0.05,
-            (value) => pt(value * config.logoSize),
-          )}
           {toggle(
-            "showsLogos",
-            t("Show logos", "显示 Logo"),
-            t("Off keeps only the backdrop.", "关闭后只留背景。"),
+            "separatesAgents",
+            t("Separate agents", "按智能体分开"),
+            t(
+              "Hovering a logo opens only its agent.",
+              "悬停标志只展开该智能体。",
+            ),
           )}
-          {separateAgents}
         </>
       )}
       <Row
