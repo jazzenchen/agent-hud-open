@@ -101,7 +101,9 @@ fn a_file_whose_process_no_longer_runs_ends_its_session() {
     let temp = tempfile::tempdir().unwrap();
     let config = temp.path().join(".claude");
     let roots = vec![(config.join("projects"), "claude")];
-    let (running, dead) = (7, 8);
+    // Pids of different lengths: a file rewritten at its own length within
+    // one clock tick (as on Windows) keeps its stamp and is not read again.
+    let (running, dead) = (7, 4_242);
     let file = config.join("sessions").join(format!("{dead}.json"));
     write(&file, json!({"pid":running,"sessionId":A}));
     let mut processes = on(Host(vec![(running, 0)]));
