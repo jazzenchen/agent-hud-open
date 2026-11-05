@@ -25,6 +25,8 @@ const LAYOUT_KEYS: &[&str] = &[
     "hud",
     "sessions",
     "tokens",
+    "quotaHistory",
+    "planValue",
 ];
 const DRAFT_NOTE: &str = "Shown in the panel as an unsaved draft. The user keeps it by hovering the Agent HUD and pressing Save in the panel; it is dropped when Agent HUD restarts.";
 const SAVED_NOTE: &str = "This is the layout already saved, so there is no draft.";

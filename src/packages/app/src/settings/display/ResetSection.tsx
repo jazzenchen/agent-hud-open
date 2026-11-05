@@ -3,6 +3,10 @@
  * replaced, until the page closes or another screen is picked. */
 import { useRef, useState } from "react";
 import { defaultHUDConfig, type HUDConfig } from "@agent-hud/hud/model";
+import {
+  addedSections,
+  withAddedSection,
+} from "@agent-hud/hud/panel/added-sections";
 import { Row, Section } from "../SettingsPrimitives";
 import { SmallButton } from "../SettingsControls";
 import type { DisplayProps } from "./controls";
@@ -95,8 +99,17 @@ export function ResetSection({
       layoutDensity: config.layoutDensity,
       panelSections: [...config.panelSections],
       panelOrder: [...config.panelOrder],
+      panelLayout: config.panelLayout,
     };
-    update(layoutDefault);
+    // The quota history and the plan value are off again, as by default.
+    update({
+      panelLayout: addedSections.reduce(
+        (layout, section) =>
+          withAddedSection(layout, config.panelSections, section, false),
+        config.panelLayout,
+      ),
+      ...layoutDefault,
+    });
     setRevision(revision + 1);
   };
   const revertLayout = () => {

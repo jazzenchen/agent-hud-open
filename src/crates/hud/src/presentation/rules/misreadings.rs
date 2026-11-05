@@ -29,6 +29,9 @@ pub(in crate::presentation) fn misreadings(document: &Value) -> Vec<String> {
     found.extend(super::style_rules::misreadings(&document["hud"]));
     found.extend(session_misreadings(&document["sessions"]));
     found.extend(token_misreadings(&document["tokens"]));
+    for section in ADDED_SECTIONS {
+        found.extend(added_misreadings(&document[*section], section));
+    }
     match &document["blocks"] {
         Value::Null => {}
         Value::Object(blocks) => {
@@ -215,6 +218,46 @@ fn token_misreadings(value: &Value) -> Vec<String> {
             }
             _ => found.push(format!(
                 "tokens has no property \"{property}\"; tokens take period, agents, models, hiddenModels and modelOrder."
+            )),
+        }
+    }
+    found
+}
+
+/// What is wrong with the options of the quota history or the plan value: the
+/// history's period, the agents shown and the models hidden.
+fn added_misreadings(value: &Value, section: &str) -> Vec<String> {
+    if value.is_null() {
+        return vec![];
+    }
+    let Some(fields) = value.as_object() else {
+        return vec![format!("{section} is an object.")];
+    };
+    let history = section == "quotaHistory";
+    let mut found = vec![];
+    for (property, value) in fields {
+        let path = format!("{section}.{property}");
+        match property.as_str() {
+            "period" if history => found.extend(misnamed(value, &path, PERIODS)),
+            "agents" => {
+                found.extend(names(value, &path, None));
+                found.extend(empty_names(
+                    value,
+                    &path,
+                    "an agent's name, such as one from get_hud's tokens.offeredAgents.",
+                ));
+            }
+            "hiddenModels" => {
+                found.extend(names(value, &path, None));
+                found.extend(empty_names(
+                    value,
+                    &path,
+                    "a model's id from get_hud's tokens.offeredModels.",
+                ));
+            }
+            _ => found.push(format!(
+                "{section} has no property \"{property}\"; {section} takes {}agents and hiddenModels.",
+                if history { "period, " } else { "" }
             )),
         }
     }

@@ -129,6 +129,15 @@ const app = z
       .optional(),
   })
   .strict();
+/** The panel's own sections; quotaHistory and planValue start hidden. */
+const sectionIds = z.enum([
+  "blocks",
+  "tokens",
+  "sessions",
+  "quotaHistory",
+  "planValue",
+]);
+
 export const proposal = z
   .object({
     screen,
@@ -143,14 +152,12 @@ export const proposal = z
       .record(z.string(), z.unknown())
       .optional()
       .describe(
-        "The whole panel tree, as get_hud returns it in panel, changed. Use it or edit, not both, and not with order, sections, blocks, style, sessions or tokens.",
+        "The whole panel tree, as get_hud returns it in panel, changed. Use it or edit, not both, and not with order, sections, blocks, style, sessions, tokens, quotaHistory or planValue.",
       ),
     from: z.enum(["default", "previous", "shared"]).optional(),
     order: keys.optional(),
-    sections: z.array(z.enum(["blocks", "tokens", "sessions"])).optional(),
-    hiddenSections: z
-      .array(z.enum(["blocks", "tokens", "sessions"]))
-      .optional(),
+    sections: z.array(sectionIds).optional(),
+    hiddenSections: z.array(sectionIds).optional(),
     countdown: z.boolean().optional(),
     blocks: z.record(z.string(), block).optional(),
     style: z
@@ -178,6 +185,24 @@ export const proposal = z
       })
       .strict()
       .optional(),
+    quotaHistory: z
+      .object({
+        period: period.optional(),
+        agents: keys.optional(),
+        hiddenModels: keys.optional(),
+      })
+      .strict()
+      .optional()
+      .describe(
+        "The quota history section: each window's used share over the period. Shown once sections names it and hiddenSections does not.",
+      ),
+    planValue: z
+      .object({ agents: keys.optional(), hiddenModels: keys.optional() })
+      .strict()
+      .optional()
+      .describe(
+        "The plan value section: each plan beside its last 30 days of calls at API list prices. Shown once sections names it and hiddenSections does not.",
+      ),
     hud: hud.optional(),
     app: app.optional(),
   })

@@ -201,9 +201,7 @@ export function getScreenHUDConfig(
           panelSections: [
             ...new Set([
               ...(layout.sections ?? []),
-              "blocks",
-              "tokens",
-              "sessions",
+              ...defaultHUDConfig.panelSections,
             ]),
           ] as HUDConfig["panelSections"],
           layoutDensity:

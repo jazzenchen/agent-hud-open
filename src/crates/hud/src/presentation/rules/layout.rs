@@ -75,17 +75,30 @@ pub(in crate::presentation) fn normalize_layout(value: &Value) -> Result<Value, 
         .into_iter()
         .filter(|s| SECTIONS.contains(&s.as_str()) || custom.contains_key(s))
         .collect();
+    // A section added after the layout was written is hidden until named.
+    let unnamed: Vec<&str> = ADDED_SECTIONS
+        .iter()
+        .copied()
+        .filter(|s| !sections.iter().any(|named| named == s))
+        .collect();
     for section in SECTIONS {
         push_unique(&mut sections, section);
-    }
-    if sections != SECTIONS {
-        out.insert("sections".into(), json!(sections));
     }
     let hidden = strings(&value["hiddenSections"]);
     let hidden: Vec<&str> = SECTIONS
         .iter()
         .copied()
-        .filter(|s| hidden.iter().any(|h| h == s))
+        .filter(|s| hidden.iter().any(|h| h == s) || unnamed.contains(s))
+        .collect();
+    // Written without `sections` when it says no more than having none would:
+    // the usual order with the added sections hidden.
+    let usual = sections == SECTIONS && ADDED_SECTIONS.iter().all(|s| hidden.contains(s));
+    if !usual {
+        out.insert("sections".into(), json!(sections));
+    }
+    let hidden: Vec<&str> = hidden
+        .into_iter()
+        .filter(|s| !usual || !ADDED_SECTIONS.contains(s))
         .collect();
     if !hidden.is_empty() {
         out.insert("hiddenSections".into(), json!(hidden));
@@ -173,6 +186,26 @@ pub(in crate::presentation) fn normalize_layout(value: &Value) -> Result<Value, 
     }
     if !v.is_empty() {
         out.insert("tokens".into(), Value::Object(v));
+    }
+    for section in ADDED_SECTIONS {
+        let options = &value[*section];
+        let mut v = Map::new();
+        if let Some(period) = options["period"]
+            .as_str()
+            .filter(|s| *section == "quotaHistory" && PERIODS.contains(s) && *s != "day")
+        {
+            v.insert("period".into(), json!(period));
+        }
+        for key in ["agents", "hiddenModels"] {
+            let mut values = strings(&options[key]);
+            values.sort();
+            if !values.is_empty() {
+                v.insert(key.into(), json!(values));
+            }
+        }
+        if !v.is_empty() {
+            out.insert((*section).into(), Value::Object(v));
+        }
     }
     if !custom.is_empty() {
         out.insert("custom".into(), Value::Object(custom));

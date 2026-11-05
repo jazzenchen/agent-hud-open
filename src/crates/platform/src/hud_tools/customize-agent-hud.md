@@ -1,6 +1,6 @@
 ---
 name: customize-agent-hud
-description: Rearrange, restyle or add to Agent HUD, the notch or dock HUD at the screen's edge and its hover panel, with Agent HUD's HUD tools (get_hud, draft_hud, get_hud_screenshot, discard_hud_draft, finish_hud_edit). Use it when the person asks to change, customize, tidy, reorder, hide or show anything in Agent HUD, such as quota or balance blocks, rows, accounts, widgets (bar, rings, segments, number, chart), panel sections, the sessions or token lists, panel width or spacing, controls of their own in the panel (a clock, a list, a picker, text), or the resting HUD's mode (notch, dynamic, simple), usage style, edge, position, size, glow, appearance or transparency. Also hover timing and other app settings when asked. Use it for "make the HUD smaller", "show only Codex", "add a clock", "改一下 HUD", "换成年轮/分段环", "刘海/动态/简约模式", and to explain what the HUD shows or why a change was refused. Changes are drafts that only the person can save.
+description: Rearrange, restyle or add to Agent HUD, the notch or dock HUD at the screen's edge and its hover panel, with Agent HUD's HUD tools (get_hud, draft_hud, get_hud_screenshot, discard_hud_draft, finish_hud_edit). Use it when the person asks to change, customize, tidy, reorder, hide or show anything in Agent HUD, such as quota or balance blocks, rows, accounts, widgets (bar, rings, segments, number, chart), panel sections, the sessions or token lists, the quota history or the plan value in the panel, panel width or spacing, controls of their own in the panel (a clock, a list, a picker, text), or the resting HUD's mode (notch, dynamic, simple), usage style, edge, position, size, glow, appearance or transparency. Also hover timing and other app settings when asked. Use it for "make the HUD smaller", "show only Codex", "add a clock", "put the quota history in the HUD", "改一下 HUD", "换成年轮/分段环", "刘海/动态/简约模式", and to explain what the HUD shows or why a change was refused. Changes are drafts that only the person can save.
 metadata:
   managed-by: agent-hud
 ---
@@ -46,9 +46,10 @@ Agent HUD adds its tools to this client as an MCP server named `agent-hud`. This
 
 ## The panel tree
 
-- **The panel's own parts:** the root `panel` (spacing, separators, width, countdown), its sections `blocks`, `tokens` and `sessions`, and inside `blocks` one `quota` or `balance` block per agent, named by its block key (`claude`, `codex`, `api:deepseek`). The blocks' order is also the order of the agents on the resting HUD. They cannot be deleted; `hidden: true` hides one. Their fields are in `catalog.own`.
+- **The panel's own parts:** the root `panel` (spacing, separators, width, countdown), its sections `blocks`, `tokens`, `sessions`, `quotaHistory` and `planValue`, and inside `blocks` one `quota` or `balance` block per agent, named by its block key (`claude`, `codex`, `api:deepseek`). The blocks' order is also the order of the agents on the resting HUD. They cannot be deleted; `hidden: true` hides one. Their fields are in `catalog.own`.
+- **Quota history and plan value:** two sections that start hidden. `quotaHistory` draws each quota window's used share over a day, week or month; `planValue` sets each signed-in plan beside what its last 30 days of calls on this Mac would cost at API list prices. Show one with `{"update": "quotaHistory", "hidden": false}`. Both take `agents` (only these agents) and `hiddenModels` (model ids from `tokens.offeredModels`); `quotaHistory` also takes `period`.
 - **Your own controls:** from `catalog.controls`: `row`, `column`, `grid`, `repeat`, `text`, `logo`, `bar`, `rings`, `segments`, `chart`, `divider` and `picker`. Put one in `panel` as a section of its own, or in `blocks` among the agents' blocks. A control placed there needs an `id`.
-- **Side by side:** a `row` (or a `column` or `grid` inside it) that you place in `panel` can hold the sections `blocks`, `tokens` and `sessions`: `move` them into it. Sections, columns and grids in a row share its width equally; give one a `width` in points to fix it. A row of sections wants a wider panel: set `panel.width` (480–960) to 720 or more. Moving a section back into `panel` puts it under the others again.
+- **Side by side:** a `row` (or a `column` or `grid` inside it) that you place in `panel` can hold the sections `blocks`, `tokens`, `sessions`, `quotaHistory` and `planValue`: `move` them into it. Sections, columns and grids in a row share its width equally; give one a `width` in points to fix it. A row of sections wants a wider panel: set `panel.width` (480–960) to 720 or more. Moving a section back into `panel` puts it under the others again.
 - **Compact blocks:** an agent's block drawn as `rings` or `segments` with `"legend": false` becomes a small, about square tile: its logo and name with the account's plan (Ultra, Pro x5) at the right, then the measure picker, then one ring, the same larger size in every tile, with the most used window's figure inside in the picked measure, then when that window resets. Pointing at the ring shows each window's line; pointing at the plan shows the account and any note on it, which a dot marks. `ringSize` does not apply to a compact block. `span` from `"half"` to `"sixth"` puts up to six such blocks on a line where each keeps about 130 points: with `"sixth"`, six fit at a panel width of 960, four at 720, three at 540. Blocks share a line only with neighbours asking the same span.
 - **Rings of your own:** a `rings` or `segments` control with `"legend": false` is a ring alone (`"center": "percent"` puts the share inside). In a `grid`, `colSpan` and `rowSpan` make a cell cover more, and `"size": "fill"` grows the ring to its cell, for uneven layouts.
 - **Lining up:** any control takes a `width` in points, so the same column in different rows lines up (a name column of `"width": 90` in every row of a list). A row centres its children top to bottom, or tops them when it holds sections, columns or grids; `valign` overrides that.
@@ -72,6 +73,7 @@ Agent HUD adds its tools to this client as an MCP server named `agent-hud`. This
 | 小格子, 只有圆环, 紧凑, 方块 | a block's `widget` `rings` or `segments` with `"legend": false`, and `span` `"sixth"` |
 | 错落, bento | a `grid` of your own `rings` with `colSpan`/`rowSpan` and `"size": "fill"` |
 | 会话列表 / Token 图 / 额度 | the `sessions` / `tokens` sections, the quota blocks |
+| 额度历史 / 订阅价值 | the `quotaHistory` / `planValue` sections (hidden until shown) |
 
 The same style name can mean the resting HUD or the panel. When the person talks about the logos at the screen's edge, or Simple mode, change `hud.simpleStyle` for that display. When they talk about the panel that opens on hover, change the block's `widget`. If it is unclear, ask which one.
 
@@ -91,7 +93,7 @@ The same style name can mean the resting HUD or the panel. When the person talks
 **Panel:** `edit` or `panel`, as above. Every field of the panel's own parts and of your controls is in `get_hud`'s `catalog`. Two more layout fields stay outside the tree:
 
 - `hud.agents`: which agents the resting HUD shows. Their order is not this list's: the HUD and the panel share one order, the order of the blocks inside `blocks` (Settings' agent order). To move an agent on the HUD, `move` its block. It is a layout field, so it is allowed with `"all"`, and it stays as it is unless you send it.
-- The older spelling (`order`, `sections`, `blocks`, `style`, `sessions`, `tokens`) still works, but not together with `edit` or `panel`.
+- The older spelling (`order`, `sections`, `blocks`, `style`, `sessions`, `tokens`, `quotaHistory`, `planValue`) still works, but not together with `edit` or `panel`.
 
 **HUD style (display key only), under `hud`:**
 
@@ -152,7 +154,7 @@ The same style name can mean the resting HUD or the panel. When the person talks
 - **Masking:** accounts are masked, and session titles and notices are left out.
 - **Display key required:** `show: "hud"` and `agent` need one. `agent` also needs a `dynamic` or `simple` HUD with `separateAgents` on.
 - **One at a time:** it renders one picture at a time and times out after 25 s, naming the step it was waiting for.
-- **Slow data:** a panel picture waits about 8 s for the token chart and the sessions list. If a section has not loaded by then, it is drawn as it looks while loading and is named in `loading`. Take the picture again to see it filled.
+- **Slow data:** a panel picture waits about 8 s for the token chart, the sessions list, the quota history and the plan value. If a section has not loaded by then, it is drawn as it looks while loading and is named in `loading`. Take the picture again to see it filled.
 - **Motion:** an animated glow may not show in a still picture.
 
 ## Other tools

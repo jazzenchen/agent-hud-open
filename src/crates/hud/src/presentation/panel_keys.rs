@@ -1,6 +1,6 @@
 //! The Settings keys that write the panel's layout, and what a Settings patch of them
 //! does to a layout.
-use super::rules::{normalize_layout, strings};
+use super::rules::{normalize_layout, strings, ADDED_SECTIONS};
 use super::*;
 
 pub(super) fn panel_key(key: &str) -> bool {
@@ -58,6 +58,16 @@ pub(super) fn panel_patch(layout: &mut Value, patch: &Map<String, Value>) {
         }
     }
     if let Some(value) = patch.get("panelSections") {
+        // An added section the layout keeps hidden by not naming it stays
+        // hidden once the new order names it.
+        let named = strings(&layout["sections"]);
+        let mut hidden = strings(&layout["hiddenSections"]);
+        for section in ADDED_SECTIONS {
+            if !named.iter().any(|s| s == section) && !hidden.iter().any(|s| s == section) {
+                hidden.push((*section).into());
+            }
+        }
+        layout["hiddenSections"] = json!(hidden);
         layout["sections"] = value.clone();
     }
     if let Some(value) = patch.get("panelOrder") {

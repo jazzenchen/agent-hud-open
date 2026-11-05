@@ -228,7 +228,13 @@ export function holds(
 }
 
 /** The panel's own sections, which a row, column or grid of an agent's may hold. */
-export const SECTIONS = ["blocks", "tokens", "sessions"];
+export const SECTIONS = [
+  "blocks",
+  "tokens",
+  "sessions",
+  "quotaHistory",
+  "planValue",
+];
 const HOLDERS = ["row", "column", "grid"];
 
 /** The sections a control holds in its rows, columns and grids (tree.rs `held_sections`). */

@@ -26,7 +26,11 @@ pub(super) use misreadings::{hud_agent_misreadings, misreadings};
 pub(super) use projects::{offered_projects, project_match, project_title};
 pub(super) use reduced::reduced;
 
-pub(super) const SECTIONS: &[&str] = &["blocks", "tokens", "sessions"];
+pub(super) const SECTIONS: &[&str] = &["blocks", "tokens", "sessions", "quotaHistory", "planValue"];
+/// Sections a panel shows only once it is asked to: a layout whose `sections`
+/// does not name one keeps it hidden, so a layout saved before them is drawn
+/// as it was.
+pub(super) const ADDED_SECTIONS: &[&str] = &["quotaHistory", "planValue"];
 /// `rings` are concentric and `segments` split one ring, one per account; a layout
 /// saved before them says `ring`, which `parse_block` reads as `rings`.
 const WIDGETS: &[&str] = &["bar", "rings", "segments", "number", "chart"];

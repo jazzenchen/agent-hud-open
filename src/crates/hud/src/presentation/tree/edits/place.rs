@@ -73,7 +73,10 @@ pub(super) fn put(
     let parent_kind = kind_of(parent_node).to_owned();
     let kind = kind_of(&node).to_owned();
     let own_block = matches!(kind.as_str(), "quota" | "balance");
-    let own_section = matches!(kind.as_str(), "blocks" | "tokens" | "sessions");
+    let own_section = matches!(
+        kind.as_str(),
+        "blocks" | "tokens" | "sessions" | "quotaHistory" | "planValue"
+    );
     let fits = match parent_kind.as_str() {
         "panel" => !own_block,
         "blocks" => !own_section,

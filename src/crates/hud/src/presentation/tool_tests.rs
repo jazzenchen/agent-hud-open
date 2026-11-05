@@ -2,7 +2,8 @@
 //! kept as what it changes, a screen's proposal of the shared layout uses it, a
 //! proposal the panel cannot draw as asked is refused whole and changes nothing, and
 //! `from` is a whole proposal of a version.
-use super::Presentation;
+use super::rules::strings;
+use super::{panel_keys, rules, Presentation};
 use serde_json::{json, Value};
 
 fn snapshot() -> Value {
@@ -421,7 +422,7 @@ fn misreadings_are_refused_with_open_sentences() {
         &owner,
         json!({"style": {"appearance": "light", "width": 1000}, "blocks": {"claude": {"colour": "red"}}, "wat": 1}),
     );
-    assert_eq!(error, "Nothing was changed. Unknown: \"wat\". It takes: \"blocks\", \"order\", \"sections\", \"hiddenSections\", \"countdown\", \"style\", \"hud\", \"sessions\", \"tokens\", \"panel\", \"edit\", \"app\", \"from\", \"revision\", \"screen\".");
+    assert_eq!(error, "Nothing was changed. Unknown: \"wat\". It takes: \"blocks\", \"order\", \"sections\", \"hiddenSections\", \"countdown\", \"style\", \"hud\", \"sessions\", \"tokens\", \"quotaHistory\", \"planValue\", \"panel\", \"edit\", \"app\", \"from\", \"revision\", \"screen\".");
     let error = refused(
         &owner,
         json!({"style": {"appearance": "light", "width": 1000}, "blocks": {"claude": {"colour": "red"}}}),
@@ -614,7 +615,15 @@ fn get_hud_shows_the_panel_as_a_tree_and_sending_it_back_changes_nothing() {
         .iter()
         .map(|c| c["id"].as_str().unwrap())
         .collect();
-    assert_eq!(sections, ["blocks", "tokens", "sessions"]);
+    assert_eq!(
+        sections,
+        ["blocks", "tokens", "sessions", "quotaHistory", "planValue"]
+    );
+    assert_eq!(
+        panel["children"][3],
+        json!({"id": "quotaHistory", "type": "quotaHistory", "period": "day", "hidden": true}),
+        "an added section starts hidden"
+    );
     let blocks = &panel["children"][0]["children"];
     assert_eq!(
         blocks[0],
@@ -744,7 +753,10 @@ fn a_tree_without_the_panels_own_parts_or_mixed_with_the_older_fields_is_refused
     let (_folder, owner) = owner();
     let read = call(&owner, "get_hud", json!({})).unwrap();
     let mut panel = read["panel"].clone();
-    panel["children"].as_array_mut().unwrap().pop();
+    panel["children"]
+        .as_array_mut()
+        .unwrap()
+        .retain(|child| child["id"] != "sessions");
     let error = refused(&owner, json!({"panel": panel}));
     assert!(error.contains("no \"sessions\" section"), "{error}");
     let error = refused(
@@ -810,7 +822,7 @@ fn a_row_puts_the_panels_sections_side_by_side() {
         .iter()
         .map(|n| n["id"].as_str().unwrap())
         .collect();
-    assert_eq!(top, ["main", "tokens"]);
+    assert_eq!(top, ["main", "tokens", "quotaHistory", "planValue"]);
     let main = &tree["children"][0];
     assert_eq!(main["children"][0]["id"], "blocks");
     assert!(main["children"][0]["children"].as_array().unwrap().len() >= 2);
@@ -898,7 +910,7 @@ fn a_proposal_in_the_older_spelling_keeps_sections_in_their_row() {
         .iter()
         .map(|n| n["id"].as_str().unwrap())
         .collect();
-    assert_eq!(top, ["sessions", "main"]);
+    assert_eq!(top, ["sessions", "main", "quotaHistory", "planValue"]);
     assert_eq!(tree["children"][1]["children"][1]["id"], "tokens");
 }
 
@@ -1096,5 +1108,65 @@ fn a_layout_saved_with_measures_loads_without_them() {
     assert_eq!(
         layout["blocks"]["claude"],
         json!({"widget": "rings", "hiddenRows": ["acct1/claude-weekly"]})
+    );
+}
+
+/// The quota history and the plan value are sections a layout shows only once
+/// it names them: a layout saved before them stays as it was drawn, an agent
+/// shows one by updating it, and Settings' reordering does not show one.
+#[test]
+fn an_added_section_shows_only_once_it_is_asked_for() {
+    let usual = rules::normalize_layout(&json!({"hiddenSections": ["sessions"]})).unwrap();
+    assert_eq!(usual, json!({"hiddenSections": ["sessions"]}));
+    let reordered =
+        rules::normalize_layout(&json!({"sections": ["sessions", "blocks", "tokens"]})).unwrap();
+    assert_eq!(
+        reordered,
+        json!({"sections": ["sessions", "blocks", "tokens", "quotaHistory", "planValue"],
+               "hiddenSections": ["quotaHistory", "planValue"]})
+    );
+    assert_eq!(
+        rules::normalize_layout(&reordered).unwrap(),
+        reordered,
+        "written once"
+    );
+
+    let (_folder, owner) = owner();
+    draft(
+        &owner,
+        json!({"edit": [{"update": "quotaHistory", "hidden": false, "period": "week",
+                         "hiddenModels": ["claude-model:claude-opus-4-5"]}]}),
+    );
+    let layout = layout_of(&owner);
+    assert!(
+        strings(&layout["sections"]).contains(&"quotaHistory".to_string()),
+        "{layout}"
+    );
+    assert_eq!(layout["hiddenSections"], json!(["planValue"]));
+    assert_eq!(
+        layout["quotaHistory"],
+        json!({"period": "week", "hiddenModels": ["claude-model:claude-opus-4-5"]})
+    );
+    let tree = &call(&owner, "get_hud", json!({})).unwrap()["panel"];
+    assert!(tree["children"][3]["hidden"].is_null());
+    assert_eq!(tree["children"][4]["hidden"], true);
+
+    let error = refused(&owner, json!({"planValue": {"period": "week"}}));
+    assert!(
+        error.contains("planValue has no property \"period\""),
+        "{error}"
+    );
+
+    let mut moved = json!({});
+    panel_keys::panel_patch(
+        &mut moved,
+        json!({"panelSections": ["sessions", "blocks", "tokens", "quotaHistory", "planValue"]})
+            .as_object()
+            .unwrap(),
+    );
+    assert_eq!(
+        rules::normalize_layout(&moved).unwrap()["hiddenSections"],
+        json!(["quotaHistory", "planValue"]),
+        "reordering keeps them hidden"
     );
 }

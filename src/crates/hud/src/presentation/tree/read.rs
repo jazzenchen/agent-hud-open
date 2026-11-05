@@ -182,7 +182,7 @@ pub(in crate::presentation) fn layout_from(tree: &Value, present: &[Block]) -> F
         }
         if OWN.contains(&kind_of(child)) {
             reader.issues.push(format!(
-                "{path}: a \"{}\" node belongs {}; the panel's children are the sections blocks, tokens and sessions, and your own controls.",
+                "{path}: a \"{}\" node belongs {}; the panel's children are the sections blocks, tokens, sessions, quotaHistory and planValue, and your own controls.",
                 kind_of(child),
                 if matches!(kind_of(child), "quota" | "balance") { "inside blocks" } else { "only once, as the root" }
             ));
@@ -199,10 +199,10 @@ pub(in crate::presentation) fn layout_from(tree: &Value, present: &[Block]) -> F
             reader.custom.insert(id, node);
         }
     }
-    for section in SECTIONS {
+    for section in SECTIONS.iter().filter(|s| !ADDED_SECTIONS.contains(s)) {
         if !reader.sections.iter().any(|s| s == section) {
             reader.issues.push(format!(
-                "panel.children has no \"{section}\" section. The panel always has blocks, tokens and sessions: hide one with hidden: true."
+                "panel.children has no \"{section}\" section. The panel always has blocks, tokens and sessions: hide one with hidden: true. quotaHistory and planValue may be left out, which hides them."
             ));
         }
     }

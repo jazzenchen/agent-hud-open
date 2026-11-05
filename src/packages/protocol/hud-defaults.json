@@ -44,7 +44,9 @@
   "panelSections": [
     "blocks",
     "tokens",
-    "sessions"
+    "sessions",
+    "quotaHistory",
+    "planValue"
   ],
   "panelOrder": [],
   "hasNotch": false,

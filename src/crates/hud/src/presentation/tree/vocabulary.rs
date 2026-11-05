@@ -3,7 +3,16 @@
 use super::*;
 
 /// The node types of the panel's own parts. They are in every panel.
-pub(super) const OWN: &[&str] = &["panel", "blocks", "tokens", "sessions", "quota", "balance"];
+pub(super) const OWN: &[&str] = &[
+    "panel",
+    "blocks",
+    "tokens",
+    "sessions",
+    "quotaHistory",
+    "planValue",
+    "quota",
+    "balance",
+];
 pub(super) const CONTROLS: &[&str] = &[
     "row", "column", "grid", "repeat", "text", "logo", "bar", "rings", "segments", "chart",
     "divider", "picker",
@@ -201,19 +210,21 @@ pub(in crate::presentation) fn catalog() -> Value {
     json!({
         "howItWorks": [
             "get_hud's panel is the hover panel as a tree. Each node has an id, a type and its fields; parents have children.",
-            "The panel's own parts are the sections blocks, tokens and sessions, and one quota or balance block per agent inside blocks. They cannot be deleted; hide one with hidden: true.",
+            "The panel's own parts are the sections blocks, tokens, sessions, quotaHistory and planValue, and one quota or balance block per agent inside blocks. They cannot be deleted; hide one with hidden: true. quotaHistory and planValue start hidden: show one with hidden: false.",
             "Add your own controls from controls below: as a section of the panel (inside panel), or as a block among the agents' blocks (inside blocks).",
-            "To put sections side by side, insert a row into panel and move blocks, tokens or sessions into it, or into a column or grid inside it. Each section still appears once, and no repeat holds one. Two columns want a panel width of 720 or more.",
+            "To put sections side by side, insert a row into panel and move blocks, tokens, sessions, quotaHistory or planValue into it, or into a column or grid inside it. Each section still appears once, and no repeat holds one. Two columns want a panel width of 720 or more.",
             "Change the panel with edit, a list of steps that each name a node by its id. Or send the whole tree back as panel.",
             "Text shows data with placeholders such as {window.used}. Inside a repeat over windows, each item is window; now and state can be read anywhere.",
             "Nothing is saved until the person presses Save in the panel."
         ],
         "own": {
-            "panel": {"fields": {"spacing": "compact, regular or roomy", "separators": "true or false: lines between parts", "width": "480 to 960 points (540 by default)", "countdown": "true or false: the reset countdowns"}, "children": "the sections blocks, tokens and sessions, and your own controls; a row, column or grid of yours placed here may hold sections"},
+            "panel": {"fields": {"spacing": "compact, regular or roomy", "separators": "true or false: lines between parts", "width": "480 to 960 points (540 by default)", "countdown": "true or false: the reset countdowns"}, "children": "the sections blocks, tokens, sessions, quotaHistory and planValue, and your own controls; a row, column or grid of yours placed here may hold sections"},
             "blocks": {"fields": {"hidden": "true or false", "width": "points, for the section inside a row, column or grid of yours"}, "children": "one quota or balance block per agent, and your own controls; span half to sixth puts two to six on a line when there is room"},
             "quota": {"fields": {"widget": "bar, rings, segments, number or chart", "rows": "the order of its row ids", "hiddenRows": "row ids to hide", "accounts": "show only these account ids", "hiddenAccounts": "account ids to hide", "countdown": "true or false", "columns": "2 to 6, for number", "ringSize": "small, medium or large, for rings and segments with their legend", "legend": "false makes a compact block, about square: the logo and name with the account's plan at the right, then the picker, then one larger ring with the most used window's figure inside, then when that window resets", "span": "full, half, third, quarter, fifth or sixth of a line (not for bar); blocks next to each other asking the same share it where each keeps about 200 points, a compact block about 130, else fewer to a line", "period": "day, week or month, for chart", "hidden": "true or false"}},
             "balance": {"fields": {"widget": "number or chart", "period": "day, week or month", "span": "full, half, third, quarter, fifth or sixth", "hidden": "true or false"}},
             "tokens": {"fields": {"period": "day, week or month", "agents": "agent names from get_hud's tokens.offeredAgents", "models": "model ids from tokens.offeredModels", "hiddenModels": "model ids to hide", "modelOrder": "model ids in order", "hidden": "true or false", "width": "points, for the section inside a row, column or grid of yours"}},
+            "quotaHistory": {"shows": "each quota window's used share over the period, one line per window on a 0 to 100% axis, with its reading now", "fields": {"period": "day, week or month", "agents": "only these agents' windows, by agent name such as claude or codex", "hiddenModels": "model ids from tokens.offeredModels; a window is hidden once every model whose calls spend it is", "hidden": "true or false (hidden at first)", "width": "points, for the section inside a row, column or grid of yours"}},
+            "planValue": {"shows": "each signed-in plan beside what its last 30 days of calls on this Mac would cost at API list prices, as a multiple of the plan's monthly price", "fields": {"agents": "only these agents' plans", "hiddenModels": "model ids from tokens.offeredModels, left out of the value", "hidden": "true or false (hidden at first)", "width": "points, for the section inside a row, column or grid of yours"}},
             "sessions": {"fields": {"limit": "1 to 10", "period": "day or week", "agents": "agent names from sessions.offeredAgents", "projects": "project ids from sessions.offeredProjects", "hidden": "true or false", "width": "points, for the section inside a row, column or grid of yours"}}
         },
         "controls": {

@@ -1,6 +1,13 @@
-/** The panel's requests that a picture waits for: the token chart's statistics
- * and the sessions list. */
-export type PanelQuery = "statistics" | "sessions";
+import type {
+  PlanValueResponse,
+  QuotaHistoryResponse,
+  SessionsResponse,
+} from "@agent-hud/protocol";
+
+/** The panel's requests that a picture waits for: the token chart's
+ * statistics, the sessions list, the quota history and the plan value. */
+export type PanelQuery =
+  "statistics" | "sessions" | "quota_history" | "plan_value";
 
 /** How long, from the picture page's start, its panel requests may take. The
  * host gives up on the whole picture after 25 s, and WebKit's own picture may
@@ -14,7 +21,52 @@ export const QUERY_DEADLINE_MS = 8_000;
 const SECTION: Record<PanelQuery, string> = {
   statistics: "tokens",
   sessions: "sessions",
+  quota_history: "quotaHistory",
+  plan_value: "planValue",
 };
+
+/** An answer as a picture shows it: sessions without their titles and
+ * folders, accounts without their names. */
+export function maskedAnswer(method: PanelQuery, value: unknown): unknown {
+  if (method === "sessions") {
+    const response = value as SessionsResponse;
+    return {
+      ...response,
+      items: response.items.map((session, index) => ({
+        ...session,
+        title: `Session ${index + 1}`,
+        cwd: null,
+        logPath: null,
+      })),
+    };
+  }
+  if (method === "quota_history") {
+    const response = value as QuotaHistoryResponse;
+    const accounts = [
+      ...new Set(response.windows.map((window) => window.accountId ?? "")),
+    ];
+    return {
+      ...response,
+      windows: response.windows.map((window) => ({
+        ...window,
+        account: window.account
+          ? `Account ${accounts.indexOf(window.accountId ?? "") + 1}`
+          : window.account,
+      })),
+    };
+  }
+  if (method === "plan_value") {
+    const response = value as PlanValueResponse;
+    return {
+      ...response,
+      accounts: response.accounts.map((account, index) => ({
+        ...account,
+        name: `Account ${index + 1}`,
+      })),
+    };
+  }
+  return value;
+}
 
 export class PictureQueries {
   private open = new Map<Promise<unknown>, PanelQuery>();

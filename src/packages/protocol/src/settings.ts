@@ -22,10 +22,22 @@ export interface PanelBlockLayout {
   span?: "full" | "half" | "third" | "quarter" | "fifth" | "sixth";
   period?: "day" | "week" | "month";
 }
+/** The panel's own sections. The quota history and the plan value show only
+ * once `sections` names them (`addedSections`). */
+export type PanelSectionId =
+  "blocks" | "tokens" | "sessions" | "quotaHistory" | "planValue";
+/** What the quota history or the plan value in the panel shows. */
+export interface PanelFilterLayout {
+  /** Only these agents' windows or plans. */
+  agents?: string[];
+  /** Model ids whose windows (once every one spending a window is hidden)
+   * or calls are left out. */
+  hiddenModels?: string[];
+}
 export interface PanelLayout {
   order?: string[];
-  sections?: ("blocks" | "tokens" | "sessions")[];
-  hiddenSections?: ("blocks" | "tokens" | "sessions")[];
+  sections?: PanelSectionId[];
+  hiddenSections?: PanelSectionId[];
   countdown?: boolean;
   blocks?: Record<string, PanelBlockLayout>;
   style?: {
@@ -48,6 +60,8 @@ export interface PanelLayout {
     /** Preferred model order; newly observed models follow in their natural order. */
     modelOrder?: string[];
   };
+  quotaHistory?: PanelFilterLayout & { period?: "day" | "week" | "month" };
+  planValue?: PanelFilterLayout;
   hud?: { agents?: string[] };
   /** Controls an agent added from get_hud's catalog, by id; `sections` and `order`
    * place them among the panel's sections or its blocks. */

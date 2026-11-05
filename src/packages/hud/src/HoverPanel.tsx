@@ -19,17 +19,16 @@ import { useGround } from "./ground";
 import { PanelDraftBar } from "./panel/PanelDraftBar";
 import { PanelFooter } from "./panel/PanelFooter";
 import { QuotaBlocks, usePanelBlocks } from "./panel/QuotaBlocks";
-import { SourceSessions } from "./panel/SessionsSection";
 import {
   densityMetrics,
   inPanelOrder,
   palette,
   type Logo,
 } from "./panel/theme";
-import { SourceTokenChart } from "./panel/TokenChartSection";
+import { OwnSection, ownSectionShown } from "./panel/OwnSection";
 import { SourceIndexing } from "./panel/IndexingSection";
 import { CustomControl } from "./panel/custom/CustomControl";
-import { heldSections } from "./panel/custom/custom-data";
+import { heldSections, SECTIONS } from "./panel/custom/custom-data";
 import { snapshotLanguage } from "@agent-hud/ui/format";
 
 export { SOURCE_PANEL } from "./panel/theme";
@@ -141,36 +140,21 @@ export const SourceHoverPanel = memo(function SourceHoverPanel({
           />
         )
       );
-    if (key === "tokens")
-      return (
-        config.tokenUsage && (
-          <SourceTokenChart
-            snapshot={snapshot}
-            focusVendor={focusVendor}
-            light={light}
-            Logo={Logo}
-            layout={config.panelLayout.tokens}
-            active={active}
-            bare={bare}
-          />
-        )
-      );
-    if (key === "sessions")
-      return (
-        config.sessionList && (
-          <SourceSessions
-            snapshot={snapshot}
-            focusVendor={focusVendor}
-            light={light}
-            Logo={Logo}
-            onStats={onStats}
-            layout={config.panelLayout.sessions}
-            active={active}
-            bare={bare}
-          />
-        )
-      );
-    return null;
+    return (
+      ownSectionShown(key, config) && (
+        <OwnSection
+          id={key}
+          config={config}
+          snapshot={snapshot}
+          focusVendor={focusVendor}
+          light={light}
+          Logo={Logo}
+          onStats={onStats}
+          active={active}
+          bare={bare}
+        />
+      )
+    );
   };
   // A section a row, column or grid of an agent's holds is drawn there instead.
   const held = new Set(
@@ -184,9 +168,10 @@ export const SourceHoverPanel = memo(function SourceHoverPanel({
     custom?: boolean;
   }>(
     [
-      ...["blocks", "tokens", "sessions"]
-        .filter((key) => !held.has(key))
-        .map((key) => ({ key, content: sectionContent(key) })),
+      ...SECTIONS.filter((key) => !held.has(key)).map((key) => ({
+        key,
+        content: sectionContent(key),
+      })),
       ...((config.panelSections ?? []) as string[])
         .filter((key) => custom[key] && custom[key].hidden !== true)
         .map((key) => ({ key, content: true, custom: true })),

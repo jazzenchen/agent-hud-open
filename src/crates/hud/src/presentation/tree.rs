@@ -13,58 +13,18 @@
 mod check;
 mod edits;
 mod read;
+mod section;
 mod vocabulary;
 
-use super::rules::{quoted, strings, whole, Block, Kind, SECTIONS};
+use super::rules::{quoted, strings, whole, Block, Kind, ADDED_SECTIONS, SECTIONS};
 use super::*;
 pub(super) use edits::apply;
 pub(super) use read::layout_from;
+use section::section_node;
 pub(super) use vocabulary::catalog;
 use vocabulary::*;
 
 // MARK: Layout to tree
-
-/// The layout's own field of a section, as the tree shows it.
-fn section_node(layout: &Value, id: &str, hidden: bool) -> Value {
-    let mut node = Map::new();
-    node.insert("id".into(), json!(id));
-    node.insert("type".into(), json!(id));
-    match id {
-        "tokens" => {
-            let tokens = &layout["tokens"];
-            node.insert(
-                "period".into(),
-                json!(tokens["period"].as_str().unwrap_or("day")),
-            );
-            for key in ["agents", "models", "hiddenModels", "modelOrder"] {
-                if tokens[key].is_array() {
-                    node.insert(key.into(), tokens[key].clone());
-                }
-            }
-        }
-        "sessions" => {
-            let sessions = &layout["sessions"];
-            node.insert(
-                "limit".into(),
-                json!(whole(&sessions["limit"]).unwrap_or(5)),
-            );
-            node.insert(
-                "period".into(),
-                json!(sessions["period"].as_str().unwrap_or("day")),
-            );
-            for key in ["agents", "projects"] {
-                if sessions[key].is_array() {
-                    node.insert(key.into(), sessions[key].clone());
-                }
-            }
-        }
-        _ => {}
-    }
-    if hidden {
-        node.insert("hidden".into(), json!(true));
-    }
-    Value::Object(node)
-}
 
 /// A block as the tree shows it: its kind, the widget it is drawn with and what the
 /// layout sets for it; a block that is away exactly as the layout holds it.
@@ -152,6 +112,13 @@ pub(super) fn tree(layout: &Value, present: &[Block]) -> Value {
     let layout = rules::normalize_layout(layout).unwrap_or_else(|_| json!({}));
     let custom = custom_of(&layout);
     let mut sections = strings(&layout["sections"]);
+    // An added section the layout does not name is hidden (`normalize_layout`).
+    let mut hidden = strings(&layout["hiddenSections"]);
+    for section in ADDED_SECTIONS {
+        if !sections.iter().any(|s| s == section) {
+            hidden.push((*section).to_owned());
+        }
+    }
     for section in SECTIONS {
         if !sections.iter().any(|s| s == section) {
             sections.push((*section).to_owned());
@@ -171,7 +138,6 @@ pub(super) fn tree(layout: &Value, present: &[Block]) -> Value {
             held_sections(node, &mut held);
         }
     }
-    let hidden = strings(&layout["hiddenSections"]);
     let mut children = vec![];
     for id in &sections {
         if held.contains(id) {
@@ -267,8 +233,13 @@ pub(super) fn carry(document: &mut Value, current: &Value) {
     for key in ["sections", "order"] {
         let previous = strings(&current[key]);
         let mut list = strings(&document[key]);
+        // Not the added sections, which a layout that names none keeps hidden.
         if key == "sections" && list.is_empty() {
-            list = SECTIONS.iter().map(|s| (*s).to_owned()).collect();
+            list = SECTIONS
+                .iter()
+                .filter(|s| !ADDED_SECTIONS.contains(s))
+                .map(|s| (*s).to_owned())
+                .collect();
         }
         keep_places(&mut list, &previous, &kept);
         document[key] = json!(list);

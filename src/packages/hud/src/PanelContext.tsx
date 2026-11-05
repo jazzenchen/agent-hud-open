@@ -9,6 +9,8 @@ import {
 import type { EndsLink } from "./ends/ends-link";
 export type { EndsLink, EndsOp } from "./ends/ends-link";
 import type {
+  PlanValueQuery,
+  QuotaHistoryQuery,
   Session,
   SourcePreferences,
   SessionsQuery,
@@ -16,6 +18,9 @@ import type {
   StatisticsQuery,
   StatisticsResponse,
 } from "@agent-hud/protocol";
+/** What a panel section asks Core. */
+export type PanelQueryMethod =
+  "statistics" | "sessions" | "quota_history" | "plan_value";
 import {
   noAnswer,
   settled,
@@ -24,7 +29,7 @@ import {
 } from "./panel-answers";
 export interface PanelServices {
   query(
-    method: "statistics" | "sessions",
+    method: PanelQueryMethod,
     params: Record<string, unknown>,
   ): Promise<unknown>;
   selectSession?(session: Session): void;
@@ -75,8 +80,8 @@ const latest = new Map<string, unknown>();
  * asked still counts while none newer has come (`settled`): while Core indexes,
  * its revision moves every 2 s and answers can take longer than that. */
 export function usePanelQuery<T>(
-  method: "statistics" | "sessions",
-  params: StatisticsQuery | SessionsQuery,
+  method: PanelQueryMethod,
+  params: StatisticsQuery | SessionsQuery | QuotaHistoryQuery | PlanValueQuery,
   revision: number | undefined,
   enabled: boolean,
 ) {

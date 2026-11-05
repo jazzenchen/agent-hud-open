@@ -1,6 +1,7 @@
 /* The panel that opens from the HUD on the selected screen: its density, its
- * three sections (each row shows or hides one, moves it up or down, and has a
- * small sample under it), and the order of the agent blocks. */
+ * sections (each row shows or hides one and moves it up or down; the first
+ * three have a small sample under them, and the quota history and the plan
+ * value are off until asked for), and the order of the agent blocks. */
 import { Fragment } from "react";
 import type { Snapshot } from "@agent-hud/protocol";
 import { Switch } from "@agent-hud/ui/components/switch";
@@ -10,6 +11,12 @@ import {
   defaultHUDConfig,
   type HUDConfig,
 } from "@agent-hud/hud/model";
+import {
+  addedSectionShown,
+  isAddedSection,
+  withAddedSection,
+  type AddedSection,
+} from "@agent-hud/hud/panel/added-sections";
 import { MoreRows, Row, Section } from "../SettingsPrimitives";
 import { Segments, ToggleRow } from "../SettingsControls";
 import { PartSample } from "../PartSample";
@@ -23,10 +30,10 @@ const sectionSettings = {
   sessions: { setting: "sessionList", sample: "sessions" },
 } as const;
 
-type PanelSectionKey = keyof typeof sectionSettings;
+type PanelSectionKey = keyof typeof sectionSettings | AddedSection;
 
 const builtIn = (key: string): key is PanelSectionKey =>
-  Object.hasOwn(sectionSettings, key);
+  Object.hasOwn(sectionSettings, key) || isAddedSection(key);
 
 export function PanelSection({
   snapshot,
@@ -39,6 +46,8 @@ export function PanelSection({
     blocks: t("Quota details", "额度明细"),
     tokens: t("Token usage", "Token 消耗"),
     sessions: t("Session list", "会话列表"),
+    quotaHistory: t("Quota history", "额度历史"),
+    planValue: t("Plan value", "订阅价值"),
   };
   // Saved order first; a section the saved order lacks keeps its default place.
   // A section an agent added to the panel has no row here and keeps its place
@@ -113,19 +122,35 @@ export function PanelSection({
         />
       </Row>
       {sections.map((section, index) => {
-        const { setting, sample } = sectionSettings[section];
         const name = sectionNames[section];
+        const added = isAddedSection(section);
+        const shown = added
+          ? addedSectionShown(config.panelLayout, section)
+          : config[sectionSettings[section].setting];
+        const show = (value: boolean) =>
+          isAddedSection(section)
+            ? update({
+                panelLayout: withAddedSection(
+                  config.panelLayout,
+                  order,
+                  section,
+                  value,
+                ),
+              })
+            : update({ [sectionSettings[section].setting]: value });
         return (
           <Fragment key={section}>
             <Row
               title={name}
               below={
-                <PartSample
-                  kind={sample}
-                  enabled={config[setting]}
-                  config={config}
-                  t={t}
-                />
+                !isAddedSection(section) && (
+                  <PartSample
+                    kind={sectionSettings[section].sample}
+                    enabled={shown}
+                    config={config}
+                    t={t}
+                  />
+                )
               }
             >
               <ReorderButtons
@@ -137,8 +162,8 @@ export function PanelSection({
               />
               <Switch
                 aria-label={name}
-                checked={config[setting]}
-                onCheckedChange={(value) => update({ [setting]: value })}
+                checked={shown}
+                onCheckedChange={show}
               />
             </Row>
             {section === "blocks" && (

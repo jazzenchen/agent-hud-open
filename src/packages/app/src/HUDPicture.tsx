@@ -18,7 +18,12 @@ import {
   presentationStore,
   type PresentationState,
 } from "./lib/use-hud-config";
-import { PictureQueries, QUERY_DEADLINE_MS } from "./lib/picture-queries";
+import {
+  maskedAnswer,
+  PictureQueries,
+  QUERY_DEADLINE_MS,
+  type PanelQuery,
+} from "./lib/picture-queries";
 interface Job {
   id: string;
   params: { screen?: string; show?: string; agent?: string };
@@ -89,24 +94,9 @@ export default function HUDPicture() {
   const queries = useRef(new PictureQueries());
   const services = useMemo(
     () => ({
-      query: (
-        method: "statistics" | "sessions",
-        params: Record<string, unknown>,
-      ) => {
+      query: (method: PanelQuery, params: Record<string, unknown>) => {
         const promise = invoke("native_request", { method, params }).then(
-          (value) => {
-            if (method !== "sessions") return value;
-            const response = value as { items: Snapshot["sessions"] };
-            return {
-              ...response,
-              items: response.items.map((session, index) => ({
-                ...session,
-                title: `Session ${index + 1}`,
-                cwd: null,
-                logPath: null,
-              })),
-            };
-          },
+          (value) => maskedAnswer(method, value),
         );
         return queries.current.track(method, promise);
       },
