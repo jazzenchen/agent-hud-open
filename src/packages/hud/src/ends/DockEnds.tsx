@@ -105,7 +105,6 @@ export function DockEnds({
   }, [collapsed, pointerInside]);
 
   const rowDark = notch && config.hasNotch;
-  const across = notch || edge === "top" || edge === "bottom";
   return (
     <>
       <AnimatePresence>
@@ -117,7 +116,6 @@ export function DockEnds({
               rect={geometry[side]}
               count={counts[side]}
               mode={config.mode}
-              across={across}
               light={rowDark ? false : light}
               fill={fill}
               outline={outline}

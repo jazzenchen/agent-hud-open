@@ -24,27 +24,30 @@ const WING_PADDING = 7;
 const clamp = (value: number, low: number, high: number) =>
   Math.min(high, Math.max(low, value));
 
-/** An end's long side for `count`: an icon and the number, in a pill that is
- * never shorter than it is thick. */
-export function endLength(thick: number, count: number): number {
-  const digits = count > 99 ? 3 : String(Math.max(1, count)).length;
-  const icon = Math.round(thick * 0.46);
-  const number = digits * thick * 0.32;
-  return Math.max(
-    thick,
-    Math.round(thick * 0.56 + icon + thick * 0.08 + number),
-  );
+/** An end of `thick` holds its icon alone, a little smaller than the dock's
+ * logos; the number sits in a small badge on its top-right edge. */
+export function endBadge(thick: number, count: number) {
+  const size = Math.max(12, Math.round(thick * 0.46));
+  return {
+    icon: Math.max(8, Math.round(thick * 0.4)),
+    size,
+    font: Math.max(8, Math.round(size * 0.68)),
+    label: count > 99 ? "99+" : String(count),
+    /** The badge's centre, from the end's top-left corner. */
+    x: thick * 0.85,
+    y: thick * 0.15,
+  };
 }
 
-/** The ends of the dock (`strip`) on `edge`: the head before its first mark,
+/** The ends of the dock (`strip`) on `edge`, each a circle: the head before its first mark,
  * the tail after its last. Where the screen has no room on one side, both go
  * to the other, the head always first. In notch mode they sit inside the
  * notch, which grows sideways (`wings`) for the ones that show. */
 export function dockEnds(
   strip: HUDRect,
   edge: HUDEdge,
-  config: Pick<HUDConfig, "mode">,
-  metrics: Pick<StripMetrics, "logo">,
+  config: Pick<HUDConfig, "mode" | "simpleSize">,
+  metrics: Pick<StripMetrics, "logo" | "mark" | "padding">,
   screen: { width: number; height: number },
   counts: Record<EndSide, number>,
 ): DockEndsGeometry {
@@ -52,21 +55,26 @@ export function dockEnds(
   const across = notch || edge === "top" || edge === "bottom";
   const band =
     config.mode === "simple" ? simplePanelRect(strip, edge) : { ...strip };
+  // A Simple dock's circle is as thick as its row of rings with their
+  // padding, which a side edge's wider panel (numbers beside the rings)
+  // leaves the same.
+  const simple =
+    metrics.mark +
+    2 * Math.max(3, Math.round(clamp(config.simpleSize, 20, 60) * 0.18));
   const thick = notch
     ? clamp(strip.height - 12, 18, 26)
     : config.mode === "simple"
-      ? across
-        ? band.height
-        : band.width
+      ? simple
       : clamp(Math.round(metrics.logo * 0.86), 18, 44);
-  const length = {
-    head: endLength(thick, counts.head),
-    tail: endLength(thick, counts.tail),
-  };
-  // The pill's place across the dock: centred on the dock's own band.
+  // Each end is a circle as thick as the dock.
+  const length = { head: thick, tail: thick };
+  // The circle's place across the dock: centred on the dock's own band, or
+  // on a side edge's Simple panel, on its column of rings.
   const cross = across
     ? band.y + band.height / 2 - thick / 2
-    : band.x + band.width / 2 - thick / 2;
+    : config.mode === "simple"
+      ? band.x + metrics.padding.left + metrics.mark / 2 - thick / 2
+      : band.x + band.width / 2 - thick / 2;
   const start = across ? strip.x : strip.y;
   const end = across ? strip.x + strip.width : strip.y + strip.height;
   const limit = across ? screen.width : screen.height;

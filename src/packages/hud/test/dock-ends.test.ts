@@ -4,7 +4,7 @@ import type { IslandEvent } from "@agent-hud/protocol";
 import {
   dockEnds,
   endAnchor,
-  endLength,
+  endBadge,
   ringPath,
 } from "../src/ends/end-geometry.ts";
 import {
@@ -18,12 +18,32 @@ import {
 } from "../src/ends/end-queue.ts";
 
 const screen = { width: 1600, height: 1000 };
+const logos = {
+  logo: 30,
+  mark: 30,
+  padding: { top: 0, right: 0, bottom: 0, left: 0 },
+};
 const both = { head: 1, tail: 1 };
 
-test("an end is a pill never shorter than it is thick, longer for more digits", () => {
-  assert.ok(endLength(26, 1) >= 26);
-  assert.ok(endLength(26, 12) > endLength(26, 3));
-  assert.ok(endLength(26, 120) > endLength(26, 12));
+test("an end is a circle as thick as the dock, its number in a badge on the edge", () => {
+  const strip = { x: 700, y: 960, width: 200, height: 40 };
+  const ends = dockEnds(
+    strip,
+    "bottom",
+    { mode: "logos", simpleSize: 26 },
+    logos,
+    screen,
+    {
+      head: 3,
+      tail: 12,
+    },
+  );
+  assert.equal(ends.head.width, ends.head.height);
+  assert.equal(ends.tail.width, ends.thick);
+  assert.equal(endBadge(26, 1).label, "1");
+  assert.equal(endBadge(26, 120).label, "99+");
+  // The badge sits on the circle's top-right edge.
+  assert.ok(endBadge(26, 1).x > 13 && endBadge(26, 1).y < 13);
 });
 
 test("on a bottom dock the head sits before the first mark, the tail after the last", () => {
@@ -31,8 +51,8 @@ test("on a bottom dock the head sits before the first mark, the tail after the l
   const ends = dockEnds(
     strip,
     "bottom",
-    { mode: "logos" },
-    { logo: 30 },
+    { mode: "logos", simpleSize: 26 },
+    logos,
     screen,
     both,
   );
@@ -48,14 +68,14 @@ test("on a side dock the head is above and the tail below, standing upright", ()
   const ends = dockEnds(
     strip,
     "right",
-    { mode: "logos" },
-    { logo: 30 },
+    { mode: "logos", simpleSize: 26 },
+    logos,
     screen,
     both,
   );
   assert.ok(ends.head.y + ends.head.height <= strip.y - 6);
   assert.ok(ends.tail.y >= strip.y + strip.height + 6);
-  assert.ok(ends.head.height >= ends.head.width);
+  assert.equal(ends.head.height, ends.head.width);
 });
 
 test("a dock against the screen's start keeps both ends after it, head first", () => {
@@ -63,8 +83,8 @@ test("a dock against the screen's start keeps both ends after it, head first", (
   const ends = dockEnds(
     strip,
     "bottom",
-    { mode: "logos" },
-    { logo: 30 },
+    { mode: "logos", simpleSize: 26 },
+    logos,
     screen,
     both,
   );
@@ -77,8 +97,8 @@ test("a dock against the screen's end keeps both ends before it, head first", ()
   const ends = dockEnds(
     strip,
     "bottom",
-    { mode: "logos" },
-    { logo: 30 },
+    { mode: "logos", simpleSize: 26 },
+    logos,
     screen,
     both,
   );
@@ -86,27 +106,37 @@ test("a dock against the screen's end keeps both ends before it, head first", ()
   assert.ok(ends.head.x + ends.head.width < ends.tail.x);
 });
 
-test("a Simple dock's ends are as thick as its panel, on the panel's line", () => {
-  const strip = { x: 700, y: 970, width: 200, height: 30 };
-  const ends = dockEnds(
-    strip,
-    "bottom",
-    { mode: "simple" },
-    { logo: 0 },
-    screen,
-    both,
-  );
-  // The panel leaves 3 points at the parked edge.
-  assert.equal(ends.thick, 27);
-  assert.equal(ends.tail.y, 970);
+test("a Simple dock's ends are as thick as its row of rings, on its ring column", () => {
+  const rings = {
+    logo: 14,
+    mark: 26,
+    padding: { top: 5, right: 12, bottom: 5, left: 6 },
+  };
+  const config = { mode: "simple" as const, simpleSize: 26 };
+  const bottom = { x: 700, y: 961, width: 200, height: 39 };
+  const ends = dockEnds(bottom, "bottom", config, rings, screen, both);
+  assert.equal(ends.thick, 36);
+  assert.equal(ends.tail.y, 961);
+  // A side edge's panel is wider with its numbers; the circle stays the same.
+  const right = { x: 1520, y: 400, width: 80, height: 200 };
+  const side = dockEnds(right, "right", config, rings, screen, both);
+  assert.equal(side.thick, 36);
+  assert.equal(side.head.x + side.head.width / 2, 1520 + 6 + 13);
 });
 
 test("the notch grows sideways only for the ends that show, holding them inside", () => {
   const strip = { x: 700, y: 0, width: 200, height: 32 };
-  const ends = dockEnds(strip, "top", { mode: "notch" }, { logo: 0 }, screen, {
-    head: 0,
-    tail: 3,
-  });
+  const ends = dockEnds(
+    strip,
+    "top",
+    { mode: "notch", simpleSize: 26 },
+    logos,
+    screen,
+    {
+      head: 0,
+      tail: 3,
+    },
+  );
   assert.equal(ends.wings.head, 0);
   assert.ok(ends.wings.tail > ends.tail.width);
   assert.ok(ends.tail.x > strip.x + strip.width);
