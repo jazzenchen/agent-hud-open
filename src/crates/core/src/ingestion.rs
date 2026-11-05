@@ -168,7 +168,15 @@ impl AgentHudCore {
     pub(crate) fn read_projection_sources(&mut self) {
         self.projection_sources = self.projection_sources.wrapping_add(1);
         self.claude_desktop.index.refresh(&self.provider_roots);
-        self.claude_desktop.jobs = crate::claude_jobs::ClaudeJobs::read(&self.provider_roots);
+        // A hook can bring this pass on without a collection: the jobs are
+        // placed by the processes as they are now.
+        self.claude_desktop
+            .processes
+            .refresh(&self.provider_roots, crate::snapshot::wall_clock_ms());
+        self.claude_desktop.jobs = crate::claude_jobs::ClaudeJobs::read(
+            &self.provider_roots,
+            &self.claude_desktop.processes,
+        );
         for head in self.logs.values_mut() {
             // The demo's logs are archived or not as the sample has them.
             if head.source == "claude" && !crate::demo::is_demo(&head.path) {

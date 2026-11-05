@@ -7,6 +7,7 @@ pub(super) struct Presentation<'a> {
     claude_desktop: &'a agent_hud_agents::claude::transcript::ClaudeDesktopIndex,
     claude_projects_supported: bool,
     claude_jobs: &'a claude_jobs::ClaudeJobs,
+    claude_processes: &'a agent_hud_agents::claude::processes::ClaudeProcesses,
     discovery: &'a [ProviderDiscovery],
     pending: HashMap<String, HashMap<String, Vec<Value>>>,
     native_waiting: HashMap<String, HashSet<String>>,
@@ -19,6 +20,7 @@ impl AgentHudCore {
             claude_desktop: &self.claude_desktop.index,
             claude_projects_supported: self.claude_projects_supported,
             claude_jobs: &self.claude_desktop.jobs,
+            claude_processes: &self.claude_desktop.processes,
             discovery: &self.discovery,
             pending: self.requests.session_attention(),
             native_waiting: self.requests.native_waiting_sessions(),
@@ -40,8 +42,19 @@ impl Presentation<'_> {
     /// `client` is the client the session's log last named (Claude Code's
     /// `entrypoint`), which decides between a hook origin and a newer log;
     /// `prompts` are the log's first and latest prompts, which hooks and
-    /// deliveries tell where they were typed.
+    /// deliveries tell where they were typed. A Claude Code session whose
+    /// process has gone is settled last, over whatever the evidence said.
     pub(super) fn overlay(
+        &self,
+        session: &mut Value,
+        own_line: Option<i64>,
+        client: Option<&str>,
+        prompts: &surfaces::PromptStamps,
+    ) {
+        self.overlay_evidence(session, own_line, client, prompts);
+        crate::clients::claude_processes::settle(session, self.claude_processes);
+    }
+    fn overlay_evidence(
         &self,
         session: &mut Value,
         own_line: Option<i64>,
@@ -209,6 +222,12 @@ impl Presentation<'_> {
     /// The same evidence overlay as a rendered row, without serializing every
     /// head during list filtering. Only hook-backed heads need a temporary row.
     pub(super) fn session_state(&self, log: &LogHead, child: Option<i64>) -> &'static str {
+        if log.source == "claude" && self.claude_processes.ended(&log.id, log.live.last_event()) {
+            return match log.live.session_state(self.now, &log.source, child) {
+                "unverified" => "unverified",
+                _ => "idle",
+            };
+        }
         if self.pending(&log.source, &log.id).is_some() || self.native_waiting(&log.source, &log.id)
         {
             return "waiting";

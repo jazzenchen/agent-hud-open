@@ -62,6 +62,7 @@ impl AgentHudCore {
             self.statistics.revision,
             self.requests.revision(),
             self.hook_events.clock_fingerprint(now),
+            self.claude_desktop.processes.revision(),
         );
         if self
             .sessions_checked
@@ -119,6 +120,7 @@ impl AgentHudCore {
         let mut hash = std::collections::hash_map::DefaultHasher::new();
         self.requests.revision().hash(&mut hash);
         self.hook_events.clock_fingerprint(now).hash(&mut hash);
+        self.claude_desktop.processes.revision().hash(&mut hash);
         unlisted.hash(&mut hash);
         (logs.len(), listed).hash(&mut hash);
         let fingerprint = hash.finish();

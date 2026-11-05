@@ -1,9 +1,11 @@
 //! Claude Code background jobs (`claude --bg`): which sessions a job runs and
 //! who else holds them, from Claude Code's own records: `jobs/<job>/state.json`
 //! names the job's session, and every live Claude Code process writes
-//! `sessions/<pid>.json` with its session and `kind` (`bg` for a job). A job
-//! has no window to return to; returning to one moves it into the desktop app.
-//! Only a collection pass reads them, like the desktop app's session index.
+//! `sessions/<pid>.json` with its session and `kind` (`bg` for a job), as the
+//! process registry reads it. A job has no window to return to; returning to
+//! one moves it into the desktop app. Only a collection pass reads them, like
+//! the desktop app's session index.
+use super::processes::{config_homes, ClaudeProcesses};
 use serde_json::{json, Value};
 use std::{
     collections::{HashMap, HashSet},
@@ -36,20 +38,23 @@ pub enum JobPlace {
 }
 
 impl ClaudeJobs {
-    pub fn read(provider_roots: &[(PathBuf, &'static str)]) -> Self {
-        let mut configs = Vec::new();
-        for (root, source) in provider_roots {
-            if *source == "claude" {
-                if let Some(config) = root.parent() {
-                    if !configs.contains(&config.to_path_buf()) {
-                        configs.push(config.to_path_buf());
-                    }
+    pub fn read(provider_roots: &[(PathBuf, &'static str)], processes: &ClaudeProcesses) -> Self {
+        let mut read = Self::default();
+        for config in config_homes(provider_roots) {
+            read.read_config(&config);
+        }
+        for process in processes.processes() {
+            // `bg` is the job itself; the background service's own
+            // processes say `daemon` or `daemon-worker`.
+            match (process.kind, process.entrypoint) {
+                (Some("bg" | "daemon" | "daemon-worker") | None, _) => {}
+                (_, Some("claude-desktop" | "claude-desktop-3p")) => {
+                    read.desktop.insert(process.session.to_owned());
+                }
+                _ => {
+                    read.other.insert(process.session.to_owned());
                 }
             }
-        }
-        let mut read = Self::default();
-        for config in configs {
-            read.read_config(&config);
         }
         read
     }
@@ -79,33 +84,6 @@ impl ClaudeJobs {
                 self.jobs.entry(session.to_owned()).or_insert(job);
             }
         }
-        if let Ok(entries) = fs::read_dir(config.join("sessions")) {
-            for entry in entries.flatten() {
-                let path = entry.path();
-                if path.extension().and_then(|e| e.to_str()) != Some("json")
-                    || small_file(&path).is_none()
-                {
-                    continue;
-                }
-                let Some(process) = read_json(&path) else {
-                    continue;
-                };
-                let Some(session) = process["sessionId"].as_str().filter(|s| uuid(s)) else {
-                    continue;
-                };
-                // `bg` is the job itself; the background service's own
-                // processes say `daemon` or `daemon-worker`.
-                match (process["kind"].as_str(), process["entrypoint"].as_str()) {
-                    (Some("bg" | "daemon" | "daemon-worker") | None, _) => {}
-                    (_, Some("claude-desktop" | "claude-desktop-3p")) => {
-                        self.desktop.insert(session.to_owned());
-                    }
-                    _ => {
-                        self.other.insert(session.to_owned());
-                    }
-                }
-            }
-        }
     }
     /// Where the session of a background job is; none for a session no job ran.
     pub fn place(&self, session: &str) -> Option<JobPlace> {
@@ -120,7 +98,7 @@ impl ClaudeJobs {
     }
 }
 
-fn small_file(path: &Path) -> Option<fs::Metadata> {
+pub(super) fn small_file(path: &Path) -> Option<fs::Metadata> {
     fs::symlink_metadata(path)
         .ok()
         .filter(|meta| meta.is_file() && meta.len() <= 1024 * 1024)
@@ -135,7 +113,7 @@ fn job_name(name: &str) -> bool {
             .bytes()
             .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
 }
-fn uuid(value: &str) -> bool {
+pub(super) fn uuid(value: &str) -> bool {
     value.len() == 36
         && value.bytes().enumerate().all(|(i, b)| {
             if matches!(i, 8 | 13 | 18 | 23) {
@@ -161,7 +139,12 @@ mod tests {
         let config = temp.path().join(".claude");
         let roots = vec![(config.join("projects"), "claude")];
         let id = "11111111-2222-4333-8444-555555555555";
-        assert_eq!(ClaudeJobs::read(&roots).place(id), None);
+        let read = |roots: &[(PathBuf, &'static str)]| {
+            let mut processes = ClaudeProcesses::default();
+            processes.refresh(roots, 0);
+            ClaudeJobs::read(roots, &processes)
+        };
+        assert_eq!(read(&roots).place(id), None);
         write(
             &config.join("jobs/abc123/state.json"),
             json!({"state":"done","sessionId":id}),
@@ -174,10 +157,10 @@ mod tests {
             &config.join("jobs/nosession/state.json"),
             json!({"state":"done"}),
         );
-        let read = ClaudeJobs::read(&roots);
-        assert_eq!(read.jobs.len(), 1);
+        let jobs = read(&roots);
+        assert_eq!(jobs.jobs.len(), 1);
         assert_eq!(
-            read.place(id),
+            jobs.place(id),
             Some(JobPlace::Job(
                 json!({"kind":"claude-background-job","id":id,"job":"abc123"})
             ))
@@ -187,9 +170,6 @@ mod tests {
             &config.join("sessions/7.json"),
             json!({"pid":7,"sessionId":id,"kind":"daemon-worker"}),
         );
-        assert!(matches!(
-            ClaudeJobs::read(&roots).place(id),
-            Some(JobPlace::Job(_))
-        ));
+        assert!(matches!(read(&roots).place(id), Some(JobPlace::Job(_))));
     }
 }

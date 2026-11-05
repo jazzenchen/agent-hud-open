@@ -71,6 +71,12 @@ impl crate::AgentHudCore {
         if self.claude_desktop.index.refresh(&self.provider_roots) {
             self.usage_projection = None;
         }
+        // So is Claude Code's process registry, so that a session whose
+        // process has gone stops running or waiting within a pass, not after
+        // the transcript's half hour.
+        self.claude_desktop
+            .processes
+            .refresh(&self.provider_roots, wall_clock_ms());
         if self.usage_projection.is_none() {
             self.read_projection_sources();
         }
@@ -116,6 +122,7 @@ impl crate::AgentHudCore {
         self.render.accounts.hash(&mut hash);
         self.hook_events.revision().hash(&mut hash);
         self.requests.revision().hash(&mut hash);
+        self.claude_desktop.processes.revision().hash(&mut hash);
         self.settings.to_string().hash(&mut hash);
         self.source_notice.hash(&mut hash);
         self.storage_issue.hash(&mut hash);

@@ -107,7 +107,7 @@ pub struct AgentHudCore {
     sessions_revision: u64,
     sessions_fingerprint: Option<u64>,
     /// What the session fingerprint was last worked out from, and when.
-    sessions_checked: Option<((u64, u64, u64), i64)>,
+    sessions_checked: Option<((u64, u64, u64, u64), i64)>,
     /// The listed session rows of the last render and what they were built
     /// from; a render with no session input changed reuses them.
     listed_rows: Option<(u64, snapshot::ListedRows)>,

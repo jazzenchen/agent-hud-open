@@ -61,6 +61,15 @@ hook, for up to 30 minutes, since a turn that asked for the user reports
 nothing until they answer. They carry `usageStatus: "unavailable"` and no
 tokens, and leave the lists like any other session.
 
+Claude Code registers each live process in `sessions/<pid>.json` under its
+config home and removes the file as it exits, a closed terminal tab included.
+Every collection pass reads that registry (a file again only when it changed).
+A session that had a process and has none left, with no event after the exit
+was seen, stops running or waiting at once: it is idle, with no requests and no
+attention, as the transcript's abandonment would show it 30 minutes later. A
+process killed outright leaves its file behind, so that session still waits
+for the 30 minutes.
+
 `session_detail {id}` loads only the requested parser checkpoint and returns
 its session, recorded usage entries, parent and children, including relationships
 outside the HUD projection. With the usage ledger it also returns `sessionUsage`,

@@ -147,6 +147,9 @@ impl crate::AgentHudCore {
 pub(crate) struct ClaudeDesktop {
     pub(crate) index: ClaudeDesktopIndex,
     pub(crate) jobs: crate::claude_jobs::ClaudeJobs,
+    /// Claude Code's live processes, desktop and terminal alike: which
+    /// sessions lost theirs.
+    pub(crate) processes: agent_hud_agents::claude::processes::ClaudeProcesses,
     /// The cards of the app's questions, by request id: the question's key
     /// (its session and call) and the ticket that keeps the card answerable.
     pub(crate) asks: HashMap<String, (String, crate::requests::Ticket)>,

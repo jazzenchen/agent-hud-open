@@ -10,6 +10,7 @@ pub mod jobs;
 mod live;
 pub mod plans;
 pub mod process;
+pub mod processes;
 pub mod project_origin;
 mod quota_windows;
 pub mod routes;
