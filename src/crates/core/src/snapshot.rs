@@ -55,7 +55,9 @@ impl crate::AgentHudCore {
     /// session list joins, and the notice the snapshot carries.
     pub(crate) fn collect(&mut self) {
         let previous_pending = self.reads.pending.len();
+        let started = std::time::Instant::now();
         let notice = self.scan(None).err();
+        self.pace_reads(started.elapsed());
         if previous_pending != self.reads.pending.len() {
             self.usage_projection = None;
         }
@@ -223,8 +225,14 @@ impl crate::AgentHudCore {
         let pending_meter = self.pending_meter_bounds();
         // Pausing a failed read stops the indexing timer, but does not make
         // its unread history complete. Consumers use this fact, not notices.
-        let (bytes_done, bytes_total) =
-            data_version::progress(&self.reads.listing.files, &self.logs, now);
+        let files = &self.reads.listing.files;
+        let (bytes_done, bytes_total) = data_version::progress(files, &self.logs);
+        // How far back a run has read, by day: only while one runs.
+        let (oldest, unread) = self.indexing_run.map_or((None, None), |_| {
+            data_version::reach(files, &self.logs, |path| {
+                self.reads.failed.pausing(path, now)
+            })
+        });
         let indexing = json!({
             "complete": self.database.is_some()
                 && self.storage_issue.is_none()
@@ -234,6 +242,8 @@ impl crate::AgentHudCore {
             "dataVersion": crate::DATA_VERSION,
             "bytesDone": bytes_done,
             "bytesTotal": bytes_total,
+            "oldestLogAt": oldest.map(crate::iso),
+            "readBackTo": unread.map(crate::iso),
         });
         let quotas = self.quota_rows(at, now, &pending_meter);
         let relay_users = self.relay_users(at);

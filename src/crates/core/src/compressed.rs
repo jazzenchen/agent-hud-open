@@ -182,13 +182,12 @@ impl AgentHudCore {
                     self.logs.insert(to.clone(), head);
                     self.parser_cache.insert(log, bytes);
                     self.reads.pending.remove(&from);
-                    let now_ms = chrono::Utc::now().timestamp_millis();
                     if self
                         .reads
                         .listing
                         .files
                         .get(&to)
-                        .is_some_and(|file| due(self.logs.get(&to), file, now_ms))
+                        .is_some_and(|file| needs_read(self.logs.get(&to), file))
                     {
                         self.reads.pending.insert(to);
                     }

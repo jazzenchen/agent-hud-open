@@ -166,7 +166,7 @@ fn oversized_and_partial_records_are_bounded() {
 }
 
 #[test]
-fn logs_last_written_over_31_days_ago_are_not_read_and_keep_what_they_counted() {
+fn logs_of_any_age_are_read_newest_first_and_removed_ones_keep_what_they_counted() {
     use std::time::{Duration, SystemTime};
     let temp = tempfile::tempdir().unwrap();
     let home = temp.path();
@@ -181,18 +181,22 @@ fn logs_last_written_over_31_days_ago_are_not_read_and_keep_what_they_counted() 
             .unwrap();
     };
     let line = |session: &str, id: &str, pad: usize| json!({"sessionId":session,"type":"assistant","message":{"id":id,"usage":{"input_tokens":10,"output_tokens":3}},"pad":"x".repeat(pad)});
-    // Read once, while recent: its usage counts.
+    // Read once, while recent: their usage counts.
     let counted = root.join("counted.jsonl");
     fs::write(&counted, format!("{}\n", line("s1", "m1", 0))).unwrap();
+    let removed = root.join("removed.jsonl");
+    fs::write(&removed, format!("{}\n", line("s4", "m4", 0))).unwrap();
     let mut backend = fixture(home);
     assert_eq!(
         backend.request("snapshot", json!({})).unwrap()["totals"]["total"],
-        13
+        26
     );
     drop(backend);
-    // An earlier reader version's state on a log last written 40 days
-    // ago, never read, and one 20 days old too long for one pass.
-    age(&counted, 40);
+    // An earlier reader version's state on a log last written 400 days ago,
+    // one 300 days old never read, one 20 days old too long for one pass,
+    // and one removed since it was read.
+    age(&counted, 400);
+    fs::remove_file(&removed).unwrap();
     let ledger = rusqlite::Connection::open(home.join("app/ingestion.sqlite")).unwrap();
     ledger
         .execute(
@@ -202,9 +206,9 @@ fn logs_last_written_over_31_days_ago_are_not_read_and_keep_what_they_counted() 
         .unwrap();
     let old = root.join("old.jsonl");
     fs::write(&old, format!("{}\n", line("s2", "m2", 0))).unwrap();
-    age(&old, 40);
+    age(&old, 300);
     let unfinished = root.join("unfinished.jsonl");
-    let lines = (0..4)
+    let lines = (0..20)
         .map(|n| line("s3", &format!("m3-{n}"), 900_000).to_string() + "\n")
         .collect::<String>();
     fs::write(&unfinished, lines).unwrap();
@@ -212,27 +216,32 @@ fn logs_last_written_over_31_days_ago_are_not_read_and_keep_what_they_counted() 
 
     let mut backend = fixture(home);
     let snapshot = backend.request("snapshot", json!({})).unwrap();
-    assert!(
-        !backend.logs.contains_key(&old),
-        "a log last written over 31 days ago is not read"
-    );
-    let head = &backend.logs[&counted];
-    assert_eq!(head.parser_version, 6, "nor read again for a newer reader");
-    assert_eq!(head.usage.total(), 13, "what it counted stays");
     let partial = &backend.logs[&unfinished];
     assert!(
         partial.offset < partial.length,
         "a pass reads only part of a long log"
     );
+    assert!(
+        !backend.logs.contains_key(&old) && backend.logs[&counted].parser_version == 6,
+        "older logs wait for the newer one"
+    );
     assert!(backend.indexing(), "the rest waits for the next pass");
     assert_eq!(snapshot["indexing"]["complete"], false);
-    assert_eq!(snapshot["indexing"]["pending"], 1);
-    assert_eq!(snapshot["totals"]["total"], 13 + 3 * 13);
+    assert_eq!(snapshot["indexing"]["pending"], 3);
     let snapshot = backend.request("refresh", json!({})).unwrap();
     assert_eq!(
+        backend.logs[&counted].parser_version,
+        crate::PARSER_VERSION,
+        "a log of any age is read again for a newer reader"
+    );
+    assert!(
+        backend.logs.contains_key(&old),
+        "and one never read is read"
+    );
+    assert_eq!(
         snapshot["totals"]["total"],
-        13 + 4 * 13,
-        "a log within the retention is read to its end"
+        13 + 13 + 13 + 20 * 13,
+        "each log counted once, and the removed one's usage stays"
     );
     assert!(!backend.indexing());
     assert_eq!(snapshot["indexing"]["complete"], true);
@@ -658,7 +667,7 @@ fn a_ledger_is_indexed_with_its_progress_and_records_its_data_version() {
     };
     fs::write(
         root.join("long.jsonl"),
-        (0..4).map(line).collect::<String>(),
+        (0..20).map(line).collect::<String>(),
     )
     .unwrap();
     let bytes = |snapshot: &Value| {
@@ -675,8 +684,15 @@ fn a_ledger_is_indexed_with_its_progress_and_records_its_data_version() {
     assert_eq!(first["indexing"]["dataVersion"], crate::DATA_VERSION);
     let (done, total) = bytes(&first);
     assert!(done > 0 && done < total, "{}", first["indexing"]);
+    // The one log is as far back as the history goes, and still unread.
+    assert!(first["indexing"]["oldestLogAt"].is_string());
+    assert_eq!(
+        first["indexing"]["readBackTo"],
+        first["indexing"]["oldestLogAt"]
+    );
     let finished = backend.request("refresh", json!({})).unwrap();
     assert_eq!(finished["indexing"]["kind"], Value::Null);
+    assert_eq!(finished["indexing"]["readBackTo"], Value::Null);
     let (done, total) = bytes(&finished);
     assert_eq!(done, total);
     drop(backend);
@@ -717,7 +733,7 @@ fn a_ledger_is_indexed_with_its_progress_and_records_its_data_version() {
     assert_eq!(finished["indexing"]["kind"], Value::Null);
     assert_eq!(
         finished["totals"]["total"],
-        4 * 13,
+        20 * 13,
         "read again, counted once"
     );
 

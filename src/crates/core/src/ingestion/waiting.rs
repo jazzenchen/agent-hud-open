@@ -2,7 +2,19 @@
 //! watcher and hooks point at, and the cheap look between passes.
 use crate::{log_files, AgentHudCore};
 use chrono::Utc;
-use std::{collections::HashSet, path::PathBuf};
+use std::{collections::HashSet, path::PathBuf, time::Duration};
+
+/// What a pass reads at most while no log waits, in bytes.
+const PASS_BUDGET: u64 = 16 * 1024 * 1024;
+/// What a pass reads at most while logs wait to be read.
+const WAITING_BUDGET: u64 = 128 * 1024 * 1024;
+
+impl super::Reads {
+    /// How many bytes this pass may read.
+    pub(crate) fn budget(&self) -> u64 {
+        self.budget.unwrap_or(PASS_BUDGET)
+    }
+}
 
 impl AgentHudCore {
     /// Whether logs are still waiting to be read: while indexing, the
@@ -21,6 +33,24 @@ impl AgentHudCore {
             .iter()
             .filter(|path| !self.reads.failed.pausing(path, now))
             .count()
+    }
+
+    /// Paces reading after a pass whose reading took `took`. While logs wait,
+    /// the next pass may read twice as much after a quick pass and half as
+    /// much after a slow one, so a pass spends a quarter to half a second
+    /// reading on whatever computer this is, between 16 and 128 MB. Once none
+    /// waits, a pass reads 16 MB at most.
+    pub(crate) fn pace_reads(&mut self, took: Duration) {
+        let budget = self.reads.budget();
+        self.reads.budget = Some(if self.waiting_reads() == 0 {
+            PASS_BUDGET
+        } else if took < Duration::from_millis(250) {
+            (budget * 2).min(WAITING_BUDGET)
+        } else if took > Duration::from_millis(500) {
+            (budget / 2).max(PASS_BUDGET)
+        } else {
+            budget
+        });
     }
 
     pub fn file_changes(&mut self, paths: Option<HashSet<PathBuf>>) {

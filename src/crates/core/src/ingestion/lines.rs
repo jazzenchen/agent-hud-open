@@ -5,6 +5,9 @@ use chrono::Utc;
 use serde_json::Value;
 use std::io::BufRead;
 
+/// Reads whole lines into `log` until the pass's `budget` is spent. Logs are
+/// read newest first, so a long one takes what is left before an older one
+/// starts, and an archive being decoded carries on from its open cursor.
 pub(crate) fn read_lines(
     log: &mut Log,
     reader: &mut dyn BufRead,
@@ -14,9 +17,8 @@ pub(crate) fn read_lines(
     archive: bool,
     mut conversation: Option<&mut crate::conversation_collect::Gathered>,
 ) -> std::io::Result<()> {
-    let mut page = 2 * 1024 * 1024u64;
     log.waiting_for_more = false;
-    while *budget > 0 && page > 0 {
+    while *budget > 0 {
         let (bytes, skeleton, consumed, complete) = line_with_skeleton(reader)?;
         if consumed == 0 {
             log.decoded_complete = archive;
@@ -30,7 +32,6 @@ pub(crate) fn read_lines(
         log.meter_line_start = log.offset;
         log.offset += consumed;
         *budget = budget.saturating_sub(consumed);
-        page = page.saturating_sub(consumed);
         let bytes = if bytes.len() > MAX_LINE {
             match skeleton {
                 Some(skeleton) => skeleton,

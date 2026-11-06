@@ -23,8 +23,8 @@ export type Page =
  * How far the usage ledger has been read. `kind` is set while the ledger is
  * read through: "first" for a ledger with no logs yet, "reindex" for one
  * read under another data version (the release whose reading rules it holds,
- * such as "0.6.0"). Bytes count the logs the 31-day retention keeps, decoded
- * text for compressed logs.
+ * such as "0.6.0"). Bytes count every listed log, decoded text for
+ * compressed logs.
  */
 export interface IndexingStatus {
   complete: boolean;
@@ -33,6 +33,18 @@ export interface IndexingStatus {
   dataVersion?: string;
   bytesDone?: number;
   bytesTotal?: number;
+  /**
+   * While a run reads: when the oldest log was last written, as far back as
+   * the history goes. Null outside a run.
+   */
+  oldestLogAt?: string | null;
+  /**
+   * While a run reads: the newest last write among the logs not yet read.
+   * Every log written after it has been read; logs are read newest first, so
+   * it moves back toward `oldestLogAt`. Null outside a run and once none is
+   * left.
+   */
+  readBackTo?: string | null;
 }
 export interface TokenTotals {
   input: number;

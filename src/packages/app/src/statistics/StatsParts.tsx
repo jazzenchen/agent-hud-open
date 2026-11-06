@@ -46,7 +46,8 @@ export function Coverage({
 }
 
 /** While the usage ledger is read through, in place of the coverage note:
- * what runs, a bar of how far, and that totals are incomplete meanwhile. */
+ * how far back it has read, a bar of the days read, how far back the logs
+ * go and that totals are incomplete meanwhile. */
 export function IndexingProgress({
   text,
   theme,
@@ -64,10 +65,32 @@ export function IndexingProgress({
         padding: "0 16px",
       }}
     >
-      <span style={{ fontSize: 13, fontWeight: 600 }}>{text.title}</span>
+      <span
+        style={{
+          display: "flex",
+          alignItems: "baseline",
+          justifyContent: "space-between",
+          flexWrap: "wrap",
+          columnGap: 12,
+        }}
+      >
+        <span style={{ fontSize: 13, fontWeight: 600 }}>{text.title}</span>
+        {text.days ? (
+          <span
+            style={{
+              color: theme.secondary,
+              fontSize: 11,
+              fontVariantNumeric: "tabular-nums",
+            }}
+          >
+            {text.days}
+          </span>
+        ) : null}
+      </span>
       <span
         role="progressbar"
         aria-label={text.title}
+        aria-valuetext={text.days || undefined}
         aria-valuemin={0}
         aria-valuemax={100}
         aria-valuenow={Math.floor(text.fraction * 100)}

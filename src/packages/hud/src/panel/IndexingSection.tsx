@@ -5,8 +5,9 @@ import { useGround } from "../ground";
 import { palette, SOURCE_PANEL } from "./theme";
 
 /** While the usage ledger is read through (built for the first time, or
- * again after a data-version change): what runs, how far, and that totals
- * are incomplete meanwhile. Shows nothing otherwise. */
+ * again after a data-version change): how far back it has read, a bar of
+ * the days read, how far back the logs go and that totals are incomplete
+ * meanwhile. Shows nothing otherwise. */
 export function SourceIndexing({
   snapshot,
   light,
@@ -21,16 +22,38 @@ export function SourceIndexing({
     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
       <span
         style={{
-          fontSize: SOURCE_PANEL.rowSize,
-          fontWeight: 600,
-          color: colors.text,
+          display: "flex",
+          alignItems: "baseline",
+          justifyContent: "space-between",
+          flexWrap: "wrap",
+          columnGap: 8,
         }}
       >
-        {text.title}
+        <span
+          style={{
+            fontSize: SOURCE_PANEL.rowSize,
+            fontWeight: 600,
+            color: colors.text,
+          }}
+        >
+          {text.title}
+        </span>
+        {text.days ? (
+          <span
+            style={{
+              fontSize: SOURCE_PANEL.detailSize,
+              color: colors.secondary,
+              fontVariantNumeric: "tabular-nums",
+            }}
+          >
+            {text.days}
+          </span>
+        ) : null}
       </span>
       <span
         role="progressbar"
         aria-label={text.title}
+        aria-valuetext={text.days || undefined}
         aria-valuemin={0}
         aria-valuemax={100}
         aria-valuenow={Math.floor(text.fraction * 100)}

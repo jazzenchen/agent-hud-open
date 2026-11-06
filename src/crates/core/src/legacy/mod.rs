@@ -7,7 +7,10 @@ pub(crate) mod legacy_usage;
 
 impl crate::AgentHudCore {
     pub fn set_legacy_quota_database(&mut self, path: Option<PathBuf>) {
-        if let Some(path) = path.as_ref() {
+        // The Swift app's ledger holds only its last 30 days of calls. It
+        // stands in for reading a log again only in a ledger from before data
+        // versions were recorded; a later one reads the log, keeping all of it.
+        if let Some(path) = path.as_ref().filter(|_| self.data_version.is_none()) {
             let candidates = self
                 .logs
                 .values()

@@ -6,7 +6,7 @@ use crate::{
     log_files::FileStamp,
     metering, source_db, AgentHudCore, Log, PARSER_VERSION,
 };
-use chrono::{DateTime, Utc};
+use chrono::Utc;
 use std::{
     collections::{HashMap, HashSet},
     path::{Path, PathBuf},
@@ -38,6 +38,8 @@ pub(crate) struct Reads {
     /// which file: the client says nothing when a turn ends, so quiet is only
     /// seen by looking again.
     pub(crate) bot_poll: Option<(i64, PathBuf)>,
+    /// How many bytes the next pass may read (`pace_reads`); None for 16 MB.
+    pub(crate) budget: Option<u64>,
 }
 
 #[derive(Default)]
@@ -78,25 +80,6 @@ impl FailedReads {
     }
 }
 
-/// Whether a listed log is read now: one last written within the 31-day read
-/// window that changed since it was read, was never read, or was read by
-/// another reader version or only partly. An older log is not read, even
-/// when an earlier version read it; what it counted stays (agent-hud-native-open TailLogStore.index: logs modified
-/// since the history cutoff, and older ones outdated or unfinished within the
-/// retention). The Swift app also leaves unread a log 7 to 31 days old it
-/// never read; this app reads it, so a first launch fills the 30-day token history.
-pub(crate) fn due(log: Option<&LogHead>, file: &FileStamp, now_ms: i64) -> bool {
-    within_retention(file, now_ms) && needs_read(log, file)
-}
-
-/// Whether a log was last written within the read window; one whose time
-/// cannot be told counts as recent.
-pub(crate) fn within_retention(file: &FileStamp, now_ms: i64) -> bool {
-    file.modified.is_none_or(|modified| {
-        DateTime::<Utc>::from(modified).timestamp_millis() >= now_ms - metering::READ_WINDOW_MS
-    })
-}
-
 /// Records a Claude Code log's calls under the route its session's hook
 /// said they go through (`pricing::claude_route`), a sub-agent's log under its
 /// session's; a local server's reported window becomes the calls' window.
@@ -125,6 +108,11 @@ pub(crate) fn route_claude_calls(
     Ok(())
 }
 
+/// Whether a listed log is read now: one that changed since it was read, was
+/// never read, or was read by other rules or only partly, whatever its age,
+/// so the ledger reaches back as far as the logs on disk do. The Swift app
+/// read only logs written in the last 31 days (agent-hud-native-open
+/// TailLogStore.index). What a removed log counted stays.
 pub(crate) fn needs_read(log: Option<&LogHead>, file: &FileStamp) -> bool {
     log.is_none_or(|log| {
         log.gone

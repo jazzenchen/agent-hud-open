@@ -145,10 +145,10 @@ pub(crate) fn rebuild(db: &Connection, path: &str) -> rusqlite::Result<()> {
     Ok(())
 }
 
-/// The Mac keeps every token it records: usage rows never expire, so the
-/// Statistics window can reach as far back as the record does. The phone
-/// asks for its own 30 days. Only a log last written within this window is
-/// read, or read again; an older one keeps what it counted.
+/// The Mac keeps every token it records: usage rows never expire, and every
+/// log on disk is read, so the Statistics window can reach as far back as
+/// the logs do. The phone asks for its own 30 days. The quota and balance
+/// metrics need no more than this window, so the meter view reads only it.
 pub(crate) const READ_WINDOW_MS: i64 = 31 * 86_400_000;
 
 /// What the snapshot's quota and balance metrics are read from, kept between

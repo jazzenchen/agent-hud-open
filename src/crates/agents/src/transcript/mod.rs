@@ -31,8 +31,8 @@ pub const MAX_TURNS: usize = 128;
 /// A data version is the release in which the way logs are read last
 /// changed: 0.6.5 when 0.6.5 reads them differently, and 0.6.5 still while
 /// 0.7.0 reads them the same way. The ledger records it; a log a checkpoint
-/// holds under other rules is read once more while it is within the
-/// retention, and what older or removed logs counted stays. To change how
+/// holds under other rules is read once more, and what removed logs counted
+/// stays. To change how
 /// logs are read, add a row named after the release that ships it (a build
 /// before that release uses `-dev.1`, `-dev.2`…), never edit a row.
 ///
@@ -44,7 +44,10 @@ pub const MAX_TURNS: usize = 128;
 ///
 /// 8 keeps the Project and thread a Claude Desktop Project worker was woken
 /// for (agent-hud-open #43).
-pub const DATA_VERSIONS: &[(&str, u32)] = &[("0.6.0", 7), ("0.6.0-beta.6", 8)];
+///
+/// 9 reads every log on disk, whatever its age, and keeps every call in it;
+/// 8 read only logs written in the last 31 days and kept 31 days of calls.
+pub const DATA_VERSIONS: &[(&str, u32)] = &[("0.6.0", 7), ("0.6.0-beta.6", 8), ("0.6.0-beta.8", 9)];
 
 /// The data version this build reads logs by.
 pub const DATA_VERSION: &str = DATA_VERSIONS[DATA_VERSIONS.len() - 1].0;

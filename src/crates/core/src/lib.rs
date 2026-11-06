@@ -65,7 +65,7 @@ pub(crate) use database::{
     metering, staging,
 };
 pub use discovery::ProviderDiscovery;
-pub(crate) use ingestion::{due, line};
+pub(crate) use ingestion::{line, needs_read};
 pub(crate) use legacy::{carried_usage, legacy_database, legacy_quota};
 pub(crate) use log_files::{FileStamp, LogFiles};
 pub(crate) use usage::UsageProjection;
@@ -195,9 +195,9 @@ impl AgentHudCore {
             ),
         };
         let recorded = database.as_ref().and_then(data_version::recorded);
-        let indexing_run = database.as_ref().and_then(|_| {
-            data_version::run_at_launch(recorded.as_deref(), &logs, Utc::now().timestamp_millis())
-        });
+        let indexing_run = database
+            .as_ref()
+            .and_then(|_| data_version::run_at_launch(recorded.as_deref(), &logs));
         let requests = requests::Requests::default();
         requests.set_hold_ms(
             settings["approvalWaitMinutes"]

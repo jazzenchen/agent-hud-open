@@ -1,6 +1,6 @@
 //! A pass over the logs: listing them, reading the changed ones and writing
 //! what they hold to the ledger.
-use super::{due, line, needs_read, read_lines, route_claude_calls};
+use super::{line, needs_read, read_lines, route_claude_calls};
 use crate::l10n;
 use crate::{
     carried_usage,
@@ -20,7 +20,7 @@ impl AgentHudCore {
     pub(crate) fn scan(&mut self, only: Option<HashSet<PathBuf>>) -> Result<(), String> {
         let reminder_only = only.is_some();
         let mut errors = self.storage_issue.iter().cloned().collect::<Vec<_>>();
-        let mut budget: u64 = 16 * 1024 * 1024;
+        let mut budget = self.reads.budget();
         let handovers = if let Some(paths) = &only {
             for path in paths {
                 let Some((_, source)) = self
@@ -58,14 +58,13 @@ impl AgentHudCore {
             };
             errors.extend(self.reads.listing.refresh(&self.provider_roots, &active));
             let handovers = self.archive_handovers(&mut errors);
-            let now_ms = Utc::now().timestamp_millis();
             for path in &self.reads.listing.changed {
                 if self
                     .reads
                     .listing
                     .files
                     .get(path)
-                    .is_some_and(|file| due(self.logs.get(path), file, now_ms))
+                    .is_some_and(|file| needs_read(self.logs.get(path), file))
                 {
                     self.reads.pending.insert(path.clone());
                 }
