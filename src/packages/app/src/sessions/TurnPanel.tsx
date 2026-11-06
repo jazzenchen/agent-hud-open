@@ -7,6 +7,7 @@ import { SubagentTimeline } from "./SubagentTimeline";
 import { TurnCallsTable } from "./TurnCallsTable";
 import { turnNotes } from "./TurnHover";
 import { CallsPlaceholder } from "./SessionPlaceholders";
+import { Arrival, useSettled } from "./SessionMotion";
 import {
   card,
   ColorKey,
@@ -21,7 +22,7 @@ import {
   type Theme,
 } from "./SessionTheme";
 
-/** A picked turn: when and how long, what Core sums of its calls, the message, and each call. In its own column the column's bar closes it, so it draws no × of its own. */
+/** A picked turn: when and how long, what Core sums of its calls, the message, and each call. In its own column the column's bar closes it, so it draws no × of its own. Calls read after it opened fade in over their grey shape's place. */
 export function TurnPanel({
   entry,
   detail,
@@ -36,6 +37,7 @@ export function TurnPanel({
   close?: () => void;
 }) {
   const zh = Boolean(theme.zh);
+  const settled = useSettled();
   const calls: SessionCall[] | undefined =
     entry.calls ??
     (detail.turnCalls?.turn === entry.id ? detail.turnCalls.calls : undefined);
@@ -151,21 +153,24 @@ export function TurnPanel({
         </div>
       )}
       {calls?.some((call) => call.subagent) && (
-        <SubagentTimeline
-          calls={calls}
-          agents={
-            detail.turnCalls?.turn === entry.id
-              ? (detail.turnCalls.agents ?? [])
-              : []
-          }
-          start={Date.parse(entry.timestamp)}
-          end={Date.parse(entry.end ?? entry.timestamp)}
-          live={
-            detail.session.state === "running" &&
-            entry.index === Math.max(...detail.turns.map((turn) => turn.index))
-          }
-          theme={theme}
-        />
+        <Arrival late={settled} style={{ minWidth: 0 }}>
+          <SubagentTimeline
+            calls={calls}
+            agents={
+              detail.turnCalls?.turn === entry.id
+                ? (detail.turnCalls.agents ?? [])
+                : []
+            }
+            start={Date.parse(entry.timestamp)}
+            end={Date.parse(entry.end ?? entry.timestamp)}
+            live={
+              detail.session.state === "running" &&
+              entry.index ===
+                Math.max(...detail.turns.map((turn) => turn.index))
+            }
+            theme={theme}
+          />
+        </Arrival>
       )}
       {byPrompt && calls === undefined && <CallsPlaceholder theme={theme} />}
       {calls && calls.length === 0 && (
@@ -176,7 +181,9 @@ export function TurnPanel({
         </div>
       )}
       {calls && calls.length > 0 && (
-        <TurnCallsTable calls={calls} theme={theme} />
+        <Arrival late={settled} style={{ minWidth: 0 }}>
+          <TurnCallsTable calls={calls} theme={theme} />
+        </Arrival>
       )}
     </Card>
   );

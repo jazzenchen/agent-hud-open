@@ -1,18 +1,25 @@
 import { Card } from "@agent-hud/ui/components/card";
-import { moneyAmount } from "@agent-hud/ui/format";
 import type { Session, SessionDetail } from "@agent-hud/protocol";
+import { Tween } from "../statistics/motion";
+import {
+  accountAt,
+  integerAt,
+  moneyAt,
+  percentAt,
+  tokensAt,
+} from "./SessionMotion";
 import {
   card,
   clipped,
   compact,
   integer,
-  moneyText,
   numeric,
   sessionMoney,
   type Theme,
   unpricedHelp,
 } from "./SessionTheme";
 
+/** The session's figures in a row: each counts up when first drawn and moves to new values, written as it is at rest. */
 export function DetailFigures({
   session,
   detail,
@@ -25,7 +32,13 @@ export function DetailFigures({
   const zh = Boolean(theme.zh);
   const context =
     detail?.contextTokens ?? detail?.turns.at(-1)?.context ?? null;
-  const percent = (part: number) => `${Math.round(part * 100)}%`;
+  // Every share reads as a percent, so one from the list carries on into Core's.
+  const percent =
+    detail?.contextFill != null
+      ? detail.contextFill * 100
+      : context === null
+        ? session.contextPercent
+        : null;
   // The session with its sub-agents, as Core counts it on its row too.
   const totals = detail?.usage ?? session.usage ?? null;
   // A Project counts only what its workers ran on this Mac.
@@ -33,7 +46,6 @@ export function DetailFigures({
     (detail?.session.desktopProject?.localWorkerCount ??
       session.desktopProject?.localWorkerCount ??
       0) > 0;
-  const language = zh ? "zh" : "en";
   // A priced account's own estimate comes first, as Open's SessionMoney.
   const account = session.accountCost !== undefined;
   const money = sessionMoney(session);
@@ -47,7 +59,9 @@ export function DetailFigures({
   const items = [
     {
       title: zh ? "Token" : "Tokens",
-      value: compact(totals?.total ?? session.tokens),
+      value: (
+        <Tween value={totals?.total ?? session.tokens} format={tokensAt} />
+      ),
       note: localOnly
         ? zh
           ? "仅本机执行会话"
@@ -69,9 +83,14 @@ export function DetailFigures({
     account
       ? {
           title: zh ? "费用" : "Cost",
-          value: session.accountCost
-            ? `≈${moneyAmount(session.accountCost.amount, session.accountCost.currency, language, true)}`
-            : "—",
+          value: session.accountCost ? (
+            <Tween
+              value={session.accountCost.amount}
+              format={accountAt(session.accountCost, zh)}
+            />
+          ) : (
+            "—"
+          ),
           note: zh ? "本会话" : "This session",
           help: zh
             ? "按账户价格估算的本会话费用"
@@ -79,7 +98,12 @@ export function DetailFigures({
         }
       : {
           title: zh ? "费用" : "Cost",
-          value: moneyText(money, zh),
+          value:
+            money.value === null ? (
+              "—"
+            ) : (
+              <Tween value={money.value} format={moneyAt(money, zh)} />
+            ),
           note:
             money.value === null
               ? "—"
@@ -119,7 +143,7 @@ export function DetailFigures({
             ? [
                 {
                   title: zh ? "计量上下文" : "Metered context",
-                  value: compact(credits.used),
+                  value: <Tween value={credits.used} format={tokensAt} />,
                   note: (zh ? "共 " : "Of ") + compact(credits.size),
                   help: zh
                     ? "WorkBuddy 自身计量记录的上下文用量与上限"
@@ -132,7 +156,11 @@ export function DetailFigures({
     breakdown
       ? {
           title: zh ? "轮次" : "Turns",
-          value: detail?.turnCount ? integer(detail.turnCount) : "—",
+          value: detail?.turnCount ? (
+            <Tween value={detail.turnCount} format={integerAt} />
+          ) : (
+            "—"
+          ),
           note: zh
             ? `${integer(calls)} 次调用`
             : calls === 1
@@ -142,7 +170,11 @@ export function DetailFigures({
         }
       : {
           title: zh ? "用量记录" : "Usage entries",
-          value: detail ? integer(detail.turns.length) : "—",
+          value: detail ? (
+            <Tween value={detail.turns.length} format={integerAt} />
+          ) : (
+            "—"
+          ),
           note: detail
             ? zh
               ? `已加载 ${detail.calls.length} 次调用`
@@ -155,13 +187,13 @@ export function DetailFigures({
     {
       title: zh ? "上下文" : "Context",
       value:
-        detail?.contextFill != null
-          ? percent(detail.contextFill)
-          : context !== null
-            ? compact(context)
-            : session.contextPercent !== null
-              ? `${Math.round(session.contextPercent)}%`
-              : "—",
+        percent != null ? (
+          <Tween key="percent" value={percent} format={percentAt} />
+        ) : context !== null ? (
+          <Tween key="tokens" value={context} format={tokensAt} />
+        ) : (
+          "—"
+        ),
       note:
         detail?.contextWindow != null && detail.contextWindow > 0
           ? zh
@@ -177,7 +209,12 @@ export function DetailFigures({
     },
     {
       title: zh ? "缓存命中" : "Cache hits",
-      value: detail?.cacheHitRate != null ? percent(detail.cacheHitRate) : "—",
+      value:
+        detail?.cacheHitRate != null ? (
+          <Tween value={detail.cacheHitRate * 100} format={percentAt} />
+        ) : (
+          "—"
+        ),
       note: detail?.usage
         ? zh
           ? `${compact(detail.usage.cacheRead)} 读取 · ${compact(detail.usage.cacheWrite)} 写入`

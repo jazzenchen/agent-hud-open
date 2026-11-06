@@ -1,13 +1,15 @@
 import { contextRuns, niceScale } from "../lib/session-charts";
 import { axis, Halo, labelFont, useWidth } from "./SessionCharts";
 import { compact, numeric, type Entry, type Theme } from "./SessionTheme";
+import { useGlide } from "./use-glide";
 
 /**
  * Each turn's context against the model's window, on the turn chart's axis
  * (the phone's `ContextWindowChart`): a line and its area, broken where the
  * client compacted, each compaction a labelled amber line; a whisker up to a
  * turn's peak when it ended lower; the window as a labelled dashed line over
- * a near-limit band; the last point named with its tokens and fill.
+ * a near-limit band; the last point named with its tokens and fill. The line
+ * rises from the base when first drawn and eases to new values after.
  */
 export function ContextChart({
   entries,
@@ -38,6 +40,15 @@ export function ContextChart({
   const top = limit ?? niceScale(peak, 2).top;
   const y = (tokens: number) =>
     height - (Math.min(tokens, top) / top) * (height - pad);
+  // What the line draws, easing: each turn's context and peak, the scale.
+  const contexts = useGlide(entries.map((entry) => entry.context ?? 0));
+  const peaks = useGlide(
+    entries.map((entry) => entry.peakContext ?? entry.context ?? 0),
+  );
+  const [scaleTop, lastFill] = useGlide([top, fill ?? 0], [top, 0]);
+  const at = (tokens: number) =>
+    height -
+    (Math.min(tokens, scaleTop) / Math.max(1, scaleTop)) * (height - pad);
   const slot = entries.length > 0 ? plot / entries.length : plot;
   const center = (index: number) => index * slot + slot / 2;
   const runs = contextRuns(entries);
@@ -126,8 +137,7 @@ export function ContextChart({
           ))}
           {runs.map((run, index) => {
             const points = run.map(
-              (position) =>
-                [center(position), y(entries[position].context ?? 0)] as const,
+              (position) => [center(position), at(contexts[position])] as const,
             );
             const line = points
               .map(([px, py], at) => `${at ? "L" : "M"}${px},${py}`)
@@ -150,7 +160,7 @@ export function ContextChart({
             entry.peakContext != null && entry.context != null ? (
               <path
                 key={`p${entry.id}`}
-                d={`M${center(index)},${y(entry.context)}L${center(index)},${y(entry.peakContext)}M${center(index) - 2.5},${y(entry.peakContext)}L${center(index) + 2.5},${y(entry.peakContext)}`}
+                d={`M${center(index)},${at(contexts[index])}L${center(index)},${at(peaks[index])}M${center(index) - 2.5},${at(peaks[index])}L${center(index) + 2.5},${at(peaks[index])}`}
                 stroke={color}
                 strokeWidth={1}
                 fill="none"
@@ -189,7 +199,7 @@ export function ContextChart({
             <g>
               <circle
                 cx={center(lastIndex)}
-                cy={y(last.context)}
+                cy={at(contexts[lastIndex])}
                 r={3}
                 fill={color}
                 stroke={theme.surface}
@@ -198,14 +208,14 @@ export function ContextChart({
               <Halo
                 theme={theme}
                 x={center(lastIndex) - 7}
-                y={Math.max(12, y(last.context) - 6)}
+                y={Math.max(12, at(contexts[lastIndex]) - 6)}
                 textAnchor="end"
                 fill={theme.text}
                 fontWeight={600}
                 style={numeric}
               >
-                {compact(last.context) +
-                  (fill != null ? ` · ${Math.round(fill * 100)}%` : "")}
+                {compact(Math.round(contexts[lastIndex])) +
+                  (fill != null ? ` · ${Math.round(lastFill * 100)}%` : "")}
               </Halo>
             </g>
           )}

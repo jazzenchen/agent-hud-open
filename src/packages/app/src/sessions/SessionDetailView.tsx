@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type CSSProperties } from "react";
 import { Card } from "@agent-hud/ui/components/card";
 import { sessionClient } from "../lib/sessions";
 import type { Session, SessionDetail, Snapshot } from "@agent-hud/protocol";
@@ -9,13 +9,21 @@ import { DetailHeader } from "./SessionDetailHeader";
 import { SessionTranscript } from "./SessionTranscript";
 import { TurnChartCard } from "./TurnChartCard";
 import { TurnPanel } from "./TurnPanel";
+import { reveal as fadeIn } from "./SessionMotion";
 import { UsagePlaceholder } from "./SessionPlaceholders";
 import { ProjectExecutionsCard, SubagentsCard } from "./WorkerCards";
 import { card, CardTitle, type Theme } from "./SessionTheme";
 
+const stack: CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  gap: 12,
+};
+
 /** A session's page: its header and figures, its turns, where its tokens
  * went, its sub-agents and its conversation. A picked turn opens under the
- * chart, or (`turnBeside`) in the column beside, which draws it instead. */
+ * chart, or (`turnBeside`) in the column beside, which draws it instead.
+ * Each session's head, and what Core reads of it, fades in as it comes. */
 export function InlineDetail({
   session,
   detail,
@@ -65,41 +73,43 @@ export function InlineDetail({
   // One model says nothing the figures do not (Open shows the card from two).
   const models = (detail?.models?.length ?? 0) > 1;
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-      <DetailHeader
-        session={session}
-        detail={detail}
-        client={client}
-        now={now}
-        theme={theme}
-        // Project sessions use Core's return route and label. When Core marks
-        // that route unavailable, never fall back to revealing a local log.
-        reveal={
-          session.desktopProject && !session.desktopProject.openAvailable
-            ? null
-            : session.navigationTarget || session.logPath
-              ? reveal
-              : null
-        }
-        revealDisabled={Boolean(
-          session.desktopProject && !session.desktopProject.openAvailable,
-        )}
-        revealLabel={
-          session.desktopProject?.openLabel ??
-          (session.navigationTarget
-            ? zh
-              ? "回到会话"
-              : "Return to session"
-            : snapshot.connection.platform === "macos"
+    <div style={stack}>
+      <div key={session.id} className={fadeIn} style={stack}>
+        <DetailHeader
+          session={session}
+          detail={detail}
+          client={client}
+          now={now}
+          theme={theme}
+          // Project sessions use Core's return route and label. When Core marks
+          // that route unavailable, never fall back to revealing a local log.
+          reveal={
+            session.desktopProject && !session.desktopProject.openAvailable
+              ? null
+              : session.navigationTarget || session.logPath
+                ? reveal
+                : null
+          }
+          revealDisabled={Boolean(
+            session.desktopProject && !session.desktopProject.openAvailable,
+          )}
+          revealLabel={
+            session.desktopProject?.openLabel ??
+            (session.navigationTarget
               ? zh
-                ? "在访达中显示日志"
-                : "Reveal log in Finder"
-              : zh
-                ? "显示日志"
-                : "Reveal log")
-        }
-      />
-      <DetailFigures session={session} detail={detail} theme={theme} />
+                ? "回到会话"
+                : "Return to session"
+              : snapshot.connection.platform === "macos"
+                ? zh
+                  ? "在访达中显示日志"
+                  : "Reveal log in Finder"
+                : zh
+                  ? "显示日志"
+                  : "Reveal log")
+          }
+        />
+        <DetailFigures session={session} detail={detail} theme={theme} />
+      </div>
       {!detail && loading && <UsagePlaceholder theme={theme} />}
       {error && (
         <div role="alert" style={{ color: theme.secondary, fontSize: 11 }}>
@@ -107,7 +117,7 @@ export function InlineDetail({
         </div>
       )}
       {detail && (
-        <>
+        <div className={fadeIn} style={stack}>
           <TurnChartCard
             detail={detail}
             byPrompt={byPrompt}
@@ -185,7 +195,7 @@ export function InlineDetail({
             loadMessages={loadMessages}
             loadingMessages={loadingMessages}
           />
-        </>
+        </div>
       )}
     </div>
   );

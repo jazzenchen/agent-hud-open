@@ -2,17 +2,16 @@ import { Card } from "@agent-hud/ui/components/card";
 import type { SessionsDay } from "@agent-hud/protocol";
 import { share } from "@agent-hud/ui/format";
 import { presentKinds } from "../lib/sessions";
-import { useAnimatedNumber } from "../statistics/StatsTheme";
+import { Tween } from "../statistics/motion";
+import { moneyAt, reveal, tokensAt, useBarReach } from "./SessionMotion";
 import { ShareRows } from "./ShareRows";
 import {
   card,
   ColorKey,
-  compact,
   integer,
   kindColor,
   kindLabel,
   Missing,
-  moneyText,
   numeric,
   row,
   sessionMoney,
@@ -26,7 +25,8 @@ import {
  * they cost, their tokens split by the kinds present in Open's order; and
  * beside them, where those tokens went: the sessions that spent the most,
  * each a labelled bar of its share, the rest summed. A session counts its
- * sub-agents, which nest under it.
+ * sub-agents, which nest under it. It fades in when first read; its figures
+ * count up and its bars fill, then move as the day goes on.
  */
 export function TodayCard({
   day,
@@ -40,7 +40,7 @@ export function TodayCard({
   const zh = Boolean(theme.zh);
   const total = day.tokens;
   const kinds = day.usage ? presentKinds(day.usage) : null;
-  const animatedTotal = useAnimatedNumber(total);
+  const reach = useBarReach();
   const money = sessionMoney(day);
   const kindsTotal = kinds?.reduce((sum, entry) => sum + entry.value, 0) ?? 0;
   const ranking = [
@@ -48,7 +48,7 @@ export function TodayCard({
       id: session.id,
       label: session.title || (zh ? "未命名会话" : "Untitled session"),
       value: session.tokens,
-      note: share(session.tokens, total),
+      note: (value: number) => share(value, total),
       color: theme.tertiary,
       title: session.title,
     })),
@@ -62,7 +62,7 @@ export function TodayCard({
               </span>
             ),
             value: day.rest.tokens,
-            note: share(day.rest.tokens, total),
+            note: (value: number) => share(value, total),
             color: theme.track,
           },
         ]
@@ -70,7 +70,7 @@ export function TodayCard({
   ];
   return (
     <Card
-      className="session-statistics-today"
+      className={`session-statistics-today ${reveal}`}
       style={{
         ...card(theme, "12px 14px"),
         marginBottom: 18,
@@ -107,7 +107,7 @@ export function TodayCard({
                   ...numeric,
                 }}
               >
-                {moneyText(money, zh)}
+                <Tween value={money.value} format={moneyAt(money, zh)} />
               </span>
             </span>
           )}
@@ -134,7 +134,7 @@ export function TodayCard({
               ...numeric,
             }}
           >
-            {compact(animatedTotal)}
+            <Tween value={total} format={tokensAt} />
           </strong>
           <span style={{ color: theme.secondary, fontSize: 12 }}>
             {zh ? "Token" : "tokens"}
@@ -150,6 +150,7 @@ export function TodayCard({
               overflow: "hidden",
               borderRadius: 3,
               marginBottom: 10,
+              clipPath: reach,
             }}
           >
             {kinds.map((entry) => (
@@ -207,7 +208,7 @@ export function TodayCard({
                         ...numeric,
                       }}
                     >
-                      {compact(entry.value)}
+                      <Tween value={entry.value} format={tokensAt} />
                     </span>
                   </span>
                 );

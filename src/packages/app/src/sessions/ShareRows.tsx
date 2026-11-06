@@ -1,5 +1,7 @@
 import type { ReactNode } from "react";
-import { clipped, compact, numeric, plain, type Theme } from "./SessionTheme";
+import { useTween } from "../statistics/motion";
+import { tokensAt } from "./SessionMotion";
+import { clipped, numeric, plain, type Theme } from "./SessionTheme";
 
 /** A picked row's ground, the list's selected row's, reaching a little past
  * the row so its text keeps its place. */
@@ -14,10 +16,81 @@ export interface ShareRow {
   id: string;
   label: ReactNode;
   value: number;
-  /** The text after the value: its share, or anything else. */
-  note?: string;
+  /** The text after the value: its share (written from the bar's part of the whole as it moves), or anything else. */
+  note?: string | ((value: number) => string);
   color?: string;
   title?: string;
+}
+
+/** A row's name, figures and bar: the value counts up and the bar fills when
+ * the row is first drawn, then both move to new values. */
+function ShareLine({
+  row,
+  whole,
+  theme,
+}: {
+  row: ShareRow;
+  whole: number;
+  theme: Theme;
+}) {
+  const value = useTween(row.value);
+  // The bar's share moves on its own, so it never jumps when the whole does.
+  const part = useTween(whole > 0 ? Math.min(1, row.value / whole) : 0);
+  const note =
+    typeof row.note === "function" ? row.note(part * whole) : row.note;
+  return (
+    <>
+      <span
+        style={{
+          display: "flex",
+          alignItems: "baseline",
+          gap: 8,
+          minWidth: 0,
+          fontSize: 12,
+        }}
+      >
+        <span style={{ ...clipped, flex: 1 }}>{row.label}</span>
+        <strong style={{ fontWeight: 600, ...numeric }}>
+          {tokensAt(value)}
+        </strong>
+        {note && (
+          <span
+            style={{
+              color: theme.secondary,
+              fontSize: 11,
+              minWidth: 30,
+              textAlign: "right",
+              ...numeric,
+            }}
+          >
+            {note}
+          </span>
+        )}
+      </span>
+      <span
+        aria-hidden="true"
+        style={{
+          display: "block",
+          height: 4,
+          borderRadius: 2,
+          background: theme.track,
+          overflow: "hidden",
+          marginTop: 3,
+        }}
+      >
+        <span
+          style={{
+            display: "block",
+            height: "100%",
+            width: `${part * 100}%`,
+            minWidth: part > 0 ? 2 : 0,
+            background: row.color ?? theme.secondary,
+            borderRadius: 2,
+          }}
+        />
+      </span>
+    </>
+  );
 }
 
 /**
@@ -41,60 +114,7 @@ export function ShareRows({
   return (
     <div style={{ display: "grid", gap: 7, minWidth: 0 }}>
       {rows.map((row) => {
-        const content = (
-          <>
-            <span
-              style={{
-                display: "flex",
-                alignItems: "baseline",
-                gap: 8,
-                minWidth: 0,
-                fontSize: 12,
-              }}
-            >
-              <span style={{ ...clipped, flex: 1 }}>{row.label}</span>
-              <strong style={{ fontWeight: 600, ...numeric }}>
-                {compact(row.value)}
-              </strong>
-              {row.note && (
-                <span
-                  style={{
-                    color: theme.secondary,
-                    fontSize: 11,
-                    minWidth: 30,
-                    textAlign: "right",
-                    ...numeric,
-                  }}
-                >
-                  {row.note}
-                </span>
-              )}
-            </span>
-            <span
-              aria-hidden="true"
-              style={{
-                display: "block",
-                height: 4,
-                borderRadius: 2,
-                background: theme.track,
-                overflow: "hidden",
-                marginTop: 3,
-              }}
-            >
-              <span
-                style={{
-                  display: "block",
-                  height: "100%",
-                  width: `${whole > 0 ? Math.min(100, (row.value / whole) * 100) : 0}%`,
-                  minWidth: row.value > 0 ? 2 : 0,
-                  background: row.color ?? theme.secondary,
-                  borderRadius: 2,
-                  transition: "width 240ms cubic-bezier(0.22, 1, 0.36, 1)",
-                }}
-              />
-            </span>
-          </>
-        );
+        const content = <ShareLine row={row} whole={whole} theme={theme} />;
         return onSelect ? (
           <button
             key={row.id}

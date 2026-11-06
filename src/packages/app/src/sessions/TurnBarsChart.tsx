@@ -10,12 +10,13 @@ import {
 import { moneyShort } from "@agent-hud/ui/format";
 import {
   axis,
-  grow,
   Halo,
   labelFont,
+  Rising,
   stackedRects,
   useWidth,
 } from "./SessionCharts";
+import { labelReveal } from "./SessionMotion";
 import { compact, numeric, type Entry, type Theme } from "./SessionTheme";
 
 /** What the session page's turn chart measures: the new tokens of each turn, or what its calls would cost at list prices. */
@@ -109,17 +110,15 @@ export function TurnBarsChart({
       rects =
         h > 0
           ? [
-              <rect
+              <Rising
                 key={`c${index}`}
                 x={x}
                 width={barWidth}
                 fill={theme.accent}
                 fillOpacity={0.8}
-                style={{
-                  y: top + 0.4,
-                  height: Math.max(0.6, h - 0.8),
-                  transition: grow,
-                }}
+                base={height}
+                y={top + 0.4}
+                height={Math.max(0.6, h - 0.8)}
               />,
             ]
           : [];
@@ -154,7 +153,7 @@ export function TurnBarsChart({
     const y = tops[index] - 11;
     const both = helped && resent;
     return (
-      <g key={`m${entry.id}`} aria-hidden="true">
+      <g key={`m${entry.id}`} aria-hidden="true" {...labelReveal}>
         {helped && (
           <Layers
             x={center - 4.5 - (both ? 4 : 0)}
@@ -183,13 +182,14 @@ export function TurnBarsChart({
     return (
       <Halo
         key={`v${index}`}
+        {...labelReveal}
         theme={theme}
         x={center}
         y={Math.max(10, tops[index] - (hasMark ? 14 : 4))}
         textAnchor="middle"
         fill={theme.text}
         fontWeight={600}
-        style={numeric}
+        style={{ ...numeric, ...labelReveal.style }}
       >
         {measureText(values[index], measure, zh)}
       </Halo>

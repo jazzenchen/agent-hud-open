@@ -4,6 +4,7 @@ import { Card } from "@agent-hud/ui/components/card";
 import { Button } from "@agent-hud/ui/components/button";
 import { dateFormat, localeDateTime } from "@agent-hud/ui/format";
 import type { SessionDetail } from "@agent-hud/protocol";
+import { Arrival, useSettled } from "./SessionMotion";
 import { MessagesPlaceholder } from "./SessionPlaceholders";
 import { card, row, type Theme } from "./SessionTheme";
 
@@ -47,7 +48,7 @@ function Folded({
   );
 }
 
-/** The foot of the session page, folded: the conversation, a page at a time, and the recorded calls as Core keeps them. */
+/** The foot of the session page, folded: the conversation, a page at a time (each later page fading in), and the recorded calls as Core keeps them. */
 export function SessionTranscript({
   detail,
   theme,
@@ -60,6 +61,7 @@ export function SessionTranscript({
   loadingMessages: boolean;
 }) {
   const zh = Boolean(theme.zh);
+  const settled = useSettled();
   return (
     <>
       {detail.messages && detail.messages.length > 0 && (
@@ -77,60 +79,61 @@ export function SessionTranscript({
             </p>
           )}
           {detail.messages.map((message) => (
-            <section
-              key={message.id}
-              style={{
-                borderTop: `1px solid ${theme.divider}`,
-                paddingTop: 8,
-              }}
-            >
-              <header
+            <Arrival key={message.id} late={settled}>
+              <section
                 style={{
-                  fontSize: 11,
-                  color: theme.secondary,
-                  display: "flex",
-                  gap: 8,
+                  borderTop: `1px solid ${theme.divider}`,
+                  paddingTop: 8,
                 }}
               >
-                <strong>{message.role}</strong>
-                {message.timestamp && (
-                  <time>
-                    {dateFormat(undefined, localeDateTime).format(
-                      new Date(message.timestamp),
-                    )}
-                  </time>
+                <header
+                  style={{
+                    fontSize: 11,
+                    color: theme.secondary,
+                    display: "flex",
+                    gap: 8,
+                  }}
+                >
+                  <strong>{message.role}</strong>
+                  {message.timestamp && (
+                    <time>
+                      {dateFormat(undefined, localeDateTime).format(
+                        new Date(message.timestamp),
+                      )}
+                    </time>
+                  )}
+                </header>
+                <div
+                  style={{
+                    fontSize: 12,
+                    lineHeight: 1.5,
+                    whiteSpace: "pre-wrap",
+                    overflowWrap: "anywhere",
+                    userSelect: "text",
+                    paddingTop: 5,
+                  }}
+                >
+                  {message.text}
+                </div>
+                {message.toolCall != null && (
+                  <details style={{ fontSize: 11, paddingTop: 5 }}>
+                    <summary>
+                      {zh
+                        ? `工具调用 ${message.toolCallId ?? ""}`
+                        : `Tool call ${message.toolCallId ?? ""}`}
+                    </summary>
+                    <pre
+                      style={{
+                        whiteSpace: "pre-wrap",
+                        overflowWrap: "anywhere",
+                      }}
+                    >
+                      {JSON.stringify(message.toolCall, null, 2)}
+                    </pre>
+                  </details>
                 )}
-              </header>
-              <div
-                style={{
-                  fontSize: 12,
-                  lineHeight: 1.5,
-                  whiteSpace: "pre-wrap",
-                  overflowWrap: "anywhere",
-                  userSelect: "text",
-                  paddingTop: 5,
-                }}
-              >
-                {message.text}
-              </div>
-              {message.toolCall != null && (
-                <details style={{ fontSize: 11, paddingTop: 5 }}>
-                  <summary>
-                    {zh
-                      ? `工具调用 ${message.toolCallId ?? ""}`
-                      : `Tool call ${message.toolCallId ?? ""}`}
-                  </summary>
-                  <pre
-                    style={{
-                      whiteSpace: "pre-wrap",
-                      overflowWrap: "anywhere",
-                    }}
-                  >
-                    {JSON.stringify(message.toolCall, null, 2)}
-                  </pre>
-                </details>
-              )}
-            </section>
+              </section>
+            </Arrival>
           ))}
           {loadingMessages && <MessagesPlaceholder theme={theme} />}
           {detail.nextMessageCursor != null && (

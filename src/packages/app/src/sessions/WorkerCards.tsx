@@ -2,19 +2,20 @@ import { ChevronRight } from "lucide-react";
 import { Card } from "@agent-hud/ui/components/card";
 import { share } from "@agent-hud/ui/format";
 import type { SessionDetail } from "@agent-hud/protocol";
+import { Tween } from "../statistics/motion";
+import { tokensAt, useBarReach } from "./SessionMotion";
 import { picked, ShareRows } from "./ShareRows";
 import {
   card,
   CardTitle,
   clipped,
-  compact,
   numeric,
   plain,
   row,
   type Theme,
 } from "./SessionTheme";
 
-/** How much the sub-agents added: the session's own part beside theirs, then each sub-agent as a labelled bar. */
+/** How much the sub-agents added: the session's own part beside theirs, then each sub-agent as a labelled bar; the bars fill and the figures count up when first drawn. */
 export function SubagentsCard({
   detail,
   theme,
@@ -28,6 +29,7 @@ export function SubagentsCard({
   selectedId?: string | null;
 }) {
   const zh = Boolean(theme.zh);
+  const reach = useBarReach();
   const total = detail.usage?.total ?? detail.session.tokens;
   const theirs = detail.subagents?.total ?? 0;
   const own = detail.own?.total ?? total - theirs;
@@ -73,6 +75,7 @@ export function SubagentsCard({
               height: 8,
               borderRadius: 4,
               overflow: "hidden",
+              clipPath: reach,
             }}
           >
             {parts.map((part) => (
@@ -95,10 +98,13 @@ export function SubagentsCard({
               <span key={part.key} style={{ ...row, gap: 5 }}>
                 <span style={{ color: theme.secondary }}>{part.label}</span>
                 <strong style={{ fontWeight: 600, ...numeric }}>
-                  {compact(part.value)}
+                  <Tween value={part.value} format={tokensAt} />
                 </strong>
                 <span style={{ color: theme.secondary, ...numeric }}>
-                  {share(part.value, total)}
+                  <Tween
+                    value={part.value}
+                    format={(value) => share(value, total)}
+                  />
                 </span>
               </span>
             ))}
@@ -133,7 +139,7 @@ export function SubagentsCard({
                   </span>
                 ),
                 value: child.tokens,
-                note: share(child.tokens, total),
+                note: (value: number) => share(value, total),
                 color: theme.secondary,
                 title: child.title,
               })),
@@ -149,10 +155,7 @@ export function SubagentsCard({
                         </span>
                       ),
                       value: rest.reduce((sum, child) => sum + child.tokens, 0),
-                      note: share(
-                        rest.reduce((sum, child) => sum + child.tokens, 0),
-                        total,
-                      ),
+                      note: (value: number) => share(value, total),
                       color: theme.track,
                     },
                   ]
@@ -223,7 +226,8 @@ export function ProjectExecutionsCard({
             {child.title || (zh ? "本机执行会话" : "Local execution session")}
           </span>
           <span style={{ ...numeric, color: theme.secondary, flexShrink: 0 }}>
-            {compact(child.tokens)} {zh ? "Token" : "tok"}
+            <Tween value={child.tokens} format={tokensAt} />{" "}
+            {zh ? "Token" : "tok"}
           </span>
           <ChevronRight
             size={10}

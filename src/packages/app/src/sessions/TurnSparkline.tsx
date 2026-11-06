@@ -55,6 +55,7 @@ export function TurnSparkline({
               1.5,
               theme,
               `b${index}`,
+              false,
             );
             tops[index] = top;
             return (

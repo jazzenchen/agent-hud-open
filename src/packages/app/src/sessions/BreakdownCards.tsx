@@ -3,12 +3,13 @@ import { HUDArtwork as HUDLogo } from "@agent-hud/hud/HUDArtwork";
 import { share } from "@agent-hud/ui/format";
 import type { Session, SessionDetail } from "@agent-hud/protocol";
 import { presentKinds } from "../lib/sessions";
+import { Tween, useTweens } from "../statistics/motion";
+import { percentAt, tokensAt, useBarReach } from "./SessionMotion";
 import {
   card,
   CardTitle,
   clipped,
   ColorKey,
-  compact,
   integer,
   kindColor,
   kindLabel,
@@ -17,7 +18,7 @@ import {
   type Theme,
 } from "./SessionTheme";
 
-/** What the tokens were: a bar and each kind present with its share, the sub-agents' part noted. */
+/** What the tokens were: a bar and each kind present with its share, the sub-agents' part noted. The bar fills and the figures count up when first drawn. */
 export function KindsCard({
   detail,
   theme,
@@ -29,6 +30,7 @@ export function KindsCard({
   const usage = detail.usage;
   const kinds = presentKinds(usage);
   const total = usage?.total ?? 0;
+  const reach = useBarReach();
   return (
     <Card style={{ ...card(theme), gap: 8 }}>
       <CardTitle
@@ -45,6 +47,7 @@ export function KindsCard({
             height: 6,
             overflow: "hidden",
             borderRadius: 3,
+            clipPath: reach,
           }}
         >
           {kinds.map(({ kind, value }) => (
@@ -76,7 +79,7 @@ export function KindsCard({
               {kindLabel(kind, zh)}
             </ColorKey>
             <strong style={{ marginLeft: "auto", fontWeight: 600, ...numeric }}>
-              {compact(value)}
+              <Tween value={value} format={tokensAt} />
             </strong>
             <span
               style={{
@@ -87,7 +90,7 @@ export function KindsCard({
                 ...numeric,
               }}
             >
-              {share(value, total)}
+              <Tween value={value} format={(part) => share(part, total)} />
             </span>
           </div>
         ))}
@@ -99,7 +102,7 @@ export function KindsCard({
   );
 }
 
-/** Which models did the work: each with its share, cache hits and tokens. */
+/** Which models did the work: each with its share, cache hits and tokens, its bar filling when first drawn. */
 export function ModelsCard({
   detail,
   session,
@@ -119,6 +122,9 @@ export function ModelsCard({
       model.tokens.cacheWrite +
       model.tokens.reasoning;
   const whole = models.reduce((sum, model) => sum + tokensOf(model), 0);
+  const parts = useTweens(
+    models.map((model) => (whole > 0 ? tokensOf(model) / whole : 0)),
+  );
   return (
     <Card style={{ ...card(theme), gap: 8 }}>
       <CardTitle
@@ -163,9 +169,11 @@ export function ModelsCard({
                   ...numeric,
                 }}
               >
-                {model.cacheHitRate != null
-                  ? `${Math.round(model.cacheHitRate * 100)}%`
-                  : "—"}
+                {model.cacheHitRate != null ? (
+                  <Tween value={model.cacheHitRate * 100} format={percentAt} />
+                ) : (
+                  "—"
+                )}
               </span>
               <strong
                 style={{
@@ -175,7 +183,7 @@ export function ModelsCard({
                   ...numeric,
                 }}
               >
-                {compact(tokens)}
+                <Tween value={tokens} format={tokensAt} />
               </strong>
             </div>
             <span
@@ -192,10 +200,9 @@ export function ModelsCard({
                 style={{
                   display: "block",
                   height: "100%",
-                  width: `${whole > 0 ? (tokens / whole) * 100 : 0}%`,
+                  width: `${(parts[index] ?? 0) * 100}%`,
                   background: theme.input,
                   borderRadius: 2,
-                  transition: "width 240ms cubic-bezier(0.22, 1, 0.36, 1)",
                 }}
               />
             </span>

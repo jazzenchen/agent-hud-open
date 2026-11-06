@@ -1,3 +1,4 @@
+import type { CSSProperties, ReactNode } from "react";
 import { ChevronRight } from "lucide-react";
 import { Card } from "@agent-hud/ui/components/card";
 import { Button } from "@agent-hud/ui/components/button";
@@ -5,6 +6,7 @@ import type { Session, Snapshot } from "@agent-hud/protocol";
 import { sessionClient } from "../lib/sessions";
 import type { useSessions } from "../lib/use-sessions";
 import { DayHeader, RowGrid, rowGridFor } from "./SessionListSection";
+import { reveal, useSettled } from "./SessionMotion";
 import { ListPlaceholder, RowsPlaceholder } from "./SessionPlaceholders";
 import { SessionRow } from "./SessionRow";
 import { TodayCard } from "./TodayCard";
@@ -21,9 +23,23 @@ import {
   type Theme,
 } from "./SessionTheme";
 
+/** A card of rows: those that come after it was drawn fade in on their own. */
+function RowsCard({
+  style,
+  rows,
+}: {
+  style: CSSProperties;
+  rows: (arrived: boolean) => ReactNode;
+}) {
+  const settled = useSettled();
+  return <Card style={style}>{rows(settled)}</Card>;
+}
+
 /**
  * The Sessions list under its controls: what is loading or failed, today's
  * card, the rows under their days (or the last 24 hours), and more to load.
+ * What replaces the grey shapes, and each day or row that comes later,
+ * fades in.
  */
 export function SessionList({
   list,
@@ -77,27 +93,29 @@ export function SessionList({
     (day) => day.start !== null && Date.parse(day.start) === today,
   );
   const cards = (sessions: Session[], noMargin = false) => (
-    <Card
+    <RowsCard
       style={{
         ...card(theme, "0"),
         overflow: "hidden",
         gap: 0,
         marginBottom: noMargin ? 0 : 18,
       }}
-    >
-      {sessions.map((session, index) => (
-        <SessionRow
-          key={session.id}
-          session={session}
-          client={sessionClient(session, providers)}
-          first={index === 0}
-          selected={session.id === selectedId}
-          now={now}
-          theme={theme}
-          onSelect={() => onSelect(session.id)}
-        />
-      ))}
-    </Card>
+      rows={(arrived) =>
+        sessions.map((session, index) => (
+          <SessionRow
+            key={session.id}
+            session={session}
+            client={sessionClient(session, providers)}
+            first={index === 0}
+            selected={session.id === selectedId}
+            now={now}
+            theme={theme}
+            onSelect={() => onSelect(session.id)}
+            arrived={arrived}
+          />
+        ))
+      }
+    />
   );
 
   return (
@@ -141,7 +159,7 @@ export function SessionList({
       )}
       {arrangement === "active"
         ? filtered.length > 0 && (
-            <>
+            <div className={reveal}>
               <DayHeader
                 title={t("Last 24 hours", "最近 24 小时")}
                 count={list.page!.total}
@@ -151,13 +169,13 @@ export function SessionList({
                 chevron={null}
               />
               {cards(filtered)}
-            </>
+            </div>
           )
         : grouped.map((group) => {
             const open = (group.key === today) !== flipped.has(group.key);
             const money = sessionMoney(group.day);
             return (
-              <div key={group.key}>
+              <div key={group.key} className={reveal}>
                 <DayHeader
                   title={titleForDay(group.key, today, zh)}
                   count={group.day.sessions}
@@ -201,7 +219,7 @@ export function SessionList({
             );
           })}
       {list.page && filtered.length === 0 && !list.error && (
-        <Card style={card(theme)}>
+        <Card style={card(theme)} className={reveal}>
           <span style={{ color: theme.secondary, fontSize: 12 }}>
             {filtering
               ? t("No matching sessions", "没有匹配的会话")
