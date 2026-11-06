@@ -25,6 +25,7 @@ import { ModelList } from "./ModelList";
 import { Tween } from "./motion";
 import { Sparkline } from "./Sparkline";
 import { QuotaRows, type QuotaRow } from "./dashboard/QuotaRows";
+import { usePendingLook, type Pending } from "./dashboard/pending";
 import { moneyAmount } from "@agent-hud/ui/format";
 
 export const ProviderCard = memo(function ProviderCard({
@@ -36,6 +37,7 @@ export const ProviderCard = memo(function ProviderCard({
   highlighted = false,
   billing = [],
   quota,
+  pending,
 }: {
   provider: StatisticsProvider;
   total: number;
@@ -46,8 +48,11 @@ export const ProviderCard = memo(function ProviderCard({
   billing?: BillingAccount[];
   /** This agent's quota windows, day by day. */
   quota?: { rows: QuotaRow[]; live: Map<string, Quota> };
+  /** The answers it waits for when a filter changes. */
+  pending?: (Pending | null)[];
 }) {
   const zh = Boolean(theme.zh);
+  const look = usePendingLook(...(pending ?? []));
   const animatedTokens = useAnimatedNumber(provider.selectedTokens);
   const shareTarget = total
     ? Math.round((provider.selectedTokens / total) * 100)
@@ -95,9 +100,10 @@ export const ProviderCard = memo(function ProviderCard({
   return (
     <Card
       id={`agent-${vendorKey(provider.id)}`}
-      className="statistics-agent-card stats-reveal"
+      className={`statistics-agent-card stats-reveal ${look.className}`}
       style={{
         ...card(theme),
+        ...look.style,
         ...(highlighted
           ? {
               border: "1.5px solid #30d158",

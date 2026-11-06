@@ -3,6 +3,7 @@ import { number, plain, type StatsTheme } from "../StatsTheme";
 import { Decrypt } from "../decrypt";
 import { TrendLine } from "./TrendLine";
 import { Bar } from "./Placeholder";
+import { usePendingLook, type Pending } from "./pending";
 
 /** One tile: a label, the figure, one line of context and the figure's trend
  * across the range. Every tile has the same four rows. */
@@ -16,6 +17,7 @@ export function Figure({
   series,
   active,
   onClick,
+  pending,
   theme,
 }: {
   label: string;
@@ -28,8 +30,11 @@ export function Figure({
   series: (number | null)[];
   active?: boolean;
   onClick?: () => void;
+  /** The answer it waits for when a filter changes. */
+  pending?: Pending | null;
   theme: StatsTheme;
 }) {
+  const look = usePendingLook(pending);
   // One figure element throughout, so the digits decrypt into place when
   // the value arrives instead of the tile swapping a bar for text.
   const figure = (
@@ -94,8 +99,9 @@ export function Figure({
       ? `inset 0 0 0 1.5px ${theme.light ? "rgba(0,0,0,.5)" : "rgba(255,255,255,.55)"}`
       : "none",
     transition: "box-shadow 160ms ease",
+    ...look.style,
   } as const;
-  const reveal = loading ? undefined : "stats-reveal";
+  const reveal = loading ? look.className : `stats-reveal ${look.className}`;
   return onClick ? (
     <button
       type="button"

@@ -9,7 +9,6 @@ import type {
 } from "@agent-hud/protocol";
 import {
   number,
-  plain,
   raisedCard,
   row,
   truncate,
@@ -22,8 +21,6 @@ import { useWidth } from "./Panel";
 export interface QuotaRow {
   window: QuotaHistoryWindow;
   days: QuotaDay[];
-  /** The fullest any cycle in the stretch got. */
-  peak: number;
 }
 
 /** Each window of the history as a row of days from `first`. */
@@ -39,7 +36,6 @@ export function quotaRows(
       count > 120
         ? weekly(quotaDays(window, first, count), isLong(window))
         : quotaDays(window, first, count),
-    peak: Math.max(0, ...(window.cycles ?? []).map((cycle) => cycle.used)),
   }));
 }
 
@@ -49,7 +45,7 @@ const GAP = 10;
 /** Quota windows as thin rows of days on one axis: what each day left a
  * weekly window at (its own share darker, a tick where it reset), or the
  * highest a five-hour window reached that day. Grey while fine, amber from
- * 70% and red from 90%; windows that never got past 10% fold away. */
+ * 70% and red from 90%. Every window shows, none folded away. */
 export function QuotaRows({
   rows,
   live,
@@ -72,13 +68,9 @@ export function QuotaRows({
   const language = zh ? "zh-CN" : "en-US";
   const display = useFormat().quotaDisplay ?? "consumed";
   const { ref, width } = useWidth();
-  const [quiet, setQuiet] = useState(false);
   const [hovered, setHovered] = useState<{ row: number; day: number } | null>(
     null,
   );
-  const loud = rows.filter((entry) => entry.peak >= 10);
-  const calm = rows.filter((entry) => entry.peak < 10);
-  const shown = quiet || !loud.length ? rows : loud;
   const count = rows[0]?.days.length ?? 0;
   const plot = Math.max(0, width - label - NOW - GAP * 2);
   const slot = count ? plot / count : 0;
@@ -137,7 +129,7 @@ export function QuotaRows({
       onMouseLeave={() => setHovered(null)}
     >
       {width > 0 &&
-        shown.map((entry, index) => {
+        rows.map((entry, index) => {
           const quota = live.get(entry.window.id);
           const used =
             quota?.status !== "stale" ? (quota?.usedPercent ?? null) : null;
@@ -213,28 +205,7 @@ export function QuotaRows({
             color: theme.secondary,
           }}
         >
-          {calm.length > 0 && loud.length > 0 ? (
-            <button
-              type="button"
-              onClick={() => setQuiet((value) => !value)}
-              title={t(
-                `${calm.length} more windows, none past 10%`,
-                `另有 ${calm.length} 个额度，都没超过 10%`,
-              )}
-              style={{
-                ...plain,
-                ...truncate,
-                fontSize: 10,
-                color: theme.secondary,
-              }}
-            >
-              {quiet
-                ? t("Fewer", "收起")
-                : t(`+${calm.length} more`, `+${calm.length} 个`)}
-            </button>
-          ) : (
-            <span />
-          )}
+          <span />
           <svg width={plot} height={13} style={{ display: "block" }}>
             {ticks.map((column) => (
               <text
@@ -263,7 +234,7 @@ export function QuotaRows({
           <span style={{ textAlign: "right" }}>{t("now", "当前")}</span>
         </div>
       )}
-      {hovered && shown[hovered.row] && (
+      {hovered && rows[hovered.row] && (
         <div
           style={{
             ...raisedCard(theme),
@@ -278,10 +249,10 @@ export function QuotaRows({
           }}
         >
           <strong style={{ fontSize: 12, fontWeight: 600 }}>
-            {day(shown[hovered.row].days[hovered.day].start, true)}
+            {day(rows[hovered.row].days[hovered.day].start, true)}
           </strong>
           <span>
-            {tip(shown[hovered.row], shown[hovered.row].days[hovered.day])}
+            {tip(rows[hovered.row], rows[hovered.row].days[hovered.day])}
           </span>
         </div>
       )}

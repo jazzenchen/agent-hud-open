@@ -1,4 +1,3 @@
-import { useState } from "react";
 import type { StatisticsModel } from "@agent-hud/protocol";
 import { share } from "@agent-hud/ui/format";
 import {
@@ -7,7 +6,6 @@ import {
   integer,
   modelColor,
   number,
-  plain,
   row,
   truncate,
   type StatsTheme,
@@ -88,6 +86,8 @@ export function ModelBar({
   );
 }
 
+/** The top three models, and the rest as one quiet line with their tokens
+ * together; each name and figure is in the line's tooltip. */
 export function ModelList({
   models,
   total,
@@ -97,28 +97,33 @@ export function ModelList({
   total: number;
   theme: StatsTheme;
 }) {
-  const [expanded, setExpanded] = useState(false);
   const zh = Boolean(theme.zh);
+  const rest = models.slice(3);
+  const restTokens = rest.reduce((sum, model) => sum + model.selectedTokens, 0);
   return (
     <div style={{ display: "grid", gap: 5, minWidth: 0, flex: 1 }}>
       <ModelBar models={models} total={total} theme={theme} />
-      {(expanded ? models : models.slice(0, 3)).map((model) => (
+      {models.slice(0, 3).map((model) => (
         <ModelLine key={model.id} model={model} total={total} theme={theme} />
       ))}
-      {models.length > 3 && (
-        <button
-          type="button"
-          onClick={() => setExpanded((value) => !value)}
-          style={{ ...plain, color: theme.secondary, fontSize: 11 }}
+      {rest.length > 0 && (
+        <div
+          style={{ ...row, fontSize: 11, color: theme.secondary }}
+          title={rest
+            .map((model) => `${model.name} · ${compact(model.selectedTokens)}`)
+            .join("\n")}
         >
-          {expanded
-            ? zh
-              ? "收起模型"
-              : "Show fewer models"
-            : zh
-              ? `其余 ${models.length - 3} 个模型`
-              : `${models.length - 3} more models`}
-        </button>
+          <Swatch color="transparent" />
+          <span style={truncate}>
+            {zh ? `其余 ${rest.length} 个模型` : `${rest.length} more models`}
+          </span>
+          <span style={{ marginLeft: "auto", ...number }}>
+            {compact(restTokens)}
+          </span>
+          <span style={{ width: 34, textAlign: "right", ...number }}>
+            {total > 0 ? share(restTokens, total) : "—"}
+          </span>
+        </div>
       )}
     </div>
   );

@@ -5,6 +5,7 @@ import { vendorKey } from "@agent-hud/hud/model";
 import { number, row, truncate, type StatsTheme } from "../StatsTheme";
 import { adviceText } from "../plan-value-text";
 import { Panel } from "./Panel";
+import type { Pending } from "./pending";
 import { Tween } from "../motion";
 import { Bar } from "./Placeholder";
 
@@ -17,6 +18,7 @@ export function PlanList({
   names,
   range,
   highlighted,
+  pending,
   theme,
   light,
 }: {
@@ -31,6 +33,8 @@ export function PlanList({
   range: { value: Map<string, number>; days: number; words: string } | null;
   /** The vendor another window asked for, ringed for a moment. */
   highlighted: string | null;
+  /** The range's answer, while a filter change waits for it. */
+  pending: Pending;
   theme: StatsTheme;
   light: boolean;
 }) {
@@ -52,6 +56,7 @@ export function PlanList({
   return (
     <Panel
       area="plans"
+      pending={[pending]}
       theme={theme}
       title={t("Subscriptions and balances", "订阅与余额")}
       meta={t(

@@ -4,6 +4,7 @@ import { compact, type StatsTheme } from "../StatsTheme";
 import { cacheHit, change, DAY, modelAgents, usd } from "./model";
 import { useTweens } from "../motion";
 import { Figure } from "./FigureTile";
+import type { Pending } from "./pending";
 
 /** "↑ 14%", "↓ 3%", "±0%". */
 function delta(value: number | null) {
@@ -23,6 +24,7 @@ export function Figures({
   compared,
   days,
   agentHasPlan,
+  pending,
   theme,
 }: {
   data: StatisticsResponse | null;
@@ -33,6 +35,8 @@ export function Figures({
   compared: string | null;
   days: number;
   agentHasPlan: boolean;
+  /** The range's answer, while a filter change waits for it. */
+  pending: Pending;
   theme: StatsTheme;
 }) {
   const zh = Boolean(theme.zh);
@@ -82,6 +86,7 @@ export function Figures({
               daily(compact(perDay(tokens))))
         }
         series={buckets.map((bucket) => bucket.selectedTokens)}
+        pending={pending}
         theme={theme}
       />
       <Figure
@@ -100,6 +105,7 @@ export function Figures({
               daily(money(perDay(cost))))
         }
         series={buckets.map((bucket) => bucket.costUSD ?? 0)}
+        pending={pending}
         theme={theme}
       />
       <Figure
@@ -136,6 +142,7 @@ export function Figures({
             .reduce((sum, [, amount]) => sum + amount, 0);
           return value / ((monthly * bucketDays) / 30);
         })}
+        pending={pending}
         theme={theme}
       />
       <Figure
@@ -155,6 +162,7 @@ export function Figures({
               daily(perDay(sessions).toFixed(1)))
         }
         series={buckets.map((bucket) => bucket.sessions ?? 0)}
+        pending={pending}
         theme={theme}
       />
       <Figure
@@ -178,6 +186,7 @@ export function Figures({
               : null
         }
         series={buckets.map((bucket) => cacheHit(bucket.tokens))}
+        pending={pending}
         theme={theme}
       />
     </div>

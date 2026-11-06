@@ -21,6 +21,7 @@ import { Heading } from "./StatsParts";
 import { ProviderCard } from "./ProviderCard";
 import type { QuotaRow } from "./dashboard/QuotaRows";
 import { QuotaCard, quotaOnly } from "./dashboard/QuotaCard";
+import type { Pending } from "./dashboard/pending";
 
 /** The Usage page's By agent section: a card per shown agent in a grid
  * of cards no wider than about 450 points, as many to a row as fit, with a
@@ -39,6 +40,7 @@ export function AgentCards({
   billing,
   quota,
   names,
+  pending,
 }: {
   data: StatisticsResponse | null;
   hiddenAgentCards: string[];
@@ -54,6 +56,8 @@ export function AgentCards({
   quota?: { rows: QuotaRow[]; live: Map<string, Quota> };
   /** Agents' names, for the cards of quota alone. */
   names: Map<string, string>;
+  /** The range's and the quota's answers, while a filter change waits. */
+  pending: { range: Pending; quota: Pending };
 }) {
   const zh = Boolean(theme.zh);
   const t = (en: string, cn: string) => (zh ? cn : en);
@@ -159,6 +163,7 @@ export function AgentCards({
               theme={theme}
               highlighted={highlightedVendor === vendorKey(provider.id)}
               billing={billing}
+              pending={[pending.range, pending.quota]}
               quota={
                 quota && {
                   rows: quota.rows.filter(
@@ -178,6 +183,7 @@ export function AgentCards({
                 name={names.get(vendor) ?? vendor}
                 rows={rows}
                 live={quota.live}
+                pending={pending.quota}
                 theme={theme}
                 light={light}
               />

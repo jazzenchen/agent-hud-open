@@ -42,6 +42,7 @@ export function useOverview({
   accounts,
   quotaSpan,
   reading,
+  rangeKey,
 }: {
   action: Action;
   revision: number;
@@ -59,6 +60,9 @@ export function useOverview({
   /** The history is being read: a stretch with nothing in it yet counts as
    * not answered, so the page shows grey placeholders, not "no usage". */
   reading: boolean;
+  /** The picked range ("30d", or the day picked): with the filters, what
+   * makes a shown answer outdated, unlike its end moving with the clock. */
+  rangeKey: string;
 }) {
   const checked = async (
     method: NativeMethod,
@@ -84,12 +88,14 @@ export function useOverview({
     }),
     [span, kinds, providers, models, timeZone],
   );
+  const filters = JSON.stringify({ kinds, providers, models, timeZone });
   const range = useCoreQuery<StatisticsResponse>(
     checked,
     "statistics",
     query,
     active,
     revision,
+    `${rangeKey}|${filters}`,
   );
   const yearQuery: StatisticsQuery = useMemo(() => {
     const { from, to } = heatmapSpan(end);
@@ -108,6 +114,7 @@ export function useOverview({
     yearQuery,
     active,
     revision,
+    JSON.stringify({ kinds, timeZone }),
   );
   const plans = useCoreQuery<PlanValueResponse>(
     action,
@@ -124,6 +131,24 @@ export function useOverview({
       to: new Date(quotaSpan.to).toISOString(),
     },
     active,
+    undefined,
+    rangeKey,
+  );
+  // Each answer a filter change waits for, and how long the last one took.
+  const pending = useMemo(
+    () => ({
+      range: { active: range.pending, expected: range.expected },
+      year: { active: year.pending, expected: year.expected },
+      quota: { active: quota.pending, expected: quota.expected },
+    }),
+    [
+      range.pending,
+      range.expected,
+      year.pending,
+      year.expected,
+      quota.pending,
+      quota.expected,
+    ],
   );
   const empty = (data: StatisticsResponse | null) =>
     reading && data && !data.buckets.some((bucket) => bucket.selectedTokens > 0)
@@ -136,6 +161,7 @@ export function useOverview({
     loading: !range.data && !range.error && range.fetching,
     year: empty(year.data),
     plans: plans.data,
+    pending,
   };
 }
 

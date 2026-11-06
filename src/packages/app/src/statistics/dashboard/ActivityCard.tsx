@@ -5,6 +5,7 @@ import { Segments } from "../Segments";
 import { DayCalendar } from "./DayCalendar";
 import { HourGrid } from "./HourGrid";
 import { Panel } from "./Panel";
+import type { Pending } from "./pending";
 import { GridPlaceholder } from "./Placeholder";
 
 /** When the tokens were used, in one card: every day as a calendar heatmap
@@ -19,6 +20,7 @@ export function ActivityCard({
   now,
   readBackTo = null,
   focus = null,
+  pending,
   theme,
 }: {
   /** The heatmap's year, for the days. */
@@ -33,6 +35,8 @@ export function ActivityCard({
   readBackTo?: number | null;
   /** The page's range, which the day view brings forward. */
   focus?: { from: number; to: number } | null;
+  /** The year's and the range's answers, while a filter change waits. */
+  pending: { year: Pending; range: Pending };
   theme: StatsTheme;
 }) {
   const zh = Boolean(theme.zh);
@@ -41,6 +45,7 @@ export function ActivityCard({
   return (
     <Panel
       area="heatmap"
+      pending={[view === "days" ? pending.year : pending.range]}
       theme={theme}
       title={t("When you use it", "使用节奏")}
       meta={

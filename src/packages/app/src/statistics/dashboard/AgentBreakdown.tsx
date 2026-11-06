@@ -7,6 +7,7 @@ import { compact, costShort, plain, type StatsTheme } from "../StatsTheme";
 import { agentColor } from "./colors";
 import { Donut, LegendRow } from "./Donut";
 import { Panel } from "./Panel";
+import type { Pending } from "./pending";
 import { Tween } from "../motion";
 
 /** Agents the legend names; the rest fold into one line. */
@@ -19,11 +20,14 @@ import { Bar } from "./Placeholder";
 export function AgentBreakdown({
   data,
   agent,
+  pending,
   theme,
   light,
 }: {
   data: StatisticsResponse | null;
   agent: string | null;
+  /** The range's answer, while a filter change waits for it. */
+  pending: Pending;
   theme: StatsTheme;
   light: boolean;
 }) {
@@ -80,6 +84,7 @@ export function AgentBreakdown({
   return (
     <Panel
       area="agents"
+      pending={[pending]}
       theme={theme}
       style={{ gridTemplateRows: "auto 1fr", alignContent: "stretch" }}
       title={

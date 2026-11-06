@@ -1,5 +1,4 @@
-import { useMemo, useState, type CSSProperties } from "react";
-import { Button } from "@agent-hud/ui/components/button";
+import { useMemo, useState } from "react";
 import { vendorKey } from "@agent-hud/hud/model";
 import type {
   NativeMethod,
@@ -8,13 +7,12 @@ import type {
   StatisticsTokenKind,
 } from "@agent-hud/protocol";
 import { readJSON, storageKeys } from "./lib/storage-keys";
-import { Coverage, IndexingProgress } from "./statistics/StatsParts";
 import {
-  dimensionsLabel,
-  freshKinds,
-  row,
-  themeFor,
-} from "./statistics/StatsTheme";
+  Coverage,
+  IndexingProgress,
+  RefreshFailed,
+} from "./statistics/StatsParts";
+import { dimensionsLabel, freshKinds, themeFor } from "./statistics/StatsTheme";
 import { useStatisticsEnd } from "./statistics/use-statistics-end";
 import { useProviderHighlight } from "./statistics/use-provider-highlight";
 import { quotaRows } from "./statistics/dashboard/QuotaRows";
@@ -26,6 +24,8 @@ import { ActivityCard } from "./statistics/dashboard/ActivityCard";
 import { AgentBreakdown } from "./statistics/dashboard/AgentBreakdown";
 import { PlanList } from "./statistics/dashboard/PlanList";
 import { rangeText } from "./statistics/dashboard/range-text";
+import { usePendingLook } from "./statistics/dashboard/pending";
+import { pageStyle } from "./statistics/dashboard/Panel";
 import {
   useOverview,
   useQuotaSpan,
@@ -53,9 +53,8 @@ interface StatisticsProps {
 }
 
 /** The Usage page: filters on top that every section follows, the big
- * figures, every day as a heatmap, the token chart beside each agent's
- * share, a card per agent, the plans and balances, their quota cycles and
- * the week's hours. Its grid re-flows with the window's width. The native
+ * figures, the plans and balances, every day as a heatmap, the token chart
+ * beside each agent's share, and a card per agent with its quota by day. Its grid re-flows with the window's width. The native
  * window owns the tabs. */
 export default function Statistics({
   snapshot,
@@ -97,8 +96,10 @@ export default function Statistics({
       .join(","),
     quotaSpan: quotaDays.span,
     reading: Boolean(snapshot.indexing && !snapshot.indexing.complete),
+    rangeKey: range.id === "day" ? range.day : range.id,
   });
-  const { data, year, error, loading, plans, quota } = overview;
+  const { data, year, error, loading, plans, quota, pending } = overview;
+  const trendLook = usePendingLook(pending.range);
   const live = useMemo(
     () => new Map(snapshot.quotas.map((entry) => [entry.id, entry])),
     [snapshot.quotas],
@@ -132,7 +133,16 @@ export default function Statistics({
     [quota, agents],
   );
   const prices = useMemo(() => planPrices(plans), [plans]);
-  const returned = data ? planReturn(data, prices, span) : null;
+  // The stretch the shown answer covers: while new filters wait, the old
+  // figures keep their own days rather than the newly picked range's.
+  const shownSpan = useMemo(
+    () =>
+      data
+        ? { from: Date.parse(data.query.from), to: Date.parse(data.query.to) }
+        : span,
+    [data, span],
+  );
+  const returned = data ? planReturn(data, prices, shownSpan) : null;
   const highlightedVendor = useProviderHighlight(
     active,
     Boolean(data),
@@ -146,24 +156,10 @@ export default function Statistics({
       !providers ||
       providers.some((id) => vendorKey(id) === vendorKey(account.vendor)),
   );
-  const content: CSSProperties = {
-    display: "flex",
-    flexDirection: "column",
-    gap: 14,
-    minWidth: 0,
-    fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif',
-    fontSize: 13,
-    lineHeight: 1.35,
-    color: `var(--statistics-text, ${theme.text})`,
-    background: `var(--statistics-ground, ${theme.ground})`,
-    // The frame of the sections drawn without a Panel of their own.
-    ["--stats-border" as string]: theme.border,
-    ["--stats-card" as string]: `var(--statistics-card, ${theme.card})`,
-  };
   return (
     <section
       className="statistics-native stats-dashboard"
-      style={content}
+      style={pageStyle(theme, light)}
       aria-label={t("Usage", "用量")}
       aria-busy={loading}
     >
@@ -180,27 +176,11 @@ export default function Statistics({
         light={light}
       />
       {error && (
-        <div
-          role="alert"
-          style={{
-            ...row,
-            justifyContent: "space-between",
-            color: theme.secondary,
-            fontSize: 12,
-          }}
-        >
-          <span>
-            {t("Refresh failed: ", "刷新失败：")}
-            {error}
-          </span>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setRefresh((value) => value + 1)}
-          >
-            {t("Retry", "重试")}
-          </Button>
-        </div>
+        <RefreshFailed
+          error={error}
+          onRetry={() => setRefresh((value) => value + 1)}
+          theme={theme}
+        />
       )}
       {indexing ? (
         <IndexingProgress text={indexing} theme={theme} />
@@ -216,11 +196,34 @@ export default function Statistics({
             prices={prices}
             plan={returned}
             compared={compared}
-            days={spanDays(span)}
+            days={spanDays(shownSpan)}
             agentHasPlan={!providers || providers.some((id) => prices.has(id))}
+            pending={pending.range}
             theme={theme}
           />
         </div>
+        <PlanList
+          data={plans}
+          agents={providers}
+          balances={billing}
+          names={names}
+          range={
+            data && {
+              value: new Map(
+                data.providers.map((provider) => [
+                  provider.id,
+                  usd(provider.cost?.amounts) ?? 0,
+                ]),
+              ),
+              days: spanDays(shownSpan),
+              words: rangeWords,
+            }
+          }
+          highlighted={highlightedVendor}
+          pending={pending.range}
+          theme={theme}
+          light={light}
+        />
         <ActivityCard
           year={year}
           range={data}
@@ -234,9 +237,13 @@ export default function Statistics({
               ? Date.parse(snapshot.indexing.readBackTo)
               : null
           }
+          pending={pending}
           theme={theme}
         />
-        <div className="stats-panel stats-area-trend stats-card">
+        <div
+          className={`stats-panel stats-area-trend stats-card ${trendLook.className}`}
+          style={trendLook.style}
+        >
           <TokenUsage
             data={data}
             loading={loading}
@@ -252,6 +259,7 @@ export default function Statistics({
         <AgentBreakdown
           data={data}
           agent={single}
+          pending={pending.range}
           theme={theme}
           light={light}
         />
@@ -269,29 +277,9 @@ export default function Statistics({
             billing={snapshot.billing}
             quota={{ rows, live }}
             names={names}
+            pending={pending}
           />
         </div>
-        <PlanList
-          data={plans}
-          agents={providers}
-          balances={billing}
-          names={names}
-          range={
-            data && {
-              value: new Map(
-                data.providers.map((provider) => [
-                  provider.id,
-                  usd(provider.cost?.amounts) ?? 0,
-                ]),
-              ),
-              days: spanDays(span),
-              words: rangeWords,
-            }
-          }
-          highlighted={highlightedVendor}
-          theme={theme}
-          light={light}
-        />
       </div>
     </section>
   );

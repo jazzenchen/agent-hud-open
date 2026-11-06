@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { Button } from "@agent-hud/ui/components/button";
 import type { IndexingText } from "@agent-hud/ui/text/indexing";
 import type { StatisticsCoverage, StatisticsTotal } from "@agent-hud/protocol";
 import {
@@ -11,6 +12,38 @@ import {
   useAnimatedNumber,
   type StatsTheme,
 } from "./StatsTheme";
+
+/** A refresh that failed, with its reason and a retry. */
+export function RefreshFailed({
+  error,
+  onRetry,
+  theme,
+}: {
+  error: string;
+  onRetry: () => void;
+  theme: StatsTheme;
+}) {
+  const zh = Boolean(theme.zh);
+  return (
+    <div
+      role="alert"
+      style={{
+        ...row,
+        justifyContent: "space-between",
+        color: theme.secondary,
+        fontSize: 12,
+      }}
+    >
+      <span>
+        {zh ? "刷新失败：" : "Refresh failed: "}
+        {error}
+      </span>
+      <Button variant="ghost" size="sm" onClick={onRetry}>
+        {zh ? "重试" : "Retry"}
+      </Button>
+    </div>
+  );
+}
 
 export function Coverage({
   coverage,

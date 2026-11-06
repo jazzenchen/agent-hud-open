@@ -2,6 +2,7 @@ import { HUDArtwork as HUDLogo } from "@agent-hud/hud/HUDArtwork";
 import { vendorKey } from "@agent-hud/hud/model";
 import type { Quota, StatisticsProvider } from "@agent-hud/protocol";
 import { card, row, truncate, type StatsTheme } from "../StatsTheme";
+import { usePendingLook, type Pending } from "./pending";
 import { QuotaRows, type QuotaRow } from "./QuotaRows";
 
 /** The quota windows of agents with no card of their own (no tokens
@@ -27,6 +28,7 @@ export function QuotaCard({
   name,
   rows,
   live,
+  pending,
   theme,
   light,
 }: {
@@ -34,15 +36,19 @@ export function QuotaCard({
   name: string;
   rows: QuotaRow[];
   live: Map<string, Quota>;
+  /** The quota's answer, while a filter change waits for it. */
+  pending?: Pending | null;
   theme: StatsTheme;
   light: boolean;
 }) {
   const zh = Boolean(theme.zh);
+  const look = usePendingLook(pending);
   return (
     <div
-      className="stats-reveal"
+      className={`stats-reveal ${look.className}`}
       style={{
         ...card(theme),
+        ...look.style,
         display: "grid",
         alignContent: "start",
         gap: 12,
