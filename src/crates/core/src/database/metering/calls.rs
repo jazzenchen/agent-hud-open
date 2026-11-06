@@ -3,8 +3,9 @@
 use super::{call_list_cost, tools_from, unsigned, usage};
 use crate::Usage;
 use chrono::{DateTime, Utc};
-use rusqlite::{params, Connection};
+use rusqlite::{params, Connection, OptionalExtension};
 use serde_json::{json, Value};
+use std::collections::{BTreeMap, HashSet};
 
 /// The prompt and compaction marks of these logs, each oldest first.
 pub(crate) fn marks(db: &Connection, paths: &[String]) -> rusqlite::Result<(Vec<i64>, Vec<i64>)> {
@@ -94,39 +95,65 @@ pub(crate) fn prompt_before(
 /// Prompt tokens sent again because the cache no longer held them
 /// (agent-hud-native-open `UsageLedger.recachedBuckets`): each call in a log that
 /// marks its prompts, against the call before it in that log, by the rule a
-/// session's turns count them. By 15-minute bucket, source and model:
-/// (bucket, source, model, sent, sent as cache writes).
+/// session's turns count them. By 15-minute bucket, source and model, for
+/// the calls from `since` (back to its quarter hour) until `until`: (bucket,
+/// source, model, sent, sent as cache writes), in that order.
+///
+/// Only those calls are read, each log's from an index seek, with the last
+/// call before `since` as the first one's previous.
 pub(crate) fn recached(
     db: &Connection,
     paths: &[String],
     since: i64,
+    until: i64,
 ) -> rusqlite::Result<Vec<(i64, String, String, u64, u64)>> {
-    let selected = json!(paths).to_string();
-    let mut statement = db.prepare_cached(
-        "SELECT r.bucket,r.source,r.model,SUM(r.sent),SUM(CASE WHEN r.wrote THEN r.sent ELSE 0 END) FROM (
-            SELECT (e.at_ms/900000)*900000 AS bucket,e.source,e.model,e.input+e.cache_write AS sent,
-                   e.cache_read,e.cache_write>0 AS wrote,e.at_ms,
-                   LAG(e.input+e.cache_write+e.cache_read) OVER (PARTITION BY e.contribution ORDER BY e.at_ms,e.event_key) AS previous
-            FROM usage_meter_event e
-            WHERE e.contribution IN (SELECT value FROM json_each(?1))
-              AND EXISTS (SELECT 1 FROM usage_meter_mark m WHERE m.contribution=e.contribution AND m.kind=0)
-         ) r
-         WHERE r.previous IS NOT NULL AND r.cache_read*2<r.previous AND r.sent*2>=r.previous AND r.at_ms>=?2
-         GROUP BY r.bucket,r.source,r.model",
+    let since = since.div_euclid(900_000) * 900_000;
+    let marked = db
+        .prepare_cached("SELECT DISTINCT contribution FROM usage_meter_mark WHERE kind=0")?
+        .query_map([], |row| row.get::<_, String>(0))?
+        .collect::<rusqlite::Result<HashSet<_>>>()?;
+    let mut before = db.prepare_cached(
+        "SELECT input+cache_write+cache_read FROM usage_meter_event
+         WHERE contribution=?1 AND at_ms<?2 ORDER BY at_ms DESC,event_key DESC LIMIT 1",
     )?;
-    let rows = statement.query_map(
-        params![selected, since.div_euclid(900_000) * 900_000],
-        |row| {
-            Ok((
-                row.get::<_, i64>(0)?,
-                row.get::<_, String>(1)?,
-                row.get::<_, String>(2)?,
-                unsigned(row, 3)?,
-                unsigned(row, 4)?,
-            ))
-        },
+    let mut calls = db.prepare_cached(
+        "SELECT at_ms,source,model,input+cache_write,cache_read,cache_write>0 FROM usage_meter_event
+         WHERE contribution=?1 AND at_ms>=?2 AND at_ms<?3 ORDER BY at_ms,event_key",
     )?;
-    rows.collect()
+    let mut sums = BTreeMap::<(i64, String, String), (u64, u64)>::new();
+    let mut seen = HashSet::new();
+    for path in paths {
+        if !marked.contains(path) || !seen.insert(path) {
+            continue;
+        }
+        let mut previous = before
+            .query_row(params![path, since], |row| row.get::<_, i64>(0))
+            .optional()?
+            .map(i128::from);
+        let mut rows = calls.query(params![path, since, until])?;
+        while let Some(row) = rows.next()? {
+            let sent = i128::from(row.get::<_, i64>(3)?);
+            let read = i128::from(row.get::<_, i64>(4)?);
+            if previous.is_some_and(|previous| read * 2 < previous && sent * 2 >= previous) {
+                let at = row.get::<_, i64>(0)?;
+                let key = (
+                    at / 900_000 * 900_000,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, String>(2)?,
+                );
+                let sum = sums.entry(key).or_default();
+                sum.0 += sent as u64;
+                if row.get::<_, bool>(5)? {
+                    sum.1 += sent as u64;
+                }
+            }
+            previous = Some(sent + read);
+        }
+    }
+    Ok(sums
+        .into_iter()
+        .map(|((at, source, model), (sent, written))| (at, source, model, sent, written))
+        .collect())
 }
 
 pub(crate) fn contribution_usage(db: &Connection, path: &str) -> rusqlite::Result<Usage> {

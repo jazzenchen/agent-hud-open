@@ -203,6 +203,11 @@ pub(crate) fn schema(db: &Connection) -> rusqlite::Result<()> {
         CREATE INDEX IF NOT EXISTS usage_meter_event_updated ON usage_meter_event(updated_at_ms);
         CREATE INDEX IF NOT EXISTS usage_meter_bucket_updated ON usage_meter_bucket(updated_at_ms);",
     )?;
+    // The calls with no model, which the statistics count by time.
+    db.execute_batch(
+        "CREATE INDEX IF NOT EXISTS usage_meter_event_unknown ON usage_meter_event(at_ms)
+            WHERE model='' OR lower(model)='unknown';",
+    )?;
 
     remove_turn_text(db)?;
     forget_dashboard_usage(db)

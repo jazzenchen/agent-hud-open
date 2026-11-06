@@ -144,12 +144,12 @@ pub(super) fn unavailable(query: &Query, ctx: &Context) -> Result<Value, String>
     let data = Data {
         revision: ctx.revision,
         from: floor(query.to - 30 * DAY),
-        to: query.last_bucket(),
         rows: Vec::new(),
         models: BTreeMap::new(),
         bounds: HashMap::new(),
         unknown: Vec::new(),
         recached: Vec::new(),
+        recached_from: i64::MIN,
     };
     build(query, &data, ctx, |_| None, |_| None)
 }

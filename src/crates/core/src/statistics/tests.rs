@@ -24,7 +24,6 @@ fn a_clients_cache_reads_share_its_price_and_re_caching_costs_at_list() {
     let data = Data {
         revision: 0,
         from: to - 30 * DAY,
-        to,
         rows: vec![
             bucket("claude-opus-4-5", to - 2 * QUARTER, used),
             bucket("no-such-model", to - 2 * QUARTER, used),
@@ -49,6 +48,7 @@ fn a_clients_cache_reads_share_its_price_and_re_caching_costs_at_list() {
                 0,
             ),
         ],
+        recached_from: to - 30 * DAY,
     };
     let (share, recached) = spending(&query, &data)["claude"];
     let price = |tokens: pricing::PriceTokens| {
@@ -113,7 +113,6 @@ fn a_range_counts_its_sessions_compares_with_the_stretch_before_and_prices_each_
     let data = Data {
         revision: 0,
         from: to - 30 * DAY,
-        to,
         rows: vec![
             bucket("/logs/a.jsonl", to - 3 * QUARTER),
             bucket("/logs/b.jsonl", to - 2 * QUARTER),
@@ -125,6 +124,7 @@ fn a_range_counts_its_sessions_compares_with_the_stretch_before_and_prices_each_
         bounds: HashMap::from([("claude".to_string(), (to - 30 * DAY, to))]),
         unknown: Vec::new(),
         recached: Vec::new(),
+        recached_from: to - 30 * DAY,
     };
     let ctx = Context {
         pending: Vec::new(),

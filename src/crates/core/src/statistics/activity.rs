@@ -8,23 +8,22 @@ use crate::{iso, pricing};
 use serde_json::{json, Value};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
-type SessionKey = (String, String);
+type SessionKey<'a> = (&'a str, &'a str);
 
-#[derive(Default)]
-pub(super) struct Activity {
+pub(super) struct Activity<'a> {
     /// Where the stretch before the range begins, when the loaded buckets
     /// reach back that far.
     pub(super) previous_from: Option<i64>,
     previous: Total,
-    previous_sessions: BTreeSet<SessionKey>,
-    sessions: BTreeSet<SessionKey>,
-    column_sessions: Vec<BTreeSet<SessionKey>>,
-    column_costs: Vec<BTreeMap<String, f64>>,
-    client_last: BTreeMap<String, i64>,
-    session_last: BTreeMap<SessionKey, i64>,
+    previous_sessions: BTreeSet<SessionKey<'a>>,
+    sessions: BTreeSet<SessionKey<'a>>,
+    column_sessions: Vec<BTreeSet<SessionKey<'a>>>,
+    column_costs: Vec<BTreeMap<&'a str, f64>>,
+    client_last: BTreeMap<&'a str, i64>,
+    session_last: BTreeMap<SessionKey<'a>, i64>,
     /// Each log's session, where it is a sub-agent's or worker's log: its
     /// tokens count toward the session it works for, not a session of its own.
-    roots: HashMap<String, String>,
+    roots: &'a HashMap<String, String>,
 }
 
 fn usd(cost: Option<&pricing::ModelCost>) -> f64 {
@@ -32,23 +31,27 @@ fn usd(cost: Option<&pricing::ModelCost>) -> f64 {
         .map_or(0.0, |cost| cost.amount_pico as f64 / 1e12)
 }
 
-impl Activity {
+impl<'a> Activity<'a> {
     pub(super) fn new(
         columns: usize,
         previous_from: Option<i64>,
-        roots: HashMap<String, String>,
+        roots: &'a HashMap<String, String>,
     ) -> Self {
         Self {
             previous_from,
-            roots,
+            previous: Total::default(),
+            previous_sessions: BTreeSet::new(),
+            sessions: BTreeSet::new(),
             column_sessions: vec![BTreeSet::new(); columns],
             column_costs: vec![BTreeMap::new(); columns],
-            ..Self::default()
+            client_last: BTreeMap::new(),
+            session_last: BTreeMap::new(),
+            roots,
         }
     }
 
     /// A bucket in the stretch before the range.
-    pub(super) fn before(&mut self, b: &Bucket, count: u64, cost: Option<&pricing::ModelCost>) {
+    pub(super) fn before(&mut self, b: &'a Bucket, count: u64, cost: Option<&pricing::ModelCost>) {
         self.previous.add(b, count, cost);
         if count > 0 {
             let session = self.session(b);
@@ -60,20 +63,20 @@ impl Activity {
     pub(super) fn within(
         &mut self,
         column: usize,
-        b: &Bucket,
-        id: &str,
+        b: &'a Bucket,
+        id: &'a str,
         count: u64,
         cost: Option<&pricing::ModelCost>,
     ) {
         if count == 0 {
             return;
         }
-        let key = (b.source.clone(), b.contribution.clone());
+        let key = (b.source.as_str(), b.contribution.as_str());
         let session = self.session(b);
-        self.sessions.insert(session.clone());
+        self.sessions.insert(session);
         self.column_sessions[column].insert(session);
-        *self.column_costs[column].entry(id.to_owned()).or_default() += usd(cost);
-        let last = self.client_last.entry(b.source.clone()).or_default();
+        *self.column_costs[column].entry(id).or_default() += usd(cost);
+        let last = self.client_last.entry(&b.source).or_default();
         *last = (*last).max(b.at);
         let last = self.session_last.entry(key).or_default();
         *last = (*last).max(b.at);
@@ -81,13 +84,13 @@ impl Activity {
 
     /// The session a bucket counts toward: its log's, or the one its log
     /// works for.
-    fn session(&self, b: &Bucket) -> SessionKey {
+    fn session(&self, b: &'a Bucket) -> SessionKey<'a> {
+        let roots: &'a HashMap<String, String> = self.roots;
         (
-            b.source.clone(),
-            self.roots
+            &b.source,
+            roots
                 .get(&b.contribution)
-                .cloned()
-                .unwrap_or_else(|| b.contribution.clone()),
+                .map_or(&b.contribution, |root| root),
         )
     }
 
@@ -119,7 +122,7 @@ impl Activity {
             json!(costs
                 .iter()
                 .filter(|(_, value)| **value > 0.0)
-                .map(|(id, value)| (id.clone(), rounded(*value)))
+                .map(|(id, value)| (*id, rounded(*value)))
                 .collect::<BTreeMap<_, _>>()),
         )
     }
@@ -127,7 +130,7 @@ impl Activity {
     /// A client's sessions in the range and when it last worked.
     pub(super) fn client(&self, source: &str) -> (usize, Value) {
         (
-            self.sessions.iter().filter(|(s, _)| s == source).count(),
+            self.sessions.iter().filter(|(s, _)| *s == source).count(),
             self.client_last
                 .get(source)
                 .map_or(Value::Null, |at| json!(iso(*at))),
@@ -137,7 +140,7 @@ impl Activity {
     /// When a session last worked in the range.
     pub(super) fn session_last(&self, source: &str, path: &str) -> Value {
         self.session_last
-            .get(&(source.to_owned(), path.to_owned()))
+            .get(&(source, path))
             .map_or(Value::Null, |at| json!(iso(*at)))
     }
 }

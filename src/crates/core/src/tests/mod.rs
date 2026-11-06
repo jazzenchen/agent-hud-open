@@ -9,6 +9,7 @@ mod ingestion;
 mod plan_value;
 mod quota_history;
 mod sessions;
+mod statistics;
 mod workbuddy;
 
 #[test]

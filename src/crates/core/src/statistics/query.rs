@@ -142,7 +142,7 @@ impl Query {
         floor(self.from)
     }
 
-    pub(super) fn last_bucket(&self) -> i64 {
+    fn last_bucket(&self) -> i64 {
         ceil(self.to)
     }
 
@@ -171,7 +171,8 @@ pub(super) struct Money {
 }
 
 impl Money {
-    fn add(&mut self, id: &str, tokens: u64, cost: Option<&pricing::ModelCost>) {
+    /// `id` names the model, asked only when it has no price.
+    fn add(&mut self, id: impl FnOnce() -> String, tokens: u64, cost: Option<&pricing::ModelCost>) {
         if tokens == 0 {
             return;
         }
@@ -180,7 +181,7 @@ impl Money {
             self.priced += tokens;
         } else {
             self.unpriced += tokens;
-            self.unknown.insert(id.into());
+            self.unknown.insert(id());
         }
     }
     fn json(&self) -> Value {
@@ -216,7 +217,7 @@ impl Total {
         self.tokens.add(b.tokens);
         self.selected += selected;
         self.cost
-            .add(&model_id(&b.source, &b.model), selected, cost);
+            .add(|| model_id(&b.source, &b.model), selected, cost);
     }
     pub(super) fn json(&self) -> Value {
         json!({"tokens":tokens_json(self.tokens),"selectedTokens":self.selected,"cost":self.cost.json()})
@@ -262,8 +263,9 @@ mod tests {
     #[test]
     fn unpriced_models_are_named_as_people_read_them() {
         let mut money = Money::default();
-        money.add("claude-model:qwen3-coder:30b", 1_000, None);
-        money.add("claude-model:qwen3-coder:30b", 500, None);
+        let id = || "claude-model:qwen3-coder:30b".to_string();
+        money.add(id, 1_000, None);
+        money.add(id, 500, None);
         let json = money.json();
         assert_eq!(json["unpricedTokens"], 1_500);
         assert_eq!(json["unpricedModels"][0], "claude-model:qwen3-coder:30b");

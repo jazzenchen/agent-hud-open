@@ -127,6 +127,16 @@ pub(crate) struct StatsBucketRow {
     pub tokens: Usage,
 }
 
+/// The calls with no model, by 15-minute bucket. The model test matches
+/// `usage_meter_event_unknown`, so only those calls are read; `+contribution`
+/// keeps SQLite from walking every selected log's calls instead.
+pub(super) const UNKNOWN_CALLS: &str = "SELECT source,model,(at_ms/900000)*900000,count(*)
+     FROM usage_meter_event
+     WHERE (model='' OR lower(model)='unknown') AND at_ms>=?2 AND at_ms<?3
+       AND +contribution IN (SELECT value FROM json_each(?1))
+       AND input+output+cache_read+cache_write+reasoning>0
+     GROUP BY source,model,(at_ms/900000)*900000";
+
 pub(crate) fn query_statistics_data(
     db: &Connection,
     paths: &[String],
@@ -200,16 +210,7 @@ pub(crate) fn query_statistics_data(
     }
     let mut unknown_rows = Vec::new();
     {
-        let mut s = db
-            .prepare(
-                "WITH selected(contribution) AS (SELECT value FROM json_each(?1))
-                 SELECT source,model,(at_ms/900000)*900000,count(*)
-                 FROM usage_meter_event JOIN selected USING(contribution)
-                 WHERE at_ms>=?2 AND at_ms<?3 AND (model='' OR lower(model)='unknown')
-                   AND input+output+cache_read+cache_write+reasoning>0
-                 GROUP BY source,model,(at_ms/900000)*900000",
-            )
-            .map_err(sql_error)?;
+        let mut s = db.prepare(UNKNOWN_CALLS).map_err(sql_error)?;
         let rows = s
             .query_map(params![selected, from, to], |r| {
                 Ok((r.get(0)?, r.get(1)?, r.get(2)?, unsigned(r, 3)?))

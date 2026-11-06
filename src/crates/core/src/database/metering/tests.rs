@@ -424,6 +424,7 @@ fn re_cached_prompts_count_in_logs_that_mark_their_prompts() {
         &db,
         &["/logs/s.jsonl".into(), "/logs/u.jsonl".into()],
         now - 86_400_000,
+        i64::MAX,
     )
     .unwrap();
     assert_eq!(
@@ -435,6 +436,150 @@ fn re_cached_prompts_count_in_logs_that_mark_their_prompts() {
         (rows[0].3, rows[0].4),
         (1_110, 1_110),
         "sent again, as cache writes"
+    );
+}
+
+#[test]
+fn re_cached_prompts_from_a_time_on_are_those_of_the_whole_record() {
+    let db = Connection::open_in_memory().unwrap();
+    crate::database::schema(&db).unwrap();
+    let start = 1_790_000_000_000i64 / 900_000 * 900_000;
+    // Calls five minutes apart over two hours, two of them at the same
+    // moment now and then, with prompts that grow and lapse in turn.
+    let mut seed = 7u64;
+    let mut next = |range: u64| {
+        seed = seed.wrapping_mul(6_364_136_223_846_793_005).wrapping_add(1);
+        (seed >> 33) % range
+    };
+    let mut calls = BTreeMap::<&str, Vec<Event>>::new();
+    for path in ["/logs/s.jsonl", "/logs/t.jsonl", "/logs/u.jsonl"] {
+        let mut at = start;
+        for index in 0..24 {
+            if next(4) != 0 {
+                at += 300_000;
+            }
+            calls.entry(path).or_default().push(Event {
+                usage: Usage {
+                    input: [10, 600, 2_000][next(3) as usize],
+                    write: [0, 1_000][next(2) as usize],
+                    read: [0, 1_000, 3_000][next(3) as usize],
+                    output: 10,
+                    reasoning: 0,
+                },
+                ..event(&format!("k{}", 99 - index), at)
+            });
+        }
+    }
+    // u's calls start well before the others'.
+    for call in calls.get_mut("/logs/u.jsonl").unwrap() {
+        call.at -= 3_600_000;
+    }
+    for (path, events) in &calls {
+        write(&db, path, "claude", events).unwrap();
+    }
+    for path in ["/logs/s.jsonl", "/logs/u.jsonl"] {
+        let prompt = Mark {
+            at: start,
+            kind: MarkKind::Prompt,
+        };
+        write_marks(&db, path, &[prompt]).unwrap();
+    }
+    let paths = calls
+        .keys()
+        .map(|path| path.to_string())
+        .collect::<Vec<_>>();
+    // The form before `recached` was bounded: every call of a log against
+    // the one before it, those before `since` dropped afterwards.
+    let whole = |since: i64| {
+        db.prepare(
+            "SELECT r.bucket,r.source,r.model,SUM(r.sent),SUM(CASE WHEN r.wrote THEN r.sent ELSE 0 END) FROM (
+                SELECT (e.at_ms/900000)*900000 AS bucket,e.source,e.model,e.input+e.cache_write AS sent,
+                       e.cache_read,e.cache_write>0 AS wrote,e.at_ms,
+                       LAG(e.input+e.cache_write+e.cache_read) OVER (PARTITION BY e.contribution ORDER BY e.at_ms,e.event_key) AS previous
+                FROM usage_meter_event e
+                WHERE e.contribution IN (SELECT value FROM json_each(?1))
+                  AND EXISTS (SELECT 1 FROM usage_meter_mark m WHERE m.contribution=e.contribution AND m.kind=0)
+             ) r
+             WHERE r.previous IS NOT NULL AND r.cache_read*2<r.previous AND r.sent*2>=r.previous AND r.at_ms>=?2
+             GROUP BY r.bucket,r.source,r.model",
+        )
+        .unwrap()
+        .query_map(
+            rusqlite::params![json!(paths).to_string(), since.div_euclid(900_000) * 900_000],
+            |row| {
+                Ok((
+                    row.get::<_, i64>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, String>(2)?,
+                    row.get::<_, i64>(3)? as u64,
+                    row.get::<_, i64>(4)? as u64,
+                ))
+            },
+        )
+        .unwrap()
+        .collect::<rusqlite::Result<Vec<_>>>()
+        .unwrap()
+    };
+    let mut counted = 0;
+    let quarters = (-8..12).map(|quarter| start + quarter * 900_000);
+    for since in quarters.clone().chain([start + 1, 0]) {
+        let rows = recached(&db, &paths, since, i64::MAX).unwrap();
+        assert_eq!(rows, whole(since), "since {since}");
+        counted += rows.len();
+        // Read in two stretches, the earlier one first.
+        for until in quarters.clone().filter(|until| *until > since) {
+            let mut rows = recached(&db, &paths, since, until).unwrap();
+            rows.extend(recached(&db, &paths, until, i64::MAX).unwrap());
+            assert_eq!(rows, whole(since), "since {since} until {until}");
+        }
+    }
+    assert!(counted > 20, "the calls re-cache now and then: {counted}");
+    // A log whose first call after `since` follows one before it: s's call
+    // at the quarter is weighed against the last one before.
+    let s = &calls["/logs/s.jsonl"];
+    let first = s
+        .iter()
+        .position(|call| call.at >= start + 900_000)
+        .unwrap();
+    assert!(first > 0 && s[first - 1].at < start + 900_000);
+}
+
+#[test]
+fn calls_with_no_model_are_found_through_their_own_index() {
+    let db = Connection::open_in_memory().unwrap();
+    crate::database::schema(&db).unwrap();
+    let plan = db
+        .prepare(&format!("EXPLAIN QUERY PLAN {}", queries::UNKNOWN_CALLS))
+        .unwrap()
+        .query_map(rusqlite::params!["[]", 0, 1], |row| row.get::<_, String>(3))
+        .unwrap()
+        .collect::<rusqlite::Result<Vec<_>>>()
+        .unwrap()
+        .join("\n");
+    assert!(
+        plan.contains("USING INDEX usage_meter_event_unknown"),
+        "{plan}"
+    );
+    // Each log's calls with no model are counted, others' left out.
+    let unknown = |key: &str, model: &str| Event {
+        model: model.into(),
+        ..event(key, 1_790_000_100_000)
+    };
+    let events = [
+        unknown("a", ""),
+        unknown("b", "Unknown"),
+        unknown("c", "claude-opus-4-5"),
+    ];
+    write(&db, "/logs/s.jsonl", "claude", &events).unwrap();
+    write(&db, "/logs/t.jsonl", "claude", &events).unwrap();
+    let (_, _, rows) = query_statistics_data(&db, &["/logs/s.jsonl".into()], 0, i64::MAX).unwrap();
+    let bucket = 1_790_000_100_000 / 900_000 * 900_000;
+    assert_eq!(
+        rows,
+        vec![
+            ("claude".into(), "".into(), bucket, 1),
+            ("claude".into(), "Unknown".into(), bucket, 1)
+        ]
     );
 }
 
