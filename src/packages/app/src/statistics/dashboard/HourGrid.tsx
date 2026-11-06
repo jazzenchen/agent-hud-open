@@ -62,7 +62,7 @@ function HeatmapRow({
                     : "transparent",
                   border: known ? 0 : "1px dashed currentColor",
                   opacity: known ? 1 : 0.2,
-                  transition: "background-color 220ms ease, opacity 220ms ease",
+                  transition: "background-color 420ms ease, opacity 420ms ease",
                 }}
               />
             </Tooltip.Trigger>
@@ -131,7 +131,7 @@ export const HourGrid = memo(function HourGrid({
       theme,
     );
   return (
-    <div style={{ display: "grid", gap: 6 }}>
+    <div className="stats-reveal" style={{ display: "grid", gap: 6 }}>
       <div
         style={{
           display: "grid",

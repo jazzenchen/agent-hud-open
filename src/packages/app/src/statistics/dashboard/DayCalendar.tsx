@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { StatisticsResponse } from "@agent-hud/protocol";
 import { row, type StatsTheme } from "../StatsTheme";
 import { dayKey, modelAgents, startOfDay } from "./model";
@@ -38,6 +38,14 @@ export function DayCalendar({
   const t = (en: string, cn: string) => (zh ? cn : en);
   const language = zh ? "zh-CN" : "en-US";
   const { ref, width } = useWidth();
+  // The cells first draw empty and take their colours a frame later, so the
+  // colour sweeps in when the days arrive.
+  const [entered, setEntered] = useState(false);
+  useEffect(() => {
+    if (!data) return setEntered(false);
+    const frame = requestAnimationFrame(() => setEntered(true));
+    return () => cancelAnimationFrame(frame);
+  }, [Boolean(data)]);
   const [hovered, setHovered] = useState<{
     day: Day;
     x: number;
@@ -133,6 +141,7 @@ export function DayCalendar({
     <>
       <div
         ref={ref}
+        className="stats-reveal"
         style={{
           display: "grid",
           gap: 14,
@@ -188,25 +197,29 @@ export function DayCalendar({
                     width={cell}
                     height={cell}
                     rx={Math.min(3, cell / 4)}
-                    fill={
-                      day.outside
+                    stroke={selected ? theme.text : "none"}
+                    strokeWidth={selected ? 1.5 : 0}
+                    style={{
+                      // A day's colour and fade change gradually as data
+                      // arrives or the range moves.
+                      fill: day.outside
                         ? theme.light
                           ? "rgba(0,0,0,.03)"
                           : "rgba(255,255,255,.025)"
-                        : heatColor(level(day.value), theme)
-                    }
-                    opacity={
-                      focus &&
-                      (day.start < startOfDay(focus.from) ||
-                        day.start >= focus.to)
-                        ? 0.25
-                        : pending !== null && day.start <= pending
-                          ? 0.4
-                          : 1
-                    }
-                    stroke={selected ? theme.text : "none"}
-                    strokeWidth={selected ? 1.5 : 0}
-                    style={{ cursor: day.outside ? "default" : "pointer" }}
+                        : heatColor(entered ? level(day.value) : 0, theme),
+                      opacity:
+                        focus &&
+                        (day.start < startOfDay(focus.from) ||
+                          day.start >= focus.to)
+                          ? 0.25
+                          : pending !== null && day.start <= pending
+                            ? 0.4
+                            : 1,
+                      transition: "fill 420ms ease, opacity 420ms ease",
+                      // The colour sweeps in from the newest week back.
+                      transitionDelay: `${(weeks.length - 1 - column) * 6}ms`,
+                      cursor: day.outside ? "default" : "pointer",
+                    }}
                     onMouseEnter={() => setHovered({ day, x, y })}
                     onClick={() => !day.outside && onSelectDay(day.key)}
                   />

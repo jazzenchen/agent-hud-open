@@ -1,6 +1,8 @@
 import { HUDArtwork as HUDLogo } from "@agent-hud/hud/HUDArtwork";
 import { number, plain, row, truncate, type StatsTheme } from "../StatsTheme";
 import { arcPath } from "./curves";
+import { useTweens } from "../motion";
+import type { ReactNode } from "react";
 
 const SIZE = 132;
 const GAP = 0.025;
@@ -20,11 +22,18 @@ export function Donut({
   total: number;
   hovered: string | null;
   setHovered: (id: string | null) => void;
-  center: string;
+  center: ReactNode;
   caption: string;
   theme: StatsTheme;
 }) {
   const r = SIZE / 2;
+  // Slices sweep to their new shares, from nothing the first time.
+  const values = useTweens(parts.map((part) => part.value));
+  const sum = Math.max(
+    1,
+    total,
+    values.reduce((all, value) => all + value, 0),
+  );
   let angle = 0;
   return (
     <svg
@@ -34,8 +43,8 @@ export function Donut({
       onMouseLeave={() => setHovered(null)}
       aria-hidden
     >
-      {parts.map((part) => {
-        const sweep = (part.value / Math.max(1, total)) * Math.PI * 2;
+      {parts.map((part, index) => {
+        const sweep = ((values[index] ?? 0) / sum) * Math.PI * 2;
         const start = angle;
         angle += sweep;
         if (sweep <= 0) return null;
@@ -102,7 +111,7 @@ export function LegendRow({
   name: string;
   color: string;
   share: number;
-  value: string;
+  value: ReactNode;
   detail: string;
   logo: boolean;
   hovered: string | null;

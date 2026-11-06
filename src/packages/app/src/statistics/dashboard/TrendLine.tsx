@@ -1,6 +1,7 @@
 import type { StatsTheme } from "../StatsTheme";
 import { smoothPath } from "./curves";
 import { useWidth } from "./Panel";
+import { useTweens } from "../motion";
 
 /** A figure's trend across the range: a quiet line with a wash under it and
  * a dot on the latest value. A null leaves its column out. */
@@ -14,6 +15,11 @@ export function TrendLine({
   height?: number;
 }) {
   const { ref, width } = useWidth();
+  // The line moves to new values rather than jump; gaps stay gaps.
+  const moving = useTweens(values.map((value) => value ?? 0));
+  values = values.map((value, index) =>
+    value === null ? null : (moving[index] ?? value),
+  );
   const known = values.filter((value): value is number => value !== null);
   const low = Math.min(0, ...known);
   const high = Math.max(...known, 0);

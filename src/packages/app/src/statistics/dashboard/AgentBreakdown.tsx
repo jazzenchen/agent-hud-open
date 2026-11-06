@@ -7,6 +7,7 @@ import { compact, costShort, plain, type StatsTheme } from "../StatsTheme";
 import { agentColor } from "./colors";
 import { Donut, LegendRow } from "./Donut";
 import { Panel } from "./Panel";
+import { Tween } from "../motion";
 
 /** Agents the legend names; the rest fold into one line. */
 const SHOWN = 5;
@@ -133,17 +134,22 @@ export function AgentBreakdown({
           {t("No usage in this range", "这段时间没有用量")}
         </span>
       ) : (
-        <div className="stats-donut-layout">
+        <div className="stats-donut-layout stats-reveal">
           <Donut
             parts={parts}
             total={whole}
             hovered={hovered}
             setHovered={setHovered}
-            center={compact(
-              opened
-                ? opened.selectedTokens
-                : (data?.totals.selectedTokens ?? 0),
-            )}
+            center={
+              <Tween
+                value={
+                  opened
+                    ? opened.selectedTokens
+                    : (data?.totals.selectedTokens ?? 0)
+                }
+                format={(value) => compact(Math.round(value))}
+              />
+            }
             caption={costShort(
               opened ? opened.cost : (data?.totals.cost ?? null),
               zh,
@@ -166,7 +172,12 @@ export function AgentBreakdown({
                     name={model.name}
                     color={model.color}
                     share={model.value / whole}
-                    value={compact(model.value)}
+                    value={
+                      <Tween
+                        value={model.value}
+                        format={(value) => compact(Math.round(value))}
+                      />
+                    }
                     detail={model.detail}
                     logo={false}
                     hovered={hovered}
@@ -184,7 +195,12 @@ export function AgentBreakdown({
                       name={provider.name}
                       color={agentColor(provider.id)}
                       share={provider.selectedTokens / total}
-                      value={compact(provider.selectedTokens)}
+                      value={
+                        <Tween
+                          value={provider.selectedTokens}
+                          format={(value) => compact(Math.round(value))}
+                        />
+                      }
                       detail={`${costShort(provider.cost, zh)}${sessions(provider.sessionCount)}`}
                       logo
                       hovered={hovered}

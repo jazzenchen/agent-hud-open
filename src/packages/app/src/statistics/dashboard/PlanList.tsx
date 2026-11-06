@@ -5,6 +5,7 @@ import { vendorKey } from "@agent-hud/hud/model";
 import { number, row, truncate, type StatsTheme } from "../StatsTheme";
 import { adviceText } from "../plan-value-text";
 import { Panel } from "./Panel";
+import { Tween } from "../motion";
 import { Bar } from "./Placeholder";
 
 /** Each signed-in plan: its monthly price, what its calls on this Mac over
@@ -98,7 +99,7 @@ export function PlanList({
                 ? listCost(account.value.amounts, language) || "—"
                 : null;
           return (
-            <div key={account.id} style={tile}>
+            <div key={account.id} className="stats-reveal" style={tile}>
               <div style={{ ...row, justifyContent: "space-between", gap: 10 }}>
                 <span style={{ ...row, gap: 7, minWidth: 0 }}>
                   <HUDLogo source={account.provider} size={15} light={light} />
@@ -118,9 +119,16 @@ export function PlanList({
                   </span>
                 </span>
                 <span style={{ ...number, fontSize: 17, fontWeight: 600 }}>
-                  {ratio == null
-                    ? "—"
-                    : `${own === null && account.partial ? "≥" : ""}${ratio >= 10 ? Math.round(ratio) : ratio.toFixed(1)}×`}
+                  {ratio == null ? (
+                    "—"
+                  ) : (
+                    <Tween
+                      value={ratio}
+                      format={(value) =>
+                        `${own === null && account.partial ? "≥" : ""}${value >= 10 ? Math.round(value) : value.toFixed(1)}×`
+                      }
+                    />
+                  )}
                 </span>
               </div>
               <span

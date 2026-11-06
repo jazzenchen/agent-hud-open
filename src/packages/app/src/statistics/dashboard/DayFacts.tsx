@@ -1,4 +1,8 @@
+import type { ReactNode } from "react";
 import { compact, number, type StatsTheme } from "../StatsTheme";
+import { Tween } from "../motion";
+
+const whole = (value: number) => String(Math.round(value));
 import type { DayFacts } from "./days";
 
 /** The heatmap's five steps, none to most, GitHub's greens: darker for
@@ -20,7 +24,7 @@ function Fact({
   theme,
 }: {
   label: string;
-  value: string;
+  value: ReactNode;
   caption?: string;
   theme: StatsTheme;
 }) {
@@ -69,25 +73,47 @@ export function DayFactList({
     >
       <Fact
         label={t("Active days", "活跃天数")}
-        value={`${facts.activeDays} / ${facts.recordedDays}`}
+        value={
+          <>
+            <Tween value={facts.activeDays} format={whole} /> /{" "}
+            <Tween value={facts.recordedDays} format={whole} />
+          </>
+        }
         caption={t("Days with any tokens", "有用量的天数")}
         theme={theme}
       />
       <Fact
         label={t("An active day", "活跃日平均")}
-        value={facts.average === null ? "—" : compact(facts.average)}
+        value={
+          facts.average === null ? (
+            "—"
+          ) : (
+            <Tween value={facts.average} format={compact} />
+          )
+        }
         caption={t("Tokens on average", "平均 Token")}
         theme={theme}
       />
       <Fact
         label={t("Busiest day", "用得最多的一天")}
-        value={facts.busiest ? compact(facts.busiest.value) : "—"}
+        value={
+          facts.busiest ? (
+            <Tween value={facts.busiest.value} format={compact} />
+          ) : (
+            "—"
+          )
+        }
         caption={facts.busiest ? dateText(facts.busiest.start) : undefined}
         theme={theme}
       />
       <Fact
         label={t("Streak", "连续使用")}
-        value={t(`${facts.streak} days`, `${facts.streak} 天`)}
+        value={
+          <Tween
+            value={facts.streak}
+            format={(value) => t(`${whole(value)} days`, `${whole(value)} 天`)}
+          />
+        }
         caption={t(`Longest ${facts.longest} days`, `最长 ${facts.longest} 天`)}
         theme={theme}
       />

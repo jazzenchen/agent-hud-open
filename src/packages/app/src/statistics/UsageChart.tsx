@@ -117,16 +117,21 @@ export const UsageChart = memo(function UsageChart({
   useEffect(() => {
     if (width <= 0) return;
     const prev = currentBarsRef.current;
-    if (
-      prev === null ||
-      matchMedia("(prefers-reduced-motion: reduce)").matches
-    ) {
+    if (matchMedia("(prefers-reduced-motion: reduce)").matches) {
       currentBarsRef.current = targetBars;
       paint(targetBars, hoveredRef.current);
       return;
     }
-    const from = prev;
-    const duration = 240;
+    // The first bars grow from the baseline; later ones move from where
+    // they stood.
+    const from =
+      prev ??
+      targetBars.map((bar) => ({
+        ...bar,
+        totalRatio: 0,
+        segments: bar.segments.map((segment) => ({ ...segment, ratio: 0 })),
+      }));
+    const duration = prev ? 320 : 480;
     const startTime = performance.now();
     let frame = 0;
     const animate = (now: number) => {

@@ -40,6 +40,7 @@ export function QuotaCard({
   const zh = Boolean(theme.zh);
   return (
     <div
+      className="stats-reveal"
       style={{
         ...card(theme),
         display: "grid",

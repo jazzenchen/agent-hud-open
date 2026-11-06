@@ -1,6 +1,7 @@
 import { cycleLevel } from "@agent-hud/hud/panel/quota-groups";
 import type { StatsTheme } from "../StatsTheme";
 import type { QuotaDay } from "./quota-days";
+import { useTweens } from "../motion";
 
 const PLOT = 22;
 
@@ -33,14 +34,19 @@ export function QuotaDayBars({
   theme: StatsTheme;
   onHover: (column: number) => void;
 }) {
+  // Bars grow to their heights, and move when a reading comes in.
+  const totals = useTweens(
+    days.map((day) => (long ? (day.level ?? 0) : (day.value ?? 0))),
+  );
+  const owns = useTweens(days.map((day) => (long ? (day.value ?? 0) : 0)));
   return (
     <svg width={plot} height={PLOT} style={{ display: "block" }}>
       {days.map((value, column) => {
         const x = column * slot + (slot - bar) / 2;
-        const total = long ? (value.level ?? 0) : (value.value ?? 0);
+        const total = totals[column] ?? 0;
         const height = (Math.min(100, total) / 100) * PLOT;
         const own = long
-          ? (Math.min(value.value ?? 0, total) / 100) * PLOT
+          ? (Math.min(owns[column] ?? 0, total) / 100) * PLOT
           : height;
         const fill = levelFill(value.level ?? 0, theme);
         return (

@@ -67,7 +67,8 @@ export function ChartPlaceholder({
   );
 }
 
-/** A grid of cells, the shape of a heatmap still loading. */
+/** A heatmap still loading: a dot in each cell, a wave rippling across
+ * them corner to corner. */
 export function GridPlaceholder({
   columns,
   rows = 7,
@@ -85,19 +86,33 @@ export function GridPlaceholder({
   return (
     <div
       aria-hidden
-      className="animate-pulse"
       style={{
         display: "grid",
         gridTemplateColumns: `repeat(${columns},minmax(0,1fr))`,
         gap,
       }}
     >
-      {Array.from({ length: columns * rows }, (_, index) => (
-        <span
-          key={index}
-          style={{ height: cell, borderRadius: 3, background: theme.track }}
-        />
-      ))}
+      {Array.from({ length: columns * rows }, (_, index) => {
+        const column = index % columns;
+        const row = Math.floor(index / columns);
+        return (
+          <span
+            key={index}
+            style={{ height: cell, display: "grid", placeItems: "center" }}
+          >
+            <span
+              className="stats-dot"
+              style={{
+                width: Math.max(3, cell * 0.55),
+                height: Math.max(3, cell * 0.55),
+                borderRadius: "50%",
+                background: theme.secondary,
+                animationDelay: `${((column + row) % 28) * 55}ms`,
+              }}
+            />
+          </span>
+        );
+      })}
     </div>
   );
 }

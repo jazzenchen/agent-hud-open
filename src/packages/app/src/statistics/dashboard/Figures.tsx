@@ -1,10 +1,9 @@
-import type { ReactNode } from "react";
 import { moneyShort, percent1 } from "@agent-hud/ui/format";
 import type { StatisticsResponse } from "@agent-hud/protocol";
-import { compact, number, plain, type StatsTheme } from "../StatsTheme";
+import { compact, type StatsTheme } from "../StatsTheme";
 import { cacheHit, change, DAY, modelAgents, usd } from "./model";
-import { TrendLine } from "./TrendLine";
-import { Bar } from "./Placeholder";
+import { useTweens } from "../motion";
+import { Figure } from "./FigureTile";
 
 /** "↑ 14%", "↓ 3%", "±0%". */
 function delta(value: number | null) {
@@ -12,110 +11,6 @@ function delta(value: number | null) {
   const rounded = Math.round(value * 100);
   if (rounded === 0) return "±0%";
   return `${rounded > 0 ? "↑" : "↓"} ${Math.abs(rounded)}%`;
-}
-
-/** One tile: a label, the figure, one line of context and the figure's trend
- * across the range. Every tile has the same four rows. */
-function Figure({
-  label,
-  loading = false,
-  value,
-  suffix,
-  line,
-  hint,
-  series,
-  active,
-  onClick,
-  theme,
-}: {
-  label: string;
-  /** Nothing to show yet: grey bars stand in. */
-  loading?: boolean;
-  value: string;
-  suffix?: string | null;
-  line: ReactNode;
-  hint?: string;
-  series: (number | null)[];
-  active?: boolean;
-  onClick?: () => void;
-  theme: StatsTheme;
-}) {
-  const body = loading ? (
-    <>
-      <span style={{ fontSize: 12, color: theme.secondary }}>{label}</span>
-      <Bar width={96} height={24} theme={theme} style={{ margin: "3px 0" }} />
-      <Bar width={128} height={10} theme={theme} style={{ margin: "2px 0" }} />
-      <Bar height={22} theme={theme} style={{ marginTop: 3 }} />
-    </>
-  ) : (
-    <>
-      <span style={{ fontSize: 12, color: theme.secondary }}>{label}</span>
-      <span
-        style={{
-          ...number,
-          fontSize: 24,
-          lineHeight: "30px",
-          fontWeight: 600,
-          letterSpacing: -0.2,
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-        }}
-      >
-        {value}
-        {suffix && (
-          <span
-            style={{ fontSize: 12, fontWeight: 400, color: theme.secondary }}
-          >
-            {" "}
-            {suffix}
-          </span>
-        )}
-      </span>
-      <span
-        style={{
-          fontSize: 11,
-          lineHeight: "15px",
-          minHeight: 15,
-          color: theme.secondary,
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-          whiteSpace: "nowrap",
-        }}
-      >
-        {line}
-      </span>
-      <TrendLine values={series} theme={theme} />
-    </>
-  );
-  const style = {
-    display: "grid",
-    gridTemplateRows: "auto auto auto 28px",
-    gap: 3,
-    padding: "12px 16px 10px",
-    borderRadius: 10,
-    border: `1px solid ${theme.border}`,
-    background: `var(--statistics-card, ${theme.card})`,
-    minWidth: 0,
-    boxShadow: active
-      ? `inset 0 0 0 1.5px ${theme.light ? "rgba(0,0,0,.5)" : "rgba(255,255,255,.55)"}`
-      : "none",
-    transition: "box-shadow 160ms ease",
-  } as const;
-  return onClick ? (
-    <button
-      type="button"
-      aria-pressed={active}
-      onClick={onClick}
-      title={hint}
-      style={{ ...plain, ...style }}
-    >
-      {body}
-    </button>
-  ) : (
-    <div style={style} title={hint}>
-      {body}
-    </div>
-  );
 }
 
 /** The overview's big figures for the range: tokens, their worth at API
@@ -161,6 +56,13 @@ export function Figures({
     .join(" ");
   const sessions = data?.sessionCount ?? null;
   const hit = data ? cacheHit(data.totals.tokens) : null;
+  // The figures move to their new values rather than jump.
+  // They decrypt into place when they first arrive, then count.
+  const [tokensNow, costNow, ratioNow, sessionsNow, hitNow] = useTweens(
+    [tokens ?? 0, cost ?? 0, plan?.ratio ?? 0, sessions ?? 0, hit ?? 0],
+    undefined,
+    Boolean(data),
+  );
   const hitBefore = previous ? cacheHit(previous.tokens) : null;
   const perDay = (value: number) => value / Math.max(1, days);
   const unpriced = (data?.totals.cost?.unpricedTokens ?? 0) > 0;
@@ -172,7 +74,7 @@ export function Figures({
       <Figure
         loading={!data}
         label={t("Tokens", "Token")}
-        value={tokens === null ? "—" : compact(tokens)}
+        value={tokens === null ? "—" : compact(Math.round(tokensNow))}
         line={
           tokens === null
             ? null
@@ -185,7 +87,7 @@ export function Figures({
       <Figure
         loading={!data}
         label={t("Worth at API prices", "按 API 价格折合")}
-        value={cost === null ? "—" : `${money(cost)}${unpriced ? "+" : ""}`}
+        value={cost === null ? "—" : `${money(costNow)}${unpriced ? "+" : ""}`}
         suffix={others || null}
         hint={t(
           "Every token kind at the vendors' API list prices",
@@ -205,7 +107,7 @@ export function Figures({
         label={t("Subscriptions returned", "订阅回本")}
         value={
           plan
-            ? `${plan.ratio >= 10 ? Math.round(plan.ratio) : plan.ratio.toFixed(1)}×`
+            ? `${ratioNow >= 10 ? Math.round(ratioNow) : ratioNow.toFixed(1)}×`
             : "—"
         }
         hint={t(
@@ -239,7 +141,9 @@ export function Figures({
       <Figure
         loading={!data}
         label={t("Sessions", "会话")}
-        value={sessions === null ? "—" : sessions.toLocaleString()}
+        value={
+          sessions === null ? "—" : Math.round(sessionsNow).toLocaleString()
+        }
         hint={t(
           "Sessions that used tokens; a sub-agent counts toward its session",
           "用过 Token 的会话；子 Agent 计入它所属的会话",
@@ -256,7 +160,7 @@ export function Figures({
       <Figure
         loading={!data}
         label={t("Cache hit rate", "缓存命中率")}
-        value={hit === null ? "—" : percent1(hit * 100)}
+        value={hit === null ? "—" : percent1(hitNow * 100)}
         hint={t(
           "Cache reads ÷ (new input + cache writes + cache reads)",
           "缓存读取 ÷（新输入 + 缓存写入 + 缓存读取）",

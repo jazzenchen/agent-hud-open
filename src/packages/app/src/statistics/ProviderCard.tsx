@@ -22,6 +22,7 @@ import {
   type StatsTheme,
 } from "./StatsTheme";
 import { ModelList } from "./ModelList";
+import { Tween } from "./motion";
 import { Sparkline } from "./Sparkline";
 import { QuotaRows, type QuotaRow } from "./dashboard/QuotaRows";
 import { moneyAmount } from "@agent-hud/ui/format";
@@ -79,7 +80,11 @@ export const ProviderCard = memo(function ProviderCard({
     "cacheRead",
   ].map((kind) => [
     kindLabel(kind as StatisticsTokenKind, zh),
-    compact(provider.tokens[kind as StatisticsTokenKind]),
+    <Tween
+      key={kind}
+      value={provider.tokens[kind as StatisticsTokenKind]}
+      format={(value) => compact(Math.round(value))}
+    />,
   ]);
   cells.push([
     zh ? "费用" : "Cost",
@@ -90,7 +95,7 @@ export const ProviderCard = memo(function ProviderCard({
   return (
     <Card
       id={`agent-${vendorKey(provider.id)}`}
-      className="statistics-agent-card"
+      className="statistics-agent-card stats-reveal"
       style={{
         ...card(theme),
         ...(highlighted
