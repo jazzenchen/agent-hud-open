@@ -1,6 +1,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { flashMask, glowAlert, pulseFrames } from "../src/glow-alert.ts";
+import {
+  afterFlash,
+  flashAnimation,
+  flashKeyframes,
+  flashMask,
+  glowAlert,
+  pulseFrames,
+} from "../src/glow-alert.ts";
 
 test("accents follow Open's IslandAlert: blue turns, warm warnings, calm news", () => {
   const vendors = ["claude", "codex", "kimi"];
@@ -79,4 +86,45 @@ test("a flash keeps to its sender's part of a rim moving inside a wider box", ()
     flashMask({ from: 0.5, to: 1, feather: 0.075 }, 100, 50, 300, 100),
     "linear-gradient(to right, transparent 48.125%, black 51.875%, black 60.625%, transparent 62.5%)",
   );
+});
+
+test("the flash's CSS keyframes are pulseFrames, stop for stop", () => {
+  const rules = flashKeyframes().split("\n");
+  assert.equal(rules.length, 3);
+  for (const [warning, reduced] of [
+    [false, false],
+    [true, false],
+    [false, true],
+  ] as const) {
+    const name = flashAnimation(warning, reduced).split(" ")[0];
+    const rule = rules.find((r) => r.startsWith(`@keyframes ${name} `));
+    assert.ok(rule, name);
+    const stops = [
+      ...rule!.matchAll(/([\d.]+)% \{ opacity: ([\d.]+); \}/g),
+    ].map(([, at, opacity]) => [Number(at), Number(opacity)]);
+    const frames = pulseFrames(warning, reduced);
+    assert.deepEqual(
+      stops,
+      frames.map((frame, index) => [
+        (frame.offset ?? (index === 0 ? 0 : 1)) * 100,
+        frame.opacity,
+      ]),
+    );
+  }
+  assert.equal(
+    flashAnimation(true, false),
+    "hud-glow-flash-warning 1800ms linear forwards",
+  );
+});
+
+test("a flash ends unless a newer alert has taken its place", () => {
+  const first = glowAlert({ id: "a", kind: "completion", vendor: "claude" }, [
+    "claude",
+  ])!;
+  const second = glowAlert({ id: "b", kind: "completion", vendor: "claude" }, [
+    "claude",
+  ])!;
+  assert.equal(afterFlash(first, "a"), null);
+  assert.equal(afterFlash(second, "a"), second);
+  assert.equal(afterFlash(null, "a"), null);
 });

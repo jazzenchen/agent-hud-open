@@ -76,6 +76,43 @@ export function pulseFrames(warning: boolean, reduced: boolean): Keyframe[] {
       ];
 }
 
+const flashName = (warning: boolean, reduced: boolean) =>
+  reduced
+    ? "hud-glow-flash-reduced"
+    : warning
+      ? "hud-glow-flash-warning"
+      : "hud-glow-flash";
+
+/** pulseFrames as CSS @keyframes, one rule for each pulse. A frame without an
+ * offset is the first or the last, as in pulseFrames. */
+export function flashKeyframes() {
+  return (
+    [
+      [false, false],
+      [true, false],
+      [false, true],
+    ] as const
+  )
+    .map(([warning, reduced]) => {
+      const frames = pulseFrames(warning, reduced);
+      const stops = frames.map((frame, index) => {
+        const at = frame.offset ?? (index === 0 ? 0 : 1);
+        return `${Math.round(at * 1000) / 10}% { opacity: ${frame.opacity}; }`;
+      });
+      return `@keyframes ${flashName(warning, reduced)} { ${stops.join(" ")} }`;
+    })
+    .join("\n");
+}
+
+/** The flash's CSS animation: 1800 ms, linear, ending at opacity 0. */
+export const flashAnimation = (warning: boolean, reduced: boolean) =>
+  `${flashName(warning, reduced)} 1800ms linear forwards`;
+
+/** What flashes once `ended`'s flash is over: nothing, unless a newer alert
+ * already took its place. */
+export const afterFlash = (current: GlowAlert | null, ended: string) =>
+  current?.id === ended ? null : current;
+
 /** The mask that keeps the flash to the sender's span of a rim `width` wide
  * drawn inside `padding`; undefined for the whole rim. */
 export function flashMask(

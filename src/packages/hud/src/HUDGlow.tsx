@@ -150,7 +150,7 @@ export const HUDGlow = memo(function HUDGlow({
     [width, height, radius, flare],
   );
   const shape = track ?? fixed;
-  const { flash, flashing, maskAt } = useGlowFlash({
+  const { flash, flashing, maskAt, flashAnimation, flashEnded } = useGlowFlash({
     alert,
     reduced: reduceMotion || systemReduced,
     shape,
@@ -261,12 +261,15 @@ export const HUDGlow = memo(function HUDGlow({
       </div>
       {flashing && (
         <div
+          key={flashing.id}
           ref={flash}
           data-glow-alert={flashing.id}
+          onAnimationEnd={flashEnded}
           style={{
             position: "absolute",
             inset: 0,
             opacity: 0,
+            animation: flashAnimation,
             maskImage: mask,
             WebkitMaskImage: mask,
           }}
