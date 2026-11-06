@@ -5,8 +5,6 @@ import {
   useState,
   type CSSProperties,
 } from "react";
-import { Card } from "@agent-hud/ui/components/card";
-import { Button } from "@agent-hud/ui/components/button";
 import { systemTimeZone } from "@agent-hud/ui/format";
 import { useSessionDetail, useSessions } from "./lib/use-sessions";
 import type {
@@ -14,12 +12,15 @@ import type {
   SessionsQuery,
   Snapshot,
 } from "@agent-hud/protocol";
-import { InlineDetail } from "./sessions/SessionDetailView";
+import { SessionAside } from "./sessions/SessionAside";
 import { NoSessionPicked, SessionBackBar } from "./sessions/SessionBackBar";
-import { useWidth } from "./statistics/dashboard/Panel";
+import { SessionColumns } from "./sessions/SessionColumns";
+import { SessionDetailBody } from "./sessions/SessionDetailBody";
 import { SessionList } from "./sessions/SessionList";
 import { SessionListControls } from "./sessions/SessionListControls";
-import { ALL, card, themeFor, type Arrangement } from "./sessions/SessionTheme";
+import { ALL, themeFor, type Arrangement } from "./sessions/SessionTheme";
+import { sessionColumns, type Pick } from "./sessions/session-layout";
+import { usePageWidth } from "./sessions/use-page-width";
 
 interface SessionStatisticsProps {
   snapshot: Snapshot;
@@ -34,7 +35,9 @@ interface SessionStatisticsProps {
   onClearSelection?: () => void;
 }
 
-/** The native Sessions page, including its own inline detail selection. */
+/** The native Sessions page: the list, a picked session, and what was
+ * picked in that session (a turn or a sub-agent), in as many columns as the
+ * window holds. */
 export default function SessionStatistics({
   snapshot,
   light,
@@ -49,11 +52,13 @@ export default function SessionStatistics({
   const [query, setQuery] = useState("");
   const [flipped, setFlipped] = useState<Set<number>>(() => new Set());
   const [selectedId, setSelectedId] = useState<string | null>(initialSessionId);
-  const [selectedEntry, setSelectedEntry] = useState<string | null>(null);
+  const [pick, setPick] = useState<Pick | null>(null);
   const actionRef = useRef(action);
   actionRef.current = action;
   useEffect(() => {
-    if (initialSessionId) setSelectedId(initialSessionId);
+    if (!initialSessionId) return;
+    setSelectedId(initialSessionId);
+    setPick(null);
   }, [initialSessionId]);
   const theme = themeFor(snapshot, light);
   const zh = Boolean(theme.zh);
@@ -82,15 +87,9 @@ export default function SessionStatistics({
   const observed =
     snapshot.sessions.find((session) => session.id === selectedId) ??
     filtered.find((session) => session.id === selectedId);
-  const {
-    detail,
-    loading,
-    error,
-    setError,
-    retry: retryDetail,
-    loadMessages,
-    loadingMessages,
-  } = useSessionDetail(selectedId, observed, active, action, selectedEntry);
+  const turn = pick?.kind === "turn" ? pick.id : null;
+  const state = useSessionDetail(selectedId, observed, active, action, turn);
+  const { detail } = state;
   const selected = observed ?? detail?.session;
   const parent =
     detail?.parent !== undefined
@@ -100,37 +99,40 @@ export default function SessionStatistics({
             (session) => session.id === selected.parentId,
           ) ?? filtered.find((session) => session.id === selected.parentId))
         : null;
-  useEffect(() => setSelectedEntry(null), [selectedId]);
-
+  /** Shows a session (none: the list), with `next` open beside it. */
+  const show = (id: string | null, next: Pick | null = null) => {
+    setSelectedId(id);
+    setPick(next);
+    if (!id) onClearSelection?.();
+  };
+  // A step back closes the pick first, then goes to the parent or the list.
+  const back = () => (pick ? setPick(null) : show(parent?.id ?? null));
+  const backRef = useRef(back);
+  backRef.current = back;
   useEffect(() => {
     if (!selectedId || !active) return;
-    const back = (event: KeyboardEvent) => {
+    const onKey = (event: KeyboardEvent) => {
       if (event.metaKey && event.key === "[") {
         event.preventDefault();
-        setSelectedId(parent?.id ?? null);
-        if (!parent) onClearSelection?.();
+        backRef.current();
       }
     };
-    window.addEventListener("keydown", back);
-    return () => window.removeEventListener("keydown", back);
-  }, [selectedId, parent?.id, onClearSelection, active]);
-  // Wide, the list and the detail sit side by side; narrow, the detail
-  // replaces the list until the way back is taken.
-  const { ref, width } = useWidth<HTMLElement>();
-  const split = width >= 1000;
-  const choose = (id: string) => {
-    setSelectedId(id);
-    setSelectedEntry(null);
-  };
-  const contentStyle: CSSProperties = {
-    color: `var(--statistics-text, ${theme.text})`,
-    background: `var(--statistics-ground, ${theme.ground})`,
-    fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif',
-    fontSize: 13,
-    lineHeight: 1.35,
-    minWidth: 0,
-    padding: "4px 22px 24px",
-  };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [selectedId, active]);
+  const { ref, width } = usePageWidth<HTMLElement>(active);
+  const {
+    layout,
+    shown,
+    tracks,
+    list: listRows,
+  } = sessionColumns(width, Boolean(selectedId), Boolean(pick));
+  const split = layout !== "one";
+  // One column at a time scrolls the window: a pick opens at its top.
+  useEffect(() => {
+    if (active && !split && pick) document.scrollingElement?.scrollTo(0, 0);
+  }, [split, pick?.kind, pick?.id]);
+  const open = (id: string) => actionRef.current("open_session", { id });
 
   const listColumn = (
     <>
@@ -163,111 +165,80 @@ export default function SessionStatistics({
             return next;
           })
         }
-        onSelect={choose}
+        onSelect={(id) => show(id)}
         theme={theme}
         selectedId={split ? selectedId : null}
+        narrow={listRows > 0 && listRows < 500}
       />
     </>
   );
-  // The detail, under a way back: to the parent session, or (in one
-  // column) to the list.
-  const detailColumn = selectedId ? (
+  // The session, under a way back: to the parent session, or (where the
+  // list is not beside it) to the list, which a pick beside it hides.
+  const listHidden = !shown.includes("list");
+  const sessionColumn = selectedId ? (
     <>
-      {(!split || parent) && (
+      {(listHidden || parent) && (
         <SessionBackBar
           label={parent?.title ?? t("All sessions", "全部会话")}
           top={split ? 0 : 44}
-          onBack={() => {
-            setSelectedId(parent?.id ?? null);
-            if (!parent) onClearSelection?.();
-          }}
+          onBack={() =>
+            parent ? show(parent.id) : split ? setPick(null) : show(null)
+          }
           theme={theme}
         />
       )}
-      {selected ? (
-        <InlineDetail
-          session={selected}
-          detail={detail}
-          loading={loading}
-          error={error}
-          snapshot={snapshot}
-          theme={theme}
-          selectedEntry={selectedEntry}
-          onEntry={setSelectedEntry}
-          onSession={choose}
-          loadMessages={() => void loadMessages()}
-          loadingMessages={loadingMessages}
-          reveal={() => {
-            void actionRef
-              .current("open_session", { id: selected.id })
-              .catch((failure) => setError(String(failure)));
-          }}
-        />
-      ) : (
-        <Card style={card(theme)}>
-          <span style={{ color: theme.secondary, fontSize: 12 }}>
-            {error ?? t("Reading session usage…", "正在读取会话用量…")}
-          </span>
-        </Card>
-      )}
-      {error && (
-        <Button variant="ghost" size="sm" onClick={retryDetail}>
-          {t("Retry", "重试")}
-        </Button>
-      )}
+      <SessionDetailBody
+        session={selected}
+        state={state}
+        snapshot={snapshot}
+        theme={theme}
+        open={open}
+        selectedEntry={turn}
+        onEntry={(id) => setPick(id ? { kind: "turn", id } : null)}
+        onSession={(id) => setPick({ kind: "session", id })}
+        pickedSession={pick?.kind === "session" ? pick.id : null}
+        turnBeside
+      />
     </>
   ) : (
     <NoSessionPicked theme={theme} />
   );
+  const pickColumn =
+    pick && selectedId ? (
+      <SessionAside
+        pick={pick}
+        session={selected}
+        detail={detail}
+        layout={layout}
+        snapshot={snapshot}
+        theme={theme}
+        active={active}
+        action={action}
+        onClose={() => setPick(null)}
+        onShift={(id) => show(pick.id, { kind: "session", id })}
+      />
+    ) : null;
 
+  const contentStyle: CSSProperties = {
+    color: `var(--statistics-text, ${theme.text})`,
+    background: `var(--statistics-ground, ${theme.ground})`,
+    fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif',
+    fontSize: 13,
+    lineHeight: 1.35,
+    minWidth: 0,
+    padding: "4px 22px 24px",
+  };
   return (
-    <section
-      ref={ref}
-      className="session-statistics-native"
-      style={
-        split
-          ? {
-              ...contentStyle,
-              padding: "0 0 0 22px",
-              display: "grid",
-              gridTemplateColumns: "clamp(440px, 42%, 580px) minmax(0, 1fr)",
-              height: "calc(100vh - 44px)",
-              overflow: "hidden",
-            }
-          : contentStyle
-      }
-      aria-label={t("Session statistics", "会话统计")}
-    >
-      {split ? (
-        <>
-          <div
-            className="session-statistics-list-column"
-            style={{
-              overflowY: "auto",
-              minHeight: 0,
-              paddingRight: 16,
-              paddingBottom: 24,
-              borderRight: `1px solid ${theme.divider}`,
-            }}
-          >
-            {listColumn}
-          </div>
-          <div
-            className="session-statistics-detail-column"
-            style={{
-              overflowY: "auto",
-              minHeight: 0,
-              padding: "4px 22px 24px",
-            }}
-          >
-            {detailColumn}
-          </div>
-        </>
-      ) : selectedId ? (
-        detailColumn
-      ) : (
-        listColumn
-      )}
-    </section>
+    <SessionColumns
+      sectionRef={ref}
+      label={t("Session statistics", "会话统计")}
+      style={contentStyle}
+      split={split}
+      shown={shown}
+      tracks={tracks}
+      pickKey={pick ? `${pick.kind}:${pick.id}` : ""}
+      theme={theme}
+      columns={{ list: listColumn, session: sessionColumn, pick: pickColumn }}
+    />
   );
 }

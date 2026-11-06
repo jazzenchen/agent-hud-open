@@ -4,7 +4,7 @@ import { moneyAmount } from "@agent-hud/ui/format";
 import { stackTurnBars } from "../lib/session-charts";
 import { sessionHelp, sessionWhere } from "../lib/sessions";
 import { useAnimatedNumber } from "../statistics/StatsTheme";
-import { rowColumns, rowGap } from "./SessionListSection";
+import { useRowGrid } from "./SessionListSection";
 import { TurnSparkline } from "./TurnSparkline";
 import {
   clipped,
@@ -111,6 +111,7 @@ export function SessionRow({
 }) {
   const zh = Boolean(theme.zh);
   const [hovered, setHovered] = useState(false);
+  const grid = useRowGrid();
   const animatedTokens = useAnimatedNumber(session.tokens);
   const bars = useMemo(
     () => (session.turnBars ? stackTurnBars(session.turnBars) : null),
@@ -135,8 +136,8 @@ export function SessionRow({
         width: "100%",
         padding: "10px 14px 9px",
         display: "grid",
-        gridTemplateColumns: rowColumns,
-        columnGap: rowGap,
+        gridTemplateColumns: grid.columns,
+        columnGap: grid.gap,
         alignItems: "center",
         background: selected
           ? theme.light

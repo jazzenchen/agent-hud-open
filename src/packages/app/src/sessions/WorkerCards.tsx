@@ -2,7 +2,7 @@ import { ChevronRight } from "lucide-react";
 import { Card } from "@agent-hud/ui/components/card";
 import { share } from "@agent-hud/ui/format";
 import type { SessionDetail } from "@agent-hud/protocol";
-import { ShareRows } from "./ShareRows";
+import { picked, ShareRows } from "./ShareRows";
 import {
   card,
   CardTitle,
@@ -19,10 +19,13 @@ export function SubagentsCard({
   detail,
   theme,
   onSession,
+  selectedId = null,
 }: {
   detail: SessionDetail;
   theme: Theme;
   onSession: (id: string) => void;
+  /** The sub-agent open in the next column. */
+  selectedId?: string | null;
 }) {
   const zh = Boolean(theme.zh);
   const total = detail.usage?.total ?? detail.session.tokens;
@@ -157,6 +160,7 @@ export function SubagentsCard({
             ]}
             whole={total}
             theme={theme}
+            selected={selectedId}
             onSelect={(id) => {
               if (id !== "__rest__") onSession(id);
             }}
@@ -172,10 +176,13 @@ export function ProjectExecutionsCard({
   detail,
   theme,
   onSession,
+  selectedId = null,
 }: {
   detail: SessionDetail;
   theme: Theme;
   onSession: (id: string) => void;
+  /** The worker open in the next column. */
+  selectedId?: string | null;
 }) {
   const zh = Boolean(theme.zh);
   const children = [...(detail.children ?? [])].sort(
@@ -199,6 +206,7 @@ export function ProjectExecutionsCard({
           key={child.id}
           type="button"
           onClick={() => onSession(child.id)}
+          aria-current={child.id === selectedId || undefined}
           title={child.title}
           style={{
             ...plain,
@@ -208,6 +216,7 @@ export function ProjectExecutionsCard({
             color: theme.text,
             textAlign: "left",
             minWidth: 0,
+            ...(child.id === selectedId ? picked(theme) : {}),
           }}
         >
           <span style={{ ...clipped, flex: 1, minWidth: 0 }}>

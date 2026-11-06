@@ -19,7 +19,8 @@ export function SubagentTimelineNames({
   theme: Theme;
 }) {
   return (
-    <div style={{ width: 200, flexShrink: 0 }}>
+    // Narrower in a narrow column, so the plot keeps its room.
+    <div style={{ width: "clamp(120px, 34%, 200px)", flexShrink: 0 }}>
       <div style={{ height: 16, fontSize: 11, color: theme.secondary }}>
         agent
       </div>

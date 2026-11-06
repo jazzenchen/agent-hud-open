@@ -1,20 +1,24 @@
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, X } from "lucide-react";
 import { clipped, plain, row, type Theme } from "./SessionTheme";
 
 /** The way back above a session's detail: to its parent session, or to
  * the list. It sticks under the toolbar, or at the top of the detail's own
- * column beside the list. */
+ * column beside the list. Over a pick's column it names the pick instead,
+ * with a × that closes it. */
 export function SessionBackBar({
   label,
   top,
   onBack,
+  onClose,
   theme,
 }: {
   label: string;
   top: number;
-  onBack: () => void;
+  onBack?: () => void;
+  onClose?: () => void;
   theme: Theme;
 }) {
+  const zh = Boolean(theme.zh);
   return (
     <div
       style={{
@@ -30,14 +34,37 @@ export function SessionBackBar({
         borderBottom: `1px solid ${theme.divider}`,
       }}
     >
-      <button
-        type="button"
-        onClick={onBack}
-        style={{ ...plain, ...row, fontSize: 12, fontWeight: 600 }}
-      >
-        <ChevronLeft size={13} />
-        <span style={clipped}>{label}</span>
-      </button>
+      {onBack ? (
+        <button
+          type="button"
+          onClick={onBack}
+          style={{ ...plain, ...row, fontSize: 12, fontWeight: 600 }}
+        >
+          <ChevronLeft size={13} />
+          <span style={clipped}>{label}</span>
+        </button>
+      ) : (
+        <span style={{ ...clipped, fontSize: 12, fontWeight: 600, flex: 1 }}>
+          {label}
+        </span>
+      )}
+      {onClose && (
+        <button
+          type="button"
+          aria-label={zh ? "关闭" : "Close"}
+          title={zh ? "关闭（⌘[）" : "Close (⌘[)"}
+          onClick={onClose}
+          style={{
+            ...plain,
+            ...row,
+            marginLeft: "auto",
+            color: theme.secondary,
+            flexShrink: 0,
+          }}
+        >
+          <X size={13} />
+        </button>
+      )}
     </div>
   );
 }

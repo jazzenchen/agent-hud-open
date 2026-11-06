@@ -6,6 +6,7 @@ import { presentKinds } from "../lib/sessions";
 import { SubagentTimeline } from "./SubagentTimeline";
 import { TurnCallsTable } from "./TurnCallsTable";
 import { turnNotes } from "./TurnHover";
+import { CallsPlaceholder } from "./SessionPlaceholders";
 import {
   card,
   ColorKey,
@@ -20,7 +21,7 @@ import {
   type Theme,
 } from "./SessionTheme";
 
-/** A picked turn: when and how long, what Core sums of its calls, the message, and each call. */
+/** A picked turn: when and how long, what Core sums of its calls, the message, and each call. In its own column the column's bar closes it, so it draws no × of its own. */
 export function TurnPanel({
   entry,
   detail,
@@ -32,7 +33,7 @@ export function TurnPanel({
   detail: SessionDetail;
   byPrompt: boolean;
   theme: Theme;
-  close: () => void;
+  close?: () => void;
 }) {
   const zh = Boolean(theme.zh);
   const calls: SessionCall[] | undefined =
@@ -100,14 +101,16 @@ export function TurnPanel({
               {zh ? "新增" : "new"}
             </span>
           </strong>
-          <button
-            type="button"
-            aria-label={zh ? "收起这一轮" : "Close this turn"}
-            onClick={close}
-            style={{ ...plain, color: theme.secondary }}
-          >
-            <X size={13} />
-          </button>
+          {close && (
+            <button
+              type="button"
+              aria-label={zh ? "收起这一轮" : "Close this turn"}
+              onClick={close}
+              style={{ ...plain, color: theme.secondary }}
+            >
+              <X size={13} />
+            </button>
+          )}
         </span>
       </div>
       <div style={{ color: theme.secondary, fontSize: 11 }}>
@@ -164,11 +167,7 @@ export function TurnPanel({
           theme={theme}
         />
       )}
-      {byPrompt && calls === undefined && (
-        <div style={{ color: theme.secondary, fontSize: 11 }}>
-          {zh ? "正在读取这一轮的调用…" : "Reading this turn's calls…"}
-        </div>
-      )}
+      {byPrompt && calls === undefined && <CallsPlaceholder theme={theme} />}
       {calls && calls.length === 0 && (
         <div style={{ color: theme.secondary, fontSize: 11 }}>
           {zh

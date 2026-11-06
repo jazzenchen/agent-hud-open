@@ -185,12 +185,14 @@ export function TurnChartCard({
         }
         theme={theme}
       />
+      {/* In a narrow column the hint goes under the legend. */}
       <div
         style={{
           ...row,
           justifyContent: "space-between",
           alignItems: "flex-start",
-          gap: 12,
+          flexWrap: "wrap",
+          gap: "4px 12px",
         }}
       >
         <ChartLegend entries={entries} measure={shown} theme={theme} />

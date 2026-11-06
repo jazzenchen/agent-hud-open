@@ -9,9 +9,13 @@ import { DetailHeader } from "./SessionDetailHeader";
 import { SessionTranscript } from "./SessionTranscript";
 import { TurnChartCard } from "./TurnChartCard";
 import { TurnPanel } from "./TurnPanel";
+import { UsagePlaceholder } from "./SessionPlaceholders";
 import { ProjectExecutionsCard, SubagentsCard } from "./WorkerCards";
 import { card, CardTitle, type Theme } from "./SessionTheme";
 
+/** A session's page: its header and figures, its turns, where its tokens
+ * went, its sub-agents and its conversation. A picked turn opens under the
+ * chart, or (`turnBeside`) in the column beside, which draws it instead. */
 export function InlineDetail({
   session,
   detail,
@@ -22,6 +26,8 @@ export function InlineDetail({
   selectedEntry,
   onEntry,
   onSession,
+  pickedSession = null,
+  turnBeside = false,
   reveal,
   loadMessages,
   loadingMessages,
@@ -35,6 +41,9 @@ export function InlineDetail({
   selectedEntry: string | null;
   onEntry: (id: string | null) => void;
   onSession: (id: string) => void;
+  /** The sub-agent open in the column beside. */
+  pickedSession?: string | null;
+  turnBeside?: boolean;
   reveal: () => void;
   loadMessages: () => void;
   loadingMessages: boolean;
@@ -91,11 +100,7 @@ export function InlineDetail({
         }
       />
       <DetailFigures session={session} detail={detail} theme={theme} />
-      {!detail && loading && (
-        <div style={{ color: theme.secondary, fontSize: 11 }}>
-          {zh ? "正在读取会话用量…" : "Reading session usage…"}
-        </div>
-      )}
+      {!detail && loading && <UsagePlaceholder theme={theme} />}
       {error && (
         <div role="alert" style={{ color: theme.secondary, fontSize: 11 }}>
           {error}
@@ -112,7 +117,7 @@ export function InlineDetail({
             onEntry={onEntry}
             theme={theme}
           />
-          {picked && (
+          {picked && !turnBeside && (
             <TurnPanel
               key={picked.id}
               entry={picked}
@@ -142,12 +147,14 @@ export function InlineDetail({
                 detail={detail}
                 theme={theme}
                 onSession={onSession}
+                selectedId={pickedSession}
               />
             ) : helped ? (
               <SubagentsCard
                 detail={detail}
                 theme={theme}
                 onSession={onSession}
+                selectedId={pickedSession}
               />
             ) : (
               models && (

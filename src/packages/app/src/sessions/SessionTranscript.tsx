@@ -4,6 +4,7 @@ import { Card } from "@agent-hud/ui/components/card";
 import { Button } from "@agent-hud/ui/components/button";
 import { dateFormat, localeDateTime } from "@agent-hud/ui/format";
 import type { SessionDetail } from "@agent-hud/protocol";
+import { MessagesPlaceholder } from "./SessionPlaceholders";
 import { card, row, type Theme } from "./SessionTheme";
 
 /** A folded section at the foot of the page. */
@@ -131,6 +132,7 @@ export function SessionTranscript({
               )}
             </section>
           ))}
+          {loadingMessages && <MessagesPlaceholder theme={theme} />}
           {detail.nextMessageCursor != null && (
             <Button
               variant="ghost"
@@ -138,13 +140,7 @@ export function SessionTranscript({
               disabled={loadingMessages}
               onClick={loadMessages}
             >
-              {loadingMessages
-                ? zh
-                  ? "读取中…"
-                  : "Reading…"
-                : zh
-                  ? "加载更多消息"
-                  : "Load more messages"}
+              {zh ? "加载更多消息" : "Load more messages"}
             </Button>
           )}
           {detail.messagesPending && (

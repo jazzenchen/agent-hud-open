@@ -1,9 +1,20 @@
-import type { ReactNode } from "react";
+import { createContext, useContext, type ReactNode } from "react";
 import { clipped, numeric, plain, row, type Theme } from "./SessionTheme";
 
 /** The columns a session row and its day's header share: who and how, its turns, its figures. */
-export const rowColumns = "minmax(0, 1.3fr) minmax(150px, 1fr) 132px";
-export const rowGap = 18;
+const wide = {
+  columns: "minmax(0, 1.3fr) minmax(150px, 1fr) 132px",
+  gap: 18,
+};
+/** In a narrow list the turns give the title its room. */
+const narrow = {
+  columns: "minmax(0, 1.4fr) minmax(96px, 0.7fr) 132px",
+  gap: 14,
+};
+export const rowGridFor = (narrowList: boolean) => (narrowList ? narrow : wide);
+/** The grid the list's rows and headers share, set by the list. */
+export const RowGrid = createContext(wide);
+export const useRowGrid = () => useContext(RowGrid);
 
 /** A day's header over its rows, on the rows' columns: its name and counts, then what the columns hold or, folded, what its sessions spent. */
 export function DayHeader({
@@ -26,6 +37,7 @@ export function DayHeader({
   chevron: ReactNode;
 }) {
   const zh = Boolean(theme.zh);
+  const grid = useRowGrid();
   const Element = onToggle ? "button" : "div";
   return (
     <Element
@@ -37,8 +49,8 @@ export function DayHeader({
         cursor: onToggle ? "pointer" : "default",
         width: "100%",
         display: "grid",
-        gridTemplateColumns: rowColumns,
-        columnGap: rowGap,
+        gridTemplateColumns: grid.columns,
+        columnGap: grid.gap,
         alignItems: "baseline",
         padding: open ? "0 15px" : "9px 15px",
         borderRadius: 10,

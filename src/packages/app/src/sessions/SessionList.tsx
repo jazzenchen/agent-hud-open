@@ -4,7 +4,8 @@ import { Button } from "@agent-hud/ui/components/button";
 import type { Session, Snapshot } from "@agent-hud/protocol";
 import { sessionClient } from "../lib/sessions";
 import type { useSessions } from "../lib/use-sessions";
-import { DayHeader } from "./SessionListSection";
+import { DayHeader, RowGrid, rowGridFor } from "./SessionListSection";
+import { ListPlaceholder, RowsPlaceholder } from "./SessionPlaceholders";
 import { SessionRow } from "./SessionRow";
 import { TodayCard } from "./TodayCard";
 import {
@@ -36,6 +37,7 @@ export function SessionList({
   onSelect,
   theme,
   selectedId = null,
+  narrow = false,
 }: {
   list: ReturnType<typeof useSessions>;
   arrangement: Arrangement;
@@ -51,6 +53,8 @@ export function SessionList({
   theme: Theme;
   /** The session shown beside the list, marked in it. */
   selectedId?: string | null;
+  /** The list's column is narrow: its rows give the title more room. */
+  narrow?: boolean;
 }) {
   const zh = Boolean(theme.zh);
   const t = (en: string, cn: string) => (zh ? cn : en);
@@ -97,14 +101,10 @@ export function SessionList({
   );
 
   return (
-    <>
-      {!list.page && list.loading && (
-        <div
-          role="status"
-          style={{ color: theme.secondary, fontSize: 12, marginBottom: 12 }}
-        >
-          {t("Loading sessions…", "正在加载会话…")}
-        </div>
+    <RowGrid.Provider value={rowGridFor(narrow)}>
+      {/* Until the first page is read, its shape in grey, never "no sessions". */}
+      {!list.page && !list.error && (
+        <ListPlaceholder today={arrangement === "day"} theme={theme} />
       )}
       {list.error && (
         <div
@@ -200,7 +200,7 @@ export function SessionList({
               </div>
             );
           })}
-      {filtered.length === 0 && !list.loading && !list.error && (
+      {list.page && filtered.length === 0 && !list.error && (
         <Card style={card(theme)}>
           <span style={{ color: theme.secondary, fontSize: 12 }}>
             {filtering
@@ -214,7 +214,12 @@ export function SessionList({
           </span>
         </Card>
       )}
-      {list.page?.nextOffset !== null && list.page && (
+      {list.loadingMore && (
+        <div role="status" style={{ marginBottom: 18 }}>
+          <RowsPlaceholder count={3} theme={theme} />
+        </div>
+      )}
+      {list.page?.nextOffset !== null && list.page && !list.loadingMore && (
         <div
           style={{
             ...row,
@@ -225,19 +230,17 @@ export function SessionList({
           <Button
             variant="outline"
             size="sm"
-            disabled={!active || list.loading || list.loadingMore}
+            disabled={!active || list.loading}
             onClick={() => {
               void list.loadMore();
             }}
           >
-            {list.loadingMore
-              ? t("Loading sessions…", "正在加载会话…")
-              : zh
-                ? `加载更多（剩余 ${Math.max(0, list.page.total - filtered.length)} 个）`
-                : `Load more (${Math.max(0, list.page.total - filtered.length)} remaining)`}
+            {zh
+              ? `加载更多（剩余 ${Math.max(0, list.page.total - filtered.length)} 个）`
+              : `Load more (${Math.max(0, list.page.total - filtered.length)} remaining)`}
           </Button>
         </div>
       )}
-    </>
+    </RowGrid.Provider>
   );
 }
