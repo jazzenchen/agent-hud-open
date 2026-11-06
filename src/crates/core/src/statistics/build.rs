@@ -1,5 +1,6 @@
 //! Building a statistics response from the loaded buckets: totals, series and
 //! the ranked clients and models.
+use super::activity::Activity;
 use super::coverage::coverage;
 use super::load::Data;
 use super::periods::{overlaps, periods};
@@ -15,6 +16,7 @@ pub(super) fn build(
     data: &Data,
     ctx: &Context,
     metadata: impl Fn(&str) -> Option<Value>,
+    root: impl Fn(&str) -> Option<String>,
 ) -> Result<Value, String> {
     let periods = periods(query)?;
     let mut columns = vec![Total::default(); periods.len()];
@@ -33,6 +35,25 @@ pub(super) fn build(
     let mut recent = vec![Total::default(); 3];
     let mut recent_models = vec![BTreeMap::<String, Total>::new(); 3];
     let mut heat = vec![vec![BTreeMap::<String, u64>::new(); 24]; 7];
+    // The activity heatmap covers the range, a week at the least.
+    let heat_from = query.from.min(query.to - 7 * DAY);
+    let length = query.to - query.from;
+    // The stretch before is compared only where the record already ran then.
+    let record = data.bounds.values().map(|(first, _)| *first).min();
+    let roots = data
+        .rows
+        .iter()
+        .map(|bucket| bucket.contribution.as_str())
+        .collect::<std::collections::BTreeSet<_>>()
+        .into_iter()
+        .filter_map(|path| Some((path.to_owned(), root(path)?)))
+        .collect();
+    let mut activity = Activity::new(
+        periods.len(),
+        Some(query.from - length)
+            .filter(|from| *from >= data.from && record.is_some_and(|start| start <= *from)),
+        roots,
+    );
     for bucket in &data.rows {
         if !query.keeps(&bucket.source, &bucket.model) {
             continue;
@@ -40,8 +61,13 @@ pub(super) fn build(
         let id = model_id(&bucket.source, &bucket.model);
         let selected = query.selected(bucket.tokens);
         let count = selected.total();
-        let price_tokens = crate::metering::price_tokens(selected);
-        let cost = if count > 0 {
+        let priced = if query.cost_all {
+            bucket.tokens
+        } else {
+            selected
+        };
+        let price_tokens = crate::metering::price_tokens(priced);
+        let cost = if priced.total() > 0 {
             pricing::cost_at(
                 &bucket.source,
                 &bucket.model,
@@ -63,7 +89,7 @@ pub(super) fn build(
                 );
             }
         }
-        if overlaps(bucket.at, query.to - 7 * DAY, query.to) {
+        if overlaps(bucket.at, heat_from, query.to) {
             let local = query
                 .zone
                 .timestamp_millis_opt(bucket.at)
@@ -72,6 +98,11 @@ pub(super) fn build(
             *heat[local.weekday().num_days_from_monday() as usize][local.hour() as usize]
                 .entry(id.clone())
                 .or_default() += count;
+        }
+        if let Some(from) = activity.previous_from {
+            if overlaps(bucket.at, from, query.from) && bucket.at < query.from {
+                activity.before(bucket, count, cost.as_ref());
+            }
         }
         if !overlaps(bucket.at, query.from, query.to) {
             continue;
@@ -93,6 +124,7 @@ pub(super) fn build(
             .partition_point(|(_, end)| *end <= bucket.at.max(periods[0].0))
             .min(periods.len() - 1);
         columns[column].add(bucket, count, cost.as_ref());
+        activity.within(column, bucket, &id, count, cost.as_ref());
         *column_models[column].entry(id).or_default() += count;
         series
             .entry(bucket.source.clone())
@@ -120,6 +152,7 @@ pub(super) fn build(
                     let session = metadata(path)?;
                     let mut row = value.json();
                     row["session"] = session;
+                    row["lastAt"] = activity.session_last(id, path);
                     Some(row)
                 })
                 .collect::<Vec<_>>();
@@ -134,11 +167,21 @@ pub(super) fn build(
                 .unwrap_or_else(|| vec![0; periods.len()]));
             let (share, recached) = spending.get(id.as_str()).copied().unwrap_or((None, None));
             row["cacheReadShare"] = json!(share);
+            let (count, last) = activity.client(id);
+            row["sessionCount"] = json!(count);
+            row["lastAt"] = last;
             row["recachedCost"] = json!(recached.map(|pico| pico as f64 / 1e12));
             row
         })
         .collect::<Vec<_>>();
-    let buckets = periods.iter().enumerate().map(|(index,(from,_))|json!({"timestamp":iso(*from),"tokens":tokens_json(columns[index].tokens),"selectedTokens":columns[index].selected,"models":column_models[index]})).collect::<Vec<_>>();
+    let buckets = periods
+        .iter()
+        .enumerate()
+        .map(|(index, (from, _))| {
+            let (sessions, cost, model_costs) = activity.column_json(index);
+            json!({"timestamp":iso(*from),"tokens":tokens_json(columns[index].tokens),"selectedTokens":columns[index].selected,"models":column_models[index],"sessions":sessions,"costUSD":cost,"modelCostsUSD":model_costs})
+        })
+        .collect::<Vec<_>>();
     let recent = period_ranges.iter().enumerate().map(|(index,(id,from))|json!({"id":id,"from":iso(*from),"to":iso(query.to),"totals":recent[index].json(),"models":model_rows(&recent_models[index],data),"coverage":coverage(query,data,ctx,*from,query.to)})).collect::<Vec<_>>();
     let heat_tokens = heat
         .iter()
@@ -164,7 +207,7 @@ pub(super) fn build(
         })
         .collect::<Vec<_>>();
     Ok(
-        json!({"kind":"statistics","dataRevision":ctx.revision,"generatedAt":Utc::now().to_rfc3339(),"query":query.json(),"totals":total.json(),"buckets":buckets,"providers":providers,"models":main_models,"available":{"providers":ctx.available.iter().map(|id|json!({"id":id,"name":provider_name(id)})).collect::<Vec<_>>(),"models":data.models.values().map(|model|json!({"id":model.id,"provider":model.source,"name":model.name})).collect::<Vec<_>>()},"coverage":coverage(query,data,ctx,query.from,query.to),"recent":recent,"heatmap":{"from":iso(query.to-7*DAY),"to":iso(query.to),"tokens":heat_tokens,"intensity":intensity,"models":heat,"coverage":coverage(query,data,ctx,query.to-7*DAY,query.to)}}),
+        json!({"kind":"statistics","dataRevision":ctx.revision,"generatedAt":Utc::now().to_rfc3339(),"query":query.json(),"totals":total.json(),"buckets":buckets,"providers":providers,"models":main_models,"available":{"providers":ctx.available.iter().map(|id|json!({"id":id,"name":provider_name(id)})).collect::<Vec<_>>(),"models":data.models.values().map(|model|json!({"id":model.id,"provider":model.source,"name":model.name})).collect::<Vec<_>>()},"coverage":coverage(query,data,ctx,query.from,query.to),"recent":recent,"heatmap":{"from":iso(heat_from),"to":iso(query.to),"tokens":heat_tokens,"intensity":intensity,"models":heat,"coverage":coverage(query,data,ctx,heat_from,query.to)},"sessionCount":activity.session_count(),"previous":activity.previous_json()}),
     )
 }
 

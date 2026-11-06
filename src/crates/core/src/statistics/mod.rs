@@ -1,6 +1,7 @@
 //! On-demand public statistics. The canonical accounting interval is the set of
 //! overlapping 15-minute ledger buckets (ChartData/UsagePeriods), never the UI
 //! session tail or a session's lifetime total.
+mod activity;
 mod build;
 mod coverage;
 mod load;
@@ -13,7 +14,7 @@ use load::{load, Data};
 pub(crate) use periods::{day_start, local_date};
 use periods::{floor, overlaps};
 pub(crate) use query::model_id;
-use query::{Context, Query, DAY};
+use query::{Context, Query, COMPARED_DAYS, DAY};
 
 use crate::{pricing, AgentHudCore};
 use chrono::Utc;
@@ -95,7 +96,15 @@ impl AgentHudCore {
                 let Some(db) = self.database.as_ref() else {
                     return unavailable(&query, &context);
                 };
-                let from = floor(query.from.min(query.to - 30 * DAY));
+                // The recent periods need the last 30 days; a range up to a
+                // quarter long also loads the stretch before it, to compare.
+                let length = query.to - query.from;
+                let before = if length <= COMPARED_DAYS * DAY {
+                    query.from - length
+                } else {
+                    query.from
+                };
+                let from = floor(before.min(query.to - 30 * DAY));
                 let to = query.last_bucket();
                 if cache.data.as_ref().is_none_or(|data| {
                     data.revision != revision || data.from != from || data.to != to
@@ -114,14 +123,24 @@ impl AgentHudCore {
                     refresh_times(&mut value, &query, data, &context);
                     return Ok(value);
                 }
-                let mut response = build(&query, data, &context, |path| {
-                    let log = self.logs.get(Path::new(path))?;
-                    let mut session = log.session(Utc::now().timestamp_millis(), None);
-                    if let Some(title) = projection.titles.get(&log.id) {
-                        session["title"] = json!(title);
-                    }
-                    Some(session)
-                })?;
+                let mut response = build(
+                    &query,
+                    data,
+                    &context,
+                    |path| {
+                        let log = self.logs.get(Path::new(path))?;
+                        let mut session = log.session(Utc::now().timestamp_millis(), None);
+                        if let Some(title) = projection.titles.get(&log.id) {
+                            session["title"] = json!(title);
+                        }
+                        Some(session)
+                    },
+                    |path| {
+                        // A sub-agent's log counts toward the session it works for.
+                        let log = self.logs.get(Path::new(path))?;
+                        Some(log.live.parent_id.clone().unwrap_or_else(|| log.id.clone()))
+                    },
+                )?;
                 refresh_times(&mut response, &query, data, &context);
                 if cache.responses.len() == 8 {
                     cache.responses.pop_front();

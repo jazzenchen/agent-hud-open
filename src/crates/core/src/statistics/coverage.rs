@@ -151,5 +151,5 @@ pub(super) fn unavailable(query: &Query, ctx: &Context) -> Result<Value, String>
         unknown: Vec::new(),
         recached: Vec::new(),
     };
-    build(query, &data, ctx, |_| None)
+    build(query, &data, ctx, |_| None, |_| None)
 }

@@ -8,6 +8,11 @@ use std::collections::{BTreeMap, BTreeSet};
 
 pub(super) const QUARTER: i64 = 900_000;
 pub(super) const DAY: i64 = 86_400_000;
+/// The longest range a query may ask for: a year of weeks, from the Monday
+/// before, as the daily heatmap draws it.
+pub(super) const MAX_DAYS: i64 = 372;
+/// The longest range compared with the stretch of the same length before it.
+pub(super) const COMPARED_DAYS: i64 = 92;
 const KINDS: [&str; 5] = ["cacheWrite", "input", "reasoning", "output", "cacheRead"];
 
 pub(super) struct Query {
@@ -18,6 +23,9 @@ pub(super) struct Query {
     pub(super) providers: Option<BTreeSet<String>>,
     pub(super) models: Option<BTreeSet<String>>,
     pub(super) zone: Tz,
+    /// Prices every token kind, whichever kinds are counted
+    /// (`costKinds: "all"`), as the plan value does.
+    pub(super) cost_all: bool,
 }
 
 impl Query {
@@ -30,8 +38,10 @@ impl Query {
         };
         let from = parse("from")?;
         let to = parse("to")?;
-        if from < 0 || to <= from || to - from > 31 * DAY {
-            return Err("Statistics requires a positive interval of at most 31 days".into());
+        if from < 0 || to <= from || to - from > MAX_DAYS * DAY {
+            return Err(format!(
+                "Statistics requires a positive interval of at most {MAX_DAYS} days"
+            ));
         }
         let bucket = params["bucketMinutes"].as_i64().unwrap_or(60);
         if ![15, 30, 60, 1440].contains(&bucket) {
@@ -90,6 +100,7 @@ impl Query {
             providers,
             models: strings("models")?,
             zone,
+            cost_all: params["costKinds"].as_str() == Some("all"),
         })
     }
 
@@ -100,6 +111,9 @@ impl Query {
         }
         if let Some(models) = &self.models {
             value["models"] = json!(models);
+        }
+        if self.cost_all {
+            value["costKinds"] = json!("all");
         }
         value
     }
@@ -141,7 +155,8 @@ impl Query {
             self.providers,
             self.models,
             self.zone.name(),
-            local_date(self.zone, self.to).to_string()
+            local_date(self.zone, self.to).to_string(),
+            self.cost_all
         ])
         .to_string()
     }
