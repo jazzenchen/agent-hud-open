@@ -1,14 +1,23 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type {
   NativeMethod,
   PlanValueResponse,
+  QuotaHistoryResponse,
   StatisticsQuery,
   StatisticsResponse,
   StatisticsTokenKind,
 } from "@agent-hud/protocol";
 import { useCoreQuery } from "../../lib/use-core-query";
 import { storageKeys } from "../../lib/storage-keys";
-import { heatmapSpan, rangeIds, type Range, type Span } from "./model";
+import {
+  addDays,
+  dayStart,
+  heatmapSpan,
+  rangeIds,
+  startOfDay,
+  type Range,
+  type Span,
+} from "./model";
 
 type Action = (
   method: NativeMethod,
@@ -31,6 +40,8 @@ export function useOverview({
   models,
   timeZone,
   accounts,
+  quotaSpan,
+  reading,
 }: {
   action: Action;
   revision: number;
@@ -43,6 +54,11 @@ export function useOverview({
   timeZone: string;
   /** Changes when a signed-in account or its plan does. */
   accounts: string;
+  /** The quota days' stretch: its first local midnight to the latest reading. */
+  quotaSpan: { from: number; to: number };
+  /** The history is being read: a stretch with nothing in it yet counts as
+   * not answered, so the page shows grey placeholders, not "no usage". */
+  reading: boolean;
 }) {
   const checked = async (
     method: NativeMethod,
@@ -100,11 +116,25 @@ export function useOverview({
     active,
     `${revision}|${accounts}`,
   );
+  const quota = useCoreQuery<QuotaHistoryResponse>(
+    action,
+    "quota_history",
+    {
+      from: new Date(quotaSpan.from).toISOString(),
+      to: new Date(quotaSpan.to).toISOString(),
+    },
+    active,
+  );
+  const empty = (data: StatisticsResponse | null) =>
+    reading && data && !data.buckets.some((bucket) => bucket.selectedTokens > 0)
+      ? null
+      : data;
   return {
-    data: range.data,
+    data: empty(range.data),
+    quota: quota.data,
     error: range.error,
     loading: !range.data && !range.error && range.fetching,
-    year: year.data,
+    year: empty(year.data),
     plans: plans.data,
   };
 }
@@ -131,4 +161,29 @@ export function useSavedRange(): [Range, (range: Range) => void] {
       }
   };
   return [range, keep];
+}
+
+/** The quota days' stretch for the page's range: up to the range's last day,
+ * a week at the least and 30 days at the most (readings are kept 30 days),
+ * running to the latest reading so a window read again moves its end. */
+export function useQuotaSpan(
+  range: Range,
+  end: number,
+  quotas: { id: string; observedAt?: string | null }[],
+  active: boolean,
+) {
+  const readings = quotas
+    .map((quota) => `${quota.id}@${quota.observedAt ?? ""}`)
+    .join("|");
+  const [latest, setLatest] = useState(end);
+  useEffect(() => {
+    if (active) setLatest(Date.now());
+  }, [end, readings, active]);
+  const last = range.id === "day" ? dayStart(range.day) : startOfDay(end);
+  const count =
+    range.id === "30d" || range.id === "90d" || range.id === "1y" ? 30 : 7;
+  const first = addDays(last, 1 - count);
+  const to = Math.min(latest, addDays(last, 1));
+  const span = useMemo(() => ({ from: first, to }), [first, to]);
+  return { first, count, span };
 }

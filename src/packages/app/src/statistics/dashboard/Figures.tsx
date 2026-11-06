@@ -4,6 +4,7 @@ import type { StatisticsResponse } from "@agent-hud/protocol";
 import { compact, number, plain, type StatsTheme } from "../StatsTheme";
 import { cacheHit, change, DAY, modelAgents, usd } from "./model";
 import { TrendLine } from "./TrendLine";
+import { Bar } from "./Placeholder";
 
 /** "↑ 14%", "↓ 3%", "±0%". */
 function delta(value: number | null) {
@@ -17,6 +18,7 @@ function delta(value: number | null) {
  * across the range. Every tile has the same four rows. */
 function Figure({
   label,
+  loading = false,
   value,
   suffix,
   line,
@@ -27,6 +29,8 @@ function Figure({
   theme,
 }: {
   label: string;
+  /** Nothing to show yet: grey bars stand in. */
+  loading?: boolean;
   value: string;
   suffix?: string | null;
   line: ReactNode;
@@ -36,7 +40,14 @@ function Figure({
   onClick?: () => void;
   theme: StatsTheme;
 }) {
-  const body = (
+  const body = loading ? (
+    <>
+      <span style={{ fontSize: 12, color: theme.secondary }}>{label}</span>
+      <Bar width={96} height={24} theme={theme} style={{ margin: "3px 0" }} />
+      <Bar width={128} height={10} theme={theme} style={{ margin: "2px 0" }} />
+      <Bar height={22} theme={theme} style={{ marginTop: 3 }} />
+    </>
+  ) : (
     <>
       <span style={{ fontSize: 12, color: theme.secondary }}>{label}</span>
       <span
@@ -159,6 +170,7 @@ export function Figures({
   return (
     <div className="stats-figures">
       <Figure
+        loading={!data}
         label={t("Tokens", "Token")}
         value={tokens === null ? "—" : compact(tokens)}
         line={
@@ -171,6 +183,7 @@ export function Figures({
         theme={theme}
       />
       <Figure
+        loading={!data}
         label={t("Worth at API prices", "按 API 价格折合")}
         value={cost === null ? "—" : `${money(cost)}${unpriced ? "+" : ""}`}
         suffix={others || null}
@@ -188,6 +201,7 @@ export function Figures({
         theme={theme}
       />
       <Figure
+        loading={!data}
         label={t("Subscriptions returned", "订阅回本")}
         value={
           plan
@@ -223,6 +237,7 @@ export function Figures({
         theme={theme}
       />
       <Figure
+        loading={!data}
         label={t("Sessions", "会话")}
         value={sessions === null ? "—" : sessions.toLocaleString()}
         hint={t(
@@ -239,6 +254,7 @@ export function Figures({
         theme={theme}
       />
       <Figure
+        loading={!data}
         label={t("Cache hit rate", "缓存命中率")}
         value={hit === null ? "—" : percent1(hit * 100)}
         hint={t(

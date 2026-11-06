@@ -1,16 +1,11 @@
 import type { Dispatch, SetStateAction } from "react";
 import type { StatisticsResponse } from "@agent-hud/protocol";
-import {
-  compact,
-  modelColor,
-  number,
-  row,
-  type StatsTheme,
-} from "./StatsTheme";
+import { compact, modelColor, row, type StatsTheme } from "./StatsTheme";
 import { TotalSummary } from "./StatsParts";
 import { SectionFilter } from "./SectionFilter";
 import { selectionFilter } from "./section-filter";
 import { UsageChart } from "./UsageChart";
+import { Bar, ChartPlaceholder } from "./dashboard/Placeholder";
 
 /** The Tokens page's token section: the total, the model and agent filters, and the usage chart. */
 export function TokenUsage({
@@ -63,9 +58,7 @@ export function TokenUsage({
             theme={theme}
           />
         ) : (
-          <span style={{ color: theme.secondary, ...number }}>
-            {loading ? t("Loading…", "加载中…") : "—"}
-          </span>
+          <Bar width={72} height={20} theme={theme} />
         )}
       </div>
       <SectionFilter
@@ -95,18 +88,8 @@ export function TokenUsage({
       {data ? (
         <UsageChart data={data} theme={theme} height={chartHeight} />
       ) : (
-        <div
-          style={{
-            height: (chartHeight ?? 100) + 38,
-            display: "grid",
-            placeItems: "center",
-            color: theme.secondary,
-            fontSize: 11,
-          }}
-        >
-          {loading
-            ? t("Loading token usage…", "正在加载 Token 用量…")
-            : t("Token usage is unavailable", "Token 用量暂不可用")}
+        <div style={{ paddingTop: 12 }}>
+          <ChartPlaceholder height={chartHeight ?? 100} theme={theme} />
         </div>
       )}
     </div>

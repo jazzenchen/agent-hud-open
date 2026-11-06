@@ -11,13 +11,15 @@ import { HUDArtwork as HUDLogo } from "@agent-hud/hud/HUDArtwork";
 import { vendorKey } from "@agent-hud/hud/model";
 import type {
   BillingAccount,
-  Session,
+  Quota,
   StatisticsResponse,
 } from "@agent-hud/protocol";
 import { storageKeys } from "../lib/storage-keys";
-import { plain, row, type StatsTheme } from "./StatsTheme";
+import { card, plain, row, type StatsTheme } from "./StatsTheme";
+import { Bar } from "./dashboard/Placeholder";
 import { Heading } from "./StatsParts";
 import { ProviderCard } from "./ProviderCard";
+import type { QuotaRow } from "./dashboard/QuotaRows";
 
 function agentRows<T>(values: T[]): T[][] {
   const sizes = Array.from({ length: Math.floor(values.length / 3) }, () => 3);
@@ -50,7 +52,7 @@ export function AgentCards({
   light,
   highlightedVendor,
   billing,
-  onSelectSession,
+  quota,
 }: {
   data: StatisticsResponse | null;
   hiddenAgentCards: string[];
@@ -62,7 +64,8 @@ export function AgentCards({
   light: boolean;
   highlightedVendor: string | null;
   billing: BillingAccount[];
-  onSelectSession?: (session: Session) => void;
+  /** Each quota window's days, for the cards of the agents they belong to. */
+  quota?: { rows: QuotaRow[]; live: Map<string, Quota> };
 }) {
   const zh = Boolean(theme.zh);
   const t = (en: string, cn: string) => (zh ? cn : en);
@@ -133,6 +136,36 @@ export function AgentCards({
       >
         {t("By agent", "按智能体")}
       </Heading>
+      {!data && (
+        <div
+          className="statistics-agent-row"
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(3,minmax(0,1fr))",
+            gap: 12,
+          }}
+        >
+          {[0, 1, 2].map((index) => (
+            <div
+              key={index}
+              style={{
+                ...card(theme),
+                display: "grid",
+                gap: 12,
+                minHeight: 300,
+              }}
+            >
+              <Bar width="45%" height={14} theme={theme} />
+              <Bar width="35%" height={26} theme={theme} />
+              <Bar height={60} theme={theme} />
+              <Bar height={8} theme={theme} />
+              <Bar width="80%" height={10} theme={theme} />
+              <Bar width="70%" height={10} theme={theme} />
+              <Bar height={56} theme={theme} />
+            </div>
+          ))}
+        </div>
+      )}
       {data &&
         agentRows(visibleProviders).map((providers, index) => (
           <div
@@ -154,7 +187,16 @@ export function AgentCards({
                 theme={theme}
                 highlighted={highlightedVendor === vendorKey(provider.id)}
                 billing={billing}
-                onSelectSession={onSelectSession}
+                quota={
+                  quota && {
+                    rows: quota.rows.filter(
+                      (entry) =>
+                        vendorKey(entry.window.vendor) ===
+                        vendorKey(provider.id),
+                    ),
+                    live: quota.live,
+                  }
+                }
               />
             ))}
           </div>

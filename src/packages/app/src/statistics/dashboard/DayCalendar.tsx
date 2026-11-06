@@ -1,27 +1,24 @@
 import { useMemo, useState } from "react";
-import { moneyShort } from "@agent-hud/ui/format";
 import type { StatisticsResponse } from "@agent-hud/protocol";
-import {
-  compact,
-  number,
-  raisedCard,
-  row,
-  type StatsTheme,
-} from "../StatsTheme";
-import { dayKey, modelAgents } from "./model";
+import { row, type StatsTheme } from "../StatsTheme";
+import { dayKey, modelAgents, startOfDay } from "./model";
 import { dayFacts, heatmapDays, quartileLevels, type Day } from "./days";
 import { DayFactList, heatColor } from "./DayFacts";
-import { Panel, useWidth } from "./Panel";
+import { useWidth } from "./Panel";
+import { DayTip } from "./DayTip";
+import { CalendarPlaceholder } from "./Placeholder";
 
 /** Every day as a cell, week by week, coloured by its tokens in quartiles of
- * the active days; beside it the active days, the average, the busiest day
- * and the current run. A click narrows the page to that day. */
-export function DailyHeatmap({
+ * the active days; under it the active days, the average, the busiest day
+ * and the current run. Hovering a day splits it by agent and model; a click
+ * narrows the page to that day. */
+export function DayCalendar({
   data,
   agents,
   selectedDay,
   onSelectDay,
   now,
+  readBackTo = null,
   theme,
 }: {
   data: StatisticsResponse | null;
@@ -29,6 +26,9 @@ export function DailyHeatmap({
   selectedDay: string | null;
   onSelectDay: (day: string) => void;
   now: number;
+  /** While the history is read: logs written on or before this day are not
+   * read yet, so its days may be short. */
+  readBackTo?: number | null;
   theme: StatsTheme;
 }) {
   const zh = Boolean(theme.zh);
@@ -70,7 +70,11 @@ export function DailyHeatmap({
           : (bucket.costUSD ?? 0);
         return [
           dayKey(Date.parse(bucket.timestamp)),
-          { cost, sessions: agents ? null : (bucket.sessions ?? null) },
+          {
+            cost,
+            sessions: agents ? null : (bucket.sessions ?? null),
+            models: bucket.models,
+          },
         ];
       }),
     );
@@ -82,6 +86,7 @@ export function DailyHeatmap({
       )
     : 14;
   const step = cell + gap;
+  const pending = readBackTo === null ? null : startOfDay(readBackTo);
   const top = 16;
   const svgWidth = label + weeks.length * step;
   const svgHeight = top + 7 * step;
@@ -109,20 +114,20 @@ export function DailyHeatmap({
       month: "short",
       day: "numeric",
     });
+  if (!data)
+    return (
+      <div ref={ref} style={{ minWidth: 0 }}>
+        <CalendarPlaceholder
+          columns={count}
+          width={width}
+          label={label}
+          gap={gap}
+          theme={theme}
+        />
+      </div>
+    );
   return (
-    <Panel
-      area="heatmap"
-      theme={theme}
-      title={t("Daily usage", "每日用量")}
-      meta={
-        since
-          ? t(
-              `Tokens per day, recorded since ${since} · click a day to look at it alone`,
-              `每天的 Token，自 ${since} 起有记录 · 点一天单独查看`,
-            )
-          : t("Tokens per day", "每天的 Token")
-      }
-    >
+    <>
       <div
         ref={ref}
         style={{
@@ -187,6 +192,7 @@ export function DailyHeatmap({
                           : "rgba(255,255,255,.025)"
                         : heatColor(level(day.value), theme)
                     }
+                    opacity={pending !== null && day.start <= pending ? 0.4 : 1}
                     stroke={selected ? theme.text : "none"}
                     strokeWidth={selected ? 1.5 : 0}
                     style={{ cursor: day.outside ? "default" : "pointer" }}
@@ -205,9 +211,13 @@ export function DailyHeatmap({
               color: theme.secondary,
               width: Math.max(svgWidth, 160),
               maxWidth: "100%",
-              justifyContent: "flex-end",
             }}
           >
+            <span style={{ marginRight: "auto" }}>
+              {since
+                ? t(`Recorded since ${since}`, `自 ${since} 起有记录`)
+                : ""}
+            </span>
             <span>{t("Less", "少")}</span>
             {[0, 1, 2, 3, 4].map((value) => (
               <span
@@ -224,49 +234,25 @@ export function DailyHeatmap({
             <span>{t("More", "多")}</span>
           </div>
           {hovered && (
-            <div
-              style={{
-                ...raisedCard(theme),
-                position: "absolute",
-                left: Math.min(hovered.x + cell + 8, Math.max(0, width - 200)),
-                top: hovered.y - 4,
-                minWidth: 160,
-                fontSize: 12,
-              }}
-            >
-              <strong style={{ fontWeight: 600 }}>
-                {dateText(hovered.day.start)}
-              </strong>
-              {hovered.day.outside ? (
-                <span style={{ color: theme.secondary }}>
-                  {t("Before the record starts", "记录开始之前")}
-                </span>
-              ) : (
-                <>
-                  <span style={number}>
-                    {compact(hovered.day.value)} {t("tokens", "Token")}
-                  </span>
-                  {(() => {
-                    const bucket = buckets.get(hovered.day.key);
-                    if (!bucket) return null;
-                    return (
-                      <span style={{ color: theme.secondary }}>
-                        {moneyShort(bucket.cost, "USD", zh ? "zh" : "en")}
-                        {bucket.sessions !== null
-                          ? zh
-                            ? ` · ${bucket.sessions} 个会话`
-                            : ` · ${bucket.sessions} ${bucket.sessions === 1 ? "session" : "sessions"}`
-                          : ""}
-                      </span>
-                    );
-                  })()}
-                </>
-              )}
-            </div>
+            <DayTip
+              day={hovered.day}
+              left={
+                hovered.x + cell + 268 > width
+                  ? Math.max(0, hovered.x - 268)
+                  : hovered.x + cell + 8
+              }
+              top={Math.max(0, hovered.y - 40)}
+              pending={pending !== null && hovered.day.start <= pending}
+              bucket={buckets.get(hovered.day.key) ?? null}
+              available={data.available}
+              agents={agents}
+              title={dateText(hovered.day.start)}
+              theme={theme}
+            />
           )}
         </div>
         <DayFactList facts={facts} dateText={dateText} theme={theme} />
       </div>
-    </Panel>
+    </>
   );
 }

@@ -4,7 +4,7 @@ import { HUDArtwork as HUDLogo } from "@agent-hud/hud/HUDArtwork";
 import { vendorKey } from "@agent-hud/hud/model";
 import type {
   BillingAccount,
-  Session,
+  Quota,
   StatisticsProvider,
   StatisticsTokenKind,
 } from "@agent-hud/protocol";
@@ -23,7 +23,7 @@ import {
 } from "./StatsTheme";
 import { ModelList } from "./ModelList";
 import { Sparkline } from "./Sparkline";
-import { TopSessions } from "./TopSessions";
+import { QuotaRows, type QuotaRow } from "./dashboard/QuotaRows";
 import { moneyAmount } from "@agent-hud/ui/format";
 
 export const ProviderCard = memo(function ProviderCard({
@@ -34,7 +34,7 @@ export const ProviderCard = memo(function ProviderCard({
   theme,
   highlighted = false,
   billing = [],
-  onSelectSession,
+  quota,
 }: {
   provider: StatisticsProvider;
   total: number;
@@ -43,7 +43,8 @@ export const ProviderCard = memo(function ProviderCard({
   theme: StatsTheme;
   highlighted?: boolean;
   billing?: BillingAccount[];
-  onSelectSession?: (session: Session) => void;
+  /** This agent's quota windows, day by day. */
+  quota?: { rows: QuotaRow[]; live: Map<string, Quota> };
 }) {
   const zh = Boolean(theme.zh);
   const animatedTokens = useAnimatedNumber(provider.selectedTokens);
@@ -241,19 +242,30 @@ export const ProviderCard = memo(function ProviderCard({
           total={provider.selectedTokens}
           theme={theme}
         />
-        <div
-          style={{
-            background: theme.divider,
-            width: perRow === 1 ? 1 : "100%",
-            height: perRow === 1 ? "auto" : 1,
-          }}
-        />
-        <TopSessions
-          provider={provider}
-          accent={accent}
-          theme={theme}
-          onSelectSession={onSelectSession}
-        />
+        {quota && quota.rows.length > 0 && (
+          <>
+            <div
+              style={{
+                background: theme.divider,
+                width: perRow === 1 ? 1 : "100%",
+                height: perRow === 1 ? "auto" : 1,
+              }}
+            />
+            <div style={{ display: "grid", gap: 4, minWidth: 0, flex: 1 }}>
+              <span style={{ fontSize: 11, color: theme.secondary }}>
+                {zh ? "每天的额度" : "Quota by day"}
+              </span>
+              <QuotaRows
+                rows={quota.rows}
+                live={quota.live}
+                label={perRow >= 3 ? 64 : 84}
+                vendors={null}
+                theme={theme}
+                light={theme.light}
+              />
+            </div>
+          </>
+        )}
       </div>
     </Card>
   );

@@ -94,3 +94,75 @@ export function DayFactList({
     </div>
   );
 }
+
+/** What the week's hours say in words: the busiest hour and weekday, and the
+ * shares in working hours (weekdays 9–18) and late at night (0–6). */
+export function HourFactList({
+  tokens,
+  theme,
+}: {
+  /** Monday-first 7 × 24 counted tokens. */
+  tokens: number[][];
+  theme: StatsTheme;
+}) {
+  const zh = Boolean(theme.zh);
+  const t = (en: string, cn: string) => (zh ? cn : en);
+  const days = zh
+    ? ["周一", "周二", "周三", "周四", "周五", "周六", "周日"]
+    : ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  let total = 0;
+  let work = 0;
+  let night = 0;
+  let peak = { day: -1, hour: -1, value: 0 };
+  const byDay = days.map((_, day) =>
+    Array.from({ length: 24 }, (_, hour) => {
+      const value = tokens[day]?.[hour] ?? 0;
+      total += value;
+      if (day < 5 && hour >= 9 && hour < 18) work += value;
+      if (hour < 6) night += value;
+      if (value > peak.value) peak = { day, hour, value };
+      return value;
+    }).reduce((sum, value) => sum + value, 0),
+  );
+  const busiestDay = byDay.indexOf(Math.max(...byDay));
+  const share = (part: number) =>
+    total > 0 ? `${Math.round((part / total) * 100)}%` : "—";
+  const hour = (value: number) => `${String(value).padStart(2, "0")}:00`;
+  return (
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "repeat(4,minmax(0,1fr))",
+        gap: 12,
+        paddingTop: 12,
+        marginTop: 8,
+        borderTop: `1px solid ${theme.divider}`,
+      }}
+    >
+      <Fact
+        label={t("Busiest hour", "最忙的时段")}
+        value={peak.day < 0 ? "—" : `${days[peak.day]} ${hour(peak.hour)}`}
+        caption={peak.day < 0 ? undefined : `${compact(peak.value)} Token`}
+        theme={theme}
+      />
+      <Fact
+        label={t("Busiest weekday", "最忙的一天")}
+        value={total > 0 ? days[busiestDay] : "—"}
+        caption={total > 0 ? share(byDay[busiestDay]) : undefined}
+        theme={theme}
+      />
+      <Fact
+        label={t("Working hours", "工作时间")}
+        value={share(work)}
+        caption={t("Weekdays 9:00–18:00", "工作日 9:00–18:00")}
+        theme={theme}
+      />
+      <Fact
+        label={t("Late at night", "深夜")}
+        value={share(night)}
+        caption={t("0:00–6:00", "0:00–6:00")}
+        theme={theme}
+      />
+    </div>
+  );
+}

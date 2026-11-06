@@ -7,6 +7,7 @@ import { compact, costShort, plain, type StatsTheme } from "../StatsTheme";
 import { agentColor } from "./colors";
 import { Donut, LegendRow } from "./Donut";
 import { Panel } from "./Panel";
+import { Bar } from "./Placeholder";
 
 /** Where the range's tokens went: a donut of the agents' shares beside a
  * legend with each one's tokens, worth and sessions. Picking an agent shows
@@ -90,11 +91,31 @@ export function AgentBreakdown({
         ) : undefined
       }
     >
-      {!providers.length ? (
+      {!data ? (
+        <div className="stats-donut-layout">
+          <Bar
+            width={132}
+            height={132}
+            radius={66}
+            theme={theme}
+            style={{
+              background: "transparent",
+              border: `18px solid ${theme.track}`,
+              boxSizing: "border-box",
+            }}
+          />
+          <div style={{ display: "grid", gap: 14 }}>
+            {[0, 1, 2, 3].map((index) => (
+              <div key={index} style={{ display: "grid", gap: 5 }}>
+                <Bar width="70%" height={11} theme={theme} />
+                <Bar width="45%" height={9} theme={theme} />
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : !providers.length ? (
         <span style={{ fontSize: 12, color: theme.secondary }}>
-          {data
-            ? t("No usage in this range", "这段时间没有用量")
-            : t("Loading…", "正在读取…")}
+          {t("No usage in this range", "这段时间没有用量")}
         </span>
       ) : (
         <div className="stats-donut-layout">

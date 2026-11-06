@@ -1,10 +1,16 @@
 import { HUDArtwork as HUDLogo } from "@agent-hud/hud/HUDArtwork";
 import { listCost, listPrice, moneyShort } from "@agent-hud/ui/format";
-import type { BillingAccount, PlanValueResponse } from "@agent-hud/protocol";
+import type {
+  BillingAccount,
+  PlanValueResponse,
+  Quota,
+} from "@agent-hud/protocol";
+import { QuotaRows, type QuotaRow } from "./QuotaRows";
 import { vendorKey } from "@agent-hud/hud/model";
 import { number, row, truncate, type StatsTheme } from "../StatsTheme";
 import { adviceText } from "../plan-value-text";
 import { Panel } from "./Panel";
+import { Bar } from "./Placeholder";
 
 /** Each signed-in plan: its monthly price, what its calls on this Mac over
  * the last 30 days were worth at API list prices, and the multiple. */
@@ -12,6 +18,8 @@ export function PlanList({
   data,
   agents,
   balances,
+  names,
+  quota,
   highlighted,
   theme,
   light,
@@ -20,6 +28,10 @@ export function PlanList({
   agents: string[] | null;
   /** API balances, beside the plans as what is left to spend. */
   balances: BillingAccount[];
+  /** Agents' names by id, for the balances. */
+  names: Map<string, string>;
+  /** Quota windows of agents without a card of their own, day by day. */
+  quota: { rows: QuotaRow[]; live: Map<string, Quota> };
   /** The vendor another window asked for, ringed for a moment. */
   highlighted: string | null;
   theme: StatsTheme;
@@ -50,20 +62,25 @@ export function PlanList({
         "每个订阅近 30 天按 API 目录价折合，对比月费；每个 API 余额还剩多少",
       )}
     >
-      {!accounts.length && !balances.length && (
+      {data && !accounts.length && !balances.length && (
         <span style={{ fontSize: 12, color: theme.secondary }}>
-          {data
-            ? t("No signed-in plan for this agent", "这个 Agent 没有登录的订阅")
-            : t("Loading…", "正在读取…")}
+          {t("No signed-in plan for this agent", "这个 Agent 没有登录的订阅")}
         </span>
       )}
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fill,minmax(250px,1fr))",
+          gridTemplateColumns: "repeat(auto-fill,minmax(210px,1fr))",
           gap: 12,
         }}
       >
+        {!data &&
+          [0, 1, 2, 3].map((index) => (
+            <div key={index} style={{ ...tile, gap: 8 }}>
+              <Bar width="60%" height={12} theme={theme} />
+              <Bar width="80%" height={9} theme={theme} />
+            </div>
+          ))}
         {accounts.map((account) => {
           const ratio = account.ratio;
           const worth = account.value
@@ -145,7 +162,7 @@ export function PlanList({
               <span style={{ ...row, gap: 7, minWidth: 0 }}>
                 <HUDLogo source={balance.vendor} size={15} light={light} />
                 <span style={{ fontSize: 13, fontWeight: 600, flex: "none" }}>
-                  {balance.label}
+                  {names.get(balance.vendor) ?? balance.label}
                 </span>
                 <span style={{ fontSize: 11, color: theme.secondary }}>
                   {t("API balance", "API 余额")}
@@ -166,6 +183,24 @@ export function PlanList({
           </div>
         ))}
       </div>
+      {quota.rows.length > 0 && (
+        <div style={{ display: "grid", gap: 4 }}>
+          <span style={{ fontSize: 11, color: theme.secondary }}>
+            {t(
+              "Quota by day, for agents with no tokens recorded here",
+              "每天的额度：本机没有 Token 记录的 Agent",
+            )}
+          </span>
+          <QuotaRows
+            rows={quota.rows}
+            live={quota.live}
+            label={180}
+            vendors={names}
+            theme={theme}
+            light={light}
+          />
+        </div>
+      )}
       {data && (
         <span style={{ fontSize: 10, color: theme.tertiary }}>
           {t(

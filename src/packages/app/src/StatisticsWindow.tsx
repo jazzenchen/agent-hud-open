@@ -14,6 +14,8 @@ import { TooltipProvider } from "@agent-hud/ui/components/tooltip";
 import type { NativeMethod, Session, Snapshot } from "@agent-hud/protocol";
 import { LoadingState } from "./LoadingState";
 import { ViewErrorBoundary } from "./ViewErrorBoundary";
+import { themeFor } from "./statistics/StatsTheme";
+import { PagePlaceholder } from "./statistics/dashboard/Placeholder";
 
 // Statistics does not need the shader/bot renderer, nor the settings panes.
 const Statistics = lazy(() => import("./Statistics"));
@@ -94,6 +96,10 @@ export function StatisticsWindow({
       void pendingProvider.then((unlisten) => unlisten());
     };
   }, []);
+  // Before the page has anything to draw, its shape in grey.
+  const placeholder = (
+    <PagePlaceholder theme={themeFor(theme === "light", chinese)} />
+  );
   return (
     <TooltipProvider>
       <div className="statistics-window" data-theme={theme}>
@@ -116,7 +122,9 @@ export function StatisticsWindow({
             chinese={chinese}
             onReset={() => setSelectedSession(null)}
           >
-            <Suspense fallback={null}>
+            <Suspense
+              fallback={statisticsTab === "tokens" ? placeholder : null}
+            >
               <div
                 style={{
                   display: statisticsTab === "tokens" ? "block" : "none",
@@ -149,6 +157,8 @@ export function StatisticsWindow({
               </div>
             </Suspense>
           </ViewErrorBoundary>
+        ) : !error && statisticsTab === "tokens" ? (
+          placeholder
         ) : (
           <LoadingState
             label={

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useMemo, useState, type CSSProperties } from "react";
 import { Button } from "@agent-hud/ui/components/button";
 import { vendorKey } from "@agent-hud/hud/model";
 import type {
@@ -17,17 +17,17 @@ import {
 } from "./statistics/StatsTheme";
 import { useStatisticsEnd } from "./statistics/use-statistics-end";
 import { useProviderHighlight } from "./statistics/use-provider-highlight";
-import { ActivityHeatmap } from "./statistics/ActivityHeatmap";
-import { QuotaHistory } from "./statistics/QuotaHistory";
+import { quotaRows } from "./statistics/dashboard/QuotaRows";
 import { TokenUsage } from "./statistics/TokenUsage";
 import { AgentCards } from "./statistics/AgentCards";
 import { FilterBar } from "./statistics/dashboard/FilterBar";
 import { Figures, spanDays } from "./statistics/dashboard/Figures";
-import { DailyHeatmap } from "./statistics/dashboard/DailyHeatmap";
+import { ActivityCard } from "./statistics/dashboard/ActivityCard";
 import { AgentBreakdown } from "./statistics/dashboard/AgentBreakdown";
 import { PlanList } from "./statistics/dashboard/PlanList";
 import {
   useOverview,
+  useQuotaSpan,
   useSavedRange,
 } from "./statistics/dashboard/use-overview";
 import {
@@ -59,7 +59,6 @@ export default function Statistics({
   snapshot,
   light,
   action,
-  onSelectSession,
   active = true,
 }: StatisticsProps) {
   const [range, setRange] = useSavedRange();
@@ -80,7 +79,8 @@ export default function Statistics({
   const theme = useMemo(() => themeFor(light, zh), [light, zh]);
   const kindsLabel = dimensionsLabel(selectedKinds, zh);
   const span = useMemo(() => rangeSpan(range, end), [range, end]);
-  const { data, error, loading, year, plans } = useOverview({
+  const quotaDays = useQuotaSpan(range, end, snapshot.quotas, active);
+  const overview = useOverview({
     action,
     revision,
     active,
@@ -93,7 +93,31 @@ export default function Statistics({
     accounts: (snapshot.accounts ?? [])
       .map((account) => `${account.id}:${account.plan ?? ""}`)
       .join(","),
+    quotaSpan: quotaDays.span,
+    reading: Boolean(snapshot.indexing && !snapshot.indexing.complete),
   });
+  const { data, year, error, loading, plans, quota } = overview;
+  const live = useMemo(
+    () => new Map(snapshot.quotas.map((entry) => [entry.id, entry])),
+    [snapshot.quotas],
+  );
+  const rows = useMemo(
+    () =>
+      quotaRows(quota, quotaDays.first, quotaDays.count).filter(
+        (entry) =>
+          !providers ||
+          providers.some(
+            (id) => vendorKey(id) === vendorKey(entry.window.vendor),
+          ),
+      ),
+    [quota, quotaDays.first, quotaDays.count, providers],
+  );
+  // Windows of agents without a card of their own show with the plans.
+  const carded = new Set(
+    (data?.providers ?? [])
+      .filter((provider) => provider.selectedTokens > 0)
+      .map((provider) => vendorKey(provider.id)),
+  );
   const agents = useMemo(
     () =>
       (year?.providers ?? [])
@@ -103,15 +127,6 @@ export default function Statistics({
   );
   const prices = useMemo(() => planPrices(plans), [plans]);
   const returned = data ? planReturn(data, prices, span) : null;
-  // The quota history runs to the latest reading: a window read again
-  // moves its end along with the page's.
-  const readings = snapshot.quotas
-    .map((quota) => `${quota.id}@${quota.observedAt ?? ""}`)
-    .join("|");
-  const [historyEnd, setHistoryEnd] = useState(end);
-  useEffect(() => {
-    if (active) setHistoryEnd(Date.now());
-  }, [end, readings, active]);
   const highlightedVendor = useProviderHighlight(
     active,
     Boolean(data),
@@ -206,12 +221,18 @@ export default function Statistics({
             theme={theme}
           />
         </div>
-        <DailyHeatmap
-          data={year}
+        <ActivityCard
+          year={year}
+          range={data}
           agents={providers}
           selectedDay={range.id === "day" ? range.day : null}
           onSelectDay={(day) => setRange({ id: "day", day })}
           now={end}
+          readBackTo={
+            snapshot.indexing?.readBackTo
+              ? Date.parse(snapshot.indexing.readBackTo)
+              : null
+          }
           theme={theme}
         />
         <div className="stats-panel stats-area-trend stats-card">
@@ -245,38 +266,31 @@ export default function Statistics({
             light={light}
             highlightedVendor={highlightedVendor}
             billing={snapshot.billing}
-            onSelectSession={onSelectSession}
+            quota={{ rows, live }}
           />
         </div>
         <PlanList
           data={plans}
           agents={providers}
           balances={billing}
+          quota={{
+            rows: rows.filter(
+              (entry) => !carded.has(vendorKey(entry.window.vendor)),
+            ),
+            live,
+          }}
+          names={
+            new Map(
+              [...(quota?.agents ?? []), ...agents].map((agent) => [
+                agent.id,
+                agent.name,
+              ]),
+            )
+          }
           highlighted={highlightedVendor}
           theme={theme}
           light={light}
         />
-        {snapshot.quotas.length > 0 && (
-          <div className="stats-panel stats-area-quota stats-card">
-            <QuotaHistory
-              quotas={snapshot.quotas}
-              to={historyEnd}
-              action={action}
-              active={active}
-              theme={theme}
-              light={light}
-              timeZone={timeZone}
-              agents={providers}
-            />
-          </div>
-        )}
-        {data && (
-          <ActivityHeatmap
-            data={data.heatmap}
-            available={data.available}
-            theme={theme}
-          />
-        )}
       </div>
     </section>
   );

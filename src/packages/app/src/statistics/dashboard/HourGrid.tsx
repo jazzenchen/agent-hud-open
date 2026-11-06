@@ -1,23 +1,18 @@
 import { memo } from "react";
 import { Tooltip } from "radix-ui";
-import { HUDArtwork as HUDLogo } from "@agent-hud/hud/HUDArtwork";
-import { hourModels } from "../lib/statistics";
 import type {
   StatisticsHeatmap,
   StatisticsResponse,
 } from "@agent-hud/protocol";
 import {
   integer,
-  modelColor,
   number,
   raisedCard,
   row,
-  truncate,
   type StatsTheme,
-} from "./StatsTheme";
-import { Swatch } from "./StatsParts";
-import { Panel } from "./dashboard/Panel";
-import { heatColor } from "./dashboard/DayFacts";
+} from "../StatsTheme";
+import { HourFactList, heatColor } from "./DayFacts";
+import { UsageBreakdown } from "./UsageBreakdown";
 
 function HeatmapRow({
   day,
@@ -40,7 +35,6 @@ function HeatmapRow({
       <span style={{ paddingRight: 7 }}>{day}</span>
       {Array.from({ length: 24 }, (_, hour) => {
         const value = data.tokens[index]?.[hour];
-        const breakdown = hourModels(data.models[index]?.[hour]);
         const known =
           data.coverage.state !== "unavailable" && value !== undefined;
         const period = `${day} ${String(hour).padStart(2, "0")}:00–${String(hour + 1).padStart(2, "0")}:00`;
@@ -61,8 +55,8 @@ function HeatmapRow({
                 aria-label={label}
                 className="statistics-heatmap-cell"
                 style={{
-                  height: 26,
-                  borderRadius: 4,
+                  height: 20,
+                  borderRadius: 3,
                   background: known
                     ? color(data.intensity[index]?.[hour] ?? 0)
                     : "transparent",
@@ -83,8 +77,7 @@ function HeatmapRow({
                 className="statistics-heatmap-details animate-in fade-in-0"
                 style={{
                   ...raisedCard(theme),
-                  minWidth: 180,
-                  maxWidth: 300,
+                  width: 260,
                   fontSize: 11,
                 }}
               >
@@ -98,27 +91,14 @@ function HeatmapRow({
                       ? "不可用"
                       : "Unavailable"}
                 </strong>
-                {breakdown.map(([id, count]) => {
-                  const model = available.models.find(
-                    (entry) => entry.id === id,
-                  );
-                  return (
-                    <div key={id} style={{ ...row, gap: 5 }}>
-                      <Swatch color={modelColor(id)} />
-                      {model && (
-                        <HUDLogo
-                          source={model.provider}
-                          size={12}
-                          light={theme.light}
-                        />
-                      )}
-                      <span style={truncate}>{model?.name ?? id}</span>
-                      <span style={{ marginLeft: "auto", ...number }}>
-                        {integer(count)}
-                      </span>
-                    </div>
-                  );
-                })}
+                {known && (
+                  <UsageBreakdown
+                    models={data.models[index]?.[hour]}
+                    available={available}
+                    agents={null}
+                    theme={theme}
+                  />
+                )}
               </Tooltip.Content>
             </Tooltip.Portal>
           </Tooltip.Root>
@@ -128,7 +108,9 @@ function HeatmapRow({
   );
 }
 
-export const ActivityHeatmap = memo(function ActivityHeatmap({
+/** The range's tokens by weekday and hour, each hour's share of the busiest
+ * in the day heatmap's greens, and what the week's rhythm says in words. */
+export const HourGrid = memo(function HourGrid({
   data,
   available,
   theme,
@@ -149,16 +131,7 @@ export const ActivityHeatmap = memo(function ActivityHeatmap({
       theme,
     );
   return (
-    <Panel
-      area="hours"
-      theme={theme}
-      title={zh ? "一周里的作息" : "When you work"}
-      meta={
-        zh
-          ? "所选时间里每个星期几、每个小时的 Token"
-          : "Tokens by weekday and hour over the range"
-      }
-    >
+    <div style={{ display: "grid", gap: 6 }}>
       <div
         style={{
           display: "grid",
@@ -215,6 +188,7 @@ export const ActivityHeatmap = memo(function ActivityHeatmap({
         ))}
         <span>{zh ? "多" : "More"}</span>
       </div>
-    </Panel>
+      <HourFactList tokens={data.tokens} theme={theme} />
+    </div>
   );
 });
