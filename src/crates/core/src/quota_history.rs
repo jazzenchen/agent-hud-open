@@ -1,4 +1,4 @@
-//! The quota windows' readings over a stretch of the last 30 days, for the
+//! The quota windows' readings over a stretch of up to a year, for the
 //! Statistics window's quota chart: each window's used share in runs drawn
 //! without a break, thinned to a point or two a bin, and the resets between
 //! its cycles. One window is read at a time by its key, never the whole
@@ -15,11 +15,14 @@ use std::collections::BTreeSet;
 pub(crate) mod cycles;
 
 /// The furthest a history reaches back: what `quota_sample` keeps.
-const KEPT_MS: i64 = 30 * 86_400_000;
-/// About how many bins a history is thinned to, whatever its length.
+pub(crate) const KEPT_MS: i64 = 372 * 86_400_000;
+/// About how many bins a history is thinned to, unless that makes a bin
+/// longer than `MAX_BIN_MS`.
 const BINS: i64 = 200;
 /// The shortest bin.
 const MIN_BIN_MS: i64 = 60_000;
+/// The longest bin: a few readings a day stay, so each day's use can be told.
+const MAX_BIN_MS: i64 = 3 * 3_600_000;
 /// Readings further apart than this are a gap, unless the share stayed put
 /// within one window length: nobody read the window in between, so no line
 /// is drawn across it.
@@ -51,7 +54,7 @@ impl AgentHudCore {
             return Err("quota_history.from must be before quota_history.to".into());
         }
         let from = from.max(to - KEPT_MS);
-        let bin = ((to - from) / BINS).max(MIN_BIN_MS);
+        let bin = ((to - from) / BINS).clamp(MIN_BIN_MS, MAX_BIN_MS);
         let db = self
             .database
             .as_ref()

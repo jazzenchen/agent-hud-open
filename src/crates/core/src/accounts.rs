@@ -105,7 +105,7 @@ impl crate::AgentHudCore {
             if changed {
                 let _ = metering::prune_quota_samples(
                     database,
-                    Utc::now().timestamp_millis() - 30 * 86_400_000,
+                    Utc::now().timestamp_millis() - crate::quota_history::KEPT_MS,
                 );
                 self.meters.samples = None;
             }
