@@ -145,33 +145,11 @@ pub(crate) fn rebuild(db: &Connection, path: &str) -> rusqlite::Result<()> {
     Ok(())
 }
 
-/// Token history is kept 30 days; rows outlive that by the day that crosses
-/// it (agent-hud-native-open `UsageLedger.retention`).
-pub(crate) const RETENTION_MS: i64 = 31 * 86_400_000;
-
-/// The oldest time a row may have at `now`, aligned to a bucket so no bucket
-/// keeps half its events.
-pub(crate) fn retention_cutoff(now: i64) -> i64 {
-    (now - RETENTION_MS).div_euclid(900_000) * 900_000
-}
-
-/// Deletes the usage rows that left the retention window; the number deleted.
-pub(crate) fn expire(db: &Connection, now: i64) -> rusqlite::Result<usize> {
-    let cutoff = retention_cutoff(now);
-    let events = db.execute(
-        "DELETE FROM usage_meter_event WHERE at_ms < ?1",
-        params![cutoff],
-    )?;
-    let buckets = db.execute(
-        "DELETE FROM usage_meter_bucket WHERE at_ms < ?1",
-        params![cutoff],
-    )?;
-    let marks = db.execute(
-        "DELETE FROM usage_meter_mark WHERE at_ms < ?1",
-        params![cutoff],
-    )?;
-    Ok(events + buckets + marks)
-}
+/// The Mac keeps every token it records: usage rows never expire, so the
+/// Statistics window can reach as far back as the record does. The phone
+/// asks for its own 30 days. Only a log last written within this window is
+/// read, or read again; an older one keeps what it counted.
+pub(crate) const READ_WINDOW_MS: i64 = 31 * 86_400_000;
 
 /// What the snapshot's quota and balance metrics are read from, kept between
 /// passes.

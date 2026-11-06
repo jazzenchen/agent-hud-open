@@ -2,7 +2,7 @@
 
 use super::{
     price_tokens, replies::REPLY_ROWS, reply_span, unsigned, usage, Bucket, Part, Reply, View,
-    WEEK_MS,
+    READ_WINDOW_MS, WEEK_MS,
 };
 use crate::{pricing, Usage};
 use rusqlite::{params, Connection};
@@ -54,11 +54,14 @@ impl View {
             ..Self::default()
         };
         {
+            // The metrics need the last month at most; the ledger keeps
+            // every month before it for the Statistics window.
             let mut s = db.prepare(
                 "SELECT contribution,source,model,at_ms,input,output,cache_read,cache_write,reasoning
-                 FROM usage_meter_bucket JOIN meter_selected USING(contribution)",
+                 FROM usage_meter_bucket JOIN meter_selected USING(contribution)
+                 WHERE at_ms>=?1",
             )?;
-            let mut rows = s.query([])?;
+            let mut rows = s.query([now - READ_WINDOW_MS])?;
             while let Some(r) = rows.next()? {
                 let key = view.key(r.get(1)?, r.get(2)?);
                 let row = (key, r.get(3)?, usage(r, 4)?);
@@ -121,9 +124,9 @@ impl View {
             {
                 let mut s = db.prepare_cached(
                     "SELECT source,model,at_ms,input,output,cache_read,cache_write,reasoning
-                     FROM usage_meter_bucket WHERE contribution=?1",
+                     FROM usage_meter_bucket WHERE contribution=?1 AND at_ms>=?2",
                 )?;
-                let mut rows = s.query([path])?;
+                let mut rows = s.query(params![path, now - READ_WINDOW_MS])?;
                 while let Some(r) = rows.next()? {
                     let key = self.key(r.get(0)?, r.get(1)?);
                     part.buckets.push((key, r.get(2)?, usage(r, 3)?));

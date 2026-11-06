@@ -132,8 +132,6 @@ pub struct AgentHudCore {
     accounts: AccountProjection,
     /// The platform each client's models are priced on, from `accounts`.
     price_regions: pricing::PriceRegions,
-    /// When usage older than the retention was last deleted.
-    ledger_expired_at: Option<i64>,
     meters: metering::Meters,
     legacy_quota_database: Option<PathBuf>,
     account_samples: HashMap<String, String>,
@@ -245,7 +243,6 @@ impl AgentHudCore {
             usage_projection: None,
             accounts: AccountProjection::default(),
             price_regions: pricing::PriceRegions::default(),
-            ledger_expired_at: None,
             meters: Default::default(),
             legacy_quota_database: None,
             account_samples: HashMap::new(),

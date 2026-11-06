@@ -220,11 +220,11 @@ fn a_logs_list_cost_prices_each_call_on_its_tier() {
 }
 
 #[test]
-fn usage_older_than_the_retention_is_not_written_and_expires() {
+fn usage_of_any_age_is_written_and_kept() {
     let db = Connection::open_in_memory().unwrap();
     crate::database::schema(&db).unwrap();
     let now = Utc::now().timestamp_millis();
-    let old = now - 40 * 86_400_000;
+    let old = now - 400 * 86_400_000;
     write(
         &db,
         "/logs/a.jsonl",
@@ -234,33 +234,14 @@ fn usage_older_than_the_retention_is_not_written_and_expires() {
     .unwrap();
     assert_eq!(
         count(&db, "usage_meter_event"),
-        1,
-        "an event past the retention is not written"
+        2,
+        "the Mac keeps a call over a year old"
     );
-
-    // A row written while it was still inside the window leaves at expiry.
-    db.execute(
-        "INSERT INTO usage_meter_event(contribution,event_key,source,model,at_ms,input,output,cache_read,cache_write,reasoning) VALUES('/logs/a.jsonl','kept','claude','m',?1,1,1,0,0,0)",
-        params![old],
-    )
-    .unwrap();
-    db.execute(
-        "INSERT INTO usage_meter_bucket(contribution,source,model,at_ms,input,output,cache_read,cache_write,reasoning) VALUES('/logs/a.jsonl','claude','m',?1,1,1,0,0,0)",
-        params![old.div_euclid(900_000) * 900_000],
-    )
-    .unwrap();
-    assert_eq!(expire(&db, now).unwrap(), 2);
-    assert_eq!(count(&db, "usage_meter_event"), 1);
-    assert_eq!(
-        count(&db, "usage_meter_bucket"),
-        1,
-        "the recent event's bucket stays"
-    );
-    assert_eq!(expire(&db, now).unwrap(), 0);
+    assert_eq!(count(&db, "usage_meter_bucket"), 2);
 }
 
 #[test]
-fn marks_are_kept_once_and_leave_with_their_log_or_their_time() {
+fn marks_are_kept_once_and_leave_with_their_log() {
     let db = Connection::open_in_memory().unwrap();
     crate::database::schema(&db).unwrap();
     let now = Utc::now().timestamp_millis();
@@ -285,24 +266,21 @@ fn marks_are_kept_once_and_leave_with_their_log_or_their_time() {
     );
     assert_eq!(
         count(&db, "usage_meter_mark"),
-        2,
-        "past the retention nothing is written"
+        3,
+        "a mark of any age is kept"
     );
     assert_eq!(
         marks(&db, &["/logs/a.jsonl".into()]).unwrap(),
-        (vec![now - 3_000], vec![now - 2_000])
+        (vec![now - 40 * 86_400_000, now - 3_000], vec![now - 2_000])
     );
     remove_between(&db, "/logs/a.jsonl", now - 2_500, now).unwrap();
-    assert_eq!(count(&db, "usage_meter_mark"), 1);
+    assert_eq!(count(&db, "usage_meter_mark"), 2);
     move_contribution(&db, "/logs/a.jsonl", "/logs/b.jsonl", now).unwrap();
     assert_eq!(
         marks(&db, &["/logs/b.jsonl".into()]).unwrap().0,
-        vec![now - 3_000]
+        vec![now - 40 * 86_400_000, now - 3_000]
     );
     reset(&db, "/logs/b.jsonl").unwrap();
-    assert_eq!(count(&db, "usage_meter_mark"), 0);
-    write_marks(&db, "/logs/c.jsonl", &written[..1]).unwrap();
-    expire(&db, now + 32 * 86_400_000).unwrap();
     assert_eq!(count(&db, "usage_meter_mark"), 0);
 }
 

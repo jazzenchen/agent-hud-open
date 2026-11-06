@@ -514,21 +514,6 @@ impl AgentHudCore {
             let _ = self.sync_holding(&[&held]);
         }
         self.price_unpriced_logs(64);
-        // Expired usage leaves in its own small statement about once an hour.
-        let now = Utc::now().timestamp_millis();
-        if self
-            .ledger_expired_at
-            .is_none_or(|at| now - at >= 3_600_000)
-        {
-            self.ledger_expired_at = Some(now);
-            if let Some(database) = &self.database {
-                if metering::expire(database, now).is_ok_and(|deleted| deleted > 0) {
-                    self.usage_projection = None;
-                    self.meters.view = None;
-                    self.statistics.revision = self.statistics.revision.wrapping_add(1);
-                }
-            }
-        }
         if errors.is_empty() {
             Ok(())
         } else {

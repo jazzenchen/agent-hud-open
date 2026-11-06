@@ -1,6 +1,6 @@
 //! Writing a log's calls and marks into the ledger.
 
-use super::{integer, retention_cutoff, tools_from, tools_text, usage, Event, Mark};
+use super::{integer, tools_from, tools_text, usage, Event, Mark};
 use crate::Usage;
 use chrono::Utc;
 use rusqlite::{params, Connection};
@@ -69,10 +69,8 @@ pub(crate) fn write(
     events: &[Event],
 ) -> rusqlite::Result<bool> {
     let now_ms = Utc::now().timestamp_millis();
-    // Events the next expiry would delete are not written.
-    let cutoff = retention_cutoff(now_ms);
     let mut changed = false;
-    for event in events.iter().filter(|event| event.at >= cutoff) {
+    for event in events {
         let old = {
             let mut s = db.prepare_cached(
                 "SELECT model,at_ms,input,output,cache_read,cache_write,reasoning,context_window,tools,duration_ms FROM usage_meter_event WHERE contribution=?1 AND event_key=?2",
@@ -181,8 +179,7 @@ pub(crate) fn write(
 }
 
 /// Keeps the largest prompt each model was seen with, which tells its context
-/// window where no log states it (agent-hud-native-open `model_context`). It is kept
-/// past the usage retention.
+/// window where no log states it (agent-hud-native-open `model_context`).
 fn note_context(db: &Connection, source: &str, model: &str, prompt: u64) -> rusqlite::Result<()> {
     if prompt == 0 || model.is_empty() {
         return Ok(());
@@ -197,14 +194,13 @@ fn note_context(db: &Connection, source: &str, model: &str, prompt: u64) -> rusq
 
 /// Records where a log's turns start and where its client compacted the
 /// conversation; marks already recorded stay as they are, so a line read
-/// again adds nothing. Marks the next expiry would delete are not written.
+/// again adds nothing.
 pub(crate) fn write_marks(db: &Connection, path: &str, marks: &[Mark]) -> rusqlite::Result<bool> {
-    let cutoff = retention_cutoff(Utc::now().timestamp_millis());
     let mut statement = db.prepare_cached(
         "INSERT OR IGNORE INTO usage_meter_mark(contribution,at_ms,kind) VALUES(?1,?2,?3)",
     )?;
     let mut changed = false;
-    for mark in marks.iter().filter(|mark| mark.at >= cutoff) {
+    for mark in marks {
         changed |= statement.execute(params![path, mark.at, mark.kind as i64])? > 0;
     }
     Ok(changed)
