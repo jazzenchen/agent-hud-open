@@ -53,9 +53,10 @@ interface StatisticsProps {
 }
 
 /** The Usage page: filters on top that every section follows, the big
- * figures, the plans and balances, every day as a heatmap, the token chart
- * beside each agent's share, and a card per agent with its quota by day. Its grid re-flows with the window's width. The native
- * window owns the tabs. */
+ * figures, every day as a heatmap, the token chart beside each agent's
+ * share, the plans and balances, and a card per agent with its quota by
+ * day. Its grid re-flows with the window's width. The native window owns
+ * the tabs. */
 export default function Statistics({
   snapshot,
   light,
@@ -202,28 +203,6 @@ export default function Statistics({
             theme={theme}
           />
         </div>
-        <PlanList
-          data={plans}
-          agents={providers}
-          balances={billing}
-          names={names}
-          range={
-            data && {
-              value: new Map(
-                data.providers.map((provider) => [
-                  provider.id,
-                  usd(provider.cost?.amounts) ?? 0,
-                ]),
-              ),
-              days: spanDays(shownSpan),
-              words: rangeWords,
-            }
-          }
-          highlighted={highlightedVendor}
-          pending={pending.range}
-          theme={theme}
-          light={light}
-        />
         <ActivityCard
           year={year}
           range={data}
@@ -259,6 +238,28 @@ export default function Statistics({
         <AgentBreakdown
           data={data}
           agent={single}
+          pending={pending.range}
+          theme={theme}
+          light={light}
+        />
+        <PlanList
+          data={plans}
+          agents={providers}
+          balances={billing}
+          names={names}
+          range={
+            data && {
+              value: new Map(
+                data.providers.map((provider) => [
+                  provider.id,
+                  usd(provider.cost?.amounts) ?? 0,
+                ]),
+              ),
+              days: spanDays(shownSpan),
+              words: rangeWords,
+            }
+          }
+          highlighted={highlightedVendor}
           pending={pending.range}
           theme={theme}
           light={light}
