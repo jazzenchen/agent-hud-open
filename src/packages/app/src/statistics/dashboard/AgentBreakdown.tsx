@@ -7,6 +7,9 @@ import { compact, costShort, plain, type StatsTheme } from "../StatsTheme";
 import { agentColor } from "./colors";
 import { Donut, LegendRow } from "./Donut";
 import { Panel } from "./Panel";
+
+/** Agents the legend names; the rest fold into one line. */
+const SHOWN = 5;
 import { Bar } from "./Placeholder";
 
 /** Where the range's tokens went: a donut of the agents' shares beside a
@@ -62,10 +65,22 @@ export function AgentBreakdown({
         color: agentColor(provider.id),
       }));
   const whole = opened ? Math.max(1, opened.selectedTokens) : total;
+  // What the agents past the legend's last line add up to, at least 1%.
+  const rest = Math.max(
+    1,
+    Math.round(
+      (providers
+        .slice(SHOWN)
+        .reduce((sum, provider) => sum + provider.selectedTokens, 0) /
+        total) *
+        100,
+    ),
+  );
   return (
     <Panel
       area="agents"
       theme={theme}
+      style={{ gridTemplateRows: "auto 1fr", alignContent: "stretch" }}
       title={
         opened
           ? `${opened.name} · ${t("models", "模型")}`
@@ -161,7 +176,7 @@ export function AgentBreakdown({
                   />
                 ))
               : providers
-                  .slice(0, 6)
+                  .slice(0, SHOWN)
                   .map((provider) => (
                     <LegendRow
                       key={provider.id}
@@ -179,6 +194,20 @@ export function AgentBreakdown({
                       light={light}
                     />
                   ))}
+            {!opened && providers.length > SHOWN && (
+              <span
+                style={{
+                  fontSize: 11,
+                  color: theme.secondary,
+                  padding: "2px 6px 0 24px",
+                }}
+              >
+                {t(
+                  `${providers.length - SHOWN} more, ${rest}% together`,
+                  `另有 ${providers.length - SHOWN} 个，合计 ${rest}%`,
+                )}
+              </span>
+            )}
           </div>
         </div>
       )}

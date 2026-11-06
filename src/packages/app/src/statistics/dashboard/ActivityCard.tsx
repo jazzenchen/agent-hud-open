@@ -18,6 +18,7 @@ export function ActivityCard({
   onSelectDay,
   now,
   readBackTo = null,
+  focus = null,
   theme,
 }: {
   /** The heatmap's year, for the days. */
@@ -30,6 +31,8 @@ export function ActivityCard({
   now: number;
   /** While the history is read, how far back it has got. */
   readBackTo?: number | null;
+  /** The page's range, which the day view brings forward. */
+  focus?: { from: number; to: number } | null;
   theme: StatsTheme;
 }) {
   const zh = Boolean(theme.zh);
@@ -73,6 +76,7 @@ export function ActivityCard({
           onSelectDay={onSelectDay}
           now={now}
           readBackTo={readBackTo}
+          focus={focus}
           theme={theme}
         />
       ) : range ? (

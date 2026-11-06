@@ -20,27 +20,12 @@ import { Bar } from "./dashboard/Placeholder";
 import { Heading } from "./StatsParts";
 import { ProviderCard } from "./ProviderCard";
 import type { QuotaRow } from "./dashboard/QuotaRows";
+import { QuotaCard, quotaOnly } from "./dashboard/QuotaCard";
 
-function agentRows<T>(values: T[]): T[][] {
-  const sizes = Array.from({ length: Math.floor(values.length / 3) }, () => 3);
-  if (values.length % 3 === 2) sizes.push(2);
-  if (values.length % 3 === 1) {
-    if (!sizes.length) sizes.push(1);
-    else {
-      sizes.pop();
-      sizes.push(2, 2);
-    }
-  }
-  let offset = 0;
-  return sizes.map((size) => {
-    const result = values.slice(offset, offset + size);
-    offset += size;
-    return result;
-  });
-}
-
-/** The Tokens page's By agent section: a card per shown agent, in rows,
- * with a menu that hides and shows them. */
+/** The Usage page's By agent section: a card per shown agent in a grid
+ * of cards no wider than about 450 points, as many to a row as fit, with a
+ * menu that hides and shows them. An agent with quota windows but no tokens
+ * recorded here gets a card of its quota alone. */
 export function AgentCards({
   data,
   hiddenAgentCards,
@@ -53,6 +38,7 @@ export function AgentCards({
   highlightedVendor,
   billing,
   quota,
+  names,
 }: {
   data: StatisticsResponse | null;
   hiddenAgentCards: string[];
@@ -66,6 +52,8 @@ export function AgentCards({
   billing: BillingAccount[];
   /** Each quota window's days, for the cards of the agents they belong to. */
   quota?: { rows: QuotaRow[]; live: Map<string, Quota> };
+  /** Agents' names, for the cards of quota alone. */
+  names: Map<string, string>;
 }) {
   const zh = Boolean(theme.zh);
   const t = (en: string, cn: string) => (zh ? cn : en);
@@ -137,14 +125,7 @@ export function AgentCards({
         {t("By agent", "按智能体")}
       </Heading>
       {!data && (
-        <div
-          className="statistics-agent-row"
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(3,minmax(0,1fr))",
-            gap: 12,
-          }}
-        >
+        <div className="stats-agent-grid">
           {[0, 1, 2].map((index) => (
             <div
               key={index}
@@ -166,41 +147,43 @@ export function AgentCards({
           ))}
         </div>
       )}
-      {data &&
-        agentRows(visibleProviders).map((providers, index) => (
-          <div
-            key={index}
-            className="statistics-agent-row"
-            style={{
-              display: "grid",
-              gridTemplateColumns: `repeat(${providers.length},minmax(0,1fr))`,
-              gap: 12,
-            }}
-          >
-            {providers.map((provider) => (
-              <ProviderCard
-                key={provider.id}
-                provider={provider}
-                total={data.totals.selectedTokens}
-                perRow={providers.length}
-                label={label}
-                theme={theme}
-                highlighted={highlightedVendor === vendorKey(provider.id)}
-                billing={billing}
-                quota={
-                  quota && {
-                    rows: quota.rows.filter(
-                      (entry) =>
-                        vendorKey(entry.window.vendor) ===
-                        vendorKey(provider.id),
-                    ),
-                    live: quota.live,
-                  }
+      {data && (
+        <div className="stats-agent-grid">
+          {visibleProviders.map((provider) => (
+            <ProviderCard
+              key={provider.id}
+              provider={provider}
+              total={data.totals.selectedTokens}
+              perRow={3}
+              label={label}
+              theme={theme}
+              highlighted={highlightedVendor === vendorKey(provider.id)}
+              billing={billing}
+              quota={
+                quota && {
+                  rows: quota.rows.filter(
+                    (entry) =>
+                      vendorKey(entry.window.vendor) === vendorKey(provider.id),
+                  ),
+                  live: quota.live,
                 }
+              }
+            />
+          ))}
+          {quota &&
+            quotaOnly(quota.rows, visibleProviders).map(([vendor, rows]) => (
+              <QuotaCard
+                key={vendor}
+                vendor={vendor}
+                name={names.get(vendor) ?? vendor}
+                rows={rows}
+                live={quota.live}
+                theme={theme}
+                light={light}
               />
             ))}
-          </div>
-        ))}
+        </div>
+      )}
       {data && !visibleProviders.length && (
         <p style={{ color: theme.secondary, fontSize: 12, margin: "4px 0" }}>
           {selectedProviders?.length === 0 ||

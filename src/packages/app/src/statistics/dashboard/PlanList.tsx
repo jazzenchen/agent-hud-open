@@ -1,11 +1,6 @@
 import { HUDArtwork as HUDLogo } from "@agent-hud/hud/HUDArtwork";
 import { listCost, listPrice, moneyShort } from "@agent-hud/ui/format";
-import type {
-  BillingAccount,
-  PlanValueResponse,
-  Quota,
-} from "@agent-hud/protocol";
-import { QuotaRows, type QuotaRow } from "./QuotaRows";
+import type { BillingAccount, PlanValueResponse } from "@agent-hud/protocol";
 import { vendorKey } from "@agent-hud/hud/model";
 import { number, row, truncate, type StatsTheme } from "../StatsTheme";
 import { adviceText } from "../plan-value-text";
@@ -19,7 +14,7 @@ export function PlanList({
   agents,
   balances,
   names,
-  quota,
+  range,
   highlighted,
   theme,
   light,
@@ -30,8 +25,9 @@ export function PlanList({
   balances: BillingAccount[];
   /** Agents' names by id, for the balances. */
   names: Map<string, string>;
-  /** Quota windows of agents without a card of their own, day by day. */
-  quota: { rows: QuotaRow[]; live: Map<string, Quota> };
+  /** The page's range: each agent's worth in it at API prices, its days,
+   * and how to say it ("in the last 7 days"). */
+  range: { value: Map<string, number>; days: number; words: string } | null;
   /** The vendor another window asked for, ringed for a moment. */
   highlighted: string | null;
   theme: StatsTheme;
@@ -58,8 +54,8 @@ export function PlanList({
       theme={theme}
       title={t("Subscriptions and balances", "订阅与余额")}
       meta={t(
-        "Each plan's last 30 days at API list prices, against its monthly price; what each API balance has left",
-        "每个订阅近 30 天按 API 目录价折合，对比月费；每个 API 余额还剩多少",
+        `Each plan's worth at API list prices ${range?.words ?? "in the last 30 days"}, against its price for those days; what each API balance has left`,
+        `每个订阅${range?.words ?? "近 30 天"}按 API 目录价折合，对比同样天数的月费；每个 API 余额还剩多少`,
       )}
     >
       {data && !accounts.length && !balances.length && (
@@ -82,10 +78,25 @@ export function PlanList({
             </div>
           ))}
         {accounts.map((account) => {
-          const ratio = account.ratio;
-          const worth = account.value
-            ? listCost(account.value.amounts, language) || "—"
-            : null;
+          // An agent with one plan is valued over the page's range, its
+          // price for as many days; otherwise over the plan's last 30 days.
+          const own =
+            range &&
+            account.plan &&
+            accounts.filter((other) => other.provider === account.provider)
+              .length === 1
+              ? (range.value.get(account.provider) ?? 0)
+              : null;
+          const ratio =
+            own !== null && account.plan
+              ? own / ((account.plan.monthlyUSD * range!.days) / 30)
+              : account.ratio;
+          const worth =
+            own !== null
+              ? `${moneyShort(own, "USD", language)} ${range!.words}`
+              : account.value
+                ? listCost(account.value.amounts, language) || "—"
+                : null;
           return (
             <div key={account.id} style={tile}>
               <div style={{ ...row, justifyContent: "space-between", gap: 10 }}>
@@ -109,7 +120,7 @@ export function PlanList({
                 <span style={{ ...number, fontSize: 17, fontWeight: 600 }}>
                   {ratio == null
                     ? "—"
-                    : `${account.partial ? "≥" : ""}${ratio >= 10 ? Math.round(ratio) : ratio.toFixed(1)}×`}
+                    : `${own === null && account.partial ? "≥" : ""}${ratio >= 10 ? Math.round(ratio) : ratio.toFixed(1)}×`}
                 </span>
               </div>
               <span
@@ -183,24 +194,6 @@ export function PlanList({
           </div>
         ))}
       </div>
-      {quota.rows.length > 0 && (
-        <div style={{ display: "grid", gap: 4 }}>
-          <span style={{ fontSize: 11, color: theme.secondary }}>
-            {t(
-              "Quota by day, for agents with no tokens recorded here",
-              "每天的额度：本机没有 Token 记录的 Agent",
-            )}
-          </span>
-          <QuotaRows
-            rows={quota.rows}
-            live={quota.live}
-            label={180}
-            vendors={names}
-            theme={theme}
-            light={light}
-          />
-        </div>
-      )}
       {data && (
         <span style={{ fontSize: 10, color: theme.tertiary }}>
           {t(

@@ -19,6 +19,7 @@ export function DayCalendar({
   onSelectDay,
   now,
   readBackTo = null,
+  focus = null,
   theme,
 }: {
   data: StatisticsResponse | null;
@@ -29,6 +30,8 @@ export function DayCalendar({
   /** While the history is read: logs written on or before this day are not
    * read yet, so its days may be short. */
   readBackTo?: number | null;
+  /** The page's range: the days outside it fade. */
+  focus?: { from: number; to: number } | null;
   theme: StatsTheme;
 }) {
   const zh = Boolean(theme.zh);
@@ -192,7 +195,15 @@ export function DayCalendar({
                           : "rgba(255,255,255,.025)"
                         : heatColor(level(day.value), theme)
                     }
-                    opacity={pending !== null && day.start <= pending ? 0.4 : 1}
+                    opacity={
+                      focus &&
+                      (day.start < startOfDay(focus.from) ||
+                        day.start >= focus.to)
+                        ? 0.25
+                        : pending !== null && day.start <= pending
+                          ? 0.4
+                          : 1
+                    }
                     stroke={selected ? theme.text : "none"}
                     strokeWidth={selected ? 1.5 : 0}
                     style={{ cursor: day.outside ? "default" : "pointer" }}

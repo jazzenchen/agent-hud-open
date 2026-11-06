@@ -25,6 +25,7 @@ import { Figures, spanDays } from "./statistics/dashboard/Figures";
 import { ActivityCard } from "./statistics/dashboard/ActivityCard";
 import { AgentBreakdown } from "./statistics/dashboard/AgentBreakdown";
 import { PlanList } from "./statistics/dashboard/PlanList";
+import { rangeText } from "./statistics/dashboard/range-text";
 import {
   useOverview,
   useQuotaSpan,
@@ -33,6 +34,7 @@ import {
 import {
   planPrices,
   planReturn,
+  usd,
   rangeSpan,
 } from "./statistics/dashboard/model";
 import { snapshotLanguage, systemTimeZone } from "@agent-hud/ui/format";
@@ -112,18 +114,22 @@ export default function Statistics({
       ),
     [quota, quotaDays.first, quotaDays.count, providers],
   );
-  // Windows of agents without a card of their own show with the plans.
-  const carded = new Set(
-    (data?.providers ?? [])
-      .filter((provider) => provider.selectedTokens > 0)
-      .map((provider) => vendorKey(provider.id)),
-  );
   const agents = useMemo(
     () =>
       (year?.providers ?? [])
         .filter((provider) => provider.selectedTokens > 0)
         .map((provider) => ({ id: provider.id, name: provider.name })),
     [year],
+  );
+  const names = useMemo(
+    () =>
+      new Map(
+        [...(quota?.agents ?? []), ...agents].map((agent) => [
+          agent.id,
+          agent.name,
+        ]),
+      ),
+    [quota, agents],
   );
   const prices = useMemo(() => planPrices(plans), [plans]);
   const returned = data ? planReturn(data, prices, span) : null;
@@ -133,13 +139,7 @@ export default function Statistics({
     setProviders,
     setHiddenAgentCards,
   );
-  const days = { "7d": 7, "30d": 30, "90d": 90 } as Record<string, number>;
-  const compared =
-    range.id === "day"
-      ? t("the day before", "前一天")
-      : days[range.id]
-        ? t(`the ${days[range.id]} days before`, `前 ${days[range.id]} 天`)
-        : null;
+  const { compared, words: rangeWords } = rangeText(range, span.from, zh);
   const single = providers?.length === 1 ? providers[0] : null;
   const billing = snapshot.billing.filter(
     (account) =>
@@ -228,6 +228,7 @@ export default function Statistics({
           selectedDay={range.id === "day" ? range.day : null}
           onSelectDay={(day) => setRange({ id: "day", day })}
           now={end}
+          focus={range.id === "1y" ? null : span}
           readBackTo={
             snapshot.indexing?.readBackTo
               ? Date.parse(snapshot.indexing.readBackTo)
@@ -267,25 +268,25 @@ export default function Statistics({
             highlightedVendor={highlightedVendor}
             billing={snapshot.billing}
             quota={{ rows, live }}
+            names={names}
           />
         </div>
         <PlanList
           data={plans}
           agents={providers}
           balances={billing}
-          quota={{
-            rows: rows.filter(
-              (entry) => !carded.has(vendorKey(entry.window.vendor)),
-            ),
-            live,
-          }}
-          names={
-            new Map(
-              [...(quota?.agents ?? []), ...agents].map((agent) => [
-                agent.id,
-                agent.name,
-              ]),
-            )
+          names={names}
+          range={
+            data && {
+              value: new Map(
+                data.providers.map((provider) => [
+                  provider.id,
+                  usd(provider.cost?.amounts) ?? 0,
+                ]),
+              ),
+              days: spanDays(span),
+              words: rangeWords,
+            }
           }
           highlighted={highlightedVendor}
           theme={theme}

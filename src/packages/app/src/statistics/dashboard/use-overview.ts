@@ -163,9 +163,9 @@ export function useSavedRange(): [Range, (range: Range) => void] {
   return [range, keep];
 }
 
-/** The quota days' stretch for the page's range: up to the range's last day,
- * a week at the least and 30 days at the most (readings are kept 30 days),
- * running to the latest reading so a window read again moves its end. */
+/** The quota days' stretch for the page's range: the range's days up to its
+ * last, a week at the least, running to the latest reading so a window read
+ * again moves its end. */
 export function useQuotaSpan(
   range: Range,
   end: number,
@@ -180,8 +180,7 @@ export function useQuotaSpan(
     if (active) setLatest(Date.now());
   }, [end, readings, active]);
   const last = range.id === "day" ? dayStart(range.day) : startOfDay(end);
-  const count =
-    range.id === "30d" || range.id === "90d" || range.id === "1y" ? 30 : 7;
+  const count = { "30d": 30, "90d": 90, "1y": 365 }[range.id as string] ?? 7;
   const first = addDays(last, 1 - count);
   const to = Math.min(latest, addDays(last, 1));
   const span = useMemo(() => ({ from: first, to }), [first, to]);

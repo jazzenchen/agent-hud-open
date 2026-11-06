@@ -381,22 +381,49 @@ a:focus-visible {
   .stats-grid > .stats-area-agents {
     grid-column: span 4;
   }
+  .stats-grid > .stats-area-trend,
   .stats-grid > .stats-area-agents {
     align-self: stretch;
   }
 }
-@container stats (max-width: 799.98px) {
+/* Too narrow for five figures in a row: three, then two wider ones under
+   them, so no slot stands empty; two to a row when narrower still. */
+@container stats (max-width: 999.98px) {
   .stats-figures {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+  .stats-figures > * {
+    grid-column: span 2;
+  }
+  .stats-figures > :nth-child(n + 4) {
+    grid-column: span 3;
   }
 }
 @container stats (max-width: 599.98px) {
   .stats-figures {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+  .stats-figures > *,
+  .stats-figures > :nth-child(n + 4) {
+    grid-column: span 1;
+  }
+  .stats-figures > :last-child {
+    grid-column: 1 / -1;
+  }
 }
 .stats-panel {
   container: panel / inline-size;
+}
+/* Agent cards: as many to a row as fit, none wider than about 450 points,
+   rows parted like the rest of the page. */
+.stats-area-cards {
+  display: grid;
+  gap: 10px;
+}
+.stats-agent-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 14px;
 }
 .stats-card {
   border-radius: 10px;

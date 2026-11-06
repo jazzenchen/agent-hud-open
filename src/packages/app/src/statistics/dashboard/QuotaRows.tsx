@@ -16,7 +16,7 @@ import {
   type StatsTheme,
 } from "../StatsTheme";
 import { QuotaDayBars, levelFill } from "./QuotaDayBars";
-import { isLong, quotaDays, type QuotaDay } from "./quota-days";
+import { isLong, quotaDays, weekly, type QuotaDay } from "./quota-days";
 import { useWidth } from "./Panel";
 
 export interface QuotaRow {
@@ -32,9 +32,13 @@ export function quotaRows(
   first: number,
   count: number,
 ): QuotaRow[] {
+  // A year's days fold into weeks, so each column stays wide enough to read.
   return (data?.windows ?? []).map((window) => ({
     window,
-    days: quotaDays(window, first, count),
+    days:
+      count > 120
+        ? weekly(quotaDays(window, first, count), isLong(window))
+        : quotaDays(window, first, count),
     peak: Math.max(0, ...(window.cycles ?? []).map((cycle) => cycle.used)),
   }));
 }

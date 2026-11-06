@@ -15,7 +15,7 @@ export function levelFill(used: number, theme: StatsTheme): string {
 /** One window's days as bars in their slots, over a faint 0–100% track. A
  * weekly window stands as full as it was at the day's end, the day's own
  * share darker on top, with a tick where it reset; a short one shows its
- * peak. */
+ * peak. A day nothing was read on stays empty. */
 export function QuotaDayBars({
   days,
   long,
@@ -52,15 +52,17 @@ export function QuotaDayBars({
               height={PLOT}
               fill="transparent"
             />
-            <rect
-              x={x}
-              y={0}
-              width={bar}
-              height={PLOT}
-              rx={2}
-              fill={theme.track}
-              opacity={0.45}
-            />
+            {value.value !== null && (
+              <rect
+                x={x}
+                y={0}
+                width={bar}
+                height={PLOT}
+                rx={2}
+                fill={theme.track}
+                opacity={0.45}
+              />
+            )}
             {height > 0 && (
               <rect
                 x={x}

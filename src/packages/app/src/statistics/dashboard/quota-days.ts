@@ -97,3 +97,37 @@ export function quotaDays(
 /** The most a window's days show, for folding quiet windows away. */
 export const busiest = (days: QuotaDay[]) =>
   Math.max(0, ...days.map((day) => day.value ?? 0));
+
+/** Days folded into weeks of seven from the first, for a year's columns: a
+ * long window's week is what its days used and how full it stood at the
+ * week's end; a short one's, its highest. */
+export function weekly(days: QuotaDay[], long: boolean): QuotaDay[] {
+  const weeks: QuotaDay[] = [];
+  for (let index = 0; index < days.length; index += 7) {
+    const part = days.slice(index, index + 7);
+    const read = part.filter((day) => day.value !== null);
+    const levels = part
+      .map((day) => day.level)
+      .filter((level): level is number => level !== null);
+    weeks.push({
+      start: part[0].start,
+      end: part[part.length - 1].end,
+      value: read.length
+        ? long
+          ? Math.min(
+              100,
+              read.reduce((sum, day) => sum + (day.value ?? 0), 0),
+            )
+          : Math.max(...read.map((day) => day.value ?? 0))
+        : null,
+      level: levels.length
+        ? long
+          ? levels[levels.length - 1]
+          : Math.max(...levels)
+        : null,
+      resets: part.flatMap((day) => day.resets),
+      ranOut: part.reduce((sum, day) => sum + day.ranOut, 0),
+    });
+  }
+  return weeks;
+}
