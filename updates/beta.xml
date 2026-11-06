@@ -3,16 +3,14 @@
   <channel>
     <title>Agent HUD</title>
     <item>
-      <title>0.6.0-beta.8</title>
-      <pubDate>Fri, 06 Nov 2026 15:38:43 +0800</pubDate>
-      <link>https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.8</link>
-      <sparkle:channel>beta</sparkle:channel>
-      <sparkle:minimumAutoupdateVersion>496</sparkle:minimumAutoupdateVersion>
-      <sparkle:version>496</sparkle:version>
-      <sparkle:shortVersionString>0.6.0-beta.8</sparkle:shortVersionString>
+      <title>0.6.0</title>
+      <pubDate>Fri, 06 Nov 2026 17:22:50 +0800</pubDate>
+      <link>https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0</link>
+      <sparkle:version>497</sparkle:version>
+      <sparkle:shortVersionString>0.6.0</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
       <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-      <description sparkle:format="markdown"># Agent HUD 0.6.0-beta.8
+      <description sparkle:format="markdown"># Agent HUD 0.6.0
 
 ## Compatibility
 
@@ -20,51 +18,55 @@
 
 [Get the iPhone app](https://apps.apple.com/app/id6812113619).
 
-If the required iPhone version is not yet on the App Store, cross-device features require the corresponding TestFlight version.
-
 Requires an Apple Silicon Mac running macOS 14 or later.
 
 ## Changes
 
-### Coming from 0.5.5
+### Before you update
 
-- Includes everything in [0.6.0-beta.1](https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.1), which moves Agent HUD to a new cross-platform app and brings your settings and 30 days of quota history with it, and the changes in [0.6.0-beta.2](https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.2), [0.6.0-beta.3](https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.3), [0.6.0-beta.4](https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.4), [0.6.0-beta.5](https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.5), [0.6.0-beta.6](https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.6) and [0.6.0-beta.7](https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.7).
+- The first launch reads every agent log still on disk to count your token history. Agent HUD keeps working meanwhile, and the Usage page shows how far back it has read; with a lot of history this takes a while.
+- Your settings and the last 30 days of quota history come along. Don't open an earlier version afterwards: it doesn't find this data, or deletes tokens older than 31 days.
+- Everything that changes when you come from 0.5.5 is in the [full notes](https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0).
 
-### New
+### What's new since 0.5.5
 
-- Rebuilds the Statistics window's first tab, now called Usage, as a wide dashboard. The window opens at 1280 × 820 points and narrows to 720, and its sections rearrange to fit its width.
-  - Filters at the top reach every section: all agents or the ones you pick (⌘-click adds one), the token kinds counted, and Today, 7 days, 30 days, 90 days or a year.
-  - Five figures with their trend lines: tokens, their worth at API prices, what the subscriptions returned for their price, sessions, and the cache hit rate. Each is compared with the stretch before, where Agent HUD has a record of it.
-  - One heatmap of up to a year, by day or by hour of the week, with facts such as the busiest day, the longest streak and the busiest hour. Pointing at a day or an hour splits it by agent and model, and clicking a day narrows the page to that day.
-  - The token chart beside each agent's share of the tokens. Its model list groups the models under their agents.
-  - Subscriptions and balances: each plan valued over the range against its price for as many days, beside the API balances.
-  - A card for each agent with its tokens, its top models and its quota by day: a weekly window as how full each day left it, with a tick at each reset, and a five-hour window as its highest that day. Every window shows, and an agent with quota but no tokens in the range gets a card of its quota. These take the place of the Quota history and Plan value sections.
-  - While Agent HUD reads your history, each section fills in with what has been read so far. A section draws its shape in grey until it has something to show, and one waiting for new filters dims while its card fills from the left.
-  - A filter change answers almost at once. With a year of history, each change took about a second.
-  - Figures count to their new values, the heatmap sweeps its colours in and charts grow from zero as data arrives. Reduce Motion shows everything at once.
-- Keeps every token this Mac records, with no 31-day limit, and reads every agent log still on disk, newest first. The first launch reads them all again to bring back older history. Until it finishes, tokens and costs are incomplete, and the HUD panel and the Usage page say how far back it has got, such as "Reading your history again · back to Sep 12". The iPhone still gets 30 days. Quota readings are kept for a year instead of 30 days, so the quota days can follow a range longer than a month as they build up.
-- Shows more on the Statistics window's Sessions tab:
-  - When the window is wide, the list and the picked session sit side by side. From about 1440 points a third column opens what you pick in the session: a turn's calls, or a sub-agent's own session. × or ⌘[ closes it. Narrower, the list steps aside; under 1000 points one column shows at a time.
-  - The list, the session, a turn's calls and more of the transcript draw their shapes in grey while they load. With no session picked, a faint sketch of one stands in its place: turn bars, the context line and sub-agents' lanes.
-  - Rows and cards fade in, figures count to their values, turn bars rise and the context line glides to new readings. Reduce Motion shows everything at once.
-- Parks the HUD's cards at the ends of the dock instead of letting them go. A card still comes out of its agent's mark, then flies to an end: a message after 3 seconds, a request after 5.
-  - The head counts the requests until each is answered. The tail lets its oldest message go every 5 seconds, its outline running down to show the time left. An end shows only while something waits there.
-  - Pointing at an end opens its list: the head's requests, to answer there, or the tail's messages, newest first, with an × on each and Clear all. The tail's clock stops while its list is open.
-  - In Notch mode the notch widens to hold the ends. With several screens, every screen's dock shows the same ends, and a new card comes out on the screen under the pointer.
-  - Settings → Display → All screens → Messages fade every sets the tail's pace, from 3 to 12 seconds, or Never. It is 5 seconds by default.
-- Adds Return to session to a request card for a tool call, a question or a plan, beside its folder, as reply cards have it. The session's window comes forward, the request keeps waiting at the dock's head, and the HUD collapses; if the jump fails, the button offers to try again. A request whose session Agent HUD can't reach shows no button.
-- Adds Quota history and Plan value to the hover panel, off until you turn them on in Settings → Display → Panel or an agent adds them through the HUD tools. Quota history shows each agent's windows over the last day, 7 days or 30 days: one lane per window, a bar per cycle as high as the share it used, amber from 70% and red from 90%, and a dotted line where the running cycle is heading. Plan value compares what each plan's calls of the last 30 days were worth at API list prices with its price.
-- Keeps the HUD to two modes, Notch and Simple. A screen in Dynamic mode opens as Simple at the same edge and place, a screen without a notch starts in Simple, and dragging the notch HUD away from the notch makes it a Simple dock.
-- Gets ready to take messages, new sessions and answers to waiting requests from an iPhone over the local network, a phone paired by QR code included, without going through iCloud. The Mac takes them only while Agent HUD Remote and Remote sessions are on, as it does through iCloud. No released iPhone app sends them this way yet.
+- **A new app, built for every desktop.**
+  - A Rust core works out tokens, quotas, prices and sessions the same way on every system. Agent HUD now runs on Intel Macs too, with test builds for Windows and Linux.
+  - Its own updater checks once a day and verifies every update before it installs. You can also install from a terminal: `brew install --cask jazzenchen/tap/agent-hud` or `npx @agenthud/install`.
+  - Details: [0.6.0-beta.1](https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.1), [0.6.0-beta.4](https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.4), [0.6.0-beta.7](https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.7)
+- **Many more agents.** Each appears once Agent HUD finds it on your computer.
+  - New: Devin, Qoder, TRAE, Factory Droid, Hermes, Cline, Roo Code, Goose, Kilo Code, MiMo Code and Oh My Pi. Some are read from their published formats and not yet checked on a real install.
+  - Followed more closely: Antigravity's sessions and approvals, Cursor's sessions and tokens, and DeepSeek Harness through Agent HUD's own plugin.
+  - Details: [0.6.0-beta.1](https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.1), [0.6.0-beta.4](https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.4), [0.6.0-beta.5](https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.5), [0.6.0-beta.6](https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.6)
+- **Answer more agents from the HUD.**
+  - Requests now come from the Claude desktop app, Antigravity, DeepSeek Harness, Devin and Factory Droid, and from Copilot CLI once you turn it on in Settings → Agents → Copilot.
+  - Return to session on a request card brings its session forward. A Claude Code closed while it waited no longer leaves its request open for half an hour.
+  - Details: [0.6.0-beta.1](https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.1), [0.6.0-beta.4](https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.4), [0.6.0-beta.5](https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.5), [0.6.0-beta.6](https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.6), [0.6.0-beta.7](https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.7), [0.6.0-beta.8](https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.8)
+- **Agents work together.**
+  - Claude Code and Codex sessions can message other sessions or start new ones through Agent HUD's MCP server. A message waits until the receiver is idle, and a paper plane carries it across the HUD.
+  - Agents can read your usage and sessions from Agent HUD and build its hover panel with controls of their own. Turn these on in Settings → Agent plugins.
+  - Details: [0.6.0-beta.1](https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.1), [0.6.0-beta.5](https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.5), [0.6.0-beta.7](https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.7)
+- **Quotas, plans and balances for many more accounts.**
+  - New: MiniMax and Volcengine Ark plans, ClinePass and Factory Droid limits, Hermes's Nous Portal credits, and Qoder's and TRAE's credits after you sign in inside Agent HUD. Relays show their balance, and a Prices page lets you correct what a model costs.
+  - More than one account for Codex, Antigravity and Claude Code. An agent that signs out keeps its last reading, and the HUD tells you.
+  - Details: [0.6.0-beta.3](https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.3), [0.6.0-beta.4](https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.4), [0.6.0-beta.6](https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.6), [0.6.0-beta.7](https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.7)
+- **The HUD shows more at a glance.**
+  - Two modes, Notch and Simple. Simple marks and the panel can draw usage as rings, segments, bars or numbers.
+  - Cards park at the ends of the dock: requests at the head until you answer them, messages at the tail until they fade. The hover panel can also show Quota history and Plan value.
+  - Details: [0.6.0-beta.6](https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.6), [0.6.0-beta.7](https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.7), [0.6.0-beta.8](https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.8)
+- **Statistics opens on a Usage dashboard, with your whole history behind it.**
+  - Filter by agent, token kind and range, up to a year, then read headline figures with their trends, a heatmap, each plan's value against its price, and a card per agent with its quota by day. The Mac keeps every token it records.
+  - The Sessions tab charts each session's turns, context and sub-agents.
+  - Details: [0.6.0-beta.1](https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.1), [0.6.0-beta.5](https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.5), [0.6.0-beta.6](https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.6), [0.6.0-beta.8](https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.8)
+- **More for your iPhone and Apple Watch.**
+  - Each day's usage arrives priced at API list prices. On the local network, changes reach the iPhone as they happen and the Mac offers its Tailscale address too. Once every iPhone runs Agent HUD for iPhone 1.7.6 or later, the text of approval and reminder banners stays in the end-to-end encrypted part of iCloud records.
+  - Details: [0.6.0-beta.3](https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.3), [0.6.0-beta.4](https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.4), [0.6.0-beta.6](https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.6)
 
-### Fixes
+### All beta release notes
 
-- Ends a Claude Code session's wait once its Claude Code has gone. A Claude Code closed while it waited for an approval, a question or a plan stayed waiting for half an hour in the HUD, on the iPhone and on the Apple Watch, with nothing left to answer; closing its terminal tab now clears it within seconds. A session waiting at Claude Code's own prompt stays waiting for as long as it waits, instead of turning idle after 30 minutes. After Agent HUD restarts, a session whose Claude Code had already gone no longer waits, so the iPhone no longer asks you to answer it on the Mac. Sub-agents and other agents keep the 30 minutes, and so do Claude Code versions that don't list their running processes.
-- Cuts the memory growth in the HUD's web view (#47). It grew with every card, panel opening and alert, because WebKit kept what each one had drawn. The glow now reuses its drawing surfaces, and a card's bot drawing, an alert's glow flash and what the animations held are let go once they finish.
-- Loads Agent HUD's OpenCode plugin in OpenCode 2, which refused it, so the HUD hears when an OpenCode 2 turn finishes (#46). OpenCode 1, Kilo Code and MiMo Code are unaffected, and Agent HUD replaces the old plugin itself. Checked with OpenCode 1.1.65 to 2.2.5.
-- Opens and closes the hover panel all the way. A timer could fire a moment early and leave the panel half open or half closed until the pointer moved again.
+[0.6.0-beta.1](https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.1) · [0.6.0-beta.2](https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.2) · [0.6.0-beta.3](https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.3) · [0.6.0-beta.4](https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.4) · [0.6.0-beta.5](https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.5) · [0.6.0-beta.6](https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.6) · [0.6.0-beta.7](https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.7) · [0.6.0-beta.8](https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.8)
 </description>
-      <enclosure url="https://github.com/jazzenchen/agent-hud-open/releases/download/v0.6.0-beta.8/Agent-HUD-0.6.0-beta.8-arm64.dmg" length="52632588" type="application/octet-stream" sparkle:edSignature="QhIdWzzile1VfpMhA2yeK6oJe7aEsevaE9UjWpreyCH//36wt0VyXd47+zpszT4S8MCY7jQxZOIVQU8nGaF3Bg==" />
+      <enclosure url="https://github.com/jazzenchen/agent-hud-open/releases/download/v0.6.0/Agent-HUD-0.6.0-arm64.dmg" length="52633820" type="application/octet-stream" sparkle:edSignature="B/fHwu7FIUye82NLOSN6JXeo6+fPuR9eoSUDC8PwN5KhXQ6tQ6r70mS06qjj2wUC10zXzlMQY9JKMk3EUTk1Cw==" />
       <agenthudMacOnly>false</agenthudMacOnly>
       <agenthudMinimumIOSVersion>1.7.2</agenthudMinimumIOSVersion>
     </item>
