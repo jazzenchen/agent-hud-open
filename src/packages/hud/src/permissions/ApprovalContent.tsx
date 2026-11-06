@@ -3,14 +3,17 @@ import type {
   RequestDecision,
   RequestDelivery,
 } from "@agent-hud/protocol";
+import { useState } from "react";
+import { ArrowUpRight, RotateCcw } from "lucide-react";
 import RequestActions from "../RequestActions";
 import { cardColumn } from "../card-column";
+import { CardButton } from "./CardButton";
 import {
   PermissionClosedRow,
   PermissionRowHead,
-  shortenHomePath,
   WaitingHeader,
 } from "../IslandNews";
+import { shortenHomePath } from "../project-path";
 import { alertText } from "../tokens";
 import { useGround } from "../ground";
 
@@ -56,12 +59,59 @@ export function RequestDeliveryNotice({
   );
 }
 
+/** The open request's way back to its session, as the reply card's. */
+function BackToSession({
+  open,
+  light,
+  zh,
+}: {
+  open: () => Promise<boolean>;
+  light: boolean;
+  zh: boolean;
+}) {
+  const [failed, setFailed] = useState(false);
+  const ink = (alpha: number) =>
+    light ? `rgba(0,0,0,${alpha})` : `rgba(255,255,255,${alpha})`;
+  return (
+    <CardButton
+      onClick={async () => {
+        setFailed(false);
+        if (!(await open())) setFailed(true);
+      }}
+      title={
+        failed
+          ? zh
+            ? "无法回到会话，请重试"
+            : "Couldn't return to session. Try again."
+          : undefined
+      }
+      edge={ink(0.18)}
+      color={ink(0.6)}
+      style={{ whiteSpace: "nowrap", flexShrink: 0 }}
+    >
+      {failed ? (
+        <RotateCcw size={9} strokeWidth={2.6} />
+      ) : (
+        <ArrowUpRight size={9} strokeWidth={2.6} />
+      )}
+      {failed
+        ? zh
+          ? "重试会话跳转"
+          : "Retry session"
+        : zh
+          ? "回到会话"
+          : "Return to session"}
+    </CardButton>
+  );
+}
+
 export function ApprovalContent({
   requests,
   selected,
   select,
   decide,
   openSettings,
+  backToSession,
   light,
   language,
 }: {
@@ -71,6 +121,9 @@ export function ApprovalContent({
   decide?: (id: string, decision: RequestDecision) => void | Promise<void>;
   /** Settings, on a page such as "agent-plugins", with the HUD put away. */
   openSettings?: (page: string) => void;
+  /** A request's way back to its session, false when it fails; none where
+   * its session cannot be reached. */
+  backToSession?: (request: Approval) => (() => Promise<boolean>) | undefined;
   light: boolean;
   language?: string;
 }) {
@@ -89,6 +142,8 @@ export function ApprovalContent({
       <div style={cardColumn(2)}>
         {requests.map((request) => {
           const contextPath = shortenHomePath(request.path ?? request.cwd);
+          const back =
+            request.id === selected.id ? backToSession?.(request) : undefined;
           return request.id === selected.id ? (
             <div
               key={request.id}
@@ -101,18 +156,30 @@ export function ApprovalContent({
               }}
             >
               <PermissionRowHead request={request} open light={light} />
-              {contextPath && (
+              {(contextPath || back) && (
                 <div
                   style={{
-                    fontSize: 11,
-                    fontVariantNumeric: "tabular-nums",
-                    color: tertiary,
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    minWidth: 0,
                   }}
                 >
-                  {contextPath}
+                  <span
+                    style={{
+                      flex: 1,
+                      minWidth: 0,
+                      fontSize: 11,
+                      fontVariantNumeric: "tabular-nums",
+                      color: tertiary,
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {contextPath}
+                  </span>
+                  {back && <BackToSession open={back} light={light} zh={zh} />}
                 </div>
               )}
               {/* A request whose questions change is a new card. */}

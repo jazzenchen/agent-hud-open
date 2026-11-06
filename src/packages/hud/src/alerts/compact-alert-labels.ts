@@ -2,7 +2,8 @@
 import type { Approval, IslandEvent } from "@agent-hud/protocol";
 import { systemCalendar } from "@agent-hud/ui/format";
 import { agentVendorName } from "../model";
-import { clientDisplayName, projectName } from "../IslandNews";
+import { clientDisplayName } from "../IslandNews";
+import { projectName } from "../project-path";
 import { quotaAlertCopy } from "./quota-alert-copy";
 
 /** What a quota reminder says beside its agent (Open's QuotaAlertCopy.compactTitle). */

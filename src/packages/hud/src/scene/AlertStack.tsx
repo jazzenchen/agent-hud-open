@@ -6,6 +6,7 @@ import type {
 } from "@agent-hud/protocol";
 import { snapshotLanguage } from "@agent-hud/ui/format";
 import type { useIslandNews } from "../IslandNews";
+import { usePanelServices } from "../PanelContext";
 import { NewsContent } from "../alerts/NewsContent";
 import { PendingEventRows } from "../alerts/PendingEventRows";
 import { ApprovalContent } from "../permissions/ApprovalContent";
@@ -41,6 +42,21 @@ export function AlertStack({
 }) {
   const zh = snapshotLanguage(snapshot) === "zh";
   const ends = news.ends;
+  const services = usePanelServices();
+  // Back to the session a request comes from, where Agent HUD can reach it.
+  // The request still waits, so its card goes to the head as it would
+  // unattended, and the HUD steps aside for the session's window.
+  const backToSession = (request: Approval) => {
+    const session = snapshot.sessions.find((s) => s.id === request.sessionId);
+    const open = services?.openSession;
+    if (!session?.navigationTarget || !open) return undefined;
+    return async () => {
+      if ((await open(session)) === false) return false;
+      news.park(request.id);
+      handoff();
+      return true;
+    };
+  };
   return (
     <>
       {ends.view === "tail" && (
@@ -58,6 +74,7 @@ export function AlertStack({
           select={news.select}
           decide={decide}
           openSettings={openSettings}
+          backToSession={backToSession}
           light={light}
           language={snapshotLanguage(snapshot)}
         />

@@ -185,23 +185,32 @@ export function useIslandNews(
     );
   }, [snapshot.islandEvents?.revision, requestIDs, silenced, underPointer]);
   const current = queue[0];
+  const latestCurrent = useRef(current);
+  latestCurrent.current = current;
   const dismiss = () => setQueue(dismissIslandCard);
+  /** The card `id` leaves its mark for its end now, if it is still on show. */
+  const park = (id: string) => {
+    const card = latestCurrent.current;
+    if (card?.id !== id) return;
+    const parkedCard: ParkedCard =
+      card.type === "request"
+        ? { type: "request", id: card.id }
+        : { ...card, type: "news" };
+    const source =
+      card.type === "news"
+        ? card.event.source
+        : latestRequests.current.find((r) => r.id === card.id)?.source;
+    ends?.onPark?.(parkedCard, source ?? "");
+    parked.park(parkedCard);
+    dismiss();
+  };
   // A card has its moment beside its agent's mark, then parks at its end.
   useEffect(() => {
     if (!current || held) return;
-    const timer = setTimeout(() => {
-      const card: ParkedCard =
-        current.type === "request"
-          ? { type: "request", id: current.id }
-          : { ...current, type: "news" };
-      const source =
-        current.type === "news"
-          ? current.event.source
-          : latestRequests.current.find((r) => r.id === current.id)?.source;
-      ends?.onPark?.(card, source ?? "");
-      parked.park(card);
-      dismiss();
-    }, PARK_AFTER_MS[current.type]);
+    const timer = setTimeout(
+      () => park(current.id),
+      PARK_AFTER_MS[current.type],
+    );
     return () => clearTimeout(timer);
   }, [current?.id, held]);
   const select = (id: string) => {
@@ -233,6 +242,7 @@ export function useIslandNews(
     fresh,
     queue,
     select,
+    park,
     dismiss:
       parked.view === "tail"
         ? () => message && parked.drop(message.id)
@@ -277,16 +287,4 @@ export function clientDisplayName(source: string): string {
   const normalized = source.trim().toLowerCase();
   if (normalized === "codex" || normalized === "codex-cli") return "Codex";
   return agentVendorName(source);
-}
-
-export function projectName(cwd?: string | null): string | null {
-  if (!cwd) return null;
-  const trimmed = cwd.replace(/[\\/]+$/, "");
-  const name = trimmed.split(/[\\/]/).pop();
-  return name && name.length > 0 ? name : null;
-}
-
-export function shortenHomePath(path?: string | null): string | null {
-  if (!path) return null;
-  return path.replace(/^\/Users\/[^/]+/, "~").replace(/^\/home\/[^/]+/, "~");
 }

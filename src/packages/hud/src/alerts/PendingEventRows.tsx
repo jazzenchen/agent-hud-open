@@ -4,9 +4,9 @@ import { HUDArtwork } from "../HUDArtwork";
 import {
   clientDisplayName,
   compactDuration,
-  projectName,
   type IslandCard,
 } from "../IslandNews";
+import { projectName } from "../project-path";
 import { alertText } from "../tokens";
 import { useGround } from "../ground";
 import { cardColumn } from "../card-column";
