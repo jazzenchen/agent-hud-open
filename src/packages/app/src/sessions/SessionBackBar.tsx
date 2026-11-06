@@ -1,5 +1,6 @@
 import { ChevronLeft, X } from "lucide-react";
 import { clipped, plain, row, type Theme } from "./SessionTheme";
+import { NoSessionArt } from "./NoSessionArt";
 
 /** The way back above a session's detail: to its parent session, or to
  * the list. It sticks under the toolbar, or at the top of the detail's own
@@ -69,7 +70,8 @@ export function SessionBackBar({
   );
 }
 
-/** The detail column before a session is picked. */
+/** The detail column before a session is picked: a session sketched
+ * faintly, and what picking one shows. */
 export function NoSessionPicked({ theme }: { theme: Theme }) {
   const zh = Boolean(theme.zh);
   return (
@@ -77,16 +79,23 @@ export function NoSessionPicked({ theme }: { theme: Theme }) {
       style={{
         height: "100%",
         minHeight: 240,
-        display: "grid",
-        placeItems: "center",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 18,
+        padding: "24px 16px",
         color: theme.secondary,
         fontSize: 12,
         textAlign: "center",
       }}
     >
-      {zh
-        ? "选一个会话，查看它的回合、Token 和子 Agent"
-        : "Pick a session to see its turns, tokens and agents"}
+      <NoSessionArt theme={theme} />
+      <span>
+        {zh
+          ? "选一个会话，查看它的回合、Token 和子 Agent"
+          : "Pick a session to see its turns, tokens and agents"}
+      </span>
     </div>
   );
 }
