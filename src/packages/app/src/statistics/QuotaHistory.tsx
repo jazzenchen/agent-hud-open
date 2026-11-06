@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { vendorKey } from "@agent-hud/hud/model";
 import { useCoreQuery } from "../lib/use-core-query";
 import { useFormat } from "@agent-hud/ui/format-context";
 import type {
@@ -32,6 +33,7 @@ export function QuotaHistory({
   theme,
   light,
   timeZone,
+  agents = null,
 }: {
   quotas: Quota[];
   /** The latest reading: the history runs up to it. */
@@ -41,6 +43,8 @@ export function QuotaHistory({
   theme: StatsTheme;
   light: boolean;
   timeZone: string;
+  /** The page's agent filter: only the picked agents' windows show. */
+  agents?: string[] | null;
 }) {
   const [days, setDays] = useState(30);
   const from = to - days * 86_400_000;
@@ -87,6 +91,7 @@ export function QuotaHistory({
   // stretch, while one of their models does.
   const windows = (data?.windows ?? []).filter(
     (quota) =>
+      (!agents || agents.some((id) => vendorKey(id) === quota.vendor)) &&
       filter.agentShown(quota.vendor) &&
       (!quota.models?.length || quota.models.some(filter.modelShown)),
   );

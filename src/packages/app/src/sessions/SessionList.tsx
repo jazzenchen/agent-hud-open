@@ -35,6 +35,7 @@ export function SessionList({
   onFlip,
   onSelect,
   theme,
+  selectedId = null,
 }: {
   list: ReturnType<typeof useSessions>;
   arrangement: Arrangement;
@@ -48,6 +49,8 @@ export function SessionList({
   onFlip: (day: number) => void;
   onSelect: (id: string) => void;
   theme: Theme;
+  /** The session shown beside the list, marked in it. */
+  selectedId?: string | null;
 }) {
   const zh = Boolean(theme.zh);
   const t = (en: string, cn: string) => (zh ? cn : en);
@@ -84,6 +87,7 @@ export function SessionList({
           session={session}
           client={sessionClient(session, providers)}
           first={index === 0}
+          selected={session.id === selectedId}
           now={now}
           theme={theme}
           onSelect={() => onSelect(session.id)}

@@ -97,6 +97,7 @@ export function SessionRow({
   now,
   onSelect,
   first,
+  selected = false,
 }: {
   session: Session;
   /** The client that drives the session ("Codex Desktop"). */
@@ -105,6 +106,8 @@ export function SessionRow({
   now: number;
   onSelect: () => void;
   first: boolean;
+  /** The session the detail beside the list shows. */
+  selected?: boolean;
 }) {
   const zh = Boolean(theme.zh);
   const [hovered, setHovered] = useState(false);
@@ -123,6 +126,7 @@ export function SessionRow({
       type="button"
       className="session-statistics-row"
       onClick={onSelect}
+      aria-current={selected || undefined}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       title={sessionHelp(session, client)}
@@ -134,11 +138,15 @@ export function SessionRow({
         gridTemplateColumns: rowColumns,
         columnGap: rowGap,
         alignItems: "center",
-        background: hovered
+        background: selected
           ? theme.light
-            ? "rgba(0,0,0,.03)"
-            : "rgba(255,255,255,.04)"
-          : "transparent",
+            ? "rgba(0,0,0,.06)"
+            : "rgba(255,255,255,.09)"
+          : hovered
+            ? theme.light
+              ? "rgba(0,0,0,.03)"
+              : "rgba(255,255,255,.04)"
+            : "transparent",
         borderTop: first ? 0 : `1px solid ${theme.divider}`,
         transition: "background-color 140ms ease",
       }}

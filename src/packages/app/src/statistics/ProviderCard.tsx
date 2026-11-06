@@ -9,6 +9,7 @@ import type {
   StatisticsTokenKind,
 } from "@agent-hud/protocol";
 import {
+  agentAccent,
   card,
   compact,
   costHelp,
@@ -68,21 +69,7 @@ export const ProviderCard = memo(function ProviderCard({
   ]
     .filter(Boolean)
     .join(" · ");
-  const accent =
-    (
-      {
-        claude: "#d18b68",
-        openai: "#10a37f",
-        google: "#8e75ff",
-        cursor: "#a4a4a9",
-        deepseek: "#5366e9",
-        zai: "#3b82f6",
-        minimax: "#ec4899",
-        kimi: "#6366f1",
-        github: "#a855f7",
-        qwen: "#615ced",
-      } as Record<string, string>
-    )[vendorKey(provider.id)] ?? theme.secondary;
+  const accent = agentAccent(provider.id) ?? theme.secondary;
   const cells: [string, ReactNode][] = [
     "input",
     "output",

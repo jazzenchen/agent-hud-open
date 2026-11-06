@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { vendorKey } from "@agent-hud/hud/model";
 import type { StatisticsCost, StatisticsTokenKind } from "@agent-hud/protocol";
 import { tokenKindOrder, unpricedHelp } from "../lib/sessions";
 import {
   dateFormat,
   listCost,
+  moneyShort,
   numberFormat,
   tokensShort,
 } from "@agent-hud/ui/format";
@@ -158,6 +160,26 @@ export function dimensionsLabel(selected: StatisticsTokenKind[], zh = false) {
     .join(" + ");
 }
 
+/** Each agent's own colour, its maker's: the agent cards' accent and the
+ * share donut's slice. Undefined for an agent with no colour of its own. */
+export function agentAccent(id: string): string | undefined {
+  return (
+    {
+      claude: "#d18b68",
+      openai: "#10a37f",
+      google: "#8e75ff",
+      antigravity: "#8e75ff",
+      cursor: "#a4a4a9",
+      deepseek: "#5366e9",
+      zai: "#3b82f6",
+      minimax: "#ec4899",
+      kimi: "#6366f1",
+      github: "#a855f7",
+      qwen: "#615ced",
+    } as Record<string, string>
+  )[vendorKey(id)];
+}
+
 export function modelColor(id: string) {
   let hash = 0;
   for (const char of id) hash = ((hash << 5) - hash + char.charCodeAt(0)) | 0;
@@ -179,6 +201,22 @@ export function dateLabel(at: string | number, timeZone: string, zh = false) {
 export function costText(cost: StatisticsCost | null, zh = false) {
   const text = cost && listCost(cost.amounts, zh ? "zh" : "en");
   if (!text) return "—";
+  return cost.unpricedTokens > 0 ? `${text}+` : text;
+}
+
+/** A cost in whole units from a hundred up, "$6,465 · ¥0.70"; "+" when
+ * unpriced tokens are left out. */
+export function costShort(cost: StatisticsCost | null, zh = false) {
+  const amounts = Object.entries(cost?.amounts ?? {}).filter(
+    ([, amount]) => amount > 0,
+  );
+  if (!cost || !amounts.length) return "—";
+  amounts.sort(([a], [b]) =>
+    a === "USD" ? -1 : b === "USD" ? 1 : a < b ? -1 : 1,
+  );
+  const text = amounts
+    .map(([code, amount]) => moneyShort(amount, code, zh ? "zh" : "en"))
+    .join(" · ");
   return cost.unpricedTokens > 0 ? `${text}+` : text;
 }
 

@@ -9,6 +9,7 @@ export const storageKeys = {
   hiddenAgentCards: "agenthud.hidden-agent-cards",
   quotaHistoryFilter: "agenthud.quota-history-filter",
   planValueFilter: "agenthud.plan-value-filter",
+  statisticsRange: "agenthud.statistics-range",
   hudConfig: "agenthud.hud-config.v3",
   hudConfigV2: "agenthud.hud-config.v2",
   hudConfigV1: "agenthud.hud-config",

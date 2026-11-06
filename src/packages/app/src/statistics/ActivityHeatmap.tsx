@@ -1,6 +1,5 @@
 import { memo } from "react";
 import { Tooltip } from "radix-ui";
-import { Card } from "@agent-hud/ui/components/card";
 import { HUDArtwork as HUDLogo } from "@agent-hud/hud/HUDArtwork";
 import { hourModels } from "../lib/statistics";
 import type {
@@ -8,7 +7,6 @@ import type {
   StatisticsResponse,
 } from "@agent-hud/protocol";
 import {
-  card,
   integer,
   modelColor,
   number,
@@ -17,7 +15,9 @@ import {
   truncate,
   type StatsTheme,
 } from "./StatsTheme";
-import { Coverage, Heading, Swatch } from "./StatsParts";
+import { Swatch } from "./StatsParts";
+import { Panel } from "./dashboard/Panel";
+import { heatColor } from "./dashboard/DayFacts";
 
 function HeatmapRow({
   day,
@@ -61,8 +61,8 @@ function HeatmapRow({
                 aria-label={label}
                 className="statistics-heatmap-cell"
                 style={{
-                  height: 14,
-                  borderRadius: 3,
+                  height: 26,
+                  borderRadius: 4,
                   background: known
                     ? color(data.intensity[index]?.[hour] ?? 0)
                     : "transparent",
@@ -141,20 +141,24 @@ export const ActivityHeatmap = memo(function ActivityHeatmap({
   const days = zh
     ? ["周一", "周二", "周三", "周四", "周五", "周六", "周日"]
     : ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-  const color = (value: number) => {
-    if (!value)
-      return theme.light ? "rgba(0,0,0,.075)" : "rgba(255,255,255,.06)";
-    const intensity = Math.sqrt(Math.max(0, Math.min(1, value)));
-    return `rgb(${(0.08 + 0.62 * intensity) * 255} ${(0.28 + 0.69 * intensity) * 255} ${(0.17 + 0.53 * intensity) * 255})`;
-  };
+  // The daily heatmap's five greens: an hour's share of the busiest hour,
+  // in quarters.
+  const color = (value: number) =>
+    heatColor(
+      value > 0 ? 1 + [0.25, 0.5, 0.75].filter((cut) => value > cut).length : 0,
+      theme,
+    );
   return (
-    <Card
-      className="statistics-heatmap-card"
-      style={{ ...card(theme), gap: 8 }}
+    <Panel
+      area="hours"
+      theme={theme}
+      title={zh ? "一周里的作息" : "When you work"}
+      meta={
+        zh
+          ? "所选时间里每个星期几、每个小时的 Token"
+          : "Tokens by weekday and hour over the range"
+      }
     >
-      <Heading theme={theme}>
-        {zh ? "活跃热力图 · 近 7 天" : "Activity heatmap · last 7 days"}
-      </Heading>
       <div
         style={{
           display: "grid",
@@ -197,7 +201,7 @@ export const ActivityHeatmap = memo(function ActivityHeatmap({
         }}
       >
         <span>{zh ? "少" : "Less"}</span>
-        {[0, 0.05, 0.2, 0.5, 1].map((value) => (
+        {[0, 0.2, 0.4, 0.7, 1].map((value) => (
           <span
             key={value}
             aria-hidden
@@ -211,7 +215,6 @@ export const ActivityHeatmap = memo(function ActivityHeatmap({
         ))}
         <span>{zh ? "多" : "More"}</span>
       </div>
-      <Coverage coverage={data.coverage} theme={theme} />
-    </Card>
+    </Panel>
   );
 });

@@ -175,8 +175,9 @@ pub(crate) fn show_statistics(app: &tauri::AppHandle) -> Result<(), String> {
                 tauri::WebviewUrl::App("index.html?window=statistics".into()),
             )
             .title(format!("{} — Statistics", app.package_info().name))
-            .inner_size(800.0, 1000.0)
-            .min_inner_size(750.0, 620.0)
+            // A wide dashboard that re-flows down to a narrow column.
+            .inner_size(1280.0, 820.0)
+            .min_inner_size(720.0, 560.0)
             .center();
             shell::statistics_chrome(builder)
                 .build()

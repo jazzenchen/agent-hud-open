@@ -72,6 +72,7 @@ export function SessionListControls({
   onQuery,
   page,
   theme,
+  stickyTop = 44,
 }: {
   arrangement: Arrangement;
   onArrangement: (arrangement: Arrangement) => void;
@@ -83,6 +84,9 @@ export function SessionListControls({
   onQuery: (query: string) => void;
   page: SessionsResponse | null;
   theme: Theme;
+  /** Where the controls stick: under the window's toolbar, or at the top
+   * of the list's own column. */
+  stickyTop?: number;
 }) {
   const zh = Boolean(theme.zh);
   const t = (en: string, cn: string) => (zh ? cn : en);
@@ -95,7 +99,7 @@ export function SessionListControls({
       className="session-statistics-controls"
       style={{
         position: "sticky",
-        top: 44,
+        top: stickyTop,
         zIndex: 15,
         background: `var(--statistics-ground, ${theme.ground})`,
         display: "flex",

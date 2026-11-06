@@ -5,7 +5,6 @@ import {
   useState,
   type CSSProperties,
 } from "react";
-import { ChevronLeft } from "lucide-react";
 import { Card } from "@agent-hud/ui/components/card";
 import { Button } from "@agent-hud/ui/components/button";
 import { systemTimeZone } from "@agent-hud/ui/format";
@@ -16,17 +15,11 @@ import type {
   Snapshot,
 } from "@agent-hud/protocol";
 import { InlineDetail } from "./sessions/SessionDetailView";
+import { NoSessionPicked, SessionBackBar } from "./sessions/SessionBackBar";
+import { useWidth } from "./statistics/dashboard/Panel";
 import { SessionList } from "./sessions/SessionList";
 import { SessionListControls } from "./sessions/SessionListControls";
-import {
-  ALL,
-  card,
-  clipped,
-  plain,
-  row,
-  themeFor,
-  type Arrangement,
-} from "./sessions/SessionTheme";
+import { ALL, card, themeFor, type Arrangement } from "./sessions/SessionTheme";
 
 interface SessionStatisticsProps {
   snapshot: Snapshot;
@@ -121,6 +114,10 @@ export default function SessionStatistics({
     window.addEventListener("keydown", back);
     return () => window.removeEventListener("keydown", back);
   }, [selectedId, parent?.id, onClearSelection, active]);
+  // Wide, the list and the detail sit side by side; narrow, the detail
+  // replaces the list until the way back is taken.
+  const { ref, width } = useWidth<HTMLElement>();
+  const split = width >= 1000;
   const choose = (id: string) => {
     setSelectedId(id);
     setSelectedEntry(null);
@@ -135,108 +132,141 @@ export default function SessionStatistics({
     padding: "4px 22px 24px",
   };
 
+  const listColumn = (
+    <>
+      <SessionListControls
+        arrangement={arrangement}
+        onArrangement={setArrangement}
+        source={source}
+        onSource={setSource}
+        project={project}
+        onProject={setProject}
+        query={query}
+        onQuery={setQuery}
+        page={list.page}
+        theme={theme}
+        stickyTop={split ? 0 : 44}
+      />
+      <SessionList
+        list={list}
+        arrangement={arrangement}
+        filtering={Boolean(query || project !== ALL || source !== ALL)}
+        now={now}
+        providers={snapshot.providers}
+        active={active}
+        flipped={flipped}
+        onFlip={(day) =>
+          setFlipped((previous) => {
+            const next = new Set(previous);
+            if (next.has(day)) next.delete(day);
+            else next.add(day);
+            return next;
+          })
+        }
+        onSelect={choose}
+        theme={theme}
+        selectedId={split ? selectedId : null}
+      />
+    </>
+  );
+  // The detail, under a way back: to the parent session, or (in one
+  // column) to the list.
+  const detailColumn = selectedId ? (
+    <>
+      {(!split || parent) && (
+        <SessionBackBar
+          label={parent?.title ?? t("All sessions", "全部会话")}
+          top={split ? 0 : 44}
+          onBack={() => {
+            setSelectedId(parent?.id ?? null);
+            if (!parent) onClearSelection?.();
+          }}
+          theme={theme}
+        />
+      )}
+      {selected ? (
+        <InlineDetail
+          session={selected}
+          detail={detail}
+          loading={loading}
+          error={error}
+          snapshot={snapshot}
+          theme={theme}
+          selectedEntry={selectedEntry}
+          onEntry={setSelectedEntry}
+          onSession={choose}
+          loadMessages={() => void loadMessages()}
+          loadingMessages={loadingMessages}
+          reveal={() => {
+            void actionRef
+              .current("open_session", { id: selected.id })
+              .catch((failure) => setError(String(failure)));
+          }}
+        />
+      ) : (
+        <Card style={card(theme)}>
+          <span style={{ color: theme.secondary, fontSize: 12 }}>
+            {error ?? t("Reading session usage…", "正在读取会话用量…")}
+          </span>
+        </Card>
+      )}
+      {error && (
+        <Button variant="ghost" size="sm" onClick={retryDetail}>
+          {t("Retry", "重试")}
+        </Button>
+      )}
+    </>
+  ) : (
+    <NoSessionPicked theme={theme} />
+  );
+
   return (
     <section
+      ref={ref}
       className="session-statistics-native"
-      style={contentStyle}
+      style={
+        split
+          ? {
+              ...contentStyle,
+              padding: "0 0 0 22px",
+              display: "grid",
+              gridTemplateColumns: "clamp(440px, 42%, 580px) minmax(0, 1fr)",
+              height: "calc(100vh - 44px)",
+              overflow: "hidden",
+            }
+          : contentStyle
+      }
       aria-label={t("Session statistics", "会话统计")}
     >
-      {selectedId ? (
+      {split ? (
         <>
           <div
+            className="session-statistics-list-column"
             style={{
-              ...row,
-              position: "sticky",
-              top: 44,
-              zIndex: 15,
-              background: `var(--statistics-ground, ${theme.ground})`,
-              minHeight: 28,
-              paddingTop: 6,
-              paddingBottom: 12,
-              marginBottom: 14,
-              borderBottom: `1px solid ${theme.divider}`,
+              overflowY: "auto",
+              minHeight: 0,
+              paddingRight: 16,
+              paddingBottom: 24,
+              borderRight: `1px solid ${theme.divider}`,
             }}
           >
-            <button
-              type="button"
-              onClick={() => {
-                setSelectedId(parent?.id ?? null);
-                if (!parent) onClearSelection?.();
-              }}
-              style={{ ...plain, ...row, fontSize: 12, fontWeight: 600 }}
-            >
-              <ChevronLeft size={13} />
-              <span style={clipped}>
-                {parent?.title ?? t("All sessions", "全部会话")}
-              </span>
-            </button>
+            {listColumn}
           </div>
-          {selected ? (
-            <InlineDetail
-              session={selected}
-              detail={detail}
-              loading={loading}
-              error={error}
-              snapshot={snapshot}
-              theme={theme}
-              selectedEntry={selectedEntry}
-              onEntry={setSelectedEntry}
-              onSession={choose}
-              loadMessages={() => void loadMessages()}
-              loadingMessages={loadingMessages}
-              reveal={() => {
-                void actionRef
-                  .current("open_session", { id: selected.id })
-                  .catch((failure) => setError(String(failure)));
-              }}
-            />
-          ) : (
-            <Card style={card(theme)}>
-              <span style={{ color: theme.secondary, fontSize: 12 }}>
-                {error ?? t("Reading session usage…", "正在读取会话用量…")}
-              </span>
-            </Card>
-          )}
-          {error && (
-            <Button variant="ghost" size="sm" onClick={retryDetail}>
-              {t("Retry", "重试")}
-            </Button>
-          )}
+          <div
+            className="session-statistics-detail-column"
+            style={{
+              overflowY: "auto",
+              minHeight: 0,
+              padding: "4px 22px 24px",
+            }}
+          >
+            {detailColumn}
+          </div>
         </>
+      ) : selectedId ? (
+        detailColumn
       ) : (
-        <>
-          <SessionListControls
-            arrangement={arrangement}
-            onArrangement={setArrangement}
-            source={source}
-            onSource={setSource}
-            project={project}
-            onProject={setProject}
-            query={query}
-            onQuery={setQuery}
-            page={list.page}
-            theme={theme}
-          />
-          <SessionList
-            list={list}
-            arrangement={arrangement}
-            filtering={Boolean(query || project !== ALL || source !== ALL)}
-            now={now}
-            providers={snapshot.providers}
-            active={active}
-            flipped={flipped}
-            onFlip={(day) =>
-              setFlipped((previous) => {
-                const next = new Set(previous);
-                if (next.has(day)) next.delete(day);
-                else next.add(day);
-                return next;
-              })
-            }
-            onSelect={choose}
-            theme={theme}
-          />
-        </>
+        listColumn
       )}
     </section>
   );

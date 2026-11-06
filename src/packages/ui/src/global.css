@@ -352,6 +352,80 @@ a:focus-visible {
 .session-statistics-native {
   padding: 4px 22px 24px;
 }
+/* The Usage page: a twelve-column grid that re-flows with the window. Wide,
+   the token chart sits beside the agents' shares; narrower, each takes the
+   full width. A card frames each section alike. */
+.stats-dashboard {
+  container: stats / inline-size;
+  padding-bottom: 28px;
+}
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 14px;
+  align-items: start;
+}
+.stats-grid > * {
+  min-width: 0;
+  grid-column: 1 / -1;
+}
+.stats-figures {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+}
+@container stats (min-width: 1040px) {
+  .stats-grid > .stats-area-trend {
+    grid-column: span 8;
+  }
+  .stats-grid > .stats-area-agents {
+    grid-column: span 4;
+  }
+  .stats-grid > .stats-area-agents {
+    align-self: stretch;
+  }
+}
+@container stats (max-width: 799.98px) {
+  .stats-figures {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@container stats (max-width: 599.98px) {
+  .stats-figures {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+.stats-panel {
+  container: panel / inline-size;
+}
+.stats-card {
+  border-radius: 10px;
+  border: 1px solid var(--stats-border);
+  background: var(--stats-card);
+  padding: 8px 0 6px;
+}
+.stats-donut-layout {
+  display: grid;
+  grid-template-columns: 132px minmax(0, 1fr);
+  gap: 18px;
+  align-items: center;
+}
+@container panel (max-width: 339.98px) {
+  .stats-donut-layout {
+    grid-template-columns: minmax(0, 1fr);
+    justify-items: center;
+  }
+}
+.stats-session-row:hover {
+  background: var(--statistics-hover, rgba(127, 127, 127, 0.1));
+}
+.stats-agent-chips {
+  scrollbar-width: none;
+  mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
+}
+.stats-agent-chips::-webkit-scrollbar {
+  display: none;
+}
 /* The heatmap cell whose hour the hover card shows, outlined as Open's HeatmapCard does. */
 .statistics-heatmap-cell[data-state="delayed-open"],
 .statistics-heatmap-cell[data-state="instant-open"] {

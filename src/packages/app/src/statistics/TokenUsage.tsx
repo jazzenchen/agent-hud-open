@@ -22,6 +22,7 @@ export function TokenUsage({
   setProviders,
   theme,
   light,
+  chartHeight,
 }: {
   data: StatisticsResponse | null;
   loading: boolean;
@@ -31,6 +32,8 @@ export function TokenUsage({
   setProviders: Dispatch<SetStateAction<string[] | null>>;
   theme: StatsTheme;
   light: boolean;
+  /** The chart's height, points, where it fills a taller card. */
+  chartHeight?: number;
 }) {
   const zh = Boolean(theme.zh);
   const t = (en: string, cn: string) => (zh ? cn : en);
@@ -90,11 +93,11 @@ export function TokenUsage({
         light={light}
       />
       {data ? (
-        <UsageChart data={data} theme={theme} />
+        <UsageChart data={data} theme={theme} height={chartHeight} />
       ) : (
         <div
           style={{
-            height: 138,
+            height: (chartHeight ?? 100) + 38,
             display: "grid",
             placeItems: "center",
             color: theme.secondary,

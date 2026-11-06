@@ -18,11 +18,13 @@ import { UsageChartTip } from "./UsageChartTip";
 export const UsageChart = memo(function UsageChart({
   data,
   theme,
+  height = 100,
 }: {
   data: StatisticsResponse;
   theme: StatsTheme;
+  /** The plot's height, points; the Usage page draws it taller. */
+  height?: number;
 }) {
-  const height = 100;
   const { ref, width, context } = useCanvas(height);
   const [hovered, setHovered] = useState<number | null>(null);
   const start = Date.parse(data.query.from),

@@ -102,7 +102,7 @@ export function StatisticsWindow({
           <Tabs value={statisticsTab} onValueChange={setStatisticsTab}>
             <TabsList>
               <TabsTrigger value="tokens">
-                {chinese ? "Token" : "Tokens"}
+                {chinese ? "用量" : "Usage"}
               </TabsTrigger>
               <TabsTrigger value="sessions">
                 {chinese ? "会话" : "Sessions"}
