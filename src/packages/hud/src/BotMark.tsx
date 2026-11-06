@@ -7,6 +7,7 @@ import { botPhaseState, type BotState, type BotCue } from "./bots/bot-state";
 import { makeForm } from "./bots/bot-form";
 import { clock, paintMark } from "./bots/mark-painter";
 import { HUDArtwork } from "./HUDArtwork";
+import { releaseCanvas } from "./release-canvas";
 
 export interface BotMarkProps {
   source: string;
@@ -131,6 +132,7 @@ export function BotMark({
       disposed = true;
       painter?.dispose();
       wake.current = null;
+      releaseCanvas(canvas);
     };
   }, [actor, key, light]);
   return (

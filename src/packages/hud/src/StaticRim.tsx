@@ -2,6 +2,7 @@ import { useLayoutEffect, useMemo, useRef } from "react";
 import { cssChannels } from "./glow-gpu";
 import type { RimTrack } from "./rim-track";
 import type { HUDGlowProps } from "./HUDGlow";
+import { releaseCanvas } from "./release-canvas";
 
 const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
 // Local 5 x 7 raster forms of .:-=+*#%@01; no remote font request or glyph atlas.
@@ -244,6 +245,11 @@ export function StaticRim({
     stopCount,
   ]);
   useLayoutEffect(() => track.subscribe(() => latestDraw.current()), [track]);
+  // The element is the one rendered below for the component's whole life.
+  useLayoutEffect(() => {
+    const canvas = ref.current;
+    return () => releaseCanvas(canvas);
+  }, []);
   return (
     <canvas
       ref={ref}
