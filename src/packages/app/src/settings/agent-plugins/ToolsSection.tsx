@@ -1,8 +1,14 @@
 // Agent tools: the app-wide switches for what agents may do with Agent HUD's
-// tools. Open's is arranging the HUD; a product build adds its own groups.
+// tools: arrange the HUD, and message each other. A product build may add
+// groups of its own.
 import { Fragment } from "react";
 import type { Snapshot } from "@agent-hud/protocol";
-import { Section, type Text } from "../SettingsPrimitives";
+import {
+  Section,
+  type SettingsPaneProps,
+  type Text,
+} from "../SettingsPrimitives";
+import { AgentMessagesRow } from "./AgentMessagesRow";
 import { ToolSwitchRow } from "./rows";
 import type { AgentPluginContext, AgentPluginItem } from "./types";
 import type { HudTools } from "./use-status";
@@ -11,6 +17,7 @@ export function ToolsSection({
   tools,
   groups,
   snapshot,
+  action,
   request,
   active,
   t,
@@ -18,6 +25,7 @@ export function ToolsSection({
   tools: HudTools;
   groups: AgentPluginItem[];
   snapshot: Snapshot;
+  action: SettingsPaneProps["action"];
   request: AgentPluginContext["request"];
   active: boolean;
   t: Text;
@@ -37,6 +45,7 @@ export function ToolsSection({
         error={tools.error ?? (problem ? t(...problem) : null)}
         onChange={(value) => void tools.set(value)}
       />
+      <AgentMessagesRow snapshot={snapshot} action={action} t={t} />
       {groups.map((item) => (
         <Fragment key={item.id}>
           {item.render({

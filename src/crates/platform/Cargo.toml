@@ -9,6 +9,11 @@ publish.workspace = true
 [lints]
 workspace = true
 
+[features]
+# Session-start stand-ins (a Claude Code that runs no process) for other
+# crates' tests: `delivery::fixtures`.
+fixtures = []
+
 [dependencies]
 agent-hud-core.workspace = true
 agent-hud-agents.workspace = true
@@ -22,6 +27,7 @@ base64.workspace = true
 sha2.workspace = true
 serde-saphyr = "1"
 tungstenite = { version = "=0.30.0", default-features = false, features = ["handshake"] }
+uuid = { version = "1", features = ["v4"] }
 
 [target.'cfg(unix)'.dependencies]
 libc.workspace = true
@@ -35,7 +41,7 @@ objc2-foundation = { workspace = true, features = ["std", "NSArray", "NSString",
 
 [target.'cfg(target_os = "windows")'.dependencies]
 tokio = { version = "=1.53.3", features = ["rt", "net", "sync", "time", "io-util", "macros"] }
-windows-sys = { version = "=0.61.2", features = ["Win32_Foundation", "Win32_Security", "Win32_Security_Authorization", "Win32_Security_Credentials", "Win32_Security_Cryptography", "Win32_Storage_FileSystem", "Win32_System_Pipes", "Win32_System_Threading"] }
+windows-sys = { version = "=0.61.2", features = ["Win32_Foundation", "Win32_Security", "Win32_Security_Authorization", "Win32_Security_Credentials", "Win32_Security_Cryptography", "Win32_Storage_FileSystem", "Win32_System_JobObjects", "Win32_System_Pipes", "Win32_System_Threading"] }
 
 [dev-dependencies]
 tempfile.workspace = true

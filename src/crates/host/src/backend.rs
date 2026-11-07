@@ -1,6 +1,8 @@
 //! The application's one snapshot cache: the runtime, the projection it last
 //! published, and the owners each new projection reaches.
-use crate::{activity, coordinator, extension, presentation, service::Service, system, tools};
+use crate::{
+    activity, coordinator, extension, messages, presentation, service::Service, system, tools,
+};
 use agent_hud_runtime::Runtime;
 use serde_json::Value;
 use std::sync::{Arc, PoisonError};
@@ -14,6 +16,7 @@ pub(crate) struct Backend {
     pub(crate) projected: Option<u64>,
     pub(crate) error: Option<String>,
     pub(crate) tools: Option<Arc<tools::ToolsChannel>>,
+    pub(crate) messages: Option<Arc<messages::AgentMessages>>,
     pub(crate) extension: Option<Arc<dyn extension::ProductExtension>>,
     pub(crate) share: Option<Arc<agent_hud_share::PhoneShare>>,
 }
@@ -24,10 +27,8 @@ impl Backend {
         self.projected = Some(owner.revision());
         app.state::<system::System>().project(&mut value);
         if let Some(tools) = &self.tools {
-            value["connection"]["localTools"] = tools.configure(tools::channel_wanted(
-                value["settings"]["hudTools"].as_bool().unwrap_or(false),
-                self.extension.as_deref(),
-            ));
+            value["connection"]["localTools"] =
+                tools.configure(tools::channel_wanted(&value["settings"]));
         }
         let recovered = self.error.take().is_some();
         let changed = self
@@ -74,27 +75,6 @@ impl Backend {
         if let Some(snapshot) = &self.snapshot {
             activity::publish(app, "hud:snapshot", snapshot.as_ref());
             coordinator::snapshot(app, snapshot, true);
-        }
-    }
-
-    /// Product tool switches are independent of Core's snapshot revisions.
-    /// Apply one immediately after a product request, even on a quiet ledger.
-    pub(crate) fn refresh_tools(&mut self, app: &tauri::AppHandle) {
-        let Some(tools) = &self.tools else {
-            return;
-        };
-        let wanted = tools::channel_wanted(
-            self.snapshot
-                .as_ref()
-                .is_some_and(|snapshot| snapshot["settings"]["hudTools"] == true),
-            self.extension.as_deref(),
-        );
-        let channel = tools.configure(wanted);
-        if let Some(snapshot) = &mut self.snapshot {
-            if snapshot["connection"]["localTools"] != channel {
-                Arc::make_mut(snapshot)["connection"]["localTools"] = channel;
-                self.publish_snapshot(app);
-            }
         }
     }
 

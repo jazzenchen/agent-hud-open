@@ -67,6 +67,7 @@ name = "agent-hud-host"
 version = "0.1.0"
 dependencies = [
  "agent-hud-hud",
+ "agent-hud-messaging",
  "agent-hud-runtime",
  "agent-hud-share",
  "base64 0.22.1",
@@ -134,6 +135,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "agent-hud-messaging"
+version = "0.1.0"
+dependencies = [
+ "agent-hud-core",
+ "agent-hud-platform",
+ "chrono",
+ "serde",
+ "serde_json",
+ "sha2",
+ "uuid",
+]
+
+[[package]]
 name = "agent-hud-platform"
 version = "0.1.0"
 dependencies = [
@@ -157,6 +171,7 @@ dependencies = [
  "tempfile",
  "tokio",
  "tungstenite",
+ "uuid",
  "windows-sys 0.61.2",
 ]
 

@@ -108,7 +108,6 @@ Claude Code 写完一段改动，可以请一个 Codex 会话审一遍，Codex �
 - **只传消息，不交出会话**：过去的只有 agent 写下的那条消息，会话本身留在原处。同一个项目里，项目本身就成了它们共同的上下文，对方自己去读代码。
 - **Claude Code、Codex、Antigravity 与 DeepSeek Harness**：彼此都能传话，也能新开 Claude Code、Codex 或 Antigravity 会话。
 - **不打断工作**：消息等对方空闲才送达，不会插进正在进行的一轮。
-- **在[发行版](https://agenthud.app/mac)中提供。**
 
 ### 打造你自己的界面
 

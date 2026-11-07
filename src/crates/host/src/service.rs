@@ -1,6 +1,6 @@
 //! The data service: the Backend, the hooks, the product extension and the
 //! phone share, started with the collector worker and stopped on exit.
-use crate::{activity, backend::Backend, claude_plugin, coordinator, extension, phones, tools};
+use crate::{backend::Backend, claude_plugin, coordinator, extension, messages, phones, tools};
 use agent_hud_runtime::Runtime;
 use std::sync::{
     atomic::{AtomicBool, Ordering},
@@ -59,13 +59,14 @@ impl Service {
             projected: None,
             error: None,
             tools: None,
+            messages: None,
             extension: extension.clone(),
             share: None,
         }));
         let tools = Arc::new(tools::ToolsChannel::new(
             app.clone(),
             Arc::downgrade(&backend),
-            tools_directory,
+            tools_directory.clone(),
         ));
         backend.lock().unwrap_or_else(PoisonError::into_inner).tools = Some(tools);
         let share = phones::start(
@@ -79,7 +80,6 @@ impl Service {
             let queries = snapshots.clone();
             let answers = snapshots.clone();
             let events = app.clone();
-            let flights = app.clone();
             let updates = app.clone();
             product.start(extension::HostContext {
                 snapshot: Arc::new(move || {
@@ -108,10 +108,20 @@ impl Service {
                     use tauri::Emitter;
                     let _ = events.emit("product:event", value);
                 }),
-                fly: Arc::new(move |flight| activity::publish(&flights, "hud:flight", &flight)),
                 update: Arc::new(move |notice| coordinator::update_notice(&updates, notice)),
             })?;
         }
+        // Agent messages, over the product's senders when it has some.
+        let messages = messages::AgentMessages::start(
+            &app,
+            Arc::downgrade(&backend),
+            extension.as_ref().and_then(|product| product.delivery()),
+            tools_directory,
+        )?;
+        backend
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .messages = Some(messages);
         // Before the first collection pass, so a Claude desktop question the
         // app can answer never shows first as one it cannot: the product's own
         // way into sessions, else Agent HUD's Claude Code plugin.
@@ -168,8 +178,8 @@ impl Service {
         })
     }
 
-    /// On exit: the collector, the product, the share, the hooks, the local
-    /// tools and the account readers stop.
+    /// On exit: the collector, the product, the share, the hooks, agent
+    /// messages, the local tools and the account readers stop.
     pub(crate) fn stop(&self) {
         self.stopped.store(true, Ordering::Release);
         if let Some(extension) = &self.extension {
@@ -193,6 +203,15 @@ impl Service {
                 .lock()
                 .unwrap_or_else(PoisonError::into_inner)
                 .stop();
+        }
+        let messages = self
+            .backend
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .messages
+            .clone();
+        if let Some(messages) = messages {
+            messages.stop();
         }
         let backend = self.backend.lock().unwrap_or_else(PoisonError::into_inner);
         if let Some(tools) = &backend.tools {

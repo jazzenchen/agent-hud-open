@@ -3,7 +3,7 @@
 use crate::{
     coordinator, presentation,
     service::{wake_collector, Service, DATA},
-    system, tools, AppState,
+    system, AppState,
 };
 use serde_json::Value;
 use std::sync::{atomic::Ordering, Arc, PoisonError};
@@ -37,17 +37,13 @@ pub(crate) async fn native_request(
                 );
         }
         if method == "extension" {
-            return tools::extension_request(
-                extension.as_deref(),
-                params["method"].as_str().ok_or("Extension method is required")?,
-                params.get("params").cloned().unwrap_or(Value::Null),
-                || {
-                    backend
-                        .lock()
-                        .unwrap_or_else(PoisonError::into_inner)
-                        .refresh_tools(&app);
-                },
-            );
+            return extension
+                .as_deref()
+                .ok_or("No product extension is installed")?
+                .request(
+                    params["method"].as_str().ok_or("Extension method is required")?,
+                    params.get("params").cloned().unwrap_or(Value::Null),
+                );
         }
         let mut params=params;
         // The demo never reaches outside its own folder: no login item, no

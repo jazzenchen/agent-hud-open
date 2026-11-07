@@ -23,6 +23,7 @@ agent-hud-host = { path = "src/crates/host" }
 agent-hud-hud = { path = "src/crates/hud" }
 agent-hud-l10n = { path = "src/crates/l10n" }
 agent-hud-lan = { path = "src/crates/lan" }
+agent-hud-messaging = { path = "src/crates/messaging" }
 agent-hud-platform = { path = "src/crates/platform" }
 agent-hud-runtime = { path = "src/crates/runtime" }
 agent-hud-share = { path = "src/crates/share" }

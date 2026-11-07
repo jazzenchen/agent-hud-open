@@ -1,36 +1,31 @@
 //! Optional host extension interface.
 use serde_json::Value;
-use std::sync::Arc;
+use std::{path::PathBuf, sync::Arc};
 
 /// The app's language for a product's own words, and the way a product sends
 /// words into a client session.
-pub use agent_hud_runtime::{l10n, replies::SessionReplies};
+pub use agent_hud_runtime::{delivery, l10n, replies::SessionReplies};
 
 pub type ReadSnapshot = Arc<dyn Fn() -> Result<Value, String> + Send + Sync>;
 pub type Query = Arc<dyn Fn(&str, Value) -> Result<Value, String> + Send + Sync>;
 pub type Answer = Arc<dyn Fn(&str, Value) -> Result<Value, String> + Send + Sync>;
 pub type Publish = Arc<dyn Fn(Value) + Send + Sync>;
-/// Asks every HUD for a flight (see `Flight`).
-pub type Fly = Arc<dyn Fn(Flight) + Send + Sync>;
-/// A short animation a product asks every HUD for: something leaves one
-/// agent's mark and reaches another agent's, or falls on the way. Agents are
-/// named by their source, as sessions name them (`claude`, `codex`, …). The
-/// HUD draws nothing for it outside the flight itself.
-#[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Flight {
-    /// Flights between the same two ends share a lane: one is in the air at a
-    /// time, and more that come meanwhile ride along as a count.
-    pub lane: String,
-    pub from: String,
-    pub to: String,
-    /// Where marks have no place of their own (around the notch), the sender
-    /// stands on the left; otherwise on the right.
-    pub from_left: bool,
-    /// The receiver appears first, then catches it.
-    pub arrives: bool,
-    /// It falls halfway and the sender is left puzzled.
-    pub falls: bool,
+/// What agent messages send through when a product has senders of its own
+/// (`ProductExtension::delivery`).
+pub struct Delivery {
+    /// The one owner of sends into sessions on this computer: agent messages
+    /// and the product's own senders go through it, so each session's
+    /// messages keep their order.
+    pub clients: Arc<delivery::LocalClients>,
+    /// How sessions are started, and where their receipts are kept.
+    pub starts: delivery::StartConfig,
+    pub start_receipts: PathBuf,
+    /// Where agent messages keep their journal.
+    pub directory: PathBuf,
+    /// Follows a start whose Claude job will move into the desktop app.
+    pub follow: agent_hud_messaging::Follow,
+    /// The product's store of conversation turns, read before transcript pages.
+    pub conversations: Option<Arc<dyn agent_hud_messaging::Turns>>,
 }
 /// A newer version of the app that the product found. The host shows it as
 /// Open's updater did: a New Version… item in the menu bar's menu and an
@@ -50,7 +45,6 @@ pub struct HostContext {
     pub query: Query,
     pub answer: Answer,
     pub publish: Publish,
-    pub fly: Fly,
     pub update: ShowUpdate,
 }
 pub trait ProductExtension: Send + Sync + 'static {
@@ -59,19 +53,8 @@ pub trait ProductExtension: Send + Sync + 'static {
         Ok(())
     }
     fn start(&self, host: HostContext) -> Result<(), String>;
-    /// The product's requests: its settings pages', and its own MCP tools'
-    /// from the local tools channel. `host_tools` answers `{tools: [{name,
-    /// description, inputSchema, readOnly}]}`, the tools of its groups that
-    /// are on now; `host_tool` runs one, given `{name, arguments, caller}`,
-    /// where `caller` is the agent session that called as its client names it
-    /// (`{client, sessionId, turnId}`), or null.
+    /// The product's requests, from its settings pages.
     fn request(&self, method: &str, params: Value) -> Result<Value, String>;
-    /// Whether any of the product's own tool groups is on. While one is, the
-    /// local tools channel stays open with HUD tools off; HUD tools still
-    /// answer only while their switch is on.
-    fn host_tools_on(&self) -> bool {
-        false
-    }
     fn observe_snapshot(&self, _snapshot: Arc<Value>) {}
     /// Whether the product runs its own sharing with paired phones. While it
     /// does, the host's own (quota readings and token usage) stays off and
@@ -97,6 +80,12 @@ pub trait ProductExtension: Send + Sync + 'static {
     /// the host and the product use one. None (the default) keeps both in the
     /// app's data folder.
     fn claude_plugin_paths(&self) -> Option<(std::path::PathBuf, std::path::PathBuf)> {
+        None
+    }
+    /// The product's own senders into sessions, which agent messages then
+    /// share. Asked once, after `start`; None (the default) has the host send
+    /// and start sessions on its own, from the app's data folder.
+    fn delivery(&self) -> Option<Delivery> {
         None
     }
     fn stop(&self);

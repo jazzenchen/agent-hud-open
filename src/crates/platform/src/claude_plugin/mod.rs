@@ -92,6 +92,18 @@ pub fn valid_name(value: &str) -> bool {
             .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
 }
 
+/// A prompt this plugin submitted, as Claude Code logs it: the words without
+/// the lead and closing note Claude Code puts round a plugin's prompt. Other
+/// text comes back as it is.
+pub fn unwrap_prompt(text: &str) -> &str {
+    const LEAD: &str = "The agent-hud plugin sent a message:\n";
+    const NOTE: &str = "\n\nThis is how Claude Code surfaces a prompt a plugin submits";
+    let Some(rest) = text.strip_prefix(LEAD) else {
+        return text;
+    };
+    rest.rfind(NOTE).map_or(rest, |end| &rest[..end])
+}
+
 /// Claude Code's own folder: `$CLAUDE_CONFIG_DIR`, else `~/.claude`.
 pub fn claude_config_directory(home: &Path) -> PathBuf {
     std::env::var_os("CLAUDE_CONFIG_DIR")

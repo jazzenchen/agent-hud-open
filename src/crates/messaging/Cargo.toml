@@ -1,0 +1,23 @@
+[package]
+name = "agent-hud-messaging"
+version.workspace = true
+description = "Agent messages: agents on this computer message, start and read other agents' sessions through Agent HUD's MCP tools"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+agent-hud-core.workspace = true
+agent-hud-platform.workspace = true
+chrono.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+uuid = { version = "1", features = ["v4"] }
+
+[dev-dependencies]
+agent-hud-platform = { workspace = true, features = ["fixtures"] }

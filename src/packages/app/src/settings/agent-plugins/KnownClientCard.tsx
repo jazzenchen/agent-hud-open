@@ -64,25 +64,32 @@ function hudToolsState(
   };
 }
 
-function ClaudeAnswers({
+/** One of the plugin's switches that is an app setting: "Answer questions",
+ * "Send messages". */
+function SettingControl({
+  title,
+  description,
+  setting,
   snapshot,
   action,
-  t,
 }: {
+  title: string;
+  description?: string;
+  setting: "claudeAnswers" | "claudeMessages" | "deepseekMessages";
   snapshot: Snapshot;
   action: SettingsPaneProps["action"];
-  t: Text;
 }) {
   const [pending, setPending] = useState(false);
   return (
     <PluginControl
-      title={t("Answer questions", "回答提问")}
-      checked={snapshot.settings.claudeAnswers !== false}
+      title={title}
+      description={description}
+      checked={snapshot.settings[setting] !== false}
       pending={pending}
       onChange={(value) => {
         setPending(true);
         // The row has no place for a failure, so it shows as a toast.
-        void action("set_setting", { key: "claudeAnswers", value })
+        void action("set_setting", { key: setting, value })
           .catch((failure) => toast.error(String(failure)))
           .finally(() => setPending(false));
       }}
@@ -215,7 +222,36 @@ export function KnownClientCard({
         />
       )}
       {installed === true && client.id === "claudeCode" && (
-        <ClaudeAnswers snapshot={snapshot} action={action} t={t} />
+        <>
+          <SettingControl
+            title={t("Answer questions", "回答提问")}
+            setting="claudeAnswers"
+            snapshot={snapshot}
+            action={action}
+          />
+          <SettingControl
+            title={t("Send messages", "发消息")}
+            description={t(
+              "From Agent HUD into open sessions.",
+              "从 Agent HUD 发到打开的会话。",
+            )}
+            setting="claudeMessages"
+            snapshot={snapshot}
+            action={action}
+          />
+        </>
+      )}
+      {installed === true && client.id === "deepseek" && (
+        <SettingControl
+          title={t("Send messages", "发消息")}
+          description={t(
+            "Queued for open sessions; never interrupts a turn.",
+            "排进打开的会话的队列，不打断当前一轮。",
+          )}
+          setting="deepseekMessages"
+          snapshot={snapshot}
+          action={action}
+        />
       )}
       {installed === true &&
         switches.map((item) => (

@@ -18,6 +18,7 @@ pub mod extension;
 mod hud;
 mod instance;
 mod mcp_clients;
+mod messages;
 mod phones;
 mod picture;
 mod requests;

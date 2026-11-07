@@ -113,4 +113,14 @@ export interface AppSettings {
   hudTools?: boolean;
   /** Answer the Claude desktop app's questions on the HUD through Agent HUD's Claude Code plugin; on unless turned off. */
   claudeAnswers?: boolean;
+  /** Agents message, start and read other sessions through Agent HUD's MCP tools; off unless turned on. */
+  agentMessages?: boolean;
+  /** Agents' messages go in as the user's own words, with no label. */
+  agentMessagesAsUser?: boolean;
+  /** Passes in a row with no word from the user before agents' messages stop; null for no limit. */
+  agentMessagesLimit?: number | null;
+  /** Messages may go into Claude Code sessions through Agent HUD's plugin; on unless turned off. */
+  claudeMessages?: boolean;
+  /** Messages may go into DeepSeek Harness sessions through Agent HUD's plugin; on unless turned off. */
+  deepseekMessages?: boolean;
 }
