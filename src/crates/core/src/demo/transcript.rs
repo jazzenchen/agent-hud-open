@@ -121,6 +121,10 @@ pub(super) fn turn_lines(
         "claude" => {
             // Typed in the Claude desktop app, where most real Claude Code prompts come from.
             lines.push(json!({"type":"user","uuid":format!("{}-u{index}",plan.id),"sessionId":plan.id,"cwd":dir,"entrypoint":"claude-desktop","timestamp":iso(start),"message":{"role":"user","content":prompt(plan,index)}}));
+            // Claude Code marks a compaction with a boundary line.
+            if turn.compacted {
+                lines.push(json!({"type":"system","subtype":"compact_boundary","uuid":format!("{}-c{index}",plan.id),"sessionId":plan.id,"cwd":dir,"timestamp":iso(start + 500),"compactMetadata":{"trigger":"manual"}}));
+            }
             // Each finished sub-agent's result comes back before the first
             // call after its report.
             let mut reported = vec![false; turn.agents.len()];

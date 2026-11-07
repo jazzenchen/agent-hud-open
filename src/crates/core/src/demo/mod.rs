@@ -15,7 +15,9 @@
 //! that names each one is made when it is asked for (`file`).
 mod accounts;
 mod data;
+mod extra_lines;
 mod live;
+mod quota;
 mod requests;
 pub mod script;
 mod seed;
@@ -205,6 +207,11 @@ fn source_of_name(source: &str) -> &'static str {
     match source {
         "claude" => "claude",
         "codex" => "codex",
+        "qwen" => "qwen",
+        "grok-cli" => "grok-cli",
+        "pi" => "pi",
+        "codebuddy" => "codebuddy",
+        "openclaw" => "openclaw",
         _ => "deepseek",
     }
 }

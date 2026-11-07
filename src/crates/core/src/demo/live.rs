@@ -70,6 +70,7 @@ impl AgentHudCore {
             times: data::spread(now, now + 1_000, 2),
             own,
             agents: Vec::new(),
+            compacted: false,
         };
         let lines = turn_lines(plan, index, &turn, ending, &mut totals, &mut seq);
         sessions.totals.insert(plan.id, totals);

@@ -54,19 +54,46 @@ fn the_generator_is_seeded_and_shaped_as_opens() {
         heard.tool.is_some() && heard.at < now && heard.at > now - 30_000
     }));
     assert_eq!(live[3].own, first[3].own);
-    // The 24 hours before the iPhone sample's morning, 2026-10-12 09:41 in
-    // Beijing: the same buckets as its DemoFleetTests pins.
+    // The same moment gives the same tokens.
     let morning = 1_791_769_260_000;
-    let day: Vec<_> = history(morning)
-        .into_iter()
-        .filter(|row| row.0 >= morning - 86_400_000)
-        .collect();
-    let fresh: u64 = day.iter().map(|row| row.3 + row.4).sum();
-    assert_eq!((day.len(), fresh), (52, 3_355_172));
-    // Fifteen million tokens a day before cache reads, over thirty days.
-    let total: u64 = history(now).iter().map(|row| row.3 + row.4).sum();
+    assert_eq!(history(morning), history(morning));
+    // Fifteen million tokens a day before cache reads, over the last thirty
+    // days; the year before them swings by month, week and day.
+    let year = history(now);
+    let month_start = now.div_euclid(900_000) * 900_000 - 30 * 86_400_000;
+    let total: u64 = year
+        .iter()
+        .filter(|row| row.0 >= month_start)
+        .map(|row| row.3 + row.4)
+        .sum();
     assert!(
         (total as f64 / 30.0 - 15_000_000.0).abs() < 200_000.0,
         "{total}"
     );
+    let first = year.first().unwrap().0;
+    assert!(first < month_start - 330 * 86_400_000, "a year of tokens");
+    let before: u64 = year
+        .iter()
+        .filter(|row| row.0 < month_start)
+        .map(|row| row.3 + row.4)
+        .sum();
+    let daily = before as f64 / (HISTORY_DAYS - 30) as f64;
+    assert!(daily > 4_000_000.0 && daily < 25_000_000.0, "{daily}");
+    // Days swing: rest days, and busy days far above the usual one.
+    let mut days = std::collections::BTreeMap::<i64, u64>::new();
+    for row in &year {
+        *days
+            .entry((row.0 + 8 * 3_600_000).div_euclid(86_400_000))
+            .or_default() += row.3 + row.4;
+    }
+    let mut worked: Vec<u64> = days
+        .values()
+        .copied()
+        .filter(|tokens| *tokens > 0)
+        .collect();
+    worked.sort_unstable();
+    let rest = HISTORY_DAYS - worked.len();
+    assert!((50..=200).contains(&rest), "{rest} days without tokens");
+    let median = worked[worked.len() / 2];
+    assert!(*worked.last().unwrap() > median * 2, "{median} {worked:?}");
 }

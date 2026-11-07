@@ -15,6 +15,8 @@ pub(crate) struct DemoTurn {
     pub times: Vec<i64>,
     pub own: Kinds,
     pub agents: Vec<DemoAgent>,
+    /// The turn starts by compacting the context.
+    pub compacted: bool,
 }
 
 /// `calls` answers spread evenly between `start` and `end`.
@@ -201,7 +203,7 @@ pub(crate) fn span(plan: &Plan, now: i64) -> (i64, i64) {
 /// The session's turns, from Open's generator with the plan's seed: a context
 /// that grows by what each turn writes to the cache, reasoning on about half
 /// of them, now and then a large paste, a compaction as the context nears its
-/// window, named sub-agents every fourth Claude turn (`TASKS`), and at `lapse`
+/// window or at a turn the plan names, named sub-agents every fourth Claude turn (`TASKS`), and at `lapse`
 /// a turn that writes the whole context again. A `running` session's last
 /// turn is still waiting on its sub-agents.
 pub(crate) fn turns(plan: &Plan, now: i64, running: bool) -> Vec<DemoTurn> {
@@ -234,13 +236,15 @@ pub(crate) fn turns(plan: &Plan, now: i64, running: bool) -> Vec<DemoTurn> {
             0
         };
         let mut write = (4_000.0 + random() * if claude { 26_000.0 } else { 9_000.0 }) as u64;
-        let mut compacted = false;
-        if let Some(window) = window {
-            if context + write + input > window * 82 / 100 {
-                compacted = true;
-                context = 22_000;
-                write = 22_000;
-            }
+        // A session that compacts on purpose reads in three times as much.
+        if !plan.compact.is_empty() {
+            write *= 3;
+        }
+        let near = window.is_some_and(|window| context + write + input > window * 82 / 100);
+        let compacted = near || plan.compact.contains(&index);
+        if compacted {
+            context = 22_000;
+            write = 22_000;
         }
         let lapsed = plan.lapse == Some(index) && !compacted;
         let rewritten = if lapsed { context } else { 0 };
@@ -262,6 +266,7 @@ pub(crate) fn turns(plan: &Plan, now: i64, running: bool) -> Vec<DemoTurn> {
             times: Vec::new(),
             own: kinds,
             agents: Vec::new(),
+            compacted,
         });
     }
     let count = turns.len();

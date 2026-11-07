@@ -94,7 +94,15 @@ fn the_demo_reads_through_the_real_parsers() {
     // Its sub-agents are their own Claude Code logs under it: counted in
     // its tokens, and named with their type on a turn's timeline.
     let detail = core.request("session_detail", json!({"id": "s1"})).unwrap();
-    assert_eq!(detail["children"].as_array().unwrap().len(), 20);
+    assert_eq!(detail["children"].as_array().unwrap().len(), 22);
+    // It compacted its context twice, at the turns its plan names.
+    let compacted = detail["turns"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|turn| turn["compacted"] == true)
+        .count();
+    assert_eq!(compacted, 2);
     let part = detail["subagents"]["total"].as_u64().unwrap();
     assert!(part * 10 > s1["tokens"].as_u64().unwrap(), "{part}");
     assert!(detail["models"]
@@ -127,7 +135,7 @@ fn the_demo_reads_through_the_real_parsers() {
         .filter(|agent| agent["running"] == true)
         .count();
     assert_eq!(running, 2, "the live turn waits on two of them");
-    // A collection pass leaves the hidden month of tokens hidden, and the
+    // A collection pass leaves the hidden year of tokens hidden, and the
     // live turn's calls keep the context within its window.
     core.request("refresh", json!({})).unwrap();
     let roots = core
@@ -143,18 +151,19 @@ fn the_demo_reads_through_the_real_parsers() {
     let fill = rows.iter().find(|row| row["id"] == "s1").unwrap()["contextFill"]
         .as_f64()
         .unwrap();
-    assert!(fill > 0.3 && fill <= 1.0, "{fill}");
+    // Filled again since its last compaction.
+    assert!(fill > 0.05 && fill <= 1.0, "{fill}");
     // Its prompts were typed in the Claude desktop app, as real ones say.
     let s1 = rows.iter().find(|row| row["id"] == "s1").unwrap();
     assert_eq!(s1["origins"]["init"], "desktop:claude", "{}", s1["origins"]);
     assert_eq!(s1["origins"]["latest"], "desktop:claude");
 
-    // The statistics' top sessions name sessions: the hidden month of
+    // The statistics' top sessions name sessions: the hidden year of
     // tokens is named as work, never after the home folder or a client.
     let statistics = core
         .request(
             "statistics",
-            json!({"from": iso(now - 86_400_000), "to": iso(now), "timeZone": "UTC"}),
+            json!({"from": iso(now - 30 * 86_400_000), "to": iso(now), "timeZone": "UTC"}),
         )
         .unwrap();
     fn titles(value: &Value, out: &mut Vec<String>) {
@@ -173,9 +182,12 @@ fn the_demo_reads_through_the_real_parsers() {
     titles(&statistics, &mut named);
     let home = std::env::var("HOME").unwrap_or_default();
     let home = Path::new(&home).file_name().and_then(|name| name.to_str());
-    assert!(named
-        .iter()
-        .any(|title| title == "Port the sync engine to SQLite"));
+    assert!(named.iter().any(|title| [
+        "Port the sync engine to SQLite",
+        "Add offline mode to the editor",
+        "Fix the flaky upload retry test",
+    ]
+    .contains(&title.as_str())));
     assert!(
         !named.iter().any(|title| Some(title.as_str()) == home
             || ["Claude Code", "Codex", "DeepSeek"].contains(&title.as_str())),
@@ -276,4 +288,42 @@ fn a_pass_with_nothing_new_renders_nothing_until_something_changes() {
     assert_eq!(pass(&mut core), json!({"unchanged": true}));
     // And a request without changesOnly always gets the snapshot.
     assert!(core.request("request_snapshot", json!({})).unwrap()["schemaVersion"].is_number());
+}
+
+#[test]
+fn the_other_clients_read_through_their_own_parsers() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut core = AgentHudCore::new(Vec::new(), dir.path().to_path_buf());
+    let now = Utc::now().timestamp_millis();
+    let mut sessions = DemoSessions::default();
+    core.seed_demo(now, None, &mut sessions).unwrap();
+    let statistics = core
+        .request(
+            "statistics",
+            json!({"from": iso(now - 365 * 86_400_000), "to": iso(now), "timeZone": "Asia/Shanghai"}),
+        )
+        .unwrap();
+    let providers = statistics["providers"].as_array().unwrap();
+    for id in [
+        "claude",
+        "codex",
+        "deepseek",
+        "qwen",
+        "grok-cli",
+        "pi",
+        "codebuddy",
+        "openclaw",
+    ] {
+        let provider = providers.iter().find(|provider| provider["id"] == id);
+        let tokens = provider.map_or(0, |provider| {
+            provider["selectedTokens"].as_u64().unwrap_or(0)
+        });
+        assert!(tokens > 0, "{id} has no tokens");
+        assert!(
+            provider.unwrap()["cost"]["amounts"]
+                .as_object()
+                .is_some_and(|amounts| !amounts.is_empty()),
+            "{id} is not priced"
+        );
+    }
 }

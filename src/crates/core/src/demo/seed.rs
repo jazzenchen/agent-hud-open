@@ -1,5 +1,6 @@
-//! Seeding a Core with the demo's sessions and month of tokens.
+//! Seeding a Core with the demo's sessions, year of tokens and quota readings.
 use super::data::{self, Kinds, PLANS};
+use super::extra_lines::{extra_lines, is_extra};
 use super::{
     agent_lines, agent_path, folder, header, jsonl, path, source_of, source_of_name, turn_lines,
     DemoSessions, Ending,
@@ -8,7 +9,8 @@ use crate::{iso, l10n, AgentHudCore};
 use serde_json::json;
 
 impl AgentHudCore {
-    /// Fills this Core with the demo's sessions and month of tokens, as of
+    /// Fills this Core with the demo's sessions, year of tokens and quota
+    /// readings, as of
     /// `now`. `running` names the sessions in a turn now; None keeps the
     /// sample's own (the first two).
     pub fn seed_demo(
@@ -61,79 +63,170 @@ impl AgentHudCore {
                 .collect();
             sessions.agents.insert(plan.id, waiting);
         }
-        // The month of tokens behind the charts, one hidden log per client.
-        // Each is named as the long-running work it stands for, so the
+        // The year of tokens behind the charts, as hidden logs: a client's
+        // work splits into a session at every break of 90 minutes or more.
+        // Each is named as the work it stands for, newest first, so the
         // statistics' top sessions show a session, not the home folder.
-        for (source, title, project) in [
-            ("claude", "Port the sync engine to SQLite", "~/work/orbit"),
-            (
-                "codex",
-                "Triage the nightly crash reports",
-                "~/work/ledger-api",
-            ),
-            (
-                "deepseek",
-                "Translate the onboarding copy",
-                "~/work/website",
-            ),
-        ] {
-            let rows = data::history(now)
-                .into_iter()
-                .filter(|row| row.1 == source)
-                .collect::<Vec<_>>();
-            let id = format!("history-{source}");
-            let dir = folder(project);
-            let began = iso(now - 31 * 86_400_000);
-            let mut totals = Kinds::default();
-            let mut lines = Vec::new();
-            match source {
-                "codex" => {
-                    lines.push(json!({"timestamp":began,"type":"session_meta","payload":{"id":id,"cwd":dir}}));
-                    lines.push(json!({"timestamp":began,"type":"event_msg","payload":{"type":"user_message","message":title}}));
+        let history = data::history(now);
+        let others = data::extra_history(now);
+        for (source, works) in HISTORY_WORK {
+            let mut sessions: Vec<Vec<_>> = Vec::new();
+            let mut last = i64::MIN;
+            for row in history.iter().chain(&others).filter(|row| row.1 == source) {
+                if sessions.is_empty() || row.0 - last >= 90 * 60_000 {
+                    sessions.push(Vec::new());
                 }
-                "deepseek" => {
-                    lines.push(
-                        json!({"type":"session","version":4,"id":id,"cwd":dir,"createdAt":began}),
-                    );
-                    lines.push(
-                        json!({"type":"session/title","time":began,"seq":0,"data":{"title":title}}),
-                    );
-                }
-                _ => lines.push(json!({"type":"ai-title","aiTitle":title,"sessionId":id})),
+                last = row.0;
+                sessions.last_mut().expect("a session").push(*row);
             }
-            let mut seq = 0;
-            for (index, (at, _, model, input, output, read)) in rows.into_iter().enumerate() {
-                let usage = Kinds {
-                    input,
-                    output,
-                    cache_read: read,
-                    ..Default::default()
-                };
-                match source {
-                    "claude" => lines.push(json!({"type":"assistant","sessionId":id,"cwd":dir,"entrypoint":"claude-desktop","timestamp":iso(at),"message":{"id":format!("msg-{id}-{index}"),"model":model,"role":"assistant","content":[],"stop_reason":"end_turn","usage":{"input_tokens":input,"output_tokens":output,"cache_read_input_tokens":read,"cache_creation_input_tokens":0}}})),
-                    "codex" => {
-                        lines.push(json!({"timestamp":iso(at),"type":"turn_context","payload":{"model":model}}));
-                        totals.input += input;
-                        totals.output += output;
-                        totals.cache_read += read;
-                        let kinds = |k: &Kinds| json!({"input_tokens":k.input+k.cache_read,"cached_input_tokens":k.cache_read,"output_tokens":k.output,"reasoning_output_tokens":0});
-                        lines.push(json!({"timestamp":iso(at),"type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":kinds(&totals),"last_token_usage":kinds(&usage)}}}));
-                    }
-                    _ => {
-                        seq += 1;
-                        lines.push(json!({"type":"request/header","time":iso(at),"seq":seq,"data":{"header":{"config":{"model":model,"provider":"deepseek"}}}}));
-                        seq += 1;
-                        lines.push(json!({"type":"assistant/message","time":iso(at),"seq":seq,"data":{"turn":index+1,"step":0,"usage":{"inputTokens":input,"outputTokens":output,"cacheReadTokens":read,"cacheWriteTokens":0}}}));
-                    }
-                }
+            let count = sessions.len();
+            for (index, rows) in sessions.into_iter().enumerate() {
+                let (title, project) = works[(count - 1 - index) % works.len()];
+                let id = format!("history-{source}-{}", rows[0].0 / 60_000);
+                self.read_demo_history(source, &id, title, project, rows)?;
             }
-            self.read_demo(
-                path(source, &id),
-                source_of_name(source),
-                &jsonl(lines),
-                true,
-            )?;
         }
+        self.seed_demo_quotas(now, &history)?;
         Ok(())
     }
+
+    /// One hidden day of a client's work: its rows of `data::history` written
+    /// as that client's transcript.
+    fn read_demo_history(
+        &mut self,
+        source: &str,
+        id: &str,
+        title: &str,
+        project: &str,
+        rows: Vec<(i64, &'static str, &'static str, u64, u64, u64)>,
+    ) -> Result<(), String> {
+        let dir = folder(project);
+        if is_extra(source) {
+            let (path, lines) = extra_lines(source, id, title, &dir, &rows);
+            return self.read_demo(path, source_of_name(source), &jsonl(lines), true);
+        }
+        let began = iso(rows.first().map_or(0, |row| row.0) - 60_000);
+        let mut totals = Kinds::default();
+        let mut lines = Vec::new();
+        match source {
+            "codex" => {
+                lines.push(
+                    json!({"timestamp":began,"type":"session_meta","payload":{"id":id,"cwd":dir}}),
+                );
+                lines.push(json!({"timestamp":began,"type":"event_msg","payload":{"type":"user_message","message":title}}));
+            }
+            "deepseek" => {
+                lines.push(
+                    json!({"type":"session","version":4,"id":id,"cwd":dir,"createdAt":began}),
+                );
+                lines.push(
+                    json!({"type":"session/title","time":began,"seq":0,"data":{"title":title}}),
+                );
+            }
+            _ => lines.push(json!({"type":"ai-title","aiTitle":title,"sessionId":id})),
+        }
+        let mut seq = 0;
+        for (index, (at, _, model, input, output, read)) in rows.into_iter().enumerate() {
+            let usage = Kinds {
+                input,
+                output,
+                cache_read: read,
+                ..Default::default()
+            };
+            match source {
+                "claude" => lines.push(json!({"type":"assistant","sessionId":id,"cwd":dir,"entrypoint":"claude-desktop","timestamp":iso(at),"message":{"id":format!("msg-{id}-{index}"),"model":model,"role":"assistant","content":[],"stop_reason":"end_turn","usage":{"input_tokens":input,"output_tokens":output,"cache_read_input_tokens":read,"cache_creation_input_tokens":0}}})),
+                "codex" => {
+                    lines.push(json!({"timestamp":iso(at),"type":"turn_context","payload":{"model":model}}));
+                    totals.input += input;
+                    totals.output += output;
+                    totals.cache_read += read;
+                    let kinds = |k: &Kinds| json!({"input_tokens":k.input+k.cache_read,"cached_input_tokens":k.cache_read,"output_tokens":k.output,"reasoning_output_tokens":0});
+                    lines.push(json!({"timestamp":iso(at),"type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":kinds(&totals),"last_token_usage":kinds(&usage)}}}));
+                }
+                _ => {
+                    seq += 1;
+                    lines.push(json!({"type":"request/header","time":iso(at),"seq":seq,"data":{"header":{"config":{"model":model,"provider":"deepseek"}}}}));
+                    seq += 1;
+                    lines.push(json!({"type":"assistant/message","time":iso(at),"seq":seq,"data":{"turn":index+1,"step":0,"usage":{"inputTokens":input,"outputTokens":output,"cacheReadTokens":read,"cacheWriteTokens":0}}}));
+                }
+            }
+        }
+        self.read_demo(
+            path(source, id),
+            source_of_name(source),
+            &jsonl(lines),
+            true,
+        )
+    }
 }
+
+/// The work each client's hidden days stand for, (title, project), the
+/// newest day taking the first and the days before it the next in turn.
+const HISTORY_WORK: [(&str, &[(&str, &str)]); 8] = [
+    (
+        "claude",
+        &[
+            ("Port the sync engine to SQLite", "~/work/orbit"),
+            ("Add offline mode to the editor", "~/work/orbit"),
+            ("Fix the flaky upload retry test", "~/work/orbit"),
+            ("Write the v3 schema migration", "~/work/orbit"),
+            ("Speed up the search index build", "~/work/orbit"),
+            ("Review the payments pull request", "~/work/ledger-api"),
+            ("Refactor the settings store", "~/work/orbit"),
+            ("Draft the release notes", "~/work/orbit"),
+        ],
+    ),
+    (
+        "codex",
+        &[
+            ("Triage the nightly crash reports", "~/work/ledger-api"),
+            ("Add rate limits to the public API", "~/work/ledger-api"),
+            ("Profile the slow invoice export", "~/work/ledger-api"),
+            ("Upgrade the ORM and fix the fallout", "~/work/ledger-api"),
+            ("Review the auth middleware", "~/work/ledger-api"),
+        ],
+    ),
+    (
+        "deepseek",
+        &[
+            ("Translate the onboarding copy", "~/work/website"),
+            ("Summarize the support inbox", "~/work/website"),
+            ("Rewrite the pricing FAQ", "~/work/website"),
+        ],
+    ),
+    (
+        "qwen",
+        &[
+            ("Write unit tests for the parser", "~/work/ledger-api"),
+            ("Explain the billing schema", "~/work/ledger-api"),
+        ],
+    ),
+    (
+        "codebuddy",
+        &[
+            ("Tidy the CSS of the settings page", "~/work/website"),
+            ("Add form validation", "~/work/website"),
+        ],
+    ),
+    (
+        "pi",
+        &[
+            ("Sketch the plugin API", "~/work/orbit"),
+            ("Read through the sync logs", "~/work/orbit"),
+        ],
+    ),
+    (
+        "openclaw",
+        &[
+            ("Draft the weekly update", "~/work/handbook"),
+            ("Sort the issue backlog", "~/work/handbook"),
+        ],
+    ),
+    (
+        "grok-cli",
+        &[
+            ("Try a faster image pipeline", "~/work/mobile-app"),
+            ("Benchmark the cold start", "~/work/mobile-app"),
+        ],
+    ),
+];
