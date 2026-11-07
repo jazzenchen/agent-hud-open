@@ -76,7 +76,7 @@ npx @agenthud/install
 agent 需要你做决定时，在手机上就能看清上下文，回答问题或批准下一步。任务继续，你的生活也继续。已支持 iPhone Duo。
 
 <p align="center">
-  <a href="docs/screenshots/iphone-home.webp"><img src="docs/screenshots/iphone-home.webp" alt="iPhone 版 Agent HUD 的首页：Claude 与 Codex 的额度卡片，列出每个窗口的已用比例与重置时间，以及 DeepSeek 的账户余额" width="150"></a> <a href="docs/screenshots/iphone-sessions.webp"><img src="docs/screenshots/iphone-sessions.webp" alt="iPhone 版 Agent HUD 的会话页：今天各类 Token 的用量与费用，下方是带每轮柱状图与上下文占用的会话" width="150"></a> <a href="docs/screenshots/iphone-duo-stats.webp"><img src="docs/screenshots/iphone-duo-stats.webp" alt="展开的 iPhone Duo 上的 Agent HUD 统计页：折痕左侧是按模型堆叠的 Token，右侧是今天、近 7 天与近 30 天的用量" width="455"></a><br>
+  <a href="docs/screenshots/iphone-home.webp"><img src="docs/screenshots/iphone-home.webp" alt="iPhone 版 Agent HUD 的首页：问候语、以小机器人出现的各个 agent 及其额度、一条等待批准的请求，以及本周的时长" width="150"></a> <a href="docs/screenshots/iphone-sessions.webp"><img src="docs/screenshots/iphone-sessions.webp" alt="iPhone 版 Agent HUD 的会话页：今天各类 Token 的用量与费用，下方是带每轮柱状图与上下文占用的会话" width="150"></a> <a href="docs/screenshots/iphone-duo-stats.webp"><img src="docs/screenshots/iphone-duo-stats.webp" alt="展开的 iPhone Duo 上的 Agent HUD 统计页：折痕左侧是按模型堆叠的 Token，右侧是今天、近 7 天与近 30 天的用量" width="455"></a><br>
   <sub>iPhone 版 Agent HUD · 首页与会话，以及展开的 iPhone Duo 上的统计页 · 示例数据</sub>
 </p>
 
@@ -128,16 +128,24 @@ Claude Code 写完一段改动，可以请一个 Codex 会话审一遍，Codex �
 
 额度告诉你还剩多少，Token 用量帮助你看懂资源如何被使用。
 
+<p align="center">
+  <img src="docs/screenshots/mac-statistics.webp" alt="深色的统计窗口，范围是一年：Token、按 API 标价折合的金额、订阅回本了几倍、会话数与缓存命中；一年里每一天的热力图；按天、按模型堆叠的 Token；各 agent 的占比；以及订阅与余额" width="820"><br>
+  <img src="docs/screenshots/mac-session-turn.webp" alt="会话页：左边是今天的会话；中间是一个 Claude Code 会话，有每轮新增的 Token 和压缩过两次的上下文窗口；右边是其中一轮，六个子 agent 排在时间线上，下面是这一轮的调用" width="820"><br>
+  <sub>Mac 上的统计 · 一年的用量，以及一轮里子 agent 的时间线 · 示例数据</sub>
+</p>
+
 | 维度 | 可以追踪 |
 | --- | --- |
-| **时间** | 过去 5 小时、24 小时、7 天或 30 天，柱宽从 15 分钟到 1 天。历史在你的电脑上保留 30 天。 |
+| **时间** | 今天、近 7 天、30 天、90 天或一年。每个 Token 都留在你的电脑上，手机保留 30 天。 |
 | **Token&nbsp;类别** | 输入、输出、推理、缓存写入与缓存读取，可以全看，也可以任意组合。 |
 | **Agent&nbsp;与模型** | 每个 agent 的占比、Token 与费用，以及用到的模型。 |
 | **会话** | Token（含子 agent 的部分）、费用、轮数、调用数、上下文占用与缓存命中。子 agent 计入启动它的会话。 |
 | **轮次与调用** | 每一轮新增的 Token，以及每次调用的模型、上下文和它请求的工具。 |
 | **缓存命中** | 今天、近 7 天、近 30 天，每个会话，以及会话里的每个模型。 |
 | **费用** | 按各家的 API 标价估算（中国区或国际区价目），标 ≈，并非实际扣费。 |
-| **活跃时段** | 过去 7 天里，agents 在哪些钟点工作。 |
+| **订阅** | 每个订阅的用量按 API 标价值多少，与套餐价格相比。 |
+| **活跃时段** | agents 什么时候在工作：一年里的每一天，或一天里的每个钟点，在一张热力图里。 |
+| **额度** | 每个额度窗口每天用到多满，以及在哪里重置。 |
 | **余额** | DeepSeek 每天的花费，以及余额预计用完的日期。 |
 
 ### 让 agents 活起来

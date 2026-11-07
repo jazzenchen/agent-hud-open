@@ -76,7 +76,7 @@ The details are close at hand, and what needs your approval is answered right th
 When an agent reaches something only you can decide, your phone shows you the context, and you answer the question or approve the next step. The task keeps going, and so does your day. iPhone Duo is supported.
 
 <p align="center">
-  <a href="docs/screenshots/iphone-home.webp"><img src="docs/screenshots/iphone-home.webp" alt="Agent HUD on iPhone, Home tab: quota cards for Claude and Codex with the share used and reset time of each window, and a DeepSeek account balance" width="150"></a> <a href="docs/screenshots/iphone-sessions.webp"><img src="docs/screenshots/iphone-sessions.webp" alt="Agent HUD on iPhone, Sessions tab: today's tokens by kind with their cost, then sessions with per-turn bars and context-window fill" width="150"></a> <a href="docs/screenshots/iphone-duo-stats.webp"><img src="docs/screenshots/iphone-duo-stats.webp" alt="Agent HUD on an unfolded iPhone Duo, Stats: tokens stacked by model left of the fold, and recent usage for today, the last 7 days and the last 30 days on the right" width="455"></a><br>
+  <a href="docs/screenshots/iphone-home.webp"><img src="docs/screenshots/iphone-home.webp" alt="Agent HUD on iPhone, Home: a greeting, the agents as bots with their quotas, a request waiting for approval, and this week's hours" width="150"></a> <a href="docs/screenshots/iphone-sessions.webp"><img src="docs/screenshots/iphone-sessions.webp" alt="Agent HUD on iPhone, Sessions tab: today's tokens by kind with their cost, then sessions with per-turn bars and context-window fill" width="150"></a> <a href="docs/screenshots/iphone-duo-stats.webp"><img src="docs/screenshots/iphone-duo-stats.webp" alt="Agent HUD on an unfolded iPhone Duo, Stats: tokens stacked by model left of the fold, and recent usage for today, the last 7 days and the last 30 days on the right" width="455"></a><br>
   <sub>Agent HUD for iPhone · Home and Sessions, and Stats on an unfolded iPhone Duo · Sample data</sub>
 </p>
 
@@ -128,16 +128,24 @@ Know what your agents did, and how much they used. See your token use, look back
 
 Quotas tell you how much is left. Token usage shows you how it was spent.
 
+<p align="center">
+  <img src="docs/screenshots/mac-statistics.webp" alt="The Statistics window in dark mode, over a year: tokens, their worth at API list prices, how many times the plans paid for themselves, sessions and cache hits; a year of days as a heatmap; tokens by day stacked by model; each agent's share; and the plans and balances" width="820"><br>
+  <img src="docs/screenshots/mac-session-turn.webp" alt="The Sessions tab: today's sessions on the left; a Claude Code session in the middle with its new tokens per turn and a context window compacted twice; on the right, one turn with its six sub-agents on a timeline and the calls it made" width="820"><br>
+  <sub>Statistics on the Mac · a year of usage, and one turn's sub-agents on a timeline · Sample data</sub>
+</p>
+
 | Dimension | What you can track |
 | --- | --- |
-| **Time** | The last 5 hours, 24 hours, 7 days or 30 days, in bars from 15 minutes to a day. History stays on your computer for 30 days. |
+| **Time** | Today, the last 7, 30 or 90 days, or a year. Every token stays on your computer; the phone keeps 30 days. |
 | **Token&nbsp;kinds** | Input, output, reasoning, cache writes and cache reads, all together or any mix. |
 | **Agents&nbsp;and&nbsp;models** | Each agent's share, tokens and cost, and the models behind them. |
 | **Sessions** | Tokens with the sub-agents' part, cost, turns, calls, context fill and cache hits. Sub-agents count inside the session that started them. |
 | **Turns&nbsp;and&nbsp;calls** | The new tokens of every turn, and each call with its model, context and the tools it asked for. |
 | **Cache&nbsp;hits** | Today, the last 7 days and the last 30 days, each session, and each model within a session. |
 | **Cost** | An estimate at each vendor's list price, from its China or international price list, marked ≈. It is not a charge. |
-| **Activity** | The hours your agents worked over the last 7 days. |
+| **Plans** | What each plan's usage would cost at API list prices, against the plan's price. |
+| **Activity** | When your agents worked, by day over a year or by hour, in one heatmap. |
+| **Quotas** | How full each quota window got, day by day, and where it reset. |
 | **Balances** | DeepSeek's spend per day and the day its balance runs out. |
 
 ### See your agents come to life.
