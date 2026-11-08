@@ -1,9 +1,12 @@
 //! A quota window's metrics: its pace, forecast and budget, from the meter view.
 
+use super::capacity::CapacityInterval;
 use super::{date_ms, reply_rate, Samples, View};
 use crate::database::quota_link::QuotaLink;
 use crate::iso;
 use crate::l10n;
+use crate::pricing::PriceRegions;
+use rusqlite::Connection;
 use serde_json::{json, Value};
 use std::collections::BTreeMap;
 
@@ -22,6 +25,7 @@ impl View {
         complete: bool,
         reply_complete: bool,
         samples: &Samples,
+        ledger: Option<(&Connection, &PriceRegions)>,
     ) -> Value {
         let reset = row["resetAt"].as_str().and_then(date_ms);
         let duration = row["windowDurationSeconds"].as_f64().filter(|d| *d > 0.0);
@@ -33,6 +37,7 @@ impl View {
             .as_f64()
             .map(|v| (100.0 - v).clamp(0.0, 100.0));
         let mut rate = None;
+        let mut observation = None;
         let mut sampling = Value::Null;
         if let (Some((start, end, duration)), Some(rem)) = (cycle, remaining) {
             let interval = if duration >= 86_400.0 {
@@ -44,10 +49,11 @@ impl View {
                 .get(row["id"].as_str().unwrap_or(""))
                 .map(Vec::as_slice)
                 .unwrap_or(&[]);
+            let observed = row["observedAt"].as_str().and_then(date_ms).unwrap_or(now);
             let current = points
                 .iter()
                 .copied()
-                .filter(|(at, _)| *at >= start && *at < end && *at <= now)
+                .filter(|(at, _)| *at >= start && *at < end && *at <= now.min(observed))
                 .collect::<Vec<_>>();
             let segment = current
                 .windows(2)
@@ -92,6 +98,7 @@ impl View {
                     let hours = (last.0 - first.0) as f64 / 3_600_000.0;
                     if hours * 3600.0 >= interval {
                         rate = Some((first.1 - last.1).max(0.0) / hours);
+                        observation = CapacityInterval::from_readings(first, last, rem, current);
                     }
                 }
             }
@@ -142,6 +149,13 @@ impl View {
             link.as_ref()
                 .is_some_and(|link| link.matches(source, model))
         };
+        let capacity = ledger
+            .zip(observation)
+            .zip(link.as_ref())
+            .filter(|_| complete)
+            .and_then(|(((db, regions), interval), link)| {
+                self.capacity_estimate(db, regions, link, interval)
+            });
         let consumer = self.buckets.iter().any(|b| matches(&b.source, &b.model));
         let mut token_rate = None;
         let mut consumed = Value::Null;
@@ -270,6 +284,6 @@ impl View {
                 }),
             );
         }
-        json!({"burnRatePctPerHour":rate,"tokensPerHour":token_rate,"replyRate":reply,"consumed":consumed,"cost":cost,"sampling":sampling,"outlook":outlook,"budget":budget,"unavailable":unavailable,"observedFrom":observed})
+        json!({"burnRatePctPerHour":rate,"tokensPerHour":token_rate,"replyRate":reply,"consumed":consumed,"cost":cost,"sampling":sampling,"outlook":outlook,"budget":budget,"unavailable":unavailable,"observedFrom":observed,"capacityEstimate":capacity})
     }
 }

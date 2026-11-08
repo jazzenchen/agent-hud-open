@@ -42,6 +42,8 @@ export interface QuotaMetrics {
   consumed: { used: number; capacity: number | null; unit?: string } | null;
   /** List-price estimate, by currency without conversion; not a subscription charge. */
   cost: { amounts: Record<string, number>; hours: number } | null;
+  /** Full-cycle estimate from calls within the same interval as the quota change. */
+  capacityEstimate?: { tokens: number; amounts: Record<string, number> } | null;
   sampling: { elapsed: number; required: number; afterReset: boolean } | null;
   outlook: {
     kind:

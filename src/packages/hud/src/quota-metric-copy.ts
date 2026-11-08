@@ -1,7 +1,12 @@
 // What a quota row's measure says when it has no value, where Core gave no
 // reason of its own; kept apart from the readings, as quota-alert-copy is.
-import type { QuotaMeasure } from "@agent-hud/protocol";
-import type { Language } from "@agent-hud/ui/format";
+import type { QuotaMetrics, QuotaMeasure } from "@agent-hud/protocol";
+import {
+  monthDayTime,
+  relativeWeekdayTime,
+  type FormatSettings,
+  type Language,
+} from "@agent-hud/ui/format";
 
 export const say = (language: Language, zh: string, en: string) =>
   language === "zh" ? zh : en;
@@ -40,4 +45,30 @@ export function missing(measure: QuotaMeasure, language: Language) {
         "This estimate needs a known quota cycle, matching model usage and list prices for its models.",
       );
   }
+}
+
+export function exhaustionHint(
+  outlook: QuotaMetrics["outlook"] | undefined,
+  sampling: QuotaMetrics["sampling"] | undefined,
+  now: number,
+  { language, calendar }: FormatSettings,
+) {
+  const at = outlook?.exhaustsAt ? Date.parse(outlook.exhaustsAt) : NaN;
+  let time = say(language, "暂无预测", "Unavailable");
+  if (outlook?.kind === "exhausted")
+    time = say(language, "已耗尽", "Exhausted");
+  else if (outlook?.kind === "no-usage")
+    time = say(language, "暂无消耗", "No usage");
+  else if (outlook?.kind === "insufficient-data" && sampling)
+    time = say(language, "采样中", "Sampling");
+  else if (outlook?.kind === "exhausts") {
+    if (outlook.beforeReset === false)
+      time = say(language, "重置前不会耗尽", "Not before reset");
+    else if (Number.isFinite(at))
+      time =
+        at - now < 7 * 86_400_000
+          ? relativeWeekdayTime(at, now, calendar, language)
+          : monthDayTime(at, calendar, language);
+  }
+  return say(language, `预计耗尽：${time}`, `Estimated exhaustion: ${time}`);
 }

@@ -102,7 +102,10 @@ test("burn rate: sampling is the detail, a run-out before the reset is its time,
   });
   assert.equal(quotaMetric(replies, "tokens", now, zh).detail, "9 次回复");
   assert.equal(quotaMetric(replies, "tokens", now, en).value, "42/s");
-  assert.match(quotaMetric(replies, "tokens", now, en).hint, /own call/);
+  assert.match(
+    quotaMetric(replies, "tokens", now, en).hint,
+    /Estimated exhaustion: Unavailable/,
+  );
   // Replies timed only by the gaps between calls give a floor.
   const gaps = row({
     metrics: {
@@ -115,7 +118,10 @@ test("burn rate: sampling is the detail, a run-out before the reset is its time,
     },
   });
   assert.equal(quotaMetric(gaps, "tokens", now, en).value, "≥8.3/s");
-  assert.match(quotaMetric(gaps, "tokens", now, en).hint, /at least this/);
+  assert.match(
+    quotaMetric(gaps, "tokens", now, en).hint,
+    /Estimated exhaustion: Unavailable/,
+  );
 });
 
 test("a forecast from the whole window says so, and the budget reads in points", () => {
@@ -213,4 +219,27 @@ test("remaining quota changes the figure without changing readings, risk or othe
   const stale = quotaMetric(row({ status: "stale" }), "quota", now, remaining);
   assert.equal(stale.value, "60%");
   assert.match(stale.hint, /stale/);
+});
+
+test("consumption and cost hovers show full-cycle estimates and exhaustion", () => {
+  const reading = row({
+    metrics: {
+      consumed: { used: 3000, capacity: null },
+      cost: { amounts: { USD: 20 }, hours: 2 },
+      capacityEstimate: { tokens: 12000, amounts: { USD: 80 } },
+      outlook: {
+        kind: "exhausts",
+        beforeReset: true,
+        exhaustsAt: "2026-10-21T14:10:00Z",
+      },
+    },
+  });
+  assert.match(
+    quotaMetric(reading, "consumed", now, en).hint,
+    /Estimated total tokens: 12k\nEstimated exhaustion: Wed 14:10/,
+  );
+  assert.match(
+    quotaMetric(reading, "cost", now, zh).hint,
+    /预计总额度：.*80.*\n预计耗尽：/,
+  );
 });
