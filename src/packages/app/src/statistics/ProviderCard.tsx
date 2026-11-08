@@ -70,7 +70,7 @@ export const ProviderCard = memo(function ProviderCard({
         (zh ? "" : " of cost")
       : null,
     provider.recachedCost != null
-      ? (zh ? "缓存重写 " : "Cache rewrites ") +
+      ? (zh ? "缓存读取下降时的输入 " : "Uncached input on cache drops ") +
         `≈${moneyAmount(provider.recachedCost, "USD", zh ? "zh" : "en")}`
       : null,
   ]

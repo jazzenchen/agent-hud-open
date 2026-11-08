@@ -1,5 +1,5 @@
 //! One turn in full: its summary, its calls, and its cost as exact decimals.
-use super::{new_tokens, prompt, recached, usd, Call, SessionUsage};
+use super::{new_tokens, prompt, recached, usd, CachePrompt, Call, SessionUsage};
 use crate::{iso, metering, Usage};
 use serde_json::{json, Value};
 use std::collections::BTreeMap;
@@ -137,7 +137,7 @@ pub(crate) fn decimal_text(pico: i128) -> String {
 /// the tools its log names, its context and re-cached tokens when it is in
 /// the session's own log, and its list price. `previous` is the prompt of the
 /// own log's call before the turn.
-pub(crate) fn turn_calls(calls: &[Call<'_>], mut previous: Option<u64>) -> Vec<Value> {
+pub(crate) fn turn_calls(calls: &[Call<'_>], mut previous: Option<CachePrompt>) -> Vec<Value> {
     calls
         .iter()
         .map(|call| {
@@ -147,7 +147,7 @@ pub(crate) fn turn_calls(calls: &[Call<'_>], mut previous: Option<u64>) -> Vec<V
                 let sent = recached(row.usage, previous);
                 again = json!((sent > 0).then_some(sent));
                 context = json!(prompt(row.usage));
-                previous = Some(prompt(row.usage));
+                previous = Some(row.usage.into());
             }
             let id = format!("{}-model:{}", row.source, row.model);
             json!({

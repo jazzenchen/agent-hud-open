@@ -33,8 +33,8 @@ export function turnNotes(entry: Entry, zh: boolean): string[] {
   if (entry.recached != null)
     notes.push(
       zh
-        ? `缓存过期，重发 ${compact(entry.recached)}`
-        : `Cache expired, ${compact(entry.recached)} sent again`,
+        ? `缓存读取下降，未缓存输入 ${compact(entry.recached)}`
+        : `Cache reads dropped, ${compact(entry.recached)} uncached input`,
     );
   if (entry.context != null)
     notes.push(

@@ -54,17 +54,39 @@ fn kind_lists(bars: &[Usage]) -> Option<Value> {
     (!lists.is_empty()).then_some(Value::Object(lists))
 }
 
-/// What a call in the session's own log sent again after `previous`, the
-/// prompt of the call before it: its whole input (fresh and cache writes) when
-/// it read back less than half of that prompt from the cache and sent at least
-/// half of it again. The cache had lapsed or the model changed; a compaction
-/// shrinks the prompt instead, so it re-caches nothing.
-pub(crate) fn recached(usage: Usage, previous: Option<u64>) -> u64 {
-    let sent = usage.input + usage.write;
+/// The previous call's total prompt and the part it read from cache.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct CachePrompt {
+    pub total: u64,
+    pub read: u64,
+}
+
+impl From<Usage> for CachePrompt {
+    fn from(usage: Usage) -> Self {
+        Self {
+            total: prompt(usage),
+            read: usage.read,
+        }
+    }
+}
+
+/// Uncached input on a call that read fewer cached tokens than the preceding
+/// call, read less than half its prompt, and sent at least half that size uncached.
+pub(crate) fn recached_input(sent: u64, read: u64, previous: Option<CachePrompt>) -> u64 {
     match previous {
-        Some(previous) if usage.read * 2 < previous && sent * 2 >= previous => sent,
+        Some(previous)
+            if read < previous.read
+                && u128::from(read) * 2 < u128::from(previous.total)
+                && u128::from(sent) * 2 >= u128::from(previous.total) =>
+        {
+            sent
+        }
         _ => 0,
     }
+}
+
+pub(crate) fn recached(usage: Usage, previous: Option<CachePrompt>) -> u64 {
+    recached_input(usage.input + usage.write, usage.read, previous)
 }
 
 /// Calls priced together per model and tier at the international list, off
@@ -150,7 +172,7 @@ pub(crate) struct Builder {
     window: Option<u64>,
     latest: Option<(String, String)>,
     tally: ListTally,
-    previous_prompt: Option<u64>,
+    previous_prompt: Option<CachePrompt>,
     turns: BTreeMap<i64, TurnSums>,
     prompt_index: i64,
 }

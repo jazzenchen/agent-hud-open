@@ -76,7 +76,7 @@ function ChartLegend({
             strokeWidth={2.6}
             aria-hidden="true"
           />
-          {zh ? "缓存过期，上下文重发" : "Cache expired, context sent again"}
+          {zh ? "缓存读取下降" : "Cache reads dropped"}
         </span>
       )}
       {compacted && (

@@ -21,17 +21,17 @@ fn every_query_at_a_revision_answers_as_it_would_alone() {
         let prompt = json!({"type":"user","sessionId":id,"uuid":"p","timestamp":iso(now - age - 1_000),
             "message":{"role":"user","content":"Go on."}});
         // The second call sends the whole prompt again: the cache lapsed.
-        let call = |message: &str, at: i64| {
+        let call = |message: &str, at: i64, read: u64| {
             json!({"type":"assistant","sessionId":id,"timestamp":iso(at),
                 "message":{"id":message,"model":model,"role":"assistant","content":[{"type":"text","text":"Done."}],
-                "usage":{"input_tokens":1_000,"output_tokens":500,"cache_creation_input_tokens":20_000,"cache_read_input_tokens":0}}})
+                "usage":{"input_tokens":1_000,"output_tokens":500,"cache_creation_input_tokens":20_000,"cache_read_input_tokens":read}}})
         };
         fs::write(
             root.join(format!("{id}.jsonl")),
             format!(
                 "{prompt}\n{}\n{}\n",
-                call("m1", now - age),
-                call("m2", now - age + 60_000)
+                call("m1", now - age, 5_000),
+                call("m2", now - age + 60_000, 0)
             ),
         )
         .unwrap();

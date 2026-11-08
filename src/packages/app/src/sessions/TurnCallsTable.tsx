@@ -117,7 +117,7 @@ export function TurnCallsTable({
                       size={10}
                       color={theme.warning}
                       strokeWidth={2.6}
-                      aria-label={zh ? "缓存过期" : "Cache expired"}
+                      aria-label={zh ? "缓存读取下降" : "Cache reads dropped"}
                     />
                   )}
                 </span>

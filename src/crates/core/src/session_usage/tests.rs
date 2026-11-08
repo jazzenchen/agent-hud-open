@@ -37,17 +37,17 @@ fn a_call_re_caches_when_it_reads_back_less_than_half_and_sends_half_again() {
         ..Usage::default()
     };
     assert_eq!(
-        recached(usage(10, 90, 0), Some(100)),
+        recached(usage(10, 90, 0), Some(usage(0, 0, 100).into())),
         100,
         "cache lapsed: everything sent again"
     );
     assert_eq!(
-        recached(usage(10, 0, 90), Some(100)),
+        recached(usage(10, 0, 90), Some(usage(0, 0, 100).into())),
         0,
         "read back from the cache"
     );
     assert_eq!(
-        recached(usage(5, 10, 0), Some(100)),
+        recached(usage(5, 10, 0), Some(usage(0, 0, 100).into())),
         0,
         "a compaction shrinks the prompt"
     );
@@ -57,9 +57,17 @@ fn a_call_re_caches_when_it_reads_back_less_than_half_and_sends_half_again() {
         "the first call has nothing to lose"
     );
     assert_eq!(
-        recached(usage(20, 30, 49), Some(100)),
+        recached(usage(20, 30, 49), Some(usage(0, 0, 100).into())),
         50,
         "exactly half sent again"
+    );
+    let previous = Some(usage(18_000, 0, 12_000).into());
+    for read in [12_000, 13_000] {
+        assert_eq!(recached(usage(19_000, 0, read), previous), 0);
+    }
+    assert_eq!(
+        recached(usage(19_000, 0, 0), Some(usage(18_000, 0, 0).into())),
+        0
     );
 }
 

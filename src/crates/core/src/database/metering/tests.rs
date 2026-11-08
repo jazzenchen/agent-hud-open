@@ -323,7 +323,9 @@ fn calls_keep_their_tools_and_window_and_each_model_its_largest_prompt() {
         Some(100)
     );
     assert_eq!(
-        prompt_before(&db, &["/logs/s.jsonl".into()], now).unwrap(),
+        prompt_before(&db, &["/logs/s.jsonl".into()], now)
+            .unwrap()
+            .map(|prompt| prompt.total),
         Some(100)
     );
 }
@@ -408,6 +410,7 @@ fn re_cached_prompts_count_in_logs_that_mark_their_prompts() {
         call("a", now - 3_000, 10, 1_000, 0),
         call("b", now - 2_000, 10, 10, 1_000),
         call("c", now - 1_000, 10, 1_100, 0),
+        call("d", now, 10, 1_200, 0),
     ];
     write(&db, "/logs/s.jsonl", "claude", &calls).unwrap();
     write(&db, "/logs/u.jsonl", "claude", &calls).unwrap();
@@ -495,12 +498,13 @@ fn re_cached_prompts_from_a_time_on_are_those_of_the_whole_record() {
             "SELECT r.bucket,r.source,r.model,SUM(r.sent),SUM(CASE WHEN r.wrote THEN r.sent ELSE 0 END) FROM (
                 SELECT (e.at_ms/900000)*900000 AS bucket,e.source,e.model,e.input+e.cache_write AS sent,
                        e.cache_read,e.cache_write>0 AS wrote,e.at_ms,
-                       LAG(e.input+e.cache_write+e.cache_read) OVER (PARTITION BY e.contribution ORDER BY e.at_ms,e.event_key) AS previous
+                       LAG(e.input+e.cache_write+e.cache_read) OVER (PARTITION BY e.contribution ORDER BY e.at_ms,e.event_key) AS previous,
+                       LAG(e.cache_read) OVER (PARTITION BY e.contribution ORDER BY e.at_ms,e.event_key) AS previous_read
                 FROM usage_meter_event e
                 WHERE e.contribution IN (SELECT value FROM json_each(?1))
                   AND EXISTS (SELECT 1 FROM usage_meter_mark m WHERE m.contribution=e.contribution AND m.kind=0)
              ) r
-             WHERE r.previous IS NOT NULL AND r.cache_read*2<r.previous AND r.sent*2>=r.previous AND r.at_ms>=?2
+             WHERE r.cache_read<r.previous_read AND r.cache_read*2<r.previous AND r.sent*2>=r.previous AND r.at_ms>=?2
              GROUP BY r.bucket,r.source,r.model",
         )
         .unwrap()

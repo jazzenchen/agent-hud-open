@@ -1,6 +1,7 @@
 //! A session's recorded calls and marks, read back.
 
 use super::{call_list_cost, tools_from, unsigned, usage};
+use crate::session_usage::{recached_input, CachePrompt};
 use crate::Usage;
 use chrono::{DateTime, Utc};
 use rusqlite::{params, Connection, OptionalExtension};
@@ -81,18 +82,25 @@ pub(crate) fn prompt_before(
     db: &Connection,
     paths: &[String],
     before: i64,
-) -> rusqlite::Result<Option<u64>> {
+) -> rusqlite::Result<Option<CachePrompt>> {
     let selected = json!(paths).to_string();
     let mut statement = db.prepare_cached(
-        "SELECT input+cache_write+cache_read FROM usage_meter_event
+        "SELECT input+cache_write+cache_read,cache_read FROM usage_meter_event
          WHERE contribution IN (SELECT value FROM json_each(?1)) AND at_ms<?2
          ORDER BY at_ms DESC,event_key DESC LIMIT 1",
     )?;
     let mut rows = statement.query(params![selected, before])?;
-    rows.next()?.map(|row| unsigned(row, 0)).transpose()
+    rows.next()?.map(cache_prompt).transpose()
 }
 
-/// Prompt tokens sent again because the cache no longer held them
+fn cache_prompt(row: &rusqlite::Row<'_>) -> rusqlite::Result<CachePrompt> {
+    Ok(CachePrompt {
+        total: unsigned(row, 0)?,
+        read: unsigned(row, 1)?,
+    })
+}
+
+/// Uncached input on calls flagged for a drop in cache reads
 /// (agent-hud-native-open `UsageLedger.recachedBuckets`): each call in a log that
 /// marks its prompts, against the call before it in that log, by the rule a
 /// session's turns count them. By 15-minute bucket, source and model, for
@@ -113,7 +121,7 @@ pub(crate) fn recached(
         .query_map([], |row| row.get::<_, String>(0))?
         .collect::<rusqlite::Result<HashSet<_>>>()?;
     let mut before = db.prepare_cached(
-        "SELECT input+cache_write+cache_read FROM usage_meter_event
+        "SELECT input+cache_write+cache_read,cache_read FROM usage_meter_event
          WHERE contribution=?1 AND at_ms<?2 ORDER BY at_ms DESC,event_key DESC LIMIT 1",
     )?;
     let mut calls = db.prepare_cached(
@@ -127,14 +135,14 @@ pub(crate) fn recached(
             continue;
         }
         let mut previous = before
-            .query_row(params![path, since], |row| row.get::<_, i64>(0))
-            .optional()?
-            .map(i128::from);
+            .query_row(params![path, since], cache_prompt)
+            .optional()?;
         let mut rows = calls.query(params![path, since, until])?;
         while let Some(row) = rows.next()? {
-            let sent = i128::from(row.get::<_, i64>(3)?);
-            let read = i128::from(row.get::<_, i64>(4)?);
-            if previous.is_some_and(|previous| read * 2 < previous && sent * 2 >= previous) {
+            let sent = unsigned(row, 3)?;
+            let read = unsigned(row, 4)?;
+            let again = recached_input(sent, read, previous);
+            if again > 0 {
                 let at = row.get::<_, i64>(0)?;
                 let key = (
                     at / 900_000 * 900_000,
@@ -142,12 +150,15 @@ pub(crate) fn recached(
                     row.get::<_, String>(2)?,
                 );
                 let sum = sums.entry(key).or_default();
-                sum.0 += sent as u64;
+                sum.0 += again;
                 if row.get::<_, bool>(5)? {
-                    sum.1 += sent as u64;
+                    sum.1 += again;
                 }
             }
-            previous = Some(sent + read);
+            previous = Some(CachePrompt {
+                total: sent + read,
+                read,
+            });
         }
     }
     Ok(sums
