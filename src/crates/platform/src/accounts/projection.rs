@@ -14,7 +14,10 @@ impl AccountService {
             .state
             .lock()
             .unwrap_or_else(PoisonError::into_inner);
-        let mut result = AccountProjection::default();
+        let mut result = AccountProjection {
+            external_prices: state.external_prices.clone(),
+            ..AccountProjection::default()
+        };
         let now = chrono::Utc::now().timestamp_millis();
         // Every provider the app knows, whatever this service reads.
         for &facts in agents::ACCOUNTS {

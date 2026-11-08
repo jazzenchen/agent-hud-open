@@ -16,6 +16,8 @@ pub enum Origin {
     Multiplier,
     /// The vendor's list price, through its own API or plan.
     Catalog,
+    /// The public LiteLLM catalog for an otherwise unlisted direct model.
+    External,
 }
 
 impl Origin {
@@ -26,6 +28,7 @@ impl Origin {
             Self::Relay => "relay",
             Self::Multiplier => "multiplier",
             Self::Catalog => "catalog",
+            Self::External => "external",
         }
     }
 }
@@ -97,10 +100,14 @@ pub(super) fn quote(consumer: &str, region: Region) -> Option<(Origin, Quote)> {
             ));
         }
     }
-    Some((
-        Origin::Catalog,
-        Quote::Listed(listing(consumer, region)?, 1.0),
-    ))
+    if let Some(listing) = listing(consumer, region) {
+        return Some((Origin::Catalog, Quote::Listed(listing, 1.0)));
+    }
+    if route.is_some() || region != Region::International || listed(consumer).is_some() {
+        return None;
+    }
+    let rates = overrides(|held| held.external.get(bare).copied())?;
+    Some((Origin::External, Quote::Flat("USD".into(), rates)))
 }
 
 /// `amount` times the owner's multiplier.

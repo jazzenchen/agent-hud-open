@@ -49,6 +49,7 @@ fn control() -> Control {
         finished: HashMap::new(),
         entries: BTreeMap::new(),
         pages: HashMap::new(),
+        external_prices: Default::default(),
         account_homes: HashMap::new(),
         waker: None,
     }

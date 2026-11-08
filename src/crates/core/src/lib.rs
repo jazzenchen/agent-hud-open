@@ -68,6 +68,7 @@ pub use discovery::ProviderDiscovery;
 pub(crate) use ingestion::{line, needs_read};
 pub(crate) use legacy::{carried_usage, legacy_database, legacy_quota};
 pub(crate) use log_files::{FileStamp, LogFiles};
+pub use pricing::{parse_external_prices, ExternalPrices};
 pub(crate) use usage::UsageProjection;
 
 /// A discovered source supplied by a platform adapter, never a frontend path.

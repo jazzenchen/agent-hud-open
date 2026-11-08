@@ -132,5 +132,6 @@ pub fn demo_projection(now: i64, used: &BTreeMap<String, f64>) -> AccountProject
         providers,
         session_records: Vec::new(),
         services: Vec::new(),
+        external_prices: Default::default(),
     }
 }
