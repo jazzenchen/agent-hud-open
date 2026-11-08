@@ -23,7 +23,7 @@ pub fn parse_external_prices(feed: &Value) -> Option<ExternalPrices> {
             || row
                 .as_object()?
                 .keys()
-                .any(|key| key.contains("_cost_per_token_above_"))
+                .any(|key| key.contains("_above_") && key.ends_with("_tokens"))
         {
             continue;
         }
@@ -102,10 +102,12 @@ mod tests {
             "input_cost_per_token":0.000002,"output_cost_per_token":0.00001});
         let mut tiered = chat.clone();
         tiered["input_cost_per_token_above_272k_tokens"] = json!(0.000004);
+        let mut cache_tiered = chat.clone();
+        cache_tiered["cache_read_input_token_cost_above_272k_tokens"] = json!(0.000004);
         let mut conflicting = chat.clone();
         conflicting["input_cost_per_token"] = json!(0.000003);
         let feed = json!({"openai/gpt-test":chat,"gpt-6-sol":chat,
-            "gpt-tiered":tiered,"openrouter/gpt-routed":chat,
+            "gpt-tiered":tiered,"gpt-cache-tiered":cache_tiered,"openrouter/gpt-routed":chat,
             "gpt-conflict":chat,"openai/gpt-conflict":conflicting});
         let prices = parse_external_prices(&feed).unwrap();
         assert!(set_external_prices(prices.clone()));
@@ -120,6 +122,7 @@ mod tests {
         );
         for name in [
             "gpt-tiered",
+            "gpt-cache-tiered",
             "gpt-routed",
             "gpt-conflict",
             "gpt-test#relay.example",
