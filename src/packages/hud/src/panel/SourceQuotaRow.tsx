@@ -88,8 +88,8 @@ export function SourceQuotaRow({
         gap: 12,
         padding: "var(--hud-row-padding, 4px) 6px",
         fontSize: 13,
-        lineHeight: "16px",
-        minHeight: "calc(16px + var(--hud-row-padding, 4px) * 2)",
+        lineHeight: "20px",
+        minHeight: "calc(20px + var(--hud-row-padding, 4px) * 2)",
         borderRadius: 6,
         cursor: clickable ? "pointer" : undefined,
         background: hovered && clickable ? colors.selected : "transparent",
@@ -114,6 +114,10 @@ export function SourceQuotaRow({
           flex: "0 0 152px",
           width: 152,
           fontWeight: 600,
+          // Leave room for Windows font ink below the line's baseline even
+          // when the fitting label clips long names horizontally.
+          paddingBlock: 2,
+          marginBlock: -2,
           color: colors.text,
         }}
       />
