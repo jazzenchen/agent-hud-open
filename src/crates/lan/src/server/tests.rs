@@ -393,3 +393,89 @@ fn peer_version_is_trimmed_and_bounded() {
         Some(40)
     );
 }
+
+#[test]
+fn a_host_route_may_answer_with_json() {
+    use ring::signature::{EcdsaKeyPair, ECDSA_P256_SHA256_ASN1_SIGNING};
+    let directory = std::env::temp_dir().join(format!("lan-route-{}", uuid::Uuid::new_v4()));
+    let credentials =
+        Credentials::new("fixture", directory.clone(), Arc::new(Secrets::default())).unwrap();
+    let pkcs8 = EcdsaKeyPair::generate_pkcs8(
+        &ECDSA_P256_SHA256_ASN1_SIGNING,
+        &ring::rand::SystemRandom::new(),
+    )
+    .unwrap();
+    let key = rustls::crypto::ring::sign::any_ecdsa_type(&rustls::pki_types::PrivateKeyDer::Pkcs8(
+        pkcs8.as_ref().to_vec().into(),
+    ))
+    .unwrap();
+    let identity = Identity::from_signer(vec![0x30, 0x00], key).unwrap();
+    let cache = Arc::new(Mutex::new(
+        SnapshotCache::<Item>::new(
+            "fixture".into(),
+            "Fixture".into(),
+            directory.join("cursor.json"),
+        )
+        .unwrap(),
+    ));
+    let mut server = LanServer::new(
+        "fixture".into(),
+        "Fixture".into(),
+        credentials,
+        cache,
+        identity,
+        Arc::new(|request, _| {
+            Ok((request.path == "/v1/echo").then(|| Handled {
+                status: 200,
+                remember: false,
+                body: Some(serde_json::json!({"echo": String::from_utf8_lossy(&request.body)})),
+            }))
+        }),
+    );
+    let port = server
+        .start_at(SocketAddr::from((std::net::Ipv4Addr::LOCALHOST, 0)))
+        .unwrap();
+    server.set_account(Some("account")).unwrap();
+    let token = server
+        .shared
+        .credentials
+        .lock()
+        .unwrap()
+        .automatic_credential()
+        .unwrap()
+        .to_owned();
+    let client = rustls::ClientConfig::builder_with_provider(Arc::new(
+        rustls::crypto::ring::default_provider(),
+    ))
+    .with_safe_default_protocol_versions()
+    .unwrap()
+    .dangerous()
+    .with_custom_certificate_verifier(Arc::new(AnyCertificate))
+    .with_no_client_auth();
+    let socket = TcpStream::connect(("127.0.0.1", port)).unwrap();
+    socket
+        .set_read_timeout(Some(Duration::from_secs(3)))
+        .unwrap();
+    let session =
+        rustls::ClientConnection::new(Arc::new(client), "localhost".try_into().unwrap()).unwrap();
+    let mut stream = rustls::StreamOwned::new(session, socket);
+    write!(
+        stream,
+        "POST /v1/echo HTTP/1.1\r\nHost: fixture\r\nAuthorization: Bearer {token}\r\nContent-Length: 2\r\nConnection: close\r\n\r\nhi"
+    )
+    .unwrap();
+    stream.flush().unwrap();
+    let mut response = Vec::new();
+    let _ = stream.read_to_end(&mut response);
+    let response = String::from_utf8_lossy(&response);
+    assert!(response.starts_with("HTTP/1.1 200"), "{response}");
+    assert!(
+        response
+            .to_ascii_lowercase()
+            .contains("content-type: application/json"),
+        "{response}"
+    );
+    assert!(response.ends_with("{\"echo\":\"hi\"}"), "{response}");
+    server.stop(false).unwrap();
+    let _ = std::fs::remove_dir_all(&directory);
+}

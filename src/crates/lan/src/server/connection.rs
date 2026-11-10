@@ -148,7 +148,14 @@ pub(super) fn connection<R: Record>(
         if handled.remember {
             remember_peer(shared, &request, address, &authorization, false);
         }
-        return reply(handled.status, &[], &[]);
+        return match handled.body {
+            Some(body) => reply(
+                handled.status,
+                &[("Content-Type", "application/json".into())],
+                body.to_string().as_bytes(),
+            ),
+            None => reply(handled.status, &[], &[]),
+        };
     }
     if request.method != "GET"
         || !matches!(

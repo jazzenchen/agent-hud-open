@@ -24,10 +24,12 @@ mod pairing;
 mod peers;
 use addresses::with_alternates;
 use connection::connection;
-/// Outcome of a host-mounted route. `remember` records the caller as a peer.
+/// Outcome of a host-mounted route. `remember` records the caller as a peer;
+/// `body` answers with JSON instead of the status alone.
 pub struct Handled {
     pub status: u16,
     pub remember: bool,
+    pub body: Option<serde_json::Value>,
 }
 /// Host routes run after authorization and before the built-in feed routes.
 /// Return `Ok(None)` to leave the request unclaimed (it then gets the usual 404).
