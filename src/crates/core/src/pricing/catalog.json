@@ -2856,6 +2856,7 @@
     "openai": "OpenAI",
     "openai-codex": "OpenAI",
     "deepseek": "DeepSeek",
+    "deepseek-account": "DeepSeek",
     "google": "Google",
     "xai": "xAI",
     "zai": "GLM",
