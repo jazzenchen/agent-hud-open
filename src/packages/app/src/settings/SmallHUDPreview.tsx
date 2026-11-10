@@ -12,7 +12,11 @@ import {
   type HUDConfig,
 } from "@agent-hud/hud/model";
 import { islandPath, stripMetrics } from "@agent-hud/hud/geometry";
-import { DOCK_SCALE } from "@agent-hud/hud/dock-scale";
+import {
+  DOCK_SCALE,
+  dockFontWeight,
+  dockScale,
+} from "@agent-hud/hud/dock-scale";
 import { isRingStyle } from "@agent-hud/hud/usage-meter/arcs";
 import {
   MarkBars,
@@ -191,7 +195,11 @@ export function SmallHUDPreview({
                               sample.panelLayout,
                             )}
                             size={metrics.mark}
-                            ringWidth={sample.ringWidth * DOCK_SCALE}
+                            ringWidth={
+                              sample.ringWidth *
+                              DOCK_SCALE *
+                              dockScale(sample.dockScale)
+                            }
                             light={light}
                             reduceMotion={!sample.animations}
                           />
@@ -222,9 +230,14 @@ export function SmallHUDPreview({
                         height={metrics.mark}
                         size={
                           Math.max(20, Math.min(60, sample.simpleSize)) *
-                          DOCK_SCALE
+                          DOCK_SCALE *
+                          dockScale(sample.dockScale)
                         }
-                        ringWidth={sample.ringWidth * DOCK_SCALE}
+                        ringWidth={
+                          sample.ringWidth *
+                          DOCK_SCALE *
+                          dockScale(sample.dockScale)
+                        }
                         light={light}
                         reduceMotion={!sample.animations}
                       />
@@ -236,6 +249,7 @@ export function SmallHUDPreview({
                         <span
                           style={{
                             fontSize: metrics.font,
+                            fontWeight: dockFontWeight(sample.dockScale),
                             color: statusColor(vendor.level),
                             fontVariantNumeric: "tabular-nums",
                           }}

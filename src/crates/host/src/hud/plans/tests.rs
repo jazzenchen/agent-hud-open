@@ -32,7 +32,7 @@ fn a_screen_reads_its_own_value_then_the_defaults() {
 
 #[test]
 fn a_strip_is_as_wide_as_geometry_ts_draws_it() {
-    let defaults = view(json!({}), json!({}));
+    let defaults = view(json!({"dockScale": 1}), json!({}));
     let screen = Screen::new(&defaults, "a", false);
     let labels = |n: usize| vec!["72%".to_owned(); n];
     assert_eq!(
@@ -57,11 +57,32 @@ fn a_strip_is_as_wide_as_geometry_ts_draws_it() {
 #[test]
 fn compact_dock_ignores_full_mode_bars_for_its_window_estimate() {
     let saved = view(
-        json!({"compactDock": true, "simpleStyle": "bars"}),
+        json!({"compactDock": true, "simpleStyle": "bars", "dockScale": 1}),
         json!({}),
     );
     let screen = Screen::new(&saved, "a", false);
-    // One 24 pt mark, 6 pt label gap, conservative 25 pt label and 11 pt insets.
+    // One 24 pt mark, 2 pt label gap, conservative 25 pt label and 11 pt insets.
     let width = strip_width(&screen, Mode::Simple, Edge::Top, &["72%".into()], 0.0);
-    assert!((width - 70.84).abs() < 0.001);
+    assert!((width - 67.16).abs() < 0.001);
+}
+
+#[test]
+fn whole_dock_size_and_vertical_thickness_match_the_drawing_scale() {
+    let a = view(
+        json!({"compactDock": true, "dockScale": 0.8, "dockHeight": 1}),
+        json!({}),
+    );
+    let b = view(
+        json!({"compactDock": true, "dockScale": 1.6, "dockHeight": 1.5}),
+        json!({}),
+    );
+    let labels = vec!["72%".into()];
+    let first = Screen::new(&a, "a", false);
+    let second = Screen::new(&b, "a", false);
+    let width = |screen, edge| strip_width(screen, Mode::Simple, edge, &labels, 0.0);
+    assert!((width(&second, Edge::Top) / width(&first, Edge::Top) - 2.0).abs() < 0.001);
+    assert!(
+        ((width(&second, Edge::Right) - 3.0) / (width(&first, Edge::Right) - 3.0) - 3.0).abs()
+            < 0.001
+    );
 }

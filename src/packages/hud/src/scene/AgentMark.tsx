@@ -18,7 +18,7 @@ import { isRingStyle } from "../usage-meter/arcs";
 import { MarkBars, MarkRing, markItems } from "../usage-meter/mark-usage";
 import type { HUDNativePointer } from "./useHUDInteraction";
 import { compactLabel } from "../compact-dock";
-import { DOCK_SCALE } from "../dock-scale";
+import { DOCK_SCALE, dockFontWeight, dockScale } from "../dock-scale";
 
 const clampedSize = (size: number) => Math.max(20, Math.min(60, size));
 
@@ -74,6 +74,7 @@ export function AgentMark({
   const format = useFormat();
   const { quotaDisplay } = format;
   const compact = config.mode === "simple" && config.compactDock;
+  const scale = DOCK_SCALE * dockScale(config.dockScale);
   const label = meterLabel(vendor, quotaDisplay);
   const caption = compact ? compactLabel(vendor, label) : label;
   // A ring's figure is text: on a see-through ground, its level's see-through shade.
@@ -128,7 +129,7 @@ export function AgentMark({
               style={config.simpleStyle}
               items={markItems(vendor, quotaDisplay, config.panelLayout)}
               size={metrics.mark}
-              ringWidth={config.ringWidth * DOCK_SCALE}
+              ringWidth={config.ringWidth * scale}
               light={light}
               reduceMotion={reduceMotion}
             />
@@ -207,13 +208,13 @@ export function AgentMark({
             aria-hidden="true"
             style={{
               position: "absolute",
-              right: -2,
-              bottom: -2,
-              width: 8,
-              height: 8,
+              right: -2 * scale,
+              bottom: -2 * scale,
+              width: 8 * scale,
+              height: 8 * scale,
               borderRadius: "50%",
               background: "#e9a16d",
-              boxShadow: `0 0 0 2px ${light ? "#f8f8fa" : "#000"}`,
+              boxShadow: `0 0 0 ${2 * scale}px ${light ? "#f8f8fa" : "#000"}`,
             }}
           />
         )}
@@ -223,8 +224,8 @@ export function AgentMark({
           items={markItems(vendor, quotaDisplay, config.panelLayout)}
           length={metrics.bar}
           height={metrics.mark}
-          size={clampedSize(config.simpleSize) * DOCK_SCALE}
-          ringWidth={config.ringWidth * DOCK_SCALE}
+          size={clampedSize(config.simpleSize) * scale}
+          ringWidth={config.ringWidth * scale}
           light={light}
           reduceMotion={reduceMotion}
         />
@@ -237,7 +238,7 @@ export function AgentMark({
             style={{
               color: figureColor(vendor.level),
               fontSize: metrics.font,
-              fontWeight: 400,
+              fontWeight: dockFontWeight(config.dockScale),
               fontVariantNumeric: "tabular-nums",
               whiteSpace: "nowrap",
               textAlign: "right",

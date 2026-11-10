@@ -26,6 +26,7 @@ fn strip_width(
         Mode::Notch => notch_width,
         Mode::Simple => {
             let compact = screen.flag("compactDock");
+            let scale = 0.92 * screen.number("dockScale").clamp(0.6, 1.6);
             let size = if compact {
                 24.0
             } else {
@@ -51,7 +52,7 @@ fn strip_width(
             } else {
                 (9.0 * (size / 26.0).max(1.0)).round()
             };
-            let label_gap = (size * 0.23).round();
+            let label_gap = if compact { 2.0 } else { (size * 0.23).round() };
             let spacing = if numbers || !horizontal { 1.0 } else { 0.7 };
             let gap = if compact {
                 14.0
@@ -74,12 +75,16 @@ fn strip_width(
                 })
                 .collect();
             if !horizontal {
-                return (left + widths.iter().copied().fold(mark, f64::max) + right) * 0.92 + 3.0;
+                let content = widths.iter().copied().fold(mark, f64::max);
+                let thickness = ((left + content + right)
+                    * screen.number("dockHeight").clamp(0.75, 1.75))
+                .max(content);
+                return thickness * scale + 3.0;
             }
             if labels.is_empty() {
-                return 32.0 * 0.92;
+                return 32.0 * scale;
             }
-            (left + widths.iter().sum::<f64>() + (n - 1.0) * gap + right) * 0.92
+            (left + widths.iter().sum::<f64>() + (n - 1.0) * gap + right) * scale
         }
     }
 }

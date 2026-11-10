@@ -15,7 +15,7 @@ import {
 } from "./usage-meter/arcs";
 import { markWindows } from "./usage-meter/mark-windows";
 import { compactLabel } from "./compact-dock.ts";
-import { scaleDockMetrics } from "./dock-scale.ts";
+import { dockFontWeight, scaleDockMetrics } from "./dock-scale.ts";
 
 /** Whether a HUD on `edge` runs across the screen. */
 export const horizontal = (edge: HUDEdge) =>
@@ -54,9 +54,9 @@ export interface StripMetrics {
 export const clamp = (n: number, lo: number, hi: number) =>
   Math.max(lo, Math.min(hi, n));
 
-export function labelWidth(text: string, size: number): number {
+export function labelWidth(text: string, size: number, weight = 400): number {
   const context = document.createElement("canvas").getContext("2d")!;
-  context.font = `${size}px -apple-system, BlinkMacSystemFont, sans-serif`;
+  context.font = `${weight} ${size}px -apple-system, BlinkMacSystemFont, sans-serif`;
   const tabularDigit = Math.max(
     ..."0123456789".split("").map((digit) => context.measureText(digit).width),
   );
@@ -118,7 +118,7 @@ export function stripMetrics(
   const font = compact
     ? 11
     : Math.round(HUD_METRICS.dockTextSize * Math.max(1, size / 26));
-  const labelGap = Math.round(size * 0.23);
+  const labelGap = compact ? 2 : Math.round(size * 0.23);
   const gap = compact
     ? 14
     : Math.round(
@@ -143,6 +143,7 @@ export function stripMetrics(
             ? compactLabel(v, meterLabel(v, display))
             : meterLabel(v, display),
           font,
+          dockFontWeight(config.dockScale),
         )
       : 0,
   );
@@ -186,6 +187,9 @@ export function stripMetrics(
       centers,
     },
     horizontal,
+    config.dockScale,
+    config.dockHeight,
+    config.dockRoundness,
   );
 }
 

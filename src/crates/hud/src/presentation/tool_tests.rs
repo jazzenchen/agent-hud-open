@@ -76,12 +76,16 @@ fn status_bar_selection_and_compact_mode_persist_without_changing_animation_pref
     let before = owner.view()["store"]["global"].clone();
     owner
         .update(json!({"screen":"side", "patch":{
-            "compactDock":true, "panelLayout":{"hud":{"agents":["codex","deepseek"]}}
+            "compactDock":true, "dockScale":0.8, "dockHeight":1.25, "dockRoundness":0.4,
+            "panelLayout":{"hud":{"agents":["codex","deepseek"]}}
         }}))
         .unwrap();
     let reopened = Presentation::new(folder.path().to_path_buf()).unwrap();
     let stored = reopened.view();
     assert_eq!(stored["store"]["screens"]["side"]["compactDock"], true);
+    assert_eq!(stored["store"]["screens"]["side"]["dockScale"], 0.8);
+    assert_eq!(stored["store"]["screens"]["side"]["dockHeight"], 1.25);
+    assert_eq!(stored["store"]["screens"]["side"]["dockRoundness"], 0.4);
     assert_eq!(
         stored["layouts"]["side"]["hud"]["agents"],
         json!(["codex", "deepseek"])

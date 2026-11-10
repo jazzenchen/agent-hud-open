@@ -56,6 +56,24 @@ const FIELDS: &[Field] = &[
         range: Some((0.1, 0.6)),
     },
     Field {
+        name: "dockScale",
+        stored: "dockScale",
+        modes: &["simple"],
+        range: Some((0.6, 1.6)),
+    },
+    Field {
+        name: "dockHeight",
+        stored: "dockHeight",
+        modes: &["simple"],
+        range: Some((0.75, 1.75)),
+    },
+    Field {
+        name: "dockRoundness",
+        stored: "dockRoundness",
+        modes: &["simple"],
+        range: Some((0., 1.)),
+    },
+    Field {
         name: "ringWidth",
         stored: "ringWidth",
         modes: &["simple"],

@@ -106,6 +106,30 @@ export function HUDSection({
               "缩短栏目，收起无数据且空闲的智能体。悬停查看详情，关闭后恢复完整展示。",
             ),
           )}
+          {slider(
+            "dockScale",
+            t("HUD size", "HUD 整体大小"),
+            0.6,
+            1.6,
+            0.05,
+            percent,
+          )}
+          {slider(
+            "dockHeight",
+            t("HUD height", "HUD 高度"),
+            0.75,
+            1.75,
+            0.05,
+            percent,
+          )}
+          {slider(
+            "dockRoundness",
+            t("Corner roundness", "边角圆润度"),
+            0,
+            1,
+            0.05,
+            percent,
+          )}
           {!config.compactDock && (
             <>
               {slider("simpleSize", t("Size", "大小"), 20, 60, 1, pt)}

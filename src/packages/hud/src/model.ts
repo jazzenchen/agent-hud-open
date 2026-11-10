@@ -60,6 +60,10 @@ export interface HUDConfig {
   simpleStyle: UsageStyle;
   /** Opt-in shorter dock; full appearance preferences remain saved. */
   compactDock: boolean;
+  /** Whole floating dock scale; independent of full-mode mark preferences. */
+  dockScale: number;
+  dockHeight: number;
+  dockRoundness: number;
   showsNumbers: boolean;
   separatesAgents: boolean;
   appearance: "dark" | "light" | "system";
