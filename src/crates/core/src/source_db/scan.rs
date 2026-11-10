@@ -326,12 +326,23 @@ impl AgentHudCore {
                 )
             });
         }
+        let dirty = checkpoint.source_state["dirty"] == true;
+        // A database that changed while it was read goes on from the
+        // watermark its reader left, when it leaves one, rather than from the
+        // start: a long read of a client that writes as it works (Antigravity)
+        // would otherwise restart for as long as it works (agent-hud-open #53).
+        let resume = page.cursor.is_none() && dirty && !is_batch && page.watermark.is_some();
         if let Some(watermark) = page.watermark {
             checkpoint.source_state["watermark"] = watermark;
         }
-        checkpoint.source_state["cursor"] = page.cursor.clone().unwrap_or(Value::Null);
-        let complete = page.cursor.is_none() && checkpoint.source_state["dirty"] != true;
-        checkpoint.source_state["restart"] = json!(page.cursor.is_none() && !complete);
+        checkpoint.source_state["cursor"] = if resume {
+            checkpoint.source_state["dirty"] = json!(false);
+            checkpoint.source_state["watermark"].clone()
+        } else {
+            page.cursor.clone().unwrap_or(Value::Null)
+        };
+        let complete = page.cursor.is_none() && !dirty;
+        checkpoint.source_state["restart"] = json!(page.cursor.is_none() && !complete && !resume);
         checkpoint.offset = if complete { stamp.length } else { 0 };
         checkpoint.length = stamp.length;
         checkpoint.modified = stamp.modified;

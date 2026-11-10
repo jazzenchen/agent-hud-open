@@ -12,6 +12,68 @@ mod annotations;
 use annotations::annotation;
 
 const PAGE: i64 = 500;
+/// Rows read again before where the last read of a table ended. Antigravity
+/// rewrites the rows of a turn in progress (its usage, its steps' messages),
+/// so a read that resumes takes the last of them up again; each row counts
+/// under its own key, so a row read twice counts once.
+const TAIL: i64 = 200;
+
+/// Where a read stands besides its stage and row: where steps and the second
+/// pass over the turns begin (the tables' start on a whole read, the tail of
+/// the last read on a resumed one), and the last row read of each table.
+#[derive(Clone, Copy)]
+struct Marks {
+    steps_from: i64,
+    turns_from: i64,
+    steps_last: i64,
+    turns_last: i64,
+}
+
+impl Marks {
+    fn of(cursor: &Value) -> Self {
+        let at = |key: &str| cursor[key].as_i64().unwrap_or(i64::MIN);
+        Self {
+            steps_from: at("steps"),
+            turns_from: at("turns"),
+            steps_last: at("stepsLast"),
+            turns_last: at("turnsLast"),
+        }
+    }
+
+    fn cursor(&self, stage: i64, after: i64) -> Value {
+        let mut cursor = json!({ "stage": stage });
+        for (key, value) in [
+            ("after", after),
+            ("steps", self.steps_from),
+            ("turns", self.turns_from),
+            ("stepsLast", self.steps_last),
+            ("turnsLast", self.turns_last),
+        ] {
+            if value != i64::MIN {
+                cursor[key] = json!(value);
+            }
+        }
+        cursor
+    }
+
+    /// Where the next read begins once the database changes: the last TAIL
+    /// rows of each table and what follows them, never the whole file again.
+    fn watermark(&self) -> Value {
+        let tail = |last: i64| {
+            if last == i64::MIN {
+                i64::MIN
+            } else {
+                last.saturating_sub(TAIL)
+            }
+        };
+        Self {
+            steps_from: tail(self.steps_last),
+            turns_from: tail(self.turns_last),
+            ..*self
+        }
+        .cursor(0, tail(self.turns_last))
+    }
+}
 
 fn unique_time(
     db: &Connection,
@@ -69,13 +131,14 @@ pub(crate) fn read(
     let path_text = path.to_string_lossy();
     let stage = cursor["stage"].as_i64().unwrap_or(0);
     let after = cursor["after"].as_i64().unwrap_or(i64::MIN);
+    let mut marks = Marks::of(cursor);
     if cursor.is_null() {
         staging::clear_stale_proto_identity(ledger, &path_text, generation)?;
     }
     if stage == 1 && !sql_tables(client)?.contains("steps") {
         return Ok(Page {
             records: vec![],
-            cursor: Some(json!({"stage":2})),
+            cursor: Some(marks.cursor(2, marks.turns_from)),
             watermark: None,
         });
     }
@@ -131,6 +194,11 @@ pub(crate) fn read(
     while let Some(row) = rows.next()? {
         seen += 1;
         last = row.get(0)?;
+        if stage == 1 {
+            marks.steps_last = marks.steps_last.max(last);
+        } else {
+            marks.turns_last = marks.turns_last.max(last);
+        }
         let blob = row.get_ref(1)?;
         let rusqlite::types::ValueRef::Blob(blob) = blob else {
             continue;
@@ -266,16 +334,19 @@ pub(crate) fn read(
         }
     }
     let cursor = if seen == PAGE {
-        Some(json!({"stage":stage,"after":last}))
-    } else if stage < 2 {
-        Some(json!({"stage":stage+1}))
+        Some(marks.cursor(stage, last))
+    } else if stage == 0 {
+        Some(marks.cursor(1, marks.steps_from))
+    } else if stage == 1 {
+        Some(marks.cursor(2, marks.turns_from))
     } else {
         None
     };
+    let watermark = cursor.is_none().then(|| marks.watermark());
     Ok(Page {
         records,
         cursor,
-        watermark: None,
+        watermark,
     })
 }
 
