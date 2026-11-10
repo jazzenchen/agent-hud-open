@@ -25,23 +25,40 @@ fn strip_width(
     match mode {
         Mode::Notch => notch_width,
         Mode::Simple => {
-            let size = screen.number("simpleSize").clamp(20.0, 60.0);
-            let style = screen.simple_style();
+            let compact = screen.flag("compactDock");
+            let size = if compact {
+                24.0
+            } else {
+                screen.number("simpleSize").clamp(20.0, 60.0)
+            };
+            let style = if compact {
+                "numbers"
+            } else {
+                screen.simple_style()
+            };
             let rings = matches!(style, "rings" | "segments");
             let numbers = style == "numbers" || screen.flag("showsNumbers");
             let logo = (size * if rings { 0.55 } else { 0.68 }).round();
-            let mark = if rings { size } else { logo };
+            let mark = if compact || rings { size } else { logo };
             // geometry.ts `bar`: bars beside the logo, 1.09 marks long.
             let bar = if style == "bars" {
                 (size * 1.09).round()
             } else {
                 0.0
             };
-            let font = (9.0 * (size / 26.0).max(1.0)).round();
+            let font = if compact {
+                11.0
+            } else {
+                (9.0 * (size / 26.0).max(1.0)).round()
+            };
             let label_gap = (size * 0.23).round();
             let spacing = if numbers || !horizontal { 1.0 } else { 0.7 };
-            let gap = (size * screen.number("simpleGapScale").clamp(0.1, 0.6) * spacing).round();
-            let tight = (size * 0.18).round().max(3.0);
+            let gap = if compact {
+                14.0
+            } else {
+                (size * screen.number("simpleGapScale").clamp(0.1, 0.6) * spacing).round()
+            };
+            let tight = ((size * 0.18).round() - 2.0).max(1.0);
             let loose = (size * 0.45).round();
             let left = if rings { tight + 1.0 } else { loose };
             let right = if numbers { loose } else { left };
@@ -57,12 +74,12 @@ fn strip_width(
                 })
                 .collect();
             if !horizontal {
-                return left + widths.iter().copied().fold(mark, f64::max) + right + 3.0;
+                return (left + widths.iter().copied().fold(mark, f64::max) + right) * 0.92 + 3.0;
             }
             if labels.is_empty() {
-                return 32.0;
+                return 32.0 * 0.92;
             }
-            left + widths.iter().sum::<f64>() + (n - 1.0) * gap + right
+            (left + widths.iter().sum::<f64>() + (n - 1.0) * gap + right) * 0.92
         }
     }
 }
@@ -96,6 +113,16 @@ fn plan(
         .map(|snapshot| {
             vendors::configured(snapshot, screen.mode_name(), layout, now_ms)
                 .iter()
+                .filter(|vendor| {
+                    !screen.flag("compactDock")
+                        || mode != Mode::Simple
+                        || vendor.used.is_some()
+                        || vendor.held.is_some()
+                        || vendor.balance.is_some()
+                        || vendor.usage.is_some()
+                        || vendor.working > 0
+                        || matches!(vendor.level, "warning" | "critical")
+                })
                 .map(|vendor| {
                     vendors::meter_label(
                         vendor,

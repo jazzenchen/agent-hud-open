@@ -70,6 +70,25 @@ fn drafts(owner: &Presentation) -> Value {
     owner.view()["drafts"].clone()
 }
 
+#[test]
+fn status_bar_selection_and_compact_mode_persist_without_changing_animation_preferences() {
+    let (folder, owner) = owner();
+    let before = owner.view()["store"]["global"].clone();
+    owner
+        .update(json!({"screen":"side", "patch":{
+            "compactDock":true, "panelLayout":{"hud":{"agents":["codex","deepseek"]}}
+        }}))
+        .unwrap();
+    let reopened = Presentation::new(folder.path().to_path_buf()).unwrap();
+    let stored = reopened.view();
+    assert_eq!(stored["store"]["screens"]["side"]["compactDock"], true);
+    assert_eq!(
+        stored["layouts"]["side"]["hud"]["agents"],
+        json!(["codex", "deepseek"])
+    );
+    assert_eq!(stored["store"]["global"], before);
+}
+
 // MARK: Goal 1: what a proposal changes
 
 #[test]

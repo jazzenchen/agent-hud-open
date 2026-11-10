@@ -18,6 +18,7 @@ import { isRingStyle } from "../usage-meter/arcs";
 import { MarkBars, MarkRing, markItems } from "../usage-meter/mark-usage";
 import type { HUDNativePointer } from "./useHUDInteraction";
 import { compactLabel } from "../compact-dock";
+import { DOCK_SCALE } from "../dock-scale";
 
 const clampedSize = (size: number) => Math.max(20, Math.min(60, size));
 
@@ -127,7 +128,7 @@ export function AgentMark({
               style={config.simpleStyle}
               items={markItems(vendor, quotaDisplay, config.panelLayout)}
               size={metrics.mark}
-              ringWidth={config.ringWidth}
+              ringWidth={config.ringWidth * DOCK_SCALE}
               light={light}
               reduceMotion={reduceMotion}
             />
@@ -222,8 +223,8 @@ export function AgentMark({
           items={markItems(vendor, quotaDisplay, config.panelLayout)}
           length={metrics.bar}
           height={metrics.mark}
-          size={clampedSize(config.simpleSize)}
-          ringWidth={config.ringWidth}
+          size={clampedSize(config.simpleSize) * DOCK_SCALE}
+          ringWidth={config.ringWidth * DOCK_SCALE}
           light={light}
           reduceMotion={reduceMotion}
         />

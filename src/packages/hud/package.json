@@ -17,6 +17,8 @@
     "./geometry": "./src/geometry.ts",
     "./ground": "./src/ground.tsx",
     "./model": "./src/model.ts",
+    "./agent-selection": "./src/agent-selection.ts",
+    "./dock-scale": "./src/dock-scale.ts",
     "./panel/added-sections": "./src/panel/added-sections.ts",
     "./panel/quota-groups": "./src/panel/quota-groups.ts",
     "./usage-meter/arcs": "./src/usage-meter/arcs.ts",

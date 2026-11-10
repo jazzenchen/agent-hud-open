@@ -6,6 +6,7 @@ import { Row, Section } from "../SettingsPrimitives";
 import { Segments } from "../SettingsControls";
 import { SmallHUDPreview } from "../SmallHUDPreview";
 import { displayControls, type DisplayProps } from "./controls";
+import { AgentSelection } from "./AgentSelection";
 
 /** What a Simple mark draws, in a sentence. */
 function usageSubtitle(
@@ -167,6 +168,12 @@ export function HUDSection({
           )}
         </>
       )}
+      <AgentSelection
+        snapshot={snapshot}
+        config={config}
+        update={update}
+        t={t}
+      />
       <Row
         title={t("Appearance", "外观")}
         subtitle={

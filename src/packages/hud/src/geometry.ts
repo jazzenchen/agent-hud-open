@@ -15,6 +15,7 @@ import {
 } from "./usage-meter/arcs";
 import { markWindows } from "./usage-meter/mark-windows";
 import { compactLabel } from "./compact-dock.ts";
+import { scaleDockMetrics } from "./dock-scale.ts";
 
 /** Whether a HUD on `edge` runs across the screen. */
 export const horizontal = (edge: HUDEdge) =>
@@ -125,7 +126,7 @@ export function stripMetrics(
           clamp(config.simpleGapScale, 0.1, 0.6) *
           (numbers || !horizontal ? 1 : 0.7),
       );
-  const tight = Math.max(3, Math.round(size * 0.18)),
+  const tight = Math.max(1, Math.round(size * 0.18) - 2),
     loose = Math.round(size * 0.45);
   const left = ringed ? tight + 1 : loose,
     right = numbers ? loose : left;
@@ -169,20 +170,23 @@ export function stripMetrics(
     along += (horizontal ? widths[i] : mark) + gap;
     return center;
   });
-  return {
-    width: width + (horizontal ? 0 : 3),
-    height: height + (horizontal ? 3 : 0),
-    gap,
-    logo,
-    mark,
-    font,
-    labelGap,
-    label: Math.max(0, ...labels),
-    bar,
-    padding,
-    radius: Math.min(Math.round(size * 0.73), Math.min(width, height) / 2),
-    centers,
-  };
+  return scaleDockMetrics(
+    {
+      width,
+      height,
+      gap,
+      logo,
+      mark,
+      font,
+      labelGap,
+      label: Math.max(0, ...labels),
+      bar,
+      padding,
+      radius: Math.min(Math.round(size * 0.73), Math.min(width, height) / 2),
+      centers,
+    },
+    horizontal,
+  );
 }
 
 /** SVG equivalent of IslandShape.topPath. Content stays upright when this silhouette rotates. */

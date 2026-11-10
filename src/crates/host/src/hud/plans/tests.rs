@@ -41,16 +41,27 @@ fn a_strip_is_as_wide_as_geometry_ts_draws_it() {
     );
     assert_eq!(
         strip_width(&screen, Mode::Simple, Edge::Top, &[], 0.0),
-        32.0
+        29.44
     );
-    // Simple, 22 pt with rings and numbers: 5 + 3 × (22 + 5 + 21) + 2 × 10 + 10,
-    // or a column as wide as its widest row and 3 pt of margin.
+    // Reduced vertical padding makes the leading inset 3 pt. The approved
+    // whole dock scale is 92%; the edge's transparent 3 pt margin stays native.
     assert_eq!(
         strip_width(&screen, Mode::Simple, Edge::Top, &labels(3), 0.0),
-        179.0
+        162.84
     );
-    assert_eq!(
-        strip_width(&screen, Mode::Simple, Edge::Right, &labels(3), 0.0),
-        66.0
+    assert!(
+        (strip_width(&screen, Mode::Simple, Edge::Right, &labels(3), 0.0) - 59.12).abs() < 0.001
     );
+}
+
+#[test]
+fn compact_dock_ignores_full_mode_bars_for_its_window_estimate() {
+    let saved = view(
+        json!({"compactDock": true, "simpleStyle": "bars"}),
+        json!({}),
+    );
+    let screen = Screen::new(&saved, "a", false);
+    // One 24 pt mark, 6 pt label gap, conservative 25 pt label and 11 pt insets.
+    let width = strip_width(&screen, Mode::Simple, Edge::Top, &["72%".into()], 0.0);
+    assert!((width - 70.84).abs() < 0.001);
 }
