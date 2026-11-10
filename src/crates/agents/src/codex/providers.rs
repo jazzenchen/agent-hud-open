@@ -94,6 +94,49 @@ pub fn configured(host: &dyn Host) -> Vec<ModelProvider> {
         .unwrap_or_default()
 }
 
+/// The model provider Codex is set to use: the `model_provider` named at the
+/// top of its `config.toml`, among the `[model_providers.<id>]` tables that
+/// file defines. `None` when it is not stated (Codex's own OpenAI) or names no
+/// table.
+pub fn selected(host: &dyn Host) -> Option<ModelProvider> {
+    let bytes = resolve(host, &CONFIG)
+        .first()
+        .and_then(|path| read_bounded(host, path, LIMIT).found())?;
+    let text = String::from_utf8_lossy(&bytes);
+    let id = top_level(&text, "model_provider")?;
+    parse(&text)
+        .into_iter()
+        .find(|provider| provider.id == id)
+}
+
+/// A string value set before the first table, as Codex writes
+/// `model_provider = "<id>"` above its provider tables.
+fn top_level(toml: &str, name: &str) -> Option<String> {
+    let mut in_table = false;
+    for line in toml.lines() {
+        let line = line.trim();
+        if line.starts_with('[') {
+            in_table = true;
+            continue;
+        }
+        if in_table || line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+        let Some((key, value)) = line.split_once('=') else {
+            continue;
+        };
+        if key.trim() != name {
+            continue;
+        }
+        return value
+            .trim()
+            .strip_prefix('"')
+            .and_then(|rest| rest.split_once('"'))
+            .map(|(text, _)| text.to_owned());
+    }
+    None
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -145,6 +188,23 @@ base_url = "https://ignored.example.com"
             .map(|provider| provider.key(&env))
             .collect::<Vec<_>>();
         assert_eq!(keys, [Some("sk-env".into()), Some("sk-inline".into())]);
+    }
+
+    #[test]
+    fn the_selected_provider_is_the_one_named_on_top() {
+        let host = FakeHost::new("/u").file("/u/.codex/config.toml", TOML);
+        let provider = selected(&host).expect("the config names its provider");
+        assert_eq!(provider.id, "relay");
+        assert_eq!(provider.base_url, "https://relay.example.com/v1");
+    }
+
+    #[test]
+    fn codex_own_openai_names_no_table_to_select() {
+        let host = FakeHost::new("/u").file(
+            "/u/.codex/config.toml",
+            "model = \"gpt-6-sol\"\nmodel_provider = \"openai\"\n",
+        );
+        assert_eq!(selected(&host), None);
     }
 
     #[test]

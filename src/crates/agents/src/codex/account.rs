@@ -32,6 +32,35 @@ static STATUS: StatusPage = StatusPage {
 };
 
 pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
+    let reading = read_plan(host)?;
+    Ok(prefer_relay_balance(host, reading))
+}
+
+/// Codex's plan, without the windows a relay invents when its calls go through
+/// one: the relay answers `account/rateLimits/read` itself, so those windows
+/// are not a plan this computer holds. Core shows every relay's balance under
+/// the clients that spend it (`relayReading`), so the slot reads what the
+/// account has left there instead of a meaningless share. The plan stays when
+/// the owner has not agreed to read that relay.
+fn prefer_relay_balance(host: &dyn Host, reading: Reading) -> Reading {
+    let Some(provider) = crate::codex::providers::selected(host) else {
+        return reading;
+    };
+    let Some(relay) = crate::endpoints::base_url_host(&provider.base_url) else {
+        return reading;
+    };
+    if crate::endpoints::host_kind(&relay) != crate::endpoints::HostKind::Relay {
+        return reading;
+    }
+    if !host.consented(&crate::relays::consent_key(&relay)) {
+        return reading;
+    }
+    let mut reading = reading;
+    reading.quotas.clear();
+    reading
+}
+
+fn read_plan(host: &dyn Host) -> Result<Reading, Unread> {
     let executable = host.executable("codex");
     let native = match executable.as_deref() {
         Some(executable) => read_native(host, executable),
