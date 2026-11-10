@@ -81,7 +81,7 @@ test("a credit card names the first expiry as a date", () => {
 
 test("remaining display keeps alert thresholds and forecasts in consumed semantics", () => {
   const reading = event({ usedPercent: 92, timeToExhaustSeconds: 3000 });
-  const consumed = quotaAlertCopy(reading, en);
+  const consumed = quotaAlertCopy(reading, { ...en, quotaDisplay: "consumed" });
   const remaining = quotaAlertCopy(reading, {
     ...en,
     quotaDisplay: "remaining",

@@ -184,7 +184,11 @@ test("remaining quota changes the figure without changing readings, risk or othe
   });
   const before = JSON.stringify(reading);
   const remaining = { ...en, quotaDisplay: "remaining" as const };
-  assert.equal(quotaMetric(reading, "quota", now, en).value, "92%");
+  assert.equal(
+    quotaMetric(reading, "quota", now, { ...en, quotaDisplay: "consumed" })
+      .value,
+    "92%",
+  );
   const displayed = quotaMetric(reading, "quota", now, remaining);
   assert.equal(displayed.value, "8%");
   assert.match(displayed.hint, /Quota remaining/);
