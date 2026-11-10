@@ -8,7 +8,7 @@ export type QuotaDisplay = "consumed" | "remaining";
 /** Presentation only: unknown readings stay unknown and source usage stays unchanged. */
 export function quotaPercent(
   used: number | null | undefined,
-  display: QuotaDisplay = "consumed",
+  display: QuotaDisplay = "remaining",
 ): number | null {
   if (used == null || !Number.isFinite(used)) return null;
   const bounded = Math.max(0, Math.min(100, used));
@@ -17,14 +17,14 @@ export function quotaPercent(
 
 export function quotaPercentLabel(
   used: number | null | undefined,
-  display: QuotaDisplay = "consumed",
+  display: QuotaDisplay = "remaining",
 ): string {
   const value = quotaPercent(used, display);
   return value == null ? "—" : `${Math.round(value)}%`;
 }
 
 export function quotaDisplayLabel(
-  display: QuotaDisplay = "consumed",
+  display: QuotaDisplay = "remaining",
   language: Language = "en",
 ): string {
   return display === "remaining"

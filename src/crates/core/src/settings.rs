@@ -287,10 +287,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn quota_display_defaults_to_consumed_and_persists_only_supported_choices() {
+    fn quota_display_defaults_to_remaining_and_persists_only_supported_choices() {
         let home = tempfile::tempdir().unwrap();
         let mut core = AgentHudCore::new(vec![], home.path().to_owned());
-        assert_eq!(core.settings["quotaDisplay"], "consumed");
+        assert_eq!(core.settings["quotaDisplay"], "remaining");
         core.apply_setting("quotaDisplay", &json!("remaining"))
             .unwrap();
         let reopened = AgentHudCore::new(vec![], home.path().to_owned());
@@ -376,7 +376,7 @@ mod tests {
     }
 
     #[test]
-    fn old_preferences_without_quota_display_keep_the_consumed_default() {
+    fn old_preferences_without_quota_display_use_the_remaining_default() {
         let home = tempfile::tempdir().unwrap();
         fs::write(
             home.path().join("settings.json"),
@@ -385,6 +385,6 @@ mod tests {
         .unwrap();
         let core = AgentHudCore::new(vec![], home.path().to_owned());
         assert_eq!(core.settings["language"], "en");
-        assert_eq!(core.settings["quotaDisplay"], "consumed");
+        assert_eq!(core.settings["quotaDisplay"], "remaining");
     }
 }

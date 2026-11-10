@@ -119,13 +119,19 @@ export function GeneralPane({ snapshot, action }: SettingsPaneProps) {
         {problem(appearanceKeys)}
       </Section>
       <Section title={t("Usage display", "用量显示")}>
-        <Row title={t("Quota percentage", "额度百分比")}>
+        <Row
+          title={t("Quota percentage", "额度百分比")}
+          subtitle={t(
+            "Remaining: a higher percentage means more available. Amount balances stay in their original currency.",
+            "剩余：百分比越大，可用额度越多；金额余额保持原币种。",
+          )}
+        >
           <Menu
             label={t("Quota percentage", "额度百分比")}
-            value={settings.quotaDisplay ?? "consumed"}
+            value={settings.quotaDisplay ?? "remaining"}
             options={[
-              ["consumed", t("Used", "已用")],
               ["remaining", t("Remaining", "剩余")],
+              ["consumed", t("Used", "已用")],
             ]}
             change={setting("quotaDisplay")}
           />

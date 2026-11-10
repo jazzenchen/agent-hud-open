@@ -169,7 +169,7 @@ impl AgentHudCore {
             .ok()
             .and_then(|bytes| serde_json::from_slice(&bytes).ok())
             .unwrap_or(Value::Null);
-        let mut settings = json!({"quotaDisplay":"consumed","codexHomes":[],"claudeHomes":[],"antigravityCliSettings":[],"appearance":"system","appearanceFollowsScreen":false,"language":"system","clientHooks":false,"optInApprovals":[],"readCopilotQuota":false,"approvalWaitMinutes":10,"launchAtLogin":true,"animations":true,"hudVisible":true,"showMenuBarIcon":true,"hudTools":false,"claudeAnswers":true,"agentMessages":false,"agentMessagesAsUser":false,"agentMessagesLimit":10,"claudeMessages":true,"deepseekMessages":true,"relayReading":[],"customPrices":{},"relayMultipliers":{},"localKinds":{}});
+        let mut settings = json!({"quotaDisplay":"remaining","codexHomes":[],"claudeHomes":[],"antigravityCliSettings":[],"appearance":"system","appearanceFollowsScreen":false,"language":"system","clientHooks":false,"optInApprovals":[],"readCopilotQuota":false,"approvalWaitMinutes":10,"launchAtLogin":true,"animations":true,"hudVisible":true,"showMenuBarIcon":true,"hudTools":false,"claudeAnswers":true,"agentMessages":false,"agentMessagesAsUser":false,"agentMessagesLimit":10,"claudeMessages":true,"deepseekMessages":true,"relayReading":[],"customPrices":{},"relayMultipliers":{},"localKinds":{}});
         if let Some(values) = stored["settings"].as_object() {
             for (key, value) in values {
                 if settings.get(key).is_some() {

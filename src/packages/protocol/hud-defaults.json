@@ -21,6 +21,7 @@
   "simpleGapScale": 0.45,
   "ringWidth": 1.5,
   "simpleStyle": "segments",
+  "compactDock": false,
   "showsNumbers": true,
   "separatesAgents": false,
   "appearance": "dark",

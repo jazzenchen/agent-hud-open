@@ -22,6 +22,7 @@ export function useStripMetrics(
       config.ringWidth,
       config.showsNumbers,
       config.simpleStyle,
+      config.compactDock,
       config.panelLayout,
       config.notchWidth,
       config.notchHeight,

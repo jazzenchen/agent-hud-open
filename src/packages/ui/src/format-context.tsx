@@ -7,6 +7,7 @@ const systemLocale = () =>
   typeof navigator === "undefined" ? "en-US" : navigator.language;
 
 const FormatContext = createContext<FormatSettings>({
+  quotaDisplay: "remaining",
   language: resolveLanguage("system", systemLocale()),
   calendar: systemCalendar(systemLocale()),
 });
@@ -14,7 +15,7 @@ const FormatContext = createContext<FormatSettings>({
 /** Provides the language for `setting` ("system", "en", "zh-Hans" …) and this machine's calendar. */
 export function FormatProvider({
   setting,
-  quotaDisplay = "consumed",
+  quotaDisplay = "remaining",
   children,
 }: {
   setting: string | null | undefined;

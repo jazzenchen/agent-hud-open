@@ -74,6 +74,12 @@ const FIELDS: &[Field] = &[
         range: None,
     },
     Field {
+        name: "compactDock",
+        stored: "compactDock",
+        modes: DOCKS,
+        range: None,
+    },
+    Field {
         name: "separateAgents",
         stored: "separatesAgents",
         modes: DOCKS,

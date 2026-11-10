@@ -14,6 +14,7 @@ import {
   usageArcs,
 } from "./usage-meter/arcs";
 import { markWindows } from "./usage-meter/mark-windows";
+import { compactLabel } from "./compact-dock.ts";
 
 /** Whether a HUD on `edge` runs across the screen. */
 export const horizontal = (edge: HUDEdge) =>
@@ -90,10 +91,11 @@ export function stripMetrics(
       radius: config.hasNotch ? 12 : 10,
       centers: [],
     };
-  const size = clamp(config.simpleSize, 20, 60),
-    style = config.simpleStyle,
+  const compact = config.compactDock;
+  const size = compact ? 24 : clamp(config.simpleSize, 20, 60),
+    style = compact ? "numbers" : config.simpleStyle,
     ringed = isRingStyle(style),
-    numbers = style === "numbers" || config.showsNumbers;
+    numbers = compact || style === "numbers" || config.showsNumbers;
   // Rings take every mark's logo down to what the agent with the most rings leaves.
   const logo = Math.round(
     style === "rings"
@@ -110,15 +112,19 @@ export function stripMetrics(
         )
       : size * (ringed ? 0.55 : 0.68),
   );
-  const mark = ringed ? size : logo;
+  const mark = compact ? size : ringed ? size : logo;
   const bar = style === "bars" ? Math.round(size * 1.09) : 0;
-  const font = Math.round(HUD_METRICS.dockTextSize * Math.max(1, size / 26));
+  const font = compact
+    ? 11
+    : Math.round(HUD_METRICS.dockTextSize * Math.max(1, size / 26));
   const labelGap = Math.round(size * 0.23);
-  const gap = Math.round(
-    size *
-      clamp(config.simpleGapScale, 0.1, 0.6) *
-      (numbers || !horizontal ? 1 : 0.7),
-  );
+  const gap = compact
+    ? 14
+    : Math.round(
+        size *
+          clamp(config.simpleGapScale, 0.1, 0.6) *
+          (numbers || !horizontal ? 1 : 0.7),
+      );
   const tight = Math.max(3, Math.round(size * 0.18)),
     loose = Math.round(size * 0.45);
   const left = ringed ? tight + 1 : loose,
@@ -130,7 +136,14 @@ export function stripMetrics(
     left,
   };
   const labels = vendors.map((v) =>
-    numbers ? labelWidth(meterLabel(v, display), font) : 0,
+    numbers
+      ? labelWidth(
+          compact
+            ? compactLabel(v, meterLabel(v, display))
+            : meterLabel(v, display),
+          font,
+        )
+      : 0,
   );
   const widths = labels.map(
     (label) =>

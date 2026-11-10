@@ -170,7 +170,7 @@ export function HUDScene({
   const panelServices = usePanelServices();
   const vendors = useMemo(
     () => configuredVendors(snapshot, config),
-    [snapshot, config.mode, config.panelLayout.order, config.panelLayout.hud],
+    [snapshot, config],
   );
   const { holdActive, endHold, enter, leave } = useEditHold({
     hover,

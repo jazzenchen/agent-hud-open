@@ -7,7 +7,8 @@ import {
   defaultHUDConfig,
   meterLabel,
   statusColor,
-  vendorsFromSnapshot,
+  configuredVendors,
+  compactLabel,
   type HUDConfig,
 } from "@agent-hud/hud/model";
 import { islandPath, stripMetrics } from "@agent-hud/hud/geometry";
@@ -34,7 +35,8 @@ export function SmallHUDPreview({
   active: boolean;
 }) {
   const sample = { ...defaultHUDConfig, ...config, edge: "top" as const };
-  const vendors = vendorsFromSnapshot(snapshot, sample.mode);
+  const vendors = configuredVendors(snapshot, sample);
+  const compact = sample.mode === "simple" && sample.compactDock;
   const hasActiveVendor = vendors.some(
     (vendor) => vendor.working > 0 || vendor.waiting > 0,
   );
@@ -177,20 +179,22 @@ export function SmallHUDPreview({
                         placeItems: "center",
                       }}
                     >
-                      {simple && isRingStyle(sample.simpleStyle) && (
-                        <MarkRing
-                          style={sample.simpleStyle}
-                          items={markItems(
-                            vendor,
-                            snapshot.settings.quotaDisplay,
-                            sample.panelLayout,
-                          )}
-                          size={metrics.mark}
-                          ringWidth={sample.ringWidth}
-                          light={light}
-                          reduceMotion={!sample.animations}
-                        />
-                      )}
+                      {simple &&
+                        !compact &&
+                        isRingStyle(sample.simpleStyle) && (
+                          <MarkRing
+                            style={sample.simpleStyle}
+                            items={markItems(
+                              vendor,
+                              snapshot.settings.quotaDisplay,
+                              sample.panelLayout,
+                            )}
+                            size={metrics.mark}
+                            ringWidth={sample.ringWidth}
+                            light={light}
+                            reduceMotion={!sample.animations}
+                          />
+                        )}
                       <BotMark
                         source={vendor.name}
                         size={metrics.logo}
@@ -222,7 +226,8 @@ export function SmallHUDPreview({
                       />
                     )}
                     {simple &&
-                      (sample.showsNumbers ||
+                      (compact ||
+                        sample.showsNumbers ||
                         sample.simpleStyle === "numbers") && (
                         <span
                           style={{
@@ -231,7 +236,18 @@ export function SmallHUDPreview({
                             fontVariantNumeric: "tabular-nums",
                           }}
                         >
-                          {meterLabel(vendor, snapshot.settings.quotaDisplay)}
+                          {compact
+                            ? compactLabel(
+                                vendor,
+                                meterLabel(
+                                  vendor,
+                                  snapshot.settings.quotaDisplay,
+                                ),
+                              )
+                            : meterLabel(
+                                vendor,
+                                snapshot.settings.quotaDisplay,
+                              )}
                         </span>
                       )}
                   </div>

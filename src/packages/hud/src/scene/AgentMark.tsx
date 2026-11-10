@@ -17,6 +17,7 @@ import {
 import { isRingStyle } from "../usage-meter/arcs";
 import { MarkBars, MarkRing, markItems } from "../usage-meter/mark-usage";
 import type { HUDNativePointer } from "./useHUDInteraction";
+import { compactLabel } from "../compact-dock";
 
 const clampedSize = (size: number) => Math.max(20, Math.min(60, size));
 
@@ -71,12 +72,16 @@ export function AgentMark({
 }) {
   const format = useFormat();
   const { quotaDisplay } = format;
+  const compact = config.mode === "simple" && config.compactDock;
+  const label = meterLabel(vendor, quotaDisplay);
+  const caption = compact ? compactLabel(vendor, label) : label;
   // A ring's figure is text: on a see-through ground, its level's see-through shade.
   const figureColor = useMarkLevelText(light);
   return (
     <button
       type="button"
       className="hud-agent-mark"
+      title={`${vendor.name} · ${label}${markUsed(vendor) == null ? "" : ` ${quotaDisplayLabel(quotaDisplay, format.language)}`}`}
       aria-label={`${vendor.name}, ${meterLabel(vendor, quotaDisplay)} ${markUsed(vendor) == null ? "" : quotaDisplayLabel(quotaDisplay, format.language)}`}
       onPointerEnter={() => {
         if (hovered !== vendor.key) {
@@ -115,16 +120,18 @@ export function AgentMark({
           position: "relative",
         }}
       >
-        {config.mode === "simple" && isRingStyle(config.simpleStyle) && (
-          <MarkRing
-            style={config.simpleStyle}
-            items={markItems(vendor, quotaDisplay, config.panelLayout)}
-            size={metrics.mark}
-            ringWidth={config.ringWidth}
-            light={light}
-            reduceMotion={reduceMotion}
-          />
-        )}
+        {config.mode === "simple" &&
+          !compact &&
+          isRingStyle(config.simpleStyle) && (
+            <MarkRing
+              style={config.simpleStyle}
+              items={markItems(vendor, quotaDisplay, config.panelLayout)}
+              size={metrics.mark}
+              ringWidth={config.ringWidth}
+              light={light}
+              reduceMotion={reduceMotion}
+            />
+          )}
         <BotMark
           source={vendor.name}
           size={metrics.logo}
@@ -210,7 +217,7 @@ export function AgentMark({
           />
         )}
       </span>
-      {config.mode === "simple" && metrics.bar > 0 && (
+      {config.mode === "simple" && !compact && metrics.bar > 0 && (
         <MarkBars
           items={markItems(vendor, quotaDisplay, config.panelLayout)}
           length={metrics.bar}
@@ -222,7 +229,9 @@ export function AgentMark({
         />
       )}
       {config.mode === "simple" &&
-        (config.showsNumbers || config.simpleStyle === "numbers") && (
+        (compact ||
+          config.showsNumbers ||
+          config.simpleStyle === "numbers") && (
           <span
             style={{
               color: figureColor(vendor.level),
@@ -234,7 +243,7 @@ export function AgentMark({
               minWidth: horizontal(edge) ? undefined : metrics.label,
             }}
           >
-            {meterLabel(vendor, quotaDisplay)}
+            {caption}
           </span>
         )}
     </button>

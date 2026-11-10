@@ -97,54 +97,66 @@ export function HUDSection({
       </Row>
       {config.mode === "simple" && (
         <>
-          {slider("simpleSize", t("Size", "大小"), 20, 60, 1, pt)}
-          {slider(
-            "simpleGapScale",
-            t("Logo spacing", "Logo 间距"),
-            0.1,
-            0.6,
-            0.05,
-            (value) => pt(value * config.simpleSize),
+          {toggle(
+            "compactDock",
+            t("Compact status bar", "精简状态栏"),
+            t(
+              "Shorten the bar and hide agents without readings or activity. Hover for details; turn off to restore your full layout.",
+              "缩短栏目，收起无数据且空闲的智能体。悬停查看详情，关闭后恢复完整展示。",
+            ),
           )}
-          <Row
-            title={t("Usage", "用量画法")}
-            subtitle={usageSubtitle(config.simpleStyle, t)}
-          >
-            <Segments
-              label={t("Usage", "用量画法")}
-              value={config.simpleStyle}
-              options={[
-                ["rings", t("Rings", "年轮")],
-                ["segments", t("Segments", "分段环")],
-                ["bars", t("Bars", "进度条")],
-                ["numbers", t("Numbers", "数字")],
-              ]}
-              change={(value) =>
-                update({ simpleStyle: value as HUDConfig["simpleStyle"] })
-              }
-            />
-          </Row>
-          {config.simpleStyle !== "numbers" &&
-            slider(
-              "ringWidth",
-              config.simpleStyle === "bars"
-                ? t("Bar thickness", "进度条粗细")
-                : t("Ring thickness", "圆环粗细"),
-              1,
-              4,
-              0.5,
-              (value) =>
-                `${(config.simpleStyle === "bars" ? value + 0.5 : value).toFixed(1)} pt`,
-            )}
-          {config.simpleStyle !== "numbers" &&
-            toggle(
-              "showsNumbers",
-              t("Show numbers", "显示数字"),
-              t(
-                "The most used window's percentage beside each logo.",
-                "标志旁写出用得最多那项的百分比。",
-              ),
-            )}
+          {!config.compactDock && (
+            <>
+              {slider("simpleSize", t("Size", "大小"), 20, 60, 1, pt)}
+              {slider(
+                "simpleGapScale",
+                t("Logo spacing", "Logo 间距"),
+                0.1,
+                0.6,
+                0.05,
+                (value) => pt(value * config.simpleSize),
+              )}
+              <Row
+                title={t("Usage", "用量画法")}
+                subtitle={usageSubtitle(config.simpleStyle, t)}
+              >
+                <Segments
+                  label={t("Usage", "用量画法")}
+                  value={config.simpleStyle}
+                  options={[
+                    ["rings", t("Rings", "年轮")],
+                    ["segments", t("Segments", "分段环")],
+                    ["bars", t("Bars", "进度条")],
+                    ["numbers", t("Numbers", "数字")],
+                  ]}
+                  change={(value) =>
+                    update({ simpleStyle: value as HUDConfig["simpleStyle"] })
+                  }
+                />
+              </Row>
+              {config.simpleStyle !== "numbers" &&
+                slider(
+                  "ringWidth",
+                  config.simpleStyle === "bars"
+                    ? t("Bar thickness", "进度条粗细")
+                    : t("Ring thickness", "圆环粗细"),
+                  1,
+                  4,
+                  0.5,
+                  (value) =>
+                    `${(config.simpleStyle === "bars" ? value + 0.5 : value).toFixed(1)} pt`,
+                )}
+              {config.simpleStyle !== "numbers" &&
+                toggle(
+                  "showsNumbers",
+                  t("Show numbers", "显示数字"),
+                  t(
+                    "The most used window's percentage beside each logo.",
+                    "标志旁写出用得最多那项的百分比。",
+                  ),
+                )}
+            </>
+          )}
           {toggle(
             "separatesAgents",
             t("Separate agents", "按智能体分开"),

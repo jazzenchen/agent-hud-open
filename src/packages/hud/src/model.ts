@@ -9,6 +9,7 @@ import { layoutMarks, restingAgents } from "./resting-agents.ts";
 import { recentLabel, recentUsage } from "./recent-usage.ts";
 import { visibleBalances } from "./balance-rows.ts";
 import { heldUsed } from "./held-reading.ts";
+import { compactVendors } from "./compact-dock.ts";
 import type { GlowEffect, GlowStyle } from "./HUDGlow";
 import type { UsageStyle } from "./usage-meter/arcs";
 import {
@@ -18,6 +19,7 @@ import {
   type QuotaDisplay,
 } from "@agent-hud/ui/format";
 export { agentVendorName } from "./agent-artwork";
+export { compactLabel } from "./compact-dock";
 
 export type HUDMode = "notch" | "simple";
 export type HUDEdge = "top" | "right" | "bottom" | "left";
@@ -56,6 +58,8 @@ export interface HUDConfig {
   ringWidth: number;
   /** How a Simple mark draws its usage: rings, a segmented ring, bars, or the number alone. */
   simpleStyle: UsageStyle;
+  /** Opt-in shorter dock; full appearance preferences remain saved. */
+  compactDock: boolean;
   showsNumbers: boolean;
   separatesAgents: boolean;
   appearance: "dark" | "light" | "system";
@@ -242,7 +246,10 @@ export function configuredVendors(
       usage: null,
     };
   });
-  return layoutMarks(available, config.panelLayout);
+  const ordered = layoutMarks(available, config.panelLayout);
+  return config.mode === "simple" && config.compactDock
+    ? compactVendors(ordered)
+    : ordered;
 }
 
 function balanceLevel(
