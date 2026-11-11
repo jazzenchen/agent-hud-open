@@ -1,16 +1,22 @@
 //! DeepSeek API keys other clients already send to DeepSeek's own API:
-//! Claude Code's `ANTHROPIC_BASE_URL` (`https://api.deepseek.com/anthropic`)
-//! and Codex's model providers whose `base_url` is on `api.deepseek.com`.
+//! Claude Code's `ANTHROPIC_BASE_URL` (`https://api.deepseek.com/anthropic`),
+//! Codex's model providers whose `base_url` is on `api.deepseek.com`, and
+//! Pi's `deepseek` provider or one whose `baseUrl` is on that host.
 //! Each key's balance is read at DeepSeek's fixed balance endpoint and
 //! nowhere else; the key is never kept or shown.
-use crate::account::Host;
+use crate::account::{resolve, Host};
 use crate::endpoints::base_url_host;
-use crate::{claude, codex, Look};
+use crate::{claude, codex, Location, Look};
+use serde_json::Value;
 
 /// DeepSeek's own API host.
 const HOST: &str = "api.deepseek.com";
 /// At most this many keys are read, one after another.
 const MOST: usize = 8;
+const PI_MODELS: Location = Location::home(&["PI_CODING_AGENT_DIR"], &[".pi/agent"], "models.json");
+const PI_AUTH: Location = Location::home(&["PI_CODING_AGENT_DIR"], &[".pi/agent"], "auth.json");
+/// A settings file's size limit.
+const LIMIT: u64 = 1024 * 1024;
 
 /// One key, and the clients (by id) that send it to DeepSeek.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -34,8 +40,28 @@ fn usable(key: Option<&str>) -> Option<&str> {
     })
 }
 
-/// Every key Claude Code and Codex send to DeepSeek's API here, each once
-/// with the clients that send it.
+/// Whether a Pi provider is DeepSeek's own API: by the `baseUrl` its
+/// `models.json` entry gives, and without one, by Pi's own `deepseek` id.
+fn pi_official(id: &str, base: Option<&str>) -> bool {
+    base.map_or(id == "deepseek", official)
+}
+
+/// The API keys in Pi's `auth.json` whose providers are DeepSeek's own API,
+/// as written: the key, or the name of the variable that holds it.
+fn pi_keys(auth: &Value, models: &Value) -> Vec<String> {
+    auth.as_object()
+        .into_iter()
+        .flatten()
+        .filter(|(id, entry)| {
+            entry["type"] == "api_key"
+                && pi_official(id, models["providers"][id.as_str()]["baseUrl"].as_str())
+        })
+        .filter_map(|(_, entry)| entry["key"].as_str().map(str::to_owned))
+        .collect()
+}
+
+/// Every key Claude Code, Codex and Pi send to DeepSeek's API here, each
+/// once with the clients that send it.
 pub(super) fn keys(host: &dyn Host) -> Vec<Routed> {
     let mut found = Vec::<Routed>::new();
     let mut add = |client: &'static str, key: Option<&str>| {
@@ -62,12 +88,25 @@ pub(super) fn keys(host: &dyn Host) -> Vec<Routed> {
             add("codex", provider.key(&env).as_deref());
         }
     }
+    let settings = |location: &Location| -> Value {
+        resolve(host, location)
+            .into_iter()
+            .next()
+            .and_then(|path| host.read_file(&path, LIMIT).found())
+            .filter(|bytes| bytes.len() as u64 <= LIMIT)
+            .and_then(|bytes| String::from_utf8(bytes).ok())
+            .and_then(|text| json5::from_str(&text).ok())
+            .unwrap_or(Value::Null)
+    };
+    for raw in pi_keys(&settings(&PI_AUTH), &settings(&PI_MODELS)) {
+        add("pi", Some(&env(&raw).unwrap_or(raw)));
+    }
     found.truncate(MOST);
     found
 }
 
-/// What says DeepSeek is configured through another client: Claude Code or
-/// Codex sending a key to its API. Only whether a key is there is looked at.
+/// What says DeepSeek is configured through another client: Claude Code,
+/// Codex or Pi sending a key to its API. Only whether a key is there is looked at.
 pub fn configured(look: &dyn Look) -> Vec<&'static str> {
     let mut found = Vec::new();
     if claude::routes::seen(look)
@@ -83,6 +122,12 @@ pub fn configured(look: &dyn Look) -> Vec<&'static str> {
         })
     }) {
         found.push("codex-provider-route");
+    }
+    if pi_keys(&look.settings(&PI_AUTH), &look.settings(&PI_MODELS))
+        .iter()
+        .any(|key| usable(Some(key)).is_some())
+    {
+        found.push("pi-provider-route");
     }
     found
 }
@@ -126,6 +171,44 @@ mod tests {
                 key: "sk-claude".into(),
                 clients: vec!["claude", "codex"]
             }]
+        );
+    }
+
+    #[test]
+    fn pis_deepseek_key_is_found_unless_its_provider_points_elsewhere() {
+        let auth = r#"{"deepseek":{"type":"api_key","key":"sk-pi"},"mine":{"type":"api_key","key":"PI_DS"},"openai":{"type":"api_key","key":"sk-other"},"zai":{"type":"oauth","key":"sk-oauth"}}"#;
+        let host = FakeHost::new("/u")
+            .file("/u/.pi/agent/auth.json", auth)
+            .file(
+                "/u/.pi/agent/models.json",
+                r#"{"providers":{"mine":{"baseUrl":"https://api.deepseek.com/v1"}}}"#,
+            )
+            .file("/u/.claude/settings.json", CLAUDE)
+            .env("PI_DS", "sk-claude");
+        assert_eq!(
+            keys(&host),
+            [
+                Routed {
+                    key: "sk-claude".into(),
+                    clients: vec!["claude", "pi"]
+                },
+                Routed {
+                    key: "sk-pi".into(),
+                    clients: vec!["pi"]
+                },
+            ],
+            "a key named by its variable is the variable's value"
+        );
+
+        let host = FakeHost::new("/u")
+            .file("/u/.pi/agent/auth.json", auth)
+            .file(
+                "/u/.pi/agent/models.json",
+                r#"{"providers":{"deepseek":{"baseUrl":"https://relay.example.com/v1"}}}"#,
+            );
+        assert!(
+            keys(&host).is_empty(),
+            "Pi's deepseek provider sent to a relay is not DeepSeek's API"
         );
     }
 

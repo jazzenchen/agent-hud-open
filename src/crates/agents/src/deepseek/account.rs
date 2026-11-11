@@ -1,5 +1,5 @@
 //! DeepSeek's API balance, or the Harness Platform account's separate wallets,
-//! and the balance of every key Claude Code or Codex sends to DeepSeek's own
+//! and the balance of every key Claude Code, Codex or Pi sends to DeepSeek's own
 //! API (`routes.rs`). Credentials stay in the engine and are sent only to
 //! their fixed official endpoints; no client or helper is launched.
 use super::balance::{api_balance, Balances};
