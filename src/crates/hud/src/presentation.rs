@@ -35,6 +35,9 @@ const GLOBAL: &[&str] = &[
     "animations",
 ];
 const HARDWARE: &[&str] = &["monitorIndex", "hasNotch", "notchWidth", "notchHeight"];
+/// What a screen shows at all: only the person sets these, in Settings; they
+/// are no part of the look a tool reads, drafts or restores.
+const PRESENCE: &[&str] = &["hidden", "hidesMessages", "hidesRequests", "hidesFlights"];
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 struct Saved {

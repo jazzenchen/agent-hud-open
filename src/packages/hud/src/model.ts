@@ -51,6 +51,14 @@ export interface HUDConfig {
   offset: number;
   /** Native runtime display index; this is not a persistent hardware identity. */
   monitorIndex: number;
+  /** This screen has no HUD: no strip, no panel and no cards. */
+  hidden: boolean;
+  /** This screen's HUD shows no message cards and keeps no tail. */
+  hidesMessages: boolean;
+  /** This screen's HUD shows no request cards and keeps no head. */
+  hidesRequests: boolean;
+  /** This screen's HUD plays no flights of messages between agents. */
+  hidesFlights: boolean;
   simpleSize: number;
   simpleGapScale: number;
   ringWidth: number;

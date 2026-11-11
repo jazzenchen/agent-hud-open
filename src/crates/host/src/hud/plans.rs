@@ -202,7 +202,11 @@ impl Planner {
     ) {
         let visible = snapshot.is_none_or(|snapshot| snapshot["settings"]["hudVisible"] != false);
         for display in &self.displays {
-            let config = plan(display, view, snapshot, visible, now_ms);
+            // A screen's own Hide switch: it has no HUD, whatever the others show.
+            let monitor = &display.info;
+            let hidden =
+                Screen::new(view, &monitor.screen_id, monitor.notch.is_some()).flag("hidden");
+            let config = plan(display, view, snapshot, visible && !hidden, now_ms);
             let id = display.info.screen_id.clone();
             let signature = (
                 config.clone(),

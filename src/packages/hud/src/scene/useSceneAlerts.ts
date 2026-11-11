@@ -35,9 +35,14 @@ export function useSceneAlerts({
     arriving: ReadonlySet<string>;
   };
 }) {
-  const allRequests = [...snapshot.approvals].sort(
-    (a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt),
-  );
+  // A screen that hides requests has none: it shows no card for one, claims
+  // none, and keeps no head. One that hides messages is silent for them and
+  // draws no tail, though it holds what the other screens park there.
+  const allRequests = config.hidesRequests
+    ? []
+    : [...snapshot.approvals].sort(
+        (a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt),
+      );
   const usagePanelOpenRef = useRef(false);
   const allowsInlineUsageAlert = !(
     config.mode !== "notch" && config.separatesAgents
@@ -47,11 +52,14 @@ export function useSceneAlerts({
     held,
     allRequests,
     vendors.map((v) => v.key),
-    silenced,
+    silenced || config.hidesMessages,
     underPointer,
     open && allowsInlineUsageAlert,
     {
-      hovered: open ? ends.hovered : null,
+      hovered:
+        open && !(config.hidesMessages && ends.hovered === "tail")
+          ? ends.hovered
+          : null,
       onPark: ends.onPark,
       fadeMs: config.messageFadeSeconds * 1000,
     },
@@ -67,7 +75,9 @@ export function useSceneAlerts({
       : allRequests.filter((r) => !parked.head.some((h) => h.id === r.id));
   const endCounts = {
     head: parked.head.filter((r) => !ends.arriving.has(r.id)).length,
-    tail: parked.tail.filter((m) => !ends.arriving.has(m.id)).length,
+    tail: config.hidesMessages
+      ? 0
+      : parked.tail.filter((m) => !ends.arriving.has(m.id)).length,
   };
   // The rim flashes once for each card that comes out, over its sender's colours.
   const { request: freshRequest, event: freshEvent } = news.fresh;

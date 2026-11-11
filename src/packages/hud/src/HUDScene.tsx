@@ -633,7 +633,7 @@ export function HUDScene({
             forceOpen={forceOpen}
           />
           <FlightLayer
-            flights={flights}
+            flights={config.hidesFlights ? undefined : flights}
             mode={config.mode}
             edge={edge}
             strip={strip}

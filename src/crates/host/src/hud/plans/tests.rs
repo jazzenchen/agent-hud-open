@@ -54,3 +54,10 @@ fn a_strip_is_as_wide_as_geometry_ts_draws_it() {
         66.0
     );
 }
+
+#[test]
+fn a_screen_reads_its_own_hide_switch() {
+    let view = view(json!({"hidden": true}), json!({}));
+    assert!(Screen::new(&view, "a", false).flag("hidden"));
+    assert!(!Screen::new(&view, "b", false).flag("hidden"));
+}
