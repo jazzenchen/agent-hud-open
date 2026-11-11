@@ -4,76 +4,18 @@ use agent_hud_agents::antigravity::proto as antigravity_proto;
 use agent_hud_agents::transcript::records::{Page, Record};
 use agent_hud_agents::transcript::sql_tables;
 use rusqlite::{params, Connection};
-use serde_json::{json, Value};
+use serde_json::Value;
 use std::path::Path;
 
 mod annotations;
+mod marks;
+mod metadata;
 
 use annotations::annotation;
+use marks::Marks;
+use metadata::trajectory_metadata;
 
 const PAGE: i64 = 500;
-/// Rows read again before where the last read of a table ended. Antigravity
-/// rewrites the rows of a turn in progress (its usage, its steps' messages),
-/// so a read that resumes takes the last of them up again; each row counts
-/// under its own key, so a row read twice counts once.
-const TAIL: i64 = 200;
-
-/// Where a read stands besides its stage and row: where steps and the second
-/// pass over the turns begin (the tables' start on a whole read, the tail of
-/// the last read on a resumed one), and the last row read of each table.
-#[derive(Clone, Copy)]
-struct Marks {
-    steps_from: i64,
-    turns_from: i64,
-    steps_last: i64,
-    turns_last: i64,
-}
-
-impl Marks {
-    fn of(cursor: &Value) -> Self {
-        let at = |key: &str| cursor[key].as_i64().unwrap_or(i64::MIN);
-        Self {
-            steps_from: at("steps"),
-            turns_from: at("turns"),
-            steps_last: at("stepsLast"),
-            turns_last: at("turnsLast"),
-        }
-    }
-
-    fn cursor(&self, stage: i64, after: i64) -> Value {
-        let mut cursor = json!({ "stage": stage });
-        for (key, value) in [
-            ("after", after),
-            ("steps", self.steps_from),
-            ("turns", self.turns_from),
-            ("stepsLast", self.steps_last),
-            ("turnsLast", self.turns_last),
-        ] {
-            if value != i64::MIN {
-                cursor[key] = json!(value);
-            }
-        }
-        cursor
-    }
-
-    /// Where the next read begins once the database changes: the last TAIL
-    /// rows of each table and what follows them, never the whole file again.
-    fn watermark(&self) -> Value {
-        let tail = |last: i64| {
-            if last == i64::MIN {
-                i64::MIN
-            } else {
-                last.saturating_sub(TAIL)
-            }
-        };
-        Self {
-            steps_from: tail(self.steps_last),
-            turns_from: tail(self.turns_last),
-            ..*self
-        }
-        .cursor(0, tail(self.turns_last))
-    }
-}
 
 fn unique_time(
     db: &Connection,
@@ -98,27 +40,6 @@ fn unique_time(
         message.is_some(),
         t.execution.as_deref(),
     )
-}
-
-fn trajectory_metadata(client: &Connection) -> antigravity_proto::TrajectoryMetadata {
-    let Ok(tables) = sql_tables(client) else {
-        return Default::default();
-    };
-    if !tables.contains("trajectory_metadata_blob") {
-        return Default::default();
-    }
-    client
-        .query_row(
-            "SELECT data FROM trajectory_metadata_blob LIMIT 1",
-            [],
-            |row| match row.get_ref(0)? {
-                rusqlite::types::ValueRef::Blob(b) if b.len() <= 1024 * 1024 => {
-                    Ok(antigravity_proto::metadata(b).unwrap_or_default())
-                }
-                _ => Ok(Default::default()),
-            },
-        )
-        .unwrap_or_default()
 }
 
 pub(crate) fn read(

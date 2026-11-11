@@ -1,19 +1,13 @@
 //! Reading a page of a client's database or session file into the sessions
-//! its records belong to, and writing them, their mappings and the file's
-//! cursor to the ledger in one transaction.
-use super::{opencode, opencode_legacy, reader_version};
-use crate::{
-    checkpoints::{self, LogHead},
-    legacy_database,
-    log_files::FileStamp,
-    metering, source_batches, AgentHudCore, Log, PARSER_VERSION,
-};
+//! its records belong to and moving the file's cursor past it; `read_start`
+//! picks where the read begins and `page_write` writes the page to the ledger.
+use super::{opencode, opencode_legacy};
+use crate::{legacy_database, log_files::FileStamp, source_batches, AgentHudCore, Log};
 use agent_hud_agents::copilot::store::Counts;
 use serde_json::{json, Value};
 use std::{
     collections::{HashMap, HashSet},
     path::{Path, PathBuf},
-    time::SystemTime,
 };
 
 impl AgentHudCore {
@@ -23,96 +17,9 @@ impl AgentHudCore {
         stamp: FileStamp,
         budget: &mut u64,
     ) -> Result<(), String> {
-        let previous = self.logs.get(path).cloned();
-        let reader_version = reader_version(path, stamp.source);
-        let signature = format!(
-            "{reader_version}:{}:{}",
-            stamp
-                .modified
-                .and_then(|d| d.duration_since(SystemTime::UNIX_EPOCH).ok())
-                .map(|d| d.as_nanos())
-                .unwrap_or(0),
-            stamp.length
-        );
-        let stored = if previous.is_some() {
-            Some(self.load_parser(path)?.0)
-        } else {
-            None
-        };
-        let continuing = stored.as_ref().is_some_and(|log| {
-            log.reader_version == reader_version
-                && log.offset < log.length
-                && !log.source_state["cursor"].is_null()
-        });
-        let changed = previous.as_ref().is_none_or(|old| {
-            old.modified != stamp.modified
-                || old.length != stamp.length
-                || old.parser_version != PARSER_VERSION
-                || old.reader_version != reader_version
-                || old.gone
-        });
-        let can_grow_incrementally = !continuing
-            && previous.as_ref().is_some_and(|old| {
-                stamp.length >= old.length
-                    && old.parser_version == PARSER_VERSION
-                    && old.reader_version == reader_version
-                    && !old.gone
-            });
-        let append_batch = source_batches::accepts(path, stamp.source)
-            && can_grow_incrementally
-            && previous
-                .as_ref()
-                .is_some_and(|old| old.length < stamp.length);
-        let resume_watermark = !source_batches::accepts(path, stamp.source)
-            && can_grow_incrementally
-            && changed
-            && stored
-                .as_ref()
-                .is_some_and(|log| !log.source_state["watermark"].is_null());
-        let restart = stored
-            .as_ref()
-            .is_some_and(|log| log.source_state["restart"] == true);
-        let mut checkpoint = if continuing {
-            let mut log = stored.unwrap();
-            if changed {
-                log.source_state["dirty"] = json!(true);
-            }
-            log
-        } else if append_batch {
-            let mut log = stored.unwrap();
-            log.source_state["cursor"] = source_batches::resume(
-                self.database.as_ref().ok_or("Usage ledger unavailable")?,
-                path,
-                log.source_state["generation"]
-                    .as_str()
-                    .ok_or("Missing source generation")?,
-            )
-            .map_err(|_| "Could not resume source log")?;
-            log.source_state["dirty"] = json!(false);
-            log
-        } else if resume_watermark {
-            let mut log = stored.unwrap();
-            log.source_state["cursor"] = log.source_state["watermark"].clone();
-            log.source_state["dirty"] = json!(false);
-            log
-        } else if changed || restart {
-            let mut log = Log::new(path.into(), stamp.source);
-            log.reader_version = reader_version;
-            log.live.is_internal = true;
-            log.source_state =
-                json!({"generation":signature,"cursor":null,"watermark":null,"dirty":false});
-            log
-        } else {
-            stored.unwrap()
-        };
-        // A Grok Bot roster is read again while a turn works, though it has
-        // not changed (`Reads::bot_poll`).
-        let polled = stamp.source == "grok-bot" && self.reads.forced.contains(path);
-        if !changed && !restart && !continuing && !polled && checkpoint.offset >= stamp.length {
-            self.reads.pending.remove(path);
-            self.reads.forced.remove(path);
+        let Some(mut checkpoint) = self.database_checkpoint(path, stamp)? else {
             return Ok(());
-        }
+        };
         let is_batch = source_batches::accepts(path, stamp.source);
         if is_batch {
             *budget = budget.saturating_sub(2 * 1024 * 1024);
@@ -347,85 +254,14 @@ impl AgentHudCore {
         checkpoint.length = stamp.length;
         checkpoint.modified = stamp.modified;
 
-        let mut encoded = Vec::new();
-        for (_, log) in logs {
-            let head = LogHead::from_log(&log);
-            let payload = serde_json::to_string(&log)
-                .map_err(|_| "Could not encode a client session checkpoint")?;
-            let bytes = payload.len();
-            *budget = budget.saturating_sub(bytes as u64);
-            encoded.push((log, head, payload, bytes));
-        }
-        let physical_head = LogHead::from_log(&checkpoint);
-        let parent_payload =
-            serde_json::to_string(&checkpoint).map_err(|_| "Could not encode a database cursor")?;
-        let parent_bytes = parent_payload.len();
-        encoded.push((checkpoint, physical_head, parent_payload, parent_bytes));
-
-        let now_ms = self.next_timestamp_ms();
-        let db = self
-            .database
-            .as_mut()
-            .ok_or("Usage ledger is unavailable")?;
-        let transaction = db
-            .transaction()
-            .map_err(|_| "Could not begin client database ingestion")?;
-
-        for (log, head, payload, _) in &encoded {
-            let log_path = log.path.to_string_lossy();
-            if reset_contributions.contains(&log.path) {
-                metering::reset(&transaction, &log_path)
-                    .map_err(|_| "Could not reset superseded fallback usage")?;
-            }
-            metering::write(
-                &transaction,
-                &log_path,
-                &log.source,
-                &log.meter_events.values().cloned().collect::<Vec<_>>(),
-            )
-            .map_err(|_| "Could not write client usage ledger")?;
-            let head =
-                serde_json::to_string(head).map_err(|_| "Could not encode client session head")?;
-            checkpoints::upsert_log(&transaction, log_path.as_ref(), payload, &head, now_ms)
-                .map_err(|_| "Could not write client source cursor")?;
-        }
-
-        for old_path in &superseded {
-            if let Some(mut old_head) = self.logs.get(old_path).cloned() {
-                old_head.gone = true;
-                let encoded_head = serde_json::to_string(&old_head)
-                    .map_err(|_| "Could not encode superseded session head")?;
-                checkpoints::update_head(
-                    &transaction,
-                    old_path.to_string_lossy().as_ref(),
-                    &encoded_head,
-                    now_ms,
-                )
-                .map_err(|_| "Could not mark superseded session head")?;
-                self.parser_cache.remove(old_path);
-            }
-        }
-
-        for (source, session_id, canonical_path, parent_id) in &mappings {
-            checkpoints::upsert_session_mapping(
-                &transaction,
-                source,
-                session_id,
-                canonical_path.to_string_lossy().as_ref(),
-                parent_id.as_deref(),
-                now_ms,
-            )
-            .map_err(|_| "Could not write session mapping")?;
-        }
-
-        transaction
-            .commit()
-            .map_err(|_| "Could not commit client database page")?;
-
-        for (mut log, _, _, bytes) in encoded {
-            log.meter_events.clear();
-            self.parser_cache.insert(log, bytes);
-        }
+        self.write_database_page(
+            logs,
+            checkpoint,
+            reset_contributions,
+            superseded,
+            mappings,
+            budget,
+        )?;
         self.sync_from_database()?;
         if complete {
             self.reads.pending.remove(path);

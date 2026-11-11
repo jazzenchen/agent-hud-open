@@ -1,5 +1,7 @@
+use super::marks::TAIL;
 use super::*;
 use crate::{AgentHudCore, SourceRoot};
+use serde_json::json;
 use std::{fs, ops::Range};
 
 fn varint(mut value: u64, out: &mut Vec<u8>) {

@@ -1,5 +1,6 @@
 use super::*;
 use crate::zcode::fixtures::{database, session, NOW};
+use rusqlite::Connection;
 
 const TURN: &str = "turn_011fbdd0";
 

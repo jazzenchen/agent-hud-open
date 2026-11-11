@@ -8,6 +8,8 @@ use std::{
 };
 
 mod account_sessions;
+mod page_write;
+mod read_start;
 mod scan;
 
 pub(crate) fn virtual_path(path: &Path, id: &str) -> PathBuf {
