@@ -91,9 +91,27 @@ fn status(app: &tauri::AppHandle) -> Result<Value, String> {
     let places = Places::current(&home);
     let options = app.state::<super::HostOptions>();
     let path = options.canonical_executable.as_ref();
-    let ready = path.is_some_and(|path| std::env::current_exe().ok().as_ref() == Some(path))
-        && super::cli::resource("agent-hud-mcp").is_some()
+    let running = std::env::current_exe().ok();
+    let installed_copy = path.is_some_and(|path| running.as_ref() == Some(path));
+    let complete = super::cli::resource("agent-hud-mcp").is_some()
         && super::cli::resource("agent-hud-engine").is_some();
+    let ready = installed_copy && complete;
+    let notice = if !installed_copy {
+        let copy = running
+            .map(|path| path.display().to_string())
+            .unwrap_or_default();
+        Some(agent_hud_runtime::l10n::text(
+            &format!("只有安装好的 Agent HUD 才能添加 HUD 工具，这一份在 {copy}。"),
+            &format!("Only the installed Agent HUD can add HUD tools; this copy is at {copy}."),
+        ))
+    } else if !complete {
+        Some(agent_hud_runtime::l10n::text(
+            "这一份 Agent HUD 缺少 MCP 组件。",
+            "This copy of Agent HUD is missing its MCP components.",
+        ))
+    } else {
+        None
+    };
     let clients = CLIENTS
         .iter()
         .map(|&client| {
@@ -115,7 +133,7 @@ fn status(app: &tauri::AppHandle) -> Result<Value, String> {
         .collect::<Vec<_>>();
     Ok(json!({
         "ready": ready,
-        "notice": if ready { None } else { Some("MCP setup requires the fixed installed app and its packaged relay") },
+        "notice": notice,
         "json": path.map(|path| json!({"mcpServers":{"agent-hud":{"command":path,"args":["--mcp"]}}})),
         "clients": clients,
     }))

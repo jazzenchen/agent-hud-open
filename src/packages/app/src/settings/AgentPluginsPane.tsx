@@ -61,8 +61,8 @@ function setupNote(snapshot: Snapshot, t: Text) {
     snapshot.connection.platform;
   return platform === "windows"
     ? t(
-        "Adding HUD tools needs Agent HUD in its standard Windows location.",
-        "需要从 Windows 标准安装位置运行 Agent HUD，才能添加 HUD 工具。",
+        "Adding HUD tools needs Agent HUD run from where its installer put it.",
+        "需要运行用安装包装好的 Agent HUD，才能添加 HUD 工具。",
       )
     : platform === "macos"
       ? t(

@@ -202,7 +202,17 @@ impl Clients {
     }
     pub fn status(&self, enabled: bool, desired: bool) -> Value {
         let installed = self.rows.iter().any(|row| row["installed"] == true);
-        let notice=self.notice.clone().or_else(||if self.context.is_none(){Some(l10n::text("这个版本没有指定固定的回调程序。接收回调不会安装客户端回调，客户端配置未作改动。", "No fixed hook-owner executable has been delegated. Listening does not install client hooks; client configuration is unchanged."))}else{None});
+        let notice = self.notice.clone().or_else(|| {
+            self.context.is_none().then(|| {
+                let copy = crate::launched_executable()
+                    .map(|path| path.display().to_string())
+                    .unwrap_or_default();
+                l10n::text(
+                    &format!("只有安装好的 Agent HUD 才能安装客户端回调，这一份在 {copy}。客户端设置未作改动。"),
+                    &format!("Only the installed Agent HUD can install client hooks; this copy is at {copy}. Client settings are unchanged."),
+                )
+            })
+        });
         json!({"supported":true,"enabled":enabled,"desired":desired,"installed":installed,"installable":self.context.is_some(),"notice":notice,"clients":self.rows})
     }
 }
