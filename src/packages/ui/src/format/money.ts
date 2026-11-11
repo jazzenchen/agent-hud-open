@@ -4,13 +4,25 @@ import type { Language } from "./language.ts";
 
 type Amount = number | string;
 
+function isCredits(code: string) {
+  return code.toLowerCase() === "credits";
+}
+
 function currency(
   language: Language,
   code: string,
   digits: [number, number],
   rounding: "halfEven" | "halfExpand",
 ) {
-  return numberFormat(language === "zh" ? "zh-CN" : "en-US", {
+  const locale = language === "zh" ? "zh-CN" : "en-US";
+  if (isCredits(code)) {
+    return numberFormat(locale, {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: digits[1],
+      roundingMode: rounding,
+    });
+  }
+  return numberFormat(locale, {
     style: "currency",
     currency: code,
     currencyDisplay: "narrowSymbol",

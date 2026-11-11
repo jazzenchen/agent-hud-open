@@ -39,7 +39,7 @@ pub fn is_message(row: &Value, message: &Message) -> bool {
 /// Whether `text`, a prompt as its log holds it, is the words `message`
 /// delivered: by its label, or by its fingerprint once Agent HUD's Claude
 /// plugin wrapper is taken off.
-fn is_words(text: &str, message: &Message) -> bool {
+pub(super) fn is_words(text: &str, message: &Message) -> bool {
     match message.form {
         PromptForm::Labelled => {
             text.contains(&format!("· {}]", message.id))

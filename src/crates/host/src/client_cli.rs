@@ -16,6 +16,8 @@ fn paths(home: &std::path::Path) -> Vec<PathBuf> {
         home.join(".bun/bin"),
         home.join(".local/bin"),
         home.join(".npm-global/bin"),
+        home.join(".kimi-code/bin"),
+        home.join(".zcode/bin"),
         "/opt/homebrew/bin".into(),
         "/usr/local/bin".into(),
         "/usr/bin".into(),

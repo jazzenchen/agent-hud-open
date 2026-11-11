@@ -1,4 +1,5 @@
 //! Kimi.
+pub mod hooks;
 pub mod transcript;
 
 use crate::Agent;
@@ -23,6 +24,11 @@ static DISCOVERY: Discovery = Discovery {
     settings: &[
         Location::home(&["KIMI_CODE_HOME"], &[".kimi-code"], "config.toml"),
         Location::home(&["KIMI_CODE_HOME"], &[".kimi-code"], "credentials"),
+        Location::home(
+            &["KIMI_CODE_HOME"],
+            &[".kimi-code"],
+            "credentials/kimi-code.json",
+        ),
     ],
     sessions: &[
         Location::home(&["KIMI_CODE_HOME"], &[".kimi-code"], "sessions"),
@@ -37,13 +43,13 @@ pub static AGENT: Agent = Agent {
     id: "kimi",
     name: "Kimi",
     sessions: true,
-    hooks: None,
+    hooks: Some(&hooks::HOOKS),
     observer: None,
     channel: None,
     program: None,
     replies: None,
     turns: Some(&transcript::TURNS),
-    items: None,
+    items: Some(&transcript::ITEMS),
     sources: crate::everywhere(&SOURCES),
     discovery: &DISCOVERY,
 };

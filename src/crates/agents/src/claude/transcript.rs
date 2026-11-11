@@ -47,11 +47,29 @@ pub fn claude_prompt(value: &Value) -> bool {
             .and_then(|part| part["text"].as_str())
     });
     role == Some("user")
-        && value["isMeta"] != true
+        && (value["isMeta"] != true
+            || value["origin"]["kind"] == "peer"
+            || rewake_words(value).is_some())
         && value["isCompactSummary"] != true
         && !parts.iter().any(|part| part["type"] == "tool_result")
         && !text
             .is_some_and(|s| s.starts_with("<command-name>") || s.starts_with("<local-command-"))
+}
+
+/// The words Agent HUD's rewake hook handed a session, from the notification
+/// its client wrote for them. Qoder CLI 1.1.86 writes an `isMeta` user line
+/// of `origin.kind` `task-notification` whose system reminder reads `Stop
+/// hook blocking error from command "<Agent HUD> --rewake-hook <client>":
+/// <words>`. None for any other line, a background task's notice included.
+pub fn rewake_words(value: &Value) -> Option<&str> {
+    if value["origin"]["kind"] != "task-notification" {
+        return None;
+    }
+    let content = value["message"]["content"].as_str()?;
+    let flag = content.find(" --rewake-hook ")?;
+    let start = flag + content[flag..].find("\": ")? + 3;
+    let end = content.rfind("</system-reminder>")?;
+    content.get(start..end).filter(|words| !words.is_empty())
 }
 
 /// Claude Code's note that the user stopped a turn: a user message that starts
@@ -95,6 +113,19 @@ pub fn message_items(value: &Value, offset: u64) -> Option<Vec<LineItem>> {
     let item = value.get("message").filter(|item| item.is_object())?;
     let prompt = claude_prompt(value) && !interrupted(value);
     let mut items = items::message(value, item, offset, prompt);
+    // A message another session or Agent HUD handed over shows as its words.
+    let body = if value["origin"]["kind"] == "peer" {
+        value["origin"]["body"].as_str().filter(|s| !s.is_empty())
+    } else {
+        rewake_words(value)
+    };
+    if let (true, Some(body)) = (prompt, body) {
+        for row in &mut items {
+            if row.is_prompt {
+                row.text = Some(body.to_owned());
+            }
+        }
+    }
     items.extend(narrations(value, item, offset));
     Some(items)
 }

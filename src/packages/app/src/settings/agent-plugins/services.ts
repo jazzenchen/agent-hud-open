@@ -79,6 +79,12 @@ export const knownClients: {
     plugin: { live: true },
   },
   { id: "antigravity", name: "Antigravity", logo: "antigravity" },
+  { id: "zcode", name: "ZCode", logo: "zcode" },
+  { id: "workbuddy", name: "WorkBuddy", logo: "workbuddy" },
+  { id: "kimi", name: "Kimi Code", logo: "kimi" },
+  { id: "qoder", name: "Qoder", logo: "qoder" },
+  { id: "trae", name: "TRAE", logo: "trae" },
+  { id: "traeCn", name: "TRAE CN", logo: "trae" },
 ];
 
 /** The last statuses read, so the page opens without a blank. */

@@ -47,7 +47,7 @@ impl Messaging {
         }
         if state == "taken" || state == "queued" {
             // A queued message whose session never took it within the plugin's hour.
-            if matches!(message.to.client.as_str(), "claude" | "deepseek")
+            if Provider::parse(&message.to.client).is_some_and(Provider::queues_in_channel)
                 && now - message.sent_at_ms > 3_600_000
             {
                 state = "expired".into();

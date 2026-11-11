@@ -1,15 +1,6 @@
 //! HUD tools in each agent client: Agent HUD's MCP server, registered where
 //! that client looks for MCP servers, and one skill that teaches the agent
-//! how to use it. Settings adds and removes the two together; nothing here
-//! runs a client's command line (the host does that for the clients that
-//! have one).
-//!
-//! Every client gets the skill in a folder of its own, under one folder name.
-//! Cursor and DeepSeek Harness also read some of the other clients' folders
-//! (`~/.claude/skills`, `~/.agents/skills`); they count a skill with the same
-//! folder or name once, so the agent never sees it twice. Antigravity reads
-//! its own, and `~/.agents/skills` only for a workspace at home, where a
-//! copy of the same name shadows its own.
+//! how to use it. Settings adds and removes the two together.
 use std::{
     collections::HashMap,
     fs,
@@ -35,15 +26,27 @@ pub enum Client {
     Cursor,
     DeepSeek,
     Antigravity,
+    ZCode,
+    WorkBuddy,
+    Kimi,
+    Qoder,
+    Trae,
+    TraeCn,
 }
 
 /// In the order Settings shows them.
-pub const CLIENTS: [Client; 5] = [
+pub const CLIENTS: [Client; 11] = [
     Client::ClaudeCode,
     Client::Codex,
     Client::Cursor,
     Client::DeepSeek,
     Client::Antigravity,
+    Client::ZCode,
+    Client::WorkBuddy,
+    Client::Kimi,
+    Client::Qoder,
+    Client::Trae,
+    Client::TraeCn,
 ];
 
 /// Where the clients keep their settings on this machine.
@@ -103,6 +106,12 @@ impl Client {
             Self::Cursor => "cursor",
             Self::DeepSeek => "deepseek",
             Self::Antigravity => "antigravity",
+            Self::ZCode => "zcode",
+            Self::WorkBuddy => "workbuddy",
+            Self::Kimi => "kimi",
+            Self::Qoder => "qoder",
+            Self::Trae => "trae",
+            Self::TraeCn => "traeCn",
         }
     }
 
@@ -114,24 +123,24 @@ impl Client {
             Self::Cursor => "Cursor",
             Self::DeepSeek => "DeepSeek Harness",
             Self::Antigravity => "Antigravity",
+            Self::ZCode => "ZCode",
+            Self::WorkBuddy => "WorkBuddy",
+            Self::Kimi => "Kimi Code",
+            Self::Qoder => "Qoder",
+            Self::Trae => "TRAE",
+            Self::TraeCn => "TRAE CN",
         }
     }
 
-    /// The client's own command line, which adds and removes MCP servers
-    /// itself; None when Agent HUD edits the client's settings file instead.
-    /// Antigravity's `agy` has `mcp add`, but its desktop app ships without
-    /// it, so Agent HUD edits the file the two share.
     pub fn command(self) -> Option<&'static str> {
         match self {
             Self::ClaudeCode => Some("claude"),
             Self::Codex => Some("codex"),
-            Self::Cursor | Self::DeepSeek | Self::Antigravity => None,
+            _ => None,
         }
     }
 
-    /// The folder this client reads the user's skills from, that Agent HUD
-    /// puts its skill in. Codex's own `$CODEX_HOME/skills` is deprecated;
-    /// `~/.agents/skills` is the folder it documents.
+    /// The folder this client reads the user's skills from.
     pub fn skills(self, places: &Places) -> PathBuf {
         match self {
             Self::ClaudeCode => places.claude.join("skills"),
@@ -139,16 +148,27 @@ impl Client {
             Self::Cursor => places.home.join(".cursor").join("skills"),
             Self::DeepSeek => places.deepseek.join("skills"),
             Self::Antigravity => antigravity(places).join("skills"),
+            Self::ZCode => places.home.join(".zcode").join("skills"),
+            Self::WorkBuddy => places.home.join(".workbuddy").join("skills"),
+            Self::Kimi => places.home.join(".kimi-code").join("skills"),
+            Self::Qoder => qoder(places).join("skills"),
+            Self::Trae => places.home.join(".trae").join("skills"),
+            Self::TraeCn => places.home.join(".trae-cn").join("skills"),
         }
     }
 
-    /// The settings file Agent HUD edits to add its MCP server, for the
-    /// clients without a command for it.
+    /// The settings file Agent HUD edits to add its MCP server.
     pub fn settings(self, places: &Places) -> Option<PathBuf> {
         match self {
             Self::Cursor => Some(places.home.join(".cursor").join("mcp.json")),
             Self::DeepSeek => Some(places.deepseek.join("cordis.patch.yml")),
             Self::Antigravity => Some(antigravity(places).join("mcp_config.json")),
+            Self::ZCode => Some(places.home.join(".zcode/cli/config.json")),
+            Self::WorkBuddy => Some(places.home.join(".workbuddy/mcp.json")),
+            Self::Kimi => Some(places.home.join(".kimi-code/mcp.json")),
+            Self::Qoder => Some(qoder(places).join("settings.json")),
+            Self::Trae => Some(trae_mcp(places, "Trae")),
+            Self::TraeCn => Some(trae_mcp(places, "Trae CN")),
             Self::ClaudeCode | Self::Codex => None,
         }
     }
@@ -162,12 +182,19 @@ impl Client {
             Self::Cursor => places.home.join(".cursor").is_dir() || app("Cursor"),
             Self::DeepSeek => places.deepseek.is_dir() || app("DeepSeek Harness"),
             Self::Antigravity => antigravity(places).is_dir() || app("Antigravity"),
+            Self::ZCode => places.home.join(".zcode").is_dir() || app("ZCode"),
+            Self::WorkBuddy => places.home.join(".workbuddy").is_dir() || app("WorkBuddy"),
+            Self::Kimi => {
+                places.home.join(".kimi-code").is_dir() || places.home.join(".kimi").is_dir()
+            }
+            Self::Qoder => qoder(places).is_dir() || app("Qoder"),
+            Self::Trae => places.home.join(".trae").is_dir() || app("Trae"),
+            Self::TraeCn => places.home.join(".trae-cn").is_dir() || app("Trae CN"),
             Self::ClaudeCode | Self::Codex => false,
         }
     }
 
-    /// Whether the client's settings file lists Agent HUD's server; only for
-    /// the clients whose file Agent HUD edits.
+    /// Whether the client's settings file lists Agent HUD's server.
     pub fn listed(self, places: &Places) -> bool {
         let Some(file) = self.settings(places) else {
             return false;
@@ -176,16 +203,15 @@ impl Client {
             return false;
         };
         match self {
-            Self::Cursor | Self::Antigravity => mcp_json::listed(text.as_deref()),
+            Self::ZCode => mcp_json::listed_zcode(text.as_deref()),
             Self::DeepSeek => deepseek::listed(text.as_deref()),
             Self::ClaudeCode | Self::Codex => false,
+            _ => mcp_json::listed(text.as_deref()),
         }
     }
 
     /// Adds (`Some(executable)`) or removes (`None`) Agent HUD's server in the
-    /// client's settings file. Returns whether the file changed. Refused for
-    /// the clients with a command line, and for a file Agent HUD cannot edit
-    /// without risk to the rest of it.
+    /// client's settings file. Returns whether the file changed.
     pub fn set_server(self, places: &Places, executable: Option<&Path>) -> Result<bool, String> {
         let file = self
             .settings(places)
@@ -193,11 +219,10 @@ impl Client {
         let target = crate::hooks::settings_target(&file)?;
         let original = read(&target)?;
         let updated = match self {
-            Self::Cursor | Self::Antigravity => {
-                mcp_json::edit(self.name(), original.as_deref(), executable)?
-            }
+            Self::ZCode => mcp_json::edit_zcode(self.name(), original.as_deref(), executable)?,
             Self::DeepSeek => deepseek::edit(original.as_deref(), executable)?,
             Self::ClaudeCode | Self::Codex => unreachable!("no settings file"),
+            _ => mcp_json::edit(self.name(), original.as_deref(), executable)?,
         };
         if updated == original {
             return Ok(false);
@@ -223,10 +248,29 @@ impl Client {
     }
 }
 
-/// Antigravity's folder, which its desktop app and its `agy` command line
-/// share. It ignores `GEMINI_CLI_HOME`, which only the Gemini CLI reads.
 fn antigravity(places: &Places) -> PathBuf {
     places.home.join(".gemini").join("config")
+}
+
+fn qoder(places: &Places) -> PathBuf {
+    places
+        .environment
+        .get("QODER_CONFIG_DIR")
+        .map(PathBuf::from)
+        .filter(|path| path.is_absolute())
+        .unwrap_or_else(|| places.home.join(".qoder"))
+}
+
+/// The MCP servers TRAE reads for the user: `User/mcp.json` in the build's
+/// app data folder, beside its `settings.json` (TRAE's workbench reads
+/// `userSettingsResource/../mcp.json`). A `.trae/mcp.json` is a project's
+/// own, read only in a workspace. TRAE names its China build's folder
+/// `Trae CN`, the international one's `Trae`.
+fn trae_mcp(places: &Places, folder: &str) -> PathBuf {
+    crate::os::app_support(&places.home, &places.environment)
+        .join(folder)
+        .join("User")
+        .join("mcp.json")
 }
 
 /// Settings files are small; anything bigger is not one Agent HUD should edit.

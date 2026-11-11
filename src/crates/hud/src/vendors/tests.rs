@@ -28,6 +28,9 @@ fn a_balance_reads_as_the_money_format_contract_writes_it() {
     assert_eq!(money_amount(&json!(0.125), "USD"), "$0.12");
     assert_eq!(money_amount(&json!(0.135), "USD"), "$0.14");
     assert_eq!(money_amount(&json!(1e-7), "USD"), "$0.00");
+    assert_eq!(money_amount(&json!(2099.53), "credits"), "2,099.53");
+    assert_eq!(money_amount(&json!(1600), "credits"), "1,600");
+    assert_eq!(money_amount(&json!(12.5), "credits"), "12.5");
 }
 
 #[test]

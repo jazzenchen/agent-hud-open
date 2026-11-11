@@ -35,8 +35,8 @@ fn credits(total: f64, used: f64) -> Value {
         "code": 0, "is_credits_billing": true,
         "usage_summary": {"total_amount": total, "consumed_amount": used},
         "user_entitlement_pack_list": [
-            {"group_type": 0, "status": 1, "display_desc": " Pro ", "expire_time": 2_000_000_000},
-            {"group_type": 4, "status": 1, "expire_time": 1_850_000_000},
+            {"entitlement_base_info": {"product_type": 1, "end_time": 2_000_000_000}},
+            {"entitlement_base_info": {"product_type": 2, "end_time": 1_850_000_000}},
         ],
     })
 }
@@ -83,18 +83,34 @@ fn trae_cn_credits_are_read_with_a_token_the_session_is_traded_for() {
         .any(|(name, value)| name == "Origin" && value == "https://www.trae.cn"));
 }
 
+/// One pack of the entitlement list: its kind (`product_type`), quota and
+/// usage.
+fn pack(kind: i64, quota: Value, usage: Value) -> Value {
+    json!({"entitlement_base_info": {"product_type": kind, "end_time": 1_796_083_199, "quota": quota},
+           "usage": usage})
+}
+
+fn dollars(packs: Value) -> Value {
+    json!({"code": 0, "is_dollar_usage_billing": true, "user_entitlement_pack_list": packs})
+}
+
+/// The share of a dollar allowance used, which shows no amounts.
+fn share(body: &Value) -> f64 {
+    let summary = parse(body).unwrap();
+    let quota = summary
+        .quota(&GLOBAL, GLOBAL.site(), "trae:fixture")
+        .unwrap();
+    assert!(quota["nativeUsage"].is_null());
+    quota["usedPercent"].as_f64().unwrap()
+}
+
 #[test]
 fn international_dollar_usage_is_a_share_of_the_plans_allowance() {
-    let body = json!({
-        "is_dollar_usage_billing": true,
-        "user_entitlement_pack_list": [
-            {"group_type": 0, "status": 1, "display_desc": "Pro",
-             "entitlement_base_info": {"quota": {"basic_usage_limit": 10}},
-             "usage": {"basic_usage_amount": 2.5}},
-            {"is_hide": true, "entitlement_base_info": {"quota": {"basic_usage_limit": 99}}},
-            {"entitlement_base_info": {"product_extra": {"subscription_extra": {"quota": {"basic_usage_limit": 10}}}}},
-        ],
-    });
+    let body = dollars(json!([pack(
+        0,
+        json!({"basic_usage_limit": 4}),
+        json!({"basic_usage_amount": 1})
+    )]));
     let host = signed_in(&["trae.ai"])
         .answer(ROW_TOKEN, token("row-jwt"))
         .answer_for(ROW_LIST, "Cloud-IDE-JWT row-jwt", Ok(body));
@@ -102,15 +118,126 @@ fn international_dollar_usage_is_a_share_of_the_plans_allowance() {
     let quota = &reading.quotas[0];
     assert_eq!(quota["vendor"], "trae");
     assert_eq!(quota["name"], "Usage");
-    assert_eq!(quota["usedPercent"], 12.5);
+    assert_eq!(quota["usedPercent"], 25.0);
+    // TRAE's panel: the plan resets a second after its period ends.
+    assert_eq!(quota["resetAt"], "2026-12-01T00:00:00+00:00");
     assert!(quota["nativeUsage"].is_null());
-    assert_eq!(reading.account.unwrap()["label"], "TRAE");
-    // An unlimited plan has no share to show; a missing summary is no use.
-    let unlimited = json!({"is_dollar_usage_billing": true, "user_entitlement_pack_list": [
-            {"entitlement_base_info": {"quota": {"basic_usage_limit": -1}}}]});
-    assert!(parse(&unlimited).is_none());
-    assert!(parse(&json!({"is_credits_billing": true})).is_none());
+    let account = reading.account.unwrap();
+    assert_eq!(account["label"], "TRAE");
+    assert_eq!(account["plan"], "Free");
+    // An answer that is neither credits nor dollars is no use.
     assert!(parse(&json!({"usage_summary": {"total_amount": 9, "consumed_amount": 1}})).is_none());
+}
+
+#[test]
+fn a_plans_bonus_counts_once_its_basic_allowance_is_used_up() {
+    let bonus = json!({"basic_usage_limit": 10, "bonus_usage_limit": 10});
+    let used = json!({"basic_usage_amount": 10, "bonus_usage_amount": 5});
+    assert_eq!(share(&dollars(json!([pack(1, bonus, used.clone())]))), 75.0);
+    // A plan without a bonus counts its basic allowance alone.
+    let none = json!({"basic_usage_limit": 10, "bonus_usage_limit": 10, "no_bonus_quota": true});
+    assert_eq!(share(&dollars(json!([pack(1, none, used.clone())]))), 100.0);
+    let missing = json!({"basic_usage_limit": 20});
+    assert_eq!(share(&dollars(json!([pack(1, missing, used)]))), 50.0);
+}
+
+#[test]
+fn the_plan_is_the_highest_tier_and_other_packs_are_no_part_of_it() {
+    let body = dollars(json!([
+        pack(0, json!({"basic_usage_limit": 3}), json!({"basic_usage_amount": 3})),
+        pack(8, json!({"basic_usage_limit": 5}), json!({})),
+        pack(7, json!({"basic_usage_limit": 100}), json!({"basic_usage_amount": 50})),
+        pack(2, json!({"basic_usage_limit": 50}), json!({})),
+        pack(3, json!({"basic_usage_limit": 30}), json!({"basic_usage_amount": 30})),
+        {"entitlement_base_info": {"product_type": 4, "end_time": 1_798_761_599,
+            "quota": {"basic_usage_limit": 60, "bonus_usage_limit": 20}},
+         "usage": {"basic_usage_amount": 20}, "status": 3, "expire_time": 1_900_000_000},
+    ]));
+    let summary = parse(&body).unwrap();
+    assert_eq!(summary.plan.as_deref(), Some("Pro+"));
+    let quota = summary
+        .quota(&GLOBAL, GLOBAL.site(), "trae:fixture")
+        .unwrap();
+    assert_eq!(quota["usedPercent"], 25.0);
+    // The reset is the plan's period end, not its pack's expiry.
+    assert_eq!(quota["resetAt"], "2027-01-01T00:00:00+00:00");
+    for (kind, plan) in [(6, "Ultra"), (1, "Pro"), (8, "Lite")] {
+        let body = dollars(json!([
+            pack(0, json!({"basic_usage_limit": 1}), json!({})),
+            pack(kind, json!({"basic_usage_limit": 1}), json!({})),
+        ]));
+        assert_eq!(parse(&body).unwrap().plan.as_deref(), Some(plan));
+    }
+    // Promo codes alone are no plan, and so no allowance.
+    let promo = dollars(json!([pack(
+        3,
+        json!({"basic_usage_limit": 30}),
+        json!({})
+    )]));
+    let summary = parse(&promo).unwrap();
+    assert!(summary.plan.is_none() && !summary.unlimited());
+    assert!(summary
+        .quota(&GLOBAL, GLOBAL.site(), "trae:fixture")
+        .is_none());
+}
+
+#[test]
+fn a_limit_of_minus_one_is_no_limit_and_not_an_unreadable_answer() {
+    let unlimited = dollars(json!([pack(
+        6,
+        json!({"basic_usage_limit": -1}),
+        json!({"basic_usage_amount": 120})
+    )]));
+    let host = signed_in(&["trae.ai"])
+        .answer(ROW_TOKEN, token("row-jwt"))
+        .answer(ROW_LIST, Ok(unlimited));
+    let reading = read(&host).unwrap();
+    assert!(reading.quotas.is_empty() && reading.notice.is_none());
+    assert_eq!(reading.account.unwrap()["plan"], "Ultra");
+    // A bonus with no limit is not counted.
+    let bonus = json!({"basic_usage_limit": 10, "bonus_usage_limit": -1});
+    let used = json!({"basic_usage_amount": 4, "bonus_usage_amount": 3});
+    assert_eq!(share(&dollars(json!([pack(1, bonus, used)]))), 40.0);
+    // A plan whose basic limit is missing has changed format.
+    assert!(parse(&dollars(json!([pack(1, json!({}), json!({}))]))).is_none());
+    // Credits: one pack with no limit leaves the account with none.
+    let credits = json!({"is_credits_billing": true, "user_entitlement_pack_list": [
+        {"entitlement_base_info": {"quota": {"credits_limit": 500}}, "usage": {"credits_amount": 100}},
+        {"entitlement_base_info": {"quota": {"credits_limit": -1}}, "usage": {"credits_amount": 900}},
+    ]});
+    assert!(parse(&credits).unwrap().unlimited());
+}
+
+#[test]
+fn trae_cn_credits_are_what_each_pack_has_left_as_its_title_bar_counts_them() {
+    let body = json!({
+        "is_credits_billing": true,
+        "usage_summary": {"total_amount": 1, "consumed_amount": 1},
+        "user_entitlement_pack_list": [
+            {"entitlement_base_info": {"product_type": 1, "quota": {"credits_limit": 3000}},
+             "usage": {"credits_amount": 1000}},
+            // Spent past its limit: nothing left of it, and no more counted.
+            {"entitlement_base_info": {"product_type": 2, "quota": {"credits_limit": 1000}},
+             "usage": {"credits_amount": 1500}},
+            // A promo code's credits count too; a pack of none does not.
+            {"entitlement_base_info": {"product_type": 3, "quota": {"credits_limit": 0}},
+             "usage": {"credits_amount": 700}},
+            {"entitlement_base_info": {"product_type": 7, "quota": {}}},
+        ],
+    });
+    let summary = parse(&body).unwrap();
+    assert_eq!(summary.plan.as_deref(), Some("Pro"));
+    let quota = summary.quota(&CHINA, CHINA.site(), "trae:cn").unwrap();
+    assert_eq!(quota["usedPercent"], 50.0);
+    assert_eq!(quota["nativeUsage"]["used"], 2000.0);
+    assert_eq!(quota["nativeUsage"]["capacity"], 4000.0);
+    assert!(quota["resetAt"].is_null());
+    // Packs with no credits limits leave the site's own summary; with
+    // neither, the answer is no use.
+    let summary = parse(&credits(4000.0, 1000.0)).unwrap();
+    let quota = summary.quota(&CHINA, CHINA.site(), "trae:cn").unwrap();
+    assert_eq!(quota["usedPercent"], 25.0);
+    assert!(parse(&json!({"is_credits_billing": true})).is_none());
 }
 
 #[test]

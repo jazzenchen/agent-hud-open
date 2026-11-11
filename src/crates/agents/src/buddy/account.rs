@@ -6,8 +6,8 @@
 //! The request shapes and package codes follow CodexBar's WorkBuddy provider
 //! (MIT), which took the codes from the WorkBuddy 5.6.2 client.
 use crate::account::{
-    account_id, status, Host, HttpFailure, HttpRequest, Provider, Reading, Unread, WebSession,
-    WebSignIn, WebSite,
+    account_id, Host, HttpFailure, HttpRequest, Provider, Reading, Unread, WebSession, WebSignIn,
+    WebSite,
 };
 use crate::l10n;
 use chrono::{DateTime, FixedOffset, NaiveDateTime, Utc};
@@ -41,6 +41,7 @@ const PAID_PACKAGES: &[&str] = &[
     "TCACA_code_023_4xbGhMrE6q",
     "TCACA_code_026_BaESVICNoi",
     "TCACA_code_027_0FCGVA6vSa",
+    "TCACA_code_043_6oIkxT7Z0S",
     "TCACA_code_009_0XmEQc2xOf",
     "TCACA_code_038_OhvqZtiPKr",
     "TCACA_code_036_lupO5WgNdG",
@@ -58,8 +59,12 @@ const FREE_PACKAGES: &[&str] = &[
     "TCACA_code_029_6wCGEWquYy",
     "TCACA_code_030_BjSt89qTvr",
 ];
-/// The free package reward grants are listed under; they lapse, they don't reset.
-const REWARDS_PACKAGE: &str = "TCACA_code_007_nzdH5h4Nl0";
+/// The free packages reward grants are listed under; they lapse, they don't reset.
+const REWARD_PACKAGES: &[&str] = &[
+    "TCACA_code_007_nzdH5h4Nl0",
+    "TCACA_code_029_6wCGEWquYy",
+    "TCACA_code_030_BjSt89qTvr",
+];
 
 /// The credits of the account the user signed in to; nothing until they have.
 pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
@@ -74,50 +79,61 @@ pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
         &json!({}),
     )?;
     let packages = summary["Packages"].as_array().ok_or_else(format)?;
-    let (mut total, mut left) = (0.0, 0.0);
-    for package in packages.iter().filter(|p| p["CapacityUnit"] == "credits") {
-        total += amount(&package["CycleTotalCapacity"]).ok_or_else(format)?;
-        left += amount(&package["CycleRemainCapacity"]).ok_or_else(format)?;
+    let (mut pkg_total, mut pkg_left) = (0.0, 0.0);
+    for package in packages
+        .iter()
+        .filter(|p| p["CapacityUnit"] == "credits" && !is_reward(p))
+    {
+        pkg_total += amount(&package["CycleTotalCapacity"]).ok_or_else(format)?;
+        pkg_left += amount(&package["CycleRemainCapacity"]).ok_or_else(format)?;
     }
-    let (mut reward_total, mut reward_left) = (0.0, 0.0);
+    let (mut group_total, mut group_left, mut reward_total, mut reward_left) = (0.0, 0.0, 0.0, 0.0);
     for group in summary["CreditGroups"]
         .as_array()
         .into_iter()
         .flatten()
-        .filter(|g| g["Kind"] == "benefit" && g["CapacityUnit"] == "credits")
+        .filter(|g| g["CapacityUnit"] == "credits")
     {
         if let (Some(t), Some(l)) = (
             amount(&group["CycleTotalCapacity"]),
             amount(&group["CycleRemainCapacity"]),
         ) {
-            reward_total += t;
-            reward_left += l;
+            if group["Kind"] == "benefit" {
+                reward_total += t;
+                reward_left += l;
+            } else {
+                group_total += t;
+                group_left += l;
+            }
         }
     }
+    let (total, left) = if group_total > 0.0 {
+        (round2(group_total), round2(group_left))
+    } else {
+        (round2(pkg_total), round2(pkg_left))
+    };
     // The reset is optional: a listing that fails keeps the balance.
     let now = Utc::now();
     let reset = cycle_end(host, &session, PAID_PACKAGES, false, now)
         .or_else(|| cycle_end(host, &session, FREE_PACKAGES, true, now))
         .map(|at| at.to_rfc3339());
     let id = account_id("workbuddy", &[HOST]);
-    if total > 0.0 {
-        let spent = (total - left).max(0.0);
-        let used = (spent / total * 100.0).clamp(0.0, 100.0);
-        reading.quotas.push(json!({
-            "id": format!("{id}:credits"), "vendor": "workbuddy", "consumerSource": "workbuddy", "accountId": id, "account": "WorkBuddy",
-            "name": "Credits", "shortLabel": "Credits", "usedPercent": used, "resetAt": reset,
-            "allModels": true, "status": status(used),
-            "nativeUsage": {"used": spent, "capacity": total, "unit": "credits"},
-        }));
-    }
-    if reward_total > 0.0 {
-        let spent = (reward_total - reward_left).max(0.0);
-        let used = (spent / reward_total * 100.0).clamp(0.0, 100.0);
-        reading.quotas.push(json!({
-            "id": format!("{id}:rewards"), "vendor": "workbuddy", "accountId": id, "account": "WorkBuddy",
-            "name": "Reward credits", "shortLabel": "Rewards", "usedPercent": used,
-            "allModels": true, "status": status(used),
-            "nativeUsage": {"used": spent, "capacity": reward_total, "unit": "credits"},
+    let available = amount(&summary["TotalCredits"])
+        .map(round2)
+        .unwrap_or_else(|| round2(left + reward_left));
+    if total > 0.0 || reward_total > 0.0 || available > 0.0 {
+        reading.billing.push(json!({
+            "id": format!("{id}:credits"),
+            "vendor": "workbuddy",
+            "consumerSource": "workbuddy",
+            "accountId": id,
+            "account": "WorkBuddy",
+            "label": l10n::text("可用积分", "Available credits"),
+            "amount": available,
+            "currency": "credits",
+            "planCredits": (total > 0.0).then_some(left),
+            "rewardCredits": (reward_total > 0.0).then_some(round2(reward_left)),
+            "resetAt": reset,
         }));
     }
     let plan = summary["SubscriptionPackageName"]
@@ -128,7 +144,7 @@ pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
         "id": id, "provider": "workbuddy", "label": "WorkBuddy", "plan": plan,
         "checkedAt": now.to_rfc3339(), "signIn": "web",
     }));
-    if reading.quotas.is_empty() {
+    if reading.billing.is_empty() {
         reading.notice = Some(l10n::text(
             "WorkBuddy 当前没有可用的积分额度",
             "WorkBuddy reports no credit allowance for this account.",
@@ -157,6 +173,16 @@ fn amount(value: &Value) -> Option<f64> {
         _ => None,
     }
     .filter(|n: &f64| n.is_finite() && *n >= 0.0)
+}
+
+fn is_reward(item: &Value) -> bool {
+    item["PackageCode"]
+        .as_str()
+        .is_some_and(|code| REWARD_PACKAGES.contains(&code))
+}
+
+fn round2(n: f64) -> f64 {
+    (n * 100.0).round() / 100.0
 }
 
 /// One billing request: its `data` when `code` is 0.
@@ -225,7 +251,7 @@ fn cycle_end(
         .as_array()?
         .iter()
         .filter(|account| account["CapacityUnit"] == "credits")
-        .filter(|account| !free || account["PackageCode"] != REWARDS_PACKAGE)
+        .filter(|account| !free || !is_reward(account))
         .filter_map(|account| {
             let text = account["CycleEndTime"].as_str()?;
             let end = NaiveDateTime::parse_from_str(text.trim(), "%Y-%m-%d %H:%M:%S").ok()?;
@@ -274,7 +300,9 @@ mod tests {
     #[test]
     fn nothing_is_read_before_the_user_signs_in() {
         let reading = read(&FakeHost::new("/u")).unwrap();
-        assert!(reading.quotas.is_empty() && reading.account.is_none());
+        assert!(
+            reading.billing.is_empty() && reading.quotas.is_empty() && reading.account.is_none()
+        );
     }
 
     #[test]
@@ -287,13 +315,14 @@ mod tests {
             .answer(SUMMARY, Ok(summary()))
             .answer(PAID, Ok(paid));
         let reading = read(&host).unwrap();
-        assert_eq!(reading.quotas.len(), 2);
-        assert_eq!(reading.quotas[0]["usedPercent"], 75.0);
-        assert_eq!(reading.quotas[0]["nativeUsage"]["capacity"], 1000.0);
+        assert!(reading.quotas.is_empty());
+        assert_eq!(reading.billing.len(), 1);
+        assert_eq!(reading.billing[0]["amount"], 450.0);
+        assert_eq!(reading.billing[0]["currency"], "credits");
+        assert_eq!(reading.billing[0]["planCredits"], 250.0);
+        assert_eq!(reading.billing[0]["rewardCredits"], 200.0);
         // 23:59:59 in China, a second later, is 16:00 UTC the same day.
-        assert_eq!(reading.quotas[0]["resetAt"], "2099-12-31T16:00:00+00:00");
-        assert_eq!(reading.quotas[1]["shortLabel"], "Rewards");
-        assert_eq!(reading.quotas[1]["usedPercent"], 0.0);
+        assert_eq!(reading.billing[0]["resetAt"], "2099-12-31T16:00:00+00:00");
         assert_eq!(reading.account.unwrap()["plan"], "Pro");
         let headers = host.headers.borrow();
         assert!(headers[0]
@@ -309,7 +338,8 @@ mod tests {
     #[test]
     fn the_free_list_stands_in_for_the_reset_but_never_a_reward_grant() {
         let free = json!({"code": 0, "data": {"Accounts": [
-            {"CapacityUnit": "credits", "PackageCode": REWARDS_PACKAGE, "CycleEndTime": "2098-01-01 00:00:00"},
+            {"CapacityUnit": "credits", "PackageCode": REWARD_PACKAGES[0], "CycleEndTime": "2098-01-01 00:00:00"},
+            {"CapacityUnit": "credits", "PackageCode": REWARD_PACKAGES[2], "CycleEndTime": "2098-02-01 00:00:00"},
             {"CapacityUnit": "credits", "PackageCode": "TCACA_code_001_PqouKr6QWV", "CycleEndTime": "2099-01-01 00:00:00"},
         ]}});
         let host = signed_in()
@@ -317,10 +347,33 @@ mod tests {
             .answer(PAID, Ok(json!({"code": 0, "data": {"Accounts": []}})))
             .answer(FREE, Ok(free));
         let reading = read(&host).unwrap();
-        assert_eq!(reading.quotas[0]["resetAt"], "2098-12-31T16:00:01+00:00");
+        assert_eq!(reading.billing[0]["resetAt"], "2098-12-31T16:00:01+00:00");
         // Without any listing the balance still reads.
         let host = signed_in().answer(SUMMARY, Ok(summary()));
-        assert!(read(&host).unwrap().quotas[0]["resetAt"].is_null());
+        assert!(read(&host).unwrap().billing[0]["resetAt"].is_null());
+    }
+
+    #[test]
+    fn reward_packages_in_summary_are_not_double_counted_into_plan_credits() {
+        let trial = json!({"code": 0, "data": {
+            "SubscriptionPackageName": "体验版",
+            "TotalCredits": "2099.53",
+            "Packages": [
+                {"PackageCode": "TCACA_code_008_cfWoLwvjU4", "CapacityUnit": "credits", "CycleTotalCapacity": "500", "CycleRemainCapacity": "499.53"},
+                {"PackageCode": "TCACA_code_030_BjSt89qTvr", "CapacityUnit": "credits", "CycleTotalCapacity": "1600", "CycleRemainCapacity": "1600"},
+            ],
+            "CreditGroups": [
+                {"Kind": "plan_base", "CapacityUnit": "credits", "CycleTotalCapacity": "500", "CycleRemainCapacity": "499.53"},
+                {"Kind": "benefit", "CapacityUnit": "credits", "CycleTotalCapacity": "1600", "CycleRemainCapacity": "1600"},
+            ],
+        }});
+        let host = signed_in().answer(SUMMARY, Ok(trial));
+        let reading = read(&host).unwrap();
+        assert!(reading.quotas.is_empty());
+        assert_eq!(reading.billing.len(), 1);
+        assert_eq!(reading.billing[0]["amount"], 2099.53);
+        assert_eq!(reading.billing[0]["planCredits"], 499.53);
+        assert_eq!(reading.billing[0]["rewardCredits"], 1600.0);
     }
 
     #[test]

@@ -170,6 +170,7 @@ impl AgentHudCore {
         let page = conversation::page(
             log.origin_path.as_deref().unwrap_or(&path),
             &source,
+            &log.id,
             cursor,
             limit,
             params["messageTail"] == true,

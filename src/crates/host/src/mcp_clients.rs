@@ -29,7 +29,7 @@ fn installed(client: Client, places: &Places) -> bool {
             .map(PathBuf::from)
             .unwrap_or_else(|| places.home.join(".codex"))
             .join("config.toml"),
-        Client::Cursor | Client::DeepSeek | Client::Antigravity => return client.listed(places),
+        _ => return client.listed(places),
     };
     let Ok(meta) = fs::metadata(&path) else {
         return false;
@@ -183,10 +183,19 @@ pub(crate) fn repair_on_launch(app: &tauri::AppHandle) {
         let Ok(home) = agent_hud_runtime::home_directory() else {
             return;
         };
+        let canonical = app
+            .state::<super::HostOptions>()
+            .canonical_executable
+            .clone();
         let places = Places::current(&home);
         for client in CLIENTS {
             if !installed(client, &places) {
                 continue;
+            }
+            if client.command().is_none() {
+                if let Some(path) = canonical.as_deref() {
+                    let _ = client.set_server(&places, Some(path));
+                }
             }
             match client.skill_state(&places) {
                 SkillState::Current | SkillState::Foreign => {}

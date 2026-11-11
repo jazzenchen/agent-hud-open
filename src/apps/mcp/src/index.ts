@@ -254,7 +254,10 @@ serveStdio(() => {
               name: tool.name,
               arguments: params,
               caller: named,
-              ...(named ? {} : { parent: launchedBy }),
+              // Always, so the app can tell a client its hooks name (TRAE,
+              // Kimi, ...) from Claude Code's session id inherited through
+              // the environment by an agent started inside Claude Code.
+              parent: launchedBy,
             });
           },
         );

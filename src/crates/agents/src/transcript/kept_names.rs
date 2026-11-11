@@ -99,13 +99,16 @@ impl Log {
     /// Kimi keeps the main agent's title in the session's `state.json`: Kimi
     /// Code's first prompt until a generated title or `/title` replaces it, or
     /// kimi-cli's `/title` as `custom_title`. "New Session" is no title. The
-    /// session's folder comes from Kimi Code's `workspaces.json`.
+    /// session's folder comes from Kimi Code's `workspaces.json`. A session
+    /// archived in Kimi (`archived`, which `kimi session list` leaves out) is
+    /// not listed; archiving touches only this file, so the log reads again.
     fn kimi_state(&mut self) {
         let (folder, agent) = kimi_session(&self.path);
         if agent != "main" {
             return;
         }
         let state = read_json(&folder.join("state.json"));
+        self.archived = state["archived"] == true;
         let title = crate::naming::session_title::named(state["title"].as_str())
             .or_else(|| crate::naming::session_title::named(state["custom_title"].as_str()))
             .filter(|title| title != "New Session");
@@ -117,15 +120,27 @@ impl Log {
             .and_then(Path::file_name)
             .is_some_and(|name| name == "agents");
         if modern && self.cwd.is_none() {
+            if let Some(cwd) = crate::text(&state["cwd"]) {
+                self.cwd = Some(cwd.to_owned());
+                return;
+            }
             let workspace = folder.parent();
-            let index = workspace
-                .and_then(Path::parent)
-                .and_then(Path::parent)
-                .map(|root| read_json(&root.join("workspaces.json")));
-            if let (Some(workspace), Some(index)) = (workspace, index) {
+            let root_dir = workspace.and_then(Path::parent).and_then(Path::parent);
+            if let (Some(workspace), Some(root_dir)) = (workspace, root_dir) {
                 let key = workspace.file_name().unwrap_or_default().to_string_lossy();
+                let index = read_json(&root_dir.join("workspaces.json"));
                 if let Some(root) = index["workspaces"][key.as_ref()]["root"].as_str() {
                     self.cwd = Some(root.to_owned());
+                } else if let Some(path) = read_json(&root_dir.join("projects.json"))["projects"]
+                    .as_array()
+                    .and_then(|projects| {
+                        projects
+                            .iter()
+                            .find(|p| p["id"].as_str() == Some(key.as_ref()))
+                            .and_then(|p| p["path"].as_str())
+                    })
+                {
+                    self.cwd = Some(path.to_owned());
                 }
             }
         }

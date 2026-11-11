@@ -65,8 +65,12 @@ pub(super) fn shared(value: &Value, offset: u64) -> Vec<LineItem> {
                 .unwrap_or_else(|| format!("o{offset}"));
             rows.push(line.item(id, role, json!(text), None, &Value::Null));
         }
-    } else if let Some(items) = claude::message_items(value, offset) {
+    } else if let Some(items) =
+        claude::message_items(value, offset).filter(|items| !items.is_empty())
+    {
         rows = items;
+    } else if value["message"]["message"].is_object() {
+        rows = message(value, &value["message"]["message"], offset, prompt);
     } else if matches!(
         value["type"].as_str(),
         Some("user" | "assistant" | "message")

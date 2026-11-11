@@ -29,12 +29,16 @@ impl Server {
                 }
                 if flag != "--permission-hook" {
                     // The event of a callback that could not write it (`entry`).
+                    let mut response = json!({});
                     if let Some(event) = super::handed_event(source, payload) {
                         let _ = super::record_event(&folder, &event);
+                        if let Some(claimed) = super::completion::claim_prompt(&folder, &event) {
+                            response = claimed;
+                        }
                     }
                     reminders.record(source, flag, payload);
                     wake();
-                    return Some(json!({}));
+                    return Some(response);
                 }
                 super::wait_for_answer(&requests, &reminders, source, flag, payload, || {
                     active.load(Ordering::Acquire)

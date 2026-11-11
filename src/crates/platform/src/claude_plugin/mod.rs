@@ -98,10 +98,15 @@ pub fn valid_name(value: &str) -> bool {
 pub fn unwrap_prompt(text: &str) -> &str {
     const LEAD: &str = "The agent-hud plugin sent a message:\n";
     const NOTE: &str = "\n\nThis is how Claude Code surfaces a prompt a plugin submits";
-    let Some(rest) = text.strip_prefix(LEAD) else {
-        return text;
-    };
-    rest.rfind(NOTE).map_or(rest, |end| &rest[..end])
+    if let Some(rest) = text.strip_prefix(LEAD) {
+        return rest.rfind(NOTE).map_or(rest, |end| &rest[..end]);
+    }
+    if let Some((_, rest)) = text.rsplit_once("<user_query>") {
+        if let Some((inner, _)) = rest.split_once("</user_query>") {
+            return inner;
+        }
+    }
+    text
 }
 
 /// Claude Code's own folder: `$CLAUDE_CONFIG_DIR`, else `~/.claude`.
@@ -178,6 +183,78 @@ fn write_json(file: &Path, value: &Value) -> Result<(), Refusal> {
     crate::os::private_directory(parent).map_err(Refusal::Io)?;
     write_private(file, value.to_string().as_bytes())?;
     Ok(())
+}
+
+impl ClaudeChannel {
+    /// Claims the oldest waiting prompt for `session` in FIFO order, marking
+    /// it taken and started, and returns its id and text. Each prompt is
+    /// claimed once, however many processes ask at the same moment (a
+    /// client's stop hook and its rewake hook): the one that creates its
+    /// `<id>.claim` beside it takes it.
+    pub fn take_next(
+        &self,
+        session: &str,
+        now: SystemTime,
+    ) -> Result<Option<(String, String)>, Refusal> {
+        if !valid_name(session) {
+            return Err(Refusal::InvalidInput("identity".into()));
+        }
+        let Ok(files) = fs::read_dir(self.directory().join("prompts").join(session)) else {
+            return Ok(None);
+        };
+        let mut items: Vec<(u64, String, PathBuf, Value)> = files
+            .filter_map(|entry| {
+                let path = entry.ok()?.path();
+                let id = path.file_stem()?.to_str()?.to_string();
+                if path.extension()?.to_str()? != "json" || !valid_name(&id) {
+                    return None;
+                }
+                let value: Value = serde_json::from_slice(&fs::read(&path).ok()?).ok()?;
+                Some((value["at"].as_u64().unwrap_or(0), id, path, value))
+            })
+            .collect();
+        items.sort_by(|a, b| (a.0, &a.1).cmp(&(b.0, &b.1)));
+        let at = millis(now);
+        for (_, id, path, mut value) in items {
+            if [
+                "cancelledAt",
+                "expiredAt",
+                "refused",
+                "startedAt",
+                "takenAt",
+            ]
+            .iter()
+            .any(|key| value.get(*key).is_some())
+            {
+                continue;
+            }
+            let cancel = self.cancel_path(session, &id)?;
+            if cancel.exists() {
+                value["cancelledAt"] = serde_json::json!(at);
+                write_json(&path, &value)?;
+                let _ = fs::remove_file(cancel);
+                continue;
+            }
+            if value["expiresAt"].as_u64().is_some_and(|exp| exp <= at) {
+                value["expiredAt"] = serde_json::json!(at);
+                write_json(&path, &value)?;
+                continue;
+            }
+            if let Some(text) = value["text"].as_str().map(str::to_owned) {
+                match crate::os::private_file(&path.with_extension("claim"), true) {
+                    Ok(_) => {}
+                    // Another process claimed it a moment ago.
+                    Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
+                    Err(error) => return Err(error.into()),
+                }
+                value["takenAt"] = serde_json::json!(at);
+                value["startedAt"] = serde_json::json!(at);
+                write_json(&path, &value)?;
+                return Ok(Some((id, text)));
+            }
+        }
+        Ok(None)
+    }
 }
 
 #[cfg(test)]

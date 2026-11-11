@@ -57,7 +57,12 @@ impl Log {
             Some("custom-title") => self.naming.name(0, value["customTitle"].as_str()),
             Some("ai-title") => self.naming.name(1, value["aiTitle"].as_str()),
             Some("user") if !is_managed_project_prompt(value) => {
-                if let Some(text) = value["message"]["content"].as_str() {
+                let words = if crate::qoder::transcript::is_build(&self.source) {
+                    crate::qoder::transcript::typed_words(value)
+                } else {
+                    value["message"]["content"].as_str()
+                };
+                if let Some(text) = words {
                     self.title_from(text);
                 }
             }
@@ -75,6 +80,15 @@ impl Log {
             .filter(|model| !model.is_empty() && *model != "<synthetic>")
             .unwrap_or("")
             .to_owned();
+        // Until some output is measured, a Qoder session's model is the one
+        // its replies name: Qoder writes no tokens unless asked to, and its
+        // replies would otherwise leave the model Unknown.
+        if crate::qoder::transcript::is_build(&self.source)
+            && !model.is_empty()
+            && !self.claude_output.values().any(|output| *output > 0)
+        {
+            self.model = model.clone();
+        }
         // Claude Code writes a response one content block per line, all under
         // the message's id; its tool requests join that call.
         let tools = message["content"]

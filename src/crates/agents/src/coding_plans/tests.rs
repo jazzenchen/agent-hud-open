@@ -81,6 +81,30 @@ fn kimi_names_the_account_from_its_profile() {
 }
 
 #[test]
+fn kimi_names_the_person_and_plan_from_its_profile() {
+    // Kimi Code 2.5.2's usages answer names no membership; its profile does.
+    let usages = json!({"usages": {"limit_5h": {"used_ratio": 0.25}}});
+    let reading = |me: Value| {
+        let host = FakeHost::new("/u")
+            .env("KIMI_CODE_API_KEY", "sk")
+            .answer(KIMI_ME, Ok(me))
+            .answer(KIMI_USAGES, Ok(usages.clone()));
+        kimi(&host).unwrap()
+    };
+    let read = reading(json!({"user_id": "u1", "region": "cn", "domain": 2,
+        "nickname": "Jun", "email": "jun@example.com", "user_level_name": "Allegretto"}));
+    let account = read.account.unwrap();
+    assert_eq!(account["label"], "jun@example.com");
+    assert_eq!(account["plan"], "Allegretto");
+    assert_eq!(read.quotas[0]["account"], "jun@example.com");
+    // A phone sign-in has no email: the nickname names it.
+    let read = reading(json!({"user_id": "u1", "region": "cn", "nickname": "Jun", "email": ""}));
+    let account = read.account.unwrap();
+    assert_eq!(account["label"], "Jun");
+    assert!(account["plan"].is_null());
+}
+
+#[test]
 fn a_kimi_code_sign_in_sends_its_device() {
     let expires = chrono::Utc::now().timestamp() + 3600;
     let host = FakeHost::new("/u")
@@ -366,4 +390,31 @@ fn a_plans_rows_count_the_calls_through_its_own_provider_ids() {
     glm.base = "https://api.z.ai/api/coding/paas/v4".into();
     parse::link(&mut row, &glm);
     assert_eq!(row["consumerRoutes"], json!(["zai-coding-plan", "pi#zai"]));
+}
+
+#[test]
+fn expired_kimi_oauth_token_returns_transient_and_glm_without_plan_records_free_account() {
+    let host = FakeHost::new("/u").file(
+        "/u/.kimi-code/credentials/kimi-code.json",
+        &json!({"access_token": "tok", "refresh_token": "ref", "expires_at": 1}).to_string(),
+    );
+    assert!(matches!(
+        kimi(&host).err(),
+        Some(Unread::Transient { reason, .. })
+            if reason == "Kimi Code renews its sign-in the next time it runs; the quota updates then"
+    ));
+
+    let no_plan = FakeHost::new("/u")
+        .env("ZAI_CODING_CN_API_KEY", "china-key")
+        .answer(
+            GLM_CHINA,
+            Ok(json!({"code": 500, "msg": "当前用户不存在coding plan", "success": false})),
+        );
+    let reading = glm(&no_plan).unwrap();
+    assert!(reading.quotas.is_empty());
+    assert_eq!(reading.account.unwrap()["plan"], "Free");
+    assert_eq!(
+        reading.notice.as_deref(),
+        Some("No active Coding Plan subscription on this account")
+    );
 }

@@ -26,6 +26,7 @@ pub static HOOKS: Hooks = Hooks {
     origin: Some(super::process::origin),
     attention: false,
     compaction: None,
+    rewake: None,
     prefixed_sessions: true,
     launch: POSIX_ONLY,
 };

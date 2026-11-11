@@ -39,6 +39,7 @@ pub static HOOKS: Hooks = Hooks {
     origin: None,
     attention: false,
     compaction: None,
+    rewake: None,
     prefixed_sessions: true,
     // Goose turns a plugin on by itself, without asking, so its hooks wait
     // until they are checked against a running Goose; its sessions come from

@@ -142,6 +142,7 @@ pub(crate) fn parent_processes() -> Vec<ProcessAncestor> {
     parents(&bytes)
         .map_while(|parent| {
             Some(ProcessAncestor {
+                pid: None,
                 executable: parent.executable,
                 arguments: arguments(&parent.command)?,
                 bundle: None,
@@ -213,6 +214,17 @@ pub(crate) fn codex_cli_on_port(
 /// with `started`.
 pub(crate) fn process_runs(_pid: i32, _started: Option<i64>) -> bool {
     true
+}
+
+/// Not read on Windows yet.
+pub(crate) fn process_start(_pid: i32) -> Option<i64> {
+    None
+}
+
+/// Not asked on Windows yet: no process counts as reading a terminal, so a
+/// hook that waits only beside one leaves at once.
+pub(crate) fn terminal_io(_pid: i32) -> bool {
+    false
 }
 
 #[cfg(test)]

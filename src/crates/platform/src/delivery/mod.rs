@@ -46,6 +46,8 @@ pub use files::atomic_json;
 pub use handoffs::Handoffs;
 use host::private_dir;
 use serde::{Deserialize, Serialize};
+pub use service::hook_session_key;
+use service::valid_session_id;
 pub use starts::{
     ClaudeMove, HandoffCheck, SessionStarts, StartConfig, StartOffer, StartReceipt, StartRequest,
 };
@@ -106,6 +108,12 @@ pub enum Provider {
     Codex,
     Antigravity,
     DeepSeek,
+    Cursor,
+    Trae,
+    WorkBuddy,
+    ZCode,
+    Qoder,
+    Kimi,
 }
 impl Provider {
     pub fn as_str(self) -> &'static str {
@@ -114,6 +122,12 @@ impl Provider {
             Self::Codex => "codex",
             Self::Antigravity => "antigravity",
             Self::DeepSeek => "deepseek",
+            Self::Cursor => "cursor",
+            Self::Trae => "trae",
+            Self::WorkBuddy => "workbuddy",
+            Self::ZCode => "zcode",
+            Self::Qoder => "qoder",
+            Self::Kimi => "kimi",
         }
     }
     pub fn parse(raw: &str) -> Option<Self> {
@@ -122,8 +136,23 @@ impl Provider {
             "codex" => Some(Self::Codex),
             "antigravity" => Some(Self::Antigravity),
             "deepseek" => Some(Self::DeepSeek),
+            "cursor" => Some(Self::Cursor),
+            "trae" | "trae-cn" => Some(Self::Trae),
+            "workbuddy" | "codebuddy" => Some(Self::WorkBuddy),
+            "zcode" => Some(Self::ZCode),
+            "qoder" | "qoder-cn" | "qoder-work" => Some(Self::Qoder),
+            "kimi" => Some(Self::Kimi),
             _ => None,
         }
+    }
+    pub fn uses_hook_channel(self) -> bool {
+        matches!(
+            self,
+            Self::Cursor | Self::Trae | Self::WorkBuddy | Self::ZCode | Self::Qoder | Self::Kimi
+        )
+    }
+    pub fn queues_in_channel(self) -> bool {
+        matches!(self, Self::Claude | Self::DeepSeek) || self.uses_hook_channel()
     }
 }
 #[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
@@ -223,6 +252,12 @@ pub struct LocalClients {
     deliveries: Option<PathBuf>,
 }
 
+/// Whether the client with this id hands a session a message even while it
+/// is idle, through a rewake hook waiting in the session (Qoder CLI's).
+pub fn wakes_idle(client: &str) -> bool {
+    agent_hud_agents::hooks::hooks_by_id(client).is_some_and(|hooks| hooks.rewake.is_some())
+}
+
 pub(crate) fn valid_name(value: &str) -> bool {
     !value.is_empty()
         && value.len() <= 128
@@ -235,17 +270,6 @@ pub(crate) fn valid_uuid(value: &str) -> bool {
 }
 pub(crate) fn antigravity_cascade_id(value: &str) -> &str {
     value.strip_prefix("antigravity:").unwrap_or(value)
-}
-/// A session id each client's delivery takes: Claude Code, Codex and
-/// Antigravity name a session by UUID (the snapshot shows Antigravity's as
-/// `antigravity:<uuid>`); DeepSeek Harness by a name of its own
-/// (`session-<uuid>`, which the snapshot shows as `deepseek:session-<uuid>`).
-pub(crate) fn valid_session_id(provider: Provider, value: &str) -> bool {
-    match provider {
-        Provider::Antigravity => valid_uuid(antigravity_cascade_id(value)),
-        Provider::DeepSeek => deepseek::valid_session(value),
-        Provider::Claude | Provider::Codex => valid_uuid(value),
-    }
 }
 pub(crate) fn millis(now: SystemTime) -> u64 {
     now.duration_since(UNIX_EPOCH)

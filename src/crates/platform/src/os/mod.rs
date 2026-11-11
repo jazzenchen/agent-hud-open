@@ -137,6 +137,8 @@ impl agent_hud_agents::claude::processes::Pids for HostPids {
 }
 /// A parent process of this one, as the kernel reports it.
 pub(crate) struct ProcessAncestor {
+    /// None where the host does not report it (Windows).
+    pub pid: Option<u32>,
     pub executable: PathBuf,
     pub arguments: Vec<String>,
     /// The application bundle identifier, on hosts that have bundles.

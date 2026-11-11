@@ -160,6 +160,14 @@ pub fn money_amount(amount: &Value, code: &str) -> String {
         }
         grouped.push(digit);
     }
+    let sign = if negative && cents > 0 { "-" } else { "" };
+    if code.eq_ignore_ascii_case("credits") {
+        return match cents % 100 {
+            0 => format!("{sign}{grouped}"),
+            rem if rem.is_multiple_of(10) => format!("{sign}{grouped}.{}", rem / 10),
+            rem => format!("{sign}{grouped}.{rem:02}"),
+        };
+    }
     let symbol = match code {
         "USD" | "AUD" | "CAD" | "HKD" | "NZD" | "SGD" | "TWD" | "MXN" => "$",
         "CNY" | "JPY" => "¥",
@@ -169,7 +177,6 @@ pub fn money_amount(amount: &Value, code: &str) -> String {
         "INR" => "₹",
         _ => "",
     };
-    let sign = if negative && cents > 0 { "-" } else { "" };
     let amount = format!("{grouped}.{:02}", cents % 100);
     if symbol.is_empty() {
         format!("{sign}{code}\u{a0}{amount}")

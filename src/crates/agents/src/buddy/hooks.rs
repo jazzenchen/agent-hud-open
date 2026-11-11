@@ -36,6 +36,7 @@ pub static CODEBUDDY: Hooks = Hooks {
     origin: None,
     attention: false,
     compaction: None,
+    rewake: None,
     prefixed_sessions: true,
     launch: POSIX_ONLY,
 };
@@ -57,16 +58,24 @@ pub static WORKBUDDY: Hooks = Hooks {
         opt_in: false,
         reply: Reply::HookSpecificOutput,
     }),
-    completion: None,
+    completion: Some(Completion {
+        begin: None,
+        event: "Stop",
+        timeout: 5,
+        read: completed,
+        enrich: Some(enrich),
+        reply: None,
+    }),
     origin: None,
     attention: false,
     compaction: None,
+    rewake: None,
     prefixed_sessions: true,
     launch: POSIX_ONLY,
 };
 
-/// CodeBuddy's `Stop`. Its turn is the callback's time, and the transcript
-/// path lets the platform read the final message.
+/// CodeBuddy's and WorkBuddy's `Stop`. Its turn is the callback's time, and
+/// the transcript path lets the platform read the final message.
 fn completed(payload: &Value, now_ms: i64) -> Option<Completed> {
     stop(payload, now_ms, false).map(|mut done| {
         done.transcript_path = Some(json!(payload["transcript_path"].as_str()));
@@ -74,14 +83,19 @@ fn completed(payload: &Value, now_ms: i64) -> Option<Completed> {
     })
 }
 
-/// CodeBuddy's Stop payload omits its final message identity. The platform may
-/// supply at most the last MiB of a verified transcript; the schema stays here.
-/// A newer user message is a boundary, not permission to reuse an older reply.
+/// CodeBuddy's and WorkBuddy's Stop payload omits its final message identity.
+/// The platform may supply at most the last MiB of a verified transcript; the
+/// schema stays here. A newer user message is a boundary, not permission to
+/// reuse an older reply.
 fn enrich(event: &mut HookEvent, transcript_tail: &[u8]) -> bool {
     if event.kind != "completion" {
         return false;
     }
-    let Some(session) = event.session_id.strip_prefix("codebuddy:") else {
+    let Some(session) = event
+        .session_id
+        .strip_prefix("codebuddy:")
+        .or_else(|| event.session_id.strip_prefix("workbuddy:"))
+    else {
         return false;
     };
     let tail = &transcript_tail[transcript_tail.len().saturating_sub(1024 * 1024)..];

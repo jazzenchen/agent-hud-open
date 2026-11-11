@@ -99,4 +99,53 @@ impl LocalClients {
         // A tag is a label: a failed write only leaves the log's tag.
         let _ = crate::hooks::record_delivery(data, provider, session, surface, at_ms);
     }
+    pub(super) fn hook_channel(&self) -> ClaudeChannel {
+        ClaudeChannel::new(
+            self.deliveries
+                .as_deref()
+                .unwrap_or(&self.paths.receipts)
+                .join("hook-channel"),
+        )
+    }
+}
+
+pub fn hook_session_key(provider: Provider, value: &str) -> Option<String> {
+    let raw = match provider {
+        Provider::Cursor => value.strip_prefix("cursor:").unwrap_or(value),
+        Provider::Trae => value
+            .strip_prefix("trae:")
+            .or_else(|| value.strip_prefix("trae-cn:"))
+            .unwrap_or(value),
+        Provider::WorkBuddy => value
+            .strip_prefix("workbuddy:")
+            .or_else(|| value.strip_prefix("codebuddy:"))
+            .unwrap_or(value),
+        Provider::ZCode => value.strip_prefix("zcode:").unwrap_or(value),
+        Provider::Qoder => value
+            .strip_prefix("qoder:")
+            .or_else(|| value.strip_prefix("qoder-cn:"))
+            .or_else(|| value.strip_prefix("qoder-work:"))
+            .unwrap_or(value),
+        Provider::Kimi => {
+            let stripped = value.strip_prefix("kimi:").unwrap_or(value);
+            stripped.strip_suffix(":main").unwrap_or(stripped)
+        }
+        _ => return None,
+    }
+    .trim();
+    (raw.len() <= 116 && valid_name(raw)).then(|| format!("{}--{raw}", provider.as_str()))
+}
+
+pub(crate) fn valid_session_id(provider: Provider, value: &str) -> bool {
+    match provider {
+        Provider::Antigravity => valid_uuid(antigravity_cascade_id(value)),
+        Provider::DeepSeek => deepseek::valid_session(value),
+        Provider::Claude | Provider::Codex => valid_uuid(value),
+        Provider::Cursor
+        | Provider::Trae
+        | Provider::WorkBuddy
+        | Provider::ZCode
+        | Provider::Qoder
+        | Provider::Kimi => hook_session_key(provider, value).is_some(),
+    }
 }

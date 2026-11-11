@@ -118,6 +118,7 @@ test("host tools are listed with their schema and hand the Codex caller from the
       name: "some_tool",
       arguments: { text: "hello" },
       caller: { client: "codex", sessionId: "thread-1", turnId: "turn-9" },
+      parent: process.pid,
     });
   } finally {
     await client.close();
@@ -171,6 +172,7 @@ test("an Antigravity caller comes from the conversation_id in the call's _meta",
       name: "some_tool",
       arguments: { text: "hello from antigravity" },
       caller: { client: "antigravity", sessionId: "cascade-3", turnId: null },
+      parent: process.pid,
     });
   } finally {
     await client.close();

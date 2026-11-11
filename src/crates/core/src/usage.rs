@@ -20,6 +20,14 @@ pub(crate) struct UsageProjection {
     pub(crate) counts: HashMap<String, usize>,
 }
 
+/// A WorkBuddy or CodeBuddy transcript its client made and never wrote to,
+/// such as one of a `-p` run that failed at once. These clients name a
+/// session only in its lines, so it holds none: kept, it was counted and
+/// listed under its bare file name, with no `workbuddy:` id, folder or title.
+fn unwritten_buddy_transcript(log: &LogHead) -> bool {
+    matches!(log.source.as_str(), "workbuddy" | "codebuddy") && !log.observed && log.length == 0
+}
+
 impl AgentHudCore {
     /// The logs whose usage counts: one copy per session, internal ones
     /// (Codex's guardian reviews) included, as their usage counts in Open;
@@ -53,6 +61,7 @@ impl AgentHudCore {
         let mut sessions: HashMap<(&str, &str), &LogHead> = HashMap::new();
         for log in self.logs.values().filter(|log| {
             log.source != "codex-index"
+                && !unwritten_buddy_transcript(log)
                 && self
                     .enabled
                     .get(log.source.as_str())

@@ -5,9 +5,9 @@
 //! account's entitlements with it. The token is used for that reading only
 //! and never kept; TRAE's own stored sign-in is never read.
 //!
-//! The China requests and fields follow CodexBar's Trae CN provider (MIT);
-//! the international host and the dollar-usage fields are those
-//! www.trae.ai's own script uses.
+//! The China requests follow CodexBar's Trae CN provider (MIT), and the
+//! international host is the one www.trae.ai's own script calls. The answer
+//! is counted as TRAE's own client counts it (`entitlements::parse`).
 use crate::account::{account_id, Host, Provider, Reading, Unread, WebSignIn, WebSite};
 use crate::l10n;
 use chrono::Utc;
@@ -99,12 +99,17 @@ pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
                 let id = account_id("trae", &[api.site]);
                 match summary.quota(api, site, &id) {
                     Some(quota) => reading.quotas.push(quota),
+                    // No limit: the plan shows, with no share to tell.
+                    None if summary.unlimited() => {}
                     None => empty.push(site.name),
                 }
-                let account = json!({
+                let mut account = json!({
                     "id": id, "provider": "trae", "label": site.name, "plan": summary.plan,
                     "checkedAt": Utc::now().to_rfc3339(), "signIn": "web",
                 });
+                if let Some(email) = summary.email {
+                    account["email"] = json!(email);
+                }
                 if reading.account.is_none() {
                     reading.account = Some(account);
                 } else {

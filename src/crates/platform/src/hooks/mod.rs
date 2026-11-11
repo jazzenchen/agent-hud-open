@@ -22,6 +22,7 @@ mod policy;
 pub use observers::{apply_observer_plan, observer_plan, ObserverPlan};
 mod reminders;
 mod reviewer;
+pub(crate) mod rewake;
 mod statusline;
 mod transcript;
 mod turn_log;

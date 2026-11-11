@@ -62,6 +62,12 @@ impl LocalClients {
                 automatic_installation: false,
                 notice: "Requires Agent HUD's plugin loaded in the DeepSeek Harness host. Input joins the session's own queue; slash commands are refused. Cancellation requires a plugin acknowledgement.".into(),
             },
+            hook_capability(Provider::Cursor),
+            hook_capability(Provider::Trae),
+            hook_capability(Provider::WorkBuddy),
+            hook_capability(Provider::ZCode),
+            hook_capability(Provider::Qoder),
+            hook_capability(Provider::Kimi),
         ]
     }
     pub fn targets(&self, now: SystemTime) -> Vec<ReachableTarget> {
@@ -96,6 +102,10 @@ impl LocalClients {
                         None
                     }
                     Provider::Antigravity => Some(false),
+                    provider if provider.uses_hook_channel() => {
+                        Some(valid_session_id(provider, &target.session_id))
+                    }
+                    _ => Some(false),
                 };
                 let notice = match target.provider {
                     Provider::Claude if reachable == Some(true) => {
@@ -112,6 +122,16 @@ impl LocalClients {
                     Provider::Antigravity => {
                         "Known cascade; local language server availability is verified at submission"
                     }
+                    provider
+                        if provider.uses_hook_channel()
+                            && self.hook_waiting(provider, &target.session_id) =>
+                    {
+                        "A rewake hook waits in the session and hands it over at once, even while the session is idle"
+                    }
+                    provider if provider.uses_hook_channel() => {
+                        "Waits for the session's own stop hook, which hands it over when one of its turns ends"
+                    }
+                    _ => "Unsupported provider",
                 }
                 .into();
                 ReachableTarget {
@@ -121,5 +141,34 @@ impl LocalClients {
                 }
             })
             .collect()
+    }
+
+    /// Whether a rewake hook waits in the session now (`hooks::rewake`): its
+    /// client then takes a message at once, even while the session is idle.
+    pub fn hook_waiting(&self, provider: Provider, session_id: &str) -> bool {
+        provider.uses_hook_channel()
+            && hook_session_key(provider, session_id).is_some_and(|key| {
+                crate::hooks::rewake::standing(
+                    self.deliveries.as_deref().unwrap_or(&self.paths.receipts),
+                    &key,
+                )
+            })
+    }
+}
+
+fn hook_capability(provider: Provider) -> Capability {
+    let wakes = wakes_idle(provider.as_str());
+    Capability {
+        provider,
+        supported: true,
+        operations: vec![Operation::Automatic, Operation::Enqueue],
+        plugin_preparation: false,
+        automatic_installation: true,
+        notice: if wakes {
+            "Queues input for the session's own hooks: a rewake hook waiting in the session hands it over at once, even while it is idle; otherwise its stop hook hands it over when one of its turns ends."
+        } else {
+            "Queues input for the session's own stop hook, which hands it over as the next input when one of its turns ends; an idle session takes it only after its next turn."
+        }
+        .into(),
     }
 }

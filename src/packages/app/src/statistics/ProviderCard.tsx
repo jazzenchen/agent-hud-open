@@ -230,7 +230,13 @@ export const ProviderCard = memo(function ProviderCard({
           <span>{moneyNote}</span>
           {providerBilling.length > 0 && (
             <span style={number}>
-              {zh ? "API 余额 " : "API balance "}
+              {providerBilling[0].currency === "credits"
+                ? zh
+                  ? "可用积分 "
+                  : "Available credits "
+                : zh
+                  ? "API 余额 "
+                  : "API balance "}
               {moneyAmount(
                 providerBilling[0].amount,
                 providerBilling[0].currency,

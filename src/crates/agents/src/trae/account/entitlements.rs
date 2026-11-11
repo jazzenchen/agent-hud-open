@@ -90,32 +90,40 @@ fn format_changed() -> String {
 }
 
 pub(super) struct Summary {
-    used: f64,
-    total: f64,
-    /// `credits` for TRAE CN's credits; none for the international dollar
-    /// usage, whose amounts are shown as a share only.
+    allowance: Allowance,
+    /// `credits` for credits; none for dollar usage, whose amounts are shown
+    /// as a share only.
     unit: Option<&'static str>,
+    reset_at: Option<String>,
     pub(super) plan: Option<String>,
+    pub(super) email: Option<String>,
 }
 
+/// What is used of what the account is allowed; none when TRAE reports no
+/// limit, so no share can be told.
+type Allowance = Option<(f64, f64)>;
+
 impl Summary {
-    /// The quota of one site, none for an account with no allowance.
+    /// The quota of one site, none for an account with no allowance or no
+    /// limit.
     pub(super) fn quota(&self, api: &Api, site: &WebSite, id: &str) -> Option<Value> {
-        if self.total <= 0.0 {
-            return None;
-        }
-        let used = (self.used / self.total * 100.0).clamp(0.0, 100.0);
+        let (used, total) = self.allowance.filter(|&(_, total)| total > 0.0)?;
+        let share = (used / total * 100.0).clamp(0.0, 100.0);
         let (name, short) = match self.unit {
             Some(_) => ("Credits", "Credits"),
             None => ("Usage", "Usage"),
         };
-        // Credit packs lapse on their own dates, so no one reset is told.
         Some(json!({
             "id": format!("{id}:{}", short.to_lowercase()), "vendor": api.agent, "accountId": id,
-            "account": site.name, "name": name, "shortLabel": short, "usedPercent": used,
-            "resetAt": null, "allModels": true, "status": status(used),
-            "nativeUsage": self.unit.map(|unit| json!({"used": self.used, "capacity": self.total, "unit": unit})),
+            "account": site.name, "name": name, "shortLabel": short, "usedPercent": share,
+            "resetAt": self.reset_at, "allModels": true, "status": status(share),
+            "nativeUsage": self.unit.map(|unit| json!({"used": used, "capacity": total, "unit": unit})),
         }))
+    }
+
+    /// Whether TRAE reports no limit for the account.
+    pub(super) fn unlimited(&self) -> bool {
+        self.allowance.is_none()
     }
 }
 
@@ -123,63 +131,134 @@ fn amount(value: &Value) -> Option<f64> {
     value.as_f64().filter(|n| n.is_finite() && *n >= 0.0)
 }
 
-/// The entitlement list's answer: the credits summary TRAE CN reports
-/// (`usage_summary`), else, for dollar usage, its plan packs' basic usage and
-/// limits as the site's own page adds them up. Anything else is refused
-/// rather than read as no use.
+/// An amount used: none reported is none used.
+fn spent(value: &Value) -> Option<f64> {
+    match value {
+        Value::Null => Some(0.0),
+        value => amount(value),
+    }
+}
+
+/// A pack's kind (`entitlement_base_info.product_type`), as TRAE's client
+/// numbers it. Packages (2), promo codes (3), pay-as-you-go (7) and the
+/// others are no plan.
+const FREE: i64 = 0;
+const PRO: i64 = 1;
+const PRO_PLUS: i64 = 4;
+const ULTRA: i64 = 6;
+const LITE: i64 = 8;
+
+/// The plans, highest tier first, by the names TRAE's usage panel shows.
+const PLANS: [(i64, &str); 5] = [
+    (ULTRA, "Ultra"),
+    (PRO_PLUS, "Pro+"),
+    (PRO, "Pro"),
+    (LITE, "Lite"),
+    (FREE, "Free"),
+];
+
+/// The entitlement list's answer, counted as TRAE's own client counts it
+/// (`ICubeUsageService` in TRAE's `workbench.desktop.main.js`, whose
+/// minified functions are named below): credits for an account billed in
+/// credits, else the plan's dollar usage. The plan is the account's highest
+/// tier. Anything else is refused rather than read as no use.
 pub(super) fn parse(body: &Value) -> Option<Summary> {
-    let credits = body["is_credits_billing"] == true;
-    let dollars = body["is_dollar_usage_billing"] == true;
     let packs = body["user_entitlement_pack_list"]
         .as_array()
         .map(Vec::as_slice)
         .unwrap_or_default();
-    let plan = packs
-        .iter()
-        .find(|pack| pack["group_type"] == 0 && (pack["status"].is_null() || pack["status"] == 1))
-        .and_then(|pack| pack["display_desc"].as_str())
-        .map(str::trim)
-        .filter(|plan| !plan.is_empty())
-        .map(str::to_owned);
-    let summary = &body["usage_summary"];
-    if credits || (dollars && summary.is_object()) {
-        let used = amount(&summary["consumed_amount"])?;
-        let total = amount(&summary["total_amount"])?;
-        return Some(Summary {
-            used,
-            total,
-            unit: credits.then_some("credits"),
-            plan,
-        });
-    }
-    if !dollars {
+    let plan = plan(packs);
+    let (allowance, unit, reset_at) = if body["is_credits_billing"] == true {
+        let allowance = credits(packs).or_else(|| summary(&body["usage_summary"]))?;
+        (allowance, Some("credits"), None)
+    } else if body["is_dollar_usage_billing"] == true {
+        let pack = plan.map(|(pack, _)| pack);
+        (dollars(pack)?, None, pack.and_then(reset))
+    } else {
         return None;
-    }
-    let (mut used, mut total) = (0.0, 0.0);
-    for pack in packs.iter().filter(|pack| pack["is_hide"] != true) {
-        let info = &pack["entitlement_base_info"];
-        let quota = match &info["product_extra"]["subscription_extra"]["quota"] {
-            Value::Null => &info["quota"],
-            quota => quota,
-        };
-        let limit = &quota["basic_usage_limit"];
-        if limit.is_null() {
-            continue;
-        }
-        // -1 is no limit: no share of it can be told.
-        if limit.as_f64() == Some(-1.0) {
-            return None;
-        }
-        total += amount(limit)?;
-        used += match &pack["usage"]["basic_usage_amount"] {
-            Value::Null => 0.0,
-            value => amount(value)?,
-        };
-    }
+    };
     Some(Summary {
-        used,
-        total,
-        unit: None,
-        plan,
+        allowance,
+        unit,
+        reset_at,
+        plan: plan.map(|(_, name)| name.to_owned()),
+        email: None,
     })
+}
+
+/// The account's plan pack as TRAE's client picks it (`Y`, and `p=o||r||n||l||s`
+/// in `U`): the highest tier among the packs, whatever their order or status.
+fn plan(packs: &[Value]) -> Option<(&Value, &'static str)> {
+    PLANS.iter().find_map(|&(kind, name)| {
+        packs
+            .iter()
+            .find(|pack| pack["entitlement_base_info"]["product_type"] == kind)
+            .map(|pack| (pack, name))
+    })
+}
+
+/// The plan's dollar usage as TRAE's usage panel counts it (`ab`): the basic
+/// allowance, plus the bonus TRAE applies once that is used up unless the
+/// plan has none (`no_bonus_quota`). Only limits of 0 or more are limits: a
+/// negative basic limit (-1) leaves the plan with none, and a bonus without
+/// one is not counted. Packages, pay-as-you-go and promo codes are no part of
+/// it. No plan is no allowance.
+fn dollars(plan: Option<&Value>) -> Option<Allowance> {
+    let Some(plan) = plan else {
+        return Some(Some((0.0, 0.0)));
+    };
+    let quota = &plan["entitlement_base_info"]["quota"];
+    let usage = &plan["usage"];
+    let basic = quota["basic_usage_limit"]
+        .as_f64()
+        .filter(|n| n.is_finite())?;
+    if basic < 0.0 {
+        return Some(None);
+    }
+    let (mut used, mut total) = (spent(&usage["basic_usage_amount"])?, basic);
+    if quota["no_bonus_quota"] != true {
+        if let Some(bonus) = amount(&quota["bonus_usage_limit"]) {
+            used += spent(&usage["bonus_usage_amount"])?;
+            total += bonus;
+        }
+    }
+    Some(Some((used, total)))
+}
+
+/// When the plan's usage resets, as TRAE's usage panel tells it (`bb`): a
+/// second after its period's `end_time`.
+fn reset(plan: &Value) -> Option<String> {
+    plan["entitlement_base_info"]["end_time"]
+        .as_i64()
+        .filter(|&end| end > 0)
+        .and_then(|end| chrono::DateTime::from_timestamp(end + 1, 0))
+        .map(|reset| reset.to_rfc3339())
+}
+
+/// Credits as TRAE CN's title bar counts them (`JTr`): every pack with a
+/// `credits_limit` above 0 adds it to the total and what is left of it to
+/// what remains, and -1 is no limit. Used is the total less what remains, so
+/// what Agent HUD shows left is the remainder TRAE CN shows. None when no
+/// pack has a credits limit, or an amount is unreadable.
+fn credits(packs: &[Value]) -> Option<Allowance> {
+    let (mut total, mut left, mut unlimited, mut counted) = (0.0, 0.0, false, false);
+    for pack in packs {
+        match pack["entitlement_base_info"]["quota"]["credits_limit"].as_f64() {
+            Some(-1.0) => (counted, unlimited) = (true, true),
+            Some(limit) if limit > 0.0 && limit.is_finite() => {
+                let used = spent(&pack["usage"]["credits_amount"])?;
+                (counted, total, left) = (true, total + limit, left + (limit - used).max(0.0));
+            }
+            _ => {}
+        }
+    }
+    counted.then_some((!unlimited).then_some((total - left, total)))
+}
+
+/// The credits summary the site's own page reads, which CodexBar's Trae CN
+/// provider follows, for an answer whose packs carry no credits limits.
+fn summary(summary: &Value) -> Option<Allowance> {
+    let used = amount(&summary["consumed_amount"])?;
+    let total = amount(&summary["total_amount"])?;
+    Some(Some((used, total)))
 }

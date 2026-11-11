@@ -55,6 +55,7 @@ pub static HOOKS: Hooks = Hooks {
     origin: None,
     attention: false,
     compaction: None,
+    rewake: None,
     prefixed_sessions: true,
     launch: PerOs {
         macos: Support::Verified(Launch::Command),

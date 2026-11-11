@@ -64,6 +64,7 @@ const FLAGS: &[&str] = &[
     "--attention-hook",
     "--session-origin-hook",
     "--compaction-hook",
+    "--rewake-hook",
     "--unknown-hook",
 ];
 /// Windows executables passed to `patch_configuration_for_windows`.

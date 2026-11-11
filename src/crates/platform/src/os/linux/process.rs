@@ -42,6 +42,7 @@ pub(crate) fn parent_processes() -> Vec<ProcessAncestor> {
             break;
         };
         result.push(ProcessAncestor {
+            pid: u32::try_from(pid).ok(),
             executable,
             arguments,
             bundle: None,
@@ -66,4 +67,19 @@ pub(crate) fn codex_cli_on_port(
 /// boot) would tell them apart.
 pub(crate) fn process_runs(pid: i32, started: Option<i64>) -> bool {
     super::super::unix::pid_runs(pid, started, |_| None)
+}
+
+/// No start is read here yet (see `process_runs`).
+pub(crate) fn process_start(_pid: i32) -> Option<i64> {
+    None
+}
+
+/// Whether the stdin and stdout of the process on `pid` are terminals: both
+/// link to a pseudo-terminal or a console.
+pub(crate) fn terminal_io(pid: i32) -> bool {
+    [0, 1].into_iter().all(|fd| {
+        std::fs::read_link(format!("/proc/{pid}/fd/{fd}")).is_ok_and(|target| {
+            target.starts_with("/dev/pts") || target.to_string_lossy().starts_with("/dev/tty")
+        })
+    })
 }

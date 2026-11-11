@@ -69,6 +69,89 @@ fn text_settings_take_the_hooks_in_place_and_give_them_back() {
 }
 
 #[test]
+fn kimi_takes_its_hooks_in_config_toml_and_gives_them_back() {
+    let temp = tempfile::tempdir().unwrap();
+    let home = temp.path().join("home");
+    let context = context_in(&home);
+    let path = home.join(".kimi-code/config.toml");
+    fs::create_dir_all(path.parent().unwrap()).unwrap();
+    let original = "default_model = \"kimi-code/kimi-for-coding\"\n\n[[hooks]]\nevent = \"Stop\"\ncommand = \"say done\"\n";
+    fs::write(&path, original).unwrap();
+
+    let plan = only(install_plans(&context, "kimi", "--completion-hook", true)).unwrap();
+    assert!(apply_plan(&plan).unwrap());
+    let installed = fs::read_to_string(&path).unwrap();
+    assert!(installed.starts_with(original));
+    let command = format!("'{}' --completion-hook kimi", context.executable.display());
+    for event in ["Stop", "UserPromptSubmit"] {
+        assert!(installed.contains(&format!(
+            "[[hooks]]\nevent = \"{event}\"\ncommand = \"{command}\"\ntimeout = 10\n"
+        )));
+    }
+    assert!(
+        !only(install_plans(&context, "kimi", "--completion-hook", true))
+            .unwrap()
+            .changed
+    );
+    let removal = only(install_plans(&context, "kimi", "--completion-hook", false)).unwrap();
+    assert!(apply_plan(&removal).unwrap());
+    assert_eq!(fs::read_to_string(&path).unwrap(), original);
+}
+
+#[test]
+fn qoder_takes_its_rewake_hook_beside_its_own_and_gives_it_back() {
+    let temp = tempfile::tempdir().unwrap();
+    let home = temp.path().join("home");
+    let context = context_in(&home);
+    let path = home.join(".qoder/settings.json");
+    fs::create_dir_all(path.parent().unwrap()).unwrap();
+    let original = r#"{
+  "model": "auto",
+  "hooks": {
+    "Stop": [
+      { "hooks": [ { "type": "command", "command": "say done" } ] }
+    ]
+  }
+}
+"#;
+    fs::write(&path, original).unwrap();
+
+    let plan = only(install_plans(&context, "qoder", "--rewake-hook", true)).unwrap();
+    assert!(apply_plan(&plan).unwrap());
+    let installed: Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+    let command = format!("'{}' --rewake-hook qoder", context.executable.display());
+    let handler = json!({"type":"command","command":command,"timeout":86400,"asyncRewake":true});
+    assert_eq!(
+        installed["hooks"]["SessionStart"],
+        json!([{"hooks":[handler]}])
+    );
+    // The user's own Stop hook stays first, Agent HUD's waits beside it.
+    assert_eq!(
+        installed["hooks"]["Stop"],
+        json!([{"hooks":[{"type":"command","command":"say done"}]},{"hooks":[handler]}])
+    );
+    assert_eq!(installed["model"], "auto");
+    assert!(
+        !only(install_plans(&context, "qoder", "--rewake-hook", true))
+            .unwrap()
+            .changed
+    );
+    // The completion hook's Stop handler joins without touching it.
+    let completion = only(install_plans(&context, "qoder", "--completion-hook", true)).unwrap();
+    assert!(apply_plan(&completion).unwrap());
+    assert!(
+        !only(install_plans(&context, "qoder", "--rewake-hook", true))
+            .unwrap()
+            .changed
+    );
+    for flag in ["--completion-hook", "--rewake-hook"] {
+        let removal = only(install_plans(&context, "qoder", flag, false)).unwrap();
+        assert!(apply_plan(&removal).unwrap());
+    }
+    assert_eq!(fs::read_to_string(&path).unwrap(), original);
+}
+
+#[test]
 fn text_settings_it_cannot_follow_are_left_alone() {
     let temp = tempfile::tempdir().unwrap();
     let home = temp.path().join("home");

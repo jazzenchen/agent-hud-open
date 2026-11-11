@@ -24,7 +24,22 @@ fn flags_follow_each_clients_hooks() {
         flags("codebuddy"),
         ["--permission-hook", "--completion-hook"]
     );
-    assert_eq!(flags("workbuddy"), ["--permission-hook"]);
+    assert_eq!(
+        flags("workbuddy"),
+        ["--permission-hook", "--completion-hook"]
+    );
+    assert_eq!(flags("zcode"), ["--permission-hook", "--completion-hook"]);
+    // Only Qoder CLI wakes an idle session for a hook (`Rewake`).
+    for qoder in ["qoder", "qoder-cn"] {
+        assert_eq!(
+            flags(qoder),
+            ["--permission-hook", "--completion-hook", "--rewake-hook"]
+        );
+    }
+    assert_eq!(
+        flags("qoder-work"),
+        ["--permission-hook", "--completion-hook"]
+    );
     // Copilot's approvals wait for the user to turn them on; it is the
     // only client whose hook does.
     let copilot = hooks_by_id("copilot").unwrap();

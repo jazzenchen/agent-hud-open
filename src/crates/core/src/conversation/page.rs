@@ -14,12 +14,18 @@ fn row(item: LineItem) -> Value {
 pub(crate) fn page(
     path: &Path,
     source: &str,
+    id: &str,
     cursor: u64,
     limit: usize,
     tail: bool,
     archives: &mut compressed::Archives,
     contexts: &mut Contexts,
 ) -> Result<Value, String> {
+    // ZCode keeps every session's messages in one database; a page is a run
+    // of them in order (`agents::zcode::conversation`), its cursor a place.
+    if source == "zcode" {
+        return database_page(path, source, id, cursor, limit, tail);
+    }
     if source_db::accepts(path, source) {
         return Err(l10n::text("此来源的压缩日志不支持分页查看消息；用量和调用仍可查看", "Message paging is not available for this compact source; usage and calls remain available"));
     }
@@ -143,6 +149,62 @@ pub(crate) fn page(
     Ok(
         json!({"messages":messages,"messageCursor":cursor,"nextMessageCursor":(tail||!complete).then_some(position),"endMessageCursor":position,"messagesTruncatedBefore":tail&&cursor>0,"messagesPending":false,"messagesComplete":complete}),
     )
+}
+
+/// A page of a session whose messages a database holds (ZCode): `cursor` is
+/// a message's place, and a tail page is the last `limit` messages.
+fn database_page(
+    path: &Path,
+    source: &str,
+    id: &str,
+    cursor: u64,
+    limit: usize,
+    tail: bool,
+) -> Result<Value, String> {
+    use agent_hud_agents::zcode::conversation;
+    let unreadable = || {
+        l10n::text(
+            "无法读取所选会话的日志",
+            "Could not read the selected session transcript",
+        )
+    };
+    let database =
+        agent_hud_agents::sqlite::ReadOnlyDatabase::open(path).map_err(|_| unreadable())?;
+    let read = if tail {
+        conversation::last_messages(&database.connection, id, limit)
+    } else {
+        conversation::messages(&database.connection, id, cursor, limit)
+    }
+    .map_err(|_| unreadable())?;
+    let rule = turns::of(source);
+    let reader_items = items::of(source);
+    let mut context = Context {
+        path: path.into(),
+        cursor,
+        turn_id: None,
+        started: None,
+    };
+    let mut messages = Vec::new();
+    let first = read.lines.first().map_or(read.next, |(place, _)| *place);
+    for (place, value) in &read.lines {
+        context.read(rule, value);
+        for item in (reader_items.read)(value, *place) {
+            let mut entry = row(item);
+            entry["turnId"] = json!(context.turn_id);
+            entry["turnStartedAt"] = json!(context.started);
+            messages.push(entry);
+        }
+    }
+    let start = if tail { first } else { cursor };
+    Ok(json!({
+        "messages":messages,
+        "messageCursor":start,
+        "nextMessageCursor":(tail || !read.complete).then_some(read.next),
+        "endMessageCursor":read.next,
+        "messagesTruncatedBefore":tail && read.earlier,
+        "messagesPending":false,
+        "messagesComplete":read.complete,
+    }))
 }
 
 /// How much of a transcript's end a tail page reads.

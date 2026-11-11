@@ -185,7 +185,7 @@ pub(super) fn parse(
                 );
             }
         }
-        "glm" => {
+        "glm" | "zcode" => {
             if root["success"] != true || numeric(&root["code"]) != Some(200.0) {
                 return Err(l10n::text(
                     "GLM 返回的额度格式无法识别",
@@ -309,6 +309,28 @@ pub(super) fn parse(
     Ok((windows, plan))
 }
 
+/// A Kimi Code account as its profile names it (`/me`, which Kimi Code's own
+/// account panel reads): the person's email, else nickname, and the name of
+/// their membership level. Without a profile, the plan the usage answer
+/// named (`membership.level`, which older answers carry) names both.
+pub(super) fn kimi_account(
+    profile: &Value,
+    plan: Option<String>,
+) -> (Option<String>, Option<String>) {
+    let field = |key: &str| {
+        profile[key]
+            .as_str()
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .map(str::to_owned)
+    };
+    let plan = field("user_level_name").or(plan);
+    let label = field("email")
+        .or_else(|| field("nickname"))
+        .or_else(|| plan.clone());
+    (label, plan)
+}
+
 /// The logged calls that spend a plan: those through its own provider ids,
 /// which no pay-as-you-go key uses ("pi#zai" is Pi's alone: OpenCode's `zai`
 /// is pay-as-you-go), and, when Claude Code's address is the plan's,
@@ -320,13 +342,15 @@ pub(super) fn link(row: &mut Value, entry: &Credential) {
             &["kimi-code", "kimi-for-coding", "kimi-coding"],
             Some("kimi"),
         ),
-        "glm" if china => (&["zhipuai-coding-plan", "pi#zai-coding-cn"], Some("glm")),
-        "glm" => (&["zai-coding-plan", "pi#zai"], Some("glm")),
+        "glm" | "zcode" if china => (&["zhipuai-coding-plan", "pi#zai-coding-cn"], Some("glm")),
+        "glm" | "zcode" => (&["zai-coding-plan", "pi#zai"], Some("glm")),
         "opencode" => (&["opencode-go"], None),
         _ => return,
     };
     row["consumerRoutes"] = json!(routes);
-    if let Some(family) = family.filter(|_| entry.clients.contains("Claude")) {
+    if entry.provider == "zcode" {
+        row["consumerSource"] = json!("zcode");
+    } else if let Some(family) = family.filter(|_| entry.clients.contains("Claude")) {
         row["consumerSource"] = json!("claude");
         if row["allModels"] == true {
             row["modelFamilies"] = json!([family]);

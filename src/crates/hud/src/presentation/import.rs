@@ -67,6 +67,7 @@ impl Presentation {
                     seeded.sources.insert(id.clone(), Value::Object(values));
                 }
             }
+            live_status::forget_defaults(&mut seeded.sources);
         }
         s.saved = seeded;
         if let Err(error) = self.persist(&mut s, before) {

@@ -107,6 +107,9 @@ export interface BillingAccount {
   label: string;
   amount: number;
   currency: string;
+  planCredits?: number | null;
+  rewardCredits?: number | null;
+  resetAt?: string | null;
   notice: string | null;
   /** From Core (Open's AlertPolicy.balanceLevel): critical at or below zero or while the service refuses the balance, warning at or below its currency's line. */
   level?: "normal" | "warning" | "critical";

@@ -134,7 +134,11 @@ pub(super) fn failed_reading(
         .as_deref()
         .and_then(date_ms)
         .is_some_and(|at| attempted_ms.saturating_sub(at) < GRACE_MS);
-    let unnoticed = !entry.failed && recent && matches!(unread, Unread::Transient { .. });
+    let has_reading = !entry.reading.quotas.is_empty()
+        || !entry.reading.billing.is_empty()
+        || entry.reading.account.is_some();
+    let unnoticed =
+        !entry.failed && has_reading && recent && matches!(unread, Unread::Transient { .. });
     entry.attempted = attempted;
     entry.attempted_ms = attempted_ms;
     entry.restored = false;

@@ -69,6 +69,7 @@ impl Presentation {
             .as_object_mut()
             .unwrap();
         merge(target, patch);
+        live_status::choose(target, patch.keys().map(String::as_str));
         if let Err(error) = self.persist(&mut s, before) {
             *s = checkpoint;
             return Err(error);

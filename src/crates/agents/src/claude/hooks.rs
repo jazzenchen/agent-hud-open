@@ -32,6 +32,7 @@ pub static HOOKS: Hooks = Hooks {
         // The original compaction hook ran the session-origin entrypoint.
         legacy_flag: Some("--session-origin-hook"),
     }),
+    rewake: None,
     prefixed_sessions: false,
     launch: PerOs {
         macos: Support::Verified(Launch::Command),

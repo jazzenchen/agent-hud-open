@@ -41,6 +41,10 @@ pub fn configuration(source_name: &str, flag: &str) -> Result<HookConfiguration,
                 vec!["SessionStart", "UserPromptSubmit"]
             }
         }
+        "--rewake-hook" => match &hooks.rewake {
+            Some(rewake) => rewake.events.to_vec(),
+            None => return Err("This client does not support the requested hook".into()),
+        },
         "--attention-hook" if hooks.attention => vec!["Notification"],
         "--compaction-hook" if hooks.compaction.is_some() => vec!["PreCompact"],
         _ => return Err("This client does not support the requested hook".into()),
@@ -225,6 +229,7 @@ pub(super) fn timeout(hooks: &Hooks, flag: &str) -> u64 {
     match flag {
         "--permission-hook" => hooks.permission.as_ref().map(|hook| hook.timeout),
         "--completion-hook" => hooks.completion.as_ref().map(|hook| hook.timeout),
+        "--rewake-hook" => hooks.rewake.as_ref().map(|hook| hook.timeout),
         _ => None,
     }
     .unwrap_or(5)

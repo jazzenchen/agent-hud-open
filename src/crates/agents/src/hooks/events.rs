@@ -164,6 +164,20 @@ pub fn parse_event(
             if let Some(usage) = done.usage {
                 data["usage"] = json!(usage);
             }
+            // How many times the client already carried this turn on from a
+            // stop hook: Cursor counts them (`loop_count`), the Claude-style
+            // clients say whether this stop follows one (`stop_hook_active`).
+            // The platform reads them before it hands the session a queued
+            // message, so it never asks for more than the client allows.
+            if let Some(count) = payload["loop_count"].as_u64() {
+                data["loopCount"] = json!(count);
+            }
+            if let Some(active) = payload["stop_hook_active"]
+                .as_bool()
+                .or_else(|| payload["stopHookActive"].as_bool())
+            {
+                data["stopHookActive"] = json!(active);
+            }
             Ok(Some(event(
                 source,
                 &done.session,

@@ -11,6 +11,13 @@ fn client(client: &str) -> &'static str {
         "claude" => "Claude Code",
         "antigravity" => "Antigravity",
         "deepseek" => "DeepSeek Harness",
+        "cursor" => "Cursor",
+        "trae" | "trae-cn" => "TRAE",
+        "workbuddy" => "WorkBuddy",
+        "codebuddy" => "CodeBuddy",
+        "zcode" => "ZCode",
+        "qoder" | "qoder-cn" | "qoder-work" => "Qoder",
+        "kimi" => "Kimi Code",
         _ => "Codex",
     }
 }
@@ -21,7 +28,9 @@ fn client(client: &str) -> &'static str {
 /// "send_message" is taken for those. Antigravity's name is not known yet.
 fn reply_tool(zh: bool, client: &str) -> String {
     let name = match client {
-        "claude" | "deepseek" => "mcp__agent-hud__send_message",
+        // Their logs show the Claude Code naming for Agent HUD's tools.
+        "claude" | "deepseek" | "kimi" | "qoder" | "qoder-cn" | "qoder-work" | "workbuddy"
+        | "codebuddy" | "zcode" => "mcp__agent-hud__send_message",
         "codex" => "mcp__agent_hud__send_message",
         _ => {
             return say(
@@ -119,15 +128,15 @@ pub fn to_self(zh: bool) -> String {
 pub fn unknown(zh: bool) -> String {
     say(
         zh,
-        "没有这个 id 的 Claude Code、Codex、Antigravity 或 DeepSeek Harness 会话，list_sessions 里有各会话的 id。",
-        "No Claude Code, Codex, Antigravity or DeepSeek Harness session has this id; list_sessions shows the ids.",
+        "没有这个 id 的会话，list_sessions 里有各会话的 id。",
+        "No session Agent HUD can message has this id; list_sessions shows the ids.",
     )
 }
 pub fn other_client(zh: bool) -> String {
     say(
         zh,
-        "只能发给 Claude Code、Codex、Antigravity 和 DeepSeek Harness 会话。",
-        "Messages go to Claude Code, Codex, Antigravity and DeepSeek Harness sessions only.",
+        "只能发给 Claude Code、Codex、Antigravity、DeepSeek Harness、Cursor、TRAE、WorkBuddy、ZCode、Qoder 和 Kimi Code 会话。",
+        "Messages go to Claude Code, Codex, Antigravity, DeepSeek Harness, Cursor, TRAE, WorkBuddy, ZCode, Qoder and Kimi Code sessions only.",
     )
 }
 pub fn child(zh: bool) -> String {
@@ -246,6 +255,56 @@ pub fn antigravity_waits(zh: bool) -> String {
         "发送时会通过正在运行的 Antigravity 本地服务送达。",
         "Antigravity delivers the message through its running local service when sent.",
     )
+}
+/// How a client is named in a reason.
+pub fn client_name(client: &str) -> &'static str {
+    match client {
+        "cursor" => "Cursor",
+        "trae" => "TRAE",
+        "trae-cn" => "TRAE CN",
+        "workbuddy" => "WorkBuddy",
+        "codebuddy" => "CodeBuddy",
+        "zcode" => "ZCode",
+        "qoder" | "qoder-work" => "Qoder",
+        "qoder-cn" => "Qoder CN",
+        "kimi" => "Kimi Code",
+        _ => "This client",
+    }
+}
+pub fn hook_running(zh: bool) -> String {
+    say(
+        zh,
+        "这一轮结束时，它的停止钩子会把消息作为下一条输入交给会话。",
+        "Its stop hook hands the message over as the next input when the current turn ends.",
+    )
+}
+pub fn hook_idle(zh: bool, client: &str) -> String {
+    if zh {
+        format!("{client} 没有让空闲会话开始新一轮的受支持方式：消息会等到这个会话下一轮结束时由停止钩子交给它；一小时内没有轮次结束就过期。")
+    } else {
+        format!("{client} offers no supported way to start a turn in an idle session: the message waits for this session's next turn to end, when its stop hook hands it over, and expires if no turn ends within an hour.")
+    }
+}
+pub fn hook_waiting(zh: bool) -> String {
+    say(
+        zh,
+        "Agent HUD 的唤醒钩子正在这个会话里等候：它会立即把消息交给会话，作为下一条输入；会话空闲时会为它开始新的一轮。",
+        "Agent HUD's rewake hook waits in this session: it hands the message over at once as the next input, and an idle session starts a turn for it.",
+    )
+}
+pub fn hook_not_waiting(zh: bool, client: &str) -> String {
+    if zh {
+        format!("这个 {client} 会话里没有 Agent HUD 的唤醒钩子在等候（它只在交互式会话里，从会话启动或上一轮结束起等候）：消息会等到这个会话下一轮结束时由停止钩子交给它；一小时内没有轮次结束就过期。")
+    } else {
+        format!("No Agent HUD rewake hook waits in this {client} session (one waits only in an interactive session, from its start or its last turn's end): the message waits for this session's next turn to end, when its stop hook hands it over, and expires if no turn ends within an hour.")
+    }
+}
+pub fn hook_unseen(zh: bool, client: &str) -> String {
+    if zh {
+        format!("Agent HUD 还没收到 {client} 的钩子回报，消息无法送达。请在 Agent HUD 设置里打开客户端钩子{}。", if client.starts_with("TRAE") { "，并在 TRAE 的「设置 > Hooks」里打开全局 Hooks" } else { "" })
+    } else {
+        format!("Agent HUD has not heard from {client}'s hooks yet, so nothing would take the message. Turn on client hooks in Agent HUD's settings{}.", if client.starts_with("TRAE") { ", and TRAE's global hooks in TRAE Settings → Hooks" } else { "" })
+    }
 }
 pub fn replied(zh: bool, reply: &str) -> String {
     if zh {

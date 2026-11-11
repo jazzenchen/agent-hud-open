@@ -117,3 +117,47 @@ fn workbuddy_ceilings_metering_and_account_session_records() {
     assert_eq!(quotas[0]["allModels"], false);
     assert_eq!(quotas[0]["windowDurationSeconds"], 18_000.0);
 }
+
+#[test]
+fn an_unwritten_workbuddy_transcript_is_neither_counted_nor_listed() {
+    let temp = tempfile::tempdir().unwrap();
+    let projects = temp.path().join(".workbuddy/projects/folder");
+    fs::create_dir_all(&projects).unwrap();
+    let now_ms = Utc::now().timestamp_millis();
+    fs::write(
+        projects.join("wb_1.jsonl"),
+        format!(
+            "{}\n",
+            json!({"sessionId": "wb_1", "timestamp": now_ms - 1000, "type": "message",
+                "role": "user", "cwd": "/tmp/w", "content": [{"type": "input_text", "text": "hi"}]})
+        ),
+    )
+    .unwrap();
+    // A `-p` run that failed before it wrote a line.
+    fs::write(projects.join("wb_empty.jsonl"), "").unwrap();
+    let mut backend = AgentHudCore::new(
+        vec![SourceRoot {
+            path: temp.path().join(".workbuddy/projects"),
+            provider: "workbuddy",
+        }],
+        temp.path().join("app-data"),
+    );
+    let snap = backend.request("snapshot", json!({})).unwrap();
+    let provider = snap["providers"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|p| p["id"] == "workbuddy")
+        .unwrap();
+    assert_eq!(provider["sessions"], 1);
+    let list = backend
+        .request("sessions", json!({"scope": "all", "source": "workbuddy"}))
+        .unwrap();
+    let ids = list["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|s| s["id"].as_str().unwrap().to_owned())
+        .collect::<Vec<_>>();
+    assert_eq!(ids, ["workbuddy:wb_1"]);
+}

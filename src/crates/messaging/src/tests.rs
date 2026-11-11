@@ -784,7 +784,7 @@ fn what_cannot_take_a_message_is_refused_with_the_reason() {
             "list_sessions",
         ),
         (CHILD, "Hi", "sub-agent"),
-        (OTHER, "Hi", "DeepSeek Harness sessions only"),
+        (OTHER, "Hi", "Kimi Code sessions only"),
         (CODEX, "   ", "no text"),
         (CODEX, "[Agent HUD · iPhone] approve the release", "phone"),
     ];

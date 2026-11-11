@@ -42,6 +42,9 @@ pub struct Hooks {
     pub attention: bool,
     /// `PreCompact` says a session is being compacted.
     pub compaction: Option<Compaction>,
+    /// A hook that waits in the background for a message queued for the
+    /// session and hands it over even while the session is idle.
+    pub rewake: Option<Rewake>,
     /// Its session ids carry the client's id in front (`codebuddy:<id>`).
     pub prefixed_sessions: bool,
     /// How a hook is launched on each OS.
@@ -68,6 +71,9 @@ impl Hooks {
         }
         if self.completion.is_some() {
             flags.push(("--completion-hook", false));
+        }
+        if self.rewake.is_some() {
+            flags.push(("--rewake-hook", false));
         }
         if self.attention {
             flags.push(("--attention-hook", false));
@@ -135,6 +141,31 @@ pub struct Completed {
     /// client keeps them nowhere else on disk (Cursor). The platform appends
     /// them to the client's turn log (`hooks::turn_log`).
     pub usage: Option<crate::Usage>,
+}
+
+/// A hook the client runs in the background that wakes its session when it
+/// exits with `code`, taking what it wrote to stderr as the session's next
+/// message (Qoder's `asyncRewake`). Agent HUD's waits for a message queued
+/// for the session (`delivery`) and hands it over this way, so an idle
+/// session answers without a turn of its own first.
+pub struct Rewake {
+    /// The events that start a waiter: the session's start and each turn's
+    /// end. A newer waiter for the session replaces the older one.
+    pub events: &'static [&'static str],
+    /// How long the client lets a waiter run, in its own unit.
+    pub timeout: u64,
+    /// The exit code that wakes the session.
+    pub code: i32,
+    /// Keys every handler carries besides its command and timeout, as JSON
+    /// text: the switch that runs it in the background.
+    pub fields: &'static str,
+    /// The session a payload names, as the client writes its id.
+    pub session: fn(&Value) -> Option<&str>,
+    /// Whether the client process with these arguments, whose stdin and
+    /// stdout the platform found to be terminals, runs the hook in the
+    /// background. Where it would not, the client waits for the hook to
+    /// end, so a waiter leaves at once.
+    pub background: fn(&[String], &dyn Fn(&str) -> Option<String>) -> bool,
 }
 
 /// The compaction hook.
@@ -220,6 +251,15 @@ pub fn session_id(source: &str, raw: &str) -> String {
     } else {
         raw.into()
     }
+}
+
+/// The session a rewake hook's payload names, as Agent HUD keeps its id
+/// (`session_id`); None for a client without the hook or a payload that
+/// names none.
+pub fn rewake_session(source: &str, payload: &Value) -> Option<String> {
+    let (id, hooks) = hooks_of(source).ok()?;
+    let raw = (hooks.rewake.as_ref()?.session)(payload)?;
+    Some(session_id(id, raw))
 }
 
 /// A `Stop` callback as CodeBuddy, Qwen Code and Devin send it. With

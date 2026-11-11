@@ -3,8 +3,8 @@
 //! the China builds, qoder.com.cn (`WebSignIn`). Qoder, Qoder CN and QoderWork
 //! spend the same credits as the account they are signed in to.
 use crate::account::{
-    account_id, status, Host, HttpFailure, HttpRequest, Provider, Reading, Unread, WebSession,
-    WebSignIn, WebSite,
+    account_id, append_notice, status, Host, HttpFailure, HttpRequest, Provider, Reading, Unread,
+    WebSession, WebSignIn, WebSite,
 };
 use crate::l10n;
 use chrono::{DateTime, Utc};
@@ -36,30 +36,55 @@ pub static PROVIDER: Provider = Provider {
     ..Provider::new("qoder", read)
 };
 
+/// What one site's reading brings: its credits (none when the plan has no
+/// allowance), its account, and a line to show under the account's name.
+struct Site {
+    quota: Option<Value>,
+    account: Value,
+    notice: Option<String>,
+}
+
 /// The credits of every site the user signed in to; nothing until they have.
 pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
     let mut reading = Reading::empty("qoder");
     let mut failures = Vec::new();
+    let mut empty = Vec::new();
     for site in WEB.sites {
         let Some(session) = host.web_session("qoder", site.host) else {
             continue;
         };
         match credits(host, site, &session) {
-            Ok((quota, account)) => {
-                reading.quotas.push(quota);
+            Ok(read) => {
+                match read.quota {
+                    Some(quota) => reading.quotas.push(quota),
+                    None => empty.push(site.name),
+                }
                 if reading.account.is_none() {
-                    reading.account = Some(account);
+                    reading.account = Some(read.account);
                 } else {
-                    reading.additional_accounts.push(account);
+                    reading.additional_accounts.push(read.account);
+                }
+                if let Some(notice) = read.notice {
+                    append_notice(&mut reading, notice);
                 }
             }
             Err(why) => failures.push(why),
         }
     }
+    if reading.quotas.is_empty() && !empty.is_empty() {
+        let notice = l10n::text(
+            &format!("{} 当前套餐没有可用的积分额度", empty.join("、")),
+            &format!(
+                "{} reports no credit allowance for this plan.",
+                empty.join(", ")
+            ),
+        );
+        append_notice(&mut reading, notice);
+    }
     match Unread::combined(failures) {
         // One site read and another failed: the reading stands, with why.
         Some(why) if reading.account.is_some() => {
-            reading.notice = Some(why.reason().to_owned());
+            append_notice(&mut reading, why.reason().to_owned());
             Ok(reading)
         }
         Some(why) => Err(why),
@@ -68,11 +93,7 @@ pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
 }
 
 /// The account page's credit summary for `site`.
-fn credits(
-    host: &dyn Host,
-    site: &WebSite,
-    session: &WebSession,
-) -> Result<(Value, Value), Unread> {
+fn credits(host: &dyn Host, site: &WebSite, session: &WebSession) -> Result<Site, Unread> {
     let origin = format!("https://{}", site.host);
     let referer = format!("{origin}/account/usage");
     let body = host
@@ -109,21 +130,24 @@ fn credits(
         ))
     })?;
     let id = account_id("qoder", &[site.host]);
-    let mut quota = json!({
-        "id": format!("{id}:credits"), "vendor": "qoder", "accountId": id,
-        "consumerSource": if site.host == "qoder.com.cn" { json!(["qoder-cn"]) } else { json!(["qoder", "qoder-work"]) }, "account": site.name,
-        "name": "Model credits", "shortLabel": "Credits", "usedPercent": summary.percent,
-        "resetAt": summary.reset, "allModels": true, "status": status(summary.percent),
-        "nativeUsage": {"used": summary.used, "capacity": summary.total, "unit": "credits"},
+    let quota = (summary.total > 0.0).then(|| {
+        json!({
+            "id": format!("{id}:credits"), "vendor": "qoder", "accountId": id,
+            "consumerSource": if site.host == "qoder.com.cn" { json!(["qoder-cn"]) } else { json!(["qoder", "qoder-work"]) }, "account": site.name,
+            "name": "Model credits", "shortLabel": "Credits", "usedPercent": summary.percent,
+            "resetAt": summary.reset, "allModels": true, "status": status(summary.percent),
+            "nativeUsage": {"used": summary.used, "capacity": summary.total, "unit": "credits"},
+        })
     });
-    if summary.total <= 0.0 {
-        quota["nativeUsage"] = Value::Null;
-    }
     let account = json!({
         "id": id, "provider": "qoder", "label": site.name,
         "checkedAt": Utc::now().to_rfc3339(), "signIn": "web",
     });
-    Ok((quota, account))
+    Ok(Site {
+        quota,
+        account,
+        notice: None,
+    })
 }
 
 struct Summary {

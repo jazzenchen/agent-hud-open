@@ -156,6 +156,7 @@ fn tail(path: &Path, limit: usize) -> Result<Value, String> {
     page(
         path,
         HARNESS,
+        "session",
         0,
         limit,
         true,
@@ -258,6 +259,7 @@ fn a_compressed_log_pages_forward_to_its_reply() {
         let page = page(
             &archive,
             HARNESS,
+            "session",
             cursor,
             100,
             false,
@@ -296,4 +298,32 @@ fn a_compressed_log_pages_forward_to_its_reply() {
         2,
         "Harness's context is no prompt"
     );
+}
+
+#[test]
+fn a_zcode_session_pages_its_messages_from_the_database() {
+    let temp = tempfile::tempdir().unwrap();
+    let db = temp.path().join("db.sqlite");
+    let connection = rusqlite::Connection::open(&db).unwrap();
+    connection
+        .execute_batch(
+            "CREATE TABLE message (id TEXT, session_id TEXT, time_created INTEGER, data TEXT);
+             CREATE TABLE part (id TEXT, message_id TEXT, session_id TEXT, time_created INTEGER, data TEXT);",
+        )
+        .unwrap();
+    drop(connection);
+    // An empty conversation still pages: no messages, nothing pending.
+    let page = super::page(
+        &db,
+        "zcode",
+        "zcode:sess_1",
+        0,
+        100,
+        true,
+        &mut compressed::Archives::default(),
+        &mut Contexts::default(),
+    )
+    .unwrap();
+    assert_eq!(page["messages"], serde_json::json!([]));
+    assert_eq!(page["messagesPending"], false);
 }

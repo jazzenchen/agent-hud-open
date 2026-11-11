@@ -171,13 +171,17 @@ impl HookEvidence {
                     moved.unwrap_or_else(|| origin.data["navigationTarget"].clone());
             }
         }
-        let last_event =
-            date(&session["liveFacts"]["lastEventAt"]).or_else(|| date(&session["updatedAt"]));
-        if let Some(observed) = entry
-            .observation
-            .as_ref()
-            .filter(|e| valid(e, now, 30 * DAY) && last_event.is_none_or(|at| e.at_ms >= at))
-        {
+        let log_event = date(&session["liveFacts"]["lastEventAt"]);
+        let last_event = log_event.or_else(|| date(&session["updatedAt"]));
+        if let Some(observed) = entry.observation.as_ref().filter(|e| {
+            valid(e, now, 30 * DAY)
+                && (last_event.is_none_or(|at| e.at_ms >= at)
+                    || (log_event.is_none()
+                        && entry
+                            .completion
+                            .as_ref()
+                            .is_some_and(|c| valid(c, now, 30 * DAY) && c.at_ms >= e.at_ms)))
+        }) {
             let held = asked(entry, now).map(|_| "waiting");
             if let Some(state) = held.or_else(|| observation_state(observed, now)) {
                 session["state"] = json!(state);
@@ -194,6 +198,16 @@ impl HookEvidence {
                 } else {
                     Value::Null
                 };
+                if !observed.data["prompt"].is_null() {
+                    facts["prompt"] = observed.data["prompt"].clone();
+                }
+                if !observed.data["message"].is_null() {
+                    facts["message"] = observed.data["message"].clone();
+                }
+                // Which of Agent HUD's messages a stop hook handed over.
+                if !observed.data["delivered"].is_null() {
+                    facts["delivered"] = observed.data["delivered"].clone();
+                }
                 // An observation without a destination keeps the one the log gave.
                 if !observed.data["navigationTarget"].is_null() {
                     session["navigationTarget"] = observed.data["navigationTarget"].clone();
@@ -203,7 +217,9 @@ impl HookEvidence {
 
         if let Some(completion) = entry.completion.as_ref().filter(|e| {
             valid(e, now, 30 * DAY)
-                && last_event.is_none_or(|at| e.at_ms > at)
+                && (last_event.is_none_or(|at| e.at_ms > at)
+                    || (log_event.is_none() && last_event.is_none_or(|at| e.at_ms + 60_000 >= at))
+                    || session["evidence"] == "completion-hook")
                 && date(&session["liveFacts"]["turnStartedAt"]).is_none_or(|at| e.at_ms >= at)
         }) {
             session["state"] = json!("idle");
@@ -214,10 +230,25 @@ impl HookEvidence {
             facts["endedAt"] = iso(completion.at_ms);
             facts["activity"] = Value::Null;
             facts["requests"] = json!([]);
-            if facts["message"].is_null() && !completion.data["message"].is_null() {
+            if !completion.data["message"].is_null() {
                 facts["message"] = completion.data["message"].clone();
             }
         }
+        // When a hook of this session last reported: proof that its client
+        // runs Agent HUD's hooks, which is what a queued message waits for.
+        let hook_at = [&entry.observation, &entry.completion, &entry.attention]
+            .into_iter()
+            .flatten()
+            .filter(|e| valid(e, now, 30 * DAY))
+            .map(|e| e.at_ms)
+            .max();
+        // The processes its newest hook ran from (`platform::hooks::entry`).
+        let hook_pids = [&entry.observation, &entry.completion]
+            .into_iter()
+            .flatten()
+            .filter(|e| valid(e, now, DAY) && e.data["pids"].is_array())
+            .max_by_key(|e| e.at_ms)
+            .map(|e| e.data["pids"].clone());
         let own_line = last_log_line_ms.or(last_event);
         if let Some(attention) = entry
             .attention
@@ -243,6 +274,14 @@ impl HookEvidence {
                 facts["activity"] = json!({"work":null,"openCall":null,"toolAt":null,"delegating":false,"awaitsModel":false,"retrying":false,"compactingSince":null});
             }
             facts["activity"]["compactingSince"] = iso(compaction.at_ms);
+        }
+        // What agent messages need of the hooks, kept beside the live facts
+        // because a client's live status can be turned off for display
+        // (`hud::presentation`), which drops those and shows it idle: when a
+        // hook last reported, the processes it ran from, and the state the
+        // hooks left the session in.
+        if let Some(at) = hook_at {
+            session["hooks"] = json!({"at":iso(at),"pids":hook_pids.unwrap_or(Value::Null),"state":session["state"]});
         }
     }
     /// Explicitly completed clients with no migrated transcript reader can still

@@ -7,6 +7,7 @@ import { usePanelServices } from "../PanelContext";
 import { useGround } from "../ground";
 import { agentVendorName } from "../agent-artwork";
 import {
+  balanceColumns,
   balanceMeasures,
   visibleBalances,
   type BalanceMeasure,
@@ -42,51 +43,11 @@ export function SourceBalances({
   return (
     <>
       {visibleBalances(billing, layout).map((account) => {
-        const metrics = account.metrics?.periods[period],
-          cost = metrics?.cost,
-          burn = metrics?.burnRate;
+        const isCredits = account.currency.toLowerCase() === "credits";
+        const metrics = account.metrics?.periods[period];
         const points = metrics?.series ?? [],
           peak = Math.max(0.00001, ...points.map((point) => point.amount));
-        const columns =
-          selected === "burn"
-            ? [
-                {
-                  name: language === "zh" ? "每日消耗" : "Consumption / day",
-                  value: burn ? `${money(burn.perDay, burn.currency)}/d` : "—",
-                },
-                {
-                  name: language === "zh" ? "预计用完" : "Estimated depletion",
-                  value: metrics?.runsOutAt
-                    ? dateFormat(language === "zh" ? "zh-CN" : "en-US").format(
-                        new Date(metrics.runsOutAt),
-                      )
-                    : "—",
-                },
-              ]
-            : selected === "cost"
-              ? [
-                  {
-                    name: language === "zh" ? "估算花费" : "Estimated cost",
-                    value: cost ? money(cost.amount, cost.currency) : "—",
-                  },
-                  {
-                    name: language === "zh" ? "输出速度" : "Output speed",
-                    value: metrics?.replyRate
-                      ? `${metrics.replyRate.lowerBound ? "≥" : ""}${metrics.replyRate.tokensPerSecond.toFixed(1)} tok/s`
-                      : "—",
-                  },
-                ]
-              : [
-                  {
-                    name:
-                      account.label || (language === "zh" ? "余额" : "Balance"),
-                    value: money(account.amount, account.currency),
-                  },
-                  {
-                    name: language === "zh" ? "估算花费" : "Estimated cost",
-                    value: cost ? money(cost.amount, cost.currency) : "—",
-                  },
-                ];
+        const columns = balanceColumns(account, period, selected, language);
         return (
           <section
             className="hud-source-balance"
@@ -106,52 +67,55 @@ export function SourceBalances({
               <strong style={{ fontSize: 13, fontWeight: 700, flex: 1 }}>
                 {agentVendorName(account.vendor)}
               </strong>
-              <div
-                role="group"
-                aria-label={language === "zh" ? "余额指标" : "Balance metric"}
-                style={{ display: "flex", gap: 2 }}
-              >
-                {balanceMeasures
-                  .map((key) => ({
-                    key,
-                    ...{
-                      quota: {
-                        Icon: Percent,
-                        title: language === "zh" ? "余额" : "Balance",
-                      },
-                      burn: {
-                        Icon: Flame,
-                        title:
-                          language === "zh"
-                            ? "每日消耗"
-                            : "Consumption per day",
-                      },
-                      cost: {
-                        Icon: DollarSign,
-                        title:
-                          language === "zh" ? "估算花费" : "Estimated cost",
-                      },
-                    }[key],
-                  }))
-                  .map(({ key, Icon, title }) => (
-                    <button
-                      key={key}
-                      aria-pressed={selected === key}
-                      title={title}
-                      onClick={() => setMeasure(key)}
-                      style={{
-                        ...noButtonChrome,
-                        color: selected === key ? colors.text : colors.tertiary,
-                        background:
-                          selected === key ? colors.selected : "transparent",
-                        borderRadius: 4,
-                        padding: 3,
-                      }}
-                    >
-                      <Icon size={12} />
-                    </button>
-                  ))}
-              </div>
+              {!isCredits && (
+                <div
+                  role="group"
+                  aria-label={language === "zh" ? "余额指标" : "Balance metric"}
+                  style={{ display: "flex", gap: 2 }}
+                >
+                  {balanceMeasures
+                    .map((key) => ({
+                      key,
+                      ...{
+                        quota: {
+                          Icon: Percent,
+                          title: language === "zh" ? "余额" : "Balance",
+                        },
+                        burn: {
+                          Icon: Flame,
+                          title:
+                            language === "zh"
+                              ? "每日消耗"
+                              : "Consumption per day",
+                        },
+                        cost: {
+                          Icon: DollarSign,
+                          title:
+                            language === "zh" ? "估算花费" : "Estimated cost",
+                        },
+                      }[key],
+                    }))
+                    .map(({ key, Icon, title }) => (
+                      <button
+                        key={key}
+                        aria-pressed={selected === key}
+                        title={title}
+                        onClick={() => setMeasure(key)}
+                        style={{
+                          ...noButtonChrome,
+                          color:
+                            selected === key ? colors.text : colors.tertiary,
+                          background:
+                            selected === key ? colors.selected : "transparent",
+                          borderRadius: 4,
+                          padding: 3,
+                        }}
+                      >
+                        <Icon size={12} />
+                      </button>
+                    ))}
+                </div>
+              )}
             </div>
             {account.notice && (
               <div
@@ -164,30 +128,34 @@ export function SourceBalances({
                 {account.notice}
               </div>
             )}
-            <div
-              role="group"
-              aria-label={language === "zh" ? "消耗时段" : "Consumption period"}
-              style={{ display: "flex", gap: 2, justifyContent: "flex-end" }}
-            >
-              {(["day", "week", "month"] as const).map((value) => (
-                <button
-                  key={value}
-                  aria-pressed={period === value}
-                  onClick={() => setPeriod(value)}
-                  style={{
-                    ...noButtonChrome,
-                    fontSize: 10,
-                    padding: "2px 5px",
-                    borderRadius: 4,
-                    color: period === value ? colors.text : colors.tertiary,
-                    background:
-                      period === value ? colors.selected : "transparent",
-                  }}
-                >
-                  {{ day: "24h", week: "7d", month: "30d" }[value]}
-                </button>
-              ))}
-            </div>
+            {!isCredits && (
+              <div
+                role="group"
+                aria-label={
+                  language === "zh" ? "消耗时段" : "Consumption period"
+                }
+                style={{ display: "flex", gap: 2, justifyContent: "flex-end" }}
+              >
+                {(["day", "week", "month"] as const).map((value) => (
+                  <button
+                    key={value}
+                    aria-pressed={period === value}
+                    onClick={() => setPeriod(value)}
+                    style={{
+                      ...noButtonChrome,
+                      fontSize: 10,
+                      padding: "2px 5px",
+                      borderRadius: 4,
+                      color: period === value ? colors.text : colors.tertiary,
+                      background:
+                        period === value ? colors.selected : "transparent",
+                    }}
+                  >
+                    {{ day: "24h", week: "7d", month: "30d" }[value]}
+                  </button>
+                ))}
+              </div>
+            )}
             {layout.widget === "chart" ? (
               <div
                 aria-label={

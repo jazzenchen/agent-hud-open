@@ -1,6 +1,7 @@
 //! CodeBuddy and WorkBuddy, which share one log format.
 pub mod account;
 mod hooks;
+mod items;
 mod limits;
 pub mod transcript;
 
@@ -64,7 +65,7 @@ pub static CODEBUDDY: Agent = Agent {
     program: None,
     replies: None,
     turns: None,
-    items: None,
+    items: Some(&items::ITEMS),
     sources: crate::everywhere(&CODEBUDDY_SOURCES),
     discovery: &CODEBUDDY_DISCOVERY,
 };
@@ -79,7 +80,7 @@ pub static WORKBUDDY: Agent = Agent {
     program: None,
     replies: None,
     turns: None,
-    items: None,
+    items: Some(&items::ITEMS),
     sources: crate::everywhere(&WORKBUDDY_SOURCES),
     discovery: &WORKBUDDY_DISCOVERY,
 };

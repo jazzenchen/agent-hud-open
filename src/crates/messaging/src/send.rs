@@ -48,7 +48,7 @@ impl Messaging {
         };
         let to = target["id"].as_str().unwrap_or(to);
         let client = target["source"].as_str().unwrap_or_default();
-        if !matches!(client, "claude" | "codex" | "antigravity" | "deepseek") {
+        if Provider::parse(client).is_none() {
             return Ok(refused(&words::other_client(zh)));
         }
         if !target["parentId"].is_null() {
@@ -57,7 +57,9 @@ impl Messaging {
         let sender = party(host.snapshot, &caller.client, &caller.session_id);
         let recipient = party(host.snapshot, client, to);
         // One that cannot take it now is refused before anything is queued.
-        if let (Value::Bool(false), reason) = self.reachable(client, to, &self.loaded(), zh) {
+        if let (Value::Bool(false), reason) =
+            self.reachable(client, to, &self.loaded(), (target, host.snapshot), zh)
+        {
             (self.fly)(flight(&sender, &recipient, true, false, true));
             return Ok(refused(&reason));
         }

@@ -6,6 +6,7 @@ mod discover;
 mod parse;
 #[cfg(test)]
 mod tests;
+mod zcode;
 
 use crate::account::{account_id, Host, HttpFailure, HttpRequest, Provider, Reading, Unread};
 use crate::l10n;
@@ -36,12 +37,19 @@ fn numeric(value: &Value) -> Option<f64> {
         .filter(|v| v.is_finite() && *v >= 0.0)
 }
 fn read_provider(host: &dyn Host, provider: &'static str) -> Result<Reading, Unread> {
-    let entries = discover::discover(host, provider)?
+    let (entries, stale_oauth) = discover::discover(host, provider)?;
+    let entries = entries
         .into_iter()
         .filter(|e| e.provider == provider)
         .collect::<Vec<_>>();
     let mut result = Reading::empty(provider);
     if entries.is_empty() {
+        if stale_oauth {
+            return Err(Unread::transient(l10n::text(
+                "Kimi Code 下次运行时会续期登录，之后更新额度",
+                "Kimi Code renews its sign-in the next time it runs; the quota updates then",
+            )));
+        }
         result.notice = Some(l10n::text(
             "此客户端的现有配置中没有可用的 Coding Plan 凭据",
             "No usable coding-plan credential was found in this client's existing configuration",
@@ -70,7 +78,7 @@ fn read_provider(host: &dyn Host, provider: &'static str) -> Result<Reading, Unr
         let endpoint = match provider {
             "kimi" => format!("https://{server}/coding/v1/usages"),
             "opencode" => "https://opencode.ai/zen/go/v1/usage".into(),
-            "glm" => format!(
+            "glm" | "zcode" => format!(
                 "https://{server}/api/monitor/usage/quota/limit{}",
                 if entry.organization.is_some() {
                     "?type=2"
@@ -100,6 +108,7 @@ fn read_provider(host: &dyn Host, provider: &'static str) -> Result<Reading, Unr
                 timeout: Duration::from_secs(seconds),
             })
         };
+        let mut kimi_profile = Value::Null;
         if provider == "kimi" {
             if let Ok(profile) = get(&format!("https://{server}/coding/v1/me"), 8) {
                 if let (Some(user), Some(region)) = (
@@ -109,6 +118,7 @@ fn read_provider(host: &dyn Host, provider: &'static str) -> Result<Reading, Unr
                     let domain = numeric(&profile["domain"]).unwrap_or(0.0);
                     id = account_id(provider, &[&server, user, &domain.to_string(), region]);
                 }
+                kimi_profile = profile;
             }
         }
         let reading = get(&endpoint, 15)
@@ -124,7 +134,13 @@ fn read_provider(host: &dyn Host, provider: &'static str) -> Result<Reading, Unr
                     other => other.message(),
                 }
             })
-            .and_then(|body| parse::parse(&body, &entry, &id));
+            .and_then(|body| {
+                if matches!(provider, "glm" | "zcode") && zcode::no_plan(&body) {
+                    Ok((Vec::new(), Some("Free".into())))
+                } else {
+                    parse::parse(&body, &entry, &id)
+                }
+            });
         // Every client configured with this plan reaches it on the plan's
         // platform, read or not; the platform picks its models' price list.
         let (vendor, region) = plan_service(provider, &server);
@@ -134,9 +150,18 @@ fn read_provider(host: &dyn Host, provider: &'static str) -> Result<Reading, Unr
             result.services.push(json!({"client":client,"provider":vendor,"product":"plan","accountId":id,"region":region}));
         }
         match reading {
-            Ok((quotas, plan)) => {
+            Ok((mut quotas, plan)) => {
+                let (label, plan) = if provider == "kimi" {
+                    let (label, plan) = parse::kimi_account(&kimi_profile, plan);
+                    for quota in &mut quotas {
+                        quota["account"] = json!(label);
+                    }
+                    (label, plan)
+                } else {
+                    (plan.clone(), plan)
+                };
                 result.quotas.extend(quotas);
-                let account = json!({"id":id,"provider":provider,"label":plan,"plan":plan,"clients":entry.clients,"identityEvidence":if provider=="kimi"&&id!=account_id(provider,&[&entry.base,&entry.key,entry.organization.as_deref().unwrap_or(""),entry.project.as_deref().unwrap_or("")]){"provider-account"}else{"credential-scope"}});
+                let account = json!({"id":id,"provider":provider,"label":label,"plan":plan,"clients":entry.clients,"identityEvidence":if provider=="kimi"&&id!=account_id(provider,&[&entry.base,&entry.key,entry.organization.as_deref().unwrap_or(""),entry.project.as_deref().unwrap_or("")]){"provider-account"}else{"credential-scope"}});
                 if result.account.is_none() {
                     result.account = Some(account);
                 } else if result
@@ -174,12 +199,17 @@ fn read_provider(host: &dyn Host, provider: &'static str) -> Result<Reading, Unr
         result.notice = Some(format!(
             "{failures} configured coding-plan account(s) could not be read"
         ));
+    } else if result.quotas.is_empty() && result.account.is_some() {
+        result.notice = Some(l10n::text(
+            "当前账号未开通 Coding Plan 套餐",
+            "No active Coding Plan subscription on this account",
+        ));
     }
     Ok(result)
 }
 /// The open agents' plans are read as one source whose sessions are
-/// OpenCode's, Kimi's, GLM's and Pi's.
-const OPEN_AGENTS: &[&str] = &["opencode", "kimi", "glm", "pi"];
+/// OpenCode's, Kimi's, GLM's, Pi's and ZCode's.
+const OPEN_AGENTS: &[&str] = &["opencode", "kimi", "glm", "pi", "zcode"];
 /// Kimi Code's plan.
 pub static KIMI: Provider = Provider {
     work_sources: OPEN_AGENTS,
@@ -216,7 +246,7 @@ pub fn opencode_go(host: &dyn Host) -> Result<Reading, Unread> {
 fn plan_service(provider: &str, host: &str) -> (&'static str, &'static str) {
     let vendor = match provider {
         "kimi" => "Moonshot",
-        "glm" => "GLM",
+        "glm" | "zcode" => "GLM",
         _ => "OpenCode Go",
     };
     let region = if matches!(host, "api.kimi.com" | "open.bigmodel.cn") {

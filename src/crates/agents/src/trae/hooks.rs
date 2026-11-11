@@ -36,6 +36,7 @@ const fn hooks(folder: &'static [&'static str]) -> Hooks {
         // `permission_prompt`: a tool call waits for the user's confirmation.
         attention: true,
         compaction: None,
+        rewake: None,
         prefixed_sessions: true,
         launch: POSIX_ONLY,
     }

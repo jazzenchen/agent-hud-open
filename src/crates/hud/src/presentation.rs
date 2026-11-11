@@ -127,12 +127,13 @@ impl Presentation {
     pub fn new(directory: PathBuf) -> Result<Self, String> {
         let path = directory.join("presentation.json");
         let initialized = path.exists();
-        let saved = if initialized {
+        let mut saved: Saved = if initialized {
             serde_json::from_slice(&fs::read(&path).map_err(|e| e.to_string())?)
                 .map_err(|e| format!("Display preferences: {e}"))?
         } else {
             Saved::default()
         };
+        live_status::forget_defaults(&mut saved.sources);
         Ok(Self {
             path,
             state: Mutex::new(State {

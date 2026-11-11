@@ -17,10 +17,10 @@ pub(crate) fn sessions(snapshot: &Value) -> impl Iterator<Item = &Value> {
         .into_iter()
         .flatten()
         .filter(|session| {
-            matches!(
-                session["source"].as_str(),
-                Some("claude" | "codex" | "antigravity" | "deepseek")
-            )
+            session["source"]
+                .as_str()
+                .and_then(Provider::parse)
+                .is_some()
         })
         .filter(|session| session["parentId"].is_null())
 }
@@ -47,10 +47,24 @@ pub(crate) fn sessions_targets(snapshot: &Value) -> Vec<SessionTarget> {
 /// tools, its MCP calls and its plugin leave it out.
 pub(crate) fn same_session(a: &str, b: &str) -> bool {
     fn bare(id: &str) -> &str {
-        ["antigravity:", "deepseek:"]
-            .into_iter()
-            .find_map(|prefix| id.strip_prefix(prefix))
-            .unwrap_or(id)
+        let stripped = [
+            "antigravity:",
+            "deepseek:",
+            "cursor:",
+            "trae:",
+            "trae-cn:",
+            "workbuddy:",
+            "codebuddy:",
+            "zcode:",
+            "qoder:",
+            "qoder-cn:",
+            "qoder-work:",
+            "kimi:",
+        ]
+        .into_iter()
+        .find_map(|prefix| id.strip_prefix(prefix))
+        .unwrap_or(id);
+        stripped.strip_suffix(":main").unwrap_or(stripped)
     }
     bare(a) == bare(b)
 }

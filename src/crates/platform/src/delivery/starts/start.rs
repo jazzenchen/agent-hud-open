@@ -11,10 +11,11 @@ impl SessionStarts {
     }
     /// Starts in one of `offers` instead of the phone's.
     pub fn start_with(&self, request: StartRequest, offers: &[StartOffer]) -> Result<StartReceipt> {
-        if request.provider == Provider::DeepSeek {
-            return Err(Failure::Unsupported(
-                "Agent HUD does not start DeepSeek Harness sessions".into(),
-            ));
+        if request.provider == Provider::DeepSeek || request.provider.uses_hook_channel() {
+            return Err(Failure::Unsupported(format!(
+                "Agent HUD does not start {} sessions",
+                request.provider.as_str()
+            )));
         }
         if !valid_uuid(&request.request_id)
             || request.text.trim().is_empty()
@@ -116,9 +117,16 @@ impl SessionStarts {
             Provider::Claude => self.start_claude(&folder, &request),
             Provider::Codex => self.start_codex(&folder, &request),
             Provider::Antigravity => self.start_antigravity(&folder, &request),
-            Provider::DeepSeek => Err(Failure::Unsupported(
-                "Agent HUD does not start DeepSeek Harness sessions".into(),
-            )),
+            Provider::DeepSeek
+            | Provider::Cursor
+            | Provider::Trae
+            | Provider::WorkBuddy
+            | Provider::ZCode
+            | Provider::Qoder
+            | Provider::Kimi => Err(Failure::Unsupported(format!(
+                "Agent HUD does not start {} sessions",
+                request.provider.as_str()
+            ))),
         };
         match result {
             Ok(value) => receipt = value,

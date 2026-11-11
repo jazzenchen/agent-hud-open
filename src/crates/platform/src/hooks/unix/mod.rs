@@ -203,12 +203,17 @@ fn serve(
         // Reporting facts were atomically committed by the callback, even if
         // the application was absent. This connection merely accelerates wake,
         // or carries the event of a callback that could not write it.
+        let mut response = serde_json::json!({});
         if let Some(event) = super::handed_event(source, payload) {
             let _ = super::record_event(data, &event);
+            if let Some(claimed) = super::completion::claim_prompt(data, &event) {
+                response = claimed;
+            }
         }
         reminders.record(source, flag, payload);
         wake();
-        let _ = stream.write_all(b"{}\n");
+        let _ = serde_json::to_writer(&mut stream, &response);
+        let _ = stream.write_all(b"\n");
         return;
     }
     let Some(response) =

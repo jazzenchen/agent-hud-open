@@ -8,7 +8,9 @@ pub(crate) mod pipe;
 mod process;
 mod secrets;
 pub(crate) use apps::{activate_app, app_running, launch_app};
-pub(crate) use process::{codex_cli_on_port, parent_processes, process_runs};
+pub(crate) use process::{
+    codex_cli_on_port, parent_processes, process_runs, process_start, terminal_io,
+};
 pub(crate) use secrets::{app_cookie, stored_secret, unseal_safe_storage};
 pub(crate) const READS_PROCESS_ENVIRONMENT: bool = false;
 /// The desktop app's resume link for a background job is unverified here.
@@ -107,6 +109,8 @@ pub(crate) fn executable_dirs(home: &Path, env: &Environment) -> Vec<PathBuf> {
         home.join(".local/bin"),
         home.join(".bun/bin"),
         home.join(".npm-global/bin"),
+        home.join(".kimi-code/bin"),
+        home.join(".zcode/bin"),
         app_support(home, env).join("npm"),
         local_app(home, env).join("Microsoft/WinGet/Links"),
     ]);

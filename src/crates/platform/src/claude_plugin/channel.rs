@@ -68,10 +68,10 @@ impl ClaudeChannel {
             return None;
         }
         let value: Value = serde_json::from_slice(&fs::read(&path).ok()?).ok()?;
-        if value.get("ended").is_some() {
-            return None;
-        }
-        metadata.modified().ok()
+        value
+            .get("ended")
+            .is_none()
+            .then(|| metadata.modified().ok())?
     }
 
     /// Writes the plugin's files into `folder` (an absolute path), pointing
@@ -278,7 +278,7 @@ impl ClaudeChannel {
             .join(format!("{id}.json")))
     }
 
-    fn cancel_path(&self, session: &str, id: &str) -> Result<PathBuf, Refusal> {
+    pub(super) fn cancel_path(&self, session: &str, id: &str) -> Result<PathBuf, Refusal> {
         Ok(self.prompt(session, id)?.with_extension("cancel"))
     }
 }

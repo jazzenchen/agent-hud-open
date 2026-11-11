@@ -35,6 +35,7 @@ impl LocalClients {
         if let Some(channel) = &self.deepseek {
             channel.sweep(now);
         }
+        self.hook_channel().sweep(now)?;
         ClaudeChannel::new(self.paths.claude_channel.clone()).sweep(now)
     }
     pub fn maintain(&self, now: SystemTime) -> Result<()> {
@@ -48,10 +49,7 @@ impl LocalClients {
             let Some(attempt) = read_attempt(&file)? else {
                 continue;
             };
-            if matches!(
-                attempt.receipt.provider,
-                Provider::Claude | Provider::DeepSeek
-            ) {
+            if attempt.receipt.provider.queues_in_channel() {
                 let gate = self.gate(attempt.receipt.provider, &attempt.receipt.session_id);
                 let _guard = gate.lock().unwrap_or_else(PoisonError::into_inner);
                 if let Some(latest) = read_attempt(&file)? {
@@ -67,20 +65,25 @@ impl LocalClients {
         file: &Path,
         now: SystemTime,
     ) -> Result<Receipt> {
-        if matches!(
-            attempt.receipt.provider,
-            Provider::Claude | Provider::DeepSeek
-        ) && matches!(
-            attempt.receipt.state,
-            DeliveryState::Waiting
-                | DeliveryState::Taken
-                | DeliveryState::CancelRequested
-                | DeliveryState::Uncertain
-        ) {
+        if attempt.receipt.provider.queues_in_channel()
+            && matches!(
+                attempt.receipt.state,
+                DeliveryState::Waiting
+                    | DeliveryState::Taken
+                    | DeliveryState::CancelRequested
+                    | DeliveryState::Uncertain
+            )
+        {
             let (session, request) = (&attempt.receipt.session_id, &attempt.receipt.request_id);
             let read = match (attempt.receipt.provider, &self.deepseek) {
                 (Provider::DeepSeek, Some(channel)) => channel.state(session, request, now)?,
                 (Provider::DeepSeek, None) => None,
+                (provider, _) if provider.uses_hook_channel() => {
+                    match hook_session_key(provider, session) {
+                        Some(key) => self.hook_channel().state(&key, request, now)?,
+                        None => None,
+                    }
+                }
                 _ => ClaudeChannel::new(self.paths.claude_channel.clone())
                     .state(session, request, now)?,
             };

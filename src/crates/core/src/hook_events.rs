@@ -75,6 +75,22 @@ fn newer(slot: &mut Option<HookEvent>, event: &HookEvent) -> bool {
     *slot = Some(event.clone());
     true
 }
+fn newer_observation(slot: &mut Option<HookEvent>, event: &HookEvent) -> bool {
+    let mut merged = event.clone();
+    if let Some(old) = slot.as_ref() {
+        let same_turn = old.data["turnId"] == event.data["turnId"]
+            || event.data["turnId"].is_null()
+            || old.data["turnId"].is_null();
+        if same_turn {
+            for key in ["prompt", "message", "turnId", "startedAtMs"] {
+                if merged.data[key].is_null() && !old.data[key].is_null() {
+                    merged.data[key] = old.data[key].clone();
+                }
+            }
+        }
+    }
+    newer(slot, &merged)
+}
 impl HookEvidence {
     pub(crate) fn ingest(&mut self, events: &[HookEvent], now: i64) -> bool {
         let mut changed = false;
@@ -171,7 +187,7 @@ impl HookEvidence {
                 "attention" => newer(&mut entry.attention, event),
                 "compaction" => newer(&mut entry.compaction, event),
                 "completion" => newer(&mut entry.completion, event),
-                "session-observation" => newer(&mut entry.observation, event),
+                "session-observation" => newer_observation(&mut entry.observation, event),
                 "session-forget"
                     if entry
                         .observation

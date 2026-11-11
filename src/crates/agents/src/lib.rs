@@ -94,7 +94,12 @@ pub const COMPLETION_SOURCES: &[&str] = &[
     "antigravity",
     "cursor",
     "copilot",
+    "qoder",
+    "qoder-cn",
+    "qoder-work",
     "codebuddy",
+    "workbuddy",
+    "zcode",
     "qwen",
     "devin",
     "hermes",
@@ -102,6 +107,7 @@ pub const COMPLETION_SOURCES: &[&str] = &[
     "goose",
     "trae",
     "trae-cn",
+    "kimi",
 ];
 pub const HOOK_FLAGS: &[&str] = &[
     "--permission-hook",
@@ -109,6 +115,7 @@ pub const HOOK_FLAGS: &[&str] = &[
     "--attention-hook",
     "--session-origin-hook",
     "--compaction-hook",
+    "--rewake-hook",
 ];
 
 pub fn iso(at: i64) -> Option<String> {

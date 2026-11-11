@@ -9,6 +9,13 @@ use serde_json::{json, Map, Value};
 /// Keys every handler of this hook carries. A hooks-only file's client
 /// (`Layout::Events`) runs its hooks one way and takes no `async`.
 fn fixed(hooks: &Hooks, flag: &str) -> Map<String, Value> {
+    if flag == "--rewake-hook" {
+        return hooks
+            .rewake
+            .as_ref()
+            .and_then(|rewake| serde_json::from_str(rewake.fields).ok())
+            .unwrap_or_default();
+    }
     if !matches!(hooks.layout, Layout::Events { .. })
         && matches!(
             flag,

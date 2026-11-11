@@ -38,7 +38,7 @@ fn usable(key: &str, now: i64) -> bool {
         .and_then(|p| p["exp"].as_f64())
         .is_none_or(|expiry| expiry > now as f64 / 1000.0 + 60.0)
 }
-fn service(id: &str, base: Option<&str>, pi: bool) -> Option<(&'static str, String)> {
+pub(super) fn service(id: &str, base: Option<&str>, pi: bool) -> Option<(&'static str, String)> {
     if let Some(base) = base {
         for provider in ["kimi", "glm", "opencode"] {
             if let Ok(base) = crate::account::endpoint(provider, Some(base)) {
@@ -60,9 +60,10 @@ fn service(id: &str, base: Option<&str>, pi: bool) -> Option<(&'static str, Stri
     };
     Some((provider, base.into()))
 }
-pub(super) fn discover(host: &dyn Host, wanted: &str) -> Result<Vec<Credential>, String> {
+pub(super) fn discover(host: &dyn Host, wanted: &str) -> Result<(Vec<Credential>, bool), String> {
     let now = chrono::Utc::now().timestamp_millis();
     let mut entries = Vec::new();
+    let mut stale_oauth = false;
     let mut add = |service: Option<(&'static str, String)>,
                    key: Option<&str>,
                    client: &str,
@@ -190,67 +191,66 @@ pub(super) fn discover(host: &dyn Host, wanted: &str) -> Result<Vec<Credential>,
             && value["type"] == "oauth"
             && env("KIMI_CODE_OAUTH_HOST").is_none()
             && env("KIMI_OAUTH_HOST").is_none()
-            && numeric(&value["expires"]).is_some_and(|n| n > now as f64 + 60_000.0)
+            && nonempty(value["access"].as_str()).is_some()
         {
-            add(target, value["access"].as_str(), "Pi", None, None, None);
+            if numeric(&value["expires"]).is_some_and(|n| n > now as f64 + 60_000.0) {
+                add(target, value["access"].as_str(), "Pi", None, None, None);
+            } else if wanted == "kimi" {
+                stale_oauth = true;
+            }
         }
     }
-    let kimi = variable(host, "KIMI_CODE_HOME").unwrap_or_else(|| host.home().join(".kimi-code"));
+    let kimi_homes = variable(host, "KIMI_CODE_HOME")
+        .map(|p| vec![p])
+        .unwrap_or_else(|| vec![host.home().join(".kimi-code"), host.home().join(".kimi")]);
     let oauth = env("KIMI_CODE_OAUTH_HOST").or_else(|| env("KIMI_OAUTH_HOST"));
-    for (api, slot, oauth_host) in [
-        (
-            "https://api.kimi.com/coding/v1",
-            "kimi-code".to_owned(),
-            "https://auth.kimi.com",
-        ),
-        (
-            "https://api.kimi.ai/coding/v1",
+    for kimi in kimi_homes {
+        for (api, slot, oauth_host) in [
+            (
+                "https://api.kimi.com/coding/v1",
+                "kimi-code".to_owned(),
+                "https://auth.kimi.com",
+            ),
+            (
+                "https://api.kimi.ai/coding/v1",
+                {
+                    let mut h = Sha256::new();
+                    h.update(br#"{"oauthHost":"https://auth.kimi.ai","baseUrl":"https://api.kimi.ai/coding/v1"}"#);
+                    format!("kimi-code-env-{}", &format!("{:x}", h.finalize())[..16])
+                },
+                "https://auth.kimi.ai",
+            ),
+        ] {
+            if oauth.is_some_and(|v| v != oauth_host)
+                || env("KIMI_CODE_BASE_URL").is_some_and(|v| {
+                    crate::account::endpoint("kimi", Some(v)).ok().as_deref() != Some(api)
+                })
             {
-                let mut h = Sha256::new();
-                h.update(br#"{"oauthHost":"https://auth.kimi.ai","baseUrl":"https://api.kimi.ai/coding/v1"}"#);
-                format!("kimi-code-env-{}", &format!("{:x}", h.finalize())[..16])
-            },
-            "https://auth.kimi.ai",
-        ),
-    ] {
-        if oauth.is_some_and(|v| v != oauth_host)
-            || env("KIMI_CODE_BASE_URL").is_some_and(|v| {
-                crate::account::endpoint("kimi", Some(v)).ok().as_deref() != Some(api)
-            })
-        {
-            continue;
-        }
-        let auth = file(host, &kimi.join(format!("credentials/{slot}.json")), false);
-        if numeric(&auth["expires_at"]).is_some_and(|n| n > now as f64 / 1000.0 + 60.0) {
-            let device = read_bounded(host, &kimi.join("device_id"), 4096)
-                .found()
-                .and_then(|bytes| String::from_utf8(bytes).ok())
-                .map(|s| s.trim().to_owned())
-                .filter(|s| nonempty(Some(s)).is_some());
-            add(
-                service("", Some(api), false),
-                auth["access_token"].as_str(),
-                "Kimi",
-                None,
-                None,
-                device,
-            );
+                continue;
+            }
+            let auth = file(host, &kimi.join(format!("credentials/{slot}.json")), false);
+            if nonempty(auth["access_token"].as_str()).is_some() {
+                if numeric(&auth["expires_at"]).is_some_and(|n| n > now as f64 / 1000.0 + 60.0) {
+                    let device = read_bounded(host, &kimi.join("device_id"), 4096)
+                        .found()
+                        .and_then(|bytes| String::from_utf8(bytes).ok())
+                        .map(|s| s.trim().to_owned())
+                        .filter(|s| nonempty(Some(s)).is_some());
+                    add(
+                        service("", Some(api), false),
+                        auth["access_token"].as_str(),
+                        "Kimi",
+                        None,
+                        None,
+                        device,
+                    );
+                } else if wanted == "kimi" {
+                    stale_oauth = true;
+                }
+            }
         }
     }
-    let wb = file(host, &host.home().join(".workbuddy/models.json"), false);
-    for value in wb.as_array().into_iter().flatten() {
-        if value["vendor"] == "GLM Coding Plan" {
-            let target = service("", value["url"].as_str(), false).filter(|(p, _)| *p == "glm");
-            add(
-                target,
-                value["apiKey"].as_str(),
-                "WorkBuddy",
-                None,
-                None,
-                None,
-            );
-        }
-    }
+    super::zcode::discover(host, now, &mut add);
     for provider in ["kimi", "glm", "opencode"]
         .into_iter()
         .filter(|p| *p == wanted)
@@ -291,5 +291,5 @@ pub(super) fn discover(host: &dyn Host, wanted: &str) -> Result<Vec<Credential>,
             "Too many independently configured coding-plan credentials",
         ));
     }
-    Ok(unique.into_values().collect())
+    Ok((unique.into_values().collect(), stale_oauth))
 }

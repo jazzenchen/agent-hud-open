@@ -147,7 +147,13 @@ impl SessionStarts {
             Provider::Claude => self.config.claude_executable.as_deref(),
             Provider::Codex => self.config.codex_executable.as_deref(),
             Provider::Antigravity => self.config.antigravity_executable.as_deref(),
-            Provider::DeepSeek => None,
+            Provider::DeepSeek
+            | Provider::Cursor
+            | Provider::Trae
+            | Provider::WorkBuddy
+            | Provider::ZCode
+            | Provider::Qoder
+            | Provider::Kimi => None,
         }
     }
     /// Whether the client's desktop app is installed, looked up on disk each
@@ -158,7 +164,13 @@ impl SessionStarts {
             Provider::Claude => &["Claude.app"],
             Provider::Codex => &["Codex.app", "ChatGPT.app"],
             Provider::Antigravity => &["Antigravity.app", "Antigravity IDE.app"],
-            Provider::DeepSeek => &[],
+            Provider::DeepSeek
+            | Provider::Cursor
+            | Provider::Trae
+            | Provider::WorkBuddy
+            | Provider::ZCode
+            | Provider::Qoder
+            | Provider::Kimi => &[],
         };
         self.applications
             .iter()

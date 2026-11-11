@@ -189,7 +189,7 @@ impl Messaging {
         changed |= self.fly_answers(host, now);
         for message in self.journal.messages_mut() {
             if message.kind != Kind::Send
-                || !matches!(message.to.client.as_str(), "claude" | "deepseek")
+                || !Provider::parse(&message.to.client).is_some_and(Provider::queues_in_channel)
                 || !matches!(message.state.as_str(), "queued" | "taken")
             {
                 continue;
