@@ -16333,6 +16333,24 @@
     "output": {
       "install": {
         "hooks": {
+          "afterAgentResponse": [
+            {
+              "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor",
+              "timeout": 5
+            }
+          ],
+          "beforeSubmitPrompt": [
+            {
+              "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor",
+              "timeout": 5
+            }
+          ],
+          "postToolUse": [
+            {
+              "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor",
+              "timeout": 5
+            }
+          ],
           "stop": [
             {
               "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor",
@@ -16347,10 +16365,31 @@
         "version": 1
       },
       "installedCommands": [
+        "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor",
+        "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor",
+        "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor",
         "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor"
       ],
       "move": {
         "hooks": {
+          "afterAgentResponse": [
+            {
+              "command": "'/Users/me/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor",
+              "timeout": 5
+            }
+          ],
+          "beforeSubmitPrompt": [
+            {
+              "command": "'/Users/me/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor",
+              "timeout": 5
+            }
+          ],
+          "postToolUse": [
+            {
+              "command": "'/Users/me/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor",
+              "timeout": 5
+            }
+          ],
           "stop": [
             {
               "command": "'/Users/me/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor",
@@ -16365,6 +16404,9 @@
         "version": 1
       },
       "movedCommands": [
+        "'/Users/me/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor",
+        "'/Users/me/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor",
+        "'/Users/me/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor",
         "'/Users/me/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor"
       ],
       "reinstallChanges": false,
@@ -16395,6 +16437,24 @@
     "output": {
       "install": {
         "hooks": {
+          "afterAgentResponse": [
+            {
+              "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor",
+              "timeout": 5
+            }
+          ],
+          "beforeSubmitPrompt": [
+            {
+              "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor",
+              "timeout": 5
+            }
+          ],
+          "postToolUse": [
+            {
+              "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor",
+              "timeout": 5
+            }
+          ],
           "stop": [
             {
               "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor",
@@ -16405,10 +16465,31 @@
         "version": 1
       },
       "installedCommands": [
+        "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor",
+        "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor",
+        "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor",
         "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor"
       ],
       "move": {
         "hooks": {
+          "afterAgentResponse": [
+            {
+              "command": "'/Users/me/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor",
+              "timeout": 5
+            }
+          ],
+          "beforeSubmitPrompt": [
+            {
+              "command": "'/Users/me/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor",
+              "timeout": 5
+            }
+          ],
+          "postToolUse": [
+            {
+              "command": "'/Users/me/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor",
+              "timeout": 5
+            }
+          ],
           "stop": [
             {
               "command": "'/Users/me/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor",
@@ -16419,6 +16500,9 @@
         "version": 1
       },
       "movedCommands": [
+        "'/Users/me/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor",
+        "'/Users/me/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor",
+        "'/Users/me/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor",
         "'/Users/me/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor"
       ],
       "reinstallChanges": false,
@@ -16465,9 +16549,27 @@
     "output": {
       "install": {
         "hooks": {
+          "afterAgentResponse": [
+            {
+              "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor",
+              "timeout": 5
+            }
+          ],
           "beforeShellExecution": [
             {
               "command": "/usr/local/bin/audit-log",
+              "timeout": 5
+            }
+          ],
+          "beforeSubmitPrompt": [
+            {
+              "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor",
+              "timeout": 5
+            }
+          ],
+          "postToolUse": [
+            {
+              "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor",
               "timeout": 5
             }
           ],
@@ -16485,13 +16587,34 @@
         "version": 1
       },
       "installedCommands": [
+        "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor",
+        "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor",
+        "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor",
         "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor"
       ],
       "move": {
         "hooks": {
+          "afterAgentResponse": [
+            {
+              "command": "'/Users/me/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor",
+              "timeout": 5
+            }
+          ],
           "beforeShellExecution": [
             {
               "command": "/usr/local/bin/audit-log",
+              "timeout": 5
+            }
+          ],
+          "beforeSubmitPrompt": [
+            {
+              "command": "'/Users/me/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor",
+              "timeout": 5
+            }
+          ],
+          "postToolUse": [
+            {
+              "command": "'/Users/me/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor",
               "timeout": 5
             }
           ],
@@ -16509,6 +16632,9 @@
         "version": 1
       },
       "movedCommands": [
+        "'/Users/me/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor",
+        "'/Users/me/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor",
+        "'/Users/me/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor",
         "'/Users/me/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor"
       ],
       "reinstallChanges": false,
@@ -47421,6 +47547,24 @@
       ],
       "install": {
         "hooks": {
+          "afterAgentResponse": [
+            {
+              "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor",
+              "timeout": 5
+            }
+          ],
+          "beforeSubmitPrompt": [
+            {
+              "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor",
+              "timeout": 5
+            }
+          ],
+          "postToolUse": [
+            {
+              "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor",
+              "timeout": 5
+            }
+          ],
           "stop": [
             {
               "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor",
@@ -47477,6 +47621,24 @@
       ],
       "install": {
         "hooks": {
+          "afterAgentResponse": [
+            {
+              "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor",
+              "timeout": 5
+            }
+          ],
+          "beforeSubmitPrompt": [
+            {
+              "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor",
+              "timeout": 5
+            }
+          ],
+          "postToolUse": [
+            {
+              "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor",
+              "timeout": 5
+            }
+          ],
           "stop": [
             {
               "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor",
@@ -47514,6 +47676,24 @@
       "hookCommands": [],
       "install": {
         "hooks": {
+          "afterAgentResponse": [
+            {
+              "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor",
+              "timeout": 5
+            }
+          ],
+          "beforeSubmitPrompt": [
+            {
+              "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor",
+              "timeout": 5
+            }
+          ],
+          "postToolUse": [
+            {
+              "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor",
+              "timeout": 5
+            }
+          ],
           "stop": [
             {
               "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor",
@@ -47545,6 +47725,24 @@
       "hookCommands": [],
       "install": {
         "hooks": {
+          "afterAgentResponse": [
+            {
+              "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor",
+              "timeout": 5
+            }
+          ],
+          "beforeSubmitPrompt": [
+            {
+              "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor",
+              "timeout": 5
+            }
+          ],
+          "postToolUse": [
+            {
+              "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor",
+              "timeout": 5
+            }
+          ],
           "stop": [
             {
               "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor",
@@ -47574,6 +47772,24 @@
       "hookCommands": [],
       "install": {
         "hooks": {
+          "afterAgentResponse": [
+            {
+              "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor",
+              "timeout": 5
+            }
+          ],
+          "beforeSubmitPrompt": [
+            {
+              "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor",
+              "timeout": 5
+            }
+          ],
+          "postToolUse": [
+            {
+              "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor",
+              "timeout": 5
+            }
+          ],
           "stop": [
             {
               "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor",
@@ -47664,9 +47880,27 @@
       "hookCommands": [],
       "install": {
         "hooks": {
+          "afterAgentResponse": [
+            {
+              "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor",
+              "timeout": 5
+            }
+          ],
           "beforeShellExecution": [
             {
               "command": "/usr/local/bin/audit-log",
+              "timeout": 5
+            }
+          ],
+          "beforeSubmitPrompt": [
+            {
+              "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor",
+              "timeout": 5
+            }
+          ],
+          "postToolUse": [
+            {
+              "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor",
               "timeout": 5
             }
           ],
@@ -47781,6 +48015,24 @@
       ],
       "install": {
         "hooks": {
+          "afterAgentResponse": [
+            {
+              "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor",
+              "timeout": 5
+            }
+          ],
+          "beforeSubmitPrompt": [
+            {
+              "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor",
+              "timeout": 5
+            }
+          ],
+          "postToolUse": [
+            {
+              "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor",
+              "timeout": 5
+            }
+          ],
           "stop": [
             {
               "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor --verbose",
@@ -47852,6 +48104,24 @@
       ],
       "install": {
         "hooks": {
+          "afterAgentResponse": [
+            {
+              "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor",
+              "timeout": 5
+            }
+          ],
+          "beforeSubmitPrompt": [
+            {
+              "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor",
+              "timeout": 5
+            }
+          ],
+          "postToolUse": [
+            {
+              "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor",
+              "timeout": 5
+            }
+          ],
           "stop": [
             "text",
             7,
@@ -47907,6 +48177,24 @@
       "hookCommands": [],
       "install": {
         "hooks": {
+          "afterAgentResponse": [
+            {
+              "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor",
+              "timeout": 5
+            }
+          ],
+          "beforeSubmitPrompt": [
+            {
+              "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor",
+              "timeout": 5
+            }
+          ],
+          "postToolUse": [
+            {
+              "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor",
+              "timeout": 5
+            }
+          ],
           "stop": [
             {
               "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook cursor",
@@ -47969,6 +48257,24 @@
       "hookCommands": [],
       "install": {
         "hooks": {
+          "afterAgentResponse": [
+            {
+              "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor",
+              "timeout": 5
+            }
+          ],
+          "beforeSubmitPrompt": [
+            {
+              "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor",
+              "timeout": 5
+            }
+          ],
+          "postToolUse": [
+            {
+              "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor",
+              "timeout": 5
+            }
+          ],
           "stop": [
             {
               "bash": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor"
@@ -48032,6 +48338,24 @@
       ],
       "install": {
         "hooks": {
+          "afterAgentResponse": [
+            {
+              "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor",
+              "timeout": 5
+            }
+          ],
+          "beforeSubmitPrompt": [
+            {
+              "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor",
+              "timeout": 5
+            }
+          ],
+          "postToolUse": [
+            {
+              "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor",
+              "timeout": 5
+            }
+          ],
           "stop": [
             {
               "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor",
@@ -48070,6 +48394,24 @@
       ],
       "install": {
         "hooks": {
+          "afterAgentResponse": [
+            {
+              "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor",
+              "timeout": 5
+            }
+          ],
+          "beforeSubmitPrompt": [
+            {
+              "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor",
+              "timeout": 5
+            }
+          ],
+          "postToolUse": [
+            {
+              "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor",
+              "timeout": 5
+            }
+          ],
           "stop": [
             {
               "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor",
@@ -48108,6 +48450,24 @@
       ],
       "install": {
         "hooks": {
+          "afterAgentResponse": [
+            {
+              "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor",
+              "timeout": 5
+            }
+          ],
+          "beforeSubmitPrompt": [
+            {
+              "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor",
+              "timeout": 5
+            }
+          ],
+          "postToolUse": [
+            {
+              "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor",
+              "timeout": 5
+            }
+          ],
           "stop": [
             {
               "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor",
@@ -48182,9 +48542,27 @@
       "hookCommands": [],
       "install": {
         "hooks": {
+          "afterAgentResponse": [
+            {
+              "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor",
+              "timeout": 5
+            }
+          ],
           "beforeShellExecution": [
             {
               "command": "/usr/local/bin/audit-log",
+              "timeout": 5
+            }
+          ],
+          "beforeSubmitPrompt": [
+            {
+              "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor",
+              "timeout": 5
+            }
+          ],
+          "postToolUse": [
+            {
+              "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor",
               "timeout": 5
             }
           ],
@@ -48272,6 +48650,24 @@
       ],
       "install": {
         "hooks": {
+          "afterAgentResponse": [
+            {
+              "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor",
+              "timeout": 5
+            }
+          ],
+          "beforeSubmitPrompt": [
+            {
+              "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor",
+              "timeout": 5
+            }
+          ],
+          "postToolUse": [
+            {
+              "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor",
+              "timeout": 5
+            }
+          ],
           "stop": [
             {
               "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor",
@@ -48319,6 +48715,24 @@
       "hookCommands": [],
       "install": {
         "hooks": {
+          "afterAgentResponse": [
+            {
+              "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor",
+              "timeout": 5
+            }
+          ],
+          "beforeSubmitPrompt": [
+            {
+              "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor",
+              "timeout": 5
+            }
+          ],
+          "postToolUse": [
+            {
+              "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor",
+              "timeout": 5
+            }
+          ],
           "stop": [
             {
               "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook cursor",

@@ -244,3 +244,51 @@ fn context_in(home: &Path) -> InstallContext {
     fs::create_dir_all(home).unwrap(); // plain directory
     context(home)
 }
+
+#[test]
+fn a_cursor_file_with_only_our_stop_takes_the_prompt_events_too() {
+    let temp = tempfile::tempdir().unwrap();
+    let home = temp.path().join("home");
+    let context = context_in(&home);
+    let command = format!(
+        "'{}' --completion-hook cursor",
+        context.executable.display()
+    );
+    let path = home.join(".cursor/hooks.json");
+    fs::create_dir_all(path.parent().unwrap()).unwrap();
+    let mine = serde_json::json!({"command":"notify.sh","timeout":3});
+    fs::write(
+        &path,
+        serde_json::json!({"hooks":{"stop":[mine.clone(),{"command":command,"timeout":5}]},"version":1}).to_string(),
+    )
+    .unwrap();
+    let plan = only(install_plans(&context, "cursor", "--completion-hook", true)).unwrap();
+    assert!(plan.changed);
+    assert!(apply_plan(&plan).unwrap());
+    let value: Value = serde_json::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
+    for event in [
+        "stop",
+        "beforeSubmitPrompt",
+        "postToolUse",
+        "afterAgentResponse",
+    ] {
+        let ours = value["hooks"][event]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|h| h["command"] == command.as_str())
+            .count();
+        assert_eq!(ours, 1, "{event}");
+    }
+    assert_eq!(value["hooks"]["stop"][0], mine);
+    let removal = only(install_plans(
+        &context,
+        "cursor",
+        "--completion-hook",
+        false,
+    ))
+    .unwrap();
+    assert!(apply_plan(&removal).unwrap());
+    let value: Value = serde_json::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
+    assert_eq!(value["hooks"], serde_json::json!({"stop":[mine]}));
+}
