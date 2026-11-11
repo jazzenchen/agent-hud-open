@@ -109,6 +109,8 @@ Claude Code 写完一段改动，可以请一个 Codex 会话审一遍，Codex �
 - **Claude Code、Codex、Antigravity 与 DeepSeek Harness**：彼此都能传话，也能新开 Claude Code、Codex 或 Antigravity 会话。
 - **不打断工作**：消息等对方空闲才送达，不会插进正在进行的一轮。
 
+怎样开启和使用，见[使用文档](https://agenthud.app/docs/zh/mcp/messaging/)。
+
 ### 打造你自己的界面
 
 告诉 agent 你想怎样看信息：“把 Codex 放在前面，只保留我关心的数据。”

@@ -109,6 +109,8 @@ You can watch who is talking to whom: the sender folds its message into a paper 
 - **Claude Code, Codex, Antigravity and DeepSeek Harness**: each can message the others, or start a new Claude Code, Codex or Antigravity session.
 - **Never in the way**: a message waits until its session is idle; it never interrupts a turn.
 
+How to turn it on and use it: [Agents messaging each other](https://agenthud.app/docs/en/mcp/messaging/).
+
 ### Build your own UI.
 
 Tell an agent how you want to see things: *“Put Codex first and keep only the numbers I care about.”*
