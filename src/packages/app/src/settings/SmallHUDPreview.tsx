@@ -263,10 +263,7 @@ export function SmallHUDPreview({
                               sample.dockNumberTransparency,
                               light,
                               statusColor(vendor.level),
-                              false,
                             ),
-                            borderRadius:
-                              4 * DOCK_SCALE * dockScale(sample.dockScale),
                             minWidth: metrics.labels?.[index],
                             textAlign: "right",
                             fontVariantNumeric: "tabular-nums",

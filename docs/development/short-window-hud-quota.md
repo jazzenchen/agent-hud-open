@@ -14,7 +14,7 @@ for six seconds after every 24 seconds of the short-window reading. The
 tooltip names the current window. Never turns off both the badge and the
 rotation.
 
-Number appearance is also saved per display. Tinted background uses the
-status color. Grayscale uses a neutral foreground with no number background
-and adjustable transparency (0–90%); the separate alert badge stays visible.
+Number appearance is also saved per display. Colored text uses the status
+color for the number and its unit. Grayscale uses a neutral foreground and
+adjustable transparency (0–90%). The separate alert badge stays visible.
 The expanded quota panel, ring and bar data, and agent artwork are unchanged.

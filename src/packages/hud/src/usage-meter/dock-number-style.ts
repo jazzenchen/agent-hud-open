@@ -3,7 +3,6 @@ export function dockNumberColors(
   transparency: number,
   light: boolean,
   color: string,
-  alert: boolean,
 ) {
   if (style === "grayscale") {
     return {
@@ -13,10 +12,5 @@ export function dockNumberColors(
         : 1,
     };
   }
-  return {
-    color: alert ? "#fff" : color,
-    background: alert
-      ? "#b42318"
-      : `color-mix(in srgb, ${color} 12%, transparent)`,
-  };
+  return { color };
 }

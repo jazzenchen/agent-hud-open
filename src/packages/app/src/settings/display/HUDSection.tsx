@@ -138,7 +138,7 @@ export function HUDSection({
               label={t("HUD number appearance", "悬浮栏数字外观")}
               value={config.dockNumberStyle}
               options={[
-                ["tinted", t("Tinted background", "带底色")],
+                ["tinted", t("Colored text", "彩色文字")],
                 ["grayscale", t("Grayscale", "纯灰度")],
               ]}
               change={(value) =>

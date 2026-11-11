@@ -80,13 +80,12 @@ test("the first-crossing alert survives a remount and rearms on the next reset",
   );
 });
 
-test("grayscale drops the background even during alerts and fades just the text", () => {
-  assert.deepEqual(dockNumberColors("grayscale", 0.75, true, "green", true), {
+test("quota labels color only the text, with adjustable opacity in grayscale", () => {
+  assert.deepEqual(dockNumberColors("grayscale", 0.75, true, "green"), {
     color: "#262626",
     opacity: 0.25,
   });
-  assert.equal(
-    dockNumberColors("tinted", 0.75, true, "green", true).background,
-    "#b42318",
-  );
+  assert.deepEqual(dockNumberColors("tinted", 0.75, true, "green"), {
+    color: "green",
+  });
 });
