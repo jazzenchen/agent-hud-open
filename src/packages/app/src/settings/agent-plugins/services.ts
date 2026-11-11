@@ -85,6 +85,8 @@ export const knownClients: {
   { id: "qoder", name: "Qoder", logo: "qoder" },
   { id: "trae", name: "TRAE", logo: "trae" },
   { id: "traeCn", name: "TRAE CN", logo: "trae" },
+  { id: "pi", name: "Pi", logo: "pi" },
+  { id: "opencode", name: "OpenCode", logo: "opencode" },
 ];
 
 /** The last statuses read, so the page opens without a blank. */

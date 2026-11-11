@@ -123,7 +123,9 @@ impl SessionStarts {
             | Provider::WorkBuddy
             | Provider::ZCode
             | Provider::Qoder
-            | Provider::Kimi => Err(Failure::Unsupported(format!(
+            | Provider::Kimi
+            | Provider::Pi
+            | Provider::OpenCode => Err(Failure::Unsupported(format!(
                 "Agent HUD does not start {} sessions",
                 request.provider.as_str()
             ))),

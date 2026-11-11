@@ -39,8 +39,9 @@ fn every_client_of_the_database_has_its_store_and_its_own_plugin() {
         assert_eq!(
             observer.body,
             format!(
-                "{}const SOURCE = \"{id}\", FOLDER = \"{id}\";\n{}{export}",
+                "{}const SOURCE = \"{id}\", FOLDER = \"{id}\";\nconst CHANNEL = /*agent-hud:channel*/ null;\n{}{}{export}",
                 observer.marker,
+                include_str!("../hooks/mailbox.js"),
                 include_str!("observer.js"),
                 id = client.agent.id
             ),
@@ -106,6 +107,36 @@ fn a_turn_recorded_under_opencode_2_is_a_completed_turn_without_a_terminal() {
     assert_eq!(event.data["outcome"], "completed");
     assert_eq!(event.data["workspace"], "/repo");
     assert_eq!(event.data["navigationTarget"], Value::Null);
+}
+
+#[test]
+fn a_turn_that_took_a_message_names_it_and_carries_its_reply() {
+    let record = json!({
+        "version": 1, "sessionID": "opencode:ses_e5415bdccffe", "workspace": "/repo", "turnID": "msg_1",
+        "startedAtMs": 1_793_885_619_559i64, "completedAtMs": 1_793_885_619_686i64,
+        "delivered": "m-d8776a7228b7", "message": "Done: OC_SENT",
+    });
+    let event = crate::parse_observation("opencode", &record).unwrap();
+    assert_eq!(event.data["delivered"], "m-d8776a7228b7");
+    assert_eq!(event.data["message"], "Done: OC_SENT");
+    // A message id that is not one, and an empty reply, are left out.
+    let record = json!({
+        "version": 1, "sessionID": "opencode:ses_e5415bdccffe", "workspace": "/repo", "turnID": "msg_1",
+        "startedAtMs": 1_793_885_619_559i64, "completedAtMs": 1_793_885_619_686i64,
+        "delivered": "../m", "message": "  ",
+    });
+    let event = crate::parse_observation("opencode", &record).unwrap();
+    assert!(event.data.get("delivered").is_none());
+    assert!(event.data.get("message").is_none());
+    // One that failed ends without an answer, so its sender learns it.
+    let record = json!({
+        "version": 1, "sessionID": "opencode:ses_e5415bdccffe", "workspace": "/repo", "turnID": "msg_1",
+        "startedAtMs": 1_793_885_619_559i64, "completedAtMs": 1_793_885_619_686i64,
+        "delivered": "m-d8776a7228b7", "state": "ended", "stopReason": "error",
+    });
+    let event = crate::parse_observation("opencode", &record).unwrap();
+    assert_eq!(event.data["state"], "ended");
+    assert_eq!(event.data["outcome"], "failed");
 }
 
 #[test]

@@ -415,3 +415,44 @@ fn trae_and_trae_cn_each_get_the_server_where_their_app_reads_it() {
     assert!(Client::TraeCn.set_server(&places, None).unwrap());
     assert!(!Client::TraeCn.listed(&places));
 }
+
+#[test]
+fn pi_and_opencode_get_the_server_where_they_read_it() {
+    let home = tempfile::tempdir().unwrap();
+    let places = places(home.path());
+    fs::create_dir_all(home.path().join(".pi/agent")).unwrap();
+    fs::create_dir_all(home.path().join(".config/opencode")).unwrap();
+    fs::write(
+        home.path().join(".config/opencode/opencode.json"),
+        r#"{"$schema":"https://opencode.ai/config.json","plugin":["x"]}"#,
+    )
+    .unwrap();
+    for client in [Client::Pi, Client::OpenCode] {
+        assert!(client.present(&places));
+        assert!(client.set_server(&places, Some(Path::new(APP))).unwrap());
+        assert!(client.listed(&places));
+        assert!(!client.set_server(&places, Some(Path::new(APP))).unwrap());
+    }
+    let pi: Value =
+        serde_json::from_str(&fs::read_to_string(home.path().join(".pi/agent/mcp.json")).unwrap())
+            .unwrap();
+    assert_eq!(pi["mcpServers"]["agent-hud"]["command"], APP);
+    assert_eq!(
+        pi["mcpServers"]["agent-hud"]["args"],
+        serde_json::json!(["--mcp"])
+    );
+    let opencode: Value = serde_json::from_str(
+        &fs::read_to_string(home.path().join(".config/opencode/opencode.json")).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(opencode["mcp"]["agent-hud"]["type"], "local");
+    assert_eq!(
+        opencode["mcp"]["agent-hud"]["command"],
+        serde_json::json!([APP, "--mcp"])
+    );
+    assert_eq!(opencode["plugin"], serde_json::json!(["x"]));
+    for client in [Client::Pi, Client::OpenCode] {
+        assert!(client.set_server(&places, None).unwrap());
+        assert!(!client.listed(&places));
+    }
+}

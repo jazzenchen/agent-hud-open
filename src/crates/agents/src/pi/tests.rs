@@ -24,7 +24,12 @@ fn every_client_of_the_logs_loads_its_own_extension() {
         let observer = agent.observer.unwrap();
         assert_eq!(
             observer.body,
-            format!("{}{prelude}{}", observer.marker, include_str!("observer.ts"))
+            format!(
+                "{}{prelude}const CHANNEL = /*agent-hud:channel*/ null;\n{}{}",
+                observer.marker,
+                include_str!("../hooks/mailbox.js"),
+                include_str!("observer.ts")
+            )
         );
         assert!(prelude.contains(&format!("SOURCE = \"{}\"", agent.id)));
         assert!(prelude.contains(&format!("NAME = \"{}\"", agent.name)));

@@ -12,6 +12,7 @@ pub mod fixtures;
 mod handoffs;
 mod journal;
 pub mod process;
+mod provider;
 mod sending;
 mod service;
 mod setup;
@@ -101,60 +102,8 @@ pub const CLAUDE_MESSAGES_OFF: &str =
 pub const DEEPSEEK_MESSAGES_OFF: &str =
     "Sending messages to DeepSeek Harness is off (Settings → Agent plugins)";
 
-#[derive(Clone, Copy, Debug, Hash, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "lowercase")]
-pub enum Provider {
-    Claude,
-    Codex,
-    Antigravity,
-    DeepSeek,
-    Cursor,
-    Trae,
-    WorkBuddy,
-    ZCode,
-    Qoder,
-    Kimi,
-}
-impl Provider {
-    pub fn as_str(self) -> &'static str {
-        match self {
-            Self::Claude => "claude",
-            Self::Codex => "codex",
-            Self::Antigravity => "antigravity",
-            Self::DeepSeek => "deepseek",
-            Self::Cursor => "cursor",
-            Self::Trae => "trae",
-            Self::WorkBuddy => "workbuddy",
-            Self::ZCode => "zcode",
-            Self::Qoder => "qoder",
-            Self::Kimi => "kimi",
-        }
-    }
-    pub fn parse(raw: &str) -> Option<Self> {
-        match raw.trim() {
-            "claude" => Some(Self::Claude),
-            "codex" => Some(Self::Codex),
-            "antigravity" => Some(Self::Antigravity),
-            "deepseek" => Some(Self::DeepSeek),
-            "cursor" => Some(Self::Cursor),
-            "trae" | "trae-cn" => Some(Self::Trae),
-            "workbuddy" | "codebuddy" => Some(Self::WorkBuddy),
-            "zcode" => Some(Self::ZCode),
-            "qoder" | "qoder-cn" | "qoder-work" => Some(Self::Qoder),
-            "kimi" => Some(Self::Kimi),
-            _ => None,
-        }
-    }
-    pub fn uses_hook_channel(self) -> bool {
-        matches!(
-            self,
-            Self::Cursor | Self::Trae | Self::WorkBuddy | Self::ZCode | Self::Qoder | Self::Kimi
-        )
-    }
-    pub fn queues_in_channel(self) -> bool {
-        matches!(self, Self::Claude | Self::DeepSeek) || self.uses_hook_channel()
-    }
-}
+pub use provider::Provider;
+
 #[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum PromptForm {
@@ -255,7 +204,8 @@ pub struct LocalClients {
 /// Whether the client with this id hands a session a message even while it
 /// is idle, through a rewake hook waiting in the session (Qoder CLI's).
 pub fn wakes_idle(client: &str) -> bool {
-    agent_hud_agents::hooks::hooks_by_id(client).is_some_and(|hooks| hooks.rewake.is_some())
+    Provider::parse(client).is_some_and(Provider::uses_observer)
+        || agent_hud_agents::hooks::hooks_by_id(client).is_some_and(|hooks| hooks.rewake.is_some())
 }
 
 pub(crate) fn valid_name(value: &str) -> bool {

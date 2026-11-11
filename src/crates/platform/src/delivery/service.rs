@@ -130,6 +130,8 @@ pub fn hook_session_key(provider: Provider, value: &str) -> Option<String> {
             let stripped = value.strip_prefix("kimi:").unwrap_or(value);
             stripped.strip_suffix(":main").unwrap_or(stripped)
         }
+        Provider::Pi => value.strip_prefix("pi:").unwrap_or(value),
+        Provider::OpenCode => value.strip_prefix("opencode:").unwrap_or(value),
         _ => return None,
     }
     .trim();
@@ -146,6 +148,8 @@ pub(crate) fn valid_session_id(provider: Provider, value: &str) -> bool {
         | Provider::WorkBuddy
         | Provider::ZCode
         | Provider::Qoder
-        | Provider::Kimi => hook_session_key(provider, value).is_some(),
+        | Provider::Kimi
+        | Provider::Pi
+        | Provider::OpenCode => hook_session_key(provider, value).is_some(),
     }
 }

@@ -1,5 +1,6 @@
 // SOURCE and FOLDER, above, name the client: its sessions' id prefix and its data folder. What follows the script
-// exports `server`, OpenCode 1's plugin, and for OpenCode itself also `setup`, OpenCode 2's (`export.js`).
+// exports `server`, OpenCode 1's plugin, and for OpenCode itself also `setup`, OpenCode 2's (`export.js`). OpenCode 1's
+// plugin also hands its sessions the messages other agents leave for them (`agentHudMailbox`, before this).
 import { mkdirSync, writeFileSync, renameSync, readdirSync, readFileSync, statSync, unlinkSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -47,6 +48,8 @@ function inbox() {
 async function server(input) {
   const turns = inbox();
   const sessions = new Map();
+  const mailbox = agentHudMailbox(SOURCE);
+  let known = [], listed = 0;
 
   function session(id) {
     let value = sessions.get(id);
@@ -66,18 +69,81 @@ async function server(input) {
   function settle(id, value) {
     const { reply, prompt, startedAtMs } = value;
     if (reply && !reply.completedAtMs && (!prompt || reply.parentID === prompt.id)) { value.waiting = true; return; }
-    value.reply = value.prompt = value.startedAtMs = value.waiting = undefined;
-    if (!reply || value.child || reply.error || reply.summary || reply.finish !== "stop") return;
-    if (prompt && reply.parentID !== prompt.id) return;
-    turns.write({
+    const delivered = value.delivered, parts = value.parts?.[reply?.id];
+    value.reply = value.prompt = value.startedAtMs = value.waiting = value.delivered = value.parts = undefined;
+    if (!reply || value.child || (prompt && reply.parentID !== prompt.id)) return;
+    const record = {
       version: 1, sessionID: SOURCE + ":" + id, workspace: value.directory || input.directory, title: value.title,
       model: reply.modelID, providerID: reply.providerID, turnID: reply.parentID,
       startedAtMs: startedAtMs || reply.createdAtMs || reply.completedAtMs, completedAtMs: Date.now(),
-      navigationTarget: navigationTarget(),
-    });
+      navigationTarget: navigationTarget(), delivered,
+    };
+    // A turn that took another agent's message and failed or was stopped is recorded as ended, so its sender learns.
+    if (reply.error) {
+      if (delivered) turns.write({ ...record, state: "ended", stopReason: reply.error === "MessageAbortedError" ? "aborted" : "error" });
+      return;
+    }
+    if (reply.summary || reply.finish !== "stop") return;
+    turns.write({ ...record, message: parts ? Object.values(parts).join("").slice(0, 40000) || undefined : undefined });
   }
 
+  // How the session's newest prompt was asked: its model and agent, which a message then runs on as a typed prompt would.
+  // Without them OpenCode runs it on the agent's default model, which may not be the session's.
+  function how(info) {
+    const model = info?.model;
+    return {
+      ...(model?.providerID && model?.modelID ? { model: { providerID: model.providerID, modelID: model.modelID } } : {}),
+      ...(typeof info?.agent === "string" && info.agent ? { agent: info.agent } : {}),
+      ...(typeof info?.variant === "string" && info.variant ? { variant: info.variant } : {}),
+    };
+  }
+  async function asked(client, id) {
+    const known = sessions.get(id)?.asked;
+    if (known) return known;
+    try {
+      const answer = await client.session.messages({ path: { id }, query: { limit: 20 } });
+      const list = Array.isArray(answer) ? answer : Array.isArray(answer?.data) ? answer.data : [];
+      const prompts = list.map((message) => message?.info).filter((info) => info?.role === "user");
+      return how(prompts.sort((a, b) => (a.time?.created || 0) - (b.time?.created || 0)).at(-1));
+    } catch { return {}; }
+  }
+
+  // Every two seconds: hands each idle session of this server its oldest waiting message, as a prompt through the
+  // server's own client; the turn it starts names the message when it completes (`delivered`). Every half minute it
+  // lists the server's sessions again and says which this process can take messages for.
+  const look = setInterval(async () => {
+    try {
+      const client = input?.client;
+      if (!client?.session) return;
+      if (Date.now() - listed > 30000) {
+        listed = Date.now();
+        const answer = await client.session.list();
+        const list = Array.isArray(answer) ? answer : Array.isArray(answer?.data) ? answer.data : [];
+        known = list.filter((item) => item?.id && !item.parentID)
+          .sort((a, b) => (b.time?.updated || 0) - (a.time?.updated || 0)).map((item) => item.id);
+        mailbox.present(known);
+      }
+      for (const id of mailbox.boxes()) {
+        const value = sessions.get(id);
+        if (!known.includes(id) || value?.startedAtMs || value?.delivered) continue;
+        const message = mailbox.take(id);
+        if (!message) continue;
+        session(id).delivered = message.id;
+        const body = { ...(await asked(client, id)), parts: [{ type: "text", text: message.text }] };
+        client.session.promptAsync({ path: { id }, body }).catch(() => { session(id).delivered = undefined; });
+      }
+    } catch { /* The next look tries again. */ }
+  }, 2000);
+  look.unref?.();
+
   return {
+    // A call to Agent HUD's own MCP tools names its session, so Agent HUD knows who sends a message.
+    "tool.execute.before": async (call, output) => {
+      try { mailbox.calling(call?.sessionID, mailbox.tool(call?.tool), output?.args, call?.callID); } catch { /* Never interrupts the call. */ }
+    },
+    "tool.execute.after": async (call) => {
+      try { if (mailbox.tool(call?.tool)) mailbox.called(call?.callID); } catch { /* Never interrupts the call. */ }
+    },
     // Never throws or rejects: OpenCode 1.18 (and its forks) runs this inside the call that marks a session idle.
     event: async (payload) => {
       try {
@@ -96,14 +162,27 @@ async function server(input) {
             if (!info.sessionID || !info.id) break;
             const value = session(info.sessionID), createdAtMs = info.time?.created || 0;
             const newest = (known) => !known || known.id === info.id || createdAtMs >= known.createdAtMs;
-            if (info.role === "user" && newest(value.prompt)) value.prompt = { id: info.id, createdAtMs };
+            if (info.role === "user" && newest(value.prompt)) {
+              value.prompt = { id: info.id, createdAtMs };
+              const said = how(info);
+              if (said.model) value.asked = said;
+            }
             if (info.role === "assistant" && newest(value.reply)) {
               value.reply = {
                 id: info.id, parentID: info.parentID, modelID: info.modelID, providerID: info.providerID, finish: info.finish,
-                error: !!info.error, summary: info.summary === true, createdAtMs, completedAtMs: info.time?.completed,
+                error: info.error ? String(info.error.name || "error") : undefined, summary: info.summary === true, createdAtMs, completedAtMs: info.time?.completed,
               };
               if (value.waiting && value.reply.completedAtMs) settle(info.sessionID, value);
             }
+            break;
+          }
+          case "message.part.updated": {
+            // A reply's words as they stream in, kept by part until its turn is recorded.
+            const part = properties.part;
+            if (part?.type !== "text" || !part.sessionID || !part.messageID || typeof part.text !== "string") break;
+            const value = session(part.sessionID);
+            value.parts ||= {};
+            (value.parts[part.messageID] ||= {})[part.id || "text"] = part.text;
             break;
           }
           case "message.removed": {

@@ -68,6 +68,8 @@ impl LocalClients {
             hook_capability(Provider::ZCode),
             hook_capability(Provider::Qoder),
             hook_capability(Provider::Kimi),
+            hook_capability(Provider::Pi),
+            hook_capability(Provider::OpenCode),
         ]
     }
     pub fn targets(&self, now: SystemTime) -> Vec<ReachableTarget> {
@@ -123,6 +125,15 @@ impl LocalClients {
                         "Known cascade; local language server availability is verified at submission"
                     }
                     provider
+                        if provider.uses_observer()
+                            && self.hook_waiting(provider, &target.session_id) =>
+                    {
+                        "Agent HUD's observer in the session hands it over at once, even while the session is idle"
+                    }
+                    provider if provider.uses_observer() => {
+                        "Waits until the session is open in its client again, whose Agent HUD observer then hands it over"
+                    }
+                    provider
                         if provider.uses_hook_channel()
                             && self.hook_waiting(provider, &target.session_id) =>
                     {
@@ -146,13 +157,18 @@ impl LocalClients {
     /// Whether a rewake hook waits in the session now (`hooks::rewake`): its
     /// client then takes a message at once, even while the session is idle.
     pub fn hook_waiting(&self, provider: Provider, session_id: &str) -> bool {
+        let data = self.deliveries.as_deref().unwrap_or(&self.paths.receipts);
+        if provider.uses_observer() {
+            return crate::hooks::mailbox::standing(
+                data,
+                provider.as_str(),
+                session_id,
+                SystemTime::now(),
+            );
+        }
         provider.uses_hook_channel()
-            && hook_session_key(provider, session_id).is_some_and(|key| {
-                crate::hooks::rewake::standing(
-                    self.deliveries.as_deref().unwrap_or(&self.paths.receipts),
-                    &key,
-                )
-            })
+            && hook_session_key(provider, session_id)
+                .is_some_and(|key| crate::hooks::rewake::standing(data, &key))
     }
 }
 
@@ -164,7 +180,9 @@ fn hook_capability(provider: Provider) -> Capability {
         operations: vec![Operation::Automatic, Operation::Enqueue],
         plugin_preparation: false,
         automatic_installation: true,
-        notice: if wakes {
+        notice: if provider.uses_observer() {
+            "Queues input for Agent HUD's observer in the client, which hands it to the session as its next prompt at once while the session is open, even when it is idle; a session that is not open takes it once it is opened again."
+        } else if wakes {
             "Queues input for the session's own hooks: a rewake hook waiting in the session hands it over at once, even while it is idle; otherwise its stop hook hands it over when one of its turns ends."
         } else {
             "Queues input for the session's own stop hook, which hands it over as the next input when one of its turns ends; an idle session takes it only after its next turn."

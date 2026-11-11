@@ -81,6 +81,8 @@ static OBSERVER: Observer = Observer {
     body: concat!(
         "// Agent HUD Pi session observer\n",
         "const SOURCE = \"pi\", NAME = \"Pi\", FOLDER = \".pi\", VARIABLE = \"PI_CODING_AGENT_DIR\", ENDS = \"agent_settled\";\n",
+        "const CHANNEL = /*agent-hud:channel*/ null;\n",
+        include_str!("../hooks/mailbox.js"),
         include_str!("observer.ts")
     ),
     at_key: "observedAtMs",
@@ -128,6 +130,8 @@ static OH_MY_PI_OBSERVER: Observer = Observer {
     body: concat!(
         "// Agent HUD Oh My Pi session observer\n",
         "const SOURCE = \"omp\", NAME = \"Oh My Pi\", FOLDER = \".omp\", VARIABLE = \"\", ENDS = \"agent_end\";\n",
+        "const CHANNEL = /*agent-hud:channel*/ null;\n",
+        include_str!("../hooks/mailbox.js"),
         include_str!("observer.ts")
     ),
     at_key: "observedAtMs",

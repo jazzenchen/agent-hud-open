@@ -138,8 +138,8 @@ pub fn unknown(zh: bool) -> String {
 pub fn other_client(zh: bool) -> String {
     say(
         zh,
-        "只能发给 Claude Code、Codex、Antigravity、DeepSeek Harness、Cursor、TRAE、WorkBuddy、ZCode、Qoder 和 Kimi Code 会话。",
-        "Messages go to Claude Code, Codex, Antigravity, DeepSeek Harness, Cursor, TRAE, WorkBuddy, ZCode, Qoder and Kimi Code sessions only.",
+        "只能发给 Claude Code、Codex、Antigravity、DeepSeek Harness、Cursor、TRAE、WorkBuddy、ZCode、Qoder、Kimi Code、Pi 和 OpenCode 会话。",
+        "Messages go to Claude Code, Codex, Antigravity, DeepSeek Harness, Cursor, TRAE, WorkBuddy, ZCode, Qoder, Kimi Code, Pi and OpenCode sessions only.",
     )
 }
 pub fn child(zh: bool) -> String {

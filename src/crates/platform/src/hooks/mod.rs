@@ -14,6 +14,7 @@ mod endpoint;
 mod entry;
 mod inbox;
 mod install;
+pub mod mailbox;
 mod statusline_install;
 pub use statusline_install::AntigravityCliChange;
 mod observers;
@@ -79,7 +80,7 @@ impl Hooks {
             antigravity: None,
             deepseek: None,
             deepseek_plugin: None,
-            clients: clients::Clients::default(),
+            clients: clients::Clients::with_channel(data.join("hook-channel")),
             data,
             requests,
             reminders: reminders::Reminders::default(),

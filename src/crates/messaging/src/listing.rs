@@ -72,6 +72,15 @@ impl Messaging {
             "deepseek" if loaded.contains(id) => (json!(true), words::deepseek_ready(zh)),
             "deepseek" => (json!(false), words::deepseek_not_loaded(zh)),
             "antigravity" => (Value::Null, words::antigravity_waits(zh)),
+            // Pi and OpenCode: Agent HUD's observer in the client takes it.
+            _ if Provider::parse(client).is_some_and(Provider::uses_observer) => {
+                let name = words::client_name(client);
+                if Provider::parse(client).is_some_and(|p| self.clients.hook_waiting(p, id)) {
+                    (json!(true), words::observer_ready(zh, name))
+                } else {
+                    (Value::Null, words::observer_closed(zh, name))
+                }
+            }
             _ if Provider::parse(client).is_some_and(Provider::uses_hook_channel) => {
                 let waiting = Provider::parse(client)
                     .is_some_and(|provider| self.clients.hook_waiting(provider, id));

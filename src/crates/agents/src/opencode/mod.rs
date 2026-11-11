@@ -102,6 +102,8 @@ static OBSERVER: Observer = Observer {
     body: concat!(
         "// Agent HUD OpenCode session observer\n",
         "const SOURCE = \"opencode\", FOLDER = \"opencode\";\n",
+        "const CHANNEL = /*agent-hud:channel*/ null;\n",
+        include_str!("../hooks/mailbox.js"),
         include_str!("observer.js"),
         include_str!("export.js")
     ),
@@ -167,6 +169,8 @@ static KILO_OBSERVER: Observer = Observer {
     body: concat!(
         "// Agent HUD Kilo Code session observer\n",
         "const SOURCE = \"kilo\", FOLDER = \"kilo\";\n",
+        "const CHANNEL = /*agent-hud:channel*/ null;\n",
+        include_str!("../hooks/mailbox.js"),
         include_str!("observer.js"),
         "export const AgentHUDSessionObserver = server;\n"
     ),
@@ -230,6 +234,8 @@ static MIMO_CODE_OBSERVER: Observer = Observer {
     body: concat!(
         "// Agent HUD MiMo Code session observer\n",
         "const SOURCE = \"mimocode\", FOLDER = \"mimocode\";\n",
+        "const CHANNEL = /*agent-hud:channel*/ null;\n",
+        include_str!("../hooks/mailbox.js"),
         include_str!("observer.js"),
         "export const AgentHUDSessionObserver = server;\n"
     ),

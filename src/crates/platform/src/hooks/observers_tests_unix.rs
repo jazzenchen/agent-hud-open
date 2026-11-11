@@ -23,7 +23,7 @@ fn a_config_folder_linked_to_nowhere_leaves_the_client_out_and_writes_nothing() 
     symlink(&gone, home.join(".config/opencode")).unwrap();
     let context = context(&home);
 
-    let error = observer_plan(&context, "opencode", true)
+    let error = observer_plan(&context, "opencode", true, None)
         .err()
         .expect("no plan through a dangling link");
     assert!(error.contains("symbolic link"), "{error}");
@@ -32,7 +32,11 @@ fn a_config_folder_linked_to_nowhere_leaves_the_client_out_and_writes_nothing() 
         "nothing is made at the link's target"
     );
     // Removing has nothing to remove, so it is no failure.
-    assert!(!observer_plan(&context, "opencode", false).unwrap().changed);
+    assert!(
+        !observer_plan(&context, "opencode", false, None)
+            .unwrap()
+            .changed
+    );
 }
 
 #[test]
@@ -45,7 +49,7 @@ fn a_config_folder_linked_to_a_real_folder_still_takes_the_observer() {
     fs::create_dir_all(&real).unwrap();
     symlink(&real, home.join(".config/opencode")).unwrap();
 
-    let plan = observer_plan(&context(&home), "opencode", true).unwrap();
+    let plan = observer_plan(&context(&home), "opencode", true, None).unwrap();
     assert!(apply_observer_plan(&plan).unwrap());
     assert!(fs::read_to_string(real.join("plugin/agent-hud.js"))
         .unwrap()
@@ -67,13 +71,17 @@ fn an_opencode_observer_from_an_earlier_release_gives_way_to_the_one_opencode_2_
     .unwrap();
     let context = context(&home);
 
-    let plan = observer_plan(&context, "opencode", true).unwrap();
+    let plan = observer_plan(&context, "opencode", true, None).unwrap();
     assert!(plan.changed);
     assert!(apply_observer_plan(&plan).unwrap());
     let written = fs::read_to_string(&script).unwrap();
     assert!(written.ends_with("export { plugin as default };\n"));
     assert!(!written.contains("export const"));
-    assert!(!observer_plan(&context, "opencode", true).unwrap().changed);
+    assert!(
+        !observer_plan(&context, "opencode", true, None)
+            .unwrap()
+            .changed
+    );
 }
 
 #[test]
@@ -138,13 +146,13 @@ fn each_fork_takes_its_parents_observer_in_its_own_folder_and_reports_as_itself(
             "// Agent HUD Oh My Pi session observer\nconst SOURCE = \"omp\"",
         ),
     ] {
-        let plan = observer_plan(&context, source, true).unwrap();
+        let plan = observer_plan(&context, source, true, None).unwrap();
         assert_eq!(plan.path, home.join(script));
         assert!(apply_observer_plan(&plan).unwrap());
         assert!(fs::read_to_string(home.join(script))
             .unwrap()
             .starts_with(marker));
-        assert!(!observer_plan(&context, source, true).unwrap().changed);
+        assert!(!observer_plan(&context, source, true, None).unwrap().changed);
     }
 
     // What the plugins write comes back as their own clients' turns.

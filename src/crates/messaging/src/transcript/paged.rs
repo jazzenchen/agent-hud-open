@@ -182,7 +182,7 @@ pub(super) fn answer(host: &Host<'_>, message: &Message) -> Option<Found> {
 fn live_answer(live: &Value, message: &Message) -> Option<Found> {
     if !matches!(
         message.to.client.as_str(),
-        "trae" | "trae-cn" | "cursor" | "zcode"
+        "trae" | "trae-cn" | "cursor" | "zcode" | "pi" | "opencode"
     ) {
         return None;
     }

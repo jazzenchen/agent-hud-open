@@ -106,7 +106,9 @@ impl LocalClients {
             | Provider::WorkBuddy
             | Provider::ZCode
             | Provider::Qoder
-            | Provider::Kimi => {
+            | Provider::Kimi
+            | Provider::Pi
+            | Provider::OpenCode => {
                 // Only the session's own completion hook takes it, when a turn
                 // ends; nothing here reaches into the client.
                 hook_session_key(request.provider, &request.session_id)
@@ -186,7 +188,9 @@ impl LocalClients {
             | Provider::WorkBuddy
             | Provider::ZCode
             | Provider::Qoder
-            | Provider::Kimi => {
+            | Provider::Kimi
+            | Provider::Pi
+            | Provider::OpenCode => {
                 let key = hook_session_key(provider, session_id)
                     .ok_or_else(|| Failure::InvalidInput("identity".into()))?;
                 self.hook_channel().cancel(&key, request_id)?

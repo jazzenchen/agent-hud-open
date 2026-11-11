@@ -17,11 +17,25 @@ struct Client {
     root: PathBuf,
     script: PathBuf,
     marker: &'static str,
-    body: &'static str,
+    body: String,
+}
+/// The observer script as it is written for `source`: with Agent HUD's hook
+/// channel folder in it for a client Agent HUD hands messages to through its
+/// observer (the script's mailbox), and without one for any other.
+fn script(source: &str, body: &str, channel: Option<&Path>) -> String {
+    const SLOT: &str = "/*agent-hud:channel*/ null";
+    match channel.filter(|_| crate::delivery::Provider::parse(source).is_some()) {
+        Some(folder) => body.replacen(
+            SLOT,
+            &serde_json::to_string(&folder.to_string_lossy()).unwrap_or_else(|_| "null".into()),
+            1,
+        ),
+        None => body.to_owned(),
+    }
 }
 /// The clients that report through an observer plugin, from their
 /// descriptors.
-fn clients(home: &Path, env: &HashMap<String, String>) -> Vec<Client> {
+fn clients(home: &Path, env: &HashMap<String, String>, channel: Option<&Path>) -> Vec<Client> {
     let first = |location: &agent_hud_agents::Location| {
         crate::os::resolve(home, env, location).into_iter().next()
     };
@@ -34,7 +48,7 @@ fn clients(home: &Path, env: &HashMap<String, String>) -> Vec<Client> {
                 root: first(&observer.turns)?,
                 script: first(&observer.script)?,
                 marker: observer.marker,
-                body: observer.body,
+                body: script(agent.id, observer.body, channel),
             })
         })
         .collect()
@@ -45,17 +59,20 @@ pub struct ObserverPlan {
     pub changed: bool,
     enabled: bool,
     original: Option<Vec<u8>>,
-    body: &'static str,
+    body: String,
 }
+/// The plan for `source`'s observer script; `channel` is Agent HUD's hook
+/// channel folder, which the script's mailbox reads (`script`).
 pub fn observer_plan(
     context: &InstallContext,
     source: &str,
     enabled: bool,
+    channel: Option<&Path>,
 ) -> Result<ObserverPlan, String> {
     if enabled {
         super::install::canonical(context)?;
     }
-    let client = clients(&context.home, &context.environment)
+    let client = clients(&context.home, &context.environment, channel)
         .into_iter()
         .find(|c| c.source == source)
         .ok_or_else(|| {
@@ -158,7 +175,7 @@ pub(super) struct Observers {
 }
 impl Observers {
     pub fn new(home: &Path, env: &HashMap<String, String>, wake: Wake) -> Self {
-        let clients = clients(home, env);
+        let clients = clients(home, env, None);
         let roots = clients
             .iter()
             .map(|c| SourceRoot {

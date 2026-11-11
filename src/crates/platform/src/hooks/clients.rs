@@ -12,6 +12,9 @@ pub(super) struct Clients {
     opted_in: Vec<String>,
     /// Whether the clients' hooks are in: the last install put them in.
     on: bool,
+    /// Agent HUD's hook channel folder, written into the observer scripts
+    /// whose mailbox hands their sessions messages (`observers::script`).
+    channel: Option<std::path::PathBuf>,
 }
 /// Every hook the client has, in install order, each with whether it goes
 /// in: one that waits for the user only once they turned it on.
@@ -43,6 +46,14 @@ fn found(context: &InstallContext) -> Vec<String> {
         .collect()
 }
 impl Clients {
+    /// The installer for the clients, with the hook channel folder the
+    /// observers' mailboxes read.
+    pub(super) fn with_channel(channel: std::path::PathBuf) -> Self {
+        Self {
+            channel: Some(channel),
+            ..Self::default()
+        }
+    }
     pub(super) fn context(&self) -> Option<&InstallContext> {
         self.context.as_ref()
     }
@@ -64,8 +75,9 @@ impl Clients {
         let mut errors = Vec::new();
         for source in found(context) {
             if observed(&source) {
-                if let Err(error) = observers::observer_plan(context, &source, enabled)
-                    .and_then(|plan| observers::apply_observer_plan(&plan))
+                if let Err(error) =
+                    observers::observer_plan(context, &source, enabled, self.channel.as_deref())
+                        .and_then(|plan| observers::apply_observer_plan(&plan))
                 {
                     errors.push(format!("{source}: {error}"));
                 }
@@ -163,7 +175,7 @@ impl Clients {
             let mut error = None;
             if observed(&source) {
                 known = true;
-                match observers::observer_plan(context, &source, true) {
+                match observers::observer_plan(context, &source, true, self.channel.as_deref()) {
                     Ok(plan) => installed &= !plan.changed,
                     Err(e) => {
                         installed = false;

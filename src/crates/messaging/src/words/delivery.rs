@@ -73,6 +73,8 @@ pub fn client_name(client: &str) -> &'static str {
         "qoder" | "qoder-work" => "Qoder",
         "qoder-cn" => "Qoder CN",
         "kimi" => "Kimi Code",
+        "pi" => "Pi",
+        "opencode" => "OpenCode",
         _ => "This client",
     }
 }
@@ -102,6 +104,22 @@ pub fn hook_not_waiting(zh: bool, client: &str) -> String {
         format!("这个 {client} 会话里没有 Agent HUD 的唤醒钩子在等候（它只在交互式会话里，从会话启动或上一轮结束起等候）：消息会等到这个会话下一轮结束时由停止钩子交给它；一小时内没有轮次结束就过期。")
     } else {
         format!("No Agent HUD rewake hook waits in this {client} session (one waits only in an interactive session, from its start or its last turn's end): the message waits for this session's next turn to end, when its stop hook hands it over, and expires if no turn ends within an hour.")
+    }
+}
+/// A Pi or OpenCode session whose client runs Agent HUD's observer now.
+pub fn observer_ready(zh: bool, client: &str) -> String {
+    if zh {
+        format!("这个 {client} 会话开着，Agent HUD 的观察插件会立即把消息作为下一条输入交给它；会话空闲时会为它开始新的一轮。")
+    } else {
+        format!("This {client} session is open: Agent HUD's observer in it hands the message over at once as the next input, and an idle session starts a turn for it.")
+    }
+}
+/// A Pi or OpenCode session no running client holds now.
+pub fn observer_closed(zh: bool, client: &str) -> String {
+    if zh {
+        format!("这个 {client} 会话现在没有打开：消息会等到会话在 {client} 里再次打开时，由 Agent HUD 的观察插件交给它；一小时内没打开就过期。")
+    } else {
+        format!("This {client} session is not open now: the message waits until it is open in {client} again, when Agent HUD's observer hands it over, and expires if that does not happen within an hour.")
     }
 }
 pub fn hook_unseen(zh: bool, client: &str) -> String {

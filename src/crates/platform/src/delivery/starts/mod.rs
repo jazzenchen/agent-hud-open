@@ -153,7 +153,9 @@ impl SessionStarts {
             | Provider::WorkBuddy
             | Provider::ZCode
             | Provider::Qoder
-            | Provider::Kimi => None,
+            | Provider::Kimi
+            | Provider::Pi
+            | Provider::OpenCode => None,
         }
     }
     /// Whether the client's desktop app is installed, looked up on disk each
@@ -170,7 +172,9 @@ impl SessionStarts {
             | Provider::WorkBuddy
             | Provider::ZCode
             | Provider::Qoder
-            | Provider::Kimi => &[],
+            | Provider::Kimi
+            | Provider::Pi
+            | Provider::OpenCode => &[],
         };
         self.applications
             .iter()
