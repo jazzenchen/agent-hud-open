@@ -70,6 +70,14 @@ pub(super) fn edge_hud_unsupported() -> Option<&'static str> {
     )
 }
 
+/// Not followed yet: a WebKitGTK page whose web process ended stays as it is.
+pub(super) fn watch_page(
+    _window: &tauri::WebviewWindow,
+    _on_event: std::sync::Arc<dyn Fn(super::recovery::PageEvent) + Send + Sync>,
+) -> Result<(), String> {
+    Ok(())
+}
+
 /// Runs `job` with the window's GTK toplevel and WebView on the GTK thread and
 /// waits for it. Tauri runs it in place when already on that thread.
 fn on_gtk<T: Send + 'static>(

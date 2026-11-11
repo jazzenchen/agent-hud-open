@@ -7,7 +7,10 @@ pub(super) use super::generic::{
 use super::PointerKeys;
 #[path = "windows/displays.rs"]
 mod displays;
+#[path = "windows/page.rs"]
+mod page;
 pub(super) use displays::{measure_screens, screen};
+pub(super) use page::watch_page;
 
 /// Windows reports global physical desktop pixels, with a per-window DPI scale.
 pub(super) const GLOBAL_POINTS: bool = false;

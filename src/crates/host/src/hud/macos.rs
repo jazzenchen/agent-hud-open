@@ -36,6 +36,14 @@ pub(super) fn fixed_canvas() -> bool {
     false
 }
 
+/// Tauri itself reloads a WKWebView whose content process ended.
+pub(super) fn watch_page(
+    _window: &tauri::WebviewWindow,
+    _on_event: std::sync::Arc<dyn Fn(super::recovery::PageEvent) + Send + Sync>,
+) -> Result<(), String> {
+    Ok(())
+}
+
 /// The HUD is a nonactivating NSPanel, chosen before allocation.
 pub(super) fn panel_builder<'a>(
     app: &'a tauri::AppHandle,

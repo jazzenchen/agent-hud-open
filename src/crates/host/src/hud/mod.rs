@@ -14,6 +14,7 @@ mod displays;
 mod drag;
 mod input;
 mod plans;
+mod recovery;
 mod screen;
 mod snap;
 mod text_focus;
@@ -34,6 +35,8 @@ mod worker;
 //   set_drag_cursor, global_pointer,     pointer and button state while hovering
 //     left_mouse_down, pointer_keys        or dragging
 //   edge_hud_unsupported                 what this host cannot do
+//   watch_page                           report a page whose process ended, and
+//                                          finished loads (recovery.rs)
 // generic.rs holds the pieces that need only Tauri's own window API; a host
 // re-exports those until it has a native adapter.
 #[cfg(not(target_os = "macos"))]
@@ -87,6 +90,7 @@ struct HudState {
     pointer_emitted_at: Option<Instant>,
     text_focus: Option<String>,
     text_focus_origin: Option<host::TextFocusOrigin>,
+    page: recovery::Page,
 }
 
 impl HudWindows {

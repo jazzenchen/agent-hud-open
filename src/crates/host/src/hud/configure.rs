@@ -83,6 +83,11 @@ pub(super) fn configure(
         state.config = Some(config);
         return Ok(());
     }
+    if state.page.lost {
+        // Its page is reloading; recovery places the HUD once the page is back.
+        state.config = Some(config);
+        return Ok(());
+    }
     if let Some(reason) = edge_hud_unsupported() {
         return Err(reason.into());
     }
@@ -104,7 +109,7 @@ pub(super) fn configure(
                 )
                 .into(),
             );
-            host::panel_builder(app, &owner.label, url)
+            let window = host::panel_builder(app, &owner.label, url)
                 .title("Agent HUD")
                 .decorations(false)
                 .resizable(false)
@@ -121,7 +126,9 @@ pub(super) fn configure(
                 .accept_first_mouse(true)
                 .visible(false)
                 .build()
-                .map_err(|error| format!("Could not create the HUD surface: {error}"))?
+                .map_err(|error| format!("Could not create the HUD surface: {error}"))?;
+            super::recovery::watch(app, &window, &owner.label);
+            window
         }
     };
     if !keep_drag {
