@@ -3204,7 +3204,8 @@
     },
     "output": {
       "events": [
-        "Stop"
+        "Stop",
+        "UserPromptSubmit"
       ],
       "flag": "--completion-hook",
       "relativePath": ".codebuddy/settings.json",
@@ -4473,7 +4474,8 @@
     },
     "output": {
       "events": [
-        "Stop"
+        "Stop",
+        "UserPromptSubmit"
       ],
       "flag": "--completion-hook",
       "relativePath": ".workbuddy/settings.json",
@@ -14183,10 +14185,22 @@
               ],
               "matcher": "Edit|Write"
             }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook codebuddy",
+                  "timeout": 5,
+                  "type": "command"
+                }
+              ]
+            }
           ]
         }
       },
       "installedCommands": [
+        "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook codebuddy",
         "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook codebuddy"
       ],
       "move": {
@@ -14208,10 +14222,22 @@
               ],
               "matcher": "Edit|Write"
             }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "command": "'/Users/me/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook codebuddy",
+                  "timeout": 5,
+                  "type": "command"
+                }
+              ]
+            }
           ]
         }
       },
       "movedCommands": [
+        "'/Users/me/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook codebuddy",
         "'/Users/me/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook codebuddy"
       ],
       "reinstallChanges": false,
@@ -14251,10 +14277,22 @@
                 }
               ]
             }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook codebuddy",
+                  "timeout": 5,
+                  "type": "command"
+                }
+              ]
+            }
           ]
         }
       },
       "installedCommands": [
+        "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook codebuddy",
         "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook codebuddy"
       ],
       "move": {
@@ -14269,10 +14307,22 @@
                 }
               ]
             }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "command": "'/Users/me/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook codebuddy",
+                  "timeout": 5,
+                  "type": "command"
+                }
+              ]
+            }
           ]
         }
       },
       "movedCommands": [
+        "'/Users/me/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook codebuddy",
         "'/Users/me/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook codebuddy"
       ],
       "reinstallChanges": false,
@@ -14315,6 +14365,18 @@
               ],
               "matcher": "Bash"
             }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "command": "/usr/local/bin/audit-log --event UserPromptSubmit",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ],
+              "matcher": "Bash"
+            }
           ]
         },
         "model": "opus",
@@ -14372,6 +14434,27 @@
                 }
               ]
             }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "command": "/usr/local/bin/audit-log --event UserPromptSubmit",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ],
+              "matcher": "Bash"
+            },
+            {
+              "hooks": [
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook codebuddy",
+                  "timeout": 5,
+                  "type": "command"
+                }
+              ]
+            }
           ]
         },
         "model": "opus",
@@ -14387,6 +14470,7 @@
         }
       },
       "installedCommands": [
+        "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook codebuddy",
         "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook codebuddy"
       ],
       "move": {
@@ -14423,6 +14507,27 @@
                 }
               ]
             }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "command": "/usr/local/bin/audit-log --event UserPromptSubmit",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ],
+              "matcher": "Bash"
+            },
+            {
+              "hooks": [
+                {
+                  "command": "'/Users/me/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook codebuddy",
+                  "timeout": 5,
+                  "type": "command"
+                }
+              ]
+            }
           ]
         },
         "model": "opus",
@@ -14438,6 +14543,7 @@
         }
       },
       "movedCommands": [
+        "'/Users/me/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook codebuddy",
         "'/Users/me/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook codebuddy"
       ],
       "reinstallChanges": false,
@@ -14460,6 +14566,18 @@
               "hooks": [
                 {
                   "command": "/usr/local/bin/audit-log --event Stop",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ],
+              "matcher": "Bash"
+            }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "command": "/usr/local/bin/audit-log --event UserPromptSubmit",
                   "timeout": 600,
                   "type": "command"
                 }
@@ -29616,10 +29734,22 @@
               ],
               "matcher": "Edit|Write"
             }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook workbuddy",
+                  "timeout": 5,
+                  "type": "command"
+                }
+              ]
+            }
           ]
         }
       },
       "installedCommands": [
+        "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook workbuddy",
         "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook workbuddy"
       ],
       "move": {
@@ -29641,10 +29771,22 @@
               ],
               "matcher": "Edit|Write"
             }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "command": "'/Users/me/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook workbuddy",
+                  "timeout": 5,
+                  "type": "command"
+                }
+              ]
+            }
           ]
         }
       },
       "movedCommands": [
+        "'/Users/me/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook workbuddy",
         "'/Users/me/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook workbuddy"
       ],
       "reinstallChanges": false,
@@ -29684,10 +29826,22 @@
                 }
               ]
             }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook workbuddy",
+                  "timeout": 5,
+                  "type": "command"
+                }
+              ]
+            }
           ]
         }
       },
       "installedCommands": [
+        "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook workbuddy",
         "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook workbuddy"
       ],
       "move": {
@@ -29702,10 +29856,22 @@
                 }
               ]
             }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "command": "'/Users/me/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook workbuddy",
+                  "timeout": 5,
+                  "type": "command"
+                }
+              ]
+            }
           ]
         }
       },
       "movedCommands": [
+        "'/Users/me/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook workbuddy",
         "'/Users/me/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook workbuddy"
       ],
       "reinstallChanges": false,
@@ -29748,6 +29914,18 @@
               ],
               "matcher": "Bash"
             }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "command": "/usr/local/bin/audit-log --event UserPromptSubmit",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ],
+              "matcher": "Bash"
+            }
           ]
         },
         "model": "opus",
@@ -29805,6 +29983,27 @@
                 }
               ]
             }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "command": "/usr/local/bin/audit-log --event UserPromptSubmit",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ],
+              "matcher": "Bash"
+            },
+            {
+              "hooks": [
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook workbuddy",
+                  "timeout": 5,
+                  "type": "command"
+                }
+              ]
+            }
           ]
         },
         "model": "opus",
@@ -29820,6 +30019,7 @@
         }
       },
       "installedCommands": [
+        "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook workbuddy",
         "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook workbuddy"
       ],
       "move": {
@@ -29856,6 +30056,27 @@
                 }
               ]
             }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "command": "/usr/local/bin/audit-log --event UserPromptSubmit",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ],
+              "matcher": "Bash"
+            },
+            {
+              "hooks": [
+                {
+                  "command": "'/Users/me/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook workbuddy",
+                  "timeout": 5,
+                  "type": "command"
+                }
+              ]
+            }
           ]
         },
         "model": "opus",
@@ -29871,6 +30092,7 @@
         }
       },
       "movedCommands": [
+        "'/Users/me/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook workbuddy",
         "'/Users/me/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook workbuddy"
       ],
       "reinstallChanges": false,
@@ -29893,6 +30115,18 @@
               "hooks": [
                 {
                   "command": "/usr/local/bin/audit-log --event Stop",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ],
+              "matcher": "Bash"
+            }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "command": "/usr/local/bin/audit-log --event UserPromptSubmit",
                   "timeout": 600,
                   "type": "command"
                 }
@@ -38832,6 +39066,17 @@
               ],
               "matcher": "Edit|Write"
             }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook codebuddy",
+                  "timeout": 5,
+                  "type": "command"
+                }
+              ]
+            }
           ]
         }
       },
@@ -38921,6 +39166,17 @@
               ],
               "matcher": "Bash"
             }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook codebuddy",
+                  "timeout": 5,
+                  "type": "command"
+                }
+              ]
+            }
           ]
         }
       },
@@ -38963,6 +39219,17 @@
                 }
               ]
             }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook codebuddy",
+                  "timeout": 5,
+                  "type": "command"
+                }
+              ]
+            }
           ]
         }
       },
@@ -38974,7 +39241,8 @@
       "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook codebuddy",
       "current": {
         "hooks": {
-          "Stop": []
+          "Stop": [],
+          "UserPromptSubmit": []
         }
       },
       "flag": "--completion-hook",
@@ -38985,6 +39253,17 @@
       "install": {
         "hooks": {
           "Stop": [
+            {
+              "hooks": [
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook codebuddy",
+                  "timeout": 5,
+                  "type": "command"
+                }
+              ]
+            }
+          ],
+          "UserPromptSubmit": [
             {
               "hooks": [
                 {
@@ -39016,6 +39295,17 @@
       "install": {
         "hooks": {
           "Stop": [
+            {
+              "hooks": [
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook codebuddy",
+                  "timeout": 5,
+                  "type": "command"
+                }
+              ]
+            }
+          ],
+          "UserPromptSubmit": [
             {
               "hooks": [
                 {
@@ -39131,6 +39421,17 @@
                 }
               ]
             }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook codebuddy",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ]
+            }
           ]
         },
         "model": "opus",
@@ -39150,6 +39451,7 @@
     },
     "output": {
       "hookCommands": [
+        "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook codebuddy",
         "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook codebuddy"
       ],
       "install": {
@@ -39167,6 +39469,17 @@
             }
           ],
           "Stop": [
+            {
+              "hooks": [
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook codebuddy",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ]
+            }
+          ],
+          "UserPromptSubmit": [
             {
               "hooks": [
                 {
@@ -39247,6 +39560,18 @@
               ],
               "matcher": "Bash"
             }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "command": "/usr/local/bin/audit-log --event UserPromptSubmit",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ],
+              "matcher": "Bash"
+            }
           ]
         },
         "model": "opus",
@@ -39300,6 +39625,27 @@
                 }
               ]
             }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "command": "/usr/local/bin/audit-log --event UserPromptSubmit",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ],
+              "matcher": "Bash"
+            },
+            {
+              "hooks": [
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook codebuddy",
+                  "timeout": 5,
+                  "type": "command"
+                }
+              ]
+            }
           ]
         },
         "model": "opus",
@@ -39333,6 +39679,18 @@
               "hooks": [
                 {
                   "command": "/usr/local/bin/audit-log --event Stop",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ],
+              "matcher": "Bash"
+            }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "command": "/usr/local/bin/audit-log --event UserPromptSubmit",
                   "timeout": 600,
                   "type": "command"
                 }
@@ -39449,6 +39807,33 @@
               ],
               "matcher": ""
             }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook codebuddy --verbose",
+                  "timeout": 600,
+                  "type": "command"
+                },
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook codebuddy-beta",
+                  "timeout": 600,
+                  "type": "command"
+                },
+                {
+                  "command": "my-tool--completion-hook codebuddy",
+                  "timeout": 600,
+                  "type": "command"
+                },
+                {
+                  "command": "~/bin/notify.sh --completion-hook codebuddy",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
           ]
         }
       },
@@ -39457,11 +39842,39 @@
     },
     "output": {
       "hookCommands": [
+        "~/bin/notify.sh --completion-hook codebuddy",
         "~/bin/notify.sh --completion-hook codebuddy"
       ],
       "install": {
         "hooks": {
           "Stop": [
+            {
+              "hooks": [
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook codebuddy --verbose",
+                  "timeout": 600,
+                  "type": "command"
+                },
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook codebuddy-beta",
+                  "timeout": 600,
+                  "type": "command"
+                },
+                {
+                  "command": "my-tool--completion-hook codebuddy",
+                  "timeout": 600,
+                  "type": "command"
+                },
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook codebuddy",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
+          ],
+          "UserPromptSubmit": [
             {
               "hooks": [
                 {
@@ -39493,6 +39906,28 @@
       "remove": {
         "hooks": {
           "Stop": [
+            {
+              "hooks": [
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook codebuddy --verbose",
+                  "timeout": 600,
+                  "type": "command"
+                },
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook codebuddy-beta",
+                  "timeout": 600,
+                  "type": "command"
+                },
+                {
+                  "command": "my-tool--completion-hook codebuddy",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
+          ],
+          "UserPromptSubmit": [
             {
               "hooks": [
                 {
@@ -39576,6 +40011,17 @@
                 }
               ],
               "matcher": ""
+            }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook codebuddy",
+                  "timeout": 5,
+                  "type": "command"
+                }
+              ]
             }
           ]
         }
@@ -39674,6 +40120,17 @@
               ],
               "matcher": ""
             }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook codebuddy",
+                  "timeout": 5,
+                  "type": "command"
+                }
+              ]
+            }
           ]
         }
       },
@@ -39712,6 +40169,38 @@
       "current": {
         "hooks": {
           "Stop": [
+            {
+              "hooks": [
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook codebuddy",
+                  "timeout": 600,
+                  "type": "command"
+                },
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --attention-hook codebuddy",
+                  "timeout": 600,
+                  "type": "command"
+                },
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook codebuddy",
+                  "timeout": 600,
+                  "type": "command"
+                },
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --compaction-hook codebuddy",
+                  "timeout": 600,
+                  "type": "command"
+                },
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook codex",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
+          ],
+          "UserPromptSubmit": [
             {
               "hooks": [
                 {
@@ -39792,12 +40281,85 @@
                 }
               ]
             }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook codebuddy",
+                  "timeout": 600,
+                  "type": "command"
+                },
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --attention-hook codebuddy",
+                  "timeout": 600,
+                  "type": "command"
+                },
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook codebuddy",
+                  "timeout": 600,
+                  "type": "command"
+                },
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --compaction-hook codebuddy",
+                  "timeout": 600,
+                  "type": "command"
+                },
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook codex",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            },
+            {
+              "hooks": [
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook codebuddy",
+                  "timeout": 5,
+                  "type": "command"
+                }
+              ]
+            }
           ]
         }
       },
       "remove": {
         "hooks": {
           "Stop": [
+            {
+              "hooks": [
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook codebuddy",
+                  "timeout": 600,
+                  "type": "command"
+                },
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --attention-hook codebuddy",
+                  "timeout": 600,
+                  "type": "command"
+                },
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook codebuddy",
+                  "timeout": 600,
+                  "type": "command"
+                },
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --compaction-hook codebuddy",
+                  "timeout": 600,
+                  "type": "command"
+                },
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook codex",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
+          ],
+          "UserPromptSubmit": [
             {
               "hooks": [
                 {
@@ -39848,6 +40410,85 @@
                 }
               ]
             }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook codebuddy",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "flag": "--completion-hook",
+      "source": "codebuddy"
+    },
+    "output": {
+      "hookCommands": [
+        "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook codebuddy",
+        "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook codebuddy"
+      ],
+      "install": {
+        "hooks": {
+          "Stop": [
+            {
+              "hooks": [
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook codebuddy",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ]
+            }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook codebuddy",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "remove": {
+        "hooks": {}
+      }
+    }
+  },
+  "patch/codebuddy/--completion-hook/owned-first-event-only": {
+    "input": {
+      "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook codebuddy",
+      "current": {
+        "hooks": {
+          "Stop": [
+            {
+              "hooks": [
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook codebuddy",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ]
+            }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "command": "/usr/local/bin/audit-log",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ]
+            }
           ]
         }
       },
@@ -39870,11 +40511,43 @@
                 }
               ]
             }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "command": "/usr/local/bin/audit-log",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ]
+            },
+            {
+              "hooks": [
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook codebuddy",
+                  "timeout": 5,
+                  "type": "command"
+                }
+              ]
+            }
           ]
         }
       },
       "remove": {
-        "hooks": {}
+        "hooks": {
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "command": "/usr/local/bin/audit-log",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ]
+            }
+          ]
+        }
       }
     }
   },
@@ -39893,6 +40566,17 @@
                 }
               ]
             }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "command": "'/Volumes/Agent HUD/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook codebuddy",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ]
+            }
           ]
         }
       },
@@ -39901,11 +40585,23 @@
     },
     "output": {
       "hookCommands": [
+        "'/Volumes/Agent HUD/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook codebuddy",
         "'/Volumes/Agent HUD/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook codebuddy"
       ],
       "install": {
         "hooks": {
           "Stop": [
+            {
+              "hooks": [
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook codebuddy",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ]
+            }
+          ],
+          "UserPromptSubmit": [
             {
               "hooks": [
                 {
@@ -39938,6 +40634,17 @@
                 }
               ]
             }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "command": "/usr/local/bin/agent-hud --completion-hook codebuddy",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ]
+            }
           ]
         }
       },
@@ -39946,11 +40653,23 @@
     },
     "output": {
       "hookCommands": [
+        "/usr/local/bin/agent-hud --completion-hook codebuddy",
         "/usr/local/bin/agent-hud --completion-hook codebuddy"
       ],
       "install": {
         "hooks": {
           "Stop": [
+            {
+              "hooks": [
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook codebuddy",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ]
+            }
+          ],
+          "UserPromptSubmit": [
             {
               "hooks": [
                 {
@@ -40049,6 +40768,17 @@
       "install": {
         "hooks": {
           "Stop": [
+            {
+              "hooks": [
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook codebuddy",
+                  "timeout": 5,
+                  "type": "command"
+                }
+              ]
+            }
+          ],
+          "UserPromptSubmit": [
             {
               "hooks": [
                 {
@@ -40440,6 +41170,17 @@
                 }
               ]
             }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook codebuddy",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ]
+            }
           ]
         },
         "model": "opus",
@@ -40485,6 +41226,17 @@
                 }
               ]
             }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook codebuddy",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ]
+            }
           ]
         },
         "model": "opus",
@@ -40502,6 +41254,17 @@
       "remove": {
         "hooks": {
           "Stop": [
+            {
+              "hooks": [
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook codebuddy",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ]
+            }
+          ],
+          "UserPromptSubmit": [
             {
               "hooks": [
                 {
@@ -96993,6 +97756,17 @@
               ],
               "matcher": "Edit|Write"
             }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook workbuddy",
+                  "timeout": 5,
+                  "type": "command"
+                }
+              ]
+            }
           ]
         }
       },
@@ -97082,6 +97856,17 @@
               ],
               "matcher": "Bash"
             }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook workbuddy",
+                  "timeout": 5,
+                  "type": "command"
+                }
+              ]
+            }
           ]
         }
       },
@@ -97124,6 +97909,17 @@
                 }
               ]
             }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook workbuddy",
+                  "timeout": 5,
+                  "type": "command"
+                }
+              ]
+            }
           ]
         }
       },
@@ -97135,7 +97931,8 @@
       "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook workbuddy",
       "current": {
         "hooks": {
-          "Stop": []
+          "Stop": [],
+          "UserPromptSubmit": []
         }
       },
       "flag": "--completion-hook",
@@ -97146,6 +97943,17 @@
       "install": {
         "hooks": {
           "Stop": [
+            {
+              "hooks": [
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook workbuddy",
+                  "timeout": 5,
+                  "type": "command"
+                }
+              ]
+            }
+          ],
+          "UserPromptSubmit": [
             {
               "hooks": [
                 {
@@ -97177,6 +97985,17 @@
       "install": {
         "hooks": {
           "Stop": [
+            {
+              "hooks": [
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook workbuddy",
+                  "timeout": 5,
+                  "type": "command"
+                }
+              ]
+            }
+          ],
+          "UserPromptSubmit": [
             {
               "hooks": [
                 {
@@ -97292,6 +98111,17 @@
                 }
               ]
             }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook workbuddy",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ]
+            }
           ]
         },
         "model": "opus",
@@ -97311,6 +98141,7 @@
     },
     "output": {
       "hookCommands": [
+        "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook workbuddy",
         "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook workbuddy"
       ],
       "install": {
@@ -97328,6 +98159,17 @@
             }
           ],
           "Stop": [
+            {
+              "hooks": [
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook workbuddy",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ]
+            }
+          ],
+          "UserPromptSubmit": [
             {
               "hooks": [
                 {
@@ -97408,6 +98250,18 @@
               ],
               "matcher": "Bash"
             }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "command": "/usr/local/bin/audit-log --event UserPromptSubmit",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ],
+              "matcher": "Bash"
+            }
           ]
         },
         "model": "opus",
@@ -97461,6 +98315,27 @@
                 }
               ]
             }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "command": "/usr/local/bin/audit-log --event UserPromptSubmit",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ],
+              "matcher": "Bash"
+            },
+            {
+              "hooks": [
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook workbuddy",
+                  "timeout": 5,
+                  "type": "command"
+                }
+              ]
+            }
           ]
         },
         "model": "opus",
@@ -97494,6 +98369,18 @@
               "hooks": [
                 {
                   "command": "/usr/local/bin/audit-log --event Stop",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ],
+              "matcher": "Bash"
+            }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "command": "/usr/local/bin/audit-log --event UserPromptSubmit",
                   "timeout": 600,
                   "type": "command"
                 }
@@ -97610,6 +98497,33 @@
               ],
               "matcher": ""
             }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook workbuddy --verbose",
+                  "timeout": 600,
+                  "type": "command"
+                },
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook workbuddy-beta",
+                  "timeout": 600,
+                  "type": "command"
+                },
+                {
+                  "command": "my-tool--completion-hook workbuddy",
+                  "timeout": 600,
+                  "type": "command"
+                },
+                {
+                  "command": "~/bin/notify.sh --completion-hook workbuddy",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
           ]
         }
       },
@@ -97618,11 +98532,39 @@
     },
     "output": {
       "hookCommands": [
+        "~/bin/notify.sh --completion-hook workbuddy",
         "~/bin/notify.sh --completion-hook workbuddy"
       ],
       "install": {
         "hooks": {
           "Stop": [
+            {
+              "hooks": [
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook workbuddy --verbose",
+                  "timeout": 600,
+                  "type": "command"
+                },
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook workbuddy-beta",
+                  "timeout": 600,
+                  "type": "command"
+                },
+                {
+                  "command": "my-tool--completion-hook workbuddy",
+                  "timeout": 600,
+                  "type": "command"
+                },
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook workbuddy",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
+          ],
+          "UserPromptSubmit": [
             {
               "hooks": [
                 {
@@ -97654,6 +98596,28 @@
       "remove": {
         "hooks": {
           "Stop": [
+            {
+              "hooks": [
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook workbuddy --verbose",
+                  "timeout": 600,
+                  "type": "command"
+                },
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook workbuddy-beta",
+                  "timeout": 600,
+                  "type": "command"
+                },
+                {
+                  "command": "my-tool--completion-hook workbuddy",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
+          ],
+          "UserPromptSubmit": [
             {
               "hooks": [
                 {
@@ -97737,6 +98701,17 @@
                 }
               ],
               "matcher": ""
+            }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook workbuddy",
+                  "timeout": 5,
+                  "type": "command"
+                }
+              ]
             }
           ]
         }
@@ -97835,6 +98810,17 @@
               ],
               "matcher": ""
             }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook workbuddy",
+                  "timeout": 5,
+                  "type": "command"
+                }
+              ]
+            }
           ]
         }
       },
@@ -97873,6 +98859,38 @@
       "current": {
         "hooks": {
           "Stop": [
+            {
+              "hooks": [
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook workbuddy",
+                  "timeout": 600,
+                  "type": "command"
+                },
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --attention-hook workbuddy",
+                  "timeout": 600,
+                  "type": "command"
+                },
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook workbuddy",
+                  "timeout": 600,
+                  "type": "command"
+                },
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --compaction-hook workbuddy",
+                  "timeout": 600,
+                  "type": "command"
+                },
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook codex",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
+          ],
+          "UserPromptSubmit": [
             {
               "hooks": [
                 {
@@ -97953,12 +98971,85 @@
                 }
               ]
             }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook workbuddy",
+                  "timeout": 600,
+                  "type": "command"
+                },
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --attention-hook workbuddy",
+                  "timeout": 600,
+                  "type": "command"
+                },
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook workbuddy",
+                  "timeout": 600,
+                  "type": "command"
+                },
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --compaction-hook workbuddy",
+                  "timeout": 600,
+                  "type": "command"
+                },
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook codex",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            },
+            {
+              "hooks": [
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook workbuddy",
+                  "timeout": 5,
+                  "type": "command"
+                }
+              ]
+            }
           ]
         }
       },
       "remove": {
         "hooks": {
           "Stop": [
+            {
+              "hooks": [
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --permission-hook workbuddy",
+                  "timeout": 600,
+                  "type": "command"
+                },
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --attention-hook workbuddy",
+                  "timeout": 600,
+                  "type": "command"
+                },
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --session-origin-hook workbuddy",
+                  "timeout": 600,
+                  "type": "command"
+                },
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --compaction-hook workbuddy",
+                  "timeout": 600,
+                  "type": "command"
+                },
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook codex",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
+          ],
+          "UserPromptSubmit": [
             {
               "hooks": [
                 {
@@ -98009,6 +99100,85 @@
                 }
               ]
             }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook workbuddy",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "flag": "--completion-hook",
+      "source": "workbuddy"
+    },
+    "output": {
+      "hookCommands": [
+        "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook workbuddy",
+        "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook workbuddy"
+      ],
+      "install": {
+        "hooks": {
+          "Stop": [
+            {
+              "hooks": [
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook workbuddy",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ]
+            }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook workbuddy",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "remove": {
+        "hooks": {}
+      }
+    }
+  },
+  "patch/workbuddy/--completion-hook/owned-first-event-only": {
+    "input": {
+      "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook workbuddy",
+      "current": {
+        "hooks": {
+          "Stop": [
+            {
+              "hooks": [
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook workbuddy",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ]
+            }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "command": "/usr/local/bin/audit-log",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ]
+            }
           ]
         }
       },
@@ -98031,11 +99201,43 @@
                 }
               ]
             }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "command": "/usr/local/bin/audit-log",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ]
+            },
+            {
+              "hooks": [
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook workbuddy",
+                  "timeout": 5,
+                  "type": "command"
+                }
+              ]
+            }
           ]
         }
       },
       "remove": {
-        "hooks": {}
+        "hooks": {
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "command": "/usr/local/bin/audit-log",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ]
+            }
+          ]
+        }
       }
     }
   },
@@ -98054,6 +99256,17 @@
                 }
               ]
             }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "command": "'/Volumes/Agent HUD/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook workbuddy",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ]
+            }
           ]
         }
       },
@@ -98062,11 +99275,23 @@
     },
     "output": {
       "hookCommands": [
+        "'/Volumes/Agent HUD/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook workbuddy",
         "'/Volumes/Agent HUD/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook workbuddy"
       ],
       "install": {
         "hooks": {
           "Stop": [
+            {
+              "hooks": [
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook workbuddy",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ]
+            }
+          ],
+          "UserPromptSubmit": [
             {
               "hooks": [
                 {
@@ -98099,6 +99324,17 @@
                 }
               ]
             }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "command": "/usr/local/bin/agent-hud --completion-hook workbuddy",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ]
+            }
           ]
         }
       },
@@ -98107,11 +99343,23 @@
     },
     "output": {
       "hookCommands": [
+        "/usr/local/bin/agent-hud --completion-hook workbuddy",
         "/usr/local/bin/agent-hud --completion-hook workbuddy"
       ],
       "install": {
         "hooks": {
           "Stop": [
+            {
+              "hooks": [
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook workbuddy",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ]
+            }
+          ],
+          "UserPromptSubmit": [
             {
               "hooks": [
                 {
@@ -98210,6 +99458,17 @@
       "install": {
         "hooks": {
           "Stop": [
+            {
+              "hooks": [
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook workbuddy",
+                  "timeout": 5,
+                  "type": "command"
+                }
+              ]
+            }
+          ],
+          "UserPromptSubmit": [
             {
               "hooks": [
                 {
@@ -98601,6 +99860,17 @@
                 }
               ]
             }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook workbuddy",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ]
+            }
           ]
         },
         "model": "opus",
@@ -98646,6 +99916,17 @@
                 }
               ]
             }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook workbuddy",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ]
+            }
           ]
         },
         "model": "opus",
@@ -98663,6 +99944,17 @@
       "remove": {
         "hooks": {
           "Stop": [
+            {
+              "hooks": [
+                {
+                  "command": "'/Applications/Agent HUD.app/Contents/MacOS/agent-hud' --completion-hook workbuddy",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ]
+            }
+          ],
+          "UserPromptSubmit": [
             {
               "hooks": [
                 {
@@ -144141,6 +145433,26 @@
               ],
               "matcher": ""
             }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "args": [
+                    "--completion-hook",
+                    "codebuddy"
+                  ],
+                  "command": "C:\\Users\\me\\AppData\\Local\\Agent HUD\\agent-hud.exe",
+                  "type": "command"
+                },
+                {
+                  "command": "'C:\\Users\\me\\AppData\\Local\\Agent HUD\\agent-hud.exe' --completion-hook codebuddy",
+                  "type": "command"
+                },
+                "text"
+              ],
+              "matcher": ""
+            }
           ]
         }
       },
@@ -144158,6 +145470,14 @@
       "remove": {
         "hooks": {
           "Stop": [
+            {
+              "hooks": [
+                "text"
+              ],
+              "matcher": ""
+            }
+          ],
+          "UserPromptSubmit": [
             {
               "hooks": [
                 "text"
@@ -144204,6 +145524,21 @@
               ],
               "matcher": ""
             }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "args": [
+                    "--completion-hook",
+                    "codebuddy"
+                  ],
+                  "command": "",
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
           ]
         }
       },
@@ -144221,6 +145556,21 @@
       "remove": {
         "hooks": {
           "Stop": [
+            {
+              "hooks": [
+                {
+                  "args": [
+                    "--completion-hook",
+                    "codebuddy"
+                  ],
+                  "command": "",
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
+          ],
+          "UserPromptSubmit": [
             {
               "hooks": [
                 {
@@ -144256,6 +145606,20 @@
               ],
               "matcher": ""
             }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "args": [
+                    "--hook"
+                  ],
+                  "command": "C:\\Tools\\audit.exe",
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
           ]
         }
       },
@@ -144273,6 +145637,20 @@
       "remove": {
         "hooks": {
           "Stop": [
+            {
+              "hooks": [
+                {
+                  "args": [
+                    "--hook"
+                  ],
+                  "command": "C:\\Tools\\audit.exe",
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
+          ],
+          "UserPromptSubmit": [
             {
               "hooks": [
                 {
@@ -144323,6 +145701,36 @@
               ],
               "matcher": ""
             }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "args": [
+                    "--completion-hook",
+                    "other-client"
+                  ],
+                  "command": "C:\\Tools\\other.exe",
+                  "type": "command"
+                },
+                {
+                  "args": [
+                    "--completion-hook"
+                  ],
+                  "command": "C:\\Tools\\other.exe",
+                  "type": "command"
+                },
+                {
+                  "args": [
+                    "--completion-hook",
+                    "codebuddy"
+                  ],
+                  "exec": "C:\\Users\\me\\AppData\\Local\\Agent HUD\\agent-hud.exe",
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
           ]
         }
       },
@@ -144340,6 +145748,36 @@
       "remove": {
         "hooks": {
           "Stop": [
+            {
+              "hooks": [
+                {
+                  "args": [
+                    "--completion-hook",
+                    "other-client"
+                  ],
+                  "command": "C:\\Tools\\other.exe",
+                  "type": "command"
+                },
+                {
+                  "args": [
+                    "--completion-hook"
+                  ],
+                  "command": "C:\\Tools\\other.exe",
+                  "type": "command"
+                },
+                {
+                  "args": [
+                    "--completion-hook",
+                    "codebuddy"
+                  ],
+                  "exec": "C:\\Users\\me\\AppData\\Local\\Agent HUD\\agent-hud.exe",
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
+          ],
+          "UserPromptSubmit": [
             {
               "hooks": [
                 {
@@ -144398,6 +145836,28 @@
               ],
               "matcher": ""
             }
+          ],
+          "UserPromptSubmit": [
+            "text",
+            {
+              "matcher": "Bash"
+            },
+            {
+              "hooks": "not-a-list"
+            },
+            {
+              "hooks": [
+                {
+                  "args": [
+                    "--completion-hook",
+                    "codebuddy"
+                  ],
+                  "command": "C:\\Users\\me\\AppData\\Local\\Agent HUD\\agent-hud.exe",
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
           ]
         }
       },
@@ -144422,6 +145882,15 @@
             {
               "hooks": "not-a-list"
             }
+          ],
+          "UserPromptSubmit": [
+            "text",
+            {
+              "matcher": "Bash"
+            },
+            {
+              "hooks": "not-a-list"
+            }
           ]
         }
       }
@@ -144432,6 +145901,19 @@
       "current": {
         "hooks": {
           "Stop": [
+            {
+              "hooks": [
+                {
+                  "command": "'C:\\Users\\me\\AppData\\Local\\Agent HUD\\agent-hud.exe' --completion-hook codebuddy",
+                  "commandWindows": "powershell.exe -NoLogo -NoProfile -NonInteractive -EncodedCommand c3RhbGU=",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
+          ],
+          "UserPromptSubmit": [
             {
               "hooks": [
                 {
@@ -144481,6 +145963,22 @@
               ],
               "matcher": ""
             }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "args": [
+                    "--completion-hook",
+                    "codebuddy"
+                  ],
+                  "command": "C:\\Users\\me\\AppData\\Local\\Agent HUD\\agent-hud.exe",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
           ]
         }
       },
@@ -144505,6 +146003,18 @@
       "current": {
         "hooks": {
           "Stop": [
+            {
+              "hooks": [
+                {
+                  "command": "'C:\\Users\\me\\AppData\\Local\\Agent HUD\\agent-hud.exe' --completion-hook codebuddy",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
+          ],
+          "UserPromptSubmit": [
             {
               "hooks": [
                 {
@@ -170135,6 +171645,26 @@
               ],
               "matcher": ""
             }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "args": [
+                    "--completion-hook",
+                    "workbuddy"
+                  ],
+                  "command": "C:\\Users\\me\\AppData\\Local\\Agent HUD\\agent-hud.exe",
+                  "type": "command"
+                },
+                {
+                  "command": "'C:\\Users\\me\\AppData\\Local\\Agent HUD\\agent-hud.exe' --completion-hook workbuddy",
+                  "type": "command"
+                },
+                "text"
+              ],
+              "matcher": ""
+            }
           ]
         }
       },
@@ -170152,6 +171682,14 @@
       "remove": {
         "hooks": {
           "Stop": [
+            {
+              "hooks": [
+                "text"
+              ],
+              "matcher": ""
+            }
+          ],
+          "UserPromptSubmit": [
             {
               "hooks": [
                 "text"
@@ -170198,6 +171736,21 @@
               ],
               "matcher": ""
             }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "args": [
+                    "--completion-hook",
+                    "workbuddy"
+                  ],
+                  "command": "",
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
           ]
         }
       },
@@ -170215,6 +171768,21 @@
       "remove": {
         "hooks": {
           "Stop": [
+            {
+              "hooks": [
+                {
+                  "args": [
+                    "--completion-hook",
+                    "workbuddy"
+                  ],
+                  "command": "",
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
+          ],
+          "UserPromptSubmit": [
             {
               "hooks": [
                 {
@@ -170250,6 +171818,20 @@
               ],
               "matcher": ""
             }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "args": [
+                    "--hook"
+                  ],
+                  "command": "C:\\Tools\\audit.exe",
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
           ]
         }
       },
@@ -170267,6 +171849,20 @@
       "remove": {
         "hooks": {
           "Stop": [
+            {
+              "hooks": [
+                {
+                  "args": [
+                    "--hook"
+                  ],
+                  "command": "C:\\Tools\\audit.exe",
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
+          ],
+          "UserPromptSubmit": [
             {
               "hooks": [
                 {
@@ -170317,6 +171913,36 @@
               ],
               "matcher": ""
             }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "args": [
+                    "--completion-hook",
+                    "other-client"
+                  ],
+                  "command": "C:\\Tools\\other.exe",
+                  "type": "command"
+                },
+                {
+                  "args": [
+                    "--completion-hook"
+                  ],
+                  "command": "C:\\Tools\\other.exe",
+                  "type": "command"
+                },
+                {
+                  "args": [
+                    "--completion-hook",
+                    "workbuddy"
+                  ],
+                  "exec": "C:\\Users\\me\\AppData\\Local\\Agent HUD\\agent-hud.exe",
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
           ]
         }
       },
@@ -170334,6 +171960,36 @@
       "remove": {
         "hooks": {
           "Stop": [
+            {
+              "hooks": [
+                {
+                  "args": [
+                    "--completion-hook",
+                    "other-client"
+                  ],
+                  "command": "C:\\Tools\\other.exe",
+                  "type": "command"
+                },
+                {
+                  "args": [
+                    "--completion-hook"
+                  ],
+                  "command": "C:\\Tools\\other.exe",
+                  "type": "command"
+                },
+                {
+                  "args": [
+                    "--completion-hook",
+                    "workbuddy"
+                  ],
+                  "exec": "C:\\Users\\me\\AppData\\Local\\Agent HUD\\agent-hud.exe",
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
+          ],
+          "UserPromptSubmit": [
             {
               "hooks": [
                 {
@@ -170392,6 +172048,28 @@
               ],
               "matcher": ""
             }
+          ],
+          "UserPromptSubmit": [
+            "text",
+            {
+              "matcher": "Bash"
+            },
+            {
+              "hooks": "not-a-list"
+            },
+            {
+              "hooks": [
+                {
+                  "args": [
+                    "--completion-hook",
+                    "workbuddy"
+                  ],
+                  "command": "C:\\Users\\me\\AppData\\Local\\Agent HUD\\agent-hud.exe",
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
           ]
         }
       },
@@ -170416,6 +172094,15 @@
             {
               "hooks": "not-a-list"
             }
+          ],
+          "UserPromptSubmit": [
+            "text",
+            {
+              "matcher": "Bash"
+            },
+            {
+              "hooks": "not-a-list"
+            }
           ]
         }
       }
@@ -170426,6 +172113,19 @@
       "current": {
         "hooks": {
           "Stop": [
+            {
+              "hooks": [
+                {
+                  "command": "'C:\\Users\\me\\AppData\\Local\\Agent HUD\\agent-hud.exe' --completion-hook workbuddy",
+                  "commandWindows": "powershell.exe -NoLogo -NoProfile -NonInteractive -EncodedCommand c3RhbGU=",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
+          ],
+          "UserPromptSubmit": [
             {
               "hooks": [
                 {
@@ -170475,6 +172175,22 @@
               ],
               "matcher": ""
             }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "args": [
+                    "--completion-hook",
+                    "workbuddy"
+                  ],
+                  "command": "C:\\Users\\me\\AppData\\Local\\Agent HUD\\agent-hud.exe",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
           ]
         }
       },
@@ -170499,6 +172215,18 @@
       "current": {
         "hooks": {
           "Stop": [
+            {
+              "hooks": [
+                {
+                  "command": "'C:\\Users\\me\\AppData\\Local\\Agent HUD\\agent-hud.exe' --completion-hook workbuddy",
+                  "timeout": 600,
+                  "type": "command"
+                }
+              ],
+              "matcher": ""
+            }
+          ],
+          "UserPromptSubmit": [
             {
               "hooks": [
                 {

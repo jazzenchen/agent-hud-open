@@ -1,8 +1,10 @@
 //! CodeBuddy's and WorkBuddy's hooks. Both ask for permission; CodeBuddy also
 //! reports completed turns, whose final message comes from its transcript.
-use crate::hooks::{stop, Completed, Completion, Hooks, Layout, Permission, Reply, POSIX_ONLY};
+use crate::hooks::{
+    stop, Began, Begin, Completed, Completion, Hooks, Layout, Permission, Reply, POSIX_ONLY,
+};
 use crate::HookEvent;
-use crate::Location;
+use crate::{text, Location};
 use serde_json::{json, Value};
 
 pub static CODEBUDDY: Hooks = Hooks {
@@ -26,7 +28,10 @@ pub static CODEBUDDY: Hooks = Hooks {
         reply: Reply::HookSpecificOutput,
     }),
     completion: Some(Completion {
-        begin: None,
+        begin: Some(Begin {
+            events: &["UserPromptSubmit"],
+            read: began,
+        }),
         event: "Stop",
         timeout: 5,
         read: completed,
@@ -59,7 +64,10 @@ pub static WORKBUDDY: Hooks = Hooks {
         reply: Reply::HookSpecificOutput,
     }),
     completion: Some(Completion {
-        begin: None,
+        begin: Some(Begin {
+            events: &["UserPromptSubmit"],
+            read: began,
+        }),
         event: "Stop",
         timeout: 5,
         read: completed,
@@ -73,6 +81,22 @@ pub static WORKBUDDY: Hooks = Hooks {
     prefixed_sessions: true,
     launch: POSIX_ONLY,
 };
+
+/// A prompt starts a turn. WorkBuddy runs one engine per turn and its MCP
+/// servers in the app's own process, so this is also how Agent HUD learns,
+/// from a session's first prompt, which session an MCP call comes from.
+fn began(payload: &Value) -> Option<Began> {
+    if payload["hook_event_name"] != "UserPromptSubmit" {
+        return None;
+    }
+    let session = text(&payload["session_id"])?;
+    Some(Began {
+        session: session.into(),
+        turn: session.into(),
+        workspace: text(&payload["cwd"]).map(str::to_owned),
+        waiting: false,
+    })
+}
 
 /// CodeBuddy's and WorkBuddy's `Stop`. Its turn is the callback's time, and
 /// the transcript path lets the platform read the final message.
@@ -131,4 +155,30 @@ fn enrich(event: &mut HookEvent, transcript_tail: &[u8]) -> bool {
         return true;
     }
     false
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::parse_event;
+    use serde_json::json;
+
+    #[test]
+    fn a_prompt_runs_a_workbuddy_turn_and_a_stop_ends_it() {
+        let now = 1_794_381_287_063;
+        for source in ["workbuddy", "codebuddy"] {
+            let prompt = json!({"hook_event_name":"UserPromptSubmit","session_id":"8a08fa98","prompt":"hi","cwd":"/w","transcript_path":"/t.jsonl"});
+            let event = parse_event(source, "--completion-hook", &prompt, now)
+                .unwrap()
+                .unwrap();
+            assert_eq!(event.kind, "session-observation");
+            assert_eq!(event.session_id, format!("{source}:8a08fa98"));
+            assert_eq!(event.data["state"], "running");
+            let stop = json!({"hook_event_name":"Stop","session_id":"8a08fa98","stop_hook_active":false,"cwd":"/w","transcript_path":"/t.jsonl"});
+            let event = parse_event(source, "--completion-hook", &stop, now)
+                .unwrap()
+                .unwrap();
+            assert_eq!(event.kind, "completion");
+            assert_eq!(event.session_id, format!("{source}:8a08fa98"));
+        }
+    }
 }
