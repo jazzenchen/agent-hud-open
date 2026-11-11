@@ -35,6 +35,40 @@ pub(crate) fn parent_processes() -> Vec<ProcessAncestor> {
     result
 }
 
+/// The processes above `pid` that belong to the same application bundle as
+/// it, nearest first: for a desktop app's helper, the app's own processes
+/// up to its main one. Empty for a process outside a bundle.
+pub(crate) fn app_ancestors(pid: u32) -> Vec<u32> {
+    let Ok(start) = i32::try_from(pid) else {
+        return Vec::new();
+    };
+    let Some(app) = executable_path(start).and_then(|path| super::super::outer_bundle(&path))
+    else {
+        return Vec::new();
+    };
+    let mut result = Vec::new();
+    let mut seen = HashSet::new();
+    let mut current = start;
+    while result.len() < 16 && seen.insert(current) {
+        let Some(info) = bsd_info(current) else {
+            break;
+        };
+        let parent = info.pbi_ppid as i32;
+        if parent <= 1 {
+            break;
+        }
+        let Some(path) = executable_path(parent) else {
+            break;
+        };
+        if super::super::outer_bundle(&path).as_ref() != Some(&app) {
+            break;
+        }
+        result.push(parent as u32);
+        current = parent;
+    }
+    result
+}
+
 /// The one `codex` process of this user that listens on loopback `port`: its
 /// arguments and the requested environment variables.
 pub(crate) fn codex_cli_on_port(

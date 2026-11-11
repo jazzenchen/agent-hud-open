@@ -140,11 +140,31 @@ fn handle_payload(arguments: &[String], data: &Path, input: &[u8], output: &mut 
         if matches!(event.kind.as_str(), "session-observation" | "completion")
             && crate::delivery::Provider::parse(source).is_some_and(|p| p.uses_hook_channel())
         {
-            let pids = crate::os::parent_processes()
-                .into_iter()
+            let parents = crate::os::parent_processes();
+            let mut pids = parents
+                .iter()
                 .take(3)
                 .filter_map(|parent| parent.pid)
                 .collect::<Vec<_>>();
+            // A desktop app may run its hooks and its MCP servers from
+            // different helpers (TRAE): its own processes above the nearest
+            // ones let a call from another helper of the same app match.
+            if let Some(app) = parents
+                .iter()
+                .take(3)
+                .rev()
+                .find_map(|parent| crate::os::outer_bundle(&parent.executable))
+            {
+                pids.extend(
+                    parents
+                        .iter()
+                        .skip(3)
+                        .take_while(|parent| {
+                            crate::os::outer_bundle(&parent.executable).as_ref() == Some(&app)
+                        })
+                        .filter_map(|parent| parent.pid),
+                );
+            }
             if !pids.is_empty() {
                 event.data["pids"] = json!(pids);
             }

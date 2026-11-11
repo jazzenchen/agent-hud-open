@@ -25,6 +25,12 @@ pub use navigation::session_url;
 #[cfg(target_os = "macos")]
 pub use os::registered_applications;
 
+/// The processes above `pid` in the same application bundle, nearest first
+/// (none outside a bundle, or on a host without bundles).
+pub fn app_ancestors(pid: u32) -> Vec<u32> {
+    os::app_ancestors(pid)
+}
+
 /// The program client hooks run: this executable, or on Linux the AppImage it
 /// was started from, whose temporary mount changes with every launch (Open #11).
 pub fn launched_executable() -> std::io::Result<std::path::PathBuf> {

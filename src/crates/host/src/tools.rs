@@ -200,7 +200,12 @@ fn with_caller(
         .and_then(|params| params.remove("parent"))
         .and_then(|parent| parent.as_u64())
         .and_then(|parent| u32::try_from(parent).ok());
-    let hooked = parent.zip(snapshot).and_then(|(p, s)| hook_caller(p, s));
+    let hooked = parent.zip(snapshot).and_then(|(parent, snapshot)| {
+        let chain = std::iter::once(parent)
+            .chain(agent_hud_runtime::app_ancestors(parent))
+            .collect::<Vec<_>>();
+        hook_caller(&chain, snapshot)
+    });
     if !params["caller"].is_null() {
         // Claude Code's session comes from the relay's environment, which an
         // agent started inside a Claude Code session inherits: that agent's
@@ -230,17 +235,24 @@ fn with_caller(
 /// the process that started the relay (`hooks.pids`, noted by
 /// `platform::hooks::entry`). A command-line client runs one process per
 /// session, so that is exact; a desktop app runs one for all its chats, and
-/// then only the one of them that is in a turn can be calling. Anything else
-/// leaves the caller unknown: a sender is never guessed.
-fn hook_caller(parent: u32, snapshot: &Value) -> Option<Value> {
-    let ran_from = |session: &&Value| {
-        session["parentId"].is_null()
-            && session["hooks"]["pids"]
-                .as_array()
-                .is_some_and(|pids| pids.iter().any(|pid| pid.as_u64() == Some(parent.into())))
-    };
+/// then only the one of them that is in a turn can be calling. `chain` is
+/// the relay's parent, then the processes above it in the same application
+/// bundle: a desktop app may start MCP servers from another helper than its
+/// hooks (TRAE), and the nearest process any session's hooks ran from
+/// decides. Anything else leaves the caller unknown: a sender is never
+/// guessed.
+fn hook_caller(chain: &[u32], snapshot: &Value) -> Option<Value> {
     let sessions = snapshot["sessions"].as_array()?;
-    let found = sessions.iter().filter(ran_from).collect::<Vec<_>>();
+    let found = chain.iter().find_map(|&process| {
+        let ran_from = |session: &&Value| {
+            session["parentId"].is_null()
+                && session["hooks"]["pids"]
+                    .as_array()
+                    .is_some_and(|pids| pids.iter().any(|pid| pid.as_u64() == Some(process.into())))
+        };
+        let found = sessions.iter().filter(ran_from).collect::<Vec<_>>();
+        (!found.is_empty()).then_some(found)
+    })?;
     let session = match found.as_slice() {
         [one] => *one,
         many => {
@@ -344,7 +356,7 @@ mod tests {
             session("cursor:q","cursor","idle",json!([950])),
             session("cursor:r","cursor","idle",json!([950])),
         ]});
-        let named = |parent| hook_caller(parent, &snapshot).map(|c| c["sessionId"].clone());
+        let named = |parent| hook_caller(&[parent], &snapshot).map(|c| c["sessionId"].clone());
         assert_eq!(named(800), Some(json!("kimi:session_a:main")));
         assert_eq!(named(810), Some(json!("kimi:session_b:main")));
         // Two TRAE chats mid-turn: which one called is unknown.
@@ -357,8 +369,24 @@ mod tests {
             session("trae:y","trae","running",json!([900])),
         ]});
         assert_eq!(
-            hook_caller(900, &one_running),
+            hook_caller(&[900], &one_running),
             Some(json!({"client":"trae","sessionId":"trae:y","turnId":null}))
+        );
+        // TRAE runs its hooks from one helper and its MCP servers from
+        // another: they meet at the app's own process, above both.
+        let helpers = json!({"sessions":[
+            session("trae:y","trae","running",json!([7024, 7023, 5781, 5759])),
+            session("kimi:session_c:main","kimi","idle",json!([601, 600])),
+        ]});
+        assert_eq!(
+            hook_caller(&[5777, 5759], &helpers).map(|c| c["sessionId"].clone()),
+            Some(json!("trae:y"))
+        );
+        // The nearest process decides: a session started by the relay's own
+        // parent wins over the app above it.
+        assert_eq!(
+            hook_caller(&[600, 5759], &helpers).map(|c| c["sessionId"].clone()),
+            Some(json!("kimi:session_c:main"))
         );
         // Kimi started from a Claude Code shell inherits Claude Code's session
         // id; its own hooks win over it. Codex's own naming stays.

@@ -11,6 +11,10 @@ pub(crate) use apps::{activate_app, app_running, launch_app};
 pub(crate) use process::{
     codex_cli_on_port, parent_processes, process_runs, process_start, terminal_io,
 };
+/// No application bundles here: an MCP call is matched by its own parent.
+pub(crate) fn app_ancestors(_pid: u32) -> Vec<u32> {
+    Vec::new()
+}
 pub(crate) use secrets::{app_cookie, stored_secret, unseal_safe_storage};
 pub(crate) const READS_PROCESS_ENVIRONMENT: bool = false;
 /// The desktop app's resume link for a background job is unverified here.

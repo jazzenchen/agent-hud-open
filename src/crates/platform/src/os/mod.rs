@@ -23,6 +23,19 @@ mod unix;
 pub use target::registered_applications;
 pub(crate) use target::*;
 
+/// The outermost application bundle a path lies in: `/Applications/Trae.app`
+/// for its main program and for a helper inside its `Frameworks` alike.
+pub(crate) fn outer_bundle(path: &Path) -> Option<PathBuf> {
+    let mut bundle = PathBuf::new();
+    for part in path.components() {
+        bundle.push(part);
+        if part.as_os_str().to_string_lossy().ends_with(".app") {
+            return Some(bundle);
+        }
+    }
+    None
+}
+
 /// The directory a client's variable moves its files to: the value without
 /// the whitespace around it, used as written, as the clients themselves read
 /// it (agent-hud-native-open ClientHome.variable); None when unset, empty or only
@@ -285,5 +298,30 @@ mod tests {
             home.join(".local/share/goose/sessions")
         };
         assert_eq!(goose, [expected]);
+    }
+}
+
+#[cfg(test)]
+mod bundle_tests {
+    use super::outer_bundle;
+    use std::path::Path;
+
+    #[test]
+    fn a_helper_and_its_app_share_the_outermost_bundle() {
+        let app = Some(Path::new("/Applications/Trae.app").to_path_buf());
+        assert_eq!(
+            outer_bundle(Path::new("/Applications/Trae.app/Contents/MacOS/Electron")),
+            app
+        );
+        assert_eq!(
+            outer_bundle(Path::new(
+                "/Applications/Trae.app/Contents/Frameworks/Trae Helper (Plugin).app/Contents/MacOS/Trae Helper (Plugin)"
+            )),
+            app
+        );
+        assert_eq!(
+            outer_bundle(Path::new("/Users/me/.kimi-code/bin/kimi")),
+            None
+        );
     }
 }
