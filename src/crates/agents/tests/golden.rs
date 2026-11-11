@@ -359,8 +359,36 @@ impl Pair {
             "codex"
         }
     }
+    /// Whether this client runs every patch scenario. The patch code is one
+    /// per layout and differs between clients only in their events,
+    /// matchers and legacy commands, so one client per layout runs the odd
+    /// file shapes; the others run only the scenarios that show their own
+    /// data (see `OWN_SCENARIOS`).
+    fn every_scenario(&self) -> bool {
+        matches!(
+            self.source.as_str(),
+            "claude" | "zcode" | "antigravity" | "cursor" | "copilot" | "droid"
+        )
+    }
+    /// Whether this client has a Windows launch contract, so a Windows
+    /// install can succeed and every Windows scenario says something.
+    fn windows_capable(&self) -> bool {
+        matches!(self.source.as_str(), "claude" | "codex" | "copilot")
+    }
 }
 
+/// The scenarios every client runs: a fresh install shows its events and
+/// matchers, the legacy ones its old commands, the last its full set.
+const OWN_SCENARIOS: &[&str] = &[
+    "empty",
+    "owned-legacy",
+    "owned-legacy-and-current",
+    "every-agent-hud-hook",
+];
+
+/// Every (source, flag) pair `configuration` accepts, under the source's own
+/// name. Legacy aliases (qoderCN, qoderWork) give the same results as the
+/// names they stand for; `configuration/*` and the matrices record that.
 fn pairs() -> Vec<Pair> {
     SOURCES
         .iter()
@@ -375,7 +403,15 @@ fn pairs() -> Vec<Pair> {
                 })
             })
         })
+        .filter(|pair| pair.name == pair.source)
         .collect()
+}
+
+/// A legacy name `configuration` turns into another source's.
+fn alias(name: &str) -> bool {
+    FLAGS
+        .iter()
+        .any(|flag| configuration(name, flag).is_ok_and(|description| description.source != name))
 }
 
 /// The platform's POSIX hook command: a single-quoted executable, then the
@@ -914,7 +950,10 @@ fn entry_scenarios(pair: &Pair) -> Vec<(String, Value)> {
 fn patches(golden: &mut Golden) {
     for pair in pairs() {
         let own = pair.command(EXE);
-        let scenarios = scenarios(&pair);
+        let mut scenarios = scenarios(&pair);
+        if !pair.every_scenario() {
+            scenarios.retain(|(name, _)| OWN_SCENARIOS.contains(&name.as_str()));
+        }
         for (scenario, current) in &scenarios {
             golden.case(
                 format!("patch/{}/{scenario}", pair.label()),
@@ -1017,8 +1056,10 @@ fn windows_patches(golden: &mut Golden) {
     }
     for pair in pairs() {
         // Clients without a Windows launch contract reject every executable
-        // alike, so only the plain install and the removal are recorded.
-        let capable = matches!(pair.source.as_str(), "claude" | "codex" | "copilot");
+        // alike, so only the plain install and the removal of a fresh file
+        // are recorded; removal from odd files is the same code as for the
+        // capable clients.
+        let capable = pair.windows_capable();
         let executables: Vec<(&str, Option<&str>)> = WINDOWS_EXECUTABLES
             .iter()
             .copied()
@@ -1029,7 +1070,10 @@ fn windows_patches(golden: &mut Golden) {
                 .iter()
                 .map(|(label, executable)| (*label, json!(executable))),
         );
-        let scenarios = windows_scenarios(&pair);
+        let mut scenarios = windows_scenarios(&pair);
+        if !capable {
+            scenarios.retain(|(name, _)| OWN_SCENARIOS.contains(&name.as_str()));
+        }
         for (scenario, current) in &scenarios {
             golden.case(
                 format!("windows/{}/{scenario}", pair.label()),
@@ -1962,7 +2006,7 @@ fn requests(golden: &mut Golden) {
         object(fixed_decisions()),
         json!("Every parsed request's responses use these decisions, plus its extraDecisions."),
     );
-    for source in SOURCES {
+    for source in SOURCES.iter().filter(|source| !alias(source)) {
         for (name, payload) in source_payloads() {
             request_case(
                 golden,
@@ -1994,7 +2038,7 @@ fn requests(golden: &mut Golden) {
     for source in [
         "claude",
         "qoder",
-        "qoderCN",
+        "qoder-cn",
         "qoder-work",
         "codebuddy",
         "devin",
