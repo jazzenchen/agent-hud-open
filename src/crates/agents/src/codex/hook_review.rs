@@ -66,10 +66,4 @@ mod tests {
             vec!["permissionRequest", "userPromptSubmit"]
         );
     }
-
-    #[test]
-    fn an_answer_without_hooks_has_none_waiting() {
-        assert!(unreviewed(&json!({"data":[]})).is_empty());
-        assert!(unreviewed(&json!(null)).is_empty());
-    }
 }

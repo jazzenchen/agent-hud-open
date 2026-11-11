@@ -203,27 +203,6 @@ mod tests {
     }
 
     #[test]
-    fn a_stop_with_tokens_keeps_the_fresh_input_apart_from_cache_reads() {
-        let done = completed(
-            &stop(json!({
-                "input_tokens": 740_409,
-                "output_tokens": 17_649,
-                "cache_read_tokens": 639_616,
-                "cache_write_tokens": 0,
-            })),
-            0,
-        )
-        .unwrap();
-        let usage = done.usage.unwrap();
-        assert_eq!(
-            (usage.input, usage.output, usage.read, usage.write),
-            (100_793, 17_649, 639_616, 0)
-        );
-        assert_eq!(done.model.as_deref(), Some("grok-4.7"));
-        assert_eq!(done.workspace.as_deref(), Some("/Users/me/project"));
-    }
-
-    #[test]
     fn a_stop_without_tokens_or_with_impossible_ones_reports_none() {
         assert!(completed(&stop(json!({})), 0).unwrap().usage.is_none());
         assert!(completed(

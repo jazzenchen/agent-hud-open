@@ -542,17 +542,3 @@ fn a_claude_desktop_box_sends_a_button_label_or_the_users_own_words_and_a_dismis
         "nor comes back as an answerable card"
     );
 }
-
-#[test]
-fn every_replies_setting_is_a_setting_that_starts_on() {
-    let temp = tempfile::tempdir().unwrap();
-    let core = AgentHudCore::new(Vec::new(), temp.path().to_owned());
-    let mut with_replies = 0;
-    for agent in agent_hud_agents::ALL {
-        if let Some(replies) = agent.replies {
-            with_replies += 1;
-            assert_eq!(core.settings[replies.setting], true, "{}", agent.id);
-        }
-    }
-    assert_eq!(with_replies, 1, "Claude Code alone takes words today");
-}

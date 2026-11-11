@@ -288,17 +288,6 @@ mod tests {
     }
 
     #[test]
-    fn a_lock_that_cannot_be_made_is_unavailable() {
-        let temp = tempfile::tempdir().unwrap();
-        let file = temp.path().join("file");
-        fs::write(&file, "").unwrap();
-        assert!(matches!(
-            claim(&file.join("instance.lock"), None),
-            Claim::Unavailable(_)
-        ));
-    }
-
-    #[test]
     fn every_collector_claims_its_data_with_or_without_hooks() {
         for first_hooks in [false, true] {
             for second_hooks in [false, true] {

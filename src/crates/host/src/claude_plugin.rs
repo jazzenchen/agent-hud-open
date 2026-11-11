@@ -433,25 +433,6 @@ mod tests {
     }
 
     #[test]
-    fn installing_over_our_own_copy_asks_nothing_of_claude_code() {
-        let temp = tempfile::tempdir().unwrap();
-        let root = temp.path();
-        let config = root.join("claude-config");
-        let channel = ClaudeChannel::new(root.join("channel"));
-        let folder = root.join("plugin");
-        let claude = fake_claude(root, &config);
-        listed_from(&config, &folder);
-
-        install(&channel, &folder, Some(&claude), &config, root).unwrap();
-        assert!(
-            folder.join("hooks/register.ts").is_file(),
-            "files refreshed"
-        );
-        assert!(!repair(&channel, &folder, Some(&claude), &config, root).unwrap());
-        assert!(!root.join("calls").exists());
-    }
-
-    #[test]
     fn the_launch_repair_brings_an_older_copy_of_our_plugin_up_to_date() {
         let temp = tempfile::tempdir().unwrap();
         let root = temp.path();

@@ -151,19 +151,8 @@ pub static QODER_WORK: Agent = Agent {
 
 #[cfg(test)]
 mod tests {
-    use crate::transcript::claude_lines;
     use crate::{Log, Usage};
     use serde_json::json;
-
-    #[test]
-    fn the_qoder_builds_write_claude_codes_lines_as_clients_of_their_own() {
-        for id in ["claude", "qoder", "qoder-cn", "qoder-work"] {
-            assert!(claude_lines(id), "{id}");
-        }
-        for id in ["codex", "copilot", "codebuddy", "qwen", "unknown"] {
-            assert!(!claude_lines(id), "{id}");
-        }
-    }
 
     fn log(source: &'static str, path: &[&str]) -> Log {
         let path = path

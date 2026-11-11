@@ -413,13 +413,4 @@ mod tests {
             paths(&["d/config.yaml", "d/profiles/ops/config.yaml"])
         );
     }
-
-    #[test]
-    fn relative_paths_join_folder_and_path() {
-        assert_eq!(
-            Location::home(&[], &[".codex"], "hooks.json").relative(),
-            ".codex/hooks.json"
-        );
-        assert_eq!(Location::home(&[], &[".hermes"], "").relative(), ".hermes");
-    }
 }

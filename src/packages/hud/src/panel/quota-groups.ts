@@ -1,4 +1,4 @@
-import type { QuotaCycle, QuotaHistoryWindow } from "@agent-hud/protocol";
+import type { QuotaHistoryWindow } from "@agent-hud/protocol";
 
 /** One agent's windows drawn together; an agent signed in with several
  * accounts has one group per account. */
@@ -41,23 +41,6 @@ export function quotaGroups(windows: QuotaHistoryWindow[]): QuotaGroup[] {
  * warning from 70%, critical from 90%. */
 export function cycleLevel(used: number): "normal" | "warning" | "critical" {
   return used >= 90 ? "critical" : used >= 70 ? "warning" : "normal";
-}
-
-/** A cycle that used its whole quota. */
-export const usedUp = (cycle: Pick<QuotaCycle, "used">) => cycle.used >= 99.5;
-
-/** What a window's finished cycles add up to: how many, the average of those
- * it was used in, and how many used it up. */
-export function cycleSummary(cycles: QuotaCycle[]) {
-  const done = cycles.filter((cycle) => !cycle.current);
-  const used = done.filter((cycle) => cycle.used > 0);
-  return {
-    count: done.length,
-    average: used.length
-      ? used.reduce((sum, cycle) => sum + cycle.used, 0) / used.length
-      : null,
-    full: done.filter(usedUp).length,
-  };
 }
 
 /** The stretch a cycle chart draws: the range up to `to`, then a little past

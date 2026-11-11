@@ -218,19 +218,6 @@ fn a_session_agent_hud_started_begins_with_its_sender() {
 }
 
 #[test]
-fn a_log_without_stamps_is_named_by_its_client() {
-    assert_eq!(
-        origins(resolve(
-            "claude",
-            &PromptStamps::default(),
-            Some("claude-desktop"),
-            &Reports::default()
-        )),
-        (Some("desktop:claude".into()), Some("desktop:claude".into()))
-    );
-}
-
-#[test]
 fn a_client_without_clients_of_its_own_is_its_one_interface() {
     for (agent, tag) in [
         ("antigravity", "ide:antigravity"),

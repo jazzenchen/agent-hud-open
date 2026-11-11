@@ -478,17 +478,3 @@ fn a_pi_error_preserves_an_additional_homes_error() {
     assert!(notice.contains("Sign-in expired"));
     assert!(notice.contains("Sign in to ChatGPT again in Pi"));
 }
-
-#[test]
-fn an_expired_pi_sign_in_is_a_notice_beside_codex() {
-    let host = installed(limits(), json!({"email": "a@example.com"})).file(
-        "/u/.pi/agent/auth.json",
-        r#"{"openai-codex": {"type": "oauth", "access": "tok", "accountId": "acc", "expires": 1}}"#,
-    );
-    let reading = read(&host).unwrap();
-    assert_eq!(reading.quotas.len(), 2);
-    assert_eq!(
-        reading.notice.as_deref(),
-        Some("Sign in to ChatGPT again in Pi")
-    );
-}

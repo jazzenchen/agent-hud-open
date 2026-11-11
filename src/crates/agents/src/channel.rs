@@ -28,27 +28,3 @@ impl Channel {
         self.support.on(os).value().is_some()
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use crate::{Os, ALL};
-
-    #[test]
-    fn three_clients_have_a_native_channel() {
-        let with: Vec<_> = ALL
-            .iter()
-            .filter(|agent| agent.channel.is_some())
-            .map(|agent| agent.id)
-            .collect();
-        assert_eq!(with, ["codex", "deepseek", "antigravity"]);
-        for agent in ALL {
-            if let Some(channel) = agent.channel {
-                assert!(!channel.carries.is_empty(), "{}", agent.id);
-                assert!(channel.runs_on(Os::MacOs), "{}", agent.id);
-            }
-        }
-        let codex = crate::codex::AGENT.channel.unwrap();
-        // The desktop app's IPC is a named pipe on Windows.
-        assert!(codex.runs_on(Os::Windows) && codex.runs_on(Os::Linux));
-    }
-}

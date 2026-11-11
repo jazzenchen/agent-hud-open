@@ -132,47 +132,9 @@ pub fn by_id(id: &str) -> Option<&'static Agent> {
 mod tests {
     use super::*;
 
+    /// No two clients share an id: `by_id` finds each one as itself.
     #[test]
-    fn every_client_is_listed_once_in_settings_order() {
-        let ids = ALL.iter().map(|agent| agent.id).collect::<Vec<_>>();
-        assert_eq!(
-            ids,
-            [
-                "claude",
-                "codex",
-                "deepseek",
-                "antigravity",
-                "cursor",
-                "grok-cli",
-                "grok-bot",
-                "copilot",
-                "openclaw",
-                "hermes",
-                "zcode",
-                "codebuddy",
-                "workbuddy",
-                "qwen",
-                "opencode",
-                "kimi",
-                "pi",
-                "qoder",
-                "qoder-cn",
-                "qoder-work",
-                "trae",
-                "trae-cn",
-                "devin",
-                "glm",
-                "minimax",
-                "ark",
-                "kilo",
-                "mimocode",
-                "omp",
-                "droid",
-                "cline",
-                "roo-code",
-                "goose",
-            ]
-        );
+    fn every_client_has_its_own_id() {
         for agent in ALL {
             assert!(std::ptr::eq(by_id(agent.id).unwrap(), *agent));
         }

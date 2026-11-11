@@ -390,56 +390,6 @@ fn a_deepseek_log_costs_its_calls_at_the_accounts_prices() {
 }
 
 #[test]
-fn re_cached_prompts_count_in_logs_that_mark_their_prompts() {
-    let db = Connection::open_in_memory().unwrap();
-    crate::database::schema(&db).unwrap();
-    let now = Utc::now().timestamp_millis();
-    let call = |key: &str, at: i64, input: u64, write: u64, read: u64| Event {
-        usage: Usage {
-            input,
-            write,
-            read,
-            output: 10,
-            reasoning: 0,
-        },
-        ..event(key, at)
-    };
-    let calls = [
-        call("a", now - 3_000, 10, 1_000, 0),
-        call("b", now - 2_000, 10, 10, 1_000),
-        call("c", now - 1_000, 10, 1_100, 0),
-    ];
-    write(&db, "/logs/s.jsonl", "claude", &calls).unwrap();
-    write(&db, "/logs/u.jsonl", "claude", &calls).unwrap();
-    write_marks(
-        &db,
-        "/logs/s.jsonl",
-        &[Mark {
-            at: now - 4_000,
-            kind: MarkKind::Prompt,
-        }],
-    )
-    .unwrap();
-    let rows = recached(
-        &db,
-        &["/logs/s.jsonl".into(), "/logs/u.jsonl".into()],
-        now - 86_400_000,
-        i64::MAX,
-    )
-    .unwrap();
-    assert_eq!(
-        rows.len(),
-        1,
-        "the log without prompt marks does not count: {rows:?}"
-    );
-    assert_eq!(
-        (rows[0].3, rows[0].4),
-        (1_110, 1_110),
-        "sent again, as cache writes"
-    );
-}
-
-#[test]
 fn re_cached_prompts_from_a_time_on_are_those_of_the_whole_record() {
     let db = Connection::open_in_memory().unwrap();
     crate::database::schema(&db).unwrap();

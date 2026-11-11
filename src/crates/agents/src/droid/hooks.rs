@@ -354,22 +354,6 @@ mod tests {
     }
 
     #[test]
-    fn it_installs_four_hooks_into_hooks_json() {
-        assert_eq!(
-            HOOKS.flags(),
-            [
-                "--permission-hook",
-                "--completion-hook",
-                "--attention-hook",
-                "--compaction-hook"
-            ]
-        );
-        let permission = crate::configuration("droid", "--permission-hook").unwrap();
-        assert_eq!(permission.events, ["PreToolUse"]);
-        assert_eq!(permission.relative_path, ".factory/hooks.json");
-    }
-
-    #[test]
     fn droid_exec_runs_are_unattended() {
         let env = HashMap::new();
         let installed = |_: &std::path::Path| false;

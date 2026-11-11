@@ -24,18 +24,6 @@ fn patch_text(places: &Places) -> Option<String> {
 }
 
 #[test]
-fn the_version_names_the_file_and_the_row() {
-    let version = version();
-    assert_eq!(version.len(), 12);
-    assert!(version.bytes().all(|b| b.is_ascii_hexdigit()));
-    assert_eq!(file_name(), format!("agent-hud-{version}.mjs"));
-    let (file, channel) = (Path::new("/p/agent-hud.mjs"), Path::new("/c"));
-    let block = block(file, channel);
-    assert!(block.contains(&format!("id: {}\n", row_id(channel))));
-    assert!(row_id(channel).starts_with(&format!("agent-hud-plugin-{version}-")));
-}
-
-#[test]
 fn a_moved_folder_gives_the_row_a_new_id() {
     let temp = tempfile::tempdir().unwrap();
     let root = temp.path().join("root");

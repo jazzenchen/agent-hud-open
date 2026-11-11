@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { fixedTrack, rimBox, rimCore } from "../src/rim-track.ts";
+import { rimBox, rimCore } from "../src/rim-track.ts";
 
 test("the rim wraps the notch's core, inside its shoulders", () => {
   assert.deepEqual(rimCore({ x: 100, y: 0, width: 560, height: 520 }, 16), {
@@ -28,15 +28,4 @@ test("while the notch moves, the rim's box holds both ends of the move", () => {
     width: 644,
     height: 520,
   });
-});
-
-test("a rim that does not move fills its box", () => {
-  const shape = { x: 0, y: 0, width: 200, height: 38, radius: 12, flare: 8 };
-  const track = fixedTrack(shape);
-  assert.equal(track.get(), shape);
-  // Nothing ever changes, so nothing is ever called back.
-  let calls = 0;
-  const stop = track.subscribe(() => calls++);
-  stop();
-  assert.equal(calls, 0);
 });

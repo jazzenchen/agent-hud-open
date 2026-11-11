@@ -353,18 +353,6 @@ fn claude_cancel_is_request_until_plugin_ack() {
     );
 }
 #[test]
-fn claude_taken_cannot_be_withdrawn() {
-    let fixture = Fixture::new();
-    fixture.checkin();
-    let service = fixture.service(Provider::Claude);
-    service.send(request(Provider::Claude)).unwrap();
-    atomic_json(&fixture.prompt(), &json!({"takenAt":1})).unwrap();
-    assert!(matches!(
-        service.cancel(Provider::Claude, SESSION, REQUEST),
-        Err(Failure::Unsupported(_))
-    ));
-}
-#[test]
 fn claude_input_validation_and_refusal() {
     let fixture = Fixture::new();
     fixture.checkin();

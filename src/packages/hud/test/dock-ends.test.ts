@@ -8,7 +8,6 @@ import {
   ringPath,
 } from "../src/ends/end-geometry.ts";
 import {
-  clearMessages,
   dropMessages,
   mergeEnds,
   emptyEnds,
@@ -194,7 +193,6 @@ test("the tail keeps messages newest first and lets the oldest go", () => {
     ends.tail.map((item) => item.id),
     ["2"],
   );
-  assert.deepEqual(clearMessages(ends).tail, []);
   assert.equal(fadeOldest(emptyEnds), emptyEnds);
 });
 

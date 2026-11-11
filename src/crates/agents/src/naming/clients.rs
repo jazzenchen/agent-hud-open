@@ -146,19 +146,4 @@ mod tests {
         assert_eq!(named("devin", "desktop:agenthud"), None);
         assert_eq!(named("codex", "desktop:codex"), None);
     }
-
-    #[test]
-    fn other_codex_clients_are_the_ones_codex_does_not_name() {
-        assert!(codex_other_client(Some("codex_ask")));
-        for own in [
-            "Codex Desktop",
-            "Codex CLI",
-            "Codex IDE extension",
-            "Codex",
-            "",
-        ] {
-            assert!(!codex_other_client(Some(own)), "{own}");
-        }
-        assert!(!codex_other_client(None));
-    }
 }

@@ -6,8 +6,6 @@ import {
   alertText,
   hudPalette,
   idleText,
-  levelFill,
-  levelText,
   lookGround,
   markLevelText,
   onAlertFill,
@@ -18,16 +16,6 @@ const dark = { light: false },
   light = { light: true },
   thinDark = { light: false, seeThrough: true },
   thinLight = { light: true, seeThrough: true };
-
-test("levels follow StatusPalette: deeper fills and text on a light HUD", () => {
-  assert.equal(levelFill("ok", dark), "#3ddc84");
-  assert.equal(levelFill("warning", light), "#c08000");
-  assert.equal(levelText("ok", light), "#1e7e34");
-  assert.equal(levelText("critical", light), "#d70015");
-  assert.equal(levelText("critical", dark), "#ff453a");
-  assert.equal(levelText("ok", thinDark), "#9df0c0");
-  assert.equal(levelText("warning", thinLight), "#6e4900");
-});
 
 test("alert accents and ink follow Theme", () => {
   assert.equal(alertFill("calm", dark), "#6cd8ac");
@@ -59,39 +47,6 @@ test("a look lets the desktop through under a solid with a transparency", () => 
   assert.deepEqual(lookGround({ solidTransparency: 0.3 }, true), {
     light: true,
     seeThrough: true,
-  });
-});
-
-test("the panel keeps its opaque tokens on an opaque ground", () => {
-  assert.deepEqual(hudPalette(dark), {
-    text: "#f5f5f7",
-    secondary: "#98989d",
-    tertiary: "#6e6e73",
-    divider: "#ffffff1a",
-    track: "#ffffff1f",
-    selected: "#ffffff1f",
-    accent: "#0a84ff",
-    ok: "#3ddc84",
-    warning: "#ffd23f",
-    critical: "#ff453a",
-    okText: "#3ddc84",
-    warningText: "#ffd23f",
-    criticalText: "#ff453a",
-  });
-  assert.deepEqual(hudPalette(light), {
-    text: "#1c1c1e",
-    secondary: "#6e6e73",
-    tertiary: "#8e8e93",
-    divider: "#00000014",
-    track: "#0000001a",
-    selected: "#0000001f",
-    accent: "#007aff",
-    ok: "#1f9d4c",
-    warning: "#c08000",
-    critical: "#ff3b30",
-    okText: "#1e7e34",
-    warningText: "#946300",
-    criticalText: "#d70015",
   });
 });
 

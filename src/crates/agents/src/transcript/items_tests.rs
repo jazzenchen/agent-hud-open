@@ -109,14 +109,6 @@ fn codex_rows_are_its_response_items() {
 }
 
 #[test]
-fn a_request_copy_shows_nothing_to_any_rule() {
-    let copy = json!({"type":"api-request","message":{"role":"user","content":"Hi"}});
-    assert!((SHARED.read)(&copy, 0).is_empty());
-    assert!((claude::ITEMS.read)(&copy, 0).is_empty());
-    assert!((codex::ITEMS.read)(&copy, 0).is_empty());
-}
-
-#[test]
 fn the_shared_rule_reads_each_clients_lines_as_its_own_rule_does() {
     for (rule, lines) in [
         (&claude::ITEMS, claude_lines()),

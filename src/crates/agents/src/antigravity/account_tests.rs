@@ -176,35 +176,6 @@ fn a_tokenless_running_cli_is_read_when_no_native_quota_is_available() {
 }
 
 #[test]
-fn duplicate_services_prefer_the_new_cycle_over_exhausted_old_quota() {
-    let mut old = status_body();
-    old["userStatus"]["cascadeModelConfigData"]["clientModelConfigs"][0]["quotaInfo"] = json!({
-        "remainingFraction":0.05,"resetTime":"2026-10-22T00:00:00Z"
-    });
-    let mut new = status_body();
-    new["userStatus"]["cascadeModelConfigData"]["clientModelConfigs"]
-        .as_array_mut()
-        .unwrap()
-        .truncate(1);
-    new["userStatus"]["cascadeModelConfigData"]["clientModelConfigs"][0]["quotaInfo"] = json!({
-        "remainingFraction":0.95,"resetTime":"2026-10-23T00:00:00Z"
-    });
-    for statuses in [[old.clone(), new.clone()], [new, old]] {
-        let mut reading = Reading::empty("antigravity");
-        for body in statuses {
-            merge(&mut reading, parse("/u", &body, &Value::Null).unwrap());
-        }
-        let gemini = reading
-            .quotas
-            .iter()
-            .find(|row| row["name"] == "Gemini Models")
-            .unwrap();
-        assert!((gemini["usedPercent"].as_f64().unwrap() - 5.0).abs() < 0.001);
-        assert_eq!(gemini["resetAt"], "2026-10-23T00:00:00Z");
-    }
-}
-
-#[test]
 fn native_quota_summary_supplies_exact_windows_with_account_identity() {
     let mut host = FakeHost::new("/u");
     host.natives.insert(

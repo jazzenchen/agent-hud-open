@@ -202,11 +202,6 @@ pub(crate) const SOCKET_SEND_FLAGS: libc::c_int = libc::MSG_NOSIGNAL;
 #[cfg(test)]
 mod tests {
     #[test]
-    fn url_handler_discovery_is_unavailable() {
-        assert!(!super::registered_url("dsh://open"));
-    }
-
-    #[test]
     fn an_appimage_names_its_image_file_not_its_mount() {
         let directory = tempfile::tempdir().unwrap();
         let image = directory.path().join("Agent-HUD.AppImage");

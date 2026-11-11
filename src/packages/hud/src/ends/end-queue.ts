@@ -74,10 +74,6 @@ export function mergeEnds(ends: EndQueues, other: EndQueues): EndQueues {
   return { head, tail };
 }
 
-export function clearMessages(ends: EndQueues): EndQueues {
-  return ends.tail.length ? { ...ends, tail: [] } : ends;
-}
-
 /** The head keeps only the requests still waiting; one answered anywhere
  * leaves it. */
 export function keepWaiting(

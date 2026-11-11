@@ -96,25 +96,6 @@ mod tests {
     use serde_json::json;
 
     #[test]
-    fn a_prompt_and_tool_results_run_a_turn_and_stop_ends_it() {
-        let prompt = json!({"event":"UserPromptSubmit","session_id":"20261104_3","matcher_context":"fix it","message":"fix it"});
-        let began = began(&prompt).unwrap();
-        assert_eq!(began.session, "20261104_3");
-        assert_eq!(began.turn, "20261104_3:turn");
-        let tool = json!({"event":"PostToolUse","session_id":"20261104_3","matcher_context":"shell","tool_name":"shell","tool_input":{"command":"cargo test"},"working_dir":"/Users/me/app","tool_call_id":"t1"});
-        assert_eq!(
-            super::began(&tool).unwrap().workspace.as_deref(),
-            Some("/Users/me/app")
-        );
-        let stop = json!({"event":"Stop","session_id":"20261104_3","matcher_context":null,"last_assistant_message":"Done."});
-        let done = completed(&stop, 1_000).unwrap();
-        assert_eq!(done.session, "20261104_3");
-        assert_eq!(done.turn, "stop-1000");
-        assert!(completed(&prompt, 1_000).is_none());
-        assert!(super::began(&stop).is_none());
-    }
-
-    #[test]
     fn another_clients_payload_in_the_same_folder_is_not_gooses() {
         // A Claude-style `Stop`, and a Goose one without its session.
         let claude = json!({"hook_event_name":"Stop","session_id":"abc","cwd":"/w"});

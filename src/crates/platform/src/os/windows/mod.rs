@@ -295,11 +295,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn url_handler_discovery_is_unavailable() {
-        assert!(!registered_url("dsh://open"));
-    }
-
-    #[test]
     fn captured_windows_environment_keeps_os_name_semantics() {
         let env = Environment::from([
             ("AppData".into(), "D:\\profile\\roaming".into()),

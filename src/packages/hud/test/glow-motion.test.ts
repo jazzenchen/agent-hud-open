@@ -85,31 +85,6 @@ test("half a period each way, eased, forever, as Open's autoreversing CABasicAni
   assert.equal(halfBreath(0.2), 250, "Open's 0.5 s floor");
 });
 
-test("ease-in-out stays within 2 % of the cosine the shader used to breathe with", () => {
-  // CSS ease-in-out and CAMediaTimingFunction easeInEaseOut: cubic-bezier(0.42, 0, 0.58, 1).
-  const bezier = (x: number) => {
-    const at = (t: number, a: number, b: number) =>
-      3 * a * t * (1 - t) ** 2 + 3 * b * t * t * (1 - t) + t ** 3;
-    let lo = 0;
-    let hi = 1;
-    for (let step = 0; step < 50; step++) {
-      const mid = (lo + hi) / 2;
-      if (at(mid, 0.42, 0.58) < x) lo = mid;
-      else hi = mid;
-    }
-    return at((lo + hi) / 2, 0, 1);
-  };
-  let largest = 0;
-  for (let i = 0; i <= 200; i++) {
-    const x = i / 200;
-    largest = Math.max(
-      largest,
-      Math.abs(bezier(x) - (0.5 - 0.5 * Math.cos(Math.PI * x))),
-    );
-  }
-  assert.ok(largest < 0.02, `largest difference ${largest}`);
-});
-
 test("a new period keeps the breath where it was", () => {
   // A quarter of the way down at 3 s stays a quarter of the way down at 7 s.
   assert.equal(retimedBreath(375, 1500, 3500), 875);

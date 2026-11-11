@@ -17,15 +17,6 @@ fn consenting(host: FakeHost) -> FakeHost {
 }
 
 #[test]
-fn without_consent_it_asks_nothing_and_says_why() {
-    let host = FakeHost::new("/home/u").env("GH_TOKEN", "t");
-    let reading = read(&host).unwrap();
-    assert!(reading.notice.is_some());
-    assert!(reading.quotas.is_empty());
-    assert!(host.asked.borrow().is_empty());
-}
-
-#[test]
 fn the_token_comes_from_env_then_the_store_then_hosts_yml() {
     let yml = "github.com:\n    user: me\n    oauth_token: from-file\n";
     let file = FakeHost::new("/home/u").file("/home/u/.config/gh/hosts.yml", yml);

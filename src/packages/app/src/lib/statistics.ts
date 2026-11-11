@@ -1,15 +1,6 @@
 // Pure rules of the Statistics window's Tokens page, as agent-hud-native-open draws it.
 import { dateFormat } from "@agent-hud/ui/format";
 
-/** An hour's models on the heatmap's hover card (Open's `HeatmapModelDetails`): most tokens first, ties by id. */
-export function hourModels(
-  models: Record<string, number> | undefined,
-): [string, number][] {
-  return Object.entries(models ?? {}).sort(
-    (a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0),
-  );
-}
-
 const day = 86_400_000;
 
 /** A token chart column: the whole bucket it stands for, in epoch milliseconds. */

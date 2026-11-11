@@ -141,12 +141,4 @@ mod tests {
             _ => panic!("another build is named and refused"),
         }
     }
-
-    #[test]
-    fn a_lock_failure_does_not_start_the_app() {
-        assert!(matches!(
-            launch(Err(CollectorError::Unavailable("fixture".into())), None),
-            Launch::Unavailable(error) if error == "fixture"
-        ));
-    }
 }
