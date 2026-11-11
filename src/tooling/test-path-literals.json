@@ -12,7 +12,7 @@
     "src/crates/core/src/data_version.rs": 12,
     "src/crates/core/src/log_files/tests.rs": 9,
     "src/crates/host/src/instance.rs": 1,
-    "src/crates/platform/src/deepseek_plugin/tests.rs": 6,
+    "src/crates/platform/src/deepseek_plugin/tests.rs": 5,
     "src/crates/platform/src/file_changes.rs": 4,
     "src/crates/platform/src/hooks/install/tests.rs": 8,
     "src/crates/platform/src/hud_tools/tests.rs": 1,

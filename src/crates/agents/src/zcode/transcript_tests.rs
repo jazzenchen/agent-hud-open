@@ -231,11 +231,13 @@ fn a_session_long_inactive_is_not_listed_again() {
 
 #[test]
 fn the_task_list_is_found_beside_the_database() {
+    // Absolute on every OS; nothing here is created.
+    let root = std::env::temp_dir().join("agent-hud-zcode");
     assert_eq!(
-        index_path(Path::new("/Users/me/.zcode/cli/db/db.sqlite")),
-        Some(PathBuf::from("/Users/me/.zcode/v2/tasks-index.sqlite"))
+        index_path(&root.join(".zcode/cli/db/db.sqlite")),
+        Some(root.join(".zcode/v2/tasks-index.sqlite"))
     );
-    assert_eq!(index_path(Path::new("/tmp/db.sqlite")), None);
+    assert_eq!(index_path(&root.join("db.sqlite")), None);
 }
 
 #[test]

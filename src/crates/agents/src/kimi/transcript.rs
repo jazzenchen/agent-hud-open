@@ -397,7 +397,7 @@ mod tests {
         let session = temp
             .path()
             .join(".kimi-code/sessions/wd_app_1/session_9f2a");
-        std::fs::create_dir_all(session.join("agents/main")).unwrap();
+        std::fs::create_dir_all(session.join("agents/main")).unwrap(); // plain directory
         std::fs::write(session.join("state.json"), state).unwrap();
         let mut log = Log::new(session.join("agents/main/wire.jsonl"), "kimi");
         log.read_kept_name();

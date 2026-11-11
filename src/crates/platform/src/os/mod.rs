@@ -304,24 +304,22 @@ mod tests {
 #[cfg(test)]
 mod bundle_tests {
     use super::outer_bundle;
-    use std::path::Path;
 
     #[test]
     fn a_helper_and_its_app_share_the_outermost_bundle() {
-        let app = Some(Path::new("/Applications/Trae.app").to_path_buf());
+        // Absolute on every OS; nothing here is created.
+        let root = std::env::temp_dir().join("agent-hud-bundles");
+        let trae = root.join("Applications/Trae.app");
         assert_eq!(
-            outer_bundle(Path::new("/Applications/Trae.app/Contents/MacOS/Electron")),
-            app
+            outer_bundle(&trae.join("Contents/MacOS/Electron")),
+            Some(trae.clone())
         );
         assert_eq!(
-            outer_bundle(Path::new(
-                "/Applications/Trae.app/Contents/Frameworks/Trae Helper (Plugin).app/Contents/MacOS/Trae Helper (Plugin)"
+            outer_bundle(&trae.join(
+                "Contents/Frameworks/Trae Helper (Plugin).app/Contents/MacOS/Trae Helper (Plugin)"
             )),
-            app
+            Some(trae)
         );
-        assert_eq!(
-            outer_bundle(Path::new("/Users/me/.kimi-code/bin/kimi")),
-            None
-        );
+        assert_eq!(outer_bundle(&root.join("me/.kimi-code/bin/kimi")), None);
     }
 }

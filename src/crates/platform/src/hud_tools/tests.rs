@@ -370,13 +370,7 @@ fn trae_and_trae_cn_each_get_the_server_where_their_app_reads_it() {
     let home = tempfile::tempdir().unwrap();
     let places = places(home.path());
     // Each build's app data folder on this OS, where TRAE keeps `User`.
-    let app_data = if cfg!(target_os = "macos") {
-        home.path().join("Library/Application Support")
-    } else if cfg!(windows) {
-        home.path().join("AppData/Roaming")
-    } else {
-        home.path().join(".config")
-    };
+    let app_data = crate::os::app_support(home.path(), &HashMap::new());
     let trae = app_data.join("Trae/User/mcp.json");
     let trae_cn = app_data.join("Trae CN/User/mcp.json");
     assert_eq!(Client::Trae.settings(&places), Some(trae.clone()));
