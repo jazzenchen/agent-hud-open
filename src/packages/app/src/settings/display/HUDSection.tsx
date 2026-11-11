@@ -1,9 +1,13 @@
 /* The resting HUD on the selected screen: a preview, its mode and that mode's
  * own rows, then its look. */
 import type { Snapshot } from "@agent-hud/protocol";
-import type { HUDConfig } from "@agent-hud/hud/model";
+import {
+  DOCK_QUOTA_THRESHOLDS,
+  dockQuotaThreshold,
+  type HUDConfig,
+} from "@agent-hud/hud/model";
 import { Row, Section } from "../SettingsPrimitives";
-import { Segments } from "../SettingsControls";
+import { Menu, Segments } from "../SettingsControls";
 import { SmallHUDPreview } from "../SmallHUDPreview";
 import { displayControls, type DisplayProps } from "./controls";
 import { AgentSelection } from "./AgentSelection";
@@ -31,8 +35,8 @@ function usageSubtitle(
       );
     case "numbers":
       return t(
-        "The most used window's percentage beside the logo.",
-        "标志旁只写用得最多那项的百分比。",
+        "Shows the shortest quota window first.",
+        "优先显示最短周期的额度。",
       );
   }
 }
@@ -106,6 +110,53 @@ export function HUDSection({
               "缩短栏目，收起无数据且空闲的智能体。悬停查看详情，关闭后恢复完整展示。",
             ),
           )}
+          <Row
+            title={t("Long quota warning", "长周期额度提醒")}
+            subtitle={t(
+              "Below this remaining percentage, show a one-time alert and briefly rotate in the longer window.",
+              "长周期剩余低于所选比例时，首次提示一次，之后短暂轮显。",
+            )}
+          >
+            <Menu
+              label={t("Long quota warning", "长周期额度提醒")}
+              value={String(
+                dockQuotaThreshold(config.dockQuotaWarningThreshold),
+              )}
+              options={DOCK_QUOTA_THRESHOLDS.map((value) => [
+                String(value),
+                value === 0 ? t("Never", "从不显示") : percent(value / 100),
+              ])}
+              change={(value) =>
+                update({
+                  dockQuotaWarningThreshold: dockQuotaThreshold(Number(value)),
+                })
+              }
+            />
+          </Row>
+          <Row title={t("HUD number appearance", "悬浮栏数字外观")}>
+            <Segments
+              label={t("HUD number appearance", "悬浮栏数字外观")}
+              value={config.dockNumberStyle}
+              options={[
+                ["tinted", t("Tinted background", "带底色")],
+                ["grayscale", t("Grayscale", "纯灰度")],
+              ]}
+              change={(value) =>
+                update({
+                  dockNumberStyle: value === "grayscale" ? value : "tinted",
+                })
+              }
+            />
+          </Row>
+          {config.dockNumberStyle === "grayscale" &&
+            slider(
+              "dockNumberTransparency",
+              t("Number transparency", "数字透明度"),
+              0,
+              0.9,
+              0.05,
+              percent,
+            )}
           {slider(
             "dockScale",
             t("HUD size", "HUD 整体大小"),
@@ -176,8 +227,8 @@ export function HUDSection({
                   "showsNumbers",
                   t("Show numbers", "显示数字"),
                   t(
-                    "The most used window's percentage beside each logo.",
-                    "标志旁写出用得最多那项的百分比。",
+                    "Shows the shortest quota window first.",
+                    "优先显示最短周期的额度。",
                   ),
                 )}
             </>

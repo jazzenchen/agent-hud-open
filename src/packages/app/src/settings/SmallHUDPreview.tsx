@@ -9,6 +9,8 @@ import {
   statusColor,
   configuredVendors,
   compactLabel,
+  dockNumberColors,
+  dockQuotaWindows,
   type HUDConfig,
 } from "@agent-hud/hud/model";
 import { islandPath, stripMetrics } from "@agent-hud/hud/geometry";
@@ -40,7 +42,13 @@ export function SmallHUDPreview({
   active: boolean;
 }) {
   const sample = { ...defaultHUDConfig, ...config, edge: "top" as const };
-  const vendors = configuredVendors(snapshot, sample);
+  const vendors = configuredVendors(snapshot, sample).map((vendor) => {
+    if (sample.mode !== "simple") return vendor;
+    const { primary } = dockQuotaWindows(vendor.quotas, 0);
+    return primary
+      ? { ...vendor, used: primary.usedPercent, level: primary.status }
+      : vendor;
+  });
   const compact = sample.mode === "simple" && sample.compactDock;
   const hasActiveVendor = vendors.some(
     (vendor) => vendor.working > 0 || vendor.waiting > 0,
@@ -250,7 +258,17 @@ export function SmallHUDPreview({
                           style={{
                             fontSize: metrics.font,
                             fontWeight: dockFontWeight(sample.dockScale),
-                            color: statusColor(vendor.level),
+                            ...dockNumberColors(
+                              sample.dockNumberStyle,
+                              sample.dockNumberTransparency,
+                              light,
+                              statusColor(vendor.level),
+                              false,
+                            ),
+                            borderRadius:
+                              4 * DOCK_SCALE * dockScale(sample.dockScale),
+                            minWidth: metrics.labels?.[index],
+                            textAlign: "right",
                             fontVariantNumeric: "tabular-nums",
                           }}
                         >

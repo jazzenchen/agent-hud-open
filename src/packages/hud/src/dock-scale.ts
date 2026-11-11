@@ -36,6 +36,7 @@ export function scaleDockMetrics(
     font: scale(metrics.font),
     labelGap: scale(metrics.labelGap),
     label: scale(metrics.label),
+    ...(metrics.labels && { labels: metrics.labels.map(scale) }),
     bar: scale(metrics.bar),
     radius: scale(
       (Math.min(metrics.width, horizontal ? cross : metrics.height, cross) /

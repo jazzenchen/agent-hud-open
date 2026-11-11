@@ -60,6 +60,9 @@ export interface HUDConfig {
   simpleStyle: UsageStyle;
   /** Opt-in shorter dock; full appearance preferences remain saved. */
   compactDock: boolean;
+  dockQuotaWarningThreshold: import("./usage-meter/dock-quota.ts").DockQuotaThreshold;
+  dockNumberStyle: "tinted" | "grayscale";
+  dockNumberTransparency: number;
   /** Whole floating dock scale; independent of full-mode mark preferences. */
   dockScale: number;
   dockHeight: number;
@@ -213,6 +216,14 @@ export function meterLabel(vendor: HUDVendor, display?: QuotaDisplay): string {
     ? (vendor.balance ?? vendor.usage ?? "--")
     : quotaPercentLabel(used, display);
 }
+
+export {
+  DOCK_QUOTA_THRESHOLDS,
+  dockQuotaThreshold,
+  dockQuotaWindows,
+} from "./usage-meter/dock-quota.ts";
+
+export { dockNumberColors } from "./usage-meter/dock-number-style.ts";
 
 export function statusColor(level: HUDVendor["level"]): string {
   return level === "critical"

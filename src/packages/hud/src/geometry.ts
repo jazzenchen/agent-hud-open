@@ -1,5 +1,5 @@
 import type { CSSProperties } from "react";
-import type { QuotaDisplay } from "@agent-hud/ui/format";
+import { quotaPercentLabel, type QuotaDisplay } from "@agent-hud/ui/format";
 import {
   HUD_METRICS,
   meterLabel,
@@ -14,6 +14,7 @@ import {
   usageArcs,
 } from "./usage-meter/arcs";
 import { markWindows } from "./usage-meter/mark-windows";
+import { dockQuotaWindows } from "./usage-meter/dock-quota";
 import { compactLabel } from "./compact-dock.ts";
 import { dockFontWeight, scaleDockMetrics } from "./dock-scale.ts";
 
@@ -45,6 +46,7 @@ export interface StripMetrics {
   labelGap: number;
   /** The widest of the Simple marks' number labels; 0 when they draw none. */
   label: number;
+  labels?: number[];
   /** A Simple mark's bars beside its logo, how long; 0 when it draws none. */
   bar: number;
   padding: { top: number; right: number; bottom: number; left: number };
@@ -136,17 +138,27 @@ export function stripMetrics(
     bottom: tight + (horizontal ? 0 : 3),
     left,
   };
-  const labels = vendors.map((v) =>
-    numbers
-      ? labelWidth(
-          compact
-            ? compactLabel(v, meterLabel(v, display))
-            : meterLabel(v, display),
-          font,
-          dockFontWeight(config.dockScale),
-        )
-      : 0,
-  );
+  const labels = vendors.map((v) => {
+    if (!numbers) return 0;
+    const { primary, warning } = dockQuotaWindows(
+      v.quotas,
+      config.dockQuotaWarningThreshold,
+    );
+    const label = primary
+      ? quotaPercentLabel(primary.usedPercent, display)
+      : meterLabel(v, display);
+    const weight = dockFontWeight(config.dockScale);
+    return Math.max(
+      labelWidth(compact ? compactLabel(v, label) : label, font, weight),
+      warning
+        ? labelWidth(
+            quotaPercentLabel(warning.usedPercent, display),
+            font,
+            weight,
+          )
+        : 0,
+    );
+  });
   const widths = labels.map(
     (label) =>
       mark + (bar ? labelGap + bar : 0) + (numbers ? labelGap + label : 0),
@@ -181,6 +193,7 @@ export function stripMetrics(
       font,
       labelGap,
       label: Math.max(0, ...labels),
+      labels,
       bar,
       padding,
       radius: Math.min(Math.round(size * 0.73), Math.min(width, height) / 2),

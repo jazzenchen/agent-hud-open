@@ -1,5 +1,5 @@
 import type { MutableRefObject } from "react";
-import { quotaDisplayLabel } from "@agent-hud/ui/format";
+import { quotaDisplayLabel, quotaPercentLabel } from "@agent-hud/ui/format";
 import { useFormat } from "@agent-hud/ui/format-context";
 import { BotMark } from "../BotMark";
 import { botState, facingFromEdge, isAttention } from "../bots/bot-state";
@@ -9,12 +9,15 @@ import { useMarkLevelText } from "../ground";
 import {
   markUsed,
   meterLabel,
+  dockNumberColors,
   vendorKey,
   type HUDConfig,
   type HUDEdge,
   type HUDVendor,
 } from "../model";
 import { isRingStyle } from "../usage-meter/arcs";
+import { useDockQuota } from "./useDockQuota";
+import { DockQuotaBadge } from "./DockQuotaBadge";
 import { MarkBars, MarkRing, markItems } from "../usage-meter/mark-usage";
 import type { HUDNativePointer } from "./useHUDInteraction";
 import { compactLabel } from "../compact-dock";
@@ -75,7 +78,23 @@ export function AgentMark({
   const { quotaDisplay } = format;
   const compact = config.mode === "simple" && config.compactDock;
   const scale = DOCK_SCALE * dockScale(config.dockScale);
-  const label = meterLabel(vendor, quotaDisplay);
+  const { quota, alert } = useDockQuota(
+    vendor.quotas,
+    config.dockQuotaWarningThreshold,
+    config.mode === "simple",
+  );
+  const label = quota
+    ? quotaPercentLabel(quota.usedPercent, quotaDisplay)
+    : meterLabel(vendor, quotaDisplay);
+  const description = [
+    vendor.name,
+    quota?.name,
+    markUsed(vendor) == null
+      ? label
+      : `${label} ${quotaDisplayLabel(quotaDisplay, format.language)}`,
+  ]
+    .filter(Boolean)
+    .join(" · ");
   const caption = compact ? compactLabel(vendor, label) : label;
   // A ring's figure is text: on a see-through ground, its level's see-through shade.
   const figureColor = useMarkLevelText(light);
@@ -83,8 +102,8 @@ export function AgentMark({
     <button
       type="button"
       className="hud-agent-mark"
-      title={`${vendor.name} · ${label}${markUsed(vendor) == null ? "" : ` ${quotaDisplayLabel(quotaDisplay, format.language)}`}`}
-      aria-label={`${vendor.name}, ${meterLabel(vendor, quotaDisplay)} ${markUsed(vendor) == null ? "" : quotaDisplayLabel(quotaDisplay, format.language)}`}
+      title={description}
+      aria-label={description}
       onPointerEnter={() => {
         if (hovered !== vendor.key) {
           setHovered(vendor.key);
@@ -203,6 +222,7 @@ export function AgentMark({
               : undefined
           }
         />
+        {alert && <DockQuotaBadge description={description} scale={scale} />}
         {vendor.waiting > 0 && (
           <span
             aria-hidden="true"
@@ -236,13 +256,22 @@ export function AgentMark({
           config.simpleStyle === "numbers") && (
           <span
             style={{
-              color: figureColor(vendor.level),
+              ...dockNumberColors(
+                config.dockNumberStyle,
+                config.dockNumberTransparency,
+                light,
+                figureColor(quota?.status ?? vendor.level),
+                Boolean(alert),
+              ),
+              borderRadius: 4 * scale,
               fontSize: metrics.font,
               fontWeight: dockFontWeight(config.dockScale),
               fontVariantNumeric: "tabular-nums",
               whiteSpace: "nowrap",
               textAlign: "right",
-              minWidth: horizontal(edge) ? undefined : metrics.label,
+              minWidth: horizontal(edge)
+                ? metrics.labels?.[index]
+                : metrics.label,
             }}
           >
             {caption}

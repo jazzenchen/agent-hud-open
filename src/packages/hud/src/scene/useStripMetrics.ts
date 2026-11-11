@@ -23,6 +23,7 @@ export function useStripMetrics(
       config.showsNumbers,
       config.simpleStyle,
       config.compactDock,
+      config.dockQuotaWarningThreshold,
       config.panelLayout,
       config.notchWidth,
       config.notchHeight,
