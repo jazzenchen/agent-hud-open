@@ -19,6 +19,30 @@ pub(super) fn listed(text: Option<&str>) -> bool {
         .is_some_and(|value| value["mcpServers"][SERVER_NAME].is_object())
 }
 
+/// Whether a registered Agent HUD server has an unambiguously stale executable
+/// path. This is deliberately narrower than `listed`: an existing custom
+/// server stays under the person's control, even if it uses Agent HUD's name.
+pub(super) fn missing_known_executable(text: Option<&str>, current: &Path) -> bool {
+    let Some(entry) = text
+        .and_then(|text| serde_json::from_str::<Value>(text).ok())
+        .and_then(|value| value["mcpServers"][SERVER_NAME].as_object().cloned())
+    else {
+        return false;
+    };
+    if entry.get("disabled") == Some(&Value::Bool(true))
+        || entry.get("args") != Some(&json!(["--mcp"]))
+    {
+        return false;
+    }
+    let Some(command) = entry.get("command").and_then(Value::as_str).map(Path::new) else {
+        return false;
+    };
+    command.is_absolute()
+        && command != current
+        && command.file_name() == current.file_name()
+        && !command.is_file()
+}
+
 /// The file's new text with Agent HUD's server added (`Some(executable)`) or
 /// removed; the original when nothing changes.
 pub(super) fn edit(

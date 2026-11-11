@@ -210,6 +210,24 @@ impl Client {
         }
     }
 
+    /// Whether a file-managed client has an Agent HUD entry with an
+    /// unambiguously stale executable. Only JSON clients can prove this
+    /// without claiming ownership of a person's custom configuration.
+    pub fn missing_known_executable(self, places: &Places, current: &Path) -> bool {
+        let Some(file) = self.settings(places) else {
+            return false;
+        };
+        let Ok(text) = read(&file) else {
+            return false;
+        };
+        match self {
+            Self::Cursor | Self::Antigravity => {
+                mcp_json::missing_known_executable(text.as_deref(), current)
+            }
+            Self::ClaudeCode | Self::Codex | Self::DeepSeek => false,
+        }
+    }
+
     /// Adds (`Some(executable)`) or removes (`None`) Agent HUD's server in the
     /// client's settings file. Returns whether the file changed.
     pub fn set_server(self, places: &Places, executable: Option<&Path>) -> Result<bool, String> {
