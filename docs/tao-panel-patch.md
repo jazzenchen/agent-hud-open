@@ -1,19 +1,19 @@
 # Tao panel patch
 
-On macOS the HUD must be a nonactivating `NSPanel` from the moment it is allocated, and upstream Tao cannot create one. The workspace therefore takes `tao` from a public fork that carries one small commit on top of the released 0.37.1. `tauri`, `tauri-runtime` and `tauri-runtime-wry` come unmodified from crates.io.
+On macOS the HUD must be a nonactivating `NSPanel` from the moment it is allocated, and upstream Tao cannot create one. The workspace therefore takes `tao` from a public fork that carries two small commits on top of the released 0.37.1: the panel, and a Windows fix for a crash (see [The Windows runner count](#the-windows-runner-count)). `tauri`, `tauri-runtime` and `tauri-runtime-wry` come unmodified from crates.io.
 
 ## Source
 
 | | |
 | --- | --- |
-| Fork | https://github.com/jazzenchen/tao, branch `agent-hud/nonactivating-panel` |
-| Pinned rev | `4a401fab5ba8a8b3c56b1e5c6970033a27509515` |
+| Fork | https://github.com/jazzenchen/tao, branch `agent-hud/nonactivating-panel-arc-runner` (the panel commit `4a401fab`, then the Windows commit) |
+| Pinned rev | `04fe4478c9d5d0febbff4d0714e10a8420a2eb1f` |
 | Base | tag `tao-v0.37.1` (`37b7e8bc90a050e93be988df636f322c3ef147b6`) |
 | Selected by | `[patch.crates-io]` in the root `Cargo.toml`; `Cargo.lock` records the `git+https://github.com/jazzenchen/tao?rev=…` source |
 | License | Apache-2.0, upstream's `LICENSE` and `LICENSE.spdx` unchanged |
 | `tao-macros` | The fork's `Cargo.toml` takes `tao-macros` (Android only) by path, so `Cargo.lock` lists it twice: from crates.io (required by `wry`) and from the fork's git source (required by `tao`). Both are 0.1.4 and Android-only; neither is compiled for desktop targets. |
 
-The base tag's `src/` is byte-identical to the crates.io `tao-0.37.1` package (sha256 `f37f381f4e048e6cdf038b5705f8cf14ad108279d46eb968140a7b291aba9400`). Until 2026-10-20 the patched crate was vendored as `src/vendor/tao-0.37.1`; the fork's `src/` is byte-identical to that copy. The commit changes:
+The base tag's `src/` is byte-identical to the crates.io `tao-0.37.1` package (sha256 `f37f381f4e048e6cdf038b5705f8cf14ad108279d46eb968140a7b291aba9400`). Until 2026-10-20 the patched crate was vendored as `src/vendor/tao-0.37.1`; the fork's `src/` is byte-identical to that copy. The panel commit changes:
 
 - `src/platform/macos.rs`: `WindowBuilderExtMacOS::with_nonactivating_panel` and the re-exported scope.
 - `src/platform_impl/macos/mod.rs`: exports the scope.
@@ -35,6 +35,14 @@ A marked window is allocated as `TaoNonactivatingPanel`, an `NSPanel` subclass w
 Both classes keep Tao's close/drop path (`setReleasedWhenClosed(false)` and the owned window's asynchronous close); callback and delegate ownership is unchanged.
 
 Superclass sends are lexical: the normal `sendEvent:` starts at `NSWindow`, the panel's at `NSPanel`, and the panel's `resignKeyWindow` at `NSPanel`. Never derive the lookup start from `object_getClass(self).superclass()`: AppKit or KVO can put a runtime subclass above the declaring Tao class, and that expression then dispatches into the same Tao implementation again.
+
+## The Windows runner count
+
+The second commit changes two Windows files, `src/platform_impl/windows/event_loop.rs` and `event_loop/runner.rs`: the event loop runner is shared through an `Arc` instead of an `Rc`.
+
+Tao's Windows `EventLoopWindowTarget` holds that shared runner and derives `Clone`. `tauri-runtime-wry` keeps a window target in its `Context`, which also derives `Clone` and is declared `Send` and `Sync`, and every `tauri::AppHandle` clone or runtime call clones and drops it. The HUD asks for the pointer position and the monitors from worker threads (`hud/input.rs`, `hud/drag.rs`, `hud/displays.rs`), so with an `Rc` several threads changed one plain counter. A lost update frees the runner while it is in use or trips `Rc`'s own abort: Open #51 saw heap corruption (`0xc0000374`) followed by an illegal instruction (`0xc000001d`) after about 27 idle minutes.
+
+Only the count crosses threads. The runner's `Cell` and `RefCell` state is still used on the event loop thread alone, as before. Upstream 0.37.2 still uses the `Rc`; keep this commit when rebasing.
 
 ## How the HUD uses it
 

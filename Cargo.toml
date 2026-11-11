@@ -40,6 +40,7 @@ serde_json = "1"
 sha2 = "=0.10.9"
 tempfile = "3"
 
-# Mac HUD panels are selected before allocation; see docs/tao-panel-patch.md.
+# Mac HUD panels are selected before allocation, and the Windows event loop runner is counted
+# atomically (Open #51); see docs/tao-panel-patch.md.
 [patch.crates-io]
-tao = { git = "https://github.com/jazzenchen/tao", rev = "4a401fab5ba8a8b3c56b1e5c6970033a27509515" }
+tao = { git = "https://github.com/jazzenchen/tao", rev = "04fe4478c9d5d0febbff4d0714e10a8420a2eb1f" }
