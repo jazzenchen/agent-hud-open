@@ -81,7 +81,7 @@ impl Tracker {
             .iter()
             .filter_map(|session| {
                 let facts = &session["liveFacts"];
-                if facts["outcome"] != "completed" {
+                if session["parentId"].is_string() || facts["outcome"] != "completed" {
                     return None;
                 }
                 let at = date(&facts["endedAt"])?;
