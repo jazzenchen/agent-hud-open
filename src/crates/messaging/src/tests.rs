@@ -2119,3 +2119,35 @@ impl Preferences {
         })
     }
 }
+
+#[test]
+fn an_answer_a_later_turn_hides_is_still_given() {
+    // OpenCode is read only through its latest turn: once the next one ends,
+    // get_message gives the answer that was thrown back.
+    let mut world = World::on();
+    let session = "opencode:ses_a1b2";
+    world.snapshot["sessions"].as_array_mut().unwrap().push(json!(
+        {"id":session,"source":"opencode","title":"Port","cwd":"/p","state":"idle","parentId":null,"updatedAt":"2026-10-22T01:00:00Z","liveFacts":{}}
+    ));
+    let sent = world.send(("claude", CLAUDE), session, "Port the parser");
+    assert_eq!(sent["state"], "queued", "{sent}");
+    let id = sent["id"].as_str().unwrap().to_owned();
+    let now = 1_792_600_000_000;
+    // Its turn ended while the session's next one already runs.
+    world.state(session, "running");
+    world.live(
+        session,
+        json!({"turnId":"t1","turnStartedAt":at(now + 1_000),"endedAt":at(now + 3_000),"delivered":id,"message":"Ported."}),
+    );
+    world.maintain(now + 4_000);
+    assert_eq!(flown(&world).len(), 2, "sent and back");
+    world.state(session, "idle");
+    world.live(
+        session,
+        json!({"turnId":"t2","turnStartedAt":at(now + 5_000),"endedAt":at(now + 9_000),"message":"Something else."}),
+    );
+    let got = world.get(&json!(id));
+    assert_eq!(got["state"], "done", "{got}");
+    assert_eq!(got["answer"], "Ported.");
+    assert_eq!(got["endedAt"], at(now + 3_000));
+}

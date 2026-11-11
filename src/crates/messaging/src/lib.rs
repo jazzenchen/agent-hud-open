@@ -10,6 +10,7 @@
 //! The words are kept only while they are delivered: the journal keeps who sent
 //! what to whom, a fingerprint of the words and where the answer will be, and
 //! an answer is read again from the other session's transcript each time.
+mod answers;
 mod flights;
 mod get;
 mod journal;
@@ -111,6 +112,8 @@ pub struct Messaging {
     starts: SessionStarts,
     follow: Follow,
     fly: Fly,
+    /// Answers thrown back, for `get_message` once a client's next turn hides them.
+    answers: answers::Answers,
 }
 
 impl Messaging {
@@ -130,6 +133,7 @@ impl Messaging {
             starts,
             follow,
             fly,
+            answers: Default::default(),
         }
     }
 

@@ -37,7 +37,10 @@ impl Messaging {
                 .as_str()
                 .map(transcript::at)
                 .unwrap_or(0);
-            if session["state"] == "running"
+            // Live facts that name this message as the turn that ended are
+            // final even while the session's next turn already runs.
+            let ours = live["delivered"].as_str() == Some(message.id.as_str());
+            if (!ours && session["state"] == "running")
                 || live["endedAt"].is_null()
                 || began < message.sent_at_ms - 5_000
             {
@@ -60,7 +63,11 @@ impl Messaging {
                 changed = true;
                 continue;
             }
-            if found.answer.is_some() {
+            if let Some(answer) = &found.answer {
+                if transcript::live_only(&message.to.client) {
+                    self.answers
+                        .keep(&message.id, answer, found.ended_at.clone());
+                }
                 message.answered = true;
                 flights.push(message.clone());
                 continue;

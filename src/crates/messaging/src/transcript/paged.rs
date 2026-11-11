@@ -179,11 +179,17 @@ pub(super) fn answer(host: &Host<'_>, message: &Message) -> Option<Found> {
 /// Fallback for hook-only and compact-DB clients (`trae`, `cursor`, `zcode`)
 /// where transcript paging is unavailable and turns are reported via hooks into
 /// `liveFacts`.
-fn live_answer(live: &Value, message: &Message) -> Option<Found> {
-    if !matches!(
-        message.to.client.as_str(),
+/// Clients whose turns Agent HUD reads only from what their hooks or
+/// observer report of the latest one (`liveFacts`).
+pub(crate) fn live_only(client: &str) -> bool {
+    matches!(
+        client,
         "trae" | "trae-cn" | "cursor" | "zcode" | "pi" | "opencode"
-    ) {
+    )
+}
+
+fn live_answer(live: &Value, message: &Message) -> Option<Found> {
+    if !live_only(&message.to.client) {
         return None;
     }
     let saved_id = message.turn.as_ref().and_then(|t| t.id.as_deref());
