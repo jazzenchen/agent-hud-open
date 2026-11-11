@@ -26,21 +26,48 @@ pub(super) fn edit(
     original: Option<&str>,
     executable: Option<&Path>,
 ) -> Result<Option<String>, String> {
+    edit_command(
+        client,
+        original,
+        executable.map(|path| path.to_string_lossy().into_owned()),
+    )
+}
+
+/// [`edit`] for TRAE, which splits a `command` at its spaces unless the
+/// whole of it is in double quotes (its extension host's command parser), so
+/// `/Applications/Agent HUD.app/…` would start `/Applications/Agent`.
+pub(super) fn edit_quoted(
+    client: &str,
+    original: Option<&str>,
+    executable: Option<&Path>,
+) -> Result<Option<String>, String> {
+    edit_command(
+        client,
+        original,
+        executable.map(|path| format!("\"{}\"", path.to_string_lossy())),
+    )
+}
+
+fn edit_command(
+    client: &str,
+    original: Option<&str>,
+    command: Option<String>,
+) -> Result<Option<String>, String> {
     let unchanged = Ok(original.map(str::to_owned));
     let mut value = match original.filter(|text| !text.trim().is_empty()) {
-        None if executable.is_none() => return unchanged,
+        None if command.is_none() => return unchanged,
         None => Value::Object(Map::new()),
         Some(text) => serde_json::from_str(text).map_err(|_| not_plain(client))?,
     };
     let root = value.as_object_mut().ok_or_else(|| not_plain(client))?;
-    match executable {
-        Some(executable) => {
+    match command {
+        Some(command) => {
             let servers = root
                 .entry("mcpServers")
                 .or_insert_with(|| json!({}))
                 .as_object_mut()
                 .ok_or_else(|| not_plain(client))?;
-            let command = json!(executable.to_string_lossy());
+            let command = json!(command);
             let args = json!(["--mcp"]);
             match servers.get_mut(SERVER_NAME).and_then(Value::as_object_mut) {
                 // Keep whatever else the person set on it, such as env; adding

@@ -391,7 +391,28 @@ fn trae_and_trae_cn_each_get_the_server_where_their_app_reads_it() {
         .set_server(&places, Some(Path::new(APP)))
         .unwrap());
     let value: Value = serde_json::from_str(&fs::read_to_string(&trae_cn).unwrap()).unwrap();
-    assert_eq!(value["mcpServers"]["agent-hud"]["command"], APP);
+    // In double quotes: TRAE splits an unquoted command at its spaces.
+    assert_eq!(
+        value["mcpServers"]["agent-hud"]["command"],
+        format!("\"{APP}\"")
+    );
+    assert!(!Client::TraeCn
+        .set_server(&places, Some(Path::new(APP)))
+        .unwrap());
+    // An older unquoted entry is quoted.
+    fs::write(
+        &trae_cn,
+        format!(r#"{{"mcpServers":{{"agent-hud":{{"command":"{APP}","args":["--mcp"]}}}}}}"#),
+    )
+    .unwrap();
+    assert!(Client::TraeCn
+        .set_server(&places, Some(Path::new(APP)))
+        .unwrap());
+    let value: Value = serde_json::from_str(&fs::read_to_string(&trae_cn).unwrap()).unwrap();
+    assert_eq!(
+        value["mcpServers"]["agent-hud"]["command"],
+        format!("\"{APP}\"")
+    );
     assert!(Client::TraeCn.listed(&places) && !Client::Trae.listed(&places));
     assert!(!trae.exists());
     for project in [".trae/mcp.json", ".trae-cn/mcp.json"] {

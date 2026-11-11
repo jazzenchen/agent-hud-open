@@ -222,6 +222,9 @@ impl Client {
             Self::ZCode => mcp_json::edit_zcode(self.name(), original.as_deref(), executable)?,
             Self::DeepSeek => deepseek::edit(original.as_deref(), executable)?,
             Self::ClaudeCode | Self::Codex => unreachable!("no settings file"),
+            Self::Trae | Self::TraeCn => {
+                mcp_json::edit_quoted(self.name(), original.as_deref(), executable)?
+            }
             _ => mcp_json::edit(self.name(), original.as_deref(), executable)?,
         };
         if updated == original {
