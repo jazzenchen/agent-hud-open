@@ -15,16 +15,16 @@ pub(super) fn processes() -> Result<Vec<ProcessInfo>, String> {
     let mut command =
         Command::new(PathBuf::from(root).join("System32/WindowsPowerShell/v1.0/powershell.exe"));
     super::configure_command(&mut command);
-    let mut child = command
+    command
         .args(["-NoLogo", "-NoProfile", "-NonInteractive", "-Command"])
         .arg(include_str!(
             "../../../scripts/windows/antigravity-processes.ps1"
         ))
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
-        .stderr(Stdio::null())
-        .spawn()
-        .map_err(|_| "Antigravity process discovery unavailable")?;
+        .stderr(Stdio::null());
+    let mut child =
+        super::spawn(&mut command).map_err(|_| "Antigravity process discovery unavailable")?;
     let stdout = child.stdout.take().unwrap();
     let (sender, receiver) = std::sync::mpsc::sync_channel(1);
     std::thread::spawn(move || {

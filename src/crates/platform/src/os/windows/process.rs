@@ -40,7 +40,7 @@ pub(crate) fn parent_processes() -> Vec<ProcessAncestor> {
     command
         .env("AGENT_HUD_ANCESTRY_DIAGNOSTICS", "1")
         .stderr(Stdio::piped());
-    let Ok(mut child) = command.spawn() else {
+    let Ok(mut child) = super::spawn(&mut command) else {
         #[cfg(test)]
         eprintln!(
             "ancestry: spawn failed after {}ms",

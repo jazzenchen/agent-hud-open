@@ -1,6 +1,10 @@
 //! Linux: the app keeps its panel entry, and the global shortcut is not
 //! implemented yet (macOS uses ⌘⌥H to show Settings; the tray menu does here).
 
+pub(crate) fn prepare(_app: &tauri::AppHandle) -> Result<(), String> {
+    Ok(())
+}
+
 pub(crate) fn install(_app: &tauri::AppHandle) {}
 
 pub(crate) fn window_opened(_app: &tauri::AppHandle) {}

@@ -54,8 +54,7 @@ impl Engine {
             command.env(key, value);
         }
         crate::os::configure_command(&mut command);
-        let mut child = command
-            .spawn()
+        let mut child = crate::os::spawn(&mut command)
             .map_err(|_| l10n::text("账户读取引擎无法启动", "Account engine could not start"))?;
         let input = child.stdin.take().unwrap();
         let output = child.stdout.take().unwrap();

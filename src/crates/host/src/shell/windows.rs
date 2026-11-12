@@ -1,6 +1,13 @@
 //! Windows: the app keeps its taskbar entry, and the global shortcut is not
 //! implemented yet (macOS uses ⌘⌥H to show Settings; the tray menu does here).
 
+#[path = "windows/session.rs"]
+mod session;
+
+pub(crate) fn prepare(app: &tauri::AppHandle) -> Result<(), String> {
+    session::install(app)
+}
+
 pub(crate) fn install(_app: &tauri::AppHandle) {}
 
 pub(crate) fn window_opened(_app: &tauri::AppHandle) {}

@@ -5,6 +5,10 @@ use tauri::Manager;
 #[path = "macos_hotkey.rs"]
 mod hotkey;
 
+pub(crate) fn prepare(_app: &tauri::AppHandle) -> Result<(), String> {
+    Ok(())
+}
+
 pub(crate) fn install(app: &tauri::AppHandle) {
     hotkey::install(app);
     windows_changed(app);

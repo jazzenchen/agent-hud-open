@@ -58,7 +58,7 @@ impl ProcessRunner for NativeProcessRunner {
             command.current_dir(folder);
         }
         crate::os::configure_command(&mut command);
-        let mut child = command.spawn()?;
+        let mut child = crate::os::spawn(&mut command)?;
         let mut stdout = child.stdout.take().expect("piped stdout");
         let mut stderr = child.stderr.take().expect("piped stderr");
         children::prepare(&mut child, &stdout, &stderr)?;
