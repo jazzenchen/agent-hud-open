@@ -43,7 +43,7 @@ pub static PROVIDER: Provider = Provider {
 };
 
 pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
-    let root = host.folder(Base::DataHome).join("TeleAgent/users");
+    let root = host.folder(Base::DataHome).join("TeleAgent").join("users");
     let owners = match host.list_dir(&root) {
         Answer::Found(entries) => entries,
         _ => return Ok(Reading::empty("teleagent")),
@@ -99,7 +99,7 @@ fn account_name(name: &str) -> bool {
 }
 
 fn read_owner(host: &dyn Host, owner: &Path, name: &str) -> Result<Reading, Unread> {
-    let path = owner.join("app-auth/token.json");
+    let path = owner.join("app-auth").join("token.json");
     let bytes = match host.read_file(&path, 64 * 1024) {
         Answer::Found(bytes) => bytes,
         Answer::Missing => {
@@ -246,13 +246,21 @@ mod tests {
     fn host_with(body: Result<Value, HttpFailure>) -> FakeHost {
         let (bytes, stored) = sealed();
         let mut host = FakeHost::new("/u").answer(URL, body);
-        host.files.insert(
-            "/u/.local/share/TeleAgent/users/v1_public_1/app-auth/token.json".into(),
-            Answer::Found(stored.into_bytes()),
-        );
+        host.files
+            .insert(token_file(&host), Answer::Found(stored.into_bytes()));
         host.sealed
             .insert(bytes, Answer::Found("secret-token".into()));
         host
+    }
+
+    /// The token file, built the same way `read` looks it up, on every OS.
+    fn token_file(host: &FakeHost) -> std::path::PathBuf {
+        host.folder(crate::Base::DataHome)
+            .join("TeleAgent")
+            .join("users")
+            .join("v1_public_1")
+            .join("app-auth")
+            .join("token.json")
     }
 
     #[test]
@@ -376,10 +384,8 @@ mod tests {
     fn a_sign_in_this_system_cannot_open_says_so() {
         let (_bytes, stored) = sealed();
         let mut host = FakeHost::new("/u");
-        host.files.insert(
-            "/u/.local/share/TeleAgent/users/v1_public_1/app-auth/token.json".into(),
-            Answer::Found(stored.into_bytes()),
-        );
+        host.files
+            .insert(token_file(&host), Answer::Found(stored.into_bytes()));
         let Err(error) = read(&host) else {
             panic!("a sealed sign-in this system cannot open is an error");
         };

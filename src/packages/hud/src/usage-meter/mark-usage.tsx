@@ -26,12 +26,11 @@ export function markItems(
   now = Date.now(),
 ): RingItem[] {
   return markWindows(vendor, layout, now).map((q) => ({
-    percent:
-      isPointsShareQuota(q)
-        ? itemShare(q.usedPercent)
-        : q.status === "stale" && resetPassed(q, now)
-          ? 0
-          : quotaPercent(q.usedPercent, display),
+    percent: isPointsShareQuota(q)
+      ? itemShare(q.usedPercent)
+      : q.status === "stale" && resetPassed(q, now)
+        ? 0
+        : quotaPercent(q.usedPercent, display),
     color: statusColor(q.status),
   }));
 }

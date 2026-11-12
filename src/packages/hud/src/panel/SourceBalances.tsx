@@ -15,7 +15,13 @@ import {
 import { MetricPicker } from "./MetricPicker";
 import { PointsDetail } from "./PointsDetail";
 import { pointsMeasureAvailability } from "./points-detail";
-import { noButtonChrome, palette, tabular, type Logo, type Measure } from "./theme";
+import {
+  noButtonChrome,
+  palette,
+  tabular,
+  type Logo,
+  type Measure,
+} from "./theme";
 
 /** An agent's API balances: each account's balance, consumption or cost over
  * 24 hours, 7 or 30 days, as figures or a spending chart. */
@@ -82,54 +88,60 @@ export function SourceBalances({
                   light={light}
                   availability={pointsAvailability}
                 />
-              ) : !isCredits && (
-                <div
-                  role="group"
-                  aria-label={language === "zh" ? "余额指标" : "Balance metric"}
-                  style={{ display: "flex", gap: 2 }}
-                >
-                  {balanceMeasures
-                    .map((key) => ({
-                      key,
-                      ...{
-                        quota: {
-                          Icon: Percent,
-                          title: language === "zh" ? "余额" : "Balance",
-                        },
-                        burn: {
-                          Icon: Flame,
-                          title:
-                            language === "zh"
-                              ? "每日消耗"
-                              : "Consumption per day",
-                        },
-                        cost: {
-                          Icon: DollarSign,
-                          title:
-                            language === "zh" ? "估算花费" : "Estimated cost",
-                        },
-                      }[key],
-                    }))
-                    .map(({ key, Icon, title }) => (
-                      <button
-                        key={key}
-                        aria-pressed={selected === key}
-                        title={title}
-                        onClick={() => setMeasure(key)}
-                        style={{
-                          ...noButtonChrome,
-                          color:
-                            selected === key ? colors.text : colors.tertiary,
-                          background:
-                            selected === key ? colors.selected : "transparent",
-                          borderRadius: 4,
-                          padding: 3,
-                        }}
-                      >
-                        <Icon size={12} />
-                      </button>
-                    ))}
-                </div>
+              ) : (
+                !isCredits && (
+                  <div
+                    role="group"
+                    aria-label={
+                      language === "zh" ? "余额指标" : "Balance metric"
+                    }
+                    style={{ display: "flex", gap: 2 }}
+                  >
+                    {balanceMeasures
+                      .map((key) => ({
+                        key,
+                        ...{
+                          quota: {
+                            Icon: Percent,
+                            title: language === "zh" ? "余额" : "Balance",
+                          },
+                          burn: {
+                            Icon: Flame,
+                            title:
+                              language === "zh"
+                                ? "每日消耗"
+                                : "Consumption per day",
+                          },
+                          cost: {
+                            Icon: DollarSign,
+                            title:
+                              language === "zh" ? "估算花费" : "Estimated cost",
+                          },
+                        }[key],
+                      }))
+                      .map(({ key, Icon, title }) => (
+                        <button
+                          key={key}
+                          aria-pressed={selected === key}
+                          title={title}
+                          onClick={() => setMeasure(key)}
+                          style={{
+                            ...noButtonChrome,
+                            color:
+                              selected === key ? colors.text : colors.tertiary,
+                            background:
+                              selected === key
+                                ? colors.selected
+                                : "transparent",
+                            borderRadius: 4,
+                            padding: 3,
+                          }}
+                        >
+                          <Icon size={12} />
+                        </button>
+                      ))}
+                  </div>
+                )
               )}
             </div>
             {account.notice && (

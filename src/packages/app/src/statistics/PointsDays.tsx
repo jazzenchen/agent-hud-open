@@ -1,6 +1,12 @@
 import { useState } from "react";
 import { moneyAmount } from "@agent-hud/ui/format";
-import { number, raisedCard, row, truncate, type StatsTheme } from "./StatsTheme";
+import {
+  number,
+  raisedCard,
+  row,
+  truncate,
+  type StatsTheme,
+} from "./StatsTheme";
 import { useWidth } from "./dashboard/Panel";
 import { addDays } from "./dashboard/model";
 import { pointsInSpan } from "./points-days";
@@ -148,7 +154,10 @@ export function PointsDays({
             ...raisedCard(theme),
             position: "absolute",
             top: 30,
-            left: Math.min(label + GAP + hovered * slot, Math.max(0, width - 180)),
+            left: Math.min(
+              label + GAP + hovered * slot,
+              Math.max(0, width - 180),
+            ),
             fontSize: 11,
           }}
         >

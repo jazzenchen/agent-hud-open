@@ -20,19 +20,13 @@ export function remainingPercentLabel(
 }
 
 /** "12,875 points". */
-export function grantPointsLabel(
-  points: number,
-  language: Language,
-): string {
+export function grantPointsLabel(points: number, language: Language): string {
   const amount = pointsAmount(points, language);
   return language === "zh" ? `${amount} 积分` : `${amount} points`;
 }
 
 /** "Expires in 18 days"; zero days is "Expires today". */
-export function grantExpiryLabel(
-  days: number,
-  language: Language,
-): string {
+export function grantExpiryLabel(days: number, language: Language): string {
   if (days <= 0) return language === "zh" ? "今天到期" : "Expires today";
   return language === "zh" ? `${days} 天后到期` : `Expires in ${days} days`;
 }

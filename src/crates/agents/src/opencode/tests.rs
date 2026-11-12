@@ -272,8 +272,14 @@ fn teleagent_reads_each_account_and_its_cached_tokens() {
     let share = tempfile::tempdir().unwrap();
     let account = share
         .path()
-        .join("TeleAgent/users/v1_public_1903017520943529984");
-    let skipped = share.path().join("TeleAgent/users/not a profile");
+        .join("TeleAgent")
+        .join("users")
+        .join("v1_public_1903017520943529984");
+    let skipped = share
+        .path()
+        .join("TeleAgent")
+        .join("users")
+        .join("not a profile");
     let disk = Disk(
         [
             account.clone(),
@@ -331,7 +337,9 @@ fn teleagent_reads_each_account_and_its_cached_tokens() {
 }
 
 /// When TeleAgent is installed here, check the reader against its database.
-/// Skip when this machine has no such database.
+/// Skip when this machine has no such database. The data directory is the
+/// Unix XDG path, so Windows does not run it.
+#[cfg(unix)]
 #[test]
 fn teleagent_reads_the_installed_database_when_it_is_here() {
     let Some(home) = std::env::var_os("HOME") else {

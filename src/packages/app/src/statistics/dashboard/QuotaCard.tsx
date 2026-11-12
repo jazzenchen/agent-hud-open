@@ -56,8 +56,9 @@ export function QuotaCard({
   const look = usePendingLook(pending);
   const display = useFormat().quotaDisplay ?? "consumed";
   const plan =
-    accounts?.find((account) => vendorKey(account.provider) === vendorKey(vendor))
-      ?.plan ?? null;
+    accounts?.find(
+      (account) => vendorKey(account.provider) === vendorKey(vendor),
+    )?.plan ?? null;
   const accent = agentAccent(vendor) ?? theme.secondary;
   const locale = zh ? "zh-CN" : "en-US";
   const figure = (quota: Quota | undefined) => {

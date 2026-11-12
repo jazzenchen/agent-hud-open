@@ -21,7 +21,10 @@ test("TeleAgent points read as a total, a remaining share and an expiring grant"
   assert.equal(grantExpiryLabel(0, "zh"), "今天到期");
   assert.equal(grantPointsLabel(12875, "en"), "12,875 points");
   assert.equal(grantExpiryLabel(18, "en"), "Expires in 18 days");
-  assert.equal(leadingPointsPercent([{ percent: null }, { percent: 99.37 }]), 99.37);
+  assert.equal(
+    leadingPointsPercent([{ percent: null }, { percent: 99.37 }]),
+    99.37,
+  );
   assert.equal(usedPointsPercent(99.37), 0.63);
   const measures = pointsMeasureAvailability("zh");
   assert.equal(measures.quota.selectable, true);
