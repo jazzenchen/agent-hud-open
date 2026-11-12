@@ -16,13 +16,15 @@ import { dimensionsLabel, freshKinds, themeFor } from "./statistics/StatsTheme";
 import { useStatisticsEnd } from "./statistics/use-statistics-end";
 import { useProviderHighlight } from "./statistics/use-provider-highlight";
 import { quotaRows } from "./statistics/dashboard/QuotaRows";
+import { listedAgents } from "./statistics/listed-agents";
 import { TokenUsage } from "./statistics/TokenUsage";
 import { AgentCards } from "./statistics/AgentCards";
 import { FilterBar } from "./statistics/dashboard/FilterBar";
 import { Figures, spanDays } from "./statistics/dashboard/Figures";
 import { ActivityCard } from "./statistics/dashboard/ActivityCard";
 import { AgentBreakdown } from "./statistics/dashboard/AgentBreakdown";
-import { PlanList, subscriptionTiles } from "./statistics/dashboard/PlanList";
+import { PlanList } from "./statistics/dashboard/PlanList";
+import { subscriptionTiles } from "./statistics/dashboard/subscription-tiles";
 import { rangeText } from "./statistics/dashboard/range-text";
 import { usePendingLook } from "./statistics/dashboard/pending";
 import { pageStyle } from "./statistics/dashboard/Panel";
@@ -116,33 +118,7 @@ export default function Statistics({
       ),
     [quota, quotaDays.first, quotaDays.count, providers],
   );
-  const agents = useMemo(() => {
-    const listed = new Map<string, { id: string; name: string }>();
-    for (const provider of year?.providers ?? []) {
-      if (provider.selectedTokens > 0) {
-        listed.set(vendorKey(provider.id), {
-          id: provider.id,
-          name: provider.name,
-        });
-      }
-    }
-    // Agents with a quota or an account but no local token ledger, such as
-    // Doubao, still belong in the filter.
-    for (const provider of snapshot.providers ?? []) {
-      const key = vendorKey(provider.id);
-      if (listed.has(key) || provider.enabled === false) continue;
-      const hasQuota = (snapshot.quotas ?? []).some(
-        (quota) => vendorKey(quota.vendor) === key,
-      );
-      const hasAccount = (snapshot.accounts ?? []).some(
-        (account) => vendorKey(account.provider) === key,
-      );
-      if (hasQuota || hasAccount) {
-        listed.set(key, { id: provider.id, name: provider.name });
-      }
-    }
-    return [...listed.values()];
-  }, [year, snapshot.providers, snapshot.quotas, snapshot.accounts]);
+  const agents = useMemo(() => listedAgents(year, snapshot), [year, snapshot]);
   const names = useMemo(
     () =>
       new Map(

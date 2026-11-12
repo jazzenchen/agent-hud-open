@@ -5,15 +5,19 @@
 //! Electron safe storage.
 //! Points spent over the last 7 days come from
 //! `GET /user/portal/usage/stats/overview`.
-use crate::account::{
-    account_id, Answer, Host, HttpFailure, HttpRequest, Provider, Reading, Unread,
-};
+use crate::account::{Answer, Host, HttpFailure, HttpRequest, Provider, Reading, Unread};
 use crate::l10n;
 use crate::Base;
 use base64::{engine::general_purpose::STANDARD, Engine};
-use serde_json::{json, Value};
+use serde_json::Value;
 use std::path::Path;
 use std::time::Duration;
+
+mod reading;
+mod spend;
+
+use reading::parse;
+use spend::recent_spend;
 
 const BASE: &str = "https://agent.teleai.com.cn/superCowork/sapi";
 const CENTER: &str = "/user/portal/companyStore/userCenter";
@@ -148,143 +152,6 @@ fn read_owner(host: &dyn Host, owner: &Path, name: &str) -> Result<Reading, Unre
     parse(name, &data(&body)?, spend)
 }
 
-struct Spend {
-    per_day: Option<f64>,
-    days: Vec<Value>,
-}
-
-/// Usage records summed by day. The 7-day pace prefers overview `pointsUsed`.
-fn recent_spend(host: &dyn Host, token: &str, os: &str) -> Spend {
-    let today = chrono::Local::now().date_naive();
-    let history_start = today - chrono::Duration::days(HISTORY_DAYS - 1);
-    let pace_start = today - chrono::Duration::days(SPEND_DAYS - 1);
-    let mut by_day = std::collections::BTreeMap::<chrono::NaiveDate, f64>::new();
-    let mut fetched = 0i64;
-    for page in 1..=PAGE_LIMIT {
-        let url = format!(
-            "{BASE}{RECORDS}?startDate={}&endDate={}&page={page}&pageSize={PAGE_SIZE}",
-            history_start.format("%Y-%m-%d"),
-            today.format("%Y-%m-%d")
-        );
-        let Ok(body) = ask(host, token, os, &url) else {
-            break;
-        };
-        let Some(payload) = spend_payload(&body) else {
-            break;
-        };
-        let Some(list) = payload["list"]
-            .as_array()
-            .or_else(|| payload["rows"].as_array())
-        else {
-            break;
-        };
-        if list.is_empty() {
-            break;
-        }
-        for item in list {
-            let Some(day) = record_day(&item["statTime"]) else {
-                continue;
-            };
-            let points = number(&item["totalUsage"]).unwrap_or_else(|| {
-                number(&item["modelUsage"]).unwrap_or(0.0)
-                    + number(&item["toolUsage"]).unwrap_or(0.0)
-            });
-            *by_day.entry(day).or_default() += points;
-        }
-        fetched += list.len() as i64;
-        let total = payload["total"].as_i64().or_else(|| {
-            payload["total"]
-                .as_f64()
-                .filter(|n| n.is_finite())
-                .map(|n| n as i64)
-        });
-        if list.len() < PAGE_SIZE as usize || total.is_some_and(|total| fetched >= total) {
-            break;
-        }
-    }
-    let days = if by_day.is_empty() {
-        Vec::new()
-    } else {
-        (0..HISTORY_DAYS)
-            .map(|offset| {
-                let day = history_start + chrono::Duration::days(offset);
-                json!({
-                    "date": day.format("%Y-%m-%d").to_string(),
-                    "points": by_day.get(&day).copied().unwrap_or(0.0),
-                })
-            })
-            .collect()
-    };
-    let per_day = overview_per_day(host, token, os, pace_start, today).or_else(|| {
-        if by_day.is_empty() {
-            return None;
-        }
-        let mut sum = 0.0;
-        let mut day = pace_start;
-        while day <= today {
-            sum += by_day.get(&day).copied().unwrap_or(0.0);
-            day += chrono::Duration::days(1);
-        }
-        Some(sum / SPEND_DAYS as f64)
-    });
-    Spend { per_day, days }
-}
-
-fn overview_per_day(
-    host: &dyn Host,
-    token: &str,
-    os: &str,
-    start: chrono::NaiveDate,
-    today: chrono::NaiveDate,
-) -> Option<f64> {
-    let url = format!(
-        "{BASE}{OVERVIEW}?startDate={}&endDate={}",
-        start.format("%Y-%m-%d"),
-        today.format("%Y-%m-%d")
-    );
-    let body = ask(host, token, os, &url).ok()?;
-    let payload = spend_payload(&body)?;
-    let used =
-        number(&payload["pointsUsed"]).or_else(|| number(&payload["summary"]["pointsUsed"]))?;
-    Some(used / SPEND_DAYS as f64)
-}
-
-fn ask(host: &dyn Host, token: &str, os: &str, url: &str) -> Result<Value, HttpFailure> {
-    host.http_json(&HttpRequest {
-        url,
-        secrets: &[("X-Token", token)],
-        headers: &[("X-OS-Type", os)],
-        body: None,
-        timeout: Duration::from_secs(12),
-    })
-}
-
-fn spend_payload(body: &Value) -> Option<&Value> {
-    if body["code"] == 0 || body["code"] == 200 || body["success"] == true {
-        return Some(&body["data"]);
-    }
-    if body["list"].is_array()
-        || body["rows"].is_array()
-        || body["pointsUsed"].is_number()
-        || body["summary"]["pointsUsed"].is_number()
-    {
-        return Some(body);
-    }
-    None
-}
-
-fn record_day(value: &Value) -> Option<chrono::NaiveDate> {
-    let text = label_text(value)?;
-    if text.len() >= 10 {
-        if let Ok(day) = chrono::NaiveDate::parse_from_str(&text[..10], "%Y-%m-%d") {
-            return Some(day);
-        }
-    }
-    chrono::DateTime::parse_from_rfc3339(text)
-        .ok()
-        .map(|time| time.with_timezone(&chrono::Local).date_naive())
-}
-
 fn open_token(host: &dyn Host, stored: &Value) -> Result<String, Unread> {
     if stored["scheme"] != "safe_storage" {
         return Err(Unread::Failed(l10n::text(
@@ -340,135 +207,18 @@ fn data(body: &Value) -> Result<Value, Unread> {
     )))
 }
 
-fn number(value: &Value) -> Option<f64> {
+pub(super) fn number(value: &Value) -> Option<f64> {
     value
         .as_f64()
         .or_else(|| value.as_str()?.trim().trim_end_matches('%').parse().ok())
         .filter(|n| n.is_finite() && *n >= 0.0)
 }
 
-fn label_text(value: &Value) -> Option<&str> {
+pub(super) fn label_text(value: &Value) -> Option<&str> {
     value
         .as_str()
         .map(str::trim)
         .filter(|text| !text.is_empty())
-}
-
-fn parse(owner: &str, body: &Value, spend: Spend) -> Result<Reading, Unread> {
-    let balance = number(&body["current_points_balance"]);
-    let activities = body["activities"].as_array();
-    if balance.is_none() && activities.map(|rows| rows.is_empty()).unwrap_or(true) {
-        return Err(Unread::Failed(l10n::text(
-            "TeleAgent 返回的积分格式无法识别",
-            "TeleAgent's points have an unsupported format",
-        )));
-    }
-    let id = account_id("teleagent", &[owner]);
-    // The plan name is payment info only. Without a separate account name it
-    // is not also used as the heading, or the plan is written twice.
-    let plan = label_text(&body["plan_display_name"]);
-    let label = label_text(&body["account_name"]).or_else(|| label_text(&body["user_name"]));
-    let mut reading = Reading::empty("teleagent");
-    let groups = activities
-        .filter(|rows| !rows.is_empty())
-        .map(|rows| {
-            let only = rows.len() == 1;
-            rows.iter()
-                .filter_map(|activity| activity_group(activity, balance.filter(|_| only)))
-                .collect::<Vec<_>>()
-        })
-        .unwrap_or_default();
-    if !groups.is_empty() {
-        let amount = groups
-            .iter()
-            .find_map(|group| group["remaining"].as_f64())
-            .or(balance)
-            .unwrap_or(0.0);
-        reading
-            .billing
-            .push(points_row(&id, label, amount, groups, &spend));
-    } else if let Some(balance) = balance {
-        reading
-            .billing
-            .push(points_row(&id, label, balance, Vec::new(), &spend));
-    }
-    reading.account = Some(json!({
-        "id": id,
-        "provider": "teleagent",
-        "label": label,
-        "plan": plan,
-    }));
-    Ok(reading)
-}
-
-/// One activity: its total, what remains, and points about to expire.
-/// The percent is the remaining share of the total.
-fn activity_group(activity: &Value, fallback_remaining: Option<f64>) -> Option<Value> {
-    let total = number(&activity["total_activity_points"]);
-    let remaining = number(&activity["remaining_activity_points"]).or(fallback_remaining);
-    let percent = percent_number(&activity["usage_percent"]).or_else(|| {
-        let (remaining, total) = (remaining?, total?);
-        (total > 0.0).then_some(remaining / total * 100.0)
-    });
-    let grant = grant(activity);
-    if total.is_none() && remaining.is_none() && percent.is_none() && grant.is_none() {
-        return None;
-    }
-    Some(json!({
-        "total": total,
-        "remaining": remaining,
-        "percent": percent,
-        "grant": grant,
-    }))
-}
-
-/// `balance` is the points that expire; `expire_days` is how many days remain.
-fn grant(activity: &Value) -> Option<Value> {
-    let points = number(&activity["balance"]).filter(|points| *points > 0.0);
-    let days = number(&activity["expire_days"]).map(|days| days.round() as i64);
-    let name = label_text(&activity["name"]).unwrap_or("");
-    if points.is_none() && days.is_none() && name.is_empty() {
-        return None;
-    }
-    Some(json!({
-        "name": name,
-        "points": points,
-        "expireDays": days,
-    }))
-}
-
-fn percent_number(value: &Value) -> Option<f64> {
-    label_text(value)
-        .and_then(|text| text.trim_end_matches('%').trim().parse::<f64>().ok())
-        .or_else(|| number(value))
-        .filter(|n| n.is_finite() && *n >= 0.0)
-}
-
-fn points_row(
-    id: &str,
-    account: Option<&str>,
-    amount: f64,
-    groups: Vec<Value>,
-    spend: &Spend,
-) -> Value {
-    let mut row = json!({
-        "id": format!("{id}:points"),
-        "vendor": "teleagent",
-        "consumerSource": "teleagent",
-        "accountId": id,
-        "account": account,
-        "label": l10n::text("余额", "Balance"),
-        "amount": amount,
-        "currency": "credits",
-    });
-    if !groups.is_empty() || spend.per_day.is_some() || !spend.days.is_empty() {
-        row["pointsDetail"] = json!({
-            "groups": groups,
-            "spent": spend.per_day.map(|per_day| json!({"perDay": per_day, "days": SPEND_DAYS})),
-            "days": spend.days,
-        });
-    }
-    row
 }
 
 #[cfg(test)]
@@ -476,6 +226,7 @@ mod tests {
     use super::*;
     use crate::account::fake::FakeHost;
     use crate::account::{Answer, HttpFailure};
+    use serde_json::json;
 
     const URL: &str =
         "https://agent.teleai.com.cn/superCowork/sapi/user/portal/companyStore/userCenter";

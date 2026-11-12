@@ -1,7 +1,6 @@
 import hudDefaults from "@agent-hud/protocol/hud-defaults.json";
 import type {
   PanelLayout,
-  Quota,
   RequestDecision,
   Snapshot,
 } from "@agent-hud/protocol";
@@ -9,7 +8,9 @@ import { agentArtworkKey, agentVendorName } from "./agent-artwork";
 import { layoutMarks, restingAgents } from "./resting-agents.ts";
 import { recentLabel, recentUsage } from "./recent-usage.ts";
 import { visibleBalances } from "./balance-rows.ts";
-import { leadingPointsPercent } from "./panel/points-detail.ts";
+import { isPointsShareQuota, pointsShareQuota } from "./points-share.ts";
+
+export { isPointsShareQuota };
 import { heldUsed } from "./held-reading.ts";
 import type { GlowEffect, GlowStyle } from "./HUDGlow";
 import type { UsageStyle } from "./usage-meter/arcs";
@@ -215,32 +216,11 @@ export function markUsed(vendor: HUDVendor): number | null {
 
 /** The number beside a mark: its tightest window, else its balance, else the last 24 hours.
  * A points share is already the remaining bar, so the consumed/remaining setting does not flip it. */
-export function isPointsShareQuota(quota: { id: string }): boolean {
-  return quota.id.endsWith(":points-share");
-}
-
 export function meterLabel(vendor: HUDVendor, display?: QuotaDisplay): string {
   const used = markUsed(vendor);
   if (used == null) return vendor.balance ?? vendor.usage ?? "--";
   if (vendor.quotas.some(isPointsShareQuota)) return quotaPercentLabel(used);
   return quotaPercentLabel(used, display);
-}
-
-function pointsShareQuota(snapshot: Snapshot, key: string): Quota | null {
-  const percent = snapshot.billing
-    .filter((row) => vendorKey(row.vendor) === key)
-    .map((row) => leadingPointsPercent(row.pointsDetail?.groups))
-    .find((share) => share != null);
-  if (percent == null) return null;
-  return {
-    id: `${key}:points-share`,
-    vendor: key,
-    name: "剩余额度",
-    usedPercent: percent,
-    resetAt: null,
-    status: "normal",
-    account: null,
-  };
 }
 
 export function statusColor(level: HUDVendor["level"]): string {

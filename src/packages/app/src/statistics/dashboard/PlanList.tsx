@@ -7,12 +7,8 @@ import {
   quotaPercentLabel,
 } from "@agent-hud/ui/format";
 import { useFormat } from "@agent-hud/ui/format-context";
-import type {
-  Account,
-  BillingAccount,
-  PlanValueResponse,
-  Quota,
-} from "@agent-hud/protocol";
+import type { BillingAccount, PlanValueResponse } from "@agent-hud/protocol";
+import { shareAmount, type SubscriptionTile } from "./subscription-tiles";
 import { number, row, truncate, type StatsTheme } from "../StatsTheme";
 import { adviceText } from "../plan-value-text";
 import { Panel } from "./Panel";
@@ -20,8 +16,7 @@ import type { Pending } from "./pending";
 import { Tween } from "../motion";
 import { Bar } from "./Placeholder";
 
-/** Each signed-in plan: its monthly price, what its calls on this Mac over
- * the last 30 days were worth at API list prices, and the multiple. */
+/** Each signed-in plan: its monthly price against what its calls were worth at API list prices. */
 export function PlanList({
   data,
   agents,
@@ -80,11 +75,14 @@ export function PlanList({
         `每个订阅${range?.words ?? "近 30 天"}按 API 目录价折合，对比同样天数的月费；每个 API 余额还剩多少`,
       )}
     >
-      {data && !accounts.length && !balances.length && !subscriptions.length && (
-        <span style={{ fontSize: 12, color: theme.secondary }}>
-          {t("No signed-in plan for this agent", "这个 Agent 没有登录的订阅")}
-        </span>
-      )}
+      {data &&
+        !accounts.length &&
+        !balances.length &&
+        !subscriptions.length && (
+          <span style={{ fontSize: 12, color: theme.secondary }}>
+            {t("No signed-in plan for this agent", "这个 Agent 没有登录的订阅")}
+          </span>
+        )}
       <div
         style={{
           display: "grid",
@@ -192,7 +190,12 @@ export function PlanList({
           );
           const headline =
             pooled?.used != null && pooled.capacity != null
-              ? shareAmount(pooled.used, pooled.capacity, quotaDisplay, language)
+              ? shareAmount(
+                  pooled.used,
+                  pooled.capacity,
+                  quotaDisplay,
+                  language,
+                )
               : (subscription.plan ?? "—");
           const detail = subscription.windows
             .map((window) => {
@@ -294,88 +297,4 @@ export function PlanList({
       )}
     </Panel>
   );
-}
-
-/** A signed-in plan the priced catalog does not cover, shown beside the
- * plans and the API balances. */
-export interface SubscriptionTile {
-  vendor: string;
-  name: string;
-  plan: string | null;
-  windows: {
-    name: string;
-    shortLabel?: string;
-    usedPercent: number | null;
-    used: number | null;
-    capacity: number | null;
-  }[];
-}
-
-/** Quotas and accounts that the plan catalog and the balance list do not
- * already show. Empty until the plan answer has arrived, so they do not
- * flash beside the placeholders. */
-export function subscriptionTiles(
-  accounts: Account[],
-  quotas: Quota[],
-  names: Map<string, string>,
-  plans: PlanValueResponse | null,
-  balances: BillingAccount[],
-  selected: string[] | null,
-): SubscriptionTile[] {
-  if (!plans) return [];
-  const shown = new Set([
-    ...plans.accounts.map((account) => vendorKey(account.provider)),
-    ...balances.map((balance) => vendorKey(balance.vendor)),
-  ]);
-  const wanted = (vendor: string) =>
-    (!selected ||
-      selected.some((id) => vendorKey(id) === vendorKey(vendor))) &&
-    !shown.has(vendorKey(vendor));
-  const byVendor = new Map<string, Quota[]>();
-  for (const quota of quotas) {
-    const key = vendorKey(quota.vendor);
-    if (!wanted(key)) continue;
-    byVendor.set(key, [...(byVendor.get(key) ?? []), quota]);
-  }
-  for (const account of accounts) {
-    const key = vendorKey(account.provider);
-    if (byVendor.has(key) || !wanted(key)) continue;
-    if (!account.plan && !account.planLabel) continue;
-    byVendor.set(key, []);
-  }
-  return [...byVendor].flatMap(([key, windows]) => {
-    const account = accounts.find((item) => vendorKey(item.provider) === key);
-    const plan = account?.plan ?? account?.planLabel ?? null;
-    if (!windows.length && !plan) return [];
-    return [
-      {
-        vendor: key,
-        name:
-          names.get(key) ??
-          names.get(windows[0]?.vendor ?? "") ??
-          account?.name ??
-          key,
-        plan,
-        windows: windows.map((quota) => ({
-          name: quota.name,
-          shortLabel: quota.shortLabel,
-          usedPercent: quota.usedPercent,
-          used: quota.metrics?.consumed?.used ?? null,
-          capacity: quota.metrics?.consumed?.capacity ?? null,
-        })),
-      },
-    ];
-  });
-}
-
-function shareAmount(
-  used: number,
-  capacity: number,
-  display: "consumed" | "remaining",
-  language: string,
-): string {
-  const shown = display === "remaining" ? Math.max(0, capacity - used) : used;
-  const fmt = (value: number) =>
-    Math.round(value).toLocaleString(language === "zh" ? "zh-CN" : "en-US");
-  return `${fmt(shown)}/${fmt(capacity)}`;
 }

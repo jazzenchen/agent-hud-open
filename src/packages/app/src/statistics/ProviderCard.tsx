@@ -24,8 +24,8 @@ import {
 import { ModelList } from "./ModelList";
 import { Tween } from "./motion";
 import { Sparkline } from "./Sparkline";
-import { QuotaRows, type QuotaRow } from "./dashboard/QuotaRows";
-import { PointsDays } from "./PointsDays";
+import { DailyPoints, DailyQuota } from "./CardDaily";
+import type { QuotaRow } from "./dashboard/QuotaRows";
 import { usePendingLook, type Pending } from "./dashboard/pending";
 import { moneyAmount } from "@agent-hud/ui/format";
 
@@ -265,58 +265,21 @@ export const ProviderCard = memo(function ProviderCard({
           total={provider.selectedTokens}
           theme={theme}
         />
-        {quota && quota.rows.length > 0 && (
-          <>
-            <div
-              style={{
-                background: theme.divider,
-                width: perRow === 1 ? 1 : "100%",
-                height: perRow === 1 ? "auto" : 1,
-              }}
-            />
-            <div style={{ display: "grid", gap: 4, minWidth: 0, flex: 1 }}>
-              <span style={{ fontSize: 11, color: theme.secondary }}>
-                {zh ? "每天的额度" : "Quota by day"}
-              </span>
-              <QuotaRows
-                rows={quota.rows}
-                live={quota.live}
-                label={perRow >= 3 ? 64 : 84}
-                vendors={null}
-                theme={theme}
-                light={theme.light}
-              />
-            </div>
-          </>
-        )}
-        {dayFirst != null &&
-          dayCount != null &&
-          providerBilling.some((row) => row.pointsDetail?.days?.length) && (
-            <>
-              <div
-                style={{
-                  background: theme.divider,
-                  width: perRow === 1 ? 1 : "100%",
-                  height: perRow === 1 ? "auto" : 1,
-                }}
-              />
-              <div style={{ display: "grid", gap: 4, minWidth: 0, flex: 1 }}>
-                <span style={{ fontSize: 11, color: theme.secondary }}>
-                  {zh ? "每天的积分" : "Points by day"}
-                </span>
-                <PointsDays
-                  days={
-                    providerBilling.find((row) => row.pointsDetail?.days?.length)
-                      ?.pointsDetail?.days ?? []
-                  }
-                  first={dayFirst}
-                  count={dayCount}
-                  label={perRow >= 3 ? 64 : 84}
-                  theme={theme}
-                />
-              </div>
-            </>
-          )}
+        <DailyQuota
+          rows={quota?.rows ?? []}
+          live={quota?.live}
+          perRow={perRow}
+          theme={theme}
+          zh={zh}
+        />
+        <DailyPoints
+          billing={providerBilling}
+          dayFirst={dayFirst}
+          dayCount={dayCount}
+          perRow={perRow}
+          theme={theme}
+          zh={zh}
+        />
       </div>
     </Card>
   );

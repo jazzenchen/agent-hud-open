@@ -1,4 +1,5 @@
 use super::crypto::{CCCrypt, AES, PKCS7_PADDING};
+use super::key_cache::{decode_cache, encode_cache};
 use super::*;
 
 fn encrypt(key: &[u8; 16], plain: &[u8]) -> Vec<u8> {
