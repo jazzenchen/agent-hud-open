@@ -3,14 +3,14 @@
   <channel>
     <title>Agent HUD</title>
     <item>
-      <title>0.6.0</title>
-      <pubDate>Fri, 06 Nov 2026 17:22:50 +0800</pubDate>
-      <link>https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0</link>
-      <sparkle:version>497</sparkle:version>
-      <sparkle:shortVersionString>0.6.0</sparkle:shortVersionString>
+      <title>0.6.1</title>
+      <pubDate>Thu, 12 Nov 2026 19:36:29 +0800</pubDate>
+      <link>https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.1</link>
+      <sparkle:version>498</sparkle:version>
+      <sparkle:shortVersionString>0.6.1</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
       <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-      <description sparkle:format="markdown"># Agent HUD 0.6.0
+      <description sparkle:format="markdown"># Agent HUD 0.6.1
 
 ## Compatibility
 
@@ -22,51 +22,39 @@ Requires an Apple Silicon Mac running macOS 14 or later.
 
 ## Changes
 
-### Before you update
+### New
 
-- The first launch reads every agent log still on disk to count your token history. Agent HUD keeps working meanwhile, and the Usage page shows how far back it has read; with a lot of history this takes a while.
-- Your settings and the last 30 days of quota history come along. Don't open an earlier version afterwards: it doesn't find this data, or deletes tokens older than 31 days.
-- Everything that changes when you come from 0.5.5 is in the [full notes](https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0).
+- Lets agents message Cursor, TRAE, WorkBuddy, ZCode, Qoder and Kimi Code sessions, and lets those sessions message others. Turn it on in Settings → Agent plugins → Agent tools → Let agents message each other; Settings → Agent plugins has a HUD tools row for each of them.
+  - A message reaches one of these sessions through the client's own completion hook, so it goes in when the session's turn ends and the session carries on with it. An idle session takes it at the end of its next turn. Only an interactive Qoder CLI session takes a message while idle.
+  - A client carries a turn on only a few times in a row (Cursor and TRAE 4, ZCode, WorkBuddy and Qoder 3, Kimi Code 1); more messages wait for a later turn. A message nobody took within an hour expires.
+  - TRAE runs hooks only after you turn them on in TRAE's Settings → Hooks. WorkBuddy starts Agent HUD's tools only after you trust the connector under Connectors → Custom connectors and switch it on.
+  - Kimi Code gets Agent HUD's hooks for this, in its `config.toml`. Requests from Kimi Code are still not answered from the HUD.
+  - The paper plane flies for these sessions too, and the sender can read the answer once the turn ends.
+- Lets Pi and OpenCode sessions take and send agent messages. An open session takes a waiting message once it is idle, and a message that comes during a turn waits for its end. Agent HUD adds its tools to Pi's `mcp.json` and to OpenCode's `opencode.json`. This works with OpenCode 1; OpenCode 2, Oh My Pi, Kilo Code and MiMo Code don't take messages yet.
+- Adds switches for each screen in Settings → Display, under On this screen: Show the HUD on this screen, and under it Messages, Requests and Agent messages in flight. A screen with the HUD off shows nothing, cards included; the other three hide the message cards and the tail, the request cards and the head, or the paper plane. Agents can't change these through the HUD tools, and Reset leaves them alone.
+- Draws the hover panel as cards. Each block and each section has a ground and a frame of its own, in place of the lines between them. Cards side by side stand at one height, and the token chart fills its card. A panel styled without separators looks as it did.
+- Counts Agent HUD Remote's seats as one pool. App Store subscriptions and license keys add up, and the computers turned on most recently hold the seats.
+  - A computer beyond the seats turns its own Remote off; turn it on again once a seat is free. With no valid purchase every computer pauses and comes back by itself.
+  - A Mac that was off for a month no longer takes its seat back from the computer that took it meanwhile.
+  - The Subscription and Remote pages speak of computers. My computers lists every other computer using a seat, with its platform and whether it is within the paid seats.
+- Reads these agents more closely:
+  - TRAE's quota is counted as TRAE's own app counts it, and WorkBuddy's credits show as a balance, "Available credits" in Statistics. TRAE's, WorkBuddy's and Qoder's quotas come only from the sign-in you make in Agent HUD's own window.
+  - Kimi Code shows its account and plan, its sessions' titles and its archived sessions.
+  - ZCode's sessions follow its renames, archive and sub-agents, and its conversations can be read.
+  - A Qoder session is titled by what you first typed, and names its model.
+- Adds How agent messages work → Open the guide to Settings → Agent plugins → Agent tools (#56, #59).
 
-### What's new since 0.5.5
+### Fixes
 
-- **A new app, built for every desktop.**
-  - A Rust core works out tokens, quotas, prices and sessions the same way on every system. Agent HUD now runs on Intel Macs too, with test builds for Windows and Linux.
-  - Its own updater checks once a day and verifies every update before it installs. You can also install from a terminal: `brew install --cask jazzenchen/tap/agent-hud` or `npx @agenthud/install`.
-  - Details: [0.6.0-beta.1](https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.1), [0.6.0-beta.4](https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.4), [0.6.0-beta.7](https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.7)
-- **Many more agents.** Each appears once Agent HUD finds it on your computer.
-  - New: Devin, Qoder, TRAE, Factory Droid, Hermes, Cline, Roo Code, Goose, Kilo Code, MiMo Code and Oh My Pi. Some are read from their published formats and not yet checked on a real install.
-  - Followed more closely: Antigravity's sessions and approvals, Cursor's sessions and tokens, and DeepSeek Harness through Agent HUD's own plugin.
-  - Details: [0.6.0-beta.1](https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.1), [0.6.0-beta.4](https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.4), [0.6.0-beta.5](https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.5), [0.6.0-beta.6](https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.6)
-- **Answer more agents from the HUD.**
-  - Requests now come from the Claude desktop app, Antigravity, DeepSeek Harness, Devin and Factory Droid, and from Copilot CLI once you turn it on in Settings → Agents → Copilot.
-  - Return to session on a request card brings its session forward. A Claude Code closed while it waited no longer leaves its request open for half an hour.
-  - Details: [0.6.0-beta.1](https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.1), [0.6.0-beta.4](https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.4), [0.6.0-beta.5](https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.5), [0.6.0-beta.6](https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.6), [0.6.0-beta.7](https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.7), [0.6.0-beta.8](https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.8)
-- **Agents work together.**
-  - Claude Code and Codex sessions can message other sessions or start new ones through Agent HUD's MCP server. A message waits until the receiver is idle, and a paper plane carries it across the HUD.
-  - Agents can read your usage and sessions from Agent HUD and build its hover panel with controls of their own. Turn these on in Settings → Agent plugins.
-  - Details: [0.6.0-beta.1](https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.1), [0.6.0-beta.5](https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.5), [0.6.0-beta.7](https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.7)
-- **Quotas, plans and balances for many more accounts.**
-  - New: MiniMax and Volcengine Ark plans, ClinePass and Factory Droid limits, Hermes's Nous Portal credits, and Qoder's and TRAE's credits after you sign in inside Agent HUD. Relays show their balance, and a Prices page lets you correct what a model costs.
-  - More than one account for Codex, Antigravity and Claude Code. An agent that signs out keeps its last reading, and the HUD tells you.
-  - Details: [0.6.0-beta.3](https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.3), [0.6.0-beta.4](https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.4), [0.6.0-beta.6](https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.6), [0.6.0-beta.7](https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.7)
-- **The HUD shows more at a glance.**
-  - Two modes, Notch and Simple. Simple marks and the panel can draw usage as rings, segments, bars or numbers.
-  - Cards park at the ends of the dock: requests at the head until you answer them, messages at the tail until they fade. The hover panel can also show Quota history and Plan value.
-  - Details: [0.6.0-beta.6](https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.6), [0.6.0-beta.7](https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.7), [0.6.0-beta.8](https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.8)
-- **Statistics opens on a Usage dashboard, with your whole history behind it.**
-  - Filter by agent, token kind and range, up to a year, then read headline figures with their trends, a heatmap, each plan's value against its price, and a card per agent with its quota by day. The Mac keeps every token it records.
-  - The Sessions tab charts each session's turns, context and sub-agents.
-  - Details: [0.6.0-beta.1](https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.1), [0.6.0-beta.5](https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.5), [0.6.0-beta.6](https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.6), [0.6.0-beta.8](https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.8)
-- **More for your iPhone and Apple Watch.**
-  - Each day's usage arrives priced at API list prices. On the local network, changes reach the iPhone as they happen and the Mac offers its Tailscale address too. Once every iPhone runs Agent HUD for iPhone 1.7.6 or later, the text of approval and reminder banners stays in the end-to-end encrypted part of iCloud records.
-  - Details: [0.6.0-beta.3](https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.3), [0.6.0-beta.4](https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.4), [0.6.0-beta.6](https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.6)
-
-### All beta release notes
-
-[0.6.0-beta.1](https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.1) · [0.6.0-beta.2](https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.2) · [0.6.0-beta.3](https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.3) · [0.6.0-beta.4](https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.4) · [0.6.0-beta.5](https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.5) · [0.6.0-beta.6](https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.6) · [0.6.0-beta.7](https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.7) · [0.6.0-beta.8](https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.0-beta.8)
+- Stops the steady CPU use while Antigravity runs (#53). A large conversation that Antigravity kept writing to was read again from its first row every two seconds, and the read never finished. A change is now read from where the last read stopped: about 1% CPU in place of 7 to 8% on a 155 MB conversation written every 20 seconds, and nothing once the writing stops.
+- Shows DeepSeek's balance for Pi on a DeepSeek API key (#64). Pi's tokens showed without a balance. The balance's currency now also picks the price list for Pi's DeepSeek tokens.
+- Asks a sending agent for one whole message (#54). Each message is a turn of its own for the receiver, so three partial messages about one task made it review the work three times.
+- Shows a Cursor chat as running while its turn goes on. Only Cursor's completion hook was installed, so a chat never showed running.
+- Reads the 30 days of usage shared with the iPhone at most every 30 seconds. It was read again each time new usage came in while your history was still being read, and always on a computer that shares over the local network only, which cost CPU each time.
+- Sends an agent's waiting message into a Claude Code session it started before that session moves into the Claude desktop app.
+- Scrolls the hover panel without scroll bars. A dark bar flashed along its side and bottom while the panel grew.
 </description>
-      <enclosure url="https://github.com/jazzenchen/agent-hud-open/releases/download/v0.6.0/Agent-HUD-0.6.0-arm64.dmg" length="52633820" type="application/octet-stream" sparkle:edSignature="B/fHwu7FIUye82NLOSN6JXeo6+fPuR9eoSUDC8PwN5KhXQ6tQ6r70mS06qjj2wUC10zXzlMQY9JKMk3EUTk1Cw==" />
+      <enclosure url="https://github.com/jazzenchen/agent-hud-open/releases/download/v0.6.1/Agent-HUD-0.6.1-arm64.dmg" length="53142996" type="application/octet-stream" sparkle:edSignature="AYCuFg8IvYT2xryvbEi3mOrjsSNW85V4t75afsSvcOvssL1QWQ5ciQWFhn2WDIPmqA4W6XyA7YK0IyuRNMq1Cw==" />
       <agenthudMacOnly>false</agenthudMacOnly>
       <agenthudMinimumIOSVersion>1.7.2</agenthudMinimumIOSVersion>
     </item>
