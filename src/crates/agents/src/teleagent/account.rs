@@ -243,14 +243,17 @@ mod tests {
         (bytes, stored)
     }
 
-    fn host_with(body: Result<Value, HttpFailure>) -> FakeHost {
+    /// A home under a temporary directory. A Unix root such as `/u` is not an
+    /// absolute path on Windows, so the lookup would miss the token file.
+    fn host_with(body: Result<Value, HttpFailure>) -> (tempfile::TempDir, FakeHost) {
+        let dir = tempfile::tempdir().unwrap();
         let (bytes, stored) = sealed();
-        let mut host = FakeHost::new("/u").answer(URL, body);
+        let mut host = FakeHost::new(dir.path().to_str().unwrap()).answer(URL, body);
         host.files
             .insert(token_file(&host), Answer::Found(stored.into_bytes()));
         host.sealed
             .insert(bytes, Answer::Found("secret-token".into()));
-        host
+        (dir, host)
     }
 
     /// The token file, built the same way `read` looks it up, on every OS.
@@ -280,7 +283,8 @@ mod tests {
                 }]
             }
         });
-        let reading = read(&host_with(Ok(body))).unwrap();
+        let (_home, host) = host_with(Ok(body));
+        let reading = read(&host).unwrap();
         assert!(reading.quotas.is_empty());
         assert_eq!(reading.billing.len(), 1);
         assert_eq!(reading.billing[0]["currency"], "credits");
@@ -303,7 +307,7 @@ mod tests {
             start.format("%Y-%m-%d"),
             today.format("%Y-%m-%d")
         );
-        let mut host = host_with(Ok(json!({
+        let (_home, mut host) = host_with(Ok(json!({
             "code": 0,
             "data": {
                 "current_points_balance": 100,
@@ -352,7 +356,7 @@ mod tests {
 
     #[test]
     fn the_request_sends_the_unsealed_token() {
-        let host = host_with(Ok(json!({
+        let (_home, host) = host_with(Ok(json!({
             "code": 200,
             "data": {"current_points_balance": 1, "plan_display_name": "个人版"}
         })));
@@ -364,13 +368,15 @@ mod tests {
 
     #[test]
     fn without_teleagent_there_is_nothing_to_say() {
-        let reading = read(&FakeHost::new("/u")).unwrap();
+        let home = tempfile::tempdir().unwrap();
+        let reading = read(&FakeHost::new(home.path().to_str().unwrap())).unwrap();
         assert!(reading.account.is_none() && reading.billing.is_empty());
     }
 
     #[test]
     fn an_expired_sign_in_says_so() {
-        let Err(error) = read(&host_with(Err(HttpFailure::Status(401)))) else {
+        let (_home, host) = host_with(Err(HttpFailure::Status(401)));
+        let Err(error) = read(&host) else {
             panic!("an expired sign-in is an error");
         };
         assert_eq!(
@@ -383,7 +389,8 @@ mod tests {
     #[test]
     fn a_sign_in_this_system_cannot_open_says_so() {
         let (_bytes, stored) = sealed();
-        let mut host = FakeHost::new("/u");
+        let home = tempfile::tempdir().unwrap();
+        let mut host = FakeHost::new(home.path().to_str().unwrap());
         host.files
             .insert(token_file(&host), Answer::Found(stored.into_bytes()));
         let Err(error) = read(&host) else {
