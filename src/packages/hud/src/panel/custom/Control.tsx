@@ -12,6 +12,7 @@ import { Clickable, useClick } from "./Clickable";
 import { card } from "../theme";
 import { DrawingContext, type Node } from "./drawing";
 import { LeafControl } from "./LeafControl";
+import { placing, spanning } from "./placing";
 
 const GAPS: Record<string, number> = {
   none: 0,
@@ -67,22 +68,6 @@ function Children({
   );
 }
 
-/** Where a control sits in its parent: a width of its own, or in a row an equal
- * share of the room left for a column, a grid or a section. */
-function placing(width: unknown, shares: boolean): CSSProperties | null {
-  if (typeof width === "number")
-    return { flex: `0 0 ${width}px`, width, minWidth: 0, maxWidth: "100%" };
-  return shares ? { flex: "1 1 0", minWidth: 0 } : null;
-}
-
-/** The cells a control covers in its grid. */
-function spanning(node: Node, parent: string): CSSProperties | null {
-  if (parent !== "grid" || !(node.colSpan || node.rowSpan)) return null;
-  const span = (value: unknown) =>
-    typeof value === "number" && value > 1 ? `span ${value}` : undefined;
-  return { gridColumn: span(node.colSpan), gridRow: span(node.rowSpan) };
-}
-
 export function Placed({
   node,
   scope,
@@ -125,7 +110,12 @@ export function Placed({
     !holds(node.when as Record<string, unknown> | undefined, scope)
   )
     return control;
-  return <div style={place}>{control}</div>;
+  // A column of cards takes the height its row gives it.
+  const filled =
+    parent === "row" && drawing.separated
+      ? { display: "grid", gridTemplateColumns: "minmax(0, 1fr)" }
+      : null;
+  return <div style={{ ...filled, ...place }}>{control}</div>;
 }
 
 /** One of the panel's own sections where a control of an agent's holds it: drawn
@@ -170,7 +160,15 @@ function Slot({
       style={{
         minWidth: 0,
         ...placing(node.width, parent === "row"),
-        ...(drawing.separated ? card(drawing.colors) : {}),
+        // A card fills the height its row gives it, and in a column takes
+        // the room the others leave; the section fills the card.
+        ...(drawing.separated
+          ? {
+              ...card(drawing.colors),
+              display: "grid",
+              ...(parent === "column" ? { flexGrow: 1 } : {}),
+            }
+          : {}),
       }}
     >
       {content}
@@ -218,7 +216,12 @@ function Control({
                   justifyContent: JUSTIFY[align ?? "start"] ?? "flex-start",
                   alignItems:
                     VALIGN[String(node.valign)] ??
-                    (tall ? "flex-start" : "center"),
+                    // Cards side by side stand at one height.
+                    (tall
+                      ? drawing.separated
+                        ? "stretch"
+                        : "flex-start"
+                      : "center"),
                 }
               : {
                   alignItems:

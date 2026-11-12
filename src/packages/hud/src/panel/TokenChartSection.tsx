@@ -1,11 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import {
   AnimatePresence,
-  animate,
   motion,
-  useMotionValue,
   useReducedMotionConfig,
-  useTransform,
   type Transition,
 } from "motion/react";
 import type {
@@ -18,12 +15,13 @@ import { HUD_METRICS, sourcesForMark } from "../model";
 import { usePanelQuery } from "../PanelContext";
 import { palette, tabular, type Logo, type Period } from "./theme";
 import { useFormat } from "@agent-hud/ui/format-context";
-import { systemTimeZone, tokensShort } from "@agent-hud/ui/format";
+import { systemTimeZone } from "@agent-hud/ui/format";
 import { hexAlpha } from "../tokens";
 import { useGround } from "../ground";
 import { orderedModels, visibleModelCounts } from "./model-visibility";
 import { ColumnDetail } from "./ColumnDetail";
 import { TokenBar } from "./TokenBar";
+import { TokenCount } from "./TokenCount";
 
 const moving: Transition = {
   duration: HUD_METRICS.duration,
@@ -155,6 +153,8 @@ export function SourceTokenChart({
         display: "grid",
         // As wide as its place, never wider: a long total shortens instead.
         gridTemplateColumns: "minmax(0, 1fr)",
+        // In a card taller than it needs, the chart takes the room left.
+        gridTemplateRows: "auto 1fr",
         gap: 6,
         paddingTop: bare ? 0 : 8,
         boxShadow: bare ? undefined : `inset 0 1px 0 ${colors.divider}`,
@@ -228,7 +228,12 @@ export function SourceTokenChart({
               : "Recorded usage from the shared ledger")
           }
         >
-          {period} · {known ? <TokenCount tokens={total} still={still} /> : "—"}{" "}
+          {period} ·{" "}
+          {known ? (
+            <TokenCount tokens={total} still={still} moving={moving} />
+          ) : (
+            "—"
+          )}{" "}
           tok
         </span>
       </div>
@@ -237,7 +242,7 @@ export function SourceTokenChart({
         className="hud-source-token-histogram"
         style={{
           position: "relative",
-          height: 40,
+          minHeight: 40,
           margin: "8px 6px 0",
           boxShadow: `inset 0 -1px 0 ${colors.divider}`,
           display: "flex",
@@ -332,19 +337,4 @@ export function SourceTokenChart({
       </div>
     </section>
   );
-}
-
-/** The range's total, counting to each new value as the bars move. */
-function TokenCount({ tokens, still }: { tokens: number; still: boolean }) {
-  const count = useMotionValue(tokens);
-  const text = useTransform(count, (value) => tokensShort(Math.round(value)));
-  useEffect(() => {
-    if (still) {
-      count.jump(tokens);
-      return;
-    }
-    const controls = animate(count, tokens, moving);
-    return () => controls.stop();
-  }, [count, tokens, still]);
-  return still ? tokensShort(tokens) : <motion.span>{text}</motion.span>;
 }

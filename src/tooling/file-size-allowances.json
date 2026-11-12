@@ -11,6 +11,6 @@
   "src/packages/hud/src/bots/bot-spec.ts": 393,
   "src/packages/hud/src/bots/clawd-clips.ts": 301,
   "src/packages/hud/src/bots/clawd-player.ts": 526,
-  "src/packages/hud/src/panel/TokenChartSection.tsx": 350,
+  "src/packages/hud/src/panel/TokenChartSection.tsx": 340,
   "src/packages/hud/src/scene/flight-plan.ts": 395
 }
