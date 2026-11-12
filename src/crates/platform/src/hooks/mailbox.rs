@@ -134,19 +134,26 @@ mod tests {
         assert!(standing(&data, "pi", "a1", now));
         assert!(!standing(&data, "pi", "pi:b2", now));
         assert!(!standing(&data, "opencode", "opencode:a1", now));
-        // Said too long ago, or by a process that is gone: not held.
+        // Said too long ago: not held.
         assert!(!standing(
             &data,
             "pi",
             "pi:a1",
             now + Duration::from_secs(120)
         ));
+        // Said by a process that is gone: held only where the OS adapter
+        // cannot tell yet (Windows' `process_runs` answers yes for any pid),
+        // and there the note stands until it is too old.
+        let gone = 999_999_999;
         put(
             &observers,
             "pi@1.json",
-            json!({"pid":999_999_999_i64,"at":millis(now),"client":"pi","sessions":["a1"]}),
+            json!({"pid":gone,"at":millis(now),"client":"pi","sessions":["a1"]}),
         );
-        assert!(!standing(&data, "pi", "pi:a1", now));
+        assert_eq!(
+            standing(&data, "pi", "pi:a1", now),
+            crate::os::process_runs(gone, None)
+        );
     }
 
     #[test]

@@ -887,11 +887,13 @@ mod native {
         fs::create_dir_all(script.parent().unwrap()).unwrap(); // plain directory
         fs::write(
             &script,
-            r#"#!/usr/bin/env python3
-import json, sys, time
-message = json.loads(sys.stdin.readline())
-print(json.dumps({"id": message["id"], "result": {}}), flush=True)
-time.sleep(30)
+            // A shell, not Python: a busy macOS runner takes longer than the
+            // 3 s deadline just to start Python, and `open` then times out.
+            // It answers `initialize` (always id 1) and reads nothing more.
+            r#"#!/bin/sh
+read -r line
+echo '{"id":1,"result":{}}'
+exec sleep 30
 "#,
         )
         .unwrap();
