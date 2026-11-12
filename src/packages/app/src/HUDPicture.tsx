@@ -234,7 +234,14 @@ export default function HUDPicture() {
             />
           ) : (
             <>
-              <div style={{ position: "relative", padding: 20 }}>
+              <div
+                style={{
+                  position: "relative",
+                  // As on screen: cards keep less room around them.
+                  padding:
+                    config.panelLayout.style?.separators !== false ? 10 : 20,
+                }}
+              >
                 <HUDGroundProvider look={config}>
                   <SourceHoverPanel
                     config={config}

@@ -7,9 +7,10 @@ import {
   type CSSProperties,
 } from "react";
 import { itemName } from "./custom-collections";
-import { holds, pick, SECTIONS, type Scope } from "./custom-data";
+import { heldSections, holds, pick, SECTIONS, type Scope } from "./custom-data";
 import { Clickable, useClick } from "./Clickable";
-import { DrawingContext, type Colors, type Node } from "./drawing";
+import { card } from "../theme";
+import { DrawingContext, type Node } from "./drawing";
 import { LeafControl } from "./LeafControl";
 
 const GAPS: Record<string, number> = {
@@ -41,14 +42,15 @@ function Children({
   nodes,
   scope,
   parent,
-  lined = false,
 }: {
   nodes: Node[] | undefined;
   scope: Scope;
   parent: string;
-  /** A line between the children, as between sections side by side. */
-  lined?: boolean;
 }) {
+  // Beside a section, which is a card, the other parts are cards too.
+  const carded = (nodes ?? []).some((child) =>
+    SECTIONS.includes(String(child.type)),
+  );
   return (
     <>
       {(nodes ?? []).map((child, index) => (
@@ -58,18 +60,12 @@ function Children({
           scope={scope}
           parent={parent}
           index={index}
-          lined={lined && index > 0}
+          carded={carded}
         />
       ))}
     </>
   );
 }
-
-/** The line beside a part that follows another in a row of sections. */
-const besideLine = (colors: Colors): CSSProperties => ({
-  boxShadow: `inset 1px 0 0 ${colors.divider}`,
-  paddingLeft: "var(--hud-section-gap)",
-});
 
 /** Where a control sits in its parent: a width of its own, or in a row an equal
  * share of the room left for a column, a grid or a section. */
@@ -92,17 +88,21 @@ export function Placed({
   scope,
   parent,
   index,
-  lined = false,
+  carded = false,
 }: {
   node: Node;
   scope: Scope;
   parent: string;
   index: number;
-  lined?: boolean;
+  /** A card of its own, as the sections beside it are. */
+  carded?: boolean;
 }) {
   const drawing = useContext(DrawingContext)!;
   if (SECTIONS.includes(String(node.type)))
-    return <Slot node={node} parent={parent} index={index} lined={lined} />;
+    return <Slot node={node} parent={parent} index={index} />;
+  // What holds sections is no card itself, and between cards no line is drawn.
+  const inCard = carded && drawing.separated && heldSections(node).length === 0;
+  if (inCard && node.type === "divider") return null;
   const control = <Control node={node} scope={scope} parent={parent} />;
   const placed = placing(
     node.width,
@@ -110,38 +110,42 @@ export function Placed({
   );
   const spans = spanning(node, parent);
   const place = placed || spans ? { ...placed, ...spans } : null;
+  if (inCard)
+    return (
+      <div
+        className="hud-card"
+        style={{ minWidth: 0, ...place, ...card(drawing.colors) }}
+      >
+        {control}
+      </div>
+    );
   if (
-    (!place && !lined) ||
+    !place ||
     node.hidden === true ||
     !holds(node.when as Record<string, unknown> | undefined, scope)
   )
     return control;
-  return (
-    <div style={{ ...place, ...(lined ? besideLine(drawing.colors) : {}) }}>
-      {control}
-    </div>
-  );
+  return <div style={place}>{control}</div>;
 }
 
 /** One of the panel's own sections where a control of an agent's holds it: drawn
- * by the panel at the width it is given here, with no line above it where it heads
- * a column, and a line beside it after another in a row. */
+ * by the panel at the width it is given here, as a card of its own; where the
+ * panel's style asks for no cards, with no line above it where it heads a column. */
 function Slot({
   node,
   parent,
   index,
-  lined,
 }: {
   node: Node;
   parent: string;
   index: number;
-  lined: boolean;
 }) {
   const drawing = useContext(DrawingContext)!;
   const element = useRef<HTMLDivElement>(null);
   const [measured, setMeasured] = useState<number>();
   const section = String(node.type);
-  const bare = parent !== "column" || index === 0;
+  // In a card a section draws no line above itself.
+  const bare = drawing.separated || parent !== "column" || index === 0;
   const content = drawing.section?.(section, measured, bare);
   const shown = Boolean(content);
   useLayoutEffect(() => {
@@ -150,7 +154,8 @@ function Slot({
     const measure = () =>
       setMeasured(
         box.getBoundingClientRect().width -
-          (parseFloat(getComputedStyle(box).paddingLeft) || 0),
+          (parseFloat(getComputedStyle(box).paddingLeft) || 0) -
+          (parseFloat(getComputedStyle(box).paddingRight) || 0),
       );
     measure();
     const observer = new ResizeObserver(measure);
@@ -165,7 +170,7 @@ function Slot({
       style={{
         minWidth: 0,
         ...placing(node.width, parent === "row"),
-        ...(lined ? besideLine(drawing.colors) : {}),
+        ...(drawing.separated ? card(drawing.colors) : {}),
       }}
     >
       {content}
@@ -223,18 +228,7 @@ function Control({
                 }),
           }}
         >
-          <Children
-            nodes={children}
-            scope={scope}
-            parent={node.type}
-            lined={
-              node.type === "row" &&
-              drawing.separated &&
-              (children ?? []).some((child) =>
-                SECTIONS.includes(String(child.type)),
-              )
-            }
-          />
+          <Children nodes={children} scope={scope} parent={node.type} />
         </Clickable>
       );
     }

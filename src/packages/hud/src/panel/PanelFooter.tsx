@@ -15,6 +15,7 @@ import type { palette } from "./theme";
 export function PanelFooter({
   language,
   colors,
+  lined,
   onConfigure,
   onStats,
   update,
@@ -22,6 +23,8 @@ export function PanelFooter({
 }: {
   language: Language;
   colors: ReturnType<typeof palette>;
+  /** A line above it, where the panel draws lines and not cards. */
+  lined: boolean;
   onConfigure?: () => void;
   onStats?: () => void;
   update?: HUDUpdateNotice | null;
@@ -45,8 +48,8 @@ export function PanelFooter({
         justifyContent: "space-between",
         alignItems: "center",
         flex: "0 0 auto",
-        paddingTop: 6,
-        boxShadow: `inset 0 1px 0 ${colors.divider}`,
+        paddingTop: lined ? 6 : 0,
+        boxShadow: lined ? `inset 0 1px 0 ${colors.divider}` : undefined,
         color: colors.secondary,
       }}
     >

@@ -20,6 +20,7 @@ import { PanelDraftBar } from "./panel/PanelDraftBar";
 import { PanelFooter } from "./panel/PanelFooter";
 import { QuotaBlocks, usePanelBlocks } from "./panel/QuotaBlocks";
 import {
+  card,
   densityMetrics,
   inPanelOrder,
   palette,
@@ -80,17 +81,13 @@ export const SourceHoverPanel = memo(function SourceHoverPanel({
   }, []);
   const density = densityMetrics[config.layoutDensity] ?? densityMetrics.normal;
   const separated = config.panelLayout.style?.separators !== false;
-  // A section the panel's lists follow: a hairline below it.
-  const dividedBelow = separated
-    ? {
-        boxShadow: `inset 0 -1px 0 ${colors.divider}`,
-        paddingBottom: "var(--hud-divided-gap)",
-      }
-    : undefined;
+  // Each block and section is a card of its own, unless the panel's style
+  // asks for none.
+  const carded = separated ? card(colors) : undefined;
   // Controls an agent added, placed among the blocks by `order` or among the
   // sections by `sections`; an agent's own panel shows its blocks alone.
   const custom = focusVendor ? {} : (config.panelLayout.custom ?? {});
-  const customAt = (key: string, divided = false) => {
+  const customAt = (key: string) => {
     const node = custom[key];
     return node && node.hidden !== true ? (
       <CustomControl
@@ -101,7 +98,6 @@ export const SourceHoverPanel = memo(function SourceHoverPanel({
         active={active}
         showReset={config.resetCountdown}
         onStats={onStats}
-        divided={divided}
         section={(key, width, bare) => sectionContent(key, width, bare)}
         separated={separated}
       />
@@ -170,7 +166,8 @@ export const SourceHoverPanel = memo(function SourceHoverPanel({
     [
       ...SECTIONS.filter((key) => !held.has(key)).map((key) => ({
         key,
-        content: sectionContent(key),
+        // In a card a section draws no line above itself.
+        content: sectionContent(key, undefined, separated),
       })),
       ...((config.panelSections ?? []) as string[])
         .filter((key) => custom[key] && custom[key].hidden !== true)
@@ -200,16 +197,14 @@ export const SourceHoverPanel = memo(function SourceHoverPanel({
     >
       <div
         data-hud-natural-scroll
-        className={
-          snapshot.connection.platform === "windows"
-            ? "hud-windows-scroll"
-            : undefined
-        }
+        className="hud-bare-scroll"
+        // No bars: while the panel grows to its content the room is briefly
+        // short both ways, and a bar would flash over the content.
         style={{
+          overflowX: "hidden",
           overflowY: "auto",
           minHeight: 0,
-          scrollbarWidth:
-            snapshot.connection.platform === "windows" ? "none" : "thin",
+          scrollbarWidth: "none",
           flex: "1 1 auto",
         }}
       >
@@ -222,12 +217,12 @@ export const SourceHoverPanel = memo(function SourceHoverPanel({
           }}
         >
           {inlineAlert && (
-            <div data-hud-section="inline-alert" style={dividedBelow}>
+            <div data-hud-section="inline-alert" style={carded}>
               {inlineAlert}
             </div>
           )}
           {snapshot.indexing?.kind && (
-            <div data-hud-section="indexing" style={dividedBelow}>
+            <div data-hud-section="indexing" style={carded}>
               <SourceIndexing snapshot={snapshot} light={light} />
             </div>
           )}
@@ -238,11 +233,20 @@ export const SourceHoverPanel = memo(function SourceHoverPanel({
           )}
           {sections
             .filter((section) => section.content)
-            .map((section, index) => (
-              <div key={section.key} data-hud-section={section.key}>
-                {section.custom
-                  ? customAt(section.key, index > 0 && separated)
-                  : section.content}
+            .map((section) => (
+              <div
+                key={section.key}
+                data-hud-section={section.key}
+                // The blocks are cards already, and so are the sections a
+                // row, column or grid of an agent's holds.
+                style={
+                  section.key === "blocks" ||
+                  (section.custom && heldSections(custom[section.key]).length)
+                    ? undefined
+                    : carded
+                }
+              >
+                {section.custom ? customAt(section.key) : section.content}
               </div>
             ))}
         </div>
@@ -260,6 +264,7 @@ export const SourceHoverPanel = memo(function SourceHoverPanel({
       <PanelFooter
         language={snapshotLanguage(snapshot)}
         colors={colors}
+        lined={!separated}
         onConfigure={onConfigure}
         onStats={onStats}
         update={update}

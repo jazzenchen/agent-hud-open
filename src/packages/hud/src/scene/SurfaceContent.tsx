@@ -129,17 +129,13 @@ export function SurfaceContent({
         />
       ) : (
         <div
-          className={
-            snapshot.connection.platform === "windows"
-              ? "hud-windows-scroll"
-              : undefined
-          }
+          className="hud-bare-scroll"
           style={{
             position: "relative",
             maxHeight: "100%",
+            overflowX: "hidden",
             overflowY: "auto",
-            scrollbarWidth:
-              snapshot.connection.platform === "windows" ? "none" : "thin",
+            scrollbarWidth: "none",
           }}
         >
           <motion.div

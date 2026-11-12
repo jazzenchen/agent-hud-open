@@ -5,7 +5,12 @@
 @source "../../hud/src";
 @source ".";
 
-/* WebView2 versions without scrollbar-width still scroll without the native bar. */
-.hud-windows-scroll::-webkit-scrollbar {
+/* The panel scrolls without a bar, in web views without scrollbar-width too. */
+.hud-bare-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+/* A card whose control shows nothing takes no room. */
+.hud-card:empty {
   display: none;
 }

@@ -44,6 +44,7 @@ const SURFACE = {
     tertiary: "#6e6e73",
     divider: "#ffffff1a",
     track: "#ffffff1f",
+    card: "#ffffff0d",
     selected: "#ffffff1f",
     // The system blue, which Open's update arrow took as its accent.
     accent: "#0a84ff",
@@ -54,6 +55,7 @@ const SURFACE = {
     tertiary: "#8e8e93",
     divider: "#00000014",
     track: "#0000001a",
+    card: "#0000000a",
     selected: "#0000001f",
     accent: "#007aff",
   },

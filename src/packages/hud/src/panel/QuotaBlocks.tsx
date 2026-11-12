@@ -10,14 +10,15 @@ import { SourceProviderBlock } from "./QuotaSection";
 import { SourceBalances } from "./SourceBalances";
 import { blockLines, COMPACT_LEAST } from "./block-lines";
 import {
+  card,
   inPanelOrder,
   type densityMetrics,
   type Logo,
   type palette,
 } from "./theme";
 
-/** The panel's blocks in lines, a hairline between lines when the panel draws
- * separators. */
+/** The panel's blocks in lines, each block a card unless the panel's style
+ * asks for none. */
 export function QuotaBlocks({
   blocks,
   custom,
@@ -60,19 +61,13 @@ export function QuotaBlocks({
         gap: "var(--hud-section-gap)",
       }}
     >
-      {lines.map(({ blocks: line, columns }, index) => (
+      {lines.map(({ blocks: line, columns }) => (
         <div
           key={line.map((b) => b.key).join("+")}
           style={{
             display: "grid",
             gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
             gap: density.section,
-            ...(index > 0 && separated
-              ? {
-                  boxShadow: `inset 0 1px 0 ${colors.divider}`,
-                  paddingTop: "var(--hud-divided-gap)",
-                }
-              : {}),
           }}
         >
           {line.map((block) => (
@@ -80,7 +75,7 @@ export function QuotaBlocks({
               key={block.key}
               data-hud-block={block.key}
               data-hud-half={columns > 1 ? "true" : undefined}
-              style={{ minWidth: 0 }}
+              style={{ minWidth: 0, ...(separated ? card(colors) : {}) }}
             >
               {block.content}
             </div>

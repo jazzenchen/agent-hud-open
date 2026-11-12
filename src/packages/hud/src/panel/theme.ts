@@ -57,6 +57,17 @@ export const noButtonChrome: CSSProperties = {
   textAlign: "left",
 };
 
+/** A block's own ground and frame, as a bento's cell has: a tint of the ink
+ * under it and a hairline around it. */
+export function card(colors: ReturnType<typeof hudPalette>): CSSProperties {
+  return {
+    background: colors.card,
+    boxShadow: `inset 0 0 0 1px ${colors.divider}`,
+    borderRadius: 10,
+    padding: "8px 10px",
+  };
+}
+
 export const tabular: CSSProperties = { fontVariantNumeric: "tabular-nums" };
 
 /** Unknown or newly discovered blocks retain their source order after saved ones. */

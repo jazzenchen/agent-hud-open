@@ -38,7 +38,6 @@ export function CustomControl({
   active,
   showReset,
   onStats,
-  divided,
   section,
   separated = true,
 }: {
@@ -50,7 +49,6 @@ export function CustomControl({
   showReset: boolean;
   onStats?: () => void;
   /** A line above it, as the panel's other sections draw one. */
-  divided?: boolean;
   /** Draws one of the panel's own sections that a row, column or grid holds. */
   section?: (
     key: string,
@@ -97,16 +95,7 @@ export function CustomControl({
     <DrawingContext.Provider value={drawing}>
       <div
         data-hud-custom={node.id}
-        style={{
-          color: colors.text,
-          minWidth: 0,
-          ...(divided
-            ? {
-                boxShadow: `inset 0 1px 0 ${colors.divider}`,
-                paddingTop: "var(--hud-divided-gap)",
-              }
-            : {}),
-        }}
+        style={{ color: colors.text, minWidth: 0 }}
       >
         <Placed node={root} scope={scope} parent="panel" index={0} />
       </div>
