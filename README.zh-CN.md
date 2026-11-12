@@ -19,7 +19,7 @@
 </p>
 
 <p align="center">
-  <a href="README.md">English</a> · <strong>简体中文</strong> · <a href="https://agenthud.app">官网</a> · <a href="#支持的-agent">支持的 agent</a> · <a href="#文档">文档</a>
+  <a href="README.md">English</a> · <strong>简体中文</strong> · <a href="https://agenthud.app">官网</a> · <a href="https://discord.gg/cpTPDgWwXR">Discord</a> · <a href="#支持的-agent">支持的 agent</a> · <a href="#文档">文档</a>
 </p>
 
 <p align="center">
