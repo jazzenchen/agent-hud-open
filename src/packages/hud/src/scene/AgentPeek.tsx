@@ -3,6 +3,7 @@ import { useFormat } from "@agent-hud/ui/format-context";
 import { quotaPercentLabel, type QuotaDisplay } from "@agent-hud/ui/format";
 import { useMarkLevelText } from "../ground";
 import {
+  isPointsShareQuota,
   quotaShortName,
   statusColor,
   type HUDEdge,
@@ -38,7 +39,9 @@ export function peekItems(
       value:
         q.usedPercent == null
           ? "--"
-          : quotaPercentLabel(q.usedPercent, display),
+          : isPointsShareQuota(q)
+            ? quotaPercentLabel(q.usedPercent)
+            : quotaPercentLabel(q.usedPercent, display),
       color: q.usedPercent == null ? undefined : color(q.status),
     }));
   if (vendor.balance)
@@ -181,7 +184,9 @@ export function AgentPeek({
           >
             {q.usedPercent == null
               ? "--"
-              : quotaPercentLabel(q.usedPercent, quotaDisplay)}
+              : isPointsShareQuota(q)
+                ? quotaPercentLabel(q.usedPercent)
+                : quotaPercentLabel(q.usedPercent, quotaDisplay)}
           </strong>
         </div>
       ))}

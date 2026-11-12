@@ -3,10 +3,11 @@
 //! "<App> Safe Storage" keychain item. The Claude desktop app keeps its
 //! claude.ai sign-in this way.
 //!
-//! The keychain item belongs to the app, so macOS asks the user once whether
-//! Agent HUD may read it. The key is kept in memory for this run only, and a
-//! refusal holds until Agent HUD restarts. Nothing read here is written
-//! anywhere.
+//! The keychain item belongs to the app, so macOS asks once per item whether
+//! Agent HUD may read it. After a key is allowed, it is kept for this run and
+//! copied into one Agent HUD keychain item, so the next launch reads that
+//! single item instead of asking for every app again. A refusal holds until
+//! Agent HUD restarts. Cookie values are not written anywhere.
 use agent_hud_agents::Answer;
 use rusqlite::{Connection, OpenFlags, OptionalExtension};
 use std::{
@@ -27,7 +28,7 @@ const LATER_WAIT: Duration = Duration::from_secs(1);
 
 enum Key {
     /// macOS is asking the user; the keychain's answer arrives here.
-    Asking(mpsc::Receiver<Result<Vec<u8>, i32>>),
+    Asking(mpsc::Receiver<Fetched>),
     Ready([u8; 16]),
     /// The user said no in this run.
     Refused,
@@ -35,16 +36,19 @@ enum Key {
 
 /// Each app's key, by app name.
 static KEYS: Mutex<BTreeMap<String, Key>> = Mutex::new(BTreeMap::new());
+/// One keychain call at a time, so the system dialogs do not stack.
+static KEYCHAIN: Mutex<()> = Mutex::new(());
+/// Derived keys already copied into Agent HUD's own keychain item.
+static CACHE: Mutex<Option<BTreeMap<String, [u8; 16]>>> = Mutex::new(None);
+
+const CACHE_SERVICE: &str = "Agent HUD Safe Storage";
+const CACHE_ACCOUNT: &str = "safe-storage-keys";
 
 /// The cookie `name` that the app whose data folder is `app` under
 /// `app_data` keeps for `site`, decrypted.
 pub(crate) fn app_cookie(app_data: &Path, app: &str, site: &str, name: &str) -> Answer<String> {
     let folder = app_data.join(app);
-    let Some(database) = ["Cookies", "Network/Cookies"]
-        .into_iter()
-        .map(|file| folder.join(file))
-        .find(|path| path.is_file())
-    else {
+    let Some(database) = cookie_database(&folder) else {
         return Answer::Missing;
     };
     let stored = match stored(&database, site, name) {
@@ -101,6 +105,29 @@ pub(crate) fn unseal_safe_storage(app: &str, encrypted: &[u8]) -> Answer<String>
         .map_or(Answer::Failed, Answer::Found)
 }
 
+/// The app's cookie database: beside its data folder, or, for a Chromium
+/// profile app such as Doubao, in the profile it last used.
+fn cookie_database(folder: &Path) -> Option<std::path::PathBuf> {
+    direct_cookie_database(folder).or_else(|| profile_cookie_database(folder))
+}
+
+fn direct_cookie_database(folder: &Path) -> Option<std::path::PathBuf> {
+    ["Cookies", "Network/Cookies"]
+        .into_iter()
+        .map(|file| folder.join(file))
+        .find(|path| path.is_file())
+}
+
+fn profile_cookie_database(folder: &Path) -> Option<std::path::PathBuf> {
+    let state = std::fs::read(folder.join("Local State")).ok()?;
+    let value: serde_json::Value = serde_json::from_slice(&state).ok()?;
+    let last = value["profile"]["last_used"]
+        .as_str()
+        .filter(|name| !name.is_empty())
+        .unwrap_or("Default");
+    direct_cookie_database(&folder.join(last))
+}
+
 struct Stored {
     encrypted: Vec<u8>,
     plain: String,
@@ -145,6 +172,14 @@ fn stored(database: &Path, site: &str, name: &str) -> Result<Option<Stored>, ()>
         .map_err(|_| ())
 }
 
+enum Fetched {
+    /// Already copied into Agent HUD's own keychain item.
+    Cached([u8; 16]),
+    /// The foreign item's password, just allowed by the user.
+    Password(Vec<u8>),
+    Error(i32),
+}
+
 /// The key from the app's "<App> Safe Storage" item, asking macOS on a
 /// thread of its own, so a prompt the user leaves open holds up a reading
 /// for at most a minute.
@@ -163,16 +198,11 @@ fn safe_storage_key(app: &str) -> Answer<[u8; 16]> {
             Some(Key::Asking(receiver)) => (receiver, LATER_WAIT),
             None => {
                 let (sender, receiver) = mpsc::channel();
-                let service = format!("{app} Safe Storage");
-                let accounts = safe_storage_accounts(app);
+                let name = app.to_owned();
                 let asked = std::thread::Builder::new()
                     .name("app-cookie-key".into())
                     .spawn(move || {
-                        let answer = first_found(&accounts, |account| {
-                            security_framework::passwords::get_generic_password(&service, account)
-                                .map_err(|error| error.code())
-                        });
-                        let _ = sender.send(answer);
+                        let _ = sender.send(fetch_key(&name));
                     });
                 if asked.is_err() {
                     return Answer::Failed;
@@ -191,26 +221,137 @@ fn safe_storage_key(app: &str) -> Answer<[u8; 16]> {
         }
         Err(mpsc::RecvTimeoutError::Disconnected) => return Answer::Failed,
     };
-    match answer {
-        Ok(password) => match derive(&password) {
-            Some(key) => {
-                KEYS.lock()
-                    .unwrap_or_else(PoisonError::into_inner)
-                    .insert(app.into(), Key::Ready(key));
-                Answer::Found(key)
-            }
-            None => Answer::Failed,
+    let key = match answer {
+        Fetched::Cached(key) => key,
+        Fetched::Password(password) => match derive(&password) {
+            Some(key) => key,
+            None => return Answer::Failed,
         },
-        // errSecItemNotFound: the app keeps no key here; asked again next time.
-        Err(-25300) => Answer::Missing,
+        Fetched::Error(-25300) => return Answer::Missing,
         // errSecUserCanceled or errSecAuthFailed: the user said no.
-        Err(-128 | -25293) => {
+        Fetched::Error(-128 | -25293) => {
             KEYS.lock()
                 .unwrap_or_else(PoisonError::into_inner)
                 .insert(app.into(), Key::Refused);
-            Answer::Denied
+            return Answer::Denied;
         }
-        Err(_) => Answer::Failed,
+        Fetched::Error(_) => return Answer::Failed,
+    };
+    KEYS.lock()
+        .unwrap_or_else(PoisonError::into_inner)
+        .insert(app.into(), Key::Ready(key));
+    Answer::Found(key)
+}
+
+/// One keychain lookup. A key already copied into Agent HUD's item is used
+/// without another prompt. A newly allowed key is copied there before the
+/// next app is asked, so later launches share one item.
+fn fetch_key(app: &str) -> Fetched {
+    let _gate = KEYCHAIN.lock().unwrap_or_else(PoisonError::into_inner);
+    if let Some(key) = cached_key(app) {
+        return Fetched::Cached(key);
+    }
+    let service = format!("{app} Safe Storage");
+    let accounts = safe_storage_accounts(app);
+    match first_found(&accounts, |account| {
+        security_framework::passwords::get_generic_password(&service, account)
+            .map_err(|error| error.code())
+    }) {
+        Ok(password) => {
+            if let Some(key) = derive(&password) {
+                remember(app, key);
+            }
+            Fetched::Password(password)
+        }
+        Err(code) => Fetched::Error(code),
+    }
+}
+
+fn cached_key(app: &str) -> Option<[u8; 16]> {
+    let mut cache = CACHE.lock().unwrap_or_else(PoisonError::into_inner);
+    if cache.is_none() {
+        *cache = Some(load_cache());
+    }
+    cache.as_ref().and_then(|map| map.get(app).copied())
+}
+
+fn remember(app: &str, key: [u8; 16]) {
+    let mut cache = CACHE.lock().unwrap_or_else(PoisonError::into_inner);
+    let map = cache.get_or_insert_with(BTreeMap::new);
+    map.insert(app.to_owned(), key);
+    let encoded = encode_cache(map);
+    drop(cache);
+    let _ = security_framework::passwords::set_generic_password(
+        CACHE_SERVICE,
+        CACHE_ACCOUNT,
+        encoded.as_bytes(),
+    );
+}
+
+fn load_cache() -> BTreeMap<String, [u8; 16]> {
+    match security_framework::passwords::get_generic_password(CACHE_SERVICE, CACHE_ACCOUNT) {
+        Ok(bytes) => decode_cache(&bytes),
+        Err(_) => BTreeMap::new(),
+    }
+}
+
+fn encode_cache(map: &BTreeMap<String, [u8; 16]>) -> String {
+    let mut out = String::from("v1\n");
+    for (app, key) in map {
+        if app.is_empty() || app.chars().any(|c| c.is_whitespace()) {
+            continue;
+        }
+        out.push_str(app);
+        out.push(' ');
+        for byte in key {
+            out.push_str(&format!("{byte:02x}"));
+        }
+        out.push('\n');
+    }
+    out
+}
+
+fn decode_cache(bytes: &[u8]) -> BTreeMap<String, [u8; 16]> {
+    let mut map = BTreeMap::new();
+    let text = String::from_utf8_lossy(bytes);
+    for line in text.lines().skip(1) {
+        let Some((app, hex)) = line.split_once(' ') else {
+            continue;
+        };
+        let Ok(raw) = hex_decode(hex) else {
+            continue;
+        };
+        if raw.len() == 16 {
+            let mut key = [0u8; 16];
+            key.copy_from_slice(&raw);
+            map.insert(app.to_owned(), key);
+        }
+    }
+    map
+}
+
+fn hex_decode(text: &str) -> Result<Vec<u8>, ()> {
+    if text.len() % 2 != 0 {
+        return Err(());
+    }
+    let mut out = Vec::with_capacity(text.len() / 2);
+    let bytes = text.as_bytes();
+    let mut index = 0;
+    while index < bytes.len() {
+        let high = hex_value(bytes[index])?;
+        let low = hex_value(bytes[index + 1])?;
+        out.push((high << 4) | low);
+        index += 2;
+    }
+    Ok(out)
+}
+
+fn hex_value(byte: u8) -> Result<u8, ()> {
+    match byte {
+        b'0'..=b'9' => Ok(byte - b'0'),
+        b'a'..=b'f' => Ok(byte - b'a' + 10),
+        b'A'..=b'F' => Ok(byte - b'A' + 10),
+        _ => Err(()),
     }
 }
 

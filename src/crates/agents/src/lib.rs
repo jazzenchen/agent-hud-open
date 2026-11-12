@@ -50,6 +50,7 @@ pub mod copilot;
 pub mod cursor;
 pub mod deepseek;
 pub mod devin;
+pub mod doubao;
 pub mod droid;
 pub mod glm;
 pub mod goose;
@@ -62,6 +63,7 @@ pub mod opencode;
 pub mod pi;
 pub mod qoder;
 pub mod qwen;
+pub mod teleagent;
 pub mod trae;
 pub mod zcode;
 

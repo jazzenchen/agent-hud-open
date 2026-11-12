@@ -25,6 +25,8 @@ pub struct Vendor<'a> {
     /// What an agent with no window and no balance shows instead: its last
     /// 24 hours at list prices, else their tokens (`recent_label`).
     pub usage: Option<String>,
+    /// The used share is TeleAgent's remaining bar, so the remaining display does not flip it.
+    pub points_share: bool,
     pub quotas: Vec<&'a Value>,
     pub sessions: Vec<&'a Value>,
 }
@@ -103,6 +105,22 @@ fn held(quotas: &[&Value], now_ms: i64) -> Option<f64> {
         })
 }
 
+/// The remaining share TeleAgent draws, when the agent has no quota window of its own.
+fn points_percent(snapshot: &Value, key: &str) -> Option<f64> {
+    list(snapshot, "billing")
+        .filter(|row| mark(row["vendor"].as_str().unwrap_or("")) == key)
+        .find_map(|row| {
+            row["pointsDetail"]["groups"]
+                .as_array()?
+                .iter()
+                .find_map(|group| {
+                    group["percent"]
+                        .as_f64()
+                        .filter(|percent| percent.is_finite() && *percent >= 0.0)
+                })
+        })
+}
+
 /// Every agent a resting HUD in `mode` shows without a list, one per mark; `mode` is
 /// "notch", "simple" or the bots' [`crate::presentation::QUEUE`].
 pub fn vendors<'a>(snapshot: &'a Value, mode: &str, now_ms: i64) -> Vec<Vendor<'a>> {
@@ -125,8 +143,11 @@ pub fn vendors<'a>(snapshot: &'a Value, mode: &str, now_ms: i64) -> Vec<Vendor<'
             let sessions: Vec<&Value> = list(snapshot, "sessions")
                 .filter(|s| mark(s["source"].as_str().unwrap_or("")) == key)
                 .collect();
-            let balance = quotas
+            let points_share = quotas
                 .is_empty()
+                .then(|| points_percent(snapshot, &key))
+                .flatten();
+            let balance = (quotas.is_empty() && points_share.is_none())
                 .then(|| {
                     list(snapshot, "billing")
                         .find(|b| mark(b["vendor"].as_str().unwrap_or("")) == key)
@@ -136,11 +157,12 @@ pub fn vendors<'a>(snapshot: &'a Value, mode: &str, now_ms: i64) -> Vec<Vendor<'
                 .then(|| deepseek_balances(snapshot, &Value::Null));
             Vendor {
                 name: vendor_name(&source),
-                used: tightest.map(|(used, _)| used),
+                used: tightest.map(|(used, _)| used).or(points_share),
                 held: held(&quotas, now_ms),
                 // An agent billed by balance alone takes its balance's level.
                 level: tightest
                     .and_then(|(_, q)| q["status"].as_str())
+                    .or(points_share.map(|_| "normal"))
                     .or_else(|| deepseek.as_ref().map(|(_, level)| *level))
                     .or_else(|| balance.and_then(|b| b["level"].as_str()))
                     .unwrap_or("stale"),
@@ -153,9 +175,10 @@ pub fn vendors<'a>(snapshot: &'a Value, mode: &str, now_ms: i64) -> Vec<Vendor<'
                         money_amount(&b["amount"], b["currency"].as_str().unwrap_or("USD"))
                     })
                 }),
-                usage: (quotas.is_empty() && balance.is_none())
+                usage: (quotas.is_empty() && balance.is_none() && points_share.is_none())
                     .then(|| recent_label(snapshot, &key))
                     .flatten(),
+                points_share: points_share.is_some(),
                 key,
                 quotas,
                 sessions,
@@ -246,6 +269,7 @@ fn vendor_name(source: &str) -> String {
         "roo-code" => "Roo Code",
         "goose" => "Goose",
         "trae" => "TRAE",
+        "doubao" => "豆包",
         // Agents with no mark of their own here, by their own names.
         _ => agent_hud_core::naming::model_names::vendor_name(source),
     };

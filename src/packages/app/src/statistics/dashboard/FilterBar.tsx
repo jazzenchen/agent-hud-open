@@ -93,7 +93,7 @@ export function FilterBar({
         role="group"
         aria-label={t("Agent", "Agent")}
         className="stats-agent-chips"
-        style={{ ...row, gap: 6, flex: "1 1 320px", overflowX: "auto" }}
+        style={{ ...row, gap: 6, flex: "1 1 320px", flexWrap: "wrap" }}
       >
         <button
           type="button"

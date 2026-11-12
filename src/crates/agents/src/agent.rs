@@ -1,8 +1,8 @@
 //! The descriptor every client has, and the registry of them all.
 use crate::hooks::{Hooks, Observer};
 use crate::{
-    antigravity, ark, buddy, claude, cline, codex, copilot, cursor, deepseek, devin, droid, glm,
-    goose, grok, hermes, kimi, minimax, openclaw, opencode, pi, qoder, qwen, trae, zcode,
+    antigravity, ark, buddy, claude, cline, codex, copilot, cursor, deepseek, devin, doubao, droid,
+    glm, goose, grok, hermes, kimi, minimax, openclaw, opencode, pi, qoder, qwen, trae, zcode,
 };
 use crate::{Channel, Discovery, PerOs, Replies, Source};
 
@@ -70,6 +70,8 @@ pub static ALL: &[&Agent] = &[
     &ark::AGENT,
     &opencode::KILO,
     &opencode::MIMO_CODE,
+    &opencode::TELEAGENT,
+    &doubao::AGENT,
     &pi::OH_MY_PI,
     &droid::AGENT,
     &cline::CLINE,
@@ -102,6 +104,8 @@ pub static ACCOUNTS: &[&crate::account::Provider] = &[
     &crate::relays::PROVIDER,
     &droid::account::PROVIDER,
     &crate::qoder::account::PROVIDER,
+    &crate::teleagent::account::PROVIDER,
+    &crate::doubao::account::PROVIDER,
     &crate::buddy::account::PROVIDER,
     &trae::account::PROVIDER,
 ];

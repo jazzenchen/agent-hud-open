@@ -2,7 +2,7 @@
 //! database under folders of their own and load OpenCode's plugins.
 use crate::hooks::Observer;
 use crate::Discovery;
-use crate::{Location, Source};
+use crate::{Base, Location, Profiles, Source};
 pub mod legacy;
 pub mod transcript;
 
@@ -28,7 +28,7 @@ pub struct Store {
 }
 
 /// Every client of OpenCode's database, OpenCode first.
-pub static STORES: [&Store; 3] = [&STORE, &KILO_STORE, &MIMO_CODE_STORE];
+pub static STORES: [&Store; 4] = [&STORE, &KILO_STORE, &MIMO_CODE_STORE, &TELEAGENT_STORE];
 
 /// The client of OpenCode's database with this id.
 pub fn store(source: &str) -> Option<&'static Store> {
@@ -241,6 +241,58 @@ static MIMO_CODE_OBSERVER: Observer = Observer {
     ),
     at_key: "completedAtMs",
     states: false,
+};
+
+// TeleAgent 3.0 (desktop app com.teleai.superagent) stores sessions in an
+// OpenCode database: `$XDG_DATA_HOME/TeleAgent/users/<owner>/teleagent.db`.
+// Each account has its own database, with the same tables and message JSON
+// as OpenCode. It does not load the OpenCode plugin, so there is no observer.
+const fn teleagent_place(path: &'static str) -> Location {
+    Location {
+        base: Base::DataHome,
+        env: &[],
+        folders: &["TeleAgent"],
+        profiles: Some(Profiles::Inside("users")),
+        path,
+        not_if: None,
+    }
+}
+
+static TELEAGENT_STORE: Store = Store {
+    agent: &TELEAGENT,
+    database: "teleagent.db",
+    legacy: false,
+    copies: None,
+    imports: &[],
+};
+
+static TELEAGENT_SOURCES: [Source; 1] = [Source {
+    reads_as: "teleagent",
+    location: teleagent_place(""),
+}];
+static TELEAGENT_DISCOVERY: Discovery = Discovery {
+    storage: &[teleagent_place("")],
+    settings: &[Location::config_home(&["teleagent"], "")],
+    sessions: &[teleagent_place("")],
+    usage_files: &[teleagent_place("teleagent.db")],
+    apps: &["TeleAgent"],
+    bundles: &["com.teleai.superagent"],
+    ..Discovery::NONE
+};
+
+pub static TELEAGENT: Agent = Agent {
+    id: "teleagent",
+    name: "TeleAgent",
+    sessions: true,
+    hooks: None,
+    observer: None,
+    channel: None,
+    program: None,
+    replies: None,
+    turns: None,
+    items: None,
+    sources: crate::everywhere(&TELEAGENT_SOURCES),
+    discovery: &TELEAGENT_DISCOVERY,
 };
 
 #[cfg(test)]

@@ -74,6 +74,17 @@ export interface Account {
   warning?: string | null;
   /** From Core: what the client said otherwise. */
   notice?: string | null;
+  /** Usage rows the agent's own service reported, when it has no local token ledger. */
+  usageDetail?: {
+    records: {
+      at: string;
+      title: string;
+      source: string | null;
+      model: string | null;
+      percent: number | null;
+      amount: number | null;
+    }[];
+  } | null;
   /** Codex's earned usage resets, from the account's rate limits. */
   resetCredits?: ResetCredits | null;
 }
@@ -109,6 +120,26 @@ export interface BillingAccount {
   currency: string;
   planCredits?: number | null;
   rewardCredits?: number | null;
+  /** One agent's points the way TeleAgent's detail draws them: a total, the
+   * remaining share, and each grant that expires on its own. */
+  pointsDetail?: {
+    groups: {
+      total: number | null;
+      remaining: number | null;
+      /** Remaining share of `total`, 0–100, already the bar's width. */
+      percent: number | null;
+      grant: {
+        name: string;
+        points: number | null;
+        /** Whole days until the grant expires. 0 expires today. */
+        expireDays: number | null;
+      } | null;
+    }[];
+    /** Points spent lately, for the consumed measure: a daily pace. */
+    spent?: { perDay: number | null; days: number } | null;
+    /** Each local day in the recent history, oldest first, including quiet days. */
+    days?: { date: string; points: number }[] | null;
+  } | null;
   resetAt?: string | null;
   notice: string | null;
   /** From Core (Open's AlertPolicy.balanceLevel): critical at or below zero or while the service refuses the balance, warning at or below its currency's line. */

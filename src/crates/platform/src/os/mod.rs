@@ -251,6 +251,7 @@ mod tests {
             ("devin", ".local/share/devin/cli"),
             ("kilo", ".local/share/kilo"),
             ("mimocode", ".local/share/mimocode"),
+            ("teleagent", ".local/share/TeleAgent"),
             ("omp", ".omp/agent/sessions"),
             ("droid", ".factory/sessions"),
             ("cline", ".cline/data/sessions"),

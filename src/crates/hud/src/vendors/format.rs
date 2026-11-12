@@ -18,6 +18,8 @@ pub fn quota_percent(used: f64, remaining: bool) -> f64 {
 /// hours (model.ts `meterLabel`).
 pub fn meter_label(vendor: &Vendor, remaining: bool) -> String {
     match vendor.used.or(vendor.held) {
+        // A points remaining share is already the ring's share, so remaining display does not flip it.
+        Some(used) if vendor.points_share => format!("{}%", used.clamp(0.0, 100.0).round()),
         Some(used) => format!("{}%", quota_percent(used, remaining).round()),
         None => vendor
             .balance

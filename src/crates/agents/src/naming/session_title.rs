@@ -189,6 +189,7 @@ fn folder_named(source: &str) -> bool {
             | "qoder-work"
             | "kilo"
             | "mimocode"
+            | "teleagent"
             | "droid"
             | "cline"
             | "roo-code"

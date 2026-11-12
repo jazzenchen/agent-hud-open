@@ -31,6 +31,8 @@ export const ORIGINAL_ARTWORK_FILES = {
   "Roo Code": "roo-code",
   Goose: "goose",
   TRAE: "trae",
+  TeleAgent: "teleagent",
+  豆包: "doubao",
 } as const;
 type OriginalVendor = keyof typeof ORIGINAL_ARTWORK_FILES;
 const vendors: Readonly<Record<string, OriginalVendor>> = {
@@ -62,6 +64,8 @@ const vendors: Readonly<Record<string, OriginalVendor>> = {
   "roo-code": "Roo Code",
   goose: "Goose",
   trae: "TRAE",
+  teleagent: "TeleAgent",
+  doubao: "豆包",
 };
 const templates: ReadonlySet<OriginalVendor> = new Set([
   "Grok",
@@ -98,6 +102,7 @@ const aliases: Readonly<Record<string, string>> = {
   qoderwork: "qoder",
   "qoder-dark": "qoder",
   "trae-cn": "trae",
+  豆包: "doubao",
 };
 export function agentArtworkKey(source: string): string {
   const key = normalize(source);

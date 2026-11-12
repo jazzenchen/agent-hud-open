@@ -163,6 +163,30 @@ fn vendors_follow_the_resting_order_and_a_layout_list() {
     assert_eq!(meter_label(&simple[0], true), "28%");
     assert_eq!(simple[0].used, Some(72.4));
     assert_eq!(meter_label(&simple[2], false), "¥8.85");
+    let points = json!({
+        "language": "zh",
+        "quotas": [],
+        "billing": [{
+            "vendor": "teleagent",
+            "amount": 19575.06,
+            "currency": "credits",
+            "level": "normal",
+            "pointsDetail": {"groups": [{"percent": 99.37, "remaining": 19575.06, "total": 19700.0}]}
+        }],
+        "providers": [],
+        "approvals": [],
+        "sessions": []
+    });
+    let teleagent = vendors(&points, "simple", now)
+        .into_iter()
+        .find(|vendor| vendor.key == "teleagent")
+        .expect("teleagent");
+    assert_eq!(teleagent.used, Some(99.37));
+    assert!(teleagent.points_share);
+    assert!(teleagent.balance.is_none());
+    assert_eq!(teleagent.level, "normal");
+    assert_eq!(meter_label(&teleagent, false), "99%");
+    assert_eq!(meter_label(&teleagent, true), "99%");
     let named = configured(
         &snapshot,
         "simple",

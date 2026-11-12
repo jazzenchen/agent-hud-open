@@ -94,6 +94,38 @@ fn a_cookie_row_reads_with_its_host_hash_dropped() {
 }
 
 #[test]
+fn a_profile_apps_last_used_cookie_database_is_read() {
+    let folder = tempfile::tempdir().unwrap();
+    let app = folder.path().join("Doubao");
+    let profile = app.join("Profile 2");
+    std::fs::create_dir_all(&profile).unwrap();
+    std::fs::write(
+        app.join("Local State"),
+        r#"{"profile":{"last_used":"Profile 2"}}"#,
+    )
+    .unwrap();
+    let database = Connection::open(profile.join("Cookies")).unwrap();
+    database
+        .execute_batch(
+            "CREATE TABLE meta(key TEXT, value TEXT);
+                 INSERT INTO meta VALUES ('version', '1');
+                 CREATE TABLE cookies(host_key TEXT, name TEXT, value TEXT,
+                   encrypted_value BLOB, expires_utc INTEGER);",
+        )
+        .unwrap();
+    database
+        .execute(
+            "INSERT INTO cookies VALUES ('.doubao.com', 'sessionid', 'sid', x'', 0)",
+            [],
+        )
+        .unwrap();
+    assert_eq!(
+        app_cookie(folder.path(), "Doubao", "doubao.com", "sessionid"),
+        Answer::Found("sid".into())
+    );
+}
+
+#[test]
 fn the_key_is_looked_up_under_each_account_an_app_may_use() {
     assert_eq!(safe_storage_accounts("Cursor"), ["Cursor", "Cursor Key"]);
     let accounts = safe_storage_accounts("Cursor");
@@ -118,4 +150,15 @@ fn the_key_is_looked_up_under_each_account_an_app_may_use() {
     assert_eq!((answer, asked), (Err(-128), 1));
     // Neither account there: still not found.
     assert_eq!(first_found(&accounts, |_| Err(-25300)), Err(-25300));
+}
+
+#[test]
+fn remembered_keys_round_trip_as_one_record() {
+    let mut keys = std::collections::BTreeMap::new();
+    keys.insert("Cursor".into(), [1u8; 16]);
+    keys.insert("Doubao".into(), [2u8; 16]);
+    keys.insert("TeleAgent".into(), [0xab; 16]);
+    let decoded = decode_cache(encode_cache(&keys).as_bytes());
+    assert_eq!(decoded, keys);
+    assert!(decode_cache(b"v1\nbad\n").is_empty());
 }

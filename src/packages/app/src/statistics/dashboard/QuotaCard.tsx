@@ -1,7 +1,17 @@
+import { Card } from "@agent-hud/ui/components/card";
 import { HUDArtwork as HUDLogo } from "@agent-hud/hud/HUDArtwork";
 import { vendorKey } from "@agent-hud/hud/model";
-import type { Quota, StatisticsProvider } from "@agent-hud/protocol";
-import { card, row, truncate, type StatsTheme } from "../StatsTheme";
+import { quotaPercentLabel } from "@agent-hud/ui/format";
+import { useFormat } from "@agent-hud/ui/format-context";
+import type { Account, Quota, StatisticsProvider } from "@agent-hud/protocol";
+import {
+  agentAccent,
+  card,
+  number,
+  row,
+  truncate,
+  type StatsTheme,
+} from "../StatsTheme";
 import { usePendingLook, type Pending } from "./pending";
 import { QuotaRows, type QuotaRow } from "./QuotaRows";
 
@@ -21,21 +31,22 @@ export function quotaOnly(
   return [...byVendor];
 }
 
-/** An agent's card when only its quota is known here: its name, and each
- * quota window by day as the other cards show it. */
+/** An agent's card when only its quota is known here. Same shell as the
+ * token cards: the name, the current windows, then each window by day. */
 export function QuotaCard({
   vendor,
   name,
   rows,
   live,
+  accounts,
   pending,
   theme,
-  light,
 }: {
   vendor: string;
   name: string;
   rows: QuotaRow[];
   live: Map<string, Quota>;
+  accounts?: Account[];
   /** The quota's answer, while a filter change waits for it. */
   pending?: Pending | null;
   theme: StatsTheme;
@@ -43,30 +54,108 @@ export function QuotaCard({
 }) {
   const zh = Boolean(theme.zh);
   const look = usePendingLook(pending);
+  const display = useFormat().quotaDisplay ?? "consumed";
+  const plan =
+    accounts?.find((account) => vendorKey(account.provider) === vendorKey(vendor))
+      ?.plan ?? null;
+  const accent = agentAccent(vendor) ?? theme.secondary;
+  const locale = zh ? "zh-CN" : "en-US";
+  const figure = (quota: Quota | undefined) => {
+    const consumed = quota?.metrics?.consumed;
+    if (
+      consumed &&
+      consumed.capacity != null &&
+      Number.isFinite(consumed.used)
+    ) {
+      const shown =
+        display === "remaining"
+          ? Math.max(0, consumed.capacity - consumed.used)
+          : consumed.used;
+      const fmt = (value: number) => Math.round(value).toLocaleString(locale);
+      return `${fmt(shown)}/${fmt(consumed.capacity)}`;
+    }
+    return quotaPercentLabel(quota?.usedPercent, display);
+  };
   return (
-    <div
-      className={`stats-reveal ${look.className}`}
+    <Card
+      id={`agent-${vendorKey(vendor)}`}
+      className={`statistics-agent-card stats-reveal ${look.className}`}
       style={{
         ...card(theme),
         ...look.style,
         display: "grid",
         alignContent: "start",
         gap: 12,
-        padding: "14px 16px",
       }}
     >
-      <div style={{ ...row, gap: 8 }}>
-        <HUDLogo source={vendor} size={18} light={light} />
+      <div style={{ ...row, gap: 7 }}>
+        <span
+          style={{
+            width: 26,
+            height: 26,
+            borderRadius: 6,
+            background: `${accent}2e`,
+            display: "inline-grid",
+            placeItems: "center",
+            flexShrink: 0,
+          }}
+        >
+          <HUDLogo source={vendor} size={14} light={theme.light} />
+        </span>
         <strong style={{ ...truncate, fontSize: 13, fontWeight: 600 }}>
           {name}
         </strong>
+        {plan && (
+          <span
+            style={{
+              marginLeft: "auto",
+              padding: "2px 7px",
+              borderRadius: 100,
+              background: theme.segment,
+              color: theme.secondary,
+              fontSize: 11,
+            }}
+          >
+            {plan}
+          </span>
+        )}
       </div>
-      <span style={{ fontSize: 11, color: theme.secondary }}>
-        {zh
-          ? "这台 Mac 上没有它的 Token 记录，只有额度读数"
-          : "No tokens recorded on this Mac, only its quota readings"}
-      </span>
-      <div style={{ display: "grid", gap: 4 }}>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(2,minmax(0,1fr))",
+          columnGap: 10,
+          rowGap: 6,
+        }}
+      >
+        {rows.map((entry) => {
+          const quota = live.get(entry.window.id);
+          const label =
+            quota?.shortLabel || entry.window.shortLabel || entry.window.name;
+          return (
+            <div
+              key={entry.window.id}
+              style={{ ...row, gap: 4, justifyContent: "space-between" }}
+            >
+              <span
+                style={{
+                  fontSize: 11,
+                  color: theme.secondary,
+                  whiteSpace: "nowrap",
+                  flexShrink: 0,
+                }}
+              >
+                {label}
+              </span>
+              <strong style={{ ...number, fontSize: 12, fontWeight: 600 }}>
+                {figure(quota)}
+              </strong>
+            </div>
+          );
+        })}
+      </div>
+      <div style={{ background: theme.divider, height: 1 }} />
+      <div style={{ display: "grid", gap: 4, minWidth: 0 }}>
         <span style={{ fontSize: 11, color: theme.secondary }}>
           {zh ? "每天的额度" : "Quota by day"}
         </span>
@@ -76,9 +165,9 @@ export function QuotaCard({
           label={64}
           vendors={null}
           theme={theme}
-          light={light}
+          light={theme.light}
         />
       </div>
-    </div>
+    </Card>
   );
 }

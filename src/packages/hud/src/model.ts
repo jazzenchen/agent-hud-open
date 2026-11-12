@@ -1,6 +1,7 @@
 import hudDefaults from "@agent-hud/protocol/hud-defaults.json";
 import type {
   PanelLayout,
+  Quota,
   RequestDecision,
   Snapshot,
 } from "@agent-hud/protocol";
@@ -8,6 +9,7 @@ import { agentArtworkKey, agentVendorName } from "./agent-artwork";
 import { layoutMarks, restingAgents } from "./resting-agents.ts";
 import { recentLabel, recentUsage } from "./recent-usage.ts";
 import { visibleBalances } from "./balance-rows.ts";
+import { leadingPointsPercent } from "./panel/points-detail.ts";
 import { heldUsed } from "./held-reading.ts";
 import type { GlowEffect, GlowStyle } from "./HUDGlow";
 import type { UsageStyle } from "./usage-meter/arcs";
@@ -133,7 +135,12 @@ export function vendorsFromSnapshot(
   const value = restingAgents(snapshot, mode).map((name) => {
     const key = vendorKey(name);
     const quotas = snapshot.quotas.filter((q) => vendorKey(q.vendor) === key);
-    const measured = quotas.filter(
+    // A points-detail percent is not consumed quota. With no quota window, it draws the top ring and the percent beside it.
+    const pointsShare = quotas.some((q) => q.usedPercent != null)
+      ? null
+      : pointsShareQuota(snapshot, key);
+    const drawn = pointsShare ? [pointsShare] : quotas;
+    const measured = drawn.filter(
       (q) => q.usedPercent != null && q.status !== "stale",
     );
     const tightest = measured.reduce<(typeof measured)[number] | undefined>(
@@ -143,11 +150,11 @@ export function vendorsFromSnapshot(
     const sessions = snapshot.sessions.filter(
       (s) => vendorKey(s.source) === key,
     );
-    const balance = quotas.length
+    const balance = drawn.length
       ? undefined
       : snapshot.billing.find((b) => vendorKey(b.vendor) === key);
     const deepseekBalances =
-      key === "deepseek" && !quotas.length
+      key === "deepseek" && !drawn.length
         ? snapshot.billing.filter((b) => vendorKey(b.vendor) === key)
         : [];
     return {
@@ -181,10 +188,10 @@ export function vendorsFromSnapshot(
             )
           : null,
       usage:
-        quotas.length || balance
+        drawn.length || balance
           ? null
           : recentLabel(recentUsage(snapshot, key), snapshotLanguage(snapshot)),
-      quotas,
+      quotas: drawn,
       sessions,
     };
   });
@@ -206,12 +213,34 @@ export function markUsed(vendor: HUDVendor): number | null {
   return vendor.used ?? vendor.heldUsed;
 }
 
-/** The number a Simple HUD writes beside a mark: its tightest window (`markUsed`), else its balance, else its last 24 hours (vendors.rs `meter_label`). */
+/** The number beside a mark: its tightest window, else its balance, else the last 24 hours.
+ * A points share is already the remaining bar, so the consumed/remaining setting does not flip it. */
+export function isPointsShareQuota(quota: { id: string }): boolean {
+  return quota.id.endsWith(":points-share");
+}
+
 export function meterLabel(vendor: HUDVendor, display?: QuotaDisplay): string {
   const used = markUsed(vendor);
-  return used == null
-    ? (vendor.balance ?? vendor.usage ?? "--")
-    : quotaPercentLabel(used, display);
+  if (used == null) return vendor.balance ?? vendor.usage ?? "--";
+  if (vendor.quotas.some(isPointsShareQuota)) return quotaPercentLabel(used);
+  return quotaPercentLabel(used, display);
+}
+
+function pointsShareQuota(snapshot: Snapshot, key: string): Quota | null {
+  const percent = snapshot.billing
+    .filter((row) => vendorKey(row.vendor) === key)
+    .map((row) => leadingPointsPercent(row.pointsDetail?.groups))
+    .find((share) => share != null);
+  if (percent == null) return null;
+  return {
+    id: `${key}:points-share`,
+    vendor: key,
+    name: "剩余额度",
+    usedPercent: percent,
+    resetAt: null,
+    status: "normal",
+    account: null,
+  };
 }
 
 export function statusColor(level: HUDVendor["level"]): string {

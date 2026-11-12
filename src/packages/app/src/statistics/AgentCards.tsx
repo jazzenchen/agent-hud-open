@@ -10,6 +10,7 @@ import {
 import { HUDArtwork as HUDLogo } from "@agent-hud/hud/HUDArtwork";
 import { vendorKey } from "@agent-hud/hud/model";
 import type {
+  Account,
   BillingAccount,
   Quota,
   StatisticsResponse,
@@ -38,9 +39,12 @@ export function AgentCards({
   light,
   highlightedVendor,
   billing,
+  accounts,
   quota,
   names,
   pending,
+  dayFirst,
+  dayCount,
 }: {
   data: StatisticsResponse | null;
   hiddenAgentCards: string[];
@@ -52,12 +56,15 @@ export function AgentCards({
   light: boolean;
   highlightedVendor: string | null;
   billing: BillingAccount[];
+  accounts?: Account[];
   /** Each quota window's days, for the cards of the agents they belong to. */
   quota?: { rows: QuotaRow[]; live: Map<string, Quota> };
   /** Agents' names, for the cards of quota alone. */
   names: Map<string, string>;
   /** The range's and the quota's answers, while a filter change waits. */
   pending: { range: Pending; quota: Pending };
+  dayFirst: number;
+  dayCount: number;
 }) {
   const zh = Boolean(theme.zh);
   const t = (en: string, cn: string) => (zh ? cn : en);
@@ -164,6 +171,8 @@ export function AgentCards({
               highlighted={highlightedVendor === vendorKey(provider.id)}
               billing={billing}
               pending={[pending.range, pending.quota]}
+              dayFirst={dayFirst}
+              dayCount={dayCount}
               quota={
                 quota && {
                   rows: quota.rows.filter(
@@ -183,6 +192,7 @@ export function AgentCards({
                 name={names.get(vendor) ?? vendor}
                 rows={rows}
                 live={quota.live}
+                accounts={accounts}
                 pending={pending.quota}
                 theme={theme}
                 light={light}

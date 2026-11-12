@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { DollarSign, Flame, Percent } from "lucide-react";
 import type { PanelBlockLayout, Snapshot } from "@agent-hud/protocol";
 import { dateFormat, localeDateTime, moneyAmount } from "@agent-hud/ui/format";
@@ -12,7 +12,10 @@ import {
   visibleBalances,
   type BalanceMeasure,
 } from "../balance-rows";
-import { noButtonChrome, palette, tabular, type Logo } from "./theme";
+import { MetricPicker } from "./MetricPicker";
+import { PointsDetail } from "./PointsDetail";
+import { pointsMeasureAvailability } from "./points-detail";
+import { noButtonChrome, palette, tabular, type Logo, type Measure } from "./theme";
 
 /** An agent's API balances: each account's balance, consumption or cost over
  * 24 hours, 7 or 30 days, as figures or a spending chart. */
@@ -36,8 +39,13 @@ export function SourceBalances({
     layout.period ?? "day",
   );
   const [selected, setMeasure] = useState<BalanceMeasure>("quota");
+  const [pointsMeasure, setPointsMeasure] = useState<Measure>("quota");
   useEffect(() => setPeriod(layout.period ?? "day"), [layout.period]);
   const { language } = useFormat();
+  const pointsAvailability = useMemo(
+    () => pointsMeasureAvailability(language),
+    [language],
+  );
   const money = (amount: number, currency: string) =>
     moneyAmount(amount, currency, language);
   return (
@@ -67,7 +75,14 @@ export function SourceBalances({
               <strong style={{ fontSize: 13, fontWeight: 700, flex: 1 }}>
                 {agentVendorName(account.vendor)}
               </strong>
-              {!isCredits && (
+              {account.pointsDetail?.groups?.length ? (
+                <MetricPicker
+                  selected={pointsMeasure}
+                  choose={setPointsMeasure}
+                  light={light}
+                  availability={pointsAvailability}
+                />
+              ) : !isCredits && (
                 <div
                   role="group"
                   aria-label={language === "zh" ? "余额指标" : "Balance metric"}
@@ -156,7 +171,16 @@ export function SourceBalances({
                 ))}
               </div>
             )}
-            {layout.widget === "chart" ? (
+            {account.pointsDetail?.groups?.length ? (
+              <PointsDetail
+                groups={account.pointsDetail.groups}
+                spent={account.pointsDetail.spent}
+                vendor={account.vendor}
+                light={light}
+                mode={pointsMeasure === "consumed" ? "used" : "remaining"}
+                onOpen={onStats}
+              />
+            ) : layout.widget === "chart" ? (
               <div
                 aria-label={
                   language === "zh"

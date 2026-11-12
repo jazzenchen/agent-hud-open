@@ -3,9 +3,10 @@
  * these. */
 import type { PanelLayout } from "@agent-hud/protocol";
 import { quotaPercent, type QuotaDisplay } from "@agent-hud/ui/format";
-import { statusColor, type HUDVendor } from "../model";
+import { isPointsShareQuota, statusColor, type HUDVendor } from "../model";
 import { simpleRingSpec, type RingStyle } from "./arcs";
 import {
+  itemShare,
   markTrack,
   markWindows,
   resetPassed,
@@ -26,9 +27,11 @@ export function markItems(
 ): RingItem[] {
   return markWindows(vendor, layout, now).map((q) => ({
     percent:
-      q.status === "stale" && resetPassed(q, now)
-        ? 0
-        : quotaPercent(q.usedPercent, display),
+      isPointsShareQuota(q)
+        ? itemShare(q.usedPercent)
+        : q.status === "stale" && resetPassed(q, now)
+          ? 0
+          : quotaPercent(q.usedPercent, display),
     color: statusColor(q.status),
   }));
 }

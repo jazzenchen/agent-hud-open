@@ -281,10 +281,7 @@ impl Host for FakeHost {
             .cloned()
             .unwrap_or(Answer::Missing)
     }
-    fn unseal_safe_storage(&self, app: &str, encrypted: &[u8]) -> Answer<String> {
-        if app != "Cursor" {
-            return Answer::Unsupported;
-        }
+    fn unseal_safe_storage(&self, _app: &str, encrypted: &[u8]) -> Answer<String> {
         self.sealed
             .get(encrypted)
             .cloned()
