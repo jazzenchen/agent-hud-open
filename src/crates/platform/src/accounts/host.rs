@@ -80,7 +80,7 @@ impl Host for AccountContext {
         crate::os::app_cookie(&self.folder(Base::AppData), app, site, name)
     }
     fn unseal_safe_storage(&self, app: &str, encrypted: &[u8]) -> Answer<String> {
-        crate::os::unseal_safe_storage(app, encrypted)
+        crate::os::unseal_safe_storage(&self.folder(Base::AppData), app, encrypted)
     }
     fn saved_credential(&self, agent: &str) -> Result<Option<Value>, String> {
         if agent == agent_hud_agents::relays::MANUAL {

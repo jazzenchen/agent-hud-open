@@ -142,6 +142,11 @@ export interface BotForm {
   light: boolean;
 }
 const cache = new WeakMap<HTMLCanvasElement, Map<string, BotForm | null>>();
+const specAliases: Readonly<Record<string, string>> = {
+  "codebuddy-cn": "codebuddy",
+  "qoder-cn": "qoder",
+  "qoder-work": "qoder",
+};
 export function makeForm(
   key: string,
   artwork: HTMLCanvasElement,
@@ -154,7 +159,8 @@ export function makeForm(
   }
   const cacheKey = key + String(light);
   if (forms.has(cacheKey)) return forms.get(cacheKey)!;
-  const s = botSpecs(light)[key];
+  const specs = botSpecs(light);
+  const s = specs[key] ?? specs[specAliases[key]];
   if (!s) return null;
   const logo = reaches(
     artwork.getContext("2d")!.getImageData(0, 0, 256, 256).data,

@@ -57,6 +57,7 @@ pub mod grok;
 pub mod hermes;
 pub mod kimi;
 pub mod minimax;
+pub mod minimax_code;
 pub mod openclaw;
 pub mod opencode;
 pub mod pi;

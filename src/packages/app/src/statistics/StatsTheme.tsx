@@ -173,6 +173,7 @@ export function agentAccent(id: string): string | undefined {
       deepseek: "#5366e9",
       zai: "#3b82f6",
       minimax: "#ec4899",
+      "minimax-code": "#ec4899",
       kimi: "#6366f1",
       github: "#a855f7",
       qwen: "#615ced",

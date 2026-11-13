@@ -42,7 +42,7 @@ fn chromiums_key_and_cipher_round_trip() {
     assert_eq!(decrypt(&key, &sealed).unwrap(), b"sk-ant-sid01-example");
     // Refused before its key is asked for.
     assert!(matches!(
-        unseal_safe_storage("Example", b"v11nope"),
+        unseal_safe_storage(Path::new(""), "Example", b"v11nope"),
         Answer::Failed
     ));
     assert!(decrypt(&derive(b"other").unwrap(), &sealed)
@@ -95,7 +95,10 @@ fn a_cookie_row_reads_with_its_host_hash_dropped() {
 
 #[test]
 fn the_key_is_looked_up_under_each_account_an_app_may_use() {
-    assert_eq!(safe_storage_accounts("Cursor"), ["Cursor", "Cursor Key"]);
+    assert_eq!(
+        safe_storage_accounts("Cursor"),
+        ["Cursor", "Cursor Key", "cursor", "Cursor Safe Storage"]
+    );
     let accounts = safe_storage_accounts("Cursor");
     // Cursor files its key under "Cursor Key": the first account is not there.
     let mut asked = Vec::new();

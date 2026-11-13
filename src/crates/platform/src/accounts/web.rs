@@ -30,15 +30,29 @@ fn path(ctx: &AccountContext, provider: &str, host: &str) -> Option<PathBuf> {
     Some(folder(ctx).join(format!("{provider}@{host}.json")))
 }
 
+fn legacy_path(ctx: &AccountContext, provider: &str, host: &str) -> Option<PathBuf> {
+    let legacy = match (provider, host) {
+        ("qoder-cn", "qoder.com.cn") => "qoder",
+        ("trae-cn", "trae.cn") => "trae",
+        _ => return None,
+    };
+    Some(folder(ctx).join(format!("{legacy}@{host}.json")))
+}
+
 /// The kept session for `provider` on `host`, if any and readable.
 pub(super) fn read(ctx: &AccountContext, provider: &str, host: &str) -> Option<WebSession> {
-    let path = path(ctx, provider, host)?;
-    let meta = fs::symlink_metadata(&path).ok()?;
-    if !meta.is_file() || meta.len() > 256 * 1024 || !crate::os::owner_only(&path, &meta) {
+    let primary = path(ctx, provider, host)?;
+    read_file(&primary, host)
+        .or_else(|| legacy_path(ctx, provider, host).and_then(|p| read_file(&p, host)))
+}
+
+fn read_file(path: &std::path::Path, host: &str) -> Option<WebSession> {
+    let meta = fs::symlink_metadata(path).ok()?;
+    if !meta.is_file() || meta.len() > 256 * 1024 || !crate::os::owner_only(path, &meta) {
         return None;
     }
     let mut bytes = Vec::new();
-    fs::File::open(&path)
+    fs::File::open(path)
         .and_then(|file| file.take(256 * 1024).read_to_end(&mut bytes))
         .ok()?;
     let value: Value = serde_json::from_slice(&bytes).ok()?;
@@ -118,6 +132,9 @@ pub(super) fn remove(ctx: &AccountContext, provider: &str, host: &str) -> Result
             "This provider takes no sign-in in Agent HUD",
         )
     })?;
+    if let Some(legacy) = legacy_path(ctx, provider, host) {
+        let _ = fs::remove_file(legacy);
+    }
     match fs::remove_file(path) {
         Ok(()) => Ok(()),
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
@@ -179,10 +196,14 @@ mod tests {
         let file = folder(&ctx).join("qoder@qoder.com.json");
         let meta = fs::symlink_metadata(&file).unwrap();
         assert!(crate::os::owner_only(&file, &meta));
-        let status = status(&ctx, agents::account_provider("qoder").unwrap()).unwrap();
-        assert_eq!(status["sites"][0]["signedIn"], true);
-        assert_eq!(status["sites"][1]["signedIn"], false);
-        assert!(!status.to_string().contains("sid=1"), "never the session");
+        let qoder_status = status(&ctx, agents::account_provider("qoder").unwrap()).unwrap();
+        assert_eq!(qoder_status["sites"][0]["signedIn"], true);
+        let cn_status = status(&ctx, agents::account_provider("qoder-cn").unwrap()).unwrap();
+        assert_eq!(cn_status["sites"][0]["signedIn"], false);
+        assert!(
+            !qoder_status.to_string().contains("sid=1"),
+            "never the session"
+        );
         remove(&ctx, "qoder", "qoder.com").unwrap();
         assert!(read(&ctx, "qoder", "qoder.com").is_none());
     }

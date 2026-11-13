@@ -1,99 +1,236 @@
-//! Qoder's model credits, which only its account page shows: read with the
-//! sign-in the user makes in Agent HUD's own window, on qoder.com or, for
-//! the China builds, qoder.com.cn (`WebSignIn`). Qoder, Qoder CN and QoderWork
-//! spend the same credits as the account they are signed in to.
+//! Separate account providers for Qoder (`qoder`), Qoder CN (`qoder-cn`),
+//! and QoderWork (`qoder-work`). Each reads its own local credentials
+//! (`auth.v1.dat` or `state.vscdb`) in read-only mode and queries
+//! `/sash/api/v2/me/usage`, falling back to cached `creditUsage` or `WebSignIn`.
 use crate::account::{
-    account_id, append_notice, status, Host, HttpFailure, HttpRequest, Provider, Reading, Unread,
-    WebSession, WebSignIn, WebSite,
+    account_id, Host, HttpFailure, HttpRequest, Provider, Reading, Unread, WebSession, WebSignIn,
+    WebSite,
 };
 use crate::l10n;
-use chrono::{DateTime, Utc};
-use serde_json::{json, Value};
 use std::time::Duration;
 
-/// The sites a Qoder account is on. Each page asks the user to sign in when
-/// they aren't, and shows the credits after.
-pub static WEB: WebSignIn = WebSignIn {
-    sites: &[
-        WebSite {
-            host: "qoder.com",
-            name: "Qoder",
-            sign_in: "https://qoder.com/account/usage",
-        },
-        WebSite {
-            host: "qoder.com.cn",
-            name: "Qoder CN",
-            sign_in: "https://qoder.com.cn/account/usage",
-        },
-    ],
+mod local;
+mod parse;
+
+use local::{read_local, LocalSpec, QoderLocal};
+use parse::{finish_reading, parse};
+
+const GLOBAL_SITE: WebSite = WebSite {
+    host: "qoder.com",
+    name: "Qoder",
+    sign_in: "https://qoder.com/account/usage",
+};
+const CHINA_SITE: WebSite = WebSite {
+    host: "qoder.com.cn",
+    name: "Qoder CN",
+    sign_in: "https://qoder.com.cn/account/usage",
 };
 
-/// The credits are spent on every device the account is signed in on.
-pub static PROVIDER: Provider = Provider {
+pub static WEB_GLOBAL: WebSignIn = WebSignIn {
+    sites: &[GLOBAL_SITE],
+};
+pub static WEB_CHINA: WebSignIn = WebSignIn {
+    sites: &[CHINA_SITE],
+};
+
+pub static QODER: Provider = Provider {
     local_work: false,
-    work_sources: &["qoder", "qoder-cn", "qoder-work"],
-    web: Some(&WEB),
-    ..Provider::new("qoder", read)
+    // QoderWork spends the same qoder.com credits.
+    work_sources: &["qoder", "qoder-work"],
+    web: Some(&WEB_GLOBAL),
+    ..Provider::new("qoder", read_qoder)
 };
 
-/// What one site's reading brings: its credits (none when the plan has no
-/// allowance), its account, and a line to show under the account's name.
-struct Site {
-    quota: Option<Value>,
-    account: Value,
-    notice: Option<String>,
+pub static QODER_CN: Provider = Provider {
+    local_work: false,
+    work_sources: &["qoder-cn"],
+    web: Some(&WEB_CHINA),
+    ..Provider::new("qoder-cn", read_qoder_cn)
+};
+
+pub static QODER_WORK: Provider = Provider {
+    local_work: false,
+    work_sources: &["qoder-work"],
+    ..Provider::new("qoder-work", read_qoder_work)
+};
+
+const SPEC_QODER: LocalSpec = LocalSpec {
+    provider: "qoder",
+    label: "Qoder",
+    china: false,
+    dat_dirs: &["com.qoder.app.stable"],
+    dat_apps: &["Qoder App", "Qoder"],
+    vscdb_dirs: &["Qoder"],
+    vscdb_apps: &["Qoder", "Qoder App"],
+};
+const SPEC_QODER_CN: LocalSpec = LocalSpec {
+    provider: "qoder-cn",
+    label: "Qoder CN",
+    china: true,
+    dat_dirs: &["com.qoder.cn.stable"],
+    dat_apps: &["Qoder CN", "QoderCN", "Qoder App"],
+    vscdb_dirs: &["QoderCN", "Qoder CN"],
+    vscdb_apps: &["QoderCN", "Qoder CN", "Qoder"],
+};
+const SPEC_QODER_WORK: LocalSpec = LocalSpec {
+    provider: "qoder-work",
+    label: "QoderWork",
+    china: false,
+    dat_dirs: &["com.qoder.work.stable"],
+    dat_apps: &["QoderWork", "Qoder Work"],
+    vscdb_dirs: &["QoderWork"],
+    vscdb_apps: &["QoderWork", "Qoder"],
+};
+
+pub fn read_qoder(host: &dyn Host) -> Result<Reading, Unread> {
+    read_one(host, &SPEC_QODER, Some(&GLOBAL_SITE))
 }
 
-/// The credits of every site the user signed in to; nothing until they have.
-pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
-    let mut reading = Reading::empty("qoder");
-    let mut failures = Vec::new();
-    let mut empty = Vec::new();
-    for site in WEB.sites {
-        let Some(session) = host.web_session("qoder", site.host) else {
-            continue;
-        };
-        match credits(host, site, &session) {
-            Ok(read) => {
-                match read.quota {
-                    Some(quota) => reading.quotas.push(quota),
-                    None => empty.push(site.name),
+pub fn read_qoder_cn(host: &dyn Host) -> Result<Reading, Unread> {
+    read_one(host, &SPEC_QODER_CN, Some(&CHINA_SITE))
+}
+
+pub fn read_qoder_work(host: &dyn Host) -> Result<Reading, Unread> {
+    read_one(host, &SPEC_QODER_WORK, None)
+}
+
+fn read_one(
+    host: &dyn Host,
+    spec: &LocalSpec,
+    web_site: Option<&'static WebSite>,
+) -> Result<Reading, Unread> {
+    let mut local_failure = None;
+    match read_local(host, spec) {
+        Ok(Some(local)) => match fetch_local_reading(host, spec, &local) {
+            Ok(reading) => return Ok(reading),
+            Err(why) => local_failure = Some(why),
+        },
+        Ok(None) => {}
+        Err(why) => local_failure = Some(why),
+    }
+    if let Some(site) = web_site {
+        let session = host.web_session(spec.provider, site.host).or_else(|| {
+            spec.china
+                .then(|| host.web_session("qoder", site.host))
+                .flatten()
+        });
+        if let Some(session) = session {
+            return read_web(host, spec, site, &session);
+        }
+    }
+    if let Some(why) = local_failure {
+        return Err(why);
+    }
+    Ok(Reading::empty(spec.provider))
+}
+
+fn fetch_local_reading(
+    host: &dyn Host,
+    spec: &LocalSpec,
+    local: &QoderLocal,
+) -> Result<Reading, Unread> {
+    let key = local
+        .user_id
+        .as_deref()
+        .or(local.email.as_deref())
+        .unwrap_or(spec.provider);
+    let id = account_id(spec.provider, &[key]);
+    let label = local
+        .email
+        .as_deref()
+        .or(local.name.as_deref())
+        .unwrap_or(spec.label);
+
+    if let Some(token) = local.token.as_deref() {
+        let endpoints = openapi_endpoints(spec, local);
+        let bearer = format!("Bearer {token}");
+        let mut last_err = None;
+        for base in endpoints {
+            match host.http_json(&HttpRequest {
+                url: &format!("{base}/sash/api/v2/me/usage"),
+                secrets: &[("Authorization", &bearer)],
+                headers: &[("Accept", "application/json")],
+                body: None,
+                timeout: Duration::from_secs(15),
+            }) {
+                Ok(body) => {
+                    let summary = parse(&body).ok_or_else(|| format_err(spec.label))?;
+                    let plan = summary.plan.clone().or_else(|| local.cached_plan.clone());
+                    return Ok(finish_reading(
+                        spec,
+                        &id,
+                        label,
+                        &local.email,
+                        plan,
+                        "local",
+                        summary,
+                    ));
                 }
-                if reading.account.is_none() {
-                    reading.account = Some(read.account);
-                } else {
-                    reading.additional_accounts.push(read.account);
+                Err(HttpFailure::Status(401 | 403)) => {
+                    last_err = Some(Unread::SignedOut(l10n::text(
+                        &format!(
+                            "{} 保存的登录已失效，请打开 {} 重新登录",
+                            spec.label, spec.label
+                        ),
+                        &format!(
+                            "{}'s saved sign-in has ended; sign in again in {}.",
+                            spec.label, spec.label
+                        ),
+                    )));
                 }
-                if let Some(notice) = read.notice {
-                    append_notice(&mut reading, notice);
+                Err(other) => {
+                    last_err = Some(other.unread());
+                    break;
                 }
             }
-            Err(why) => failures.push(why),
+        }
+        // A refused token is a sign-out and a failed call is that failure:
+        // neither is hidden behind the client's cached usage, which is read
+        // only when there is no token to ask with.
+        if let Some(why) = last_err {
+            return Err(why);
         }
     }
-    if reading.quotas.is_empty() && !empty.is_empty() {
-        let notice = l10n::text(
-            &format!("{} 当前套餐没有可用的积分额度", empty.join("、")),
-            &format!(
-                "{} reports no credit allowance for this plan.",
-                empty.join(", ")
-            ),
-        );
-        append_notice(&mut reading, notice);
+    if let Some(cached) = local.cached_usage.as_ref().and_then(parse) {
+        let plan = cached.plan.clone().or_else(|| local.cached_plan.clone());
+        return Ok(finish_reading(
+            spec,
+            &id,
+            label,
+            &local.email,
+            plan,
+            "local",
+            cached,
+        ));
     }
-    match Unread::combined(failures) {
-        // One site read and another failed: the reading stands, with why.
-        Some(why) if reading.account.is_some() => {
-            append_notice(&mut reading, why.reason().to_owned());
-            Ok(reading)
-        }
-        Some(why) => Err(why),
-        None => Ok(reading),
-    }
+    Err(format_err(spec.label))
 }
 
-/// The account page's credit summary for `site`.
-fn credits(host: &dyn Host, site: &WebSite, session: &WebSession) -> Result<Site, Unread> {
+fn openapi_endpoints(spec: &LocalSpec, local: &QoderLocal) -> Vec<String> {
+    let source = local.login_source.as_deref().unwrap_or_default();
+    if source.eq_ignore_ascii_case("dedicated_qodercn") {
+        if let Some(url) = &local.dedicated_openapi {
+            return vec![url.clone()];
+        }
+    }
+    if spec.china || source.eq_ignore_ascii_case("qodercn") {
+        return vec!["https://openapi.qoder.com.cn".into()];
+    }
+    if !source.is_empty() {
+        return vec!["https://openapi.qoder.sh".into()];
+    }
+    vec![
+        "https://openapi.qoder.sh".into(),
+        "https://openapi.qoder.com.cn".into(),
+    ]
+}
+
+fn read_web(
+    host: &dyn Host,
+    spec: &LocalSpec,
+    site: &WebSite,
+    session: &WebSession,
+) -> Result<Reading, Unread> {
     let origin = format!("https://{}", site.host);
     let referer = format!("{origin}/account/usage");
     let body = host
@@ -123,194 +260,21 @@ fn credits(host: &dyn Host, site: &WebSite, session: &WebSession) -> Result<Site
             )),
             other => other.unread(),
         })?;
-    let summary = parse(&body).ok_or_else(|| {
-        Unread::from(l10n::text(
-            "Qoder 的额度格式无法识别",
-            "Qoder's credit usage has an unsupported format.",
-        ))
-    })?;
-    let id = account_id("qoder", &[site.host]);
-    let quota = (summary.total > 0.0).then(|| {
-        json!({
-            "id": format!("{id}:credits"), "vendor": "qoder", "accountId": id,
-            "consumerSource": if site.host == "qoder.com.cn" { json!(["qoder-cn"]) } else { json!(["qoder", "qoder-work"]) }, "account": site.name,
-            "name": "Model credits", "shortLabel": "Credits", "usedPercent": summary.percent,
-            "resetAt": summary.reset, "allModels": true, "status": status(summary.percent),
-            "nativeUsage": {"used": summary.used, "capacity": summary.total, "unit": "credits"},
-        })
-    });
-    let account = json!({
-        "id": id, "provider": "qoder", "label": site.name,
-        "checkedAt": Utc::now().to_rfc3339(), "signIn": "web",
-    });
-    Ok(Site {
-        quota,
-        account,
-        notice: None,
-    })
+    let summary = parse(&body).ok_or_else(|| format_err(spec.label))?;
+    let id = account_id(spec.provider, &[site.host]);
+    let plan = summary.plan.clone();
+    Ok(finish_reading(
+        spec, &id, site.name, &None, plan, "web", summary,
+    ))
 }
 
-struct Summary {
-    used: f64,
-    total: f64,
-    percent: f64,
-    reset: Option<String>,
-}
-
-fn field<'a>(object: &'a Value, camel: &str, snake: &str) -> &'a Value {
-    match &object[camel] {
-        Value::Null => &object[snake],
-        value => value,
-    }
-}
-
-fn amount(value: &Value) -> Option<f64> {
-    value.as_f64().filter(|n| n.is_finite() && *n >= 0.0)
-}
-
-/// Used and total credits of one quota, from its `quotaSummary`.
-fn quota(container: &Value) -> Option<(f64, f64, Option<f64>)> {
-    let summary = field(container, "quotaSummary", "quota_summary");
-    if !summary.is_object() {
-        return None;
-    }
-    let used = amount(field(summary, "usedValue", "used_value"))?;
-    let total = amount(field(summary, "limitValue", "limit_value"))?;
-    let given = match field(summary, "usagePercentage", "usage_percentage") {
-        Value::Null => None,
-        value => Some(amount(value)?),
-    };
-    Some((used, total, given))
-}
-
-/// The answer of `big_model_credits`: the plan's credits, with the shared
-/// ones added where the account has both, and when they reset.
-fn parse(body: &Value) -> Option<Summary> {
-    let (used, total, given) = quota(field(body, "totalQuota", "total_quota"))?;
-    let shared = match field(body, "sharedQuota", "shared_quota") {
-        Value::Null => None,
-        container => Some(quota(container)?),
-    };
-    let (used, total, given) = match shared {
-        Some((more_used, more_total, _)) => (used + more_used, total + more_total, None),
-        None => (used, total, given),
-    };
-    if total == 0.0 && used > 0.0 {
-        return None;
-    }
-    let percent = given
-        .unwrap_or(if total > 0.0 {
-            used / total * 100.0
-        } else {
-            100.0
-        })
-        .clamp(0.0, 100.0);
-    let reset = match field(body, "nextResetAt", "next_reset_at") {
-        Value::Number(n) => n.as_i64().and_then(|at| {
-            let ms = if at > 10_000_000_000 { at } else { at * 1000 };
-            DateTime::<Utc>::from_timestamp_millis(ms)
-        }),
-        Value::String(text) => DateTime::parse_from_rfc3339(text)
-            .ok()
-            .map(|at| at.with_timezone(&Utc)),
-        _ => None,
-    }
-    .map(|at| at.to_rfc3339());
-    Some(Summary {
-        used,
-        total,
-        percent,
-        reset,
-    })
+fn format_err(label: &str) -> Unread {
+    Unread::from(l10n::text(
+        &format!("{label} 的额度格式无法识别"),
+        &format!("{label}'s credit usage has an unsupported format."),
+    ))
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::account::fake::FakeHost;
-
-    const GLOBAL: &str = "https://qoder.com/api/v2/me/usages/big_model_credits";
-    const CHINA: &str = "https://qoder.com.cn/api/v2/me/usages/big_model_credits";
-
-    fn session(host: &str) -> WebSession {
-        WebSession {
-            host: host.into(),
-            cookie: "sid=abc".into(),
-            user_agent: crate::account::WEB_USER_AGENT.into(),
-        }
-    }
-
-    fn signed_in(hosts: &[&str]) -> FakeHost {
-        let mut fake = FakeHost::new("/u");
-        for host in hosts {
-            fake.web_sessions
-                .insert(format!("qoder|{host}"), session(host));
-        }
-        fake
-    }
-
-    #[test]
-    fn nothing_is_read_before_the_user_signs_in() {
-        let reading = read(&FakeHost::new("/u")).unwrap();
-        assert!(reading.quotas.is_empty() && reading.account.is_none());
-        assert!(reading.notice.is_none());
-    }
-
-    #[test]
-    fn the_credits_are_read_with_the_session_the_window_kept() {
-        let body = json!({
-            "totalQuota": {"quotaSummary": {"usedValue": 300, "limitValue": 2000, "unit": "credits"}},
-            "nextResetAt": 1_794_000_000_000_i64,
-        });
-        let host = signed_in(&["qoder.com"]).answer(GLOBAL, Ok(body));
-        let reading = read(&host).unwrap();
-        assert_eq!(reading.quotas.len(), 1);
-        let quota = &reading.quotas[0];
-        assert_eq!(quota["usedPercent"], 15.0);
-        assert_eq!(quota["nativeUsage"]["capacity"], 2000.0);
-        assert!(quota["resetAt"].as_str().unwrap().starts_with("2026-11-06"));
-        assert_eq!(reading.account.unwrap()["label"], "Qoder");
-        let sent = host.sent.borrow();
-        assert_eq!(sent[0].0, [("Cookie".to_owned(), "sid=abc".to_owned())]);
-        let headers = host.headers.borrow();
-        assert!(headers[0]
-            .iter()
-            .any(|(name, value)| name == "User-Agent" && value == crate::account::WEB_USER_AGENT));
-    }
-
-    #[test]
-    fn shared_credits_add_to_the_plans_and_each_site_is_its_own_account() {
-        let global = json!({
-            "total_quota": {"quota_summary": {"used_value": 100, "limit_value": 1000, "usage_percentage": 10}},
-            "shared_quota": {"quota_summary": {"used_value": 100, "limit_value": 1000}},
-        });
-        let china = json!({"totalQuota": {"quotaSummary": {"usedValue": 0, "limitValue": 500}}});
-        let host = signed_in(&["qoder.com", "qoder.com.cn"])
-            .answer(GLOBAL, Ok(global))
-            .answer(CHINA, Ok(china));
-        let reading = read(&host).unwrap();
-        let used: Vec<_> = reading
-            .quotas
-            .iter()
-            .map(|q| q["usedPercent"].as_f64().unwrap())
-            .collect();
-        assert_eq!(used, [10.0, 0.0]);
-        assert_eq!(reading.additional_accounts[0]["label"], "Qoder CN");
-        assert_ne!(
-            reading.quotas[0]["accountId"],
-            reading.quotas[1]["accountId"]
-        );
-    }
-
-    #[test]
-    fn a_refused_session_is_a_sign_out_and_a_missed_answer_is_not() {
-        let host = signed_in(&["qoder.com"]).answer(GLOBAL, Err(HttpFailure::Status(401)));
-        let why = read(&host).err().unwrap();
-        assert_eq!(why.kind(), "signedOut");
-        assert!(why.reason().contains("sign in again"));
-        let host = signed_in(&["qoder.com"]).answer(GLOBAL, Err(HttpFailure::Status(503)));
-        assert_eq!(read(&host).err().unwrap().kind(), "transient");
-        let host = signed_in(&["qoder.com"]).answer(GLOBAL, Ok(json!({"totalQuota": 3})));
-        assert_eq!(read(&host).err().unwrap().kind(), "failed");
-    }
-}
+#[path = "account_tests.rs"]
+mod tests;

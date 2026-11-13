@@ -64,9 +64,89 @@ pub(crate) fn app_cookie(
     Answer::Unsupported
 }
 
-/// Electron's safe storage can't be opened on this OS yet.
-pub(crate) fn unseal_safe_storage(_app: &str, _encrypted: &[u8]) -> Answer<String> {
-    Answer::Unsupported
+/// Opens Electron's `safeStorage.encryptString` (`v10` + 12-byte nonce +
+/// AES-256-GCM ciphertext/tag) using the DPAPI key in `<app>/Local State`.
+pub(crate) fn unseal_safe_storage(
+    app_data: &std::path::Path,
+    app: &str,
+    encrypted: &[u8],
+) -> Answer<String> {
+    use agent_hud_agents::account::cipher::aes_256_gcm_open;
+    use base64::{engine::general_purpose::STANDARD, Engine};
+    use windows_sys::Win32::{
+        Foundation::LocalFree,
+        Security::Cryptography::{CryptUnprotectData, CRYPT_INTEGER_BLOB},
+    };
+    let Some(rest) = encrypted.strip_prefix(b"v10") else {
+        return Answer::Failed;
+    };
+    if rest.len() < 28 {
+        return Answer::Failed;
+    }
+    let folders: &[&str] = if app == "Qoder App" {
+        &["com.qoder.app.stable", app]
+    } else {
+        std::slice::from_ref(&app)
+    };
+    let Some(text) = folders
+        .iter()
+        .find_map(|folder| std::fs::read_to_string(app_data.join(folder).join("Local State")).ok())
+    else {
+        return Answer::Missing;
+    };
+    let Ok(state) = serde_json::from_str::<serde_json::Value>(&text) else {
+        return Answer::Failed;
+    };
+    let Some(encoded) = state["os_crypt"]["encrypted_key"].as_str() else {
+        return Answer::Missing;
+    };
+    let Ok(raw) = STANDARD.decode(encoded.trim()) else {
+        return Answer::Failed;
+    };
+    let Some(dpapi) = raw.strip_prefix(b"DPAPI") else {
+        return Answer::Failed;
+    };
+    let mut input = CRYPT_INTEGER_BLOB {
+        cbData: dpapi.len() as u32,
+        pbData: dpapi.as_ptr().cast_mut(),
+    };
+    let mut output = CRYPT_INTEGER_BLOB {
+        cbData: 0,
+        pbData: std::ptr::null_mut(),
+    };
+    if unsafe {
+        CryptUnprotectData(
+            &mut input,
+            std::ptr::null_mut(),
+            std::ptr::null(),
+            std::ptr::null_mut(),
+            std::ptr::null(),
+            0,
+            &mut output,
+        )
+    } == 0
+    {
+        return Answer::Denied;
+    }
+    struct Guard(*mut u8);
+    impl Drop for Guard {
+        fn drop(&mut self) {
+            if !self.0.is_null() {
+                unsafe { LocalFree(self.0.cast()) };
+            }
+        }
+    }
+    let _guard = Guard(output.pbData);
+    if output.cbData != 32 || output.pbData.is_null() {
+        return Answer::Failed;
+    }
+    let key: [u8; 32] = unsafe { std::slice::from_raw_parts(output.pbData, 32) }
+        .try_into()
+        .unwrap();
+    let nonce: &[u8; 12] = rest[..12].try_into().unwrap();
+    aes_256_gcm_open(&key, nonce, b"", &rest[12..])
+        .and_then(|plain| String::from_utf8(plain).ok())
+        .map_or(Answer::Failed, Answer::Found)
 }
 
 #[cfg(test)]

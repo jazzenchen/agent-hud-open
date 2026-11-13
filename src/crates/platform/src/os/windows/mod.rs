@@ -157,6 +157,17 @@ pub(crate) fn is_shell(path: &Path) -> bool {
         })
 }
 pub(crate) fn engine_candidates(home: &Path, env: &Environment, name: &str) -> Vec<PathBuf> {
+    if name == "workbuddy-app" {
+        // Only WorkBuddy's own install, never whatever else carries the name.
+        let pf = variable(env, "ProgramFiles").unwrap_or_else(|| "C:/Program Files".into());
+        let pf86 =
+            variable(env, "ProgramFiles(x86)").unwrap_or_else(|| "C:/Program Files (x86)".into());
+        return vec![
+            local_app(home, env).join("Programs/WorkBuddy/WorkBuddy.exe"),
+            pf.join("WorkBuddy/WorkBuddy.exe"),
+            pf86.join("WorkBuddy/WorkBuddy.exe"),
+        ];
+    }
     let mut paths = if name == "codex" {
         codex::installation(home, env).engines
     } else {

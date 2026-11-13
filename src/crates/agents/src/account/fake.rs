@@ -2,12 +2,16 @@ use super::*;
 use crate::{Base, Os};
 use std::{
     cell::RefCell,
-    collections::{HashMap, VecDeque},
+    collections::HashMap,
     path::{Path, PathBuf},
     rc::Rc,
     sync::atomic::{AtomicBool, Ordering},
-    time::{Duration, Instant},
+    time::Duration,
 };
+
+#[path = "fake_engine.rs"]
+mod fake_engine;
+pub use fake_engine::FakeEngine;
 
 pub struct FakeHost {
     pub os: Os,
@@ -156,6 +160,13 @@ impl Host for FakeHost {
         if let Some(info) = self.info.get(path) {
             return Answer::Found(*info);
         }
+        if self.databases.contains_key(path) {
+            return Answer::Found(FileInfo {
+                len: 4096,
+                modified_ms: None,
+                symlink: false,
+            });
+        }
         match self.files.get(path) {
             Some(Answer::Found(bytes)) => Answer::Found(FileInfo {
                 len: bytes.len() as u64,
@@ -282,11 +293,12 @@ impl Host for FakeHost {
             .unwrap_or(Answer::Missing)
     }
     fn unseal_safe_storage(&self, app: &str, encrypted: &[u8]) -> Answer<String> {
-        if app != "Cursor" {
-            return Answer::Unsupported;
-        }
+        let mut scoped = app.as_bytes().to_vec();
+        scoped.push(b'|');
+        scoped.extend_from_slice(encrypted);
         self.sealed
-            .get(encrypted)
+            .get(&scoped)
+            .or_else(|| self.sealed.get(encrypted))
             .cloned()
             .unwrap_or(Answer::Unsupported)
     }
@@ -351,43 +363,5 @@ impl Host for FakeHost {
     fn write_own(&self, name: &str, bytes: &[u8]) -> Result<(), String> {
         self.own.borrow_mut().insert(name.into(), bytes.to_vec());
         Ok(())
-    }
-}
-
-/// An engine that answers each request with the reply scripted for its id.
-pub struct FakeEngine {
-    replies: HashMap<u64, Value>,
-    ends: bool,
-    queue: VecDeque<Value>,
-    ended: bool,
-    sent: Rc<RefCell<Vec<Value>>>,
-}
-impl Engine for FakeEngine {
-    fn send(&mut self, value: &Value) -> Result<(), String> {
-        self.sent.borrow_mut().push(value.clone());
-        if let Some(reply) = value["id"].as_u64().and_then(|id| self.replies.get(&id)) {
-            self.queue.push_back(reply.clone());
-        }
-        Ok(())
-    }
-    fn next(&mut self, _deadline: Instant) -> Option<Value> {
-        let next = self.queue.pop_front();
-        if next.is_none() && self.ends {
-            self.ended = true;
-        }
-        next
-    }
-    fn ended(&self) -> bool {
-        self.ended
-    }
-    fn joined(&mut self, deadline: Instant) -> Option<Value> {
-        let body = self.next(deadline);
-        if self.queue.is_empty() && self.ends {
-            self.ended = true;
-        }
-        body
-    }
-    fn stderr_preview(&self, _limit: usize) -> Option<String> {
-        None
     }
 }

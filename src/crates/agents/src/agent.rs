@@ -2,7 +2,8 @@
 use crate::hooks::{Hooks, Observer};
 use crate::{
     antigravity, ark, buddy, claude, cline, codex, copilot, cursor, deepseek, devin, droid, glm,
-    goose, grok, hermes, kimi, minimax, openclaw, opencode, pi, qoder, qwen, trae, zcode,
+    goose, grok, hermes, kimi, minimax, minimax_code, openclaw, opencode, pi, qoder, qwen, trae,
+    zcode,
 };
 use crate::{Channel, Discovery, PerOs, Replies, Source};
 
@@ -54,6 +55,7 @@ pub static ALL: &[&Agent] = &[
     &hermes::AGENT,
     &zcode::AGENT,
     &buddy::CODEBUDDY,
+    &buddy::CODEBUDDY_CN,
     &buddy::WORKBUDDY,
     &qwen::AGENT,
     &opencode::AGENT,
@@ -67,6 +69,7 @@ pub static ALL: &[&Agent] = &[
     &devin::AGENT,
     &glm::AGENT,
     &minimax::AGENT,
+    &minimax_code::AGENT,
     &ark::AGENT,
     &opencode::KILO,
     &opencode::MIMO_CODE,
@@ -98,13 +101,20 @@ pub static ACCOUNTS: &[&crate::account::Provider] = &[
     &crate::coding_plans::GLM,
     &crate::coding_plans::OPENCODE_GO,
     &minimax::account::PROVIDER,
+    &minimax_code::account::PROVIDER,
     &ark::account::PROVIDER,
     &cline::account::PROVIDER,
     &crate::relays::PROVIDER,
     &droid::account::PROVIDER,
-    &crate::qoder::account::PROVIDER,
-    &crate::buddy::account::PROVIDER,
-    &trae::account::PROVIDER,
+    &zcode::account::PROVIDER,
+    &crate::qoder::account::QODER,
+    &crate::qoder::account::QODER_CN,
+    &crate::qoder::account::QODER_WORK,
+    &crate::buddy::account::WORKBUDDY,
+    &crate::buddy::account::CODEBUDDY,
+    &crate::buddy::account::CODEBUDDY_CN,
+    &trae::account::TRAE,
+    &trae::account::TRAE_CN,
 ];
 
 /// Where a session of `source` opens, as its agent says (`Discovery::session_target`):

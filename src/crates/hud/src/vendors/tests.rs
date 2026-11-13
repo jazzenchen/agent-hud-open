@@ -276,3 +276,47 @@ fn detected_clients_without_readings_keep_their_marks_and_unknown_meter() {
         assert_eq!(selected[0].key, "openai");
     }
 }
+
+#[test]
+fn domestic_agent_variants_stay_separate_marks_and_vendors() {
+    let snapshot = json!({
+        "quotas": [
+            {"vendor": "trae", "usedPercent": 10.0, "status": "normal"},
+            {"vendor": "trae-cn", "usedPercent": 20.0, "status": "normal"},
+            {"vendor": "qoder", "usedPercent": 30.0, "status": "normal"},
+            {"vendor": "qoder-cn", "usedPercent": 40.0, "status": "normal"},
+            {"vendor": "qoder-work", "usedPercent": 50.0, "status": "normal"},
+            {"vendor": "codebuddy", "usedPercent": 60.0, "status": "normal"},
+            {"vendor": "codebuddy-cn", "usedPercent": 70.0, "status": "normal"},
+            {"vendor": "zcode", "usedPercent": 80.0, "status": "warning"}
+        ],
+        "billing": [
+            {"vendor": "workbuddy", "amount": 500, "currency": "credits", "level": "normal"},
+            {"vendor": "minimax-code", "amount": 1200, "currency": "credits", "level": "normal"}
+        ],
+        "providers": [{"id": "minimax", "detected": true, "enabled": true}],
+        "sessions": [],
+        "approvals": []
+    });
+    let rows = vendors(&snapshot, "simple", 0);
+    let pairs: Vec<(&str, &str)> = rows
+        .iter()
+        .map(|row| (row.key.as_str(), row.name.as_str()))
+        .collect();
+    assert_eq!(
+        pairs,
+        [
+            ("trae", "TRAE"),
+            ("trae-cn", "TRAE CN"),
+            ("qoder", "Qoder"),
+            ("qoder-cn", "Qoder CN"),
+            ("qoder-work", "QoderWork"),
+            ("codebuddy", "CodeBuddy"),
+            ("codebuddy-cn", "CodeBuddy CN"),
+            ("zcode", "ZCode"),
+            ("workbuddy", "WorkBuddy"),
+            ("minimax-code", "MiniMax Code"),
+            ("minimax", "MiniMax"),
+        ]
+    );
+}

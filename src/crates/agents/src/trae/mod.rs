@@ -2,8 +2,8 @@
 //! app), and its China build TRAE CN. Each keeps its conversations encrypted
 //! with a key only the running app holds, so no session file is read: a
 //! session is what its hooks report (`hooks.rs`), titled by its first
-//! prompt, with no tokens. The credits show only on trae.ai and trae.cn
-//! (`account.rs`).
+//! prompt, with no tokens. Each build's credits are read from its own local
+//! `storage.json` sign-in (`iCubeAuthInfo`), or from trae.ai / trae.cn (`account.rs`).
 pub mod account;
 mod hooks;
 pub mod process;
@@ -14,24 +14,30 @@ use crate::Agent;
 use crate::{Discovery, Location};
 
 static TRAE_DISCOVERY: Discovery = Discovery {
-    storage: &[Location::app_data(&["Trae", "TRAE"], "")],
+    storage: &[Location::app_data(&["Trae", "TRAE", "TRAE SOLO"], "")],
     settings: &[
-        Location::app_data(&["Trae", "TRAE"], "User/settings.json"),
+        Location::app_data(&["Trae", "TRAE", "TRAE SOLO"], "User/settings.json"),
         Location::home(&[], &[".trae"], "hooks.json"),
     ],
     commands: &["trae"],
-    apps: &["Trae", "TRAE"],
+    apps: &["Trae", "TRAE", "TRAE SOLO"],
     bundles: &[process::BUNDLES[0]],
     ..Discovery::NONE
 };
 static TRAE_CN_DISCOVERY: Discovery = Discovery {
-    storage: &[Location::app_data(&["Trae CN", "TRAE CN"], "")],
+    storage: &[Location::app_data(
+        &["Trae CN", "TRAE CN", "TRAE SOLO CN"],
+        "",
+    )],
     settings: &[
-        Location::app_data(&["Trae CN", "TRAE CN"], "User/settings.json"),
+        Location::app_data(
+            &["Trae CN", "TRAE CN", "TRAE SOLO CN"],
+            "User/settings.json",
+        ),
         Location::home(&[], &[".trae-cn"], "hooks.json"),
     ],
     commands: &["trae-cn"],
-    apps: &["Trae CN", "TRAE CN"],
+    apps: &["Trae CN", "TRAE CN", "TRAE SOLO CN"],
     bundles: &[process::BUNDLES[1]],
     ..Discovery::NONE
 };

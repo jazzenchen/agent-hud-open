@@ -79,7 +79,11 @@ static QODER_WORK_SOURCES: [Source; 1] = [Source {
 }];
 
 static QODER_DISCOVERY: Discovery = Discovery {
-    storage: &[Location::home(&[], &[".qoder"], "")],
+    storage: &[
+        Location::home(&[], &[".qoder"], ""),
+        Location::app_data(&["com.qoder.app.stable"], "auth.v1.dat"),
+        Location::app_data(&["Qoder"], "User/globalStorage/state.vscdb"),
+    ],
     settings: &[Location::home(&[], &[".qoder"], "settings.json")],
     sessions: &[QODER_PROJECTS, QODER_IDE_PROJECTS],
     commands: &["qoder", "qodercli"],
@@ -87,15 +91,23 @@ static QODER_DISCOVERY: Discovery = Discovery {
     ..Discovery::NONE
 };
 static QODER_CN_DISCOVERY: Discovery = Discovery {
-    storage: &[Location::home(&[], &[".qoder-cn"], "")],
+    storage: &[
+        Location::home(&[], &[".qoder-cn"], ""),
+        Location::app_data(&["QoderCN", "Qoder CN"], "User/globalStorage/state.vscdb"),
+        Location::app_data(&["com.qoder.cn.stable"], "auth.v1.dat"),
+    ],
     settings: &[Location::home(&[], &[".qoder-cn"], "settings.json")],
     sessions: &[QODER_CN_PROJECTS, QODER_CN_STORE],
     commands: &["qoder-cn"],
-    apps: &["Qoder CN"],
+    apps: &["Qoder CN", "QoderCN"],
     ..Discovery::NONE
 };
 static QODER_WORK_DISCOVERY: Discovery = Discovery {
-    storage: &[Location::home(&[], &[".qoderwork"], "")],
+    storage: &[
+        Location::home(&[], &[".qoderwork"], ""),
+        Location::app_data(&["QoderWork"], "User/globalStorage/state.vscdb"),
+        Location::app_data(&["com.qoder.work.stable"], "auth.v1.dat"),
+    ],
     settings: &[Location::home(&[], &[".qoderwork"], "settings.json")],
     sessions: &[QODER_WORK_PROJECTS],
     commands: &["qoderwork"],

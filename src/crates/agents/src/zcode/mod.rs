@@ -1,6 +1,8 @@
 //! ZCode: its desktop app and its CLI keep their sessions, their calls and
 //! their conversations in one database (`~/.zcode/cli/db/db.sqlite`), read
-//! by `transcript` and `conversation`.
+//! by `transcript` and `conversation`, and its plan balance in
+//! `~/.zcode/v2/credentials.json` (`account`).
+pub mod account;
 pub mod conversation;
 #[cfg(test)]
 mod fixtures;

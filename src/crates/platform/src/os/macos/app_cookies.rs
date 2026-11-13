@@ -85,7 +85,7 @@ pub(crate) fn app_cookie(app_data: &Path, app: &str, site: &str, name: &str) -> 
 /// Opens what Electron's `safeStorage.encryptString` wrote for `app`. On macOS
 /// it starts with `v10` and opens with the app's "<App> Safe Storage"
 /// keychain item.
-pub(crate) fn unseal_safe_storage(app: &str, encrypted: &[u8]) -> Answer<String> {
+pub(crate) fn unseal_safe_storage(_app_data: &Path, app: &str, encrypted: &[u8]) -> Answer<String> {
     let Some(sealed) = encrypted.strip_prefix(b"v10") else {
         return Answer::Failed;
     };
@@ -215,10 +215,16 @@ fn safe_storage_key(app: &str) -> Answer<[u8; 16]> {
 }
 
 /// The accounts an app's "<App> Safe Storage" item may be under: Electron
-/// builds differ, so the Claude desktop app files it under "Claude" and
-/// Cursor under "Cursor Key".
-fn safe_storage_accounts(app: &str) -> [String; 2] {
-    [app.to_owned(), format!("{app} Key")]
+/// builds differ, filing it under the app's name, "<App> Key", lowercase, or
+/// "<App> Safe Storage".
+fn safe_storage_accounts(app: &str) -> Vec<String> {
+    let mut out = vec![app.to_owned(), format!("{app} Key")];
+    let lower = app.to_lowercase();
+    if !out.contains(&lower) {
+        out.push(lower);
+    }
+    out.push(format!("{app} Safe Storage"));
+    out
 }
 
 /// The first account's answer that is not errSecItemNotFound, which only a

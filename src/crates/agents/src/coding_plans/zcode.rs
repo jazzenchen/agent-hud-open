@@ -1,7 +1,7 @@
 //! WorkBuddy's GLM Coding Plan models in `~/.workbuddy/models.json`, a key
 //! the user typed into WorkBuddy, and how Zhipu says an account has no
-//! Coding Plan. ZCode's own sign-in (`~/.zcode/v2/credentials.json`) is
-//! encrypted by ZCode and never read.
+//! Coding Plan. ZCode's own sign-in (`~/.zcode/v2/credentials.json`) is read
+//! separately by `crate::zcode::account` as its own provider (`zcode`).
 use crate::account::{read_bounded, Host};
 use serde_json::Value;
 

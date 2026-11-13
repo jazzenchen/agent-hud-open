@@ -5,6 +5,7 @@
 pub use crate::sqlite::DatabaseFailure;
 use serde_json::Value;
 
+pub mod cipher;
 mod host;
 mod ids;
 mod places;
@@ -15,7 +16,10 @@ pub use host::{
     WebSite, MAX_BODY, WEB_USER_AGENT,
 };
 pub use ids::{account_id, hash, jwt_claims, legacy_account, legacy_unresolved, status};
-pub use places::{client_home_key, endpoint, locate, read_bounded, read_json, resolve, variable};
+pub use places::{
+    client_home_key, endpoint, locate, read_bounded, read_json, read_json_bounded, resolve,
+    variable,
+};
 pub use unread::Unread;
 
 /// One reading of a provider's account: its quota windows, balances, the

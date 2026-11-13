@@ -17,12 +17,16 @@ export const ORIGINAL_ARTWORK_FILES = {
   Hermes: "hermes",
   ZCode: "zcode",
   CodeBuddy: "codebuddy",
+  "CodeBuddy CN": "codebuddy",
   WorkBuddy: "workbuddy",
   Qwen: "qwen",
   Qoder: "qoder",
   "Qoder-dark": "qoder-dark",
+  "Qoder CN": "qoder",
+  QoderWork: "qoder",
   Devin: "devin",
   MiniMax: "minimax",
+  "MiniMax Code": "minimax",
   "Volcengine Ark": "ark",
   "Kilo Code": "kilocode",
   "MiMo Code": "xiaomimimo",
@@ -31,6 +35,7 @@ export const ORIGINAL_ARTWORK_FILES = {
   "Roo Code": "roo-code",
   Goose: "goose",
   TRAE: "trae",
+  "TRAE CN": "trae",
   TeleAgent: "teleagent",
 } as const;
 type OriginalVendor = keyof typeof ORIGINAL_ARTWORK_FILES;
@@ -51,11 +56,15 @@ const vendors: Readonly<Record<string, OriginalVendor>> = {
   hermes: "Hermes",
   zcode: "ZCode",
   codebuddy: "CodeBuddy",
+  "codebuddy-cn": "CodeBuddy CN",
   workbuddy: "WorkBuddy",
   qwen: "Qwen",
   qoder: "Qoder",
+  "qoder-cn": "Qoder CN",
+  "qoder-work": "QoderWork",
   devin: "Devin",
   minimax: "MiniMax",
+  "minimax-code": "MiniMax Code",
   ark: "Volcengine Ark",
   kilo: "Kilo Code",
   mimocode: "MiMo Code",
@@ -63,6 +72,7 @@ const vendors: Readonly<Record<string, OriginalVendor>> = {
   "roo-code": "Roo Code",
   goose: "Goose",
   trae: "TRAE",
+  "trae-cn": "TRAE CN",
   teleagent: "TeleAgent",
 };
 const templates: ReadonlySet<OriginalVendor> = new Set([
@@ -79,6 +89,7 @@ const templates: ReadonlySet<OriginalVendor> = new Set([
   "Roo Code",
   "Goose",
   "TRAE",
+  "TRAE CN",
 ]);
 const normalize = (source: string) =>
   source
@@ -95,11 +106,8 @@ const aliases: Readonly<Record<string, string>> = {
   "grok-cli": "grok",
   "opencode-go": "opencode",
   "opencode-dark": "opencode",
-  "qoder-cn": "qoder",
-  "qoder-work": "qoder",
-  qoderwork: "qoder",
+  qoderwork: "qoder-work",
   "qoder-dark": "qoder",
-  "trae-cn": "trae",
 };
 export function agentArtworkKey(source: string): string {
   const key = normalize(source);
@@ -133,10 +141,12 @@ export function agentArtwork(
   const key = agentArtworkKey(source);
   let vendor = vendors[key];
   if (!vendor) return null;
-  if (!light && (vendor === "OpenCode" || vendor === "Qoder"))
-    vendor = `${vendor}-dark`;
-  const file = ORIGINAL_ARTWORK_FILES[vendor],
-    template = templates.has(vendor);
+  let file: string = ORIGINAL_ARTWORK_FILES[vendor];
+  if (!light && (file === "opencode" || file === "qoder")) {
+    file = `${file}-dark`;
+    if (vendor === "OpenCode" || vendor === "Qoder") vendor = `${vendor}-dark`;
+  }
+  const template = templates.has(vendor);
   return {
     key,
     vendor,

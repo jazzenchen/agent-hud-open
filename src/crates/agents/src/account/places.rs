@@ -125,6 +125,19 @@ pub fn read_json(host: &dyn Host, path: &Path) -> Option<Value> {
     serde_json::from_slice(&bytes).ok()
 }
 
+/// A JSON file of at most `limit` bytes, preserving `Missing` / `Denied` / `Failed`.
+pub fn read_json_bounded(host: &dyn Host, path: &Path, limit: u64) -> Answer<Value> {
+    match read_bounded(host, path, limit) {
+        Answer::Found(bytes) => {
+            serde_json::from_slice(&bytes).map_or(Answer::Failed, Answer::Found)
+        }
+        Answer::Missing => Answer::Missing,
+        Answer::Denied => Answer::Denied,
+        Answer::Unsupported => Answer::Unsupported,
+        Answer::Failed => Answer::Failed,
+    }
+}
+
 /// A client home as Open keys it (ClientHome.key): empty for the client's
 /// default folder, otherwise a hash of the resolved path.
 pub fn client_home_key(host: &dyn Host, directory: &Path, default: &Path) -> String {
