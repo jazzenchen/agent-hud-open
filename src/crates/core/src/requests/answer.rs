@@ -78,7 +78,14 @@ fn validate_native_decision(view: &Value, decision: &Value) -> Result<(), String
         .unwrap_or("permission");
     let allowed = match kind {
         "leave" => true,
-        "allow" | "deny" => request == "permission",
+        "allow" => request == "permission",
+        // With words, a denial that tells the agent what to do instead.
+        "deny" => {
+            request == "permission"
+                && decision
+                    .get("message")
+                    .is_none_or(|v| v.is_null() || v.is_string())
+        }
         "always" => {
             request == "permission"
                 && view.get("allowsAlways").and_then(Value::as_bool) == Some(true)
@@ -146,4 +153,30 @@ fn validate_native_answers(view: &Value, decision: &Value) -> Result<(), String>
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::validate_native_decision;
+    use serde_json::json;
+
+    /// A denial may carry the user's reply as text; anything else in its
+    /// place is refused, and so is a reply to what is not a call.
+    #[test]
+    fn a_denial_takes_an_optional_reply_in_words() {
+        let call = json!({"kind": "permission"});
+        for decision in [
+            json!({"kind": "deny"}),
+            json!({"kind": "deny", "message": null}),
+            json!({"kind": "deny", "message": "Use the staging database instead."}),
+        ] {
+            assert_eq!(validate_native_decision(&call, &decision), Ok(()));
+        }
+        assert!(validate_native_decision(&call, &json!({"kind": "deny", "message": 42})).is_err());
+        let question = json!({"kind": "question"});
+        assert!(
+            validate_native_decision(&question, &json!({"kind": "deny", "message": "No."}))
+                .is_err()
+        );
+    }
 }

@@ -27,6 +27,8 @@ export interface Approval {
   sessionId: string | null;
   createdAt: string;
   allowsAlways: boolean;
+  /** Its client hands the agent the words of a `deny` decision's `message`. */
+  deniesWithReply?: boolean;
   kind?: "permission" | "question" | "plan";
   vendor?: string;
   summary?: string;

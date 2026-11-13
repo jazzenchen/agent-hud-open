@@ -5,6 +5,9 @@ use crate::hooks::{display, hooks_by_id, Permission, Reply};
 use crate::iso;
 use serde_json::{json, Map, Value};
 
+/// What the agent is told of a denial, before the user's reply to it.
+const DENIED: &str = "The user denied this tool call in Agent HUD.";
+
 impl Request {
     /// The client's permission hook, when its source is still known.
     fn permission(&self) -> Option<&'static Permission> {
@@ -20,6 +23,14 @@ impl Request {
         self.suggestions
             .iter()
             .find(|v| v["type"] == "addRules" && v["behavior"] == "allow" && rules(v).is_some())
+    }
+    /// Whether a denial reaches the agent with the user's words: every reply
+    /// shape has a place for them but the bare decision.
+    fn denies_with_reply(&self) -> bool {
+        self.kind == "permission"
+            && self
+                .permission()
+                .is_some_and(|permission| !matches!(permission.reply, Reply::Decision))
     }
     fn plan(&self) -> Option<&str> {
         if self.kind != "plan" {
@@ -40,7 +51,7 @@ impl Request {
                 item
             })
             .collect();
-        json!({"id":id,"title":self.summary,"source":self.source,"vendor":display(&self.source),"toolName":self.tool_name.as_deref().unwrap_or(""),"input":self.detail.as_deref().unwrap_or(""),"detail":self.detail,"summary":self.summary,"sessionId":self.session_id,"createdAt":iso(created_at_ms),"allowsAlways":self.always().is_some(),"kind":self.kind,"cwd":self.cwd,"path":self.path,"removed":self.removed,"added":self.added,"suggestions":self.suggestions,"alwaysAllowRule":self.always().and_then(rules),"questions":questions,"plan":self.plan(),"answersQuestion":!self.questions.is_empty(),"answersPlan":self.plans()&&self.plan().is_some()})
+        json!({"id":id,"title":self.summary,"source":self.source,"vendor":display(&self.source),"toolName":self.tool_name.as_deref().unwrap_or(""),"input":self.detail.as_deref().unwrap_or(""),"detail":self.detail,"summary":self.summary,"sessionId":self.session_id,"createdAt":iso(created_at_ms),"allowsAlways":self.always().is_some(),"deniesWithReply":self.denies_with_reply(),"kind":self.kind,"cwd":self.cwd,"path":self.path,"removed":self.removed,"added":self.added,"suggestions":self.suggestions,"alwaysAllowRule":self.always().and_then(rules),"questions":questions,"plan":self.plan(),"answersQuestion":!self.questions.is_empty(),"answersPlan":self.plans()&&self.plan().is_some()})
     }
     /// None is an empty response: close the hook connection without writing JSON.
     pub fn response(&self, decision: &Value) -> Result<Option<Value>, String> {
@@ -54,7 +65,20 @@ impl Request {
                 output.insert("behavior".into(), json!("allow"));
             }
             "deny" => {
+                let reply = decision
+                    .get("message")
+                    .filter(|v| !v.is_null())
+                    .map(|v| v.as_str().ok_or("message must be a string"))
+                    .transpose()?
+                    .unwrap_or("")
+                    .trim();
                 output.insert("behavior".into(), json!("deny"));
+                if !reply.is_empty() {
+                    output.insert(
+                        "message".into(),
+                        json!(format!("{DENIED} Their reply: {reply}")),
+                    );
+                }
             }
             "always" => {
                 let Some(default) = self.always() else {
@@ -159,10 +183,16 @@ impl Request {
         match self.permission().map(|permission| &permission.reply) {
             Some(Reply::PreToolUse { .. }) => {
                 let allow = output["behavior"] == "allow";
+                // A denial's own words (the user's reply) are the reason.
+                let reason = match output.get("message").and_then(Value::as_str) {
+                    Some(message) if !allow => message,
+                    _ if allow => "The user allowed this tool call in Agent HUD.",
+                    _ => DENIED,
+                };
                 return Ok(Some(json!({"hookSpecificOutput":{
                     "hookEventName":"PreToolUse",
                     "permissionDecision":if allow {"allow"} else {"deny"},
-                    "permissionDecisionReason":if allow {"The user allowed this tool call in Agent HUD."} else {"The user denied this tool call in Agent HUD."},
+                    "permissionDecisionReason":reason,
                 }})));
             }
             Some(Reply::Decision) => {

@@ -1801,6 +1801,22 @@ fn fixed_decisions() -> Vec<(&'static str, Value)> {
     vec![
         ("allow", json!({"kind": "allow"})),
         ("deny", json!({"kind": "deny"})),
+        (
+            "deny-message",
+            json!({"kind": "deny", "message": "  Use the staging database instead.  "}),
+        ),
+        (
+            "deny-null-message",
+            json!({"kind": "deny", "message": null}),
+        ),
+        (
+            "deny-blank-message",
+            json!({"kind": "deny", "message": "   "}),
+        ),
+        (
+            "deny-message-not-string",
+            json!({"kind": "deny", "message": 42}),
+        ),
         ("leave", json!({"kind": "leave"})),
         ("always", json!({"kind": "always"})),
         (
