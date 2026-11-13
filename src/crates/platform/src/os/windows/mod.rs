@@ -2,6 +2,7 @@ use super::{joined_path, path_entries, variable, Environment, ProcessInfo};
 mod acl;
 mod antigravity;
 mod apps;
+mod claude;
 mod codex;
 mod files;
 pub(crate) mod pipe;
@@ -169,42 +170,12 @@ pub(crate) fn engine_candidates(home: &Path, env: &Environment, name: &str) -> V
     paths.extend(dirs.into_iter().map(|dir| dir.join(format!("{name}.exe"))));
     // Fallbacks for desktop apps that keep their CLI off PATH.
     match name {
-        // The Claude desktop app: %APPDATA%\Claude\claude-code\<version>\<hash>\claude.exe
-        "claude" => paths.extend(newest_nested(
-            &app_support(home, env).join("Claude/claude-code"),
-            "claude.exe",
-        )),
+        "claude" => paths.extend(claude::engines(home, env)),
         // The Codex desktop app's own copy of its CLI.
         "codex" => paths.push(home.join(".codex/.sandbox-bin/codex.exe")),
         _ => {}
     }
     paths
-}
-/// `<root>\*\*\<file>`, most recently modified first.
-fn newest_nested(root: &Path, file: &str) -> Vec<PathBuf> {
-    let children = |dir: &Path| -> Vec<PathBuf> {
-        std::fs::read_dir(dir)
-            .into_iter()
-            .flatten()
-            .filter_map(Result::ok)
-            .map(|entry| entry.path())
-            .filter(|path| path.is_dir())
-            .collect()
-    };
-    let mut found: Vec<_> = children(root)
-        .iter()
-        .flat_map(|version| children(version))
-        .map(|dir| dir.join(file))
-        .filter(|path| path.is_file())
-        .map(|path| {
-            let modified = std::fs::metadata(&path)
-                .and_then(|meta| meta.modified())
-                .unwrap_or(std::time::SystemTime::UNIX_EPOCH);
-            (modified, path)
-        })
-        .collect();
-    found.sort_by_key(|entry| std::cmp::Reverse(entry.0));
-    found.into_iter().map(|(_, path)| path).collect()
 }
 pub(crate) fn engine_path(home: &Path, env: &Environment) -> String {
     joined_path(executable_dirs(home, env))
