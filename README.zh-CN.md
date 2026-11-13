@@ -109,7 +109,8 @@ Claude Code 写完一段改动，可以请一个 Codex 会话审一遍，Codex �
 
 - **只传消息，不交出会话**：过去的只有 agent 写下的那条消息，会话本身留在原处。同一个项目里，项目本身就成了它们共同的上下文，对方自己去读代码。
 - **十二款 agent**：Claude Code、Codex、Antigravity、DeepSeek Harness、Cursor、TRAE、WorkBuddy、ZCode、Qoder、Kimi Code、Pi 与 OpenCode 彼此都能传话，也能新开 Claude Code、Codex 或 Antigravity 会话。
-- **不打断工作**：消息不会插进正在进行的一轮。它等对方空闲才送达；Cursor、TRAE、WorkBuddy、ZCode、Qoder 与 Kimi Code 在它们的一轮结束时接收。
+- **不打断工作**：消息不会插进正在进行的一轮。它等对方空闲才送达。
+- **六款受限**：Cursor、TRAE、WorkBuddy、ZCode、Qoder 与 Kimi Code 只在它们的一轮结束时接收，空闲的会话要等你在那里再发起一轮才收得到。除 WorkBuddy 外，一轮里连续接收的次数也有上限。
 
 怎样开启和使用，见[使用文档](https://agenthud.app/docs/zh/mcp/messaging/)。
 
@@ -247,31 +248,31 @@ iPhone 和发行版在同一个网络里，不订阅也能在 iPhone 与 Apple W
 | **Codex** | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | **DeepSeek&nbsp;Harness** | ✓ | 余额 | ✓ | ✓ | ✓ | ✓ |  | ✓ | ✓ |
 | **Antigravity** | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| **Cursor** | ✓ | ✓ | ✓ |  |  | ✓ | ✓ |  | ✓ |
+| **Cursor** | ✓ | ✓ | ✓ |  |  | ✓ | ✓ |  | 受限 |
 | **Grok&nbsp;CLI** | ✓ | ✓ | ✓ |  |  | ✓ |  |  |  |
 | **Grok&nbsp;Bot** | ✓ | ✓ | ✓ |  |  | ✓ | ✓ |  |  |
 | **GitHub&nbsp;Copilot&nbsp;CLI** | ✓ | ✓ | ✓ | ✓ |  | ✓ |  |  |  |
 | **OpenCode** | ✓ | ✓ |  |  |  | ✓ | ✓ |  | ✓ |
 | **Kilo&nbsp;Code** | ✓ |  |  |  |  | ✓ | ✓ |  |  |
 | **MiMo&nbsp;Code** | ✓ |  |  |  |  | ✓ | ✓ |  |  |
-| **Kimi** | ✓ | ✓ | ✓ |  |  | ✓ |  |  | ✓ |
+| **Kimi** | ✓ | ✓ | ✓ |  |  | ✓ |  |  | 受限 |
 | **Pi** | ✓ | ✓ | ✓ |  |  | ✓ | ✓ |  | ✓ |
 | **Oh&nbsp;My&nbsp;Pi** | ✓ |  | ✓ |  |  | ✓ | ✓ |  |  |
 | **OpenClaw** | ✓ |  |  |  |  |  |  |  |  |
 | **Hermes&nbsp;Agent** | ✓ | ✓ | ✓ |  |  | ✓ |  |  |  |
 | **Factory&nbsp;Droid** | ✓ | ✓ | ✓ | ✓ |  | ✓ |  |  |  |
-| **TRAE** | 会话 | ✓ | ✓ |  |  | ✓ |  |  | ✓ |
-| **Qoder** | ✓ | ✓ | ✓ | ✓ |  | ✓ |  | ✓ | ✓ |
-| **ZCode** | ✓ |  | ✓ | ✓ | ✓ | ✓ |  |  | ✓ |
+| **TRAE** | 会话 | ✓ | ✓ |  |  | ✓ |  |  | 受限 |
+| **Qoder** | ✓ | ✓ | ✓ | ✓ |  | ✓ |  | ✓ | 受限 |
+| **ZCode** | ✓ |  | ✓ | ✓ | ✓ | ✓ |  |  | 受限 |
 | **CodeBuddy** | ✓ |  |  | ✓ |  | ✓ |  |  |  |
-| **WorkBuddy** | ✓ | ✓ |  | ✓ |  | ✓ |  |  | ✓ |
+| **WorkBuddy** | ✓ | ✓ |  | ✓ |  | ✓ |  |  | 受限 |
 | **Qwen&nbsp;Code** | ✓ |  |  | ✓ |  | ✓ |  |  |  |
 | **Devin** | ✓ | ✓ |  | ✓ |  | ✓ | ✓ |  |  |
 | **Cline** | ✓ | ✓ |  |  |  |  |  |  |  |
 | **Roo&nbsp;Code** | ✓ |  |  |  |  |  |  |  |  |
 | **Goose** | ✓ |  |  |  |  |  |  |  |  |
 
-另外还读取 **GLM Coding Plan**、**OpenCode Go**、**MiniMax** 与 **火山方舟** 的套餐额度。Qoder 包括 Qoder CN 与 QoderWork，TRAE 包括 TRAE CN，Devin 包括 CLI 与 Devin Desktop。Codex CLI 的批准需先在 Codex 中信任回调（Codex 桌面版不需要），DeepSeek Harness 的批准和提问需先安装 Agent HUD 插件（设置 → 智能体插件），Copilot 的批准与额度分别在设置中打开。Qoder、WorkBuddy 与 TRAE 的额度需先在 Agent HUD 自己的窗口里登录厂商网站。TRAE 不提供 Token，只显示会话；打开它的全局 Hooks 后才会运行 Agent HUD 的回调。Qoder 只在使用你自己密钥的模型、或设置了 `QODER_EXPOSE_TOKEN_USAGE` 时记录 Token，逐轮明细也随之才有。一键回到终端窗格需要 iTerm2；Cursor 能回到云端 agent 的对话，本地对话只能打开它的文件夹。[互发消息](https://agenthud.app/docs/zh/mcp/messaging/)支持 OpenCode 1；Qoder CN 与 QoderWork 只收不发。Factory Droid 的额度需要 Factory API Key，Devin 的额度来自其 CLI 的本机缓存。Cursor 的 Token 需要 Cursor 3.27 或更新版本。Grok Bot 的 Bot 运行在 Cursor 的服务器上，由服务器给出每个 Bot 每天的 Token；已合并到 SuperGrok 的账户没有这项数据，只显示会话。Cursor 与 Grok Bot 登录同一账户时，Grok Bot 的周额度也从这些服务器读取；否则读取 Bot 自己的缓存，而 Bot 只在使用时刷新它。已合并到 SuperGrok 的账户由 Cursor 和 Grok Bot 共用一个周额度，Cursor 一栏按 Cursor 自己的显示读取它。
+另外还读取 **GLM Coding Plan**、**OpenCode Go**、**MiniMax** 与 **火山方舟** 的套餐额度。Qoder 包括 Qoder CN 与 QoderWork，TRAE 包括 TRAE CN，Devin 包括 CLI 与 Devin Desktop。Codex CLI 的批准需先在 Codex 中信任回调（Codex 桌面版不需要），DeepSeek Harness 的批准和提问需先安装 Agent HUD 插件（设置 → 智能体插件），Copilot 的批准与额度分别在设置中打开。Qoder、WorkBuddy 与 TRAE 的额度需先在 Agent HUD 自己的窗口里登录厂商网站。TRAE 不提供 Token，只显示会话；打开它的全局 Hooks 后才会运行 Agent HUD 的回调。Qoder 只在使用你自己密钥的模型、或设置了 `QODER_EXPOSE_TOKEN_USAGE` 时记录 Token，逐轮明细也随之才有。一键回到终端窗格需要 iTerm2；Cursor 能回到云端 agent 的对话，本地对话只能打开它的文件夹。[互发消息](https://agenthud.app/docs/zh/mcp/messaging/)标为「受限」的 agent 只在自己的一轮结束时收消息，空闲时收不到，也不能被新开会话；只有交互式的 Qoder CLI 会话空闲时也收得到。互发消息支持 OpenCode 1；Qoder CN 与 QoderWork 只收不发。Factory Droid 的额度需要 Factory API Key，Devin 的额度来自其 CLI 的本机缓存。Cursor 的 Token 需要 Cursor 3.27 或更新版本。Grok Bot 的 Bot 运行在 Cursor 的服务器上，由服务器给出每个 Bot 每天的 Token；已合并到 SuperGrok 的账户没有这项数据，只显示会话。Cursor 与 Grok Bot 登录同一账户时，Grok Bot 的周额度也从这些服务器读取；否则读取 Bot 自己的缓存，而 Bot 只在使用时刷新它。已合并到 SuperGrok 的账户由 Cursor 和 Grok Bot 共用一个周额度，Cursor 一栏按 Cursor 自己的显示读取它。
 
 ## 保护你的数据
 

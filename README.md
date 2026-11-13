@@ -109,7 +109,8 @@ You can watch who is talking to whom: the sender folds its message into a paper 
 
 - **A message, not the conversation**: only what the agent writes goes across; its session stays where it is. On one project, the project itself becomes the shared context, and the other agent reads the code for itself.
 - **Twelve agents**: Claude Code, Codex, Antigravity, DeepSeek Harness, Cursor, TRAE, WorkBuddy, ZCode, Qoder, Kimi Code, Pi and OpenCode can message each other, or start a new Claude Code, Codex or Antigravity session.
-- **Never in the way**: a message never interrupts a turn. It waits until its session is idle; Cursor, TRAE, WorkBuddy, ZCode, Qoder and Kimi Code take it when one of their turns ends.
+- **Never in the way**: a message never interrupts a turn. It waits until its session is idle.
+- **Six are limited**: Cursor, TRAE, WorkBuddy, ZCode, Qoder and Kimi Code take a message only when one of their turns ends, so an idle session gets it after you start another turn there. All but WorkBuddy also cap how many they take in a row.
 
 How to turn it on and use it: [Agents messaging each other](https://agenthud.app/docs/en/mcp/messaging/).
 
@@ -247,31 +248,31 @@ Install and sign in to the agents you want to follow; Agent HUD finds them by it
 | **Codex** | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | **DeepSeek&nbsp;Harness** | ✓ | Balance | ✓ | ✓ | ✓ | ✓ |  | ✓ | ✓ |
 | **Antigravity** | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| **Cursor** | ✓ | ✓ | ✓ |  |  | ✓ | ✓ |  | ✓ |
+| **Cursor** | ✓ | ✓ | ✓ |  |  | ✓ | ✓ |  | Limited |
 | **Grok&nbsp;CLI** | ✓ | ✓ | ✓ |  |  | ✓ |  |  |  |
 | **Grok&nbsp;Bot** | ✓ | ✓ | ✓ |  |  | ✓ | ✓ |  |  |
 | **GitHub&nbsp;Copilot&nbsp;CLI** | ✓ | ✓ | ✓ | ✓ |  | ✓ |  |  |  |
 | **OpenCode** | ✓ | ✓ |  |  |  | ✓ | ✓ |  | ✓ |
 | **Kilo&nbsp;Code** | ✓ |  |  |  |  | ✓ | ✓ |  |  |
 | **MiMo&nbsp;Code** | ✓ |  |  |  |  | ✓ | ✓ |  |  |
-| **Kimi** | ✓ | ✓ | ✓ |  |  | ✓ |  |  | ✓ |
+| **Kimi** | ✓ | ✓ | ✓ |  |  | ✓ |  |  | Limited |
 | **Pi** | ✓ | ✓ | ✓ |  |  | ✓ | ✓ |  | ✓ |
 | **Oh&nbsp;My&nbsp;Pi** | ✓ |  | ✓ |  |  | ✓ | ✓ |  |  |
 | **OpenClaw** | ✓ |  |  |  |  |  |  |  |  |
 | **Hermes&nbsp;Agent** | ✓ | ✓ | ✓ |  |  | ✓ |  |  |  |
 | **Factory&nbsp;Droid** | ✓ | ✓ | ✓ | ✓ |  | ✓ |  |  |  |
-| **TRAE** | Sessions | ✓ | ✓ |  |  | ✓ |  |  | ✓ |
-| **Qoder** | ✓ | ✓ | ✓ | ✓ |  | ✓ |  | ✓ | ✓ |
-| **ZCode** | ✓ |  | ✓ | ✓ | ✓ | ✓ |  |  | ✓ |
+| **TRAE** | Sessions | ✓ | ✓ |  |  | ✓ |  |  | Limited |
+| **Qoder** | ✓ | ✓ | ✓ | ✓ |  | ✓ |  | ✓ | Limited |
+| **ZCode** | ✓ |  | ✓ | ✓ | ✓ | ✓ |  |  | Limited |
 | **CodeBuddy** | ✓ |  |  | ✓ |  | ✓ |  |  |  |
-| **WorkBuddy** | ✓ | ✓ |  | ✓ |  | ✓ |  |  | ✓ |
+| **WorkBuddy** | ✓ | ✓ |  | ✓ |  | ✓ |  |  | Limited |
 | **Qwen&nbsp;Code** | ✓ |  |  | ✓ |  | ✓ |  |  |  |
 | **Devin** | ✓ | ✓ |  | ✓ |  | ✓ | ✓ |  |  |
 | **Cline** | ✓ | ✓ |  |  |  |  |  |  |  |
 | **Roo&nbsp;Code** | ✓ |  |  |  |  |  |  |  |  |
 | **Goose** | ✓ |  |  |  |  |  |  |  |  |
 
-Also: the **GLM Coding Plan**, **OpenCode Go**, **MiniMax** and **Volcengine Ark** plan quotas. Qoder includes Qoder CN and QoderWork, TRAE includes TRAE CN, and Devin includes the CLI and Devin Desktop. Codex CLI approvals need its hook trusted in Codex (the Codex app's need nothing), DeepSeek Harness approvals and questions need Agent HUD's plugin (Settings → Agent plugins), and Copilot's approvals and quota are each turned on in Settings. Qoder's, WorkBuddy's and TRAE's quotas show once you sign in to the vendor's site in Agent HUD's own window. TRAE reports no tokens, so only its sessions show, and it runs Agent HUD's hooks once you turn on its global hooks. Qoder records tokens, and so its turns, only for a model on your own key or with `QODER_EXPOSE_TOKEN_USAGE` set. A jump back to a terminal pane needs iTerm2, and Cursor opens a cloud agent's chat but only a local chat's folder. [Agent messages](https://agenthud.app/docs/en/mcp/messaging/) work with OpenCode 1, and Qoder CN and QoderWork take them without sending. Factory Droid's quota needs a Factory API key, and Devin's quotas come from its CLI's local cache. Cursor's tokens come from Cursor 3.27 or later. Grok Bot's bots run on Cursor's servers, which report each bot's daily tokens; an account merged into SuperGrok reports none, so only its sessions show. Grok Bot's weekly quota comes from the same servers when Cursor is signed in to the Bot's account, otherwise from the Bot's own cache, which it refreshes only while in use. An account merged into SuperGrok has one weekly limit for Cursor and Grok Bot, and Cursor's block shows it as Cursor does.
+Also: the **GLM Coding Plan**, **OpenCode Go**, **MiniMax** and **Volcengine Ark** plan quotas. Qoder includes Qoder CN and QoderWork, TRAE includes TRAE CN, and Devin includes the CLI and Devin Desktop. Codex CLI approvals need its hook trusted in Codex (the Codex app's need nothing), DeepSeek Harness approvals and questions need Agent HUD's plugin (Settings → Agent plugins), and Copilot's approvals and quota are each turned on in Settings. Qoder's, WorkBuddy's and TRAE's quotas show once you sign in to the vendor's site in Agent HUD's own window. TRAE reports no tokens, so only its sessions show, and it runs Agent HUD's hooks once you turn on its global hooks. Qoder records tokens, and so its turns, only for a model on your own key or with `QODER_EXPOSE_TOKEN_USAGE` set. A jump back to a terminal pane needs iTerm2, and Cursor opens a cloud agent's chat but only a local chat's folder. An agent marked Limited under [Agent messages](https://agenthud.app/docs/en/mcp/messaging/) takes a message only when one of its turns ends, not while idle, and cannot be started in a new session; only an interactive Qoder CLI session takes one while idle. Agent messages work with OpenCode 1, and Qoder CN and QoderWork take them without sending. Factory Droid's quota needs a Factory API key, and Devin's quotas come from its CLI's local cache. Cursor's tokens come from Cursor 3.27 or later. Grok Bot's bots run on Cursor's servers, which report each bot's daily tokens; an account merged into SuperGrok reports none, so only its sessions show. Grok Bot's weekly quota comes from the same servers when Cursor is signed in to the Bot's account, otherwise from the Bot's own cache, which it refreshes only while in use. An account merged into SuperGrok has one weekly limit for Cursor and Grok Bot, and Cursor's block shows it as Cursor does.
 
 ## Keep your data safe.
 
