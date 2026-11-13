@@ -41,6 +41,20 @@ pub(super) fn read(host: &dyn Host, executable: &Path) -> Result<Reading, String
 }
 
 fn parse(scope: &str, body: &Value) -> Result<Reading, String> {
+    // The CLI can refuse to report usage at all, for example when the
+    // account's region is not eligible for Antigravity. Its own words say
+    // why, so keep them in the failure instead of the generic text.
+    if body["status"] == "ERROR" {
+        let reason = body["error"].as_str().map(str::trim).unwrap_or("");
+        return Err(if reason.is_empty() {
+            failure()
+        } else {
+            l10n::text(
+                &format!("无法读取 Antigravity 额度：{reason}"),
+                &format!("Antigravity quota could not be read: {reason}"),
+            )
+        });
+    }
     if body["status"] != "SUCCESS" || body["command"]["name"] != "usage" {
         return Err(failure());
     }

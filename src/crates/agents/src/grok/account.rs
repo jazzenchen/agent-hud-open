@@ -160,9 +160,14 @@ fn no_personal_quota() -> String {
 /// `weekly` reads it from the servers) for `slot`, read at `observed`, on
 /// the account named `email` where Cursor's sign-in to it tells.
 fn quota(u: &Value, slot: &str, observed: i64, email: Option<&str>) -> Result<Reading, String> {
-    if u["hasNonZeroIncludedLimit"] != true
-        || !u["isSandTrial"].is_boolean()
+    // A trial reports its usage without including a weekly allowance; that
+    // reading is still the Bot's own quota, so show it rather than claim the
+    // account has no personal limit. Accounts that are neither trial nor
+    // carry an included limit (a pooled team allowance) keep the notice.
+    let trial = u["isSandTrial"] == true;
+    if !u["isSandTrial"].is_boolean()
         || u["isTeamSeat"] == true
+        || (u["hasNonZeroIncludedLimit"] != true && !trial)
     {
         return Err(no_personal_quota());
     }
@@ -181,7 +186,6 @@ fn quota(u: &Value, slot: &str, observed: i64, email: Option<&str>) -> Result<Re
         ));
     }
     let observed = iso(observed);
-    let trial = u["isSandTrial"] == true;
     r.quotas.push(json!({"id":format!("{id}/grok"),"vendor":"grok-bot","consumerSource":"grok-bot","accountId":id,"legacyWindowId":format!("{id}/grok"),"name":if trial{"Trial usage limit"}else{"Weekly usage limit"},"shortLabel":if trial{"Trial".to_owned()}else{window_names::Period::Week.short_name()},"usedPercent":used,"resetAt":reset,"windowDurationSeconds":if trial{None}else{Some(604800)},"allModels":true,"observedAt":observed,"status":used.map(status).unwrap_or("unknown")}));
     let cap = u["onDemand"]["limitCents"].as_f64();
     let extra = u["onDemand"]["usedCents"].as_f64();
@@ -270,6 +274,16 @@ mod tests {
         let reading = read(&host_with(fresh_quota(true))).unwrap();
         assert_eq!(reading.quotas[0]["name"], "Trial usage limit");
         assert!(reading.quotas[0]["windowDurationSeconds"].is_null());
+    }
+
+    #[test]
+    fn a_trial_without_an_included_limit_still_reports_its_usage() {
+        let mut quota = fresh_quota(true);
+        quota["reading"]["usage"]["hasNonZeroIncludedLimit"] = json!(false);
+        let reading = read(&host_with(quota)).unwrap();
+        assert_eq!(reading.quotas[0]["name"], "Trial usage limit");
+        assert_eq!(reading.quotas[0]["usedPercent"], 42.0);
+        assert_eq!(reading.account.unwrap()["plan"], "SuperGrok");
     }
 
     #[test]

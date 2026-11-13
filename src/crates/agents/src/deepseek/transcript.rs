@@ -188,7 +188,7 @@ impl Log {
         let model = format!(
             "{}#{}",
             self.model,
-            self.source_state["provider"].as_str().unwrap_or("Unknown")
+            route(self.source_state["provider"].as_str().unwrap_or("Unknown"))
         );
         let duration_ms = self.call_timing.since_request(0, at);
         self.count_timed_source(
@@ -205,6 +205,18 @@ impl Log {
             false,
             duration_ms,
         );
+    }
+}
+
+/// The route a DeepSeek Harness provider id names in HUD's terminology. The
+/// Harness calls its platform account provider `deepseek-account`; HUD's
+/// balance reader, billing queries and price catalog call that route
+/// `deepseek-official`, so usage recorded under either name prices and bills
+/// as DeepSeek's own API.
+fn route(provider: &str) -> &str {
+    match provider {
+        "deepseek-account" => "deepseek-official",
+        other => other,
     }
 }
 
