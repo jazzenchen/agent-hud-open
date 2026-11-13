@@ -7,6 +7,7 @@ mod files;
 pub(crate) mod pipe;
 mod process;
 mod secrets;
+pub(crate) use crate::windows_session::spawn;
 pub(crate) use apps::{activate_app, app_running, launch_app};
 pub(crate) use process::{
     codex_cli_on_port, parent_processes, process_runs, process_start, terminal_io,
@@ -217,8 +218,8 @@ pub(crate) fn reveal_transcript(path: &Path) -> Result<(), String> {
         .arg(format!("/select,{}", path.display()))
         .stdin(Stdio::null())
         .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .spawn()
+        .stderr(Stdio::null());
+    spawn(&mut command)
         .map(|_| ())
         .map_err(|_| "Could not reveal transcript".into())
 }

@@ -209,7 +209,7 @@ fn query_registered_applications() -> Vec<PathBuf> {
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::null());
-    let Ok(mut child) = command.spawn() else {
+    let Ok(mut child) = super::spawn(&mut command) else {
         return Vec::new();
     };
     let stdout = child.stdout.take().unwrap();

@@ -20,6 +20,9 @@ pub mod local_ipc;
 pub mod local_tools;
 mod navigation;
 mod os;
+#[cfg(target_os = "windows")]
+#[path = "windows/session.rs"]
+pub mod windows_session;
 pub use accounts::{AccountService, CollectionGate, WebSignInDesk};
 pub use navigation::session_url;
 #[cfg(target_os = "macos")]

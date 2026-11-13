@@ -38,7 +38,7 @@ impl StdioServer {
             .stderr(Stdio::null());
         crate::os::configure_command(&mut command);
         let job = children::Job::new()?;
-        let mut child = command.spawn()?;
+        let mut child = crate::os::spawn(&mut command)?;
         if let Err(error) = job.assign(&child) {
             let _ = child.kill();
             let _ = child.wait();

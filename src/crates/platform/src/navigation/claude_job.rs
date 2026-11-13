@@ -132,7 +132,7 @@ fn stop(claude: &Path, job: &str, path: &str) {
         .stdout(Stdio::null())
         .stderr(Stdio::null());
     crate::os::configure_command(&mut command);
-    let Ok(mut child) = command.spawn() else {
+    let Ok(mut child) = crate::os::spawn(&mut command) else {
         return;
     };
     let deadline = Instant::now() + STOP;
