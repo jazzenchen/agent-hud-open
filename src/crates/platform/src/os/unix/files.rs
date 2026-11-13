@@ -34,6 +34,11 @@ pub(crate) fn owned_by_user(_path: &Path, metadata: &fs::Metadata) -> bool {
     metadata.uid() == unsafe { libc::geteuid() }
 }
 
+/// A client's transcript this user may read: owned by this user.
+pub(crate) fn user_transcript(path: &Path, metadata: &fs::Metadata) -> bool {
+    owned_by_user(path, metadata)
+}
+
 /// Owned by this user and closed to group and others.
 pub(crate) fn owner_only(path: &Path, metadata: &fs::Metadata) -> bool {
     owned_by_user(path, metadata) && metadata.permissions().mode() & 0o077 == 0

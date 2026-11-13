@@ -34,7 +34,7 @@ impl Transcript {
         if !metadata.is_file() {
             return None;
         }
-        if !crate::os::owned_by_user(path, &metadata) {
+        if !crate::os::user_transcript(path, &metadata) {
             return None;
         }
         let dirty = Arc::new(AtomicBool::new(true));

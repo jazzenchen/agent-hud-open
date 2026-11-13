@@ -25,7 +25,7 @@ pub(crate) const MOVES_CLAUDE_JOBS: bool = false;
 pub(crate) const OPENS_CLAUDE_PROJECTS: bool = false;
 pub(crate) use files::{
     hook_configuration, hook_text, owned_by_user, owner_only, private_append, private_directory,
-    private_file, read_stdin,
+    private_file, read_stdin, user_transcript,
 };
 use std::{
     path::{Path, PathBuf},

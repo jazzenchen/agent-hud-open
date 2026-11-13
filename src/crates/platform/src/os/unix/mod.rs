@@ -5,7 +5,7 @@ mod files;
 mod pids;
 pub(crate) use files::{
     hook_configuration, hook_text, owned_by_user, owner_only, private_append, private_directory,
-    private_file, read_stdin,
+    private_file, read_stdin, user_transcript,
 };
 pub(crate) use pids::pid_runs;
 use std::{

@@ -16,6 +16,14 @@ pub(crate) fn owned_by_user(path: &Path, _metadata: &fs::Metadata) -> bool {
     acl::owned_path(path)
 }
 
+/// A client's transcript this user may read: owned by this user, or by the
+/// owner Windows gives this process's files (for an elevated administrator,
+/// the Administrators group), as an elevated Claude Code's transcripts are.
+/// Only transcript reads accept that; the app's own folders never do.
+pub(crate) fn user_transcript(path: &Path, metadata: &fs::Metadata) -> bool {
+    owned_by_user(path, metadata) || acl::owned_by_default_owner(path)
+}
+
 /// Files inherit the private directory's protected DACL, so ownership is the check.
 pub(crate) fn owner_only(path: &Path, metadata: &fs::Metadata) -> bool {
     owned_by_user(path, metadata)
@@ -122,7 +130,19 @@ pub(crate) fn hook_text(
 
 #[cfg(test)]
 mod tests {
-    use super::complete_json;
+    use super::{complete_json, user_transcript};
+
+    /// What this process writes is owned by the user, or for an elevated
+    /// process by the Administrators group; a transcript read accepts both.
+    #[test]
+    fn a_transcript_this_process_writes_is_readable_elevated_or_not() {
+        let temp = tempfile::tempdir().unwrap();
+        let path = temp.path().join("t.jsonl");
+        std::fs::write(&path, b"{}\n").unwrap();
+        let metadata = std::fs::metadata(&path).unwrap();
+        assert!(user_transcript(&path, &metadata));
+        assert!(!user_transcript(&temp.path().join("missing"), &metadata));
+    }
 
     #[test]
     fn a_payload_is_taken_once_its_json_is_whole() {

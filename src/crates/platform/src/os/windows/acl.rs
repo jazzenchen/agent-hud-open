@@ -15,9 +15,9 @@ use windows_sys::Win32::{
             ConvertSidToStringSidW, ConvertStringSecurityDescriptorToSecurityDescriptorW,
             GetNamedSecurityInfoW, SE_FILE_OBJECT,
         },
-        GetTokenInformation, SetFileSecurityW, TokenUser, DACL_SECURITY_INFORMATION,
+        GetTokenInformation, SetFileSecurityW, TokenOwner, TokenUser, DACL_SECURITY_INFORMATION,
         OWNER_SECURITY_INFORMATION, PROTECTED_DACL_SECURITY_INFORMATION, SECURITY_ATTRIBUTES,
-        TOKEN_QUERY, TOKEN_USER,
+        TOKEN_OWNER, TOKEN_QUERY, TOKEN_USER,
     },
     Storage::FileSystem::{
         CreateDirectoryW, CreateFileW, CREATE_NEW, FILE_ATTRIBUTE_REPARSE_POINT,
@@ -39,28 +39,36 @@ impl Drop for Local {
     }
 }
 pub(super) fn sid() -> Result<String, String> {
+    token_sid(TokenUser)
+}
+/// The owner Windows gives what this process creates: the user, or for an
+/// elevated administrator the Administrators group.
+fn default_owner() -> Option<&'static str> {
+    static OWNER: std::sync::OnceLock<Option<String>> = std::sync::OnceLock::new();
+    OWNER.get_or_init(|| token_sid(TokenOwner).ok()).as_deref()
+}
+/// One SID from this process's token (`TokenUser` or `TokenOwner`), as text.
+fn token_sid(class: i32) -> Result<String, String> {
     unsafe {
         let mut token: HANDLE = std::ptr::null_mut();
         if OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &mut token) == 0 {
             return Err("Current-user token unavailable".into());
         }
         let mut bytes = 0;
-        GetTokenInformation(token, TokenUser, std::ptr::null_mut(), 0, &mut bytes);
+        GetTokenInformation(token, class, std::ptr::null_mut(), 0, &mut bytes);
         let mut buffer = vec![0usize; (bytes as usize).div_ceil(size_of::<usize>())];
-        let ok = GetTokenInformation(
-            token,
-            TokenUser,
-            buffer.as_mut_ptr().cast(),
-            bytes,
-            &mut bytes,
-        );
+        let ok = GetTokenInformation(token, class, buffer.as_mut_ptr().cast(), bytes, &mut bytes);
         CloseHandle(token);
         if ok == 0 {
             return Err("Current-user identity unavailable".into());
         }
-        let user = &*buffer.as_ptr().cast::<TOKEN_USER>();
+        let sid = if class == TokenUser {
+            (*buffer.as_ptr().cast::<TOKEN_USER>()).User.Sid
+        } else {
+            (*buffer.as_ptr().cast::<TOKEN_OWNER>()).Owner
+        };
         let mut text = std::ptr::null_mut();
-        if ConvertSidToStringSidW(user.User.Sid, &mut text) == 0 {
+        if ConvertSidToStringSidW(sid, &mut text) == 0 {
             return Err("Current-user identity unavailable".into());
         }
         let text = Local(text.cast());
@@ -95,6 +103,15 @@ pub(super) fn security(inherit: bool) -> Result<Local, String> {
     Ok(Local(descriptor))
 }
 pub(crate) fn owned_path(path: &Path) -> bool {
+    path_owner(path).is_some_and(|owner| sid().is_ok_and(|sid| sid == owner))
+}
+/// Owned by this process's default owner. Only transcript reads accept this
+/// (`files::user_transcript`); the app's own folders and inbox never do.
+pub(crate) fn owned_by_default_owner(path: &Path) -> bool {
+    path_owner(path).is_some_and(|owner| default_owner() == Some(owner.as_str()))
+}
+/// A file's owner SID, as text.
+fn path_owner(path: &Path) -> Option<String> {
     let mut owner = std::ptr::null_mut();
     let mut descriptor = std::ptr::null_mut();
     let path = wide(path.as_os_str());
@@ -112,11 +129,11 @@ pub(crate) fn owned_path(path: &Path) -> bool {
     };
     let _descriptor = Local(descriptor);
     if status != 0 || owner.is_null() {
-        return false;
+        return None;
     }
     let mut text = std::ptr::null_mut();
     if unsafe { ConvertSidToStringSidW(owner, &mut text) } == 0 {
-        return false;
+        return None;
     }
     let text = Local(text.cast());
     let mut count = 0;
@@ -125,10 +142,9 @@ pub(crate) fn owned_path(path: &Path) -> bool {
             count += 1;
         }
     }
-    let owner = unsafe {
+    Some(unsafe {
         String::from_utf16_lossy(std::slice::from_raw_parts(text.0.cast::<u16>(), count))
-    };
-    sid().is_ok_and(|sid| sid == owner)
+    })
 }
 pub(crate) fn private_directory(path: &Path) -> Result<(), String> {
     if let Some(parent) = path
