@@ -42,10 +42,11 @@ fn carry(source: &str) -> Option<Carry> {
             most: 3,
         },
         // The engine turns the reason into "Stop hook feedback"; it sets no
-        // cap of its own, so chains stay short.
+        // cap of its own, and Agent HUD adds none: what ends a chain is the
+        // limit on passes between agents (`agentMessagesLimit`).
         "workbuddy" | "codebuddy" => Carry {
             reply: block,
-            most: 3,
+            most: u64::MAX,
         },
         // Qoder documents `decision: "deny"` with a reason for Stop.
         "qoder" | "qoder-cn" | "qoder-work" => Carry {
