@@ -54,7 +54,7 @@ impl Builder {
         let mut again = 0;
         if call.own {
             again = recached(tokens, self.previous_prompt);
-            self.previous_prompt = Some(sent);
+            self.previous_prompt = Some(tokens.into());
             self.context = Some(sent);
             if let Some(reported) = row.context_window {
                 self.window = Some(reported);

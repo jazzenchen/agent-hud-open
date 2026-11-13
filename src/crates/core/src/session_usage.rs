@@ -54,15 +54,39 @@ fn kind_lists(bars: &[Usage]) -> Option<Value> {
     (!lists.is_empty()).then_some(Value::Object(lists))
 }
 
-/// What a call in the session's own log sent again after `previous`, the
-/// prompt of the call before it: its whole input (fresh and cache writes) when
-/// it read back less than half of that prompt from the cache and sent at least
-/// half of it again. The cache had lapsed or the model changed; a compaction
-/// shrinks the prompt instead, so it re-caches nothing.
-pub(crate) fn recached(usage: Usage, previous: Option<u64>) -> u64 {
+/// The call before a call: its whole prompt, and what it left in the cache
+/// (what it read from it and wrote to it).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct CachePrompt {
+    pub total: u64,
+    pub cached: u64,
+}
+
+impl From<Usage> for CachePrompt {
+    fn from(usage: Usage) -> Self {
+        Self {
+            total: prompt(usage),
+            cached: usage.read + usage.write,
+        }
+    }
+}
+
+/// What a call in the session's own log sent again after `previous`, the call
+/// before it: its whole input (fresh and cache writes) when it read back less
+/// than that call left in the cache, less than half of its prompt, and sent at
+/// least half of it again. The cache had lapsed or the model changed. A
+/// compaction shrinks the prompt instead, and a model that never caches, or
+/// reads the same from it every call, loses nothing, so neither counts.
+pub(crate) fn recached(usage: Usage, previous: Option<CachePrompt>) -> u64 {
     let sent = usage.input + usage.write;
     match previous {
-        Some(previous) if usage.read * 2 < previous && sent * 2 >= previous => sent,
+        Some(previous)
+            if usage.read < previous.cached
+                && usage.read * 2 < previous.total
+                && sent * 2 >= previous.total =>
+        {
+            sent
+        }
         _ => 0,
     }
 }
@@ -150,7 +174,7 @@ pub(crate) struct Builder {
     window: Option<u64>,
     latest: Option<(String, String)>,
     tally: ListTally,
-    previous_prompt: Option<u64>,
+    previous_prompt: Option<CachePrompt>,
     turns: BTreeMap<i64, TurnSums>,
     prompt_index: i64,
 }

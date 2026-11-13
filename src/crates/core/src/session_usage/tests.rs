@@ -36,18 +36,20 @@ fn a_call_re_caches_when_it_reads_back_less_than_half_and_sends_half_again() {
         read,
         ..Usage::default()
     };
+    // The call before wrote its whole 100-token prompt to the cache.
+    let cached = Some(usage(0, 100, 0).into());
     assert_eq!(
-        recached(usage(10, 90, 0), Some(100)),
+        recached(usage(10, 90, 0), cached),
         100,
         "cache lapsed: everything sent again"
     );
     assert_eq!(
-        recached(usage(10, 0, 90), Some(100)),
+        recached(usage(10, 0, 90), cached),
         0,
         "read back from the cache"
     );
     assert_eq!(
-        recached(usage(5, 10, 0), Some(100)),
+        recached(usage(5, 10, 0), cached),
         0,
         "a compaction shrinks the prompt"
     );
@@ -57,9 +59,30 @@ fn a_call_re_caches_when_it_reads_back_less_than_half_and_sends_half_again() {
         "the first call has nothing to lose"
     );
     assert_eq!(
-        recached(usage(20, 30, 49), Some(100)),
+        recached(usage(20, 30, 49), cached),
         50,
         "exactly half sent again"
+    );
+    assert_eq!(
+        recached(usage(19_000, 0, 0), Some(usage(18_000, 0, 0).into())),
+        0,
+        "a model that never caches lost nothing"
+    );
+    let steady = Some(usage(18_000, 0, 12_000).into());
+    for read in [12_000, 13_000] {
+        assert_eq!(
+            recached(usage(19_000, 0, read), steady),
+            0,
+            "reads the same as before, or more"
+        );
+    }
+    assert_eq!(
+        recached(
+            usage(1_000, 20_000, 0),
+            Some(usage(1_000, 20_000, 0).into())
+        ),
+        21_000,
+        "the cache the call before wrote has lapsed"
     );
 }
 

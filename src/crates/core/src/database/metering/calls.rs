@@ -1,6 +1,7 @@
 //! A session's recorded calls and marks, read back.
 
 use super::{call_list_cost, tools_from, unsigned, usage};
+use crate::session_usage::{recached as resent, CachePrompt};
 use crate::Usage;
 use chrono::{DateTime, Utc};
 use rusqlite::{params, Connection, OptionalExtension};
@@ -75,21 +76,33 @@ pub(crate) fn calls_of(
     Ok(calls)
 }
 
-/// The prompt (fresh input, cache writes and cache reads) of the latest call
-/// in these logs before `before`.
+/// The prompt and the cache of the latest call in these logs before `before`.
 pub(crate) fn prompt_before(
     db: &Connection,
     paths: &[String],
     before: i64,
-) -> rusqlite::Result<Option<u64>> {
+) -> rusqlite::Result<Option<CachePrompt>> {
     let selected = json!(paths).to_string();
     let mut statement = db.prepare_cached(
-        "SELECT input+cache_write+cache_read FROM usage_meter_event
+        "SELECT input,cache_write,cache_read FROM usage_meter_event
          WHERE contribution IN (SELECT value FROM json_each(?1)) AND at_ms<?2
          ORDER BY at_ms DESC,event_key DESC LIMIT 1",
     )?;
     let mut rows = statement.query(params![selected, before])?;
-    rows.next()?.map(|row| unsigned(row, 0)).transpose()
+    rows.next()?
+        .map(|row| sent(row, 0))
+        .transpose()
+        .map(|found| found.map(CachePrompt::from))
+}
+
+/// A call's prompt from its `input`, `cache_write` and `cache_read` columns.
+fn sent(row: &rusqlite::Row<'_>, first: usize) -> rusqlite::Result<Usage> {
+    Ok(Usage {
+        input: unsigned(row, first)?,
+        write: unsigned(row, first + 1)?,
+        read: unsigned(row, first + 2)?,
+        ..Usage::default()
+    })
 }
 
 /// Prompt tokens sent again because the cache no longer held them
@@ -113,11 +126,11 @@ pub(crate) fn recached(
         .query_map([], |row| row.get::<_, String>(0))?
         .collect::<rusqlite::Result<HashSet<_>>>()?;
     let mut before = db.prepare_cached(
-        "SELECT input+cache_write+cache_read FROM usage_meter_event
+        "SELECT input,cache_write,cache_read FROM usage_meter_event
          WHERE contribution=?1 AND at_ms<?2 ORDER BY at_ms DESC,event_key DESC LIMIT 1",
     )?;
     let mut calls = db.prepare_cached(
-        "SELECT at_ms,source,model,input+cache_write,cache_read,cache_write>0 FROM usage_meter_event
+        "SELECT at_ms,source,model,input,cache_write,cache_read FROM usage_meter_event
          WHERE contribution=?1 AND at_ms>=?2 AND at_ms<?3 ORDER BY at_ms,event_key",
     )?;
     let mut sums = BTreeMap::<(i64, String, String), (u64, u64)>::new();
@@ -127,14 +140,14 @@ pub(crate) fn recached(
             continue;
         }
         let mut previous = before
-            .query_row(params![path, since], |row| row.get::<_, i64>(0))
+            .query_row(params![path, since], |row| sent(row, 0))
             .optional()?
-            .map(i128::from);
+            .map(CachePrompt::from);
         let mut rows = calls.query(params![path, since, until])?;
         while let Some(row) = rows.next()? {
-            let sent = i128::from(row.get::<_, i64>(3)?);
-            let read = i128::from(row.get::<_, i64>(4)?);
-            if previous.is_some_and(|previous| read * 2 < previous && sent * 2 >= previous) {
+            let call = sent(row, 3)?;
+            let again = resent(call, previous);
+            if again > 0 {
                 let at = row.get::<_, i64>(0)?;
                 let key = (
                     at / 900_000 * 900_000,
@@ -142,12 +155,12 @@ pub(crate) fn recached(
                     row.get::<_, String>(2)?,
                 );
                 let sum = sums.entry(key).or_default();
-                sum.0 += sent as u64;
-                if row.get::<_, bool>(5)? {
-                    sum.1 += sent as u64;
+                sum.0 += again;
+                if call.write > 0 {
+                    sum.1 += again;
                 }
             }
-            previous = Some(sent + read);
+            previous = Some(call.into());
         }
     }
     Ok(sums
