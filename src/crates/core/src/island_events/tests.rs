@@ -51,6 +51,43 @@ fn a_reading_that_only_missed_an_answer_is_not_a_sign_out() {
     );
 }
 
+#[test]
+fn a_subagent_completion_does_not_create_a_new_reply_alert() {
+    let mut tracker = Tracker::new();
+    let at = tracker.started + 30_000;
+    let completed = |id: &str, parent: Option<&str>| {
+        json!({
+            "id": id,
+            "source": "codex",
+            "title": id,
+            "model": "gpt-5.5",
+            "parentId": parent,
+            "liveFacts": {
+                "outcome": "completed",
+                "endedAt": iso(at),
+                "turnId": "turn-1"
+            }
+        })
+    };
+
+    let events = tracker.update(
+        &[completed("main", None), completed("child", Some("main"))],
+        &[],
+        &[],
+        &[],
+        at,
+    );
+    let completions = events["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|event| event["kind"] == "completion")
+        .collect::<Vec<_>>();
+
+    assert_eq!(completions.len(), 1);
+    assert_eq!(completions[0]["sessionId"], "main");
+}
+
 fn codex(hooks: &[&str]) -> Value {
     json!({"id":"codex","name":"Codex","enabled":true,"accountStatus":{"status":"ready","unreviewedHooks":hooks}})
 }
