@@ -20,7 +20,7 @@ pub const CACHE_LOCATION: Location = Location::app_data(&["Grok Bot"], "sand-cli
 /// Grok Bot's desktop cache.
 pub const CACHE: PerOs<Location> = PerOs {
     macos: Support::Verified(CACHE_LOCATION),
-    windows: Support::Unsupported("Grok Bot's cache location on Windows is not known yet"),
+    windows: Support::Verified(CACHE_LOCATION),
     linux: Support::Unsupported("Grok Bot's cache location on Linux is not known yet"),
 };
 
@@ -275,7 +275,7 @@ mod tests {
     #[test]
     fn other_systems_say_the_cache_is_not_supported_yet() {
         let mut host = host_with(fresh_quota(false));
-        host.os = Os::Windows;
+        host.os = Os::Linux;
         let reading = read(&host).unwrap();
         assert_eq!(
             reading.notice.as_deref(),
