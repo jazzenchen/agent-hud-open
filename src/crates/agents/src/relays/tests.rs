@@ -36,6 +36,26 @@ fn official_and_vendor_addresses_are_no_relays() {
 }
 
 #[test]
+fn deepseek_harness_pointed_at_a_relay_lists_it() {
+    let harness = |base: &str| {
+        FakeHost::new("/u")
+            .file(
+                "/u/.dsh/settings.yaml",
+                &format!("llm-deepseek:\n  baseURL: {base}\n"),
+            )
+            .env("DEEPSEEK_API_KEY", "sk-relay")
+    };
+    let reading = read(&harness("https://proxy.example.com/v1")).unwrap();
+    assert_eq!(reading.services.len(), 1);
+    assert_eq!(reading.services[0]["provider"], "proxy.example.com");
+    assert_eq!(reading.services[0]["clients"], json!(["deepseek"]));
+    assert!(read(&harness("https://api.deepseek.com"))
+        .unwrap()
+        .services
+        .is_empty());
+}
+
+#[test]
 fn a_new_api_site_reports_the_balance_in_the_money_it_shows() {
     let status = |shown: &str| json!({"success": true, "data": {"system_name": "Relay One", "quota_per_unit": 500000, "quota_display_type": shown, "usd_exchange_rate": 7.0}});
     let usage = json!({"code": true, "data": {"total_available": 2_500_000, "total_used": 100, "unlimited_quota": false}});

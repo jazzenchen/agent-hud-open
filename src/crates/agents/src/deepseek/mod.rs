@@ -4,6 +4,7 @@ mod balance;
 mod hooks;
 mod platform;
 pub mod routes;
+pub mod settings;
 pub mod transcript;
 
 use crate::Discovery;

@@ -1,7 +1,8 @@
 //! Relays (中转站) and their balances (docs/proposals/no-plan-usage.md §5),
 //! one per address. A relay is found where a client keeps its address and
 //! key: Claude Code's settings.json `env` or this process's environment,
-//! Codex's `config.toml` providers; or the owner adds it by hand, for any
+//! Codex's `config.toml` providers, DeepSeek Harness's endpoint
+//! (`settings.yaml` `llm-deepseek.baseURL`); or the owner adds it by hand, for any
 //! agent. Which agents use it is the clients configured with it here, and
 //! the core adds the agents whose calls go through it. Nothing is asked of a
 //! relay found in a client's configuration until the owner agrees to it,
@@ -136,7 +137,7 @@ struct Found {
 /// The relays the clients send their calls through. A relay is read sooner
 /// while the clients it is found in work.
 pub static PROVIDER: Provider = Provider {
-    work_sources: &["claude", "codex"],
+    work_sources: &["claude", "codex", "deepseek"],
     ..Provider::new("relay", read)
 };
 
@@ -267,6 +268,10 @@ fn targets(host: &dyn Host) -> Result<Vec<Target>, Unread> {
             key.as_deref(),
             Some(&provider.id),
         );
+    }
+    // DeepSeek Harness: the endpoint its settings give, and its key.
+    if let Some((base, key)) = crate::deepseek::settings::route(host) {
+        add("deepseek", Some(&base), Some(&key), None);
     }
     Ok(found)
 }
