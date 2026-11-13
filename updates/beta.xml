@@ -3,14 +3,14 @@
   <channel>
     <title>Agent HUD</title>
     <item>
-      <title>0.6.1</title>
-      <pubDate>Thu, 12 Nov 2026 19:36:29 +0800</pubDate>
-      <link>https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.1</link>
-      <sparkle:version>498</sparkle:version>
-      <sparkle:shortVersionString>0.6.1</sparkle:shortVersionString>
+      <title>0.6.2</title>
+      <pubDate>Fri, 13 Nov 2026 20:39:34 +0800</pubDate>
+      <link>https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.2</link>
+      <sparkle:version>499</sparkle:version>
+      <sparkle:shortVersionString>0.6.2</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
       <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-      <description sparkle:format="markdown"># Agent HUD 0.6.1
+      <description sparkle:format="markdown"># Agent HUD 0.6.2
 
 ## Compatibility
 
@@ -24,37 +24,26 @@ Requires an Apple Silicon Mac running macOS 14 or later.
 
 ### New
 
-- Lets agents message Cursor, TRAE, WorkBuddy, ZCode, Qoder and Kimi Code sessions, and lets those sessions message others. Turn it on in Settings → Agent plugins → Agent tools → Let agents message each other; Settings → Agent plugins has a HUD tools row for each of them.
-  - A message reaches one of these sessions through the client's own completion hook, so it goes in when the session's turn ends and the session carries on with it. An idle session takes it at the end of its next turn. Only an interactive Qoder CLI session takes a message while idle.
-  - A client carries a turn on only a few times in a row (Cursor and TRAE 4, ZCode, WorkBuddy and Qoder 3, Kimi Code 1); more messages wait for a later turn. A message nobody took within an hour expires.
-  - TRAE runs hooks only after you turn them on in TRAE's Settings → Hooks. WorkBuddy starts Agent HUD's tools only after you trust the connector under Connectors → Custom connectors and switch it on.
-  - Kimi Code gets Agent HUD's hooks for this, in its `config.toml`. Requests from Kimi Code are still not answered from the HUD.
-  - The paper plane flies for these sessions too, and the sender can read the answer once the turn ends.
-- Lets Pi and OpenCode sessions take and send agent messages. An open session takes a waiting message once it is idle, and a message that comes during a turn waits for its end. Agent HUD adds its tools to Pi's `mcp.json` and to OpenCode's `opencode.json`. This works with OpenCode 1; OpenCode 2, Oh My Pi, Kilo Code and MiMo Code don't take messages yet.
-- Adds switches for each screen in Settings → Display, under On this screen: Show the HUD on this screen, and under it Messages, Requests and Agent messages in flight. A screen with the HUD off shows nothing, cards included; the other three hide the message cards and the tail, the request cards and the head, or the paper plane. Agents can't change these through the HUD tools, and Reset leaves them alone.
-- Draws the hover panel as cards. Each block and each section has a ground and a frame of its own, in place of the lines between them. Cards side by side stand at one height, and the token chart fills its card. A panel styled without separators looks as it did.
-- Counts Agent HUD Remote's seats as one pool. App Store subscriptions and license keys add up, and the computers turned on most recently hold the seats.
-  - A computer beyond the seats turns its own Remote off; turn it on again once a seat is free. With no valid purchase every computer pauses and comes back by itself.
-  - A Mac that was off for a month no longer takes its seat back from the computer that took it meanwhile.
-  - The Subscription and Remote pages speak of computers. My computers lists every other computer using a seat, with its platform and whether it is within the paid seats.
-- Reads these agents more closely:
-  - TRAE's quota is counted as TRAE's own app counts it, and WorkBuddy's credits show as a balance, "Available credits" in Statistics. TRAE's, WorkBuddy's and Qoder's quotas come only from the sign-in you make in Agent HUD's own window.
-  - Kimi Code shows its account and plan, its sessions' titles and its archived sessions.
-  - ZCode's sessions follow its renames, archive and sub-agents, and its conversations can be read.
-  - A Qoder session is titled by what you first typed, and names its model.
-- Adds How agent messages work → Open the guide to Settings → Agent plugins → Agent tools (#56, #59).
+- Guides a new copy from beside the HUD. On first launch a small window opens beside the main screen's HUD: where the HUD is, then Notch or Simple picked right there. The tour goes on in Settings and rings what each step explains: Display, Agents, client hooks, HUD tools, agent messages, and the tools and plugins of each client. Every step has Back and Next, and none moves on by itself. Start it again from Settings → General → Help → Getting started, or from the ⋯ menu in Settings → Getting Started…
+- Tells what a release adds after an update, in the same window beside the HUD. Open it again from the ⋯ menu in Settings → What's New…
+- Lets you choose which agents a screen's HUD shows, in Settings → Display → HUD → Agents on this HUD (#66). There is a switch per agent, in Notch and in Simple. One agent always stays on, and with all of them on an agent added later shows too. The preview above leaves out a hidden agent as well.
+- Reads TeleAgent's sessions and tokens (#69). TeleAgent 3.0 keeps an OpenCode database per signed-in account. Its sessions show tokens without live state.
+- Shows the balance of a relay that DeepSeek Harness is set to (#70). Relays were found only in Claude Code's and Codex's settings. The relay is now listed in Settings → Relays; nothing is asked of it until you turn it on there.
+- Shows a SuperGrok trial's usage for Grok Bot as "Trial usage limit" (#61). A trial has no included weekly allowance, so it was told it had no personal quota.
 
 ### Fixes
 
-- Stops the steady CPU use while Antigravity runs (#53). A large conversation that Antigravity kept writing to was read again from its first row every two seconds, and the read never finished. A change is now read from where the last read stopped: about 1% CPU in place of 7 to 8% on a 155 MB conversation written every 20 seconds, and nothing once the writing stops.
-- Shows DeepSeek's balance for Pi on a DeepSeek API key (#64). Pi's tokens showed without a balance. The balance's currency now also picks the price list for Pi's DeepSeek tokens.
-- Asks a sending agent for one whole message (#54). Each message is a turn of its own for the receiver, so three partial messages about one task made it review the work three times.
-- Shows a Cursor chat as running while its turn goes on. Only Cursor's completion hook was installed, so a chat never showed running.
-- Reads the 30 days of usage shared with the iPhone at most every 30 seconds. It was read again each time new usage came in while your history was still being read, and always on a computer that shares over the local network only, which cost CPU each time.
-- Sends an agent's waiting message into a Claude Code session it started before that session moves into the Claude desktop app.
-- Scrolls the hover panel without scroll bars. A dark bar flashed along its side and bottom while the panel grew.
+- Stops reply alerts for a sub-agent's finished turn (#67). A child session's completion raised an alert of its own while the parent agent was still working.
+- Marks a cache as expired only when a call reads less than the call before left in it (#48). A model that never reads from a cache, or reads the same amount on every call, was marked on every call, which showed as "Cache expired, … sent again" on a session's turns and added to Cache rewrites in Statistics.
+- Prices DeepSeek Harness's calls on its DeepSeek platform account, and links them to the DeepSeek balance (#61). Harness records that account under a name of its own, so those calls had no price.
+- Shows Antigravity's own reason when its command line refuses to report usage (#61), for example for an account in a region Antigravity does not serve. Only a general failure text showed.
+- Rebuilds a damaged ledger (#34). When the ledger file was corrupt, Agent HUD ran without it. The file is now deleted and filled again from the agents' logs. Quota history, and tokens from logs a client has already deleted, do not come back.
+- Carries a WorkBuddy or CodeBuddy turn on with every waiting agent message. Agent HUD stopped after 3 in a row and left the rest for a later turn; these clients set no cap of their own.
+- Opens web links in Agent HUD's windows in your browser. Links to the docs and to order and store pages did nothing.
+- Keeps Claude Code's `settings.json` and Codex's `hooks.json` in their own key order (#74). Each launch wrote the Remote hooks back with the keys sorted, which rearranged the whole file.
+- Shows a license key that another computer of the account holds, on the Subscription page: "License key · On &lt;computer&gt; · 1 computer · Until &lt;day&gt;". A computer without a key of its own, whose App Store plan had lapsed, showed only the expired App Store row and read "Subscribe or enter a license key to enable a computer", although the other computer's key paid for the seat. It now reads "Turn this computer on below to use a seat".
 </description>
-      <enclosure url="https://github.com/jazzenchen/agent-hud-open/releases/download/v0.6.1/Agent-HUD-0.6.1-arm64.dmg" length="53142996" type="application/octet-stream" sparkle:edSignature="AYCuFg8IvYT2xryvbEi3mOrjsSNW85V4t75afsSvcOvssL1QWQ5ciQWFhn2WDIPmqA4W6XyA7YK0IyuRNMq1Cw==" />
+      <enclosure url="https://github.com/jazzenchen/agent-hud-open/releases/download/v0.6.2/Agent-HUD-0.6.2-arm64.dmg" length="53219739" type="application/octet-stream" sparkle:edSignature="LPW4WfcKdZk87TdbsI/qjNeXKT1n3FzZrVwDk3nrspMzzj/PjdOUH6KBwtz7M69ZoN6Fllo6Ho9eHrLumfLQAQ==" />
       <agenthudMacOnly>false</agenthudMacOnly>
       <agenthudMinimumIOSVersion>1.7.2</agenthudMinimumIOSVersion>
     </item>
