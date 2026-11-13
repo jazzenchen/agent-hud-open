@@ -338,6 +338,12 @@ mod tests {
     }
 
     #[test]
+    fn harness_platform_account_calls_are_deepseeks_own_api() {
+        assert_eq!(route("deepseek-account"), "deepseek-official");
+        assert_eq!(route("openrouter"), "openrouter");
+    }
+
+    #[test]
     fn deepseek_states_its_own_rule() {
         assert!(std::ptr::eq(
             crate::transcript::items::of("deepseek"),
