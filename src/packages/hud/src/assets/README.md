@@ -20,6 +20,9 @@ Volcengine Ark, `light/volcengine-color.png`), `cline.png`, `roo-code.png` and
 are single-colour and are tinted to the foreground, as the original Grok and
 Cursor marks are.
 
+`teleagent.png` is TeleAgent's own app icon, as its contributor sent it in
+agent-hud-open#69, scaled from 640 to 320 pixels.
+
 The bundled `clawd-sprites.json` is consumed by the original Clawd bot renderer.
 It contains Anthropic's artwork copied unchanged from Claude for macOS
 2.37337.1's Clawd Quest sprite table. Copyright Anthropic PBC, all rights

@@ -116,14 +116,16 @@ a call in more than one place, the best one counts it and the others give way.
 
 ## Forks read with their parents' readers
 
-Kilo Code and MiMo Code keep OpenCode's database, and Oh My Pi keeps Pi's
-logs, each under folders of its own. Each is its own source, with its own
-session ids (`kilo:`, `mimocode:`, `omp:`), read by its parent's reader:
+Kilo Code, MiMo Code and TeleAgent keep OpenCode's database, and Oh My Pi
+keeps Pi's logs, each under folders of its own. Each is its own source, with
+its own session ids (`kilo:`, `mimocode:`, `teleagent:`, `omp:`), read by its
+parent's reader:
 
 | Client | Sessions | Left out |
 | --- | --- | --- |
 | Kilo Code | `$XDG_DATA_HOME/kilo/kilo.db` | Tasks moved in from the VS Code extension (`ses_migrated_*`, no tokens); the JSON files it copied into the database; rows whose data is not JSON |
 | MiMo Code | `$XDG_DATA_HOME/mimocode/mimocode.db` | Messages imported from Claude Code, Codex or OpenCode (`external_import`), which are read where they were made; the made-up title "Untitled" |
+| TeleAgent | `$XDG_DATA_HOME/TeleAgent/users/<account>/teleagent.db`, one per signed-in account | Nothing of its own; it loads no OpenCode plugin, so its sessions show tokens without live state |
 | Oh My Pi | `~/.omp/agent/sessions` | Entries a moved or forked session copied from the one it continues (older than its header); the copies `omp gc --compress` stages in `.omp-gc-compress-*`; calls outside the conversation (`model_usage`) count, without changing the session's model |
 
 Not read: Kilo Code's and MiMo Code's release-channel databases

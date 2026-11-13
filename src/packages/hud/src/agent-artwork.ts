@@ -31,6 +31,7 @@ export const ORIGINAL_ARTWORK_FILES = {
   "Roo Code": "roo-code",
   Goose: "goose",
   TRAE: "trae",
+  TeleAgent: "teleagent",
 } as const;
 type OriginalVendor = keyof typeof ORIGINAL_ARTWORK_FILES;
 const vendors: Readonly<Record<string, OriginalVendor>> = {
@@ -62,6 +63,7 @@ const vendors: Readonly<Record<string, OriginalVendor>> = {
   "roo-code": "Roo Code",
   goose: "Goose",
   trae: "TRAE",
+  teleagent: "TeleAgent",
 };
 const templates: ReadonlySet<OriginalVendor> = new Set([
   "Grok",

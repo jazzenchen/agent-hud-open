@@ -138,6 +138,7 @@ fn agent_category(agent: &str) -> (Category, Option<&'static str>) {
         "qoder-work" => (Category::Desktop, Some("qoderwork")),
         "trae" | "trae-cn" => (Category::Ide, Some("trae")),
         "workbuddy" => (Category::Desktop, Some("workbuddy")),
+        "teleagent" => (Category::Desktop, Some("teleagent")),
         "grok-cli" | "hermes" | "kimi" | "opencode" | "pi" | "qwen" | "kilo" | "mimocode"
         | "omp" => (Category::Cli, None),
         _ => (Category::Others, None),

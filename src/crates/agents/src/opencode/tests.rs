@@ -25,10 +25,14 @@ fn records(db: &Connection, store: &Store) -> Vec<crate::transcript::records::Re
 #[test]
 fn every_client_of_the_database_has_its_store_and_its_own_plugin() {
     let ids = STORES.iter().map(|s| s.agent.id).collect::<Vec<_>>();
-    assert_eq!(ids, ["opencode", "kilo", "mimocode"]);
+    assert_eq!(ids, ["opencode", "kilo", "mimocode", "teleagent"]);
     for client in STORES {
         assert!(std::ptr::eq(store(client.agent.id).unwrap(), client));
-        let observer = client.agent.observer.unwrap();
+        // TeleAgent uses the same database and does not load the OpenCode plugin.
+        let Some(observer) = client.agent.observer else {
+            assert_eq!(client.agent.id, "teleagent");
+            continue;
+        };
         // The plugin is OpenCode's, written for this client's ids and folder
         // and exported the way the client loads it.
         assert!(observer.body.starts_with(observer.marker));
@@ -233,4 +237,101 @@ fn an_import_table_from_before_message_ids_leaves_its_sessions_out() {
     assert_eq!(read[0].id, "mimocode:s_own");
     // OpenCode names no import tables: the same rows are all its own.
     assert_eq!(records(&db, &STORE).len(), 2);
+}
+
+#[test]
+fn teleagent_reads_each_account_and_its_cached_tokens() {
+    use crate::{Base, Location, Places, Profiles};
+    use std::collections::HashSet;
+    use std::path::{Path, PathBuf};
+
+    struct Disk(HashSet<PathBuf>);
+    impl Places for Disk {
+        fn exists(&self, path: &Path) -> bool {
+            self.0.contains(path)
+        }
+        fn same(&self, a: &Path, b: &Path) -> bool {
+            a == b
+        }
+        fn names(&self, folder: &Path) -> Vec<String> {
+            self.0
+                .iter()
+                .filter(|path| path.parent() == Some(folder))
+                .filter_map(|path| path.file_name()?.to_str().map(str::to_owned))
+                .collect()
+        }
+    }
+    let place = Location {
+        base: Base::DataHome,
+        env: &[],
+        folders: &["TeleAgent"],
+        profiles: Some(Profiles::Inside("users")),
+        path: "teleagent.db",
+        not_if: None,
+    };
+    let share = tempfile::tempdir().unwrap();
+    let account = share
+        .path()
+        .join("TeleAgent")
+        .join("users")
+        .join("v1_public_1903017520943529984");
+    let skipped = share
+        .path()
+        .join("TeleAgent")
+        .join("users")
+        .join("not a profile");
+    let disk = Disk(
+        [
+            account.clone(),
+            account.join("teleagent.db"),
+            skipped.clone(),
+            skipped.join("teleagent.db"),
+        ]
+        .into_iter()
+        .collect(),
+    );
+    let found = place.resolve(share.path(), &|_| None, &disk);
+    assert!(found
+        .iter()
+        .any(|path| path == &account.join("teleagent.db")));
+    assert!(found
+        .iter()
+        .all(|path| !path.to_string_lossy().contains("not a profile")));
+
+    let db = database(
+        "CREATE TABLE session(id TEXT PRIMARY KEY,title TEXT,directory TEXT,time_archived INTEGER,parent_id TEXT,workspace_id TEXT);
+         CREATE TABLE message(id TEXT PRIMARY KEY,session_id TEXT,time_created INTEGER,data TEXT);
+         INSERT INTO session VALUES('ses_1','调研报告','/work/report',NULL,NULL,'ws');",
+    );
+    db.execute(
+        "INSERT INTO message VALUES('msg_1','ses_1',1,?1)",
+        [json!({
+            "role":"assistant",
+            "finish":"stop",
+            "time":{"created":1_794_389_084_772i64,"completed":1_794_389_090_000i64},
+            "modelID":"chat-pro",
+            "providerID":"NewApi",
+            "tokens":{"input":12,"output":3,"reasoning":1,"cache":{"read":4,"write":2}},
+            "cost":0
+        })
+        .to_string()],
+    )
+    .unwrap();
+    let read = records(&db, &TELEAGENT_STORE);
+    assert_eq!(read.len(), 1);
+    assert_eq!(read[0].id, "teleagent:ses_1");
+    assert_eq!(read[0].key, "teleagent:msg_1");
+    assert_eq!(read[0].title.as_deref(), Some("调研报告"));
+    assert_eq!(read[0].cwd.as_deref(), Some("/work/report"));
+    assert_eq!(read[0].model, "chat-pro#NewApi");
+    assert_eq!(
+        (
+            read[0].usage.input,
+            read[0].usage.output,
+            read[0].usage.reasoning,
+            read[0].usage.read,
+            read[0].usage.write
+        ),
+        (12, 3, 1, 4, 2)
+    );
 }

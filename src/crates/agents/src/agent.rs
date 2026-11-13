@@ -70,6 +70,7 @@ pub static ALL: &[&Agent] = &[
     &ark::AGENT,
     &opencode::KILO,
     &opencode::MIMO_CODE,
+    &opencode::TELEAGENT,
     &pi::OH_MY_PI,
     &droid::AGENT,
     &cline::CLINE,
