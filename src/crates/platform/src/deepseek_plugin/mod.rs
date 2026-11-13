@@ -1,7 +1,7 @@
 //! Agent HUD's plugin for DeepSeek Harness (`agent-hud.mjs`), and the folder
 //! it shares with the app. With it, Agent HUD knows which Harness session
 //! called one of its MCP tools, can leave words for a running session as its
-//! next message, and shows the questions and approvals a session waits on in
+//! next message, can ask a running Harness host for a new session, and shows the questions and approvals a session waits on in
 //! the HUD, next to Harness's own cards: whichever is answered first wins.
 //!
 //! Installing it writes the module and one marked row in Harness's home
@@ -11,10 +11,11 @@
 //! the version, because Harness does not reload a new file or folder under an
 //! id it already runs.
 //!
-//! The folder holds what the plugin writes (`sessions/` check-ins, `calls/`
-//! notes, `asks/` waiting questions and approvals) and what the app writes
-//! (`prompts/` words for a session, `asks/<id>.answer`, `app.json` while the
-//! app watches asks). Check-ins and prompts are the Claude Code plugin's
+//! The folder holds what the plugin writes (`sessions/` and `hosts/`
+//! check-ins, `calls/` notes, `asks/` waiting questions and approvals) and
+//! what the app writes (`prompts/` words for a session, `starts/` new sessions
+//! asked of a host, `asks/<id>.answer`, `app.json` while the app watches
+//! asks). Check-ins and prompts are the Claude Code plugin's
 //! protocol, read and written with `ClaudeChannel`'s code.
 use crate::clients::deepseek::patch::{self, Block};
 use crate::hud_tools::Places;
@@ -28,11 +29,16 @@ use std::{
 
 pub mod asks;
 mod channel;
+mod starts;
 
 pub use channel::DeepSeekChannel;
+pub use starts::{Host, Started, START_LIFETIME};
 
 /// The plugin module Harness loads.
-pub const SCRIPT: &str = include_str!("agent-hud.mjs");
+pub const SCRIPT: &str = concat!(
+    include_str!("agent-hud.mjs"),
+    include_str!("agent-hud-inbox.mjs")
+);
 /// A note older than this belongs to a call that ended without removing it.
 pub const CALL_LIFETIME: Duration = Duration::from_secs(120);
 /// Every version's row id starts with this.

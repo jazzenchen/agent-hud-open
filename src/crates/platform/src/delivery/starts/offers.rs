@@ -22,10 +22,20 @@ impl SessionStarts {
                 .then_with(|| b["id"].as_str().cmp(&a["id"].as_str()))
         });
         let mut offers = Vec::new();
-        for provider in [Provider::Claude, Provider::Codex, Provider::Antigravity] {
-            if self.executable(provider).is_none()
-                && !(provider == Provider::Antigravity && self.desktop(Provider::Antigravity))
-            {
+        for provider in [
+            Provider::Claude,
+            Provider::Codex,
+            Provider::Antigravity,
+            Provider::DeepSeek,
+        ] {
+            let offered = match provider {
+                Provider::DeepSeek => self.starts_deepseek(),
+                Provider::Antigravity => {
+                    self.executable(provider).is_some() || self.desktop(provider)
+                }
+                _ => self.executable(provider).is_some(),
+            };
+            if !offered {
                 continue;
             }
             let name = provider.as_str();

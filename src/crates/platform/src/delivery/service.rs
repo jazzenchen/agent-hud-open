@@ -56,6 +56,11 @@ impl LocalClients {
             .map(DeepSeekChannel::new);
         self
     }
+    /// The folder Agent HUD's DeepSeek Harness plugin shares with the app,
+    /// for the starts that go through it too (`SessionStarts`).
+    pub fn deepseek_channel(&self) -> Option<DeepSeekChannel> {
+        self.deepseek.clone()
+    }
     /// Records, in the hook inbox under `data` (Agent HUD's data folder),
     /// which of Agent HUD's surfaces sent each prompt or started each
     /// session, so a session's tags name the phone, the Mac HUD or the MCP

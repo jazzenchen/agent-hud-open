@@ -1,6 +1,8 @@
 //! Starting new sessions from the phone, the HUD or an MCP caller: the
 //! folders each client offers, one start per request identity, and moving a
 //! Claude Code background job into the desktop app once its turn stopped.
+//! DeepSeek Harness has no command that starts a session: Agent HUD's plugin
+//! in a running Harness host makes it (`delivery::deepseek`).
 use super::process::{NativeProcessRunner, ProcessRunner};
 use super::*;
 use serde_json::Value;
@@ -107,6 +109,9 @@ pub struct SessionStarts {
     runner: Arc<dyn ProcessRunner>,
     /// Where desktop apps are installed: `/Applications` and `~/Applications`.
     applications: Vec<PathBuf>,
+    /// The folder Agent HUD's DeepSeek Harness plugin shares with the app;
+    /// none, and no Harness session is offered or started.
+    deepseek: Option<DeepSeekChannel>,
 }
 impl SessionStarts {
     pub fn new(config: StartConfig, receipts: PathBuf) -> Result<Self> {
@@ -135,6 +140,22 @@ impl SessionStarts {
             offers: Vec::new(),
             runner,
             applications,
+            deepseek: None,
+        })
+    }
+    /// Harness sessions start through Agent HUD's plugin and the folder it
+    /// shares with the app (`LocalClients::deepseek_channel`).
+    pub fn with_deepseek_channel(mut self, channel: Option<DeepSeekChannel>) -> Self {
+        self.deepseek = channel;
+        self
+    }
+    /// Whether a Harness session can start now: the plugin is installed, and
+    /// a Harness host runs it or the Desktop app is there to open.
+    pub(super) fn starts_deepseek(&self) -> bool {
+        self.deepseek.as_ref().is_some_and(|channel| {
+            channel.installed()
+                && (channel.hosted(std::time::SystemTime::now())
+                    || self.desktop(Provider::DeepSeek))
         })
     }
     /// Tests look for desktop apps in fixture folders instead of this computer's.
@@ -160,14 +181,15 @@ impl SessionStarts {
     }
     /// Whether the client's desktop app is installed, looked up on disk each
     /// time: Claude.app for Claude; Codex.app or ChatGPT.app for Codex;
-    /// Antigravity.app or Antigravity IDE.app for Antigravity.
+    /// Antigravity.app or Antigravity IDE.app for Antigravity; DeepSeek
+    /// Harness.app for DeepSeek Harness.
     fn desktop(&self, provider: Provider) -> bool {
         let names: &[&str] = match provider {
             Provider::Claude => &["Claude.app"],
             Provider::Codex => &["Codex.app", "ChatGPT.app"],
             Provider::Antigravity => &["Antigravity.app", "Antigravity IDE.app"],
-            Provider::DeepSeek
-            | Provider::Cursor
+            Provider::DeepSeek => &["DeepSeek Harness.app"],
+            Provider::Cursor
             | Provider::Trae
             | Provider::WorkBuddy
             | Provider::ZCode

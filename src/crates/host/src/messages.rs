@@ -58,7 +58,8 @@ impl AgentMessages {
             codex_command: delivery.starts.codex_executable.is_some(),
         };
         let starts = SessionStarts::new(delivery.starts, delivery.start_receipts)
-            .map_err(|error| error.to_string())?;
+            .map_err(|error| error.to_string())?
+            .with_deepseek_channel(delivery.clients.deepseek_channel());
         let flights = app.clone();
         let messaging = Messaging::new(
             &delivery.directory,

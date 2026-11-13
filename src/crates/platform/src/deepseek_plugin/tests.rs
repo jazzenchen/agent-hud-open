@@ -476,3 +476,121 @@ fn the_observer_shows_asks_leaves_answers_and_settles_when_they_go() {
     drop(observer);
     assert!(!channel.directory().join("app.json").exists());
 }
+
+/// A host's check-in as the plugin writes it.
+fn host_check_in(channel: &DeepSeekChannel, process: u32, desktop: bool) {
+    let file = channel
+        .directory()
+        .join("hosts")
+        .join(format!("{process}.json"));
+    crate::os::private_directory(file.parent().unwrap()).unwrap();
+    fs::write(
+        file,
+        json!({"at": 1, "desktop": desktop, "channelVersion": 1}).to_string(),
+    )
+    .unwrap();
+}
+
+#[test]
+fn running_hosts_are_listed_with_the_desktop_apps_first() {
+    let temp = tempfile::tempdir().unwrap();
+    let channel = DeepSeekChannel::new(temp.path().join("channel"));
+    let now = SystemTime::now();
+    assert!(!channel.prepared());
+    assert!(channel.hosts(now).is_empty());
+    host_check_in(&channel, 100, false);
+    host_check_in(&channel, 300, true);
+    host_check_in(&channel, 200, false);
+    assert!(channel.prepared());
+    assert_eq!(
+        channel.hosts(now),
+        vec![
+            Host {
+                process: 300,
+                desktop: true
+            },
+            Host {
+                process: 100,
+                desktop: false
+            },
+            Host {
+                process: 200,
+                desktop: false
+            },
+        ]
+    );
+    // A host that stopped checking in is gone.
+    assert!(channel
+        .hosts(now + crate::claude_plugin::CHECK_IN_LIFETIME + Duration::from_secs(1))
+        .is_empty());
+}
+
+#[test]
+fn a_session_asked_of_a_host_reports_how_it_went() {
+    let temp = tempfile::tempdir().unwrap();
+    let channel = DeepSeekChannel::new(temp.path().join("channel"));
+    let now = SystemTime::now();
+    let folder = temp.path().join("project");
+    assert_eq!(channel.started(7, "one", now).unwrap(), None);
+    assert!(channel
+        .ask_start(7, "one", Path::new("project"), "hello", now)
+        .is_err());
+    channel.ask_start(7, "one", &folder, "hello", now).unwrap();
+    assert_eq!(
+        channel.ask_start(7, "one", &folder, "again", now),
+        Err(Refusal::IdentityConflict)
+    );
+    let file = channel.directory().join("starts/7/one.json");
+    let asked: Value = serde_json::from_slice(&fs::read(&file).unwrap()).unwrap();
+    assert_eq!(asked["cwd"], json!(folder));
+    assert_eq!(asked["text"], "hello");
+    let waiting = Started {
+        session: None,
+        queued: false,
+        refused: None,
+        expired: false,
+    };
+    assert_eq!(
+        channel.started(7, "one", now).unwrap(),
+        Some(waiting.clone())
+    );
+    // Nobody took it before it ran out.
+    assert_eq!(
+        channel.started(7, "one", now + START_LIFETIME).unwrap(),
+        Some(Started {
+            expired: true,
+            ..waiting.clone()
+        })
+    );
+    // The plugin claims it, creates the session, then queues the message.
+    fs::write(
+        &file,
+        json!({"takenAt": 2, "sessionId": SESSION}).to_string(),
+    )
+    .unwrap();
+    assert_eq!(
+        channel.started(7, "one", now + START_LIFETIME).unwrap(),
+        Some(Started {
+            session: Some(SESSION.into()),
+            ..waiting.clone()
+        })
+    );
+    fs::write(
+        &file,
+        json!({"takenAt": 2, "sessionId": SESSION, "startedAt": 3}).to_string(),
+    )
+    .unwrap();
+    assert!(channel.started(7, "one", now).unwrap().unwrap().queued);
+    fs::write(
+        &file,
+        json!({"takenAt": 2, "refused": "no such folder"}).to_string(),
+    )
+    .unwrap();
+    assert_eq!(
+        channel.started(7, "one", now).unwrap(),
+        Some(Started {
+            refused: Some("no such folder".into()),
+            ..waiting
+        })
+    );
+}

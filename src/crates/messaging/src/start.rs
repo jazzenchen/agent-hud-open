@@ -12,11 +12,13 @@ impl Messaging {
         let zh = language(host.snapshot);
         let client = arguments["client"].as_str().ok_or("client is required")?;
         let text = arguments["text"].as_str().ok_or("text is required")?;
-        if client == "deepseek" {
-            return Ok(refused(&words::deepseek_no_start(zh)));
-        }
-        if !matches!(client, "claude" | "codex" | "antigravity") {
+        if !matches!(client, "claude" | "codex" | "antigravity" | "deepseek") {
             return Ok(refused(&words::other_client(zh)));
+        }
+        // "Send messages" off on the Harness plugin's row: the first message
+        // would go in through that plugin.
+        if client == "deepseek" && !self.preferences.deepseek {
+            return Ok(refused(DEEPSEEK_MESSAGES_OFF));
         }
         if let Some(reason) = check_text(text, zh) {
             return Ok(refused(&reason));
@@ -24,7 +26,11 @@ impl Messaging {
         let provider = provider(client);
         let offers = self.starts.offers_for(&all_sessions(host.snapshot));
         let Some(offer) = offers.iter().find(|offer| offer.provider == provider) else {
-            return Ok(refused(&words::cannot_start(zh, client)));
+            return Ok(refused(&if client == "deepseek" {
+                words::deepseek_cannot_start(zh)
+            } else {
+                words::cannot_start(zh, client)
+            }));
         };
         let folder = match arguments["folder"].as_str() {
             Some(folder) => folder.to_owned(),

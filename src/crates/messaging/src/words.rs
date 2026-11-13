@@ -193,11 +193,13 @@ pub fn unknown_message(zh: bool) -> String {
         "No message has this id (messages are kept for a week).",
     )
 }
-pub fn deepseek_no_start(zh: bool) -> String {
+/// Harness has no command line that starts a session: Agent HUD's plugin in
+/// a running Harness does it.
+pub fn deepseek_cannot_start(zh: bool) -> String {
     say(
         zh,
-        "Agent HUD 还不能开新的 DeepSeek Harness 会话；可以用 send_message 发给已经打开的会话。",
-        "Agent HUD cannot start DeepSeek Harness sessions yet; send_message reaches one that is open.",
+        "现在开不了新的 DeepSeek Harness 会话：要先在 设置 → 智能体插件 里安装 Agent HUD 的 DeepSeek Harness 插件，并打开 DeepSeek Harness。",
+        "Agent HUD cannot start a DeepSeek Harness session now: install Agent HUD's DeepSeek Harness plugin in Settings → Agent plugins, and open DeepSeek Harness.",
     )
 }
 pub fn replied(zh: bool, reply: &str) -> String {

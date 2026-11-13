@@ -397,7 +397,9 @@ impl World {
                 codex_command: true,
             },
             clients.clone(),
-            fixture.starts(),
+            fixture
+                .starts()
+                .with_deepseek_channel(clients.deepseek_channel()),
             Arc::new(move |receipt| follow.lock().unwrap().push(receipt)),
             Arc::new(move |flight| fly.lock().unwrap().push(flight)),
         );
@@ -922,10 +924,49 @@ fn a_deepseek_harness_session_sends_under_its_own_id_and_the_passes_count() {
     assert_eq!(flown(&world).last().unwrap()["from"], "deepseek");
 }
 
+/// A Harness host running Agent HUD's plugin: it checks in under process
+/// 777 and, like the plugin, answers the next start asked of it with a new
+/// session whose first message it queued. Returns the request it took.
+fn harness_host(
+    channel: &std::path::Path,
+    session: &'static str,
+) -> std::thread::JoinHandle<Value> {
+    std::fs::create_dir_all(channel.join("hosts")).unwrap();
+    std::fs::write(
+        channel.join("hosts/777.json"),
+        br#"{"at":1,"desktop":false,"channelVersion":1}"#,
+    )
+    .unwrap();
+    let folder = channel.join("starts/777");
+    std::thread::spawn(move || {
+        for _ in 0..400 {
+            if let Some(file) = std::fs::read_dir(&folder)
+                .ok()
+                .and_then(|files| files.flatten().next())
+                .map(|entry| entry.path())
+            {
+                if let Some(asked) = std::fs::read(&file)
+                    .ok()
+                    .and_then(|bytes| serde_json::from_slice::<Value>(&bytes).ok())
+                {
+                    std::fs::write(
+                        &file,
+                        json!({"takenAt":1,"sessionId":session,"startedAt":2}).to_string(),
+                    )
+                    .unwrap();
+                    return asked;
+                }
+            }
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        panic!("no start was asked of the Harness host");
+    })
+}
+
 #[test]
-fn a_deepseek_harness_session_is_refused_without_its_plugin_or_switch_and_is_never_started() {
+fn a_deepseek_harness_session_starts_through_its_plugin_in_a_running_host() {
     let mut world = World::on();
-    world.harness();
+    // No plugin folders: nothing to start a session with.
     let start = world.call(
         Some(("claude", CLAUDE)),
         "start_session",
@@ -935,7 +976,41 @@ fn a_deepseek_harness_session_is_refused_without_its_plugin_or_switch_and_is_nev
     assert!(start["reason"]
         .as_str()
         .unwrap()
-        .contains("cannot start DeepSeek Harness"));
+        .contains("install Agent HUD's DeepSeek Harness plugin"));
+    world.harness();
+    let host = harness_host(&world.harness_channel, HARNESS_TWO_OWN);
+    let listed = world.call(Some(("claude", CLAUDE)), "list_sessions", json!({}));
+    assert_eq!(
+        listed["startFolders"]["deepseek"]["folders"],
+        json!(["~/project"])
+    );
+    // "Send messages" off on the plugin's row: the first message is one too.
+    world.snapshot["settings"]["deepseekMessages"] = json!(false);
+    let start = world.call(
+        Some(("claude", CLAUDE)),
+        "start_session",
+        json!({"client":"deepseek","text":"Port the parser"}),
+    );
+    assert_eq!(start["reason"], DEEPSEEK_MESSAGES_OFF);
+    world.snapshot["settings"]["deepseekMessages"] = json!(true);
+    let start = world.call(
+        Some(("claude", CLAUDE)),
+        "start_session",
+        json!({"client":"deepseek","text":"Port the parser"}),
+    );
+    assert_eq!(start["state"], "started", "{start}");
+    assert_eq!(start["sessionId"], HARNESS_TWO_OWN);
+    let asked = host.join().unwrap();
+    assert_eq!(asked["cwd"], json!(world.fixture.home().join("project")));
+    let text = asked["text"].as_str().unwrap();
+    assert!(text.starts_with("[Agent HUD · from Claude Code"), "{text}");
+    assert!(text.contains("Port the parser"));
+}
+
+#[test]
+fn a_deepseek_harness_session_is_refused_without_its_plugin_or_switch() {
+    let mut world = World::on();
+    world.harness();
     // "Send messages" off on its plugin's row.
     world.snapshot["settings"]["deepseekMessages"] = json!(false);
     let answer = world.send(("claude", CLAUDE), HARNESS, "Hi");

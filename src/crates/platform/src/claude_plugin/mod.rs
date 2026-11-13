@@ -176,7 +176,7 @@ pub(crate) fn write_private(file: &Path, bytes: &[u8]) -> std::io::Result<()> {
     fs::rename(&temp, file)
 }
 
-fn write_json(file: &Path, value: &Value) -> Result<(), Refusal> {
+pub(crate) fn write_json(file: &Path, value: &Value) -> Result<(), Refusal> {
     let parent = file
         .parent()
         .ok_or_else(|| Refusal::InvalidInput("path".into()))?;

@@ -6,7 +6,19 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { start, apply } from "./agent-hud.mjs";
+
+// The plugin as Harness loads it: agent-hud.mjs with agent-hud-inbox.mjs
+// after it, as `SCRIPT` in mod.rs joins them.
+const here = path.dirname(new URL(import.meta.url).pathname);
+const joined = fs.mkdtempSync(path.join(os.tmpdir(), "dsh-plugin-module-"));
+fs.writeFileSync(
+  path.join(joined, "agent-hud.mjs"),
+  ["agent-hud.mjs", "agent-hud-inbox.mjs"]
+    .map((name) => fs.readFileSync(path.join(here, name), "utf8"))
+    .join(""),
+);
+const { start, apply } = await import(path.join(joined, "agent-hud.mjs"));
+test.after(() => fs.rmSync(joined, { recursive: true, force: true }));
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 async function until(check, ms = 2000) {
@@ -37,7 +49,8 @@ function harness() {
       effects.push(fn());
     },
     get(key) {
-      return key === "sessionController" ? ctx.controller : undefined;
+      if (key === "sessionController") return ctx.controller;
+      return key === "workspaceRegistry" ? ctx.workspaces : undefined;
     },
     agents: {
       list: () => [...agents.values()],
@@ -149,6 +162,92 @@ test("words left for a session are queued through the session controller", async
   assert.equal(typeof json("prompts", session, `${id}.json`).takenAt, "number");
   plugin.tick();
   assert.equal(sent.length, 2, "a taken prompt is never submitted again");
+});
+
+test("the host checks in, and says it is gone when it stops", (t) => {
+  const { plugin, json, files } = setup(t);
+  const checkIn = json("hosts", "4242.json");
+  assert.equal(typeof checkIn.at, "number");
+  assert.equal(checkIn.desktop, false);
+  plugin.stop();
+  assert.deepEqual(files("hosts"), []);
+});
+
+test("a start makes a session in the folder's workspace and queues its first message", async (t) => {
+  const { h, plugin, channel, json } = setup(t);
+  const made = [];
+  const sent = [];
+  h.ctx.workspaces = { list: () => [{ id: "ws-1", path: "/work/known" }] };
+  h.ctx.controller = {
+    create: async (request) => {
+      made.push(request);
+      return { sessionId: `session-0000000${made.length}-2222-4333-8444-555555555555` };
+    },
+    prompt: async (input, signal) => {
+      assert.ok(signal instanceof AbortSignal);
+      sent.push(input);
+      return { accepted: true };
+    },
+  };
+  const dir = path.join(channel, "starts", "4242");
+  fs.mkdirSync(dir, { recursive: true });
+  const known = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee";
+  const other = "bbbbbbbb-bbbb-4ccc-8ddd-eeeeeeeeeeee";
+  const ask = (id, cwd) =>
+    fs.writeFileSync(path.join(dir, `${id}.json`), JSON.stringify({ id, cwd, text: `hello ${id}`, at: 1, expiresAt: Date.now() + 60_000 }));
+  ask(known, "/work/known");
+  plugin.tick();
+  await until(() => json("starts", "4242", `${known}.json`).startedAt);
+  ask(other, "/work/other");
+  plugin.tick();
+  await until(() => json("starts", "4242", `${other}.json`).startedAt);
+  assert.deepEqual(made, [{ workspaceId: "ws-1" }, { cwd: "/work/other" }]);
+  const first = json("starts", "4242", `${known}.json`);
+  assert.equal(first.sessionId, "session-00000001-2222-4333-8444-555555555555");
+  assert.deepEqual(
+    sent.map(({ requestId, sessionId, mode, content }) => [requestId, sessionId, mode, content[0].text]),
+    [
+      [known, first.sessionId, "queue", `hello ${known}`],
+      [other, "session-00000002-2222-4333-8444-555555555555", "queue", `hello ${other}`],
+    ],
+  );
+  plugin.tick();
+  assert.equal(made.length, 2, "a taken start never makes a second session");
+});
+
+test("a start waits for the controller, and refusals and expiry are written", async (t) => {
+  const { h, plugin, channel, json } = setup(t);
+  const dir = path.join(channel, "starts", "4242");
+  fs.mkdirSync(dir, { recursive: true });
+  const ask = (id, more = {}) =>
+    fs.writeFileSync(path.join(dir, `${id}.json`), JSON.stringify({ id, cwd: "/work", text: "hi", at: 1, expiresAt: Date.now() + 60_000, ...more }));
+  ask("waits");
+  ask("relative", { cwd: "work" });
+  plugin.tick();
+  assert.equal(json("starts", "4242", "waits.json").takenAt, undefined);
+  ask("expired", { expiresAt: 1 });
+  let refuse = "create";
+  h.ctx.controller = {
+    create: async () => {
+      if (refuse === "create") throw new Error("no such folder");
+      return { sessionId: session };
+    },
+    prompt: async () => ({ accepted: false, reason: "busy" }),
+  };
+  plugin.tick();
+  await until(() => json("starts", "4242", "waits.json").refused);
+  assert.equal(json("starts", "4242", "waits.json").refused, "no such folder");
+  assert.equal(json("starts", "4242", "waits.json").sessionId, undefined);
+  assert.equal(typeof json("starts", "4242", "expired.json").expiredAt, "number");
+  assert.equal(json("starts", "4242", "relative.json").takenAt, undefined);
+  refuse = "prompt";
+  ask("made");
+  plugin.tick();
+  await until(() => json("starts", "4242", "made.json").refused);
+  assert.deepEqual(
+    [json("starts", "4242", "made.json").sessionId, json("starts", "4242", "made.json").refused],
+    [session, "busy"],
+  );
 });
 
 test("words wait for the controller, and refusals, cancels and expiry are written", async (t) => {

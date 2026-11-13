@@ -16,7 +16,7 @@ const LEFTOVER_LIFETIME: Duration = Duration::from_secs(86_400);
 /// The folder the plugin and the app share.
 #[derive(Clone, Debug)]
 pub struct DeepSeekChannel {
-    directory: PathBuf,
+    pub(super) directory: PathBuf,
     prompts: ClaudeChannel,
 }
 
@@ -124,7 +124,9 @@ impl DeepSeekChannel {
         if !folder.is_absolute() {
             return Err("The plugin folder must be absolute".into());
         }
-        for name in ["", "sessions", "prompts", "calls", "asks"] {
+        for name in [
+            "", "sessions", "prompts", "calls", "asks", "hosts", "starts",
+        ] {
             crate::os::private_directory(&self.directory.join(name))?;
         }
         crate::os::private_directory(folder)?;
@@ -139,7 +141,7 @@ impl DeepSeekChannel {
     /// Forgets every check-in, word, note and ask, when the plugin is removed.
     pub fn clear(&self) -> Result<(), String> {
         self.prompts.clear()?;
-        for name in ["calls", "asks"] {
+        for name in ["calls", "asks", "hosts", "starts"] {
             match fs::remove_dir_all(self.directory.join(name)) {
                 Ok(()) => {}
                 Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
@@ -160,6 +162,25 @@ impl DeepSeekChannel {
                     for note in notes.flatten() {
                         if file_age(&note.path(), now) > CALL_LIFETIME {
                             let _ = fs::remove_file(note.path());
+                        }
+                    }
+                }
+                let _ = fs::remove_dir(host.path());
+            }
+        }
+        if let Ok(files) = fs::read_dir(self.directory.join("hosts")) {
+            for file in files.flatten() {
+                if file_age(&file.path(), now) > LEFTOVER_LIFETIME {
+                    let _ = fs::remove_file(file.path());
+                }
+            }
+        }
+        if let Ok(hosts) = fs::read_dir(self.directory.join("starts")) {
+            for host in hosts.flatten() {
+                if let Ok(requests) = fs::read_dir(host.path()) {
+                    for request in requests.flatten() {
+                        if file_age(&request.path(), now) > crate::claude_plugin::PROMPT_LIFETIME {
+                            let _ = fs::remove_file(request.path());
                         }
                     }
                 }

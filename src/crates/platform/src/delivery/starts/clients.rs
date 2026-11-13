@@ -1,6 +1,7 @@
 //! How each client starts a session: Claude Code as a background job, Codex
 //! as a new thread with its first message queued, Antigravity as a cascade
-//! on its language server or through its command line.
+//! on its language server or through its command line, DeepSeek Harness
+//! through Agent HUD's plugin in a running Harness host.
 use super::super::process::StdioServer;
 use super::handoff::job_state;
 use super::*;
@@ -191,5 +192,21 @@ impl SessionStarts {
             }
             Err(error) => Err(error),
         }
+    }
+    pub(super) fn start_deepseek(
+        &self,
+        folder: &Path,
+        request: &StartRequest,
+    ) -> Result<StartReceipt> {
+        let channel = self.deepseek.as_ref().ok_or_else(|| {
+            Failure::Unavailable("Agent HUD's DeepSeek Harness plugin is not installed".into())
+        })?;
+        let open = |link: &str| self.runner.open(link);
+        channel.start(
+            folder,
+            request,
+            self.desktop(Provider::DeepSeek)
+                .then_some(&open as &dyn Fn(&str) -> Result<()>),
+        )
     }
 }

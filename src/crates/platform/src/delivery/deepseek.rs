@@ -4,18 +4,31 @@
 //! session's next message (Harness's own queue: it never interrupts a turn).
 //! Here a message goes into an existing session: a send is checked before it
 //! is journaled, left in the folder the plugin shares with the app, and read
-//! back for how it went.
+//! back for how it went. A new session is asked of a running Harness host the
+//! same way (`start`): the plugin creates it in the folder, in the folder's
+//! Workspace when Harness has one, and queues the first message.
 //!
 //! The snapshot names a Harness session `deepseek:<id>`; the plugin and the
 //! session's own tools use the bare `<id>` (`session-<uuid>`). Both are taken.
 use super::claude::delivery;
 use super::*;
 use crate::claude_plugin::Refusal;
-use crate::deepseek_plugin::DeepSeekChannel as Plugin;
-use std::{collections::HashSet, path::PathBuf, time::SystemTime};
+use crate::deepseek_plugin::{DeepSeekChannel as Plugin, Started, START_LIFETIME};
+use std::{
+    collections::HashSet,
+    path::{Path, PathBuf},
+    time::{Instant, SystemTime},
+};
 
 pub(super) const UNAVAILABLE_REASON: &str =
     "DeepSeek Harness plugin check-in is missing or expired";
+/// The link that opens the Desktop app, whose host then loads the plugin.
+const OPEN_APP: &str = "dsh://open";
+/// How long the Desktop app may take to open and its host to check in.
+const HOST_WAIT: Duration = Duration::from_secs(30);
+/// How long a host may take to create the session and queue its message.
+const START_WAIT: Duration = Duration::from_secs(20);
+const POLL: Duration = Duration::from_millis(250);
 
 /// The session's id as the plugin names it: without the snapshot's prefix.
 pub(crate) fn bare(session: &str) -> &str {
@@ -94,6 +107,120 @@ impl DeepSeekChannel {
     }
     pub fn sweep(&self, now: SystemTime) {
         self.0.sweep(now);
+    }
+    /// Whether Agent HUD's plugin is installed: its folders are here.
+    pub fn installed(&self) -> bool {
+        self.0.prepared()
+    }
+    /// Whether a Harness host runs the plugin now, so a session can start
+    /// without opening the Desktop app first.
+    pub fn hosted(&self, now: SystemTime) -> bool {
+        !self.0.hosts(now).is_empty()
+    }
+    /// Starts a session in `folder` with `request`'s text as its first
+    /// message, in the Desktop app's host when it runs, else another running
+    /// host. With no host and `open` given, opens the Desktop app first and
+    /// waits for its host. The receipt carries the session as Harness names
+    /// it (`session-<uuid>`).
+    pub(super) fn start(
+        &self,
+        folder: &Path,
+        request: &StartRequest,
+        open: Option<&dyn Fn(&str) -> Result<()>>,
+    ) -> Result<StartReceipt> {
+        let mut host = self.0.hosts(SystemTime::now()).first().copied();
+        if host.is_none() {
+            let open = open.ok_or_else(|| {
+                Failure::Unavailable(
+                    "No DeepSeek Harness is running with Agent HUD's plugin; open DeepSeek Harness first".into(),
+                )
+            })?;
+            open(OPEN_APP)?;
+            let deadline = Instant::now() + HOST_WAIT;
+            while host.is_none() && Instant::now() < deadline {
+                std::thread::sleep(POLL);
+                host = self.0.hosts(SystemTime::now()).first().copied();
+            }
+        }
+        let host = host.ok_or_else(|| {
+            Failure::Unavailable(
+                "DeepSeek Harness opened, but Agent HUD's plugin did not check in".into(),
+            )
+        })?;
+        self.0
+            .ask_start(
+                host.process,
+                &request.request_id,
+                folder,
+                &request.text,
+                SystemTime::now(),
+            )
+            .map_err(failure)?;
+        let deadline = Instant::now() + START_WAIT.min(START_LIFETIME);
+        let mut last = None;
+        while Instant::now() < deadline {
+            std::thread::sleep(POLL);
+            last = self
+                .0
+                .started(host.process, &request.request_id, SystemTime::now())
+                .map_err(failure)?;
+            if last
+                .as_ref()
+                .is_some_and(|state| state.queued || state.refused.is_some() || state.expired)
+            {
+                break;
+            }
+        }
+        let receipt = |session: Option<String>, state: &str, reason: Option<String>| StartReceipt {
+            provider: Provider::DeepSeek,
+            request_id: request.request_id.clone(),
+            session_id: session,
+            thread_id: None,
+            state: state.into(),
+            reason,
+            job_id: None,
+            handoff_pending: false,
+        };
+        match last {
+            Some(Started {
+                session: Some(session),
+                queued: true,
+                ..
+            }) => Ok(receipt(Some(session), "started", None)),
+            // The session exists but its first message was refused: say so,
+            // and name the session so the caller can send to it.
+            Some(Started {
+                session: Some(session),
+                refused: Some(reason),
+                ..
+            }) => Ok(receipt(
+                Some(session),
+                "uncertain",
+                Some(format!(
+                    "DeepSeek Harness created the session but refused its first message: {reason}"
+                )),
+            )),
+            Some(Started {
+                refused: Some(reason),
+                ..
+            }) => Err(Failure::Rejected(format!(
+                "DeepSeek Harness refused to start a session: {reason}"
+            ))),
+            Some(Started { expired: true, .. }) => Err(Failure::Unavailable(
+                "The DeepSeek Harness host did not take the request in time".into(),
+            )),
+            // Created, with the message still on its way; or nothing written
+            // yet, and the request may still be taken until it expires.
+            Some(Started {
+                session: Some(session),
+                ..
+            }) => Ok(receipt(
+                Some(session),
+                "uncertain",
+                Some("The first message was not confirmed in time".into()),
+            )),
+            _ => Err(Failure::AcceptanceUncertain),
+        }
     }
 }
 

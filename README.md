@@ -108,7 +108,7 @@ When Claude Code finishes a change, it can ask a Codex session to review it and 
 You can watch who is talking to whom: the sender folds its message into a paper plane and flies it to the receiver's mark, and the answer flies back the same way.
 
 - **A message, not the conversation**: only what the agent writes goes across; its session stays where it is. On one project, the project itself becomes the shared context, and the other agent reads the code for itself.
-- **Twelve agents**: Claude Code, Codex, Antigravity, DeepSeek Harness, Cursor, TRAE, WorkBuddy, ZCode, Qoder, Kimi Code, Pi and OpenCode can message each other, or start a new Claude Code, Codex or Antigravity session.
+- **Twelve agents**: Claude Code, Codex, Antigravity, DeepSeek Harness, Cursor, TRAE, WorkBuddy, ZCode, Qoder, Kimi Code, Pi and OpenCode can message each other, or start a new Claude Code, Codex, Antigravity or DeepSeek Harness session.
 - **Never in the way**: a message never interrupts a turn. It waits until its session is idle.
 - **Six are limited**: Cursor, TRAE, WorkBuddy, ZCode, Qoder and Kimi Code take a message only when one of their turns ends, so an idle session gets it after you start another turn there. All but WorkBuddy also cap how many they take in a row.
 

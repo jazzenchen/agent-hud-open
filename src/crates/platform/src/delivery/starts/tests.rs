@@ -387,3 +387,136 @@ fn launch_trusts_the_task_folder_only_where_claude_code_is_set_up() {
     fixture.starts().trust_task_folder().unwrap();
     assert!(!fixture.home().join(".claude.json").exists());
 }
+
+const HARNESS_SESSION: &str = "session-11111111-2222-4333-8444-555555555555";
+
+fn harness_request(fixture: &StartFixture) -> StartRequest {
+    StartRequest {
+        provider: Provider::DeepSeek,
+        ..fixture.request()
+    }
+}
+/// The fixture's session list with a DeepSeek Harness session in the project.
+fn harness_sessions(fixture: &StartFixture) -> Vec<Value> {
+    let mut sessions = fixture.sessions();
+    sessions.push(json!({"id":format!("deepseek:{HARNESS_SESSION}"),"source":"deepseek","cwd":fixture.home().join("project"),"updatedAt":"2026-10-21T10:00:00Z","parentId":null}));
+    sessions
+}
+/// A Harness host running Agent HUD's plugin: after `delay` it checks in under
+/// process 777, then writes `answer` over the first start asked of it and
+/// returns what was asked.
+fn harness_host(channel: &Path, delay: Duration, answer: Value) -> std::thread::JoinHandle<Value> {
+    let channel = channel.to_path_buf();
+    std::thread::spawn(move || {
+        std::thread::sleep(delay);
+        crate::os::private_directory(&channel.join("hosts")).unwrap();
+        fs::write(
+            channel.join("hosts/777.json"),
+            br#"{"at":1,"desktop":true}"#,
+        )
+        .unwrap();
+        for _ in 0..500 {
+            let asked = fs::read_dir(channel.join("starts/777"))
+                .ok()
+                .and_then(|files| files.flatten().next())
+                .and_then(|entry| {
+                    let value =
+                        serde_json::from_slice::<Value>(&fs::read(entry.path()).ok()?).ok()?;
+                    fs::write(entry.path(), answer.to_string()).ok()?;
+                    Some(value)
+                });
+            if let Some(asked) = asked {
+                return asked;
+            }
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        panic!("no start was asked of the Harness host");
+    })
+}
+
+#[test]
+fn harness_is_offered_with_its_plugin_and_a_host_or_the_desktop_app() {
+    let fixture = StartFixture::new();
+    let channel = fixture.root.join("deepseek-channel");
+    let offered = |starts: &mut SessionStarts| {
+        starts
+            .update_offers(&harness_sessions(&fixture))
+            .into_iter()
+            .find(|offer| offer.provider == Provider::DeepSeek)
+    };
+    // No channel: the product's own starts, which the phone reads.
+    assert!(offered(&mut fixture.starts()).is_none());
+    let mut starts = fixture
+        .starts()
+        .with_deepseek_channel(Some(DeepSeekChannel::new(channel.clone())));
+    // The plugin is not installed: its folders are missing.
+    fixture.install("DeepSeek Harness.app", false, true);
+    assert!(offered(&mut starts).is_none());
+    crate::os::private_directory(&channel.join("hosts")).unwrap();
+    let offer = offered(&mut starts).unwrap();
+    assert_eq!(offer.app, "desktop");
+    assert_eq!(offer.folders, ["~/project"]);
+    // Neither a running host nor the app to open.
+    fixture.install("DeepSeek Harness.app", false, false);
+    assert!(offered(&mut starts).is_none());
+    fs::write(
+        channel.join("hosts/777.json"),
+        br#"{"at":1,"desktop":false}"#,
+    )
+    .unwrap();
+    assert_eq!(offered(&mut starts).unwrap().app, "cli");
+}
+
+#[test]
+fn a_harness_start_opens_the_desktop_app_when_no_host_runs() {
+    let fixture = StartFixture::new();
+    let channel = fixture.root.join("deepseek-channel");
+    crate::os::private_directory(&channel.join("hosts")).unwrap();
+    fixture.install("DeepSeek Harness.app", false, true);
+    let mut starts = fixture
+        .starts()
+        .with_deepseek_channel(Some(DeepSeekChannel::new(channel.clone())));
+    starts.update_offers(&harness_sessions(&fixture));
+    let host = harness_host(
+        &channel,
+        Duration::from_millis(100),
+        json!({"takenAt":1,"sessionId":HARNESS_SESSION,"startedAt":2}),
+    );
+    let receipt = starts.start(harness_request(&fixture)).unwrap();
+    assert_eq!(receipt.state, "started", "{:?}", receipt.reason);
+    assert_eq!(receipt.session_id.as_deref(), Some(HARNESS_SESSION));
+    assert_eq!(fixture.fake.opened(), ["dsh://open"]);
+    let asked = host.join().unwrap();
+    assert_eq!(asked["cwd"], json!(fixture.home().join("project")));
+    assert_eq!(asked["text"], "Look at the failing test");
+    assert_eq!(asked["id"], REQUEST);
+    // The same request again returns the saved receipt and asks nothing new.
+    let again = starts.start(harness_request(&fixture)).unwrap();
+    assert_eq!(again.session_id.as_deref(), Some(HARNESS_SESSION));
+    assert_eq!(fixture.fake.opened().len(), 1);
+}
+
+#[test]
+fn a_harness_start_reports_what_harness_refused() {
+    let fixture = StartFixture::new();
+    let channel = fixture.root.join("deepseek-channel");
+    let mut starts = fixture
+        .starts()
+        .with_deepseek_channel(Some(DeepSeekChannel::new(channel.clone())));
+    let host = harness_host(
+        &channel,
+        Duration::ZERO,
+        json!({"takenAt":1,"refused":"no such folder"}),
+    );
+    while !channel.join("hosts/777.json").exists() {
+        std::thread::sleep(Duration::from_millis(5));
+    }
+    starts.update_offers(&harness_sessions(&fixture));
+    let receipt = starts.start(harness_request(&fixture)).unwrap();
+    host.join().unwrap();
+    assert_eq!(receipt.state, "rejected");
+    assert!(receipt.reason.unwrap().contains("no such folder"));
+    assert!(receipt.session_id.is_none());
+    // A running host is used as it is: the app is not opened.
+    assert!(fixture.fake.opened().is_empty());
+}
