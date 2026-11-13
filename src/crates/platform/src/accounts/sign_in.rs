@@ -21,18 +21,21 @@ impl WebSignInDesk {
     pub fn site(&self, provider: &str, host: &str) -> Option<(&'static str, &'static str)> {
         web::site(provider, host).map(|site| (site.sign_in, site.name))
     }
-    /// The browser identity the window presents and the session is kept with.
-    pub fn user_agent(&self) -> &'static str {
-        agents::account::WEB_USER_AGENT
-    }
     /// Tries the cookies the window holds for `host` as `provider`'s session
     /// and keeps them once the provider's reader reads the quota with them:
-    /// true when the sign-in is done.
-    pub fn sign_in_with(&self, provider: &str, host: &str, cookie: &str) -> Result<bool, String> {
+    /// true when the sign-in is done. `user_agent` is the browser identity
+    /// the window presented, which the session is kept and sent with.
+    pub fn sign_in_with(
+        &self,
+        provider: &str,
+        host: &str,
+        cookie: &str,
+        user_agent: &str,
+    ) -> Result<bool, String> {
         let session = agents::account::WebSession {
             host: host.to_owned(),
             cookie: cookie.to_owned(),
-            user_agent: agents::account::WEB_USER_AGENT.to_owned(),
+            user_agent: user_agent.to_owned(),
         };
         if !self.accepts(provider, &session) {
             return Ok(false);

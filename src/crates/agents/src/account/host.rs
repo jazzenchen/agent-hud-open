@@ -203,8 +203,8 @@ pub struct WebSession {
     pub cookie: String,
     pub user_agent: String,
 }
-/// The browser identity Agent HUD's sign-in window presents, and every
-/// request made with its session after.
+/// A browser identity for a web session in tests. A real session carries the
+/// identity its sign-in window presented (the host's `web_sign_in`).
 pub const WEB_USER_AGENT: &str = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36";
 
 /// What an account reader may ask of the machine it runs on. Platform
