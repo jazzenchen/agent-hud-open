@@ -1,4 +1,5 @@
-//! Windows 結束工作階段時，阻止背景工作再建立外部程式。
+//! While Windows ends the session, background work starts no more helper
+//! programs.
 use std::{
     io,
     process::{Child, Command},
@@ -34,7 +35,8 @@ impl SpawnGate {
         system_ending: impl FnOnce() -> bool,
         launch: impl FnOnce() -> io::Result<T>,
     ) -> io::Result<T> {
-        // 最後一次檢查和建立程序必須在同一把鎖內，不能只在配置命令時檢查。
+        // The last check and the spawn hold the same lock; checking only while
+        // the command is configured would leave a gap.
         let _launching = self
             .launching
             .lock()
@@ -42,7 +44,7 @@ impl SpawnGate {
         if self.ending.load(Ordering::Acquire) || system_ending() {
             return Err(io::Error::new(
                 io::ErrorKind::Interrupted,
-                "Windows 工作階段正在結束，已略過背景程式啟動",
+                "Windows is ending the session; the helper program was not started",
             ));
         }
         launch()
@@ -51,23 +53,27 @@ impl SpawnGate {
 
 static GATE: SpawnGate = SpawnGate::new();
 
-/// 收到結束工作階段查詢時暫停；收到取消通知時恢復，不永久停用偵測。
+/// Pauses when Windows asks to end the session and resumes when the shutdown
+/// is cancelled; reading is never switched off for good.
 pub fn set_ending(ending: bool) {
     GATE.set_ending(ending);
 }
 
-/// 系統狀態提供保底，也涵蓋未建立桌面視窗的命令列工作。
+/// The system's own flag backs this up, and covers command-line runs that make
+/// no desktop window.
 pub fn is_ending() -> bool {
     GATE.ending.load(Ordering::Acquire) || system_is_ending()
 }
 
-/// 已配置完成的命令，也必須在真正建立程序之前通過關機檢查。
+/// A command that is already configured still passes the shutdown check right
+/// before its process is created.
 pub fn spawn(command: &mut Command) -> io::Result<Child> {
     GATE.run(system_is_ending, || command.spawn())
 }
 
 fn system_is_ending() -> bool {
-    // SAFETY：GetSystemMetrics 不接收指標，SM_SHUTTINGDOWN 只讀取工作階段狀態。
+    // SAFETY: GetSystemMetrics takes no pointers; SM_SHUTTINGDOWN only reads
+    // the session's state.
     unsafe { GetSystemMetrics(0x2000) != 0 }
 }
 

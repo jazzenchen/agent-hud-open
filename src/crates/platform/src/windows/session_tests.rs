@@ -12,7 +12,10 @@ fn pending_shutdown_blocks_launch_and_cancellation_restores_it() {
     assert_eq!(gate.run(|| false, || Ok(7)).unwrap(), 7);
     gate.set_ending(true);
     let error = gate
-        .run(|| false, || -> io::Result<()> { panic!("關機後不可啟動") })
+        .run(
+            || false,
+            || -> io::Result<()> { panic!("nothing may start once the session is ending") },
+        )
         .unwrap_err();
     assert_eq!(error.kind(), io::ErrorKind::Interrupted);
     gate.set_ending(false);
@@ -25,7 +28,7 @@ fn windows_shutdown_metric_also_blocks_without_a_window_notification() {
     let error = gate
         .run(
             || true,
-            || -> io::Result<()> { panic!("系統關機時不可啟動") },
+            || -> io::Result<()> { panic!("nothing may start while the system shuts down") },
         )
         .unwrap_err();
     assert_eq!(error.kind(), io::ErrorKind::Interrupted);
@@ -63,7 +66,8 @@ fn shutdown_transition_and_actual_launch_share_the_same_lock() {
         })
     };
     transition_rx.recv_timeout(Duration::from_secs(2)).unwrap();
-    // 已經開始的啟動可以完成；關機狀態切換完成後，不可再有新的啟動穿過。
+    // A spawn already under way may finish; once the switch to ending is
+    // done, no new spawn gets through.
     assert!(matches!(
         ending_rx.recv_timeout(Duration::from_millis(50)),
         Err(mpsc::RecvTimeoutError::Timeout)
@@ -82,7 +86,9 @@ fn shutdown_transition_and_actual_launch_share_the_same_lock() {
 fn configured_command_is_checked_at_spawn_and_can_run_after_cancellation() {
     const CHILD: &str = "AGENT_HUD_TEST_SESSION_CHILD";
     if std::env::var_os(CHILD).is_none() {
-        // 全域門閂在獨立測試程序內切換，不影響其他同時執行的帳戶或原生程序測試。
+        // The global gate is switched in a test process of its own, so tests
+        // running alongside that read accounts or spawn helpers are not
+        // affected.
         let name = format!(
             "{}::configured_command_is_checked_at_spawn_and_can_run_after_cancellation",
             module_path!().split_once("::").unwrap().1
@@ -125,12 +131,12 @@ fn configured_command_is_checked_at_spawn_and_can_run_after_cancellation() {
     set_ending(false);
     assert!(!super::is_ending());
     assert!(spawn(&mut prepared).unwrap().wait().unwrap().success());
-    assert_eq!(std::fs::read_to_string(marker).unwrap(), "已啟動");
+    assert_eq!(std::fs::read_to_string(marker).unwrap(), "started");
 }
 
 #[test]
 fn spawn_probe_writes_a_marker() {
     if let Some(path) = std::env::var_os("AGENT_HUD_TEST_SESSION_MARKER") {
-        std::fs::write(path, "已啟動").unwrap();
+        std::fs::write(path, "started").unwrap();
     }
 }

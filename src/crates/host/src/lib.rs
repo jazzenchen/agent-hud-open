@@ -142,8 +142,12 @@ pub fn run_with_options(
             }
         })
         .setup(move |app| {
-            // 先接收系統關機通知，再啟動任何背景偵測工作。
-            shell::prepare(app.handle())?;
+            // Hear about the system's shutdown before any background reading
+            // starts. Without it the app still runs; helpers just are not held
+            // back while Windows ends the session.
+            if let Err(error) = shell::prepare(app.handle()) {
+                eprintln!("Agent HUD session-end monitor: {error}");
+            }
             app.manage(system::System::new(app.config().identifier.clone()));
             app.manage(mcp_clients::Clients::default());
             app.manage(claude_plugin::ClaudePlugin::new(

@@ -1,4 +1,5 @@
-//! 在啟動偵測前建立隱藏的頂層視窗，接收 Windows 關機與取消關機通知。
+//! A hidden top-level window, made before any reading starts, that hears
+//! Windows ask to end the session, cancel that, or end it.
 use agent_hud_runtime::windows_session;
 use std::sync::{Arc, OnceLock};
 use tauri::Manager;
@@ -51,7 +52,9 @@ impl Monitor {
             .as_ref()
             .map_err(Clone::clone)?;
         let callback: Exit = Arc::new(exit);
-        // HWND_MESSAGE 不會收到關機廣播；這裡是不可見、沒有工作列按鈕的頂層視窗。
+        // A message-only window (HWND_MESSAGE) never gets the shutdown
+        // broadcast, so this is an invisible top-level window with no taskbar
+        // button.
         let window = unsafe {
             CreateWindowExW(
                 WS_EX_TOOLWINDOW,
@@ -104,7 +107,8 @@ unsafe extern "system" fn window_proc(
             LRESULT(1)
         }
         WM_QUERYENDSESSION => {
-            // 只封鎖新的背景程序；此時不能永久停止服務，因為使用者仍能取消關機。
+            // Only hold back new helpers: the user can still cancel the
+            // shutdown, so nothing stops for good here.
             windows_session::set_ending(true);
             LRESULT(1)
         }
@@ -114,7 +118,9 @@ unsafe extern "system" fn window_proc(
                 let stored = GetWindowLongPtrW(window, GWLP_USERDATA) as *const Exit;
                 if !stored.is_null() {
                     let callback = (*stored).clone();
-                    // 明確的正常結束會走既有服務清理，不等待鎖或在視窗回呼裡啟動其他程序。
+                    // An orderly exit runs the usual service cleanup; the
+                    // window procedure neither waits on a lock nor starts a
+                    // process.
                     callback();
                 }
             }
