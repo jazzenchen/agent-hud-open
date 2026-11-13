@@ -19,7 +19,7 @@
 </p>
 
 <p align="center">
-  <a href="README.md">English</a> · <strong>简体中文</strong> · <a href="https://agenthud.app">官网</a> · <a href="https://discord.gg/cpTPDgWwXR">Discord</a> · <a href="#支持的-agent">支持的 agent</a> · <a href="#文档">文档</a>
+  <a href="README.md">English</a> · <strong>简体中文</strong> · <a href="https://agenthud.app">官网</a> · <a href="https://discord.gg/cpTPDgWwXR">Discord</a> · <a href="#社区">微信群</a> · <a href="#支持的-agent">支持的 agent</a> · <a href="#文档">文档</a>
 </p>
 
 <p align="center">
@@ -69,6 +69,8 @@ npx @agenthud/install
 | **刘&#8288;海** | 在刘海处，周围是光晕。 |
 | **简&#8288;约** | 停靠在任意屏幕边缘的小型悬浮面板：每个 agent 的图标外套一个圆环，画的是它用量最高的那项额度，旁边写着百分比。agent 工作时，它的图标会变成 Bot。 |
 
+每块屏幕还可以不显示 HUD，或只隐去消息、交互请求或纸飞机：设置 → 显示。
+
 ## 在手机上
 
 **需要做决定时，不必停下脚步。** 离开电脑，工作仍然接得上。在 iPhone 上查看进展、阅读回复、继续对话。
@@ -106,8 +108,8 @@ Claude Code 写完一段改动，可以请一个 Codex 会话审一遍，Codex �
 谁在跟谁说话，HUD 上看得见：发信的 agent 把信折成纸飞机，飞到收信的 agent 那里，回答再沿原路飞回来。
 
 - **只传消息，不交出会话**：过去的只有 agent 写下的那条消息，会话本身留在原处。同一个项目里，项目本身就成了它们共同的上下文，对方自己去读代码。
-- **Claude Code、Codex、Antigravity 与 DeepSeek Harness**：彼此都能传话，也能新开 Claude Code、Codex 或 Antigravity 会话。
-- **不打断工作**：消息等对方空闲才送达，不会插进正在进行的一轮。
+- **十二款 agent**：Claude Code、Codex、Antigravity、DeepSeek Harness、Cursor、TRAE、WorkBuddy、ZCode、Qoder、Kimi Code、Pi 与 OpenCode 彼此都能传话，也能新开 Claude Code、Codex 或 Antigravity 会话。
+- **不打断工作**：消息不会插进正在进行的一轮。它等对方空闲才送达；Cursor、TRAE、WorkBuddy、ZCode、Qoder 与 Kimi Code 在当前这一轮结束时接收。
 
 怎样开启和使用，见[使用文档](https://agenthud.app/docs/zh/mcp/messaging/)。
 
@@ -183,8 +185,8 @@ Agent HUD 基于 Tauri 2 构建：Rust 核心、React 界面，每个操作系�
 
 - **一套核心。** 读取 agent 的记录、统计 Token、计算额度、价格与会话，都只在 Rust 里做一次，每个系统的结果完全一致。窗口只负责显示核心算好的内容。
 - **每个系统各有自己的文件。** 路径、进程、凭据、回调与窗口，每个系统各写一份；改进 Windows 或 Linux，不会碰到共享代码。
-- **macOS 已可用，Windows 与 Linux 处于预览。** 两者都能从本仓库源码构建，但尚未在真机上验证；还缺的部分见[即将推出](#即将推出)。
-- **iPhone 与 Apple Watch 与 Mac 配对。** Agent HUD Remote 经由 iCloud 同步，因此只在 macOS 上提供。
+- **macOS 已可用，Windows 与 Linux 处于预览。** 两者都能从本仓库源码构建，每次发布也附带未签名的测试安装包。Linux 版尚未在真机桌面上试过；还缺的部分见[即将推出](#即将推出)。
+- **iPhone 与 Apple Watch 可与 Mac 或 Windows 电脑配对。** Agent HUD Remote 经由 iCloud 同步，所以暂时只在 macOS 上提供；配对 Windows 电脑时，手机在同一局域网内连接。
 
 ## Agent HUD Remote
 
@@ -219,7 +221,7 @@ iPhone 和发行版在同一个网络里，不订阅也能在 iPhone 与 Apple W
 
 ## 即将推出
 
-- **Windows 与 Linux 结束预览**：Windows 上的客户端回调。[欢迎参与](CONTRIBUTING.md)。
+- **Windows 与 Linux 结束预览。** [欢迎参与](CONTRIBUTING.md)。
 - **支持更多 agent**，不止下面表格里的 27 款。
 - **按 Token 计费的 API**：用 API 密钥付费的账户，也能看到用量、花费与余额，和订阅的额度放在一起。
 - **UI 提示词模板。** 现成的提示词，一次就把 HUD 改成你想要的样子。
@@ -281,6 +283,16 @@ iPhone 和发行版在同一个网络里，不订阅也能在 iPhone 与 Apple W
   - **同一局域网内**走 HTTPS，手机配对时固定这台 Mac 的证书。
   - **任何网络下，借助 Agent HUD Remote**，经由你自己的 iCloud。记录正文端到端加密，密钥在你的 iCloud 钥匙串里；只有提醒要显示的文字不在加密范围内，以便系统弹出提醒。
   - **运行中会话的实时活动**同样需要 Remote，经 Agent HUD 的中转服务交给 Apple 的推送服务。中转只保留转发所需的内容，即每台 Mac 最新的会话与每部手机的卡片，不保留账户身份；30 天没有请求的账户会被删除。
+
+## 社区
+
+有问题、想法或 bug，欢迎到 [Discord](https://discord.gg/cpTPDgWwXR)、微信群或 [issues](https://github.com/jazzenchen/agent-hud-open/issues) 找我。
+
+<details>
+<summary><strong>微信群</strong>：用微信扫码加入</summary>
+<p><img src="https://agenthud.app/assets/community/wechat-group.png" alt="Agent HUD 微信交流群二维码" width="220"></p>
+<p>微信群二维码 7 天有效，我每周在官网换上新的，这里会跟着更新。如果已过期，可以先到 Discord 找我。</p>
+</details>
 
 ## 从源码构建
 
