@@ -112,3 +112,39 @@ fn the_dashboards_cursor_and_grok_bot_usage_leaves_once() {
     schema(&db).unwrap();
     assert_eq!(count("SELECT count(*) FROM usage_meter_event"), 2);
 }
+
+#[test]
+fn a_damaged_ledger_is_deleted_and_rebuilt() {
+    let temp = tempfile::tempdir().unwrap();
+    let directory = temp.path().join("data");
+    fs::create_dir_all(&directory).unwrap();
+    let mut garbage = b"SQLite format 3\0".to_vec();
+    garbage.extend(std::iter::repeat_n(0xA5u8, 8192));
+    fs::write(directory.join("ingestion.sqlite"), &garbage).unwrap();
+    let (database, logs, _, _) = open(&directory).expect("a fresh ledger replaces it");
+    assert!(logs.is_empty());
+    let check: String = database
+        .query_row("PRAGMA quick_check", [], |row| row.get(0))
+        .unwrap();
+    assert_eq!(check, "ok");
+    let names: Vec<String> = fs::read_dir(&directory)
+        .unwrap()
+        .filter_map(Result::ok)
+        .map(|entry| entry.file_name().to_string_lossy().into_owned())
+        .collect();
+    assert!(
+        names
+            .iter()
+            .all(|name| name.starts_with("ingestion.sqlite") && !name.contains("damaged")),
+        "no copy of the damaged file is kept: {names:?}"
+    );
+}
+
+#[test]
+fn a_ledger_that_fails_for_another_reason_is_left_alone() {
+    let temp = tempfile::tempdir().unwrap();
+    // A folder where the file should be: not damage, so nothing is deleted.
+    fs::create_dir_all(temp.path().join("ingestion.sqlite")).unwrap();
+    assert!(open(temp.path()).is_err());
+    assert!(temp.path().join("ingestion.sqlite").is_dir());
+}
