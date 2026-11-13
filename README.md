@@ -109,7 +109,7 @@ You can watch who is talking to whom: the sender folds its message into a paper 
 
 - **A message, not the conversation**: only what the agent writes goes across; its session stays where it is. On one project, the project itself becomes the shared context, and the other agent reads the code for itself.
 - **Twelve agents**: Claude Code, Codex, Antigravity, DeepSeek Harness, Cursor, TRAE, WorkBuddy, ZCode, Qoder, Kimi Code, Pi and OpenCode can message each other, or start a new Claude Code, Codex or Antigravity session.
-- **Never in the way**: a message never interrupts a turn. It waits until its session is idle; Cursor, TRAE, WorkBuddy, ZCode, Qoder and Kimi Code take it when their current turn ends.
+- **Never in the way**: a message never interrupts a turn. It waits until its session is idle; Cursor, TRAE, WorkBuddy, ZCode, Qoder and Kimi Code take it when one of their turns ends.
 
 How to turn it on and use it: [Agents messaging each other](https://agenthud.app/docs/en/mcp/messaging/).
 
