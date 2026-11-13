@@ -241,37 +241,37 @@ When your iPhone and the release share a network, iPhone and Apple Watch show yo
 
 Install and sign in to the agents you want to follow; Agent HUD finds them by itself.
 
-| Agent | Tokens and sessions | Quota | Live status | Approvals | Questions | Replies | One click back | Turns and calls |
-| --- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| **Claude&nbsp;Code** | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| **Codex** | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| **DeepSeek&nbsp;Harness** | ✓ | Balance | ✓ | ✓ | ✓ | ✓ |  | ✓ |
-| **Antigravity** | ✓ | ✓ |  | ✓ | ✓ | ✓ | ✓ |  |
-| **Cursor** | ✓ | ✓ | ✓ |  |  | ✓ | ✓ |  |
-| **Grok&nbsp;CLI** | ✓ | ✓ | ✓ |  |  | ✓ |  |  |
-| **Grok&nbsp;Bot** | ✓ | ✓ |  |  |  |  | ✓ |  |
-| **GitHub&nbsp;Copilot&nbsp;CLI** | ✓ | ✓ | ✓ | ✓ |  | ✓ |  |  |
-| **OpenCode** | ✓ | ✓ |  |  |  | ✓ | ✓ |  |
-| **Kilo&nbsp;Code** | ✓ |  |  |  |  | ✓ | ✓ |  |
-| **MiMo&nbsp;Code** | ✓ |  |  |  |  | ✓ | ✓ |  |
-| **Kimi** | ✓ | ✓ | ✓ |  |  | ✓ |  |  |
-| **Pi** | ✓ | ✓ | ✓ |  |  | ✓ | ✓ |  |
-| **Oh&nbsp;My&nbsp;Pi** | ✓ |  | ✓ |  |  | ✓ | ✓ |  |
-| **OpenClaw** | ✓ |  |  |  |  |  |  |  |
-| **Hermes&nbsp;Agent** | ✓ | ✓ | ✓ |  |  | ✓ |  |  |
-| **Factory&nbsp;Droid** | ✓ | ✓ | ✓ | ✓ |  | ✓ |  |  |
-| **TRAE** | Sessions | ✓ | ✓ |  |  | ✓ |  |  |
-| **Qoder** | ✓ | ✓ |  | ✓ |  |  |  |  |
-| **ZCode** | ✓ |  |  | ✓ | ✓ |  |  |  |
-| **CodeBuddy** | ✓ |  |  | ✓ |  | ✓ |  |  |
-| **WorkBuddy** | ✓ | ✓ |  | ✓ |  |  |  |  |
-| **Qwen&nbsp;Code** | ✓ |  |  | ✓ |  | ✓ |  |  |
-| **Devin** | ✓ | ✓ |  | ✓ |  | ✓ |  |  |
-| **Cline** | ✓ | ✓ |  |  |  |  |  |  |
-| **Roo&nbsp;Code** | ✓ |  |  |  |  |  |  |  |
-| **Goose** | ✓ |  |  |  |  |  |  |  |
+| Agent | Tokens and sessions | Quota | Live status | Approvals | Questions | Replies | One click back | Turns and calls | Agent messages |
+| --- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| **Claude&nbsp;Code** | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| **Codex** | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| **DeepSeek&nbsp;Harness** | ✓ | Balance | ✓ | ✓ | ✓ | ✓ |  | ✓ | ✓ |
+| **Antigravity** | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| **Cursor** | ✓ | ✓ | ✓ |  |  | ✓ | ✓ |  | ✓ |
+| **Grok&nbsp;CLI** | ✓ | ✓ | ✓ |  |  | ✓ |  |  |  |
+| **Grok&nbsp;Bot** | ✓ | ✓ | ✓ |  |  | ✓ | ✓ |  |  |
+| **GitHub&nbsp;Copilot&nbsp;CLI** | ✓ | ✓ | ✓ | ✓ |  | ✓ |  |  |  |
+| **OpenCode** | ✓ | ✓ |  |  |  | ✓ | ✓ |  | ✓ |
+| **Kilo&nbsp;Code** | ✓ |  |  |  |  | ✓ | ✓ |  |  |
+| **MiMo&nbsp;Code** | ✓ |  |  |  |  | ✓ | ✓ |  |  |
+| **Kimi** | ✓ | ✓ | ✓ |  |  | ✓ |  |  | ✓ |
+| **Pi** | ✓ | ✓ | ✓ |  |  | ✓ | ✓ |  | ✓ |
+| **Oh&nbsp;My&nbsp;Pi** | ✓ |  | ✓ |  |  | ✓ | ✓ |  |  |
+| **OpenClaw** | ✓ |  |  |  |  |  |  |  |  |
+| **Hermes&nbsp;Agent** | ✓ | ✓ | ✓ |  |  | ✓ |  |  |  |
+| **Factory&nbsp;Droid** | ✓ | ✓ | ✓ | ✓ |  | ✓ |  |  |  |
+| **TRAE** | Sessions | ✓ | ✓ |  |  | ✓ |  |  | ✓ |
+| **Qoder** | ✓ | ✓ | ✓ | ✓ |  | ✓ |  | ✓ | ✓ |
+| **ZCode** | ✓ |  | ✓ | ✓ | ✓ | ✓ |  |  | ✓ |
+| **CodeBuddy** | ✓ |  |  | ✓ |  | ✓ |  |  |  |
+| **WorkBuddy** | ✓ | ✓ |  | ✓ |  | ✓ |  |  | ✓ |
+| **Qwen&nbsp;Code** | ✓ |  |  | ✓ |  | ✓ |  |  |  |
+| **Devin** | ✓ | ✓ |  | ✓ |  | ✓ | ✓ |  |  |
+| **Cline** | ✓ | ✓ |  |  |  |  |  |  |  |
+| **Roo&nbsp;Code** | ✓ |  |  |  |  |  |  |  |  |
+| **Goose** | ✓ |  |  |  |  |  |  |  |  |
 
-Also: the **GLM Coding Plan**, **MiniMax** and **Volcengine Ark** plan quotas. Qoder includes Qoder CN and QoderWork, TRAE includes TRAE CN, and Devin includes the CLI and Devin Desktop. Codex approvals need its hook trusted in Codex, DeepSeek Harness approvals and questions need Agent HUD's plugin (Settings → Agent plugins), and Copilot's approvals and quota are each turned on in Settings. Qoder's, WorkBuddy's and TRAE's quotas show once you sign in to the vendor's site in Agent HUD's own window. TRAE reports no tokens, so only its sessions show, and it runs Agent HUD's hooks once you turn on its global hooks. Factory Droid's quota needs a Factory API key, and Devin's quotas come from its CLI's local cache. Cursor's tokens come from Cursor 3.27 or later. Grok Bot's bots run on Cursor's servers, which report each bot's daily tokens; an account merged into SuperGrok reports none, so only its sessions show. Grok Bot's weekly quota comes from the same servers when Cursor is signed in to the Bot's account, otherwise from the Bot's own cache, which it refreshes only while in use. An account merged into SuperGrok has one weekly limit for Cursor and Grok Bot, and Cursor's block shows it as Cursor does.
+Also: the **GLM Coding Plan**, **OpenCode Go**, **MiniMax** and **Volcengine Ark** plan quotas. Qoder includes Qoder CN and QoderWork, TRAE includes TRAE CN, and Devin includes the CLI and Devin Desktop. Codex CLI approvals need its hook trusted in Codex (the Codex app's need nothing), DeepSeek Harness approvals and questions need Agent HUD's plugin (Settings → Agent plugins), and Copilot's approvals and quota are each turned on in Settings. Qoder's, WorkBuddy's and TRAE's quotas show once you sign in to the vendor's site in Agent HUD's own window. TRAE reports no tokens, so only its sessions show, and it runs Agent HUD's hooks once you turn on its global hooks. Qoder records tokens, and so its turns, only for a model on your own key or with `QODER_EXPOSE_TOKEN_USAGE` set. A jump back to a terminal pane needs iTerm2, and Cursor opens a cloud agent's chat but only a local chat's folder. [Agent messages](https://agenthud.app/docs/en/mcp/messaging/) work with OpenCode 1, and Qoder CN and QoderWork take them without sending. Factory Droid's quota needs a Factory API key, and Devin's quotas come from its CLI's local cache. Cursor's tokens come from Cursor 3.27 or later. Grok Bot's bots run on Cursor's servers, which report each bot's daily tokens; an account merged into SuperGrok reports none, so only its sessions show. Grok Bot's weekly quota comes from the same servers when Cursor is signed in to the Bot's account, otherwise from the Bot's own cache, which it refreshes only while in use. An account merged into SuperGrok has one weekly limit for Cursor and Grok Bot, and Cursor's block shows it as Cursor does.
 
 ## Keep your data safe.
 

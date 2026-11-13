@@ -241,37 +241,37 @@ iPhone 和发行版在同一个网络里，不订阅也能在 iPhone 与 Apple W
 
 安装并登录想要关注的 agent，Agent HUD 会自动发现它们。
 
-| Agent | Token 与会话 | 额度 | 实时状态 | 批准 | 提问 | 回复 | 回到会话 | 轮次与调用 |
-| --- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| **Claude&nbsp;Code** | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| **Codex** | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| **DeepSeek&nbsp;Harness** | ✓ | 余额 | ✓ | ✓ | ✓ | ✓ |  | ✓ |
-| **Antigravity** | ✓ | ✓ |  | ✓ | ✓ | ✓ | ✓ |  |
-| **Cursor** | ✓ | ✓ | ✓ |  |  | ✓ | ✓ |  |
-| **Grok&nbsp;CLI** | ✓ | ✓ | ✓ |  |  | ✓ |  |  |
-| **Grok&nbsp;Bot** | ✓ | ✓ |  |  |  |  | ✓ |  |
-| **GitHub&nbsp;Copilot&nbsp;CLI** | ✓ | ✓ | ✓ | ✓ |  | ✓ |  |  |
-| **OpenCode** | ✓ | ✓ |  |  |  | ✓ | ✓ |  |
-| **Kilo&nbsp;Code** | ✓ |  |  |  |  | ✓ | ✓ |  |
-| **MiMo&nbsp;Code** | ✓ |  |  |  |  | ✓ | ✓ |  |
-| **Kimi** | ✓ | ✓ | ✓ |  |  | ✓ |  |  |
-| **Pi** | ✓ | ✓ | ✓ |  |  | ✓ | ✓ |  |
-| **Oh&nbsp;My&nbsp;Pi** | ✓ |  | ✓ |  |  | ✓ | ✓ |  |
-| **OpenClaw** | ✓ |  |  |  |  |  |  |  |
-| **Hermes&nbsp;Agent** | ✓ | ✓ | ✓ |  |  | ✓ |  |  |
-| **Factory&nbsp;Droid** | ✓ | ✓ | ✓ | ✓ |  | ✓ |  |  |
-| **TRAE** | 会话 | ✓ | ✓ |  |  | ✓ |  |  |
-| **Qoder** | ✓ | ✓ |  | ✓ |  |  |  |  |
-| **ZCode** | ✓ |  |  | ✓ | ✓ |  |  |  |
-| **CodeBuddy** | ✓ |  |  | ✓ |  | ✓ |  |  |
-| **WorkBuddy** | ✓ | ✓ |  | ✓ |  |  |  |  |
-| **Qwen&nbsp;Code** | ✓ |  |  | ✓ |  | ✓ |  |  |
-| **Devin** | ✓ | ✓ |  | ✓ |  | ✓ |  |  |
-| **Cline** | ✓ | ✓ |  |  |  |  |  |  |
-| **Roo&nbsp;Code** | ✓ |  |  |  |  |  |  |  |
-| **Goose** | ✓ |  |  |  |  |  |  |  |
+| Agent | Token 与会话 | 额度 | 实时状态 | 批准 | 提问 | 回复 | 回到会话 | 轮次与调用 | 互发消息 |
+| --- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| **Claude&nbsp;Code** | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| **Codex** | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| **DeepSeek&nbsp;Harness** | ✓ | 余额 | ✓ | ✓ | ✓ | ✓ |  | ✓ | ✓ |
+| **Antigravity** | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| **Cursor** | ✓ | ✓ | ✓ |  |  | ✓ | ✓ |  | ✓ |
+| **Grok&nbsp;CLI** | ✓ | ✓ | ✓ |  |  | ✓ |  |  |  |
+| **Grok&nbsp;Bot** | ✓ | ✓ | ✓ |  |  | ✓ | ✓ |  |  |
+| **GitHub&nbsp;Copilot&nbsp;CLI** | ✓ | ✓ | ✓ | ✓ |  | ✓ |  |  |  |
+| **OpenCode** | ✓ | ✓ |  |  |  | ✓ | ✓ |  | ✓ |
+| **Kilo&nbsp;Code** | ✓ |  |  |  |  | ✓ | ✓ |  |  |
+| **MiMo&nbsp;Code** | ✓ |  |  |  |  | ✓ | ✓ |  |  |
+| **Kimi** | ✓ | ✓ | ✓ |  |  | ✓ |  |  | ✓ |
+| **Pi** | ✓ | ✓ | ✓ |  |  | ✓ | ✓ |  | ✓ |
+| **Oh&nbsp;My&nbsp;Pi** | ✓ |  | ✓ |  |  | ✓ | ✓ |  |  |
+| **OpenClaw** | ✓ |  |  |  |  |  |  |  |  |
+| **Hermes&nbsp;Agent** | ✓ | ✓ | ✓ |  |  | ✓ |  |  |  |
+| **Factory&nbsp;Droid** | ✓ | ✓ | ✓ | ✓ |  | ✓ |  |  |  |
+| **TRAE** | 会话 | ✓ | ✓ |  |  | ✓ |  |  | ✓ |
+| **Qoder** | ✓ | ✓ | ✓ | ✓ |  | ✓ |  | ✓ | ✓ |
+| **ZCode** | ✓ |  | ✓ | ✓ | ✓ | ✓ |  |  | ✓ |
+| **CodeBuddy** | ✓ |  |  | ✓ |  | ✓ |  |  |  |
+| **WorkBuddy** | ✓ | ✓ |  | ✓ |  | ✓ |  |  | ✓ |
+| **Qwen&nbsp;Code** | ✓ |  |  | ✓ |  | ✓ |  |  |  |
+| **Devin** | ✓ | ✓ |  | ✓ |  | ✓ | ✓ |  |  |
+| **Cline** | ✓ | ✓ |  |  |  |  |  |  |  |
+| **Roo&nbsp;Code** | ✓ |  |  |  |  |  |  |  |  |
+| **Goose** | ✓ |  |  |  |  |  |  |  |  |
 
-另外还读取 **GLM Coding Plan**、**MiniMax** 与 **火山方舟** 的套餐额度。Qoder 包括 Qoder CN 与 QoderWork，TRAE 包括 TRAE CN，Devin 包括 CLI 与 Devin Desktop。Codex 的批准需先在 Codex 中信任回调，DeepSeek Harness 的批准和提问需先安装 Agent HUD 插件（设置 → 智能体插件），Copilot 的批准与额度分别在设置中打开。Qoder、WorkBuddy 与 TRAE 的额度需先在 Agent HUD 自己的窗口里登录厂商网站。TRAE 不提供 Token，只显示会话；打开它的全局 Hooks 后才会运行 Agent HUD 的回调。Factory Droid 的额度需要 Factory API Key，Devin 的额度来自其 CLI 的本机缓存。Cursor 的 Token 需要 Cursor 3.27 或更新版本。Grok Bot 的 Bot 运行在 Cursor 的服务器上，由服务器给出每个 Bot 每天的 Token；已合并到 SuperGrok 的账户没有这项数据，只显示会话。Cursor 与 Grok Bot 登录同一账户时，Grok Bot 的周额度也从这些服务器读取；否则读取 Bot 自己的缓存，而 Bot 只在使用时刷新它。已合并到 SuperGrok 的账户由 Cursor 和 Grok Bot 共用一个周额度，Cursor 一栏按 Cursor 自己的显示读取它。
+另外还读取 **GLM Coding Plan**、**OpenCode Go**、**MiniMax** 与 **火山方舟** 的套餐额度。Qoder 包括 Qoder CN 与 QoderWork，TRAE 包括 TRAE CN，Devin 包括 CLI 与 Devin Desktop。Codex CLI 的批准需先在 Codex 中信任回调（Codex 桌面版不需要），DeepSeek Harness 的批准和提问需先安装 Agent HUD 插件（设置 → 智能体插件），Copilot 的批准与额度分别在设置中打开。Qoder、WorkBuddy 与 TRAE 的额度需先在 Agent HUD 自己的窗口里登录厂商网站。TRAE 不提供 Token，只显示会话；打开它的全局 Hooks 后才会运行 Agent HUD 的回调。Qoder 只在使用你自己密钥的模型、或设置了 `QODER_EXPOSE_TOKEN_USAGE` 时记录 Token，逐轮明细也随之才有。一键回到终端窗格需要 iTerm2；Cursor 能回到云端 agent 的对话，本地对话只能打开它的文件夹。[互发消息](https://agenthud.app/docs/zh/mcp/messaging/)支持 OpenCode 1；Qoder CN 与 QoderWork 只收不发。Factory Droid 的额度需要 Factory API Key，Devin 的额度来自其 CLI 的本机缓存。Cursor 的 Token 需要 Cursor 3.27 或更新版本。Grok Bot 的 Bot 运行在 Cursor 的服务器上，由服务器给出每个 Bot 每天的 Token；已合并到 SuperGrok 的账户没有这项数据，只显示会话。Cursor 与 Grok Bot 登录同一账户时，Grok Bot 的周额度也从这些服务器读取；否则读取 Bot 自己的缓存，而 Bot 只在使用时刷新它。已合并到 SuperGrok 的账户由 Cursor 和 Grok Bot 共用一个周额度，Cursor 一栏按 Cursor 自己的显示读取它。
 
 ## 保护你的数据
 
