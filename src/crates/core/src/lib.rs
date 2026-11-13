@@ -24,6 +24,7 @@ mod database;
 pub mod demo;
 mod discovery;
 mod dispatch;
+mod guide;
 mod hook_events;
 mod host;
 mod ingestion;
@@ -169,13 +170,16 @@ impl AgentHudCore {
             .ok()
             .and_then(|bytes| serde_json::from_slice(&bytes).ok())
             .unwrap_or(Value::Null);
-        let mut settings = json!({"quotaDisplay":"consumed","codexHomes":[],"claudeHomes":[],"antigravityCliSettings":[],"appearance":"system","appearanceFollowsScreen":false,"language":"system","clientHooks":false,"optInApprovals":[],"readCopilotQuota":false,"approvalWaitMinutes":10,"launchAtLogin":true,"animations":true,"hudVisible":true,"showMenuBarIcon":true,"hudTools":false,"claudeAnswers":true,"agentMessages":false,"agentMessagesAsUser":false,"agentMessagesLimit":10,"claudeMessages":true,"deepseekMessages":true,"relayReading":[],"customPrices":{},"relayMultipliers":{},"localKinds":{}});
+        let mut settings = json!({"quotaDisplay":"consumed","codexHomes":[],"claudeHomes":[],"antigravityCliSettings":[],"appearance":"system","appearanceFollowsScreen":false,"language":"system","clientHooks":false,"optInApprovals":[],"readCopilotQuota":false,"approvalWaitMinutes":10,"launchAtLogin":true,"animations":true,"hudVisible":true,"showMenuBarIcon":true,"hudTools":false,"claudeAnswers":true,"agentMessages":false,"agentMessagesAsUser":false,"agentMessagesLimit":10,"claudeMessages":true,"deepseekMessages":true,"relayReading":[],"customPrices":{},"relayMultipliers":{},"localKinds":{},"guide":null});
         if let Some(values) = stored["settings"].as_object() {
             for (key, value) in values {
                 if settings.get(key).is_some() {
                     settings[key] = value.clone();
                 }
             }
+        }
+        if !guide::valid(&settings["guide"]) {
+            settings["guide"] = guide::unseen(stored.is_null());
         }
         let enabled = serde_json::from_value(stored["providers"].clone()).unwrap_or_default();
         let opened = database::open(&app_data);

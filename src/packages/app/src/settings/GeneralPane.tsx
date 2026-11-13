@@ -1,6 +1,14 @@
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { useEffect, useState } from "react";
-import { Menu, Segments, ToggleRow, Unavailable } from "./SettingsControls";
+import { emit } from "@tauri-apps/api/event";
+import { guideEvents } from "../guide/use-hud-guide";
+import {
+  Menu,
+  Segments,
+  SmallButton,
+  ToggleRow,
+  Unavailable,
+} from "./SettingsControls";
 import {
   Notice,
   Page,
@@ -147,6 +155,19 @@ export function GeneralPane({ snapshot, action }: SettingsPaneProps) {
           change={setting("showMenuBarIcon")}
         />
         {problem(startupKeys)}
+      </Section>
+      <Section title={t("Help", "帮助")}>
+        <Row
+          title={t("Getting started", "上手引导")}
+          subtitle={t(
+            "Walk through the HUD and its key settings again.",
+            "从头再走一遍 HUD 和几个关键设置。",
+          )}
+        >
+          <SmallButton onClick={() => void emit(guideEvents.open, "tour")}>
+            {t("Start again", "重新开始")}
+          </SmallButton>
+        </Row>
       </Section>
     </Page>
   );

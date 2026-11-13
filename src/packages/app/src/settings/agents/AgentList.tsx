@@ -33,7 +33,11 @@ export function AgentList({
     </button>
   );
   return (
-    <nav className="agents-list" aria-label={t("Agents", "智能体")}>
+    <nav
+      className="agents-list"
+      data-guide="agents-list"
+      aria-label={t("Agents", "智能体")}
+    >
       {found.map(item)}
       {missing.length > 0 && (
         <>

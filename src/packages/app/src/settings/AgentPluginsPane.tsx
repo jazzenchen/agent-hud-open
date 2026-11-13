@@ -121,6 +121,7 @@ export function AgentPluginsPane({
       <Page>
         <HooksSection snapshot={snapshot} action={action} t={t} />
         <Section
+          anchor="clients"
           title={t("Clients", "客户端")}
           plain
           footer={mcp.status?.ready === false ? setupNote(snapshot, t) : null}

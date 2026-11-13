@@ -61,6 +61,7 @@ export function HooksSection({
       footer={error ? undefined : (status?.notice ?? undefined)}
     >
       <Row
+        anchor="client-hooks"
         title={t("Client hooks", "客户端回调")}
         subtitle={t(
           "For permission requests and finished turns in the HUD.",

@@ -17,10 +17,13 @@ import { useSelectedScreen } from "./lib/use-selected-screen";
 import { useRequestDeliveryToasts } from "./lib/use-request-delivery-toasts";
 import { useWindowTheme } from "./lib/use-window-theme";
 import { storageKeys } from "./lib/storage-keys";
+import { withAppDraft } from "./lib/app-draft";
+import { useWebLinks } from "./lib/use-web-links";
 import type { HUDConfig } from "@agent-hud/hud/model";
 import { snapshotLanguage } from "@agent-hud/ui/format";
 import type { AgentPluginItem } from "./settings/AgentPluginsPane";
 import type { AppExtensionPage } from "./settings/pages";
+import type { ProductGuide } from "./guide/plan";
 import { SettingsWindow } from "./settings/SettingsWindow";
 import { SourceMenu } from "./SourceMenu";
 import { StatisticsWindow } from "./StatisticsWindow";
@@ -34,6 +37,8 @@ const NativeHUDSurface = lazy(() => import("./HUDSurface"));
 export interface AppProps {
   extensionPages?: AppExtensionPage[];
   /** Rows a product build adds to a client's card on Agent plugins. */ agentPlugins?: AgentPluginItem[];
+  /** What the product adds to the guide: its news and its Settings steps. */
+  guide?: ProductGuide;
   productName?: string;
   version?: string;
 }
@@ -46,6 +51,7 @@ export default function App(props: AppProps = {}) {
 function AppContent({
   extensionPages = [],
   agentPlugins = [],
+  guide,
   productName = "Agent HUD",
   version = "0.1.0",
 }: AppProps) {
@@ -102,24 +108,12 @@ function AppContent({
     discardDraft,
     releaseHold,
   } = useHUDConfig(selectedId, screenContexts, windowActive);
-  const snapshot = useMemo(() => {
-    if (!collectedSnapshot) return null;
-    const draft = store.appDraft as Record<string, any> | null | undefined;
-    const settings = {
-      ...collectedSnapshot.settings,
-      ...(draft?.appearance !== undefined
-        ? { appearance: draft.appearance }
-        : {}),
-      ...(draft?.matchScreen !== undefined
-        ? { appearanceFollowsScreen: draft.matchScreen }
-        : {}),
-      ...(draft?.showMenuBarIcon !== undefined
-        ? { showMenuBarIcon: draft.showMenuBarIcon }
-        : {}),
-    };
-    return { ...collectedSnapshot, settings };
-  }, [collectedSnapshot, store.appDraft, store.sources]);
+  const snapshot = useMemo(
+    () => withAppDraft(collectedSnapshot, store.appDraft),
+    [collectedSnapshot, store.appDraft, store.sources],
+  );
   useRequestDeliveryToasts(snapshot, settings && windowActive);
+  useWebLinks((url) => act("open_link", { url }));
   const botDirections = useBotDirections(surface && windowActive);
   const measured = geometries[selectedId] ?? null;
   const selectedMonitor = monitors.find(
@@ -240,6 +234,9 @@ function AppContent({
             geometry={measured}
             monitors={monitors}
             action={act}
+            updateConfig={updateConfig}
+            demo={demo}
+            guide={guide}
           />
         </PanelServicesProvider>
       ) : null,
@@ -271,6 +268,7 @@ function AppContent({
     <PanelServicesProvider value={panelServices}>
       <SettingsWindow
         extensionPages={extensionPages}
+        guide={guide}
         agentPlugins={agentPlugins}
         productName={productName}
         version={version}

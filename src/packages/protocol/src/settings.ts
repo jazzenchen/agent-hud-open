@@ -123,4 +123,16 @@ export interface AppSettings {
   claudeMessages?: boolean;
   /** Messages may go into DeepSeek Harness sessions through Agent HUD's plugin; on unless turned off. */
   deepseekMessages?: boolean;
+  guide?: GuideRecord;
+}
+/** What the guide knows of this copy, kept by the Settings window and the HUD. */
+export interface GuideRecord {
+  /** When this copy first ran with the guide; 0 for a copy older than it. */
+  since: number;
+  /** The last version whose guide was finished or closed; "" for none. */
+  seen: string;
+  /** The first-run step on screen; "" when no tour is open. */
+  step: string;
+  /** "done" once the Star invitation was taken or closed. */
+  star: string;
 }

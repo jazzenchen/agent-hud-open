@@ -34,6 +34,7 @@ export function ToolsSection({
   return (
     <Section title={t("Agent tools", "智能体工具")}>
       <ToolSwitchRow
+        anchor="hud-tools"
         title={t("Let agents arrange the HUD", "允许智能体调整 HUD")}
         description={t(
           "Changes stay drafts until you save them in the panel.",

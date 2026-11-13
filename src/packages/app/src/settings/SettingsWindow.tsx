@@ -35,6 +35,9 @@ import {
   type AppExtensionPage,
 } from "./pages";
 import { SettingsNavigation } from "./SettingsNavigation";
+import { GuideLayer } from "../guide/GuideLayer";
+import type { ProductGuide } from "../guide/plan";
+import { openSettingsSteps } from "../guide/steps";
 import type { SettingsPaneProps } from "./SettingsPrimitives";
 
 // A resting HUD does not need the settings panes.
@@ -46,6 +49,7 @@ type Page = string;
  * and pane. */
 export function SettingsWindow({
   extensionPages,
+  guide,
   agentPlugins,
   productName,
   version,
@@ -69,6 +73,7 @@ export function SettingsWindow({
   onPreferences,
 }: {
   extensionPages: AppExtensionPage[];
+  guide?: ProductGuide;
   agentPlugins: AgentPluginItem[];
   productName: string;
   version: string;
@@ -100,8 +105,10 @@ export function SettingsWindow({
   const [page, setPage] = useState<Page>("display");
   // The running app's own version: a release is stamped with its version when
   // it is built (0.6.0-beta.1), which a product's front end cannot know.
-  // `version` stands in outside the app.
-  const [runningVersion, setRunningVersion] = useState(version);
+  // `version` stands in outside the app; null until the app has said.
+  const [runningVersion, setRunningVersion] = useState<string | null>(
+    isTauri() ? null : version,
+  );
   useEffect(() => {
     if (!isTauri()) return;
     void getVersion().then(setRunningVersion);
@@ -172,7 +179,7 @@ export function SettingsWindow({
               <div>
                 <strong>{productName}</strong>
                 <span>
-                  {runningVersion} ·{" "}
+                  {runningVersion ?? version} ·{" "}
                   {demo
                     ? chinese
                       ? "演示"
@@ -262,6 +269,13 @@ export function SettingsWindow({
               </div>
             </div>
           </main>
+          <GuideLayer
+            snapshot={snapshot}
+            settingsProps={settingsProps}
+            version={runningVersion}
+            steps={[...openSettingsSteps, ...(guide?.steps ?? [])]}
+            setPage={setPage}
+          />
           <Toaster theme={theme} position="bottom-right" />
         </div>
       </TooltipProvider>

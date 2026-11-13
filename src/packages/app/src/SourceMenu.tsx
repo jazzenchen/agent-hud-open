@@ -10,6 +10,8 @@ import {
   DropdownMenuTrigger,
 } from "@agent-hud/ui/components/dropdown-menu";
 import type { NativeMethod } from "@agent-hud/protocol";
+import { emit } from "@tauri-apps/api/event";
+import { guideEvents } from "./guide/use-hud-guide";
 
 /** The More options menu of the Settings and Statistics windows. */
 export function SourceMenu({
@@ -46,6 +48,7 @@ export function SourceMenu({
         <Button
           variant="ghost"
           size="icon"
+          data-guide="more-menu"
           aria-label={chinese ? "更多选项" : "More options"}
         >
           <MoreHorizontal size={16} />
@@ -59,7 +62,7 @@ export function SourceMenu({
         >
           {chinese ? "用量统计…" : "Statistics…"}
         </DropdownMenuItem>
-        {statistics && (
+        {statistics ? (
           <DropdownMenuItem
             onClick={() => {
               if (isTauri()) void invoke("hud_show_main");
@@ -67,6 +70,19 @@ export function SourceMenu({
           >
             {chinese ? "设置…" : "Settings…"}
           </DropdownMenuItem>
+        ) : (
+          <>
+            <DropdownMenuItem
+              onClick={() => void emit(guideEvents.open, "tour")}
+            >
+              {chinese ? "上手引导…" : "Getting Started…"}
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => void emit(guideEvents.open, "news")}
+            >
+              {chinese ? "新功能…" : "What’s New…"}
+            </DropdownMenuItem>
+          </>
         )}
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={toggleHUDVisibility}>

@@ -1,0 +1,125 @@
+/* The guide in Settings: the rest of the window dims, the row stays lit in
+ * its ring, and the card sits right by it. Nothing here takes a click but
+ * the card itself. */
+/* A guided row scrolled to the top stays clear of the page header. */
+[data-guide] {
+  scroll-margin-top: 96px;
+}
+.guide-spotlight {
+  position: fixed;
+  z-index: 39;
+  pointer-events: none;
+  border-radius: 12px;
+  box-shadow: 0 0 0 2px var(--primary);
+  transition:
+    left 0.25s ease,
+    top 0.25s ease,
+    width 0.25s ease,
+    height 0.25s ease;
+}
+.guide-spotlight.is-dim {
+  box-shadow:
+    0 0 0 2px var(--primary),
+    0 0 0 200vmax rgb(0 0 0 / 0.42);
+}
+.guide-spotlight::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: 0 0 0 2px var(--primary);
+  animation: guide-pulse 1.8s ease-out infinite;
+}
+.guide-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 39;
+  pointer-events: none;
+  background: rgb(0 0 0 / 0.42);
+}
+.guide-card {
+  position: fixed;
+  z-index: 40;
+  box-sizing: border-box;
+  padding: 14px 18px 16px;
+  border-radius: 14px;
+  background: var(--popover, var(--card));
+  color: var(--popover-foreground, var(--foreground));
+  border: 1px solid color-mix(in srgb, var(--primary) 45%, transparent);
+  box-shadow:
+    0 18px 44px rgb(0 0 0 / 0.32),
+    0 2px 8px rgb(0 0 0 / 0.12);
+  font-size: 13px;
+  line-height: 1.5;
+  animation: guide-in 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.guide-card header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11.5px;
+  color: var(--muted-foreground);
+}
+.guide-card h2 {
+  margin: 6px 0 4px;
+  font-size: 16px;
+  font-weight: 600;
+}
+.guide-card p {
+  margin: 0;
+  color: var(--muted-foreground);
+}
+.guide-card footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 14px;
+}
+.guide-arrow {
+  position: absolute;
+  width: 13px;
+  height: 13px;
+  background: inherit;
+  border-left: inherit;
+  border-top: inherit;
+  transform: rotate(45deg);
+}
+.guide-arrow[data-side="bottom"] {
+  transform: rotate(225deg);
+}
+.guide-arrow[data-side="left"] {
+  transform: rotate(-45deg);
+}
+.guide-done {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: #1f8a3b;
+}
+[data-theme="dark"] .guide-done {
+  color: #30d158;
+}
+@keyframes guide-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+@keyframes guide-pulse {
+  from {
+    opacity: 0.6;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.04, 1.3);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .guide-card,
+  .guide-spotlight::after {
+    animation: none;
+  }
+}

@@ -3,6 +3,12 @@
 export type { AppProps } from "./App";
 export type { AppExtensionPage } from "./settings/pages";
 export type {
+  NewsEntry,
+  NewsItem,
+  ProductGuide,
+  SettingsStep,
+} from "./guide/plan";
+export type {
   AgentPluginContext,
   AgentPluginItem,
 } from "./settings/AgentPluginsPane";

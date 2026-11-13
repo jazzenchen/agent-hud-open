@@ -20,6 +20,10 @@ import type {
 } from "./lib/use-hud-geometry";
 import { useHUDPointer } from "./lib/use-hud-pointer";
 import { useHUDTextFocus } from "./lib/use-hud-text-focus";
+import type { ProductGuide } from "./guide/plan";
+import { openSettingsSteps } from "./guide/steps";
+import { openNews } from "./guide/news";
+import { useHUDGuide } from "./guide/use-hud-guide";
 
 export default function NativeHUDSurface({
   screenId,
@@ -30,6 +34,9 @@ export default function NativeHUDSurface({
   botDirections,
   glowHidden,
   action,
+  updateConfig,
+  demo = false,
+  guide: product,
 }: {
   screenId: string;
   snapshot: Snapshot;
@@ -42,6 +49,10 @@ export default function NativeHUDSurface({
     method: NativeMethod,
     params?: Record<string, unknown>,
   ) => Promise<unknown>;
+  /** Changes this screen's HUD configuration, as Settings' Display page does. */
+  updateConfig: (patch: Partial<HUDConfig>) => unknown;
+  demo?: boolean;
+  guide?: ProductGuide;
 }) {
   const nativePointer = useHUDPointer(screenId);
   const textFocused = useHUDTextFocus(
@@ -136,6 +147,21 @@ export default function NativeHUDSurface({
   const openUpdate = useCallback(() => {
     void invoke("open_update");
   }, []);
+  // The guide's window: only beside the main screen's HUD.
+  const primary =
+    monitors.find((m) => m.screenId === screenId)?.primary ??
+    monitors[0]?.screenId === screenId;
+  const guide = useHUDGuide({
+    active: primary,
+    snapshot,
+    config,
+    update: updateConfig,
+    action,
+    demo,
+    screens: monitors.length,
+    news: [...openNews, ...(product?.news ?? [])],
+    steps: [...openSettingsSteps, ...(product?.steps ?? [])],
+  });
   // A product's flights between two agents' marks; every screen's HUD plays them.
   const [flights, setFlights] = useState<readonly HUDFlightCommand[]>([]);
   useEffect(() => {
@@ -185,9 +211,6 @@ export default function NativeHUDSurface({
     };
   }, [screenId]);
   if (isTauri() && (!geometry || geometry.screenId !== screenId)) return null;
-  const primary =
-    monitors.find((m) => m.screenId === screenId)?.primary ??
-    monitors[0]?.screenId === screenId;
   const underPointer = (() => {
     if (!isTauri() || !geometry || monitors.length <= 1) return true;
     if (!nativePointer?.point) return primary;
@@ -256,6 +279,7 @@ export default function NativeHUDSurface({
       onRequestDecision={decide}
       panelCommand={primary ? panelCommand : undefined}
       flights={flights}
+      guide={guide}
     />
   );
 }

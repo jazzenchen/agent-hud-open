@@ -11,6 +11,7 @@
     "./HUDArtwork": "./src/HUDArtwork.tsx",
     "./HUDGlow": "./src/HUDGlow.tsx",
     "./HUDScene": "./src/HUDScene.tsx",
+    "./GuideDock": "./src/GuideDock.tsx",
     "./HoverPanel": "./src/HoverPanel.tsx",
     "./PanelContext": "./src/PanelContext.tsx",
     "./bots/mark-director": "./src/bots/mark-director.ts",

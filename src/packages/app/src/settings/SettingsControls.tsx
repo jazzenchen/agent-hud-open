@@ -52,6 +52,7 @@ export function ToggleRow({
   icon,
   reason,
   below,
+  anchor,
 }: {
   title: ReactNode;
   subtitle?: ReactNode;
@@ -62,6 +63,8 @@ export function ToggleRow({
   icon?: ReactNode;
   reason?: string;
   below?: ReactNode;
+  /** What the guide calls this row (`data-guide`). */
+  anchor?: string;
 }) {
   const control = (
     <Switch
@@ -72,7 +75,14 @@ export function ToggleRow({
     />
   );
   return (
-    <Row title={title} subtitle={subtitle} tag={tag} icon={icon} below={below}>
+    <Row
+      title={title}
+      subtitle={subtitle}
+      tag={tag}
+      icon={icon}
+      below={below}
+      anchor={anchor}
+    >
       {disabled && reason ? (
         <Unavailable reason={reason}>{control}</Unavailable>
       ) : (

@@ -1,7 +1,6 @@
 import {
   useEffect,
   useId,
-  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -39,6 +38,8 @@ import { HoverFloor, SceneBackdrop } from "./scene/SceneFloors";
 import { usePanelHandoffs } from "./scene/usePanelHandoffs";
 import { useSceneAlerts } from "./scene/useSceneAlerts";
 import { useStripMetrics } from "./scene/useStripMetrics";
+import { useSceneWidth, useSystemLight } from "./scene/useSceneMeasures";
+import { GuideDock, type HUDGuide } from "./GuideDock";
 import { usePanelServices } from "./PanelContext";
 import type { HUDRect } from "./geometry";
 import { useHoverMachine } from "./hover";
@@ -108,6 +109,8 @@ export interface HUDSceneProps {
   panelCommand?: { open: boolean; sequence: number };
   /** The host's recent flights between two agents' marks, oldest first. */
   flights?: readonly HUDFlightCommand[];
+  /** The guide's small window beside the resting HUD (GuideDock). */
+  guide?: HUDGuide | null;
 }
 
 /**
@@ -138,6 +141,7 @@ export function HUDScene({
   renderBackdrop,
   panelCommand,
   flights,
+  guide,
 }: HUDSceneProps) {
   const sourceConfig = useMemo(
     () => ({ ...defaultHUDConfig, ...supplied }),
@@ -155,11 +159,11 @@ export function HUDScene({
   const id = useId().replaceAll(":", "");
   const scene = useRef<HTMLElement>(null);
   const dockMemory = useRef(new DockMemory());
-  const [width, setWidth] = useState(720);
+  const width = useSceneWidth(scene);
   const [contentHeight, setContentHeight] = useState<number>(
     HUD_METRICS.defaultPanelHeight,
   );
-  const [systemLight, setSystemLight] = useState(false);
+  const systemLight = useSystemLight();
   const [hovered, setHovered] = useState<string | null>(null);
   const [pinned, setPinned] = useState(false);
   const [pointerInside, setPointerInside] = useState(false);
@@ -324,23 +328,6 @@ export function HUDScene({
     nativePointer,
     scene,
   });
-
-  useEffect(() => {
-    const media = window.matchMedia("(prefers-color-scheme: light)");
-    const change = () => setSystemLight(media.matches);
-    change();
-    media.addEventListener("change", change);
-    return () => media.removeEventListener("change", change);
-  }, []);
-  useLayoutEffect(() => {
-    if (!scene.current) return;
-    setWidth(Math.max(360, scene.current.getBoundingClientRect().width));
-    const observer = new ResizeObserver((entries) =>
-      setWidth(Math.max(360, entries[0].contentRect.width)),
-    );
-    observer.observe(scene.current);
-    return () => observer.disconnect();
-  }, []);
 
   const {
     vendorUnderPointer,
@@ -641,6 +628,16 @@ export function HUDScene({
             botLogos={config.botLogos}
             reduceMotion={reduceMotion}
             light={light}
+          />
+          <GuideDock
+            guide={guide}
+            open={open}
+            hidden={Boolean(dragVisual) || cardVisible}
+            edge={edge}
+            strip={strip}
+            screen={screen}
+            look={{ light, fill, outline, shadow }}
+            reduceMotion={reduceMotion}
           />
           <span id={`hud-instructions-${id}`} className="sr-only">
             {snapshotLanguage(snapshot) === "zh"

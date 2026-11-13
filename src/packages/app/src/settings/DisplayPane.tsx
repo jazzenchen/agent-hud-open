@@ -55,6 +55,7 @@ export function DisplayPane({
       >
         {several && (
           <Row
+            anchor="screen-picker"
             title={t("Screen", "屏幕")}
             subtitle={t(
               "The screen whose HUD you're setting up.",

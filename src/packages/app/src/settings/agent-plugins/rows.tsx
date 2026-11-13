@@ -262,6 +262,7 @@ export function ToolSwitchRow({
   pending = false,
   unavailable,
   error,
+  anchor,
   children,
 }: {
   title: string;
@@ -273,11 +274,14 @@ export function ToolSwitchRow({
   /** Why it cannot change now; the switch is drawn disabled with this as its tip. */
   unavailable?: string | null;
   error?: string | null;
+  /** What the guide calls this row (`data-guide`). */
+  anchor?: string;
   children?: ReactNode;
 }) {
   return (
     <>
       <ToggleRow
+        anchor={anchor}
         title={title}
         subtitle={description}
         checked={checked}

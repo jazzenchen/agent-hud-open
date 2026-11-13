@@ -40,6 +40,7 @@ export function Section({
   action,
   footer,
   plain = false,
+  anchor,
   children,
 }: {
   title?: ReactNode;
@@ -47,10 +48,12 @@ export function Section({
   action?: ReactNode;
   footer?: ReactNode;
   plain?: boolean;
+  /** What the guide calls this section (`data-guide`). */
+  anchor?: string;
   children: ReactNode;
 }) {
   return (
-    <section className="settings-section">
+    <section className="settings-section" data-guide={anchor}>
       {(title || action) && (
         <header className="settings-section-header">
           <div>
@@ -82,6 +85,7 @@ export function Row({
   detail,
   below,
   muted = false,
+  anchor,
   children,
 }: {
   title: ReactNode;
@@ -91,10 +95,15 @@ export function Row({
   detail?: ReactNode;
   below?: ReactNode;
   muted?: boolean;
+  /** What the guide calls this row (`data-guide`). */
+  anchor?: string;
   children?: ReactNode;
 }) {
   return (
-    <div className={`settings-row${muted ? " is-muted" : ""}`}>
+    <div
+      className={`settings-row${muted ? " is-muted" : ""}`}
+      data-guide={anchor}
+    >
       <div className="settings-row-main">
         {icon && <div className="settings-row-icon">{icon}</div>}
         <div className="settings-row-text">

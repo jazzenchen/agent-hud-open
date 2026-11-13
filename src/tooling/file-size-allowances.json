@@ -6,7 +6,7 @@
   "src/crates/platform/src/deepseek_plugin/agent-hud.mjs": 455,
   "src/packages/app/src/sessions/SubagentTimeline.tsx": 463,
   "src/packages/app/src/sessions/TurnBarsChart.tsx": 329,
-  "src/packages/hud/src/HUDScene.tsx": 656,
+  "src/packages/hud/src/HUDScene.tsx": 653,
   "src/packages/hud/src/bots/bot-motion.ts": 463,
   "src/packages/hud/src/bots/bot-spec.ts": 393,
   "src/packages/hud/src/bots/clawd-clips.ts": 301,

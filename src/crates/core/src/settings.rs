@@ -132,6 +132,7 @@ impl crate::AgentHudCore {
 
     fn validate_setting(key: &str, value: &Value) -> Result<(), String> {
         match key {
+            "guide" if crate::guide::valid(value) => {}
             "appearance" if ["dark", "light", "system"].contains(&value.as_str().unwrap_or("")) => {
             }
             "quotaDisplay" if matches!(value.as_str(), Some("consumed" | "remaining")) => {}
@@ -386,5 +387,35 @@ mod tests {
         let core = AgentHudCore::new(vec![], home.path().to_owned());
         assert_eq!(core.settings["language"], "en");
         assert_eq!(core.settings["quotaDisplay"], "consumed");
+    }
+
+    #[test]
+    fn a_new_copy_starts_the_guide_and_an_older_one_is_known_to_be_in_use() {
+        let home = tempfile::tempdir().unwrap();
+        let mut core = AgentHudCore::new(vec![], home.path().to_owned());
+        assert!(core.settings["guide"]["since"].as_u64().unwrap() > 0);
+        assert_eq!(core.settings["guide"]["seen"], "");
+        let finished = json!({"since": 5, "seen": "0.6.2", "step": "", "star": "done"});
+        core.apply_setting("guide", &finished).unwrap();
+        let reopened = AgentHudCore::new(vec![], home.path().to_owned());
+        assert_eq!(reopened.settings["guide"], finished);
+        for invalid in [
+            json!({"since": 5, "seen": "0.6.2", "step": ""}),
+            json!({"since": -1, "seen": "", "step": "", "star": ""}),
+            json!({"since": 5, "seen": 2, "step": "", "star": ""}),
+            json!(null),
+        ] {
+            assert!(core.apply_setting("guide", &invalid).is_err());
+        }
+
+        let older = tempfile::tempdir().unwrap();
+        fs::write(
+            older.path().join("settings.json"),
+            r#"{"settings":{"language":"en"},"providers":{}}"#,
+        )
+        .unwrap();
+        let core = AgentHudCore::new(vec![], older.path().to_owned());
+        assert_eq!(core.settings["guide"]["since"], 0);
+        assert_eq!(core.settings["guide"]["seen"], "");
     }
 }

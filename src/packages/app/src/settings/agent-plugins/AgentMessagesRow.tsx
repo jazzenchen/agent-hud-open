@@ -48,6 +48,7 @@ export function AgentMessagesRow({
   return (
     <>
       <ToolSwitchRow
+        anchor="agent-messages"
         title={t("Let agents message each other", "允许智能体互发消息")}
         description={t(
           "Agents message, start and read other sessions here.",

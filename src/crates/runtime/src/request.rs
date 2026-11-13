@@ -85,6 +85,14 @@ impl Runtime {
             }
             return Ok(json!({"opened":self.platform.open_client(source)}));
         }
+        if method == "open_link" {
+            // A web link in a window (the guide's Star, a page's docs link):
+            // the system's browser opens it, as the windows cannot.
+            let url = params["url"]
+                .as_str()
+                .ok_or_else(|| l10n::text("缺少链接", "Link is required"))?;
+            return Ok(json!({"opened":self.platform.open_link(url)?}));
+        }
         if method == "answer_request" {
             return self.core.request(method, params);
         }
