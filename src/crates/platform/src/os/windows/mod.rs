@@ -8,8 +8,9 @@ mod files;
 pub(crate) mod pipe;
 mod process;
 mod secrets;
+mod shortcut;
 pub(crate) use crate::windows_session::spawn;
-pub(crate) use apps::{activate_app, app_running, launch_app};
+pub(crate) use apps::{activate_app, app_running, launch_app, registered_bundle};
 pub(crate) use process::{
     codex_cli_on_port, parent_processes, process_runs, process_start, terminal_io,
 };
@@ -95,15 +96,15 @@ pub(crate) fn application_installed(home: &Path, env: &Environment, name: &str) 
     if matches!(name, "Codex" | "ChatGPT") {
         return codex::installation(home, env).installed;
     }
+    if name == "Claude" && registered_bundle("com.anthropic.claudefordesktop") {
+        return true;
+    }
     [
         local_app(home, env).join("Programs"),
         variable(env, "ProgramFiles").unwrap_or_else(|| PathBuf::from("C:/Program Files")),
     ]
     .iter()
     .any(|dir| dir.join(name).is_dir())
-}
-pub(crate) fn registered_bundle(_id: &str) -> bool {
-    false
 }
 /// URL-handler lookup through Windows associations is not implemented.
 pub(crate) fn registered_url(_url: &str) -> bool {
@@ -219,6 +220,9 @@ pub(crate) fn open_url_in_app(_bundle_id: &str, _url: &str) -> bool {
 }
 
 pub(crate) fn open_session_url(url: &str) -> Result<(), String> {
+    if let Some(opened) = apps::open_unregistered_link(url) {
+        return opened;
+    }
     use std::{
         ffi::{c_void, OsStr},
         os::windows::ffi::OsStrExt,

@@ -45,9 +45,23 @@ fn registered_desktop_engine_precedes_normal_install_and_complete_cached_runtime
     let new = runtime(root, "fedcba9876543210", 1_700_000_100);
     runtime(root, ".staging-1111111111111111-temp", 1_700_000_300);
     file(&root.join("local/OpenAI/Codex/bin/2222222222222222/codex.exe"));
-    let found = locate(root, &environment(root), &[application]);
+    let found = locate(root, &environment(root), std::slice::from_ref(&application));
     assert!(found.installed);
     assert_eq!(found.engines, [bundled, normal, new, old]);
+    assert_eq!(found.applications, [application]);
+}
+
+#[test]
+fn the_store_app_is_started_before_a_copy_in_the_usual_folders() {
+    let root = tempfile::tempdir().unwrap();
+    let root = root.path();
+    let store = root.join("WindowsApps/OpenAI.Codex_fixture/app/Codex.exe");
+    file(&store);
+    let usual = root.join("local/Programs/Codex/Codex.exe");
+    file(&usual);
+    file(&root.join("programs/ChatGPT/resources/codex.exe"));
+    let found = locate(root, &environment(root), std::slice::from_ref(&store));
+    assert_eq!(found.applications, [store, usual]);
 }
 
 #[test]

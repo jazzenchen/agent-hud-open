@@ -26,21 +26,38 @@ const CACHE_FILES: [&str; 4] = [
 pub(super) struct Installation {
     pub installed: bool,
     pub engines: Vec<PathBuf>,
+    /// The app's own programs, to start it: a running or shortcut copy
+    /// first, then the Store package's, then the usual folders'.
+    pub applications: Vec<PathBuf>,
 }
 
 pub(super) fn installation(home: &Path, env: &Environment) -> Installation {
-    locate(home, env, &registered_applications())
+    let mut found = locate(home, env, &registered_applications());
+    // A copy anywhere else, found from its process or its shortcut, such as
+    // one unpacked to D:\ChatGPT\app (VirPoe, agent-hud-open#34).
+    if let Some(application) = super::apps::found_executable("com.openai.codex") {
+        let engine = application.with_file_name("resources/codex.exe");
+        if engine.is_file() && !found.engines.contains(&engine) {
+            found.engines.push(engine);
+        }
+        found.applications.retain(|known| *known != application);
+        found.applications.insert(0, application);
+        found.installed = true;
+    }
+    found
 }
 
 fn locate(home: &Path, env: &Environment, registered: &[PathBuf]) -> Installation {
     let mut installed = false;
     let mut engines = Vec::new();
+    let mut applications = Vec::new();
     let cache = local_app(home, env).join("OpenAI/Codex/bin");
     // Older Store builds relocate their runtime; app-contained-core builds
     // can use the package directly. Prefer the official copy of these exact
     // package binaries when present, before the bundled executable itself.
     for application in registered.iter().filter(|path| path.is_file()) {
         installed = true;
+        applications.push(application.clone());
         if let Some(directory) = application.parent() {
             let resources = directory.join("resources");
             if cache.is_dir() {
@@ -64,6 +81,10 @@ fn locate(home: &Path, env: &Environment, registered: &[PathBuf]) -> Installatio
         for name in ["Codex", "ChatGPT"] {
             let app = directory.join(name);
             installed |= app.is_dir();
+            let program = app.join(format!("{name}.exe"));
+            if program.is_file() {
+                applications.push(program);
+            }
             let engine = app.join("resources/codex.exe");
             if engine.is_file() && !engines.contains(&engine) {
                 engines.push(engine);
@@ -98,6 +119,7 @@ fn locate(home: &Path, env: &Environment, registered: &[PathBuf]) -> Installatio
     Installation {
         installed: installed || !engines.is_empty(),
         engines,
+        applications,
     }
 }
 
