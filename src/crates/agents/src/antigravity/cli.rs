@@ -209,6 +209,17 @@ mod tests {
     }
 
     #[test]
+    fn a_refusal_keeps_the_clis_own_reason() {
+        let refused = json!({"status": "ERROR", "error": " Not eligible in this region. "});
+        let why = parse("/u", &refused).err().unwrap();
+        assert!(why.ends_with("Not eligible in this region."), "{why}");
+        assert_eq!(
+            parse("/u", &json!({"status": "ERROR"})).err(),
+            Some(failure())
+        );
+    }
+
+    #[test]
     fn incomplete_cli_output_is_not_a_successful_reading() {
         let mut host = FakeHost::new("/u");
         host.engine_output.insert("-p".into(), vec![usage()]);
