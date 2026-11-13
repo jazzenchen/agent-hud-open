@@ -484,7 +484,10 @@ fn a_harness_start_opens_the_desktop_app_when_no_host_runs() {
     );
     let receipt = starts.start(harness_request(&fixture)).unwrap();
     assert_eq!(receipt.state, "started", "{:?}", receipt.reason);
-    assert_eq!(receipt.session_id.as_deref(), Some(HARNESS_SESSION));
+    assert_eq!(
+        receipt.session_id,
+        Some(format!("deepseek:{HARNESS_SESSION}"))
+    );
     assert_eq!(fixture.fake.opened(), ["dsh://open"]);
     let asked = host.join().unwrap();
     assert_eq!(asked["cwd"], json!(fixture.home().join("project")));
@@ -492,7 +495,7 @@ fn a_harness_start_opens_the_desktop_app_when_no_host_runs() {
     assert_eq!(asked["id"], REQUEST);
     // The same request again returns the saved receipt and asks nothing new.
     let again = starts.start(harness_request(&fixture)).unwrap();
-    assert_eq!(again.session_id.as_deref(), Some(HARNESS_SESSION));
+    assert_eq!(again.session_id, receipt.session_id);
     assert_eq!(fixture.fake.opened().len(), 1);
 }
 

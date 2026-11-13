@@ -120,8 +120,9 @@ impl DeepSeekChannel {
     /// Starts a session in `folder` with `request`'s text as its first
     /// message, in the Desktop app's host when it runs, else another running
     /// host. With no host and `open` given, opens the Desktop app first and
-    /// waits for its host. The receipt carries the session as Harness names
-    /// it (`session-<uuid>`).
+    /// waits for its host. The receipt carries the session as the snapshot
+    /// will name it (`deepseek:session-<uuid>`), which is the id its pages
+    /// are read under.
     pub(super) fn start(
         &self,
         folder: &Path,
@@ -174,7 +175,7 @@ impl DeepSeekChannel {
         let receipt = |session: Option<String>, state: &str, reason: Option<String>| StartReceipt {
             provider: Provider::DeepSeek,
             request_id: request.request_id.clone(),
-            session_id: session,
+            session_id: session.map(|session| format!("deepseek:{session}")),
             thread_id: None,
             state: state.into(),
             reason,

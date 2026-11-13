@@ -40,6 +40,15 @@ pub trait ProcessRunner: Send + Sync {
     fn open(&self, uri: &str) -> Result<()>;
 }
 pub struct NativeProcessRunner;
+/// The links a start or a send may open: a Claude Code session in the
+/// desktop app, a Codex thread to wake, and the DeepSeek Harness desktop app
+/// itself, whose host a new session is then asked of.
+fn opens(uri: &str) -> bool {
+    uri.starts_with("claude://resume?session=")
+        || uri.starts_with("codex://threads/wake/")
+        || uri == "dsh://open"
+}
+
 impl ProcessRunner for NativeProcessRunner {
     fn run(&self, plan: &CommandPlan) -> Result<ProcessOutput> {
         if !plan.executable.is_absolute() || plan.timeout.is_zero() {
@@ -91,9 +100,7 @@ impl ProcessRunner for NativeProcessRunner {
         })
     }
     fn open(&self, uri: &str) -> Result<()> {
-        if !(uri.starts_with("claude://resume?session=")
-            || uri.starts_with("codex://threads/wake/"))
-        {
+        if !opens(uri) {
             return Err(Failure::InvalidInput("Unsupported client link".into()));
         }
         let (executable, arguments) = host::link_opener(uri)?;
@@ -110,6 +117,27 @@ impl ProcessRunner for NativeProcessRunner {
             Err(Failure::Unavailable(
                 "Client link could not be opened".into(),
             ))
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn only_the_clients_own_links_are_opened() {
+        for link in [
+            "claude://resume?session=11111111-2222-4333-8444-555555555555",
+            "codex://threads/wake/abc",
+            "dsh://open",
+        ] {
+            assert!(super::opens(link), "{link}");
+        }
+        for link in [
+            "dsh://open/elsewhere",
+            "https://example.com",
+            "file:///etc/passwd",
+        ] {
+            assert!(!super::opens(link), "{link}");
         }
     }
 }

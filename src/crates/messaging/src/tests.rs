@@ -999,12 +999,22 @@ fn a_deepseek_harness_session_starts_through_its_plugin_in_a_running_host() {
         json!({"client":"deepseek","text":"Port the parser"}),
     );
     assert_eq!(start["state"], "started", "{start}");
-    assert_eq!(start["sessionId"], HARNESS_TWO_OWN);
+    // Named as list_sessions will name it, so its answer is found.
+    assert_eq!(start["sessionId"], HARNESS_TWO);
     let asked = host.join().unwrap();
     assert_eq!(asked["cwd"], json!(world.fixture.home().join("project")));
     let text = asked["text"].as_str().unwrap();
     assert!(text.starts_with("[Agent HUD · from Claude Code"), "{text}");
     assert!(text.contains("Port the parser"));
+    // Its answer is read from the new session's pages, under that id.
+    let id = start["id"].clone();
+    world.harness_session(HARNESS_TWO, HARNESS_TWO_OWN, "Port the parser");
+    world.transcripts.prompt(HARNESS_TWO, "h1", text);
+    world.transcripts.reply(HARNESS_TWO, "h1", "Ported.");
+    world.live(HARNESS_TWO, json!({"turnId":"h1","turnStartedAt":"2026-10-22T01:00:00Z","endedAt":"2026-10-22T01:03:00Z"}));
+    let done = world.get(&id);
+    assert_eq!(done["state"], "done", "{done}");
+    assert_eq!(done["answer"], "Ported.");
 }
 
 #[test]
