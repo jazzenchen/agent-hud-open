@@ -81,9 +81,9 @@ impl ClaudeChannel {
         if !folder.is_absolute() {
             return Err("The plugin folder must be absolute".into());
         }
-        crate::os::private_directory(&self.directory)?;
-        crate::os::private_directory(&self.directory.join("sessions"))?;
-        crate::os::private_directory(&self.directory.join("prompts"))?;
+        crate::os::channel_directory(&self.directory)?;
+        crate::os::channel_directory(&self.directory.join("sessions"))?;
+        crate::os::channel_directory(&self.directory.join("prompts"))?;
         let channel = serde_json::to_string(&self.directory.to_string_lossy()).unwrap();
         let files = [
             (

@@ -23,6 +23,36 @@ mod unix;
 pub use target::registered_applications;
 pub(crate) use target::*;
 
+/// A folder that only passes short-lived words between the app and a
+/// client's plugin or hooks. One another account made, as an elevated run or
+/// a copied data folder leaves behind, is set aside under a new name and made
+/// again: the app never takes over what another account owns, and nothing in
+/// such a folder outlives a minute.
+pub(crate) fn channel_directory(path: &Path) -> Result<(), String> {
+    let Err(error) = private_directory(path) else {
+        return Ok(());
+    };
+    let foreign = std::fs::symlink_metadata(path).is_ok_and(|metadata| {
+        metadata.is_dir() && !metadata.is_symlink() && !owned_by_user(path, &metadata)
+    });
+    if !foreign {
+        return Err(error);
+    }
+    let name = path.file_name().unwrap_or_default().to_string_lossy();
+    let at = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis();
+    let aside = path.with_file_name(format!("{name}.other-owner-{at}"));
+    std::fs::rename(path, &aside).map_err(|_| {
+        format!(
+            "{} belongs to another account and could not be moved aside. Give it to this user or delete it, then start Agent HUD again.",
+            path.display()
+        )
+    })?;
+    private_directory(path)
+}
+
 /// The outermost application bundle a path lies in: `/Applications/Trae.app`
 /// for its main program and for a helper inside its `Frameworks` alike.
 pub(crate) fn outer_bundle(path: &Path) -> Option<PathBuf> {

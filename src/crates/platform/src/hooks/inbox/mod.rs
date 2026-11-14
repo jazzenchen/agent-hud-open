@@ -17,8 +17,7 @@ const ACCOUNT_LOCK: &str = ".accounts.lock";
 static SEQUENCE: AtomicU64 = AtomicU64::new(0);
 
 pub(super) fn prepare(directory: &Path) -> Result<(), String> {
-    crate::os::private_directory(directory)
-        .map_err(|_| "Hook inbox must belong to the current user".into())
+    crate::os::channel_directory(directory)
 }
 fn key(event: &HookEvent) -> String {
     let mut hash = Sha256::new();

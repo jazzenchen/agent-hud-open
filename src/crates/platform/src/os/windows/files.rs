@@ -144,6 +144,36 @@ mod tests {
         assert!(!user_transcript(&temp.path().join("missing"), &metadata));
     }
 
+    /// An elevated process's own folders belong to the Administrators group
+    /// (as a channel an elevated run left behind does): such a channel is
+    /// moved aside and made again, owned by the user. Run without elevation,
+    /// the folder is the user's own and stays where it is.
+    #[test]
+    fn a_channel_another_owner_made_is_moved_aside_and_made_again() {
+        let temp = tempfile::tempdir().unwrap();
+        let channel = temp.path().join("deepseek-channel");
+        std::fs::create_dir(&channel).unwrap();
+        std::fs::write(channel.join("old.json"), b"{}").unwrap();
+        let foreign = !super::owned_by_user(&channel, &std::fs::metadata(&channel).unwrap());
+        crate::os::channel_directory(&channel).unwrap();
+        assert!(super::owned_by_user(
+            &channel,
+            &std::fs::metadata(&channel).unwrap()
+        ));
+        let aside = std::fs::read_dir(temp.path())
+            .unwrap()
+            .flatten()
+            .filter(|entry| {
+                entry
+                    .file_name()
+                    .to_string_lossy()
+                    .contains(".other-owner-")
+            })
+            .count();
+        assert_eq!(aside, usize::from(foreign));
+        assert_eq!(channel.join("old.json").exists(), !foreign);
+    }
+
     #[test]
     fn a_payload_is_taken_once_its_json_is_whole() {
         assert!(complete_json(b"{\"a\":{\"b\":[1,2]}}\r\n"));

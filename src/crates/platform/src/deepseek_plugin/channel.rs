@@ -127,7 +127,7 @@ impl DeepSeekChannel {
         for name in [
             "", "sessions", "prompts", "calls", "asks", "hosts", "starts",
         ] {
-            crate::os::private_directory(&self.directory.join(name))?;
+            crate::os::channel_directory(&self.directory.join(name))?;
         }
         crate::os::private_directory(folder)?;
         let file = folder.join(file_name());
