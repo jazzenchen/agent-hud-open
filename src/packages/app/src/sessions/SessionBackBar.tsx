@@ -1,6 +1,7 @@
 import { ChevronLeft, X } from "lucide-react";
 import { clipped, plain, row, type Theme } from "./SessionTheme";
 import { NoSessionArt } from "./NoSessionArt";
+import { useT } from "@agent-hud/ui/format-context";
 
 /** The way back above a session's detail: to its parent session, or to
  * the list. It sticks under the toolbar, or at the top of the detail's own
@@ -19,7 +20,7 @@ export function SessionBackBar({
   onClose?: () => void;
   theme: Theme;
 }) {
-  const zh = Boolean(theme.zh);
+  const t = useT();
   return (
     <div
       style={{
@@ -52,8 +53,8 @@ export function SessionBackBar({
       {onClose && (
         <button
           type="button"
-          aria-label={zh ? "关闭" : "Close"}
-          title={zh ? "关闭（⌘[）" : "Close (⌘[)"}
+          aria-label={t("Close")}
+          title={t("Close (⌘[)")}
           onClick={onClose}
           style={{
             ...plain,
@@ -73,7 +74,7 @@ export function SessionBackBar({
 /** The detail column before a session is picked: a session sketched
  * faintly, and what picking one shows. */
 export function NoSessionPicked({ theme }: { theme: Theme }) {
-  const zh = Boolean(theme.zh);
+  const t = useT();
   return (
     <div
       style={{
@@ -91,11 +92,7 @@ export function NoSessionPicked({ theme }: { theme: Theme }) {
       }}
     >
       <NoSessionArt theme={theme} />
-      <span>
-        {zh
-          ? "选一个会话，查看它的回合、Token 和子 Agent"
-          : "Pick a session to see its turns, tokens and agents"}
-      </span>
+      <span>{t("Pick a session to see its turns, tokens and agents")}</span>
     </div>
   );
 }

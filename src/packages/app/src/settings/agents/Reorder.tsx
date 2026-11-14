@@ -1,6 +1,6 @@
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "@agent-hud/ui/components/button";
-import type { Text } from "../SettingsPrimitives";
+import type { Translate } from "@agent-hud/ui/format";
 
 /** Swaps `id` with its neighbour among `visible`, inside the full `order`
  * (which may keep ids that are not on screen, so their places survive a
@@ -32,7 +32,7 @@ export function ReorderButtons({
   disabled = false,
   move,
 }: {
-  t: Text;
+  t: Translate;
   name: string;
   first: boolean;
   last: boolean;
@@ -44,7 +44,7 @@ export function ReorderButtons({
       <Button
         variant="ghost"
         size="icon-xs"
-        aria-label={`${t("Move up", "上移")} ${name}`}
+        aria-label={t("Move up {{name}}", { name })}
         disabled={disabled || first}
         onClick={() => move(-1)}
       >
@@ -53,7 +53,7 @@ export function ReorderButtons({
       <Button
         variant="ghost"
         size="icon-xs"
-        aria-label={`${t("Move down", "下移")} ${name}`}
+        aria-label={t("Move down {{name}}", { name })}
         disabled={disabled || last}
         onClick={() => move(1)}
       >

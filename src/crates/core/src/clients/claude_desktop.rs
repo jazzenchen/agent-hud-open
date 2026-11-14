@@ -1,5 +1,6 @@
 //! Claude's desktop app on AgentHudCore: the questions it asks in its own
 //! window, as cards, and how their answers go back.
+use crate::l10n::tr;
 use crate::*;
 use agent_hud_agents::claude::{transcript::*, AGENT as CLAUDE, REPLIES};
 use agent_hud_agents::replies::{AnswerFix, Unreachable};
@@ -63,10 +64,7 @@ impl crate::AgentHudCore {
     pub(crate) fn claude_answers_off(&self) -> Option<Unreachable> {
         (self.settings[REPLIES.setting] == false).then(|| {
             Unreachable::new(
-                crate::l10n::text(
-                    "在 Agent HUD 里回答 Claude 的提问已关闭（设置 → 智能体插件）。",
-                    "Answering Claude's questions in Agent HUD is off (Settings → Agent plugins).",
-                ),
+                tr!("Answering Claude's questions in Agent HUD is off (Settings → Agent plugins)."),
                 Some(AnswerFix::TurnOnAnswers),
             )
         })
@@ -83,10 +81,7 @@ impl crate::AgentHudCore {
     ) -> Result<(), Unreachable> {
         if ask.kind == "offer" {
             return Err(Unreachable::new(
-                crate::l10n::text(
-                    "它的按钮只能在 Claude 窗口里用。",
-                    "Its buttons work only in Claude's own window.",
-                ),
+                tr!("Its buttons work only in Claude's own window."),
                 None,
             ));
         }
@@ -96,10 +91,7 @@ impl crate::AgentHudCore {
         match &self.session_replies {
             Some(replies) => replies.reaches(CLAUDE.id, session),
             None => Err(Unreachable::new(
-                crate::l10n::text(
-                    "Agent HUD 不能把回答发进 Claude 会话。",
-                    "Agent HUD can't send answers into Claude sessions.",
-                ),
+                tr!("Agent HUD can't send answers into Claude sessions."),
                 None,
             )),
         }
@@ -124,12 +116,10 @@ impl crate::AgentHudCore {
             if let Some(off) = self.claude_answers_off() {
                 return Err(off.note);
             }
-            let replies = self.session_replies.as_ref().ok_or_else(|| {
-                crate::l10n::text(
-                    "Agent HUD 不能把回答发进 Claude 会话。",
-                    "Agent HUD can't send answers into Claude sessions.",
-                )
-            })?;
+            let replies = self
+                .session_replies
+                .as_ref()
+                .ok_or_else(|| tr!("Agent HUD can't send answers into Claude sessions."))?;
             replies.reply(
                 CLAUDE.id,
                 view["sessionId"].as_str().unwrap_or_default(),

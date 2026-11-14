@@ -1,5 +1,5 @@
 import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
-import { moneyAmount } from "@agent-hud/ui/format";
+import { moneyAmount, type Language } from "@agent-hud/ui/format";
 import { useTween } from "../statistics/motion";
 import { compact, integer, moneyText, type ListMoney } from "./SessionTheme";
 
@@ -53,19 +53,20 @@ export const integerAt = (value: number) => integer(Math.round(value));
 export const percentAt = (value: number) => `${Math.round(value)}%`;
 
 /** A list-price cost as it moves: on the way up from nothing it reads $0.00, never "Free". */
-export const moneyAt = (money: ListMoney, zh: boolean) => (value: number) =>
-  moneyText(
-    money.value
-      ? { ...money, value: Math.max(value, Number.MIN_VALUE) }
-      : money,
-    zh,
-  );
+export const moneyAt =
+  (money: ListMoney, language: Language) => (value: number) =>
+    moneyText(
+      money.value
+        ? { ...money, value: Math.max(value, Number.MIN_VALUE) }
+        : money,
+      language,
+    );
 
 /** An account's own estimate as it moves, with no more decimals than it has at rest. */
 export const accountAt =
-  (cost: { amount: number; currency: string }, zh: boolean) =>
+  (cost: { amount: number; currency: string }, language: Language) =>
   (value: number) => {
     const places = (String(cost.amount).split(".")[1] ?? "").length;
     const shown = Number(value.toFixed(Math.min(6, Math.max(2, places))));
-    return `≈${moneyAmount(shown, cost.currency, zh ? "zh" : "en", true)}`;
+    return `≈${moneyAmount(shown, cost.currency, language, true)}`;
   };

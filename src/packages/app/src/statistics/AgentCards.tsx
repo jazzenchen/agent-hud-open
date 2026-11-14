@@ -9,6 +9,7 @@ import {
 } from "@agent-hud/ui/components/dropdown-menu";
 import { HUDArtwork as HUDLogo } from "@agent-hud/hud/HUDArtwork";
 import { vendorKey } from "@agent-hud/hud/model";
+import { useT } from "@agent-hud/ui/format-context";
 import type {
   BillingAccount,
   Quota,
@@ -59,8 +60,7 @@ export function AgentCards({
   /** The range's and the quota's answers, while a filter change waits. */
   pending: { range: Pending; quota: Pending };
 }) {
-  const zh = Boolean(theme.zh);
-  const t = (en: string, cn: string) => (zh ? cn : en);
+  const t = useT();
   const visibleProviders = useMemo(
     () =>
       (data?.providers ?? []).filter(
@@ -89,10 +89,7 @@ export function AgentCards({
                   type="button"
                   style={{ ...plain, ...row, gap: 4, color: theme.secondary }}
                 >
-                  {t(
-                    `${visibleProviders.length} shown`,
-                    `显示 ${visibleProviders.length} 个`,
-                  )}
+                  {t("{{agents}} shown", { agents: visibleProviders.length })}
                   <ChevronDown size={10} />
                 </button>
               </DropdownMenuTrigger>
@@ -105,7 +102,7 @@ export function AgentCards({
                     localStorage.removeItem(storageKeys.hiddenAgentCards);
                   }}
                 >
-                  {t("Show all", "全部显示")}
+                  {t("Show all")}
                 </DropdownMenuCheckboxItem>
                 <DropdownMenuSeparator />
                 {data.providers.map((provider) => (
@@ -126,7 +123,7 @@ export function AgentCards({
           ) : undefined
         }
       >
-        {t("By agent", "按智能体")}
+        {t("By agent")}
       </Heading>
       {!data && (
         <div className="stats-agent-grid">
@@ -195,11 +192,8 @@ export function AgentCards({
           {selectedProviders?.length === 0 ||
           selectedModels?.length === 0 ||
           (data.providers.length > 0 && visibleProviders.length === 0)
-            ? t("No agents or models selected.", "未选择智能体或模型。")
-            : t(
-                "No recorded agent usage in this range.",
-                "该范围内无已记录的智能体用量。",
-              )}
+            ? t("No agents or models selected.")
+            : t("No recorded agent usage in this range.")}
         </p>
       )}
     </>

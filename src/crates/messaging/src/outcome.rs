@@ -24,12 +24,12 @@ pub(crate) fn plain(reason: &str) -> String {
 pub(crate) fn refused(reason: &str) -> Value {
     json!({"state":"refused","reason":reason})
 }
-pub(crate) fn check_text(text: &str, zh: bool) -> Option<String> {
+pub(crate) fn check_text(text: &str, language: Language) -> Option<String> {
     if text.trim().is_empty() {
-        return Some(words::empty(zh));
+        return Some(words::empty(language));
     }
     if text.trim_start().starts_with(PHONE_TAG) {
-        return Some(words::phone_tag(zh));
+        return Some(words::phone_tag(language));
     }
     None
 }

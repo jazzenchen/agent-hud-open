@@ -8,12 +8,13 @@ import {
   quotaPercent,
   quotaDisplayLabel,
   resetLabelCompact,
+  listSeparator,
+  locale,
+  translate,
+  translator,
   type FormatSettings,
   type Language,
 } from "@agent-hud/ui/format";
-
-const say = (language: Language, zh: string, en: string) =>
-  language === "zh" ? zh : en;
 
 /** The window's share left, from the share used the event carries; none without a reading. */
 function remainingOf(event: IslandEvent) {
@@ -24,6 +25,7 @@ function remainingOf(event: IslandEvent) {
 
 export function quotaAlertCopy(event: IslandEvent, settings: FormatSettings) {
   const { language } = settings;
+  const t = translator(language);
   const remaining = remainingOf(event);
   const usedPct = remaining == null ? null : Math.max(0, 100 - remaining);
   const displayPct = quotaPercent(event.usedPercent, settings.quotaDisplay);
@@ -41,7 +43,7 @@ export function quotaAlertCopy(event: IslandEvent, settings: FormatSettings) {
   const others = (event.otherExhaustedWindows ?? [])
     .map((window) => window?.name)
     .filter((name): name is string => Boolean(name));
-  const names = others.join("、");
+  const names = others.join(listSeparator(language));
   return {
     displayPct,
     display: displayPct == null ? "N/A" : percent(displayPct),
@@ -59,49 +61,31 @@ export function quotaAlertCopy(event: IslandEvent, settings: FormatSettings) {
     /** Beside the agent in the small reminder. */
     compactTitle:
       remaining == null
-        ? say(language, "额度不可用", "Quota unavailable")
+        ? t("Quota unavailable")
         : isReset
-          ? say(language, "已重置", "Reset")
+          ? t("Reset [status]")
           : empty
-            ? say(language, "已耗尽", "Empty")
+            ? t("Empty")
             : exhaustion
-              ? say(language, `${exhaustion} 后耗尽`, `${exhaustion} left`)
-              : say(language, "即将耗尽", "Running low"),
+              ? t("{{exhaustion}} left", { exhaustion })
+              : t("Running low"),
     /** The card's sentence. */
     title:
       remaining == null
-        ? say(language, "额度暂不可用。", "Quota is unavailable.")
+        ? t("Quota is unavailable.")
         : isReset
           ? others.length
-            ? say(
-                language,
-                "此窗口已重置，其他窗口仍有限制。",
-                "This window has reset; other limits still apply.",
-              )
-            : say(
-                language,
-                "此窗口额度已重置。",
-                "This quota window has reset.",
-              )
+            ? t("This window has reset; other limits still apply.")
+            : t("This quota window has reset.")
           : empty
-            ? say(
-                language,
-                "当前窗口额度已耗尽，等待重置。",
-                "This window is empty. Waiting for reset.",
-              )
+            ? t("This window is empty. Waiting for reset.")
             : exhaustion
-              ? say(
-                  language,
-                  "按最近的消耗速率，预计将在重置前耗尽。",
+              ? t(
                   "At the recent burn rate, this window may run out before it resets.",
                 )
-              : say(
-                  language,
-                  "已用额度达到危险阈值，请留意后续任务。",
-                  "Usage has reached the critical threshold.",
-                ),
+              : t("Usage has reached the critical threshold."),
     otherLimits: others.length
-      ? say(language, `${names}额度仍已耗尽`, `Still exhausted: ${names}`)
+      ? t("Still exhausted: {{names}}", { names })
       : null,
   };
 }
@@ -118,23 +102,17 @@ export function resetCreditCopy(
     .filter(Number.isFinite)
     .sort((a, b) => a - b)[0];
   return {
-    compactTitle: say(
+    compactTitle: translate(language, "+{{count}} resets", { count: added }),
+    title: translate(
       language,
-      `+${added} 次重置`,
-      added === 1 ? "+1 reset" : `+${added} resets`,
-    ),
-    title: say(
-      language,
-      `此账户新增了 ${added} 次额度重置。`,
-      added === 1
-        ? "A usage reset was added to this account."
-        : `${added} usage resets were added to this account.`,
+      "{{count}} usage resets were added to this account.",
+      { count: added },
     ),
     /** The account's earliest deadline as a date. */
     expiry:
       first === undefined
         ? "—"
-        : dateFormat(language === "zh" ? "zh-CN" : "en-US", {
+        : dateFormat(locale(language), {
             month: "short",
             day: "numeric",
           }).format(first),

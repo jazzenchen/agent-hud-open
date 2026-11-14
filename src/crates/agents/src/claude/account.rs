@@ -18,7 +18,7 @@ use super::usage_record;
 use crate::account::{
     append_notice, merge, read_json, variable, Host, Provider, Reading, StatusPage, Unread,
 };
-use crate::l10n;
+use crate::l10n::tr;
 use serde_json::{json, Value};
 use std::{
     collections::HashSet,
@@ -101,7 +101,7 @@ pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
     let mut records = Vec::new();
     for folder in &folders {
         if host.cancelled() {
-            return Err(l10n::text("账户读取已停止", "Account reading was stopped").into());
+            return Err(tr!("Account reading was stopped").into());
         }
         let prefix = format!("{}: ", folder.path.display());
         let error = match read_folder(host, folder) {

@@ -1,3 +1,4 @@
+import { useT } from "@agent-hud/ui/format-context";
 import type { ReactNode } from "react";
 import { Plug, X } from "lucide-react";
 import type { Approval } from "@agent-hud/protocol";
@@ -31,19 +32,17 @@ export function QuestionAnswerElsewhere({
   request,
   disabled,
   light,
-  zh,
   openSettings,
   dismiss,
 }: {
   request: Approval;
   disabled: boolean;
   light: boolean;
-  zh: boolean;
   /** Settings, on a page such as "agent-plugins"; without it the card only says where to go. */
   openSettings?: (page: string) => void;
   dismiss: () => void;
 }) {
-  const t = (en: string, cn: string) => (zh ? cn : en);
+  const t = useT();
   const questions = request.questions ?? [];
   const vendor = request.vendor ?? clientDisplayName(request.source);
   const detailText = request.detail?.trim() || null;
@@ -128,7 +127,7 @@ export function QuestionAnswerElsewhere({
         }}
       >
         <span style={{ fontSize: 11, fontWeight: 600, color: primary }}>
-          {t(`Answer in ${vendor}`, `请到 ${vendor} 里回答`)}
+          {t("Answer in {{vendor}}", { vendor })}
         </span>
         {request.answerNote && (
           <span
@@ -153,7 +152,7 @@ export function QuestionAnswerElsewhere({
             color={onAllow}
           >
             <Plug size={9} strokeWidth={2.6} />
-            {t("Open Agent plugins", "打开智能体插件")}
+            {t("Open Agent plugins")}
           </CardButton>
         )}
         <span style={{ flex: 1, minWidth: 8 }} />
@@ -164,7 +163,7 @@ export function QuestionAnswerElsewhere({
           color={secondary}
         >
           <X size={9} strokeWidth={2.6} />
-          {t("Dismiss", "知道了")}
+          {t("Dismiss [acknowledge]")}
         </CardButton>
       </div>
     </div>

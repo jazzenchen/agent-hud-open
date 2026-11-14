@@ -4,7 +4,7 @@ mod glm;
 
 use super::{numeric, Credential};
 use crate::account::status;
-use crate::l10n;
+use crate::l10n::tr;
 use crate::naming::{vendor_windows::kimi_name, window_names::Period};
 use serde_json::{json, Value};
 
@@ -90,29 +90,18 @@ pub(super) fn parse(
                 }
                 for value in root["limits"].as_array().into_iter().flatten() {
                     let spec = &value["window"];
-                    let count =
-                        numeric(&spec["duration"])
-                            .filter(|n| *n > 0.0)
-                            .ok_or_else(|| {
-                                l10n::text(
-                                    "Kimi 额度窗口缺少时长",
-                                    "Kimi quota window has no duration",
-                                )
-                            })?;
-                    let unit = spec["timeUnit"].as_str().ok_or_else(|| {
-                        l10n::text("Kimi 额度窗口缺少单位", "Kimi quota window has no unit")
-                    })?;
+                    let count = numeric(&spec["duration"])
+                        .filter(|n| *n > 0.0)
+                        .ok_or_else(|| tr!("Kimi quota window has no duration"))?;
+                    let unit = spec["timeUnit"]
+                        .as_str()
+                        .ok_or_else(|| tr!("Kimi quota window has no unit"))?;
                     let multiplier = match unit {
                         "TIME_UNIT_MINUTE" => 60.0,
                         "TIME_UNIT_HOUR" => 3600.0,
                         "TIME_UNIT_DAY" => 86400.0,
                         "TIME_UNIT_WEEK" => 604800.0,
-                        _ => {
-                            return Err(l10n::text(
-                                "Kimi 额度窗口的单位无法识别",
-                                "Kimi quota window unit is unsupported",
-                            ))
-                        }
+                        _ => return Err(tr!("Kimi quota window unit is unsupported")),
                     };
                     old.push((
                         format!("limit:{unit}:{count:.1}"),
@@ -123,14 +112,10 @@ pub(super) fn parse(
                 for (key, duration, value) in old {
                     let limit = numeric(&value["limit"])
                         .filter(|n| *n > 0.0)
-                        .ok_or_else(|| {
-                            l10n::text("Kimi 未提供额度总量", "Kimi quota capacity is unavailable")
-                        })?;
+                        .ok_or_else(|| tr!("Kimi quota capacity is unavailable"))?;
                     let used = numeric(&value["used"])
                         .or_else(|| numeric(&value["remaining"]).map(|n| (limit - n).max(0.0)))
-                        .ok_or_else(|| {
-                            l10n::text("Kimi 未提供已用额度", "Kimi quota usage is unavailable")
-                        })?;
+                        .ok_or_else(|| tr!("Kimi quota usage is unavailable"))?;
                     add(
                         key,
                         kimi_name(Period::from_seconds(Some(duration))),
@@ -145,10 +130,7 @@ pub(super) fn parse(
         }
         "opencode" => {
             if !root["usage"].is_object() {
-                return Err(l10n::text(
-                    "OpenCode Go 返回的额度格式无法识别",
-                    "OpenCode Go returned an unsupported quota format",
-                ));
+                return Err(tr!("OpenCode Go returned an unsupported quota format"));
             }
             for key in ["rolling", "weekly", "monthly"] {
                 let value = &root["usage"][key];
@@ -170,12 +152,8 @@ pub(super) fn parse(
                 add(
                     key.into(),
                     name,
-                    numeric(&value["percent"]).ok_or_else(|| {
-                        l10n::text(
-                            "OpenCode Go 未提供额度比例",
-                            "OpenCode Go quota percentage is unavailable",
-                        )
-                    })?,
+                    numeric(&value["percent"])
+                        .ok_or_else(|| tr!("OpenCode Go quota percentage is unavailable"))?,
                     date(&value["resetsAt"]),
                     duration,
                     true,
@@ -187,10 +165,7 @@ pub(super) fn parse(
         _ => unreachable!(),
     }
     if windows.is_empty() {
-        return Err(l10n::text(
-            "Coding Plan 没有返回可核实的额度窗口",
-            "Coding plan did not return a verifiable quota window",
-        ));
+        return Err(tr!("Coding plan did not return a verifiable quota window"));
     }
     for row in &mut windows {
         link(row, entry);

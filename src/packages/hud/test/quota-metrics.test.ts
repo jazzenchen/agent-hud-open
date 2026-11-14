@@ -1,10 +1,21 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { addCatalog } from "@agent-hud/ui/format";
 import { quotaMetric } from "../src/quota-metrics.ts";
+
+// The Chinese below is zh-Hans.json's.
+const locales = join(import.meta.dirname, "../../protocol/locales");
+for (const language of ["en", "zh-Hans"] as const)
+  addCatalog(
+    language,
+    JSON.parse(readFileSync(join(locales, `${language}.json`), "utf8")),
+  );
 
 const now = Date.parse("2026-10-21T12:00:00Z");
 const zh = {
-  language: "zh" as const,
+  language: "zh-Hans" as const,
   calendar: { timeZone: "UTC", firstWeekday: 2 },
 };
 const en = {

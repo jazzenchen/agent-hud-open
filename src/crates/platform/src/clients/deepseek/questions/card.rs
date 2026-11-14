@@ -1,7 +1,7 @@
 //! The HUD's card for a DeepSeek Harness question, and the answer it sends.
 use super::{Pending, QuestionItem};
 use agent_hud_agents::deepseek::AGENT;
-use agent_hud_core::l10n;
+use agent_hud_core::l10n::tr;
 use chrono::Utc;
 use serde_json::{json, Value};
 
@@ -80,9 +80,8 @@ pub fn answer_entries(
         return Ok(None);
     }
     if kind != "answer" {
-        return Err(l10n::text(
-            "DeepSeek Harness 的提问只能回答，不能批准",
-            "DeepSeek Harness's questions can only be answered, not approved.",
+        return Err(tr!(
+            "DeepSeek Harness's questions can only be answered, not approved."
         ));
     }
     let answers = decision["answers"].as_object();

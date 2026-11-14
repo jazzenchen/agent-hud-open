@@ -4,7 +4,7 @@ import { horizontal, type HUDRect, type stripMetrics } from "../geometry";
 import type { HUDConfig, HUDEdge, HUDVendor } from "../model";
 import { Silhouette } from "./NotchSurface";
 import type { HUDNativePointer } from "./useHUDInteraction";
-import { useFormat } from "@agent-hud/ui/format-context";
+import { useT } from "@agent-hud/ui/format-context";
 import { AgentMark } from "./AgentMark";
 
 export function HUDMarkStrip({
@@ -62,15 +62,14 @@ export function HUDMarkStrip({
   forceOpen: () => void;
   pin: (key?: string) => void;
 }) {
-  const format = useFormat();
-  const zh = format.language === "zh";
+  const t = useT();
 
   return (
     <>
       {config.mode === "notch" ? (
         <div
           className="hud-classic-silhouette"
-          aria-label={zh ? "悬停展开 Agent HUD" : "Hover to expand Agent HUD"}
+          aria-label={t("Hover to expand Agent HUD")}
           tabIndex={0}
           role="button"
           aria-describedby={`hud-instructions-${id}`}

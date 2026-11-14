@@ -1,6 +1,16 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { addCatalog } from "../src/format.ts";
 import { indexingText } from "../src/text/indexing.ts";
+
+const locales = join(import.meta.dirname, "../../protocol/locales");
+for (const language of ["en", "zh-Hans"] as const)
+  addCatalog(
+    language,
+    JSON.parse(readFileSync(join(locales, `${language}.json`), "utf8")),
+  );
 
 const now = new Date(2026, 10, 6, 12);
 const at = (year: number, month: number, day: number, hour = 9) =>
@@ -27,7 +37,7 @@ test("a run says how far back it has read, by day", () => {
     detail:
       "Your logs go back to May 7 · tokens and costs are incomplete until it finishes",
   });
-  const zh = indexingText({ ...facts, kind: "first" }, "zh", now);
+  const zh = indexingText({ ...facts, kind: "first" }, "zh-Hans", now);
   assert.equal(zh?.title, "正在读取历史记录 · 已读到 9月12日");
   assert.equal(zh?.days, "55/184 天");
   assert.equal(zh?.detail, "日志可追溯到 5月7日 · 完成前 Token 和费用不完整");
@@ -51,7 +61,7 @@ test("a first run starts at today and names another year", () => {
 test("a run shows less than 100% until the core ends it", () => {
   const text = indexingText(
     { kind: "reindex", oldestLogAt: at(2026, 4, 7), readBackTo: null },
-    "zh",
+    "zh-Hans",
     now,
   );
   assert.equal(text?.fraction, 0.99);
@@ -69,7 +79,8 @@ test("without days it falls back on bytes", () => {
     },
   );
   assert.equal(
-    indexingText({ kind: "first", bytesDone: 0, bytesTotal: 0 }, "zh")?.title,
+    indexingText({ kind: "first", bytesDone: 0, bytesTotal: 0 }, "zh-Hans")
+      ?.title,
     "正在读取历史记录",
   );
 });

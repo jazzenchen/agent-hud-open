@@ -46,10 +46,11 @@ pub(crate) fn statistics_chrome<'a>(
         .hidden_title(true)
 }
 
-pub(crate) fn system_prefers_chinese() -> bool {
+pub(crate) fn system_languages() -> Vec<String> {
     objc2_foundation::NSLocale::preferredLanguages()
-        .firstObject()
-        .is_some_and(|language| language.to_string().starts_with("zh"))
+        .iter()
+        .map(|language| language.to_string())
+        .collect()
 }
 
 /// An app-modal alert from a process that has not started Tauri yet.

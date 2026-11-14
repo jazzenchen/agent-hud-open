@@ -4,7 +4,7 @@
 import type { ReactNode } from "react";
 import { X } from "lucide-react";
 import { Button } from "@agent-hud/ui/components/button";
-import type { Text } from "./copy";
+import type { Translate } from "@agent-hud/ui/format";
 
 /** The arrow's colour: the system blue the HUD's links use. */
 export const blue = "#0a84ff";
@@ -16,7 +16,7 @@ export function Header({
 }: {
   label: string;
   close: () => void;
-  t: Text;
+  t: Translate;
 }) {
   return (
     <div style={{ display: "flex", alignItems: "center", fontSize: 11 }}>
@@ -24,7 +24,7 @@ export function Header({
       <Button
         size="icon-xs"
         variant="ghost"
-        aria-label={t("Close the guide", "关闭引导")}
+        aria-label={t("Close the guide")}
         onClick={close}
         className="opacity-60 hover:opacity-100"
       >

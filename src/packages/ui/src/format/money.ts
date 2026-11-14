@@ -1,6 +1,6 @@
 // Money
 import { numberFormat } from "./intl.ts";
-import type { Language } from "./language.ts";
+import { locale as localeOf, type Language } from "./language.ts";
 
 type Amount = number | string;
 
@@ -14,7 +14,7 @@ function currency(
   digits: [number, number],
   rounding: "halfEven" | "halfExpand",
 ) {
-  const locale = language === "zh" ? "zh-CN" : "en-US";
+  const locale = localeOf(language);
   if (isCredits(code)) {
     return numberFormat(locale, {
       minimumFractionDigits: 0,

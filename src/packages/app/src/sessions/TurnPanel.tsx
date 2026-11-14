@@ -21,6 +21,7 @@ import {
   type Entry,
   type Theme,
 } from "./SessionTheme";
+import { useFormat, useT } from "@agent-hud/ui/format-context";
 
 /** A picked turn: when and how long, what Core sums of its calls, the message, and each call. In its own column the column's bar closes it, so it draws no × of its own. Calls read after it opened fade in over their grey shape's place. */
 export function TurnPanel({
@@ -36,7 +37,8 @@ export function TurnPanel({
   theme: Theme;
   close?: () => void;
 }) {
-  const zh = Boolean(theme.zh);
+  const t = useT();
+  const { language } = useFormat();
   const settled = useSettled();
   const calls: SessionCall[] | undefined =
     entry.calls ??
@@ -47,20 +49,22 @@ export function TurnPanel({
     entry.end && Date.parse(entry.end) > Date.parse(entry.timestamp)
       ? countdown((Date.parse(entry.end) - Date.parse(entry.timestamp)) / 1000)
       : null;
-  const notes = turnNotes(entry, zh);
+  const notes = turnNotes(entry, language);
   const facts = [
     // The calls first, as Open's line starts.
     ...(entry.callCount != null ? notes.slice(0, 1) : []),
     span,
     summary && summary.subagentCalls > 0
-      ? zh
-        ? `其中子 agent ${summary.subagentCalls} 次（${summary.subagentLogs} 个）`
-        : `${summary.subagentCalls} by ${summary.subagentLogs === 1 ? "a sub-agent" : `${summary.subagentLogs} sub-agents`}`
+      ? t("{{calls}} by {{count}} sub-agents", {
+          calls: summary.subagentCalls,
+          count: summary.subagentLogs,
+        })
       : null,
     summary?.largestNew != null && summary.largestShare != null
-      ? zh
-        ? `新增最多的一次 ${compact(summary.largestNew)}，占 ${Math.round(summary.largestShare * 100)}%`
-        : `Largest call added ${compact(summary.largestNew)}, ${Math.round(summary.largestShare * 100)}%`
+      ? t("Largest call added {{tokens}}, {{share}}%", {
+          tokens: compact(summary.largestNew),
+          share: Math.round(summary.largestShare * 100),
+        })
       : null,
     ...(entry.callCount != null ? notes.slice(1) : notes),
   ].filter(Boolean);
@@ -73,11 +77,11 @@ export function TurnPanel({
         <div style={{ ...row, gap: 8 }}>
           <strong style={{ fontSize: 13, fontWeight: 600 }}>
             {byPrompt
-              ? `T${entry.index} · ${timeLabel(entry.timestamp, zh)}`
-              : (zh
-                  ? `用量记录 ${entry.index}`
-                  : `Usage entry ${entry.index}`) +
-                ` · ${timeLabel(entry.timestamp, zh)}`}
+              ? `T${entry.index} · ${timeLabel(entry.timestamp, language)}`
+              : t("Usage entry {{index}} · {{time}}", {
+                  index: entry.index,
+                  time: timeLabel(entry.timestamp, language),
+                })}
           </strong>
           {entry.compacted && (
             <span
@@ -90,7 +94,7 @@ export function TurnPanel({
                 borderRadius: 4,
               }}
             >
-              {zh ? "上下文压缩" : "Compacted"}
+              {t("Compacted")}
             </span>
           )}
         </div>
@@ -100,13 +104,13 @@ export function TurnPanel({
             <span
               style={{ color: theme.secondary, fontWeight: 400, fontSize: 11 }}
             >
-              {zh ? "新增" : "new"}
+              {t("new")}
             </span>
           </strong>
           {close && (
             <button
               type="button"
-              aria-label={zh ? "收起这一轮" : "Close this turn"}
+              aria-label={t("Close this turn")}
               onClick={close}
               style={{ ...plain, color: theme.secondary }}
             >
@@ -132,7 +136,7 @@ export function TurnPanel({
             <span key={kind} style={{ ...row, gap: 6 }}>
               <ColorKey color={kindColor(theme, kind)}>
                 <span style={{ color: theme.secondary }}>
-                  {kindLabel(kind, zh)}
+                  {kindLabel(kind, language)}
                 </span>
               </ColorKey>
               <span style={numeric}>{compact(value)}</span>
@@ -175,9 +179,7 @@ export function TurnPanel({
       {byPrompt && calls === undefined && <CallsPlaceholder theme={theme} />}
       {calls && calls.length === 0 && (
         <div style={{ color: theme.secondary, fontSize: 11 }}>
-          {zh
-            ? "用量库里没有这一轮的调用"
-            : "The usage ledger holds no calls of this turn"}
+          {t("The usage ledger holds no calls of this turn")}
         </div>
       )}
       {calls && calls.length > 0 && (

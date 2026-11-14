@@ -2,6 +2,7 @@ import { HUDArtwork as HUDLogo } from "@agent-hud/hud/HUDArtwork";
 import { listCost, listPrice, moneyShort } from "@agent-hud/ui/format";
 import type { BillingAccount, PlanValueResponse } from "@agent-hud/protocol";
 import { vendorKey } from "@agent-hud/hud/model";
+import { useFormat, useT } from "@agent-hud/ui/format-context";
 import { number, row, truncate, type StatsTheme } from "../StatsTheme";
 import { adviceText } from "../plan-value-text";
 import { Panel } from "./Panel";
@@ -38,9 +39,8 @@ export function PlanList({
   theme: StatsTheme;
   light: boolean;
 }) {
-  const zh = Boolean(theme.zh);
-  const t = (en: string, cn: string) => (zh ? cn : en);
-  const language = zh ? "zh" : "en";
+  const t = useT();
+  const { language } = useFormat();
   const tile = {
     display: "grid",
     alignContent: "start",
@@ -58,15 +58,17 @@ export function PlanList({
       area="plans"
       pending={[pending]}
       theme={theme}
-      title={t("Subscriptions and balances", "订阅与余额")}
+      title={t("Subscriptions and balances")}
       meta={t(
-        `Each plan's worth at API list prices ${range?.words ?? "in the last 30 days"}, against its price for those days; what each API balance has left`,
-        `每个订阅${range?.words ?? "近 30 天"}按 API 目录价折合，对比同样天数的月费；每个 API 余额还剩多少`,
+        "Each plan's worth at API list prices {{range}}, against its price for those days; what each API balance has left",
+        {
+          range: range?.words ?? t("in the last {{days}} days", { days: 30 }),
+        },
       )}
     >
       {data && !accounts.length && !balances.length && (
         <span style={{ fontSize: 12, color: theme.secondary }}>
-          {t("No signed-in plan for this agent", "这个 Agent 没有登录的订阅")}
+          {t("No signed-in plan for this agent")}
         </span>
       )}
       <div
@@ -145,13 +147,16 @@ export function PlanList({
                 }}
               >
                 {account.plan
-                  ? t(
-                      `${listPrice(account.plan.monthlyUSD, "USD", language)}/mo`,
-                      `每月 ${listPrice(account.plan.monthlyUSD, "USD", language)}`,
-                    )
-                  : t("No monthly list price", "没有月付标价")}
+                  ? t("{{price}}/mo", {
+                      price: listPrice(
+                        account.plan.monthlyUSD,
+                        "USD",
+                        language,
+                      ),
+                    })
+                  : t("No monthly list price")}
                 {worth
-                  ? t(` · worth ${worth}`, ` · 折合 ${worth}`)
+                  ? t(" · worth {{worth}}", { worth })
                   : account.unavailable
                     ? ` · ${account.unavailable}`
                     : ""}
@@ -164,7 +169,7 @@ export function PlanList({
                     lineHeight: 1.4,
                   }}
                 >
-                  {adviceText(account.advice, zh)}
+                  {adviceText(account.advice, language)}
                 </span>
               )}
             </div>
@@ -189,7 +194,7 @@ export function PlanList({
                   {names.get(balance.vendor) ?? balance.label}
                 </span>
                 <span style={{ fontSize: 11, color: theme.secondary }}>
-                  {t("API balance", "API 余额")}
+                  {t("API balance")}
                 </span>
               </span>
               <span style={{ ...number, fontSize: 17, fontWeight: 600 }}>
@@ -199,10 +204,10 @@ export function PlanList({
             <span style={{ fontSize: 11, color: theme.secondary }}>
               {balance.notice ??
                 (balance.level === "critical"
-                  ? t("Used up", "已用完")
+                  ? t("Used up")
                   : balance.level === "warning"
-                    ? t("Running low", "余额不多")
-                    : t("Prepaid, spent per call", "预付，按调用扣费"))}
+                    ? t("Running low [balance]")
+                    : t("Prepaid, spent per call"))}
             </span>
           </div>
         ))}
@@ -210,8 +215,8 @@ export function PlanList({
       {data && (
         <span style={{ fontSize: 10, color: theme.tertiary }}>
           {t(
-            `Monthly list prices checked ${data.checked}. Calls through a relay or a coding plan are left out.`,
-            `月付标价核对于 ${data.checked}。经中转或 Coding Plan 的调用不计入。`,
+            "Monthly list prices checked {{date}}. Calls through a relay or a coding plan are left out.",
+            { date: data.checked },
           )}
         </span>
       )}

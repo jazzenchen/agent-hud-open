@@ -1,6 +1,7 @@
 //! One session in full: its head, totals, turns and calls, and where its
 //! transcript is.
 use super::log_session;
+use crate::l10n::tr;
 use crate::*;
 
 impl AgentHudCore {
@@ -236,12 +237,7 @@ impl crate::AgentHudCore {
             .selected()
             .into_iter()
             .find(|log| log.id == id)
-            .ok_or_else(|| {
-                l10n::text(
-                    "找不到这个会话，请先刷新",
-                    "Session was not found; refresh first",
-                )
-            })?;
+            .ok_or_else(|| tr!("Session was not found; refresh first"))?;
         let path = log
             .origin_path
             .as_ref()
@@ -254,9 +250,8 @@ impl crate::AgentHudCore {
             .filter_map(|(root, _)| root.canonicalize().ok())
             .any(|root| path.starts_with(root));
         if !allowed {
-            return Err(l10n::text(
-                "这个会话日志已不在已启用客户端的目录中",
-                "Transcript no longer belongs to an enabled local provider directory",
+            return Err(tr!(
+                "Transcript no longer belongs to an enabled local provider directory"
             ));
         }
         Ok(path)

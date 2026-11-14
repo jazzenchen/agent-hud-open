@@ -11,16 +11,15 @@ import {
 } from "@agent-hud/ui/components/dropdown-menu";
 import type { NativeMethod } from "@agent-hud/protocol";
 import { emit } from "@tauri-apps/api/event";
+import { useT } from "@agent-hud/ui/format-context";
 import { guideEvents } from "./guide/use-hud-guide";
 
 /** The More options menu of the Settings and Statistics windows. */
 export function SourceMenu({
-  chinese,
   statistics,
   hudVisible,
   act,
 }: {
-  chinese: boolean;
   /** The menu is in the Statistics window, so it offers Settings. */
   statistics: boolean;
   hudVisible: boolean;
@@ -29,6 +28,7 @@ export function SourceMenu({
     params?: Record<string, unknown>,
   ) => Promise<unknown>;
 }) {
+  const t = useT();
   function toggleHUDVisibility() {
     // The menu has no place for a failure, so it shows as a toast.
     void act("set_setting", { key: "hudVisible", value: !hudVisible }).catch(
@@ -49,7 +49,7 @@ export function SourceMenu({
           variant="ghost"
           size="icon"
           data-guide="more-menu"
-          aria-label={chinese ? "更多选项" : "More options"}
+          aria-label={t("More options")}
         >
           <MoreHorizontal size={16} />
         </Button>
@@ -60,7 +60,7 @@ export function SourceMenu({
             void showStatistics();
           }}
         >
-          {chinese ? "用量统计…" : "Statistics…"}
+          {t("Statistics…")}
         </DropdownMenuItem>
         {statistics ? (
           <DropdownMenuItem
@@ -68,31 +68,25 @@ export function SourceMenu({
               if (isTauri()) void invoke("hud_show_main");
             }}
           >
-            {chinese ? "设置…" : "Settings…"}
+            {t("Settings…")}
           </DropdownMenuItem>
         ) : (
           <>
             <DropdownMenuItem
               onClick={() => void emit(guideEvents.open, "tour")}
             >
-              {chinese ? "上手引导…" : "Getting Started…"}
+              {t("Getting Started…")}
             </DropdownMenuItem>
             <DropdownMenuItem
               onClick={() => void emit(guideEvents.open, "news")}
             >
-              {chinese ? "新功能…" : "What’s New…"}
+              {t("What’s New…")}
             </DropdownMenuItem>
           </>
         )}
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={toggleHUDVisibility}>
-          {hudVisible
-            ? chinese
-              ? "隐藏 HUD"
-              : "Hide HUD"
-            : chinese
-              ? "显示 HUD"
-              : "Show HUD"}
+          {hudVisible ? t("Hide HUD") : t("Show HUD")}
         </DropdownMenuItem>
         {isTauri() && (
           <>
@@ -102,7 +96,7 @@ export function SourceMenu({
                 void invoke("quit_app");
               }}
             >
-              {chinese ? "退出" : "Quit"}
+              {t("Quit")}
             </DropdownMenuItem>
           </>
         )}

@@ -1,11 +1,26 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { addCatalog, translator } from "@agent-hud/ui/format";
 import {
   mcpRow,
   pluginRow,
   toolsSwitch,
   type McpInput,
 } from "../src/lib/agent-plugins.ts";
+
+// The counted forms ("1 session") are English's, in en.json.
+addCatalog(
+  "en",
+  JSON.parse(
+    readFileSync(
+      join(import.meta.dirname, "../../protocol/locales/en.json"),
+      "utf8",
+    ),
+  ),
+);
+const t = translator("en");
 
 const plugin = {
   installed: false,
@@ -29,10 +44,10 @@ const mcp: McpInput = {
 };
 
 test("the plugin row offers Install until it is in, then says how many sessions run it", () => {
-  const reading = pluginRow({ ...plugin, installed: null });
-  assert.deepEqual([reading.status[0], reading.action], ["Checking…", null]);
+  const reading = pluginRow(t, { ...plugin, installed: null });
+  assert.deepEqual([reading.status, reading.action], ["Checking…", null]);
 
-  const missing = pluginRow(plugin);
+  const missing = pluginRow(t, plugin);
   assert.deepEqual(
     [
       missing.tone,
@@ -40,74 +55,70 @@ test("the plugin row offers Install until it is in, then says how many sessions 
       missing.action?.id,
       missing.action?.unavailable,
     ],
-    ["off", ["Not installed", "未安装"], "install", undefined],
+    ["off", "Not installed", "install", undefined],
   );
   assert.deepEqual(missing.menu, []);
 
-  const noClient = pluginRow({ ...plugin, clientFound: false });
-  assert.deepEqual(noClient.action?.unavailable, [
-    "Install Claude Code first.",
-    "请先安装 Claude Code。",
-  ]);
+  const noClient = pluginRow(t, { ...plugin, clientFound: false });
+  assert.equal(noClient.action?.unavailable, "Install Claude Code first.");
 
-  const installing = pluginRow({ ...plugin, running: "install" });
-  assert.deepEqual(installing.busy, ["Installing…", "正在安装…"]);
+  const installing = pluginRow(t, { ...plugin, running: "install" });
+  assert.equal(installing.busy, "Installing…");
 
   // In place but no session has loaded it: blue, no button, and the step that loads it.
-  const idle = pluginRow({ ...plugin, installed: true });
+  const idle = pluginRow(t, { ...plugin, installed: true });
   assert.deepEqual(
-    [idle.tone, idle.status[0], idle.action],
+    [idle.tone, idle.status, idle.action],
     ["installed", "Installed", null],
   );
   assert.equal(idle.next?.command, "/reload-plugins");
-  assert.match(
-    idle.next!.words[1],
-    /已经打开的会话，在其中运行 \/reload-plugins/,
-  );
+  assert.match(idle.next!.words, /In an open session, run \/reload-plugins/);
   assert.deepEqual(
     idle.menu.map((item) => [item.id, item.destructive]),
     [["remove", true]],
   );
 
-  const loaded = pluginRow({ ...plugin, installed: true, sessions: 2 });
+  const loaded = pluginRow(t, { ...plugin, installed: true, sessions: 2 });
   assert.deepEqual(
     [loaded.tone, loaded.status],
-    ["working", ["Loaded in 2 sessions", "已在 2 个会话中加载"]],
+    ["working", "Loaded in 2 sessions"],
   );
   assert.equal(loaded.next, null);
   assert.equal(
-    pluginRow({ ...plugin, installed: true, sessions: 1 }).status[0],
+    pluginRow(t, { ...plugin, installed: true, sessions: 1 }).status,
     "Loaded in 1 session",
   );
   // Right after installing, the reload step stays even once a session loaded it.
   assert.ok(
-    pluginRow({ ...plugin, installed: true, sessions: 1, justInstalled: true })
-      .next,
+    pluginRow(t, {
+      ...plugin,
+      installed: true,
+      sessions: 1,
+      justInstalled: true,
+    }).next,
   );
 
   assert.deepEqual(
-    pluginRow({ ...plugin, installed: true, sessions: 2, running: "remove" })
+    pluginRow(t, { ...plugin, installed: true, sessions: 2, running: "remove" })
       .busy,
-    ["Removing…", "正在移除…"],
+    "Removing…",
   );
 });
 
 test("a plugin the client loads by itself only asks to open the client, never to reload", () => {
   const client = "DeepSeek Harness";
   assert.equal(
-    pluginRow({ ...plugin, clientFound: false }, client, true).action
-      ?.unavailable?.[0],
+    pluginRow(t, { ...plugin, clientFound: false }, client, true).action
+      ?.unavailable,
     "Install DeepSeek Harness first.",
   );
-  const idle = pluginRow({ ...plugin, installed: true }, client, true);
-  assert.equal(idle.status[0], "Installed");
+  const idle = pluginRow(t, { ...plugin, installed: true }, client, true);
+  assert.equal(idle.status, "Installed");
   assert.equal(idle.next?.command, undefined);
-  assert.match(
-    idle.next?.words[0] ?? "",
-    /^DeepSeek Harness loads it by itself/,
-  );
-  assert.match(idle.next?.words[1] ?? "", /打开 DeepSeek Harness/);
+  assert.match(idle.next?.words ?? "", /^DeepSeek Harness loads it by itself/);
+  assert.match(idle.next?.words ?? "", /Open DeepSeek Harness to use it/);
   const loaded = pluginRow(
+    t,
     { ...plugin, installed: true, sessions: 2, justInstalled: true },
     client,
     true,
@@ -117,13 +128,13 @@ test("a plugin the client loads by itself only asks to open the client, never to
 });
 
 test("the MCP row asks for the one step left, and never removes from its main button", () => {
-  assert.equal(mcpRow({ ...mcp, setupReady: null }).status[0], "Checking…");
+  assert.equal(mcpRow(t, { ...mcp, setupReady: null }).status, "Checking…");
 
-  const notAdded = mcpRow(mcp);
+  const notAdded = mcpRow(t, mcp);
   assert.deepEqual(
     [
       notAdded.tone,
-      notAdded.status[0],
+      notAdded.status,
       notAdded.action?.id,
       notAdded.action?.unavailable,
     ],
@@ -134,21 +145,18 @@ test("the MCP row asks for the one step left, and never removes from its main bu
     ["copy"],
   );
 
-  const noClient = mcpRow({ ...mcp, clientFound: false });
-  assert.deepEqual(noClient.action?.unavailable, [
-    "Install Codex first.",
-    "请先安装 Codex。",
-  ]);
+  const noClient = mcpRow(t, { ...mcp, clientFound: false });
+  assert.equal(noClient.action?.unavailable, "Install Codex first.");
 
-  const notInstalledApp = mcpRow({
+  const notInstalledApp = mcpRow(t, {
     ...mcp,
     setupReady: false,
     hasCommand: false,
   });
   assert.deepEqual(
     [
-      notInstalledApp.status[0],
-      notInstalledApp.action?.unavailable?.[0],
+      notInstalledApp.status,
+      notInstalledApp.action?.unavailable,
       notInstalledApp.menu,
     ],
     [
@@ -159,18 +167,18 @@ test("the MCP row asks for the one step left, and never removes from its main bu
   );
 
   // Added while the app-side switch is off: amber, and the row turns it on.
-  const off = mcpRow({ ...mcp, added: true });
+  const off = mcpRow(t, { ...mcp, added: true });
   assert.deepEqual(
     [off.tone, off.status, off.action?.id],
-    ["attention", ["Tools off", "工具已关闭"], "turn-on"],
+    ["attention", "Tools off", "turn-on"],
   );
   assert.deepEqual(
     off.menu.map((item) => item.id),
     ["copy", "remove"],
   );
-  assert.deepEqual(off.menu[1].label, ["Remove from Codex", "从 Codex 移除"]);
+  assert.equal(off.menu[1].label, "Remove from Codex");
   // In the demo the switch cannot change, and Turn on says why.
-  const demo = toolsSwitch({
+  const demo = toolsSwitch(t, {
     supported: true,
     enabled: false,
     listening: false,
@@ -178,22 +186,28 @@ test("the MCP row asks for the one step left, and never removes from its main bu
     demo: true,
   }).unavailable;
   assert.deepEqual(
-    mcpRow({ ...mcp, added: true, toolsUnavailable: demo }).action?.unavailable,
-    ["Not available in the demo.", "演示模式下不可用。"],
+    mcpRow(t, { ...mcp, added: true, toolsUnavailable: demo }).action
+      ?.unavailable,
+    "Not available in the demo.",
   );
 
-  const failed = mcpRow({ ...mcp, added: true, toolsOn: true });
+  const failed = mcpRow(t, { ...mcp, added: true, toolsOn: true });
   assert.deepEqual(
-    [failed.tone, failed.status[0], failed.action],
+    [failed.tone, failed.status, failed.action],
     ["failed", "Not running", null],
   );
 
-  const ready = mcpRow({ ...mcp, added: true, toolsOn: true, listening: true });
+  const ready = mcpRow(t, {
+    ...mcp,
+    added: true,
+    toolsOn: true,
+    listening: true,
+  });
   assert.deepEqual(
     [ready.tone, ready.status, ready.action, ready.next],
-    ["working", ["Ready", "可以使用"], null, null],
+    ["working", "Ready", null, null],
   );
-  const justAdded = mcpRow({
+  const justAdded = mcpRow(t, {
     ...mcp,
     client: "Claude Code",
     added: true,
@@ -201,36 +215,33 @@ test("the MCP row asks for the one step left, and never removes from its main bu
     listening: true,
     justAdded: true,
   });
-  assert.deepEqual(justAdded.next?.words, [
+  assert.equal(
+    justAdded.next?.words,
     "Start a new Claude Code session and ask it to change the HUD.",
-    "在 Claude Code 里新开一个会话，说“把 HUD 改成……”。",
-  ]);
+  );
   // A copy confirms in place of any other next step.
   assert.equal(
-    mcpRow({
+    mcpRow(t, {
       ...mcp,
       added: true,
       toolsOn: true,
       listening: true,
       justAdded: true,
       copied: true,
-    }).next?.words[0],
+    }).next?.words,
     "Command copied. Paste it into Terminal.",
   );
 
-  assert.deepEqual(mcpRow({ ...mcp, running: "add" }).busy, [
-    "Adding…",
-    "正在添加…",
-  ]);
+  assert.equal(mcpRow(t, { ...mcp, running: "add" }).busy, "Adding…");
   assert.deepEqual(
-    mcpRow({
+    mcpRow(t, {
       ...mcp,
       added: true,
       toolsOn: true,
       listening: true,
       running: "remove",
     }).busy,
-    ["Removing…", "正在移除…"],
+    "Removing…",
   );
 });
 
@@ -242,21 +253,24 @@ test("the switch explains itself only when it cannot change or the channel broke
     notice: null,
     demo: false,
   };
-  assert.deepEqual(toolsSwitch(healthy), { unavailable: null, problem: null });
+  assert.deepEqual(toolsSwitch(t, healthy), {
+    unavailable: null,
+    problem: null,
+  });
   assert.deepEqual(
-    toolsSwitch({ ...healthy, enabled: false, listening: false }),
+    toolsSwitch(t, { ...healthy, enabled: false, listening: false }),
     { unavailable: null, problem: null },
   );
   assert.deepEqual(
-    toolsSwitch({ ...healthy, listening: false, notice: "socket in use" })
+    toolsSwitch(t, { ...healthy, listening: false, notice: "socket in use" })
       .problem,
-    ["Not running: socket in use", "未运行：socket in use"],
+    "Not running: socket in use",
   );
-  assert.deepEqual(toolsSwitch({ ...healthy, demo: true }).unavailable, [
+  assert.equal(
+    toolsSwitch(t, { ...healthy, demo: true }).unavailable,
     "Not available in the demo.",
-    "演示模式下不可用。",
-  ]);
-  const unsupported = toolsSwitch({
+  );
+  const unsupported = toolsSwitch(t, {
     ...healthy,
     supported: false,
     enabled: false,

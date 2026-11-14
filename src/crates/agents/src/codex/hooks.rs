@@ -1,6 +1,7 @@
 //! Codex's hooks: permission requests, which wait on the reviewer gate, and
 //! session origin.
 use crate::hooks::{Hooks, Launch, Layout, Permission, Reply, Setup};
+use crate::l10n::tr;
 use crate::Location;
 use crate::{PerOs, Support};
 
@@ -43,8 +44,8 @@ pub static SETUP: Setup = Setup {
 };
 
 fn step(name: &str) -> String {
-    crate::l10n::text(
-        &format!("在 {name} 输入框上方点「审查钩子」，再点「全部允许」，它才会运行这些回调；回调改动后要再允许一次。"),
-        &format!("{name} runs these hooks once you allow them: click Review hooks above its message box, then Allow all. It asks again whenever they change."),
+    tr!(
+        "{{name}} runs these hooks once you allow them: click Review hooks above its message box, then Allow all. It asks again whenever they change.",
+        name = name
     )
 }

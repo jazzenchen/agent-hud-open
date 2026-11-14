@@ -3,7 +3,7 @@
 //! `ByteCrypto`-sealed) in read-only mode, falling back to `WebSignIn` when no
 //! local desktop sign-in is present.
 use crate::account::{account_id, Host, Provider, Reading, Unread, WebSignIn, WebSite};
-use crate::l10n;
+use crate::l10n::tr;
 use chrono::Utc;
 use serde_json::json;
 
@@ -132,9 +132,9 @@ fn build_reading(api: &Api, summary: Summary, id: &str, label: &str, sign_in: &s
         Some(quota) => reading.quotas.push(quota),
         None if summary.unlimited() => {}
         None => {
-            reading.notice = Some(l10n::text(
-                &format!("{} 当前没有可用的额度", api.site.name),
-                &format!("{} reports no allowance for this account.", api.site.name),
+            reading.notice = Some(tr!(
+                "{{names}} reports no allowance for this account.",
+                names = api.site.name
             ));
         }
     }

@@ -1,7 +1,7 @@
 //! A pass over the logs: listing them, reading the changed ones and writing
 //! what they hold to the ledger.
 use super::{line, needs_read, read_lines, route_claude_calls};
-use crate::l10n;
+use crate::l10n::tr;
 use crate::{
     carried_usage,
     checkpoints::{self, LogHead},
@@ -518,10 +518,7 @@ impl AgentHudCore {
         } else {
             Err(format!(
                 "{} ({}): {}",
-                l10n::text(
-                    "部分本地会话无法读取",
-                    "Some local transcripts could not be read"
-                ),
+                tr!("Some local transcripts could not be read"),
                 errors.len(),
                 errors[0]
             ))

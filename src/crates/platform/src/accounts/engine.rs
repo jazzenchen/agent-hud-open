@@ -1,6 +1,6 @@
 //! Bounded, short-lived client protocol connection. Never sends a prompt/turn.
 use super::AccountContext;
-use agent_hud_core::l10n;
+use agent_hud_core::l10n::tr;
 use serde_json::Value;
 use std::{
     fs,
@@ -35,12 +35,7 @@ impl Engine {
         directory: &Path,
         extra: &[(&str, String)],
     ) -> Result<Self, String> {
-        fs::create_dir_all(directory).map_err(|_| {
-            l10n::text(
-                "账户读取引擎的目录不可用",
-                "Account engine directory unavailable",
-            )
-        })?;
+        fs::create_dir_all(directory).map_err(|_| tr!("Account engine directory unavailable"))?;
         let mut command = Command::new(executable);
         command
             .args(args)
@@ -54,8 +49,8 @@ impl Engine {
             command.env(key, value);
         }
         crate::os::configure_command(&mut command);
-        let mut child = crate::os::spawn(&mut command)
-            .map_err(|_| l10n::text("账户读取引擎无法启动", "Account engine could not start"))?;
+        let mut child =
+            crate::os::spawn(&mut command).map_err(|_| tr!("Account engine could not start"))?;
         let input = child.stdin.take().unwrap();
         let output = child.stdout.take().unwrap();
         let mut errors = child.stderr.take().unwrap();
@@ -72,7 +67,7 @@ impl Engine {
             let mut child = child.lock().unwrap_or_else(PoisonError::into_inner);
             let _ = child.kill();
             let _ = child.wait();
-            return Err(l10n::text("账户读取已停止", "Account reading was stopped"));
+            return Err(tr!("Account reading was stopped"));
         }
         let (tx, lines) = mpsc::sync_channel(8);
         let reader = std::thread::Builder::new()
@@ -138,10 +133,7 @@ impl Engine {
             let mut child = child.lock().unwrap_or_else(PoisonError::into_inner);
             let _ = child.kill();
             let _ = child.wait();
-            return Err(l10n::text(
-                "账户读取器无法启动",
-                "Account reader could not start",
-            ));
+            return Err(tr!("Account reader could not start"));
         }
         Ok(Self {
             child,
@@ -171,7 +163,7 @@ impl agent_hud_agents::account::Engine for Engine {
         bytes.push(b'\n');
         self.input
             .write_all(&bytes)
-            .map_err(|_| l10n::text("账户读取引擎请求失败", "Account engine request failed"))
+            .map_err(|_| tr!("Account engine request failed"))
     }
     fn next(&mut self, deadline: Instant) -> Option<Value> {
         loop {

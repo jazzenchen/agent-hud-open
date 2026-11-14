@@ -38,6 +38,7 @@ import {
   rangeSpan,
 } from "./statistics/dashboard/model";
 import { snapshotLanguage, systemTimeZone } from "@agent-hud/ui/format";
+import { useT } from "@agent-hud/ui/format-context";
 import { indexingText } from "@agent-hud/ui/text/indexing";
 
 interface StatisticsProps {
@@ -75,11 +76,11 @@ export default function Statistics({
   const revision = snapshot.statisticsRevision ?? 0;
   const end = useStatisticsEnd(revision, refresh, active);
   const timeZone = useMemo(systemTimeZone, []);
-  const zh = snapshotLanguage(snapshot) === "zh";
-  const indexing = indexingText(snapshot.indexing, zh ? "zh" : "en");
-  const t = (en: string, cn: string) => (zh ? cn : en);
-  const theme = useMemo(() => themeFor(light, zh), [light, zh]);
-  const kindsLabel = dimensionsLabel(selectedKinds, zh);
+  const language = snapshotLanguage(snapshot);
+  const indexing = indexingText(snapshot.indexing, language);
+  const t = useT();
+  const theme = useMemo(() => themeFor(light, language), [light, language]);
+  const kindsLabel = dimensionsLabel(selectedKinds, language);
   const span = useMemo(() => rangeSpan(range, end), [range, end]);
   const quotaDays = useQuotaSpan(range, end, snapshot.quotas, active);
   const overview = useOverview({
@@ -150,7 +151,7 @@ export default function Statistics({
     setProviders,
     setHiddenAgentCards,
   );
-  const { compared, words: rangeWords } = rangeText(range, span.from, zh);
+  const { compared, words: rangeWords } = rangeText(range, span.from, language);
   const single = providers?.length === 1 ? providers[0] : null;
   const billing = snapshot.billing.filter(
     (account) =>
@@ -161,7 +162,7 @@ export default function Statistics({
     <section
       className="statistics-native stats-dashboard"
       style={pageStyle(theme, light)}
-      aria-label={t("Usage", "用量")}
+      aria-label={t("Usage")}
       aria-busy={loading}
     >
       <FilterBar

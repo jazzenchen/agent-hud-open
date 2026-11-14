@@ -16,11 +16,8 @@ pub(super) fn app_listing(s: &State, snapshot: &Value) -> Value {
         }
     }
     app["language"] = snapshot["settings"]["language"].clone();
-    app["writtenIn"] = json!(if written_in_chinese(&snapshot["settings"]["language"]) {
-        "zh-Hans"
-    } else {
-        "en"
-    });
+    app["writtenIn"] =
+        json!(agent_hud_core::l10n::Language::of_setting(&snapshot["settings"]["language"]).code());
     app
 }
 
@@ -137,13 +134,4 @@ pub(super) fn listing(
         view["note"] = json!(note);
     }
     view
-}
-
-/// The language the app is shown in: the system's when the setting is
-/// "system" (the default), as agent-hud-native-open resolves it.
-fn written_in_chinese(language: &Value) -> bool {
-    match language.as_str().unwrap_or("system") {
-        "system" => agent_hud_core::l10n::system_chinese(),
-        language => language.starts_with("zh"),
-    }
 }

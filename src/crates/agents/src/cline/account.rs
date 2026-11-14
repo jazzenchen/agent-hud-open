@@ -13,7 +13,7 @@ use crate::account::{
     Unread,
 };
 use crate::naming::window_names::Period;
-use crate::{l10n, Location};
+use crate::{l10n::tr, Location};
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
 use serde_json::{json, Value};
 use std::time::Duration;
@@ -106,26 +106,19 @@ fn sign_in(host: &dyn Host) -> Option<SignIn> {
 }
 
 fn signed_out() -> Unread {
-    Unread::SignedOut(l10n::text(
-        "登录 Cline 后才能读取 ClinePass 的额度",
-        "Sign in to Cline to read ClinePass",
-    ))
+    Unread::SignedOut(tr!("Sign in to Cline to read ClinePass"))
 }
 
 fn unsupported() -> Unread {
-    Unread::Failed(l10n::text(
-        "ClinePass 的额度格式无法识别",
-        "ClinePass's limits have an unsupported format",
-    ))
+    Unread::Failed(tr!("ClinePass's limits have an unsupported format"))
 }
 
 pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
     let sign_in = sign_in(host).ok_or_else(signed_out)?;
     let now = chrono::Utc::now().timestamp_millis();
     if sign_in.expires.is_some_and(|at| at <= now + 60_000) {
-        return Err(Unread::Failed(l10n::text(
-            "Cline 下次运行时会续期登录，之后更新 ClinePass 额度",
-            "Cline renews its sign-in the next time it runs; ClinePass updates then",
+        return Err(Unread::Failed(tr!(
+            "Cline renews its sign-in the next time it runs; ClinePass updates then"
         )));
     }
     let authorization = format!("Bearer {}", sign_in.token);
@@ -140,22 +133,18 @@ pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
         .map_err(|failure| match failure {
             // The service no longer takes the sign-in. A 403 may only mean
             // the account has no plan to read, so it is not taken for one.
-            HttpFailure::Status(401) => Unread::SignedOut(l10n::text(
-                "Cline 的登录已失效，请在 Cline 中重新登录",
-                "Cline's sign-in is no longer accepted; sign in to Cline again",
+            HttpFailure::Status(401) => Unread::SignedOut(tr!(
+                "Cline's sign-in is no longer accepted; sign in to Cline again"
             )),
-            HttpFailure::Status(403 | 404) => Unread::Failed(l10n::text(
-                "这个 Cline 账户读不到 ClinePass 额度",
-                "This Cline account has no ClinePass limits to read",
-            )),
-            HttpFailure::BadHeader => Unread::Failed(l10n::text(
-                "Cline 的登录凭据无法用于请求",
-                "Cline's sign-in cannot be used in a request",
-            )),
-            HttpFailure::Unreachable => failure.unread_as(l10n::text(
-                "无法连接 ClinePass 的额度服务",
-                "ClinePass's limits could not be reached",
-            )),
+            HttpFailure::Status(403 | 404) => {
+                Unread::Failed(tr!("This Cline account has no ClinePass limits to read"))
+            }
+            HttpFailure::BadHeader => {
+                Unread::Failed(tr!("Cline's sign-in cannot be used in a request"))
+            }
+            HttpFailure::Unreachable => {
+                failure.unread_as(tr!("ClinePass's limits could not be reached"))
+            }
             other => other.unread(),
         })?;
     let id = account_id(

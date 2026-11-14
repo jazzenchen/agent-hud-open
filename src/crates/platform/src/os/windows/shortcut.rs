@@ -224,8 +224,8 @@ mod tests {
             Some(PathBuf::from(r"D:\ChatGPT\app\ChatGPT.exe"))
         );
         assert_eq!(
-            target(&shortcut(r"D:\应用\Claude\Claude.exe", true)),
-            Some(PathBuf::from(r"D:\应用\Claude\Claude.exe"))
+            target(&shortcut(r"D:\应用\Claude\Claude.exe", true)), // l10n-ignore: test data
+            Some(PathBuf::from(r"D:\应用\Claude\Claude.exe"))      // l10n-ignore: test data
         );
     }
 

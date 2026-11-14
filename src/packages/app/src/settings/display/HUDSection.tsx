@@ -16,25 +16,13 @@ function usageSubtitle(
 ): string {
   switch (style) {
     case "rings":
-      return t(
-        "One ring per window round the logo, the first outermost.",
-        "每项一圈，套在标志外，第一项在最外圈。",
-      );
+      return t("One ring per window round the logo, the first outermost.");
     case "segments":
-      return t(
-        "One ring round the logo, split into a segment per window.",
-        "标志外一圈，按项分段，第一段在最上面。",
-      );
+      return t("One ring round the logo, split into a segment per window.");
     case "bars":
-      return t(
-        "One bar per window beside the logo, the first on top.",
-        "标志旁每项一条，第一项在最上面。",
-      );
+      return t("One bar per window beside the logo, the first on top.");
     case "numbers":
-      return t(
-        "The most used window's percentage beside the logo.",
-        "标志旁只写用得最多那项的百分比。",
-      );
+      return t("The most used window's percentage beside the logo.");
   }
 }
 
@@ -53,35 +41,28 @@ export function HUDSection({
 
   const modeSubtitle =
     config.mode === "simple"
-      ? t("A small floating panel, with no glow.", "悬浮的小面板，没有光晕。")
+      ? t("A small floating panel, with no glow.")
       : config.hasNotch
-        ? t("Uses this screen's notch.", "使用这块屏幕的刘海。")
-        : t(
-            "No notch here, so it draws a stand-in bar.",
-            "这块屏幕没有刘海，画一条替代条。",
-          );
+        ? t("Uses this screen's notch.")
+        : t("No notch here, so it draws a stand-in bar.");
 
   const dragHint =
     config.mode === "notch"
       ? t(
           "Drag the HUD on screen to move it. Dragging the notch switches to Simple.",
-          "直接拖动屏幕上的 HUD 来移动它；拖动刘海会切换为「简约」。",
         )
-      : t(
-          "Drag the HUD on screen to move it.",
-          "直接拖动屏幕上的 HUD 来移动它。",
-        );
+      : t("Drag the HUD on screen to move it.");
 
   return (
     <Section title="HUD" footer={dragHint}>
       <SmallHUDPreview snapshot={snapshot} config={config} active={active} />
-      <Row anchor="hud-mode" title={t("Mode", "形态")} subtitle={modeSubtitle}>
+      <Row anchor="hud-mode" title={t("Mode")} subtitle={modeSubtitle}>
         <Segments
-          label={t("Mode", "形态")}
+          label={t("Mode")}
           value={config.mode}
           options={[
-            ["notch", t("Notch", "刘海")],
-            ["simple", t("Simple", "简约")],
+            ["notch", t("Notch")],
+            ["simple", t("Simple")],
           ]}
           change={(value) =>
             update(modePatch(config, value as HUDConfig["mode"]))
@@ -90,27 +71,27 @@ export function HUDSection({
       </Row>
       {config.mode === "simple" && (
         <>
-          {slider("simpleSize", t("Size", "大小"), 20, 60, 1, pt)}
+          {slider("simpleSize", t("Size"), 20, 60, 1, pt)}
           {slider(
             "simpleGapScale",
-            t("Logo spacing", "Logo 间距"),
+            t("Logo spacing"),
             0.1,
             0.6,
             0.05,
             (value) => pt(value * config.simpleSize),
           )}
           <Row
-            title={t("Usage", "用量画法")}
+            title={t("Usage style")}
             subtitle={usageSubtitle(config.simpleStyle, t)}
           >
             <Segments
-              label={t("Usage", "用量画法")}
+              label={t("Usage style")}
               value={config.simpleStyle}
               options={[
-                ["rings", t("Rings", "年轮")],
-                ["segments", t("Segments", "分段环")],
-                ["bars", t("Bars", "进度条")],
-                ["numbers", t("Numbers", "数字")],
+                ["rings", t("Rings")],
+                ["segments", t("Segments")],
+                ["bars", t("Bars")],
+                ["numbers", t("Numbers")],
               ]}
               change={(value) =>
                 update({ simpleStyle: value as HUDConfig["simpleStyle"] })
@@ -121,8 +102,8 @@ export function HUDSection({
             slider(
               "ringWidth",
               config.simpleStyle === "bars"
-                ? t("Bar thickness", "进度条粗细")
-                : t("Ring thickness", "圆环粗细"),
+                ? t("Bar thickness")
+                : t("Ring thickness"),
               1,
               4,
               0.5,
@@ -132,19 +113,13 @@ export function HUDSection({
           {config.simpleStyle !== "numbers" &&
             toggle(
               "showsNumbers",
-              t("Show numbers", "显示数字"),
-              t(
-                "The most used window's percentage beside each logo.",
-                "标志旁写出用得最多那项的百分比。",
-              ),
+              t("Show numbers"),
+              t("The most used window's percentage beside each logo."),
             )}
           {toggle(
             "separatesAgents",
-            t("Separate agents", "按智能体分开"),
-            t(
-              "Hovering a logo opens only its agent.",
-              "悬停标志只展开该智能体。",
-            ),
+            t("Separate agents"),
+            t("Hovering a logo opens only its agent."),
           )}
         </>
       )}
@@ -155,37 +130,27 @@ export function HUDSection({
         t={t}
       />
       <Row
-        title={t("Appearance", "外观")}
+        title={t("Appearance")}
         subtitle={
           config.hasNotch && config.mode === "notch"
-            ? t(
-                "The notch stays black; its panel uses this.",
-                "刘海保持纯黑，展开的面板用这个外观。",
-              )
+            ? t("The notch stays black; its panel uses this.")
             : undefined
         }
       >
         <Segments
-          label={t("HUD appearance", "HUD 外观")}
+          label={t("HUD appearance")}
           value={config.appearance}
           options={[
-            ["system", t("System", "跟随系统")],
-            ["light", t("Light", "浅色")],
-            ["dark", t("Dark", "深色")],
+            ["system", t("System")],
+            ["light", t("Light")],
+            ["dark", t("Dark")],
           ]}
           change={(value) =>
             update({ appearance: value as HUDConfig["appearance"] })
           }
         />
       </Row>
-      {slider(
-        "solidTransparency",
-        t("Transparency", "透明度"),
-        0,
-        1,
-        0.05,
-        percent,
-      )}
+      {slider("solidTransparency", t("Transparency"), 0, 1, 0.05, percent)}
     </Section>
   );
 }

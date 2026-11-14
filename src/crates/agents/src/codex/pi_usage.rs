@@ -3,15 +3,12 @@ use super::limits::parse;
 use crate::account::{
     client_home_key, read_json, variable, Host, HttpFailure, HttpRequest, Reading, Unread,
 };
-use crate::l10n;
+use crate::l10n::tr;
 use serde_json::{json, Value};
 use std::time::Duration;
 
 fn pi_signed_out() -> Unread {
-    Unread::SignedOut(l10n::text(
-        "请在 Pi 中重新登录 ChatGPT",
-        "Sign in to ChatGPT again in Pi",
-    ))
+    Unread::SignedOut(tr!("Sign in to ChatGPT again in Pi"))
 }
 
 /// The route Pi logs its calls through a ChatGPT sign-in under; they spend
@@ -55,10 +52,9 @@ pub(super) fn read_pi(host: &dyn Host) -> Result<Option<Reading>, Unread> {
             timeout: Duration::from_secs(12),
         })
         .map_err(|failure| match failure {
-            HttpFailure::Unreachable | HttpFailure::BadHeader => failure.unread_as(l10n::text(
-                "Pi 的 ChatGPT 用量请求失败",
-                "Pi ChatGPT usage request failed",
-            )),
+            HttpFailure::Unreachable | HttpFailure::BadHeader => {
+                failure.unread_as(tr!("Pi ChatGPT usage request failed"))
+            }
             HttpFailure::Status(401) => pi_signed_out(),
             other => other.unread(),
         })?;
@@ -67,11 +63,7 @@ pub(super) fn read_pi(host: &dyn Host) -> Result<Option<Reading>, Unread> {
             .as_str()
             .is_none_or(|value| value.is_empty())
     {
-        return Err(l10n::text(
-            "Pi 的 ChatGPT 用量返回了其他或未知的账户",
-            "Pi ChatGPT usage returned a different or unknown account",
-        )
-        .into());
+        return Err(tr!("Pi ChatGPT usage returned a different or unknown account").into());
     }
     let window = |value: &Value| json!({"usedPercent":value["used_percent"],"windowDurationMins":value["limit_window_seconds"].as_i64().map(|seconds|seconds/60),"resetsAt":value["reset_at"]});
     let bucket = |value: &Value, id: &str, name: Option<&str>| json!({"limitId":id,"limitName":name,"planType":payload["plan_type"],"primary":window(&value["primary_window"]),"secondary":window(&value["secondary_window"])});

@@ -1,6 +1,19 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { addCatalog } from "@agent-hud/ui/format";
 import { sessionMoney, unpricedHelp } from "../src/lib/sessions.ts";
+
+addCatalog(
+  "zh-Hans",
+  JSON.parse(
+    readFileSync(
+      join(import.meta.dirname, "../../protocol/locales/zh-Hans.json"),
+      "utf8",
+    ),
+  ),
+);
 
 test("a whole cost is the session's money, with nothing left out", () => {
   assert.deepEqual(
@@ -29,11 +42,11 @@ test("a partly priced session keeps its priced calls' cost and counts the rest",
 test("the tooltip names what a cost leaves out", () => {
   assert.equal(unpricedHelp(0), undefined);
   assert.equal(
-    unpricedHelp(12_000, false, ["Claude Code · qwen3-coder:30b"]),
+    unpricedHelp(12_000, "en", ["Claude Code · qwen3-coder:30b"]),
     "12,000 more tokens came from models with no API list price and are not included: Claude Code · qwen3-coder:30b",
   );
   assert.equal(
-    unpricedHelp(12_000, true),
+    unpricedHelp(12_000, "zh-Hans"),
     "另有 12,000 个 Token 来自没有 API 价格的模型，未计入",
   );
 });

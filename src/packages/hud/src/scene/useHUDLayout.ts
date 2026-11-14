@@ -132,7 +132,7 @@ export function useHUDLayout({
       ? peekLineWidth(
           focusedVendor,
           scale,
-          snapshotLanguage(snapshot) === "zh",
+          snapshotLanguage(snapshot),
           peekTuck,
           snapshot.settings.quotaDisplay,
         )
@@ -149,7 +149,7 @@ export function useHUDLayout({
                     event,
                     requestsCount,
                     scale,
-                    snapshotLanguage(snapshot) === "zh",
+                    snapshotLanguage(snapshot),
                   ),
                   screen.width,
                 ),

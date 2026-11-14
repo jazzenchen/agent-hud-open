@@ -1,5 +1,6 @@
 //! A tail page of a compressed transcript, read by decoding it from its start.
 use super::*;
+use crate::l10n::tr;
 
 /// A tail page of a compressed transcript (every DeepSeek Harness log, a
 /// cold Codex rollout): the page a plain transcript of the same text gives.
@@ -14,18 +15,9 @@ pub(in crate::conversation) fn archive_tail(
     contexts: &mut Contexts,
     reach: u64,
 ) -> Result<Value, String> {
-    let undecodable = || {
-        l10n::text(
-            "无法解码所选会话的日志",
-            "Could not decode the selected session transcript",
-        )
-    };
-    let file = File::open(path).map_err(|_| {
-        l10n::text(
-            "无法读取所选会话的日志",
-            "Could not read the selected session transcript",
-        )
-    })?;
+    let undecodable = || tr!("Could not decode the selected session transcript");
+    let file =
+        File::open(path).map_err(|_| tr!("Could not read the selected session transcript"))?;
     let mut decoder = zstd::stream::read::Decoder::new(file).map_err(|_| undecodable())?;
     decoder.window_log_max(27).map_err(|_| undecodable())?; // As `Archives` reads.
     let mut reader = BufReader::with_capacity(64 * 1024, decoder);
@@ -58,9 +50,8 @@ pub(in crate::conversation) fn archive_tail(
             break;
         }
         if length > reach + TAIL {
-            return Err(l10n::text(
-                "所选会话的压缩日志太长，无法从末尾查看消息",
-                "The selected session's compressed transcript is too long to page from its end",
+            return Err(tr!(
+                "The selected session's compressed transcript is too long to page from its end"
             ));
         }
         kept.push_back((position, bytes));

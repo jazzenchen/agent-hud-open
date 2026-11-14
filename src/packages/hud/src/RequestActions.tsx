@@ -1,3 +1,4 @@
+import { useT } from "@agent-hud/ui/format-context";
 import { useState } from "react";
 import type { Approval, RequestDecision } from "@agent-hud/protocol";
 import { PermissionPlanCard } from "./permissions/PermissionPlanCard";
@@ -13,7 +14,6 @@ export interface RequestActionsProps {
   /** Settings, on a page such as "agent-plugins". */
   onOpenSettings?: (page: string) => void;
   light?: boolean;
-  language?: string;
 }
 
 /**
@@ -25,10 +25,8 @@ export function RequestActions({
   onDecision,
   onOpenSettings,
   light = false,
-  language,
 }: RequestActionsProps) {
-  const zh = language?.startsWith("zh") ?? false;
-  const t = (en: string, cn: string) => (zh ? cn : en);
+  const t = useT();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const ground = useGround(light);
@@ -65,7 +63,6 @@ export function RequestActions({
           disabled={disabled}
           pending={pending}
           light={light}
-          zh={zh}
           answer={answer}
           openSettings={onOpenSettings}
         />
@@ -74,7 +71,6 @@ export function RequestActions({
           request={request}
           disabled={disabled}
           light={light}
-          zh={zh}
           answer={answer}
         />
       ) : (
@@ -83,13 +79,12 @@ export function RequestActions({
           disabled={disabled}
           pending={pending}
           light={light}
-          zh={zh}
           answer={answer}
         />
       )}
       {!onDecision && (
         <p style={{ margin: 0, fontSize: 11, opacity: 0.6 }}>
-          {t("Approval delivery is not connected.", "尚未连接审批处理。")}
+          {t("Approval delivery is not connected.")}
         </p>
       )}
       {error && (

@@ -1,7 +1,7 @@
 import { memo, useMemo, useState } from "react";
 import type { PanelBlockLayout, Quota, Snapshot } from "@agent-hud/protocol";
 import { quotaMetricAvailability } from "../quota-metrics";
-import { useFormat } from "@agent-hud/ui/format-context";
+import { useFormat, useT } from "@agent-hud/ui/format-context";
 import { tokensShort } from "@agent-hud/ui/format";
 import { quotaAccountKey, vendorKey } from "../model";
 import { recentCost, recentUsage } from "../recent-usage";
@@ -50,6 +50,7 @@ export const SourceProviderBlock = memo(function SourceProviderBlock({
   // readings cannot give.
   const [measure, setMeasure] = useState<Measure>("quota");
   const format = useFormat();
+  const t = useT();
   const services = usePanelServices();
   const availability = useMemo(
     () =>
@@ -179,9 +180,14 @@ export const SourceProviderBlock = memo(function SourceProviderBlock({
               className="hud-source-recent"
               title={
                 recent.unpricedTokens > 0
-                  ? format.language === "zh"
-                    ? `其中 ${new Intl.NumberFormat("en").format(recent.unpricedTokens)} 个 Token 来自没有 API 价格的模型，未计入花费`
-                    : `${new Intl.NumberFormat("en").format(recent.unpricedTokens)} of these tokens came from models with no API list price and are not in the cost`
+                  ? t(
+                      "{{tokens}} of these tokens came from models with no API list price and are not in the cost",
+                      {
+                        tokens: new Intl.NumberFormat("en").format(
+                          recent.unpricedTokens,
+                        ),
+                      },
+                    )
                   : undefined
               }
               style={{
@@ -191,9 +197,7 @@ export const SourceProviderBlock = memo(function SourceProviderBlock({
                 color: colors.secondary,
               }}
             >
-              <span>
-                {format.language === "zh" ? "最近 24 小时" : "Last 24 hours"}
-              </span>
+              <span>{t("Last 24 hours")}</span>
               <strong style={{ color: colors.text }}>
                 {`${tokensShort(recent.tokens)} Token`}
                 {recentMoney ? ` · ${recentMoney}` : ""}
@@ -207,7 +211,7 @@ export const SourceProviderBlock = memo(function SourceProviderBlock({
                 color: colors.secondary,
               }}
             >
-              <span>{format.language === "zh" ? "额度" : "Quota"}</span>
+              <span>{t("Quota")}</span>
               <strong>--</strong>
             </div>
           )}

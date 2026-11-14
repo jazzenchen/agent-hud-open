@@ -1,7 +1,7 @@
 //! API balances consume only explicitly linked billing routes from the same
 //! ledger. A familiar model name or today's login does not bind historical use.
 use super::*;
-use crate::l10n;
+use crate::l10n::tr;
 #[derive(Default)]
 pub(super) struct Cache {
     revision: Option<u64>,
@@ -140,7 +140,7 @@ impl Cache {
                 .and_then(DateTime::<Utc>::from_timestamp_millis)
                 .map(|d| d.to_rfc3339());
             let series=buckets.into_iter().map(|(at,(p,unknown))|json!({"timestamp":DateTime::<Utc>::from_timestamp_millis(at).map(|d|d.to_rfc3339()),"amount":(!unknown&&complete).then_some(p as f64/1e12),"currency":currency})).collect::<Vec<_>>();
-            periods.insert(name.into(),json!({"from":DateTime::<Utc>::from_timestamp_millis(from).map(|d|d.to_rfc3339()),"to":DateTime::<Utc>::from_timestamp_millis(now).map(|d|d.to_rfc3339()),"hours":days*24,"cost":amount.map(|amount|json!({"currency":currency,"amount":amount})),"burnRate":per_day.map(|per_day|json!({"currency":currency,"perDay":per_day})),"runsOutAt":run,"replyRate":if reply_complete{reply.clone()}else{Value::Null},"consumed":(bound&&complete&&count>0).then(||json!({"used":total,"capacity":null,"unit":"tokens"})),"tokensPerHour":(bound&&complete&&count>0).then_some(total as f64/(days*24)as f64),"series":series,"coverage":{"complete":complete,"notice":if !bound{Some(l10n::text("没有与此余额精确关联的本机计费来源", "No exact local billing route/account home is linked to this balance"))}else if !complete{Some(l10n::text("关联的本地用量账本仍在索引", "The linked local usage ledger is still indexing"))}else if unknown{Some(l10n::text("部分已记录的请求在此币种下没有价格", "Some recorded requests have no price in this currency"))}else{None}}}));
+            periods.insert(name.into(),json!({"from":DateTime::<Utc>::from_timestamp_millis(from).map(|d|d.to_rfc3339()),"to":DateTime::<Utc>::from_timestamp_millis(now).map(|d|d.to_rfc3339()),"hours":days*24,"cost":amount.map(|amount|json!({"currency":currency,"amount":amount})),"burnRate":per_day.map(|per_day|json!({"currency":currency,"perDay":per_day})),"runsOutAt":run,"replyRate":if reply_complete{reply.clone()}else{Value::Null},"consumed":(bound&&complete&&count>0).then(||json!({"used":total,"capacity":null,"unit":"tokens"})),"tokensPerHour":(bound&&complete&&count>0).then_some(total as f64/(days*24)as f64),"series":series,"coverage":{"complete":complete,"notice":if !bound{Some(tr!("No exact local billing route/account home is linked to this balance"))}else if !complete{Some(tr!("The linked local usage ledger is still indexing"))}else if unknown{Some(tr!("Some recorded requests have no price in this currency"))}else{None}}}));
         }
         json!({"periods":periods,"defaultPeriod":"day","estimate":"local-recorded-requests","pricingSnapshot":pricing::checked_on()})
     }

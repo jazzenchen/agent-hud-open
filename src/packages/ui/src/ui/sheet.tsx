@@ -2,7 +2,7 @@ import * as React from "react";
 import { cn } from "cn";
 import { XIcon } from "lucide-react";
 import { Dialog as SheetPrimitive } from "radix-ui";
-import { useFormat } from "../format-context";
+import { useT } from "../format-context";
 
 function Sheet({ ...props }: React.ComponentProps<typeof SheetPrimitive.Root>) {
   return <SheetPrimitive.Root data-slot="sheet" {...props} />;
@@ -52,7 +52,7 @@ function SheetContent({
   side?: "top" | "right" | "bottom" | "left";
   showCloseButton?: boolean;
 }) {
-  const closeLabel = useFormat().language === "zh" ? "关闭" : "Close";
+  const closeLabel = useT()("Close");
   return (
     <SheetPortal>
       <SheetOverlay />

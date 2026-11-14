@@ -73,7 +73,9 @@ pub fn run_with_options(
             std::process::exit(2);
         }
     };
-    agent_hud_runtime::l10n::set_system_chinese(shell::system_prefers_chinese());
+    agent_hud_runtime::l10n::set_system_languages(&shell::system_languages());
+    // The system's language until the stored settings are read.
+    agent_hud_runtime::l10n::follow(&serde_json::Value::Null);
     let instance = if demo {
         None
     } else {

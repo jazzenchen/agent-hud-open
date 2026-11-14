@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { Approval, IslandEvent, Snapshot } from "@agent-hud/protocol";
+import type { Translate } from "@agent-hud/ui/format";
 import { usePanelServices } from "./PanelContext";
 import { agentVendorName, sourceID, vendorKey } from "./model";
 import type { EndSide } from "./ends/end-geometry";
@@ -251,30 +252,18 @@ export function useIslandNews(
   };
 }
 
-export const newsTitle = (event: IslandEvent, zh = false) =>
+export const newsTitle = (event: IslandEvent, t: Translate) =>
   event.kind === "completion"
-    ? zh
-      ? "有新回复"
-      : "New reply"
+    ? t("New reply")
     : event.kind === "quota-reset"
-      ? zh
-        ? "额度已重置"
-        : "Quota reset"
+      ? t("Quota reset")
       : event.kind === "reset-credits"
-        ? zh
-          ? "获得使用重置"
-          : "Usage resets added"
+        ? t("Usage resets added")
         : event.kind === "sign-in-needed"
-          ? zh
-            ? "需要重新登录"
-            : "Sign in again"
+          ? t("Sign in again")
           : event.kind === "hooks-review-needed"
-            ? zh
-              ? "回调待允许"
-              : "Allow its hooks"
-            : zh
-              ? "额度预警"
-              : "Running low";
+            ? t("Allow its hooks")
+            : t("Running low");
 
 export const compactDuration = (seconds: number) => {
   const total = Math.max(0, Math.round(seconds)),

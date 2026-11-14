@@ -29,6 +29,7 @@ mod words;
 pub use preferences::{Preferences, DEFAULT_LIMIT};
 pub use transcript::{StoredTurn, Turns};
 
+use agent_hud_core::l10n::Language;
 use agent_hud_platform::delivery::{
     self, DeliveryState, LocalClients, Operation, PromptForm, Provider, SendRequest, SessionStarts,
     SessionTarget, StartReceipt, StartRequest, CLAUDE_MESSAGES_OFF, DEEPSEEK_MESSAGES_OFF,

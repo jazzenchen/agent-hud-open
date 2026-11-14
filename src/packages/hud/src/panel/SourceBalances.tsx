@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { DollarSign, Flame, Percent } from "lucide-react";
 import type { PanelBlockLayout, Snapshot } from "@agent-hud/protocol";
 import { dateFormat, localeDateTime, moneyAmount } from "@agent-hud/ui/format";
-import { useFormat } from "@agent-hud/ui/format-context";
+import { useFormat, useT } from "@agent-hud/ui/format-context";
 import { usePanelServices } from "../PanelContext";
 import { useGround } from "../ground";
 import { agentVendorName } from "../agent-artwork";
@@ -38,6 +38,7 @@ export function SourceBalances({
   const [selected, setMeasure] = useState<BalanceMeasure>("quota");
   useEffect(() => setPeriod(layout.period ?? "day"), [layout.period]);
   const { language } = useFormat();
+  const t = useT();
   const money = (amount: number, currency: string) =>
     moneyAmount(amount, currency, language);
   return (
@@ -70,7 +71,7 @@ export function SourceBalances({
               {!isCredits && (
                 <div
                   role="group"
-                  aria-label={language === "zh" ? "余额指标" : "Balance metric"}
+                  aria-label={t("Balance metric")}
                   style={{ display: "flex", gap: 2 }}
                 >
                   {balanceMeasures
@@ -79,19 +80,15 @@ export function SourceBalances({
                       ...{
                         quota: {
                           Icon: Percent,
-                          title: language === "zh" ? "余额" : "Balance",
+                          title: t("Balance"),
                         },
                         burn: {
                           Icon: Flame,
-                          title:
-                            language === "zh"
-                              ? "每日消耗"
-                              : "Consumption per day",
+                          title: t("Consumption per day"),
                         },
                         cost: {
                           Icon: DollarSign,
-                          title:
-                            language === "zh" ? "估算花费" : "Estimated cost",
+                          title: t("Estimated cost"),
                         },
                       }[key],
                     }))
@@ -131,9 +128,7 @@ export function SourceBalances({
             {!isCredits && (
               <div
                 role="group"
-                aria-label={
-                  language === "zh" ? "消耗时段" : "Consumption period"
-                }
+                aria-label={t("Consumption period")}
                 style={{ display: "flex", gap: 2, justifyContent: "flex-end" }}
               >
                 {(["day", "week", "month"] as const).map((value) => (
@@ -158,11 +153,7 @@ export function SourceBalances({
             )}
             {layout.widget === "chart" ? (
               <div
-                aria-label={
-                  language === "zh"
-                    ? "估算花费记录"
-                    : "Estimated spending history"
-                }
+                aria-label={t("Estimated spending history")}
                 title={metrics?.coverage.notice ?? undefined}
                 style={{
                   display: "flex",

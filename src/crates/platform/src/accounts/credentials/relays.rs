@@ -1,6 +1,6 @@
 //! The relays the owner added by hand, kept beside the API credentials.
 use super::{clean, folder, private_folder, AccountContext};
-use agent_hud_core::l10n;
+use agent_hud_core::l10n::tr;
 use serde_json::{json, Value};
 use std::{
     fs,
@@ -46,10 +46,7 @@ pub(crate) fn relay_sources(ctx: &AccountContext) -> Result<Value, String> {
 }
 
 fn unreadable_relays() -> String {
-    l10n::text(
-        "无法读取手动添加的中转站",
-        "Could not read the relays added by hand",
-    )
+    tr!("Could not read the relays added by hand")
 }
 
 /// Adds a relay by hand: `{client, name, baseUrl, key, kind, custom}`, where
@@ -62,10 +59,7 @@ pub(crate) fn add_relay_source(ctx: &AccountContext, params: &Value) -> Result<V
     let mut sources = relay_sources(ctx)?;
     let list = sources["sources"].as_array_mut().unwrap();
     if list.len() >= RELAY_LIMIT {
-        return Err(l10n::text(
-            "手动添加的中转站已达上限",
-            "Too many relays added by hand",
-        ));
+        return Err(tr!("Too many relays added by hand"));
     }
     let id = format!(
         "relay-{}",
@@ -92,10 +86,7 @@ pub(crate) fn set_relay_kind(ctx: &AccountContext, params: &Value) -> Result<Val
     match choice {
         Some(choice) => {
             if !kinds.contains_key(&host) && kinds.len() >= RELAY_LIMIT {
-                return Err(l10n::text(
-                    "手选类型的中转站已达上限",
-                    "Too many relays with a chosen type",
-                ));
+                return Err(tr!("Too many relays with a chosen type"));
             }
             kinds.insert(host.clone(), choice);
         }
@@ -112,18 +103,17 @@ pub(crate) fn set_relay_kind(ctx: &AccountContext, params: &Value) -> Result<Val
 /// address on its host, so the key never leaves for another one.
 pub(super) fn relay_kind(params: &Value) -> Result<(String, Option<Value>), String> {
     use agent_hud_agents::endpoints::{base_url_host, https_address};
-    let invalid = |what: &str, zh: &str| l10n::text(zh, what);
     let host = params["host"]
         .as_str()
         .map(str::trim)
         .filter(|host| {
             !host.is_empty() && base_url_host(&format!("https://{host}")).as_deref() == Some(*host)
         })
-        .ok_or_else(|| invalid("Unknown relay address", "无法识别的中转站地址"))?
+        .ok_or_else(|| tr!("Unknown relay address"))?
         .to_owned();
     let kind = params["kind"].as_str().unwrap_or("auto");
     if !agent_hud_agents::relays::KINDS.contains(&kind) {
-        return Err(invalid("Unknown relay type", "无法识别的中转站类型"));
+        return Err(tr!("Unknown relay type"));
     }
     if kind == "auto" {
         return Ok((host, None));
@@ -156,10 +146,7 @@ pub(super) fn relay_kind(params: &Value) -> Result<(String, Option<Value>), Stri
             || !matches!(currency, "USD" | "CNY")
             || !header_ok
         {
-            return Err(invalid(
-                "A custom relay needs its balance endpoint on its own address, the JSON path of the balance, a positive divisor and USD or CNY",
-                "自定义中转站需要它自己地址上的余额接口、余额在返回 JSON 里的位置、大于 0 的除数，以及 USD 或 CNY",
-            ));
+            return Err(tr!("A custom relay needs its balance endpoint on its own address, the JSON path of the balance, a positive divisor and USD or CNY"));
         }
         choice["custom"] = json!({"url": endpoint, "remaining": remaining, "divisor": divisor, "currency": currency, "header": header});
     }
@@ -184,27 +171,17 @@ pub(super) fn relay_source(params: &Value) -> Result<Value, String> {
             .map(str::trim)
             .filter(|value| clean(value) && value.chars().count() <= limit)
     };
-    let invalid = |what: &str, zh: &str| l10n::text(zh, what);
     // Without a name, the relay's own name (or its address) is shown.
     let name = match params["name"].as_str().map(str::trim) {
         None | Some("") => "",
-        Some(_) => text("name", 40).ok_or_else(|| {
-            invalid(
-                "Keep the name to 40 characters on one line",
-                "名称最多 40 个字，不能换行",
-            )
-        })?,
+        Some(_) => {
+            text("name", 40).ok_or_else(|| tr!("Keep the name to 40 characters on one line"))?
+        }
     };
-    let base = text("baseUrl", 2048)
-        .ok_or_else(|| invalid("Enter the relay's address", "请填写中转站地址"))?;
-    let address = agent_hud_agents::endpoints::https_address(base).ok_or_else(|| {
-        invalid(
-            "The relay's address must be an HTTPS address",
-            "中转站地址必须是 HTTPS 地址",
-        )
-    })?;
-    let key =
-        text("key", 4096).ok_or_else(|| invalid("Enter the relay's key", "请填写中转站的 key"))?;
+    let base = text("baseUrl", 2048).ok_or_else(|| tr!("Enter the relay's address"))?;
+    let address = agent_hud_agents::endpoints::https_address(base)
+        .ok_or_else(|| tr!("The relay's address must be an HTTPS address"))?;
+    let key = text("key", 4096).ok_or_else(|| tr!("Enter the relay's key"))?;
     // Which agents use it is seen from their configuration and calls.
     Ok(json!({"name": name, "baseUrl": address, "key": key}))
 }
@@ -213,5 +190,5 @@ pub(super) fn relay_source(params: &Value) -> Result<Value, String> {
 fn write_relays(ctx: &AccountContext, sources: &Value) -> Result<(), String> {
     private_folder(&folder(ctx))?;
     crate::claude_plugin::write_private(&relays_path(ctx), sources.to_string().as_bytes())
-        .map_err(|_| l10n::text("无法保存中转站", "Could not save the relays"))
+        .map_err(|_| tr!("Could not save the relays"))
 }

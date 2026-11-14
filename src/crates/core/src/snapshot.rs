@@ -2,6 +2,7 @@
 //! pass, then sessions, quotas, balances, accounts and providers as of the
 //! metrics clock.
 use super::*;
+use crate::l10n::tr;
 
 mod balances;
 mod meters;
@@ -108,11 +109,10 @@ impl crate::AgentHudCore {
         }
         self.source_notice = notice.or_else(|| {
             (remaining > 0).then(|| {
-                if l10n::chinese() {
-                    format!("正在索引 {remaining} 个会话日志，索引完成前 Token 合计不完整")
-                } else {
-                    format!("Indexing {remaining} transcript files. Token totals are partial until indexing finishes.")
-                }
+                tr!(
+                    count = remaining,
+                    "Indexing {{count}} transcript files. Token totals are partial until indexing finishes."
+                )
             })
         });
     }
@@ -259,7 +259,7 @@ impl crate::AgentHudCore {
             .as_ref()
             .expect("usage projection prepared");
         Ok(
-            json!({"islandEvents":island_events,"schemaVersion":1,"statisticsRevision":self.statistics.revision,"sessionsRevision":self.sessions_revision,"sessionScope":"recent","indexing":indexing,"generatedAt":Utc::now().to_rfc3339(),"mode":if self.demo{"demo"}else{"live"},"connection":{"status":"connected","platform":self.platform,"message":notice.unwrap_or_else(|| l10n::text("本机会话日志与客户端事件；回调连接状态另行显示", "Local transcripts and client events; hook connection status is reported separately."))},"totals":projection.totals.json(),"quotas":quotas,"accounts":accounts,"sessions":sessions,"timeline":projection.timeline,"providers":providers,"approvals":approvals,"requestDeliveries":deliveries,"settings":self.settings,"language":if crate::l10n::chinese(){"zh"}else{"en"},"capabilities":serde_json::from_str::<Value>(include_str!("../../../packages/protocol/capabilities.json")).expect("checked-in capability manifest"),"billing":billing,"relays":relays}),
+            json!({"islandEvents":island_events,"schemaVersion":1,"statisticsRevision":self.statistics.revision,"sessionsRevision":self.sessions_revision,"sessionScope":"recent","indexing":indexing,"generatedAt":Utc::now().to_rfc3339(),"mode":if self.demo{"demo"}else{"live"},"connection":{"status":"connected","platform":self.platform,"message":notice.unwrap_or_else(|| tr!("Local transcripts and client events; hook connection status is reported separately."))},"totals":projection.totals.json(),"quotas":quotas,"accounts":accounts,"sessions":sessions,"timeline":projection.timeline,"providers":providers,"approvals":approvals,"requestDeliveries":deliveries,"settings":self.settings,"language":crate::l10n::current().code(),"capabilities":serde_json::from_str::<Value>(include_str!("../../../packages/protocol/capabilities.json")).expect("checked-in capability manifest"),"billing":billing,"relays":relays}),
         )
     }
 

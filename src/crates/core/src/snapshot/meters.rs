@@ -1,6 +1,7 @@
 //! The meter view, the quota samples and the balance metrics, brought up to
 //! date with the ledger before a snapshot is read from them.
 use super::*;
+use crate::l10n::tr;
 
 impl crate::AgentHudCore {
     /// Brings the meter view, the quota samples and the balance metrics up to
@@ -57,10 +58,7 @@ impl crate::AgentHudCore {
                 };
                 if result.is_err() {
                     self.meters.view = None;
-                    self.storage_issue = Some(l10n::text(
-                        "无法从本地数据库读取用量指标",
-                        "Usage metrics could not be read from SQLite",
-                    ))
+                    self.storage_issue = Some(tr!("Usage metrics could not be read from SQLite"))
                 }
                 self.meters.changes.clear();
             }
@@ -75,10 +73,8 @@ impl crate::AgentHudCore {
                 match metering::samples(database, now) {
                     Ok(samples) => self.meters.samples = Some(samples),
                     Err(_) => {
-                        self.storage_issue = Some(l10n::text(
-                            "无法从本地数据库读取额度记录",
-                            "Quota history could not be read from SQLite",
-                        ))
+                        self.storage_issue =
+                            Some(tr!("Quota history could not be read from SQLite"))
                     }
                 }
             }

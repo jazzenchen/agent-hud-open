@@ -1816,9 +1816,9 @@ fn the_reply_line_names_the_tool_as_the_recipients_client_does() {
         session_id: CLAUDE.into(),
         title: None,
     };
-    let line = |zh, client, reply_to| {
+    let line = |language, client, reply_to| {
         words::compose(
-            zh,
+            language,
             PromptForm::Labelled,
             &from,
             client,
@@ -1832,20 +1832,20 @@ fn the_reply_line_names_the_tool_as_the_recipients_client_does() {
         .unwrap()
         .to_owned()
     };
-    assert!(line(false, "claude", None).contains("mcp__agent-hud__send_message"));
-    assert!(line(false, "deepseek", None).contains("mcp__agent-hud__send_message"));
-    assert!(line(false, "codex", None).contains("mcp__agent_hud__send_message"));
+    assert!(line(Language::En, "claude", None).contains("mcp__agent-hud__send_message"));
+    assert!(line(Language::En, "deepseek", None).contains("mcp__agent-hud__send_message"));
+    assert!(line(Language::En, "codex", None).contains("mcp__agent_hud__send_message"));
     assert_eq!(
-        line(false, "antigravity", None),
+        line(Language::En, "antigravity", None),
         "Reply with agent-hud's send_message tool, reply_to: m-1: your reply reaches the sender as a message. Without that tool, answer here: the sender can read this turn's last reply."
     );
     assert_eq!(
-        line(true, "deepseek", Some("m-0")),
+        line(Language::ZhHans, "deepseek", Some("m-0")),
         "这是对 m-0 的回复。还需要再说时，用 agent-hud 的 MCP 工具 mcp__agent-hud__send_message 回复，reply_to: m-1。"
     );
     assert_eq!(
         words::compose(
-            false,
+            Language::En,
             PromptForm::Own,
             &from,
             "codex",
@@ -1867,9 +1867,9 @@ fn without_the_reply_hint_the_recipient_is_asked_to_answer_in_its_turn() {
         session_id: CLAUDE.into(),
         title: None,
     };
-    let line = |zh, reply_to| {
+    let line = |language, reply_to| {
         let words = words::compose(
-            zh,
+            language,
             PromptForm::Labelled,
             &from,
             "codex",
@@ -1882,10 +1882,10 @@ fn without_the_reply_hint_the_recipient_is_asked_to_answer_in_its_turn() {
         words.lines().last().unwrap().to_owned()
     };
     assert_eq!(
-        line(false, None),
+        line(Language::En, None),
         "Answer here: the sender reads this turn's last reply, so send nothing back."
     );
-    assert_eq!(line(true, Some("m-0")), "这是对 m-0 的回复。");
+    assert_eq!(line(Language::ZhHans, Some("m-0")), "这是对 m-0 的回复。");
     let tools = Messaging::tools(true).to_string();
     assert_eq!(tools.matches("\"reply_hint\"").count(), 2);
 }
@@ -2097,7 +2097,7 @@ fn an_antigravity_answer_flies_back_once_the_store_reads_it() {
     let id = message["id"].as_str().unwrap().to_owned();
     let sent = world.messaging.journal.find(&id).unwrap().sent_at_ms;
     let words = words::compose(
-        false,
+        Language::En,
         PromptForm::Labelled,
         &party(&world.snapshot, "claude", CLAUDE),
         "antigravity",
@@ -2169,7 +2169,7 @@ fn an_antigravity_answer_the_store_cannot_tie_to_the_message_flies_only_its_repl
     let id = message["id"].as_str().unwrap().to_owned();
     let sent = world.messaging.journal.find(&id).unwrap().sent_at_ms;
     let words = words::compose(
-        false,
+        Language::En,
         PromptForm::Labelled,
         &party(&world.snapshot, "claude", CLAUDE),
         "antigravity",

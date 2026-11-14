@@ -3,7 +3,8 @@
 //! - VS Code IDE `User/globalStorage/state.vscdb` (`secret://aicoding.auth.*`)
 use crate::account::cipher::{unseal_safe_storage_apps, unseal_vscode_secret};
 use crate::account::{read_bounded, read_json_bounded, Answer, DatabaseFailure, Host, Unread};
-use crate::{l10n, Base};
+use crate::l10n::tr;
+use crate::Base;
 use serde_json::Value;
 use std::time::Duration;
 
@@ -59,9 +60,9 @@ fn read_auth_dat(host: &dyn Host, spec: &LocalSpec) -> Result<Option<QoderLocal>
             Answer::Found(b) => b,
             Answer::Missing => continue,
             Answer::Denied => {
-                return Err(l10n::text(
-                    &format!("无权读取 {} 的本地登录文件", spec.label),
-                    &format!("Permission denied reading {}'s local sign-in.", spec.label),
+                return Err(tr!(
+                    "Permission denied reading {{name}}'s local sign-in.",
+                    name = spec.label
                 )
                 .into())
             }
@@ -97,9 +98,9 @@ fn read_vscdb(host: &dyn Host, spec: &LocalSpec) -> Result<Option<QoderLocal>, U
             Ok(rows) => rows,
             Err(DatabaseFailure::Missing) => continue,
             Err(DatabaseFailure::Unopenable | DatabaseFailure::Unreadable) => {
-                return Err(l10n::text(
-                    &format!("无法读取 {} 账户数据库", spec.label),
-                    &format!("{} account database could not be read.", spec.label),
+                return Err(tr!(
+                    "{{name}} account database could not be read.",
+                    name = spec.label
                 )
                 .into())
             }
@@ -221,8 +222,8 @@ fn str_field(value: &Value) -> Option<String> {
 }
 
 fn auth_format(label: &str) -> String {
-    l10n::text(
-        &format!("{label} 账户登录信息格式无法识别"),
-        &format!("{label} account authentication has an unsupported format."),
+    tr!(
+        "{{name}} account authentication has an unsupported format.",
+        name = label
     )
 }

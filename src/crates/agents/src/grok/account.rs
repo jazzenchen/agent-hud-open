@@ -12,7 +12,7 @@ use super::cache as bot;
 use crate::account::{legacy_unresolved, locate, status, Host, Provider, Reading, Unread};
 use crate::cursor::account::sign_in;
 use crate::naming::window_names;
-use crate::{iso, l10n, Location, PerOs, Support};
+use crate::{iso, l10n::tr, Location, PerOs, Support};
 use serde_json::{json, Value};
 
 /// Grok Bot's desktop cache, where it is known.
@@ -35,16 +35,14 @@ pub static PROVIDER: Provider = Provider {
 pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
     let mut r = Reading::empty("grok-bot");
     let Ok(directory) = locate(host, &CACHE) else {
-        r.notice = Some(l10n::text(
-            "此系统暂不支持读取 Grok Bot 缓存",
-            "Grok Bot cache acquisition is not implemented on this platform",
+        r.notice = Some(tr!(
+            "Grok Bot cache acquisition is not implemented on this platform"
         ));
         return Ok(r);
     };
     let Some(slot) = bot::account_through(host, &directory) else {
-        r.notice = Some(l10n::text(
-            "登录 Grok Bot 后读取其缓存的个人额度",
-            "Sign in to Grok Bot to expose its cached personal quota",
+        r.notice = Some(tr!(
+            "Sign in to Grok Bot to expose its cached personal quota"
         ));
         return Ok(r);
     };
@@ -114,12 +112,8 @@ fn cached(
     now: i64,
     email: Option<&str>,
 ) -> Result<Reading, String> {
-    let value = bot::value_through(host, directory, &bot::quota_key(slot), 2).ok_or_else(|| {
-        l10n::text(
-            "Grok Bot 缓存额度不可用，请在 Bot 中刷新",
-            "Grok Bot cached quota is unavailable; refresh in Bot",
-        )
-    })?;
+    let value = bot::value_through(host, directory, &bot::quota_key(slot), 2)
+        .ok_or_else(|| tr!("Grok Bot cached quota is unavailable; refresh in Bot"))?;
     if value["kind"] != "present" || !value["selectedTeamId"].is_null() {
         return Err(no_personal_quota());
     }
@@ -130,30 +124,20 @@ fn cached(
     let Some(observed) = observed.filter(|at| {
         *at <= now && now - at < 86_400_000 && expires.is_some_and(|e| e > now && e > *at)
     }) else {
-        return Err(l10n::text(
-            "Grok Bot 缓存的额度已超过一天，打开 Grok Bot 即可刷新",
-            "Grok Bot's cached quota is more than a day old; open Grok Bot to refresh it.",
+        return Err(tr!(
+            "Grok Bot's cached quota is more than a day old; open Grok Bot to refresh it."
         ));
     };
     let mut r = quota(&value["reading"]["usage"], slot, observed, email)?;
-    r.notice = Some(l10n::text(
-        "额度来自 Grok Bot 缓存；在 Bot 中刷新可更新读数",
-        "Quota from Grok Bot cache; refresh in Bot to update",
-    ));
+    r.notice = Some(tr!("Quota from Grok Bot cache; refresh in Bot to update"));
     if bot::account_through(host, directory).as_deref() != Some(slot) {
-        return Err(l10n::text(
-            "读取缓存期间 Grok Bot 账户发生了变化",
-            "Grok Bot account changed while reading its cache",
-        ));
+        return Err(tr!("Grok Bot account changed while reading its cache"));
     }
     Ok(r)
 }
 
 fn no_personal_quota() -> String {
-    l10n::text(
-        "Grok Bot 在当前账户或团队下没有个人周额度",
-        "Grok Bot has no personal weekly limit for this account or team.",
-    )
+    tr!("Grok Bot has no personal weekly limit for this account or team.")
 }
 
 /// The quota of Grok Bot's weekly `usage` (as its cache keeps it, or as
@@ -180,10 +164,7 @@ fn quota(u: &Value, slot: &str, observed: i64, email: Option<&str>) -> Result<Re
         .map(|n| n.clamp(0., 100.));
     let reset = u["nextResetMs"].as_i64().and_then(iso);
     if !u["nextResetMs"].is_null() && reset.is_none() {
-        return Err(l10n::text(
-            "Grok Bot 缓存的重置时间无效",
-            "Grok Bot cache reset time is invalid",
-        ));
+        return Err(tr!("Grok Bot cache reset time is invalid"));
     }
     let observed = iso(observed);
     r.quotas.push(json!({"id":format!("{id}/grok"),"vendor":"grok-bot","consumerSource":"grok-bot","accountId":id,"legacyWindowId":format!("{id}/grok"),"name":if trial{"Trial usage limit"}else{"Weekly usage limit"},"shortLabel":if trial{"Trial".to_owned()}else{window_names::Period::Week.short_name()},"usedPercent":used,"resetAt":reset,"windowDurationSeconds":if trial{None}else{Some(604800)},"allModels":true,"observedAt":observed,"status":used.map(status).unwrap_or("unknown")}));

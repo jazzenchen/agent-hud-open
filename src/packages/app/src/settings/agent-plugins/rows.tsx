@@ -18,13 +18,8 @@ import {
   ToggleRow,
   Unavailable,
 } from "../SettingsControls";
-import {
-  Notice,
-  Pill,
-  Row,
-  type PillTone,
-  type Text,
-} from "../SettingsPrimitives";
+import type { Translate } from "@agent-hud/ui/format";
+import { Notice, Pill, Row, type PillTone } from "../SettingsPrimitives";
 import { useBriefly } from "./use-status";
 
 const tones: Record<Tone, PillTone> = {
@@ -44,17 +39,17 @@ export function StatePill({
 }: {
   state: RowState;
   label?: Words;
-  t: Text;
+  t: Translate;
 }) {
-  const [en, zh] = state.busy ?? state.status;
+  const status = state.busy ?? state.status;
   return (
     <Pill tone={state.busy ? "gray" : tones[state.tone]} dot>
-      {label ? t(`${label[0]}: ${en}`, `${label[1]}：${zh}`) : t(en, zh)}
+      {label ? t("{{label}}: {{status}}", { label, status }) : status}
     </Pill>
   );
 }
 
-function CopyLink({ text, t }: { text: string; t: Text }) {
+function CopyLink({ text, t }: { text: string; t: Translate }) {
   const [copied, setCopied] = useBriefly<true>(1600);
   return (
     <LinkButton
@@ -65,7 +60,7 @@ function CopyLink({ text, t }: { text: string; t: Text }) {
           .catch(() => {})
       }
     >
-      {copied ? t("Copied", "已复制") : t("Copy", "复制")}
+      {copied ? t("Copied") : t("Copy")}
     </LinkButton>
   );
 }
@@ -79,9 +74,9 @@ function NextStep({
 }: {
   words: Words;
   command?: string;
-  t: Text;
+  t: Translate;
 }) {
-  const text = t(...words);
+  const text = words;
   const at = command ? text.indexOf(command) : -1;
   return (
     <Notice
@@ -111,7 +106,7 @@ function MoreMenu({
   items: RowState["menu"];
   disabled: boolean;
   onAction: (id: string) => void;
-  t: Text;
+  t: Translate;
 }) {
   if (!items.length)
     return (
@@ -131,7 +126,7 @@ function MoreMenu({
           variant="ghost"
           size="icon-xs"
           disabled={disabled}
-          aria-label={t("More", "更多")}
+          aria-label={t("More")}
         >
           <MoreHorizontal size={15} />
         </Button>
@@ -143,7 +138,7 @@ function MoreMenu({
             variant={item.destructive ? "destructive" : "default"}
             onClick={() => onAction(item.id)}
           >
-            {t(...item.label)}
+            {item.label}
           </DropdownMenuItem>
         ))}
       </DropdownMenuContent>
@@ -171,7 +166,7 @@ export function StatusRow({
   error?: string | null;
   pillReason?: string | null;
   onAction: (id: string) => void;
-  t: Text;
+  t: Translate;
 }) {
   const busy = state.busy !== null;
   const action = state.action;
@@ -181,7 +176,7 @@ export function StatusRow({
       disabled={busy || Boolean(action.unavailable)}
       onClick={() => onAction(action.id)}
     >
-      {t(...action.label)}
+      {action.label}
     </SmallButton>
   );
   return (
@@ -211,7 +206,7 @@ export function StatusRow({
       )}
       {button &&
         (action?.unavailable && !busy ? (
-          <Unavailable reason={t(...action.unavailable)}>{button}</Unavailable>
+          <Unavailable reason={action.unavailable}>{button}</Unavailable>
         ) : (
           button
         ))}

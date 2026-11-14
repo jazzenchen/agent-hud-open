@@ -1,7 +1,7 @@
 //! Quota samples, and the rows the statistics and billing metrics read.
 
 use super::{unsigned, usage};
-use crate::l10n;
+use crate::l10n::tr;
 use crate::Usage;
 use rusqlite::{params, Connection};
 use serde_json::json;
@@ -151,10 +151,7 @@ pub(crate) fn query_statistics_data(
     String,
 > {
     let sql_error = |_: rusqlite::Error| -> String {
-        l10n::text(
-            "无法从本地用量账本读取统计",
-            "Statistics could not be read from the local usage ledger",
-        )
+        tr!("Statistics could not be read from the local usage ledger")
     };
     let selected = json!(paths).to_string();
     let mut model_bounds = Vec::new();

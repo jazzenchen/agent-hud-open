@@ -132,14 +132,9 @@ function AppContent({
   const glowHidden = presentation?.glowHidden ?? false;
   const hudVisible = snapshot?.settings.hudVisible !== false;
   const theme = useWindowTheme(snapshot, store, monitors, surface);
-  const chinese = snapshotLanguage(snapshot) === "zh";
+  // SettingsWindow still takes Chinese or not.
   const sourceMenu = (
-    <SourceMenu
-      chinese={chinese}
-      statistics={statistics}
-      hudVisible={hudVisible}
-      act={act}
-    />
+    <SourceMenu statistics={statistics} hudVisible={hudVisible} act={act} />
   );
   const panelServices: PanelServices = {
     sources: snapshot?.sourcePreferences ?? store.sources,
@@ -246,7 +241,6 @@ function AppContent({
       <StatisticsWindow
         snapshot={snapshot}
         theme={theme}
-        chinese={chinese}
         act={act}
         windowActive={windowActive}
         demo={demo}
@@ -273,7 +267,6 @@ function AppContent({
         productName={productName}
         version={version}
         theme={theme}
-        chinese={chinese}
         demo={demo}
         sourceMenu={sourceMenu}
         error={error}

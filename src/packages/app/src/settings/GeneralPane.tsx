@@ -9,12 +9,13 @@ import {
   ToggleRow,
   Unavailable,
 } from "./SettingsControls";
+import { languages } from "@agent-hud/ui/format";
+import { useT } from "@agent-hud/ui/format-context";
 import {
   Notice,
   Page,
   Row,
   Section,
-  useText,
   type SettingsPaneProps,
 } from "./SettingsPrimitives";
 import { usePending } from "./use-pending";
@@ -30,7 +31,7 @@ export function GeneralPane({ snapshot, action }: SettingsPaneProps) {
         console.warn("System preferences could not be refreshed", error),
       );
   }, []);
-  const t = useText(snapshot);
+  const t = useT();
   const { pending, error, run } = usePending();
   const [savedKey, setSavedKey] = useState("");
 
@@ -52,32 +53,25 @@ export function GeneralPane({ snapshot, action }: SettingsPaneProps) {
   const login = snapshot.connection.system?.launchAtLogin;
   const loginReason = login?.supported
     ? undefined
-    : t(
-        login?.notice ?? "Not available in this build.",
-        "此版本不支持登录时启动。",
-      );
+    : t("Launch at login isn't available in this build.");
   // Only states the person can act on; other notices are platform plumbing.
   const loginNote = !login?.supported
     ? null
     : login.status === "requires-approval"
-      ? t(
-          login.notice ??
-            "Allow it in System Settings → General → Login Items.",
-          "需在「系统设置 → 通用 → 登录项」中允许。",
-        )
+      ? t("Allow it in System Settings → General → Login Items.")
       : login.status === "unavailable" && login.notice
-        ? t(login.notice, "此版本找不到登录服务。")
+        ? t("This build can't find the login service.")
         : null;
 
   const appearance = (
     <Segments
-      label={t("Appearance", "外观")}
+      label={t("Appearance")}
       value={settings.appearance}
       disabled={followsScreen}
       options={[
-        ["system", t("System", "跟随系统")],
-        ["light", t("Light", "浅色")],
-        ["dark", t("Dark", "深色")],
+        ["system", t("System")],
+        ["light", t("Light")],
+        ["dark", t("Dark")],
       ]}
       change={setting("appearance")}
     />
@@ -85,15 +79,10 @@ export function GeneralPane({ snapshot, action }: SettingsPaneProps) {
 
   return (
     <Page>
-      <Section title={t("Appearance & language", "外观与语言")}>
-        <Row title={t("Appearance", "外观")}>
+      <Section title={t("Appearance & language")}>
+        <Row title={t("Appearance")}>
           {followsScreen ? (
-            <Unavailable
-              reason={t(
-                "Turn off Match screen to choose.",
-                "关闭「跟随所在屏幕」后可选。",
-              )}
-            >
+            <Unavailable reason={t("Turn off Match screen to choose.")}>
               {appearance}
             </Unavailable>
           ) : (
@@ -101,48 +90,48 @@ export function GeneralPane({ snapshot, action }: SettingsPaneProps) {
           )}
         </Row>
         <ToggleRow
-          title={t("Match screen", "跟随所在屏幕")}
-          tag={t("Experimental", "实验")}
-          subtitle={t(
-            "Windows take the HUD look of their screen.",
-            "窗口外观跟随所在屏幕的 HUD。",
-          )}
+          title={t("Match screen")}
+          tag={t("Experimental")}
+          subtitle={t("Windows take the HUD look of their screen.")}
           checked={settings.appearanceFollowsScreen ?? false}
           change={setting("appearanceFollowsScreen")}
         />
-        <Row title={t("Language", "语言")}>
+        <Row title={t("Language")}>
           <Menu
-            label={t("Language", "语言")}
+            label={t("Language")}
             value={
-              settings.language === "zh-Hans" ? "zh-CN" : settings.language
+              // Settings before 0.7 stored Simplified Chinese as "zh-CN".
+              settings.language === "zh-CN" ? "zh-Hans" : settings.language
             }
             options={[
-              ["system", t("System", "跟随系统")],
-              ["zh-CN", "中文"],
-              ["en", "English"],
+              ["system", t("System")],
+              ...languages.map(([code, name]): [string, string] => [
+                code,
+                name,
+              ]),
             ]}
             change={setting("language")}
           />
         </Row>
         {problem(appearanceKeys)}
       </Section>
-      <Section title={t("Usage display", "用量显示")}>
-        <Row title={t("Quota percentage", "额度百分比")}>
+      <Section title={t("Usage display")}>
+        <Row title={t("Quota percentage")}>
           <Menu
-            label={t("Quota percentage", "额度百分比")}
+            label={t("Quota percentage")}
             value={settings.quotaDisplay ?? "consumed"}
             options={[
-              ["consumed", t("Used", "已用")],
-              ["remaining", t("Remaining", "剩余")],
+              ["consumed", t("Used")],
+              ["remaining", t("Remaining")],
             ]}
             change={setting("quotaDisplay")}
           />
         </Row>
         {problem(usageKeys)}
       </Section>
-      <Section title={t("Startup & menu bar", "启动与菜单栏")}>
+      <Section title={t("Startup & menu bar")}>
         <ToggleRow
-          title={t("Launch at login", "登录时启动")}
+          title={t("Launch at login")}
           checked={login?.enabled ?? settings.launchAtLogin}
           disabled={pending || !login?.supported}
           reason={loginReason}
@@ -150,22 +139,19 @@ export function GeneralPane({ snapshot, action }: SettingsPaneProps) {
         />
         {loginNote && <Notice tone="warning">{loginNote}</Notice>}
         <ToggleRow
-          title={t("Show menu bar icon", "显示菜单栏图标")}
+          title={t("Show menu bar icon")}
           checked={settings.showMenuBarIcon !== false}
           change={setting("showMenuBarIcon")}
         />
         {problem(startupKeys)}
       </Section>
-      <Section title={t("Help", "帮助")}>
+      <Section title={t("Help")}>
         <Row
-          title={t("Getting started", "上手引导")}
-          subtitle={t(
-            "Walk through the HUD and its key settings again.",
-            "从头再走一遍 HUD 和几个关键设置。",
-          )}
+          title={t("Getting started")}
+          subtitle={t("Walk through the HUD and its key settings again.")}
         >
           <SmallButton onClick={() => void emit(guideEvents.open, "tour")}>
-            {t("Start again", "重新开始")}
+            {t("Start again")}
           </SmallButton>
         </Row>
       </Section>

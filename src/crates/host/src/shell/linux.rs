@@ -22,11 +22,13 @@ pub(crate) fn statistics_chrome<'a>(
     builder
 }
 
-pub(crate) fn system_prefers_chinese() -> bool {
+pub(crate) fn system_languages() -> Vec<String> {
+    // LANGUAGE lists several, separated by colons.
     ["LANGUAGE", "LC_ALL", "LC_MESSAGES", "LANG"]
         .iter()
         .find_map(|key| std::env::var(key).ok().filter(|value| !value.is_empty()))
-        .is_some_and(|value| value.starts_with("zh"))
+        .map(|value| value.split(':').map(str::to_owned).collect())
+        .unwrap_or_default()
 }
 
 /// Not drawn yet: GTK is not running before Tauri starts, so the message

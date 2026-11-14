@@ -8,19 +8,19 @@ import { cardColumn } from "../card-column";
 import { useGround } from "../ground";
 import { alertInk, alertText } from "../tokens";
 import type { TailItem } from "./end-queue";
+import { useT } from "@agent-hud/ui/format-context";
 
 /** "Messages" over the tail's panel, with how many and a way to clear them. */
 export function MessagesHeader({
   count,
   clear,
   light,
-  zh,
 }: {
   count: number;
   clear: () => void;
   light: boolean;
-  zh: boolean;
 }) {
+  const t = useT();
   const ground = useGround(light);
   const [hover, setHover] = useState(false);
   return (
@@ -35,7 +35,7 @@ export function MessagesHeader({
       <span
         style={{ fontSize: 11, fontWeight: 600, color: alertInk(0.55, ground) }}
       >
-        {zh ? "消息" : "Messages"}
+        {t("Messages")}
       </span>
       <span
         style={{
@@ -70,7 +70,7 @@ export function MessagesHeader({
           cursor: "pointer",
         }}
       >
-        {zh ? "全部清空" : "Clear all"}
+        {t("Clear all")}
       </button>
     </div>
   );
@@ -83,14 +83,13 @@ function MessageRow({
   onSelect,
   onDrop,
   light,
-  zh,
 }: {
   event: IslandEvent;
   onSelect: () => void;
   onDrop: () => void;
   light: boolean;
-  zh: boolean;
 }) {
+  const t = useT();
   const [hover, setHover] = useState(false);
   const ground = useGround(light);
   const reply = event.kind === "completion";
@@ -149,7 +148,7 @@ function MessageRow({
         >
           <Icon size={8} strokeWidth={2.5} />
           <span style={{ fontSize: 10, fontWeight: 700 }}>
-            {newsTitle(event, zh)}
+            {newsTitle(event, t)}
           </span>
         </span>
         <span
@@ -180,7 +179,7 @@ function MessageRow({
       </button>
       <button
         type="button"
-        aria-label={zh ? "移除这条消息" : "Remove this message"}
+        aria-label={t("Remove this message")}
         onClick={onDrop}
         style={{
           display: "inline-flex",
@@ -210,14 +209,12 @@ export function MessageRows({
   select,
   drop,
   light,
-  zh,
 }: {
   items: TailItem[];
   currentID: string;
   select: (id: string) => void;
   drop: (id: string) => void;
   light: boolean;
-  zh: boolean;
 }) {
   const others = items.filter((item) => item.id !== currentID);
   if (!others.length) return null;
@@ -230,7 +227,6 @@ export function MessageRows({
           onSelect={() => select(item.id)}
           onDrop={() => drop(item.id)}
           light={light}
-          zh={zh}
         />
       ))}
     </div>

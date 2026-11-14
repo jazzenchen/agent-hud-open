@@ -13,9 +13,11 @@ import {
   samplingHint,
   samplingLabel,
   tokensShort,
+  locale,
+  translate,
   type FormatSettings,
 } from "@agent-hud/ui/format";
-import { missing, say } from "./quota-metric-copy.ts";
+import { missing } from "./quota-metric-copy.ts";
 
 export interface QuotaMetricReading {
   value: string;
@@ -35,8 +37,7 @@ export interface QuotaMetricReading {
 function rowResetLabel(row: Quota, now: number, settings: FormatSettings) {
   const resetAt = row.resetAt ? Date.parse(row.resetAt) : NaN;
   if (Number.isFinite(resetAt)) {
-    if (resetAt <= now)
-      return say(settings.language, "等待更新", "Pending update");
+    if (resetAt <= now) return translate(settings.language, "Pending update");
     if (resetAt - now < 60_000) return "<1m";
   }
   return resetLabel(
@@ -69,9 +70,8 @@ export function quotaMetric(
     budgetPercent: null,
     hint: metrics?.unavailable?.[measure] ?? missing(measure, language),
   };
-  const stale = say(
+  const stale = translate(
     language,
-    "额度读数已过期，请刷新这个账户。",
     "Last quota reading is stale; refresh this account.",
   );
   const budget = metrics?.budget ?? null;
@@ -141,11 +141,9 @@ export function quotaMetric(
     result.projectedPercent = result.runsOut ? 100 : projected;
     const basis =
       outlook?.basis === "window"
-        ? say(
-            language,
-            `${outlookBasisText("window", language)}，读数够了改按目前节奏`,
-            `${outlookBasisText("window", language)} until readings give the recent pace`,
-          )
+        ? translate(language, "{{basis}} until readings give the recent pace", {
+            basis: outlookBasisText("window", language),
+          })
         : outlook?.basis === "recent"
           ? outlookBasisText("recent", language)
           : null;
@@ -160,7 +158,7 @@ export function quotaMetric(
         ]
       : result.available
         ? [
-            `${result.value} · ${words ?? say(language, "这个周期的读数", "from this quota cycle's readings")}`,
+            `${result.value} · ${words ?? translate(language, "from this quota cycle's readings")}`,
             basis,
           ]
         : [];
@@ -173,24 +171,22 @@ export function quotaMetric(
     // A rate timed by the gaps between calls holds tool runs and the
     // person's time, so it is a floor.
     result.value = `${rate.lowerBound ? "≥" : ""}${rate.tokensPerSecond < 10 ? rate.tokensPerSecond.toFixed(1) : Math.trunc(rate.tokensPerSecond)}/s`;
-    result.detail = say(
-      language,
-      `${rate.calls} 次回复`,
-      `${rate.calls} replies`,
-    );
+    result.detail = translate(language, "{{count}} replies", {
+      count: rate.calls,
+    });
     result.available = result.selectable = true;
-    const zhTokens = numberFormat("zh-CN").format(rate.tokensOut);
-    const enTokens = numberFormat("en-US").format(rate.tokensOut);
+    const tokens = numberFormat(locale(language)).format(rate.tokensOut);
+    const calls = rate.calls;
     result.hint = rate.lowerBound
-      ? say(
+      ? translate(
           language,
-          `这个窗口的模型在 ${rate.calls} 次回复中输出 ${zhTokens} 个 token。客户端日志没有记下每次调用的用时，只能从上一次调用算起（120 秒以内），其中含工具运行和你的时间，实际速度不低于这个数。有最近一小时的记录时取最近一小时，否则取最近七天。`,
-          `${enTokens} output tokens over ${rate.calls} replies from this window's models. The client's log does not time its calls, so each is timed from the call before it (within 120 seconds), tool runs and your time included; the real rate is at least this. Latest hour when available, otherwise the last seven days.`,
+          "{{tokens}} output tokens over {{calls}} replies from this window's models. The client's log does not time its calls, so each is timed from the call before it (within 120 seconds), tool runs and your time included; the real rate is at least this. Latest hour when available, otherwise the last seven days.",
+          { tokens, calls },
         )
-      : say(
+      : translate(
           language,
-          `这个窗口的模型在 ${rate.calls} 次回复中输出 ${zhTokens} 个 token，每次按客户端日志记下的调用用时计算，不含工具运行和你的时间。有最近一小时的记录时取最近一小时，否则取最近七天。`,
-          `${enTokens} output tokens over ${rate.calls} replies from this window's models, each timed by its own call as the client's log records it, without tool runs or your time. Latest hour when available, otherwise the last seven days.`,
+          "{{tokens}} output tokens over {{calls}} replies from this window's models, each timed by its own call as the client's log records it, without tool runs or your time. Latest hour when available, otherwise the last seven days.",
+          { tokens, calls },
         );
   } else if (
     measure === "consumed" &&
@@ -209,14 +205,19 @@ export function quotaMetric(
     result.available = result.selectable = true;
     const since = metrics.observedFrom ? Date.parse(metrics.observedFrom) : NaN;
     result.hint = Number.isFinite(since)
-      ? say(
+      ? used.unit
+        ? translate(
+            language,
+            "Consumed in this quota window ({{unit}}), observed since {{since}}.",
+            { unit: used.unit, since: monthDayTime(since, calendar, language) },
+          )
+        : translate(
+            language,
+            "Consumed in this quota window, observed since {{since}}.",
+            { since: monthDayTime(since, calendar, language) },
+          )
+      : translate(
           language,
-          `这个额度窗口已消耗${used.unit ? `（${used.unit}）` : ""}，自 ${monthDayTime(since, calendar, language)} 起记录。`,
-          `Consumed in this quota window${used.unit ? ` (${used.unit})` : ""}, observed since ${monthDayTime(since, calendar, language)}.`,
-        )
-      : say(
-          language,
-          "只计入已知周期内观察到的用量。",
           "Only observed usage in its known cycle is counted.",
         );
   } else if (measure === "cost" && metrics?.cost) {
@@ -236,9 +237,8 @@ export function quotaMetric(
               .join(" + ")}`
           : `${moneyShort(cost.amounts[first] / cost.hours, first, language)}/h`;
       result.available = result.selectable = true;
-      result.hint = say(
+      result.hint = translate(
         language,
-        "按标价估算这个窗口本周期已观察到的模型用量。订阅费不按 token 计费；不同币种分开计算。",
         "List-price estimate for this window's observed current-cycle model usage. Subscription fees are not billed by token. Currencies remain separate.",
       );
     }

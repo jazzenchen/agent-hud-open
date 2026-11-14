@@ -1,6 +1,6 @@
 use super::{installed, installed_at, millis, ClaudeChannel, Refusal};
 use agent_hud_core::{
-    l10n,
+    l10n::tr,
     replies::{AnswerFix, SessionReplies, Unreachable},
 };
 use std::{path::PathBuf, time::SystemTime};
@@ -39,10 +39,7 @@ impl ClaudeReplies {
     fn unreachable(&self, session: &str) -> Unreachable {
         if !installed(&self.claude_config) {
             return Unreachable::new(
-                l10n::text(
-                    "Claude Code 还没装 Agent HUD 插件，装好后就能在 Agent HUD 里回答 Claude 的提问（设置 → 智能体插件）。",
-                    "Claude Code doesn't have Agent HUD's plugin yet. Install it to answer Claude's questions in Agent HUD (Settings → Agent plugins).",
-                ),
+                tr!("Claude Code doesn't have Agent HUD's plugin yet. Install it to answer Claude's questions in Agent HUD (Settings → Agent plugins)."),
                 Some(AnswerFix::InstallPlugin),
             );
         }
@@ -51,18 +48,12 @@ impl ClaudeReplies {
             .is_some_and(|(installed, checked_in)| checked_in >= installed);
         if paused {
             return Unreachable::new(
-                l10n::text(
-                    "这个会话有一阵没回应 Agent HUD 插件了，可能被 Claude 暂停了。在 Claude 里打开这个会话就能回答。",
-                    "This session hasn't answered Agent HUD's plugin for a while; Claude may have paused it. Open it in Claude to answer.",
-                ),
+                tr!("This session hasn't answered Agent HUD's plugin for a while; Claude may have paused it. Open it in Claude to answer."),
                 None,
             );
         }
         Unreachable::new(
-            l10n::text(
-                "这个会话还没加载 Agent HUD 插件。在会话里执行 /reload-plugins 后，就能在 Agent HUD 里回答。",
-                "This session hasn't loaded Agent HUD's plugin. Run /reload-plugins in it to answer in Agent HUD.",
-            ),
+            tr!("This session hasn't loaded Agent HUD's plugin. Run /reload-plugins in it to answer in Agent HUD."),
             Some(AnswerFix::ReloadPlugins),
         )
     }
@@ -70,10 +61,7 @@ impl ClaudeReplies {
 
 /// Why words for another client's session never reach it: the plugin is Claude Code's.
 fn not_claude() -> String {
-    l10n::text(
-        "Agent HUD 的插件只能把回答发进 Claude Code 会话。",
-        "Agent HUD's plugin sends answers only into Claude Code sessions.",
-    )
+    tr!("Agent HUD's plugin sends answers only into Claude Code sessions.")
 }
 
 impl SessionReplies for ClaudeReplies {
@@ -107,15 +95,9 @@ impl SessionReplies for ClaudeReplies {
         }
         handed.map(drop).map_err(|refusal| match refusal {
             Refusal::NotLoaded => self.unreachable(session).note,
-            Refusal::Rejected(_) => l10n::text(
-                "插件不能发送以 / 开头的话。",
-                "The plugin can't send words that start with /.",
-            ),
-            Refusal::InvalidInput(_) => l10n::text("没有要发送的话。", "There is nothing to send."),
-            _ => l10n::text(
-                "回答没能交给 Claude Code 插件。",
-                "The answer could not be left for the Claude Code plugin.",
-            ),
+            Refusal::Rejected(_) => tr!("The plugin can't send words that start with /."),
+            Refusal::InvalidInput(_) => tr!("There is nothing to send."),
+            _ => tr!("The answer could not be left for the Claude Code plugin."),
         })
     }
 }

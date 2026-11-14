@@ -12,19 +12,21 @@ import { ReminderMark } from "./ReminderMark";
 import { compactAlertLabels } from "./compact-alert-labels";
 import { alertInk, alertText } from "../tokens";
 import { useGround } from "../ground";
+import type { Language } from "@agent-hud/ui/format";
+import { useFormat } from "@agent-hud/ui/format-context";
 
 export function compactAlertDockWidth(
   request: Approval | undefined,
   event: IslandEvent | undefined,
   requestCount: number,
   scale: number,
-  zh: boolean,
+  language: Language,
 ): number {
   const { who, status, badge } = compactAlertLabels(
     request,
     event,
     requestCount,
-    zh,
+    language,
   );
   const font = Math.round(9 * scale);
   const icon = Math.round(17 * scale);
@@ -50,7 +52,6 @@ export function CompactAlertView({
   scale,
   light,
   botLogos,
-  zh,
   onOpen,
   onDismissAndStats,
 }: {
@@ -63,15 +64,15 @@ export function CompactAlertView({
   scale: number;
   light: boolean;
   botLogos: boolean;
-  zh: boolean;
   onOpen: () => void;
   onDismissAndStats: () => void;
 }) {
+  const { language } = useFormat();
   const { who, status, badge } = compactAlertLabels(
     request,
     event,
     requestCount,
-    zh,
+    language,
   );
   const font = onDock ? Math.round(9 * scale) : 12;
   const iconSize = onDock ? Math.round(17 * scale) : 17;

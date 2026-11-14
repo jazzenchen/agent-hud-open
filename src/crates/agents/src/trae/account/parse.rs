@@ -62,7 +62,7 @@ const PLANS: [(i64, &str); 8] = [
     (1, "Pro"),
     (9, "Pro"),
     (8, "Lite"),
-    (100, "尝鲜版"),
+    (100, "尝鲜版"), // l10n-ignore TRAE's plan name
     (0, "Free"),
 ];
 

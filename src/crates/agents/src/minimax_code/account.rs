@@ -3,7 +3,7 @@
 //! `auth-state.json`) without ever calling `/oauth2/token` (which single-use
 //! rotates MiniMax's refresh token), then queries MiniMax's user & membership APIs.
 use crate::account::{account_id, Host, HttpFailure, HttpRequest, Provider, Reading, Unread};
-use crate::l10n;
+use crate::l10n::tr;
 use chrono::Utc;
 use serde_json::{json, Value};
 use std::time::Duration;
@@ -175,16 +175,15 @@ fn build_reading(
             "consumerSource": "minimax-code",
             "accountId": id,
             "account": label,
-            "label": l10n::text("可用积分", "Available credits"),
+            "label": tr!("Available credits"),
             "amount": round2(amount),
             "currency": "credits",
             "planCredits": purchased.filter(|&n| n > 0.0).map(round2),
             "rewardCredits": gifted.filter(|&n| n > 0.0).map(round2),
         }));
     } else {
-        reading.notice = Some(l10n::text(
-            "MiniMax Code 当前没有可用的套餐或积分额度",
-            "MiniMax Code reports no active plan or credit balance for this account.",
+        reading.notice = Some(tr!(
+            "MiniMax Code reports no active plan or credit balance for this account."
         ));
     }
 
@@ -223,16 +222,15 @@ fn round2(n: f64) -> f64 {
 }
 
 fn signed_out() -> Unread {
-    Unread::SignedOut(l10n::text(
-        "MiniMax Code 保存的登录已失效，请打开 MiniMax Code 重新登录",
-        "MiniMax Code's saved sign-in has ended; sign in again in MiniMax Code.",
+    Unread::SignedOut(tr!(
+        "{{name}}'s saved sign-in has ended; sign in again in {{name}}.",
+        name = "MiniMax Code"
     ))
 }
 
 fn format_err() -> Unread {
-    Unread::from(l10n::text(
-        "MiniMax Code 的额度格式无法识别",
-        "MiniMax Code's membership response has an unsupported format.",
+    Unread::from(tr!(
+        "MiniMax Code's membership response has an unsupported format."
     ))
 }
 

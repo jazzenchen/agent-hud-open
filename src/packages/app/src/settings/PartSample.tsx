@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import { HUDArtwork as HUDLogo } from "@agent-hud/hud/HUDArtwork";
 import type { HUDConfig } from "@agent-hud/hud/model";
-import type { Text } from "./SettingsPrimitives";
+import type { Translate } from "@agent-hud/ui/format";
 
 /** A made-up slice of one panel section, in the HUD's own light or dark
  * look; faded while that section is switched off. */
@@ -23,7 +23,7 @@ export function PartSample({
   kind: "sessions" | "quota" | "tokens";
   enabled: boolean;
   config: HUDConfig;
-  t: Text;
+  t: Translate;
 }) {
   const light =
     config.appearance === "light" ||
@@ -52,10 +52,8 @@ export function PartSample({
       {kind === "sessions" ? (
         <>
           <div style={{ display: "flex", justifyContent: "space-between" }}>
-            <strong style={{ fontWeight: 600 }}>{t("Sessions", "会话")}</strong>
-            <span style={{ opacity: 0.55 }}>
-              {t("1 running", "1 个运行中")}
-            </span>
+            <strong style={{ fontWeight: 600 }}>{t("Sessions")}</strong>
+            <span style={{ opacity: 0.55 }}>{t("1 running")}</span>
           </div>
           <div
             style={{
@@ -80,7 +78,7 @@ export function PartSample({
                 }}
               />
             </span>
-            <span>{t("Fix sign-in issue", "修复登录问题")}</span>
+            <span>{t("Fix sign-in issue")}</span>
             <span style={{ flex: 1 }} />
             <span
               style={{
@@ -150,7 +148,7 @@ export function PartSample({
                 background: "#34c759",
               }}
             />
-            <strong style={{ fontWeight: 600 }}>{t("Session", "会话")}</strong>
+            <strong style={{ fontWeight: 600 }}>{t("Session")}</strong>
             <span
               style={{
                 flex: 1,
@@ -181,7 +179,7 @@ export function PartSample({
                   fontSize: 11,
                 }}
               >
-                {t("2h 14m", "2 小时 14 分")}
+                {t("2h 14m")}
               </span>
             )}
           </div>
@@ -189,12 +187,8 @@ export function PartSample({
       ) : (
         <>
           <div style={{ display: "flex", justifyContent: "space-between" }}>
-            <strong style={{ fontWeight: 600 }}>
-              {t("Tokens", "Token 消耗")}
-            </strong>
-            <span style={{ opacity: 0.55 }}>
-              {t("1hr · 46M tok", "1 小时 · 46M tok")}
-            </span>
+            <strong style={{ fontWeight: 600 }}>{t("Tokens")}</strong>
+            <span style={{ opacity: 0.55 }}>{t("1hr · 46M tok")}</span>
           </div>
           <div
             style={{ display: "flex", alignItems: "end", gap: 4, height: 30 }}

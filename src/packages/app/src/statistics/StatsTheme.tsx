@@ -1,18 +1,19 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { vendorKey } from "@agent-hud/hud/model";
-import type { StatisticsCost, StatisticsTokenKind } from "@agent-hud/protocol";
-import { tokenKindOrder, unpricedHelp } from "../lib/sessions";
+import type { StatisticsTokenKind } from "@agent-hud/protocol";
+import { tokenKindOrder } from "../lib/sessions";
 import {
   dateFormat,
-  listCost,
-  moneyShort,
+  locale,
   numberFormat,
   tokensShort,
+  translate,
+  type Language,
 } from "@agent-hud/ui/format";
 
 export interface StatsTheme {
   light: boolean;
-  zh?: boolean;
+  language: Language;
   text: string;
   secondary: string;
   tertiary: string;
@@ -34,15 +35,23 @@ export const kindLabels: Record<StatisticsTokenKind, string> = {
   cacheWrite: "Cache write",
   cacheRead: "Cache read",
 };
-export const zhKindLabels: Record<StatisticsTokenKind, string> = {
-  input: "输入",
-  output: "输出",
-  reasoning: "思考",
-  cacheWrite: "缓存写入",
-  cacheRead: "缓存读取",
-};
-export function kindLabel(kind: StatisticsTokenKind, zh = false): string {
-  return zh ? zhKindLabels[kind] : kindLabels[kind];
+/** A token kind's name in `language`. */
+export function kindLabel(
+  kind: StatisticsTokenKind,
+  lang: Language = "en",
+): string {
+  switch (kind) {
+    case "input":
+      return translate(lang, "Input");
+    case "output":
+      return translate(lang, "Output");
+    case "reasoning":
+      return translate(lang, "Reasoning");
+    case "cacheWrite":
+      return translate(lang, "Cache write");
+    case "cacheRead":
+      return translate(lang, "Cache read");
+  }
 }
 
 const palette = [
@@ -118,11 +127,11 @@ export const raisedCard = (theme: StatsTheme): CSSProperties => ({
   pointerEvents: "none",
 });
 
-export function themeFor(light: boolean, zh = false): StatsTheme {
+export function themeFor(light: boolean, lang: Language = "en"): StatsTheme {
   return light
     ? {
         light,
-        zh,
+        language: lang,
         ground: "#f5f5f7",
         text: "#1d1d1f",
         secondary: "#6e6e73",
@@ -136,7 +145,7 @@ export function themeFor(light: boolean, zh = false): StatsTheme {
       }
     : {
         light,
-        zh,
+        language: lang,
         ground: "#282828",
         text: "#f5f5f7",
         secondary: "#98989d",
@@ -150,13 +159,17 @@ export function themeFor(light: boolean, zh = false): StatsTheme {
       };
 }
 
-export function dimensionsLabel(selected: StatisticsTokenKind[], zh = false) {
-  if (selected.length === kinds.length) return zh ? "全部 Token" : "All tokens";
+export function dimensionsLabel(
+  selected: StatisticsTokenKind[],
+  language: Language,
+) {
+  if (selected.length === kinds.length)
+    return translate(language, "All tokens");
   if (selected.length === freshKinds.length && !selected.includes("cacheRead"))
-    return zh ? "不含缓存读取" : "Excl. cache reads";
+    return translate(language, "Excl. cache reads");
   return kinds
     .filter((kind) => selected.includes(kind))
-    .map((kind) => kindLabel(kind, zh))
+    .map((kind) => kindLabel(kind, language))
     .join(" + ");
 }
 
@@ -187,8 +200,27 @@ export function modelColor(id: string) {
   return palette[(hash >>> 0) % palette.length];
 }
 
-export function dateLabel(at: string | number, timeZone: string, zh = false) {
-  return dateFormat(zh ? "zh-CN" : "en-GB", {
+/** The days of the week in `language`, Monday first ("Mon" in English). */
+export function weekdays(
+  language: Language,
+  width: "short" | "narrow" = "short",
+): string[] {
+  const format = dateFormat(locale(language), {
+    weekday: width,
+    timeZone: "UTC",
+  });
+  // 1 January 2024 was a Monday.
+  return Array.from({ length: 7 }, (_, day) =>
+    format.format(new Date(Date.UTC(2024, 0, 1 + day))),
+  );
+}
+
+export function dateLabel(
+  at: string | number,
+  timeZone: string,
+  language: Language,
+) {
+  return dateFormat(language === "en" ? "en-GB" : locale(language), {
     timeZone,
     month: "short",
     day: "numeric",
@@ -196,44 +228,6 @@ export function dateLabel(at: string | number, timeZone: string, zh = false) {
     minute: "2-digit",
     hour12: false,
   }).format(new Date(at));
-}
-
-/** What the selection would cost at list prices, as Open writes it: "≈$12.30 · ≈¥45.60"; "+" when unpriced tokens are left out, which the help names. */
-export function costText(cost: StatisticsCost | null, zh = false) {
-  const text = cost && listCost(cost.amounts, zh ? "zh" : "en");
-  if (!text) return "—";
-  return cost.unpricedTokens > 0 ? `${text}+` : text;
-}
-
-/** A cost in whole units from a hundred up, "$6,465 · ¥0.70"; "+" when
- * unpriced tokens are left out. */
-export function costShort(cost: StatisticsCost | null, zh = false) {
-  const amounts = Object.entries(cost?.amounts ?? {}).filter(
-    ([, amount]) => amount > 0,
-  );
-  if (!cost || !amounts.length) return "—";
-  amounts.sort(([a], [b]) =>
-    a === "USD" ? -1 : b === "USD" ? 1 : a < b ? -1 : 1,
-  );
-  const text = amounts
-    .map(([code, amount]) => moneyShort(amount, code, zh ? "zh" : "en"))
-    .join(" · ");
-  return cost.unpricedTokens > 0 ? `${text}+` : text;
-}
-
-export function costHelp(cost: StatisticsCost | null, zh = false) {
-  if (!cost)
-    return zh
-      ? "当前筛选暂无目录价估算。"
-      : "A list-price estimate is unavailable for this selection.";
-  const unpriced = unpricedHelp(
-    cost.unpricedTokens,
-    zh,
-    cost.unpricedNames ?? cost.unpricedModels,
-  );
-  return zh
-    ? `按各厂商 API 目录价估算所选 Token 类型，不同币种不做换算。${unpriced ? `${unpriced}。` : ""}`
-    : `Selected token kinds at the vendors' API list prices; currencies are not converted.${unpriced ? ` ${unpriced}.` : ""}`;
 }
 
 export function useAnimatedNumber(target: number, duration = 220): number {

@@ -31,23 +31,15 @@ pub enum IpcError {
 /// itself is for the logs.
 impl std::fmt::Display for IpcError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        use agent_hud_core::l10n::text;
+        use agent_hud_core::l10n::tr;
         match self {
-            Self::Unavailable => f.write_str(&text("无法连接 Codex", "Codex could not be reached")),
-            Self::TimedOut => {
-                f.write_str(&text("Codex 没有及时回应", "Codex did not answer in time"))
-            }
-            Self::Protocol => f.write_str(&text(
-                "Codex 的回应无法识别",
-                "Codex answered in a way Agent HUD cannot read",
+            Self::Unavailable => f.write_str(&tr!("Codex could not be reached")),
+            Self::TimedOut => f.write_str(&tr!("Codex did not answer in time")),
+            Self::Protocol => f.write_str(&tr!("Codex answered in a way Agent HUD cannot read")),
+            Self::Rejected(reason) => f.write_str(&tr!(
+                "Codex declined the answer: {{reason}}",
+                reason = reason
             )),
-            Self::Rejected(reason) => {
-                if agent_hud_core::l10n::chinese() {
-                    write!(f, "Codex 拒绝了这个回应：{reason}")
-                } else {
-                    write!(f, "Codex declined the answer: {reason}")
-                }
-            }
         }
     }
 }

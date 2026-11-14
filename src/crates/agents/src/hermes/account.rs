@@ -21,7 +21,7 @@ use crate::account::{
     Unread,
 };
 use crate::naming::window_names::Period;
-use crate::{l10n, Location};
+use crate::{l10n::tr, Location};
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
 use serde_json::{json, Value};
 use std::time::Duration;
@@ -144,17 +144,13 @@ fn sign_in(auth: &Value) -> Option<SignIn> {
 
 /// Not read now: Hermes renews the token itself, and nothing here can.
 fn expired() -> Unread {
-    Unread::transient(l10n::text(
-        "Hermes 下次运行时会续期 Nous Portal 的登录，之后更新额度",
-        "Hermes renews its Nous Portal sign-in the next time it runs; the credits update then",
+    Unread::transient(tr!(
+        "Hermes renews its Nous Portal sign-in the next time it runs; the credits update then"
     ))
 }
 
 fn unsupported() -> Unread {
-    Unread::Failed(l10n::text(
-        "Nous Portal 的额度格式无法识别",
-        "Nous Portal's credits have an unsupported format",
-    ))
+    Unread::Failed(tr!("Nous Portal's credits have an unsupported format"))
 }
 
 pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
@@ -192,22 +188,16 @@ fn credits(host: &dyn Host, sign_in: &SignIn) -> Result<Reading, Unread> {
             timeout: Duration::from_secs(15),
         })
         .map_err(|failure| match failure {
-            HttpFailure::Status(401) => Unread::SignedOut(l10n::text(
-                "Nous Portal 不再接受 Hermes 的登录，运行 hermes 重新登录",
-                "Nous Portal no longer accepts Hermes's sign-in; run hermes to sign in again",
+            HttpFailure::Status(401) => Unread::SignedOut(tr!(
+                "Nous Portal no longer accepts Hermes's sign-in; run hermes to sign in again"
             )),
-            HttpFailure::Status(403) => Unread::Failed(l10n::text(
-                "Nous Portal 拒绝显示这个账户",
-                "Nous Portal refused to show this account",
+            HttpFailure::Status(403) => {
+                Unread::Failed(tr!("Nous Portal refused to show this account"))
+            }
+            HttpFailure::BadHeader => Unread::Failed(tr!(
+                "Hermes's Nous Portal sign-in cannot be used in a request"
             )),
-            HttpFailure::BadHeader => Unread::Failed(l10n::text(
-                "Hermes 的 Nous Portal 登录凭据无法用于请求",
-                "Hermes's Nous Portal sign-in cannot be used in a request",
-            )),
-            HttpFailure::Unreachable => failure.unread_as(l10n::text(
-                "无法连接 Nous Portal",
-                "Nous Portal could not be reached",
-            )),
+            HttpFailure::Unreachable => failure.unread_as(tr!("Nous Portal could not be reached")),
             other => other.unread(),
         })?;
     let user = claims(&sign_in.token)
@@ -272,17 +262,13 @@ fn parse(body: &Value, user: &str) -> Result<Reading, Unread> {
         })
     };
     if let Some(purchased) = purchased {
-        reading.billing.push(balance(
-            "top-up",
-            l10n::text("充值额度", "Top-up credits"),
-            purchased.max(0.0),
-        ));
+        reading
+            .billing
+            .push(balance("top-up", tr!("Top-up credits"), purchased.max(0.0)));
     } else if let (true, Some(usable)) = (reading.quotas.is_empty(), usable) {
-        reading.billing.push(balance(
-            "usable",
-            l10n::text("可用额度", "Usable credits"),
-            usable.max(0.0),
-        ));
+        reading
+            .billing
+            .push(balance("usable", tr!("Usable credits"), usable.max(0.0)));
     }
     let plan = text(&subscription["plan"]);
     let label = email.or_else(|| text(&body["organisation"]["name"]));

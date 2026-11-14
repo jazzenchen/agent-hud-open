@@ -5,6 +5,7 @@ import { ReminderMark } from "./ReminderMark";
 import { alertInk, onAlertFill } from "../tokens";
 import { cardColumn } from "../card-column";
 import { MiddleTruncated } from "../panel/MiddleTruncated";
+import { useT } from "@agent-hud/ui/format-context";
 
 /** A card's three figures, each over its label (23 pt medium figures, 10 pt labels). */
 export function Metric({
@@ -100,14 +101,13 @@ export function Heading({
 export function StatsButton({
   fill,
   light,
-  zh,
   onClick,
 }: {
   fill: string;
   light: boolean;
-  zh: boolean;
   onClick: () => void;
 }) {
+  const t = useT();
   return (
     <button
       type="button"
@@ -129,7 +129,7 @@ export function StatsButton({
         cursor: "pointer",
       }}
     >
-      <span>{zh ? "查看用量统计" : "View usage statistics"}</span>
+      <span>{t("View usage statistics")}</span>
       <ArrowUpRight size={9} strokeWidth={2.6} />
     </button>
   );

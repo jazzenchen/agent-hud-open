@@ -1,7 +1,7 @@
 //! Where things are on the host: locations, official endpoints, variables,
 //! bounded reads and the key of a client's home.
 use super::{hash, Answer, Host};
-use crate::{l10n, Location, PerOs, Support};
+use crate::{l10n::tr, Location, PerOs, Support};
 use serde_json::Value;
 use std::path::{Path, PathBuf};
 
@@ -57,16 +57,10 @@ pub fn endpoint(provider: &str, base: Option<&str>) -> Result<String, String> {
         "kimi" => "https://api.kimi.com/coding/v1",
         "glm" => "https://api.z.ai/api/coding/paas/v4",
         "opencode" => "https://opencode.ai/zen/go/v1",
-        _ => {
-            return Err(l10n::text(
-                "不支持为此服务配置凭据",
-                "Unsupported configurable provider",
-            ))
-        }
+        _ => return Err(tr!("Unsupported configurable provider")),
     };
     let raw = base.unwrap_or(default).trim_end_matches('/');
-    let url = url::Url::parse(raw)
-        .map_err(|_| l10n::text("官方 API 地址无效", "Invalid official API address"))?;
+    let url = url::Url::parse(raw).map_err(|_| tr!("Invalid official API address"))?;
     if url.scheme() != "https"
         || !url.username().is_empty()
         || url.password().is_some()
@@ -74,9 +68,8 @@ pub fn endpoint(provider: &str, base: Option<&str>) -> Result<String, String> {
         || url.fragment().is_some()
         || url.port_or_known_default() != Some(443)
     {
-        return Err(l10n::text(
-            "只支持服务商官方的 HTTPS Coding Plan 地址",
-            "Only the provider's official HTTPS coding endpoint is supported",
+        return Err(tr!(
+            "Only the provider's official HTTPS coding endpoint is supported"
         ));
     }
     let allowed = match provider {
@@ -95,9 +88,8 @@ pub fn endpoint(provider: &str, base: Option<&str>) -> Result<String, String> {
         _ => false,
     };
     if !allowed {
-        return Err(l10n::text(
-            "此地址属于其他 API 产品或代理，无法读取这个套餐的额度",
-            "This address is a different API product or proxy; it cannot read this plan's quota",
+        return Err(tr!(
+            "This address is a different API product or proxy; it cannot read this plan's quota"
         ));
     }
     Ok(raw.into())

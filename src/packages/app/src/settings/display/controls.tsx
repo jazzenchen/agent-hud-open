@@ -3,13 +3,13 @@
  * them. */
 import type { HUDConfig } from "@agent-hud/hud/model";
 import { Slide, ToggleRow } from "../SettingsControls";
-import type { Text } from "../SettingsPrimitives";
+import type { Translate } from "@agent-hud/ui/format";
 
 export interface DisplayProps {
   /** The selected screen's settings, with defaults filled in. */
   config: HUDConfig;
   update: (patch: Partial<HUDConfig>) => void;
-  t: Text;
+  t: Translate;
 }
 
 type KeysOf<T> = {
@@ -22,9 +22,9 @@ export function displayControls({ config, update, t }: DisplayProps) {
   const ms = (value: number) => `${Math.round(value)} ms`;
   const percent = (value: number) => `${Math.round(value * 100)}%`;
   const seconds = (value: number) =>
-    t(`${value.toFixed(1)} s`, `${value.toFixed(1)} 秒`);
+    t("{{seconds}} s", { seconds: value.toFixed(1) });
   const rows = (value: number) =>
-    t(`${Math.round(value)} rows`, `${Math.round(value)} 排`);
+    t("{{count}} rows", { count: Math.round(value) });
 
   const slider = (
     key: KeysOf<number>,

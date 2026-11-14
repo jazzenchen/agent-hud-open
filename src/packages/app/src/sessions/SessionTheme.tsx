@@ -1,10 +1,12 @@
 import type { CSSProperties, ReactNode } from "react";
-import type { Session, SessionDetail, Snapshot } from "@agent-hud/protocol";
+import type { Session, SessionDetail } from "@agent-hud/protocol";
 import {
   age,
   dateFormat,
+  locale,
   moneyAmount,
-  snapshotLanguage,
+  translate,
+  type Language,
 } from "@agent-hud/ui/format";
 import {
   lastMessageTime,
@@ -52,19 +54,26 @@ export const ALL = "__all__";
 export const earlier = Number.NEGATIVE_INFINITY;
 
 /** What a session's calls would cost at API list prices, in US dollars; always an estimate. A partial one, which leaves out calls with no list price, ends in "+". */
-export const cost = (value: number | null, zh = false, partial = false) =>
+export const cost = (
+  value: number | null,
+  language: Language,
+  partial = false,
+) =>
   value === null
     ? "—"
     : value === 0 && !partial
       ? // Calls to a model on this computer cost nothing.
-        zh
-        ? "免费"
-        : "Free"
-      : `≈${moneyAmount(value, "USD", zh ? "zh" : "en")}${partial ? "+" : ""}`;
+        translate(language, "Free")
+      : `≈${moneyAmount(value, "USD", language)}${partial ? "+" : ""}`;
 
 /** `money` as a cost, "+" when calls with no list price are left out. */
-export const moneyText = (money: ListMoney, zh = false) =>
-  cost(money.value, zh, money.unpriced > 0);
+export const moneyText = (money: ListMoney, language: Language) =>
+  cost(money.value, language, money.unpriced > 0);
+
+/** The locale the page's dates and times are written in: English's
+ * day-month order and 24-hour clock, else the language's own. */
+export const dateLocale = (language: Language) =>
+  language === "en" ? "en-GB" : locale(language);
 
 export const row: CSSProperties = {
   display: "flex",
@@ -84,9 +93,9 @@ export const plain: CSSProperties = {
   cursor: "pointer",
 };
 
-/** The Sessions page's colours in the window's look (`light`, App's theme), as Open's `Theme.forScheme`. */
-export function themeFor(snapshot: Snapshot, light: boolean): Theme {
-  const base = statsTheme(light, snapshotLanguage(snapshot) === "zh");
+/** The Sessions page's colours in the window's look (`light`, App's theme), as Open's `Theme.forScheme`, for text in `language`. */
+export function themeFor(light: boolean, language: Language): Theme {
+  const base = statsTheme(light, language);
   return light
     ? {
         ...base,
@@ -143,39 +152,43 @@ export function dayStart(at: number) {
 }
 
 /** How long ago the session's last message was written ("2h ago"). */
-export function sinceLabel(session: Session, now: number, zh = false) {
+export function sinceLabel(session: Session, now: number, language: Language) {
   const at = Date.parse(lastMessageTime(session));
-  return Number.isFinite(at) ? age((now - at) / 1000, zh ? "zh" : "en") : "—";
+  return Number.isFinite(at) ? age((now - at) / 1000, language) : "—";
 }
 
 /** A row's status line (Open's `SessionCard.status`): the turns, the time. */
-export function statusLine(session: Session, now: number, zh = false): string {
+export function statusLine(
+  session: Session,
+  now: number,
+  language: Language,
+): string {
   const turns =
     session.turnCount != null && session.turnCount > 0
-      ? zh
-        ? `${session.turnCount} 轮`
-        : `${session.turnCount} ${session.turnCount === 1 ? "turn" : "turns"}`
+      ? translate(language, "{{count}} turns", { count: session.turnCount })
       : null;
-  return [turns, sinceLabel(session, now, zh)].filter(Boolean).join(" · ");
+  return [turns, sinceLabel(session, now, language)]
+    .filter(Boolean)
+    .join(" · ");
 }
 
-export function titleForDay(day: number, today: number, zh = false) {
-  if (day === earlier) return zh ? "更早" : "Earlier";
-  if (day === today) return zh ? "今天" : "Today";
+export function titleForDay(day: number, today: number, language: Language) {
+  if (day === earlier) return translate(language, "Earlier");
+  if (day === today) return translate(language, "Today");
   const yesterday = new Date(today);
   yesterday.setDate(yesterday.getDate() - 1);
-  if (day === yesterday.getTime()) return zh ? "昨天" : "Yesterday";
-  return dateFormat(zh ? "zh-CN" : "en-GB", {
+  if (day === yesterday.getTime()) return translate(language, "Yesterday");
+  return dateFormat(dateLocale(language), {
     weekday: "long",
     month: "long",
     day: "numeric",
   }).format(new Date(day));
 }
 
-export function timeLabel(at: string, zh = false) {
+export function timeLabel(at: string, language: Language) {
   const time = Date.parse(at);
   return Number.isFinite(time)
-    ? dateFormat(zh ? "zh-CN" : "en-GB", {
+    ? dateFormat(dateLocale(language), {
         weekday: "short",
         hour: "2-digit",
         minute: "2-digit",
@@ -187,34 +200,31 @@ export function timeLabel(at: string, zh = false) {
 export function durationLabel(
   startMs: number,
   endMs: number,
-  zh = false,
+  language: Language,
 ): string {
   if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs < startMs)
     return "—";
   const seconds = Math.max(0, Math.round((endMs - startMs) / 1000));
-  if (seconds < 60) return zh ? `${seconds} 秒` : `${seconds}s`;
+  if (seconds < 60) return translate(language, "{{seconds}}s", { seconds });
   const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return zh ? `${minutes} 分钟` : `${minutes}m`;
+  if (minutes < 60) return translate(language, "{{minutes}}m", { minutes });
   const hours = Math.floor(minutes / 60);
   const remMin = minutes % 60;
-  return zh
-    ? remMin > 0
-      ? `${hours} 小时 ${remMin} 分钟`
-      : `${hours} 小时`
-    : remMin > 0
-      ? `${hours}h ${remMin}m`
-      : `${hours}h`;
+  return remMin > 0
+    ? translate(language, "{{hours}}h {{minutes}}m", {
+        hours,
+        minutes: remMin,
+      })
+    : translate(language, "{{hours}}h", { hours });
 }
 
-export function projectName(path: string | null, zh = false) {
+export function projectName(path: string | null, language: Language) {
   return path
     ? path
         .replace(/[\\/]+$/, "")
         .split(/[\\/]/)
         .at(-1) || path
-    : zh
-      ? "未归属项目"
-      : "Unassigned";
+    : translate(language, "Unassigned");
 }
 
 export function Missing({

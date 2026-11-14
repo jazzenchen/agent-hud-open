@@ -9,7 +9,7 @@ import { emit, listen } from "@tauri-apps/api/event";
 import type { HUDGuide } from "@agent-hud/hud/GuideDock";
 import type { HUDConfig } from "@agent-hud/hud/model";
 import type { GuideRecord, NativeMethod, Snapshot } from "@agent-hud/protocol";
-import { snapshotLanguage } from "@agent-hud/ui/format";
+import { useT } from "@agent-hud/ui/format-context";
 import { modePatch } from "../lib/mode-patch";
 import { HUDGuideCard } from "./HUDGuideCard";
 import {
@@ -60,8 +60,7 @@ export function useHUDGuide({
   steps: readonly SettingsStep[];
 }): HUDGuide | null {
   const record = snapshot.settings.guide;
-  const chinese = snapshotLanguage(snapshot) === "zh";
-  const t = (en: string, zh: string) => (chinese ? zh : en);
+  const t = useT();
   // The guide's arrow and drag picture move as the HUD does.
   const moving =
     snapshot.settings.animations !== false &&

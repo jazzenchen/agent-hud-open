@@ -11,23 +11,20 @@ import {
   timeLabel,
   type Theme,
 } from "./SessionTheme";
+import { useFormat, useT } from "@agent-hud/ui/format-context";
 
 /** Where the session's first and latest prompts were typed, as Core tags them (`cli:iterm`, `mobile:iphone`). */
 function OriginTags({ session, theme }: { session: Session; theme: Theme }) {
-  const zh = Boolean(theme.zh);
+  const t = useT();
   const tags = [
     {
-      label: zh ? "首条消息" : "First prompt",
-      help: zh
-        ? "第一条消息在哪里打的：类别:来源"
-        : "Where the first prompt was typed: category:source",
+      label: t("First prompt"),
+      help: t("Where the first prompt was typed: category:source"),
       tag: session.origins?.init,
     },
     {
-      label: zh ? "最新消息" : "Latest prompt",
-      help: zh
-        ? "最新一条消息在哪里打的：类别:来源"
-        : "Where the latest prompt was typed: category:source",
+      label: t("Latest prompt"),
+      help: t("Where the latest prompt was typed: category:source"),
       tag: session.origins?.latest,
     },
   ].filter((item): item is typeof item & { tag: string } => Boolean(item.tag));
@@ -83,7 +80,8 @@ export function DetailHeader({
   revealDisabled?: boolean;
   revealLabel: string;
 }) {
-  const zh = Boolean(theme.zh);
+  const t = useT();
+  const { language } = useFormat();
   const startedRaw =
     detail?.startedAt ??
     detail?.turns[0]?.timestamp ??
@@ -91,10 +89,10 @@ export function DetailHeader({
     null;
   const endedRaw =
     detail?.updatedAt ?? detail?.turns.at(-1)?.end ?? session.updatedAt ?? null;
-  const started = startedRaw ? timeLabel(startedRaw, zh) : "—";
+  const started = startedRaw ? timeLabel(startedRaw, language) : "—";
   const duration =
     startedRaw && endedRaw
-      ? durationLabel(Date.parse(startedRaw), Date.parse(endedRaw), zh)
+      ? durationLabel(Date.parse(startedRaw), Date.parse(endedRaw), language)
       : "—";
   return (
     <div
@@ -114,7 +112,7 @@ export function DetailHeader({
             minWidth: 0,
           }}
         >
-          {session.title || (zh ? "未命名会话" : "Untitled session")}
+          {session.title || t("Untitled session")}
         </h2>
         {(reveal || revealDisabled) && (
           <button
@@ -155,14 +153,14 @@ export function DetailHeader({
             ...numeric,
           }}
         >
-          {sinceLabel(session, now, zh)}
+          {sinceLabel(session, now, language)}
         </span>
         <HUDLogo source={session.source} size={13} light={theme.light} />
         <span style={{ ...clipped, flex: 1 }} title={session.cwd ?? client}>
           {[
             ...sessionWhere(session, client),
-            zh ? `开始于 ${started}` : `Started ${started}`,
-            zh ? `时长 ${duration}` : `Duration ${duration}`,
+            t("Started {{time}}", { time: started }),
+            t("Duration {{duration}}", { duration }),
           ].join(" · ")}
         </span>
       </div>

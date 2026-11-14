@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
-import { compact, number, type StatsTheme } from "../StatsTheme";
+import { useFormat, useT } from "@agent-hud/ui/format-context";
+import { compact, number, weekdays, type StatsTheme } from "../StatsTheme";
 import { Tween } from "../motion";
 
 const whole = (value: number) => String(Math.round(value));
@@ -59,8 +60,7 @@ export function DayFactList({
   dateText: (start: number) => string;
   theme: StatsTheme;
 }) {
-  const zh = Boolean(theme.zh);
-  const t = (en: string, cn: string) => (zh ? cn : en);
+  const t = useT();
   return (
     <div
       style={{
@@ -72,18 +72,18 @@ export function DayFactList({
       }}
     >
       <Fact
-        label={t("Active days", "活跃天数")}
+        label={t("Active days")}
         value={
           <>
             <Tween value={facts.activeDays} format={whole} /> /{" "}
             <Tween value={facts.recordedDays} format={whole} />
           </>
         }
-        caption={t("Days with any tokens", "有用量的天数")}
+        caption={t("Days with any tokens")}
         theme={theme}
       />
       <Fact
-        label={t("An active day", "活跃日平均")}
+        label={t("An active day")}
         value={
           facts.average === null ? (
             "—"
@@ -91,11 +91,11 @@ export function DayFactList({
             <Tween value={facts.average} format={compact} />
           )
         }
-        caption={t("Tokens on average", "平均 Token")}
+        caption={t("Tokens on average")}
         theme={theme}
       />
       <Fact
-        label={t("Busiest day", "用得最多的一天")}
+        label={t("Busiest day")}
         value={
           facts.busiest ? (
             <Tween value={facts.busiest.value} format={compact} />
@@ -107,14 +107,16 @@ export function DayFactList({
         theme={theme}
       />
       <Fact
-        label={t("Streak", "连续使用")}
+        label={t("Streak")}
         value={
           <Tween
             value={facts.streak}
-            format={(value) => t(`${whole(value)} days`, `${whole(value)} 天`)}
+            format={(value) =>
+              t("{{count}} days", { count: Math.round(value) })
+            }
           />
         }
-        caption={t(`Longest ${facts.longest} days`, `最长 ${facts.longest} 天`)}
+        caption={t("Longest {{count}} days", { count: facts.longest })}
         theme={theme}
       />
     </div>
@@ -131,11 +133,9 @@ export function HourFactList({
   tokens: number[][];
   theme: StatsTheme;
 }) {
-  const zh = Boolean(theme.zh);
-  const t = (en: string, cn: string) => (zh ? cn : en);
-  const days = zh
-    ? ["周一", "周二", "周三", "周四", "周五", "周六", "周日"]
-    : ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  const t = useT();
+  const { language } = useFormat();
+  const days = weekdays(language);
   let total = 0;
   let work = 0;
   let night = 0;
@@ -166,27 +166,27 @@ export function HourFactList({
       }}
     >
       <Fact
-        label={t("Busiest hour", "最忙的时段")}
+        label={t("Busiest hour")}
         value={peak.day < 0 ? "—" : `${days[peak.day]} ${hour(peak.hour)}`}
         caption={peak.day < 0 ? undefined : `${compact(peak.value)} Token`}
         theme={theme}
       />
       <Fact
-        label={t("Busiest weekday", "最忙的一天")}
+        label={t("Busiest weekday")}
         value={total > 0 ? days[busiestDay] : "—"}
         caption={total > 0 ? share(byDay[busiestDay]) : undefined}
         theme={theme}
       />
       <Fact
-        label={t("Working hours", "工作时间")}
+        label={t("Working hours")}
         value={share(work)}
-        caption={t("Weekdays 9:00–18:00", "工作日 9:00–18:00")}
+        caption={t("Weekdays 9:00–18:00")}
         theme={theme}
       />
       <Fact
-        label={t("Late at night", "深夜")}
+        label={t("Late at night")}
         value={share(night)}
-        caption={t("0:00–6:00", "0:00–6:00")}
+        caption="0:00–6:00"
         theme={theme}
       />
     </div>

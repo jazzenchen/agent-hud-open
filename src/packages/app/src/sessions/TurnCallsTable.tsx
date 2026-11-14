@@ -1,7 +1,15 @@
 import { RotateCw } from "lucide-react";
-import { dateFormat } from "@agent-hud/ui/format";
+import { dateFormat, listSeparator } from "@agent-hud/ui/format";
 import type { SessionCall } from "@agent-hud/protocol";
-import { clipped, compact, numeric, row, type Theme } from "./SessionTheme";
+import {
+  clipped,
+  compact,
+  dateLocale,
+  numeric,
+  row,
+  type Theme,
+} from "./SessionTheme";
+import { useFormat, useT } from "@agent-hud/ui/format-context";
 
 /** An MCP tool by its own name, without its server's (Open's SessionCharts.toolName). */
 function toolName(name: string): string {
@@ -16,7 +24,8 @@ export function TurnCallsTable({
   calls: SessionCall[];
   theme: Theme;
 }) {
-  const zh = Boolean(theme.zh);
+  const t = useT();
+  const { language } = useFormat();
   const reasoning = calls.some((call) => (call.reasoning ?? 0) > 0);
   const contexts = calls.some((call) => call.context != null);
   const tools = calls.some((call) => (call.tools?.length ?? 0) > 0);
@@ -50,21 +59,19 @@ export function TurnCallsTable({
             }}
           >
             <th style={{ ...head, textAlign: "left", paddingLeft: 0 }}>
-              {zh ? "时间" : "Time"}
+              {t("Time")}
             </th>
-            <th style={{ ...head, textAlign: "left" }}>
-              {zh ? "模型" : "Model"}
-            </th>
-            <th style={head}>{zh ? "新增" : "New"}</th>
-            <th style={head}>{zh ? "缓存写" : "Cache W"}</th>
-            <th style={head}>{zh ? "输入" : "Input"}</th>
-            {reasoning && <th style={head}>{zh ? "思考" : "Reasoning"}</th>}
-            <th style={head}>{zh ? "输出" : "Output"}</th>
-            <th style={head}>{zh ? "缓存读" : "Cache R"}</th>
-            {contexts && <th style={head}>{zh ? "上下文" : "Context"}</th>}
+            <th style={{ ...head, textAlign: "left" }}>{t("Model")}</th>
+            <th style={head}>{t("New")}</th>
+            <th style={head}>{t("Cache W")}</th>
+            <th style={head}>{t("Input")}</th>
+            {reasoning && <th style={head}>{t("Reasoning")}</th>}
+            <th style={head}>{t("Output")}</th>
+            <th style={head}>{t("Cache R")}</th>
+            {contexts && <th style={head}>{t("Context")}</th>}
             {tools && (
               <th style={{ ...head, textAlign: "left", paddingRight: 0 }}>
-                {zh ? "发起工具" : "Asked for"}
+                {t("Asked for")}
               </th>
             )}
           </tr>
@@ -85,7 +92,7 @@ export function TurnCallsTable({
                   color: theme.secondary,
                 }}
               >
-                {dateFormat(zh ? "zh-CN" : "en-GB", {
+                {dateFormat(dateLocale(language), {
                   hour: "numeric",
                   minute: "numeric",
                   second: "numeric",
@@ -109,7 +116,7 @@ export function TurnCallsTable({
                         flexShrink: 0,
                       }}
                     >
-                      {zh ? "子 agent" : "Sub-agent"}
+                      {t("Sub-agent")}
                     </span>
                   )}
                   {call.recached != null && (
@@ -117,7 +124,7 @@ export function TurnCallsTable({
                       size={10}
                       color={theme.warning}
                       strokeWidth={2.6}
-                      aria-label={zh ? "缓存过期" : "Cache expired"}
+                      aria-label={t("Cache expired")}
                     />
                   )}
                 </span>
@@ -151,8 +158,9 @@ export function TurnCallsTable({
                     ...clipped,
                   }}
                 >
-                  {(call.tools ?? []).map(toolName).join(zh ? "、" : ", ") ||
-                    "—"}
+                  {(call.tools ?? [])
+                    .map(toolName)
+                    .join(listSeparator(language)) || "—"}
                 </td>
               )}
             </tr>

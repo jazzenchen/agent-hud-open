@@ -15,8 +15,12 @@ import {
   quotaRowKey,
   vendorKey,
 } from "@agent-hud/hud/model";
-import { moneyAmount, snapshotLanguage } from "@agent-hud/ui/format";
-import { Card, Row, Section, type Text } from "../SettingsPrimitives";
+import {
+  moneyAmount,
+  snapshotLanguage,
+  type Translate,
+} from "@agent-hud/ui/format";
+import { Card, Row, Section } from "../SettingsPrimitives";
 import { AccountCard } from "./AccountCard";
 import { moveAmong, ReorderButtons } from "./Reorder";
 
@@ -29,7 +33,7 @@ export function PanelBlocks({
   perform,
   pending,
 }: {
-  t: Text;
+  t: Translate;
   snapshot: Snapshot;
   source: Provider;
   layout: PanelLayout;
@@ -159,7 +163,9 @@ export function PanelBlocks({
         <Switch
           checked={!(balanceBlock.hiddenRows ?? []).includes(item.id)}
           disabled={pending}
-          aria-label={`${t("Show balance", "显示余额")} ${item.label} ${amount}`}
+          aria-label={t("Show balance {{name}}", {
+            name: `${item.label} ${amount}`,
+          })}
           onCheckedChange={(show) =>
             void changeBalanceBlock({
               hiddenRows: show
@@ -175,26 +181,20 @@ export function PanelBlocks({
   return (
     <Section
       plain
-      title={t("In the panel", "面板中显示")}
-      footer={t(
-        "Applies to the screen chosen on the Display page.",
-        "作用于“显示”页面选中的屏幕。",
-      )}
+      title={t("In the panel")}
+      footer={t("Applies to the screen chosen on the Display page.")}
     >
       <Card>
         {blockRow(
           key,
-          t("Show in panel", "在面板中显示"),
+          t("Show in panel"),
           source.name,
           block.hidden,
           changeBlock,
         )}
         {balanceKey === key && balanceRows}
         {!windows.length && !billing.length && (
-          <Row
-            muted
-            title={t("No quota or balance read yet", "还没有读到额度或余额")}
-          />
+          <Row muted title={t("No quota or balance read yet")} />
         )}
       </Card>
       {accounts.map((account) => (
@@ -216,8 +216,8 @@ export function PanelBlocks({
         <Card>
           {blockRow(
             balanceKey,
-            t("Balances", "余额"),
-            `${source.name} ${t("balances", "余额")}`,
+            t("Balances"),
+            t("{{name}} balances", { name: source.name }),
             balanceBlock.hidden,
             changeBalanceBlock,
           )}

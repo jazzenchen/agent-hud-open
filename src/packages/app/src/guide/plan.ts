@@ -4,6 +4,7 @@
 // ending with the Star. A copy that moved to a newer version gets that
 // version's news beside the HUD, once.
 import type { GuideRecord, Snapshot } from "@agent-hud/protocol";
+import type { GuideText } from "./copy";
 
 /** The tour's steps beside the HUD, in order. */
 export const hudSteps = ["hud", "mode"] as const;
@@ -16,8 +17,8 @@ export interface SettingsStep {
   id: string;
   page: string;
   anchor: string;
-  title: [en: string, zh: string];
-  body: [en: string, zh: string];
+  title: GuideText;
+  body: GuideText;
   /** Already set up: the step is ticked. */
   done?: (snapshot: Snapshot) => boolean;
 }
@@ -30,8 +31,8 @@ export interface GuideTarget {
 }
 
 export interface NewsItem {
-  title: [en: string, zh: string];
-  body?: [en: string, zh: string];
+  title: GuideText;
+  body?: GuideText;
   target?: GuideTarget;
 }
 

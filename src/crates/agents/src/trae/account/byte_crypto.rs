@@ -2,7 +2,8 @@
 //! `iCubeAuthInfo` entries, including TRAE's static `ByteCrypto` AES-128-CBC envelope.
 use crate::account::cipher::aes_128_cbc_open;
 use crate::account::{read_json_bounded, Answer, Host, Unread};
-use crate::{l10n, Base};
+use crate::l10n::tr;
+use crate::Base;
 use base64::{engine::general_purpose::STANDARD, Engine};
 use chrono::Utc;
 use ring::digest::{digest, SHA512};
@@ -59,9 +60,9 @@ pub(super) fn read_local_auth(
             Answer::Found(value) => value,
             Answer::Missing => continue,
             Answer::Denied => {
-                found_error = Some(Unread::from(l10n::text(
-                    &format!("无权读取 {name} 的本地配置文件"),
-                    &format!("Permission denied reading {name}'s local storage."),
+                found_error = Some(Unread::from(tr!(
+                    "Permission denied reading {{name}}'s local storage.",
+                    name = name
                 )));
                 continue;
             }
@@ -135,9 +136,9 @@ fn parse_auth_entry(entry: &Value, name: &str) -> Result<Option<LocalAuth>, Unre
             exp
         };
         if exp_ms <= Utc::now().timestamp_millis() {
-            return Err(Unread::SignedOut(l10n::text(
-                &format!("{name} 保存的登录已过期，请打开 {name} 刷新登录"),
-                &format!("{name}'s saved sign-in expired; open {name} to refresh it."),
+            return Err(Unread::SignedOut(tr!(
+                "{{name}}'s saved sign-in expired; open {{name}} to refresh it.",
+                name = name
             )));
         }
     }
@@ -200,8 +201,8 @@ fn text(value: &Value) -> Option<String> {
 }
 
 fn auth_format(name: &str) -> String {
-    l10n::text(
-        &format!("{name} 账户登录信息格式无法识别"),
-        &format!("{name} account authentication has an unsupported format."),
+    tr!(
+        "{{name}} account authentication has an unsupported format.",
+        name = name
     )
 }

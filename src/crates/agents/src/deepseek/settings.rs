@@ -2,15 +2,12 @@
 //! it sends there. The balance reader (`account.rs`) asks DeepSeek's own API
 //! with it; the relays reader asks a relay with it when the endpoint is one.
 use crate::account::{Answer, Host, Unread};
-use crate::l10n;
+use crate::l10n::tr;
 use serde_json::Value;
 use std::path::{Path, PathBuf};
 
 pub(super) fn unreadable() -> String {
-    l10n::text(
-        "无法读取 DeepSeek 设置或凭据",
-        "DeepSeek settings or credentials could not be read.",
-    )
+    tr!("DeepSeek settings or credentials could not be read.")
 }
 fn yaml(host: &dyn Host, path: &Path) -> Result<Value, String> {
     const LIMIT: u64 = 1024 * 1024;
@@ -20,19 +17,14 @@ fn yaml(host: &dyn Host, path: &Path) -> Result<Value, String> {
         _ => return Err(unreadable()),
     };
     if bytes.len() as u64 > LIMIT {
-        return Err(l10n::text(
-            "DeepSeek 设置或凭据文件过大",
-            "DeepSeek settings or credentials exceeded the size limit.",
+        return Err(tr!(
+            "DeepSeek settings or credentials exceeded the size limit."
         ));
     }
     let text = String::from_utf8(bytes).map_err(|_| unreadable())?;
     // A YAML error can quote the offending secret line. Only return fixed diagnostics.
-    serde_saphyr::from_str(&text).map_err(|_| {
-        l10n::text(
-            "DeepSeek 设置或凭据的 YAML 格式无法识别",
-            "DeepSeek settings or credentials have an unsupported YAML format.",
-        )
-    })
+    serde_saphyr::from_str(&text)
+        .map_err(|_| tr!("DeepSeek settings or credentials have an unsupported YAML format."))
 }
 
 /// Harness's home: `DSH_HOME`, or `~/.dsh`.
@@ -105,11 +97,9 @@ pub(super) fn configured(host: &dyn Host) -> Result<Configured, Unread> {
                             .all(|value| value.as_str().is_some_and(|value| !value.is_empty()))
                     }))
             {
-                return Err(l10n::text(
-                    "DeepSeek 凭据文件格式无法识别",
-                    "DeepSeek credentials have an unsupported document format.",
-                )
-                .into());
+                return Err(
+                    tr!("DeepSeek credentials have an unsupported document format.").into(),
+                );
             }
             credential = credentials["refs"][reference].as_str().map(str::to_owned);
         }

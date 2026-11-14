@@ -9,7 +9,7 @@ mod tests;
 mod zcode;
 
 use crate::account::{account_id, Host, HttpFailure, HttpRequest, Provider, Reading, Unread};
-use crate::l10n;
+use crate::l10n::tr;
 use serde_json::{json, Value};
 use std::{collections::HashSet, time::Duration};
 
@@ -45,14 +45,12 @@ fn read_provider(host: &dyn Host, provider: &'static str) -> Result<Reading, Unr
     let mut result = Reading::empty(provider);
     if entries.is_empty() {
         if stale_oauth {
-            return Err(Unread::transient(l10n::text(
-                "Kimi Code 下次运行时会续期登录，之后更新额度",
-                "Kimi Code renews its sign-in the next time it runs; the quota updates then",
+            return Err(Unread::transient(tr!(
+                "Kimi Code renews its sign-in the next time it runs; the quota updates then"
             )));
         }
-        result.notice = Some(l10n::text(
-            "此客户端的现有配置中没有可用的 Coding Plan 凭据",
-            "No usable coding-plan credential was found in this client's existing configuration",
+        result.notice = Some(tr!(
+            "No usable coding-plan credential was found in this client's existing configuration"
         ));
         return Ok(result);
     }
@@ -60,7 +58,7 @@ fn read_provider(host: &dyn Host, provider: &'static str) -> Result<Reading, Unr
     let mut transient = 0;
     for entry in entries {
         if host.cancelled() {
-            return Err(l10n::text("账户读取已停止", "Account reading was stopped").into());
+            return Err(tr!("Account reading was stopped").into());
         }
         let mut id = account_id(
             provider,
@@ -127,10 +125,9 @@ fn read_provider(host: &dyn Host, provider: &'static str) -> Result<Reading, Unr
                     transient += 1;
                 }
                 match failure {
-                    HttpFailure::Unreachable | HttpFailure::BadHeader => l10n::text(
-                        "无法连接 Coding Plan 额度服务",
-                        "Coding plan quota could not be reached",
-                    ),
+                    HttpFailure::Unreachable | HttpFailure::BadHeader => {
+                        tr!("Coding plan quota could not be reached")
+                    }
                     other => other.message(),
                 }
             })
@@ -189,21 +186,17 @@ fn read_provider(host: &dyn Host, provider: &'static str) -> Result<Reading, Unr
         if result.quotas.is_empty() {
             // Only no answer this time, for every plan: it passes by itself.
             if transient == failures {
-                return Err(Unread::transient(l10n::text(
-                    "无法连接 Coding Plan 额度服务",
-                    "Coding plan quota could not be reached",
+                return Err(Unread::transient(tr!(
+                    "Coding plan quota could not be reached"
                 )));
             }
-            return Err(l10n::text("现有 Coding Plan 凭据未能读到可核实的额度，请检查来源客户端的登录或 API Key", "Existing coding-plan credentials could not read a verifiable quota; check the source client's login or API key").into());
+            return Err(tr!("Existing coding-plan credentials could not read a verifiable quota; check the source client's login or API key").into());
         }
         result.notice = Some(format!(
             "{failures} configured coding-plan account(s) could not be read"
         ));
     } else if result.quotas.is_empty() && result.account.is_some() {
-        result.notice = Some(l10n::text(
-            "当前账号未开通 Coding Plan 套餐",
-            "No active Coding Plan subscription on this account",
-        ));
+        result.notice = Some(tr!("No active Coding Plan subscription on this account"));
     }
     Ok(result)
 }

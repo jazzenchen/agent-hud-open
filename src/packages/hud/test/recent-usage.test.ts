@@ -1,6 +1,17 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { addCatalog } from "@agent-hud/ui/format";
 import { recentCost, recentLabel, recentUsage } from "../src/recent-usage.ts";
+
+// The Chinese below is zh-Hans.json's.
+const locales = join(import.meta.dirname, "../../protocol/locales");
+for (const language of ["en", "zh-Hans"] as const)
+  addCatalog(
+    language,
+    JSON.parse(readFileSync(join(locales, `${language}.json`), "utf8")),
+  );
 
 const provider = (
   id: string,
@@ -63,7 +74,10 @@ test("an agent with no window or balance shows its last 24 hours, as vendors.rs 
   );
   assert.equal(label("pi"), null, "nothing used: nothing to show");
   assert.equal(label("opencode"), "Free", "a local model costs nothing");
-  assert.equal(recentLabel(recentUsage(snapshot, "opencode"), "zh"), "免费");
+  assert.equal(
+    recentLabel(recentUsage(snapshot, "opencode"), "zh-Hans"),
+    "免费",
+  );
 });
 
 test("recent usage sums the providers behind one mark", () => {

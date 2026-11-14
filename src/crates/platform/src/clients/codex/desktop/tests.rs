@@ -68,9 +68,9 @@ fn scopes_and_browser_reviewer_match_source() {
 }
 #[test]
 fn native_cards_say_what_allowing_keeps_as_open_words_it() {
-    use agent_hud_core::l10n;
-    let conversation = l10n::text("允许此对话", "Allow this conversation");
-    let once = l10n::text("批准一次", "Allow once");
+    use agent_hud_core::l10n::tr;
+    let conversation = tr!("Allow this conversation");
+    let once = tr!("Allow once");
     let app = snapshot(vec![permission(
         "computer-use",
         json!(["session", "always"]),

@@ -1,6 +1,7 @@
 import { HUDArtwork as HUDLogo } from "@agent-hud/hud/HUDArtwork";
 import { vendorKey } from "@agent-hud/hud/model";
 import type { Quota, StatisticsProvider } from "@agent-hud/protocol";
+import { useT } from "@agent-hud/ui/format-context";
 import { card, row, truncate, type StatsTheme } from "../StatsTheme";
 import { usePendingLook, type Pending } from "./pending";
 import { QuotaRows, type QuotaRow } from "./QuotaRows";
@@ -41,7 +42,7 @@ export function QuotaCard({
   theme: StatsTheme;
   light: boolean;
 }) {
-  const zh = Boolean(theme.zh);
+  const t = useT();
   const look = usePendingLook(pending);
   return (
     <div
@@ -62,13 +63,11 @@ export function QuotaCard({
         </strong>
       </div>
       <span style={{ fontSize: 11, color: theme.secondary }}>
-        {zh
-          ? "这台 Mac 上没有它的 Token 记录，只有额度读数"
-          : "No tokens recorded on this Mac, only its quota readings"}
+        {t("No tokens recorded on this Mac, only its quota readings")}
       </span>
       <div style={{ display: "grid", gap: 4 }}>
         <span style={{ fontSize: 11, color: theme.secondary }}>
-          {zh ? "每天的额度" : "Quota by day"}
+          {t("Quota by day")}
         </span>
         <QuotaRows
           rows={rows}

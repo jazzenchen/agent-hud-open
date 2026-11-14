@@ -3,11 +3,8 @@
 // groups of its own.
 import { Fragment } from "react";
 import type { Snapshot } from "@agent-hud/protocol";
-import {
-  Section,
-  type SettingsPaneProps,
-  type Text,
-} from "../SettingsPrimitives";
+import type { Translate } from "@agent-hud/ui/format";
+import { Section, type SettingsPaneProps } from "../SettingsPrimitives";
 import { AgentMessagesRow } from "./AgentMessagesRow";
 import { ToolSwitchRow } from "./rows";
 import type { AgentPluginContext, AgentPluginItem } from "./types";
@@ -28,22 +25,19 @@ export function ToolsSection({
   action: SettingsPaneProps["action"];
   request: AgentPluginContext["request"];
   active: boolean;
-  t: Text;
+  t: Translate;
 }) {
   const { unavailable, problem } = tools.state;
   return (
-    <Section title={t("Agent tools", "智能体工具")}>
+    <Section title={t("Agent tools")}>
       <ToolSwitchRow
         anchor="hud-tools"
-        title={t("Let agents arrange the HUD", "允许智能体调整 HUD")}
-        description={t(
-          "Changes stay drafts until you save them in the panel.",
-          "改动先是草稿，在面板里保存后才生效。",
-        )}
+        title={t("Let agents arrange the HUD")}
+        description={t("Changes stay drafts until you save them in the panel.")}
         checked={tools.on}
         pending={tools.pending}
-        unavailable={unavailable ? t(...unavailable) : null}
-        error={tools.error ?? (problem ? t(...problem) : null)}
+        unavailable={unavailable}
+        error={tools.error ?? problem}
         onChange={(value) => void tools.set(value)}
       />
       <AgentMessagesRow snapshot={snapshot} action={action} t={t} />

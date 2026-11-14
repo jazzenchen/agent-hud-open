@@ -8,13 +8,9 @@
 import { Braces } from "lucide-react";
 import type { Snapshot } from "@agent-hud/protocol";
 import { TooltipProvider } from "@agent-hud/ui/components/tooltip";
-import {
-  Page,
-  Section,
-  useText,
-  type SettingsPaneProps,
-  type Text,
-} from "./SettingsPrimitives";
+import type { Translate } from "@agent-hud/ui/format";
+import { useT } from "@agent-hud/ui/format-context";
+import { Page, Section, type SettingsPaneProps } from "./SettingsPrimitives";
 import {
   OtherAgentsCard,
   ProductClientCard,
@@ -55,21 +51,15 @@ export type {
 export { PluginControl, ToolSwitchRow } from "./agent-plugins/rows";
 
 /** Why no client can be given HUD tools here, under the client cards. */
-function setupNote(snapshot: Snapshot, t: Text) {
+function setupNote(snapshot: Snapshot, t: Translate) {
   const platform =
     snapshot.connection.platformCapabilities?.os ??
     snapshot.connection.platform;
   return platform === "windows"
-    ? t(
-        "Adding HUD tools needs Agent HUD run from where its installer put it.",
-        "需要运行用安装包装好的 Agent HUD，才能添加 HUD 工具。",
-      )
+    ? t("Adding HUD tools needs Agent HUD run from where its installer put it.")
     : platform === "macos"
-      ? t(
-          "Adding HUD tools needs Agent HUD in an approved macOS location.",
-          "需要从 macOS 指定安装位置运行 Agent HUD，才能添加 HUD 工具。",
-        )
-      : t("This build can't add HUD tools.", "当前版本无法添加 HUD 工具。");
+      ? t("Adding HUD tools needs Agent HUD in an approved macOS location.")
+      : t("This build can't add HUD tools.");
 }
 
 /** Clients only a product build knows: those its rows name, once each. */
@@ -106,7 +96,7 @@ export function AgentPluginsPane({
   /** The DeepSeek Harness plugin's service; a fake in pictures and tests. */
   deepseekPlugin?: ClaudePluginService;
 }) {
-  const t = useText(snapshot);
+  const t = useT();
   const light = useLightTheme();
   const mcp = useMcpClients(clients, active, t);
   const plugins: Record<string, ReturnType<typeof usePlugin>> = {
@@ -122,7 +112,7 @@ export function AgentPluginsPane({
         <HooksSection snapshot={snapshot} action={action} t={t} />
         <Section
           anchor="clients"
-          title={t("Clients", "客户端")}
+          title={t("Clients")}
           plain
           footer={mcp.status?.ready === false ? setupNote(snapshot, t) : null}
         >

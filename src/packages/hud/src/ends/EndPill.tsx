@@ -7,6 +7,7 @@ import { useGround } from "../ground";
 import { alertInk, alertText } from "../tokens";
 import { endBadge, ringPath, type EndSide } from "./end-geometry";
 import type { EndFade } from "./useParkedEnds";
+import { useT } from "@agent-hud/ui/format-context";
 
 const box = (rect: HUDRect) => ({
   left: rect.x,
@@ -100,7 +101,6 @@ export function EndPill({
   onEnter,
   onLeave,
   onPick,
-  zh,
 }: {
   side: EndSide;
   rect: HUDRect;
@@ -114,8 +114,8 @@ export function EndPill({
   onEnter: (altKey: boolean) => void;
   onLeave: (event: { relatedTarget?: EventTarget | null }) => void;
   onPick: () => void;
-  zh: boolean;
 }) {
+  const t = useT();
   const ground = useGround(light);
   const thick = Math.min(rect.width, rect.height);
   const badge = endBadge(thick, count);
@@ -130,12 +130,8 @@ export function EndPill({
       role="button"
       aria-label={
         head
-          ? zh
-            ? `${count} 个请求待处理`
-            : `${count} requests waiting`
-          : zh
-            ? `${count} 条消息`
-            : `${count} messages`
+          ? t("{{count}} requests waiting", { count })
+          : t("{{count}} messages", { count })
       }
       // Only opacity and scale move: they run on the compositor, so the pop
       // keeps its pace while the page is busy.

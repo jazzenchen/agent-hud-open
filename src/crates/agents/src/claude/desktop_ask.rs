@@ -1,5 +1,6 @@
 //! The Claude desktop app's questions: the cards its asks become, and the words their answers send.
 use super::button_text::{sends_otherwise, shown};
+use crate::l10n::tr;
 use crate::transcript::live::{DesktopAsk, DesktopAskOption};
 use serde_json::{json, Value};
 use std::{fs, path::Path};
@@ -181,9 +182,9 @@ pub fn desktop_ask_view(
         "mcp__ccd_turn__wrap_up"
     };
     let header = if ask.kind == "offer" {
-        crate::l10n::text("新任务", "New task")
+        tr!("New task")
     } else {
-        crate::l10n::text("下一步", "Next step")
+        tr!("Next step")
     };
     let options = ask
         .options

@@ -49,7 +49,7 @@ pub(crate) async fn native_request(
         // The demo never reaches outside its own folder: no login item, no
         // client's hooks.
         if method=="set_setting" && app.state::<AppState>().demo && matches!(params["key"].as_str(),Some("launchAtLogin"|"clientHooks"|"optInApprovals")) {
-            return Err(agent_hud_runtime::l10n::text("演示模式不会更改这项设置。","The demo leaves this setting alone."));
+            return Err(agent_hud_runtime::l10n::tr("The demo leaves this setting alone."));
         }
         if method=="set_setting" {if let Some(value)=app.state::<system::System>().set_setting(params["key"].as_str().ok_or("Setting key is required")?,&params["value"])? {params["value"]=value;}}
         if method=="set_setting" && params["key"]=="clientHooks" {

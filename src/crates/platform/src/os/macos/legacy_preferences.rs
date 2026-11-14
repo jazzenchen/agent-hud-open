@@ -86,19 +86,10 @@ pub(super) fn normalize(settings: &Value, layouts: &Value, agents: &Value) -> Va
             settings["approvalWaitMinutes"].clone(),
         );
     }
-    if let Some(language) = settings["language"]
-        .as_str()
-        .filter(|s| ["system", "zh-Hans", "en"].contains(s))
-    {
-        app.insert(
-            "language".into(),
-            json!(if language == "zh-Hans" {
-                "zh-CN"
-            } else {
-                language
-            }),
-        );
-    }
+    // The Swift app's codes are the app's own: "zh-Hans" is kept as it is
+    // (cores before 0.7 stored it as "zh-CN", which still reads as
+    // Simplified Chinese).
+    copy_enum(&mut app, settings, "language", &["system", "zh-Hans", "en"]);
     let mut global = Map::new();
     copy_bool(
         &mut global,
@@ -209,4 +200,30 @@ pub(crate) fn read() -> Option<Value> {
         }
     }
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::normalize;
+    use agent_hud_core::l10n::Language;
+    use serde_json::{json, Value};
+
+    #[test]
+    fn the_swift_apps_language_carries_over() {
+        let language = |setting: Value| {
+            normalize(&json!({ "language": setting }), &Value::Null, &Value::Null)["settings"]
+                ["language"]
+                .clone()
+        };
+        assert_eq!(language(json!("zh-Hans")), "zh-Hans");
+        assert_eq!(
+            Language::of_setting(&language(json!("zh-Hans"))),
+            Language::ZhHans
+        );
+        assert_eq!(language(json!("en")), "en");
+        assert_eq!(language(json!("system")), "system");
+        assert!(language(json!("klingon")).is_null());
+        // What cores before 0.7 stored for it still reads as Simplified Chinese.
+        assert_eq!(Language::of_setting(&json!("zh-CN")), Language::ZhHans);
+    }
 }

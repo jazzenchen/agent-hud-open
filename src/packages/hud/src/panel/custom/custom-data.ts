@@ -4,11 +4,13 @@
  * nothing reads as nothing. */
 import {
   age,
+  locale,
   moneyShort,
   numberFormat,
   percent,
   resetLabel,
   tokensShort,
+  translate,
   type Language,
   type WeekCalendar,
 } from "@agent-hud/ui/format";
@@ -60,8 +62,6 @@ function time(value: unknown): number | null {
   return Number.isFinite(at) ? at : null;
 }
 
-const locale = (language: Language) => (language === "zh" ? "zh-CN" : "en-US");
-
 /** One value as text, in `format` or the field's own. */
 export function formatted(
   value: unknown,
@@ -109,9 +109,7 @@ export function formatted(
       if (at == null) return "—";
       if (at <= scope.now)
         return path.endsWith(".resetsAt")
-          ? scope.language === "zh"
-            ? "等待更新"
-            : "Pending update"
+          ? translate(scope.language, "Pending update")
           : "—";
       if (at - scope.now < 60_000) return "<1m";
       return resetLabel(at, scope.now, scope.calendar, scope.language);

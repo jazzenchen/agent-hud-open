@@ -5,7 +5,7 @@ use crate::account::{
     account_id, read_json_bounded, status, Answer, Host, HttpFailure, HttpRequest, Provider,
     Reading, Unread,
 };
-use crate::l10n;
+use crate::l10n::tr;
 use chrono::{DateTime, Utc};
 use serde_json::{json, Value};
 use std::time::Duration;
@@ -30,11 +30,7 @@ pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
         Answer::Found(v) => v,
         Answer::Missing => return Ok(Reading::empty("zcode")),
         Answer::Denied => {
-            return Err(l10n::text(
-                "无权读取 ZCode 的本地凭证文件",
-                "Permission denied reading ZCode's local credentials.",
-            )
-            .into())
+            return Err(tr!("Permission denied reading ZCode's local credentials.").into())
         }
         _ => return Err(auth_format().into()),
     };
@@ -46,9 +42,9 @@ pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
         return Ok(Reading::empty("zcode"));
     }
     let jwt = open_value(raw_token, &key).ok_or_else(|| {
-        l10n::text(
-            "ZCode 加密的登录信息无法解密",
-            "ZCode's encrypted sign-in could not be unlocked.",
+        tr!(
+            "{{name}}'s encrypted sign-in could not be unlocked.",
+            name = "ZCode"
         )
     })?;
     if jwt.trim().is_empty() {
@@ -77,9 +73,9 @@ pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
             timeout: Duration::from_secs(15),
         })
         .map_err(|failure| match failure {
-            HttpFailure::Status(401 | 403) => Unread::SignedOut(l10n::text(
-                "ZCode 保存的登录已失效，请打开 ZCode 重新登录",
-                "ZCode's saved sign-in has ended; sign in again in ZCode.",
+            HttpFailure::Status(401 | 403) => Unread::SignedOut(tr!(
+                "{{name}}'s saved sign-in has ended; sign in again in {{name}}.",
+                name = "ZCode"
             )),
             other => other.unread(),
         })?;
@@ -174,9 +170,8 @@ fn parse_balance(
         }));
     }
     if reading.quotas.is_empty() {
-        reading.notice = Some(l10n::text(
-            "ZCode 当前套餐没有可用的额度",
-            "ZCode reports no active plan allowance for this account.",
+        reading.notice = Some(tr!(
+            "ZCode reports no active plan allowance for this account."
         ));
     }
     let mut acc = json!({
@@ -229,17 +224,11 @@ fn parse_reset(v: Option<&Value>) -> Option<String> {
 }
 
 fn auth_format() -> String {
-    l10n::text(
-        "ZCode 账户凭证格式无法识别",
-        "ZCode credentials have an unsupported format.",
-    )
+    tr!("ZCode credentials have an unsupported format.")
 }
 
 fn format_err() -> Unread {
-    Unread::from(l10n::text(
-        "ZCode 的额度格式无法识别",
-        "ZCode's balance response has an unsupported format.",
-    ))
+    Unread::from(tr!("ZCode's balance response has an unsupported format."))
 }
 
 #[cfg(test)]

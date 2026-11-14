@@ -9,6 +9,8 @@ import {
 } from "@agent-hud/ui/components/dropdown-menu";
 import { HUDArtwork as HUDLogo } from "@agent-hud/hud/HUDArtwork";
 import type { StatisticsTokenKind } from "@agent-hud/protocol";
+import { locale } from "@agent-hud/ui/format";
+import { useFormat, useT } from "@agent-hud/ui/format-context";
 import {
   freshKinds,
   kindLabel,
@@ -65,14 +67,14 @@ export function FilterBar({
   theme: StatsTheme;
   light: boolean;
 }) {
-  const zh = Boolean(theme.zh);
-  const t = (en: string, cn: string) => (zh ? cn : en);
+  const t = useT();
+  const { language } = useFormat();
   const ranges: { value: RangeId; label: string }[] = [
-    { value: "today", label: t("Today", "今天") },
-    { value: "7d", label: t("7 days", "7 天") },
-    { value: "30d", label: t("30 days", "30 天") },
-    { value: "90d", label: t("90 days", "90 天") },
-    { value: "1y", label: t("Year", "一年") },
+    { value: "today", label: t("Today") },
+    { value: "7d", label: t("7 days") },
+    { value: "30d", label: t("30 days") },
+    { value: "90d", label: t("90 days") },
+    { value: "1y", label: t("Year") },
   ];
   return (
     <div
@@ -91,7 +93,7 @@ export function FilterBar({
     >
       <div
         role="group"
-        aria-label={t("Agent", "Agent")}
+        aria-label={t("Agent")}
         className="stats-agent-chips"
         style={{ ...row, gap: 6, flex: "1 1 320px", overflowX: "auto" }}
       >
@@ -102,7 +104,7 @@ export function FilterBar({
           onClick={() => setSelected(null)}
           style={chip(theme, selected === null)}
         >
-          {t("All agents", "全部 Agent")}
+          {t("All agents")}
         </button>
         {agents.map((entry) => (
           <button
@@ -110,10 +112,7 @@ export function FilterBar({
             type="button"
             role="checkbox"
             aria-checked={Boolean(selected?.includes(entry.id))}
-            title={t(
-              "Click to see this agent alone; ⌘-click to add it",
-              "点击只看这个 Agent；按住 ⌘ 点击可多选",
-            )}
+            title={t("Click to see this agent alone; ⌘-click to add it")}
             onClick={(event) => {
               const on = Boolean(selected?.includes(entry.id));
               if (!event.metaKey) {
@@ -137,7 +136,7 @@ export function FilterBar({
           <DropdownMenuTrigger asChild>
             <button
               type="button"
-              aria-label={t("Token kinds counted", "计入的 Token 类型")}
+              aria-label={t("Token kinds counted")}
               style={{
                 ...plain,
                 ...row,
@@ -161,14 +160,14 @@ export function FilterBar({
               onSelect={(event) => event.preventDefault()}
               onCheckedChange={() => setKinds([...freshKinds])}
             >
-              {t("Excl. cache reads", "不含缓存读取")}
+              {t("Excl. cache reads")}
             </DropdownMenuCheckboxItem>
             <DropdownMenuCheckboxItem
               checked={selectedKinds.length === kinds.length}
               onSelect={(event) => event.preventDefault()}
               onCheckedChange={() => setKinds([...kinds])}
             >
-              {t("All tokens", "全部 Token")}
+              {t("All tokens")}
             </DropdownMenuCheckboxItem>
             <DropdownMenuSeparator />
             {kinds.map((kind) => (
@@ -188,7 +187,7 @@ export function FilterBar({
                   )
                 }
               >
-                {kindLabel(kind, zh)}
+                {kindLabel(kind, language)}
               </DropdownMenuCheckboxItem>
             ))}
           </DropdownMenuContent>
@@ -197,18 +196,18 @@ export function FilterBar({
           <button
             type="button"
             onClick={() => setRange({ id: "30d" })}
-            aria-label={t("Back to 30 days", "回到 30 天")}
+            aria-label={t("Back to 30 days")}
             style={{ ...chip(theme, true), height: 28, gap: 5 }}
           >
             {new Date(dayStart(range.day)).toLocaleDateString(
-              zh ? "zh-CN" : "en-US",
+              locale(language),
               { month: "short", day: "numeric", weekday: "short" },
             )}
             <X size={12} style={{ opacity: 0.7 }} />
           </button>
         )}
         <Segments
-          label={t("Range", "范围")}
+          label={t("Range")}
           value={range.id}
           onChange={(value) => setRange({ id: value as RangeId })}
           choices={ranges}

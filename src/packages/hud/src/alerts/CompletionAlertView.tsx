@@ -10,11 +10,12 @@ import type { IslandEvent, Session, Snapshot } from "@agent-hud/protocol";
 import { usePanelServices } from "../PanelContext";
 import { clientDisplayName, compactDuration, newsTitle } from "../IslandNews";
 import { ReminderMark } from "./ReminderMark";
-import { dateFormat, snapshotLanguage } from "@agent-hud/ui/format";
+import { dateFormat } from "@agent-hud/ui/format";
 import { alertFill, alertInk, alertText, onAlertFill } from "../tokens";
 import { useGround } from "../ground";
 import { cardColumn } from "../card-column";
 import { CardButton } from "../permissions/CardButton";
+import { useT } from "@agent-hud/ui/format-context";
 
 export function CompletionAlertView({
   event,
@@ -33,8 +34,8 @@ export function CompletionAlertView({
   light?: boolean;
   botLogos?: boolean;
 }) {
+  const t = useT();
   const services = usePanelServices(),
-    zh = snapshotLanguage(snapshot) === "zh",
     [failed, setFailed] = useState(false),
     [closeHover, setCloseHover] = useState(false);
   const session = snapshot.sessions.find((s) => s.id === event.sessionId);
@@ -130,12 +131,12 @@ export function CompletionAlertView({
         </div>
         <MessageSquareText size={12} strokeWidth={2.2} color={turnText} />
         <span style={{ color: turnText, fontSize: 12, fontWeight: 500 }}>
-          {zh ? "有新回复" : "New reply"}
+          {t("New reply")}
         </span>
         <button
           type="button"
-          aria-label={zh ? "关闭回复提醒" : "Dismiss reply"}
-          title={zh ? "关闭回复提醒" : "Dismiss reply"}
+          aria-label={t("Dismiss reply")}
+          title={t("Dismiss reply")}
           onClick={dismiss}
           onPointerEnter={() => setCloseHover(true)}
           onPointerLeave={() => setCloseHover(false)}
@@ -167,7 +168,7 @@ export function CompletionAlertView({
             overflow: "hidden",
           }}
         >
-          {event.title ?? newsTitle(event, zh)}
+          {event.title ?? newsTitle(event, t)}
         </strong>
         {message && (
           <p
@@ -209,14 +210,12 @@ export function CompletionAlertView({
       <div style={cardColumn(8)}>
         {failed && hasSession ? (
           <span style={{ fontSize: 11, color: ink(0.65) }}>
-            {zh
-              ? "无法回到会话，请重试或查看 Token 用量"
-              : "Couldn't return to session. Retry or view token usage."}
+            {t("Couldn't return to session. Retry or view token usage.")}
           </span>
         ) : (
           !hasSession && (
             <span style={{ fontSize: 11, color: ink(0.5) }}>
-              {zh ? "暂时无法回到原会话" : "Session return unavailable"}
+              {t("Session return unavailable")}
             </span>
           )
         )}
@@ -228,7 +227,7 @@ export function CompletionAlertView({
             style={{ whiteSpace: "nowrap" }}
           >
             <ChartNoAxesColumn size={9} strokeWidth={2.6} />
-            {zh ? "查看 Token 用量" : "View token usage"}
+            {t("View token usage")}
           </CardButton>
           <span style={{ flex: 1, minWidth: 8 }} />
           {hasSession && (
@@ -243,13 +242,7 @@ export function CompletionAlertView({
               ) : (
                 <ArrowUpRight size={9} strokeWidth={2.6} />
               )}
-              {failed
-                ? zh
-                  ? "重试会话跳转"
-                  : "Retry session"
-                : zh
-                  ? "回到会话"
-                  : "Return to session"}
+              {failed ? t("Retry session") : t("Return to session")}
             </CardButton>
           )}
         </div>

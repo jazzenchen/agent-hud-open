@@ -1,7 +1,6 @@
 //! Explicit, bounded transcript pages. Message bodies are read only for the
 //! selected session and never stored in ingestion checkpoints or snapshots.
 use super::*;
-use crate::l10n;
 use agent_hud_agents::transcript::items::{self, LineItem};
 use agent_hud_agents::transcript::turns::{self, TurnStart, Turns};
 

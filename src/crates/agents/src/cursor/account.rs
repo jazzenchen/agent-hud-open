@@ -8,7 +8,7 @@ use super::periods::{current_period, summary_period};
 use crate::account::{
     account_id, legacy_account, status, Host, HttpFailure, HttpRequest, Provider, Reading, Unread,
 };
-use crate::{l10n, Location, PerOs, Support};
+use crate::{l10n::tr, Location, PerOs, Support};
 use chrono::Utc;
 use serde_json::{json, Value};
 use std::time::Duration;
@@ -25,16 +25,10 @@ pub const DATABASE: PerOs<Location> = PerOs {
 };
 
 pub(super) fn auth_format() -> String {
-    l10n::text(
-        "Cursor 账户登录信息格式无法识别",
-        "Cursor account authentication has an unsupported format.",
-    )
+    tr!("Cursor account authentication has an unsupported format.")
 }
 pub(super) fn database_format() -> String {
-    l10n::text(
-        "Cursor 账户数据库格式无法识别",
-        "Cursor account database has an unsupported format.",
-    )
+    tr!("Cursor account database has an unsupported format.")
 }
 
 pub(super) fn percentage(pool: &Value) -> Option<f64> {
@@ -92,9 +86,8 @@ pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
         })
         .map_err(|failure| match failure {
             HttpFailure::BadHeader => auth_format().into(),
-            HttpFailure::Unreachable => failure.unread_as(l10n::text(
-                "无法读取 Cursor 账户用量，请检查网络",
-                "Cursor account usage could not be reached; check the connection.",
+            HttpFailure::Unreachable => failure.unread_as(tr!(
+                "Cursor account usage could not be reached; check the connection."
             )),
             other => other.unread(),
         })
@@ -103,11 +96,7 @@ pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
                 && !body["teamUsage"].is_object()
                 && !body["membershipType"].is_string()
             {
-                Err(l10n::text(
-                    "Cursor 账户返回的数据格式无法识别",
-                    "Cursor account response has an unsupported format.",
-                )
-                .into())
+                Err(tr!("Cursor account response has an unsupported format.").into())
             } else {
                 Ok(body)
             }
@@ -130,18 +119,13 @@ pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
         let reply =
             dashboard(host, &token, "GetCurrentPeriodUsage").map_err(|failure| match failure {
                 HttpFailure::BadHeader => auth_format().into(),
-                HttpFailure::Unreachable => failure.unread_as(l10n::text(
-                    "无法读取 Cursor 的计划用量，请检查网络",
-                    "Cursor's plan usage could not be reached; check the connection.",
+                HttpFailure::Unreachable => failure.unread_as(tr!(
+                    "Cursor's plan usage could not be reached; check the connection."
                 )),
                 other => other.unread(),
             })?;
-        current_period(&reply).ok_or_else(|| {
-            Unread::from(l10n::text(
-                "Cursor 的计划用量格式无法识别",
-                "Cursor's plan usage has an unsupported format.",
-            ))
-        })?
+        current_period(&reply)
+            .ok_or_else(|| Unread::from(tr!("Cursor's plan usage has an unsupported format.")))?
     } else {
         summary_period(&body)
     };
@@ -219,12 +203,9 @@ pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
             })
         })
         .collect::<Vec<_>>();
-    let notice = quotas.is_empty().then(|| {
-        l10n::text(
-            "Cursor 已连接，当前计划未提供额度比例",
-            "Cursor is connected; this plan reports no quota percentage.",
-        )
-    });
+    let notice = quotas
+        .is_empty()
+        .then(|| tr!("Cursor is connected; this plan reports no quota percentage."));
     Ok(Reading {
         provider: "cursor",
         failure: None,

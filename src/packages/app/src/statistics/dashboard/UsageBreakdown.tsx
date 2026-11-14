@@ -1,5 +1,6 @@
 import { HUDArtwork as HUDLogo } from "@agent-hud/hud/HUDArtwork";
 import type { StatisticsResponse } from "@agent-hud/protocol";
+import { useT } from "@agent-hud/ui/format-context";
 import {
   compact,
   modelColor,
@@ -26,7 +27,7 @@ export function UsageBreakdown({
   agents: string[] | null;
   theme: StatsTheme;
 }) {
-  const zh = Boolean(theme.zh);
+  const t = useT();
   const catalog = new Map(available.models.map((model) => [model.id, model]));
   const names = new Map(
     available.providers.map((provider) => [provider.id, provider.name]),
@@ -94,9 +95,9 @@ export function UsageBreakdown({
               <span
                 style={{ paddingLeft: 18, color: theme.tertiary, fontSize: 10 }}
               >
-                {zh
-                  ? `另有 ${group.models.length - MODELS} 个模型`
-                  : `${group.models.length - MODELS} more models`}
+                {t("{{count}} more models", {
+                  count: group.models.length - MODELS,
+                })}
               </span>
             )}
           </div>
@@ -104,9 +105,7 @@ export function UsageBreakdown({
       })}
       {sorted.length > AGENTS && (
         <span style={{ color: theme.tertiary, fontSize: 10 }}>
-          {zh
-            ? `另有 ${sorted.length - AGENTS} 个 Agent`
-            : `${sorted.length - AGENTS} more agents`}
+          {t("{{count}} more agents", { count: sorted.length - AGENTS })}
         </span>
       )}
     </div>

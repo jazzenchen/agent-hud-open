@@ -28,12 +28,8 @@ import type { NativeHUDMonitor } from "../lib/use-hud-geometry";
 import { LoadingState } from "../LoadingState";
 import { ViewErrorBoundary } from "../ViewErrorBoundary";
 import type { AgentPluginItem } from "./AgentPluginsPane";
-import {
-  chinesePages,
-  pageGroups,
-  sidebarPages,
-  type AppExtensionPage,
-} from "./pages";
+import { useFormat, useT } from "@agent-hud/ui/format-context";
+import { pageGroups, sidebarPages, type AppExtensionPage } from "./pages";
 import { SettingsNavigation } from "./SettingsNavigation";
 import { GuideLayer } from "../guide/GuideLayer";
 import type { ProductGuide } from "../guide/plan";
@@ -54,7 +50,6 @@ export function SettingsWindow({
   productName,
   version,
   theme,
-  chinese,
   demo,
   sourceMenu,
   error,
@@ -78,7 +73,6 @@ export function SettingsWindow({
   productName: string;
   version: string;
   theme: "dark" | "light";
-  chinese: boolean;
   demo: boolean;
   sourceMenu: ReactNode;
   error: string | null;
@@ -96,12 +90,12 @@ export function SettingsWindow({
   preferences: Record<string, SourcePreferences>;
   onPreferences: (source: string, patch: SourcePreferences) => Promise<unknown>;
 }) {
+  const t = useT();
+  const { language } = useFormat();
   const allPages = useMemo(
-    () => sidebarPages(extensionPages),
-    [extensionPages],
+    () => sidebarPages(extensionPages, t, language),
+    [extensionPages, t, language],
   );
-  for (const page of extensionPages)
-    if (page.zh) chinesePages[page.id] = page.zh;
   const [page, setPage] = useState<Page>("display");
   // The running app's own version: a release is stamped with its version when
   // it is built (0.6.0-beta.1), which a product's front end cannot know.
@@ -140,7 +134,7 @@ export function SettingsWindow({
         <div className="apple-app" data-theme={theme}>
           <aside className="apple-sidebar">
             <div className="sidebar-drag-space" data-tauri-drag-region />
-            <nav aria-label={chinese ? "设置" : "Settings"}>
+            <nav aria-label={t("Settings")}>
               {pageGroups.map((group) => {
                 const items = allPages.filter((item) => item.group === group);
                 if (!items.length) return null;
@@ -164,9 +158,7 @@ export function SettingsWindow({
                               <Icon size={13} strokeWidth={1.9} />
                             )}
                           </span>
-                          <span>
-                            {chinese ? (chinesePages[id]?.[0] ?? label) : label}
-                          </span>
+                          <span>{label}</span>
                         </Button>
                       );
                     })}
@@ -179,14 +171,7 @@ export function SettingsWindow({
               <div>
                 <strong>{productName}</strong>
                 <span>
-                  {runningVersion ?? version} ·{" "}
-                  {demo
-                    ? chinese
-                      ? "演示"
-                      : "Demo"
-                    : chinese
-                      ? "实时"
-                      : "Live"}
+                  {runningVersion ?? version} · {demo ? t("Demo") : t("Live")}
                 </span>
               </div>
               {sourceMenu}
@@ -197,18 +182,9 @@ export function SettingsWindow({
           >
             <div className="settings-header" data-tauri-drag-region="deep">
               <div className="settings-column">
-                <h1>
-                  {chinese
-                    ? (chinesePages[page]?.[0] ?? currentPage?.label)
-                    : currentPage?.label}
-                </h1>
-                {((chinese ? chinesePages[page]?.[1] : null) ??
-                currentPage?.description) ? (
-                  <p>
-                    {chinese
-                      ? (chinesePages[page]?.[1] ?? currentPage?.description)
-                      : currentPage?.description}
-                  </p>
+                <h1>{currentPage?.label}</h1>
+                {currentPage?.description ? (
+                  <p>{currentPage.description}</p>
                 ) : null}
               </div>
             </div>
@@ -218,9 +194,7 @@ export function SettingsWindow({
                   <Alert variant="destructive">
                     <CircleHelp />
                     <AlertTitle>
-                      {chinese
-                        ? "无法连接数据服务"
-                        : "Couldn’t connect to the runtime"}
+                      {t("Couldn’t connect to the runtime")}
                     </AlertTitle>
                     <AlertDescription>{error}</AlertDescription>
                   </Alert>
@@ -229,21 +203,17 @@ export function SettingsWindow({
                   <LoadingState
                     label={
                       loading
-                        ? chinese
-                          ? "正在读取本机活动…"
-                          : "Reading local activity…"
-                        : chinese
-                          ? "数据服务不可用"
-                          : "The runtime is unavailable"
+                        ? t("Reading local activity…")
+                        : t("The runtime is unavailable")
                     }
                     failed={!loading}
-                    retryLabel={chinese ? "重试" : "Retry"}
+                    retryLabel={t("Retry")}
                     onRetry={() => void refresh()}
                   />
                 ) : (
                   // A page that fails to draw shows its error under its own
                   // header; the sidebar stays, and another page clears it.
-                  <ViewErrorBoundary key={page} chinese={chinese}>
+                  <ViewErrorBoundary key={page}>
                     <Suspense fallback={null}>
                       {extensionPages
                         .find((item) => item.id === page)
@@ -255,7 +225,6 @@ export function SettingsWindow({
                         selectedId={selectedId}
                         monitors={monitors}
                         selectScreen={selectScreen}
-                        chinese={chinese}
                         layout={layout}
                         onLayout={onLayout}
                         preferences={preferences}

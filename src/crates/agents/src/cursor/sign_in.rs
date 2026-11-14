@@ -1,7 +1,7 @@
 //! Cursor's saved sign-in, read from its state database, which Grok Bot uses too.
 use super::account::{auth_format, database_format, DATABASE};
 use crate::account::{locate, Answer, DatabaseFailure, Host, Unread};
-use crate::l10n;
+use crate::l10n::tr;
 use base64::{engine::general_purpose::STANDARD, Engine};
 use chrono::Utc;
 use std::time::Duration;
@@ -27,22 +27,10 @@ fn opened_token(host: &dyn Host, stored: &str) -> Result<String, String> {
     let encrypted = STANDARD.decode(encoded).map_err(|_| auth_format())?;
     match host.unseal_safe_storage("Cursor", &encrypted) {
         Answer::Found(token) => Ok(token),
-        Answer::Denied => Err(l10n::text(
-            "Cursor 加密了登录信息，钥匙串访问被拒绝。重新打开 Agent HUD 后会再次询问",
-            "Cursor encrypted its sign-in, and keychain access was refused. Agent HUD asks again after it restarts.",
-        )),
-        Answer::Missing => Err(l10n::text(
-            "Cursor 加密了登录信息，但找不到它的钥匙串项",
-            "Cursor encrypted its sign-in, but its keychain item is missing.",
-        )),
-        Answer::Unsupported => Err(l10n::text(
-            "Cursor 加密了登录信息，此系统还不能解密",
-            "Cursor encrypted its sign-in; this system cannot unlock it yet.",
-        )),
-        Answer::Failed => Err(l10n::text(
-            "Cursor 加密的登录信息无法解密",
-            "Cursor's encrypted sign-in could not be unlocked.",
-        )),
+        Answer::Denied => Err(tr!("Cursor encrypted its sign-in, and keychain access was refused. Agent HUD asks again after it restarts.")),
+        Answer::Missing => Err(tr!("Cursor encrypted its sign-in, but its keychain item is missing.")),
+        Answer::Unsupported => Err(tr!("Cursor encrypted its sign-in; this system cannot unlock it yet.")),
+        Answer::Failed => Err(tr!("Cursor's encrypted sign-in could not be unlocked.")),
     }
 }
 
@@ -60,18 +48,10 @@ pub(crate) fn sign_in(host: &dyn Host) -> Result<Option<SignIn>, Unread> {
         Ok(rows) => rows,
         Err(DatabaseFailure::Missing) => return Ok(None),
         Err(DatabaseFailure::Unopenable) => {
-            return Err(l10n::text(
-                "无法打开 Cursor 账户数据库",
-                "Cursor account database could not be opened.",
-            )
-            .into())
+            return Err(tr!("Cursor account database could not be opened.").into())
         }
         Err(DatabaseFailure::Unreadable) => {
-            return Err(l10n::text(
-                "无法读取 Cursor 账户数据库",
-                "Cursor account database could not be read.",
-            )
-            .into())
+            return Err(tr!("Cursor account database could not be read.").into())
         }
         Err(DatabaseFailure::Unrecognized) => return Err(database_format().into()),
     };
@@ -88,9 +68,8 @@ pub(crate) fn sign_in(host: &dyn Host) -> Result<Option<SignIn>, Unread> {
             .transpose()
     };
     let Some(stored) = lookup("cursorAuth/accessToken")?.filter(|token| !token.is_empty()) else {
-        return Err(Unread::SignedOut(l10n::text(
-            "登录 Cursor 后读取账户用量",
-            "Sign in to Cursor to read its account usage.",
+        return Err(Unread::SignedOut(tr!(
+            "Sign in to Cursor to read its account usage."
         )));
     };
     let token = opened_token(host, &stored)?;
@@ -103,9 +82,8 @@ pub(crate) fn sign_in(host: &dyn Host) -> Result<Option<SignIn>, Unread> {
         .as_f64()
         .is_some_and(|expiry| expiry > Utc::now().timestamp() as f64 + 60.0)
     {
-        return Err(Unread::SignedOut(l10n::text(
-            "Cursor 保存的登录已过期，请在 Cursor 中重新登录",
-            "Cursor's saved access token expired; sign in in Cursor to renew it.",
+        return Err(Unread::SignedOut(tr!(
+            "Cursor's saved access token expired; sign in in Cursor to renew it."
         )));
     }
     let user = claims["sub"]

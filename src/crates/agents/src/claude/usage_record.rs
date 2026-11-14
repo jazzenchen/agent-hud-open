@@ -14,7 +14,7 @@
 //! Code fetched it, and touching no identity field or credential to do so,
 //! follows QuotaView (github.com/duoasa/quotaview, MIT,
 //! `ClaudeCodeAccountProfile.decode`).
-use crate::l10n;
+use crate::l10n::tr;
 use serde_json::Value;
 
 /// How old a record can be and still stand for a reading made now. Claude
@@ -49,11 +49,10 @@ impl Record<'_> {
     /// Says that the windows shown are this record's, and how old it is.
     pub fn shown(&self, now_ms: i64) -> String {
         let age = age(self.age_ms(now_ms));
-        if l10n::chinese() {
-            format!("显示的是 Claude Code {age} 前记下的读数")
-        } else {
-            format!("Showing Claude Code's own reading from {age} ago")
-        }
+        tr!(
+            "Showing Claude Code's own reading from {{age}} ago",
+            age = age
+        )
     }
 }
 

@@ -1,5 +1,6 @@
 //! Legacy database and usage/quota migration helpers.
 use super::*;
+use crate::l10n::tr;
 pub(crate) use agent_hud_agents::sqlite as legacy_database;
 pub(crate) use agent_hud_agents::transcript::carried_usage;
 pub(crate) mod legacy_quota;
@@ -87,7 +88,7 @@ impl crate::AgentHudCore {
                         self.usage_projection = None;
                     }
                     Err(_) => {
-                        self.storage_issue = Some(l10n::text("无法沿用之前的用量记录，将重新逐步索引会话日志", "Previous usage history could not be reused; source logs will be indexed incrementally"));
+                        self.storage_issue = Some(tr!("Previous usage history could not be reused; source logs will be indexed incrementally"));
                     }
                 }
             }

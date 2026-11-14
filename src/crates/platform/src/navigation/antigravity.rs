@@ -1,6 +1,6 @@
 //! The public AntigravityNavigation contract: an already-running desktop's
 //! loopback CDP inventory and /c/<UUID>. Never launches an application/server.
-use agent_hud_core::l10n;
+use agent_hud_core::l10n::tr;
 use reqwest::{blocking::Client, Url};
 use serde::Deserialize;
 use serde_json::{json, Value};
@@ -86,10 +86,7 @@ pub(super) fn destination(id: &str, pages: &[Page], port: u16) -> Option<Destina
 fn remaining(deadline: Instant) -> Result<Duration, String> {
     let left = deadline.saturating_duration_since(Instant::now());
     if left.is_zero() {
-        Err(l10n::text(
-            "打开 Antigravity 会话超时",
-            "Antigravity navigation timed out",
-        ))
+        Err(tr!("Antigravity navigation timed out"))
     } else {
         Ok(left)
     }

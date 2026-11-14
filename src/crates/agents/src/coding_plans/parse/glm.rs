@@ -1,7 +1,7 @@
 //! The GLM Coding Plan's answer (ZCode's plan's too): its quota limits, the
 //! token, credit and MCP call windows, each told apart by kind, unit and length.
 use crate::coding_plans::numeric;
-use crate::l10n;
+use crate::l10n::tr;
 use crate::naming::{vendor_windows::glm_name, window_names::Period};
 use crate::transcript::metering::date_ms;
 use serde_json::{json, Value};
@@ -20,15 +20,12 @@ pub(super) fn windows(
     ),
 ) -> Result<(), String> {
     if root["success"] != true || numeric(&root["code"]) != Some(200.0) {
-        return Err(l10n::text(
-            "GLM 返回的额度格式无法识别",
-            "GLM returned an unsupported quota format",
-        ));
+        return Err(tr!("GLM returned an unsupported quota format"));
     }
     let mut found = Vec::new();
     for value in root["data"]["limits"]
         .as_array()
-        .ok_or_else(|| l10n::text("GLM 未提供额度窗口", "GLM quota windows are unavailable"))?
+        .ok_or_else(|| tr!("GLM quota windows are unavailable"))?
     {
         let Some(kind) = value["type"]
             .as_str()
@@ -36,21 +33,13 @@ pub(super) fn windows(
         else {
             continue;
         };
-        let unit = value["unit"].as_i64().ok_or_else(|| {
-            l10n::text(
-                "GLM 额度窗口缺少单位",
-                "GLM quota window unit is unavailable",
-            )
-        })?;
-        let count = numeric(&value["number"]).ok_or_else(|| {
-            l10n::text(
-                "GLM 额度窗口缺少时长",
-                "GLM quota window duration is unavailable",
-            )
-        })?;
-        let mut used = numeric(&value["percentage"]).ok_or_else(|| {
-            l10n::text("GLM 未提供额度比例", "GLM quota percentage is unavailable")
-        })?;
+        let unit = value["unit"]
+            .as_i64()
+            .ok_or_else(|| tr!("GLM quota window unit is unavailable"))?;
+        let count = numeric(&value["number"])
+            .ok_or_else(|| tr!("GLM quota window duration is unavailable"))?;
+        let mut used = numeric(&value["percentage"])
+            .ok_or_else(|| tr!("GLM quota percentage is unavailable"))?;
         let capacity = numeric(&value["usage"]);
         let current = numeric(&value["currentValue"]);
         if let Some(capacity) = capacity.filter(|n| *n > 0.0) {

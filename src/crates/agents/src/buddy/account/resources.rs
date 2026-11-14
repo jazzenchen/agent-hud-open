@@ -3,7 +3,7 @@ use super::copilot::{account_json, post_token, CopilotSpec};
 use super::summary::{amount, parse_cst_end, round2, REWARD_PACKAGES};
 use super::vscdb::BuddyAuth;
 use crate::account::{status, Host, Reading, Unread};
-use crate::l10n;
+use crate::l10n::tr;
 use chrono::{DateTime, FixedOffset, Utc};
 use serde_json::{json, Value};
 
@@ -195,12 +195,9 @@ pub(super) fn read_codebuddy_resources(
             "nativeUsage": {"used": used, "capacity": cap, "unit": "credits"},
         }));
     } else {
-        reading.notice = Some(l10n::text(
-            &format!("{} 当前没有可用的积分额度", spec.label),
-            &format!(
-                "{} reports no credit allowance for this account.",
-                spec.label
-            ),
+        reading.notice = Some(tr!(
+            "{{name}} reports no credit allowance for this account.",
+            name = spec.label
         ));
     }
     reading.account = Some(account_json(
@@ -228,8 +225,8 @@ fn signed_amount(value: Option<&Value>) -> Option<f64> {
 }
 
 fn format_err(label: &str) -> Unread {
-    Unread::from(l10n::text(
-        &format!("{label} 的积分格式无法识别"),
-        &format!("{label}'s credit usage has an unsupported format."),
+    Unread::from(tr!(
+        "{{name}}'s credit usage has an unsupported format.",
+        name = label
     ))
 }

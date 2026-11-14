@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { HUDArtwork as HUDLogo } from "@agent-hud/hud/HUDArtwork";
-import { quotaPercentLabel } from "@agent-hud/ui/format";
-import { useFormat } from "@agent-hud/ui/format-context";
+import { locale, quotaPercentLabel } from "@agent-hud/ui/format";
+import { useFormat, useT } from "@agent-hud/ui/format-context";
 import type {
   Quota,
   QuotaHistoryResponse,
@@ -63,10 +63,10 @@ export function QuotaRows({
   theme: StatsTheme;
   light: boolean;
 }) {
-  const zh = Boolean(theme.zh);
-  const t = (en: string, cn: string) => (zh ? cn : en);
-  const language = zh ? "zh-CN" : "en-US";
-  const display = useFormat().quotaDisplay ?? "consumed";
+  const t = useT();
+  const format = useFormat();
+  const language = locale(format.language);
+  const display = format.quotaDisplay ?? "consumed";
   const { ref, width } = useWidth();
   const [hovered, setHovered] = useState<{ row: number; day: number } | null>(
     null,
@@ -90,26 +90,22 @@ export function QuotaRows({
     });
   const tip = (entry: QuotaRow, value: QuotaDay) => {
     const name = entry.window.shortLabel ?? entry.window.name;
-    if (value.value === null) return t("Nothing read that day", "这天没有读数");
+    if (value.value === null) return t("Nothing read that day");
     const share = Math.round(value.value);
     const lines = isLong(entry.window)
       ? [
-          t(`Used ${share}% of ${name}`, `用掉 ${name} 的 ${share}%`),
+          t("Used {{share}}% of {{window}}", { share, window: name }),
           value.level !== null &&
-            t(
-              `${Math.round(value.level)}% used by the day's end`,
-              `当天结束时已用 ${Math.round(value.level)}%`,
-            ),
+            t("{{level}}% used by the day's end", {
+              level: Math.round(value.level),
+            }),
         ]
       : [
-          t(`Highest ${name}: ${share}%`, `${name} 当天最高 ${share}%`),
-          value.ranOut > 0 &&
-            t(`${value.ranOut} ran out`, `${value.ranOut} 次用满`),
+          t("Highest {{window}}: {{share}}%", { window: name, share }),
+          value.ranOut > 0 && t("{{times}} ran out", { times: value.ranOut }),
         ];
     if (value.resets.length)
-      lines.push(
-        t(`Reset at ${time(value.resets[0])}`, `${time(value.resets[0])} 重置`),
-      );
+      lines.push(t("Reset at {{time}}", { time: time(value.resets[0]) }));
     return lines.filter(Boolean).join(" · ");
   };
   // The first and last days, and evenly between them where they fit.
@@ -231,7 +227,7 @@ export function QuotaRows({
               </text>
             ))}
           </svg>
-          <span style={{ textAlign: "right" }}>{t("now", "当前")}</span>
+          <span style={{ textAlign: "right" }}>{t("now")}</span>
         </div>
       )}
       {hovered && rows[hovered.row] && (

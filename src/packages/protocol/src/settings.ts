@@ -3,7 +3,8 @@ import type { CustomPrice } from "./prices-relays.ts";
 
 export type ApprovalWaitMinutes = 1 | 3 | 5 | 10 | 30 | 60;
 export interface PanelBlockLayout {
-  /** `rings` are concentric (年轮) and `segments` split one ring (分段环), one
+  /**
+   * `rings` are concentric (年轮) and `segments` split one ring (分段环), one
    * per account; a layout saved before them says `ring`, read as `rings`. */
   widget?: "bar" | "rings" | "segments" | "ring" | "number" | "chart";
   hidden?: boolean;

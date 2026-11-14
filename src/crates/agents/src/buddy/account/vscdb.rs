@@ -2,7 +2,8 @@
 //! `state.vscdb` credentials, plus shared Tencent Copilot session normalization.
 use crate::account::cipher::unseal_vscode_secret;
 use crate::account::{resolve, Answer, DatabaseFailure, Host, Unread};
-use crate::{l10n, Location};
+use crate::l10n::tr;
+use crate::Location;
 use serde_json::Value;
 use std::time::Duration;
 
@@ -40,11 +41,7 @@ pub(super) fn read_codebuddy_local(
         Ok(rows) => rows,
         Err(DatabaseFailure::Missing) => return Ok(None),
         Err(DatabaseFailure::Unopenable | DatabaseFailure::Unreadable) => {
-            return Err(l10n::text(
-                &format!("无法读取 {label} 账户数据库"),
-                &format!("{label} account database could not be read."),
-            )
-            .into())
+            return Err(tr!("{{name}} account database could not be read.", name = label).into())
         }
         Err(DatabaseFailure::Unrecognized) => return Err(db_format(label).into()),
     };
@@ -142,8 +139,8 @@ fn text(value: &Value) -> Option<String> {
 }
 
 fn db_format(label: &str) -> String {
-    l10n::text(
-        &format!("{label} 账户数据库格式无法识别"),
-        &format!("{label} account database has an unsupported format."),
+    tr!(
+        "{{name}} account database has an unsupported format.",
+        name = label
     )
 }

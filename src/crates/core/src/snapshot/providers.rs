@@ -1,6 +1,7 @@
 //! The clients and accounts a snapshot shows: every client with what was
 //! found of it, and each enabled client's accounts as their headers show them.
 use super::*;
+use crate::l10n::tr;
 
 impl crate::AgentHudCore {
     /// An account as its section header shows it (Open's AccountSectionHeader
@@ -19,7 +20,10 @@ impl crate::AgentHudCore {
             .map(str::to_owned)
             .unwrap_or_else(|| {
                 let tail = id.rsplit(':').next().unwrap_or(id);
-                l10n::text("账户 ", "Account ") + &tail.chars().take(6).collect::<String>()
+                tr!(
+                    "Account {{id}}",
+                    id = tail.chars().take(6).collect::<String>()
+                )
             });
         account["name"] = json!(name);
         account["planLabel"] = json!(account["plan"]

@@ -9,7 +9,7 @@ use super::DeepSeekChannel;
 use crate::claude_plugin::{file_age, millis, valid_name, write_private};
 use crate::hooks::Wake;
 use agent_hud_agents::deepseek::AGENT;
-use agent_hud_core::l10n;
+use agent_hud_core::l10n::tr;
 use agent_hud_core::requests::{Requests, Ticket};
 use serde_json::{json, Value};
 use std::{
@@ -267,12 +267,7 @@ fn deliver(shared: Arc<Shared>, ask: Ask, ticket: Ticket) {
                 .join(format!("{}.answer", ask.id));
             write_private(&file, value.to_string().as_bytes())
                 .map(|()| true)
-                .map_err(|_| {
-                    l10n::text(
-                        "回答没能交给 DeepSeek Harness 插件。",
-                        "The answer could not be left for the DeepSeek Harness plugin.",
-                    )
-                })
+                .map_err(|_| tr!("The answer could not be left for the DeepSeek Harness plugin."))
         }
     });
     match left {

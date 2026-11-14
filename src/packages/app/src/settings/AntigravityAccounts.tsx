@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { NativeMethod } from "@agent-hud/protocol";
-import { Notice, Section, type Text } from "./SettingsPrimitives";
+import { Notice, Section } from "./SettingsPrimitives";
+import type { Translate } from "@agent-hud/ui/format";
 import { SmallButton, Unavailable } from "./SettingsControls";
 import { usePending } from "./use-pending";
 
@@ -17,7 +18,7 @@ export default function AntigravityAccounts({
   settings,
   action,
 }: {
-  t: Text;
+  t: Translate;
   settings: string[];
   action: (
     method: NativeMethod,
@@ -53,18 +54,14 @@ export default function AntigravityAccounts({
         .filter(Boolean),
     ),
   ];
-  const label = t("Antigravity CLI accounts", "Antigravity CLI 账户");
+  const label = t("Antigravity CLI accounts");
   // Why the field is off: still checking, or the CLI can't take the hook.
   const reason = !status
     ? error
       ? undefined
-      : t("Checking the Antigravity CLI…", "正在检查 Antigravity CLI…")
+      : t("Checking the Antigravity CLI…")
     : !status.installable
-      ? (status.notice ??
-        t(
-          "The Antigravity CLI can't be connected.",
-          "无法连接 Antigravity CLI。",
-        ))
+      ? (status.notice ?? t("The Antigravity CLI can't be connected."))
       : undefined;
   const ready = !!status?.installable;
 
@@ -88,7 +85,6 @@ export default function AntigravityAccounts({
       title={label}
       footer={t(
         "One settings.json per line. Restart the CLI after connecting; removing a path undoes the change.",
-        "每行一个 settings.json。连接后重启 CLI；移除路径即可还原。",
       )}
     >
       <div className="settings-field">
@@ -109,7 +105,7 @@ export default function AntigravityAccounts({
                 setText([...paths(), status!.defaultSettings].join("\n"))
               }
             >
-              {t("Add default", "添加默认配置")}
+              {t("Add default")}
             </SmallButton>,
             addDefaultOff,
           )}
@@ -119,7 +115,7 @@ export default function AntigravityAccounts({
               disabled={connectOff}
               onClick={() => void save()}
             >
-              {pending ? t("Saving…", "正在保存…") : t("Connect", "连接")}
+              {pending ? t("Saving…") : t("Connect")}
             </SmallButton>,
             connectOff,
           )}

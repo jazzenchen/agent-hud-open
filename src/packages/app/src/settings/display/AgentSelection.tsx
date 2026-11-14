@@ -21,7 +21,7 @@ export function AgentSelection({
   const saved = (config.panelLayout.hud?.agents ?? []).map(vendorKey);
   const shown = shownAgents(available, saved);
   return (
-    <MoreRows label={t("Agents on this HUD", "这块屏幕的 HUD 显示哪些智能体")}>
+    <MoreRows label={t("Agents on this HUD")}>
       {agents.map((agent) => {
         const on = shown.includes(agent.key);
         const last = on && shown.length === 1;
@@ -29,15 +29,11 @@ export function AgentSelection({
           <Row
             key={agent.key}
             title={agent.name}
-            subtitle={
-              last
-                ? t("One agent always stays.", "至少留一个智能体。")
-                : undefined
-            }
+            subtitle={last ? t("One agent always stays.") : undefined}
             icon={<HUDArtwork source={agent.name} size={18} light={light} />}
           >
             <Switch
-              aria-label={t(`Show ${agent.name}`, `显示 ${agent.name}`)}
+              aria-label={t("Show {{agent}}", { agent: agent.name })}
               checked={on}
               disabled={last}
               onCheckedChange={() =>

@@ -7,6 +7,7 @@ import { palette } from "../panel/theme";
 import { useFormat } from "@agent-hud/ui/format-context";
 import { quotaAlertCopy, resetCreditCopy } from "./quota-alert-copy";
 import { Heading, Metric, StatsButton } from "./AlertCardParts";
+import { useT } from "@agent-hud/ui/format-context";
 
 /** Usage resets added to an account (Open's ResetCreditAlertDetailView): the
  * client and the account, what was added, how many the account holds and its
@@ -18,7 +19,6 @@ export function ResetCreditAlertView({
   onStats,
   light = false,
   botLogos = true,
-  zh = false,
 }: {
   event: IslandEvent;
   snapshot?: Snapshot;
@@ -26,8 +26,9 @@ export function ResetCreditAlertView({
   onStats?: () => void;
   light?: boolean;
   botLogos?: boolean;
-  zh?: boolean;
 }) {
+  const t = useT();
+  const { language } = useFormat();
   const ground = useGround(light);
   const ink = (alpha: number) => alertInk(alpha, ground);
   const account = snapshot?.accounts?.find(
@@ -42,14 +43,14 @@ export function ResetCreditAlertView({
     (Array.isArray(event.newCredits)
       ? event.newCredits.map((credit) => credit?.expiresAt)
       : []);
-  const copy = resetCreditCopy(added, expiries, zh ? "zh" : "en");
+  const copy = resetCreditCopy(added, expiries, language);
   return (
     <article style={{ ...cardColumn(20), fontSize: 12, color: "inherit" }}>
       <Heading
         event={event}
         name={agentVendorName(event.source)}
         under={account?.name ?? event.title ?? null}
-        news={zh ? "新增重置" : "new reset"}
+        news={t("new reset")}
         accentFill={alertFill("calm", ground)}
         accentText={alertText("calm", ground)}
         light={light}
@@ -63,26 +64,13 @@ export function ResetCreditAlertView({
           gap: 12,
         }}
       >
-        <Metric
-          value={`+${added}`}
-          label={zh ? "新增" : "added"}
-          light={light}
-        />
-        <Metric
-          value={`${available}`}
-          label={zh ? "可用次数" : "available"}
-          light={light}
-        />
-        <Metric
-          value={copy.expiry}
-          label={zh ? "最早到期" : "first expires"}
-          light={light}
-        />
+        <Metric value={`+${added}`} label={t("added")} light={light} />
+        <Metric value={`${available}`} label={t("available")} light={light} />
+        <Metric value={copy.expiry} label={t("first expires")} light={light} />
       </div>
       <StatsButton
         fill={alertFill("calm", ground)}
         light={light}
-        zh={zh}
         onClick={() => {
           dismiss();
           onStats?.();
@@ -100,14 +88,13 @@ export function SignInAlertView({
   dismiss,
   light = false,
   botLogos = true,
-  zh = false,
 }: {
   event: IslandEvent;
   dismiss: () => void;
   light?: boolean;
   botLogos?: boolean;
-  zh?: boolean;
 }) {
+  const t = useT();
   const ground = useGround(light);
   const ink = (alpha: number) => alertInk(alpha, ground);
   const name = event.title ?? agentVendorName(event.source);
@@ -117,7 +104,7 @@ export function SignInAlertView({
         event={event}
         name={name}
         under={null}
-        news={zh ? "需要重新登录" : "sign in again"}
+        news={t("sign in again")}
         accentFill={alertFill("warning", ground)}
         accentText={alertText("warning", ground)}
         light={light}
@@ -129,9 +116,7 @@ export function SignInAlertView({
         </div>
       )}
       <div style={{ fontSize: 10, color: ink(0.42) }}>
-        {zh
-          ? "重新登录前，额度显示上次读到的数字。"
-          : "Until then, its quota shows the last reading."}
+        {t("Until then, its quota shows the last reading.")}
       </div>
       <button
         type="button"
@@ -149,7 +134,7 @@ export function SignInAlertView({
           cursor: "pointer",
         }}
       >
-        {zh ? "知道了" : "OK"}
+        {t("OK [acknowledge]")}
       </button>
     </article>
   );
@@ -165,22 +150,18 @@ export function QuotaAlertView({
   onStats,
   light = false,
   botLogos = true,
-  zh = false,
 }: {
   event: IslandEvent;
   dismiss: () => void;
   onStats?: () => void;
   light?: boolean;
   botLogos?: boolean;
-  zh?: boolean;
 }) {
+  const t = useT();
   const ground = useGround(light);
   const ink = (alpha: number) => alertInk(alpha, ground);
   const settings = useFormat();
-  const copy = quotaAlertCopy(event, {
-    ...settings,
-    language: zh ? "zh" : "en",
-  });
+  const copy = quotaAlertCopy(event, settings);
   const isReset = event.kind === "quota-reset";
   const tone = isReset ? "calm" : "warning";
   const accentFill = alertFill(tone, ground);
@@ -192,9 +173,7 @@ export function QuotaAlertView({
         event={event}
         name={agentVendorName(event.source)}
         under={windowName || null}
-        news={
-          isReset ? (zh ? "已重置" : "reset") : zh ? "额度预警" : "running low"
-        }
+        news={isReset ? t("reset") : t("running low")}
         accentFill={accentFill}
         accentText={accentText}
         light={light}
@@ -220,23 +199,13 @@ export function QuotaAlertView({
           label={
             isReset
               ? settings.quotaDisplay === "remaining"
-                ? zh
-                  ? "已用额度"
-                  : "used"
-                : zh
-                  ? "剩余额度"
-                  : "remaining"
-              : zh
-                ? "预计耗尽"
-                : "until empty"
+                ? t("used")
+                : t("remaining")
+              : t("until empty")
           }
           light={light}
         />
-        <Metric
-          value={copy.reset}
-          label={zh ? "下次重置" : "next reset"}
-          light={light}
-        />
+        <Metric value={copy.reset} label={t("next reset")} light={light} />
       </div>
       <div style={cardColumn(7)}>
         <div style={{ display: "flex", fontSize: 10, color: ink(0.42) }}>
@@ -280,7 +249,6 @@ export function QuotaAlertView({
       <StatsButton
         fill={accentFill}
         light={light}
-        zh={zh}
         onClick={() => {
           dismiss();
           onStats?.();

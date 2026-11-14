@@ -1,7 +1,7 @@
 //! An Antigravity account's quota windows, from its user status and the
 //! model quota summary.
 use crate::account::{account_id, legacy_account, legacy_unresolved, status, Reading};
-use crate::l10n;
+use crate::l10n::tr;
 use crate::naming::{
     vendor_windows,
     window_names::{self, Period},
@@ -110,12 +110,7 @@ pub(super) fn parse(scope: &str, body: &Value, summary: &Value) -> Result<Readin
     let user = &body["userStatus"];
     let configs = user["cascadeModelConfigData"]["clientModelConfigs"]
         .as_array()
-        .ok_or_else(|| {
-            l10n::text(
-                "Antigravity 本地服务返回的额度格式无法识别",
-                "Antigravity local service returned an unsupported quota format.",
-            )
-        })?;
+        .ok_or_else(|| tr!("Antigravity local service returned an unsupported quota format."))?;
     let email = user["email"]
         .as_str()
         .map(str::trim)
@@ -217,12 +212,9 @@ pub(super) fn parse(scope: &str, body: &Value, summary: &Value) -> Result<Readin
             })
             .collect::<Vec<_>>()
     };
-    let notice = quotas.is_empty().then(|| {
-        l10n::text(
-            "Antigravity 已连接，但本地服务未提供额度比例",
-            "Antigravity is connected; its local service reports no quota percentage.",
-        )
-    });
+    let notice = quotas
+        .is_empty()
+        .then(|| tr!("Antigravity is connected; its local service reports no quota percentage."));
     Ok(Reading {
         provider: "antigravity",
         failure: None,

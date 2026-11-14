@@ -5,7 +5,7 @@ use super::pending::{self, Pending, ELICITATION_METHOD, QUESTION_METHOD};
 use super::turns::current_turn;
 use super::Shared;
 use agent_hud_agents::codex::AGENT;
-use agent_hud_core::l10n;
+use agent_hud_core::l10n::tr;
 use serde_json::{json, Value};
 use std::{
     sync::{atomic::Ordering, Arc, PoisonError},
@@ -187,24 +187,21 @@ impl Shared {
                 }
             })?;
         if receipt["handledByClientId"] != item.owner || receipt["result"]["method"] != method {
-            return Err(ReplyFailure::Uncertain(l10n::text(
-                "Codex Desktop 的回复与请求不匹配",
-                "Desktop reply identity did not match",
+            return Err(ReplyFailure::Uncertain(tr!(
+                "Desktop reply identity did not match"
             )));
         }
         if method == pending::ELICITATION_METHOD {
             if receipt["result"]["result"]["ok"] != true {
-                return Err(ReplyFailure::Uncertain(l10n::text(
-                    "Codex Desktop 没有确认这个审批",
-                    "Desktop did not confirm this approval",
+                return Err(ReplyFailure::Uncertain(tr!(
+                    "Desktop did not confirm this approval"
                 )));
             }
         } else if receipt["result"]["result"]["result"]["turnId"]
             != item.turn_id.as_deref().unwrap_or("")
         {
-            return Err(ReplyFailure::Uncertain(l10n::text(
-                "Codex Desktop 没有确认对应的提问轮次",
-                "Desktop did not confirm the exact question turn",
+            return Err(ReplyFailure::Uncertain(tr!(
+                "Desktop did not confirm the exact question turn"
             )));
         }
         Ok(())

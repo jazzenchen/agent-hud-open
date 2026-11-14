@@ -12,7 +12,7 @@ pub use agent_hud_agents::replies::{AnswerFix, Unreachable};
 pub trait SessionReplies: Send + Sync {
     /// Whether words left now would reach the session `session` of `source`;
     /// Err gives the reason they would not, in the app's language
-    /// (`l10n::text`), and the step that would change it. Asked at every
+    /// (`tr!`), and the step that would change it. Asked at every
     /// collection pass for each question that waits, so it must be cheap and
     /// must never wait on the host's own data.
     fn reaches(&self, source: &str, session: &str) -> Result<(), Unreachable>;

@@ -61,10 +61,10 @@ pub(super) fn no_plan(body: &Value) -> bool {
         .collect::<String>();
     message.contains("codingplan")
         && [
-            "不存在",
-            "没有",
-            "未开通",
-            "未订阅",
+            "不存在", // l10n-ignore vendor message match
+            "没有",   // l10n-ignore vendor message match
+            "未开通", // l10n-ignore vendor message match
+            "未订阅", // l10n-ignore vendor message match
             "notexist",
             "nocodingplan",
             "nothave",

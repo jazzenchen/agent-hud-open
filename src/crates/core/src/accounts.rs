@@ -1,6 +1,7 @@
 //! Cached account facts supplied by the platform account reader. The domain
 //! engine never performs network or engine I/O while projecting local sessions.
 use super::*;
+use crate::l10n::tr;
 use serde_json::Value;
 use std::collections::HashMap;
 
@@ -68,10 +69,7 @@ impl crate::AgentHudCore {
                         self.account_samples.insert(id.into(), observed.into());
                     }
                     Err(_) => {
-                        self.storage_issue = Some(l10n::text(
-                            "额度读数暂时无法保存",
-                            "Quota sample persistence is unavailable",
-                        ))
+                        self.storage_issue = Some(tr!("Quota sample persistence is unavailable"))
                     }
                 }
             }
@@ -95,10 +93,7 @@ impl crate::AgentHudCore {
                 match legacy_quota::import(database, path, &pairs) {
                     Ok(count) => changed |= count > 0,
                     Err(_) => {
-                        self.storage_issue = Some(l10n::text(
-                            "无法读取之前的额度记录",
-                            "Previous quota history could not be read",
-                        ))
+                        self.storage_issue = Some(tr!("Previous quota history could not be read"))
                     }
                 }
             }

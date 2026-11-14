@@ -2,7 +2,7 @@
 use super::service::{self as antigravity, Endpoint};
 use agent_hud_agents::antigravity::AGENT;
 use agent_hud_agents::{antigravity_permissions, AntigravityPermission};
-use agent_hud_core::l10n;
+use agent_hud_core::l10n::tr;
 use agent_hud_core::requests::{Requests, Ticket};
 use serde_json::{json, Value};
 use std::{
@@ -189,24 +189,19 @@ fn resolve(shared: &Shared, pending: &Pending, decision: &Value) -> Result<(), R
         return Err(Reply::Stopped);
     }
     let endpoints = antigravity::endpoints(true).map_err(|_| {
-        fail(l10n::text(
-            "无法重新核实 Antigravity 正在等待的权限请求",
-            "Antigravity's waiting permission could not be revalidated",
+        fail(tr!(
+            "Antigravity's waiting permission could not be revalidated"
         ))
     })?;
     if !endpoints.contains(&pending.endpoint) {
-        return Err(fail(l10n::text(
-            "Antigravity 的权限服务已变化",
-            "Antigravity's permission service changed",
-        )));
+        return Err(fail(tr!("Antigravity's permission service changed")));
     }
     let current = pending
         .endpoint
         .call("GetAllCascadeTrajectories", &json!({}))
         .map_err(|_| {
-            fail(l10n::text(
-                "无法重新核实 Antigravity 正在等待的权限请求",
-                "Antigravity's waiting permission could not be revalidated",
+            fail(tr!(
+                "Antigravity's waiting permission could not be revalidated"
             ))
         })?;
     let current = antigravity_permissions(
@@ -214,20 +209,12 @@ fn resolve(shared: &Shared, pending: &Pending, decision: &Value) -> Result<(), R
         &pending.endpoint.identity(),
         crate::hooks::now_ms(),
     )
-    .map_err(|_| {
-        fail(l10n::text(
-            "Antigravity 的权限请求内容已变化",
-            "Antigravity's permission summary changed",
-        ))
-    })?;
+    .map_err(|_| fail(tr!("Antigravity's permission summary changed")))?;
     if !current
         .iter()
         .any(|item| item.id == pending.item.id && item.permission == pending.item.permission)
     {
-        return Err(fail(l10n::text(
-            "Antigravity 的请求已撤回或变更",
-            "Antigravity's request was withdrawn or changed",
-        )));
+        return Err(fail(tr!("Antigravity's request was withdrawn or changed")));
     }
     let response = pending.item.response(decision).map_err(Reply::Failed)?;
     let Some(body) = response else {
@@ -240,9 +227,8 @@ fn resolve(shared: &Shared, pending: &Pending, decision: &Value) -> Result<(), R
         .endpoint
         .call("HandleCascadeUserInteraction", &body)
         .map_err(|_| {
-            Reply::Uncertain(l10n::text(
-                "Antigravity 没有确认收到这个权限答复",
-                "Antigravity did not confirm receipt of the permission answer",
+            Reply::Uncertain(tr!(
+                "Antigravity did not confirm receipt of the permission answer"
             ))
         })?;
     Ok(())

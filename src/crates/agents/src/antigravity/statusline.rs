@@ -1,7 +1,7 @@
 //! Official agy status-line reports identify the signed-in account and its
 //! quota buckets. Only these account facts cross the callback storage boundary.
 use crate::account::{account_id, legacy_account, status, Reading};
-use crate::l10n;
+use crate::l10n::tr;
 use crate::naming::window_names::Period;
 use chrono::{DateTime, Utc};
 use serde_json::{json, Map, Value};
@@ -109,9 +109,8 @@ fn parse_at(report: &Value, now: DateTime<Utc>) -> Option<Reading> {
         }
     }
     if reading.quotas.is_empty() {
-        reading.notice = Some(l10n::text(
-            "Antigravity CLI 已识别账户，但未提供额度比例",
-            "Antigravity CLI identified the account but reports no quota percentage.",
+        reading.notice = Some(tr!(
+            "Antigravity CLI identified the account but reports no quota percentage."
         ));
     }
     Some(reading)

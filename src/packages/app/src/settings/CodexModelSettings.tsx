@@ -1,13 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import type { PanelLayout, StatisticsResponse } from "@agent-hud/protocol";
 import { systemTimeZone } from "@agent-hud/ui/format";
+import { useT } from "@agent-hud/ui/format-context";
 import { Switch } from "@agent-hud/ui/components/switch";
 import {
   Notice,
   Row,
   Section,
   type SettingsPaneProps,
-  useText,
 } from "./SettingsPrimitives";
 import { moveAmong, ReorderButtons } from "./agents/Reorder";
 
@@ -24,7 +24,7 @@ export function CodexModelSettings({
   layout: PanelLayout;
   onLayout: (layout: PanelLayout) => Promise<unknown>;
 }) {
-  const t = useText(snapshot);
+  const t = useT();
   const [models, setModels] = useState<
     StatisticsResponse["available"]["models"]
   >([]);
@@ -100,24 +100,15 @@ export function CodexModelSettings({
   };
   return (
     <Section
-      title={t("Token chart models", "Token 图表中的模型")}
+      title={t("Token chart models")}
       footer={t(
         "Models used in the last 30 days. Applies to the screen chosen on the Display page.",
-        "最近 30 天用过的模型。作用于“显示”页面选中的屏幕。",
       )}
     >
       {error && <Notice tone="error">{error}</Notice>}
-      {!loaded && !error && (
-        <Row muted title={t("Reading models…", "正在读取模型…")} />
-      )}
+      {!loaded && !error && <Row muted title={t("Reading models…")} />}
       {loaded && !shown.length && (
-        <Row
-          muted
-          title={t(
-            "No Codex models in the last 30 days",
-            "最近 30 天没有 Codex 模型用量",
-          )}
-        />
+        <Row muted title={t("No Codex models in the last 30 days")} />
       )}
       {shown.map((row, index) => (
         <Row
@@ -125,7 +116,7 @@ export function CodexModelSettings({
           title={row.name}
           subtitle={
             tokenLayout.models?.length && !tokenLayout.models.includes(row.id)
-              ? t("Left out by the model filter", "模型筛选未包含此项")
+              ? t("Left out by the model filter")
               : undefined
           }
         >
@@ -140,7 +131,7 @@ export function CodexModelSettings({
           <Switch
             checked={!hidden.includes(row.id)}
             disabled={pending}
-            aria-label={`${t("Show model", "显示模型")} ${row.name}`}
+            aria-label={t("Show model {{name}}", { name: row.name })}
             onCheckedChange={(show) =>
               void change({
                 hiddenModels: show

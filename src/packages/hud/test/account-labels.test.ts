@@ -1,5 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { addCatalog } from "@agent-hud/ui/format";
 import {
   accountReadLabel,
   missingReadingNotice,
@@ -7,6 +10,14 @@ import {
   nextExpiryLabel,
   webSignInOffer,
 } from "../src/panel/account-labels.ts";
+
+// The Chinese below is zh-Hans.json's.
+const locales = join(import.meta.dirname, "../../protocol/locales");
+for (const language of ["en", "zh-Hans"] as const)
+  addCatalog(
+    language,
+    JSON.parse(readFileSync(join(locales, `${language}.json`), "utf8")),
+  );
 
 const now = Date.parse("2026-10-21T12:00:00Z");
 const account = {
@@ -30,7 +41,7 @@ test("an account reads as current until a read fails, then says when it was last
     accountReadLabel(
       { ...account, checkedAt: "2026-10-21T11:58:00Z" },
       now,
-      "zh",
+      "zh-Hans",
     ),
     "当前账户",
   );
@@ -46,7 +57,7 @@ test("an account reads as current until a read fails, then says when it was last
     accountReadLabel(
       { ...account, stale: true, checkedAt: "2026-10-21T11:30:00Z" },
       now,
-      "zh",
+      "zh-Hans",
     ),
     "上次读取 30m 前",
   );
@@ -66,7 +77,7 @@ test("the first expiry is named only when every reset has one", () => {
     "Partial expiry details",
   );
   assert.equal(
-    nextExpiryLabel({ availableCount: 1 }, "zh").full,
+    nextExpiryLabel({ availableCount: 1 }, "zh-Hans").full,
     "有效期未提供",
   );
 });
@@ -114,7 +125,7 @@ test("a vendor status shows only while one of the agent's components is not oper
     },
   ];
   assert.equal(
-    serviceNotice(providers, "claude", "zh"),
+    serviceNotice(providers, "claude", "zh-Hans"),
     "官方状态：部分故障 · Elevated API errors",
   );
   assert.equal(

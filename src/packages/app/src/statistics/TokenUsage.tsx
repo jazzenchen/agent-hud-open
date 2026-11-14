@@ -1,4 +1,5 @@
 import type { Dispatch, SetStateAction } from "react";
+import { useT } from "@agent-hud/ui/format-context";
 import type { StatisticsResponse } from "@agent-hud/protocol";
 import { compact, modelColor, row, type StatsTheme } from "./StatsTheme";
 import { TotalSummary } from "./StatsParts";
@@ -30,8 +31,7 @@ export function TokenUsage({
   /** The chart's height, points, where it fills a taller card. */
   chartHeight?: number;
 }) {
-  const zh = Boolean(theme.zh);
-  const t = (en: string, cn: string) => (zh ? cn : en);
+  const t = useT();
   const available = data?.available;
   const providerChoices = available?.providers ?? [];
   const modelChoices = available?.models ?? [];
@@ -48,9 +48,7 @@ export function TokenUsage({
           marginBottom: 6,
         }}
       >
-        <strong style={{ fontSize: 13, fontWeight: 600 }}>
-          {t("Tokens", "Token")}
-        </strong>
+        <strong style={{ fontSize: 13, fontWeight: 600 }}>{t("Tokens")}</strong>
         {data ? (
           <TotalSummary
             value={data.totals}

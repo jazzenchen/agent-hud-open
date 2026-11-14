@@ -7,6 +7,7 @@
 //! facts. Models the page's filter hides (`hiddenModels`, ids as the
 //! statistics name them) are left out of the value.
 use super::*;
+use crate::l10n::tr;
 use crate::naming::model_names::{consumer_name, vendor_name};
 use crate::statistics::model_id;
 use agent_hud_agents::plans::{self, Catalog, Plan};
@@ -156,22 +157,15 @@ impl AgentHudCore {
             let mut ratio = Value::Null;
             let mut partial = false;
             let unavailable = if shared {
-                Some(l10n::text(
-                    "这台 Mac 上同一服务的几个账户用量分不开",
-                    "This Mac's usage cannot be told apart between this provider's accounts",
+                Some(tr!(
+                    "This Mac's usage cannot be told apart between this provider's accounts"
                 ))
             } else if let Some(view) = &self.meters.view {
                 let (spent, oldest) = view.spent(sources, since, now, keep);
                 if spent.tokens == 0 && !models.is_empty() {
-                    Some(l10n::text(
-                        "它用过的模型都被筛选隐藏了",
-                        "Every model it used is hidden by the filter",
-                    ))
+                    Some(tr!("Every model it used is hidden by the filter"))
                 } else if spent.tokens == 0 {
-                    Some(l10n::text(
-                        "这台 Mac 近 30 天没有记录到用量",
-                        "No usage was recorded on this Mac in the last 30 days",
-                    ))
+                    Some(tr!("No usage was recorded on this Mac in the last 30 days"))
                 } else {
                     // Partial while its logs are still read, when the ledger
                     // begins inside the 30 days, or with calls left unpriced
@@ -196,7 +190,7 @@ impl AgentHudCore {
                     None
                 }
             } else {
-                Some(l10n::text("用量仍在载入", "Usage is still loading"))
+                Some(tr!("Usage is still loading"))
             };
             let advice = match plan {
                 Some(plan) if plan.multiple.is_some() => {
@@ -207,13 +201,8 @@ impl AgentHudCore {
                                 .as_f64()
                                 .is_some_and(|seconds| seconds > 0.0)
                     }) {
-                        let samples =
-                            read(row["id"].as_str().unwrap_or_default()).map_err(|_| {
-                                l10n::text(
-                                    "无法从本地数据库读取额度记录",
-                                    "Quota history could not be read from SQLite",
-                                )
-                            })?;
+                        let samples = read(row["id"].as_str().unwrap_or_default())
+                            .map_err(|_| tr!("Quota history could not be read from SQLite"))?;
                         windows.push((row.clone(), samples));
                     }
                     let length = |row: &Value| row["windowDurationSeconds"].as_f64().unwrap_or(0.0);

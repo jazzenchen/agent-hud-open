@@ -6,6 +6,7 @@ import {
   type CSSProperties,
 } from "react";
 import { systemTimeZone } from "@agent-hud/ui/format";
+import { useFormat, useT } from "@agent-hud/ui/format-context";
 import { useSessionDetail, useSessions } from "./lib/use-sessions";
 import type {
   NativeMethod,
@@ -60,9 +61,9 @@ export default function SessionStatistics({
     setSelectedId(initialSessionId);
     setPick(null);
   }, [initialSessionId]);
-  const theme = themeFor(snapshot, light);
-  const zh = Boolean(theme.zh);
-  const t = (en: string, cn: string) => (zh ? cn : en);
+  const { language } = useFormat();
+  const theme = themeFor(light, language);
+  const t = useT();
   const now = Date.parse(snapshot.generatedAt);
   const timeZone = useMemo(systemTimeZone, []);
   const listQuery = useMemo<Omit<SessionsQuery, "offset" | "limit">>(
@@ -179,7 +180,7 @@ export default function SessionStatistics({
     <>
       {(listHidden || parent) && (
         <SessionBackBar
-          label={parent?.title ?? t("All sessions", "全部会话")}
+          label={parent?.title ?? t("All sessions")}
           top={split ? 0 : 44}
           onBack={() =>
             parent ? show(parent.id) : split ? setPick(null) : show(null)
@@ -231,7 +232,7 @@ export default function SessionStatistics({
   return (
     <SessionColumns
       sectionRef={ref}
-      label={t("Session statistics", "会话统计")}
+      label={t("Session statistics")}
       style={contentStyle}
       split={split}
       shown={shown}

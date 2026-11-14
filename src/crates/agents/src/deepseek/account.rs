@@ -7,7 +7,7 @@ use super::platform::platform_balance;
 use super::routes::{self, Routed};
 use super::settings::{configured, Configured};
 use crate::account::{account_id, legacy_unresolved, Host, Provider, Reading, Unread};
-use crate::l10n;
+use crate::l10n::{self, tr};
 use chrono::Utc;
 use serde_json::{json, Value};
 
@@ -59,7 +59,7 @@ pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
     let checked = Utc::now().to_rfc3339();
     for route in routed {
         if host.cancelled() {
-            return Err(l10n::text("账户读取已停止", "Account reading was stopped").into());
+            return Err(tr!("Account reading was stopped").into());
         }
         let names = client_names(&route.clients);
         let id = account_id("deepseek", &["api-key", &route.key]);
@@ -70,11 +70,7 @@ pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
                 continue;
             }
         };
-        let label = if l10n::chinese() {
-            format!("{names} 的 API 余额")
-        } else {
-            format!("API balance ({names})")
-        };
+        let label = tr!("API balance ({{names}})", names = names);
         for (currency, amount) in &balances.amounts {
             reading.billing.push(json!({"id":format!("{id}:{currency}"),"vendor":"deepseek","accountId":id,"clients":route.clients,"label":label,"amount":amount,"currency":currency,"available":balances.available,"notice":balances.notice()}));
         }
@@ -110,7 +106,7 @@ fn client_names(clients: &[&str]) -> String {
         .iter()
         .map(|id| crate::by_id(id).map_or(*id, |agent| agent.name))
         .collect::<Vec<_>>()
-        .join(if l10n::chinese() { "、" } else { ", " })
+        .join(l10n::list_separator())
 }
 
 /// Which clients reach DeepSeek's API with the account, on the platform its
@@ -142,25 +138,22 @@ fn read_text(host: &dyn Host, routed: &mut Vec<Routed>) -> Result<Reading, Unrea
             return Ok(reading);
         }
         let mut reading = Reading::empty("deepseek");
-        reading.notice = Some(l10n::text(
-            "请在 Harness 中配置 DeepSeek API Key 以读取余额",
-            "Configure a DeepSeek API key in Harness to read its balance.",
+        reading.notice = Some(tr!(
+            "Configure a DeepSeek API key in Harness to read its balance."
         ));
         return Ok(reading);
     };
-    let endpoint = url::Url::parse(&endpoint)
-        .map_err(|_| l10n::text("DeepSeek API 地址无效", "DeepSeek API address is invalid."))?;
+    let endpoint =
+        url::Url::parse(&endpoint).map_err(|_| tr!("DeepSeek API address is invalid."))?;
     if endpoint.scheme() != "https"
         || endpoint.host_str() != Some("api.deepseek.com")
         || !endpoint.username().is_empty()
         || endpoint.password().is_some()
         || endpoint.port_or_known_default() != Some(443)
     {
-        return Err(l10n::text(
-            "自定义 API 地址无法读取 DeepSeek 官方余额",
-            "Official DeepSeek balance is unavailable for a custom API endpoint.",
-        )
-        .into());
+        return Err(
+            tr!("Official DeepSeek balance is unavailable for a custom API endpoint.").into(),
+        );
     }
     // The clients that send Harness's own key share its rows.
     let mut shared = Vec::new();
@@ -179,7 +172,7 @@ fn read_text(host: &dyn Host, routed: &mut Vec<Routed>) -> Result<Reading, Unrea
     let account_identity = legacy_unresolved("DeepSeek", &scope.to_string_lossy());
     let mut billing = Vec::new();
     for (currency, amount) in &balances.amounts {
-        let mut row = json!({"id":format!("{id}:{currency}"),"vendor":"deepseek","accountId":account_identity,"consumerRoutes":["deepseek-official"],"consumerHome":scope,"label":l10n::text("API 余额", "API balance"),"amount":amount,"currency":currency,"available":balances.available,
+        let mut row = json!({"id":format!("{id}:{currency}"),"vendor":"deepseek","accountId":account_identity,"consumerRoutes":["deepseek-official"],"consumerHome":scope,"label":tr!("API balance"),"amount":amount,"currency":currency,"available":balances.available,
             "notice":balances.notice()});
         if !shared.is_empty() {
             row["clients"] = json!(["deepseek"].iter().chain(&shared).collect::<Vec<_>>());

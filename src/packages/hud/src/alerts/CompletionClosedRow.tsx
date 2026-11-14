@@ -6,6 +6,7 @@ import { clientDisplayName, newsTitle } from "../IslandNews";
 import { alertText } from "../tokens";
 import { useGround } from "../ground";
 import { dateFormat } from "@agent-hud/ui/format";
+import { useT } from "@agent-hud/ui/format-context";
 
 /** A finished turn waiting behind the card on show: the agent, "New reply",
  * the turn's title and the time it finished. */
@@ -13,13 +14,12 @@ export function CompletionClosedRow({
   event,
   onSelect,
   light = false,
-  zh = false,
 }: {
   event: IslandEvent;
   onSelect: () => void;
   light?: boolean;
-  zh?: boolean;
 }) {
+  const t = useT();
   const [hover, setHover] = useState(false);
   const segmentBg = light ? "rgba(0,0,0,0.05)" : "rgba(255,255,255,0.06)";
   const turnText = alertText("turn", useGround(light));
@@ -80,7 +80,7 @@ export function CompletionClosedRow({
             fontVariantNumeric: "tabular-nums",
           }}
         >
-          {zh ? "有新回复" : "New reply"}
+          {t("New reply")}
         </span>
       </span>
       <span
@@ -94,7 +94,7 @@ export function CompletionClosedRow({
           minWidth: 0,
         }}
       >
-        {event.title ?? newsTitle(event, zh)}
+        {event.title ?? newsTitle(event, t)}
       </span>
       <time
         style={{

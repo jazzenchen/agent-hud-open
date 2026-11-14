@@ -10,7 +10,7 @@ import {
 test("list costs read as Open's ListCost.text: ≈ each currency, US dollars first, then by code", () => {
   assert.equal(listCost({ CNY: 45.6, USD: 12.3 }, "en"), "≈$12.30 · ≈¥45.60");
   assert.equal(
-    listCost({ EUR: 2, CNY: 8.85, USD: 1 }, "zh"),
+    listCost({ EUR: 2, CNY: 8.85, USD: 1 }, "zh-Hans"),
     "≈$1.00 · ≈¥8.85 · ≈€2.00",
   );
   assert.equal(

@@ -1,6 +1,6 @@
 //! A client's settings file on disk: its symbolic links followed, read
 //! within a size limit, and replaced in one step.
-use agent_hud_core::l10n;
+use agent_hud_core::l10n::tr;
 use std::{
     fs,
     io::{Read, Write},
@@ -38,32 +38,23 @@ pub(crate) fn contents(path: &Path) -> Result<Option<Vec<u8>>, String> {
         Ok(file) => {
             if file
                 .metadata()
-                .map_err(|_| l10n::text("无法读取客户端的回调设置", "Hook settings unavailable"))?
+                .map_err(|_| tr!("Hook settings unavailable"))?
                 .len()
                 > CONFIGURATION_LIMIT
             {
-                return Err(l10n::text(
-                    "客户端的回调设置超过 16 MiB",
-                    "Hook settings exceed 16 MiB",
-                ));
+                return Err(tr!("Hook settings exceed 16 MiB"));
             }
             let mut bytes = Vec::new();
             file.take(CONFIGURATION_LIMIT + 1)
                 .read_to_end(&mut bytes)
-                .map_err(|_| l10n::text("无法读取客户端的回调设置", "Hook settings unavailable"))?;
+                .map_err(|_| tr!("Hook settings unavailable"))?;
             if bytes.len() as u64 > CONFIGURATION_LIMIT {
-                return Err(l10n::text(
-                    "客户端的回调设置超过 16 MiB",
-                    "Hook settings exceed 16 MiB",
-                ));
+                return Err(tr!("Hook settings exceed 16 MiB"));
             }
             Ok(Some(bytes))
         }
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
-        Err(_) => Err(l10n::text(
-            "无法读取客户端的回调设置",
-            "Hook settings unavailable",
-        )),
+        Err(_) => Err(tr!("Hook settings unavailable")),
     }
 }
 /// Atomic settings replacement shared by reversible explicit installers.
@@ -87,32 +78,15 @@ pub(crate) fn write_contents(path: &Path, bytes: Option<&[u8]>) -> Result<(), St
         SEQUENCE.fetch_add(1, Ordering::Relaxed)
     ));
     let result = (|| {
-        let mut file = crate::os::private_file(&temporary, true).map_err(|_| {
-            l10n::text(
-                "无法保存客户端的回调设置",
-                "Hook settings could not be saved",
-            )
-        })?;
-        file.write_all(bytes).map_err(|_| {
-            l10n::text(
-                "无法保存客户端的回调设置",
-                "Hook settings could not be saved",
-            )
-        })?;
+        let mut file = crate::os::private_file(&temporary, true)
+            .map_err(|_| tr!("Hook settings could not be saved"))?;
+        file.write_all(bytes)
+            .map_err(|_| tr!("Hook settings could not be saved"))?;
         if let Some(permissions) = permissions {
-            file.set_permissions(permissions).map_err(|_| {
-                l10n::text(
-                    "无法保留客户端回调设置的文件权限",
-                    "Hook settings permissions could not be preserved",
-                )
-            })?;
+            file.set_permissions(permissions)
+                .map_err(|_| tr!("Hook settings permissions could not be preserved"))?;
         }
-        fs::rename(&temporary, path).map_err(|_| {
-            l10n::text(
-                "无法保存客户端的回调设置",
-                "Hook settings could not be saved",
-            )
-        })?;
+        fs::rename(&temporary, path).map_err(|_| tr!("Hook settings could not be saved"))?;
         Ok(())
     })();
     if result.is_err() {

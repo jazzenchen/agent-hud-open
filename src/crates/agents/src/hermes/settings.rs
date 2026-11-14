@@ -13,7 +13,7 @@
 //! with Agent HUD's handlers changed, or nothing is written. Parse errors are
 //! never shown, since they can quote a line holding a key.
 use crate::hooks::TextEdit;
-use crate::l10n;
+use crate::l10n::tr;
 use lines::{apply, content};
 use serde_json::{json, Map, Value};
 
@@ -38,17 +38,11 @@ pub fn patch(original: &str, edit: &TextEdit) -> Result<String, String> {
 }
 
 fn unreadable() -> String {
-    l10n::text(
-        "Hermes 的 config.yaml 不是 Agent HUD 能读懂的 YAML，未作改动",
-        "Hermes's config.yaml is not YAML Agent HUD can read; it was not changed",
-    )
+    tr!("Hermes's config.yaml is not YAML Agent HUD can read; it was not changed")
 }
 
 fn unsafe_layout() -> String {
-    l10n::text(
-        "Hermes 的 config.yaml 里 hooks 的写法 Agent HUD 无法安全修改，未作改动",
-        "Agent HUD cannot safely change how Hermes's config.yaml lists its hooks; it was not changed",
-    )
+    tr!("Agent HUD cannot safely change how Hermes's config.yaml lists its hooks; it was not changed")
 }
 
 /// The file as JSON; a file of blank lines and comments is an empty mapping.

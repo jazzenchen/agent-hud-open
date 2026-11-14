@@ -1,5 +1,6 @@
 import { createContext, useContext, type ReactNode } from "react";
 import { clipped, numeric, plain, row, type Theme } from "./SessionTheme";
+import { useT } from "@agent-hud/ui/format-context";
 
 /** The columns a session row and its day's header share: who and how, its turns, its figures. */
 const wide = {
@@ -36,7 +37,7 @@ export function DayHeader({
   onToggle?: () => void;
   chevron: ReactNode;
 }) {
-  const zh = Boolean(theme.zh);
+  const t = useT();
   const grid = useRowGrid();
   const Element = onToggle ? "button" : "div";
   return (
@@ -77,16 +78,12 @@ export function DayHeader({
           ...clipped,
         }}
       >
-        {zh ? "每轮新增 Token" : "New tokens per turn"}
+        {t("New tokens per turn")}
       </span>
       <span
         style={{ fontSize: 11, textAlign: "right", ...numeric, ...clipped }}
       >
-        {open
-          ? zh
-            ? "Token · 费用 · 上下文"
-            : "Tokens · cost · context"
-          : folded}
+        {open ? t("Tokens · cost · context") : folded}
       </span>
     </Element>
   );

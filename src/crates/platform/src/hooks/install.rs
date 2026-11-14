@@ -1,4 +1,4 @@
-use agent_hud_core::l10n;
+use agent_hud_core::l10n::tr;
 use serde_json::{json, Value};
 use std::{collections::HashMap, path::PathBuf};
 
@@ -40,30 +40,27 @@ impl InstallPlan {
     }
 }
 pub(super) fn canonical(context: &InstallContext) -> Result<(), String> {
-    let fixed=context.canonical_executable.as_ref().ok_or_else(|| l10n::text("这个版本还没有指定固定的回调程序，在迁移指定正式安装路径之前请保持客户端回调关闭。", "This build has no approved fixed hook-owner executable yet. Keep hooks disabled until an explicit migration supplies its canonical installation path."))?;
+    let fixed=context.canonical_executable.as_ref().ok_or_else(|| tr!("This build has no approved fixed hook-owner executable yet. Keep hooks disabled until an explicit migration supplies its canonical installation path."))?;
     let text = fixed.to_string_lossy();
     if !fixed.is_absolute()
         || text.starts_with("/Volumes/")
         || text.contains("/AppTranslocation/")
         || fixed.components().any(|p| p.as_os_str() == "target")
     {
-        return Err(l10n::text("客户端回调不能指向编译目录、磁盘映像或被系统转移的副本，请使用指定的固定安装程序。", "Hooks cannot point at target builds, disk images or translocated copies. Use the approved fixed installed executable."));
+        return Err(tr!("Hooks cannot point at target builds, disk images or translocated copies. Use the approved fixed installed executable."));
     }
-    let resolved = fixed.canonicalize().map_err(|_| {
-        l10n::text(
-            "指定的固定回调程序不可用",
-            "The approved fixed hook executable is unavailable",
-        )
-    })?;
+    let resolved = fixed
+        .canonicalize()
+        .map_err(|_| tr!("The approved fixed hook executable is unavailable"))?;
     let physical = resolved.to_string_lossy();
     if physical.starts_with("/Volumes/")
         || physical.contains("/AppTranslocation/")
         || resolved.components().any(|p| p.as_os_str() == "target")
     {
-        return Err(l10n::text("固定回调路径指向一个临时编译版本，客户端设置未作改动。", "The fixed hook path resolves to a transient target build; client settings were not changed."));
+        return Err(tr!("The fixed hook path resolves to a transient target build; client settings were not changed."));
     }
     if context.executable != *fixed || !fixed.is_file() {
-        return Err(l10n::text("当前程序不是指定的固定回调程序，客户端设置未作改动。", "This executable is not the approved fixed hook owner; client settings were not changed."));
+        return Err(tr!("This executable is not the approved fixed hook owner; client settings were not changed."));
     }
     Ok(())
 }
@@ -153,12 +150,8 @@ fn plan(
     if agent_hud_agents::text_settings(&description.source) {
         let current = match original.as_deref() {
             None => String::new(),
-            Some(bytes) => String::from_utf8(bytes.to_vec()).map_err(|_| {
-                l10n::text(
-                    "客户端的回调设置不是有效的 UTF-8 文本",
-                    "Hook settings are not UTF-8 text",
-                )
-            })?,
+            Some(bytes) => String::from_utf8(bytes.to_vec())
+                .map_err(|_| tr!("Hook settings are not UTF-8 text"))?,
         };
         let updated = crate::os::hook_text(
             &description.source,
@@ -180,18 +173,11 @@ fn plan(
     }
     let current = match original.as_deref() {
         None | Some([]) => json!({}),
-        Some(bytes) => serde_json::from_slice::<Value>(bytes).map_err(|_| {
-            l10n::text(
-                "客户端的回调设置不是有效的 JSON",
-                "Hook settings are not valid JSON",
-            )
-        })?,
+        Some(bytes) => serde_json::from_slice::<Value>(bytes)
+            .map_err(|_| tr!("Hook settings are not valid JSON"))?,
     };
     if !current.is_object() {
-        return Err(l10n::text(
-            "客户端的回调设置必须是 JSON 对象",
-            "Hook settings must be a JSON object",
-        ));
+        return Err(tr!("Hook settings must be a JSON object"));
     }
     let base = if enabled {
         with_shadowed(context, &description.source, &description.flag, &current)?
@@ -223,9 +209,8 @@ pub fn apply_plan(plan: &InstallPlan) -> Result<bool, String> {
         return Ok(false);
     }
     if target(&plan.configuration)? != plan.target || contents(&plan.target)? != plan.original {
-        return Err(l10n::text(
-            "准备回调改动后客户端设置又发生了变化，请重新操作。",
-            "Client settings changed after this hook plan was prepared; prepare a new plan.",
+        return Err(tr!(
+            "Client settings changed after this hook plan was prepared; prepare a new plan."
         ));
     }
     let bytes = match &plan.updated {

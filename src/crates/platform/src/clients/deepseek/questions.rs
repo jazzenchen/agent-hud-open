@@ -3,7 +3,7 @@
 //! confirms hosts via `POST /api/host.describe`, and delivers answers via `POST /api/respond`.
 use crate::hooks::Wake;
 use agent_hud_agents::deepseek::AGENT;
-use agent_hud_core::l10n;
+use agent_hud_core::l10n::tr;
 use agent_hud_core::requests::Requests;
 use reqwest::blocking::Client;
 use serde_json::{json, Value};
@@ -77,9 +77,8 @@ fn unwrap_server_response(reply: &Value) -> Result<&Value, String> {
         return Err("DeepSeek response has an unsupported format.".into());
     }
     if reply["result"]["ok"].as_bool() != Some(true) {
-        return Err(l10n::text(
-            "DeepSeek Harness 的提问服务不在这个端口",
-            "DeepSeek Harness's question service is not on that port.",
+        return Err(tr!(
+            "DeepSeek Harness's question service is not on that port."
         ));
     }
     Ok(&reply["result"]["value"])

@@ -1,11 +1,12 @@
 //! What the menu bar item shows, projected from a snapshot: the highest
 //! usage, each agent's level for the gradient, and the menu's entries.
 use crate::vendors::Vendor;
+use agent_hud_runtime::l10n::{self, tr_in, Language};
 use serde_json::Value;
 
 #[derive(Clone, PartialEq)]
 pub(crate) struct Presentation {
-    pub(super) language: &'static str,
+    pub(super) language: Language,
     pub(super) visible: bool,
     pub(super) glow_hidden: bool,
     pub(super) light: bool,
@@ -20,7 +21,7 @@ pub(crate) struct Presentation {
 impl Default for Presentation {
     fn default() -> Self {
         Self {
-            language: "en",
+            language: l10n::current(),
             visible: true,
             glow_hidden: false,
             light: false,
@@ -103,7 +104,10 @@ pub(crate) fn project(
     update: Option<&str>,
     now_ms: i64,
 ) -> Presentation {
-    let zh = snapshot["language"] == "zh";
+    let language = snapshot["language"]
+        .as_str()
+        .and_then(Language::from_tag)
+        .unwrap_or_else(l10n::current);
     let remaining = snapshot["settings"]["quotaDisplay"] == "remaining";
     let mut entries = vec![];
     let quota_vendors: Vec<&Vendor> = vendors
@@ -149,12 +153,8 @@ pub(crate) fn project(
             entries.push(item(quota["name"].as_str().unwrap_or(""), &value, true));
         }
         if vendor.quotas.is_empty() && vendor.balance.is_none() {
-            let title = if zh {
-                "暂无额度读数"
-            } else {
-                "No quota reading"
-            };
-            entries.push(item(title, "—", false));
+            let title = tr_in(language, "No quota reading");
+            entries.push(item(&title, "—", false));
         }
     }
     for (index, vendor) in vendors
@@ -165,7 +165,10 @@ pub(crate) fn project(
         if !quota_vendors.is_empty() || index > 0 {
             entries.push(Entry::Separator);
         }
-        let title = format!("{} · {}", vendor.name, if zh { "余额" } else { "Balance" });
+        let title = l10n::fill(
+            &tr_in(language, "{{vendor}} · Balance"),
+            &[("vendor", &vendor.name)],
+        );
         entries.push(item(&title, vendor.balance.as_deref().unwrap_or(""), true));
     }
     let used_percent = vendors
@@ -175,7 +178,7 @@ pub(crate) fn project(
         .reduce(f64::max);
     let paused = snapshot["status"]["paused"] == true;
     Presentation {
-        language: if zh { "zh" } else { "en" },
+        language,
         visible,
         glow_hidden,
         light,

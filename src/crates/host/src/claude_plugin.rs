@@ -6,6 +6,7 @@
 //! channel it shares with the app and the HUD's answers live in
 //! `agent_hud_runtime::claude_plugin`.
 use agent_hud_runtime::claude_plugin::{self as plugin, ClaudeChannel, ClaudeReplies};
+use agent_hud_runtime::l10n::{self, Language};
 use agent_hud_runtime::replies::SessionReplies;
 use serde_json::{json, Value};
 use std::{
@@ -108,24 +109,18 @@ fn install(
 /// A Claude Code too old for `plugin install --marketplace` only says the
 /// option is unknown; say what fixes it, keeping its words.
 fn install_error(error: String) -> String {
-    install_error_in(error, agent_hud_runtime::l10n::chinese())
+    install_error_in(error, l10n::current())
 }
 
-fn install_error_in(error: String, chinese: bool) -> String {
+fn install_error_in(error: String, language: Language) -> String {
     if error.contains("unknown option") && error.contains("--marketplace") {
-        let message = if chinese {
-            "Claude Code 版本太旧，无法识别 --marketplace。请先在终端运行 claude update 升级，再点安装。"
-        } else {
-            concat!(
-                "This Claude Code is too old to recognize --marketplace. ",
-                "Run claude update in a terminal to upgrade, then click Install again."
-            )
-        };
-        if chinese {
-            format!("{message}（{error}）")
-        } else {
-            format!("{message} ({error})")
-        }
+        l10n::fill(
+            &l10n::tr_in(
+                language,
+                "This Claude Code is too old to recognize --marketplace. Run claude update in a terminal to upgrade, then click Install again. ({{error}})",
+            ),
+            &[("error", &error)],
+        )
     } else {
         error
     }
@@ -250,14 +245,15 @@ pub async fn native_claude_plugin(
 #[cfg(test)]
 mod error_tests {
     use super::{install_error, install_error_in};
+    use agent_hud_runtime::l10n::Language;
 
     #[test]
     fn unknown_marketplace_option_explains_how_to_upgrade_in_chinese() {
         let error = "error: unknown option '--marketplace'";
         assert_eq!(
-            install_error_in(error.into(), true),
+            install_error_in(error.into(), Language::ZhHans),
             format!(
-                "Claude Code 版本太旧，无法识别 --marketplace。请先在终端运行 claude update 升级，再点安装。（{error}）"
+                "Claude Code 版本太旧，无法识别 --marketplace。请先在终端运行 claude update 升级，再点安装。（{error}）" // l10n-ignore: test expectation
             )
         );
     }
@@ -266,7 +262,7 @@ mod error_tests {
     fn unknown_marketplace_option_explains_how_to_upgrade_in_english() {
         let error = "error: unknown option '--marketplace'";
         assert_eq!(
-            install_error_in(error.into(), false),
+            install_error_in(error.into(), Language::En),
             format!(
                 "{} ({error})",
                 concat!(
@@ -285,8 +281,8 @@ mod error_tests {
             "error: permission denied",
         ] {
             assert_eq!(install_error(error.into()), error);
-            for chinese in [true, false] {
-                assert_eq!(install_error_in(error.into(), chinese), error);
+            for language in [Language::ZhHans, Language::En] {
+                assert_eq!(install_error_in(error.into(), language), error);
             }
         }
     }

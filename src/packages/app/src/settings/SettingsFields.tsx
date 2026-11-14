@@ -12,7 +12,8 @@ import {
 } from "react";
 import { Button } from "@agent-hud/ui/components/button";
 import { Input } from "@agent-hud/ui/components/input";
-import { Row, type Text } from "./SettingsPrimitives";
+import { Row } from "./SettingsPrimitives";
+import type { Translate } from "@agent-hud/ui/format";
 
 // The id of the InlineForm a text box or submit button belongs to.
 const FormOwner = createContext<string | undefined>(undefined);
@@ -116,7 +117,7 @@ export function FormActions({
   onCancel,
   start,
 }: {
-  t: Text;
+  t: Translate;
   submit: string;
   ready: boolean;
   pending: boolean;
@@ -139,7 +140,7 @@ export function FormActions({
             disabled={pending}
             onClick={onCancel}
           >
-            {t("Cancel", "取消")}
+            {t("Cancel")}
           </Button>
           <Button
             type="submit"

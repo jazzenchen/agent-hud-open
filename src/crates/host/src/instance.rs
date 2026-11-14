@@ -8,6 +8,7 @@
 //! installed one runs, says which one runs, as agent-hud-native-open does. Demos
 //! take no lock: they keep their own preferences and collect nothing.
 use agent_hud_runtime::instance::{self, CollectorError, CollectorLocks};
+use agent_hud_runtime::l10n::tr;
 use std::path::{Path, PathBuf};
 
 pub(crate) enum Launch {
@@ -48,18 +49,14 @@ fn launch(result: Result<CollectorLocks, CollectorError>, executable: Option<&Pa
 }
 
 pub(crate) fn unavailable(error: &str) {
-    let chinese = crate::shell::system_prefers_chinese();
-    let title = if chinese {
-        "Agent HUD 无法启动"
-    } else {
-        "Agent HUD could not start"
-    };
-    let body = if chinese {
-        format!("无法准备数据目录或客户端回调，采集未启动。\n{error}")
-    } else {
-        format!("The data directory or client hooks could not be prepared. Collection has not started.\n{error}")
-    };
-    crate::shell::alert(title, &body, "OK");
+    let body = tr!(
+        "The data directory or client hooks could not be prepared. Collection has not started."
+    );
+    crate::shell::alert(
+        &tr!("Agent HUD could not start"),
+        &format!("{body}\n{error}"),
+        &tr!("OK"),
+    );
 }
 
 fn same_file(a: &Path, b: Option<&Path>) -> bool {
@@ -70,32 +67,17 @@ fn same_file(a: &Path, b: Option<&Path>) -> bool {
 /// Says which copy runs and that it must quit first. In the system's
 /// language, since the stored preferences are not read before the claim.
 pub(crate) fn refuse(holder: Option<&Path>) {
-    let chinese = crate::shell::system_prefers_chinese();
-    let text = |zh: &str, en: &str| {
-        if chinese {
-            zh.to_owned()
-        } else {
-            en.to_owned()
-        }
-    };
     let body = match holder {
         Some(holder) => {
             let place = abbreviated(&instance::application(holder));
-            text(
-                &format!("正在运行的是 {place}。请先退出它，再打开这一个。"),
-                &format!("{place} is running. Quit it first, then open this one."),
+            tr!(
+                "{{place}} is running. Quit it first, then open this one.",
+                place = place
             )
         }
-        None => text(
-            "请先退出正在运行的 Agent HUD，再打开这一个。",
-            "Quit the Agent HUD that is running first, then open this one.",
-        ),
+        None => tr!("Quit the Agent HUD that is running first, then open this one."),
     };
-    crate::shell::alert(
-        &text("Agent HUD 已在运行", "Agent HUD is already running"),
-        &body,
-        &text("好", "OK"),
-    );
+    crate::shell::alert(&tr!("Agent HUD is already running"), &body, &tr!("OK"));
 }
 
 fn abbreviated(path: &Path) -> String {

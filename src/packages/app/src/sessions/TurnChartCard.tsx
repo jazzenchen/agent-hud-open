@@ -16,6 +16,7 @@ import {
   type Entry,
   type Theme,
 } from "./SessionTheme";
+import { useFormat, useT } from "@agent-hud/ui/format-context";
 
 /** The marks the turn chart uses, named once above it. */
 function ChartLegend({
@@ -27,7 +28,8 @@ function ChartLegend({
   measure: Measure;
   theme: Theme;
 }) {
-  const zh = Boolean(theme.zh);
+  const t = useT();
+  const { language } = useFormat();
   const kinds = (
     ["cacheWrite", "input", "reasoning", "output"] as const
   ).filter((kind) => entries.some((entry) => (entry.kinds?.[kind] ?? 0) > 0));
@@ -47,12 +49,12 @@ function ChartLegend({
     >
       {measure === "cost" ? (
         <ColorKey color={theme.accent}>
-          {zh ? "按 API 价，含缓存读取" : "API prices, cache reads included"}
+          {t("API prices, cache reads included")}
         </ColorKey>
       ) : (
         kinds.map((kind) => (
           <ColorKey key={kind} color={kindColor(theme, kind)}>
-            {kindLabel(kind, zh)}
+            {kindLabel(kind, language)}
           </ColorKey>
         ))
       )}
@@ -60,12 +62,8 @@ function ChartLegend({
         <span style={{ ...row, gap: 4 }}>
           <Layers size={10} aria-hidden="true" />
           {measure === "cost"
-            ? zh
-              ? "子 agent 参与"
-              : "Sub-agents helped"
-            : zh
-              ? "子 agent 参与，淡色为其部分"
-              : "Sub-agents helped, their part faded"}
+            ? t("Sub-agents helped")
+            : t("Sub-agents helped, their part faded")}
         </span>
       )}
       {resent && (
@@ -76,7 +74,7 @@ function ChartLegend({
             strokeWidth={2.6}
             aria-hidden="true"
           />
-          {zh ? "缓存过期，上下文重发" : "Cache expired, context sent again"}
+          {t("Cache expired, context sent again")}
         </span>
       )}
       {compacted && (
@@ -89,7 +87,7 @@ function ChartLegend({
               borderLeft: `1.5px dashed ${theme.compaction}`,
             }}
           />
-          {zh ? "上下文压缩" : "Compacted"}
+          {t("Compacted")}
         </span>
       )}
     </div>
@@ -114,7 +112,7 @@ export function TurnChartCard({
   onEntry: (id: string | null) => void;
   theme: Theme;
 }) {
-  const zh = Boolean(theme.zh);
+  const t = useT();
   const entries = detail.turns;
   // Cost bars only when every turn has a list price, so no turn looks free.
   const priced =
@@ -128,16 +126,10 @@ export function TurnChartCard({
       <CardTitle
         title={
           !byPrompt
-            ? zh
-              ? "Token 随时间变化"
-              : "Tokens over time"
+            ? t("Tokens over time")
             : shown === "cost"
-              ? zh
-                ? "每轮费用"
-                : "Cost per turn"
-              : zh
-                ? "每轮新增 Token"
-                : "New tokens per turn"
+              ? t("Cost per turn")
+              : t("New tokens per turn")
         }
         right={
           priced ? (
@@ -153,7 +145,7 @@ export function TurnChartCard({
                   borderRadius: 6,
                   gap: 1,
                 }}
-                aria-label={zh ? "度量" : "Measure"}
+                aria-label={t("Measure")}
               >
                 {(["tokens", "cost"] as const).map((value) => (
                   <TabsTrigger
@@ -176,7 +168,7 @@ export function TurnChartCard({
                         "background-color 160ms ease, box-shadow 160ms ease",
                     }}
                   >
-                    {value === "tokens" ? "Token" : zh ? "费用" : "Cost"}
+                    {value === "tokens" ? "Token" : t("Cost")}
                   </TabsTrigger>
                 ))}
               </TabsList>
@@ -204,9 +196,7 @@ export function TurnChartCard({
               flexShrink: 0,
             }}
           >
-            {zh
-              ? "数字为最大的几轮 · 点击一轮看调用"
-              : "Largest turns labelled · click a turn for its calls"}
+            {t("Largest turns labelled · click a turn for its calls")}
           </span>
         )}
       </div>
@@ -231,7 +221,7 @@ export function TurnChartCard({
             fontSize: 11,
           }}
         >
-          {zh ? "暂无已记录的用量" : "No recorded usage"}
+          {t("No recorded usage")}
         </div>
       )}
       {hasContext && (
@@ -244,13 +234,13 @@ export function TurnChartCard({
             }}
           />
           <CardTitle
-            title={zh ? "上下文窗口" : "Context window"}
+            title={t("Context window")}
             right={
-              (zh ? "缓存读取 + 新增输入" : "Cache read + new input") +
-              (detail.contextWindow != null && detail.contextWindow > 0
-                ? (zh ? " · 上限 " : " · limit ") +
-                  compact(detail.contextWindow)
-                : "")
+              detail.contextWindow != null && detail.contextWindow > 0
+                ? t("Cache read + new input · limit {{limit}}", {
+                    limit: compact(detail.contextWindow),
+                  })
+                : t("Cache read + new input")
             }
             theme={theme}
           />

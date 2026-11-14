@@ -4,7 +4,7 @@ use super::new_api::{new_api, new_api_prices};
 use super::{Balance, Found, Target};
 use crate::account::{Host, HttpFailure, HttpRequest};
 use crate::endpoints::base_url_host;
-use crate::l10n;
+use crate::l10n::tr;
 use serde_json::{json, Value};
 use std::time::Duration;
 
@@ -92,15 +92,11 @@ pub(super) fn balance(host: &dyn Host, target: &Target) -> Found {
         }
     }
     if kind == "sub2api" {
-        return known(Err(l10n::text(
-            "这个地址的 /v1/usage 没有返回余额",
-            "This address's /v1/usage reports no balance.",
-        )));
+        return known(Err(tr!("This address's /v1/usage reports no balance.")));
     }
     Found {
-        balance: Err(l10n::text(
-            "没认出这个中转站，可以手选类型",
-            "Agent HUD could not tell what kind of relay this is; choose its type.",
+        balance: Err(tr!(
+            "Agent HUD could not tell what kind of relay this is; choose its type."
         )),
         prices: None,
         recognized: false,
@@ -121,9 +117,8 @@ fn custom_balance(host: &dyn Host, target: &Target, custom: &Value) -> Result<Ba
     {
         endpoint.to_owned()
     } else {
-        return Err(l10n::text(
-            "余额接口必须在中转站自己的地址上",
-            "The balance endpoint must be on the relay's own address.",
+        return Err(tr!(
+            "The balance endpoint must be on the relay's own address."
         ));
     };
     let bearer = format!("Bearer {}", target.key);
@@ -142,21 +137,12 @@ fn custom_balance(host: &dyn Host, target: &Target, custom: &Value) -> Result<Ba
             timeout: Duration::from_secs(12),
         })
         .map_err(failure)?;
-    let found = json_path(&body, custom["remaining"].as_str().unwrap_or("")).ok_or_else(|| {
-        l10n::text(
-            "余额接口的返回里没有找到这个字段",
-            "The balance endpoint's answer has nothing at that path.",
-        )
-    })?;
+    let found = json_path(&body, custom["remaining"].as_str().unwrap_or(""))
+        .ok_or_else(|| tr!("The balance endpoint's answer has nothing at that path."))?;
     let amount = found
         .as_f64()
         .or_else(|| found.as_str().and_then(|text| text.trim().parse().ok()))
-        .ok_or_else(|| {
-            l10n::text(
-                "余额接口返回的余额不是数字",
-                "The balance endpoint's balance is not a number.",
-            )
-        })?;
+        .ok_or_else(|| tr!("The balance endpoint's balance is not a number."))?;
     let divisor = custom["divisor"]
         .as_f64()
         .filter(|d| *d > 0.0)
@@ -203,10 +189,7 @@ fn openrouter(
         None => {
             let key = ask(&format!("{}/api/v1/key", target.origin), true).map_err(failure)?;
             key["data"]["limit_remaining"].as_f64().ok_or_else(|| {
-                l10n::text(
-                    "这个 OpenRouter key 不限额度，读不到账户余额",
-                    "This OpenRouter key has no limit, and the account's credits could not be read.",
-                )
+                tr!("This OpenRouter key has no limit, and the account's credits could not be read.")
             })?
         }
     };
@@ -231,18 +214,14 @@ fn currency(unit: &str) -> Option<&'static str> {
 }
 
 fn unsupported_unit() -> String {
-    l10n::text(
-        "这个中转站的余额单位无法识别",
-        "This relay reports its balance in a unit Agent HUD does not know.",
-    )
+    tr!("This relay reports its balance in a unit Agent HUD does not know.")
 }
 
 pub(super) fn failure(failure: HttpFailure) -> String {
     match failure {
-        HttpFailure::Unreachable | HttpFailure::BadHeader => l10n::text(
-            "中转站余额读取失败，请检查网络后重试",
-            "The relay's balance could not be reached; check the connection.",
-        ),
+        HttpFailure::Unreachable | HttpFailure::BadHeader => {
+            tr!("The relay's balance could not be reached; check the connection.")
+        }
         other => other.message(),
     }
 }

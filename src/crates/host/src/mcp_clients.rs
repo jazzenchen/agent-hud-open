@@ -5,6 +5,7 @@
 //! has the server is brought up to date.
 use crate::client_cli::{executable, run_client};
 use agent_hud_runtime::hud_tools::{Client, Places, SkillState, CLIENTS};
+use agent_hud_runtime::l10n::tr;
 use serde_json::{json, Value};
 use std::{
     fs,
@@ -100,15 +101,12 @@ fn status(app: &tauri::AppHandle) -> Result<Value, String> {
         let copy = running
             .map(|path| path.display().to_string())
             .unwrap_or_default();
-        Some(agent_hud_runtime::l10n::text(
-            &format!("只有安装好的 Agent HUD 才能添加 HUD 工具，这一份在 {copy}。"),
-            &format!("Only the installed Agent HUD can add HUD tools; this copy is at {copy}."),
+        Some(tr!(
+            "Only the installed Agent HUD can add HUD tools; this copy is at {{copy}}.",
+            copy = copy
         ))
     } else if !complete {
-        Some(agent_hud_runtime::l10n::text(
-            "这一份 Agent HUD 缺少 MCP 组件。",
-            "This copy of Agent HUD is missing its MCP components.",
-        ))
+        Some(tr!("This copy of Agent HUD is missing its MCP components."))
     } else {
         None
     };

@@ -4,7 +4,6 @@ import {
   ColorKey,
   compact,
   cost,
-  integer,
   kindColor,
   kindLabel,
   numeric,
@@ -13,49 +12,50 @@ import {
   type Entry,
   type Theme,
 } from "./SessionTheme";
+import { translator, type Language } from "@agent-hud/ui/format";
+import { useFormat, useT } from "@agent-hud/ui/format-context";
 
 /** The facts Core gives a turn, as Open's chart notes them. */
-export function turnNotes(entry: Entry, zh: boolean): string[] {
+export function turnNotes(entry: Entry, language: Language): string[] {
+  const t = translator(language);
   const notes: string[] = [];
   if (entry.callCount != null)
-    notes.push(
-      zh
-        ? `${entry.callCount} 次调用`
-        : entry.callCount === 1
-          ? "1 call"
-          : `${integer(entry.callCount)} calls`,
-    );
+    notes.push(t("{{count}} calls", { count: entry.callCount }));
   if (entry.subagentNew)
     notes.push(
-      (zh ? "子 agent 新增 " : "Sub-agents added ") +
-        compact(entry.subagentNew),
+      t("Sub-agents added {{tokens}}", {
+        tokens: compact(entry.subagentNew),
+      }),
     );
   if (entry.recached != null)
     notes.push(
-      zh
-        ? `缓存过期，重发 ${compact(entry.recached)}`
-        : `Cache expired, ${compact(entry.recached)} sent again`,
+      t("Cache expired, {{tokens}} sent again", {
+        tokens: compact(entry.recached),
+      }),
     );
   if (entry.context != null)
     notes.push(
-      (zh ? "上下文 " : "Context ") +
-        compact(entry.context) +
-        (entry.peakContext != null
-          ? (zh ? " · 轮中最高 " : " · peak ") + compact(entry.peakContext)
-          : ""),
+      entry.peakContext != null
+        ? t("Context {{tokens}} · peak {{peak}}", {
+            tokens: compact(entry.context),
+            peak: compact(entry.peakContext),
+          })
+        : t("Context {{tokens}}", { tokens: compact(entry.context) }),
     );
   const turnCost = entry.listCost ?? entry.pricedCost ?? null;
   if (turnCost != null)
     notes.push(
-      cost(turnCost, zh, entry.listCost == null) +
-        (zh ? " 按 API 价" : " at API prices"),
+      t("{{cost}} at API prices", {
+        cost: cost(turnCost, language, entry.listCost == null),
+      }),
     );
   return notes;
 }
 
 /** What one turn holds, beside the bar the pointer is on. */
 export function TurnHover({ entry, theme }: { entry: Entry; theme: Theme }) {
-  const zh = Boolean(theme.zh);
+  const t = useT();
+  const { language } = useFormat();
   return (
     <div
       style={{
@@ -77,24 +77,24 @@ export function TurnHover({ entry, theme }: { entry: Entry; theme: Theme }) {
           color: theme.secondary,
         }}
       >
-        <span>{`T${entry.index} · ${timeLabel(entry.timestamp, zh)}`}</span>
+        <span>{`T${entry.index} · ${timeLabel(entry.timestamp, language)}`}</span>
         {entry.compacted && (
           <span style={{ color: theme.compaction, fontWeight: 600 }}>
-            {zh ? "已压缩" : "Compacted"}
+            {t("Compacted")}
           </span>
         )}
       </div>
       <strong style={{ fontSize: 13, ...numeric }}>
         {compact(entry.newTokens ?? entry.input + entry.output)}{" "}
         <span style={{ fontWeight: 400, color: theme.secondary, fontSize: 11 }}>
-          {zh ? "新增 Token" : "new tokens"}
+          {t("new tokens")}
         </span>
       </strong>
       {presentKinds(entry.kinds).map(({ kind, value }) => (
         <span key={kind} style={{ ...row, gap: 6 }}>
           <ColorKey color={kindColor(theme, kind)}>
             <span style={{ color: theme.secondary }}>
-              {kindLabel(kind, zh)}
+              {kindLabel(kind, language)}
             </span>
           </ColorKey>
           <span style={{ marginLeft: "auto", ...numeric }}>
@@ -102,7 +102,7 @@ export function TurnHover({ entry, theme }: { entry: Entry; theme: Theme }) {
           </span>
         </span>
       ))}
-      {turnNotes(entry, zh).map((note) => (
+      {turnNotes(entry, language).map((note) => (
         <span key={note} style={{ color: theme.secondary }}>
           {note}
         </span>

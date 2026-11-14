@@ -7,7 +7,7 @@ import type {
   Snapshot,
   SourcePreferences,
 } from "@agent-hud/protocol";
-import { useText } from "../SettingsPrimitives";
+import { useT } from "@agent-hud/ui/format-context";
 import { AgentList } from "./AgentList";
 import { AgentDetail } from "./AgentDetail";
 import "./agents.css";
@@ -35,7 +35,7 @@ export default function AgentsPage({
   preferences,
   onPreferences,
 }: AgentsPageProps) {
-  const t = useText(snapshot);
+  const t = useT();
   const [selectedID, setSelected] = useState<string>();
   const page = useRef<HTMLDivElement>(null);
   // Found agents first; otherwise the order the runtime lists them in, so

@@ -1,7 +1,12 @@
 import { Fragment, useState, type ReactNode } from "react";
 import { Info } from "lucide-react";
 import { Switch } from "@agent-hud/ui/components/switch";
-import { moneyAmount, snapshotLanguage } from "@agent-hud/ui/format";
+import {
+  listSeparator,
+  moneyAmount,
+  snapshotLanguage,
+} from "@agent-hud/ui/format";
+import { useT } from "@agent-hud/ui/format-context";
 import type { RelaySource } from "@agent-hud/protocol";
 import { LinkButton, SmallButton, Unavailable } from "./SettingsControls";
 import {
@@ -9,7 +14,6 @@ import {
   Page,
   Row,
   Section,
-  useText,
   type SettingsPaneProps,
 } from "./SettingsPrimitives";
 import { RelayForm, RelayKindForm } from "./RelayForms";
@@ -24,7 +28,7 @@ import { usePending } from "./use-pending";
  * sniffing found none, or to change that choice.
  */
 export function RelaysPane({ snapshot, action }: SettingsPaneProps) {
-  const t = useText(snapshot);
+  const t = useT();
   const language = snapshotLanguage(snapshot);
   const { pending, error, run: perform } = usePending();
   const [adding, setAdding] = useState(false);
@@ -34,19 +38,20 @@ export function RelaysPane({ snapshot, action }: SettingsPaneProps) {
   const consented = snapshot.settings.relayReading ?? [];
   const agentName = (id: string) =>
     snapshot.providers.find((provider) => provider.id === id)?.name ?? id;
-  const names = (ids: string[]) => ids.map(agentName).join(t(", ", "、"));
+  const names = (ids: string[]) =>
+    ids.map(agentName).join(listSeparator(language));
   const kinds: Record<string, string> = {
     newapi: "New API",
     sub2api: "Sub2API",
     openrouter: "OpenRouter",
-    custom: t("Custom endpoint", "自定义接口"),
+    custom: t("Custom endpoint"),
   };
   /** Where the relay came from, next to its name. */
   const origin = (relay: RelaySource) => {
-    if (relay.manual) return t("Added by hand", "手动添加");
+    if (relay.manual) return t("Added by hand");
     const clients = relay.clients ?? [];
     if (clients.length === 0) return undefined;
-    return t(`Found in ${names(clients)}`, `来自 ${names(clients)}`);
+    return t("Found in {{clients}}", { clients: names(clients) });
   };
   /** Who uses it, beyond the clients its tag already names. */
   const users = (relay: RelaySource) => {
@@ -54,18 +59,18 @@ export function RelaysPane({ snapshot, action }: SettingsPaneProps) {
     const agents = relay.agents ?? [];
     if (relay.manual || clients.length === 0)
       return agents.length
-        ? t(`Used by ${names(agents)}`, `${names(agents)} 在用`)
-        : t("Not used yet", "还没有智能体在用");
+        ? t("Used by {{agents}}", { agents: names(agents) })
+        : t("Not used yet");
     const others = agents.filter((agent) => !clients.includes(agent));
     return others.length
-      ? t(`Also used by ${names(others)}`, `${names(others)} 也在用`)
+      ? t("Also used by {{agents}}", { agents: names(others) })
       : undefined;
   };
   const kind = (relay: RelaySource) => {
     const shown = relay.chosen ?? relay.kind;
     if (!shown || !kinds[shown]) return undefined;
     return relay.chosen
-      ? t(`${kinds[shown]} (chosen)`, `${kinds[shown]}（手选）`)
+      ? t("{{kind}} (chosen)", { kind: kinds[shown] })
       : kinds[shown];
   };
   /** What it has left; nothing while reading it is off. A missing balance
@@ -73,18 +78,21 @@ export function RelaysPane({ snapshot, action }: SettingsPaneProps) {
   const balance = (relay: RelaySource, agreed: boolean): ReactNode => {
     if (!agreed) return undefined;
     if (relay.balance)
-      return t(
-        `Balance ${moneyAmount(relay.balance.amount, relay.balance.currency, language)}`,
-        `余额 ${moneyAmount(relay.balance.amount, relay.balance.currency, language)}`,
-      );
+      return t("Balance {{amount}}", {
+        amount: moneyAmount(
+          relay.balance.amount,
+          relay.balance.currency,
+          language,
+        ),
+      });
     if (relay.notice)
       return (
         <Unavailable reason={relay.notice}>
-          {t("No balance", "未读到余额")}
+          {t("No balance")}
           <Info className="ml-1 size-3 self-center" aria-hidden />
         </Unavailable>
       );
-    return t("Balance not read yet", "余额还没读到");
+    return t("Balance not read yet");
   };
   const facts = (relay: RelaySource, agreed: boolean) =>
     [
@@ -112,7 +120,7 @@ export function RelaysPane({ snapshot, action }: SettingsPaneProps) {
               disabled={pending || adding}
               onClick={() => setAdding(true)}
             >
-              {t("Add a relay", "添加中转站")}
+              {t("Add a relay")}
             </SmallButton>
           </span>
         }
@@ -120,11 +128,9 @@ export function RelaysPane({ snapshot, action }: SettingsPaneProps) {
           relays.some((relay) => !relay.manual)
             ? t(
                 "Turn a relay on to read its balance with its own key. The key stays on this computer and goes only to that relay.",
-                "打开开关即用中转站自己的 Key 读取余额。Key 只留在本机，只发给这个中转站。",
               )
             : t(
                 "Balances are read with each relay's own key. The key stays on this computer and goes only to that relay.",
-                "余额用中转站自己的 Key 读取。Key 只留在本机，只发给这个中转站。",
               )
         }
       >
@@ -159,9 +165,7 @@ export function RelaysPane({ snapshot, action }: SettingsPaneProps) {
                     disabled={pending}
                     onClick={() => setChoosing(relay.provider)}
                   >
-                    {relay.chosen
-                      ? t("Change type", "更改类型")
-                      : t("Choose type", "选择类型")}
+                    {relay.chosen ? t("Change type") : t("Choose type")}
                   </LinkButton>
                 )}
                 {relay.manual ? (
@@ -173,16 +177,15 @@ export function RelaysPane({ snapshot, action }: SettingsPaneProps) {
                       )
                     }
                   >
-                    {t("Remove", "移除")}
+                    {t("Remove")}
                   </SmallButton>
                 ) : (
                   <Switch
                     checked={agreed}
                     disabled={pending}
-                    aria-label={t(
-                      `Read ${relay.provider}'s balance`,
-                      `读取 ${relay.provider} 的余额`,
-                    )}
+                    aria-label={t("Read {{relay}}'s balance", {
+                      relay: relay.provider,
+                    })}
                     onCheckedChange={(value) =>
                       void perform(() =>
                         action("set_setting", {
@@ -221,7 +224,7 @@ export function RelaysPane({ snapshot, action }: SettingsPaneProps) {
           );
         })}
         {relays.length === 0 && !adding && (
-          <Row muted title={t("No relays yet", "还没有中转站")} />
+          <Row muted title={t("No relays yet")} />
         )}
       </Section>
     </Page>

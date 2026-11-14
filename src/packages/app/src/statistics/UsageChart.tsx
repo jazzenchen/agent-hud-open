@@ -1,6 +1,7 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { tokenPlot } from "../lib/statistics";
 import type { StatisticsResponse } from "@agent-hud/protocol";
+import { useFormat, useT } from "@agent-hud/ui/format-context";
 import {
   compact,
   dateLabel,
@@ -154,7 +155,8 @@ export const UsageChart = memo(function UsageChart({
   }, [hovered, paint, width]);
 
   useEffect(() => setHovered(null), [data]);
-  const zh = Boolean(theme.zh);
+  const t = useT();
+  const { language } = useFormat();
   const inspected = hovered === null ? null : data.buckets[hovered];
   const inspectedColumn = hovered === null ? null : plot.columns[hovered];
   const locate = (clientX: number) => {
@@ -179,11 +181,10 @@ export const UsageChart = memo(function UsageChart({
       <div
         role="img"
         tabIndex={0}
-        aria-label={
-          zh
-            ? `已记录 ${integer(data.totals.selectedTokens)} Token。方向键可查看各时间段。`
-            : `${integer(data.totals.selectedTokens)} recorded tokens. Arrow keys inspect time buckets.`
-        }
+        aria-label={t(
+          "{{tokens}} recorded tokens. Arrow keys inspect time buckets.",
+          { tokens: integer(data.totals.selectedTokens) },
+        )}
         onKeyDown={(event) => {
           if (event.key === "Escape") setHovered(null);
           if (
@@ -242,17 +243,11 @@ export const UsageChart = memo(function UsageChart({
             }}
           >
             {data.coverage.state === "unavailable"
-              ? zh
-                ? "当前筛选暂无用量数据"
-                : "Usage is unavailable for this selection"
+              ? t("Usage is unavailable for this selection")
               : data.query.models?.length === 0 ||
                   data.query.providers?.length === 0
-                ? zh
-                  ? "未选择模型或智能体"
-                  : "No models or agents selected"
-                : zh
-                  ? "该时间范围内无已记录的 Token 用量"
-                  : "No recorded token usage in this range"}
+                ? t("No models or agents selected")
+                : t("No recorded token usage in this range")}
           </div>
         )}
         {inspected && inspectedColumn && (
@@ -282,7 +277,11 @@ export const UsageChart = memo(function UsageChart({
       >
         {[0, 1 / 3, 2 / 3, 1].map((part) => (
           <span key={part} style={{ maxWidth: "26%" }}>
-            {dateLabel(start + (end - start) * part, data.query.timeZone, zh)}
+            {dateLabel(
+              start + (end - start) * part,
+              data.query.timeZone,
+              language,
+            )}
           </span>
         ))}
       </div>

@@ -14,6 +14,7 @@ import { TurnPanel } from "./TurnPanel";
 import type { Pick, SessionLayout } from "./session-layout";
 import { card, type Theme } from "./SessionTheme";
 import { Bar } from "../statistics/dashboard/Placeholder";
+import { useT } from "@agent-hud/ui/format-context";
 
 type Action = (
   method: NativeMethod,
@@ -51,30 +52,20 @@ export function SessionAside({
    * column and its sub-agent opens beside it. */
   onShift: (id: string) => void;
 }) {
-  const zh = Boolean(theme.zh);
+  const t = useT();
   const one = layout === "one";
   const localWorkers =
     (detail?.session.desktopProject?.localWorkerCount ?? 0) > 0;
   const name =
     pick.kind === "turn"
-      ? zh
-        ? "这一轮"
-        : "Turn"
+      ? t("Turn")
       : localWorkers
-        ? zh
-          ? "本机执行会话"
-          : "Local execution session"
-        : zh
-          ? "子 agent"
-          : "Sub-agent";
+        ? t("Local execution session")
+        : t("Sub-agent");
   return (
     <div style={{ animation: "session-fade-in 200ms ease" }}>
       <SessionBackBar
-        label={
-          one
-            ? session?.title || (zh ? "未命名会话" : "Untitled session")
-            : name
-        }
+        label={one ? session?.title || t("Untitled session") : name}
         top={one ? 44 : 0}
         onBack={one ? onClose : undefined}
         onClose={one ? undefined : onClose}

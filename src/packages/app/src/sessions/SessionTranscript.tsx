@@ -7,6 +7,7 @@ import type { SessionDetail } from "@agent-hud/protocol";
 import { Arrival, useSettled } from "./SessionMotion";
 import { MessagesPlaceholder } from "./SessionPlaceholders";
 import { card, row, type Theme } from "./SessionTheme";
+import { useT } from "@agent-hud/ui/format-context";
 
 /** A folded section at the foot of the page. */
 function Folded({
@@ -60,17 +61,15 @@ export function SessionTranscript({
   loadMessages: () => void;
   loadingMessages: boolean;
 }) {
-  const zh = Boolean(theme.zh);
+  const t = useT();
   const settled = useSettled();
   return (
     <>
       {detail.messages && detail.messages.length > 0 && (
         <Folded
-          title={
-            zh
-              ? `对话记录（${detail.messages.length}）`
-              : `Conversation (${detail.messages.length})`
-          }
+          title={t("Conversation ({{total}})", {
+            total: detail.messages.length,
+          })}
           theme={theme}
         >
           {detail.messageNotice && (
@@ -118,9 +117,7 @@ export function SessionTranscript({
                 {message.toolCall != null && (
                   <details style={{ fontSize: 11, paddingTop: 5 }}>
                     <summary>
-                      {zh
-                        ? `工具调用 ${message.toolCallId ?? ""}`
-                        : `Tool call ${message.toolCallId ?? ""}`}
+                      {t("Tool call {{id}}", { id: message.toolCallId ?? "" })}
                     </summary>
                     <pre
                       style={{
@@ -143,25 +140,21 @@ export function SessionTranscript({
               disabled={loadingMessages}
               onClick={loadMessages}
             >
-              {zh ? "加载更多消息" : "Load more messages"}
+              {t("Load more messages")}
             </Button>
           )}
           {detail.messagesPending && (
             <p style={{ fontSize: 11, color: theme.secondary, margin: 0 }}>
-              {zh
-                ? "正在索引更多对话内容。"
-                : "More transcript content is being indexed."}
+              {t("More transcript content is being indexed.")}
             </p>
           )}
         </Folded>
       )}
       {detail.calls.length > 0 && (
         <Folded
-          title={
-            zh
-              ? `已记录的调用（${detail.calls.length}）`
-              : `Recorded calls (${detail.calls.length})`
-          }
+          title={t("Recorded calls ({{total}})", {
+            total: detail.calls.length,
+          })}
           theme={theme}
         >
           {detail.calls.map((call, index) => (

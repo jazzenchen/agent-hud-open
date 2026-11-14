@@ -17,6 +17,7 @@ import {
   row,
   type Theme,
 } from "./SessionTheme";
+import { useFormat, useT } from "@agent-hud/ui/format-context";
 
 /** What the tokens were: a bar and each kind present with its share, the sub-agents' part noted. The bar fills and the figures count up when first drawn. */
 export function KindsCard({
@@ -26,18 +27,15 @@ export function KindsCard({
   detail: SessionDetail;
   theme: Theme;
 }) {
-  const zh = Boolean(theme.zh);
+  const t = useT();
+  const { language } = useFormat();
   const usage = detail.usage;
   const kinds = presentKinds(usage);
   const total = usage?.total ?? 0;
   const reach = useBarReach();
   return (
     <Card style={{ ...card(theme), gap: 8 }}>
-      <CardTitle
-        title={zh ? "Token 类型" : "Token kinds"}
-        right={zh ? "占比" : "Share"}
-        theme={theme}
-      />
+      <CardTitle title={t("Token kinds")} right={t("Share")} theme={theme} />
       {total > 0 && (
         <div
           aria-hidden="true"
@@ -67,7 +65,7 @@ export function KindsCard({
         {kinds.map(({ kind, value }, index) => (
           <div
             key={kind}
-            title={`${kindLabel(kind, zh)} ${integer(value)}`}
+            title={`${kindLabel(kind, language)} ${integer(value)}`}
             style={{
               ...row,
               padding: "6px 0",
@@ -76,7 +74,7 @@ export function KindsCard({
             }}
           >
             <ColorKey color={kindColor(theme, kind)}>
-              {kindLabel(kind, zh)}
+              {kindLabel(kind, language)}
             </ColorKey>
             <strong style={{ marginLeft: "auto", fontWeight: 600, ...numeric }}>
               <Tween value={value} format={tokensAt} />
@@ -112,7 +110,7 @@ export function ModelsCard({
   session: Session;
   theme: Theme;
 }) {
-  const zh = Boolean(theme.zh);
+  const t = useT();
   const models = detail.models ?? [];
   const tokensOf = (model: (typeof models)[number]) =>
     model.tokens.total ??
@@ -128,18 +126,18 @@ export function ModelsCard({
   return (
     <Card style={{ ...card(theme), gap: 8 }}>
       <CardTitle
-        title={zh ? "模型" : "Models"}
+        title={t("Models")}
         right={
           <>
             <span
               style={{ width: 64, textAlign: "right", whiteSpace: "nowrap" }}
             >
-              {zh ? "缓存命中" : "Cache hits"}
+              {t("Cache hits")}
             </span>
             <span
               style={{ width: 48, textAlign: "right", whiteSpace: "nowrap" }}
             >
-              {zh ? "Token" : "Tokens"}
+              {t("Tokens")}
             </span>
           </>
         }

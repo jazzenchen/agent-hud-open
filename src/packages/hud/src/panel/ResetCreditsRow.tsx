@@ -3,7 +3,8 @@ import { createPortal } from "react-dom";
 import { Info, RotateCcw } from "lucide-react";
 import type { ResetCredits } from "@agent-hud/protocol";
 import { useFormat } from "@agent-hud/ui/format-context";
-import { expiryLabel, nextExpiryLabel, say } from "./account-labels";
+import { translate } from "@agent-hud/ui/format";
+import { expiryLabel, nextExpiryLabel } from "./account-labels";
 import { palette } from "./theme";
 import { useGround } from "../ground";
 
@@ -33,7 +34,7 @@ export function ResetCreditsRow({
     <div
       ref={row}
       className="hud-source-reset-credits"
-      aria-label={say(language, "额度重置", "Usage resets")}
+      aria-label={translate(language, "Usage resets")}
       onMouseEnter={() =>
         available && setHovered(row.current?.getBoundingClientRect() ?? null)
       }
@@ -60,7 +61,7 @@ export function ResetCreditsRow({
       />
       {!compact && (
         <span style={{ flex: "0 0 152px", width: 152, fontWeight: 500 }}>
-          {say(language, "额度重置", "Usage resets")}
+          {translate(language, "Usage resets")}
         </span>
       )}
       <span
@@ -70,11 +71,9 @@ export function ResetCreditsRow({
           color: available ? colors.okText : colors.secondary,
         }}
       >
-        {say(
-          language,
-          `${resets.availableCount} 次可用`,
-          `${resets.availableCount} available`,
-        )}
+        {translate(language, "{{available}} available", {
+          available: resets.availableCount,
+        })}
       </span>
       {compact ? null : available && showExpiry ? (
         <ExpiryLabel full={label.full} short={label.short} />
@@ -192,7 +191,7 @@ function ResetCreditsCard({
     >
       <div style={{ display: "flex", alignItems: "center" }}>
         <strong style={{ fontSize: 12, fontWeight: 600 }}>
-          {say(language, "额度重置", "Usage resets")}
+          {translate(language, "Usage resets")}
         </strong>
         <span style={{ flex: 1 }} />
         <span
@@ -202,21 +201,19 @@ function ResetCreditsCard({
             color: colors.okText,
           }}
         >
-          {say(
-            language,
-            `${resets.availableCount} 次可用`,
-            `${resets.availableCount} available`,
-          )}
+          {translate(language, "{{available}} available", {
+            available: resets.availableCount,
+          })}
         </span>
       </div>
       <span style={{ fontSize: 10, color: colors.secondary }}>
-        {say(language, "到期时间 · 本地时区", "Expires at · local time")}
+        {translate(language, "Expires at · local time")}
       </span>
       <div style={{ display: "grid", gap: 8 }}>
         {credits.map((credit, index) => (
           <div key={credit.id} style={{ display: "flex" }}>
             <span style={{ color: colors.secondary }}>
-              {say(language, `重置 ${index + 1}`, `Reset ${index + 1}`)}
+              {translate(language, "Reset {{number}}", { number: index + 1 })}
             </span>
             <span style={{ flex: 1 }} />
             <span style={{ fontSize: 12, fontVariantNumeric: "tabular-nums" }}>
@@ -227,11 +224,9 @@ function ResetCreditsCard({
       </div>
       {missing > 0 && (
         <span style={{ color: colors.secondary }}>
-          {say(
-            language,
-            `${missing} 次重置的有效期未提供`,
-            `Expiry unavailable for ${missing} resets`,
-          )}
+          {translate(language, "Expiry unavailable for {{count}} resets", {
+            count: missing,
+          })}
         </span>
       )}
     </div>

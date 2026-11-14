@@ -1,4 +1,5 @@
 import type { CSSProperties } from "react";
+import { useT } from "@agent-hud/ui/format-context";
 import { Check, Minus } from "lucide-react";
 import { HUDArtwork as HUDLogo } from "@agent-hud/hud/HUDArtwork";
 import type { FilterChoice } from "@agent-hud/protocol";
@@ -93,8 +94,7 @@ export function ModelFilter({
   theme: StatsTheme;
   light: boolean;
 }) {
-  const zh = Boolean(theme.zh);
-  const t = (en: string, cn: string) => (zh ? cn : en);
+  const t = useT();
   const ids = [
     ...new Set(groups.flatMap((group) => group.models.map(({ id }) => id))),
   ];
@@ -130,8 +130,8 @@ export function ModelFilter({
               style={{ ...plain, ...row, color: theme.secondary, fontSize: 11 }}
             >
               <Check size={11} style={{ opacity: everything ? 1 : 0 }} />
-              {t("All models", "全部模型")}
-              {!everything && t(" · Show all", " · 全部显示")}
+              {t("All models")}
+              {!everything && ` · ${t("Show all")}`}
             </button>
           )}
           {groups.map(({ agent, models }) => {
@@ -144,10 +144,9 @@ export function ModelFilter({
                   type="button"
                   role="checkbox"
                   aria-checked={mark}
-                  aria-label={t(
-                    `Show ${agent.name}'s models`,
-                    `显示 ${agent.name} 的模型`,
-                  )}
+                  aria-label={t("Show {{agent}}'s models", {
+                    agent: agent.name,
+                  })}
                   onClick={() =>
                     state.setModels(
                       models.map((model) => model.id),
@@ -186,10 +185,10 @@ export function ModelFilter({
                         type="button"
                         role="checkbox"
                         aria-checked={checked}
-                        aria-label={t(
-                          `Show ${model.name} from ${agent.name}`,
-                          `显示 ${agent.name} 的 ${model.name}`,
-                        )}
+                        aria-label={t("Show {{model}} from {{agent}}", {
+                          model: model.name,
+                          agent: agent.name,
+                        })}
                         title={`${agent.name} · ${model.name}`}
                         onClick={() => state.setModels([model.id], !checked)}
                         style={{
@@ -225,9 +224,7 @@ export function ModelFilter({
           })}
           {!groups.length && (
             <span style={{ color: theme.secondary, fontSize: 11 }}>
-              {loading
-                ? t("Loading models…", "正在加载模型…")
-                : t("No recorded models", "暂无已记录的模型")}
+              {loading ? t("Loading models…") : t("No recorded models")}
             </span>
           )}
         </div>

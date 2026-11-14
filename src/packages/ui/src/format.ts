@@ -10,10 +10,22 @@ export {
   systemTimeZone,
 } from "./format/intl.ts";
 export {
+  addCatalog,
+  hasCatalog,
   interfaceLanguage,
+  isChinese,
+  isLanguage,
+  languageOfTag,
+  languages,
+  listSeparator,
+  locale,
   resolveLanguage,
   snapshotLanguage,
+  translate,
+  translator,
+  unspaced,
   type Language,
+  type Translate,
 } from "./format/language.ts";
 export {
   percent,

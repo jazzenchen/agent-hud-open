@@ -1,4 +1,5 @@
 import { moneyShort } from "@agent-hud/ui/format";
+import { useFormat, useT } from "@agent-hud/ui/format-context";
 import type { StatisticsResponse } from "@agent-hud/protocol";
 import { compact, number, raisedCard, type StatsTheme } from "../StatsTheme";
 import type { Day } from "./days";
@@ -32,8 +33,8 @@ export function DayTip({
   title: string;
   theme: StatsTheme;
 }) {
-  const zh = Boolean(theme.zh);
-  const t = (en: string, cn: string) => (zh ? cn : en);
+  const t = useT();
+  const { language } = useFormat();
   return (
     <div
       style={{
@@ -47,18 +48,16 @@ export function DayTip({
     >
       <strong style={{ fontWeight: 600, fontSize: 12 }}>{title}</strong>
       {pending && (
-        <span style={{ color: theme.secondary }}>
-          {t("Still being read", "还在读取")}
-        </span>
+        <span style={{ color: theme.secondary }}>{t("Still being read")}</span>
       )}
       {day.outside ? (
         <span style={{ color: theme.secondary }}>
-          {t("Before the record starts", "记录开始之前")}
+          {t("Before the record starts")}
         </span>
       ) : (
         <>
           <span style={{ ...number, fontSize: 14, fontWeight: 600 }}>
-            {compact(day.value)} {t("tokens", "Token")}
+            {t("{{tokens}} tokens", { tokens: compact(day.value) })}
             {bucket && (
               <span
                 style={{
@@ -68,11 +67,9 @@ export function DayTip({
                 }}
               >
                 {" · "}
-                {moneyShort(bucket.cost, "USD", zh ? "zh" : "en")}
+                {moneyShort(bucket.cost, "USD", language)}
                 {bucket.sessions !== null
-                  ? zh
-                    ? ` · ${bucket.sessions} 个会话`
-                    : ` · ${bucket.sessions} ${bucket.sessions === 1 ? "session" : "sessions"}`
+                  ? ` · ${t("{{count}} sessions", { count: bucket.sessions })}`
                   : ""}
               </span>
             )}

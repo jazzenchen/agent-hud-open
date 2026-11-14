@@ -7,7 +7,7 @@
 //! Apache-2.0, checked 2026-11-04); the named failures follow CodexBar's
 //! Doubao reader (MIT, 897bff3).
 use crate::account::{account_id, status, EngineStart, Host, Provider, Reading, Unread};
-use crate::l10n;
+use crate::l10n::{self, tr};
 use crate::naming::window_names::Period;
 use serde_json::{json, Value};
 use std::time::{Duration, Instant};
@@ -35,17 +35,12 @@ const PRODUCTS: [(&str, &str, &str); 4] = [
 ];
 
 fn signed_out() -> Unread {
-    Unread::SignedOut(l10n::text(
-        "arkcli 已退出登录，运行 arkcli auth login 后更新额度",
-        "arkcli is signed out. Run arkcli auth login to update the quota",
+    Unread::SignedOut(tr!(
+        "arkcli is signed out. Run arkcli auth login to update the quota"
     ))
 }
 fn unreadable() -> Unread {
-    l10n::text(
-        "arkcli 的输出无法识别，请更新 arkcli",
-        "arkcli's output could not be read; update arkcli",
-    )
-    .into()
+    tr!("arkcli's output could not be read; update arkcli").into()
 }
 
 /// What a failed run wrote that says the CLI is not signed in.
@@ -58,7 +53,7 @@ fn says_signed_out(text: &str) -> bool {
         "login required",
         "please login",
         "please log in",
-        "未登录",
+        "未登录", // l10n-ignore arkcli output match
     ]
     .iter()
     .any(|words| text.contains(words))
@@ -68,10 +63,7 @@ fn says_signed_out(text: &str) -> bool {
 pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
     let Some(executable) = host.executable("arkcli") else {
         let mut reading = Reading::empty("ark");
-        reading.notice = Some(l10n::text(
-            "未找到 arkcli（火山方舟命令行）；安装并运行 arkcli auth login 后显示套餐额度",
-            "arkcli (Volcengine Ark's command line) was not found; install it and run arkcli auth login to show the plan quota",
-        ));
+        reading.notice = Some(tr!("arkcli (Volcengine Ark's command line) was not found; install it and run arkcli auth login to show the plan quota"));
         return Ok(reading);
     };
     let mut process = host.start_engine(&EngineStart {
@@ -83,9 +75,8 @@ pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
     })?;
     let body = process.joined(Instant::now() + WAIT);
     if !process.ended() {
-        return Err(Unread::transient(l10n::text(
-            "arkcli 没有在 20 秒内返回用量，稍后自动重试",
-            "arkcli returned no usage within 20 s; retrying later",
+        return Err(Unread::transient(tr!(
+            "arkcli returned no usage within 20 s; retrying later"
         )));
     }
     match body {
@@ -236,19 +227,17 @@ fn parse(body: &Value, now: i64) -> Result<Reading, Unread> {
         reading.quotas.push(row);
     }
     let failure = (!failed.is_empty()).then(|| {
-        if l10n::chinese() {
-            format!("arkcli 未能读取：{}", failed.join("、"))
-        } else {
-            format!("arkcli could not read: {}", failed.join(", "))
-        }
+        tr!(
+            "arkcli could not read: {{items}}",
+            items = failed.join(l10n::list_separator())
+        )
     });
     if reading.quotas.is_empty() {
         if let Some(failure) = failure {
             return Err(failure.into());
         }
-        reading.notice = Some(l10n::text(
-            "这个火山方舟账号没有生效中的 Coding Plan 或 Agent Plan",
-            "This Volcengine Ark account has no active Coding Plan or Agent Plan",
+        reading.notice = Some(tr!(
+            "This Volcengine Ark account has no active Coding Plan or Agent Plan"
         ));
     } else {
         reading.notice = failure;

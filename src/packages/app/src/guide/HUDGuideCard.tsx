@@ -4,7 +4,8 @@
 import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp } from "lucide-react";
 import { Button } from "@agent-hud/ui/components/button";
 import type { HUDConfig } from "@agent-hud/hud/model";
-import { hudStepText, modeStepText, type Place, type Text } from "./copy";
+import type { Translate } from "@agent-hud/ui/format";
+import { hudStepText, modeStepText, type Place } from "./copy";
 import { DragHint } from "./DragHint";
 import { Actions, Body, Header, blue } from "./hud-guide-parts";
 import { News } from "./HUDGuideNews";
@@ -18,7 +19,7 @@ export interface HUDGuideCardProps {
   screens: number;
   /** This step's place in the tour, and the tour's length. */
   count: [number, number];
-  t: Text;
+  t: Translate;
   /** Animations are on (the app's setting and the system's). */
   moving: boolean;
   next: () => void;
@@ -48,10 +49,10 @@ const nudges = {
 export function HUDGuideCard(props: HUDGuideCardProps) {
   const { view, t, close } = props;
   if (view.kind === "news") return <News {...props} />;
-  const label = t(
-    `Getting started · ${props.count[0]} / ${props.count[1]}`,
-    `上手引导 · ${props.count[0]} / ${props.count[1]}`,
-  );
+  const label = t("Getting started · {{step}} / {{steps}}", {
+    step: props.count[0],
+    steps: props.count[1],
+  });
   return (
     <>
       <Header label={label} close={close} t={t} />
@@ -62,15 +63,14 @@ export function HUDGuideCard(props: HUDGuideCardProps) {
       ) : (
         <>
           <Body
-            title={t("The rest is in Settings", "接下来在设置里")}
+            title={t("The rest is in Settings")}
             body={t(
               "A few more steps are in Settings. They pick up where you left off.",
-              "还有几步在设置里，从刚才停下的地方接着走。",
             )}
           />
           <Actions>
             <Button size="sm" onClick={props.resume}>
-              {t("Continue", "继续")}
+              {t("Continue")}
             </Button>
           </Actions>
         </>
@@ -123,7 +123,7 @@ function HUDStep({ looked, place, t, moving, next }: HUDGuideCardProps) {
       </style>
       <Actions>
         <Button size="sm" onClick={next}>
-          {t("Next", "下一步")}
+          {t("Next")}
         </Button>
       </Actions>
     </>
@@ -155,15 +155,15 @@ function ModeStep({
       <Body {...modeStepText(screens, t)} />
       <DragHint moving={moving} />
       <div style={{ display: "flex", gap: 8 }}>
-        {option("notch", t("Notch", "刘海"))}
-        {option("simple", t("Simple", "简约"))}
+        {option("notch", t("Notch"))}
+        {option("simple", t("Simple"))}
       </div>
       <Actions>
         <Button size="sm" variant="ghost" onClick={back} className="mr-auto">
-          {t("Back", "上一步")}
+          {t("Back [step]")}
         </Button>
         <Button size="sm" onClick={next}>
-          {t("Next", "下一步")}
+          {t("Next")}
         </Button>
       </Actions>
     </>

@@ -6,6 +6,7 @@ import { useGround } from "../ground";
 import { cardColumn } from "../card-column";
 import { usePanelServices } from "../PanelContext";
 import { Heading } from "./AlertCardParts";
+import { useT } from "@agent-hud/ui/format-context";
 
 /** An agent that skips Agent HUD's hooks until the user allows them in the
  * agent itself (Codex keeps a changed hook "modified"): what that costs,
@@ -16,14 +17,13 @@ export function HooksReviewAlertView({
   dismiss,
   light = false,
   botLogos = true,
-  zh = false,
 }: {
   event: IslandEvent;
   dismiss: () => void;
   light?: boolean;
   botLogos?: boolean;
-  zh?: boolean;
 }) {
+  const t = useT();
   const ground = useGround(light);
   const services = usePanelServices();
   const ink = (alpha: number) => alertInk(alpha, ground);
@@ -43,7 +43,7 @@ export function HooksReviewAlertView({
         event={event}
         name={name}
         under={null}
-        news={zh ? "回调待允许" : "allow its hooks"}
+        news={t("allow its hooks")}
         accentFill={alertFill("warning", ground)}
         accentText={alertText("warning", ground)}
         light={light}
@@ -71,7 +71,7 @@ export function HooksReviewAlertView({
               color: ink(0.72),
             }}
           >
-            {zh ? "稍后" : "Later"}
+            {t("Later")}
           </button>
         )}
         <button
@@ -88,7 +88,7 @@ export function HooksReviewAlertView({
             opacity: 0.9,
           }}
         >
-          {open ? (zh ? `打开 ${name}` : `Open ${name}`) : zh ? "知道了" : "OK"}
+          {open ? t("Open {{name}}", { name }) : t("OK [acknowledge]")}
         </button>
       </div>
     </article>

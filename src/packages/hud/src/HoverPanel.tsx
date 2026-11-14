@@ -31,6 +31,7 @@ import { SourceIndexing } from "./panel/IndexingSection";
 import { CustomControl } from "./panel/custom/CustomControl";
 import { heldSections, SECTIONS } from "./panel/custom/custom-data";
 import { snapshotLanguage } from "@agent-hud/ui/format";
+import { useT } from "@agent-hud/ui/format-context";
 
 export { SOURCE_PANEL } from "./panel/theme";
 
@@ -68,6 +69,7 @@ export const SourceHoverPanel = memo(function SourceHoverPanel({
 }: SourceHoverPanelProps) {
   const colors = palette(useGround(light));
   const services = usePanelServices();
+  const t = useT();
   const panelElement = useRef<HTMLDivElement>(null),
     [contentWidth, setContentWidth] = useState<number>();
   useEffect(() => {
@@ -258,7 +260,7 @@ export const SourceHoverPanel = memo(function SourceHoverPanel({
       />
       {services?.draft?.heldUntil && (
         <Button size="xs" variant="ghost" onClick={services.draft.release}>
-          {snapshotLanguage(snapshot) === "zh" ? "完成编辑" : "Finish editing"}
+          {t("Finish editing")}
         </Button>
       )}
       <PanelFooter

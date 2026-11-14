@@ -12,6 +12,7 @@ import { useGround } from "../ground";
 import { cardColumn } from "../card-column";
 import { permissionToolBadge } from "./permission-tool-badge";
 import { CompletionClosedRow } from "./CompletionClosedRow";
+import { useT } from "@agent-hud/ui/format-context";
 
 export function WaitedLabel({ createdAt }: { createdAt: string }) {
   const [, setTick] = useState(0);
@@ -183,13 +184,12 @@ export function WaitingHeader({
   count,
   padding,
   light,
-  zh,
 }: {
   count: number;
   padding: string;
   light: boolean;
-  zh: boolean;
 }) {
+  const t = useT();
   const signalText = alertText("warning", useGround(light));
   const secondary = light ? "rgba(0,0,0,0.55)" : "rgba(255,255,255,0.55)";
   return (
@@ -202,7 +202,7 @@ export function WaitingHeader({
       }}
     >
       <span style={{ fontSize: 11, fontWeight: 600, color: secondary }}>
-        {zh ? "待审批" : "Waiting"}
+        {t("Waiting")}
       </span>
       <span
         style={{
@@ -228,7 +228,6 @@ export function PendingEventRows({
   select,
   includeRequests = false,
   light = false,
-  zh = false,
 }: {
   queue: IslandCard[];
   currentID: string;
@@ -236,7 +235,6 @@ export function PendingEventRows({
   select: (id: string) => void;
   includeRequests?: boolean;
   light?: boolean;
-  zh?: boolean;
 }) {
   const waitingRequests = includeRequests
     ? requests.filter((req) => req.id !== currentID)
@@ -258,7 +256,6 @@ export function PendingEventRows({
             count={waitingRequests.length}
             padding="4px 4px 6px"
             light={light}
-            zh={zh}
           />
           {waitingRequests.map((req) => (
             <PermissionClosedRow
@@ -278,7 +275,6 @@ export function PendingEventRows({
               event={card.event}
               onSelect={() => select(card.id)}
               light={light}
-              zh={zh}
             />
           ))}
         </div>

@@ -1,5 +1,6 @@
 import { HUDArtwork as HUDLogo } from "@agent-hud/hud/HUDArtwork";
 import type { StatisticsBucket, StatisticsResponse } from "@agent-hud/protocol";
+import { useFormat, useT } from "@agent-hud/ui/format-context";
 import type { TokenPlot, TokenPlotColumn } from "../lib/statistics";
 import {
   card,
@@ -31,7 +32,8 @@ export function UsageChartTip({
   width: number;
   theme: StatsTheme;
 }) {
-  const zh = Boolean(theme.zh);
+  const t = useT();
+  const { language } = useFormat();
   return (
     <div
       role="tooltip"
@@ -60,11 +62,11 @@ export function UsageChartTip({
         {dateLabel(
           Math.max(inspectedColumn.start, start),
           data.query.timeZone,
-          zh,
+          language,
         )}
       </div>
       <strong style={{ ...number, fontSize: 14 }}>
-        {integer(inspected.selectedTokens)} {zh ? "Token" : "tokens"}
+        {t("{{tokens}} tokens", { tokens: integer(inspected.selectedTokens) })}
       </strong>
       {data.models
         .filter((model) => (inspected.models[model.id] ?? 0) > 0)
@@ -80,9 +82,7 @@ export function UsageChartTip({
         ))}
       {inspectedColumn.partial && (
         <div style={{ color: theme.secondary, marginTop: 5 }}>
-          {zh
-            ? "仅统计所选范围内的部分时段"
-            : "Partial period within the selected range"}
+          {t("Partial period within the selected range")}
         </div>
       )}
     </div>

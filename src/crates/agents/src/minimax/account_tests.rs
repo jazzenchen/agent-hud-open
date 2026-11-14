@@ -208,7 +208,7 @@ fn one_unreadable_key_is_a_notice_beside_another() {
     assert_eq!(reading.quotas.len(), 3);
     assert_eq!(
         reading.notice.as_deref(),
-        Some("1 configured MiniMax plan(s) could not be read")
+        Some("1 configured MiniMax plan could not be read")
     );
     assert_eq!(reading.services.len(), 2);
 }

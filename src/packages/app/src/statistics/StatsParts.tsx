@@ -1,17 +1,17 @@
 import type { ReactNode } from "react";
 import { Button } from "@agent-hud/ui/components/button";
+import { listSeparator } from "@agent-hud/ui/format";
+import { useFormat, useT } from "@agent-hud/ui/format-context";
 import type { IndexingText } from "@agent-hud/ui/text/indexing";
 import type { StatisticsCoverage, StatisticsTotal } from "@agent-hud/protocol";
 import {
   compact,
-  costHelp,
-  costText,
-  integer,
   number,
   row,
   useAnimatedNumber,
   type StatsTheme,
 } from "./StatsTheme";
+import { costHelp, costText } from "./cost-text";
 
 /** A refresh that failed, with its reason and a retry. */
 export function RefreshFailed({
@@ -23,7 +23,7 @@ export function RefreshFailed({
   onRetry: () => void;
   theme: StatsTheme;
 }) {
-  const zh = Boolean(theme.zh);
+  const t = useT();
   return (
     <div
       role="alert"
@@ -34,12 +34,9 @@ export function RefreshFailed({
         fontSize: 12,
       }}
     >
-      <span>
-        {zh ? "刷新失败：" : "Refresh failed: "}
-        {error}
-      </span>
+      <span>{t("Refresh failed: {{error}}", { error })}</span>
       <Button variant="ghost" size="sm" onClick={onRetry}>
-        {zh ? "重试" : "Retry"}
+        {t("Retry")}
       </Button>
     </div>
   );
@@ -52,17 +49,18 @@ export function Coverage({
   coverage: StatisticsCoverage;
   theme: StatsTheme;
 }) {
+  const t = useT();
+  const { language } = useFormat();
   if (coverage.state === "complete" && !coverage.notice) return null;
-  const zh = Boolean(theme.zh);
   const detail =
     coverage.notice ??
     (coverage.state === "unavailable"
-      ? zh
-        ? "当前筛选暂无账本数据。"
-        : "No ledger data is available for this selection."
-      : zh
-        ? `已记录用量尚不完整${coverage.pendingSources ? ` · ${integer(coverage.pendingSources)} 个文件待解析` : ""}。`
-        : `Recorded usage is partial${coverage.pendingSources ? ` · ${integer(coverage.pendingSources)} files pending` : ""}.`);
+      ? t("No ledger data is available for this selection.")
+      : coverage.pendingSources
+        ? t("Recorded usage is partial · {{count}} files pending.", {
+            count: coverage.pendingSources,
+          })
+        : t("Recorded usage is partial."));
   return (
     <div
       role="status"
@@ -70,9 +68,10 @@ export function Coverage({
     >
       {detail}
       {coverage.unavailableProviders.length
-        ? zh
-          ? ` 暂不可用：${coverage.unavailableProviders.join("、")}。`
-          : ` Unavailable: ${coverage.unavailableProviders.join(", ")}.`
+        ? " " +
+          t("Unavailable: {{agents}}.", {
+            agents: coverage.unavailableProviders.join(listSeparator(language)),
+          })
         : ""}
     </div>
   );
@@ -199,26 +198,25 @@ export function TotalSummary({
   theme: StatsTheme;
 }) {
   const animatedTokens = useAnimatedNumber(value.selectedTokens);
-  const zh = Boolean(theme.zh);
+  const t = useT();
+  const { language } = useFormat();
   return (
     <div style={{ textAlign: "right" }}>
       <div
-        title={
-          zh
-            ? "所选时间范围、智能体、模型和类型的已记录 Token 数"
-            : "Recorded tokens for exactly the selected range, agents, models and kinds"
-        }
+        title={t(
+          "Recorded tokens for exactly the selected range, agents, models and kinds",
+        )}
         style={{ fontSize: 20, fontWeight: 600, lineHeight: 1.2, ...number }}
       >
         {coverage.state === "unavailable" ? "—" : compact(animatedTokens)}
       </div>
       <div
-        title={costHelp(value.cost, zh)}
+        title={costHelp(value.cost, language)}
         style={{ color: theme.secondary, fontSize: 11, marginTop: 2 }}
       >
-        {zh
-          ? `按 API 价格估算 ${costText(value.cost, zh)}`
-          : `At API prices ${costText(value.cost, zh)}`}
+        {t("At API prices {{cost}}", {
+          cost: costText(value.cost, language),
+        })}
       </div>
     </div>
   );

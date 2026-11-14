@@ -9,6 +9,7 @@ import {
 } from "@agent-hud/ui/components/dropdown-menu";
 import { HUDArtwork as HUDLogo } from "@agent-hud/hud/HUDArtwork";
 import type { FilterChoice } from "@agent-hud/protocol";
+import { useT } from "@agent-hud/ui/format-context";
 import { plain, row, type StatsTheme } from "./StatsTheme";
 import { ModelFilter, modelGroups, type ModelOption } from "./ModelFilter";
 import type { FilterState } from "./section-filter";
@@ -31,8 +32,7 @@ export function SectionFilter({
   theme: StatsTheme;
   light: boolean;
 }) {
-  const zh = Boolean(theme.zh);
-  const t = (en: string, cn: string) => (zh ? cn : en);
+  const t = useT();
   const [expanded, setExpanded] = useState(false);
   const groups = modelGroups(agents, models).filter((group) =>
     state.agentShown(group.agent.id),
@@ -44,11 +44,7 @@ export function SectionFilter({
   const filtered =
     shownAgents < agentIds.length || shownModels < modelIds.length;
   const count = (shown: number, total: number) =>
-    shown === total
-      ? t("All", "全部")
-      : zh
-        ? `${shown}/${total}`
-        : `${shown} of ${total}`;
+    shown === total ? t("All") : t("{{shown}} of {{total}}", { shown, total });
   return (
     <>
       <div
@@ -73,16 +69,16 @@ export function SectionFilter({
                 transition: "transform 180ms cubic-bezier(0.22, 1, 0.36, 1)",
               }}
             />
-            {t("Models", "模型")} · {count(shownModels, modelIds.length)}
+            {t("Models")} · {count(shownModels, modelIds.length)}
           </button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button
                 type="button"
                 style={{ ...plain, ...row, gap: 4 }}
-                aria-label={t("Filter by agent", "按智能体筛选")}
+                aria-label={t("Filter by agent")}
               >
-                {t("Agents", "智能体")} · {count(shownAgents, agentIds.length)}
+                {t("Agents")} · {count(shownAgents, agentIds.length)}
                 <ChevronDown size={10} />
               </button>
             </DropdownMenuTrigger>
@@ -92,7 +88,7 @@ export function SectionFilter({
                 onSelect={(event) => event.preventDefault()}
                 onCheckedChange={() => state.setAgents(agentIds, true)}
               >
-                {t("All agents", "全部智能体")}
+                {t("All agents")}
               </DropdownMenuCheckboxItem>
               <DropdownMenuSeparator />
               {agents.map((agent) => (
@@ -112,7 +108,7 @@ export function SectionFilter({
                 <span
                   style={{ padding: 8, color: theme.secondary, fontSize: 11 }}
                 >
-                  {t("No recorded agents", "暂无已记录的智能体")}
+                  {t("No recorded agents")}
                 </span>
               )}
             </DropdownMenuContent>
@@ -124,7 +120,7 @@ export function SectionFilter({
             onClick={state.clear}
             style={{ ...plain, color: theme.secondary, fontSize: 11 }}
           >
-            {t("Clear filter", "清除筛选")}
+            {t("Clear filter")}
           </button>
         )}
       </div>

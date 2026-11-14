@@ -1,6 +1,6 @@
 //! WorkBuddy's summary/packages meter parser and `www.workbuddy.cn` web fallback.
 use crate::account::{account_id, Host, HttpFailure, HttpRequest, Reading, Unread, WebSession};
-use crate::l10n;
+use crate::l10n::tr;
 use chrono::{DateTime, FixedOffset, NaiveDateTime, Utc};
 use serde_json::{json, Value};
 use std::time::Duration;
@@ -119,7 +119,7 @@ pub(super) fn finish_workbuddy_reading(
             "consumerSource": provider,
             "accountId": id,
             "account": label,
-            "label": l10n::text("可用积分", "Available credits"),
+            "label": tr!("Available credits"),
             "amount": available,
             "currency": "credits",
             "planCredits": (total > 0.0).then_some(left),
@@ -144,18 +144,18 @@ pub(super) fn finish_workbuddy_reading(
     }
     reading.account = Some(acc);
     if reading.billing.is_empty() {
-        reading.notice = Some(l10n::text(
-            "WorkBuddy 当前没有可用的积分额度",
-            "WorkBuddy reports no credit allowance for this account.",
+        reading.notice = Some(tr!(
+            "{{name}} reports no credit allowance for this account.",
+            name = "WorkBuddy"
         ));
     }
     Ok(reading)
 }
 
 fn format_wb() -> Unread {
-    Unread::from(l10n::text(
-        "WorkBuddy 的积分格式无法识别",
-        "WorkBuddy's credit usage has an unsupported format.",
+    Unread::from(tr!(
+        "{{name}}'s credit usage has an unsupported format.",
+        name = "WorkBuddy"
     ))
 }
 
@@ -204,19 +204,17 @@ fn post_web(
             timeout: Duration::from_secs(15),
         })
         .map_err(|failure| match failure {
-            HttpFailure::Status(401) => Unread::SignedOut(l10n::text(
-                "WorkBuddy 在 Agent HUD 中的登录已失效，请在它的额度处重新登录",
-                "WorkBuddy's sign-in in Agent HUD has ended; sign in again from its quota.",
+            HttpFailure::Status(401) => Unread::SignedOut(tr!(
+                "{{site}}'s sign-in in Agent HUD has ended; sign in again from its quota.",
+                site = "WorkBuddy"
             )),
             other => other.unread(),
         })?;
     if root["code"] != 0 {
-        return Err(Unread::from(l10n::text(
-            &format!("WorkBuddy 的账单服务返回了错误 {}", root["code"]),
-            &format!(
-                "WorkBuddy's billing service answered code {}.",
-                root["code"]
-            ),
+        return Err(Unread::from(tr!(
+            "{{name}}'s billing service answered code {{code}}.",
+            name = "WorkBuddy",
+            code = root["code"]
         )));
     }
     root.get("data")

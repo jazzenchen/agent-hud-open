@@ -12,6 +12,7 @@ import { Toaster } from "sonner";
 import { Tabs, TabsList, TabsTrigger } from "@agent-hud/ui/components/tabs";
 import { TooltipProvider } from "@agent-hud/ui/components/tooltip";
 import type { NativeMethod, Session, Snapshot } from "@agent-hud/protocol";
+import { useFormat, useT } from "@agent-hud/ui/format-context";
 import { LoadingState } from "./LoadingState";
 import { ViewErrorBoundary } from "./ViewErrorBoundary";
 import { themeFor } from "./statistics/StatsTheme";
@@ -26,7 +27,6 @@ const SessionStatistics = lazy(() => import("./SessionStatistics"));
 export function StatisticsWindow({
   snapshot,
   theme,
-  chinese,
   act,
   windowActive,
   demo,
@@ -36,7 +36,6 @@ export function StatisticsWindow({
 }: {
   snapshot: Snapshot | null;
   theme: "dark" | "light";
-  chinese: boolean;
   act: (
     method: NativeMethod,
     params?: Record<string, unknown>,
@@ -47,6 +46,8 @@ export function StatisticsWindow({
   refresh: () => Promise<unknown>;
   sourceMenu: ReactNode;
 }) {
+  const t = useT();
+  const { language } = useFormat();
   const [statisticsTab, setStatisticsTab] = useState("tokens");
   const [selectedSession, setSelectedSession] = useState<Session | null>(null);
   useEffect(() => {
@@ -98,7 +99,7 @@ export function StatisticsWindow({
   }, []);
   // Before the page has anything to draw, its shape in grey.
   const placeholder = (
-    <PagePlaceholder theme={themeFor(theme === "light", chinese)} />
+    <PagePlaceholder theme={themeFor(theme === "light", language)} />
   );
   return (
     <TooltipProvider>
@@ -107,21 +108,14 @@ export function StatisticsWindow({
           <span className="statistics-toolbar-spacer" data-tauri-drag-region />
           <Tabs value={statisticsTab} onValueChange={setStatisticsTab}>
             <TabsList>
-              <TabsTrigger value="tokens">
-                {chinese ? "用量" : "Usage"}
-              </TabsTrigger>
-              <TabsTrigger value="sessions">
-                {chinese ? "会话" : "Sessions"}
-              </TabsTrigger>
+              <TabsTrigger value="tokens">{t("Usage")}</TabsTrigger>
+              <TabsTrigger value="sessions">{t("Sessions")}</TabsTrigger>
             </TabsList>
           </Tabs>
           <div>{sourceMenu}</div>
         </header>
         {snapshot ? (
-          <ViewErrorBoundary
-            chinese={chinese}
-            onReset={() => setSelectedSession(null)}
-          >
+          <ViewErrorBoundary onReset={() => setSelectedSession(null)}>
             <Suspense
               fallback={statisticsTab === "tokens" ? placeholder : null}
             >
@@ -163,16 +157,12 @@ export function StatisticsWindow({
           <LoadingState
             label={
               error
-                ? chinese
-                  ? "无法读取本机活动"
-                  : "Couldn’t read local activity"
-                : chinese
-                  ? "正在读取本机活动…"
-                  : "Reading local activity…"
+                ? t("Couldn’t read local activity")
+                : t("Reading local activity…")
             }
             failed={!!error}
             detail={error}
-            retryLabel={chinese ? "重试" : "Retry"}
+            retryLabel={t("Retry")}
             onRetry={() => void refresh()}
           />
         )}

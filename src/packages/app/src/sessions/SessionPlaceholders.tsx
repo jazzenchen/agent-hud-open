@@ -1,4 +1,5 @@
 import type { CSSProperties } from "react";
+import { useT } from "@agent-hud/ui/format-context";
 import { Card } from "@agent-hud/ui/components/card";
 import { Bar, ChartPlaceholder } from "../statistics/dashboard/Placeholder";
 import { useRowGrid } from "./SessionListSection";
@@ -63,11 +64,9 @@ export function ListPlaceholder({
   today: boolean;
   theme: Theme;
 }) {
+  const t = useT();
   return (
-    <div
-      role="status"
-      aria-label={theme.zh ? "正在加载会话" : "Loading sessions"}
-    >
+    <div role="status" aria-label={t("Loading sessions")}>
       {today && <TodayPlaceholder theme={theme} />}
       <div style={{ padding: "4px 2px 10px" }}>
         <Bar width={96} height={12} theme={theme} />
@@ -165,10 +164,11 @@ function FiguresPlaceholder({ theme }: { theme: Theme }) {
 /** What a session's usage draws, still loading: the turn chart, then the
  * breakdown cards. */
 export function UsagePlaceholder({ theme }: { theme: Theme }) {
+  const t = useT();
   return (
     <div
       role="status"
-      aria-label={theme.zh ? "正在读取会话用量" : "Reading session usage"}
+      aria-label={t("Reading session usage")}
       style={{ display: "grid", gap: 12 }}
     >
       <Card aria-hidden style={{ ...card(theme, "12px 14px"), gap: 12 }}>
@@ -218,12 +218,11 @@ export function DetailPlaceholder({ theme }: { theme: Theme }) {
 
 /** A turn's calls still loading, as the table's rows. */
 export function CallsPlaceholder({ theme }: { theme: Theme }) {
+  const t = useT();
   return (
     <div
       role="status"
-      aria-label={
-        theme.zh ? "正在读取这一轮的调用" : "Reading this turn's calls"
-      }
+      aria-label={t("Reading this turn's calls")}
       style={{
         display: "grid",
         borderTop: `1px solid ${theme.divider}`,
@@ -257,10 +256,11 @@ export function CallsPlaceholder({ theme }: { theme: Theme }) {
 
 /** More of the conversation still loading: two messages in grey. */
 export function MessagesPlaceholder({ theme }: { theme: Theme }) {
+  const t = useT();
   return (
     <div
       role="status"
-      aria-label={theme.zh ? "正在读取更多消息" : "Reading more messages"}
+      aria-label={t("Reading more messages")}
       style={{ display: "grid", gap: 8 }}
     >
       {[0, 1].map((index) => (

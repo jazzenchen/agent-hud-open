@@ -12,8 +12,6 @@ import {
   agentAccent,
   card,
   compact,
-  costHelp,
-  costText,
   kindLabel,
   number,
   row,
@@ -21,12 +19,14 @@ import {
   useAnimatedNumber,
   type StatsTheme,
 } from "./StatsTheme";
+import { costHelp, costText } from "./cost-text";
 import { ModelList } from "./ModelList";
 import { Tween } from "./motion";
 import { Sparkline } from "./Sparkline";
 import { QuotaRows, type QuotaRow } from "./dashboard/QuotaRows";
 import { usePendingLook, type Pending } from "./dashboard/pending";
 import { moneyAmount } from "@agent-hud/ui/format";
+import { useFormat, useT } from "@agent-hud/ui/format-context";
 
 export const ProviderCard = memo(function ProviderCard({
   provider,
@@ -51,7 +51,8 @@ export const ProviderCard = memo(function ProviderCard({
   /** The answers it waits for when a filter changes. */
   pending?: (Pending | null)[];
 }) {
-  const zh = Boolean(theme.zh);
+  const t = useT();
+  const { language } = useFormat();
   const look = usePendingLook(...(pending ?? []));
   const animatedTokens = useAnimatedNumber(provider.selectedTokens);
   const shareTarget = total
@@ -65,17 +66,25 @@ export const ProviderCard = memo(function ProviderCard({
   // context back from the cache, and sending it again after the cache lapsed.
   const moneyNote = [
     provider.cacheReadShare != null
-      ? (zh ? "缓存读占费用 " : "Cache reads ") +
-        `${Math.round(provider.cacheReadShare * 100)}%` +
-        (zh ? "" : " of cost")
+      ? t("Cache reads {{share}}% of cost", {
+          share: Math.round(provider.cacheReadShare * 100),
+        })
       : null,
     provider.recachedCost != null
-      ? (zh ? "缓存重写 " : "Cache rewrites ") +
-        `≈${moneyAmount(provider.recachedCost, "USD", zh ? "zh" : "en")}`
+      ? t("Cache rewrites ≈{{cost}}", {
+          cost: moneyAmount(provider.recachedCost, "USD", language),
+        })
       : null,
   ]
     .filter(Boolean)
     .join(" · ");
+  const balance =
+    providerBilling[0] &&
+    moneyAmount(
+      providerBilling[0].amount,
+      providerBilling[0].currency,
+      language,
+    );
   const accent = agentAccent(provider.id) ?? theme.secondary;
   const cells: [string, ReactNode][] = [
     "input",
@@ -84,7 +93,7 @@ export const ProviderCard = memo(function ProviderCard({
     "cacheWrite",
     "cacheRead",
   ].map((kind) => [
-    kindLabel(kind as StatisticsTokenKind, zh),
+    kindLabel(kind as StatisticsTokenKind, language),
     <Tween
       key={kind}
       value={provider.tokens[kind as StatisticsTokenKind]}
@@ -92,9 +101,9 @@ export const ProviderCard = memo(function ProviderCard({
     />,
   ]);
   cells.push([
-    zh ? "费用" : "Cost",
-    <span title={costHelp(provider.cost, zh)}>
-      {costText(provider.cost, zh)}
+    t("Cost"),
+    <span title={costHelp(provider.cost, language)}>
+      {costText(provider.cost, language)}
     </span>,
   ]);
   return (
@@ -133,11 +142,9 @@ export const ProviderCard = memo(function ProviderCard({
           {provider.name}
         </strong>
         <span
-          title={
-            theme.zh
-              ? "在所选时段、智能体、模型和 Token 类型中的占比"
-              : "Share of the selected range, agents, models and token kinds"
-          }
+          title={t(
+            "Share of the selected range, agents, models and token kinds",
+          )}
           style={{
             marginLeft: "auto",
             padding: "2px 7px",
@@ -231,17 +238,8 @@ export const ProviderCard = memo(function ProviderCard({
           {providerBilling.length > 0 && (
             <span style={number}>
               {providerBilling[0].currency === "credits"
-                ? zh
-                  ? "可用积分 "
-                  : "Available credits "
-                : zh
-                  ? "API 余额 "
-                  : "API balance "}
-              {moneyAmount(
-                providerBilling[0].amount,
-                providerBilling[0].currency,
-                zh ? "zh" : "en",
-              )}
+                ? t("Available credits {{amount}}", { amount: balance })
+                : t("API balance {{amount}}", { amount: balance })}
             </span>
           )}
         </div>
@@ -270,7 +268,7 @@ export const ProviderCard = memo(function ProviderCard({
             />
             <div style={{ display: "grid", gap: 4, minWidth: 0, flex: 1 }}>
               <span style={{ fontSize: 11, color: theme.secondary }}>
-                {zh ? "每天的额度" : "Quota by day"}
+                {t("Quota by day")}
               </span>
               <QuotaRows
                 rows={quota.rows}

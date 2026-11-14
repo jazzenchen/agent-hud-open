@@ -4,7 +4,7 @@
 use super::quotas::parse;
 use super::{ACCOUNT_SERVICE, AGENT};
 use crate::account::{Host, Provider, Reading, Reported, Unread};
-use crate::l10n;
+use crate::l10n::tr;
 use serde_json::{json, Value};
 use std::{collections::BTreeSet, path::Path};
 
@@ -30,10 +30,7 @@ pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
     if !ACCOUNT_SERVICE.runs_on(host.os()) && reading.account.is_none() {
         reading.notice = Some(format!(
             "{} ({})",
-            l10n::text(
-                "此系统暂不支持查找 Antigravity 本地服务",
-                "Antigravity local-service discovery is not implemented here"
-            ),
+            tr!("Antigravity local-service discovery is not implemented here"),
             host.os().name()
         ));
         return Ok(reading);
@@ -86,9 +83,8 @@ pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
                         }
                     }
                 } else if reading.account.is_none() {
-                    return Err(l10n::text(
-                        "Antigravity 本地服务返回的账户格式无法识别",
-                        "Antigravity local service returned an unsupported account format.",
+                    return Err(tr!(
+                        "Antigravity local service returned an unsupported account format."
                     )
                     .into());
                 } else {
@@ -103,21 +99,15 @@ pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
         if let Some(executable) = executable {
             return Ok(super::cli::read(host, Path::new(&executable))?);
         }
-        return Err(l10n::text(
-            "没有已登录且正在运行的 Antigravity 服务",
-            "No authenticated already-running Antigravity service is available",
-        )
-        .into());
+        return Err(
+            tr!("No authenticated already-running Antigravity service is available").into(),
+        );
     }
     reading.notice = if partial {
-        Some(l10n::text(
-            "部分 Antigravity 账户额度无法读取",
-            "Some Antigravity accounts could not be read.",
-        ))
+        Some(tr!("Some Antigravity accounts could not be read."))
     } else if reading.quotas.is_empty() {
-        Some(l10n::text(
-            "Antigravity 已连接，但未提供额度比例",
-            "Antigravity is connected but reports no quota percentage.",
+        Some(tr!(
+            "Antigravity is connected but reports no quota percentage."
         ))
     } else {
         None

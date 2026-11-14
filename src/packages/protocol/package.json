@@ -6,7 +6,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./capabilities": "./capabilities.json",
-    "./hud-defaults.json": "./hud-defaults.json"
+    "./hud-defaults.json": "./hud-defaults.json",
+    "./locales/*": "./locales/*"
   },
   "scripts": {
     "typecheck": "tsc -p ."

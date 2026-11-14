@@ -1,4 +1,5 @@
-/** How usage is drawn: concentric rings (年轮), one ring split into a segment
+/**
+ * How usage is drawn: concentric rings (年轮), one ring split into a segment
  * per item (分段环), horizontal bars (进度条), or the number alone (数字). */
 export type UsageStyle = "rings" | "segments" | "bars" | "numbers";
 export type RingStyle = Extract<UsageStyle, "rings" | "segments">;

@@ -1,7 +1,8 @@
 //! Bringing the in-memory logs up to date with the database, adopting a
 //! session whose mapping moved to another log, and loading a log's parser
 //! from its checkpoint.
-use crate::{checkpoints, l10n, source_batches, AgentHudCore, Log};
+use crate::l10n::tr;
+use crate::{checkpoints, source_batches, AgentHudCore, Log};
 use serde_json::json;
 use std::path::{Path, PathBuf};
 
@@ -119,12 +120,9 @@ impl AgentHudCore {
             return Ok(log);
         }
         let (mut log, bytes) = checkpoints::read(
-            self.database.as_ref().ok_or_else(|| {
-                l10n::text(
-                    "会话解析进度暂时无法保存",
-                    "Parser checkpoint storage is unavailable",
-                )
-            })?,
+            self.database
+                .as_ref()
+                .ok_or_else(|| tr!("Parser checkpoint storage is unavailable"))?,
             path,
         )?;
         // A checkpoint keeps no turn text; this run's words come from its head.

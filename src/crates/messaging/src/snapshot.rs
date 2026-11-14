@@ -1,10 +1,11 @@
 //! What a call reads from the app's snapshot: its sessions and language.
 use super::*;
 
-pub(crate) fn language(snapshot: &Value) -> bool {
+pub(crate) fn language(snapshot: &Value) -> Language {
     snapshot["language"]
         .as_str()
-        .is_some_and(|language| language.starts_with("zh"))
+        .and_then(Language::from_tag)
+        .unwrap_or_else(agent_hud_core::l10n::current)
 }
 pub(crate) fn all_sessions(snapshot: &Value) -> Vec<Value> {
     snapshot["sessions"].as_array().cloned().unwrap_or_default()

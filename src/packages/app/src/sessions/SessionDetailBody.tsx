@@ -5,6 +5,7 @@ import type { useSessionDetail } from "../lib/use-sessions";
 import { InlineDetail } from "./SessionDetailView";
 import { DetailPlaceholder } from "./SessionPlaceholders";
 import { card, type Theme } from "./SessionTheme";
+import { useT } from "@agent-hud/ui/format-context";
 
 /** What `useSessionDetail` reads of one session. */
 export type DetailState = ReturnType<typeof useSessionDetail>;
@@ -38,7 +39,7 @@ export function SessionDetailBody({
   pickedSession?: string | null;
   turnBeside?: boolean;
 }) {
-  const zh = Boolean(theme.zh);
+  const t = useT();
   return (
     <>
       {session ? (
@@ -73,7 +74,7 @@ export function SessionDetailBody({
       )}
       {state.error && (
         <Button variant="ghost" size="sm" onClick={state.retry}>
-          {zh ? "重试" : "Retry"}
+          {t("Retry")}
         </Button>
       )}
     </>

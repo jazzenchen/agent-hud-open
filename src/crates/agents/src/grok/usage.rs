@@ -7,7 +7,7 @@
 use super::cache as bot;
 use crate::account::{Host, HttpFailure, HttpRequest};
 use crate::cursor::account::SignIn;
-use crate::l10n;
+use crate::l10n::tr;
 use serde_json::{json, Value};
 use std::collections::{BTreeMap, HashSet};
 use std::path::Path;
@@ -48,20 +48,19 @@ pub(super) fn read(
     cursor: &Result<Option<SignIn>, String>,
     now_ms: i64,
 ) -> Result<Vec<Value>, String> {
-    let token =
-        match cursor {
-            Ok(Some(SignIn { token, .. })) => token,
-            Ok(None) => return Err(l10n::text(
-                "Grok Bot 的 Token 用 Cursor 的登录读取；登录 Cursor 后可见",
-                "Grok Bot's tokens are read with Cursor's sign-in; sign in to Cursor to see them.",
-            )),
-            Err(why) => return Err(why.clone()),
-        };
+    let token = match cursor {
+        Ok(Some(SignIn { token, .. })) => token,
+        Ok(None) => {
+            return Err(tr!(
+                "Grok Bot's tokens are read with Cursor's sign-in; sign in to Cursor to see them."
+            ))
+        }
+        Err(why) => return Err(why.clone()),
+    };
     let unreachable = |failure: HttpFailure| match failure {
-        HttpFailure::Unreachable => l10n::text(
-            "无法读取 Grok Bot 的 Token 用量，请检查网络",
-            "Grok Bot's token usage could not be reached; check the connection.",
-        ),
+        HttpFailure::Unreachable => {
+            tr!("Grok Bot's token usage could not be reached; check the connection.")
+        }
         other => other.message(),
     };
     let me = post(host, token, "GetMe", &json!({})).map_err(unreachable)?;
@@ -112,16 +111,15 @@ pub(super) fn read(
     // Cursor signed in to another account than Grok Bot would bring that
     // account's bots: rows must name at least one of this Bot's.
     if !totals.is_empty() && !totals.keys().any(|(id, _)| roster.contains(id)) {
-        return Err(l10n::text(
-            "Cursor 登录的账户与 Grok Bot 不同，无法读取 Grok Bot 的 Token",
-            "Cursor is signed in to another account than Grok Bot; its tokens are not read.",
+        return Err(tr!(
+            "Cursor is signed in to another account than Grok Bot; its tokens are not read."
         ));
     }
     Ok(totals
         .into_iter()
         .map(|((id, day), tokens)| {
             let title = if id == UNATTRIBUTED {
-                Some(l10n::text("其他 Bot", "Other bots"))
+                Some(tr!("Other bots"))
             } else if roster.contains(&id) {
                 None
             } else {
@@ -147,10 +145,7 @@ pub(super) fn read(
 static EMPTY: Vec<Value> = Vec::new();
 
 fn format_error() -> String {
-    l10n::text(
-        "Grok Bot 的 Token 用量格式无法识别",
-        "Grok Bot's token usage has an unsupported format.",
-    )
+    tr!("Grok Bot's token usage has an unsupported format.")
 }
 
 /// The bots in the Bot's roster for `slot`.

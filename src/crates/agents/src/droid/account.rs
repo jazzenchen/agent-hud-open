@@ -14,7 +14,7 @@
 use crate::account::{
     account_id, status, Host, HttpFailure, HttpRequest, Provider, Reading, Unread,
 };
-use crate::{l10n, Location};
+use crate::{l10n::tr, Location};
 use serde_json::{json, Value};
 use std::time::Duration;
 
@@ -74,10 +74,7 @@ fn api_key(host: &dyn Host) -> Option<String> {
 }
 
 fn unsupported() -> Unread {
-    Unread::Failed(l10n::text(
-        "Factory 的用量上限格式无法识别",
-        "Factory's usage limits have an unsupported format",
-    ))
+    Unread::Failed(tr!("Factory's usage limits have an unsupported format"))
 }
 
 pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
@@ -85,9 +82,8 @@ pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
     let Some(key) = api_key(host) else {
         // Droid signs in on its own; only an API key lets Agent HUD read
         // its limits, and having none is no sign-out.
-        reading.notice = Some(l10n::text(
-            "设置 FACTORY_API_KEY 后才能读取 Factory Droid 的用量上限",
-            "Set FACTORY_API_KEY to read Factory Droid's usage limits",
+        reading.notice = Some(tr!(
+            "Set FACTORY_API_KEY to read Factory Droid's usage limits"
         ));
         return Ok(reading);
     };
@@ -103,18 +99,15 @@ pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
         .map_err(|failure| match failure {
             // Factory no longer takes the key: only a new one brings the
             // reading back.
-            HttpFailure::Status(401 | 403) => Unread::SignedOut(l10n::text(
-                "Factory 不再接受这个 API Key，请在 app.factory.ai 重新生成",
-                "Factory no longer accepts this API key; create a new one at app.factory.ai",
+            HttpFailure::Status(401 | 403) => Unread::SignedOut(tr!(
+                "Factory no longer accepts this API key; create a new one at app.factory.ai"
             )),
-            HttpFailure::BadHeader => Unread::Failed(l10n::text(
-                "FACTORY_API_KEY 无法用于请求",
-                "FACTORY_API_KEY cannot be used in a request",
-            )),
-            HttpFailure::Unreachable => failure.unread_as(l10n::text(
-                "无法连接 Factory 的用量服务",
-                "Factory's usage limits could not be reached",
-            )),
+            HttpFailure::BadHeader => {
+                Unread::Failed(tr!("FACTORY_API_KEY cannot be used in a request"))
+            }
+            HttpFailure::Unreachable => {
+                failure.unread_as(tr!("Factory's usage limits could not be reached"))
+            }
             other => other.unread(),
         })?;
     if !body.is_object() {
@@ -131,7 +124,7 @@ pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
     {
         reading.billing.push(json!({
             "id": format!("{id}/droid:extra-usage"), "vendor": "droid", "accountId": id,
-            "label": l10n::text("额外用量余额", "Extra usage balance"),
+            "label": tr!("Extra usage balance"),
             "amount": cents / 100.0, "currency": "USD",
         }));
     }
@@ -140,10 +133,7 @@ pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
             return Err(unsupported());
         }
         // A plan billed another way reports no windows here.
-        reading.notice = Some(l10n::text(
-            "这个 Factory 套餐不按用量窗口计费",
-            "This Factory plan reports no usage windows",
-        ));
+        reading.notice = Some(tr!("This Factory plan reports no usage windows"));
     }
     reading.account = Some(json!({"id": id, "provider": "droid", "label": null, "plan": null}));
     Ok(reading)
@@ -170,29 +160,15 @@ fn window_end(value: &Value) -> Option<i64> {
 /// The rows of every window the pools report, Standard first.
 fn windows(body: &Value, id: &str, now: i64) -> Vec<Value> {
     let mut rows = Vec::new();
-    for (pool, prefix_en, prefix_zh) in
-        [("standard", "", ""), ("core", "Droid Core ", "Droid Core ")]
-    {
+    for (pool, prefix) in [("standard", ""), ("core", "Droid Core ")] {
         let limits = &body["limits"][pool];
         if !limits.is_object() {
             continue;
         }
-        for (key, short, seconds, name_en, name_zh) in [
-            (
-                "fiveHour",
-                "5h",
-                Some(5 * 3600),
-                "5-hour limit",
-                "5 小时额度",
-            ),
-            (
-                "weekly",
-                "Weekly",
-                Some(7 * 86_400),
-                "Weekly limit",
-                "每周额度",
-            ),
-            ("monthly", "Monthly", None, "Monthly limit", "每月额度"),
+        for (key, short, seconds, window_name) in [
+            ("fiveHour", "5h", Some(5 * 3600), tr!("5-hour limit")),
+            ("weekly", "Weekly", Some(7 * 86_400), tr!("Weekly limit")),
+            ("monthly", "Monthly", None, tr!("Monthly limit")),
         ] {
             let window = &limits[key];
             let Some(used) = window["usedPercent"].as_f64().filter(|n| n.is_finite()) else {
@@ -213,11 +189,7 @@ fn windows(body: &Value, id: &str, now: i64) -> Vec<Value> {
             } else {
                 used.clamp(0.0, 100.0)
             };
-            let name = format!(
-                "{}{}",
-                l10n::text(prefix_zh, prefix_en),
-                l10n::text(name_zh, name_en)
-            );
+            let name = format!("{prefix}{window_name}");
             let short = if pool == "core" {
                 format!("Core {short}")
             } else {

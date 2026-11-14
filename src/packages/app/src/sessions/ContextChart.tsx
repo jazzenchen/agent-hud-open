@@ -2,6 +2,7 @@ import { contextRuns, niceScale } from "../lib/session-charts";
 import { axis, Halo, labelFont, useWidth } from "./SessionCharts";
 import { compact, numeric, type Entry, type Theme } from "./SessionTheme";
 import { useGlide } from "./use-glide";
+import { useT } from "@agent-hud/ui/format-context";
 
 /**
  * Each turn's context against the model's window, on the turn chart's axis
@@ -27,7 +28,7 @@ export function ContextChart({
   theme: Theme;
   height?: number;
 }) {
-  const zh = Boolean(theme.zh);
+  const t = useT();
   const [ref, width] = useWidth<HTMLDivElement>();
   const plot = Math.max(0, width - axis);
   const pad = 6;
@@ -63,7 +64,7 @@ export function ContextChart({
           width={width}
           height={total}
           role="img"
-          aria-label={zh ? "上下文窗口" : "Context window"}
+          aria-label={t("Context window")}
           style={{ display: "block", overflow: "visible" }}
         >
           {picked >= 0 && (
@@ -102,7 +103,7 @@ export function ContextChart({
                 fill={theme.warning}
                 fontWeight={600}
               >
-                {(zh ? "上限 " : "Limit ") + compact(limit)}
+                {t("Limit {{limit}}", { limit: compact(limit) })}
               </Halo>
             </>
           )}
@@ -190,7 +191,7 @@ export function ContextChart({
                   fill={theme.compaction}
                   fontWeight={600}
                 >
-                  {zh ? "已压缩" : "Compacted"}
+                  {t("Compacted")}
                 </Halo>
               </g>
             );

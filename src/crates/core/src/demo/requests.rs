@@ -1,5 +1,6 @@
 //! The demo's permission requests, as native requests.
-use crate::{iso, l10n};
+use crate::iso;
+use crate::l10n::tr;
 use serde_json::{json, Value};
 
 /// The demo's permission requests and how many seconds ago each was asked:
@@ -29,7 +30,7 @@ pub fn demo_request(id: &str, at: i64) -> Option<Value> {
             "claude",
             "s1",
             "Bash",
-            l10n::text("运行测试", "Run the test suite"),
+            tr!("Run the test suite"),
             "swift test --filter SyncRecordTests",
             "~/work/orbit",
         ),
@@ -52,7 +53,7 @@ pub fn demo_request(id: &str, at: i64) -> Option<Value> {
             "codex",
             "demo-2",
             "Bash",
-            l10n::text("构建生产版本", "Build for production"),
+            tr!("Build for production"),
             "npm run build",
             "~/Projects/acme-api",
         ),

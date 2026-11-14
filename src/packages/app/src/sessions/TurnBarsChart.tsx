@@ -7,7 +7,7 @@ import {
   turnTicks,
   type StackedBar,
 } from "../lib/session-charts";
-import { moneyShort } from "@agent-hud/ui/format";
+import { moneyShort, type Language } from "@agent-hud/ui/format";
 import {
   axis,
   Halo,
@@ -18,14 +18,15 @@ import {
 } from "./SessionCharts";
 import { labelReveal } from "./SessionMotion";
 import { compact, numeric, type Entry, type Theme } from "./SessionTheme";
+import { useFormat, useT } from "@agent-hud/ui/format-context";
 
 /** What the session page's turn chart measures: the new tokens of each turn, or what its calls would cost at list prices. */
 export type Measure = "tokens" | "cost";
 
 /** A value on the turn chart: tokens as "48k", money as "$1.20". */
-function measureText(value: number, measure: Measure, zh: boolean) {
+function measureText(value: number, measure: Measure, language: Language) {
   return measure === "cost"
-    ? moneyShort(value, "USD", zh ? "zh" : "en")
+    ? moneyShort(value, "USD", language)
     : compact(value);
 }
 
@@ -71,7 +72,8 @@ export function TurnBarsChart({
   theme: Theme;
   height?: number;
 }) {
-  const zh = Boolean(theme.zh);
+  const t = useT();
+  const { language } = useFormat();
   const [ref, width] = useWidth<HTMLDivElement>();
   const [pointed, setPointed] = useState<number | null>(null);
   const labels = 18;
@@ -191,7 +193,7 @@ export function TurnBarsChart({
         fontWeight={600}
         style={{ ...numeric, ...labelReveal.style }}
       >
-        {measureText(values[index], measure, zh)}
+        {measureText(values[index], measure, language)}
       </Halo>
     );
   });
@@ -205,13 +207,7 @@ export function TurnBarsChart({
           height={total}
           role="img"
           aria-label={
-            measure === "cost"
-              ? zh
-                ? "每轮费用"
-                : "Cost per turn"
-              : zh
-                ? "每轮新增 Token"
-                : "New tokens per turn"
+            measure === "cost" ? t("Cost per turn") : t("New tokens per turn")
           }
           style={{
             display: "block",
@@ -267,7 +263,7 @@ export function TurnBarsChart({
                   fill={theme.secondary}
                   style={numeric}
                 >
-                  {tick === 0 ? "0" : measureText(tick, measure, zh)}
+                  {tick === 0 ? "0" : measureText(tick, measure, language)}
                 </text>
               </g>
             );

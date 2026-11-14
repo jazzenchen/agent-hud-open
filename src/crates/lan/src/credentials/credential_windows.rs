@@ -96,7 +96,7 @@ mod tests {
     fn credential_names_do_not_alias_at_separators() {
         assert_ne!(target("a/b", "c"), target("a", "b/c"));
         assert_ne!(target("a", "bc"), target("ab", "c"));
-        assert_ne!(target("服务", "账户"), target("服务", "其他"));
+        assert_ne!(target("服务", "账户"), target("服务", "其他")); // l10n-ignore: test data
     }
 
     #[test]

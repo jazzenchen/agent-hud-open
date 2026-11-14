@@ -16,14 +16,14 @@ impl Messaging {
             .collect()
     }
     pub(crate) fn list(&self, caller: Option<&Caller>, host: &Host<'_>) -> Value {
-        let zh = language(host.snapshot);
+        let language = language(host.snapshot);
         let loaded = self.loaded();
         let mut rows = sessions(host.snapshot)
             .map(|session| {
                 let id = session["id"].as_str().unwrap_or_default();
                 let client = session["source"].as_str().unwrap_or_default();
                 let (reachable, reason) =
-                    self.reachable(client, id, &loaded, (session, host.snapshot), zh);
+                    self.reachable(client, id, &loaded, (session, host.snapshot), language);
                 json!({
                     "id": id,
                     "client": client,
@@ -60,31 +60,31 @@ impl Messaging {
         id: &str,
         loaded: &std::collections::BTreeSet<String>,
         rows: (&Value, &Value),
-        zh: bool,
+        language: Language,
     ) -> (Value, String) {
         match client {
             "claude" if !self.preferences.claude => (json!(false), CLAUDE_MESSAGES_OFF.into()),
-            "claude" if loaded.contains(id) => (json!(true), words::claude_ready(zh)),
-            "claude" => (json!(false), words::claude_not_loaded(zh)),
+            "claude" if loaded.contains(id) => (json!(true), words::claude_ready(language)),
+            "claude" => (json!(false), words::claude_not_loaded(language)),
             "deepseek" if !self.preferences.deepseek => {
                 (json!(false), DEEPSEEK_MESSAGES_OFF.into())
             }
-            "deepseek" if loaded.contains(id) => (json!(true), words::deepseek_ready(zh)),
-            "deepseek" => (json!(false), words::deepseek_not_loaded(zh)),
-            "antigravity" => (Value::Null, words::antigravity_waits(zh)),
+            "deepseek" if loaded.contains(id) => (json!(true), words::deepseek_ready(language)),
+            "deepseek" => (json!(false), words::deepseek_not_loaded(language)),
+            "antigravity" => (Value::Null, words::antigravity_waits(language)),
             // Pi and OpenCode: Agent HUD's observer in the client takes it.
             _ if Provider::parse(client).is_some_and(Provider::uses_observer) => {
                 let name = words::client_name(client);
                 if Provider::parse(client).is_some_and(|p| self.clients.hook_waiting(p, id)) {
-                    (json!(true), words::observer_ready(zh, name))
+                    (json!(true), words::observer_ready(language, name))
                 } else {
-                    (Value::Null, words::observer_closed(zh, name))
+                    (Value::Null, words::observer_closed(language, name))
                 }
             }
             _ if Provider::parse(client).is_some_and(Provider::uses_hook_channel) => {
                 let waiting = Provider::parse(client)
                     .is_some_and(|provider| self.clients.hook_waiting(provider, id));
-                hook_reachable(client, rows, waiting, zh)
+                hook_reachable(client, rows, waiting, language)
             }
             // With neither a command line nor the shared daemon, nothing
             // can queue it, even into a thread an app has open.
@@ -95,15 +95,15 @@ impl Messaging {
                     .join("app-server-control/app-server-control.sock")
                     .exists() =>
             {
-                (json!(false), words::codex_no_command(zh))
+                (json!(false), words::codex_no_command(language))
             }
             _ if delivery::codex_thread_open(&self.places.codex_data, id) => {
-                (json!(true), words::codex_open(zh))
+                (json!(true), words::codex_open(language))
             }
             _ if delivery::codex_desktop_installed(&self.places.applications) => {
-                (json!(true), words::codex_wakes(zh))
+                (json!(true), words::codex_wakes(language))
             }
-            _ => (Value::Null, words::codex_waits(zh)),
+            _ => (Value::Null, words::codex_waits(language)),
         }
     }
 }
@@ -117,10 +117,10 @@ fn hook_reachable(
     client: &str,
     (session, snapshot): (&Value, &Value),
     waiting: bool,
-    zh: bool,
+    language: Language,
 ) -> (Value, String) {
     if waiting {
-        return (json!(true), words::hook_waiting(zh));
+        return (json!(true), words::hook_waiting(language));
     }
     let week_ago = chrono::Utc::now() - chrono::Duration::days(7);
     let recent = |row: &Value| {
@@ -137,15 +137,15 @@ fn hook_reachable(
         });
     let name = words::client_name(client);
     if !hooked {
-        return (json!(false), words::hook_unseen(zh, name));
+        return (json!(false), words::hook_unseen(language, name));
     }
     // The state the hooks saw: a client's live status may be off for display.
     if session["hooks"]["state"] == "running" || session["state"] == "running" {
-        (json!(true), words::hook_running(zh))
+        (json!(true), words::hook_running(language))
     } else if delivery::wakes_idle(client) {
-        (Value::Null, words::hook_not_waiting(zh, name))
+        (Value::Null, words::hook_not_waiting(language, name))
     } else {
-        (Value::Null, words::hook_idle(zh, name))
+        (Value::Null, words::hook_idle(language, name))
     }
 }
 
@@ -163,19 +163,19 @@ mod hook_tests {
         let unseen = json!({"id":"trae:c","source":"trae","state":"idle"});
         let snapshot = json!({"sessions":[running.clone(), idle.clone(), unseen.clone()]});
         assert_eq!(
-            hook_reachable("kimi", (&running, &snapshot), false, false).0,
+            hook_reachable("kimi", (&running, &snapshot), false, Language::En).0,
             json!(true)
         );
-        let (reachable, reason) = hook_reachable("kimi", (&idle, &snapshot), false, false);
+        let (reachable, reason) = hook_reachable("kimi", (&idle, &snapshot), false, Language::En);
         assert_eq!(reachable, Value::Null);
         assert!(reason.contains("next turn"), "{reason}");
-        let (reachable, reason) = hook_reachable("trae", (&unseen, &snapshot), false, false);
+        let (reachable, reason) = hook_reachable("trae", (&unseen, &snapshot), false, Language::En);
         assert_eq!(reachable, json!(false));
         assert!(reason.contains("TRAE Settings → Hooks"), "{reason}");
         // Another session of the same client proves its hooks run.
         let fresh = json!({"id":"kimi:session_d:main","source":"kimi","state":"idle"});
         assert_eq!(
-            hook_reachable("kimi", (&fresh, &snapshot), false, false).0,
+            hook_reachable("kimi", (&fresh, &snapshot), false, Language::En).0,
             Value::Null
         );
     }
@@ -186,11 +186,11 @@ mod hook_tests {
         let idle =
             json!({"id":"q1","source":"qoder","state":"idle","hooks":{"at":now,"state":"idle"}});
         let snapshot = json!({"sessions":[idle.clone()]});
-        let (reachable, reason) = hook_reachable("qoder", (&idle, &snapshot), true, false);
+        let (reachable, reason) = hook_reachable("qoder", (&idle, &snapshot), true, Language::En);
         assert_eq!(reachable, json!(true));
         assert!(reason.contains("at once"), "{reason}");
         // No waiter: it says why, and waits for the session's next turn.
-        let (reachable, reason) = hook_reachable("qoder", (&idle, &snapshot), false, false);
+        let (reachable, reason) = hook_reachable("qoder", (&idle, &snapshot), false, Language::En);
         assert_eq!(reachable, Value::Null);
         assert!(reason.contains("interactive"), "{reason}");
         assert!(reason.contains("next turn"), "{reason}");

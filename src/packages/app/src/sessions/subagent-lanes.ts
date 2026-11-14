@@ -2,6 +2,7 @@
 // between calls, what each row added, and the line its hover card reads.
 // The timeline only draws them.
 import type { SessionCall, SessionTurnAgent } from "@agent-hud/protocol";
+import { translate, type Language } from "@agent-hud/ui/format";
 import { compact, type Theme } from "./SessionTheme";
 
 /** A step (one call to the next) at least this long: long thinking or a slow tool. */
@@ -87,8 +88,8 @@ export function lanes(
   now: number,
   live: boolean,
   theme: Theme,
+  language: Language,
 ): Lane[] {
-  const zh = Boolean(theme.zh);
   const palette = theme.light ? PALETTE.light : PALETTE.dark;
   const timed = calls
     .map((call) => ({ at: ms(call.timestamp), call }))
@@ -170,7 +171,7 @@ export function lanes(
 
   const main: Lane = {
     key: ownLog ?? "own",
-    name: zh ? "主会话" : "Main session",
+    name: translate(language, "Main session"),
     sub: mostUsedModel(ownCalls.map((entry) => entry.call)) ?? "",
     depth: 0,
     color: theme.secondary,
@@ -239,32 +240,29 @@ export function tipLine(
   start: number,
   nearest: { at: number; call: SessionCall } | null,
   step: Step | undefined,
-  zh: boolean,
+  language: Language,
 ) {
   if (nearest) {
     const tools = nearest.call.tools?.length
       ? nearest.call.tools.join(", ")
-      : zh
-        ? "回复"
-        : "reply";
-    return `+${offset(nearest.at - start)} · ${tools} · ${compact(nearest.call.newTokens ?? 0)} ${zh ? "新增" : "new"}`;
+      : translate(language, "reply");
+    const added = translate(language, "{{tokens}} new", {
+      tokens: compact(nearest.call.newTokens ?? 0),
+    });
+    return `+${offset(nearest.at - start)} · ${tools} · ${added}`;
   }
   if (step) {
     const length = offset(step.to - step.from);
     const text =
       step.kind === "idle"
-        ? zh
-          ? `等子 agent ${length}`
-          : `Waiting on sub-agents ${length}`
+        ? translate(language, "Waiting on sub-agents {{length}}", { length })
         : step.kind === "live"
-          ? zh
-            ? `进行中 ${length}`
-            : `Working ${length}`
-          : zh
-            ? `一步 ${length}`
-            : `A step of ${length}`;
+          ? translate(language, "Working {{length}}", { length })
+          : translate(language, "A step of {{length}}", { length });
     return `+${offset(at - start)} · ${text}`;
   }
-  const calls = lane.calls.length;
-  return `+${offset(at - start)} · ${zh ? `${calls} 次调用` : `${calls} call${calls === 1 ? "" : "s"}`}`;
+  const calls = translate(language, "{{count}} calls", {
+    count: lane.calls.length,
+  });
+  return `+${offset(at - start)} · ${calls}`;
 }

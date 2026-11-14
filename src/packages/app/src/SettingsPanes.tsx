@@ -1,6 +1,7 @@
 import type { PanelLayout, SourcePreferences } from "@agent-hud/protocol";
 import type { NativeHUDMonitor } from "./lib/use-hud-geometry";
 import AgentsPage from "./settings/agents/AgentsPage";
+import { useT } from "@agent-hud/ui/format-context";
 import { LoadingState } from "./LoadingState";
 import {
   AgentPluginsPane,
@@ -21,7 +22,6 @@ export default function SettingsPane({
   selectedId,
   monitors,
   selectScreen,
-  chinese,
   layout,
   onLayout,
   preferences,
@@ -35,7 +35,6 @@ export default function SettingsPane({
   selectedId: string;
   monitors: NativeHUDMonitor[];
   selectScreen: (id: string) => void;
-  chinese: boolean;
   layout: PanelLayout;
   onLayout: (layout: PanelLayout) => Promise<unknown>;
   preferences: Record<string, SourcePreferences>;
@@ -43,6 +42,7 @@ export default function SettingsPane({
   agentPlugins?: AgentPluginItem[];
   request: (method: string, params?: unknown) => Promise<unknown>;
 }) {
+  const t = useT();
   if (page === "general") return <GeneralPane {...settingsProps} />;
   if (page === "prices") return <PricesPane {...settingsProps} />;
   if (page === "relays") return <RelaysPane {...settingsProps} />;
@@ -58,7 +58,7 @@ export default function SettingsPane({
         onSelectScreen={selectScreen}
       />
     ) : (
-      <LoadingState label={chinese ? "正在读取显示器…" : "Reading displays…"} />
+      <LoadingState label={t("Reading displays…")} />
     );
   if (page === "agents")
     return (

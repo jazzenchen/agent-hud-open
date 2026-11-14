@@ -1,6 +1,7 @@
 //! The menu bar item: the highest usage, the quota gradient and a menu of
 //! every agent's windows and balances (Open's StatusItemController). The app
 //! projects it from each snapshot itself; no window has to stay open for it.
+use agent_hud_runtime::l10n::{self, tr_in};
 use std::sync::{Mutex, PoisonError};
 use tauri::{
     menu::{Menu, MenuItem, PredefinedMenuItem},
@@ -62,7 +63,6 @@ pub(crate) fn apply(app: &tauri::AppHandle, state: Presentation) -> Result<(), S
     let tray = app
         .tray_by_id("main")
         .ok_or("The menu bar item is unavailable")?;
-    let chinese = state.language == "zh";
     let value = state.used_percent.map_or_else(
         || "—".into(),
         |value| {
@@ -76,16 +76,16 @@ pub(crate) fn apply(app: &tauri::AppHandle, state: Presentation) -> Result<(), S
         .map_err(|e| e.to_string())?;
     tray.set_title(Some(format!(" {value}")))
         .map_err(|e| e.to_string())?;
-    tray.set_tooltip(Some(format!(
-        "Agent HUD · {}: {value}",
-        match (chinese, state.remaining) {
-            (true, true) => "最低剩余额度",
-            (true, false) => "最高已用额度",
-            (false, true) => "lowest remaining quota",
-            (false, false) => "highest usage",
-        }
-    )))
-    .map_err(|e| e.to_string())?;
+    let tooltip = if state.remaining {
+        tr_in(
+            state.language,
+            "Agent HUD · lowest remaining quota: {{value}}",
+        )
+    } else {
+        tr_in(state.language, "Agent HUD · highest usage: {{value}}")
+    };
+    tray.set_tooltip(Some(l10n::fill(&tooltip, &[("value", &value)])))
+        .map_err(|e| e.to_string())?;
     tray.set_menu(Some(make_menu(app, &state).map_err(|e| e.to_string())?))
         .map_err(|e| e.to_string())?;
     tray.set_visible(state.visible).map_err(|e| e.to_string())?;
@@ -95,13 +95,12 @@ pub(crate) fn apply(app: &tauri::AppHandle, state: Presentation) -> Result<(), S
 
 fn make_menu(app: &tauri::AppHandle, state: &Presentation) -> tauri::Result<Menu<tauri::Wry>> {
     let menu = Menu::new(app)?;
-    let zh = state.language == "zh";
-    let text = |chinese, english| if zh { chinese } else { english };
+    let language = state.language;
     if state.entries.is_empty() {
         menu.append(&MenuItem::with_id(
             app,
             "tray-empty",
-            text("没有启用的模型", "No agents enabled"),
+            tr_in(language, "No agents enabled"),
             false,
             None::<&str>,
         )?)?;
@@ -127,11 +126,10 @@ fn make_menu(app: &tauri::AppHandle, state: &Presentation) -> tauri::Result<Menu
         }
     }
     menu.append(&PredefinedMenuItem::separator(app)?)?;
-    let glow = match (zh, state.glow_hidden) {
-        (true, true) => "显示灵动岛光晕",
-        (true, false) => "隐藏灵动岛光晕",
-        (false, true) => "Show notch glow",
-        (false, false) => "Hide notch glow",
+    let glow = if state.glow_hidden {
+        tr_in(language, "Show notch glow")
+    } else {
+        tr_in(language, "Hide notch glow")
     };
     menu.append(&MenuItem::with_id(
         app,
@@ -144,21 +142,21 @@ fn make_menu(app: &tauri::AppHandle, state: &Presentation) -> tauri::Result<Menu
     menu.append(&MenuItem::with_id(
         app,
         "tray-statistics",
-        text("统计…", "Statistics…"),
+        tr_in(language, "Statistics…"),
         true,
         None::<&str>,
     )?)?;
     menu.append(&MenuItem::with_id(
         app,
         "tray-refresh",
-        text("刷新数据", "Refresh data"),
+        tr_in(language, "Refresh data"),
         true,
         None::<&str>,
     )?)?;
     menu.append(&MenuItem::with_id(
         app,
         "tray-settings",
-        text("设置…", "Settings…"),
+        tr_in(language, "Settings…"),
         true,
         Some("CmdOrCtrl+,"),
     )?)?;
@@ -169,7 +167,7 @@ fn make_menu(app: &tauri::AppHandle, state: &Presentation) -> tauri::Result<Menu
         menu.append(&MenuItem::with_id(
             app,
             "tray-update",
-            text("发现新版本…", "New Version…"),
+            tr_in(language, "New Version…"),
             true,
             None::<&str>,
         )?)?;
@@ -177,7 +175,7 @@ fn make_menu(app: &tauri::AppHandle, state: &Presentation) -> tauri::Result<Menu
     menu.append(&MenuItem::with_id(
         app,
         "tray-quit",
-        text("退出", "Quit"),
+        tr_in(language, "Quit"),
         true,
         Some("CmdOrCtrl+Q"),
     )?)?;

@@ -1,5 +1,4 @@
 import type { IslandEvent, Snapshot } from "@agent-hud/protocol";
-import { snapshotLanguage } from "@agent-hud/ui/format";
 import { CompletionAlertView } from "./CompletionAlertView";
 import { HooksReviewAlertView } from "./HooksReviewAlertView";
 import {
@@ -26,7 +25,6 @@ export function NewsContent({
   light?: boolean;
   botLogos?: boolean;
 }) {
-  const zh = snapshotLanguage(snapshot) === "zh";
   if (event.kind === "completion") {
     return (
       <CompletionAlertView
@@ -47,7 +45,6 @@ export function NewsContent({
         dismiss={dismiss}
         light={light}
         botLogos={botLogos}
-        zh={zh}
       />
     );
   }
@@ -58,7 +55,6 @@ export function NewsContent({
         dismiss={dismiss}
         light={light}
         botLogos={botLogos}
-        zh={zh}
       />
     );
   }
@@ -71,7 +67,6 @@ export function NewsContent({
         onStats={onStats}
         light={light}
         botLogos={botLogos}
-        zh={zh}
       />
     );
   }
@@ -82,7 +77,6 @@ export function NewsContent({
       onStats={onStats}
       light={light}
       botLogos={botLogos}
-      zh={zh}
     />
   );
 }

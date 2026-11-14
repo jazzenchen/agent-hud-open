@@ -11,6 +11,12 @@ type Args = Record<string, any>;
 type Language = format.Language;
 
 const root = join(import.meta.dirname, "../../../fixtures/parity");
+const locales = join(import.meta.dirname, "../../protocol/locales");
+for (const language of ["en", "zh-Hans"] as const)
+  format.addCatalog(
+    language,
+    JSON.parse(readFileSync(join(locales, `${language}.json`), "utf8")),
+  );
 const decisions = JSON.parse(
   readFileSync(join(root, "decisions.json"), "utf8"),
 );
@@ -66,7 +72,7 @@ const functions: Record<string, (args: Args, language: Language) => unknown> = {
 };
 
 /** The value this app must produce, and whether the case is a recorded gap. */
-function decision(key: string, language: Language, open: unknown) {
+function decision(key: string, language: "en" | "zh", open: unknown) {
   const lookup = (table: Record<string, any>) =>
     table[`${key}/${language}`] ?? table[key];
   const improvement = lookup(decisions.improvements);
@@ -101,11 +107,12 @@ for (const file of readdirSync(join(root, "contracts"))
         problems.push(`${item.name}: no TypeScript function for ${item.fn}`);
         continue;
       }
+      // The fixtures write Chinese as "zh"; the app's language is zh-Hans.
       for (const language of ["en", "zh"] as const) {
         const key = `${contract.contract}/${item.name}`;
         const open = item.expected[language];
         const { expected, gap, improved } = decision(key, language, open);
-        const actual = run(item.args, language);
+        const actual = run(item.args, language === "zh" ? "zh-Hans" : "en");
         const same = JSON.stringify(actual) === JSON.stringify(expected);
         if (improved && JSON.stringify(expected) === JSON.stringify(open)) {
           problems.push(

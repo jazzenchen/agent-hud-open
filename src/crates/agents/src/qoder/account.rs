@@ -6,7 +6,7 @@ use crate::account::{
     account_id, Host, HttpFailure, HttpRequest, Provider, Reading, Unread, WebSession, WebSignIn,
     WebSite,
 };
-use crate::l10n;
+use crate::l10n::tr;
 use std::time::Duration;
 
 mod local;
@@ -167,15 +167,9 @@ fn fetch_local_reading(
                     ));
                 }
                 Err(HttpFailure::Status(401 | 403)) => {
-                    last_err = Some(Unread::SignedOut(l10n::text(
-                        &format!(
-                            "{} 保存的登录已失效，请打开 {} 重新登录",
-                            spec.label, spec.label
-                        ),
-                        &format!(
-                            "{}'s saved sign-in has ended; sign in again in {}.",
-                            spec.label, spec.label
-                        ),
+                    last_err = Some(Unread::SignedOut(tr!(
+                        "{{name}}'s saved sign-in has ended; sign in again in {{name}}.",
+                        name = spec.label
                     )));
                 }
                 Err(other) => {
@@ -248,15 +242,9 @@ fn read_web(
             timeout: Duration::from_secs(15),
         })
         .map_err(|failure| match failure {
-            HttpFailure::Status(401 | 403) => Unread::SignedOut(l10n::text(
-                &format!(
-                    "{} 在 Agent HUD 中的登录已失效，请在它的额度处重新登录",
-                    site.name
-                ),
-                &format!(
-                    "{}'s sign-in in Agent HUD has ended; sign in again from its quota.",
-                    site.name
-                ),
+            HttpFailure::Status(401 | 403) => Unread::SignedOut(tr!(
+                "{{site}}'s sign-in in Agent HUD has ended; sign in again from its quota.",
+                site = site.name
             )),
             other => other.unread(),
         })?;
@@ -269,9 +257,9 @@ fn read_web(
 }
 
 fn format_err(label: &str) -> Unread {
-    Unread::from(l10n::text(
-        &format!("{label} 的额度格式无法识别"),
-        &format!("{label}'s credit usage has an unsupported format."),
+    Unread::from(tr!(
+        "{{name}}'s credit usage has an unsupported format.",
+        name = label
     ))
 }
 

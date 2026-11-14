@@ -5,7 +5,7 @@
 //! to the interface, and goes when the user signs out.
 use super::*;
 use agent_hud_agents::account::{WebSession, WebSite};
-use agent_hud_core::l10n;
+use agent_hud_core::l10n::tr;
 use std::{
     fs,
     io::{Read, Write},
@@ -69,12 +69,8 @@ pub(super) fn save(
     provider: &str,
     session: &WebSession,
 ) -> Result<(), String> {
-    let target = path(ctx, provider, &session.host).ok_or_else(|| {
-        l10n::text(
-            "此服务不支持在 Agent HUD 中登录",
-            "This provider takes no sign-in in Agent HUD",
-        )
-    })?;
+    let target = path(ctx, provider, &session.host)
+        .ok_or_else(|| tr!("This provider takes no sign-in in Agent HUD"))?;
     if session.cookie.is_empty()
         || session.cookie.len() > 128 * 1024
         || session
@@ -82,17 +78,12 @@ pub(super) fn save(
             .bytes()
             .any(|b| matches!(b, 0 | b'\r' | b'\n'))
     {
-        return Err(l10n::text("登录信息无效", "The sign-in is not usable"));
+        return Err(tr!("The sign-in is not usable"));
     }
     let directory = folder(ctx);
     crate::os::private_directory(&ctx.data_dir.join("account-credentials"))
         .and_then(|_| crate::os::private_directory(&directory))
-        .map_err(|error| {
-            format!(
-                "{}{error}",
-                l10n::text("凭据目录：", "Credential directory: ")
-            )
-        })?;
+        .map_err(|error| tr!("Credential directory: {{error}}", error = error))?;
     let temporary = directory.join(format!(
         ".{provider}@{}.{}.{}.tmp",
         session.host,
@@ -108,15 +99,14 @@ pub(super) fn save(
         "userAgent": session.user_agent,
         "savedAt": chrono::Utc::now().to_rfc3339(),
     }))
-    .map_err(|_| l10n::text("无法保存登录", "Could not keep the sign-in"))?;
+    .map_err(|_| tr!("Could not keep the sign-in"))?;
     let result = (|| -> Result<(), String> {
         let mut file = crate::os::private_file(&temporary, true)
-            .map_err(|_| l10n::text("无法保存登录", "Could not keep the sign-in"))?;
+            .map_err(|_| tr!("Could not keep the sign-in"))?;
         file.write_all(&bytes)
             .and_then(|_| file.sync_all())
-            .map_err(|_| l10n::text("无法保存登录", "Could not keep the sign-in"))?;
-        fs::rename(&temporary, &target)
-            .map_err(|_| l10n::text("无法保存登录", "Could not keep the sign-in"))
+            .map_err(|_| tr!("Could not keep the sign-in"))?;
+        fs::rename(&temporary, &target).map_err(|_| tr!("Could not keep the sign-in"))
     })();
     if result.is_err() {
         let _ = fs::remove_file(&temporary);
@@ -126,19 +116,15 @@ pub(super) fn save(
 
 /// Forgets the session for `provider` on `host`.
 pub(super) fn remove(ctx: &AccountContext, provider: &str, host: &str) -> Result<(), String> {
-    let path = path(ctx, provider, host).ok_or_else(|| {
-        l10n::text(
-            "此服务不支持在 Agent HUD 中登录",
-            "This provider takes no sign-in in Agent HUD",
-        )
-    })?;
+    let path = path(ctx, provider, host)
+        .ok_or_else(|| tr!("This provider takes no sign-in in Agent HUD"))?;
     if let Some(legacy) = legacy_path(ctx, provider, host) {
         let _ = fs::remove_file(legacy);
     }
     match fs::remove_file(path) {
         Ok(()) => Ok(()),
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
-        Err(_) => Err(l10n::text("无法退出登录", "Could not sign out")),
+        Err(_) => Err(tr!("Could not sign out")),
     }
 }
 

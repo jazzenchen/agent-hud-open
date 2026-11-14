@@ -1,6 +1,7 @@
 //! Portable domain engine. No Tauri, Swift, system frameworks or process execution.
 //! Source directories and operating-system actions are supplied by the platform boundary.
 //! Files are streamed and cached by offset; incomplete trailing records are retried.
+use crate::l10n::tr;
 use chrono::{DateTime, Utc};
 use rusqlite::Connection;
 use serde_json::{json, Value};
@@ -192,9 +193,9 @@ impl AgentHudCore {
                 HashMap::new(),
                 HashMap::new(),
                 0,
-                Some(format!(
-                    "{}{error}",
-                    l10n::text("会话解析进度无法保存：", "Checkpoint storage unavailable: ")
+                Some(tr!(
+                    "Checkpoint storage unavailable: {{error}}",
+                    error = error
                 )),
             ),
         };

@@ -5,6 +5,7 @@ import { useGround } from "../ground";
 import { cardColumn } from "../card-column";
 import { compactAlertLabels } from "./compact-alert-labels";
 import { ReminderMark } from "./ReminderMark";
+import { useFormat } from "@agent-hud/ui/format-context";
 
 /** A quota or reset-credit event inside the open usage panel: one quiet
  * line, not a nested card (Open QuotaAlertInlineView). Opening it shows the
@@ -14,18 +15,17 @@ export function InlineEventRow({
   snapshot,
   light = false,
   botLogos = true,
-  zh = false,
   onOpen,
 }: {
   event: IslandEvent;
   snapshot: Snapshot;
   light?: boolean;
   botLogos?: boolean;
-  zh?: boolean;
   onOpen?: () => void;
 }) {
   const ground = useGround(light);
-  const { status } = compactAlertLabels(undefined, event, 0, zh);
+  const { language } = useFormat();
+  const { status } = compactAlertLabels(undefined, event, 0, language);
   const quota = snapshot.quotas.find((row) => row.id === event.quotaId);
   const vendor = agentVendorName(event.source);
   const account = quota ? `${vendor} · ${quotaShortName(quota)}` : vendor;

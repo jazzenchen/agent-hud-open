@@ -162,7 +162,7 @@ mod tests {
         let target = format!("agenthud-test:{}:", unique.path().display());
         let wide: Vec<_> = target.encode_utf16().chain([0]).collect();
         assert_eq!(read_target(&target), Answer::Missing);
-        let mut bytes = "fixture-令牌".as_bytes().to_vec();
+        let mut bytes = "fixture-令牌".as_bytes().to_vec(); // l10n-ignore: test data
         let credential = CREDENTIALW {
             Type: CRED_TYPE_GENERIC,
             TargetName: wide.as_ptr().cast_mut(),
@@ -179,7 +179,7 @@ mod tests {
             }
         }
         let _cleanup = Cleanup(wide);
-        assert_eq!(read_target(&target), Answer::Found("fixture-令牌".into()));
+        assert_eq!(read_target(&target), Answer::Found("fixture-令牌".into())); // l10n-ignore: test data
         assert_eq!(stored_secret("unrelated-service"), Answer::Unsupported);
     }
 }

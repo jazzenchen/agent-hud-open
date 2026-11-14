@@ -6,10 +6,8 @@ import { useEffect, useRef, useState } from "react";
 import { isTauri } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import type { GuideRecord, Snapshot } from "@agent-hud/protocol";
-import {
-  useText,
-  type SettingsPaneProps,
-} from "../settings/SettingsPrimitives";
+import { useT } from "@agent-hud/ui/format-context";
+import type { SettingsPaneProps } from "../settings/SettingsPrimitives";
 import { guideEvents } from "./use-hud-guide";
 import {
   atStep,
@@ -54,7 +52,7 @@ export function GuideLayer({
   steps: readonly SettingsStep[];
   setPage: (page: string) => void;
 }) {
-  const t = useText(snapshot);
+  const t = useT();
   const record = snapshot?.settings.guide;
   const stepId = record?.step ?? "";
   const step = steps.find((item) => item.id === stepId) ?? null;

@@ -30,6 +30,9 @@ catalogs:
     clsx:
       specifier: 2.1.1
       version: 2.1.1
+    i18next:
+      specifier: 26.5.12
+      version: 26.5.12
     lucide-react:
       specifier: 1.59.0
       version: 1.59.0
@@ -244,6 +247,9 @@ importers:
 
   src/packages/ui:
     dependencies:
+      '@agent-hud/protocol':
+        specifier: workspace:*
+        version: link:../protocol
       class-variance-authority:
         specifier: 'catalog:'
         version: 0.7.1
@@ -253,6 +259,9 @@ importers:
       cn:
         specifier: ^0.2.6
         version: 0.2.6
+      i18next:
+        specifier: 'catalog:'
+        version: 26.5.12(typescript@7.0.2)
       lucide-react:
         specifier: 'catalog:'
         version: 1.59.0(@types/react@19.3.0)(react@19.3.1)
@@ -2278,6 +2287,14 @@ packages:
   human-signals@8.0.1:
     resolution: {integrity: sha512-eKCa6bwnJhvxj14kZk5NCPc6Hb6BdsU9DZcOnmQKSnO1VKrfV0zCvtttPZUsBvjmNDn8rpcJfpwSYnHBjc95MQ==}
     engines: {node: '>=18.18.0'}
+
+  i18next@26.5.12:
+    resolution: {integrity: sha512-vTt8tc3y5axoU7wwTYg8vjpILLyP33a5GyGJAVI7FDRx1XueYxZVIkcVeStoftrVnAM/o28hKvK0sslucDI9aQ==}
+    peerDependencies:
+      typescript: ^5 || ^6 || ^7
+    peerDependenciesMeta:
+      typescript:
+        optional: true
 
   iconv-lite@0.7.3:
     resolution: {integrity: sha512-IKXpvIzjnC9XTAUbVBcMfGS0EPaIXtW6v+zr+RRp+hqULEpo0owZax6wyRwPOJbWbzjYspQwusTsfVr0ifh4uQ==}
@@ -5123,6 +5140,10 @@ snapshots:
   human-signals@2.1.0: {}
 
   human-signals@8.0.1: {}
+
+  i18next@26.5.12(typescript@7.0.2):
+    optionalDependencies:
+      typescript: 7.0.2
 
   iconv-lite@0.7.3:
     dependencies:

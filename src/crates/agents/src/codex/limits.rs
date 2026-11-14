@@ -1,7 +1,7 @@
 //! Codex's plan windows and credits as its app-server reports them, and the
 //! sign-in identities Agent HUD remembers for them.
 use crate::account::{account_id, legacy_account, legacy_unresolved, status, Host, Reading};
-use crate::l10n;
+use crate::l10n::tr;
 use crate::naming::{vendor_windows, window_names};
 use serde_json::{json, Value};
 
@@ -226,10 +226,7 @@ pub(super) fn parse(
         }
     }
     if reading.quotas.is_empty() {
-        reading.notice = Some(l10n::text(
-            "Codex 当前登录没有返回额度窗口",
-            "Codex returned no quota windows for its current login",
-        ));
+        reading.notice = Some(tr!("Codex returned no quota windows for its current login"));
     }
     Ok(reading)
 }

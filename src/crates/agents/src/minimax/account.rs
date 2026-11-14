@@ -9,7 +9,7 @@
 use super::remains::{parse, Answer, Parsed};
 use super::routes::{self, Key, Region};
 use crate::account::{account_id, Host, HttpFailure, HttpRequest, Provider, Reading, Unread};
-use crate::l10n;
+use crate::l10n::tr;
 use serde_json::{json, Value};
 use std::time::Duration;
 
@@ -39,28 +39,16 @@ fn endpoints(region: Region) -> [&'static str; 2] {
 }
 
 fn unreachable() -> String {
-    l10n::text(
-        "无法连接 MiniMax 额度服务",
-        "MiniMax plan quota could not be reached",
-    )
+    tr!("MiniMax plan quota could not be reached")
 }
 fn refused() -> String {
-    l10n::text(
-        "MiniMax 拒绝了现有的套餐 Key，请检查来源客户端里的 M Plan API Key",
-        "MiniMax refused the existing plan key; check the M Plan API key in the source client",
-    )
+    tr!("MiniMax refused the existing plan key; check the M Plan API key in the source client")
 }
 fn no_plan() -> String {
-    l10n::text(
-        "这个 MiniMax Key 没有生效中的套餐",
-        "This MiniMax key has no active plan",
-    )
+    tr!("This MiniMax key has no active plan")
 }
 fn no_usage() -> String {
-    l10n::text(
-        "MiniMax 没有返回可核实的套餐额度",
-        "MiniMax did not return a verifiable plan quota",
-    )
+    tr!("MiniMax did not return a verifiable plan quota")
 }
 
 /// The plan's quota, one account per key.
@@ -68,16 +56,15 @@ pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
     let keys = routes::keys(host);
     let mut reading = Reading::empty("minimax");
     if keys.is_empty() {
-        reading.notice = Some(l10n::text(
-            "现有客户端配置中没有可用的 MiniMax 套餐 Key",
-            "No usable MiniMax plan key was found in the existing client configuration",
+        reading.notice = Some(tr!(
+            "No usable MiniMax plan key was found in the existing client configuration"
         ));
         return Ok(reading);
     }
     let mut failures = Vec::new();
     for key in &keys {
         if host.cancelled() {
-            return Err(l10n::text("账户读取已停止", "Account reading was stopped").into());
+            return Err(tr!("Account reading was stopped").into());
         }
         let result = read_key(host, key);
         // Every client configured with the key reaches the plan on its
@@ -124,19 +111,12 @@ pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
         };
     }
     if !failures.is_empty() {
-        reading.notice = Some(if l10n::chinese() {
-            format!("有 {} 个已配置的 MiniMax 套餐读取失败", failures.len())
-        } else {
-            format!(
-                "{} configured MiniMax plan(s) could not be read",
-                failures.len()
-            )
-        });
-    } else if reading.quotas.is_empty() {
-        reading.notice = Some(l10n::text(
-            "MiniMax 套餐目前没有限额窗口",
-            "The MiniMax plan reports no limited window right now",
+        reading.notice = Some(tr!(
+            count = failures.len(),
+            "{{count}} configured MiniMax plans could not be read"
         ));
+    } else if reading.quotas.is_empty() {
+        reading.notice = Some(tr!("The MiniMax plan reports no limited window right now"));
     }
     Ok(reading)
 }
@@ -193,12 +173,7 @@ fn read_key(host: &dyn Host, key: &Key) -> Result<Option<(Parsed, Region)>, Unre
         return Ok(None);
     }
     Err(match status {
-        Some(code) => if l10n::chinese() {
-            format!("MiniMax 额度服务返回状态 {code}")
-        } else {
-            format!("MiniMax plan quota returned status {code}")
-        }
-        .into(),
+        Some(code) => tr!("MiniMax plan quota returned status {{code}}", code = code).into(),
         None if refused_any => refused().into(),
         None => no_usage().into(),
     })

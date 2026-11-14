@@ -2,8 +2,9 @@
 // commands that change them, and the app-wide HUD tools switch.
 import { useEffect, useRef, useState } from "react";
 import type { NativeMethod, Snapshot } from "@agent-hud/protocol";
+import type { Translate } from "@agent-hud/ui/format";
+import { useT } from "@agent-hud/ui/format-context";
 import { failure, toolsSwitch } from "../../lib/agent-plugins";
-import type { Text } from "../SettingsPrimitives";
 import { usePending } from "../use-pending";
 import {
   cache,
@@ -51,7 +52,7 @@ export function usePlugin(
   client: string,
   service: ClaudePluginService,
   active: boolean,
-  t: Text,
+  t: Translate,
 ) {
   const [status, setStatus] = useState<ClaudePluginStatus | null>(
     cache.plugins[client] ?? null,
@@ -93,7 +94,7 @@ export function usePlugin(
       apply(await read.current(kind));
       setJustInstalled(kind === "install");
     } catch (failed) {
-      setError(t(...failure(kind, String(failed))));
+      setError(failure(t, kind, String(failed)));
     } finally {
       setRunning(null);
     }
@@ -108,7 +109,7 @@ export type PluginStatus = ReturnType<typeof usePlugin>;
 export function useMcpClients(
   clients: MCPClientsService,
   active: boolean,
-  t: Text,
+  t: Translate,
 ) {
   const [status, setStatus] = useState<MCPClientsStatus | null>(cache.clients);
   const [running, setRunning] = useState<Record<string, "add" | "remove">>({});
@@ -162,7 +163,7 @@ export function useMcpClients(
     } catch (error) {
       setErrors((previous) => ({
         ...previous,
-        [client]: t(...failure(kind, String(error))),
+        [client]: failure(t, kind, String(error)),
       }));
     } finally {
       setRunning(({ [client]: _, ...rest }) => rest);
@@ -184,11 +185,12 @@ export type McpClients = ReturnType<typeof useMcpClients>;
 
 /** The app-wide switch that lets agents with HUD tools arrange the HUD. */
 export function useHudTools(snapshot: Snapshot, action: Action) {
+  const t = useT();
   const { pending, error, run } = usePending();
   const local = snapshot.connection.localTools;
   const on = Boolean(snapshot.settings.hudTools);
   const listening = Boolean(local?.listening);
-  const state = toolsSwitch({
+  const state = toolsSwitch(t, {
     supported: Boolean(local?.supported),
     enabled: on,
     listening,

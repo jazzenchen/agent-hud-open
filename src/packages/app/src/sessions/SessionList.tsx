@@ -22,6 +22,7 @@ import {
   type Arrangement,
   type Theme,
 } from "./SessionTheme";
+import { useFormat, useT } from "@agent-hud/ui/format-context";
 
 /** A card of rows: those that come after it was drawn fade in on their own. */
 function RowsCard({
@@ -72,8 +73,8 @@ export function SessionList({
   /** The list's column is narrow: its rows give the title more room. */
   narrow?: boolean;
 }) {
-  const zh = Boolean(theme.zh);
-  const t = (en: string, cn: string) => (zh ? cn : en);
+  const t = useT();
+  const { language } = useFormat();
   const today = dayStart(now);
   const filtered = list.page?.items ?? [];
   const partial = Boolean(list.page && filtered.length < list.page.total);
@@ -136,7 +137,7 @@ export function SessionList({
         >
           <span>{list.error}</span>
           <Button variant="ghost" size="sm" onClick={list.retry}>
-            {t("Retry", "重试")}
+            {t("Retry")}
           </Button>
         </div>
       )}
@@ -149,9 +150,10 @@ export function SessionList({
             padding: "0 2px",
           }}
         >
-          {zh
-            ? `已显示 ${filtered.length} / ${list.page!.total} 个会话。`
-            : `Showing ${filtered.length} of ${list.page!.total} sessions.`}
+          {t("Showing {{shown}} of {{total}} sessions.", {
+            shown: filtered.length,
+            total: list.page!.total,
+          })}
         </div>
       )}
       {todayFigures && (
@@ -161,7 +163,7 @@ export function SessionList({
         ? filtered.length > 0 && (
             <div className={reveal}>
               <DayHeader
-                title={t("Last 24 hours", "最近 24 小时")}
+                title={t("Last 24 hours")}
                 count={list.page!.total}
                 open
                 folded=""
@@ -177,11 +179,11 @@ export function SessionList({
             return (
               <div key={group.key} className={reveal}>
                 <DayHeader
-                  title={titleForDay(group.key, today, zh)}
+                  title={titleForDay(group.key, today, language)}
                   count={group.day.sessions}
                   open={open}
                   folded={[
-                    money.value !== null ? moneyText(money, zh) : null,
+                    money.value !== null ? moneyText(money, language) : null,
                     group.day.tokens > 0 ? compact(group.day.tokens) : "—",
                   ]
                     .filter(Boolean)
@@ -222,13 +224,10 @@ export function SessionList({
         <Card style={card(theme)} className={reveal}>
           <span style={{ color: theme.secondary, fontSize: 12 }}>
             {filtering
-              ? t("No matching sessions", "没有匹配的会话")
+              ? t("No matching sessions")
               : arrangement === "active"
-                ? t(
-                    "No sessions active in the last 24 hours",
-                    "最近 24 小时内无活跃会话",
-                  )
-                : t("No sessions in the last 7 days", "最近 7 天内无会话")}
+                ? t("No sessions active in the last 24 hours")
+                : t("No sessions in the last 7 days")}
           </span>
         </Card>
       )}
@@ -253,9 +252,9 @@ export function SessionList({
               void list.loadMore();
             }}
           >
-            {zh
-              ? `加载更多（剩余 ${Math.max(0, list.page.total - filtered.length)} 个）`
-              : `Load more (${Math.max(0, list.page.total - filtered.length)} remaining)`}
+            {t("Load more ({{remaining}} remaining)", {
+              remaining: Math.max(0, list.page.total - filtered.length),
+            })}
           </Button>
         </div>
       )}

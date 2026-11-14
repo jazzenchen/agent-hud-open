@@ -12,12 +12,12 @@ import {
   card,
   clipped,
   compact,
-  integer,
   numeric,
   sessionMoney,
   type Theme,
   unpricedHelp,
 } from "./SessionTheme";
+import { useFormat, useT } from "@agent-hud/ui/format-context";
 
 /** The session's figures in a row: each counts up when first drawn and moves to new values, written as it is at rest. */
 export function DetailFigures({
@@ -29,7 +29,8 @@ export function DetailFigures({
   detail: SessionDetail | null;
   theme: Theme;
 }) {
-  const zh = Boolean(theme.zh);
+  const t = useT();
+  const { language } = useFormat();
   const context =
     detail?.contextTokens ?? detail?.turns.at(-1)?.context ?? null;
   // Every share reads as a percent, so one from the list carries on into Core's.
@@ -56,98 +57,87 @@ export function DetailFigures({
   const credits = detail?.credits ?? null;
   const breakdown = detail?.turnsBy != null;
   const calls = detail?.callCount ?? 0;
+  const unpriced = unpricedHelp(money.unpriced, language, unpricedModels);
+  const listPriceHelp = t(
+    "What the same calls cost at the vendor's API list price; not a charge",
+  );
   const items = [
     {
-      title: zh ? "Token" : "Tokens",
+      title: t("Tokens"),
       value: (
         <Tween value={totals?.total ?? session.tokens} format={tokensAt} />
       ),
       note: localOnly
-        ? zh
-          ? "仅本机执行会话"
-          : "Local execution sessions only"
+        ? t("Local execution sessions only")
         : detail?.subagents
-          ? (zh ? "含子 agent " : "Sub-agents ") +
-            compact(detail.subagents.total)
+          ? t("Sub-agents {{tokens}}", {
+              tokens: compact(detail.subagents.total),
+            })
           : totals
-            ? zh
-              ? `不含缓存读取 ${compact(totals.total - totals.cacheRead)}`
-              : `Excl. cache reads ${compact(totals.total - totals.cacheRead)}`
-            : zh
-              ? "不含缓存读取 —"
-              : "Excl. cache reads —",
-      help: zh
-        ? "五类合计，含缓存读取"
-        : "All five kinds, cache reads included",
+            ? t("Excl. cache reads {{tokens}}", {
+                tokens: compact(totals.total - totals.cacheRead),
+              })
+            : t("Excl. cache reads —"),
+      help: t("All five kinds, cache reads included"),
     },
     account
       ? {
-          title: zh ? "费用" : "Cost",
+          title: t("Cost"),
           value: session.accountCost ? (
             <Tween
               value={session.accountCost.amount}
-              format={accountAt(session.accountCost, zh)}
+              format={accountAt(session.accountCost, language)}
             />
           ) : (
             "—"
           ),
-          note: zh ? "本会话" : "This session",
-          help: zh
-            ? "按账户价格估算的本会话费用"
-            : "This session's cost at the account's prices",
+          note: t("This session"),
+          help: t("This session's cost at the account's prices"),
         }
       : {
-          title: zh ? "费用" : "Cost",
+          title: t("Cost"),
           value:
             money.value === null ? (
               "—"
             ) : (
-              <Tween value={money.value} format={moneyAt(money, zh)} />
+              <Tween value={money.value} format={moneyAt(money, language)} />
             ),
           note:
             money.value === null
               ? "—"
               : money.unpriced > 0
-                ? zh
-                  ? "部分 · 按 API 价"
-                  : "Partial · at API prices"
-                : zh
-                  ? "按 API 价"
-                  : "At API prices",
-          help: [
-            zh
-              ? "同样的调用按厂商 API 公开价计算的费用，不是实际扣费"
-              : "What the same calls cost at the vendor's API list price; not a charge",
-            unpricedHelp(money.unpriced, zh, unpricedModels),
-          ]
-            .filter(Boolean)
-            .join(zh ? "。" : ". "),
+                ? t("Partial · at API prices")
+                : t("At API prices"),
+          help: unpriced
+            ? t("{{listPrice}}. {{unpriced}}", {
+                listPrice: listPriceHelp,
+                unpriced,
+              })
+            : listPriceHelp,
         },
     ...(credits
       ? [
           {
-            title: zh ? "积分" : "Credits",
+            title: t("Credits"),
             value: credits.text,
             note: credits.unattributedText
-              ? zh
-                ? `未归因 ${credits.unattributedText}`
-                : `Unattributed ${credits.unattributedText}`
-              : zh
-                ? "已按模型归因"
-                : "Attributed to models",
-            help: zh
-              ? "WorkBuddy 自身计量记录的会话积分消耗；无法唯一确定模型的积分单独列为未归因"
-              : "Credits WorkBuddy's own metering charged the session; the part no one model could be pinned on shows as unattributed",
+              ? t("Unattributed {{credits}}", {
+                  credits: credits.unattributedText,
+                })
+              : t("Attributed to models"),
+            help: t(
+              "Credits WorkBuddy's own metering charged the session; the part no one model could be pinned on shows as unattributed",
+            ),
           },
           ...(credits.used != null && credits.size != null
             ? [
                 {
-                  title: zh ? "计量上下文" : "Metered context",
+                  title: t("Metered context"),
                   value: <Tween value={credits.used} format={tokensAt} />,
-                  note: (zh ? "共 " : "Of ") + compact(credits.size),
-                  help: zh
-                    ? "WorkBuddy 自身计量记录的上下文用量与上限"
-                    : "The context usage and limit WorkBuddy's own metering recorded",
+                  note: t("Of {{tokens}}", { tokens: compact(credits.size) }),
+                  help: t(
+                    "The context usage and limit WorkBuddy's own metering recorded",
+                  ),
                 },
               ]
             : []),
@@ -155,37 +145,31 @@ export function DetailFigures({
       : []),
     breakdown
       ? {
-          title: zh ? "轮次" : "Turns",
+          title: t("Turns"),
           value: detail?.turnCount ? (
             <Tween value={detail.turnCount} format={integerAt} />
           ) : (
             "—"
           ),
-          note: zh
-            ? `${integer(calls)} 次调用`
-            : calls === 1
-              ? "1 call"
-              : `${integer(calls)} calls`,
-          help: zh ? "每个 prompt 开始一轮" : "Each prompt starts a turn",
+          note: t("{{count}} calls", { count: calls }),
+          help: t("Each prompt starts a turn"),
         }
       : {
-          title: zh ? "用量记录" : "Usage entries",
+          title: t("Usage entries"),
           value: detail ? (
             <Tween value={detail.turns.length} format={integerAt} />
           ) : (
             "—"
           ),
           note: detail
-            ? zh
-              ? `已加载 ${detail.calls.length} 次调用`
-              : `${detail.calls.length} calls loaded`
+            ? t("{{count}} calls loaded", { count: detail.calls.length })
             : "—",
-          help: zh
-            ? "已记录的用量变动条目。"
-            : "Recorded usage changes; these are not assumed to be prompt-defined turns.",
+          help: t(
+            "Recorded usage changes; these are not assumed to be prompt-defined turns.",
+          ),
         },
     {
-      title: zh ? "上下文" : "Context",
+      title: t("Context"),
       value:
         percent != null ? (
           <Tween key="percent" value={percent} format={percentAt} />
@@ -196,19 +180,15 @@ export function DetailFigures({
         ),
       note:
         detail?.contextWindow != null && detail.contextWindow > 0
-          ? zh
-            ? `共 ${compact(detail.contextWindow)}`
-            : `Of ${compact(detail.contextWindow)}`
-          : zh
-            ? "最近一次调用"
-            : "Latest call",
-      help: zh
-        ? "最近一次模型调用的输入：新输入、缓存写入与缓存读取"
-        : "The latest model call's input: fresh, cache writes and cache reads",
+          ? t("Of {{tokens}}", { tokens: compact(detail.contextWindow) })
+          : t("Latest call"),
+      help: t(
+        "The latest model call's input: fresh, cache writes and cache reads",
+      ),
       warn: detail?.contextFill != null && detail.contextFill >= 0.8,
     },
     {
-      title: zh ? "缓存命中" : "Cache hits",
+      title: t("Cache hits"),
       value:
         detail?.cacheHitRate != null ? (
           <Tween value={detail.cacheHitRate * 100} format={percentAt} />
@@ -216,15 +196,14 @@ export function DetailFigures({
           "—"
         ),
       note: detail?.usage
-        ? zh
-          ? `${compact(detail.usage.cacheRead)} 读取 · ${compact(detail.usage.cacheWrite)} 写入`
-          : `${compact(detail.usage.cacheRead)} read · ${compact(detail.usage.cacheWrite)} write`
-        : zh
-          ? "提示读自缓存"
-          : "Of prompts, from cache",
-      help: zh
-        ? "缓存读取占全部提示的比例：新输入、缓存写入与缓存读取"
-        : "Cache reads as a share of every prompt: fresh input, cache writes and cache reads",
+        ? t("{{read}} read · {{write}} write", {
+            read: compact(detail.usage.cacheRead),
+            write: compact(detail.usage.cacheWrite),
+          })
+        : t("Of prompts, from cache"),
+      help: t(
+        "Cache reads as a share of every prompt: fresh input, cache writes and cache reads",
+      ),
     },
   ];
   return (

@@ -1,6 +1,6 @@
 // Quota readings and outlook in words.
 import { forecast } from "./durations.ts";
-import { text, type Language } from "./language.ts";
+import { translate, type Language } from "./language.ts";
 import { roundHalfAway } from "./numbers.ts";
 
 export type QuotaDisplay = "consumed" | "remaining";
@@ -28,12 +28,8 @@ export function quotaDisplayLabel(
   language: Language = "en",
 ): string {
   return display === "remaining"
-    ? language === "zh"
-      ? "剩余额度"
-      : "Quota remaining"
-    : language === "zh"
-      ? "已用额度"
-      : "Quota used";
+    ? translate(language, "Quota remaining")
+    : translate(language, "Quota used");
 }
 
 export type OutlookKind =
@@ -47,7 +43,7 @@ export type OutlookKind =
 /** The share of the window used by its reset: "85% by reset" / "重置时 85%". */
 export function byReset(projectedUsedPercent: number, language: Language) {
   const value = roundHalfAway(projectedUsedPercent);
-  return text(language, `重置时 ${value}%`, `${value}% by reset`);
+  return translate(language, "{{value}}% by reset", { value });
 }
 
 /**
@@ -63,21 +59,21 @@ export function outlookText(
     case "untimed":
       return null;
     case "exhausted":
-      return text(language, "已耗尽", "Exhausted");
+      return translate(language, "Exhausted");
     case "no-estimate":
-      return text(language, "暂无预测", "No estimate");
+      return translate(language, "No estimate");
     case "no-usage":
-      return text(language, "暂无消耗", "No usage");
+      return translate(language, "No usage");
     case "insufficient-data":
-      return text(language, "记录不足", "Insufficient data");
+      return translate(language, "Insufficient data");
     case "exhausts": {
       if (outlook.beforeReset === false) {
         return projectedUsedAtReset === null
-          ? text(language, "记录不足", "Insufficient data")
+          ? translate(language, "Insufficient data")
           : byReset(projectedUsedAtReset, language);
       }
       const exhaustion = forecast(outlook.seconds ?? 0, language);
-      return text(language, `耗尽 ~${exhaustion}`, `Exhausts ~${exhaustion}`);
+      return translate(language, "Exhausts ~{{exhaustion}}", { exhaustion });
     }
   }
 }
@@ -88,8 +84,8 @@ export function outlookBasisText(
   language: Language,
 ) {
   return basis === "window"
-    ? text(language, "按整个窗口估算", "Estimated from the whole window")
-    : text(language, "按目前节奏", "At the recent pace");
+    ? translate(language, "Estimated from the whole window")
+    : translate(language, "At the recent pace");
 }
 
 /** Where a window's use stands against a steady pace through its cycle: "12 pts ahead of budget" / "比预算超前 12 个点". */
@@ -98,30 +94,25 @@ export function budgetText(
   language: Language,
 ) {
   const points = roundHalfAway(Math.abs(budget.paceDelta));
-  const unit = points === 1 ? "pt" : "pts";
   switch (budget.status) {
     case "ahead":
-      return text(
-        language,
-        `比预算超前 ${points} 个点`,
-        `${points} ${unit} ahead of budget`,
-      );
+      return translate(language, "{{count}} pts ahead of budget", {
+        count: points,
+      });
     case "behind":
-      return text(
-        language,
-        `比预算少用 ${points} 个点`,
-        `${points} ${unit} under budget`,
-      );
+      return translate(language, "{{count}} pts under budget", {
+        count: points,
+      });
     case "onTrack":
-      return text(language, "与预算持平", "On budget");
+      return translate(language, "On budget");
   }
 }
 
 /** The burn rate's detail while readings are still too few: first sampling or again after a reset. */
 export function samplingLabel(afterReset: boolean, language: Language) {
   return afterReset
-    ? text(language, "重新采样", "Resampling")
-    : text(language, "采样中", "Sampling");
+    ? translate(language, "Resampling")
+    : translate(language, "Sampling");
 }
 
 /** The sampling hint: why, then the span observed so far beside the span needed. */
@@ -132,21 +123,13 @@ export function samplingHint(
   language: Language,
 ) {
   const reason = afterReset
-    ? text(
-        language,
-        "额度已重置，正在重新采样",
-        "Quota reset; collecting new readings",
-      )
-    : text(
-        language,
-        "首次采样，正在积累预测数据",
-        "Collecting initial readings for a forecast",
-      );
+    ? translate(language, "Quota reset; collecting new readings")
+    : translate(language, "Collecting initial readings for a forecast");
   // A partial minute must not claim the minimum has been met.
   const observed =
     elapsed < 60
-      ? text(language, "不足1分", "less than 1m")
+      ? translate(language, "less than 1m")
       : forecast(Math.floor(elapsed / 60) * 60, language);
   const minimum = forecast(required, language);
-  return `${reason}\n${text(language, `已采样 ${observed}，预测至少需要${minimum}的有效记录`, `Sampled ${observed}; at least ${minimum} of readings needed`)}`;
+  return `${reason}\n${translate(language, "Sampled {{observed}}; at least {{minimum}} of readings needed", { observed, minimum })}`;
 }

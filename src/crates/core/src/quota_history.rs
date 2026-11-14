@@ -7,6 +7,7 @@
 //! and its cycles with what each used (`cycles`).
 use super::*;
 use crate::database::quota_link::QuotaLink;
+use crate::l10n::tr;
 use crate::naming::model_names::{consumer_name, vendor_name};
 use crate::statistics::model_id;
 use rusqlite::params;
@@ -147,12 +148,8 @@ impl AgentHudCore {
                     .entry(model.clone())
                     .or_insert_with(|| json!({"id": model, "name": consumer_name(model)}));
             }
-            let samples = read(id).map_err(|_| {
-                l10n::text(
-                    "无法从本地数据库读取额度记录",
-                    "Quota history could not be read from SQLite",
-                )
-            })?;
+            let samples =
+                read(id).map_err(|_| tr!("Quota history could not be read from SQLite"))?;
             let length = row["windowDurationSeconds"]
                 .as_f64()
                 .filter(|seconds| *seconds > 0.0)
@@ -160,12 +157,8 @@ impl AgentHudCore {
             let reset = row["resetAt"].as_str().and_then(metering::date_ms);
             let cycle_start = reset.zip(length).map(|(reset, length)| reset - length);
             let (segments, resets) = history(&samples, from, to, bin, cycle_start, length);
-            let span = read_since(id, from - length.unwrap_or(7 * 86_400_000)).map_err(|_| {
-                l10n::text(
-                    "无法从本地数据库读取额度记录",
-                    "Quota history could not be read from SQLite",
-                )
-            })?;
+            let span = read_since(id, from - length.unwrap_or(7 * 86_400_000))
+                .map_err(|_| tr!("Quota history could not be read from SQLite"))?;
             let cycles = cycles::cycles(&span, length, reset)
                 .into_iter()
                 .filter(|cycle| cycle.end > from)

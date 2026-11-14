@@ -33,7 +33,7 @@ fn error_status(error: &Value) -> Option<i64> {
 }
 
 pub fn parse_beijing_reset_ms(message: &str) -> Option<i64> {
-    let suffix_idx = message.find(" 重置")?;
+    let suffix_idx = message.find(" 重置")?; // l10n-ignore vendor message match
     if suffix_idx < 19 {
         return None;
     }
@@ -59,11 +59,11 @@ pub fn parse_limit_hit(
     }
     let message = text(&error["message"])?;
     let window = [
-        ("5h", "5 小时"),
-        ("5h", "5小时"),
-        ("day", "每日"),
-        ("week", "每周"),
-        ("month", "每月"),
+        ("5h", "5 小时"),  // l10n-ignore vendor message match
+        ("5h", "5小时"),   // l10n-ignore vendor message match
+        ("day", "每日"),   // l10n-ignore vendor message match
+        ("week", "每周"),  // l10n-ignore vendor message match
+        ("month", "每月"), // l10n-ignore vendor message match
     ]
     .into_iter()
     .find_map(|(w, phrase)| message.contains(phrase).then_some(w))?;

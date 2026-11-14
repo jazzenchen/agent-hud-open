@@ -1,4 +1,9 @@
-import { dateFormat, numberFormat } from "@agent-hud/ui/format";
+import {
+  dateFormat,
+  numberFormat,
+  locale as intlLocale,
+} from "@agent-hud/ui/format";
+import { useFormat, useT } from "@agent-hud/ui/format-context";
 import { useGround } from "../ground";
 import { agentColor, palette, tabular, type Logo } from "./theme";
 
@@ -13,7 +18,6 @@ export function ColumnDetail({
   bucketMs,
   models,
   light,
-  zh,
   Logo,
 }: {
   point: { timestamp: string; tokens: number; models?: Record<string, number> };
@@ -23,16 +27,17 @@ export function ColumnDetail({
   bucketMs: number;
   models: { id: string; name: string; provider: string }[];
   light: boolean;
-  zh: boolean;
   Logo?: Logo;
 }) {
+  const { language } = useFormat();
+  const t = useT();
   const colors = palette(useGround(light));
   const cardWidth = Math.min(280, width);
   const midpoint = ((index + 0.5) / Math.max(1, count)) * width;
   const preferred =
     midpoint < width / 2 ? midpoint + 12 : midpoint - cardWidth - 12;
   const start = Date.parse(point.timestamp);
-  const locale = zh ? "zh-CN" : "en-US";
+  const locale = intlLocale(language);
   const time = dateFormat(locale, {
     hour: "2-digit",
     minute: "2-digit",
@@ -109,7 +114,7 @@ export function ColumnDetail({
       ))}
       {point.tokens === 0 && (
         <span style={{ color: colors.secondary }}>
-          {zh ? "此时段没有 Token 消耗" : "No token usage in this period"}
+          {t("No token usage in this period")}
         </span>
       )}
     </div>

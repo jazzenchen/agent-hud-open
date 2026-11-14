@@ -2,7 +2,7 @@
 use super::balance::failure;
 use super::Balance;
 use crate::account::HttpFailure;
-use crate::l10n;
+use crate::l10n::tr;
 use serde_json::{json, Value};
 
 /// A New API site's price list, in what calls through it cost per million
@@ -71,9 +71,8 @@ pub(super) fn new_api(
             .flatten()
     });
     let Some(quota) = quota else {
-        return Err(l10n::text(
-            "这个 key 不限额度，站点也没有开放账户余额",
-            "This key has no spending limit and the site does not share the account balance.",
+        return Err(tr!(
+            "This key has no spending limit and the site does not share the account balance."
         ));
     };
     let shown = status["quota_display_type"]
@@ -92,12 +91,7 @@ pub(super) fn new_api(
             "CNY",
         ),
         "USD" => (quota / per_unit, "USD"),
-        _ => {
-            return Err(l10n::text(
-                "这个中转站以 Token 计额度，没有金额",
-                "This relay counts its quota in tokens, not money.",
-            ))
-        }
+        _ => return Err(tr!("This relay counts its quota in tokens, not money.")),
     };
     let name = status["system_name"]
         .as_str()

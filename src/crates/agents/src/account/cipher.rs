@@ -1,7 +1,7 @@
 //! Portable authenticated and block ciphers used to open local client credentials
 //! in memory without modifying or writing back to any client file.
 use crate::account::{Answer, Host, Unread};
-use crate::l10n;
+use crate::l10n::tr;
 use ring::aead::{Aad, LessSafeKey, Nonce, UnboundKey, AES_256_GCM};
 use serde_json::Value;
 
@@ -26,22 +26,10 @@ pub fn unseal_safe_storage_apps(
         }
     }
     Err(match last {
-        Answer::Denied => l10n::text(
-            &format!("{label} 加密了登录信息，钥匙串访问被拒绝。重新打开 Agent HUD 后会再次询问"),
-            &format!("{label} encrypted its sign-in, and keychain access was refused. Agent HUD asks again after it restarts."),
-        ),
-        Answer::Missing => l10n::text(
-            &format!("{label} 加密了登录信息，但找不到它的钥匙串项"),
-            &format!("{label} encrypted its sign-in, but its keychain item is missing."),
-        ),
-        Answer::Unsupported => l10n::text(
-            &format!("{label} 加密了登录信息，此系统还不能解密"),
-            &format!("{label} encrypted its sign-in; this system cannot unlock it yet."),
-        ),
-        _ => l10n::text(
-            &format!("{label} 加密的登录信息无法解密"),
-            &format!("{label}'s encrypted sign-in could not be unlocked."),
-        ),
+        Answer::Denied => tr!("{{name}} encrypted its sign-in, and keychain access was refused. Agent HUD asks again after it restarts.", name = label),
+        Answer::Missing => tr!("{{name}} encrypted its sign-in, but its keychain item is missing.", name = label),
+        Answer::Unsupported => tr!("{{name}} encrypted its sign-in; this system cannot unlock it yet.", name = label),
+        _ => tr!("{{name}}'s encrypted sign-in could not be unlocked.", name = label),
     }
     .into())
 }
@@ -56,9 +44,9 @@ pub fn unseal_vscode_secret(
     if let Ok(parsed) = serde_json::from_str::<Value>(stored) {
         if parsed["type"] == "Buffer" {
             let data = parsed["data"].as_array().ok_or_else(|| {
-                Unread::from(l10n::text(
-                    &format!("{label} 账户登录信息格式无法识别"),
-                    &format!("{label} account authentication has an unsupported format."),
+                Unread::from(tr!(
+                    "{{name}} account authentication has an unsupported format.",
+                    name = label
                 ))
             })?;
             let mut bytes = Vec::with_capacity(data.len());
@@ -67,9 +55,9 @@ pub fn unseal_vscode_secret(
                     .as_u64()
                     .and_then(|n| u8::try_from(n).ok())
                     .ok_or_else(|| {
-                        Unread::from(l10n::text(
-                            &format!("{label} 账户登录信息格式无法识别"),
-                            &format!("{label} account authentication has an unsupported format."),
+                        Unread::from(tr!(
+                            "{{name}} account authentication has an unsupported format.",
+                            name = label
                         ))
                     })?;
                 bytes.push(b);

@@ -1,6 +1,7 @@
 //! A page of a session's transcript: its messages from the live log, or from
 //! the tail of a compressed archive.
 use super::*;
+use crate::l10n::tr;
 
 mod archive_tail;
 
@@ -31,14 +32,10 @@ pub(crate) fn page(
         return database_page(path, source, id, cursor, limit, tail);
     }
     if source_db::accepts(path, source) {
-        return Err(l10n::text("此来源的压缩日志不支持分页查看消息；用量和调用仍可查看", "Message paging is not available for this compact source; usage and calls remain available"));
+        return Err(tr!("Message paging is not available for this compact source; usage and calls remain available"));
     }
-    let metadata = fs::metadata(path).map_err(|_| {
-        l10n::text(
-            "所选会话的日志不可用",
-            "The selected session transcript is unavailable",
-        )
-    })?;
+    let metadata =
+        fs::metadata(path).map_err(|_| tr!("The selected session transcript is unavailable"))?;
     let stamp = FileStamp {
         source: "conversation",
         length: metadata.len(),
@@ -69,12 +66,7 @@ pub(crate) fn page(
     if archive
         && !archives
             .prepare(path, stamp, cursor, &mut budget)
-            .map_err(|_| {
-                l10n::text(
-                    "无法解码所选会话的日志",
-                    "Could not decode the selected session transcript",
-                )
-            })?
+            .map_err(|_| tr!("Could not decode the selected session transcript"))?
     {
         return Ok(
             json!({"messages":[],"messageCursor":cursor,"nextMessageCursor":cursor,"messagesPending":true,"messagesComplete":false}),
@@ -84,12 +76,8 @@ pub(crate) fn page(
     if archive {
         file = None;
     } else {
-        let mut opened = File::open(path).map_err(|_| {
-            l10n::text(
-                "无法读取所选会话的日志",
-                "Could not read the selected session transcript",
-            )
-        })?;
+        let mut opened =
+            File::open(path).map_err(|_| tr!("Could not read the selected session transcript"))?;
         opened
             .seek(SeekFrom::Start(cursor))
             .map_err(|_| "Invalid transcript cursor")?;
@@ -113,12 +101,8 @@ pub(crate) fn page(
     let mut messages = Vec::new();
     let mut complete = false;
     while budget > 0 && (tail || messages.len() < limit) {
-        let (bytes, count, ended) = line(reader).map_err(|_| {
-            l10n::text(
-                "无法读取所选会话的日志",
-                "Could not read the selected session transcript",
-            )
-        })?;
+        let (bytes, count, ended) =
+            line(reader).map_err(|_| tr!("Could not read the selected session transcript"))?;
         if count == 0 || !ended {
             complete = true;
             break;
@@ -166,12 +150,7 @@ fn database_page(
     tail: bool,
 ) -> Result<Value, String> {
     use agent_hud_agents::zcode::conversation;
-    let unreadable = || {
-        l10n::text(
-            "无法读取所选会话的日志",
-            "Could not read the selected session transcript",
-        )
-    };
+    let unreadable = || tr!("Could not read the selected session transcript");
     let database =
         agent_hud_agents::sqlite::ReadOnlyDatabase::open(path).map_err(|_| unreadable())?;
     let read = if tail {

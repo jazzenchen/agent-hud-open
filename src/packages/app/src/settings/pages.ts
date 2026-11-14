@@ -12,96 +12,89 @@ import {
   Waypoints,
 } from "lucide-react";
 import type { Snapshot } from "@agent-hud/protocol";
+import { isChinese, type Language, type Translate } from "@agent-hud/ui/format";
 
 /** Sidebar groups, top to bottom; a gap separates them. */
 export const pageGroups = ["app", "agents", "devices", "about"] as const;
 export type PageGroup = (typeof pageGroups)[number];
-const pages: {
+const builtInPages = (
+  t: Translate,
+): {
   id: string;
   label: string;
   icon: typeof Settings2;
   color: string;
   description: string;
   group: PageGroup;
-}[] = [
+}[] => [
   {
     id: "general",
-    label: "General",
+    label: t("General"),
     icon: Settings2,
     color: "#8e8e93",
-    description: "Appearance, language and startup.",
+    description: t("Appearance, language and startup."),
     group: "app",
   },
   {
     id: "display",
-    label: "Display",
+    label: t("Display"),
     icon: Monitor,
     color: "#7c65e8",
-    description: "The HUD and its panel on each screen.",
+    description: t("The HUD and its panel on each screen."),
     group: "app",
   },
   {
     id: "agents",
-    label: "Agents",
+    label: t("Agents"),
     icon: Puzzle,
     color: "#30b0c7",
-    description: "Which agents Agent HUD follows, and their accounts.",
+    description: t("Which agents Agent HUD follows, and their accounts."),
     group: "agents",
   },
   {
     // What Agent HUD installs into each client.
     id: "agent-plugins",
-    label: "Agent plugins",
+    label: t("Agent plugins"),
     icon: Plug,
     color: "#30b0c7",
-    description: "What Agent HUD adds to the agents on this computer.",
+    description: t("What Agent HUD adds to the agents on this computer."),
     group: "agents",
   },
   {
     // Relays, one per address, whichever agents use them.
     id: "relays",
-    label: "Relays",
+    label: t("Relays"),
     icon: Waypoints,
     color: "#ff9500",
-    description: "The relays your agents go through.",
+    description: t("The relays your agents go through."),
     group: "agents",
   },
   {
     id: "prices",
-    label: "Prices",
+    label: t("Prices"),
     icon: Coins,
     color: "#34c759",
-    description: "What each model costs. Set your own when it is wrong.",
+    description: t("What each model costs. Set your own when it is wrong."),
     group: "agents",
   },
   {
     // What paired phones read: quota and token usage, never sessions.
     id: "local-network",
-    label: "Local Network",
+    label: t("Local Network"),
     icon: Network,
     color: "#5e5ce6",
-    description: "Share quota and token usage with paired phones.",
+    description: t("Share quota and token usage with paired phones."),
     group: "devices",
   },
   {
     id: "updates",
-    label: "Updates",
+    label: t("Updates"),
     icon: Download,
     color: "#007aff",
-    description: "Agent HUD updates and beta releases.",
+    description: t("Agent HUD updates and beta releases."),
     group: "about",
   },
 ];
-export const chinesePages: Record<string, [string, string]> = {
-  general: ["通用", "外观、语言与启动。"],
-  display: ["显示", "每块屏幕上的 HUD 和它的面板。"],
-  agents: ["智能体", "Agent HUD 关注哪些智能体，以及它们的账户。"],
-  "agent-plugins": ["智能体插件", "Agent HUD 为这台电脑上的智能体添加的功能。"],
-  relays: ["中转站", "智能体经过的中转站。"],
-  prices: ["价格", "每个模型的价格，不对时可以自己改。"],
-  "local-network": ["局域网", "与已配对的手机共享额度和 token 用量。"],
-  updates: ["更新", "Agent HUD 的更新与 Beta 版本。"],
-};
 
 export interface AppExtensionPage {
   id: string;
@@ -109,6 +102,8 @@ export interface AppExtensionPage {
   icon?: ReactNode;
   color?: string;
   description?: string;
+  /** The title and description in Chinese (transitional, until products
+   * use catalogs). Without it, `title` and `description` are catalog keys. */
   zh?: [string, string];
   /** Built-in page id this page takes the place of, in its slot. */
   replaces?: string;
@@ -130,23 +125,31 @@ type SidebarPage = {
   group: PageGroup;
   customIcon?: ReactNode;
 };
-/** The sidebar's pages in order: a product page that replaces a built-in
- * one takes its slot; the others join their group, before the page they
- * name or at the group's end. */
+/** The sidebar's pages in order, in the interface language: a product page
+ * that replaces a built-in one takes its slot; the others join their group,
+ * before the page they name or at the group's end. */
 export function sidebarPages(
   extensionPages: AppExtensionPage[],
+  t: Translate,
+  language: Language,
 ): SidebarPage[] {
-  const list: SidebarPage[] = pages.map((page) => {
+  const chinese = (page: AppExtensionPage) =>
+    isChinese(language) ? page.zh : undefined;
+  const list: SidebarPage[] = builtInPages(t).map((page) => {
     const replacement = extensionPages.find(
       (item) => item.replaces === page.id,
     );
     return replacement
       ? {
           id: replacement.id,
-          label: replacement.title,
+          label: chinese(replacement)?.[0] ?? t(replacement.title),
           icon: page.icon,
           color: replacement.color ?? page.color,
-          description: replacement.description ?? page.description,
+          description:
+            chinese(replacement)?.[1] ??
+            (replacement.description
+              ? t(replacement.description)
+              : page.description),
           group: page.group,
           customIcon: replacement.icon,
         }
@@ -156,10 +159,11 @@ export function sidebarPages(
     if (page.replaces) continue;
     const entry: SidebarPage = {
       id: page.id,
-      label: page.title,
+      label: chinese(page)?.[0] ?? t(page.title),
       icon: Puzzle,
       color: page.color ?? "#7474d4",
-      description: page.description ?? "",
+      description:
+        chinese(page)?.[1] ?? (page.description ? t(page.description) : ""),
       group: page.group ?? pageGroups[pageGroups.length - 1],
       customIcon: page.icon,
     };

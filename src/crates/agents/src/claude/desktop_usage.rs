@@ -2,7 +2,7 @@
 use super::account::{profile, Folder};
 use super::quota_windows::{plan_reading, profile_plan, windows};
 use crate::account::{read_json, Answer, Host, HttpFailure, HttpRequest, Reading, Unread};
-use crate::l10n;
+use crate::l10n::tr;
 use crate::Base;
 use serde_json::{json, Value};
 use std::time::Duration;
@@ -13,10 +13,7 @@ const SITE: &str = "claude.ai";
 const WEB_API: &str = "https://claude.ai/api";
 
 fn desktop_unreadable() -> String {
-    l10n::text(
-        "暂时无法读取 Claude 桌面版的登录，稍后自动重试",
-        "Couldn't read the Claude desktop app's sign-in; retrying shortly",
-    )
+    tr!("Couldn't read the Claude desktop app's sign-in; retrying shortly")
 }
 
 /// claude.ai answered with Cloudflare's browser check. The desktop app, a
@@ -24,15 +21,9 @@ fn desktop_unreadable() -> String {
 /// without it once signed in again, so that is the way back.
 fn desktop_challenged(signed_out: bool) -> String {
     if signed_out {
-        l10n::text(
-            "Claude Code 已退出登录，claude.ai 也要求浏览器验证；运行 claude 重新登录后更新额度",
-            "Claude Code is signed out and claude.ai asked for a browser check. Run claude to sign in again to update the quota",
-        )
+        tr!("Claude Code is signed out and claude.ai asked for a browser check. Run claude to sign in again to update the quota")
     } else {
-        l10n::text(
-            "claude.ai 要求浏览器验证，暂时无法通过 Claude 桌面版读取额度，稍后自动重试",
-            "claude.ai asked for a browser check, so the Claude desktop app's sign-in can't read the quota; retrying shortly",
-        )
+        tr!("claude.ai asked for a browser check, so the Claude desktop app's sign-in can't read the quota; retrying shortly")
     }
 }
 
@@ -140,9 +131,8 @@ pub(super) fn from_desktop(
         Err(failure) => return failed(failure),
     };
     let Some(windows) = windows(&limits) else {
-        return Some(Err(l10n::text(
-            "Claude 桌面版的登录返回了无法识别的额度数据",
-            "The Claude desktop app's sign-in returned unrecognised usage data",
+        return Some(Err(tr!(
+            "The Claude desktop app's sign-in returned unrecognised usage data"
         )
         .into()));
     };

@@ -11,15 +11,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@agent-hud/ui/components/dialog";
-import { Notice, Pill, Row, Section, type Text } from "../SettingsPrimitives";
+import { Notice, Pill, Row, Section } from "../SettingsPrimitives";
+import type { Translate } from "@agent-hud/ui/format";
 import { SmallButton } from "../SettingsControls";
 import { FieldRow } from "../SettingsFields";
 
-const labels: Record<string, [string, string]> = {
-  apiKey: ["API key", "API 密钥"],
-  baseUrl: ["API endpoint", "API 地址"],
-  organization: ["Organization", "组织"],
-  project: ["Project", "项目"],
+const labels: Record<string, (t: Translate) => string> = {
+  apiKey: (t) => t("API key"),
+  baseUrl: (t) => t("API endpoint"),
+  organization: (t) => t("Organization"),
+  project: (t) => t("Project"),
 };
 
 export function Connection({
@@ -29,7 +30,7 @@ export function Connection({
   perform,
   pending,
 }: {
-  t: Text;
+  t: Translate;
   source: Provider;
   action: (
     method: NativeMethod,
@@ -50,20 +51,17 @@ export function Connection({
   const fields = (source.accountStatus?.configurableFields ?? []).map(
     (key) => ({
       key,
-      label: labels[key] ? t(...labels[key]) : key,
+      label: labels[key]?.(t) ?? key,
       secret: key === "apiKey",
       required: key === "apiKey",
       placeholder:
         key === "apiKey"
           ? configured
-            ? t(
-                "Saved; type a new key to replace it",
-                "已保存，输入新密钥可替换",
-              )
+            ? t("Saved; type a new key to replace it")
             : undefined
           : key === "baseUrl"
-            ? t("Default", "默认")
-            : t("Team plans only", "仅团队套餐需要"),
+            ? t("Default")
+            : t("Team plans only"),
     }),
   );
   if (!fields.length) return null;
@@ -92,14 +90,14 @@ export function Connection({
   return (
     <>
       <Section
-        title={t("Connection", "连接配置")}
+        title={t("Connection")}
         action={
           configured === undefined ? undefined : configured ? (
             <Pill tone="green" dot>
-              {t("Saved", "已保存")}
+              {t("Saved")}
             </Pill>
           ) : (
-            <Pill>{t("Not set", "未设置")}</Pill>
+            <Pill>{t("Not set")}</Pill>
           )
         }
         plain
@@ -141,7 +139,7 @@ export function Connection({
               disabled={pending}
               onClick={() => setConfirming(true)}
             >
-              {t("Remove", "移除")}
+              {t("Remove")}
             </Button>
             <Button
               type="submit"
@@ -149,7 +147,7 @@ export function Connection({
               className="settings-button"
               disabled={pending || !complete}
             >
-              {t("Save", "保存")}
+              {t("Save")}
             </Button>
           </Row>
           {error && <Notice tone="error">{error}</Notice>}
@@ -159,24 +157,22 @@ export function Connection({
         <DialogContent className="agents-dialog" showCloseButton={false}>
           <DialogHeader>
             <DialogTitle>
-              {t(
-                `Remove the saved credentials for ${source.name}?`,
-                `移除 ${source.name} 已保存的凭据？`,
-              )}
+              {t("Remove the saved credentials for {{name}}?", {
+                name: source.name,
+              })}
             </DialogTitle>
             <DialogDescription>
               {t(
                 "Agent HUD stops reading this account until you add them again.",
-                "重新添加之前，Agent HUD 不再读取这个账户。",
               )}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <SmallButton onClick={() => setConfirming(false)}>
-              {t("Cancel", "取消")}
+              {t("Cancel")}
             </SmallButton>
             <SmallButton variant="destructive" onClick={remove}>
-              {t("Remove", "移除")}
+              {t("Remove")}
             </SmallButton>
           </DialogFooter>
         </DialogContent>

@@ -8,7 +8,7 @@
 //! here is the same for every provider: when to read, how long a reading
 //! that missed an answer keeps the last one, how far apart retries are, and
 //! when the vendor's status page is asked.
-use agent_hud_core::l10n;
+use agent_hud_core::l10n::tr;
 use reqwest::blocking::Client;
 use serde_json::{json, Value};
 use std::{
@@ -145,12 +145,7 @@ impl AccountService {
             .timeout(Duration::from_secs(20))
             .user_agent("AgentHUD/0.1")
             .build()
-            .map_err(|_| {
-                l10n::text(
-                    "账户网络请求无法启动",
-                    "Account HTTP client could not start",
-                )
-            })?;
+            .map_err(|_| tr!("Account HTTP client could not start"))?;
         let restored = restart_copy::load(&data_dir, readers);
         let entries = restored
             .readings
@@ -207,7 +202,7 @@ impl AccountService {
         std::thread::Builder::new()
             .name("agenthud-accounts".into())
             .spawn(move || run(worker_context, worker, worker_gate, readers))
-            .map_err(|_| l10n::text("账户读取线程无法启动", "Account worker could not start"))?;
+            .map_err(|_| tr!("Account worker could not start"))?;
         Ok(Self {
             shared,
             context,

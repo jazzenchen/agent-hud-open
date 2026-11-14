@@ -5,7 +5,7 @@ use crate::account::{
     legacy_account, legacy_unresolved, read_bounded, status, Host, Provider, Reading, Unread,
 };
 use crate::naming::window_names;
-use crate::{iso, l10n, protobuf};
+use crate::{iso, l10n::tr, protobuf};
 use base64::Engine;
 use serde_json::{json, Value};
 use std::collections::HashMap;
@@ -99,20 +99,8 @@ pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
         let mut quotas = vec![];
         for (p, reset, key, label, duration) in [
             // In the app's language, as Open names Devin's windows.
-            (
-                15,
-                17,
-                "daily",
-                l10n::text("每日额度", "Daily limit"),
-                86400,
-            ),
-            (
-                14,
-                18,
-                "weekly",
-                l10n::text("每周额度", "Weekly limit"),
-                604800,
-            ),
+            (15, 17, "daily", tr!("Daily limit"), 86400),
+            (14, 18, "weekly", tr!("Weekly limit"), 604800),
         ] {
             let reset = integer(&subscription, reset)
                 .filter(|n| *n > 0 && *n <= 253_402_300_799)
@@ -133,16 +121,10 @@ pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
         reading.account = Some(
             json!({"id":id,"provider":"devin","label":email.or_else(||text(&root,3)),"plan":plan,"checkedAt":observed.and_then(iso)}),
         );
-        reading.notice = Some(l10n::text(
-            "额度来自 Devin CLI 缓存；在 CLI 中刷新可更新读数",
-            "Quota from Devin CLI cache; refresh in CLI to update",
-        ));
+        reading.notice = Some(tr!("Quota from Devin CLI cache; refresh in CLI to update"));
         return Ok(reading);
     }
-    reading.notice = Some(l10n::text(
-        "Devin CLI 缓存额度不可用，请在 CLI 中刷新",
-        "Devin CLI has no readable account status cache",
-    ));
+    reading.notice = Some(tr!("Devin CLI has no readable account status cache"));
     Ok(reading)
 }
 

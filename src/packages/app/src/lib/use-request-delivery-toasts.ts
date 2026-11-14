@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { toast } from "sonner";
 import type { Snapshot } from "@agent-hud/protocol";
+import { snapshotLanguage, translator } from "@agent-hud/ui/format";
 
 /** Shows a client's failed or unconfirmed answer to a request as a toast,
  * once each and only while `enabled`; an answer older than five minutes
@@ -21,20 +22,16 @@ export function useRequestDeliveryToasts(
         Date.now() - Date.parse(delivery.at) > 300_000
       )
         continue;
-      const zh = snapshot?.language === "zh";
+      // App calls this outside its FormatProvider, so the language is read
+      // from the snapshot here.
+      const t = translator(snapshotLanguage(snapshot));
       const title =
         delivery.state === "uncertain"
-          ? zh
-            ? "未能确认客户端已收到回应"
-            : "Client response unconfirmed"
-          : zh
-            ? "客户端回应失败"
-            : "Client response failed";
+          ? t("Client response unconfirmed")
+          : t("Client response failed");
       const description =
         delivery.reason ??
-        (zh
-          ? "请先在原客户端中查看，再做下一步操作。"
-          : "Check the original client before taking another action.");
+        t("Check the original client before taking another action.");
       if (delivery.state === "uncertain") toast.warning(title, { description });
       else toast.error(title, { description });
     }

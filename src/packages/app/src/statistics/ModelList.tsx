@@ -1,8 +1,8 @@
 import type { StatisticsModel } from "@agent-hud/protocol";
 import { share } from "@agent-hud/ui/format";
+import { useFormat, useT } from "@agent-hud/ui/format-context";
 import {
   compact,
-  costText,
   integer,
   modelColor,
   number,
@@ -10,6 +10,7 @@ import {
   truncate,
   type StatsTheme,
 } from "./StatsTheme";
+import { costText } from "./cost-text";
 import { Swatch } from "./StatsParts";
 
 export function ModelLine({
@@ -21,15 +22,20 @@ export function ModelLine({
   total: number;
   theme: StatsTheme;
 }) {
-  const zh = Boolean(theme.zh);
+  const t = useT();
+  const { language } = useFormat();
   return (
     <div
       style={{ ...row, fontSize: 11 }}
-      title={
-        zh
-          ? `${model.provider} · ${model.name}\n${integer(model.selectedTokens)} 已选 Token\n按 API 价格估算 ${costText(model.cost, zh)}`
-          : `${model.provider} · ${model.name}\n${integer(model.selectedTokens)} selected tokens\n${costText(model.cost, zh)} at API prices`
-      }
+      title={t(
+        "{{provider}} · {{model}}\n{{tokens}} selected tokens\n{{cost}} at API prices",
+        {
+          provider: model.provider,
+          model: model.name,
+          tokens: integer(model.selectedTokens),
+          cost: costText(model.cost, language),
+        },
+      )}
     >
       <Swatch color={modelColor(model.id)} />
       <span style={truncate}>{model.name}</span>
@@ -97,7 +103,7 @@ export function ModelList({
   total: number;
   theme: StatsTheme;
 }) {
-  const zh = Boolean(theme.zh);
+  const t = useT();
   const rest = models.slice(3);
   const restTokens = rest.reduce((sum, model) => sum + model.selectedTokens, 0);
   return (
@@ -115,7 +121,7 @@ export function ModelList({
         >
           <Swatch color="transparent" />
           <span style={truncate}>
-            {zh ? `其余 ${rest.length} 个模型` : `${rest.length} more models`}
+            {t("{{count}} more models", { count: rest.length })}
           </span>
           <span style={{ marginLeft: "auto", ...number }}>
             {compact(restTokens)}

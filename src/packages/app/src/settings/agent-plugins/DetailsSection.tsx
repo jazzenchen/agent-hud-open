@@ -1,7 +1,8 @@
 // Details, folded at the bottom of the page: whether the pieces behind hooks
 // and HUD tools are running, for when something doesn't work.
 import type { Snapshot } from "@agent-hud/protocol";
-import { Collapsible, Pill, Row, type Text } from "../SettingsPrimitives";
+import type { Translate } from "@agent-hud/ui/format";
+import { Collapsible, Pill, Row } from "../SettingsPrimitives";
 import type { MCPClientsStatus } from "./services";
 import type { HudTools } from "./use-status";
 
@@ -14,7 +15,7 @@ export function DetailsSection({
   snapshot: Snapshot;
   clients: MCPClientsStatus | null;
   tools: HudTools;
-  t: Text;
+  t: Translate;
 }) {
   const hooks = snapshot.connection.clientHooks;
   const local = snapshot.connection.localTools;
@@ -22,15 +23,15 @@ export function DetailsSection({
     snapshot.providers.find((provider) => provider.id === source)?.name ??
     source;
   return (
-    <Collapsible title={t("Details", "详细信息")}>
-      <Row title={t("Hook receiver", "回调接收器")}>
+    <Collapsible title={t("Details")}>
+      <Row title={t("Hook receiver")}>
         {hooks?.enabled ? (
           <Pill tone="green" dot>
-            {t("Listening", "正在监听")}
+            {t("Listening")}
           </Pill>
         ) : (
           <Pill tone="gray" dot>
-            {t("Off", "未运行")}
+            {t("Off")}
           </Pill>
         )}
       </Row>
@@ -41,49 +42,41 @@ export function DetailsSection({
           subtitle={client.notice ?? undefined}
         >
           <Pill tone={client.installed ? "green" : "gray"} dot>
-            {client.installed
-              ? t("Hooks installed", "回调已安装")
-              : t("No hooks", "未安装回调")}
+            {client.installed ? t("Hooks installed") : t("No hooks")}
           </Pill>
         </Row>
       ))}
-      <Row
-        title={t("HUD tools server", "HUD 工具服务")}
-        subtitle={local?.notice ?? undefined}
-      >
+      <Row title={t("HUD tools server")} subtitle={local?.notice ?? undefined}>
         {!local?.supported ? (
           <Pill tone="gray" dot>
-            {t("Not supported", "不支持")}
+            {t("Not supported")}
           </Pill>
         ) : !tools.on ? (
           <Pill tone="gray" dot>
-            {t("Off", "已关闭")}
+            {t("Off")}
           </Pill>
         ) : tools.listening ? (
           <Pill tone="green" dot>
-            {t("Listening", "正在监听")}
+            {t("Listening")}
           </Pill>
         ) : (
           <Pill tone="red" dot>
-            {t("Not running", "未运行")}
+            {t("Not running")}
           </Pill>
         )}
       </Row>
-      <Row
-        title={t("HUD tools setup", "HUD 工具安装")}
-        subtitle={clients?.notice ?? undefined}
-      >
+      <Row title={t("HUD tools setup")} subtitle={clients?.notice ?? undefined}>
         {clients === null ? (
           <Pill tone="gray" dot>
-            {t("Checking…", "正在检查…")}
+            {t("Checking…")}
           </Pill>
         ) : clients.ready ? (
           <Pill tone="green" dot>
-            {t("Ready", "可以使用")}
+            {t("Ready")}
           </Pill>
         ) : (
           <Pill tone="gray" dot>
-            {t("Unavailable", "不可用")}
+            {t("Unavailable")}
           </Pill>
         )}
       </Row>

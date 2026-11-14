@@ -1,26 +1,23 @@
+import { useT } from "@agent-hud/ui/format-context";
 import {
   Page,
   Row,
   Section,
-  useText,
   type SettingsPaneProps,
 } from "./SettingsPrimitives";
 import { SmallButton } from "./SettingsControls";
 
 /** Open builds have no update feed; a product build replaces this page. */
-export function UpdatesPane({ snapshot }: SettingsPaneProps) {
-  const t = useText(snapshot);
+export function UpdatesPane(_props: SettingsPaneProps) {
+  const t = useT();
   return (
     <Page>
       <Section>
         <Row
-          title={t("Automatic updates", "自动更新")}
-          subtitle={t(
-            "This build does not update itself.",
-            "这个版本不会自动更新。",
-          )}
+          title={t("Automatic updates")}
+          subtitle={t("This build does not update itself.")}
         >
-          <SmallButton disabled>{t("Unavailable", "不可用")}</SmallButton>
+          <SmallButton disabled>{t("Unavailable")}</SmallButton>
         </Row>
       </Section>
     </Page>

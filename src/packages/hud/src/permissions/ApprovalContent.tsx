@@ -16,22 +16,21 @@ import {
 import { shortenHomePath } from "../project-path";
 import { alertText } from "../tokens";
 import { useGround } from "../ground";
+import { useT } from "@agent-hud/ui/format-context";
 
 export function RequestDeliveryNotice({
   delivery,
-  language,
   light = false,
 }: {
   delivery: RequestDelivery | undefined;
-  language: string;
   light?: boolean;
 }) {
   // The warning's peach on an opaque ground, as before; its see-through
   // shade where the desktop shows through.
   const ground = useGround(light);
   const color = ground.seeThrough ? alertText("warning", ground) : "#d99a69";
+  const t = useT();
   if (!delivery) return null;
-  const zh = language.startsWith("zh");
   return (
     <p
       role={delivery.state === "failed" ? "alert" : "status"}
@@ -48,12 +47,8 @@ export function RequestDeliveryNotice({
     >
       <strong style={{ fontWeight: 550 }}>{delivery.source} · </strong>
       {delivery.state === "failed"
-        ? zh
-          ? "回答未能送达客户端。"
-          : "The response could not be delivered to the client."
-        : zh
-          ? "尚未确认客户端收到回答，请在客户端核对。"
-          : "Delivery is unconfirmed. Check the client."}
+        ? t("The response could not be delivered to the client.")
+        : t("Delivery is unconfirmed. Check the client.")}
       {delivery.reason && <span> {delivery.reason}</span>}
     </p>
   );
@@ -63,13 +58,12 @@ export function RequestDeliveryNotice({
 function BackToSession({
   open,
   light,
-  zh,
 }: {
   open: () => Promise<boolean>;
   light: boolean;
-  zh: boolean;
 }) {
   const [failed, setFailed] = useState(false);
+  const t = useT();
   const ink = (alpha: number) =>
     light ? `rgba(0,0,0,${alpha})` : `rgba(255,255,255,${alpha})`;
   return (
@@ -78,13 +72,7 @@ function BackToSession({
         setFailed(false);
         if (!(await open())) setFailed(true);
       }}
-      title={
-        failed
-          ? zh
-            ? "无法回到会话，请重试"
-            : "Couldn't return to session. Try again."
-          : undefined
-      }
+      title={failed ? t("Couldn't return to session. Try again.") : undefined}
       edge={ink(0.18)}
       color={ink(0.6)}
       style={{ whiteSpace: "nowrap", flexShrink: 0 }}
@@ -94,13 +82,7 @@ function BackToSession({
       ) : (
         <ArrowUpRight size={9} strokeWidth={2.6} />
       )}
-      {failed
-        ? zh
-          ? "重试会话跳转"
-          : "Retry session"
-        : zh
-          ? "回到会话"
-          : "Return to session"}
+      {failed ? t("Retry session") : t("Return to session")}
     </CardButton>
   );
 }
@@ -113,7 +95,6 @@ export function ApprovalContent({
   openSettings,
   backToSession,
   light,
-  language,
 }: {
   requests: Approval[];
   selected: Approval;
@@ -125,9 +106,7 @@ export function ApprovalContent({
    * its session cannot be reached. */
   backToSession?: (request: Approval) => (() => Promise<boolean>) | undefined;
   light: boolean;
-  language?: string;
 }) {
-  const zh = language?.startsWith("zh") ?? false;
   const tertiary = light ? "rgba(0,0,0,0.38)" : "rgba(255,255,255,0.38)";
   const cardSurface = light ? "rgba(0,0,0,0.035)" : "rgba(255,255,255,0.045)";
 
@@ -137,7 +116,6 @@ export function ApprovalContent({
         count={requests.length}
         padding="0 4px 8px"
         light={light}
-        zh={zh}
       />
       <div style={cardColumn(2)}>
         {requests.map((request) => {
@@ -179,7 +157,7 @@ export function ApprovalContent({
                   >
                     {contextPath}
                   </span>
-                  {back && <BackToSession open={back} light={light} zh={zh} />}
+                  {back && <BackToSession open={back} light={light} />}
                 </div>
               )}
               {/* A request whose questions change is a new card. */}
@@ -187,7 +165,6 @@ export function ApprovalContent({
                 key={`${request.id}:${JSON.stringify(request.questions ?? [])}`}
                 request={request}
                 light={light}
-                language={language}
                 onOpenSettings={openSettings}
                 onDecision={
                   decide

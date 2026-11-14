@@ -3,20 +3,23 @@ import { Star, X } from "lucide-react";
 import type { HUDGuideCardProps } from "./HUDGuideCard";
 import { Button } from "@agent-hud/ui/components/button";
 import { Actions, Header } from "./hud-guide-parts";
-import type { Text } from "./copy";
+import { unspaced, type Translate } from "@agent-hud/ui/format";
+import { useFormat } from "@agent-hud/ui/format-context";
+import { guideText } from "./copy";
 
 export function News({ view, t, close, tour, show, star }: HUDGuideCardProps) {
+  const { language } = useFormat();
   if (view.kind !== "news") return null;
   return (
     <>
       <Header
-        label={t(`New in ${view.version}`, `${view.version} 新增`)}
+        label={t("New in {{version}}", { version: view.version })}
         close={close}
         t={t}
       />
       {view.items.map((item) => (
         <div
-          key={item.title[0]}
+          key={typeof item.title === "string" ? item.title : item.title[0]}
           style={{
             display: "flex",
             gap: 10,
@@ -26,10 +29,12 @@ export function News({ view, t, close, tour, show, star }: HUDGuideCardProps) {
         >
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 13.5, fontWeight: 600 }}>
-              {t(...item.title)}
+              {guideText(t, language, item.title)}
             </div>
             {item.body && (
-              <div style={{ opacity: 0.72 }}>{t(...item.body)}</div>
+              <div style={{ opacity: 0.72 }}>
+                {guideText(t, language, item.body)}
+              </div>
             )}
           </div>
           {item.target && (
@@ -39,7 +44,7 @@ export function News({ view, t, close, tour, show, star }: HUDGuideCardProps) {
               className="text-primary"
               onClick={() => show(item.target!)}
             >
-              {t("Show me", "看看")}
+              {t("Show me")}
             </Button>
           )}
         </div>
@@ -47,10 +52,10 @@ export function News({ view, t, close, tour, show, star }: HUDGuideCardProps) {
       {view.star && <StarLine t={t} star={star} />}
       <Actions>
         <Button size="sm" variant="ghost" onClick={tour}>
-          {t("Take me around", "带我走一遍")}
+          {t("Take me around")}
         </Button>
         <Button size="sm" onClick={close}>
-          {t("Got it", "知道了")}
+          {t("Got it")}
         </Button>
       </Actions>
     </>
@@ -61,9 +66,10 @@ export function StarLine({
   t,
   star,
 }: {
-  t: Text;
+  t: Translate;
   star: (open: boolean) => void;
 }) {
+  const { language } = useFormat();
   return (
     <div
       style={{
@@ -78,19 +84,20 @@ export function StarLine({
     >
       <Star size={13} aria-hidden style={{ opacity: 0.6, flexShrink: 0 }} />
       <span style={{ flex: 1, opacity: 0.85 }}>
-        {t("Like it? ", "喜欢的话，")}
+        {t("Like it?")}
+        {unspaced(language) ? "" : " "}
         <Button
           variant="link"
           onClick={() => star(true)}
           className="h-auto p-0 text-xs"
         >
-          {t("Star it on GitHub", "去 GitHub 点个 Star")}
+          {t("Star it on GitHub")}
         </Button>
       </span>
       <Button
         size="icon-xs"
         variant="ghost"
-        aria-label={t("Don't ask again", "不再提示")}
+        aria-label={t("Don't ask again")}
         onClick={() => star(false)}
         className="opacity-60 hover:opacity-100"
       >

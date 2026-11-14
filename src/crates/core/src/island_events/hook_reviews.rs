@@ -2,6 +2,7 @@
 //! itself (Codex keeps a hook whose command changed `modified`), told on the
 //! island with a way to the agent, at most once a day while they wait.
 use super::*;
+use crate::l10n::tr;
 
 /// Told at most once a day while the hooks wait.
 const REVIEW_TOLD_EVERY_MS: i64 = 86_400_000;
@@ -43,14 +44,14 @@ impl Tracker {
             // Without the permission hook its approvals stay in the agent;
             // the other hooks only report how its sessions are doing.
             let message = if events.contains(&"permissionRequest") {
-                l10n::text(
-                    &format!("{name} 在你允许之前会跳过 Agent HUD 的回调，它的审批不会出现在 HUD 上。"),
-                    &format!("{name} skips Agent HUD's hooks until you allow them, so its approvals won't reach the HUD."),
+                tr!(
+                    "{{name}} skips Agent HUD's hooks until you allow them, so its approvals won't reach the HUD.",
+                    name = name
                 )
             } else {
-                l10n::text(
-                    &format!("{name} 在你允许之前会跳过 Agent HUD 的回调，它的会话进展不会及时出现在 HUD 上。"),
-                    &format!("{name} skips Agent HUD's hooks until you allow them, so the HUD learns of its sessions late."),
+                tr!(
+                    "{{name}} skips Agent HUD's hooks until you allow them, so the HUD learns of its sessions late.",
+                    name = name
                 )
             };
             self.push(

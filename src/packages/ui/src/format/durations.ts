@@ -1,5 +1,5 @@
 // Durations
-import { text, type Language } from "./language.ts";
+import { translate, type Language } from "./language.ts";
 import { roundHalfAway } from "./numbers.ts";
 
 /** "2h 14m", "4h 02m", "51m". Never negative. */
@@ -36,7 +36,7 @@ export function age(seconds: number, language: Language) {
         : whole < 86400
           ? `${Math.floor(whole / 3600)}h`
           : `${Math.floor(whole / 86400)}d`;
-  return text(language, `${value} 前`, `${value} ago`);
+  return translate(language, "{{value}} ago", { value });
 }
 
 /** A wait in seconds while that is the honest unit, then compact: "42s", "3m", "1h05m". */
@@ -50,12 +50,11 @@ export function forecast(seconds: number, language: Language) {
   const minutes = Math.min(Math.ceil(seconds / 60), 2_147_483_647);
   const hours = Math.floor(minutes / 60);
   if (hours > 0) {
-    if (minutes % 60 === 0) return text(language, `${hours}小时`, `${hours}h`);
-    return text(
-      language,
-      `${hours}小时${minutes % 60}分`,
-      `${hours}h ${minutes % 60}m`,
-    );
+    if (minutes % 60 === 0) return translate(language, "{{hours}}h", { hours });
+    return translate(language, "{{hours}}h {{minutes}}m", {
+      hours,
+      minutes: minutes % 60,
+    });
   }
-  return text(language, `${minutes}分`, `${minutes}m`);
+  return translate(language, "{{minutes}}m", { minutes });
 }

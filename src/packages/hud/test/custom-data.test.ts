@@ -1,7 +1,18 @@
 // What a control of an agent's own reads: the collections a repeat goes over,
+
+// The Chinese below is zh-Hans.json's.
+const locales = join(import.meta.dirname, "../../protocol/locales");
+for (const language of ["en", "zh-Hans"] as const)
+  addCatalog(
+    language,
+    JSON.parse(readFileSync(join(locales, `${language}.json`), "utf8")),
+  );
 // the items it picks, its placeholders filled in and its conditions.
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { addCatalog } from "@agent-hud/ui/format";
 import type { Snapshot } from "@agent-hud/protocol";
 import {
   fill,
@@ -245,7 +256,7 @@ test("a reset reads as the panel's rows write it", () => {
   assert.equal(read("2026-11-04T13:10:00Z"), "3h 10m");
   assert.equal(read("2026-11-10T19:59:00Z"), "Next Tue 19:59");
   assert.equal(
-    read("2026-11-10T19:59:00Z", { language: "zh" }),
+    read("2026-11-10T19:59:00Z", { language: "zh-Hans" }),
     "下周二 19:59",
   );
   assert.equal(read("2026-11-04T10:00:30Z"), "<1m");

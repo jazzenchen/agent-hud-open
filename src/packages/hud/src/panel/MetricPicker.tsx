@@ -5,7 +5,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@agent-hud/ui/components/tooltip";
-import { useFormat } from "@agent-hud/ui/format-context";
+import { useT } from "@agent-hud/ui/format-context";
 import type { quotaMetricAvailability } from "../quota-metrics";
 import { useGround } from "../ground";
 import { measures, palette, type Measure } from "./theme";
@@ -23,14 +23,14 @@ export function MetricPicker({
   light: boolean;
   availability: Record<Measure, ReturnType<typeof quotaMetricAvailability>>;
 }) {
-  const zh = useFormat().language === "zh";
+  const t = useT();
   const colors = palette(useGround(light));
   return (
     <TooltipProvider delayDuration={300}>
       <div
         className="hud-source-metric-picker"
         role="group"
-        aria-label={zh ? "额度指标" : "Quota metric"}
+        aria-label={t("Quota metric")}
         style={{ display: "flex", gap: 2, paddingRight: 2 }}
       >
         {measures.map(({ key, title, icon: Icon }) => {

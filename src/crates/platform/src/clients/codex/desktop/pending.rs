@@ -1,6 +1,6 @@
 use super::super::desktop_io::IpcError;
 use agent_hud_agents::codex::AGENT;
-use agent_hud_core::l10n;
+use agent_hud_core::l10n::tr;
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use std::collections::HashSet;
@@ -96,11 +96,7 @@ pub(super) fn parse(state: &Value, thread: &str, owner: &str) -> Result<Vec<Pend
                         .and_then(|value| text(&value["value"]))
                         .unwrap_or(app);
                     (
-                        if l10n::chinese() {
-                            format!("允许 ChatGPT 使用 {display}？")
-                        } else {
-                            format!("Allow ChatGPT to use {display}?")
-                        },
+                        tr!("Allow ChatGPT to use {{app}}?", app = display),
                         "computer_use_app".into(),
                         Some(app.to_owned()),
                     )
@@ -134,11 +130,11 @@ pub(super) fn parse(state: &Value, thread: &str, owner: &str) -> Result<Vec<Pend
                     let name = text(&metadata["connector_name"]).unwrap_or("ChatGPT");
                     let summary =
                         if let Some(origin) = origin.filter(|_| tool == "access_browser_origin") {
-                            if l10n::chinese() {
-                                format!("允许 {name} 访问 {origin}？")
-                            } else {
-                                format!("Allow {name} to access {origin}?")
-                            }
+                            tr!(
+                                "Allow {{name}} to access {{origin}}?",
+                                name = name,
+                                origin = origin
+                            )
                         } else if let Some(message) = text(&params["message"]) {
                             message.into()
                         } else {
@@ -158,7 +154,7 @@ pub(super) fn parse(state: &Value, thread: &str, owner: &str) -> Result<Vec<Pend
             };
         let mut card = view(thread, &summary, &tool, &state["cwd"], "permission");
         let detail = [
-            (metadata["riskLevel"] == "high").then(|| l10n::text("较高风险", "Elevated Risk")),
+            (metadata["riskLevel"] == "high").then(|| tr!("Elevated Risk")),
             text(&metadata["subtitle"]).map(str::to_owned),
             subject,
         ]
@@ -181,9 +177,9 @@ pub(super) fn parse(state: &Value, thread: &str, owner: &str) -> Result<Vec<Pend
             Value::Null
         };
         card["allowLabel"] = json!(if website && !scopes.iter().any(|v| v == "session") {
-            l10n::text("批准一次", "Allow once")
+            tr!("Allow once")
         } else {
-            l10n::text("允许此对话", "Allow this conversation")
+            tr!("Allow this conversation")
         });
         card["badge"] = json!(if website { "WEB" } else { "APP" });
         let id = identity("codex-desktop-permission", thread, owner, wire);

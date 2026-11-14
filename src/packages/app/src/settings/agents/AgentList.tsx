@@ -1,6 +1,6 @@
 import type { Provider } from "@agent-hud/protocol";
 import { HUDArtwork as HUDLogo } from "@agent-hud/hud/HUDArtwork";
-import type { Text } from "../SettingsPrimitives";
+import type { Translate } from "@agent-hud/ui/format";
 
 /** The agents, found ones first; the rest under a small label, still
  * selectable so they can be set up before they are installed. */
@@ -10,7 +10,7 @@ export function AgentList({
   selected,
   select,
 }: {
-  t: Text;
+  t: Translate;
   providers: Provider[];
   selected?: string;
   select: (id: string) => void;
@@ -28,7 +28,7 @@ export function AgentList({
       <HUDLogo source={provider.id} size={18} />
       <span className="agents-list-name">{provider.name}</span>
       {!provider.enabled && (
-        <span className="agents-list-state">{t("Off", "已关闭")}</span>
+        <span className="agents-list-state">{t("Off")}</span>
       )}
     </button>
   );
@@ -36,14 +36,12 @@ export function AgentList({
     <nav
       className="agents-list"
       data-guide="agents-list"
-      aria-label={t("Agents", "智能体")}
+      aria-label={t("Agents")}
     >
       {found.map(item)}
       {missing.length > 0 && (
         <>
-          <div className="agents-list-label">
-            {t("Not on this computer", "未在这台电脑上发现")}
-          </div>
+          <div className="agents-list-label">{t("Not on this computer")}</div>
           {missing.map(item)}
         </>
       )}

@@ -1,50 +1,59 @@
 // The words of the guide's window beside the HUD. The window sits right
 // beside the HUD, with an arrow at it, so the words name no side.
 import type { HUDConfig } from "@agent-hud/hud/model";
+import { isChinese, type Language, type Translate } from "@agent-hud/ui/format";
 
-export type Text = (en: string, zh: string) => string;
 export type Place = Pick<HUDConfig, "mode" | "edge" | "requiresOptionToOpen">;
+
+/** A step's or a news item's text: an English catalog key, or a product's
+ * own English/Chinese pair (transitional, until products use catalogs). */
+export type GuideText = string | readonly [en: string, zh: string];
+
+export function guideText(
+  t: Translate,
+  language: Language,
+  text: GuideText,
+): string {
+  if (typeof text === "string") return t(text);
+  return isChinese(language) ? text[1] : text[0];
+}
 
 /** The first step, before and after the panel has been looked at. */
 export function hudStepText(
   place: Place,
   looked: boolean,
-  t: Text,
+  t: Translate,
 ): { title: string; body: string } {
   if (looked)
     return {
-      title: t("That's it", "就是这样"),
-      body: t(
-        "Point at the HUD and it opens. Move away and it closes.",
-        "鼠标放上去，HUD 就展开；移走，就收起。",
-      ),
+      title: t("That's it"),
+      body: t("Point at the HUD and it opens. Move away and it closes."),
     };
-  const reach = place.requiresOptionToOpen
-    ? t(
-        "Hold Option and rest the pointer on the HUD",
-        "按住 Option，把鼠标移到 HUD 上",
-      )
-    : t("Rest the pointer on the HUD", "把鼠标移到 HUD 上");
   return {
-    title: t("Agent HUD is here", "Agent HUD 在这里"),
-    body: t(
-      `${reach} and its quota panel opens. New messages from your agents, and requests waiting on you, show up here too.`,
-      `${reach}，停一会儿，额度面板就会展开。智能体的新消息、等你点头的请求，也会出现在这里。`,
-    ),
+    title: t("Agent HUD is here"),
+    body: place.requiresOptionToOpen
+      ? t(
+          "Hold Option and rest the pointer on the HUD and its quota panel opens. New messages from your agents, and requests waiting on you, show up here too.",
+        )
+      : t(
+          "Rest the pointer on the HUD and its quota panel opens. New messages from your agents, and requests waiting on you, show up here too.",
+        ),
   };
 }
 
 export function modeStepText(
   screens: number,
-  t: Text,
+  t: Translate,
 ): { title: string; body: string } {
   return {
-    title: t("Display mode", "显示模式"),
+    title: t("Display mode"),
     body:
-      t(
-        "Pick the one that suits you, or drag the HUD to wherever feels right.",
-        "按你的习惯挑一种，或者直接拖着 HUD，放到你顺手的位置。",
-      ) +
-      (screens > 1 ? t(" Each screen has its own.", "每块屏幕各选各的。") : ""),
+      screens > 1
+        ? t(
+            "Pick the one that suits you, or drag the HUD to wherever feels right. Each screen has its own.",
+          )
+        : t(
+            "Pick the one that suits you, or drag the HUD to wherever feels right.",
+          ),
   };
 }

@@ -3,10 +3,13 @@ import type { MouseEvent as ReactMouseEvent } from "react";
 import type { SessionCall, SessionTurnAgent } from "@agent-hud/protocol";
 import { callRuns } from "../lib/session-charts";
 import { lanes, offset, tipLine, type Lane, type Step } from "./subagent-lanes";
+import { SubagentTimelineAdded } from "./SubagentTimelineAdded";
 import { SubagentTimelineLegend } from "./SubagentTimelineLegend";
 import { SubagentTimelineNames } from "./SubagentTimelineNames";
-import { clipped, compact, cost, numeric, type Theme } from "./SessionTheme";
+import { clipped, dateLocale, numeric, type Theme } from "./SessionTheme";
 import { useTimelineGlide } from "./use-timeline-glide";
+import type { Language } from "@agent-hud/ui/format";
+import { useFormat, useT } from "@agent-hud/ui/format-context";
 
 const ROW = 36;
 const BAR = 12;
@@ -48,7 +51,8 @@ export const SubagentTimeline = memo(function SubagentTimeline({
   live: boolean;
   theme: Theme;
 }) {
-  const zh = Boolean(theme.zh);
+  const t = useT();
+  const { language } = useFormat();
   const [now, setNow] = useState(() => Date.now());
   const anyRunning = live || agents.some((agent) => agent.running);
   useEffect(() => {
@@ -57,8 +61,18 @@ export const SubagentTimeline = memo(function SubagentTimeline({
     return () => clearInterval(timer);
   }, [anyRunning]);
   const rows = useMemo(
-    () => lanes(calls, agents, start, Math.max(end, start), now, live, theme),
-    [calls, agents, start, end, now, live, theme],
+    () =>
+      lanes(
+        calls,
+        agents,
+        start,
+        Math.max(end, start),
+        now,
+        live,
+        theme,
+        language,
+      ),
+    [calls, agents, start, end, now, live, theme, language],
   );
   const fullTo = Math.max(start + 1000, end, ...rows.map((lane) => lane.end));
   const plot = useRef<HTMLDivElement>(null);
@@ -157,17 +171,15 @@ export const SubagentTimeline = memo(function SubagentTimeline({
               color: theme.secondary,
             }}
           >
-            <span>{clock(from, zh)}</span>
-            <span>{clock(to, zh)}</span>
+            <span>{clock(from, language)}</span>
+            <span>{clock(to, language)}</span>
           </div>
           <div
             ref={plot}
             role="img"
-            aria-label={
-              zh
-                ? `主会话与 ${rows.length - 1} 个子 agent 的时间轴`
-                : `Timeline of the session and ${rows.length - 1} sub-agents`
-            }
+            aria-label={t("Timeline of the session and {{count}} sub-agents", {
+              count: rows.length - 1,
+            })}
             onMouseMove={(event) => {
               const point = atX(event);
               if (!point) return;
@@ -383,7 +395,14 @@ export const SubagentTimeline = memo(function SubagentTimeline({
                   {hovered.name}
                 </div>
                 <div style={{ color: theme.secondary }}>
-                  {tipLine(hovered, hoverAt, start, nearest, hoveredStep, zh)}
+                  {tipLine(
+                    hovered,
+                    hoverAt,
+                    start,
+                    nearest,
+                    hoveredStep,
+                    language,
+                  )}
                 </div>
               </div>
             )}
@@ -408,40 +427,12 @@ export const SubagentTimeline = memo(function SubagentTimeline({
           </div>
         </div>
 
-        {/* What each row added */}
-        <div style={{ width: 76, flexShrink: 0 }}>
-          <div
-            style={{
-              height: 16,
-              fontSize: 11,
-              color: theme.secondary,
-              textAlign: "right",
-            }}
-          >
-            {zh ? "新增 · 费用" : "New · cost"}
-          </div>
-          {rows.map((lane, i) => (
-            <div
-              key={lane.key}
-              style={{
-                ...numeric,
-                height: ROW,
-                display: "flex",
-                flexDirection: "column",
-                justifyContent: "center",
-                alignItems: "flex-end",
-                opacity: dim(i),
-              }}
-            >
-              <span style={{ fontSize: 12, fontWeight: 600 }}>
-                {compact(lane.added)}
-              </span>
-              <span style={{ fontSize: 10.5, color: theme.secondary }}>
-                {cost(lane.cost, zh, lane.unpriced && lane.cost !== null)}
-              </span>
-            </div>
-          ))}
-        </div>
+        <SubagentTimelineAdded
+          rows={rows}
+          rowHeight={ROW}
+          dim={dim}
+          theme={theme}
+        />
       </div>
 
       <SubagentTimelineLegend
@@ -453,8 +444,8 @@ export const SubagentTimeline = memo(function SubagentTimeline({
   );
 });
 
-function clock(at: number, zh: boolean) {
-  return new Intl.DateTimeFormat(zh ? "zh-CN" : "en-GB", {
+function clock(at: number, language: Language) {
+  return new Intl.DateTimeFormat(dateLocale(language), {
     hour: "2-digit",
     minute: "2-digit",
     second: "2-digit",

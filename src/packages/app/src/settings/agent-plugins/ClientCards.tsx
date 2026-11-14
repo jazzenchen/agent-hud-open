@@ -4,7 +4,8 @@
 import { Fragment, type ReactNode } from "react";
 import { Check } from "lucide-react";
 import { HUDArtwork } from "@agent-hud/hud/HUDArtwork";
-import { Collapsible, Row, type Text } from "../SettingsPrimitives";
+import type { Translate } from "@agent-hud/ui/format";
+import { Collapsible, Row } from "../SettingsPrimitives";
 import { SmallButton } from "../SettingsControls";
 import type { AgentPluginContext, AgentPluginItem } from "./types";
 import { useBriefly } from "./use-status";
@@ -80,18 +81,15 @@ export function OtherAgentsCard({
 }: {
   json: unknown;
   icon: ReactNode;
-  t: Text;
+  t: Translate;
 }) {
   const [copied, setCopied] = useBriefly<true>(2000);
   return (
-    <Collapsible icon={icon} title={t("Other agents", "其他智能体")}>
+    <Collapsible icon={icon} title={t("Other agents")}>
       <Row
-        title={t("HUD tools", "HUD 工具")}
+        title={t("HUD tools")}
         tag="MCP"
-        subtitle={t(
-          "Paste into the agent's MCP settings.",
-          "粘贴到智能体的 MCP 设置里。",
-        )}
+        subtitle={t("Paste into the agent's MCP settings.")}
       >
         <SmallButton
           disabled={json == null}
@@ -105,10 +103,10 @@ export function OtherAgentsCard({
           {copied ? (
             <>
               <Check size={13} aria-hidden />
-              {t("Copied", "已复制")}
+              {t("Copied")}
             </>
           ) : (
-            t("Copy settings", "复制设置")
+            t("Copy settings")
           )}
         </SmallButton>
       </Row>

@@ -9,7 +9,7 @@ impl Messaging {
         host: &Host<'_>,
         now: i64,
     ) -> Result<Value> {
-        let zh = language(host.snapshot);
+        let language = language(host.snapshot);
         let text = arguments["text"].as_str().ok_or("text is required")?;
         let reply_to = arguments["reply_to"].as_str().filter(|id| !id.is_empty());
         let reply_hint = arguments["reply_hint"].as_bool().unwrap_or(true);
@@ -22,7 +22,7 @@ impl Messaging {
                 .as_ref()
                 .is_none_or(|message| !same_session(&message.to.session_id, &caller.session_id))
             {
-                return Ok(refused(&words::unknown_reply(zh, parent)));
+                return Ok(refused(&words::unknown_reply(language, parent)));
             }
         }
         let Some(to) = arguments["to"]
@@ -38,29 +38,33 @@ impl Messaging {
             return Err("to is required, unless reply_to names a message you received".into());
         };
         let to = to.as_str();
-        if let Some(reason) = check_text(text, zh) {
+        if let Some(reason) = check_text(text, language) {
             return Ok(refused(&reason));
         }
         if same_session(to, &caller.session_id) {
-            return Ok(refused(&words::to_self(zh)));
+            return Ok(refused(&words::to_self(language)));
         }
         let Some(target) = find(host.snapshot, to) else {
-            return Ok(refused(&words::unknown(zh)));
+            return Ok(refused(&words::unknown(language)));
         };
         let to = target["id"].as_str().unwrap_or(to);
         let client = target["source"].as_str().unwrap_or_default();
         if Provider::parse(client).is_none() {
-            return Ok(refused(&words::other_client(zh)));
+            return Ok(refused(&words::other_client(language)));
         }
         if !target["parentId"].is_null() {
-            return Ok(refused(&words::child(zh)));
+            return Ok(refused(&words::child(language)));
         }
         let sender = party(host.snapshot, &caller.client, &caller.session_id);
         let recipient = party(host.snapshot, client, to);
         // One that cannot take it now is refused before anything is queued.
-        if let (Value::Bool(false), reason) =
-            self.reachable(client, to, &self.loaded(), (target, host.snapshot), zh)
-        {
+        if let (Value::Bool(false), reason) = self.reachable(
+            client,
+            to,
+            &self.loaded(),
+            (target, host.snapshot),
+            language,
+        ) {
             (self.fly)(flight(&sender, &recipient, true, false, true));
             return Ok(refused(&reason));
         }
@@ -72,12 +76,14 @@ impl Messaging {
         let from_left = same_session(&left, &caller.session_id);
         if let Some(limit) = self.preferences.limit.filter(|limit| count > *limit) {
             (self.fly)(flight(&sender, &recipient, from_left, false, true));
-            return Ok(refused(&words::limit(zh, limit)));
+            return Ok(refused(&words::limit(language, limit)));
         }
         let id = message_id();
         let form = self.form();
         let from = sender.clone();
-        let delivered = words::compose(zh, form, &from, client, &id, reply_to, reply_hint, text);
+        let delivered = words::compose(
+            language, form, &from, client, &id, reply_to, reply_hint, text,
+        );
         // Where the recipient's transcript ends now: its answer is after this.
         // The store finds the answer by when it was sent instead.
         let cursor = match transcript::stored(host, client) {

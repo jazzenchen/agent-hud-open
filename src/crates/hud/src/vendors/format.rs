@@ -1,6 +1,7 @@
 //! What a HUD writes beside a mark: a window's share, a balance, or the last 24
 //! hours, as src/packages/hud/src/model.ts and format.ts write them.
 use super::*;
+use agent_hud_core::l10n::{self, Language};
 use serde_json::json;
 
 /// A display percentage; stored readings and quota severity always use consumed usage.
@@ -57,12 +58,11 @@ pub fn recent_label(snapshot: &Value, key: &str) -> Option<String> {
     Some(match shown {
         Some((_, amount)) if amount == 0.0 && unpriced <= 0.0 && costs.len() == 1 => {
             // Calls to a model on this computer cost nothing.
-            if snapshot["language"] == "zh" {
-                "免费"
-            } else {
-                "Free"
-            }
-            .to_owned()
+            let language = snapshot["language"]
+                .as_str()
+                .and_then(Language::from_tag)
+                .unwrap_or_else(l10n::current);
+            l10n::tr_in(language, "Free")
         }
         Some((currency, amount)) => {
             let more = unpriced > 0.0 || costs.len() > 1;

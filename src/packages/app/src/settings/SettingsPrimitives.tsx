@@ -6,7 +6,7 @@ import { useId, useState, type ReactNode } from "react";
 import { ChevronRight } from "lucide-react";
 import type { NativeMethod, Snapshot } from "@agent-hud/protocol";
 import type { HUDConfig } from "@agent-hud/hud/model";
-import { snapshotLanguage } from "@agent-hud/ui/format";
+import { isChinese, snapshotLanguage } from "@agent-hud/ui/format";
 
 export interface SettingsPaneProps {
   snapshot: Snapshot;
@@ -19,10 +19,12 @@ export interface SettingsPaneProps {
   ) => Promise<unknown>;
 }
 
+/** Transitional, for a product's pages still written as English/Chinese
+ * pairs; Agent HUD's own pages use `useT()` and the catalogs. */
 export type Text = (en: string, zh: string) => string;
 
 export function useText(snapshot: Snapshot | null): Text {
-  const chinese = snapshot ? snapshotLanguage(snapshot) === "zh" : false;
+  const chinese = snapshot ? isChinese(snapshotLanguage(snapshot)) : false;
   return (en, zh) => (chinese ? zh : en);
 }
 

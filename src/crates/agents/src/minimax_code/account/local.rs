@@ -1,6 +1,6 @@
 //! Read-only discovery of MiniMax Code's `auth.json` and `auth-state.json`.
 use crate::account::{read_json_bounded, Answer, Host, Unread};
-use crate::l10n;
+use crate::l10n::tr;
 use chrono::Utc;
 use serde_json::Value;
 use std::path::PathBuf;
@@ -49,18 +49,16 @@ pub(super) fn discover_auth(host: &dyn Host) -> Result<Option<LocalAuth>, Unread
             Answer::Found(v) => v,
             Answer::Missing => continue,
             Answer::Denied => {
-                return Err(l10n::text(
-                    "无权读取 MiniMax Code 的本地登录文件",
-                    "Permission denied reading MiniMax Code's local sign-in.",
+                return Err(tr!(
+                    "Permission denied reading {{name}}'s local sign-in.",
+                    name = "MiniMax Code"
                 )
                 .into())
             }
             _ => {
-                return Err(l10n::text(
-                    "MiniMax Code 登录文件格式无法识别",
-                    "MiniMax Code authentication file has an unsupported format.",
+                return Err(
+                    tr!("MiniMax Code authentication file has an unsupported format.").into(),
                 )
-                .into())
             }
         };
         if let Answer::Found(state) =
@@ -102,10 +100,7 @@ pub(super) fn discover_auth(host: &dyn Host) -> Result<Option<LocalAuth>, Unread
         return Ok(chosen);
     }
     if expired {
-        return Err(Unread::transient(l10n::text(
-            "MiniMax Code 本地访问令牌已过期，请打开 MiniMax Code 自动续期",
-            "MiniMax Code's local access token expired; open MiniMax Code so it renews its session.",
-        )));
+        return Err(Unread::transient(tr!("MiniMax Code's local access token expired; open MiniMax Code so it renews its session.")));
     }
     Ok(None)
 }

@@ -8,7 +8,7 @@
 //! Grok Bot shows for a merged account.
 use crate::account::{Host, HttpFailure, Unread};
 use crate::cursor::account::{dashboard, SignIn};
-use crate::l10n;
+use crate::l10n::tr;
 use serde_json::{json, Map, Value};
 
 /// Grok Bot's value for a spend limit without a ceiling.
@@ -41,16 +41,14 @@ pub(super) fn read(
         return Ok(None);
     };
     let status = dashboard(host, token, "GetSandUsageStatus").map_err(|failure| match failure {
-        HttpFailure::Unreachable => failure.unread_as(l10n::text(
-            "无法读取 Grok Bot 的周额度，请检查网络",
-            "Grok Bot's weekly usage could not be reached; check the connection.",
+        HttpFailure::Unreachable => failure.unread_as(tr!(
+            "Grok Bot's weekly usage could not be reached; check the connection."
         )),
         other => other.unread(),
     })?;
     if !status.is_object() {
-        return Err(Unread::from(l10n::text(
-            "Grok Bot 的周额度格式无法识别",
-            "Grok Bot's weekly usage has an unsupported format.",
+        return Err(Unread::from(tr!(
+            "Grok Bot's weekly usage has an unsupported format."
         )));
     }
     // The Bot asks for the period's spend alongside and does without it.

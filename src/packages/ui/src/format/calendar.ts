@@ -1,7 +1,7 @@
 // Calendar: weekdays, dates and reset times, and this machine's week.
 import { countdown, countdownCompact } from "./durations.ts";
 import { dateFormat, systemTimeZone } from "./intl.ts";
-import type { Language } from "./language.ts";
+import { isChinese, locale, translate, type Language } from "./language.ts";
 import type { QuotaDisplay } from "./quota-text.ts";
 
 /** A calendar for weekday and week arithmetic: a time zone and the first day of the week (1 = Sunday … 7 = Saturday). */
@@ -17,10 +17,26 @@ export interface FormatSettings {
   calendar: WeekCalendar;
 }
 
-const weekdays: Record<Language, string[]> = {
-  zh: ["周日", "周一", "周二", "周三", "周四", "周五", "周六"],
-  en: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
-};
+const englishWeekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const weekdayNames = new Map<Language, string[]>();
+
+/** The short weekday names of a language, Sunday first. */
+function weekdays(language: Language): string[] {
+  if (language === "en") return englishWeekdays;
+  let names = weekdayNames.get(language);
+  if (!names) {
+    const format = dateFormat(locale(language), {
+      weekday: "short",
+      timeZone: "UTC",
+    });
+    // 2023-01-01 was a Sunday.
+    names = englishWeekdays.map((_, day) =>
+      format.format(Date.UTC(2023, 0, 1 + day)),
+    );
+    weekdayNames.set(language, names);
+  }
+  return names;
+}
 const months = [
   "Jan",
   "Feb",
@@ -61,7 +77,7 @@ function wallClock(instant: number, timeZone: string) {
     day,
     hour: Number(parts.hour),
     minute: Number(parts.minute),
-    weekday: weekdays.en.indexOf(parts.weekday) + 1,
+    weekday: englishWeekdays.indexOf(parts.weekday) + 1,
     /** Days since 1970-01-01 of this wall-clock date. */
     dayNumber: Math.floor(Date.UTC(year, month - 1, day) / 86_400_000),
   };
@@ -76,17 +92,27 @@ function weekdayTime(
   language: Language,
 ) {
   const clock = wallClock(instant, calendar.timeZone);
-  return `${weekdays[language][clock.weekday - 1]} ${two(clock.hour)}:${two(clock.minute)}`;
+  return `${weekdays(language)[clock.weekday - 1]} ${two(clock.hour)}:${two(clock.minute)}`;
 }
 
 /** "11月20日 周五 09:00" / "Fri 20 Nov at 09:00". */
 function dateTime(instant: number, calendar: WeekCalendar, language: Language) {
   const clock = wallClock(instant, calendar.timeZone);
   const time = `${two(clock.hour)}:${two(clock.minute)}`;
-  const weekday = weekdays[language][clock.weekday - 1];
-  return language === "zh"
-    ? `${clock.month}月${clock.day}日 ${weekday} ${time}`
-    : `${weekday} ${clock.day} ${months[clock.month - 1]} at ${time}`;
+  const weekday = weekdays(language)[clock.weekday - 1];
+  if (isChinese(language))
+    return `${clock.month}月${clock.day}日 ${weekday} ${time}`; // l10n-ignore
+  if (language === "en")
+    return `${weekday} ${clock.day} ${months[clock.month - 1]} at ${time}`;
+  return dateFormat(locale(language), {
+    timeZone: calendar.timeZone,
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).format(instant);
 }
 
 /** "10月28日 16:10" / "Oct 28, 16:10": a time a week or more away. */
@@ -97,9 +123,17 @@ export function monthDayTime(
 ) {
   const clock = wallClock(instant, calendar.timeZone);
   const time = `${two(clock.hour)}:${two(clock.minute)}`;
-  return language === "zh"
-    ? `${clock.month}月${clock.day}日 ${time}`
-    : `${months[clock.month - 1]} ${clock.day}, ${time}`;
+  if (isChinese(language)) return `${clock.month}月${clock.day}日 ${time}`; // l10n-ignore
+  if (language === "en")
+    return `${months[clock.month - 1]} ${clock.day}, ${time}`;
+  return dateFormat(locale(language), {
+    timeZone: calendar.timeZone,
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).format(instant);
 }
 
 /** Whole calendar weeks between the weeks containing `from` and `to`. */
@@ -127,13 +161,19 @@ export function relativeWeekdayTime(
   calendar: WeekCalendar,
   language: Language,
 ) {
-  const firstWeekday = language === "zh" ? 2 : calendar.firstWeekday;
+  const firstWeekday = isChinese(language) ? 2 : calendar.firstWeekday;
   const delta = weeksBetween(now, instant, calendar.timeZone, firstWeekday);
   if (delta <= 0) return weekdayTime(instant, calendar, language);
   if (delta <= 3) {
-    if (language === "zh")
-      return "下".repeat(delta) + weekdayTime(instant, calendar, language);
-    if (delta === 1) return `Next ${weekdayTime(instant, calendar, language)}`;
+    if (isChinese(language))
+      return (
+        "下".repeat(delta) + // l10n-ignore: next week
+        weekdayTime(instant, calendar, language)
+      );
+    if (delta === 1)
+      return translate(language, "Next {{weekdayTime}}", {
+        weekdayTime: weekdayTime(instant, calendar, language),
+      });
   }
   return dateTime(instant, calendar, language);
 }

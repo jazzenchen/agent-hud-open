@@ -5,7 +5,9 @@ import type { CSSProperties } from "react";
 import { Check, Star, X } from "lucide-react";
 import { Button } from "@agent-hud/ui/components/button";
 import type { Snapshot } from "@agent-hud/protocol";
-import type { Text } from "./copy";
+import type { Translate } from "@agent-hud/ui/format";
+import { useFormat } from "@agent-hud/ui/format-context";
+import { guideText } from "./copy";
 import type { SettingsStep } from "./plan";
 import { Ring, type Box } from "./Spotlight";
 
@@ -66,13 +68,14 @@ export function SettingsGuideCard({
   box: Box | null;
   snapshot: Snapshot;
   count: [number, number];
-  t: Text;
+  t: Translate;
   next: () => void;
   /** To the step before, which may be beside the HUD. */
   back: () => void;
   close: () => void;
   star: () => void;
 }) {
+  const { language } = useFormat();
   const { card, arrow } = placement(step ? box : null);
   const done = step?.done?.(snapshot) ?? false;
   return (
@@ -80,7 +83,7 @@ export function SettingsGuideCard({
       {step && box ? <Ring box={box} dim /> : <div className="guide-scrim" />}
       <aside
         className="guide-card"
-        aria-label={t("Guide", "引导")}
+        aria-label={t("Guide")}
         style={{ ...card, width }}
       >
         {arrow && (
@@ -93,15 +96,15 @@ export function SettingsGuideCard({
         )}
         <header>
           <span>
-            {t(
-              `Getting started · ${count[0]} / ${count[1]}`,
-              `上手引导 · ${count[0]} / ${count[1]}`,
-            )}
+            {t("Getting started · {{step}} / {{steps}}", {
+              step: count[0],
+              steps: count[1],
+            })}
           </span>
           <Button
             size="icon-xs"
             variant="ghost"
-            aria-label={t("Close the guide", "关闭引导")}
+            aria-label={t("Close the guide")}
             onClick={close}
           >
             <X />
@@ -109,8 +112,8 @@ export function SettingsGuideCard({
         </header>
         {step ? (
           <>
-            <h2>{t(...step.title)}</h2>
-            <p>{t(...step.body)}</p>
+            <h2>{guideText(t, language, step.title)}</h2>
+            <p>{guideText(t, language, step.body)}</p>
             <footer>
               <Button
                 size="sm"
@@ -118,26 +121,25 @@ export function SettingsGuideCard({
                 onClick={back}
                 className="mr-auto"
               >
-                {t("Back", "上一步")}
+                {t("Back [step]")}
               </Button>
               {done && (
                 <span className="guide-done">
                   <Check size={13} strokeWidth={2.6} />
-                  {t("On", "已开启")}
+                  {t("On")}
                 </span>
               )}
               <Button size="sm" onClick={next}>
-                {t("Next", "下一步")}
+                {t("Next")}
               </Button>
             </footer>
           </>
         ) : (
           <>
-            <h2>{t("Thanks for your support", "谢谢你的支持")}</h2>
+            <h2>{t("Thanks for your support")}</h2>
             <p>
               {t(
                 "Agent HUD is open source. If it helps you, a Star on GitHub helps more people find it.",
-                "Agent HUD 是开源项目。如果它帮到了你，可以去 GitHub 点个 Star，让更多人看到它。",
               )}
             </p>
             <footer>
@@ -147,15 +149,15 @@ export function SettingsGuideCard({
                 onClick={back}
                 className="mr-auto"
               >
-                {t("Back", "上一步")}
+                {t("Back [step]")}
               </Button>
               <Button size="sm" variant="outline" onClick={close}>
                 <Check />
-                {t("Done", "完成")}
+                {t("Done")}
               </Button>
               <Button size="sm" onClick={star}>
                 <Star />
-                {t("Star on GitHub", "去 GitHub 点个 Star")}
+                {t("Star on GitHub")}
               </Button>
             </footer>
           </>

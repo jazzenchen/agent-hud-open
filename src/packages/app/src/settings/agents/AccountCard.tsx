@@ -9,8 +9,8 @@ import {
   quotaRowMatches,
   withRowShown,
 } from "@agent-hud/hud/model";
-import { quotaPercentLabel } from "@agent-hud/ui/format";
-import { Card, Row, type Text } from "../SettingsPrimitives";
+import { quotaPercentLabel, type Translate } from "@agent-hud/ui/format";
+import { Card, Row } from "../SettingsPrimitives";
 import { moveAmong, ReorderButtons } from "./Reorder";
 
 const dragType = "text/agent-hud-window";
@@ -29,7 +29,7 @@ export function AccountCard({
   changeBlock,
   pending,
 }: {
-  t: Text;
+  t: Translate;
   snapshot: Snapshot;
   account: string;
   accounts: string[];
@@ -52,7 +52,7 @@ export function AccountCard({
     profile?.name ??
     accountWindows[0]?.account ??
     profile?.label ??
-    t("Unknown account", "未知账户");
+    t("Unknown account");
   const checked =
     !block.hidden &&
     !(block.hiddenAccounts ?? []).includes(account) &&
@@ -85,7 +85,7 @@ export function AccountCard({
         <Switch
           checked={checked}
           disabled={pending}
-          aria-label={`${t("Show account", "显示账户")} ${name}`}
+          aria-label={t("Show account {{name}}", { name })}
           onCheckedChange={showAccount}
         />
       </Row>
@@ -137,7 +137,7 @@ export function AccountCard({
               <Switch
                 checked={!quotaRowHidden(window, block.hiddenRows ?? [])}
                 disabled={pending}
-                aria-label={`${t("Show", "显示")} ${window.name}`}
+                aria-label={t("Show {{name}}", { name: window.name })}
                 onCheckedChange={(show) =>
                   void changeBlock({
                     hiddenRows: show

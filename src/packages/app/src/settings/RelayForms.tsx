@@ -1,7 +1,8 @@
 import { useState } from "react";
 import type { RelayCustom, RelayKind } from "@agent-hud/protocol";
 import { Menu, Segments } from "./SettingsControls";
-import { Row, type Text } from "./SettingsPrimitives";
+import { Row } from "./SettingsPrimitives";
+import type { Translate } from "@agent-hud/ui/format";
 import { FieldRow, FormActions, InlineForm } from "./SettingsFields";
 
 /** A relay added by hand: its address and key, and a name if the owner wants
@@ -12,7 +13,7 @@ export function RelayForm({
   onSave,
   onCancel,
 }: {
-  t: Text;
+  t: Translate;
   pending: boolean;
   onSave: (relay: Record<string, unknown>) => void;
   onCancel: () => void;
@@ -23,29 +24,24 @@ export function RelayForm({
   return (
     <InlineForm onSubmit={() => onSave({ name, baseUrl, key })}>
       <FieldRow
-        label={t("Address", "地址")}
+        label={t("Address")}
         value={baseUrl}
         change={setBaseUrl}
         placeholder="https://relay.example.com"
         autoFocus
       />
+      <FieldRow label={t("API key")} value={key} change={setKey} secret />
       <FieldRow
-        label={t("API key", "API Key")}
-        value={key}
-        change={setKey}
-        secret
-      />
-      <FieldRow
-        label={t("Name", "名称")}
+        label={t("Name")}
         value={name}
         change={setName}
-        placeholder={t("Optional", "可不填")}
+        placeholder={t("Optional")}
       />
       <FormActions
         t={t}
         pending={pending}
         ready={Boolean(baseUrl.trim() && key.trim())}
-        submit={t("Add", "添加")}
+        submit={t("Add")}
         onCancel={onCancel}
       />
     </InlineForm>
@@ -62,7 +58,7 @@ export function RelayKindForm({
   onSave,
   onCancel,
 }: {
-  t: Text;
+  t: Translate;
   pending: boolean;
   kind: RelayKind;
   custom?: RelayCustom;
@@ -78,11 +74,11 @@ export function RelayKindForm({
   );
   const [header, setHeader] = useState(saved?.header ?? "");
   const kinds: [RelayKind, string][] = [
-    ["auto", t("Automatic", "自动识别")],
+    ["auto", t("Automatic")],
     ["newapi", "New API"],
     ["sub2api", "Sub2API"],
     ["openrouter", "OpenRouter"],
-    ["custom", t("Custom endpoint", "自定义接口")],
+    ["custom", t("Custom endpoint")],
   ];
   return (
     <InlineForm
@@ -103,9 +99,9 @@ export function RelayKindForm({
         )
       }
     >
-      <Row title={t("Type", "类型")}>
+      <Row title={t("Type")}>
         <Menu
-          label={t("Type", "类型")}
+          label={t("Type")}
           value={kind}
           options={kinds}
           change={(value) => setKind(value as RelayKind)}
@@ -115,29 +111,29 @@ export function RelayKindForm({
       {kind === "custom" && (
         <>
           <FieldRow
-            label={t("Balance endpoint", "余额接口")}
-            hint={t("On the relay's own address.", "须在中转站自己的地址上。")}
+            label={t("Balance endpoint")}
+            hint={t("On the relay's own address.")}
             value={url}
             change={setUrl}
             placeholder="/api/balance"
           />
           <FieldRow
-            label={t("Balance field", "余额字段")}
+            label={t("Balance field")}
             value={remaining}
             change={setRemaining}
             placeholder="data.balance"
           />
           <FieldRow
-            label={t("Divide by", "除数")}
+            label={t("Divide by")}
             value={divisor}
             change={setDivisor}
             placeholder="1"
             decimal
             width={80}
           />
-          <Row title={t("Currency", "币种")}>
+          <Row title={t("Currency")}>
             <Segments
-              label={t("Currency", "币种")}
+              label={t("Currency")}
               value={currency}
               options={[
                 ["USD", "USD"],
@@ -147,8 +143,8 @@ export function RelayKindForm({
             />
           </Row>
           <FieldRow
-            label={t("Key header", "Key 请求头")}
-            hint={t("Optional", "可不填")}
+            label={t("Key header")}
+            hint={t("Optional")}
             value={header}
             change={setHeader}
             placeholder="Authorization"
@@ -159,7 +155,7 @@ export function RelayKindForm({
         t={t}
         pending={pending}
         ready={kind !== "custom" || Boolean(url.trim() && remaining.trim())}
-        submit={t("Save", "保存")}
+        submit={t("Save")}
         onCancel={onCancel}
       />
     </InlineForm>

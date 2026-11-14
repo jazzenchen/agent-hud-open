@@ -1,7 +1,7 @@
 //! What an ask is: the HUD's card for it, and what its answer hands Harness.
 use crate::clients::deepseek::questions::{self, QuestionItem};
 use agent_hud_agents::deepseek::AGENT;
-use agent_hud_core::l10n;
+use agent_hud_core::l10n::{self, tr};
 use chrono::Utc;
 use serde_json::{json, Value};
 
@@ -72,7 +72,7 @@ fn approval_view(id: &str, session: &str, value: &Value) -> Option<Value> {
         reason["zh"].as_str().filter(shown),
         reason["en"].as_str().filter(shown),
     ) {
-        (Some(zh), Some(en)) => Some(l10n::text(zh, en)),
+        (Some(zh), Some(en)) => Some(if l10n::current().is_chinese() { zh } else { en }.to_owned()),
         (zh, en) => zh.or(en).map(str::to_owned),
     };
     let summary = localized
@@ -121,9 +121,8 @@ pub fn answer(kind: &Kind, decision: &Value) -> Result<Option<Value>, String> {
             Some("leave") => Ok(None),
             Some("allow") => Ok(Some(json!("allowed-once"))),
             Some("deny") => Ok(Some(json!("rejected"))),
-            _ => Err(l10n::text(
-                "DeepSeek Harness 的批准只能允许一次或拒绝",
-                "DeepSeek Harness's approvals can only be allowed once or rejected.",
+            _ => Err(tr!(
+                "DeepSeek Harness's approvals can only be allowed once or rejected."
             )),
         },
     }

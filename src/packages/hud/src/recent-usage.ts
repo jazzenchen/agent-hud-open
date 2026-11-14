@@ -2,7 +2,12 @@
 // 24 hours, as Core reports it on each provider row (`recent`). Kept free of
 // the UI so the tests can run it; crates/hud vendors.rs writes the same text.
 import type { Snapshot } from "@agent-hud/protocol";
-import { moneyShort, tokensShort, type Language } from "@agent-hud/ui/format";
+import {
+  moneyShort,
+  tokensShort,
+  translate,
+  type Language,
+} from "@agent-hud/ui/format";
 import { agentArtworkKey as vendorKey } from "./agent-artwork.ts";
 
 /** The last 24 hours of one mark's clients, at list prices. */
@@ -42,8 +47,7 @@ export function recentCost(
   if (shown === undefined) return null;
   const more = recent.unpricedTokens > 0 || currencies.length > 1;
   // Calls to a model on this computer cost nothing.
-  if (!more && recent.costs[shown] === 0)
-    return language === "zh" ? "免费" : "Free";
+  if (!more && recent.costs[shown] === 0) return translate(language, "Free");
   return `≈${moneyShort(recent.costs[shown], shown, language)}${more ? "+" : ""}`;
 }
 

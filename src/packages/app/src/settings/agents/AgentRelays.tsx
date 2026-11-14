@@ -1,7 +1,11 @@
 import type { Provider, Snapshot } from "@agent-hud/protocol";
-import { moneyAmount, snapshotLanguage } from "@agent-hud/ui/format";
+import {
+  moneyAmount,
+  snapshotLanguage,
+  type Translate,
+} from "@agent-hud/ui/format";
 import { LinkButton } from "../SettingsControls";
-import { Row, Section, type Text } from "../SettingsPrimitives";
+import { Row, Section } from "../SettingsPrimitives";
 import { useOpenSettingsPage } from "../SettingsNavigation";
 
 /** The relays this agent goes through; they are set up on the Relays page. */
@@ -10,7 +14,7 @@ export function AgentRelays({
   snapshot,
   source,
 }: {
-  t: Text;
+  t: Translate;
   snapshot: Snapshot;
   source: Provider;
 }) {
@@ -21,11 +25,11 @@ export function AgentRelays({
   if (!relays.length) return null;
   return (
     <Section
-      title={t("Relays", "中转站")}
+      title={t("Relays")}
       action={
         openPage && (
           <LinkButton onClick={() => openPage("relays")}>
-            {t("Relay settings", "中转站设置")}
+            {t("Relay settings")}
           </LinkButton>
         )
       }
@@ -36,15 +40,16 @@ export function AgentRelays({
           title={relay.name ?? relay.provider}
           subtitle={
             relay.balance
-              ? t("Balance ", "余额 ") +
-                moneyAmount(
-                  relay.balance.amount,
-                  relay.balance.currency,
-                  snapshotLanguage(snapshot),
-                )
+              ? t("Balance {{amount}}", {
+                  amount: moneyAmount(
+                    relay.balance.amount,
+                    relay.balance.currency,
+                    snapshotLanguage(snapshot),
+                  ),
+                })
               : !relay.consented
-                ? t("Balance not read", "未开启读取余额")
-                : (relay.notice ?? t("Balance not read yet", "余额还没读到"))
+                ? t("Balance not read")
+                : (relay.notice ?? t("Balance not read yet"))
           }
         />
       ))}

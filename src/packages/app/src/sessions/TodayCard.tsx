@@ -18,6 +18,7 @@ import {
   type Theme,
   unpricedHelp,
 } from "./SessionTheme";
+import { useFormat, useT } from "@agent-hud/ui/format-context";
 
 /**
  * The sessions filed under today in one card (Open's SessionsTodayCard, the
@@ -37,7 +38,8 @@ export function TodayCard({
   theme: Theme;
   onSelect: (id: string) => void;
 }) {
-  const zh = Boolean(theme.zh);
+  const t = useT();
+  const { language } = useFormat();
   const total = day.tokens;
   const kinds = day.usage ? presentKinds(day.usage) : null;
   const reach = useBarReach();
@@ -46,7 +48,7 @@ export function TodayCard({
   const ranking = [
     ...day.top.map((session) => ({
       id: session.id,
-      label: session.title || (zh ? "未命名会话" : "Untitled session"),
+      label: session.title || t("Untitled session"),
       value: session.tokens,
       note: (value: number) => share(value, total),
       color: theme.tertiary,
@@ -58,7 +60,7 @@ export function TodayCard({
             id: "__rest__",
             label: (
               <span style={{ color: theme.secondary }}>
-                {zh ? `其余 ${day.rest.count} 个` : `${day.rest.count} more`}
+                {t("{{rest}} more", { rest: day.rest.count })}
               </span>
             ),
             value: day.rest.tokens,
@@ -89,16 +91,14 @@ export function TodayCard({
           }}
         >
           <strong style={{ fontSize: 13, fontWeight: 600 }}>
-            {zh
-              ? `今天 · ${day.sessions} 个会话`
-              : `Today · ${day.sessions} ${day.sessions === 1 ? "session" : "sessions"}`}
+            {t("Today · {{count}} sessions", { count: day.sessions })}
           </strong>
           {money.value !== null && (
             <span
               style={{ color: theme.secondary, fontSize: 11 }}
-              title={unpricedHelp(money.unpriced, zh)}
+              title={unpricedHelp(money.unpriced, language)}
             >
-              {zh ? "费用 " : "Cost "}
+              {t("Cost")}{" "}
               <span
                 style={{
                   fontSize: 12,
@@ -107,7 +107,7 @@ export function TodayCard({
                   ...numeric,
                 }}
               >
-                <Tween value={money.value} format={moneyAt(money, zh)} />
+                <Tween value={money.value} format={moneyAt(money, language)} />
               </span>
             </span>
           )}
@@ -122,11 +122,7 @@ export function TodayCard({
           }}
         >
           <strong
-            title={
-              zh
-                ? "今天会话的已记录总 Token 数"
-                : "Whole recorded totals of the sessions filed under today"
-            }
+            title={t("Whole recorded totals of the sessions filed under today")}
             style={{
               fontSize: 24,
               fontWeight: 600,
@@ -137,7 +133,7 @@ export function TodayCard({
             <Tween value={total} format={tokensAt} />
           </strong>
           <span style={{ color: theme.secondary, fontSize: 12 }}>
-            {zh ? "Token" : "tokens"}
+            {t("tokens")}
           </span>
         </div>
         {kinds ? (
@@ -167,11 +163,9 @@ export function TodayCard({
           </div>
         ) : (
           <div
-            title={
-              zh
-                ? "所列会话未包含按类型细分的 Token 数据"
-                : "Token-kind breakdown is not provided for the listed sessions"
-            }
+            title={t(
+              "Token-kind breakdown is not provided for the listed sessions",
+            )}
             style={{
               height: 6,
               background: theme.track,
@@ -191,7 +185,7 @@ export function TodayCard({
         >
           {kinds
             ? kinds.map((entry) => {
-                const name = kindLabel(entry.kind, zh);
+                const name = kindLabel(entry.kind, language);
                 return (
                   <span
                     key={entry.kind}
@@ -218,7 +212,7 @@ export function TodayCard({
                   key={kind}
                   style={{ ...row, gap: 6, color: theme.secondary }}
                 >
-                  {kindLabel(kind, zh)}
+                  {kindLabel(kind, language)}
                   <Missing theme={theme} />
                 </span>
               ))}
@@ -236,10 +230,10 @@ export function TodayCard({
             style={{ ...row, justifyContent: "space-between", marginBottom: 9 }}
           >
             <strong style={{ fontSize: 13, fontWeight: 600 }}>
-              {zh ? "今天的 Token 花在哪" : "Where today's tokens went"}
+              {t("Where today's tokens went")}
             </strong>
             <span style={{ color: theme.secondary, fontSize: 11 }}>
-              {zh ? "占比" : "Share"}
+              {t("Share")}
             </span>
           </div>
           <ShareRows

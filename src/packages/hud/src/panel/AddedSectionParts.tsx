@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Button } from "@agent-hud/ui/components/button";
 import { palette, tabular, type Period } from "./theme";
+import { useT } from "@agent-hud/ui/format-context";
 
 type Colors = ReturnType<typeof palette>;
 
@@ -38,13 +39,12 @@ export function PeriodButtons({
   period,
   setPeriod,
   colors,
-  zh,
 }: {
   period: Period;
   setPeriod: (period: Period) => void;
   colors: Colors;
-  zh: boolean;
 }) {
+  const t = useT();
   return (
     <div style={{ display: "flex", gap: 2 }}>
       {(["24h", "7d", "30d"] as const).map((label) => (
@@ -53,7 +53,7 @@ export function PeriodButtons({
           size="xs"
           variant="ghost"
           aria-pressed={period === label}
-          title={zh ? `最近 ${label}` : `Last ${label}`}
+          title={t("Last {{period}}", { period: label })}
           onClick={() => setPeriod(label)}
           style={{
             height: 18,

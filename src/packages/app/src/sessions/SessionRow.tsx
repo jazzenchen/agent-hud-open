@@ -17,10 +17,11 @@ import {
   type Theme,
   unpricedHelp,
 } from "./SessionTheme";
+import { useFormat, useT } from "@agent-hud/ui/format-context";
 
 /** A row's context: how full, with its bar (amber from 80%), else its tokens. */
 function ContextFigure({ session, theme }: { session: Session; theme: Theme }) {
-  const zh = Boolean(theme.zh);
+  const t = useT();
   const fill =
     session.contextFill != null
       ? session.contextFill * 100
@@ -32,7 +33,7 @@ function ContextFigure({ session, theme }: { session: Session; theme: Theme }) {
   if (fill === null) {
     return session.contextTokens != null ? (
       <span style={{ ...row, gap: 6, justifyContent: "flex-end" }}>
-        <span>{zh ? "上下文" : "Context"}</span>
+        <span>{t("Context")}</span>
         <span style={{ color: theme.text, ...numeric }}>
           <Tween value={session.contextTokens} format={tokensAt} />
         </span>
@@ -42,13 +43,9 @@ function ContextFigure({ session, theme }: { session: Session; theme: Theme }) {
   return (
     <span
       style={{ ...row, gap: 6, justifyContent: "flex-end" }}
-      title={
-        zh
-          ? "最近一次调用的上下文占模型窗口的比例"
-          : "The latest call's context as a share of the model's window"
-      }
+      title={t("The latest call's context as a share of the model's window")}
     >
-      <span>{zh ? "上下文" : "Context"}</span>
+      <span>{t("Context")}</span>
       <span
         aria-hidden="true"
         style={{
@@ -113,7 +110,8 @@ export function SessionRow({
   /** The row came after its card was drawn (a new session, a page loaded). */
   arrived?: boolean;
 }) {
-  const zh = Boolean(theme.zh);
+  const t = useT();
+  const { language } = useFormat();
   const [hovered, setHovered] = useState(false);
   const [fresh] = useState(arrived);
   const grid = useRowGrid();
@@ -159,13 +157,13 @@ export function SessionRow({
     >
       <span style={{ display: "grid", gap: 4, minWidth: 0 }}>
         <strong style={{ ...clipped, fontSize: 13, fontWeight: 600 }}>
-          {session.title || (zh ? "未命名会话" : "Untitled session")}
+          {session.title || t("Untitled session")}
         </strong>
         <span style={{ ...line, ...clipped }}>
           {sessionWhere(session, client).join(" · ")}
         </span>
         <span style={{ ...line, ...clipped }}>
-          {statusLine(session, now, zh)}
+          {statusLine(session, now, language)}
         </span>
       </span>
       <span style={{ minWidth: 0 }}>
@@ -174,9 +172,13 @@ export function SessionRow({
             bars={bars}
             theme={theme}
             label={
-              zh
-                ? `最近 ${bars.length} 轮每轮新增的 Token`
-                : `New tokens of the last ${bars.length} ${session.turnBars?.by === "period" ? "periods" : "turns"}`
+              session.turnBars?.by === "period"
+                ? t("New tokens of the last {{count}} periods", {
+                    count: bars.length,
+                  })
+                : t("New tokens of the last {{count}} turns", {
+                    count: bars.length,
+                  })
             }
           />
         ) : (
@@ -216,7 +218,7 @@ export function SessionRow({
           style={numeric}
           title={
             session.accountCost === undefined
-              ? unpricedHelp(money.unpriced, zh)
+              ? unpricedHelp(money.unpriced, language)
               : undefined
           }
         >
@@ -225,15 +227,15 @@ export function SessionRow({
             session.accountCost ? (
               <Tween
                 value={session.accountCost.amount}
-                format={accountAt(session.accountCost, zh)}
+                format={accountAt(session.accountCost, language)}
               />
             ) : (
               "—"
             )
           ) : money.value !== null ? (
-            <Tween value={money.value} format={moneyAt(money, zh)} />
+            <Tween value={money.value} format={moneyAt(money, language)} />
           ) : (
-            moneyText(money, zh)
+            moneyText(money, language)
           )}
         </span>
         <ContextFigure session={session} theme={theme} />

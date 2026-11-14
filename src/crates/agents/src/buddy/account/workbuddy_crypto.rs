@@ -5,7 +5,8 @@
 use super::vscdb::{parse_buddy_session, BuddyAuth};
 use crate::account::cipher::aes_256_gcm_open;
 use crate::account::{read_json_bounded, resolve, Answer, EngineStart, Host, Unread};
-use crate::{l10n, Base, Location, Os};
+use crate::l10n::tr;
+use crate::{Base, Location, Os};
 use base64::{engine::general_purpose::STANDARD, Engine};
 use ring::digest::{digest, SHA256};
 use serde_json::Value;
@@ -33,11 +34,7 @@ pub(super) fn read_workbuddy_local(host: &dyn Host) -> Result<Option<BuddyAuth>,
             Answer::Found(value) => value,
             Answer::Missing => continue,
             Answer::Denied => {
-                return Err(l10n::text(
-                    "无权读取 WorkBuddy 的本地登录文件",
-                    "Permission denied reading WorkBuddy's local sign-in file.",
-                )
-                .into())
+                return Err(tr!("Permission denied reading WorkBuddy's local sign-in file.").into())
             }
             _ => return Err(auth_format().into()),
         };
@@ -91,9 +88,9 @@ fn open_envelope(host: &dyn Host, root: &Value) -> Result<Value, Unread> {
     let key = resolve_key(host, &key_id)?;
     let aad = build_aad(&key_id);
     let plain = aes_256_gcm_open(&key, &nonce, &aad, &ct_and_tag).ok_or_else(|| {
-        l10n::text(
-            "WorkBuddy 加密的登录信息无法解密",
-            "WorkBuddy's encrypted sign-in could not be unlocked.",
+        tr!(
+            "{{name}}'s encrypted sign-in could not be unlocked.",
+            name = "WorkBuddy"
         )
     })?;
     serde_json::from_slice(&plain).map_err(|_| auth_format().into())
@@ -109,10 +106,7 @@ fn resolve_key(host: &dyn Host, key_id: &str) -> Result<[u8; 32], Unread> {
         return Ok(cached);
     }
     let exe = host.executable("workbuddy-app").ok_or_else(|| {
-        l10n::text(
-            "WorkBuddy 加密了本地登录信息，但未找到已安装的 WorkBuddy 应用来读取密钥",
-            "WorkBuddy encrypted its local sign-in, and the WorkBuddy app could not be found to unlock it.",
-        )
+        tr!("WorkBuddy encrypted its local sign-in, and the WorkBuddy app could not be found to unlock it.")
     })?;
     let mut engine = host
         .start_engine(&EngineStart {
@@ -121,20 +115,10 @@ fn resolve_key(host: &dyn Host, key_id: &str) -> Result<[u8; 32], Unread> {
             folder: "workbuddy",
             env: &[("ELECTRON_RUN_AS_NODE", "1".into())],
         })
-        .map_err(|_| {
-            l10n::text(
-                "无法运行 WorkBuddy 以读取本地登录密钥",
-                "Could not run WorkBuddy to read its local storage key.",
-            )
-        })?;
+        .map_err(|_| tr!("Could not run WorkBuddy to read its local storage key."))?;
     let out = engine
         .joined(Instant::now() + Duration::from_secs(5))
-        .ok_or_else(|| {
-            l10n::text(
-                "WorkBuddy 未返回本地登录密钥",
-                "WorkBuddy did not return its local storage key.",
-            )
-        })?;
+        .ok_or_else(|| tr!("WorkBuddy did not return its local storage key."))?;
     let secret = out["atRestSecretKey"]
         .as_str()
         .map(str::trim)
@@ -142,11 +126,7 @@ fn resolve_key(host: &dyn Host, key_id: &str) -> Result<[u8; 32], Unread> {
         .ok_or_else(auth_format)?;
     let (derived_id, key_bytes) = derive_workbuddy_key(secret);
     if derived_id != key_id {
-        return Err(l10n::text(
-            "WorkBuddy 返回的本地密钥与加密登录信息不匹配",
-            "WorkBuddy's storage key did not match the encrypted sign-in.",
-        )
-        .into());
+        return Err(tr!("WorkBuddy's storage key did not match the encrypted sign-in.").into());
     }
     KEYS.lock()
         .unwrap_or_else(PoisonError::into_inner)
@@ -187,8 +167,8 @@ fn decode_field(value: &Value) -> Result<Vec<u8>, String> {
 }
 
 fn auth_format() -> String {
-    l10n::text(
-        "WorkBuddy 账户登录信息格式无法识别",
-        "WorkBuddy account authentication has an unsupported format.",
+    tr!(
+        "{{name}} account authentication has an unsupported format.",
+        name = "WorkBuddy"
     )
 }

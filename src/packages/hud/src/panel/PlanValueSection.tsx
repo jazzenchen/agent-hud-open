@@ -4,8 +4,8 @@ import type {
   PlanValueResponse,
   Snapshot,
 } from "@agent-hud/protocol";
-import { useFormat } from "@agent-hud/ui/format-context";
-import { listCost, listPrice } from "@agent-hud/ui/format";
+import { useFormat, useT } from "@agent-hud/ui/format-context";
+import { listCost, listPrice, type Translate } from "@agent-hud/ui/format";
 import { usePanelQuery } from "../PanelContext";
 import { useGround } from "../ground";
 import { palette, tabular, type Logo } from "./theme";
@@ -19,13 +19,13 @@ const ellipsis = {
 } as const;
 
 /** The value as a multiple of the plan's price, "≥" when it is a lower bound. */
-function ratioText(account: PlanValueAccount, zh: boolean): string {
+function ratioText(account: PlanValueAccount, t: Translate): string {
   if (account.ratio == null) return "—";
   const figure =
     account.ratio < 10
       ? account.ratio.toFixed(1)
       : String(Math.round(account.ratio));
-  return `${account.partial ? "≥" : ""}${zh ? `${figure} 倍` : `${figure}×`}`;
+  return `${account.partial ? "≥" : ""}${t("{{figure}}×", { figure })}`;
 }
 
 /** The hover panel's plan value: each signed-in plan beside what the last 30
@@ -49,7 +49,7 @@ export function PlanValueSection({
   bare?: boolean;
 }) {
   const { language } = useFormat();
-  const zh = language === "zh";
+  const t = useT();
   const colors = palette(useGround(light));
   const query = usePanelQuery<PlanValueResponse>(
     "plan_value",
@@ -72,23 +72,18 @@ export function PlanValueSection({
         boxShadow: bare ? undefined : `inset 0 1px 0 ${colors.divider}`,
       }}
     >
-      <AddedSectionHeading
-        title={zh ? "订阅价值" : "Plan value"}
-        colors={colors}
-      >
+      <AddedSectionHeading title={t("Plan value")} colors={colors}>
         <span style={{ fontSize: 11, color: colors.tertiary }}>
-          {zh ? "近 30 天 · API 标价" : "30 days · API list prices"}
+          {t("30 days · API list prices")}
         </span>
       </AddedSectionHeading>
       {!query.data && (
         <SectionNote colors={colors}>
-          {query.error ?? (zh ? "正在加载订阅价值…" : "Loading plan value…")}
+          {query.error ?? t("Loading plan value…")}
         </SectionNote>
       )}
       {query.data && !accounts.length && (
-        <SectionNote colors={colors}>
-          {zh ? "没有可估值的订阅" : "No plans to value"}
-        </SectionNote>
+        <SectionNote colors={colors}>{t("No plans to value")}</SectionNote>
       )}
       {accounts.map((account) => {
         const value = account.value;
@@ -119,14 +114,12 @@ export function PlanValueSection({
               </span>
               <span style={{ flex: 1 }} />
               <span
-                title={
-                  zh
-                    ? "近 30 天 API 价值除以每月标价"
-                    : "The 30-day API value divided by the monthly list price"
-                }
+                title={t(
+                  "The 30-day API value divided by the monthly list price",
+                )}
                 style={{ ...tabular, fontWeight: 600, color: colors.text }}
               >
-                {ratioText(account, zh)}
+                {ratioText(account, t)}
               </span>
             </div>
             <div
@@ -138,17 +131,11 @@ export function PlanValueSection({
               }}
             >
               {account.plan
-                ? zh
-                  ? `每月 ${usd(account.plan.monthlyUSD)}`
-                  : `${usd(account.plan.monthlyUSD)}/mo`
-                : zh
-                  ? "没有官方月付标价"
-                  : "No monthly list price"}
+                ? t("{{price}}/mo", { price: usd(account.plan.monthlyUSD) })
+                : t("No monthly list price")}
               {" · "}
               {worth
-                ? zh
-                  ? `API 价值 ${worth}`
-                  : `API value ${worth}`
+                ? t("API value {{worth}}", { worth })
                 : account.unavailable}
             </div>
           </div>

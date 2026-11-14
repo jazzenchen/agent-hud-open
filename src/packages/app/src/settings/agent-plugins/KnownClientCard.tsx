@@ -4,8 +4,9 @@
 import { Fragment, useState } from "react";
 import { toast } from "sonner";
 import type { Snapshot } from "@agent-hud/protocol";
+import type { Translate } from "@agent-hud/ui/format";
 import { mcpRow, pluginRow, type RowState } from "../../lib/agent-plugins";
-import { Pill, type SettingsPaneProps, type Text } from "../SettingsPrimitives";
+import { Pill, type SettingsPaneProps } from "../SettingsPrimitives";
 import { ClientCard } from "./ClientCards";
 import { PluginControl, StatePill, StatusRow } from "./rows";
 import type { AgentPluginContext, AgentPluginItem } from "./types";
@@ -31,10 +32,10 @@ function hudToolsState(
   client: Client,
   clients: McpClients,
   tools: HudTools,
-  t: Text,
+  t: Translate,
 ) {
   const entry = clients.status?.clients.find((item) => item.id === client.id);
-  const state = mcpRow({
+  const state = mcpRow(t, {
     client: client.name,
     setupReady: clients.status ? clients.status.ready : null,
     clientFound: entry ? entry.available : true,
@@ -52,15 +53,12 @@ function hudToolsState(
     state: {
       ...state,
       tone: "off",
-      status: ["Off", "已关闭"],
+      status: t("Off"),
       action: null,
     } satisfies RowState,
-    reason: tools.state.unavailable
-      ? t(...tools.state.unavailable)
-      : t(
-          "Turn on “Let agents arrange the HUD” under Agent tools.",
-          "在下方「智能体工具」里打开「允许智能体调整 HUD」。",
-        ),
+    reason:
+      tools.state.unavailable ??
+      t("Turn on “Let agents arrange the HUD” under Agent tools."),
   };
 }
 
@@ -121,7 +119,7 @@ export function KnownClientCard({
   request: AgentPluginContext["request"];
   active: boolean;
   light: boolean;
-  t: Text;
+  t: Translate;
 }) {
   const entry = clients.status?.clients.find((item) => item.id === client.id);
   const found = entry ? entry.available : null;
@@ -137,6 +135,7 @@ export function KnownClientCard({
   const pluginState =
     plugin &&
     pluginRow(
+      t,
       {
         installed,
         sessions: plugin.status?.sessions ?? 0,
@@ -178,40 +177,30 @@ export function KnownClientCard({
       summary={
         missing ? (
           <Pill tone="gray" dot>
-            {t("Not found", "未发现")}
+            {t("Not found")}
           </Pill>
         ) : (
           <>
             {pluginState && (
-              <StatePill state={pluginState} label={["Plugin", "插件"]} t={t} />
+              <StatePill state={pluginState} label={t("Plugin")} t={t} />
             )}
             {answersOff && (
               <Pill tone="orange" dot>
-                {t("Answers off", "回答已关闭")}
+                {t("Answers off")}
               </Pill>
             )}
-            <StatePill
-              state={hud.state}
-              label={["HUD tools", "HUD 工具"]}
-              t={t}
-            />
+            <StatePill state={hud.state} label={t("HUD tools")} t={t} />
           </>
         )
       }
     >
       {plugin && pluginState && (
         <StatusRow
-          title={t("Agent HUD plugin", "Agent HUD 插件")}
+          title={t("Agent HUD plugin")}
           subtitle={
             client.id === "claudeCode"
-              ? t(
-                  "Answer Claude's questions in the HUD.",
-                  "在 HUD 上回答 Claude 的提问。",
-                )
-              : t(
-                  "Answer its questions and approvals in the HUD.",
-                  "在 HUD 上回答它的提问和批准请求。",
-                )
+              ? t("Answer Claude's questions in the HUD.")
+              : t("Answer its questions and approvals in the HUD.")
           }
           state={pluginState}
           error={plugin.error}
@@ -224,17 +213,14 @@ export function KnownClientCard({
       {installed === true && client.id === "claudeCode" && (
         <>
           <SettingControl
-            title={t("Answer questions", "回答提问")}
+            title={t("Answer questions")}
             setting="claudeAnswers"
             snapshot={snapshot}
             action={action}
           />
           <SettingControl
-            title={t("Send messages", "发消息")}
-            description={t(
-              "From Agent HUD into open sessions.",
-              "从 Agent HUD 发到打开的会话。",
-            )}
+            title={t("Send messages")}
+            description={t("From Agent HUD into open sessions.")}
             setting="claudeMessages"
             snapshot={snapshot}
             action={action}
@@ -243,11 +229,8 @@ export function KnownClientCard({
       )}
       {installed === true && client.id === "deepseek" && (
         <SettingControl
-          title={t("Send messages", "发消息")}
-          description={t(
-            "Queued for open sessions; never interrupts a turn.",
-            "排进打开的会话的队列，不打断当前一轮。",
-          )}
+          title={t("Send messages")}
+          description={t("Queued for open sessions; never interrupts a turn.")}
           setting="deepseekMessages"
           snapshot={snapshot}
           action={action}
@@ -261,7 +244,7 @@ export function KnownClientCard({
         <Fragment key={item.id}>{item.render(context)}</Fragment>
       ))}
       <StatusRow
-        title={t("HUD tools", "HUD 工具")}
+        title={t("HUD tools")}
         tag="MCP"
         state={hud.state}
         pillReason={hud.reason}

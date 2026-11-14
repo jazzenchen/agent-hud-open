@@ -12,6 +12,7 @@ export { HUDArtwork as HUDLogo } from "./HUDArtwork";
 import { DockMemory, type Direction } from "./bots/mark-director";
 import { AlertStack } from "./scene/AlertStack";
 import { HUDExpandedSurface } from "./scene/HUDExpandedSurface";
+import { HUDInstructions } from "./scene/HUDInstructions";
 import { HUDMarkStrip } from "./scene/HUDMarkStrip";
 import { FlightLayer } from "./scene/FlightLayer";
 import type { HUDFlightCommand } from "./scene/flight-queue";
@@ -52,7 +53,6 @@ import {
   type HUDDecision,
   type HUDUpdateNotice,
 } from "./model";
-import { snapshotLanguage } from "@agent-hud/ui/format";
 import {
   ListedSessionsContext,
   type StatsTarget,
@@ -639,11 +639,7 @@ export function HUDScene({
             look={{ light, fill, outline, shadow }}
             reduceMotion={reduceMotion}
           />
-          <span id={`hud-instructions-${id}`} className="sr-only">
-            {snapshotLanguage(snapshot) === "zh"
-              ? "悬停展开。在分开显示的模式下，点按一个智能体打开它的完整面板。"
-              : "Hover to expand. In separated agent mode, click an agent to open its full panel."}
-          </span>
+          <HUDInstructions id={`hud-instructions-${id}`} />
         </section>
       </ListedSessionsContext.Provider>
     </HUDGroundProvider>

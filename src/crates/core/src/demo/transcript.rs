@@ -2,7 +2,8 @@
 //! sub-agents, as Claude Code, Codex and DeepSeek Harness write them.
 use super::data::{DemoAgent, DemoTurn, Kinds, Plan};
 use super::{folder, Ending};
-use crate::{iso, l10n};
+use crate::iso;
+use crate::l10n::tr;
 use serde_json::{json, Value};
 
 /// What a session's later prompts ask; the first is its title.
@@ -23,10 +24,7 @@ fn prompt(plan: &Plan, index: usize) -> &'static str {
 }
 
 pub(super) fn reply(plan: &Plan) -> String {
-    l10n::text(
-        &format!("已完成：{}。", plan.title),
-        &format!("Done: {}.", plan.title),
-    )
+    tr!("Done: {{task}}.", task = plan.title)
 }
 
 pub(super) fn jsonl(lines: Vec<Value>) -> String {
@@ -86,10 +84,9 @@ pub(super) fn agent_lines(plan: &Plan, agent: &DemoAgent) -> Vec<Value> {
             Some(tool) => {
                 json!([{"type":"tool_use","id":format!("{id}-t{call}"),"name":tool,"input":tool_input(tool,&dir)}])
             }
-            None => json!([{"type":"text","text":l10n::text(
-                &format!("已完成：{}。", agent.task.description),
-                &format!("Done: {}.", agent.task.description),
-            )}]),
+            None => {
+                json!([{"type":"text","text":tr!("Done: {{task}}.", task = agent.task.description)}])
+            }
         };
         let usage = step.usage;
         lines.push(line("assistant", step.at, json!({"id":format!("msg-{id}-{call}"),"model":agent.model,"role":"assistant","content":content,"stop_reason":if step.tool.is_some() {"tool_use"} else {"end_turn"},"usage":{"input_tokens":usage.input,"output_tokens":usage.output+usage.reasoning,"cache_read_input_tokens":usage.cache_read,"cache_creation_input_tokens":usage.cache_write}})));

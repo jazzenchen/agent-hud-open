@@ -1,5 +1,5 @@
 //! Navigate Antigravity via the host application on Unix.
-use agent_hud_core::l10n;
+use agent_hud_core::l10n::tr;
 use reqwest::Url;
 use std::path::Path;
 
@@ -15,9 +15,8 @@ fn workspace_uri(cwd: Option<&str>) -> Option<String> {
 }
 pub(super) fn open(home: &Path, id: &str, cwd: Option<&str>) -> Result<bool, String> {
     if !crate::os::ACTIVATES_APPS {
-        return Err(l10n::text(
-            "此系统暂不支持打开 Antigravity 会话",
-            "Antigravity native session navigation is not implemented for this operating system",
+        return Err(tr!(
+            "Antigravity native session navigation is not implemented for this operating system"
         ));
     }
     if !crate::os::app_running(APP) {

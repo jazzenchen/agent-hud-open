@@ -4,7 +4,7 @@
 //! reads: no key resolver runs, no token is refreshed, nobody signs in.
 use super::{nonempty, numeric, Credential};
 use crate::account::{account_id, jwt_claims, read_bounded, variable, Host};
-use crate::l10n;
+use crate::l10n::tr;
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::{
@@ -286,9 +286,8 @@ pub(super) fn discover(host: &dyn Host, wanted: &str) -> Result<(Vec<Credential>
             .or_insert(entry);
     }
     if unique.len() > 32 {
-        return Err(l10n::text(
-            "单独配置的 Coding Plan 凭据过多",
-            "Too many independently configured coding-plan credentials",
+        return Err(tr!(
+            "Too many independently configured coding-plan credentials"
         ));
     }
     Ok((unique.into_values().collect(), stale_oauth))

@@ -4,7 +4,6 @@ import type {
   RequestDelivery,
   Snapshot,
 } from "@agent-hud/protocol";
-import { snapshotLanguage } from "@agent-hud/ui/format";
 import { InlineEventRow } from "../alerts/InlineEventRow";
 import { HUDArtwork as HUDLogo } from "../HUDArtwork";
 import { SourceHoverPanel } from "../HoverPanel";
@@ -71,7 +70,6 @@ export function PanelBody({
                 snapshot={snapshot}
                 light={light}
                 botLogos={config.botLogos}
-                zh={snapshotLanguage(snapshot) === "zh"}
                 onOpen={() => {
                   dismissNews();
                   footer.stats?.();
@@ -82,11 +80,7 @@ export function PanelBody({
           maxHeight={maxHeight}
         />
       )}
-      <RequestDeliveryNotice
-        delivery={delivery}
-        light={light}
-        language={snapshotLanguage(snapshot)}
-      />
+      <RequestDeliveryNotice delivery={delivery} light={light} />
     </>
   );
 }

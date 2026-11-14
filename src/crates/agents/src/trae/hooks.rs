@@ -9,6 +9,7 @@
 //! tool TRAE asks about by itself, so a request stays in TRAE's window and
 //! the HUD only shows that the session waits.
 use crate::hooks::{stop, Began, Begin, Completed, Completion, Hooks, Layout, Setup, POSIX_ONLY};
+use crate::l10n::tr;
 use crate::process::Imported;
 use crate::{text, Location};
 use serde_json::Value;
@@ -55,9 +56,9 @@ pub static SETUP: Setup = Setup {
 };
 
 fn step(name: &str) -> String {
-    crate::l10n::text(
-        &format!("在 {name} 的「设置 > Hooks」中打开全局 Hooks 后，它才会运行这些回调；选「沙箱运行」时，只有 Agent HUD 正在运行才能收到。"),
-        &format!("{name} runs these hooks once you turn on its global hooks in {name} Settings → Hooks. When they run in its sandbox, they reach Agent HUD only while it is open."),
+    tr!(
+        "{{name}} runs these hooks once you turn on its global hooks in {{name}} Settings → Hooks. When they run in its sandbox, they reach Agent HUD only while it is open.",
+        name = name
     )
 }
 

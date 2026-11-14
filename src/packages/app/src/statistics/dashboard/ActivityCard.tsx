@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { StatisticsResponse } from "@agent-hud/protocol";
+import { useT } from "@agent-hud/ui/format-context";
 import type { StatsTheme } from "../StatsTheme";
 import { Segments } from "../Segments";
 import { DayCalendar } from "./DayCalendar";
@@ -39,34 +40,29 @@ export function ActivityCard({
   pending: { year: Pending; range: Pending };
   theme: StatsTheme;
 }) {
-  const zh = Boolean(theme.zh);
-  const t = (en: string, cn: string) => (zh ? cn : en);
+  const t = useT();
   const [view, setView] = useState<"days" | "hours">("days");
   return (
     <Panel
       area="heatmap"
       pending={[view === "days" ? pending.year : pending.range]}
       theme={theme}
-      title={t("When you use it", "使用节奏")}
+      title={t("When you use it")}
       meta={
         view === "days"
           ? t(
               "Tokens per day · hover a day for its agents and models, click it to look at it alone",
-              "每天的 Token · 悬停看 Agent 和模型，点击单独查看这一天",
             )
-          : t(
-              "Tokens by weekday and hour over the range",
-              "所选时间里每个星期几、每个小时的 Token",
-            )
+          : t("Tokens by weekday and hour over the range")
       }
       actions={
         <Segments
-          label={t("Heatmap", "热力图")}
+          label={t("Heatmap")}
           value={view}
           onChange={(value) => setView(value as "days" | "hours")}
           choices={[
-            { value: "days", label: t("By day", "按天") },
-            { value: "hours", label: t("By hour", "按小时") },
+            { value: "days", label: t("By day") },
+            { value: "hours", label: t("By hour") },
           ]}
           theme={theme}
           small

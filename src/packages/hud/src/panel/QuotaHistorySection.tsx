@@ -6,7 +6,7 @@ import type {
   QuotaHistoryWindow,
   Snapshot,
 } from "@agent-hud/protocol";
-import { useFormat } from "@agent-hud/ui/format-context";
+import { useFormat, useT } from "@agent-hud/ui/format-context";
 import { quotaPercentLabel } from "@agent-hud/ui/format";
 import { usePanelQuery } from "../PanelContext";
 import { useGround } from "../ground";
@@ -140,8 +140,8 @@ export function QuotaHistorySection({
   active?: boolean;
   bare?: boolean;
 }) {
-  const { language, quotaDisplay } = useFormat();
-  const zh = language === "zh";
+  const { quotaDisplay } = useFormat();
+  const t = useT();
   const initial: Period =
     layout.period === "week" ? "7d" : layout.period === "month" ? "30d" : "24h";
   const [period, setPeriod] = useState<Period>(initial);
@@ -180,25 +180,17 @@ export function QuotaHistorySection({
         boxShadow: bare ? undefined : `inset 0 1px 0 ${colors.divider}`,
       }}
     >
-      <AddedSectionHeading
-        title={zh ? "额度历史" : "Quota history"}
-        colors={colors}
-      >
-        <PeriodButtons
-          period={period}
-          setPeriod={setPeriod}
-          colors={colors}
-          zh={zh}
-        />
+      <AddedSectionHeading title={t("Quota history")} colors={colors}>
+        <PeriodButtons period={period} setPeriod={setPeriod} colors={colors} />
       </AddedSectionHeading>
       {!query.data && (
         <SectionNote colors={colors}>
-          {query.error ?? (zh ? "正在加载额度历史…" : "Loading quota history…")}
+          {query.error ?? t("Loading quota history…")}
         </SectionNote>
       )}
       {query.data && !windows.length && (
         <SectionNote colors={colors}>
-          {zh ? "暂无可显示的额度窗口" : "No quota windows to show"}
+          {t("No quota windows to show")}
         </SectionNote>
       )}
       {quotaGroups(windows).map((group) => (

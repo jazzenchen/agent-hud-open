@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Notice, Section, type Text } from "./SettingsPrimitives";
+import { Notice, Section } from "./SettingsPrimitives";
+import type { Translate } from "@agent-hud/ui/format";
 import { SmallButton } from "./SettingsControls";
 import { usePending } from "./use-pending";
 
@@ -13,7 +14,7 @@ export default function AccountHomes({
   homes,
   onSave,
 }: {
-  t: Text;
+  t: Translate;
   label: string;
   /** The variable that names the client's folder. */
   variable: string;
@@ -42,8 +43,8 @@ export default function AccountHomes({
     <Section
       title={label}
       footer={t(
-        `One ${variable} folder per line. Your default account is always read.`,
-        `每行一个 ${variable} 文件夹，默认账户总会读取。`,
+        "One {{variable}} folder per line. Your default account is always read.",
+        { variable },
       )}
     >
       <div className="settings-field">
@@ -62,7 +63,7 @@ export default function AccountHomes({
             disabled={pending || text === saved}
             onClick={() => void save()}
           >
-            {pending ? t("Saving…", "正在保存…") : t("Save", "保存")}
+            {pending ? t("Saving…") : t("Save")}
           </SmallButton>
         </div>
       </div>

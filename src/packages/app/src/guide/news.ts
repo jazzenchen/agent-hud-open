@@ -5,26 +5,30 @@
 // it marked `data-guide`.
 import type { NewsEntry } from "./plan";
 
+/** Marks English text as a catalog key; the guide translates it where it
+ * shows it. */
+const t = (key: string) => key;
+
 export const openNews: NewsEntry[] = [
   {
     version: "0.6.3",
     items: [
       {
-        title: ["More accounts found on their own", "更多账号自动认出"],
-        body: [
-          "Qoder, QoderWork, TRAE, WorkBuddy, CodeBuddy, ZCode and MiniMax Code accounts come from each app's own sign-in, each region on its own.",
-          "Qoder、QoderWork、TRAE、WorkBuddy、CodeBuddy、ZCode 和 MiniMax Code 的账号直接从各自应用的登录里读，不同区域分开显示。",
-        ],
+        title: t("Nine languages"),
+        body: t(
+          "Japanese, Korean, Traditional Chinese, French, German, Spanish and Brazilian Portuguese join English and Simplified Chinese. Pick one in Settings → General.",
+        ),
+        target: { page: "general" },
       },
       {
-        title: [
-          "Agents can start DeepSeek Harness sessions",
-          "Agent 可以新开 DeepSeek Harness 会话",
-        ],
-        body: [
-          "Through Agent HUD's plugin in a running Harness.",
-          "经由运行中 Harness 里的 Agent HUD 插件。",
-        ],
+        title: t("More accounts found on their own"),
+        body: t(
+          "Qoder, QoderWork, TRAE, WorkBuddy, CodeBuddy, ZCode and MiniMax Code accounts come from each app's own sign-in, each region on its own.",
+        ),
+      },
+      {
+        title: t("Agents can start DeepSeek Harness sessions"),
+        body: t("Through Agent HUD's plugin in a running Harness."),
       },
     ],
   },
@@ -32,14 +36,10 @@ export const openNews: NewsEntry[] = [
     version: "0.6.2",
     items: [
       {
-        title: [
+        title: t(
           "A guide beside the HUD on first launch, and this note after each update",
-          "第一次打开时 HUD 旁会带你走一遍，每次更新后在这里说新增了什么",
-        ],
-        body: [
-          "Both open again from the ⋯ menu in Settings.",
-          "两样都能从设置里的 ⋯ 菜单再打开。",
-        ],
+        ),
+        body: t("Both open again from the ⋯ menu in Settings."),
         target: { anchor: "more-menu" },
       },
     ],

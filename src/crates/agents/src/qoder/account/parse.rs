@@ -1,7 +1,7 @@
 //! Parsing Qoder's `/sash/api/v2/me/usage`, `big_model_credits`, and cached `creditUsage`.
 use super::local::{plan_name, LocalSpec};
 use crate::account::{status, Reading};
-use crate::l10n;
+use crate::l10n::tr;
 use chrono::{DateTime, Utc};
 use serde_json::{json, Value};
 
@@ -39,9 +39,9 @@ pub(super) fn finish_reading(
             "nativeUsage": {"used": summary.used, "capacity": summary.total, "unit": "credits"},
         }));
     } else {
-        reading.notice = Some(l10n::text(
-            &format!("{} 当前套餐没有可用的积分额度", spec.label),
-            &format!("{} reports no credit allowance for this plan.", spec.label),
+        reading.notice = Some(tr!(
+            "{{names}} reports no credit allowance for this plan.",
+            names = spec.label
         ));
     }
     let mut acc = json!({

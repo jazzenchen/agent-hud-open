@@ -4,7 +4,7 @@ use super::byte_crypto::LocalAuth;
 use super::parse::{parse, unwrap, Summary};
 use super::Api;
 use crate::account::{Host, HttpFailure, HttpRequest, Unread, WebSession};
-use crate::l10n;
+use crate::l10n::tr;
 use serde_json::{json, Value};
 use std::time::Duration;
 
@@ -274,22 +274,19 @@ fn check_code(body: &Value, name: &str, local: bool) -> Result<(), Unread> {
 }
 
 fn local_signed_out(name: &str) -> Unread {
-    Unread::SignedOut(l10n::text(
-        &format!("{name} 保存的登录已失效，请打开 {name} 重新登录"),
-        &format!("{name}'s saved sign-in has ended; sign in again in {name}."),
+    Unread::SignedOut(tr!(
+        "{{name}}'s saved sign-in has ended; sign in again in {{name}}.",
+        name = name
     ))
 }
 
 fn web_signed_out(site: &str) -> Unread {
-    Unread::SignedOut(l10n::text(
-        &format!("{site} 在 Agent HUD 中的登录已失效，请在它的额度处重新登录"),
-        &format!("{site}'s sign-in in Agent HUD has ended; sign in again from its quota."),
+    Unread::SignedOut(tr!(
+        "{{site}}'s sign-in in Agent HUD has ended; sign in again from its quota.",
+        site = site
     ))
 }
 
 fn format_changed() -> String {
-    l10n::text(
-        "TRAE 的额度格式无法识别",
-        "TRAE's usage has an unsupported format.",
-    )
+    tr!("TRAE's usage has an unsupported format.")
 }

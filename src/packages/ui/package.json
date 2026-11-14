@@ -10,6 +10,7 @@
     "./global.css": "./src/global.css",
     "./styles.css": "./src/styles.css",
     "./format": "./src/format.ts",
+    "./catalogs": "./src/catalogs.ts",
     "./components/*": "./src/ui/*.tsx",
     "./lib/*": "./src/lib/*.ts",
     "./text/*": "./src/text/*.ts",
@@ -21,6 +22,8 @@
     "react-dom": "catalog:"
   },
   "dependencies": {
+    "@agent-hud/protocol": "workspace:*",
+    "i18next": "catalog:",
     "class-variance-authority": "catalog:",
     "clsx": "catalog:",
     "cn": "^0.2.6",

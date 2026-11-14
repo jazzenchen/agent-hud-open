@@ -1,7 +1,7 @@
 //! Explicit installation coordinator. Status is refreshed only at delegation or
 //! a user setting action, never by the five-second snapshot projection.
 use super::{install, observers, InstallContext};
-use agent_hud_core::l10n;
+use agent_hud_core::l10n::tr;
 use serde_json::{json, Value};
 #[derive(Default)]
 pub(super) struct Clients {
@@ -67,7 +67,7 @@ impl Clients {
     /// the notice; the others still go in, so one broken client folder never turns the switch off (Open #16). The
     /// error is only what stops every client.
     pub fn install(&mut self, enabled: bool) -> Result<(), String> {
-        let context=self.context.as_ref().ok_or_else(|| l10n::text("这个版本没有指定固定的回调程序，客户端配置未作改动", "No fixed hook-owner executable has been delegated; no client configuration was changed"))?;
+        let context=self.context.as_ref().ok_or_else(|| tr!("No fixed hook-owner executable has been delegated; no client configuration was changed"))?;
         if enabled {
             install::canonical(context)?;
         }
@@ -219,9 +219,9 @@ impl Clients {
                 let copy = crate::launched_executable()
                     .map(|path| path.display().to_string())
                     .unwrap_or_default();
-                l10n::text(
-                    &format!("只有安装好的 Agent HUD 才能安装客户端回调，这一份在 {copy}。客户端设置未作改动。"),
-                    &format!("Only the installed Agent HUD can install client hooks; this copy is at {copy}. Client settings are unchanged."),
+                tr!(
+                    "Only the installed Agent HUD can install client hooks; this copy is at {{copy}}. Client settings are unchanged.",
+                    copy = copy
                 )
             })
         });

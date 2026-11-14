@@ -48,12 +48,12 @@ fn the_menu_lists_windows_then_balances_as_use_tray_did() {
     // The highest reading that is not stale; one level per agent.
     assert_eq!(state.used_percent, Some(72.5));
     assert!(state.levels == [Level::Warning, Level::Stale, Level::Normal]);
-    let paused = json!({"language": "zh", "status": {"paused": true}, "quotas": [], "billing": [], "approvals": [],
+    let paused = json!({"language": "en", "status": {"paused": true}, "quotas": [], "billing": [], "approvals": [],
         "providers": [{"id": "kimi", "detected": true, "enabled": true}],
         "sessions": [{"id": "a", "source": "kimi", "state": "idle", "updatedAt": "2026-10-21T11:00:00Z"}]});
     let agents = crate::vendors::vendors(&paused, "simple", now);
     let state = project(&paused, &agents, true, true, false, None, now);
-    assert_eq!(titles(&state), ["Kimi", "暂无额度读数 —"]);
+    assert_eq!(titles(&state), ["Kimi", "No quota reading —"]);
     assert!(state.levels.is_empty() && state.glow_hidden && state.used_percent.is_none());
 }
 

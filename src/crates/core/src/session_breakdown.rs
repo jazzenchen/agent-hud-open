@@ -2,6 +2,7 @@
 //! own log and the sub-agent logs under it, the breakdown read from the usage
 //! ledger by query.
 use super::*;
+use crate::l10n::tr;
 use crate::session_usage::{self, Builder, Call};
 use std::hash::{Hash, Hasher};
 
@@ -148,7 +149,7 @@ impl AgentHudCore {
                 .iter()
                 .map(|log| log.path.to_string_lossy().into_owned()),
         );
-        let failed = |_| l10n::text("无法读取会话用量", "Could not read session usage");
+        let failed = |_| tr!("Could not read session usage");
         let (prompts, compactions) = metering::marks(db, &own_paths).map_err(failed)?;
         let rows = metering::calls_of(db, &paths, None, None).map_err(failed)?;
         let mut builder = Builder::new(prompts, compactions);
@@ -216,7 +217,7 @@ impl AgentHudCore {
             return Ok(None);
         };
         let own_paths = vec![own.path.to_string_lossy().into_owned()];
-        let failed = |_| l10n::text("无法读取会话用量", "Could not read session usage");
+        let failed = |_| tr!("Could not read session usage");
         let mut value = usage.json();
         // The session at its account's own prices (agent-hud-native-open
         // `UsageLedger` costs): a currency only when every priced log of the

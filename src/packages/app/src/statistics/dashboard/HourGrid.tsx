@@ -4,11 +4,13 @@ import type {
   StatisticsHeatmap,
   StatisticsResponse,
 } from "@agent-hud/protocol";
+import { useFormat, useT } from "@agent-hud/ui/format-context";
 import {
   integer,
   number,
   raisedCard,
   row,
+  weekdays,
   type StatsTheme,
 } from "../StatsTheme";
 import { HourFactList, heatColor } from "./DayFacts";
@@ -29,7 +31,7 @@ function HeatmapRow({
   color: (value: number) => string;
   theme: StatsTheme;
 }) {
-  const zh = Boolean(theme.zh);
+  const t = useT();
   return (
     <>
       <span style={{ paddingRight: 7 }}>{day}</span>
@@ -40,12 +42,8 @@ function HeatmapRow({
         const period = `${day} ${String(hour).padStart(2, "0")}:00–${String(hour + 1).padStart(2, "0")}:00`;
         const label = `${period} · ${
           known
-            ? zh
-              ? `已记录 ${integer(value)} Token`
-              : `${integer(value)} recorded tokens`
-            : zh
-              ? "不可用"
-              : "Unavailable"
+            ? t("{{tokens}} recorded tokens", { tokens: integer(value) })
+            : t("Unavailable")
         }`;
         return (
           <Tooltip.Root key={hour}>
@@ -86,10 +84,8 @@ function HeatmapRow({
                 </div>
                 <strong style={{ fontSize: 14, fontWeight: 600, ...number }}>
                   {known
-                    ? `${integer(value)} ${zh ? "Token" : "tokens"}`
-                    : zh
-                      ? "不可用"
-                      : "Unavailable"}
+                    ? t("{{tokens}} tokens", { tokens: integer(value) })
+                    : t("Unavailable")}
                 </strong>
                 {known && (
                   <UsageBreakdown
@@ -119,10 +115,9 @@ export const HourGrid = memo(function HourGrid({
   available: StatisticsResponse["available"];
   theme: StatsTheme;
 }) {
-  const zh = Boolean(theme.zh);
-  const days = zh
-    ? ["周一", "周二", "周三", "周四", "周五", "周六", "周日"]
-    : ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  const t = useT();
+  const { language } = useFormat();
+  const days = weekdays(language);
   // The daily heatmap's five greens: an hour's share of the busiest hour,
   // in quarters.
   const color = (value: number) =>
@@ -173,7 +168,7 @@ export const HourGrid = memo(function HourGrid({
           gap: 4,
         }}
       >
-        <span>{zh ? "少" : "Less"}</span>
+        <span>{t("Less")}</span>
         {[0, 0.2, 0.4, 0.7, 1].map((value) => (
           <span
             key={value}
@@ -186,7 +181,7 @@ export const HourGrid = memo(function HourGrid({
             }}
           />
         ))}
-        <span>{zh ? "多" : "More"}</span>
+        <span>{t("More [scale]")}</span>
       </div>
       <HourFactList tokens={data.tokens} theme={theme} />
     </div>

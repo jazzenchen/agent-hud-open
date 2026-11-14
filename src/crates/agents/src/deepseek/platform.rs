@@ -1,7 +1,7 @@
 //! The DeepSeek Harness Platform account's wallets, read with the sign-in the
 //! Harness keeps.
 use crate::account::{account_id, legacy_unresolved, Host, HttpFailure, HttpRequest, Reading};
-use crate::l10n;
+use crate::l10n::tr;
 use chrono::Utc;
 use serde_json::{json, Value};
 use std::{path::Path, time::Duration};
@@ -40,9 +40,8 @@ pub(super) fn platform_balance(
         || payload["issuer"] != PLATFORM_ORIGIN
         || token.is_none()
     {
-        return Err(l10n::text(
-            "DeepSeek 平台登录凭据格式或来源无法识别",
-            "DeepSeek Platform sign-in has an unsupported format or issuer.",
+        return Err(tr!(
+            "DeepSeek Platform sign-in has an unsupported format or issuer."
         ));
     }
     let platform = match host.os() {
@@ -59,10 +58,9 @@ pub(super) fn platform_balance(
             timeout: Duration::from_secs(15),
         })
         .map_err(|failure| match failure {
-            HttpFailure::Unreachable | HttpFailure::BadHeader => l10n::text(
-                "DeepSeek 余额读取失败，请检查网络后重试",
-                "DeepSeek balance could not be reached; check the connection.",
-            ),
+            HttpFailure::Unreachable | HttpFailure::BadHeader => {
+                tr!("DeepSeek balance could not be reached; check the connection.")
+            }
             other => other.message(),
         })?;
     if body["code"] == 40003 {
@@ -70,10 +68,7 @@ pub(super) fn platform_balance(
     }
     let summary = &body["data"]["biz_data"];
     if body["code"] != 0 || body["data"]["biz_code"] != 0 {
-        return Err(l10n::text(
-            "DeepSeek 平台余额读取失败",
-            "DeepSeek Platform balance could not be read.",
-        ));
+        return Err(tr!("DeepSeek Platform balance could not be read."));
     }
     let scope = host
         .canonical(directory)
@@ -82,43 +77,28 @@ pub(super) fn platform_balance(
     let identity = legacy_unresolved("DeepSeek", &scope.to_string_lossy());
     let mut billing = Vec::new();
     for (kind, field) in [("normal", "normal_wallets"), ("bonus", "bonus_wallets")] {
-        let wallets = summary[field].as_array().ok_or_else(|| {
-            l10n::text(
-                "DeepSeek 平台余额格式无法识别",
-                "DeepSeek Platform balance has an unsupported format.",
-            )
-        })?;
+        let wallets = summary[field]
+            .as_array()
+            .ok_or_else(|| tr!("DeepSeek Platform balance has an unsupported format."))?;
         let mut currencies = std::collections::HashSet::new();
         for wallet in wallets {
             let currency = wallet["currency"]
                 .as_str()
                 .filter(|c| matches!(*c, "CNY" | "USD"))
-                .ok_or_else(|| {
-                    l10n::text(
-                        "DeepSeek 余额的币种无法识别",
-                        "DeepSeek balance response has an unsupported currency.",
-                    )
-                })?;
-            let amount = platform_amount(&wallet["balance"]).ok_or_else(|| {
-                l10n::text(
-                    "DeepSeek 余额金额无效",
-                    "DeepSeek balance response has an invalid amount.",
-                )
-            })?;
+                .ok_or_else(|| tr!("DeepSeek balance response has an unsupported currency."))?;
+            let amount = platform_amount(&wallet["balance"])
+                .ok_or_else(|| tr!("DeepSeek balance response has an invalid amount."))?;
             if !currencies.insert(currency) {
-                return Err(l10n::text(
-                    "DeepSeek 平台余额格式无法识别",
-                    "DeepSeek Platform balance has an unsupported format.",
-                ));
+                return Err(tr!("DeepSeek Platform balance has an unsupported format."));
             }
             // Harness displays granted wallets only while positive.
             if kind == "bonus" && amount <= 0.0 {
                 continue;
             }
             let label = if kind == "normal" {
-                l10n::text("充值余额", "Topped-up balance")
+                tr!("Topped-up balance")
             } else {
-                l10n::text("赠送余额", "Granted balance")
+                tr!("Granted balance")
             };
             // Platform login wallets are not proven to be an API-key billing
             // route, so do not attach a consumer route or estimate its costs.

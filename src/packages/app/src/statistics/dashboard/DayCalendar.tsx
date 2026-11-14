@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import type { StatisticsResponse } from "@agent-hud/protocol";
-import { row, type StatsTheme } from "../StatsTheme";
+import { locale, unspaced } from "@agent-hud/ui/format";
+import { useFormat, useT } from "@agent-hud/ui/format-context";
+import { row, weekdays, type StatsTheme } from "../StatsTheme";
 import { dayKey, modelAgents, startOfDay } from "./model";
 import { dayFacts, heatmapDays, quartileLevels, type Day } from "./days";
 import { DayFactList, heatColor } from "./DayFacts";
@@ -34,9 +36,9 @@ export function DayCalendar({
   focus?: { from: number; to: number } | null;
   theme: StatsTheme;
 }) {
-  const zh = Boolean(theme.zh);
-  const t = (en: string, cn: string) => (zh ? cn : en);
-  const language = zh ? "zh-CN" : "en-US";
+  const t = useT();
+  const format = useFormat();
+  const language = locale(format.language);
   const { ref, width } = useWidth();
   // The cells first draw empty and take their colours a frame later, so the
   // colour sweeps in when the days arrive.
@@ -108,10 +110,13 @@ export function DayCalendar({
     if (index === 0 && !firstOfMonth && week[0]) return new Date(week[0].start);
     return firstOfMonth ? new Date(firstOfMonth.start) : null;
   });
+  // Monday, Wednesday and Friday name their rows.
+  const weekdayNames = weekdays(
+    format.language,
+    unspaced(format.language) ? "narrow" : "short",
+  );
   const weekday = (index: number) =>
-    zh
-      ? ["一", "", "三", "", "五", "", ""][index]
-      : ["Mon", "", "Wed", "", "Fri", "", ""][index];
+    index % 2 === 0 && index < 5 ? weekdayNames[index] : "";
   const since = first
     ? new Date(first).toLocaleDateString(language, {
         year: "numeric",
@@ -154,7 +159,7 @@ export function DayCalendar({
             width={svgWidth}
             height={svgHeight}
             role="img"
-            aria-label={t("Tokens per day", "每天的 Token")}
+            aria-label={t("Tokens per day")}
             style={{ display: "block", overflow: "visible" }}
             onMouseLeave={() => setHovered(null)}
           >
@@ -238,11 +243,9 @@ export function DayCalendar({
             }}
           >
             <span style={{ marginRight: "auto" }}>
-              {since
-                ? t(`Recorded since ${since}`, `自 ${since} 起有记录`)
-                : ""}
+              {since ? t("Recorded since {{date}}", { date: since }) : ""}
             </span>
-            <span>{t("Less", "少")}</span>
+            <span>{t("Less")}</span>
             {[0, 1, 2, 3, 4].map((value) => (
               <span
                 key={value}
@@ -255,7 +258,7 @@ export function DayCalendar({
                 }}
               />
             ))}
-            <span>{t("More", "多")}</span>
+            <span>{t("More [scale]")}</span>
           </div>
           {hovered && (
             <DayTip

@@ -1,6 +1,17 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { addCatalog } from "@agent-hud/ui/format";
 import { balanceColumns, visibleBalances } from "../src/balance-rows.ts";
+
+// The Chinese below is zh-Hans.json's.
+const locales = join(import.meta.dirname, "../../protocol/locales");
+for (const language of ["en", "zh-Hans"] as const)
+  addCatalog(
+    language,
+    JSON.parse(readFileSync(join(locales, `${language}.json`), "utf8")),
+  );
 
 const rows = [
   {
@@ -67,7 +78,7 @@ test("workbuddy credit balances show total, plan and reward credits as numbers",
     rewardCredits: 1600,
     notice: null,
   };
-  assert.deepEqual(balanceColumns(wb, "day", "quota", "zh"), [
+  assert.deepEqual(balanceColumns(wb, "day", "quota", "zh-Hans"), [
     { name: "可用积分", value: "2,099.53" },
     { name: "套餐积分", value: "499.53" },
     { name: "奖励积分", value: "1,600" },

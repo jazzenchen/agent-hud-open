@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import type { CustomPrice, PriceRow } from "@agent-hud/protocol";
 import { LinkButton, Segments } from "./SettingsControls";
-import { Row, type Text } from "./SettingsPrimitives";
+import type { Translate } from "@agent-hud/ui/format";
+import { Row } from "./SettingsPrimitives";
 import { FormActions, InlineForm, TextInput } from "./SettingsFields";
 
 type Rates = Record<"input" | "output" | "cacheRead" | "cacheWrite", string>;
@@ -19,7 +20,7 @@ export function PriceEditor({
   row: PriceRow;
   custom: CustomPrice | null;
   pending: boolean;
-  t: Text;
+  t: Translate;
   onSave: (price: CustomPrice | null) => void;
   onCancel: () => void;
 }) {
@@ -52,10 +53,10 @@ export function PriceEditor({
     values[0] !== null &&
     values[1] !== null;
   const names: Record<(typeof fields)[number], string> = {
-    input: t("Input", "输入"),
-    output: t("Output", "输出"),
-    cacheRead: t("Cache read", "缓存读"),
-    cacheWrite: t("Cache write", "缓存写"),
+    input: t("Input"),
+    output: t("Output"),
+    cacheRead: t("Cache read"),
+    cacheWrite: t("Cache write"),
   };
   // The four rates side by side, each named above its box.
   const grid = (
@@ -73,7 +74,7 @@ export function PriceEditor({
             label={names[key]}
             value={rates[key]}
             change={(text) => setRates({ ...rates, [key]: text })}
-            placeholder={key.startsWith("cache") ? t("= input", "同输入") : ""}
+            placeholder={key.startsWith("cache") ? t("= input") : ""}
             decimal
             width="100%"
           />
@@ -95,15 +96,12 @@ export function PriceEditor({
       }}
     >
       <Row
-        title={t("Price per million tokens", "每百万 Token 价格")}
-        subtitle={t(
-          "0 is free; an empty cache rate uses the input's.",
-          "0 表示免费；缓存价留空按输入价。",
-        )}
+        title={t("Price per million tokens")}
+        subtitle={t("0 is free; an empty cache rate uses the input's.")}
         below={grid}
       >
         <Segments
-          label={t("Currency", "币种")}
+          label={t("Currency")}
           value={currency}
           options={[
             ["USD", "USD"],
@@ -116,12 +114,12 @@ export function PriceEditor({
         t={t}
         pending={pending}
         ready={valid}
-        submit={t("Save", "保存")}
+        submit={t("Save")}
         onCancel={onCancel}
         start={
           custom && (
             <LinkButton disabled={pending} onClick={() => onSave(null)}>
-              {t("Use the automatic price", "改回自动价格")}
+              {t("Use the automatic price")}
             </LinkButton>
           )
         }

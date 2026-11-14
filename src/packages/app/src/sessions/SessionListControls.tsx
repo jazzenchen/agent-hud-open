@@ -19,6 +19,7 @@ import {
   type Arrangement,
   type Theme,
 } from "./SessionTheme";
+import { useFormat, useT } from "@agent-hud/ui/format-context";
 
 function SourceSelect({
   value,
@@ -88,8 +89,8 @@ export function SessionListControls({
    * of the list's own column. */
   stickyTop?: number;
 }) {
-  const zh = Boolean(theme.zh);
-  const t = (en: string, cn: string) => (zh ? cn : en);
+  const t = useT();
+  const { language } = useFormat();
   const sources = page?.sources ?? [];
   const projects = (page?.projects ?? []).filter(
     (path): path is string => path !== null,
@@ -114,12 +115,12 @@ export function SessionListControls({
       <div style={{ ...row, gap: 12, minHeight: 26 }}>
         <Segments
           small
-          label={t("Session arrangement", "会话排列")}
+          label={t("Session arrangement")}
           value={arrangement}
           onChange={(value) => onArrangement(value as Arrangement)}
           choices={[
-            { value: "day", label: t("Day", "按日期") },
-            { value: "active", label: t("Active", "活跃") },
+            { value: "day", label: t("Day") },
+            { value: "active", label: t("Active") },
           ]}
           theme={theme}
         />
@@ -132,18 +133,18 @@ export function SessionListControls({
             ...numeric,
           }}
         >
-          {zh
-            ? `${arrangement === "active" ? "24 小时" : "7 天"}内 ${page?.total ?? 0} 个`
-            : `${page?.total ?? 0} in ${arrangement === "active" ? "24 hours" : "7 days"}`}
+          {arrangement === "active"
+            ? t("{{total}} in 24 hours", { total: page?.total ?? 0 })
+            : t("{{total}} in 7 days", { total: page?.total ?? 0 })}
         </span>
         <SourceSelect
-          label={t("Session source", "会话来源")}
+          label={t("Session source")}
           value={source}
           onChange={onSource}
           width={185}
           theme={theme}
         >
-          <SelectItem value={ALL}>{t("All sources", "全部来源")}</SelectItem>
+          <SelectItem value={ALL}>{t("All sources")}</SelectItem>
           {sources.map((name) => (
             <SelectItem key={name} value={name}>
               {name}
@@ -153,22 +154,20 @@ export function SessionListControls({
       </div>
       <div style={{ ...row, gap: 12, height: 26 }}>
         <SourceSelect
-          label={t("Project path", "项目路径")}
+          label={t("Project path")}
           value={project}
           onChange={onProject}
           width={260}
           theme={theme}
         >
-          <SelectItem value={ALL}>{t("All projects", "全部项目")}</SelectItem>
+          <SelectItem value={ALL}>{t("All projects")}</SelectItem>
           {projects.map((path) => (
             <SelectItem key={path} value={path}>
-              {page?.projectLabels?.[path] ?? projectName(path, zh)}
+              {page?.projectLabels?.[path] ?? projectName(path, language)}
             </SelectItem>
           ))}
           {page?.projects.includes(null) && (
-            <SelectItem value="__unassigned__">
-              {t("Unassigned", "未归属项目")}
-            </SelectItem>
+            <SelectItem value="__unassigned__">{t("Unassigned")}</SelectItem>
           )}
         </SourceSelect>
         <div
@@ -187,8 +186,8 @@ export function SessionListControls({
           <Input
             value={query}
             onChange={(event) => onQuery(event.target.value)}
-            placeholder={t("Search sessions or paths", "搜索会话标题或路径")}
-            aria-label={t("Search sessions", "搜索会话")}
+            placeholder={t("Search sessions or paths")}
+            aria-label={t("Search sessions")}
             style={{
               border: 0,
               background: "transparent",
@@ -202,7 +201,7 @@ export function SessionListControls({
           {query && (
             <button
               type="button"
-              aria-label={t("Clear search", "清空搜索")}
+              aria-label={t("Clear search")}
               style={{ ...plain, color: theme.secondary }}
               onClick={() => onQuery("")}
             >

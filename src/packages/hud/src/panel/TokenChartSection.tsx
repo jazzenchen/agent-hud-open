@@ -14,7 +14,7 @@ import { Button } from "@agent-hud/ui/components/button";
 import { HUD_METRICS, sourcesForMark } from "../model";
 import { usePanelQuery } from "../PanelContext";
 import { palette, tabular, type Logo, type Period } from "./theme";
-import { useFormat } from "@agent-hud/ui/format-context";
+import { useT } from "@agent-hud/ui/format-context";
 import { systemTimeZone } from "@agent-hud/ui/format";
 import { hexAlpha } from "../tokens";
 import { useGround } from "../ground";
@@ -46,7 +46,7 @@ export function SourceTokenChart({
   /** No line above it: it heads a column of its own. */
   bare?: boolean;
 }) {
-  const zh = useFormat().language === "zh";
+  const t = useT();
   const initial =
     layout.period === "week" ? "7d" : layout.period === "month" ? "30d" : "24h";
   const [period, setPeriod] = useState<Period>(initial);
@@ -169,7 +169,7 @@ export function SourceTokenChart({
         }}
       >
         <strong style={{ fontSize: 13, fontWeight: 600, color: colors.text }}>
-          {zh ? "Token 消耗" : "Tokens"}
+          {t("Tokens")}
         </strong>
         <span style={{ flex: 1 }} />
         <div style={{ display: "flex", gap: 2 }}>
@@ -184,12 +184,10 @@ export function SourceTokenChart({
                 disabled={!available}
                 title={
                   available
-                    ? zh
-                      ? `最近 ${p.label}`
-                      : `Last ${p.label}`
-                    : zh
-                      ? `这份快照没有 ${p.label} 的历史`
-                      : `${p.label} history is not provided by this snapshot`
+                    ? t("Last {{period}}", { period: p.label })
+                    : t("{{period}} history is not provided by this snapshot", {
+                        period: p.label,
+                      })
                 }
                 onClick={() => setPeriod(p.label)}
                 style={{
@@ -221,12 +219,7 @@ export function SourceTokenChart({
             overflow: "hidden",
             textOverflow: "ellipsis",
           }}
-          title={
-            notice ??
-            (zh
-              ? "本机账本记录的用量"
-              : "Recorded usage from the shared ledger")
-          }
+          title={notice ?? t("Recorded usage from the shared ledger")}
         >
           {period} ·{" "}
           {known ? (
@@ -312,12 +305,8 @@ export function SourceTokenChart({
                     : layout.hiddenModels?.length &&
                         (query.data?.totals.selectedTokens ?? 0) > 0 &&
                         total === 0
-                      ? zh
-                        ? "这段时间的模型消耗已隐藏"
-                        : "Model usage in this range is hidden"
-                      : zh
-                        ? "这段时间没有 token 消耗"
-                        : "No token usage in this range"}
+                      ? t("Model usage in this range is hidden")
+                      : t("No token usage in this range")}
                 </motion.span>
               )}
         </AnimatePresence>
@@ -330,7 +319,6 @@ export function SourceTokenChart({
             bucketMs={bucketMs}
             models={models}
             light={light}
-            zh={zh}
             Logo={Logo}
           />
         )}

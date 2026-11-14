@@ -3,7 +3,7 @@
 //! sessions start and end, a client asks for permission, a reply arrives, a
 //! window fills up, the panel opens. Each step changes what the demo reports,
 //! and the HUD reacts the way it does to real readings.
-use crate::l10n;
+use crate::l10n::tr;
 use serde_json::Value;
 use std::collections::BTreeMap;
 
@@ -135,10 +135,7 @@ impl DemoScript {
                     39.0,
                     Reply(
                         "s2".into(),
-                        Some(l10n::text(
-                            "沙盒收据的校验已经补上，生产环境的购买流程没有变化。",
-                            "Sandbox receipts are validated now; purchases in production go through as before.",
-                        )),
+                        Some(tr!("Sandbox receipts are validated now; purchases in production go through as before.")),
                     ),
                 ),
             ],

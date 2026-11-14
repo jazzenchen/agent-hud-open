@@ -1,3 +1,4 @@
+import { useT } from "@agent-hud/ui/format-context";
 import { BadgeCheck, Check, LoaderCircle, X } from "lucide-react";
 import type { Approval, RequestDecision } from "@agent-hud/protocol";
 import { permissionColors } from "../tokens";
@@ -10,17 +11,15 @@ export function PermissionToolCard({
   disabled,
   pending,
   light = false,
-  zh = false,
   answer,
 }: {
   request: Approval;
   disabled: boolean;
   pending: boolean;
   light?: boolean;
-  zh?: boolean;
   answer: (decision: RequestDecision) => void | Promise<void>;
 }) {
-  const t = (en: string, cn: string) => (zh ? cn : en);
+  const t = useT();
   const text = (alpha: number) =>
     light ? `rgba(0,0,0,${alpha})` : `rgba(255,255,255,${alpha})`;
   const secondary = text(0.55);
@@ -38,7 +37,7 @@ export function PermissionToolCard({
     <div style={cardColumn(9)}>
       {request.removed || request.added ? (
         <div
-          aria-label={t("Edit preview", "修改预览")}
+          aria-label={t("Edit preview")}
           style={{
             ...cardColumn(2),
             padding: 9,
@@ -141,7 +140,7 @@ export function PermissionToolCard({
             style={{ flexShrink: 0 }}
           />
           <span style={{ fontSize: 11, color: secondary, flexShrink: 0 }}>
-            {t("Always allow adds", "总是允许会添加")}
+            {t("Always allow adds")}
           </span>
           <span
             style={{
@@ -167,7 +166,7 @@ export function PermissionToolCard({
           style={{ whiteSpace: "nowrap" }}
         >
           <X size={9} strokeWidth={2.6} />
-          {t("Deny", "拒绝")}
+          {t("Deny")}
         </CardButton>
         <span style={{ flex: 1, minWidth: 8 }} />
         {request.allowsAlways && (
@@ -180,7 +179,7 @@ export function PermissionToolCard({
             style={{ whiteSpace: "nowrap" }}
           >
             <BadgeCheck size={9} strokeWidth={2.6} />
-            {t("Always allow", "总是允许")}
+            {t("Always allow")}
           </CardButton>
         )}
         <CardButton
@@ -195,7 +194,7 @@ export function PermissionToolCard({
           ) : (
             <Check size={9} strokeWidth={2.6} />
           )}
-          {request.allowLabel ?? t("Allow once", "批准一次")}
+          {request.allowLabel ?? t("Allow once")}
         </CardButton>
       </div>
     </div>

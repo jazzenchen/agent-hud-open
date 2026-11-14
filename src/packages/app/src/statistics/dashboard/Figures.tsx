@@ -1,4 +1,5 @@
 import { moneyShort, percent1 } from "@agent-hud/ui/format";
+import { useFormat, useT } from "@agent-hud/ui/format-context";
 import type { StatisticsResponse } from "@agent-hud/protocol";
 import { compact, type StatsTheme } from "../StatsTheme";
 import { cacheHit, change, DAY, modelAgents, usd } from "./model";
@@ -39,14 +40,13 @@ export function Figures({
   pending: Pending;
   theme: StatsTheme;
 }) {
-  const zh = Boolean(theme.zh);
-  const t = (en: string, cn: string) => (zh ? cn : en);
-  const language = zh ? "zh" : "en";
+  const t = useT();
+  const { language } = useFormat();
   const previous = compared ? data?.previous : null;
   const versus = (value: number | null) => {
     const text = delta(value);
     if (!text || !compared) return null;
-    return zh ? `比${compared} ${text}` : `${text} vs ${compared}`;
+    return t("{{change}} vs {{compared}}", { change: text, compared });
   };
   const buckets = data?.buckets ?? [];
   const agents = data ? modelAgents(data) : new Map<string, string>();
@@ -72,12 +72,12 @@ export function Figures({
   const unpriced = (data?.totals.cost?.unpricedTokens ?? 0) > 0;
   const money = (value: number) => moneyShort(value, "USD", language);
   const daily = (text: string) =>
-    days > 1 ? t(`≈ ${text} a day`, `日均 ≈ ${text}`) : null;
+    days > 1 ? t("≈ {{amount}} a day", { amount: text }) : null;
   return (
     <div className="stats-figures">
       <Figure
         loading={!data}
-        label={t("Tokens", "Token")}
+        label={t("Tokens")}
         value={tokens === null ? "—" : compact(Math.round(tokensNow))}
         line={
           tokens === null
@@ -91,13 +91,10 @@ export function Figures({
       />
       <Figure
         loading={!data}
-        label={t("Worth at API prices", "按 API 价格折合")}
+        label={t("Worth at API prices")}
         value={cost === null ? "—" : `${money(costNow)}${unpriced ? "+" : ""}`}
         suffix={others || null}
-        hint={t(
-          "Every token kind at the vendors' API list prices",
-          "全部 Token 种类，按各厂商 API 目录价",
-        )}
+        hint={t("Every token kind at the vendors' API list prices")}
         line={
           cost === null
             ? null
@@ -110,7 +107,7 @@ export function Figures({
       />
       <Figure
         loading={!data}
-        label={t("Subscriptions returned", "订阅回本")}
+        label={t("Subscriptions returned")}
         value={
           plan
             ? `${ratioNow >= 10 ? Math.round(ratioNow) : ratioNow.toFixed(1)}×`
@@ -118,21 +115,17 @@ export function Figures({
         }
         hint={t(
           "What the subscribed agents' calls were worth at API prices, against the plans' monthly prices for the days shown",
-          "订阅 Agent 的调用按 API 价格折合，对比所选天数折算的月费",
         )}
         line={
           plan
-            ? t(
-                `${money(plan.value)} on ${money(plan.price)} of plans`,
-                `${money(plan.price)} 订阅换来 ${money(plan.value)}`,
-              )
+            ? t("{{value}} on {{price}} of plans", {
+                value: money(plan.value),
+                price: money(plan.price),
+              })
             : data
               ? agentHasPlan
-                ? t("No usage in this range", "这段时间没有用量")
-                : t(
-                    "No priced plan for this agent",
-                    "这个 Agent 没有可定价的订阅",
-                  )
+                ? t("No usage in this range")
+                : t("No priced plan for this agent")
               : null
         }
         series={buckets.map((bucket) => {
@@ -147,13 +140,12 @@ export function Figures({
       />
       <Figure
         loading={!data}
-        label={t("Sessions", "会话")}
+        label={t("Sessions")}
         value={
           sessions === null ? "—" : Math.round(sessionsNow).toLocaleString()
         }
         hint={t(
           "Sessions that used tokens; a sub-agent counts toward its session",
-          "用过 Token 的会话；子 Agent 计入它所属的会话",
         )}
         line={
           sessions === null
@@ -167,22 +159,19 @@ export function Figures({
       />
       <Figure
         loading={!data}
-        label={t("Cache hit rate", "缓存命中率")}
+        label={t("Cache hit rate")}
         value={hit === null ? "—" : percent1(hitNow * 100)}
-        hint={t(
-          "Cache reads ÷ (new input + cache writes + cache reads)",
-          "缓存读取 ÷（新输入 + 缓存写入 + 缓存读取）",
-        )}
+        hint={t("Cache reads ÷ (new input + cache writes + cache reads)")}
         line={
           hit !== null && hitBefore !== null && compared
-            ? zh
-              ? `比${compared} ${hit >= hitBefore ? "↑" : "↓"} ${Math.abs((hit - hitBefore) * 100).toFixed(1)} 个百分点`
-              : `${hit >= hitBefore ? "↑" : "↓"} ${Math.abs((hit - hitBefore) * 100).toFixed(1)} pts vs ${compared}`
+            ? t("{{change}} pts vs {{compared}}", {
+                change: `${hit >= hitBefore ? "↑" : "↓"} ${Math.abs((hit - hitBefore) * 100).toFixed(1)}`,
+                compared,
+              })
             : data
-              ? t(
-                  `${compact(data.totals.tokens.cacheRead)} read from cache`,
-                  `${compact(data.totals.tokens.cacheRead)} 从缓存读取`,
-                )
+              ? t("{{tokens}} read from cache", {
+                  tokens: compact(data.totals.tokens.cacheRead),
+                })
               : null
         }
         series={buckets.map((bucket) => cacheHit(bucket.tokens))}

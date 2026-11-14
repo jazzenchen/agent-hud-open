@@ -2,7 +2,7 @@
 //! stale or left out by their age, and each provider's status.
 use super::{credentials, date_ms, status, web, AccountService, WINDOW_RETENTION_MS};
 use agent_hud_agents as agents;
-use agent_hud_core::{l10n, AccountProjection};
+use agent_hud_core::{l10n::tr, AccountProjection};
 use agents::account::Provider;
 use serde_json::{json, Value};
 use std::sync::PoisonError;
@@ -25,7 +25,7 @@ impl AccountService {
             let Some(entry) = state.entries.get(provider) else {
                 result.providers.insert(
                     provider.into(),
-                    json!({"status":"loading","checkedAt":null,"notice":l10n::text("正在读取额度", "Reading account usage")}),
+                    json!({"status":"loading","checkedAt":null,"notice":tr!("Reading account usage")}),
                 );
                 continue;
             };
@@ -144,7 +144,7 @@ impl AccountService {
             .flatten()
         {
             if let Some(provider) = metadata["provider"].as_str() {
-                let entry=result.providers.entry(provider.into()).or_insert_with(||json!({"status":"unavailable","checkedAt":null,"notice":l10n::text("可以在 Agent HUD 中配置 API 凭据", "API credentials can be configured in Agent HUD")}));
+                let entry=result.providers.entry(provider.into()).or_insert_with(||json!({"status":"unavailable","checkedAt":null,"notice":tr!("API credentials can be configured in Agent HUD")}));
                 entry["configurableFields"] = metadata["configurableFields"].clone();
                 entry["configured"] = metadata["configured"].clone();
             }

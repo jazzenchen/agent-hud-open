@@ -1,7 +1,8 @@
 //! The demo's quotas, accounts and DeepSeek balance, as the account readers
 //! give them.
 use super::data::{EXTRAS, READINGS};
-use crate::{accounts::AccountProjection, iso, l10n, naming::vendor_windows};
+use crate::l10n::tr;
+use crate::{accounts::AccountProjection, iso, naming::vendor_windows};
 use serde_json::json;
 use std::collections::BTreeMap;
 
@@ -108,12 +109,12 @@ pub fn demo_projection(now: i64, used: &BTreeMap<String, f64>) -> AccountProject
         json!({"id":"deepseek:demo","provider":"deepseek","label":"DeepSeek API","plan":null,"identity":"local-home","checkedAt":observed}),
     ];
     let billing = vec![
-        json!({"id":"deepseek:demo:CNY","vendor":"deepseek","accountId":"deepseek:demo","consumerRoutes":["deepseek-official"],"label":l10n::text("API 余额", "API balance"),"amount":8.85,"currency":"CNY"}),
+        json!({"id":"deepseek:demo:CNY","vendor":"deepseek","accountId":"deepseek:demo","consumerRoutes":["deepseek-official"],"label":tr!("API balance"),"amount":8.85,"currency":"CNY"}),
         // Antigravity's credits beside them, then Hermes and Copilot as their
         // account readers report theirs.
-        json!({"id":"antigravity:demo:credits","vendor":"antigravity","accountId":"antigravity:demo","label":l10n::text("AI 积分", "AI credits"),"amount":25.0,"currency":"USD"}),
-        json!({"id":"hermes:demo/hermes:purchased","vendor":"hermes","accountId":"hermes:demo","label":l10n::text("已购额度", "Purchased credits"),"amount":18.4,"currency":"USD"}),
-        json!({"id":"copilot:demo/copilot:overage","vendor":"copilot","accountId":"copilot:demo","label":l10n::text("超额请求（估算）", "Overage (estimated)"),"amount":0.48,"currency":"USD","notice":l10n::text("12 次超出套餐的高级请求，按每次 0.04 美元估算，以 GitHub 账单为准", "12 premium requests beyond the plan at US$0.04 each; GitHub's bill is authoritative")}),
+        json!({"id":"antigravity:demo:credits","vendor":"antigravity","accountId":"antigravity:demo","label":tr!("AI credits"),"amount":25.0,"currency":"USD"}),
+        json!({"id":"hermes:demo/hermes:purchased","vendor":"hermes","accountId":"hermes:demo","label":tr!("Purchased credits"),"amount":18.4,"currency":"USD"}),
+        json!({"id":"copilot:demo/copilot:overage","vendor":"copilot","accountId":"copilot:demo","label":tr!("Overage (estimated)"),"amount":0.48,"currency":"USD","notice":tr!("12 premium requests beyond the plan at US$0.04 each; GitHub's bill is authoritative")}),
     ];
     let mut providers = std::collections::HashMap::new();
     for id in ["claude", "codex", "deepseek"]

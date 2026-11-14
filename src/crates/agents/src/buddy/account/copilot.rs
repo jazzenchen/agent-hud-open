@@ -3,7 +3,7 @@ use super::resources::{read_codebuddy_resources, read_enterprise};
 use super::summary::{earliest_cycle_end, finish_workbuddy_reading, FREE_PACKAGES, PAID_PACKAGES};
 use super::vscdb::BuddyAuth;
 use crate::account::{account_id, Host, HttpFailure, HttpRequest, Reading, Unread, WEB_USER_AGENT};
-use crate::l10n;
+use crate::l10n::tr;
 use chrono::{DateTime, Utc};
 use serde_json::{json, Value};
 use std::time::Duration;
@@ -206,23 +206,18 @@ pub(super) fn post_token(
             timeout: Duration::from_secs(15),
         })
         .map_err(|failure| match failure {
-            HttpFailure::Status(401 | 403) => Unread::SignedOut(l10n::text(
-                &format!(
-                    "{} 保存的登录已失效，请打开 {} 重新登录",
-                    spec.label, spec.label
-                ),
-                &format!(
-                    "{}'s saved sign-in has ended; sign in again in {}.",
-                    spec.label, spec.label
-                ),
+            HttpFailure::Status(401 | 403) => Unread::SignedOut(tr!(
+                "{{name}}'s saved sign-in has ended; sign in again in {{name}}.",
+                name = spec.label
             )),
             other => other.unread(),
         })?;
     if let Some(code) = root["code"].as_i64() {
         if code != 0 && code != 200 {
-            return Err(Unread::from(l10n::text(
-                &format!("{} 的账单服务返回了错误 {code}", spec.label),
-                &format!("{}'s billing service answered code {code}.", spec.label),
+            return Err(Unread::from(tr!(
+                "{{name}}'s billing service answered code {{code}}.",
+                name = spec.label,
+                code = code
             )));
         }
     }
@@ -230,9 +225,9 @@ pub(super) fn post_token(
         .filter(|d| d.is_object())
         .cloned()
         .ok_or_else(|| {
-            Unread::from(l10n::text(
-                &format!("{} 的积分格式无法识别", spec.label),
-                &format!("{}'s credit usage has an unsupported format.", spec.label),
+            Unread::from(tr!(
+                "{{name}}'s credit usage has an unsupported format.",
+                name = spec.label
             ))
         })
 }

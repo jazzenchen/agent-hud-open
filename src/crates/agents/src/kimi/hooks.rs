@@ -13,7 +13,7 @@
 //! No permission is answered from the HUD: Kimi's `PermissionRequest` is
 //! fired and forgotten, and `PreToolUse` runs before every tool call.
 use crate::hooks::{Began, Begin, Completed, Completion, Hooks, Layout, Text, TextEdit};
-use crate::{l10n, text, Location};
+use crate::{l10n::tr, text, Location};
 use serde_json::Value;
 use toml_edit::{value, ArrayOfTables, DocumentMut, Item, Table};
 
@@ -82,10 +82,7 @@ fn completed(payload: &Value, now_ms: i64) -> Option<Completed> {
 }
 
 fn unsafe_layout() -> String {
-    l10n::text(
-        "Kimi Code 的 config.toml 里 hooks 的写法 Agent HUD 无法安全修改，未作改动",
-        "Agent HUD cannot safely change how Kimi Code's config.toml lists its hooks; it was not changed",
-    )
+    tr!("Agent HUD cannot safely change how Kimi Code's config.toml lists its hooks; it was not changed")
 }
 
 /// `config.toml` with Agent HUD's handlers for `edit.events` put in, or
@@ -94,10 +91,7 @@ fn unsafe_layout() -> String {
 /// place of its first one, else goes last.
 pub(crate) fn patch(original: &str, edit: &TextEdit) -> Result<String, String> {
     let mut document = original.parse::<DocumentMut>().map_err(|_| {
-        l10n::text(
-            "Kimi Code 的 config.toml 不是 Agent HUD 能读懂的 TOML，未作改动",
-            "Kimi Code's config.toml is not TOML Agent HUD can read; it was not changed",
-        )
+        tr!("Kimi Code's config.toml is not TOML Agent HUD can read; it was not changed")
     })?;
     let mut hooks = match document.get("hooks") {
         None => ArrayOfTables::new(),

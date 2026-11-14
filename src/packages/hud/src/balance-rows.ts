@@ -1,5 +1,11 @@
 import type { BillingAccount, PanelBlockLayout } from "@agent-hud/protocol";
-import { dateFormat, moneyAmount, type Language } from "@agent-hud/ui/format";
+import {
+  dateFormat,
+  locale,
+  moneyAmount,
+  translator,
+  type Language,
+} from "@agent-hud/ui/format";
 
 /** A balance ID includes the account and currency, unlike accountId. */
 export function visibleBalances(
@@ -38,18 +44,17 @@ export function balanceColumns(
   const burn = metrics?.burnRate;
   const money = (amount: number, currency: string) =>
     moneyAmount(amount, currency, language);
+  const t = translator(language);
   if (!isCredits && selected === "burn") {
     return [
       {
-        name: language === "zh" ? "每日消耗" : "Consumption / day",
+        name: t("Consumption / day"),
         value: burn ? `${money(burn.perDay, burn.currency)}/d` : "—",
       },
       {
-        name: language === "zh" ? "预计用完" : "Estimated depletion",
+        name: t("Estimated depletion"),
         value: metrics?.runsOutAt
-          ? dateFormat(language === "zh" ? "zh-CN" : "en-US").format(
-              new Date(metrics.runsOutAt),
-            )
+          ? dateFormat(locale(language)).format(new Date(metrics.runsOutAt))
           : "—",
       },
     ];
@@ -57,11 +62,11 @@ export function balanceColumns(
   if (!isCredits && selected === "cost") {
     return [
       {
-        name: language === "zh" ? "估算花费" : "Estimated cost",
+        name: t("Estimated cost"),
         value: cost ? money(cost.amount, cost.currency) : "—",
       },
       {
-        name: language === "zh" ? "输出速度" : "Output speed",
+        name: t("Output speed"),
         value: metrics?.replyRate
           ? `${metrics.replyRate.lowerBound ? "≥" : ""}${metrics.replyRate.tokensPerSecond.toFixed(1)} tok/s`
           : "—",
@@ -71,17 +76,15 @@ export function balanceColumns(
   if (account.planCredits != null && account.rewardCredits != null) {
     return [
       {
-        name:
-          account.label ||
-          (language === "zh" ? "可用积分" : "Available credits"),
+        name: account.label || t("Available credits"),
         value: money(account.amount, account.currency),
       },
       {
-        name: language === "zh" ? "套餐积分" : "Plan credits",
+        name: t("Plan credits"),
         value: money(account.planCredits, account.currency),
       },
       {
-        name: language === "zh" ? "奖励积分" : "Reward credits",
+        name: t("Reward credits"),
         value: money(account.rewardCredits, account.currency),
       },
     ];
@@ -89,20 +92,18 @@ export function balanceColumns(
   if (isCredits) {
     return [
       {
-        name:
-          account.label ||
-          (language === "zh" ? "可用积分" : "Available credits"),
+        name: account.label || t("Available credits"),
         value: money(account.amount, account.currency),
       },
     ];
   }
   return [
     {
-      name: account.label || (language === "zh" ? "余额" : "Balance"),
+      name: account.label || t("Balance"),
       value: money(account.amount, account.currency),
     },
     {
-      name: language === "zh" ? "估算花费" : "Estimated cost",
+      name: t("Estimated cost"),
       value: cost ? money(cost.amount, cost.currency) : "—",
     },
   ];

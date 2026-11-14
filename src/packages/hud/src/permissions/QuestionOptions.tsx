@@ -1,3 +1,4 @@
+import { useT } from "@agent-hud/ui/format-context";
 import type { RefObject } from "react";
 import { Check } from "lucide-react";
 import type { ApprovalQuestion } from "@agent-hud/protocol";
@@ -15,7 +16,6 @@ export function QuestionOptions({
   editingCustom,
   disabled,
   light,
-  zh,
   customInputRef,
   changeAnswer,
   setEditingCustomKey,
@@ -27,13 +27,12 @@ export function QuestionOptions({
   editingCustom: boolean;
   disabled: boolean;
   light: boolean;
-  zh: boolean;
   customInputRef: RefObject<HTMLInputElement | null>;
   changeAnswer: (key: string, patch: Partial<Draft>) => void;
   setEditingCustomKey: (key: string | null) => void;
   advanceOrSubmit: () => void;
 }) {
-  const t = (en: string, cn: string) => (zh ? cn : en);
+  const t = useT();
   const key = q.answerKey;
 
   const ink = (alpha: number) =>
@@ -154,11 +153,9 @@ export function QuestionOptions({
           <input
             ref={customInputRef}
             type="text"
-            aria-label={t("Your own answer", "补充回答")}
+            aria-label={t("Your own answer")}
             placeholder={
-              q.options.length === 0
-                ? t("Type an answer", "输入回答")
-                : t("Other", "其他回答")
+              q.options.length === 0 ? t("Type an answer") : t("Other answer")
             }
             value={value.custom ?? ""}
             disabled={disabled}
@@ -229,7 +226,7 @@ export function QuestionOptions({
               whiteSpace: "nowrap",
             }}
           >
-            {value.custom?.trim() ? value.custom : t("Other", "其他")}
+            {value.custom?.trim() ? value.custom : t("Other")}
           </span>
         </button>
       )}

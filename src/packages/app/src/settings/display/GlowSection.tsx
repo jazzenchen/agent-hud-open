@@ -15,18 +15,18 @@ export function GlowSection({ config, update, t }: DisplayProps) {
   // Every style but Soft draws a grid of marks, with its own sliders.
   const grid = config.glowStyle !== "blur";
   return (
-    <Section title={t("Notch glow", "刘海光晕")}>
-      <Row title={t("Style", "样式")}>
+    <Section title={t("Notch glow")}>
+      <Row title={t("Style")}>
         <Menu
-          label={t("Glow style", "光晕样式")}
+          label={t("Glow style")}
           value={config.glowStyle}
           options={[
-            ["blur", t("Soft", "柔光")],
-            ["dots", t("Dots", "点阵")],
-            ["ascii", t("ASCII  .:-=+*#%@", "字符  .:-=+*#%@")],
-            ["blocks", t("Blocks  ░▒▓█", "色块  ░▒▓█")],
-            ["braille", t("Braille  ⠁⠃⠇⡇⣿", "盲文  ⠁⠃⠇⡇⣿")],
-            ["binary", t("Binary  0 1", "二进制  0 1")],
+            ["blur", t("Soft")],
+            ["dots", t("Dots")],
+            ["ascii", t("ASCII  .:-=+*#%@")],
+            ["blocks", t("Blocks  ░▒▓█")],
+            ["braille", t("Braille  ⠁⠃⠇⡇⣿")],
+            ["binary", t("Binary  0 1")],
           ]}
           change={(value) =>
             update({ glowStyle: value as HUDConfig["glowStyle"] })
@@ -34,17 +34,17 @@ export function GlowSection({ config, update, t }: DisplayProps) {
           width={160}
         />
       </Row>
-      <Row title={t("Effect", "动效")}>
+      <Row title={t("Effect")}>
         <Menu
-          label={t("Glow effect", "光晕动效")}
+          label={t("Glow effect")}
           value={config.glowEffect}
           options={[
-            ["breathe", t("Breathe", "呼吸")],
-            ["flow", t("Flow", "流光")],
-            ["scan", t("Scan", "扫描")],
-            ["ripple", t("Ripple", "涟漪")],
-            ["shimmer", t("Shimmer", "闪烁")],
-            ["boot", t("Boot", "启动")],
+            ["breathe", t("Breathe")],
+            ["flow", t("Flow")],
+            ["scan", t("Scan")],
+            ["ripple", t("Ripple")],
+            ["shimmer", t("Shimmer")],
+            ["boot", t("Boot")],
           ]}
           change={(value) =>
             update({ glowEffect: value as HUDConfig["glowEffect"] })
@@ -52,62 +52,27 @@ export function GlowSection({ config, update, t }: DisplayProps) {
           width={160}
         />
       </Row>
-      <MoreRows label={t("Fine-tune", "微调")}>
+      <MoreRows label={t("Fine-tune")}>
         {grid && (
           <>
-            {slider("glowGridPitch", t("Grid pitch", "点距"), 4, 12, 1, pt)}
-            {slider(
-              "glowGridDensity",
-              t("Density", "密度"),
-              0.5,
-              1.5,
-              0.05,
-              percent,
-            )}
-            {slider("glowGridCore", t("Solid", "实心"), 0, 8, 1, rows)}
-            {slider("glowGridFade", t("Fade", "渐隐"), 0, 8, 1, rows)}
+            {slider("glowGridPitch", t("Grid pitch"), 4, 12, 1, pt)}
+            {slider("glowGridDensity", t("Density"), 0.5, 1.5, 0.05, percent)}
+            {slider("glowGridCore", t("Solid"), 0, 8, 1, rows)}
+            {slider("glowGridFade", t("Fade"), 0, 8, 1, rows)}
           </>
         )}
-        {slider(
-          "glowBrightness",
-          t("Brightness", "亮度"),
-          0.2,
-          1,
-          0.05,
-          percent,
-        )}
+        {slider("glowBrightness", t("Brightness"), 0.2, 1, 0.05, percent)}
         {!grid && (
           <>
-            {slider("glowRange", t("Range", "范围"), 0, 36, 1, px)}
-            {slider("glowBlur", t("Feather", "羽化"), 0, 36, 1, px)}
-            {toggle("glowOutwardOnly", t("Outward only", "仅向外扩散"))}
+            {slider("glowRange", t("Range"), 0, 36, 1, px)}
+            {slider("glowBlur", t("Feather"), 0, 36, 1, px)}
+            {toggle("glowOutwardOnly", t("Outward only"))}
           </>
         )}
-        {slider(
-          "breathSeconds",
-          t("Working period", "工作时周期"),
-          1,
-          12,
-          0.5,
-          seconds,
-        )}
-        {slider(
-          "idleBreathSeconds",
-          t("Idle period", "空闲时周期"),
-          1,
-          24,
-          0.5,
-          seconds,
-        )}
+        {slider("breathSeconds", t("Working period"), 1, 12, 0.5, seconds)}
+        {slider("idleBreathSeconds", t("Idle period"), 1, 24, 0.5, seconds)}
         {config.glowEffect === "breathe" &&
-          slider(
-            "breathAmplitude",
-            t("Breath depth", "呼吸幅度"),
-            0,
-            1,
-            0.05,
-            percent,
-          )}
+          slider("breathAmplitude", t("Breath depth"), 0, 1, 0.05, percent)}
       </MoreRows>
     </Section>
   );
