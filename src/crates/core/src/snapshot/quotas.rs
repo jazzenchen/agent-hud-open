@@ -44,6 +44,7 @@ impl crate::AgentHudCore {
                         metering_complete(value, cycle_start),
                         metering_complete(value, at - 7 * 86_400_000),
                         self.meters.samples.as_ref().unwrap_or(&Default::default()),
+                        self.database.as_ref().map(|db| (db, &self.price_regions)),
                     );
                 }
                 // legacyWindowId stays: panel layouts, Settings and get_hud name a

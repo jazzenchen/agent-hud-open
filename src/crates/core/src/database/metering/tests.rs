@@ -41,7 +41,7 @@ fn a_forecast_runs_from_the_time_it_is_worked_out_at() {
     // Worked out again long after the reading, the six hours left still
     // run from then, not from the reading.
     for at in [observed + 10_000, observed + 50 * 60_000] {
-        let metrics = view.metrics(&row, at, false, false, &samples);
+        let metrics = view.metrics(&row, at, false, false, &samples, None);
         assert_eq!(
             metrics["outlook"]["exhaustsAt"],
             iso(at + 6 * 3_600_000),
@@ -63,7 +63,14 @@ fn until_readings_give_a_pace_the_cycle_so_far_makes_the_forecast() {
             "windowDurationSeconds":18_000.0,"observedAt":iso(now)})
     };
     let samples = Samples::from([("q".to_string(), vec![(now, 75.0)])]);
-    let metrics = view.metrics(&row(25.0, now + 4 * 3_600_000), now, false, false, &samples);
+    let metrics = view.metrics(
+        &row(25.0, now + 4 * 3_600_000),
+        now,
+        false,
+        false,
+        &samples,
+        None,
+    );
     let outlook = &metrics["outlook"];
     // 25% in the hour so far: the other 75% lasts three hours.
     assert_eq!(outlook["kind"], "exhausts", "{metrics}");
@@ -83,14 +90,27 @@ fn until_readings_give_a_pace_the_cycle_so_far_makes_the_forecast() {
         json!({"expectedUsedPercent":20.0,"paceDelta":5.0,"status":"ahead"})
     );
     let budget = |used| {
-        view.metrics(&row(used, now + 4 * 3_600_000), now, false, false, &samples)["budget"]
-            ["status"]
+        view.metrics(
+            &row(used, now + 4 * 3_600_000),
+            now,
+            false,
+            false,
+            &samples,
+            None,
+        )["budget"]["status"]
             .clone()
     };
     assert_eq!(budget(21.0), "onTrack");
     assert_eq!(budget(10.0), "behind");
     // Nothing used yet is no usage, from the same basis.
-    let idle = view.metrics(&row(0.0, now + 4 * 3_600_000), now, false, false, &samples);
+    let idle = view.metrics(
+        &row(0.0, now + 4 * 3_600_000),
+        now,
+        false,
+        false,
+        &samples,
+        None,
+    );
     assert_eq!(
         idle["outlook"],
         json!({"kind":"no-usage","basis":"window","ratePctPerHour":0.0})
@@ -102,6 +122,7 @@ fn until_readings_give_a_pace_the_cycle_so_far_makes_the_forecast() {
         false,
         false,
         &samples,
+        None,
     );
     assert_eq!(early["outlook"]["kind"], "insufficient-data");
     assert_eq!(early["budget"]["status"], "ahead");
@@ -1059,4 +1080,48 @@ fn a_reply_rate_needs_three_calls_and_five_seconds() {
         (Some(4), Some(true))
     );
     assert!(reply_rate([(900, 30_000, 2), (300, 3_000, 2)]).is_none());
+}
+
+#[test]
+fn quota_capacity_prices_only_linked_calls_between_its_readings() {
+    let db = Connection::open_in_memory().unwrap();
+    crate::database::schema(&db).unwrap();
+    let now = Utc::now().timestamp_millis();
+    let from = now - 3_600_000;
+    let path = "/logs/quota.jsonl";
+    let mut unknown = event("unpriced", from + 2);
+    unknown.model = "unpriced-test".into();
+    let priced = event("priced", from + 1);
+    write(
+        &db,
+        path,
+        "claude",
+        &[
+            event("before", from - 1),
+            priced.clone(),
+            unknown,
+            event("after", now + 1),
+        ],
+    )
+    .unwrap();
+    let regions = pricing::PriceRegions::default();
+    let view = View::load(&db, &[path.into()], now, &regions).unwrap();
+    let row = json!({"id":"quota","usedPercent":40.0,"resetAt":iso(now + 3 * 3_600_000),
+        "windowDurationSeconds":18_000.0,"observedAt":iso(now),"consumerSource":"claude","allModels":true});
+    let samples = Samples::from([("quota".into(), vec![(from, 70.0), (now, 60.0)])]);
+    let metrics = view.metrics(&row, now, true, true, &samples, Some((&db, &regions)));
+    let cost = pricing::cost_at(
+        "claude",
+        &priced.model,
+        &price_tokens(priced.usage),
+        true,
+        pricing::Region::International,
+        Some(priced.at),
+    )
+    .unwrap();
+    assert_eq!(metrics["capacityEstimate"]["tokens"], 300.0);
+    assert_eq!(
+        metrics["capacityEstimate"]["amounts"]["USD"],
+        cost.amount * 10.0
+    );
 }
