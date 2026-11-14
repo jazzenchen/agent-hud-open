@@ -27,6 +27,7 @@ mod engine;
 mod homes;
 mod host;
 pub(crate) mod http;
+mod price_feed;
 mod projection;
 mod restart_copy;
 mod schedule;
@@ -109,6 +110,7 @@ struct Control {
     entries: BTreeMap<&'static str, Entry>,
     /// Status pages by address.
     pages: HashMap<&'static str, PageReading>,
+    external_prices: agent_hud_core::ExternalPrices,
     account_homes: HashMap<String, Vec<PathBuf>>,
     waker: Option<Waker>,
 }
@@ -186,6 +188,8 @@ impl AccountService {
             relay_consent: Arc::new(Mutex::new(HashSet::new())),
             trial_web: None,
         };
+        let (external_prices, price_wait) = price_feed::restore(&context.data_dir);
+        let price_at = (!cfg!(test)).then(|| Instant::now() + price_wait);
         let shared = Arc::new(Shared {
             state: Mutex::new(Control {
                 stopped: false,
@@ -196,6 +200,7 @@ impl AccountService {
                 finished: HashMap::new(),
                 entries,
                 pages: HashMap::new(),
+                external_prices,
                 account_homes: restored.account_homes,
                 waker: None,
             }),
@@ -206,7 +211,7 @@ impl AccountService {
         let worker_gate = Arc::clone(&gate);
         std::thread::Builder::new()
             .name("agenthud-accounts".into())
-            .spawn(move || run(worker_context, worker, worker_gate, readers))
+            .spawn(move || run(worker_context, worker, worker_gate, readers, price_at))
             .map_err(|_| l10n::text("账户读取线程无法启动", "Account worker could not start"))?;
         Ok(Self {
             shared,

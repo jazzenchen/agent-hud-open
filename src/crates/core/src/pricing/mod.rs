@@ -11,6 +11,9 @@ use std::collections::HashMap;
 use std::sync::OnceLock;
 
 mod cost;
+mod external;
+pub(crate) use external::set_external_prices;
+pub use external::{parse_external_prices, ExternalPrices};
 mod overrides;
 mod quote;
 mod regions;
@@ -206,6 +209,7 @@ struct Catalog {
 #[derive(Default)]
 struct Overrides {
     routes: HashMap<String, RoutePrices>,
+    external: ExternalPrices,
     user: UserPrices,
 }
 

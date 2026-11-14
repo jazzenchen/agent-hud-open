@@ -59,6 +59,7 @@ export function PricesPane({ snapshot, action }: SettingsPaneProps) {
   const multipliers = snapshot.settings.relayMultipliers ?? {};
   const localKinds = snapshot.settings.localKinds ?? {};
   const origins: Record<string, [string, PillTone]> = {
+    external: [t("LiteLLM estimate", "LiteLLM 参考价"), "gray"],
     catalog: [t("List price", "价目表"), "gray"],
     relay: [t("Relay's list", "中转站价格表"), "gray"],
     multiplier: [t("Multiplier", "倍率"), "gray"],

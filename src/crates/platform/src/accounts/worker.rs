@@ -1,8 +1,8 @@
 //! The worker: one reading at a time, of an account or a status page, each
 //! under the collection gate, saving the restart copy as readings land.
 use super::{
-    restart_copy, schedule::due_after, settle::settle, status, AccountContext, CollectionGate,
-    PageReading, Providers, Shared,
+    price_feed, restart_copy, schedule::due_after, settle::settle, status, AccountContext,
+    CollectionGate, PageReading, Providers, Shared,
 };
 use agent_hud_agents as agents;
 use agents::account::Provider;
@@ -25,6 +25,7 @@ enum Job {
         HashMap<String, Vec<PathBuf>>,
     ),
     Page(&'static agents::account::StatusPage),
+    Prices,
 }
 
 pub(super) fn run(
@@ -32,6 +33,7 @@ pub(super) fn run(
     shared: Arc<Shared>,
     gate: CollectionGate,
     readers: Providers,
+    mut price_at: Option<Instant>,
 ) {
     let mut burst: Option<Instant> = None;
     let mut resume_at: Option<Instant> = None;
@@ -82,13 +84,17 @@ pub(super) fn run(
                         pause = pause.min(wait);
                     }
                 }
+                let price_due = price_at.is_some_and(|at| at <= now);
+                if let Some(at) = price_at.filter(|at| *at > now) {
+                    pause = pause.min(at - now);
+                }
                 if let Some(at) = resume_at.filter(|at| *at > now) {
                     pause = at - now;
-                } else if due.is_some() || page.is_some() {
+                } else if due.is_some() || page.is_some() || price_due {
                     if burst.is_none_or(|started| started.elapsed() < STEP_BUDGET) {
                         resume_at = None;
                         let Some(selected) = due else {
-                            break Job::Page(page.expect("a page is due"));
+                            break page.map_or(Job::Prices, Job::Page);
                         };
                         // Consume the request this job serves. A callback arriving
                         // during I/O remains pending for the next permitted pass.
@@ -111,6 +117,27 @@ pub(super) fn run(
         burst.get_or_insert_with(Instant::now);
         let selected = match selected {
             Job::Account(provider, facts, homes) => (provider, facts, homes),
+            Job::Prices => {
+                let (prices, next) = {
+                    let _turn = gate.lock().unwrap_or_else(PoisonError::into_inner);
+                    if context.cancelled.load(Ordering::Acquire) {
+                        return;
+                    }
+                    price_feed::refresh(&context)
+                };
+                price_at = Some(next);
+                if let Some(prices) = prices {
+                    let waker = {
+                        let mut state = shared.state.lock().unwrap_or_else(PoisonError::into_inner);
+                        state.external_prices = prices;
+                        state.waker.clone()
+                    };
+                    if let Some(waker) = waker {
+                        waker();
+                    }
+                }
+                continue;
+            }
             Job::Page(page) => {
                 let attempted = Instant::now();
                 let summary = {

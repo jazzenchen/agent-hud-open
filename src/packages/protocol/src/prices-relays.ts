@@ -21,7 +21,8 @@ export interface PriceRow {
   tokens: number;
   /** Per million tokens at the base rates; null when nothing prices it. */
   price: {
-    origin: "custom" | "local" | "relay" | "multiplier" | "catalog";
+    origin:
+      "custom" | "local" | "relay" | "multiplier" | "catalog" | "external";
     currency: string;
     input: number;
     output: number;

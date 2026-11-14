@@ -14,6 +14,7 @@ pub struct AccountProjection {
     /// Which clients reach which vendors' plans and APIs, and on which
     /// platform (`{client, provider, product, accountId, region}`).
     pub services: Vec<Value>,
+    pub external_prices: pricing::ExternalPrices,
 }
 
 impl crate::AgentHudCore {
@@ -122,7 +123,9 @@ impl crate::AgentHudCore {
             self.meters.view = None;
             self.statistics.revision = self.statistics.revision.wrapping_add(1);
         }
-        if pricing::set_route_prices(route_prices(&accounts.services)) {
+        let routes_changed = pricing::set_route_prices(route_prices(&accounts.services));
+        let external_changed = pricing::set_external_prices(accounts.external_prices.clone());
+        if routes_changed || external_changed {
             // Calls through a relay are priced on its new list: what was left
             // unpriced is priced again, and the rates and statistics follow.
             for head in self.logs.values_mut() {

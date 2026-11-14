@@ -312,3 +312,10 @@ A relay can also be added by hand on the Relays page, for any agent: its HTTPS a
 
 Settings → Prices lists every model the selected logs used in the last 30 days, with its tokens, its price per million tokens and where that comes from. A price is looked for in this order: the owner's own price for the model on that route, then on every route (`customPrices`); free on this computer (a named model server, or a local host the owner calls one in `localKinds`, or by default a local host whose model has no list price); the relay's own list; the vendor's list times the owner's multiplier for the relay (`relayMultipliers`); the vendor's list through its own API or plan. A change prices every log again.
 
+
+### External price estimates
+
+The public [LiteLLM price catalog](https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json)
+can supply USD estimates for otherwise unpriced, directly accessed chat models.
+Agent HUD refreshes it daily and keeps the last valid copy locally. Existing
+built-in regional or tiered prices, user overrides and relay prices take priority.
