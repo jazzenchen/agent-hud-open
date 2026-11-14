@@ -23,7 +23,8 @@
 </p>
 
 <p align="center">
-  <img src="docs/videos/agent-hud-loop.zh-CN.webp" alt="灵动岛上的 Agent HUD 演示。光晕呼吸着红、黄、绿的额度色段；悬停后面板展开，显示 Claude 与 Codex 的额度、DeepSeek 的余额、过去 24 小时的 Token 与会话，点击后 Claude 的额度切换为消耗速率。随后 Claude 请求运行测试，用「批准一次」回应；它的回复以「有新回复」提醒出现，卡片上有「回到会话」" width="640">
+  <img src="docs/videos/agent-hud-loop.zh-CN.webp" alt="灵动岛上的 Agent HUD 演示。光晕呼吸着红、黄、绿的额度色段；悬停后面板展开，显示 Claude 与 Codex 的额度、DeepSeek 的余额、过去 24 小时的 Token 与会话，点击后 Claude 的额度切换为消耗速率。随后 Claude 请求运行测试，用「批准一次」回应；它的回复以「有新回复」提醒出现，卡片上有「回到会话」" width="450"> <img src="docs/videos/simple-mode-tour.zh-CN.webp" alt="简约形态停靠在屏幕左侧的一段演示。五个 agent 图标外是额度圆环，随后显示百分比与余额。悬停在图标上，用一行写出该 agent 的额度；点击后展开 Claude 的卡片，显示额度、消耗速率与 24 小时的 Token 柱。接着用 Allow once 回应一个批准请求，展开一条 New reply 提醒及其 Return to session 按钮，最后把 HUD 拖到屏幕顶部再拖回" width="380"><br>
+  <sub>左：MacBook 刘海处的刘海形态 · 右：停靠在屏幕左侧的简约形态，已开启「按 agent 分开」 · 示例数据</sub>
 </p>
 
 <p align="center">如果 Agent HUD 对你有用，点个 Star，能让更多人找到它。</p>
@@ -51,11 +52,6 @@ npx @agenthud/install
 **你的 agents，一目了然。** 你在写代码、读文档或处理别的事情，agents 继续工作。屏幕边缘告诉你：谁还在忙，谁已经完成，谁正在等你。
 
 细节就在手边，需要你批准的事情也在这里回应。多个 agent 的进展，集中在一眼可见的地方。
-
-<p align="center">
-  <img src="docs/videos/simple-mode-tour.zh-CN.webp" alt="简约形态停靠在屏幕左侧的一段演示。五个 agent 图标外是额度圆环，随后显示百分比与余额。悬停在图标上，用一行写出该 agent 的额度；点击后展开 Claude 的卡片，显示额度、消耗速率与 24 小时的 Token 柱。接着用 Allow once 回应一个批准请求，展开一条 New reply 提醒及其 Return to session 按钮，最后把 HUD 拖到屏幕顶部再拖回" width="640"><br>
-  <sub>停靠在屏幕左侧的简约形态，已开启「按 agent 分开」 · 示例数据</sub>
-</p>
 
 - **光晕**：每个 agent 一种颜色，按它用量最高的那项额度：已用不足 70% 为绿色，达到 70% 为黄色，达到 90% 为红色；额度耗尽前会提醒你。有 agent 在工作时，光晕动得更快。
 - **悬停**：额度及其重置时间或消耗速率、余额、过去 24 小时的 Token，以及会话，等你处理的排在最前。

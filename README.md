@@ -23,7 +23,8 @@
 </p>
 
 <p align="center">
-  <img src="docs/videos/agent-hud-loop.webp" alt="A tour of Agent HUD at a MacBook's notch. The glow breathes in red, yellow and green quota segments. A hover opens the panel on Claude's and Codex's quotas, a DeepSeek balance, the last 24 hours of tokens and the sessions, and a click turns Claude's quotas into burn rates. Claude then asks to run the test suite and is answered with Allow once, and its reply arrives as a New reply reminder whose card offers Return to session" width="640">
+  <img src="docs/videos/agent-hud-loop.webp" alt="A tour of Agent HUD at a MacBook's notch. The glow breathes in red, yellow and green quota segments. A hover opens the panel on Claude's and Codex's quotas, a DeepSeek balance, the last 24 hours of tokens and the sessions, and a click turns Claude's quotas into burn rates. Claude then asks to run the test suite and is answered with Allow once, and its reply arrives as a New reply reminder whose card offers Return to session" width="450"> <img src="docs/videos/simple-mode-tour.webp" alt="A tour of Simple mode on the left edge of a display. Five agent logos sit in quota rings, then show percentages and a balance. Hovering a logo writes that agent's quotas on one line, and a click opens Claude's card with its limits, burn rates and the 24-hour token bars. A permission request is answered with Allow once, a New reply reminder opens with Return to session, and the HUD is dragged to the top edge and back" width="380"><br>
+  <sub>Left: Notch mode at a MacBook's notch · Right: Simple mode on a display's left edge, with Separate agents on · Sample data</sub>
 </p>
 
 <p align="center">If Agent HUD is useful to you, a star helps other people find it.</p>
@@ -51,11 +52,6 @@ Or download the [release](https://agenthud.app/mac). Either command installs the
 **Your agents, at a glance.** You write code, read docs or deal with something else while your agents keep working. The edge of your screen tells you who is still busy, who is done and who is waiting for you.
 
 The details are close at hand, and what needs your approval is answered right there. Every agent's progress, gathered where one glance takes it in.
-
-<p align="center">
-  <img src="docs/videos/simple-mode-tour.webp" alt="A tour of Simple mode on the left edge of a display. Five agent logos sit in quota rings, then show percentages and a balance. Hovering a logo writes that agent's quotas on one line, and a click opens Claude's card with its limits, burn rates and the 24-hour token bars. A permission request is answered with Allow once, a New reply reminder opens with Return to session, and the HUD is dragged to the top edge and back" width="640"><br>
-  <sub>Simple mode on a display's left edge, with Separate agents on · Sample data</sub>
-</p>
 
 - **Glow**: one colour per agent, from its most used quota: green under 70% used, yellow from 70%, red from 90%, with a warning before a quota runs out. It moves faster while an agent works.
 - **Hover**: quotas with their resets or burn rates, balances, the last 24 hours of tokens, and the sessions, those waiting for you first.
