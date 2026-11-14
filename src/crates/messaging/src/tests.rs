@@ -1143,7 +1143,11 @@ fn a_reply_goes_back_to_its_senders_client_when_another_client_has_the_same_id()
     assert_eq!(reply["state"], "queued", "{reply}");
     let reply_id = reply["id"].as_str().unwrap();
     assert!(world.claude_words(CLAUDE, reply_id).contains("Two nits"));
-    assert_eq!(world.codex.0.lock().unwrap().len(), 1, "nothing went to the twin");
+    assert_eq!(
+        world.codex.0.lock().unwrap().len(),
+        1,
+        "nothing went to the twin"
+    );
     // A bare id two clients share names neither: nothing is sent.
     let named = world.send(("codex", CODEX), CLAUDE, "Which one?");
     assert_eq!(named["state"], "refused", "{named}");
