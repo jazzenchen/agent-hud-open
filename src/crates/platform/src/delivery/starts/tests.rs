@@ -416,13 +416,21 @@ fn harness_host(channel: &Path, delay: Duration, answer: Value) -> std::thread::
         )
         .unwrap();
         for _ in 0..500 {
+            // As the plugin does: only `.json` requests (Agent HUD writes
+            // each through a `.tmp` beside it first), answered by a rename.
             let asked = fs::read_dir(channel.join("starts/777"))
                 .ok()
-                .and_then(|files| files.flatten().next())
+                .and_then(|files| {
+                    files
+                        .flatten()
+                        .find(|entry| entry.path().extension().is_some_and(|e| e == "json"))
+                })
                 .and_then(|entry| {
                     let value =
                         serde_json::from_slice::<Value>(&fs::read(entry.path()).ok()?).ok()?;
-                    fs::write(entry.path(), answer.to_string()).ok()?;
+                    let temp = entry.path().with_extension("answer");
+                    fs::write(&temp, answer.to_string()).ok()?;
+                    fs::rename(&temp, entry.path()).ok()?;
                     Some(value)
                 });
             if let Some(asked) = asked {
