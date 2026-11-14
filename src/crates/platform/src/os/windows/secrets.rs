@@ -106,7 +106,7 @@ pub(crate) fn unseal_safe_storage(
     let Some(dpapi) = raw.strip_prefix(b"DPAPI") else {
         return Answer::Failed;
     };
-    let mut input = CRYPT_INTEGER_BLOB {
+    let input = CRYPT_INTEGER_BLOB {
         cbData: dpapi.len() as u32,
         pbData: dpapi.as_ptr().cast_mut(),
     };
@@ -116,7 +116,7 @@ pub(crate) fn unseal_safe_storage(
     };
     if unsafe {
         CryptUnprotectData(
-            &mut input,
+            &input,
             std::ptr::null_mut(),
             std::ptr::null(),
             std::ptr::null_mut(),

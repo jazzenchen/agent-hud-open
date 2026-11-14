@@ -57,7 +57,7 @@ fn secure(url: &tauri::Url) -> bool {
 
 /// The identity of Safari `version` on a Mac, which is what a `WKWebView`
 /// is: WebKit, on the fixed system string Safari itself sends.
-#[cfg(any(target_os = "macos", test))]
+#[cfg_attr(not(test), allow(dead_code))]
 fn safari(version: &str) -> String {
     format!(
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/{version} Safari/605.1.15"
@@ -66,7 +66,7 @@ fn safari(version: &str) -> String {
 
 /// The identity WebView2 `version` (as `131.0.2903.86`) sends by itself:
 /// Edge on Windows, with only the major version, as Chromium shortens it.
-#[cfg(any(windows, test))]
+#[cfg_attr(not(test), allow(dead_code))]
 fn edge(version: &str) -> String {
     let major = version
         .split('.')
@@ -78,38 +78,17 @@ fn edge(version: &str) -> String {
     )
 }
 
-/// The browser identity the sign-in windows present, and the kept session
-/// sends after: the engine and system the window really runs on. A site's
-/// bot check compares the name with what the engine does, and refuses a
-/// window that says it is another browser.
-fn identity() -> String {
-    #[cfg(target_os = "macos")]
-    {
-        // Safari's own version, which WebKit leaves out of an app's window.
-        let version = objc2_foundation::NSBundle::bundleWithPath(
-            &objc2_foundation::NSString::from_str("/Applications/Safari.app"),
-        )
-        .and_then(|bundle| {
-            bundle.objectForInfoDictionaryKey(&objc2_foundation::NSString::from_str(
-                "CFBundleShortVersionString",
-            ))
-        })
-        .and_then(|value| value.downcast::<objc2_foundation::NSString>().ok())
-        .map(|value| value.to_string())
-        .filter(|value| !value.is_empty() && value.bytes().all(|b| b.is_ascii_digit() || b == b'.'))
-        .unwrap_or_else(|| "18.6".into());
-        safari(&version)
-    }
-    #[cfg(windows)]
-    {
-        edge(&tauri::webview_version().unwrap_or_default())
-    }
-    #[cfg(not(any(target_os = "macos", windows)))]
-    {
-        // WebKitGTK's own form.
-        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15".into()
-    }
-}
+// The browser identity the sign-in windows present, from each host's own file.
+#[cfg(target_os = "macos")]
+#[path = "web_sign_in/identity_macos.rs"]
+mod host;
+#[cfg(target_os = "windows")]
+#[path = "web_sign_in/identity_windows.rs"]
+mod host;
+#[cfg(target_os = "linux")]
+#[path = "web_sign_in/identity_linux.rs"]
+mod host;
+use host::identity;
 
 /// Opens the windows a sign-in page asks for (`window.open`) as sign-in
 /// windows of `parent`: the same private storage and identity, no Agent HUD
