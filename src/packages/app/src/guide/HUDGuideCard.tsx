@@ -24,6 +24,8 @@ export interface HUDGuideCardProps {
   next: () => void;
   back: () => void;
   close: () => void;
+  /** From the news: mark it seen and start the tour from its first step. */
+  tour: () => void;
   resume: () => void;
   show: (target: GuideTarget) => void;
   star: (open: boolean) => void;

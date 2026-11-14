@@ -5,7 +5,7 @@ import { Button } from "@agent-hud/ui/components/button";
 import { Actions, Header } from "./hud-guide-parts";
 import type { Text } from "./copy";
 
-export function News({ view, t, close, show, star }: HUDGuideCardProps) {
+export function News({ view, t, close, tour, show, star }: HUDGuideCardProps) {
   if (view.kind !== "news") return null;
   return (
     <>
@@ -46,6 +46,9 @@ export function News({ view, t, close, show, star }: HUDGuideCardProps) {
       ))}
       {view.star && <StarLine t={t} star={star} />}
       <Actions>
+        <Button size="sm" variant="ghost" onClick={tour}>
+          {t("Take me around", "带我走一遍")}
+        </Button>
         <Button size="sm" onClick={close}>
           {t("Got it", "知道了")}
         </Button>

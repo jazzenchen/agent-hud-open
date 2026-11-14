@@ -205,6 +205,14 @@ export function useHUDGuide({
         next={next}
         back={() => open({ kind: "tour", step: "hud" })}
         close={close}
+        tour={() => {
+          const base = current();
+          if (!base || !version) return;
+          // The news counts as seen; the tour starts beside the HUD.
+          write(atStep(closed(base, version), "hud"));
+          setView({ kind: "tour", step: "hud" });
+          setLooked(false);
+        }}
         resume={() => {
           const step = steps.find((item) => item.id === record?.step);
           void invoke("hud_show_main", { page: step?.page ?? null });

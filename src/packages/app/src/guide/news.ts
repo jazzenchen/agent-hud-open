@@ -7,6 +7,28 @@ import type { NewsEntry } from "./plan";
 
 export const openNews: NewsEntry[] = [
   {
+    version: "0.6.3",
+    items: [
+      {
+        title: ["More accounts found on their own", "更多账号自动认出"],
+        body: [
+          "Qoder, QoderWork, TRAE, WorkBuddy, CodeBuddy, ZCode and MiniMax Code accounts come from each app's own sign-in, each region on its own.",
+          "Qoder、QoderWork、TRAE、WorkBuddy、CodeBuddy、ZCode 和 MiniMax Code 的账号直接从各自应用的登录里读，不同区域分开显示。",
+        ],
+      },
+      {
+        title: [
+          "Agents can start DeepSeek Harness sessions",
+          "Agent 可以新开 DeepSeek Harness 会话",
+        ],
+        body: [
+          "Through Agent HUD's plugin in a running Harness.",
+          "经由运行中 Harness 里的 Agent HUD 插件。",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.6.2",
     items: [
       {
