@@ -55,8 +55,10 @@ fn reply_tool(zh: bool, client: &str) -> String {
 /// and reply_to first, as the recipient's client names that tool, so the
 /// reply comes back as a message; a plain answer, which the sender reads with
 /// get_message, only without the tool. A reply's last line is shorter, so two
-/// agents do not thank each other back and forth. As the user's own: the text
-/// alone.
+/// agents do not thank each other back and forth. Without the reply hint, the
+/// sender asked to read the answer itself: the last line says to answer in the
+/// turn and send nothing back. As the user's own: the text alone.
+#[allow(clippy::too_many_arguments)]
 pub fn compose(
     zh: bool,
     form: PromptForm,
@@ -64,6 +66,7 @@ pub fn compose(
     to_client: &str,
     id: &str,
     reply_to: Option<&str>,
+    reply_hint: bool,
     text: &str,
 ) -> String {
     if form == PromptForm::Own {
@@ -97,6 +100,12 @@ pub fn compose(
     );
     let tool = reply_tool(zh, to_client);
     let footer = match (zh, reply_to) {
+        _ if !reply_hint => match (zh, reply_to) {
+            (true, None) => "直接在这里作答：发件方会取回你这一轮最后的回答，不用另外回信。".to_owned(),
+            (false, None) => "Answer here: the sender reads this turn's last reply, so send nothing back.".to_owned(),
+            (true, Some(parent)) => format!("这是对 {parent} 的回复。"),
+            (false, Some(parent)) => format!("This answers {parent}."),
+        },
         (true, None) => format!("请用 {tool} 回复，reply_to: {id}，回复会作为一条消息送到发件方。没有这个工具时就直接作答，发件方能取回你这一轮最后的回答。"),
         (false, None) => format!("Reply with {tool}, reply_to: {id}: your reply reaches the sender as a message. Without that tool, answer here: the sender can read this turn's last reply."),
         (true, Some(parent)) => format!("这是对 {parent} 的回复。还需要再说时，用 {tool} 回复，reply_to: {id}。"),

@@ -12,6 +12,7 @@ impl Messaging {
         let zh = language(host.snapshot);
         let client = arguments["client"].as_str().ok_or("client is required")?;
         let text = arguments["text"].as_str().ok_or("text is required")?;
+        let reply_hint = arguments["reply_hint"].as_bool().unwrap_or(true);
         if !matches!(client, "claude" | "codex" | "antigravity" | "deepseek") {
             return Ok(refused(&words::other_client(zh)));
         }
@@ -65,7 +66,7 @@ impl Messaging {
         let id = message_id();
         let form = self.form();
         let from = party(host.snapshot, &caller.client, &caller.session_id);
-        let delivered = words::compose(zh, form, &from, client, &id, None, text);
+        let delivered = words::compose(zh, form, &from, client, &id, None, reply_hint, text);
         let request_id = uuid::Uuid::new_v4().to_string();
         let receipt = self.starts.start_with(
             StartRequest {

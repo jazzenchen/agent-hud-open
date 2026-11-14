@@ -12,6 +12,7 @@ impl Messaging {
         let zh = language(host.snapshot);
         let text = arguments["text"].as_str().ok_or("text is required")?;
         let reply_to = arguments["reply_to"].as_str().filter(|id| !id.is_empty());
+        let reply_hint = arguments["reply_hint"].as_bool().unwrap_or(true);
         // A reply goes back to whoever sent the message it answers.
         let replied = reply_to
             .and_then(|parent| self.journal.find(parent))
@@ -76,7 +77,7 @@ impl Messaging {
         let id = message_id();
         let form = self.form();
         let from = sender.clone();
-        let delivered = words::compose(zh, form, &from, client, &id, reply_to, text);
+        let delivered = words::compose(zh, form, &from, client, &id, reply_to, reply_hint, text);
         // Where the recipient's transcript ends now: its answer is after this.
         // The store finds the answer by when it was sent instead.
         let cursor = match transcript::stored(host, client) {

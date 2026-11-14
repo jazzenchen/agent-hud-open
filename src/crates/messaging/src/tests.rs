@@ -1824,6 +1824,7 @@ fn the_reply_line_names_the_tool_as_the_recipients_client_does() {
             client,
             "m-1",
             reply_to,
+            true,
             "Hi",
         )
         .lines()
@@ -1843,9 +1844,50 @@ fn the_reply_line_names_the_tool_as_the_recipients_client_does() {
         "这是对 m-0 的回复。还需要再说时，用 agent-hud 的 MCP 工具 mcp__agent-hud__send_message 回复，reply_to: m-1。"
     );
     assert_eq!(
-        words::compose(false, PromptForm::Own, &from, "codex", "m-1", None, "Hi"),
+        words::compose(
+            false,
+            PromptForm::Own,
+            &from,
+            "codex",
+            "m-1",
+            None,
+            true,
+            "Hi"
+        ),
         "Hi"
     );
+}
+
+/// A sender that reads the answer itself leaves out the reply hint: the last
+/// line asks the recipient to answer in its turn and names no tool.
+#[test]
+fn without_the_reply_hint_the_recipient_is_asked_to_answer_in_its_turn() {
+    let from = Party {
+        client: "claude".into(),
+        session_id: CLAUDE.into(),
+        title: None,
+    };
+    let line = |zh, reply_to| {
+        let words = words::compose(
+            zh,
+            PromptForm::Labelled,
+            &from,
+            "codex",
+            "m-1",
+            reply_to,
+            false,
+            "Hi",
+        );
+        assert!(!words.contains("send_message"), "{words}");
+        words.lines().last().unwrap().to_owned()
+    };
+    assert_eq!(
+        line(false, None),
+        "Answer here: the sender reads this turn's last reply, so send nothing back."
+    );
+    assert_eq!(line(true, Some("m-0")), "这是对 m-0 的回复。");
+    let tools = Messaging::tools(true).to_string();
+    assert_eq!(tools.matches("\"reply_hint\"").count(), 2);
 }
 
 /// Open decodes a compressed log from its start, 2 MiB a look, with one
@@ -2061,6 +2103,7 @@ fn an_antigravity_answer_flies_back_once_the_store_reads_it() {
         "antigravity",
         &id,
         None,
+        true,
         "Plan the opening shot",
     );
     world.antigravity_facts(vec![
@@ -2132,6 +2175,7 @@ fn an_antigravity_answer_the_store_cannot_tie_to_the_message_flies_only_its_repl
         "antigravity",
         &id,
         None,
+        true,
         "Got your message",
     );
     let item = |turn: &str, id: &str, order: u64, role: Role, text: &str| {
