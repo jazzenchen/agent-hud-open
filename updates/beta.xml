@@ -3,14 +3,16 @@
   <channel>
     <title>Agent HUD</title>
     <item>
-      <title>0.6.2</title>
-      <pubDate>Fri, 13 Nov 2026 20:39:34 +0800</pubDate>
-      <link>https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.2</link>
-      <sparkle:version>499</sparkle:version>
-      <sparkle:shortVersionString>0.6.2</sparkle:shortVersionString>
+      <title>0.6.3-beta.1</title>
+      <pubDate>Sat, 14 Nov 2026 17:38:03 +0800</pubDate>
+      <link>https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.3-beta.1</link>
+      <sparkle:channel>beta</sparkle:channel>
+      <sparkle:minimumAutoupdateVersion>500</sparkle:minimumAutoupdateVersion>
+      <sparkle:version>500</sparkle:version>
+      <sparkle:shortVersionString>0.6.3-beta.1</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
       <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-      <description sparkle:format="markdown"># Agent HUD 0.6.2
+      <description sparkle:format="markdown"># Agent HUD 0.6.3-beta.1
 
 ## Compatibility
 
@@ -18,32 +20,27 @@
 
 [Get the iPhone app](https://apps.apple.com/app/id6812113619).
 
+If the required iPhone version is not yet on the App Store, cross-device features require the corresponding TestFlight version.
+
 Requires an Apple Silicon Mac running macOS 14 or later.
 
 ## Changes
 
 ### New
 
-- Guides a new copy from beside the HUD. On first launch a small window opens beside the main screen's HUD: where the HUD is, then Notch or Simple picked right there. The tour goes on in Settings and rings what each step explains: Display, Agents, client hooks, HUD tools, agent messages, and the tools and plugins of each client. Every step has Back and Next, and none moves on by itself. Start it again from Settings → General → Help → Getting started, or from the ⋯ menu in Settings → Getting Started…
-- Tells what a release adds after an update, in the same window beside the HUD. Open it again from the ⋯ menu in Settings → What's New…
-- Lets you choose which agents a screen's HUD shows, in Settings → Display → HUD → Agents on this HUD (#66). There is a switch per agent, in Notch and in Simple. One agent always stays on, and with all of them on an agent added later shows too. The preview above leaves out a hidden agent as well.
-- Reads TeleAgent's sessions and tokens (#69). TeleAgent 3.0 keeps an OpenCode database per signed-in account. Its sessions show tokens without live state.
-- Shows the balance of a relay that DeepSeek Harness is set to (#70). Relays were found only in Claude Code's and Codex's settings. The relay is now listed in Settings → Relays; nothing is asked of it until you turn it on there.
-- Shows a SuperGrok trial's usage for Grok Bot as "Trial usage limit" (#61). A trial has no included weekly allowance, so it was told it had no personal quota.
+- Speaks nine languages: English, Simplified Chinese, Traditional Chinese, Japanese, Korean, French, German, Spanish and Brazilian Portuguese. Pick one in Settings → General → Language, or let it follow the system.
+- Adds "Take me around" to the card that tells what an update adds. It starts the getting-started tour beside the HUD, and the card counts as read.
+- Reads Qoder, QoderWork, TRAE, WorkBuddy, CodeBuddy, ZCode and MiniMax Code accounts from each app's own sign-in. Each region is its own account: Qoder CN, TRAE CN and CodeBuddy CN show apart from the international ones.
+- Lets agents start DeepSeek Harness sessions, through Agent HUD's plugin in a running Harness. With none running, the Harness desktop app opens.
+- Lets an agent that reads the answer itself leave out the reply line (#75). With `reply_hint: false` on `send_message` or `start_session`, the message ends by asking the recipient to answer in its turn, instead of sending a message back.
+- Opens the windows a sign-in page asks for beside the sign-in window, and presents the system's own browser to the site, so sign-ins that open a second window or check the browser go through.
 
 ### Fixes
 
-- Stops reply alerts for a sub-agent's finished turn (#67). A child session's completion raised an alert of its own while the parent agent was still working.
-- Marks a cache as expired only when a call reads less than the call before left in it (#48). A model that never reads from a cache, or reads the same amount on every call, was marked on every call, which showed as "Cache expired, … sent again" on a session's turns and added to Cache rewrites in Statistics.
-- Prices DeepSeek Harness's calls on its DeepSeek platform account, and links them to the DeepSeek balance (#61). Harness records that account under a name of its own, so those calls had no price.
-- Shows Antigravity's own reason when its command line refuses to report usage (#61), for example for an account in a region Antigravity does not serve. Only a general failure text showed.
-- Rebuilds a damaged ledger (#34). When the ledger file was corrupt, Agent HUD ran without it. The file is now deleted and filled again from the agents' logs. Quota history, and tokens from logs a client has already deleted, do not come back.
-- Carries a WorkBuddy or CodeBuddy turn on with every waiting agent message. Agent HUD stopped after 3 in a row and left the rest for a later turn; these clients set no cap of their own.
-- Opens web links in Agent HUD's windows in your browser. Links to the docs and to order and store pages did nothing.
-- Keeps Claude Code's `settings.json` and Codex's `hooks.json` in their own key order (#74). Each launch wrote the Remote hooks back with the keys sorted, which rearranged the whole file.
-- Shows a license key that another computer of the account holds, on the Subscription page: "License key · On &lt;computer&gt; · 1 computer · Until &lt;day&gt;". A computer without a key of its own, whose App Store plan had lapsed, showed only the expired App Store row and read "Subscribe or enter a license key to enable a computer", although the other computer's key paid for the seat. It now reads "Turn this computer on below to use a seat".
+- Delivers agent messages to Antigravity on Windows (#77). Finding Antigravity's server took over 6 seconds on some computers, longer than a message may wait, so every message was refused. It now takes milliseconds.
+- Stops marking CodeBuddy, Qoder CN and QoderWork as "Requests only" on the Remote page; their conversations sync to the phone too.
 </description>
-      <enclosure url="https://github.com/jazzenchen/agent-hud-open/releases/download/v0.6.2/Agent-HUD-0.6.2-arm64.dmg" length="53219739" type="application/octet-stream" sparkle:edSignature="LPW4WfcKdZk87TdbsI/qjNeXKT1n3FzZrVwDk3nrspMzzj/PjdOUH6KBwtz7M69ZoN6Fllo6Ho9eHrLumfLQAQ==" />
+      <enclosure url="https://github.com/jazzenchen/agent-hud-open/releases/download/v0.6.3-beta.1/Agent-HUD-0.6.3-beta.1-arm64.dmg" length="54570003" type="application/octet-stream" sparkle:edSignature="on6iCEmn/fkrVTnUGTym2MrNXcYeZlQo4llfYenmUCpxysAJK52kmJyrjzIEOc5LSrVQwUaarEAaAnYaG/SECQ==" />
       <agenthudMacOnly>false</agenthudMacOnly>
       <agenthudMinimumIOSVersion>1.7.2</agenthudMinimumIOSVersion>
     </item>
