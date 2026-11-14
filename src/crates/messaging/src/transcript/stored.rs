@@ -68,7 +68,7 @@ pub(super) fn current(
         Some(id) => turns.iter().rev().find(|turn| turn.id == *id)?,
         None => {
             let turn = turns.last()?;
-            let live = crate::find(snapshot, &caller.session_id)
+            let live = crate::find_in(snapshot, &caller.client, &caller.session_id)
                 .and_then(|session| session["liveFacts"]["turnStartedAt"].as_str())
                 .map(at);
             if live

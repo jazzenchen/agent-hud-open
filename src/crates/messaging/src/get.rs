@@ -69,7 +69,7 @@ impl Messaging {
             message.reason = reason.clone();
             self.journal.replace(message.clone());
         }
-        let to = find(host.snapshot, &message.to.session_id);
+        let to = find_in(host.snapshot, &message.to.client, &message.to.session_id);
         Ok(json!({
             "id": message.id,
             "state": state,

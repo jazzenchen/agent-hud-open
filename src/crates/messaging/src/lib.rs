@@ -149,8 +149,8 @@ impl Messaging {
         let caller = serde_json::from_value::<Caller>(params["caller"].clone())
             .ok()
             .map(|mut caller| {
-                if let Some(session_id) =
-                    find(host.snapshot, &caller.session_id).and_then(|s| s["id"].as_str())
+                if let Some(session_id) = find_in(host.snapshot, &caller.client, &caller.session_id)
+                    .and_then(|s| s["id"].as_str())
                 {
                     caller.session_id = session_id.to_owned();
                 }

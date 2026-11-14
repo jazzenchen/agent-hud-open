@@ -1123,6 +1123,34 @@ fn passes_count_while_messages_wake_each_other_and_stop_at_the_limit() {
 }
 
 #[test]
+fn a_reply_goes_back_to_its_senders_client_when_another_client_has_the_same_id() {
+    let mut world = World::on();
+    // A Codex session whose id is the same string as the Claude sender's,
+    // listed first so an id-only lookup would pick it.
+    let project = world.fixture.home().join("project");
+    world.snapshot["sessions"].as_array_mut().unwrap().insert(
+        0,
+        json!({"id":CLAUDE,"source":"codex","title":"Twin","cwd":project,"state":"idle","parentId":null,"updatedAt":"2026-10-22T01:00:04Z","liveFacts":{}}),
+    );
+    let first = world.send(("claude", CLAUDE), CODEX, "Review this");
+    assert_eq!(first["state"], "queued", "{first}");
+    let first_id = first["id"].as_str().unwrap().to_owned();
+    let reply = world.call(
+        Some(("codex", CODEX)),
+        "send_message",
+        json!({"text":"Two nits","reply_to":first_id}),
+    );
+    assert_eq!(reply["state"], "queued", "{reply}");
+    let reply_id = reply["id"].as_str().unwrap();
+    assert!(world.claude_words(CLAUDE, reply_id).contains("Two nits"));
+    assert_eq!(world.codex.0.lock().unwrap().len(), 1, "nothing went to the twin");
+    // A bare id two clients share names neither: nothing is sent.
+    let named = world.send(("codex", CODEX), CLAUDE, "Which one?");
+    assert_eq!(named["state"], "refused", "{named}");
+    assert_eq!(world.codex.0.lock().unwrap().len(), 1);
+}
+
+#[test]
 fn with_no_limit_the_passes_go_on() {
     let mut world = World::new(Preferences {
         enabled: true,

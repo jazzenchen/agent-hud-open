@@ -69,11 +69,28 @@ pub(crate) fn same_session(a: &str, b: &str) -> bool {
     }
     bare(a) == bare(b)
 }
+/// Whether two (client, session) pairs name one session. A session id is
+/// unique only within its client: two clients may use the same string.
+pub(crate) fn same_identity(a: (&str, &str), b: (&str, &str)) -> bool {
+    a.0 == b.0 && same_session(a.1, b.1)
+}
+/// The session `id` names when only one client has it; none when two
+/// clients' sessions share the id, so a message never picks one of them.
 pub(crate) fn find<'a>(snapshot: &'a Value, id: &str) -> Option<&'a Value> {
-    snapshot["sessions"]
+    let mut found = snapshot["sessions"]
         .as_array()?
         .iter()
-        .find(|session| session["id"].as_str().is_some_and(|s| same_session(s, id)))
+        .filter(|session| session["id"].as_str().is_some_and(|s| same_session(s, id)));
+    let first = found.next()?;
+    found
+        .all(|other| other["source"] == first["source"] && other["id"] == first["id"])
+        .then_some(first)
+}
+/// `client`'s session `id`.
+pub(crate) fn find_in<'a>(snapshot: &'a Value, client: &str, id: &str) -> Option<&'a Value> {
+    snapshot["sessions"].as_array()?.iter().find(|session| {
+        session["source"] == client && session["id"].as_str().is_some_and(|s| same_session(s, id))
+    })
 }
 pub(crate) fn state(session: &Value) -> &'static str {
     match session["state"].as_str() {
@@ -86,7 +103,7 @@ pub(crate) fn party(snapshot: &Value, client: &str, id: &str) -> Party {
     Party {
         client: client.into(),
         session_id: id.into(),
-        title: find(snapshot, id)
+        title: find_in(snapshot, client, id)
             .and_then(|session| session["title"].as_str())
             .map(str::to_owned),
     }

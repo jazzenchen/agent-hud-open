@@ -32,7 +32,7 @@ impl Messaging {
                     "state": state(session),
                     "reachable": reachable,
                     "reason": reason,
-                    "self": caller.is_some_and(|caller| same_session(&caller.session_id, id)),
+                    "self": caller.is_some_and(|caller| same_identity((&caller.client, &caller.session_id), (client, id))),
                     "updatedAt": session["updatedAt"],
                 })
             })

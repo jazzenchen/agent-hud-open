@@ -138,7 +138,10 @@ impl Journal {
                     .as_deref()
                     .and_then(|parent| self.find(parent))
                     .is_some_and(|parent| {
-                        super::same_session(&parent.from.session_id, &message.to.session_id)
+                        super::same_identity(
+                            (&parent.from.client, &parent.from.session_id),
+                            (&message.to.client, &message.to.session_id),
+                        )
                     })
             })
             .map(|message| message.id.clone())

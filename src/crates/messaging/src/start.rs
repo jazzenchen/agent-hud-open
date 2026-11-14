@@ -35,7 +35,7 @@ impl Messaging {
         };
         let folder = match arguments["folder"].as_str() {
             Some(folder) => folder.to_owned(),
-            None => find(host.snapshot, &caller.session_id)
+            None => find_in(host.snapshot, &caller.client, &caller.session_id)
                 .and_then(|session| session["cwd"].as_str())
                 .and_then(|cwd| self.starts.offered_folder(cwd))
                 .unwrap_or_default(),

@@ -18,37 +18,39 @@ impl Messaging {
             .and_then(|parent| self.journal.find(parent))
             .cloned();
         if let Some(parent) = reply_to {
-            if replied
-                .as_ref()
-                .is_none_or(|message| !same_session(&message.to.session_id, &caller.session_id))
-            {
+            if replied.as_ref().is_none_or(|message| {
+                !same_identity(
+                    (&message.to.client, &message.to.session_id),
+                    (&caller.client, &caller.session_id),
+                )
+            }) {
                 return Ok(refused(&words::unknown_reply(language, parent)));
             }
         }
-        let Some(to) = arguments["to"]
-            .as_str()
-            .filter(|to| !to.is_empty())
-            .map(str::to_owned)
-            .or_else(|| {
-                replied
-                    .as_ref()
-                    .map(|message| message.from.session_id.clone())
-            })
-        else {
+        let named = arguments["to"].as_str().filter(|to| !to.is_empty());
+        if named.is_none() && replied.is_none() {
             return Err("to is required, unless reply_to names a message you received".into());
-        };
-        let to = to.as_str();
+        }
         if let Some(reason) = check_text(text, language) {
             return Ok(refused(&reason));
         }
-        if same_session(to, &caller.session_id) {
-            return Ok(refused(&words::to_self(language)));
-        }
-        let Some(target) = find(host.snapshot, to) else {
+        // A reply goes to the very session that sent its parent, in that
+        // session's client; a `to` names a session of whichever client has it.
+        let target = match (named, &replied) {
+            (Some(to), _) => find(host.snapshot, to),
+            (None, Some(parent)) => {
+                find_in(host.snapshot, &parent.from.client, &parent.from.session_id)
+            }
+            (None, None) => None,
+        };
+        let Some(target) = target else {
             return Ok(refused(&words::unknown(language)));
         };
-        let to = target["id"].as_str().unwrap_or(to);
+        let to = target["id"].as_str().unwrap_or_default();
         let client = target["source"].as_str().unwrap_or_default();
+        if same_identity((client, to), (&caller.client, &caller.session_id)) {
+            return Ok(refused(&words::to_self(language)));
+        }
         if Provider::parse(client).is_none() {
             return Ok(refused(&words::other_client(language)));
         }
@@ -134,7 +136,9 @@ impl Messaging {
         // one back, so the end of the turn that sent it throws no second.
         if state != "refused" {
             if let Some(parent) = replied
-                .filter(|parent| same_session(&parent.from.session_id, to))
+                .filter(|parent| {
+                    same_identity((&parent.from.client, &parent.from.session_id), (client, to))
+                })
                 .and_then(|parent| self.journal.messages_mut().find(|m| m.id == parent.id))
             {
                 parent.answered = true;

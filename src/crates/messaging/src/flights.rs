@@ -29,7 +29,8 @@ impl Messaging {
                 changed = true;
                 continue;
             }
-            let Some(session) = find(host.snapshot, &message.to.session_id) else {
+            let Some(session) = find_in(host.snapshot, &message.to.client, &message.to.session_id)
+            else {
                 continue;
             };
             let live = &session["liveFacts"];
