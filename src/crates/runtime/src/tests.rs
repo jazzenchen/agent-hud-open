@@ -1,5 +1,5 @@
 use super::*;
-use std::{collections::HashMap, fs, path::Path};
+use std::{collections::HashMap, fs, path::Path, process::Command};
 
 #[cfg(unix)]
 #[path = "antigravity_cli_tests_unix.rs"]
@@ -46,6 +46,71 @@ fn set_paths(runtime: &mut Runtime, value: Value) -> Result<Value, String> {
 
 fn read(path: &Path) -> Value {
     serde_json::from_slice(&fs::read(path).unwrap()).unwrap()
+}
+
+#[test]
+fn appearance_survives_a_fresh_runtime_process() {
+    const DATA: &str = "AGENTHUD_TEST_APPEARANCE_DATA";
+    const SAVE: &str = "AGENTHUD_TEST_APPEARANCE_SAVE";
+    const RESULT: &str = "AGENTHUD_TEST_APPEARANCE_RESULT";
+    if let Some(data) = std::env::var_os(DATA) {
+        // Normal persistence with no source roots, account readers, client
+        // observers or delegated hooks; the demo deliberately resets its data.
+        let mut runtime = Runtime::with_sources(Vec::new(), data.into()).unwrap();
+        let snapshot = match std::env::var(SAVE) {
+            Ok(appearance) => runtime
+                .request(
+                    "set_setting",
+                    json!({"key":"appearance","value":appearance}),
+                )
+                .unwrap(),
+            Err(std::env::VarError::NotPresent) => runtime.request("snapshot", json!({})).unwrap(),
+            Err(error) => panic!("Invalid test appearance: {error}"),
+        };
+        fs::write(
+            std::env::var_os(RESULT).unwrap(),
+            serde_json::to_vec(&snapshot["settings"]["appearance"]).unwrap(),
+        )
+        .unwrap();
+        return;
+    }
+
+    let temp = tempfile::tempdir().unwrap();
+    let data = temp.path().join("app-data");
+    let name = format!(
+        "{}::appearance_survives_a_fresh_runtime_process",
+        module_path!().split_once("::").unwrap().1
+    );
+    // Reuse the folder so returning to System also replaces a saved Light.
+    for appearance in ["dark", "light", "system"] {
+        for phase in ["save", "reopen"] {
+            let result = temp.path().join(format!("{appearance}-{phase}.json"));
+            let mut command = Command::new(std::env::current_exe().unwrap());
+            command
+                .args(["--exact", &name, "--nocapture"])
+                .env(DATA, &data)
+                .env(RESULT, &result)
+                .env_remove(SAVE);
+            if phase == "save" {
+                command.env(SAVE, appearance);
+            }
+            let output = command.output().unwrap();
+            assert!(
+                output.status.success(),
+                "{appearance} {phase}: {}\nstdout:\n{}\nstderr:\n{}",
+                output.status,
+                String::from_utf8_lossy(&output.stdout),
+                String::from_utf8_lossy(&output.stderr)
+            );
+            // The result file also proves the child ran, rather than an
+            // unmatched --exact filter succeeding with no test selected.
+            assert_eq!(read(&result), appearance, "{appearance} {phase}");
+            assert_eq!(
+                read(&data.join("settings.json"))["settings"]["appearance"],
+                appearance
+            );
+        }
+    }
 }
 
 #[test]
