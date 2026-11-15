@@ -15,13 +15,70 @@ fn harness_opens_only_its_main_window_when_the_link_is_registered() {
 }
 
 #[test]
-fn harness_does_not_offer_an_unverified_desktop_link_on_other_hosts() {
-    for os in [Os::Windows, Os::Linux] {
+fn harness_opens_its_window_on_windows_when_the_scheme_is_registered() {
+    let target = json!({"kind":"deepseek-app"});
+    assert_eq!(
+        session_url_on(&target, Os::Windows, |url| url == "dsh://open"),
+        Some("dsh://open".into())
+    );
+    // An installer that never registered dsh:// leaves no way back to offer.
+    assert_eq!(session_url_on(&target, Os::Windows, |_| false), None);
+}
+
+#[test]
+fn harness_does_not_offer_an_unverified_desktop_link_on_linux() {
+    assert_eq!(
+        session_url_on(&json!({"kind":"deepseek-app"}), Os::Linux, |_| {
+            panic!("an unsupported link must not query the host")
+        }),
+        None
+    );
+}
+
+#[test]
+fn harness_session_links_open_the_exact_session_on_windows() {
+    for id in [
+        "session-1456302e-07b2-4280-a8a6-986236e9094f",
+        "session-a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4",
+        "orchestrator-a9ac75cc9a195e9c0bf7be76a6a21674",
+    ] {
+        let target = json!({"kind":"deepseek-session","id":id,"url":"https://example.com"});
         assert_eq!(
-            session_url_on(&json!({"kind":"deepseek-app"}), os, |_| {
-                panic!("an unsupported link must not query the host")
+            session_url_on(&target, Os::Windows, |url| url == "dsh://open"),
+            Some(format!("dsh://open?session={id}"))
+        );
+    }
+    // An installer that never registered dsh:// leaves no way back to offer.
+    let target =
+        json!({"kind":"deepseek-session","id":"session-1456302e-07b2-4280-a8a6-986236e9094f"});
+    assert_eq!(session_url_on(&target, Os::Windows, |_| false), None);
+}
+
+#[test]
+fn harness_session_links_stay_on_windows_and_reject_malformed_ids() {
+    let id = "session-1456302e-07b2-4280-a8a6-986236e9094f";
+    for os in [Os::MacOs, Os::Linux] {
+        assert_eq!(
+            session_url_on(&json!({"kind":"deepseek-session","id":id}), os, |_| {
+                panic!("an unverified host must not be queried")
             }),
             None
+        );
+    }
+    for bad in [
+        "session-short",
+        "orchestrator-",
+        "../etc/passwd",
+        "session-1456302E-07b2-4280-a8a6-986236e9094f",
+    ] {
+        assert_eq!(
+            session_url_on(
+                &json!({"kind":"deepseek-session","id":bad}),
+                Os::Windows,
+                |_| { panic!("a malformed id must not query the host") }
+            ),
+            None,
+            "{bad}"
         );
     }
 }

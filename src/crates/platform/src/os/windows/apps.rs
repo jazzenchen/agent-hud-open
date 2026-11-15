@@ -20,6 +20,7 @@ use std::{
 };
 
 pub(super) use link::open_unregistered as open_unregistered_link;
+pub(super) use link::scheme_registered;
 
 const CODEX: &str = "com.openai.codex";
 
