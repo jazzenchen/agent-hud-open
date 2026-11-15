@@ -10,6 +10,7 @@ use std::{
 use tauri::Manager;
 
 mod configure;
+mod depth;
 mod displays;
 mod drag;
 mod input;
@@ -52,6 +53,8 @@ mod host;
 mod host;
 
 use configure::{configure, configure_display, emit_geometry};
+pub use depth::hud_set_depth;
+pub(super) use depth::*;
 pub(super) use displays::*;
 pub use displays::{hud_geometry, hud_monitors};
 pub use drag::hud_drag_start;
@@ -86,6 +89,13 @@ struct HudState {
     config: Option<HudConfig>,
     drag: Option<DragState>,
     geometry: Option<HudGeometry>,
+    /// How far the window reaches from its edge, in points, as the page last
+    /// asked (`hud_set_depth`); None is the whole canvas.
+    depth: Option<f64>,
+    /// Whether the page has asked for a depth yet.
+    depth_asked: bool,
+    /// Where the window's top-left lies in the canvas, in points.
+    window_offset: (f64, f64),
     pointer: Option<HudPointer>,
     pointer_emitted_at: Option<Instant>,
     text_focus: Option<String>,

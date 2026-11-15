@@ -4,9 +4,9 @@ use std::sync::{Arc, PoisonError};
 use tauri::{Emitter, Manager, WebviewUrl};
 
 use super::{
-    apply_ignore_cursor, edge_frame, emit_drag_end, host, monitor_bounds, pointer_outside,
-    publish_pointer, release_text_focus, restore_drag, Display, HudConfig, HudGeometry, HudPointer,
-    HudState, HudWindows, LogicalRect, Shared,
+    apply_ignore_cursor, depth_frame, edge_frame, emit_drag_end, host, monitor_bounds,
+    pointer_outside, publish_pointer, release_text_focus, restore_drag, Display, HudConfig,
+    HudGeometry, HudPointer, HudState, HudWindows, LogicalRect, Shared,
 };
 use host::edge_hud_unsupported;
 
@@ -22,6 +22,16 @@ fn query_screen(screen_id: &str) -> String {
         })
         .collect()
 }
+
+const HUD_DOCUMENT: &str = r#"(() => {
+  const mark = () => document.documentElement?.classList.add("native-hud-document");
+  mark();
+  if (!document.documentElement) document.addEventListener("readystatechange", mark, { once: true });
+})();"#;
+
+/// How deep a window reaches before its page has said: about what a HUD at
+/// rest takes, so a starting HUD never covers the screen.
+const STARTING_DEPTH: f64 = 192.0;
 
 /// Shows, places or hides a screen's HUD window, creating it on first use.
 /// Never on the UI thread: Windows WebView2 creation can deadlock there.
@@ -95,10 +105,25 @@ pub(super) fn configure(
     let monitor = &display.monitor;
     let scale = monitor.scale_factor();
     let measured = &display.measured;
-    let frame = edge_frame(monitor_bounds(monitor), scale, &config);
+    let canvas_frame = edge_frame(monitor_bounds(monitor), scale, &config);
     // Report the actual clamped logical size, rather than an impossible requested canvas.
-    config.width = f64::from(frame.width) / scale;
-    config.height = f64::from(frame.height) / scale;
+    config.width = f64::from(canvas_frame.width) / scale;
+    config.height = f64::from(canvas_frame.height) / scale;
+    // A drag previews across the whole canvas; otherwise the window reaches
+    // only as far from the edge as the page asked.
+    let asked = if state.depth_asked {
+        state.depth
+    } else {
+        Some(STARTING_DEPTH)
+    };
+    let depth = asked
+        .filter(|_| state.drag.is_none())
+        .map(|depth| (depth * scale).round().max(1.0) as u32);
+    let frame = depth_frame(canvas_frame, config.edge, depth);
+    let offset = (
+        f64::from(frame.x - canvas_frame.x) / scale,
+        f64::from(frame.y - canvas_frame.y) / scale,
+    );
     let window = match app.get_webview_window(&owner.label) {
         Some(window) => window,
         None => {
@@ -125,6 +150,10 @@ pub(super) fn configure(
                 .focused(false)
                 .focusable(false)
                 .accept_first_mouse(true)
+                // Transparent from the first frame: the stylesheet's dark page
+                // background would otherwise fill the window until React marks
+                // the document as a HUD.
+                .initialization_script(HUD_DOCUMENT)
                 .visible(false)
                 .build()
                 .map_err(|error| format!("Could not create the HUD surface: {error}"))?;
@@ -143,7 +172,15 @@ pub(super) fn configure(
     if !keep_drag {
         state.drag = None;
     }
-    let canvas = host::place(&window, frame, scale, config.mode)?;
+    let placed = host::place(&window, frame, scale, config.mode)?;
+    // The page keeps laying out on the whole canvas, wherever the window ends.
+    let canvas = LogicalRect {
+        x: placed.x - offset.0,
+        y: placed.y - offset.1,
+        width: f64::from(canvas_frame.width) / scale,
+        height: f64::from(canvas_frame.height) / scale,
+    };
+    state.window_offset = offset;
     crate::activity::set(app, &owner.label, true);
     state.config = Some(config.clone());
     let expected = LogicalRect {
@@ -168,10 +205,10 @@ pub(super) fn configure(
             width: notch.width,
             height: notch.height,
         }),
-        placement_constrained: (expected.x - canvas.x).abs() > 0.5
-            || (expected.y - canvas.y).abs() > 0.5
-            || (expected.width - canvas.width).abs() > 0.5
-            || (expected.height - canvas.height).abs() > 0.5,
+        placement_constrained: (expected.x - placed.x).abs() > 0.5
+            || (expected.y - placed.y).abs() > 0.5
+            || (expected.width - placed.width).abs() > 0.5
+            || (expected.height - placed.height).abs() > 0.5,
     });
     // Existing rectangles own input after a resize as well. The initial show should request
     // ignoreCursor:true until React has measured its actual visible surfaces.

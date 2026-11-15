@@ -1,7 +1,7 @@
 // The interface language and calendar every formatter takes, provided once at
 // the root of each window from the app's language setting.
 import { createContext, use, useContext, useMemo, type ReactNode } from "react";
-import { catalogReady, loadCatalog } from "./catalogs.ts";
+import { loadCatalog } from "./catalogs.ts";
 import {
   interfaceLanguage,
   systemCalendar,
@@ -30,9 +30,7 @@ export function FormatProvider({
   children: ReactNode;
 }) {
   const language = interfaceLanguage(setting);
-  // React has not observed a preloaded promise yet. Reading it with use()
-  // would still suspend once, delaying the initial content unnecessarily.
-  if (!catalogReady(language)) use(loadCatalog(language));
+  use(loadCatalog(language));
   const value = useMemo<FormatSettings>(
     () => ({
       language,

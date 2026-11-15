@@ -61,6 +61,7 @@ pub(super) fn place(
     scale: f64,
     mode: super::types::Mode,
 ) -> Result<LogicalRect, String> {
+    clear_under_page(window);
     configure(
         window,
         mode,
@@ -269,4 +270,21 @@ fn configure(
             height: content.size.height,
         })
     })
+}
+
+/// WebKit fills the part of a view it has not painted yet with the "under
+/// page" color, dark by default. A HUD window that grows before its panel
+/// opens would show that as a wide black band for a frame or two, so the HUD's
+/// is clear, like the rest of its transparent window.
+fn clear_under_page(window: &tauri::WebviewWindow) {
+    use objc2_app_kit::NSColor;
+    use objc2_web_kit::WKWebView;
+    let _ = window.with_webview(|platform| {
+        let pointer = platform.inner().cast::<WKWebView>();
+        if pointer.is_null() {
+            return;
+        }
+        let view = unsafe { &*pointer };
+        unsafe { view.setUnderPageBackgroundColor(Some(&NSColor::clearColor())) };
+    });
 }

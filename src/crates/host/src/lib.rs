@@ -122,6 +122,7 @@ pub fn run_with_options(
                 hud::hud_monitors,
                 hud::hud_geometry,
                 hud::hud_report_regions,
+                hud::hud_set_depth,
                 hud::hud_drag_start,
                 hud::hud_text_focus,
                 auxiliary::hud_show_main,

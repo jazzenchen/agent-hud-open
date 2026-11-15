@@ -461,6 +461,7 @@ export function HUDScene({
           data-mode={config.mode}
           data-edge={edge}
           data-hover={state.phase}
+          data-open={open}
           data-pinned={pinned}
           data-appearance={light ? "light" : "dark"}
           aria-label={`Agent HUD ${config.mode === "notch" ? "Classic" : "Simple"} preview`}

@@ -85,6 +85,12 @@
         startupParameters.get("surface") ||
         startupParameters.get("window") ||
         "settings";
+      // Pictures keep the dark document tokens they had before window startup
+      // followed the system. Their HUD components supply the selected look.
+      if (document.documentElement.dataset.startupSurface === "picture") {
+        document.documentElement.dataset.theme = "dark";
+        document.documentElement.classList.add("dark");
+      }
     </script>
   </head>
   <body>

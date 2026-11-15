@@ -29,12 +29,6 @@ export function addCatalogs(loaders: Loaders) {
 }
 
 const loading = new Map<Language, Promise<void>>();
-const ready = new Set<Language>();
-
-/** Includes every extension catalog as well as the shared translations. */
-export function catalogReady(language: Language): boolean {
-  return ready.has(language);
-}
 
 /** Resolves once `language`'s catalog is in. The same promise every time,
  * so React's `use` can wait on it. */
@@ -48,7 +42,6 @@ export function loadCatalog(language: Language): Promise<void> {
     promise = Promise.all(own.map((load) => load())).then(async (modules) => {
       for (const module of modules) addCatalog(language, module.default);
       for (const load of shared) addCatalog(language, (await load()).default);
-      ready.add(language);
     });
     loading.set(language, promise);
   }

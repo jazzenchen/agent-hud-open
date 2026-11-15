@@ -25,7 +25,7 @@
     "format:check": "cargo fmt --all --check && prettier --check \"src/**/*.{ts,tsx,mjs,css}\"",
     "lint": "cargo clippy --workspace --tests --locked -- -D warnings",
     "test": "cargo test --workspace && pnpm run test:ts && pnpm run test:mcp && pnpm run test:installer && pnpm run test:plugins",
-    "test:ts": "node --test \"src/packages/*/test/*.test.ts\"",
+    "test:ts": "node --test \"src/packages/*/test/*.test.ts\" \"src/apps/desktop/test/*.test.mjs\"",
     "test:mcp": "node --test src/apps/mcp/test/*.test.mjs",
     "test:installer": "node --test src/apps/installer/test/*.test.mjs",
     "test:plugins": "node --test src/crates/platform/src/deepseek_plugin/*.test.mjs",
