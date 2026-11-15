@@ -3,14 +3,14 @@
   <channel>
     <title>Agent HUD</title>
     <item>
-      <title>0.6.4</title>
-      <pubDate>Sun, 15 Nov 2026 00:05:09 +0800</pubDate>
-      <link>https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.4</link>
-      <sparkle:version>501</sparkle:version>
-      <sparkle:shortVersionString>0.6.4</sparkle:shortVersionString>
+      <title>0.6.5</title>
+      <pubDate>Mon, 16 Nov 2026 00:50:06 +0800</pubDate>
+      <link>https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.5</link>
+      <sparkle:version>502</sparkle:version>
+      <sparkle:shortVersionString>0.6.5</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
       <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-      <description sparkle:format="markdown"># Agent HUD 0.6.4
+      <description sparkle:format="markdown"># Agent HUD 0.6.5
 
 ## Compatibility
 
@@ -22,23 +22,13 @@ Requires an Apple Silicon Mac running macOS 14 or later.
 
 ## Changes
 
-### New
-
-- Speaks nine languages: English, Simplified Chinese, Traditional Chinese, Japanese, Korean, French, German, Spanish and Brazilian Portuguese. Pick one in Settings → General → Language, or let it follow the system.
-- Adds "Take me around" to the card that tells what an update adds. It starts the getting-started tour beside the HUD, and the card counts as read.
-- Reads Qoder, QoderWork, TRAE, WorkBuddy, CodeBuddy, ZCode and MiniMax Code accounts from each app's own sign-in. Each region is its own account: Qoder CN, TRAE CN and CodeBuddy CN show apart from the international ones.
-- Lets agents start DeepSeek Harness sessions, through Agent HUD's plugin in a running Harness. With none running, the Harness desktop app opens.
-- Lets an agent that reads the answer itself leave out the reply line (#75). With `reply_hint: false` on `send_message` or `start_session`, the message ends by asking the recipient to answer in its turn, instead of sending a message back.
-- Opens the windows a sign-in page asks for beside the sign-in window, and presents the system's own browser to the site, so sign-ins that open a second window or check the browser go through.
-
 ### Fixes
 
-- Sends a reply to the session that sent the message it answers, in that session's own app (#79). A reply with only `reply_to` was looked up by session id across every app, so another app's session with the same id could get it. A `to` that sessions of two apps share is now refused instead of guessed.
-- Delivers agent messages to Antigravity on Windows (#77). Finding Antigravity's server took over 6 seconds on some computers, longer than a message may wait, so every message was refused. It now takes milliseconds.
-- Recovers on Windows when a plugin folder belongs to another account (#78), as after Agent HUD or a client ran as administrator. Agent HUD refused the folder, so the DeepSeek Harness plugin never connected and every Harness session read as unreachable. It now sets such a folder aside and makes it again.
-- Stops marking CodeBuddy, Qoder CN and QoderWork as "Requests only" on the Remote page; their conversations sync to the phone too.
+- Keeps the HUD's window only as large as the HUD needs at rest, so it no longer covers other apps' windows and dialogs (#84). The window was as tall as the screen, transparent but above everything, and macOS hid the App Store's Install button under it. It now grows to full size only when the panel starts to open, and shrinks back after it closes.
+- Stops a dark flash across the HUD's window when Agent HUD starts.
+- Names the folder and what to do when a private folder on Windows belongs to another account and Agent HUD cannot use it (#81, thanks @zqy5618).
 </description>
-      <enclosure url="https://github.com/jazzenchen/agent-hud-open/releases/download/v0.6.4/Agent-HUD-0.6.4-arm64.dmg" length="54574802" type="application/octet-stream" sparkle:edSignature="X15suvll+i69fGVKPuUXq89+pBAEgyUxPusmACePaZm9P9BOdkrJqHkilGz1izIaGdxnsCgkC9p40qAn00ZZAQ==" />
+      <enclosure url="https://github.com/jazzenchen/agent-hud-open/releases/download/v0.6.5/Agent-HUD-0.6.5-arm64.dmg" length="54581653" type="application/octet-stream" sparkle:edSignature="FYAIhp49a/5WhPR2jIn3HzMbMU5yjC7teNsznlpPt460SZCUJRCDcy9eVeblkWTqQYlBgfo3LAIRc+R+VE2EBw==" />
       <agenthudMacOnly>false</agenthudMacOnly>
       <agenthudMinimumIOSVersion>1.7.2</agenthudMinimumIOSVersion>
     </item>
