@@ -39,9 +39,10 @@ fn compressed(session: &str) -> bool {
     session.starts_with("deepseek:")
 }
 
-/// A Codex that queues what it is given and remembers it.
+/// A Codex that queues what it is given and remembers it. A steer goes into
+/// its turn in progress, unless it has none (`.1`, idle): then nothing goes in.
 #[derive(Default)]
-struct Codex(Mutex<Vec<SendRequest>>);
+struct Codex(Mutex<Vec<SendRequest>>, AtomicBool);
 impl CodexTransport for Codex {
     fn deliver(
         &self,
@@ -51,15 +52,25 @@ impl CodexTransport for Codex {
         _timeout: Duration,
     ) -> delivery::Result<Receipt> {
         self.0.lock().unwrap().push(request.clone());
+        let steer = request.operation == Operation::Steer;
+        if steer && self.1.load(AtomicOrdering::SeqCst) {
+            return Err(delivery::Failure::Rejected(
+                delivery::NO_TURN_TO_STEER.into(),
+            ));
+        }
         Ok(Receipt {
             provider: Provider::Codex,
             session_id: target.session_id.clone(),
             thread_id: target.thread_id.clone(),
             request_id: request.request_id.clone(),
             client_request_id: format!("agent-hud:{}", request.request_id),
-            turn_id: None,
+            turn_id: steer.then(|| "turn-in-progress".into()),
             owner_client_id: None,
-            state: DeliveryState::Queued,
+            state: if steer {
+                DeliveryState::Steered
+            } else {
+                DeliveryState::Queued
+            },
             at_ms: 0,
             reason: None,
         })
@@ -2316,4 +2327,115 @@ fn an_answer_a_later_turn_hides_is_still_given() {
     assert_eq!(got["state"], "done", "{got}");
     assert_eq!(got["answer"], "Ported.");
     assert_eq!(got["endedAt"], at(now + 3_000));
+}
+
+/// The row list_sessions gives for a session.
+fn listed(world: &mut World, id: &str) -> Value {
+    let list = world.call(Some(("claude", CLAUDE)), "list_sessions", json!({}));
+    list["sessions"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|row| row["id"] == id)
+        .unwrap()
+        .clone()
+}
+
+#[test]
+fn a_steer_goes_into_the_codex_turn_in_progress_marked_as_such_and_counts_as_a_pass() {
+    let mut world = World::on();
+    let answer = world.call(
+        Some(("claude", CLAUDE)),
+        "send_message",
+        json!({"to":CODEX,"text":"Stop: the API is v2 now, not v1.","delivery":"steer"}),
+    );
+    assert_eq!(answer["state"], "steered", "{answer}");
+    assert_eq!(answer["pass"], 1);
+    let id = answer["id"].as_str().unwrap().to_owned();
+    let sent = world.codex.0.lock().unwrap()[0].clone();
+    assert_eq!(sent.operation, Operation::Steer);
+    assert_eq!(
+        sent.expected_turn_id, None,
+        "the turn in progress, as Codex finds it"
+    );
+    assert_eq!(
+        sent.text.lines().next().unwrap(),
+        format!("[Agent HUD · from Claude Code · Fix the login · {id} · into your current turn]")
+    );
+    assert!(sent.text.contains("Stop: the API is v2 now, not v1."));
+    // queue, or no delivery at all, is the queue as before.
+    for arguments in [
+        json!({"to":CODEX,"text":"Then review it.","delivery":"queue"}),
+        json!({"to":CODEX,"text":"Then review it."}),
+    ] {
+        let answer = world.call(Some(("claude", CLAUDE)), "send_message", arguments);
+        assert_eq!(answer["state"], "queued");
+        let sent = world.codex.0.lock().unwrap().last().unwrap().clone();
+        assert_eq!(sent.operation, Operation::Enqueue);
+        assert!(!sent.text.lines().next().unwrap().contains("current turn"));
+    }
+}
+
+#[test]
+fn a_steer_with_no_turn_in_progress_is_refused_and_never_queued_instead() {
+    let mut world = World::on();
+    world.codex.1.store(true, AtomicOrdering::SeqCst);
+    let answer = world.call(
+        Some(("claude", CLAUDE)),
+        "send_message",
+        json!({"to":CODEX,"text":"Stop: the API is v2 now.","delivery":"steer"}),
+    );
+    assert_eq!(answer["state"], "refused", "{answer}");
+    assert!(answer["reason"]
+        .as_str()
+        .unwrap()
+        .contains("no turn in progress, so nothing was sent"));
+    let sent = world.codex.0.lock().unwrap().clone();
+    assert_eq!(sent.len(), 1, "one attempt, not a queued second");
+    assert_eq!(sent[0].operation, Operation::Steer);
+}
+
+#[test]
+fn a_steer_to_a_client_that_takes_none_is_refused_before_anything_is_sent() {
+    let mut world = World::on();
+    let answer = world.call(
+        Some(("codex", CODEX)),
+        "send_message",
+        json!({"to":CLAUDE,"text":"Stop: the API is v2 now.","delivery":"steer"}),
+    );
+    assert_eq!(answer["state"], "refused");
+    assert!(answer["reason"]
+        .as_str()
+        .unwrap()
+        .contains("Claude Code sessions cannot be steered"));
+    assert!(!world.channel.join(format!("prompts/{CLAUDE}")).exists());
+}
+
+#[test]
+fn list_sessions_says_a_running_codex_with_its_thread_open_can_be_steered() {
+    let mut world = World::on();
+    let codex = listed(&mut world, CODEX);
+    assert_eq!(codex["steerable"], false, "idle");
+    let claude = listed(&mut world, QUIET);
+    assert_eq!(claude["steerable"], false);
+    assert!(claude["steerReason"]
+        .as_str()
+        .unwrap()
+        .contains("cannot be steered"));
+    world.state(CODEX, "running");
+    assert_eq!(
+        listed(&mut world, CODEX)["steerable"],
+        false,
+        "no app has the thread open"
+    );
+    let locks = world.fixture.home().join(".codex/thread-writer-locks");
+    std::fs::create_dir_all(&locks).unwrap();
+    let lock = std::fs::File::create(locks.join(format!("{CODEX}.lock"))).unwrap();
+    lock.lock().unwrap();
+    let codex = listed(&mut world, CODEX);
+    assert_eq!(codex["steerable"], true, "{codex}");
+    assert!(codex["steerReason"]
+        .as_str()
+        .unwrap()
+        .contains("a steer goes into it"));
 }
