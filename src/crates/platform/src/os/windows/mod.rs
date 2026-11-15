@@ -107,9 +107,22 @@ pub(crate) fn application_installed(home: &Path, env: &Environment, name: &str) 
     .iter()
     .any(|dir| dir.join(name).is_dir())
 }
-/// URL-handler lookup through Windows associations is not implemented.
-pub(crate) fn registered_url(_url: &str) -> bool {
-    false
+/// Whether an installer pointed this machine's link at a program, which is
+/// how a session link can open its app. Registry keys are case-insensitive,
+/// so the scheme goes to the lookup as the link wrote it.
+pub(crate) fn registered_url(url: &str) -> bool {
+    url_scheme(url).is_some_and(apps::scheme_registered)
+}
+/// A link's scheme: the letters before its first colon, as RFC 3986 spells
+/// it. Anything else opens no app.
+fn url_scheme(url: &str) -> Option<&str> {
+    let (scheme, rest) = url.split_once(':')?;
+    (!rest.is_empty()
+        && scheme.starts_with(|first: char| first.is_ascii_alphabetic())
+        && scheme
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'+' | b'-' | b'.')))
+    .then_some(scheme)
 }
 pub(crate) fn executable_dirs(home: &Path, env: &Environment) -> Vec<PathBuf> {
     let mut dirs = path_entries(env);
@@ -301,5 +314,31 @@ mod tests {
             path_entries(&env),
             vec![PathBuf::from("C:\\tools"), PathBuf::from("D:\\bin")]
         );
+    }
+
+    #[test]
+    fn a_link_scheme_is_the_name_before_its_first_colon() {
+        for (url, scheme) in [
+            ("dsh://open", Some("dsh")),
+            ("dsh:open", Some("dsh")),
+            ("a+b-c.d://x", Some("a+b-c.d")),
+        ] {
+            assert_eq!(url_scheme(url), scheme, "{url}");
+        }
+        // Nothing before the colon, or a name that is not a scheme, opens nothing.
+        for url in ["", "open", "://x", "1dsh://x", "ds h://x"] {
+            assert_eq!(url_scheme(url), None, "{url}");
+        }
+    }
+
+    #[test]
+    fn a_scheme_no_installer_owning_and_a_name_that_is_not_a_scheme_open_nothing() {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let url = format!("agent-hud-unregistered-{}-{now}://open", std::process::id());
+        assert!(!registered_url(&url), "{url}");
+        assert!(!registered_url("open"));
     }
 }

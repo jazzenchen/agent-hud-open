@@ -176,6 +176,17 @@ fn session_url_on(target: &Value, os: Os, registered: impl Fn(&str) -> bool) -> 
             url.query_pairs_mut().append_pair("id", id);
             Some(url.into())
         }
+        // The Harness desktop opens its window on one session, where its
+        // installer registered dsh://; elsewhere the app link stands in.
+        "deepseek-session"
+            if os == Os::Windows
+                && agent_hud_agents::deepseek::is_session_id(id)
+                && registered("dsh://open") =>
+        {
+            let mut url = reqwest::Url::parse("dsh://open").ok()?;
+            url.query_pairs_mut().append_pair("session", id);
+            Some(url.into())
+        }
         // A cloud agent opens in Cursor's Agents window by its `bc-` id. Cursor
         // has no link for a local session (its composers open only through
         // internal commands), so that one opens its folder in Cursor.
