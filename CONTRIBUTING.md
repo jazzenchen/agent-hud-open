@@ -56,6 +56,13 @@ cargo test --workspace
 
 `pnpm run format` runs rustfmt and Prettier with the repository's settings, and CI refuses unformatted code. `pnpm run lint` is clippy with warnings as errors, as CI runs it on each operating system. Editors that read `.editorconfig`, `rustfmt.toml` and `.prettierrc.json` format the same way on save.
 
+The desktop startup surface also has browser tests. Run `pnpm exec playwright test`
+with Google Chrome installed (the default channel), or set `PLAYWRIGHT_CHANNEL`
+to an installed Playwright channel. The suite builds and serves production assets,
+without starting the development bridge or reading local agent accounts. It holds
+application and translation modules to check the loading surface and handoff.
+These tests do not replace native launch/reopen checks on each operating system.
+
 Windows compilation and adapter tests run on GitHub's native Windows runner.
 Use the **Windows desktop** workflow and download its installer for real-machine
 acceptance; see [platform builds](docs/platform-builds.md). There is no requirement

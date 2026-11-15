@@ -1,5 +1,106 @@
 <!doctype html>
 <html lang="en">
-  <head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="color-scheme" content="light dark" /><title>Agent HUD</title></head>
-  <body><div id="root"></div><script type="module" src="/src/main.tsx"></script></body>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
+    <title>Agent HUD</title>
+    <!-- Paint without waiting for the application or its language catalog.
+         Native document initialization supplies data-theme when known. -->
+    <style>
+      :root {
+        --startup-background: #282828;
+        --startup-line: #ffffff12;
+        --startup-card: #ffffff06;
+      }
+      :root[data-theme="light"] {
+        --startup-background: #f5f5f7;
+        --startup-line: #00000012;
+        --startup-card: #ffffff80;
+      }
+      @media (prefers-color-scheme: light) {
+        :root:not([data-theme]) {
+          --startup-background: #f5f5f7;
+          --startup-line: #00000012;
+          --startup-card: #ffffff80;
+        }
+      }
+      html,
+      body {
+        margin: 0;
+        background: var(--startup-background);
+      }
+      :root[data-startup-surface="hud"],
+      :root[data-startup-surface="hud"] body,
+      :root[data-startup-surface="picture"],
+      :root[data-startup-surface="picture"] body {
+        background: transparent;
+      }
+      #startup-shell {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: var(--startup-background);
+        pointer-events: none;
+      }
+      :root[data-startup-surface="settings"] #startup-shell,
+      :root[data-startup-surface="statistics"] #startup-shell {
+        display: flex;
+      }
+      :root #startup-shell[hidden] {
+        display: none;
+      }
+      .startup-sidebar {
+        box-sizing: border-box;
+        flex: 0 0 212px;
+        padding: 52px 24px;
+        border-right: 1px solid var(--startup-line);
+      }
+      :root[data-startup-surface="statistics"] .startup-sidebar {
+        display: none;
+      }
+      .startup-content {
+        flex: 1;
+        min-width: 0;
+        padding: 52px 32px;
+      }
+      .startup-line {
+        height: 12px;
+        max-width: 140px;
+        margin-bottom: 24px;
+        border-radius: 4px;
+        background: var(--startup-line);
+      }
+      .startup-card {
+        height: 112px;
+        margin-bottom: 24px;
+        border: 1px solid var(--startup-line);
+        border-radius: 10px;
+        background: var(--startup-card);
+      }
+    </style>
+    <script>
+      const startupParameters = new URLSearchParams(location.search);
+      document.documentElement.dataset.startupSurface =
+        startupParameters.get("surface") ||
+        startupParameters.get("window") ||
+        "settings";
+    </script>
+  </head>
+  <body>
+    <div id="startup-shell" role="progressbar" aria-label="Agent HUD">
+      <div class="startup-sidebar" aria-hidden="true">
+        <div class="startup-line"></div>
+        <div class="startup-line"></div>
+        <div class="startup-line"></div>
+      </div>
+      <div class="startup-content" aria-hidden="true">
+        <div class="startup-line"></div>
+        <div class="startup-card"></div>
+        <div class="startup-card"></div>
+      </div>
+    </div>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
 </html>
