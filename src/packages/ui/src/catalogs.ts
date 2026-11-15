@@ -23,12 +23,19 @@ type Loaders = Partial<Record<Language, () => Promise<Catalog>>>;
 const extra: Loaders[] = [];
 
 /** Adds the catalogs an app built on this one carries for its own text;
- * call before the first window renders. A key in both is the shared one's. */
+ * register synchronously before any preload or window render. A key in both
+ * is the shared one's. Registration after loading starts is not supported. */
 export function addCatalogs(loaders: Loaders) {
   extra.push(loaders);
 }
 
 const loading = new Map<Language, Promise<void>>();
+const ready = new Set<Language>();
+
+/** Includes every registered extension and the shared catalog. */
+export function catalogReady(language: Language): boolean {
+  return ready.has(language);
+}
 
 /** Resolves once `language`'s catalog is in. The same promise every time,
  * so React's `use` can wait on it. */
@@ -42,6 +49,7 @@ export function loadCatalog(language: Language): Promise<void> {
     promise = Promise.all(own.map((load) => load())).then(async (modules) => {
       for (const module of modules) addCatalog(language, module.default);
       for (const load of shared) addCatalog(language, (await load()).default);
+      ready.add(language);
     });
     loading.set(language, promise);
   }
