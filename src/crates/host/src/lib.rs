@@ -5,6 +5,7 @@ use tauri::Manager;
 use agent_hud_hud::{bots, presentation, vendors};
 
 mod activity;
+mod appearance;
 mod auxiliary;
 mod backend;
 mod capture;
@@ -54,7 +55,7 @@ pub fn run_with_context(
     run_with_options(context, extension, HostOptions::default())
 }
 pub fn run_with_options(
-    context: tauri::Context<tauri::Wry>,
+    mut context: tauri::Context<tauri::Wry>,
     extension: Option<Arc<dyn extension::ProductExtension>>,
     options: HostOptions,
 ) {
@@ -97,7 +98,9 @@ pub fn run_with_options(
             }
         }
     };
+    let initial_window = appearance::defer_initial(&mut context);
     tauri::Builder::default()
+        .manage(appearance::Appearance::load(demo))
         .manage(options.clone())
         .manage(AppState { demo })
         .invoke_handler({
@@ -105,6 +108,7 @@ pub fn run_with_options(
                 requests::native_request,
                 backend::cached_snapshot,
                 startup_mode,
+                appearance::window_appearance,
                 requests::presentation_request,
                 mcp_clients::native_mcp_clients,
                 claude_plugin::native_claude_plugin,
@@ -144,6 +148,7 @@ pub fn run_with_options(
             }
         })
         .setup(move |app| {
+            appearance::open_initial(app.handle(), initial_window.as_ref())?;
             // Hear about the system's shutdown before any background reading
             // starts. Without it the app still runs; helpers just are not held
             // back while Windows ends the session.

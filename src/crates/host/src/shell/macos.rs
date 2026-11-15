@@ -2,6 +2,29 @@
 //! click reopens Settings, and Statistics draws under a transparent title bar.
 use tauri::Manager;
 
+/// The opaque surface WebKit paints before document content. Tauri's generic
+/// background setter covers NSWindow but leaves this layer unchanged on macOS.
+pub(crate) fn page_background(
+    window: &tauri::WebviewWindow,
+    color: tauri::window::Color,
+) -> Result<(), String> {
+    use objc2_app_kit::NSColor;
+    use objc2_web_kit::WKWebView;
+    window
+        .with_webview(move |platform| {
+            // Tauri runs this closure on the main thread, where the WKWebView lives.
+            let view = unsafe { &*platform.inner().cast::<WKWebView>() };
+            let background = NSColor::colorWithSRGBRed_green_blue_alpha(
+                f64::from(color.0) / 255.0,
+                f64::from(color.1) / 255.0,
+                f64::from(color.2) / 255.0,
+                f64::from(color.3) / 255.0,
+            );
+            unsafe { view.setUnderPageBackgroundColor(Some(&background)) };
+        })
+        .map_err(|e| e.to_string())
+}
+
 #[path = "macos_hotkey.rs"]
 mod hotkey;
 

@@ -31,6 +31,14 @@ pub(crate) fn system_languages() -> Vec<String> {
         .unwrap_or_default()
 }
 
+/// Tauri already sets both the native window and WebKitGTK background.
+pub(crate) fn page_background(
+    _window: &tauri::WebviewWindow,
+    _color: tauri::window::Color,
+) -> Result<(), String> {
+    Ok(())
+}
+
 /// Not drawn yet: GTK is not running before Tauri starts, so the message
 /// goes to standard error.
 pub(crate) fn alert(title: &str, body: &str, _ok: &str) {

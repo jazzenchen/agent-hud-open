@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
-import { isTauri } from "@tauri-apps/api/core";
+import { invoke, isTauri } from "@tauri-apps/api/core";
 import { currentMonitor, getCurrentWindow } from "@tauri-apps/api/window";
 import type { Snapshot } from "@agent-hud/protocol";
 import { getScreenHUDConfig, type HUDConfigStore } from "./hud-config-store";
 import type { NativeHUDMonitor } from "./use-hud-geometry";
+import { windowAppearance } from "./window-theme";
 
 /** The window's look: the Appearance setting, the system's while that says
  * System, or with Match screen on, the look of the screen the window is on.
@@ -14,6 +15,9 @@ export function useWindowTheme(
   monitors: NativeHUDMonitor[],
   surface: boolean,
 ) {
+  const [initialAppearance] = useState(
+    () => document.documentElement.dataset.initialAppearance,
+  );
   const [systemLight, setSystemLight] = useState(
     () => matchMedia("(prefers-color-scheme: light)").matches,
   );
@@ -53,13 +57,18 @@ export function useWindowTheme(
           monitorIndex: 0,
           hasNotch: false,
         }).appearance
-      : snapshot?.settings.appearance || "system";
+      : windowAppearance(snapshot?.settings.appearance, initialAppearance);
   const theme =
     appearance === "system" ? (systemLight ? "light" : "dark") : appearance;
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
+    document.documentElement.style.colorScheme = theme;
     document.documentElement.classList.toggle("dark", theme === "dark");
     document.documentElement.classList.toggle("native-hud-document", surface);
+    if (isTauri() && !surface)
+      void invoke("window_appearance", { theme }).catch((error) =>
+        console.error("Agent HUD window appearance:", error),
+      );
   }, [theme, surface]);
   return theme;
 }

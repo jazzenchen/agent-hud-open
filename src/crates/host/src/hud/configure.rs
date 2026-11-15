@@ -110,6 +110,7 @@ pub(super) fn configure(
                 .into(),
             );
             let window = host::panel_builder(app, &owner.label, url)
+                .initialization_script(crate::appearance::script(app))
                 .title("Agent HUD")
                 .decorations(false)
                 .resizable(false)

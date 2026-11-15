@@ -36,6 +36,14 @@ pub(crate) fn system_languages() -> Vec<String> {
     vec![String::from_utf16_lossy(&name[..length as usize - 1])]
 }
 
+/// Tauri already sets both the native window and WebView2 background.
+pub(crate) fn page_background(
+    _window: &tauri::WebviewWindow,
+    _color: tauri::window::Color,
+) -> Result<(), String> {
+    Ok(())
+}
+
 /// A message box from a process that has not started Tauri yet.
 pub(crate) fn alert(title: &str, body: &str, _ok: &str) {
     use windows::{

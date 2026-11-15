@@ -17,6 +17,6 @@ mod host;
 #[path = "linux.rs"]
 mod host;
 pub(crate) use host::{
-    alert, install, prepare, reopened, statistics_chrome, system_languages, window_opened,
-    windows_changed,
+    alert, install, page_background, prepare, reopened, statistics_chrome, system_languages,
+    window_opened, windows_changed,
 };
