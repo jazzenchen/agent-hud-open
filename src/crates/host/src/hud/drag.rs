@@ -87,10 +87,19 @@ pub async fn hud_drag_start(
                 "The HUD placement changed before pickup; measure the current strip again".into(),
             );
         }
-        let viewport = window.inner_size().map_err(|error| error.to_string())?;
-        let scale = window.scale_factor().map_err(|error| error.to_string())?;
-        let width = f64::from(viewport.width) / scale;
-        let height = f64::from(viewport.height) / scale;
+        // The page's coordinates are the canvas's, which a shallow window
+        // shows only part of.
+        let (width, height) = match state.geometry.as_ref() {
+            Some(geometry) => (geometry.canvas.width, geometry.canvas.height),
+            None => {
+                let viewport = window.inner_size().map_err(|error| error.to_string())?;
+                let scale = window.scale_factor().map_err(|error| error.to_string())?;
+                (
+                    f64::from(viewport.width) / scale,
+                    f64::from(viewport.height) / scale,
+                )
+            }
+        };
         if pointer.x < 0.0 || pointer.y < 0.0 || pointer.x > width || pointer.y > height {
             return Err("The pickup point must be inside the HUD viewport".into());
         }
@@ -109,6 +118,17 @@ pub async fn hud_drag_start(
         let display = resolve_display(&app, &config)?;
         ensure_worker(&app, &shared, &mut state)?;
         apply_ignore_cursor(&window, &mut state, false, true)?;
+        // A drag previews across the whole canvas: a shallow window grows to it first.
+        if state.depth.is_some() || !state.depth_asked {
+            configure(
+                &app,
+                config.clone(),
+                &mut state,
+                &shared,
+                display.clone(),
+                true,
+            )?;
+        }
         state.drag = Some(DragState {
             config,
             display,

@@ -27,7 +27,7 @@ tao = { version = "=0.37.1", default-features = false, features = ["rwh_06"] }
 objc2.workspace = true
 block2 = "0.6"
 dispatch2 = { version = "0.3", default-features = false, features = ["std", "objc2"] }
-objc2-app-kit = { workspace = true, features = ["std", "NSApplication", "NSRunningApplication", "NSWorkspace", "NSWindow", "NSScreen", "NSGraphics", "NSCursor", "NSView", "NSImage", "NSBitmapImageRep", "NSImageRep", "NSAlert", "NSButton", "NSControl", "NSResponder", "objc2-core-foundation"] }
+objc2-app-kit = { workspace = true, features = ["std", "NSApplication", "NSRunningApplication", "NSWorkspace", "NSWindow", "NSScreen", "NSGraphics", "NSCursor", "NSView", "NSImage", "NSBitmapImageRep", "NSImageRep", "NSAlert", "NSButton", "NSColor", "NSControl", "NSResponder", "objc2-core-foundation"] }
 objc2-foundation = { workspace = true, features = ["std", "NSDictionary", "NSString", "NSBundle", "NSError", "NSValue", "NSNotification", "NSOperation", "NSLocale", "NSArray", "block2"] }
 objc2-core-foundation = { version = "0.3", default-features = false, features = ["std", "CFString", "CFUUID"] }
 
@@ -39,7 +39,7 @@ windows = { version = "=0.62.2", features = ["Win32_Devices_Display", "Win32_Fou
 [target.'cfg(target_os = "macos")'.dependencies.objc2-web-kit]
 version = "=0.3.2"
 default-features = false
-features = ["std", "block2", "WKWebView", "WKSnapshotConfiguration"]
+features = ["std", "block2", "objc2-app-kit", "WKWebView", "WKSnapshotConfiguration"]
 
 [target.'cfg(target_os = "linux")'.dependencies]
 webkit2gtk = "=2.0.2"

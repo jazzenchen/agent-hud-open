@@ -19,6 +19,7 @@ import type {
   NativeHUDMonitor,
 } from "./lib/use-hud-geometry";
 import { useHUDPointer } from "./lib/use-hud-pointer";
+import { HUDCanvas } from "./HUDCanvas";
 import { useHUDTextFocus } from "./lib/use-hud-text-focus";
 import type { ProductGuide } from "./guide/plan";
 import { openSettingsSteps } from "./guide/steps";
@@ -258,28 +259,33 @@ export default function NativeHUDSurface({
       })
     : undefined;
   return (
-    <HUDScene
-      snapshot={snapshot}
-      config={shownConfig}
-      dragPreview={dragPreview}
-      dragEndSequence={dragEndSequence}
-      nativePointer={nativePointer}
-      underPointer={underPointer}
-      textFocused={textFocused}
-      botDirections={botDirections}
-      glowHidden={glowHidden}
-      onBotLooked={looked}
-      notchFrame={notchFrame}
-      height={geometry?.canvas.height ?? window.innerHeight}
-      onConfigure={configure}
-      onStats={stats}
-      update={update}
-      onUpdate={openUpdate}
-      onDragStart={beginDrag}
-      onRequestDecision={decide}
-      panelCommand={primary ? panelCommand : undefined}
-      flights={flights}
-      guide={guide}
-    />
+    <HUDCanvas
+      geometry={geometry}
+      edge={shownConfig.mode === "notch" ? "top" : shownConfig.edge}
+    >
+      <HUDScene
+        snapshot={snapshot}
+        config={shownConfig}
+        dragPreview={dragPreview}
+        dragEndSequence={dragEndSequence}
+        nativePointer={nativePointer}
+        underPointer={underPointer}
+        textFocused={textFocused}
+        botDirections={botDirections}
+        glowHidden={glowHidden}
+        onBotLooked={looked}
+        notchFrame={notchFrame}
+        height={geometry?.canvas.height ?? window.innerHeight}
+        onConfigure={configure}
+        onStats={stats}
+        update={update}
+        onUpdate={openUpdate}
+        onDragStart={beginDrag}
+        onRequestDecision={decide}
+        panelCommand={primary ? panelCommand : undefined}
+        flights={flights}
+        guide={guide}
+      />
+    </HUDCanvas>
   );
 }

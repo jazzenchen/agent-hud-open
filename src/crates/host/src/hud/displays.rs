@@ -161,3 +161,76 @@ pub(super) fn edge_frame(bounds: Rect, scale: f64, config: &HudConfig) -> Rect {
         height,
     }
 }
+
+/// The part of a HUD canvas the window covers: all of it, or the `depth`
+/// physical pixels next to its edge. The page lays out on the whole canvas
+/// either way. A shallow window at rest leaves the rest of the screen to other
+/// apps' windows and dialogs: macOS hides a sheet's Install button while any
+/// window above it overlaps it, transparent or not (agent-hud-open #84).
+pub(super) fn depth_frame(canvas: Rect, edge: Edge, depth: Option<u32>) -> Rect {
+    let Some(depth) = depth else {
+        return canvas;
+    };
+    match edge {
+        Edge::Top => Rect {
+            height: depth.clamp(1, canvas.height),
+            ..canvas
+        },
+        Edge::Bottom => {
+            let height = depth.clamp(1, canvas.height);
+            Rect {
+                y: canvas.y.saturating_add((canvas.height - height) as i32),
+                height,
+                ..canvas
+            }
+        }
+        Edge::Left => Rect {
+            width: depth.clamp(1, canvas.width),
+            ..canvas
+        },
+        Edge::Right => {
+            let width = depth.clamp(1, canvas.width);
+            Rect {
+                x: canvas.x.saturating_add((canvas.width - width) as i32),
+                width,
+                ..canvas
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_shallow_window_keeps_to_its_edge_of_the_canvas() {
+        let canvas = Rect {
+            x: 100,
+            y: 0,
+            width: 940,
+            height: 1080,
+        };
+        assert!(depth_frame(canvas, Edge::Top, None) == canvas);
+        let top = depth_frame(canvas, Edge::Top, Some(120));
+        assert_eq!((top.x, top.y, top.width, top.height), (100, 0, 940, 120));
+        let bottom = depth_frame(canvas, Edge::Bottom, Some(120));
+        assert_eq!(
+            (bottom.x, bottom.y, bottom.width, bottom.height),
+            (100, 960, 940, 120)
+        );
+        let left = depth_frame(canvas, Edge::Left, Some(80));
+        assert_eq!(
+            (left.x, left.y, left.width, left.height),
+            (100, 0, 80, 1080)
+        );
+        let right = depth_frame(canvas, Edge::Right, Some(80));
+        assert_eq!(
+            (right.x, right.y, right.width, right.height),
+            (960, 0, 80, 1080)
+        );
+        // Never deeper than the canvas, never empty.
+        assert_eq!(depth_frame(canvas, Edge::Bottom, Some(5000)).height, 1080);
+        assert_eq!(depth_frame(canvas, Edge::Left, Some(0)).width, 1);
+    }
+}

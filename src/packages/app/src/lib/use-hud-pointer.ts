@@ -140,6 +140,11 @@ export function useHUDPointer(screenId: string) {
       cancelAnimationFrame(frame);
       frame = requestAnimationFrame(() => {
         if (disposed) return;
+        // In the canvas's coordinates, as the host's pointer is: the window
+        // may show only the part of the canvas next to the HUD's edge.
+        const scene = document
+          .querySelector(".hud-scene")
+          ?.getBoundingClientRect();
         const regions = [
           ...document.querySelectorAll(
             ".hud-resting-strip, .hud-expanded-surface, .hud-grab-surface, .hud-hover-floor, .hud-dock-end, .hud-guide",
@@ -148,8 +153,8 @@ export function useHUDPointer(screenId: string) {
           .map((element) => {
             const rect = element.getBoundingClientRect();
             return {
-              x: rect.x,
-              y: rect.y,
+              x: rect.x - (scene?.left ?? 0),
+              y: rect.y - (scene?.top ?? 0),
               width: rect.width,
               height: rect.height,
             };

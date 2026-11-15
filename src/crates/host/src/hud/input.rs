@@ -205,11 +205,20 @@ pub(super) fn apply_ignore_cursor(
     force: bool,
 ) -> Result<(), String> {
     if force || state.last_ignore_cursor != Some(ignored) {
-        host::set_ignore_cursor(
-            window,
-            ignored,
-            state.regions.as_deref().unwrap_or_default(),
-        )?;
+        // Regions are in canvas coordinates; a host's input shape is the window's.
+        let (dx, dy) = state.window_offset;
+        let regions: Vec<InteractiveRegion> = state
+            .regions
+            .as_deref()
+            .unwrap_or_default()
+            .iter()
+            .map(|region| InteractiveRegion {
+                x: region.x - dx,
+                y: region.y - dy,
+                ..*region
+            })
+            .collect();
+        host::set_ignore_cursor(window, ignored, &regions)?;
         state.last_ignore_cursor = Some(ignored);
     }
     Ok(())
