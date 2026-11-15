@@ -940,20 +940,25 @@ fn harness_host(
     let folder = channel.join("starts/777");
     std::thread::spawn(move || {
         for _ in 0..400 {
-            if let Some(file) = std::fs::read_dir(&folder)
-                .ok()
-                .and_then(|files| files.flatten().next())
-                .map(|entry| entry.path())
-            {
+            // As the plugin does: only `.json` requests (Agent HUD writes each
+            // through a `.tmp` beside it first), answered by a rename.
+            if let Some(file) = std::fs::read_dir(&folder).ok().and_then(|files| {
+                files
+                    .flatten()
+                    .map(|entry| entry.path())
+                    .find(|path| path.extension().is_some_and(|e| e == "json"))
+            }) {
                 if let Some(asked) = std::fs::read(&file)
                     .ok()
                     .and_then(|bytes| serde_json::from_slice::<Value>(&bytes).ok())
                 {
+                    let answer = file.with_extension("answer");
                     std::fs::write(
-                        &file,
+                        &answer,
                         json!({"takenAt":1,"sessionId":session,"startedAt":2}).to_string(),
                     )
                     .unwrap();
+                    std::fs::rename(&answer, &file).unwrap();
                     return asked;
                 }
             }
