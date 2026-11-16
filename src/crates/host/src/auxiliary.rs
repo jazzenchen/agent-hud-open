@@ -38,8 +38,9 @@ fn show_settings(app: &tauri::AppHandle) -> Result<(), String> {
                 .find(|window| window.label == "main")
                 .ok_or("Settings has no window configuration")?;
             // Shown below, once the app has joined the Dock.
-            tauri::WebviewWindowBuilder::from_config(app, config)
-                .and_then(|builder| builder.visible(false).build())
+            let builder = tauri::WebviewWindowBuilder::from_config(app, config)
+                .map_err(|error| format!("Could not configure the Settings window: {error}"))?;
+            crate::appearance::build(app, builder)
                 .map_err(|error| format!("Could not create the Settings window: {error}"))?
         }
     };
@@ -179,8 +180,7 @@ pub(crate) fn show_statistics(app: &tauri::AppHandle) -> Result<(), String> {
             .inner_size(1280.0, 820.0)
             .min_inner_size(720.0, 560.0)
             .center();
-            shell::statistics_chrome(builder)
-                .build()
+            crate::appearance::build(app, shell::statistics_chrome(builder))
                 .map_err(|error| format!("Could not create the Statistics window: {error}"))?
         }
     };
