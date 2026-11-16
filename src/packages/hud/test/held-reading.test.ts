@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { heldUsed } from "../src/held-reading.ts";
+import { heldUsed, liveWindow } from "../src/held-reading.ts";
 
 const now = Date.parse("2026-11-01T12:00:00Z");
 const window = (
@@ -52,4 +52,17 @@ test("windows that reset since, or never had a number, hold nothing", () => {
     null,
   );
   assert.equal(heldUsed([], now), null);
+});
+
+test("a live window whose reset has passed no longer stands for the mark (Open #90)", () => {
+  const expired = window(100, "critical", "2026-11-01T11:00:00Z");
+  assert.equal(liveWindow(expired, now), false);
+  assert.equal(
+    liveWindow(window(40, "normal", "2026-11-01T15:00:00Z"), now),
+    true,
+  );
+  assert.equal(
+    heldUsed([expired, window(70, "stale", "2026-11-03T12:00:00Z")], now),
+    70,
+  );
 });

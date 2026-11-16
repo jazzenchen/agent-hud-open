@@ -237,6 +237,36 @@ fn a_failed_read_holds_its_last_share_until_the_window_resets() {
     );
 }
 
+/// Open #90: a live window whose reset has passed has started over, so it no
+/// longer sets the number or its level; the next read brings it back.
+#[test]
+fn a_window_past_its_reset_sets_neither_the_number_nor_the_level() {
+    let now = chrono::DateTime::parse_from_rfc3339("2026-11-01T12:00:00Z")
+        .unwrap()
+        .timestamp_millis();
+    let window = |used: f64, status: &str, reset: &str| json!({"vendor": "claude", "usedPercent": used, "status": status, "resetAt": reset});
+    let mark = |quotas: Vec<Value>| {
+        let snapshot = json!({"quotas": quotas, "billing": [], "providers": [], "sessions": []});
+        let vendor = &vendors(&snapshot, "simple", now)[0];
+        (vendor.used, vendor.held, vendor.level.to_owned())
+    };
+    assert_eq!(
+        mark(vec![
+            window(100.0, "critical", "2026-11-01T11:00:00Z"),
+            window(40.0, "normal", "2026-11-01T15:00:00Z"),
+        ]),
+        (Some(40.0), None, "normal".into())
+    );
+    // Only a stale window is current: it is held, in the stale grey.
+    assert_eq!(
+        mark(vec![
+            window(100.0, "critical", "2026-11-01T11:00:00Z"),
+            window(70.0, "stale", "2026-11-03T12:00:00Z"),
+        ]),
+        (None, Some(70.0), "stale".into())
+    );
+}
+
 #[test]
 fn detected_clients_without_readings_keep_their_marks_and_unknown_meter() {
     let now = chrono::DateTime::parse_from_rfc3339("2026-10-23T12:00:00Z")

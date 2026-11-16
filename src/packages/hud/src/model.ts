@@ -8,7 +8,7 @@ import { agentArtworkKey, agentVendorName } from "./agent-artwork";
 import { layoutMarks, restingAgents } from "./resting-agents.ts";
 import { recentLabel, recentUsage } from "./recent-usage.ts";
 import { visibleBalances } from "./balance-rows.ts";
-import { heldUsed } from "./held-reading.ts";
+import { heldUsed, liveWindow } from "./held-reading.ts";
 import type { GlowEffect, GlowStyle } from "./HUDGlow";
 import type { UsageStyle } from "./usage-meter/arcs";
 import {
@@ -133,9 +133,7 @@ export function vendorsFromSnapshot(
   const value = restingAgents(snapshot, mode).map((name) => {
     const key = vendorKey(name);
     const quotas = snapshot.quotas.filter((q) => vendorKey(q.vendor) === key);
-    const measured = quotas.filter(
-      (q) => q.usedPercent != null && q.status !== "stale",
-    );
+    const measured = quotas.filter((q) => liveWindow(q, now));
     const tightest = measured.reduce<(typeof measured)[number] | undefined>(
       (a, b) => (!a || b.usedPercent! > a.usedPercent! ? b : a),
       undefined,

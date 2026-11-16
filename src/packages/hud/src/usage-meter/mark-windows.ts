@@ -1,6 +1,7 @@
 /* The windows a Simple mark draws round and beside its logo: those of one
  * account, as the panel shows them. */
 import type { PanelLayout, Quota } from "@agent-hud/protocol";
+import { liveWindow, resetPassed } from "../held-reading.ts";
 import { blockRows, quotaAccountKey } from "../quota-rows.ts";
 import { MAX_USAGE_ITEMS } from "./arcs.ts";
 
@@ -29,9 +30,7 @@ export function markWindows(
     (row) => blockRows([row], layout?.blocks?.[row.vendor]).length,
   );
   if (!shown.length) return [];
-  const live = shown.filter(
-    (q) => q.usedPercent != null && q.status !== "stale",
-  );
+  const live = shown.filter((q) => liveWindow(q, now));
   const pool = live.length
     ? live
     : shown.filter((q) => q.usedPercent != null && !resetPassed(q, now));
@@ -45,11 +44,6 @@ export function markWindows(
     0,
     MAX_USAGE_ITEMS,
   );
-}
-
-export function resetPassed(q: Quota, now: number): boolean {
-  const reset = q.resetAt ? Date.parse(q.resetAt) : NaN;
-  return reset <= now;
 }
 
 /** The track under a Simple mark's arcs and bars. */
