@@ -19,6 +19,9 @@ fn client(client: &str) -> &'static str {
         "zcode" => "ZCode",
         "qoder" | "qoder-cn" | "qoder-work" => "Qoder",
         "kimi" => "Kimi Code",
+        "pi" => "Pi",
+        "opencode" => "OpenCode",
+        "grok-bot" => "Grok Bot",
         _ => "Codex",
     }
 }

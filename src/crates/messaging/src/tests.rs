@@ -1895,6 +1895,37 @@ fn the_reply_line_names_the_tool_as_the_recipients_client_does() {
     );
 }
 
+/// A message's first line names the client it came from. Grok Bot, Pi and
+/// OpenCode used to fall through to "Codex".
+#[test]
+fn a_message_from_grok_bot_pi_or_opencode_names_that_client_in_the_sender_label() {
+    for (client, name) in [
+        ("grok-bot", "Grok Bot"),
+        ("pi", "Pi"),
+        ("opencode", "OpenCode"),
+    ] {
+        let from = Party {
+            client: client.into(),
+            session_id: format!("{client}:paired"),
+            title: Some("Paired".into()),
+        };
+        let message = words::compose(
+            Language::En,
+            PromptForm::Labelled,
+            &from,
+            "codex",
+            "m-1",
+            None,
+            false,
+            "Check the release notes.",
+        );
+        assert_eq!(
+            message.lines().next(),
+            Some(format!("[Agent HUD · from {name} · Paired · m-1]").as_str())
+        );
+    }
+}
+
 /// A sender that reads the answer itself leaves out the reply hint: the last
 /// line asks the recipient to answer in its turn and names no tool.
 #[test]
