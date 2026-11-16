@@ -85,19 +85,16 @@ pub(super) fn current(
 
 /// The message's turn among the recipient's turns that began after it was
 /// sent: the one the journal named, else the first whose prompt is its words.
+/// A steer's is the turn it went into, which began before it, so the latest
+/// turns are read for that one.
 /// It is done once the store saw it end, a later turn began, or the
 /// collector's live facts say its latest turn, ours, ended.
 pub(super) fn answer(store: &dyn Turns, snapshot: &Value, message: &Message) -> Option<Found> {
     let id = &message.to.session_id;
-    let turns = turns_for(
-        store,
-        &message.to.client,
-        id,
-        Some(message.sent_at_ms - SLACK_MS),
-        TURNS,
-        true,
-    )?;
-    let known = message.turn.as_ref().and_then(|turn| turn.id.as_deref());
+    let steered = message.steered_into.as_deref();
+    let since = steered.is_none().then_some(message.sent_at_ms - SLACK_MS);
+    let turns = turns_for(store, &message.to.client, id, since, TURNS, true)?;
+    let known = steered.or(message.turn.as_ref().and_then(|turn| turn.id.as_deref()));
     let index = known
         .and_then(|known| turns.iter().position(|turn| turn.id == known))
         .or_else(|| {

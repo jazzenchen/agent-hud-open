@@ -69,9 +69,11 @@ pub(super) fn answer(host: &Host<'_>, message: &Message) -> Option<Found> {
     // Words sent as the user may also be an earlier prompt of the same words
     // on the pages read (a log with no tail page is read from its start, and
     // a later look starts at the page the turn was found on): only a turn
-    // that began after the send is the message's.
+    // that began after the send is the message's. A steer's row carries the
+    // start of the turn it went into, which began before it.
     let before = |row: &Value| {
         message.form == PromptForm::Own
+            && message.steered_into.is_none()
             && row["turnStartedAt"]
                 .as_str()
                 .or(row["timestamp"].as_str())

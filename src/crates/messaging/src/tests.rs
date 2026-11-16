@@ -251,7 +251,11 @@ impl Transcripts {
                     turn: Some(turn),
                     id: format!("i{order}"),
                     order,
-                    role: Role::Assistant,
+                    role: if row["role"] == "user" {
+                        Role::User
+                    } else {
+                        Role::Assistant
+                    },
                     kind: if tool { FeedKind::Tool } else { FeedKind::Text },
                     text: if tool {
                         "Bash".into()
@@ -287,6 +291,11 @@ impl Transcripts {
             session,
             json!({"role":"assistant","isPrompt":false,"turnId":turn,"text":text,"toolCall":null}),
         );
+    }
+    /// Words that went into `turn` while it ran (a steer): a user row of
+    /// that turn, carrying when the turn began.
+    fn steered(&self, session: &str, turn: &str, text: &str) {
+        self.push(session, json!({"role":"user","isPrompt":false,"turnId":turn,"text":text,"turnStartedAt":"2026-10-21T16:00:00Z","toolCall":null}));
     }
     fn tool(&self, session: &str, turn: &str) {
         self.push(session, json!({"role":"assistant","isPrompt":false,"turnId":turn,"text":null,"toolCall":{"name":"Bash"}}));
@@ -2405,6 +2414,51 @@ fn a_steer_goes_into_the_codex_turn_in_progress_marked_as_such_and_counts_as_a_p
         assert_eq!(sent.operation, Operation::Enqueue);
         assert!(!sent.text.lines().next().unwrap().contains("current turn"));
     }
+}
+
+/// A steer's answer is that of the turn it went into, which began before the
+/// send, whether its words carry Agent HUD's label or go as the user's.
+#[test]
+fn get_message_reads_a_steers_answer_from_the_turn_it_went_into() {
+    for as_user in [false, true] {
+        let mut world = World::new(Preferences {
+            enabled: true,
+            as_user,
+            limit: Some(10),
+            ..Default::default()
+        });
+        let turn = "turn-in-progress";
+        world
+            .transcripts
+            .prompt(CODEX, turn, "Build the client against API v1");
+        world.transcripts.reply(CODEX, turn, "Starting on v1");
+        world.live(
+            CODEX,
+            json!({"turnId":turn,"turnStartedAt":"2026-10-21T16:00:00Z","endedAt":null}),
+        );
+        let sent = world.call(
+            Some(("claude", CLAUDE)),
+            "send_message",
+            json!({"to":CODEX,"text":"Stop: the API is v2 now, not v1.","delivery":"steer"}),
+        );
+        assert_eq!(sent["state"], "steered", "{sent}");
+        let delivered = world.codex.0.lock().unwrap().last().unwrap().text.clone();
+        world.transcripts.steered(CODEX, turn, &delivered);
+        world.transcripts.reply(CODEX, turn, "Switched to v2");
+        let running = world.get(&sent["id"]);
+        assert_eq!(running["state"], "started", "as the user: {as_user}");
+        world.live(
+            CODEX,
+            json!({"turnId":turn,"turnStartedAt":"2026-10-21T16:00:00Z","endedAt":"2026-10-21T16:40:00Z"}),
+        );
+        let done = world.get(&sent["id"]);
+        assert_eq!(done["state"], "done", "as the user: {as_user}: {done}");
+        assert_eq!(done["answer"], "Switched to v2");
+    }
+}
+#[test]
+fn stored_get_message_reads_a_steers_answer_from_the_turn_it_went_into() {
+    stored(get_message_reads_a_steers_answer_from_the_turn_it_went_into);
 }
 
 #[test]

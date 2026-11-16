@@ -141,6 +141,11 @@ impl Messaging {
             ),
             Err(error) => ("refused", Some(plain(&error.to_string()))),
         };
+        let steered_into = receipt
+            .as_ref()
+            .ok()
+            .filter(|receipt| receipt.state == DeliveryState::Steered)
+            .and_then(|receipt| receipt.turn_id.clone());
         let message = Message {
             id: id.clone(),
             kind: Kind::Send,
@@ -159,6 +164,7 @@ impl Messaging {
             turn: None,
             answered: false,
             replied_by: None,
+            steered_into,
         };
         // A reply that went back to its parent's sender settles the parent:
         // get_message says it was replied to, and this reply's plane is the
