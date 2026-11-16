@@ -9,15 +9,13 @@ import { interfaceLanguage } from "@agent-hud/ui/format";
 const root = ReactDOM.createRoot(document.getElementById("root")!);
 const surface = new URLSearchParams(location.search).get("surface");
 const nativeSurface = surface === "hud" || surface === "picture";
-const loading = nativeSurface ? null : (
-  <main role="status" style={{ padding: 32 }}>
-    Loading Agent HUD…
-  </main>
-);
+// No loading text: this boundary also catches a saved language's catalog
+// loading after the first render, where an English line would flash over
+// the whole window.
 function render(children: React.ReactNode) {
   root.render(
     <React.StrictMode>
-      <React.Suspense fallback={loading}>{children}</React.Suspense>
+      <React.Suspense fallback={null}>{children}</React.Suspense>
     </React.StrictMode>,
   );
 }
@@ -27,7 +25,6 @@ if (nativeSurface) {
   // loading and error paths rather than preloading the system language.
   render(<App />);
 } else {
-  render(loading);
   void Promise.resolve()
     .then(() => loadCatalog(interfaceLanguage("system")))
     .then(
