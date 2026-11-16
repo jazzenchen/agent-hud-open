@@ -196,7 +196,9 @@ fn desktop_snapshot(
         {
             continue;
         }
-        if value["version"] != 11 {
+        // 13 is what Codex in ChatGPT.app 157 sends; its state carries the
+        // canonical turn history `current_desktop_turn` already reads.
+        if !matches!(value["version"].as_i64(), Some(11 | 13)) {
             return Err(Failure::Protocol("Desktop stream version".into()));
         }
         let change = &value["params"]["change"];

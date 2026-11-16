@@ -851,7 +851,7 @@ mod native {
     }
     #[test]
     fn desktop_steer_naming_no_turn_goes_into_the_turn_in_progress_or_is_refused() {
-        for active in [true, false] {
+        for (active, version) in [(true, 11), (false, 11), (true, 13), (false, 13)] {
             let fixture = Fixture::new();
             let path = fixture.paths().codex_data.join("ipc/ipc.sock");
             fs::create_dir_all(path.parent().unwrap()).unwrap(); // plain directory
@@ -872,7 +872,7 @@ mod native {
                 assert_eq!(frame_read(&mut socket)["params"]["following"], true);
                 frame_send(
                     &mut socket,
-                    json!({"type":"broadcast","method":"thread-stream-state-changed","sourceClientId":"owner","version":11,"params":{"hostId":"local","conversationId":THREAD,"change":{"type":"snapshot","conversationState":{"turns":if active{json!([{"turnId":"turn-fixture","status":"inProgress"}])}else{json!([{"turnId":null,"id":"turn-done","status":"completed"}])}}}}}),
+                    json!({"type":"broadcast","method":"thread-stream-state-changed","sourceClientId":"owner","version":version,"params":{"hostId":"local","conversationId":THREAD,"change":{"type":"snapshot","conversationState":{"turns":if active{json!([{"turnId":"turn-fixture","status":"inProgress"}])}else{json!([{"turnId":null,"id":"turn-done","status":"completed"}])}}}}}),
                 );
                 assert_eq!(frame_read(&mut socket)["params"]["following"], false);
                 if active {
