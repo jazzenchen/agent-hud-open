@@ -51,5 +51,5 @@
 
   <path d="M48 539h984" stroke="#e4d9f5"/>
   <text x="48" y="567" class="small muted">实测「帮我总结昨天（11 月 15 日，北京时间）做了什么」只投递一次，摘要回到原 Bot 聊天。</text>
-  <text x="48" y="590" class="small muted">测试版 · 回程由原 Bot 主动查询 · 原生纸飞机动画未现场验收</text>
+  <text x="48" y="590" class="small muted">测试版 · 回程由原 Bot 主动查询 · 去程和回程纸飞机已实测</text>
 </svg>

@@ -56,9 +56,9 @@ submission with unknown acceptance is never replayed automatically.
   one Codex turn, and returned the Codex echo to the original Bot chat.
 - A real Chinese plain-text request entered the target Codex thread once, and
   the resulting summary appeared in the same Grok Bot one-to-one chat.
-- Native send and answer records were observed. Both desktop paper-plane
-  animations were not independently observed. The tested release displayed a
-  fallback Codex sender label. The accompanying Rust change corrects that label
+- Native send and answer records were observed. A follow-up live run captured
+  the outbound Grok Bot paper plane and the return Codex paper plane in the
+  macOS HUD. The tested release displayed a fallback Codex sender label. The accompanying Rust change corrects that label
   and has a focused regression test.
 - These are prototype observations from the installed macOS release; the
   example has no Windows/Linux integration or official Grok chat identity
