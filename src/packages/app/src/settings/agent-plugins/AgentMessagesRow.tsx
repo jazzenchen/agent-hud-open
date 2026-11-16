@@ -2,8 +2,8 @@
 // read other Claude Code, Codex, Antigravity and DeepSeek Harness sessions on
 // this computer through Agent HUD's MCP server. Off unless turned on. While
 // on: "Send as me", and how many passes in a row before the user takes a
-// look. A message waits until its session is idle, unless its sender steers
-// it into a Codex session's turn in progress.
+// look. A message waits until its session is idle, unless the user asks an
+// agent to steer it into a Codex session's turn in progress.
 import { useState } from "react";
 import { toast } from "sonner";
 import type { Snapshot } from "@agent-hud/protocol";
