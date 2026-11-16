@@ -17,6 +17,20 @@ import { useNotchGeometry } from "./NotchSurface";
 import { useRequestDelivery } from "./request-delivery";
 import { snapshotLanguage } from "@agent-hud/ui/format";
 
+/** The HUD's ground: its fill, and the outline and shadow that belong to it.
+ * Transparency runs it from opaque (`alpha` 1) to fully clear, the outline
+ * and shadow fading with it; logos, bots and text are drawn over it at full
+ * strength. */
+export function hudGround(light: boolean, alpha: number) {
+  return {
+    fill: light ? `rgba(245,245,247,${alpha})` : `rgba(0,0,0,${alpha})`,
+    outline: light
+      ? `rgba(0,0,0,${0.106 * alpha})`
+      : `rgba(255,255,255,${0.075 * alpha})`,
+    shadow: `0 9px 30px rgba(0,0,0,${0.133 * alpha})`,
+  };
+}
+
 export interface UseHUDLayoutArgs {
   config: HUDConfig;
   snapshot: Snapshot;
@@ -71,17 +85,10 @@ export function useHUDLayout({
   const light =
     config.appearance === "light" ||
     (config.appearance === "system" && systemLight);
-  // Transparency runs the ground from opaque to fully clear. Its outline and
-  // shadow belong to the ground and fade with it; logos, bots and text are
-  // drawn over it at full strength.
-  const surfaceAlpha = 1 - config.solidTransparency;
-  const fill = light
-    ? `rgba(245,245,247,${surfaceAlpha})`
-    : `rgba(0,0,0,${surfaceAlpha})`;
-  const outline = light
-    ? `rgba(0,0,0,${0.106 * surfaceAlpha})`
-    : `rgba(255,255,255,${0.075 * surfaceAlpha})`;
-  const shadow = `0 9px 30px rgba(0,0,0,${0.133 * surfaceAlpha})`;
+  const { fill, outline, shadow } = hudGround(
+    light,
+    1 - config.solidTransparency,
+  );
 
   // The agent the card is for: the sender of the event on show, otherwise the hovered mark. A dock never gives
   // its marks up to an event, so hovering another mark does not move an event's card (ScreenHUD.focus).

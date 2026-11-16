@@ -13,14 +13,25 @@ export function Header({
   label,
   close,
   t,
+  heading,
 }: {
   label: string;
   close: () => void;
   t: Translate;
+  /** The label is the window's title, not a small caption above it. */
+  heading?: boolean;
 }) {
   return (
     <div style={{ display: "flex", alignItems: "center", fontSize: 11 }}>
-      <span style={{ flex: 1, opacity: 0.55 }}>{label}</span>
+      <span
+        style={
+          heading
+            ? { flex: 1, fontSize: 15, fontWeight: 600 }
+            : { flex: 1, opacity: 0.55 }
+        }
+      >
+        {label}
+      </span>
       <Button
         size="icon-xs"
         variant="ghost"

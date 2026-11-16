@@ -637,7 +637,7 @@ export function HUDScene({
             edge={edge}
             strip={strip}
             screen={screen}
-            look={{ light, fill, outline, shadow }}
+            light={light}
             reduceMotion={reduceMotion}
           />
           <HUDInstructions id={`hud-instructions-${id}`} />

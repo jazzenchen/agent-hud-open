@@ -12,6 +12,7 @@ import type { GuideRecord, NativeMethod, Snapshot } from "@agent-hud/protocol";
 import { useT } from "@agent-hud/ui/format-context";
 import { modePatch } from "../lib/mode-patch";
 import { HUDGuideCard } from "./HUDGuideCard";
+import { newsWidth } from "./HUDGuideNews";
 import {
   atStep,
   closed,
@@ -182,6 +183,7 @@ export function useHUDGuide({
     setView(null);
   };
   return {
+    width: view.kind === "news" ? newsWidth : undefined,
     onPanel: (panelOpen) => {
       if (view.kind !== "tour" || view.step !== "hud") return;
       if (timer.current) clearTimeout(timer.current);

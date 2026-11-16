@@ -1,10 +1,11 @@
 // The guide's small window beside the resting HUD: where the HUD's own
 // cards come out (below a notch or a top strip, inward from a side or the
-// bottom), in the HUD's own fill, outline, shadow and corners. Its content
-// is the host's. It steps aside while the panel is open or another card is
-// out, and keeps its content alive meanwhile. Clicks reach it as the HUD's
-// own (`.hud-guide` is a hit region); the host keeps it from opening the
-// panel.
+// bottom), in the HUD's own colours and corners. Its content is the host's,
+// and so is its width. It is read over whatever window lies behind it, so
+// its ground stays solid whatever the HUD's transparency. It steps aside
+// while the panel is open or another card is out, and keeps its content
+// alive meanwhile. Clicks reach it as the HUD's own (`.hud-guide` is a hit
+// region); the host keeps it from opening the panel.
 import {
   useEffect,
   useLayoutEffect,
@@ -15,22 +16,17 @@ import {
 } from "react";
 import type { HUDRect } from "./geometry";
 import { HUD_METRICS, type HUDEdge } from "./model";
+import { hudGround } from "./scene/useHUDLayout";
 
 export interface HUDGuide {
   content: ReactNode;
+  /** The window's width; a step of the tour is 272. */
+  width?: number;
   /** The usage panel opened (true) or closed. */
   onPanel?: (open: boolean) => void;
 }
 
-/** The HUD's own card look (useHUDLayout). */
-export interface HUDGuideLook {
-  light: boolean;
-  fill: string;
-  outline: string;
-  shadow: string;
-}
-
-const width = 272;
+const stepWidth = 272;
 /** The gap a card keeps from the strip it comes out of (cardRect). */
 const gap = 8;
 const margin = 8;
@@ -39,6 +35,7 @@ function place(
   edge: HUDEdge,
   strip: HUDRect,
   screen: { width: number; height: number },
+  width: number,
   height: number,
 ): CSSProperties {
   const left = Math.min(
@@ -69,7 +66,7 @@ export function GuideDock({
   edge,
   strip,
   screen,
-  look,
+  light,
   reduceMotion,
 }: {
   guide: HUDGuide | null | undefined;
@@ -79,7 +76,8 @@ export function GuideDock({
   edge: HUDEdge;
   strip: HUDRect;
   screen: { width: number; height: number };
-  look: HUDGuideLook;
+  /** The HUD's appearance is light. */
+  light: boolean;
   reduceMotion: boolean;
 }) {
   const box = useRef<HTMLDivElement>(null);
@@ -102,24 +100,26 @@ export function GuideDock({
   }, [present]);
   if (!guide) return null;
   const shown = !open && !hidden;
+  const width = guide.width ?? stepWidth;
+  const ground = hudGround(light, 1);
   return (
     <div
       ref={box}
       className="hud-guide"
-      data-theme={look.light ? "light" : "dark"}
+      data-theme={light ? "light" : "dark"}
       style={{
         position: "absolute",
-        ...place(edge, strip, screen, height),
+        ...place(edge, strip, screen, width, height),
         width,
         zIndex: 30,
         display: shown ? "block" : "none",
         boxSizing: "border-box",
         padding: "13px 14px 14px",
         borderRadius: HUD_METRICS.cardRadius,
-        background: look.fill,
-        border: `1px solid ${look.outline}`,
-        boxShadow: look.shadow,
-        color: look.light ? "#1c1c1e" : "#f2f2f7",
+        background: ground.fill,
+        border: `1px solid ${ground.outline}`,
+        boxShadow: ground.shadow,
+        color: light ? "#1c1c1e" : "#f2f2f7",
         fontSize: 12.5,
         lineHeight: 1.45,
         transformOrigin: origins[edge],
