@@ -52,6 +52,15 @@ pub(super) fn set_ignore_cursor(
         .map_err(|error| error.to_string())
 }
 
+/// No native glass here: the page keeps its see-through ground alone.
+pub(super) fn set_glass(
+    _window: &tauri::WebviewWindow,
+    _shapes: Vec<super::glass::GlassShape>,
+    _dark: bool,
+) -> Result<bool, String> {
+    Ok(false)
+}
+
 pub(super) fn shown(window: &tauri::WebviewWindow, _configured_visible: bool) -> bool {
     window.is_visible().unwrap_or(false)
 }

@@ -1,3 +1,4 @@
+import { groundAlpha } from "../glass";
 import type { CSSProperties } from "react";
 import type { Approval, IslandEvent, Snapshot } from "@agent-hud/protocol";
 import { compactAlertDockWidth } from "../alerts/CompactAlertView";
@@ -85,10 +86,7 @@ export function useHUDLayout({
   const light =
     config.appearance === "light" ||
     (config.appearance === "system" && systemLight);
-  const { fill, outline, shadow } = hudGround(
-    light,
-    1 - config.solidTransparency,
-  );
+  const { fill, outline, shadow } = hudGround(light, groundAlpha(config));
 
   // The agent the card is for: the sender of the event on show, otherwise the hovered mark. A dock never gives
   // its marks up to an event, so hovering another mark does not move an event's card (ScreenHUD.focus).

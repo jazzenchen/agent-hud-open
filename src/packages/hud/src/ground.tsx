@@ -17,7 +17,7 @@ export function HUDGroundProvider({
   look,
   children,
 }: {
-  look: { solidTransparency: number };
+  look: { solidTransparency: number; hudMaterial?: string };
   children: ReactNode;
 }) {
   const { seeThrough = false } = lookGround(look, false);

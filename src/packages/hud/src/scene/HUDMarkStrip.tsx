@@ -1,3 +1,4 @@
+import { glassLook } from "../glass";
 import type { CSSProperties, MutableRefObject } from "react";
 import type { DockMemory, Direction } from "../bots/mark-director";
 import { horizontal, type HUDRect, type stripMetrics } from "../geometry";
@@ -103,6 +104,9 @@ export function HUDMarkStrip({
       ) : (
         <div
           className="hud-mark-strip"
+          data-hud-glass={
+            config.mode === "simple" && glassLook(config) ? "box" : undefined
+          }
           style={{
             position: "relative",
             display: "flex",

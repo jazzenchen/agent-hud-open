@@ -68,6 +68,10 @@ export interface HUDConfig {
   separatesAgents: boolean;
   appearance: "dark" | "light" | "system";
   solidTransparency: number;
+  /** What the HUD's own surfaces are made of: a solid ground, or the
+   * system's glass under a thinner one (macOS 26; elsewhere the thinner
+   * ground alone). */
+  hudMaterial: "solid" | "glass";
   hoverDelayMs: number;
   collapseDelayMs: number;
   /** How often the dock's tail lets its oldest message go, in seconds;

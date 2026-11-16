@@ -24,7 +24,7 @@ agent-hud-hud.workspace = true
 
 [target.'cfg(target_os = "macos")'.dependencies]
 tao = { version = "=0.37.1", default-features = false, features = ["rwh_06"] }
-objc2.workspace = true
+objc2 = { workspace = true, features = ["exception"] }
 block2 = "0.6"
 dispatch2 = { version = "0.3", default-features = false, features = ["std", "objc2"] }
 objc2-app-kit = { workspace = true, features = ["std", "NSApplication", "NSRunningApplication", "NSWorkspace", "NSWindow", "NSScreen", "NSGraphics", "NSCursor", "NSView", "NSImage", "NSBitmapImageRep", "NSImageRep", "NSAlert", "NSButton", "NSColor", "NSControl", "NSResponder", "objc2-core-foundation"] }

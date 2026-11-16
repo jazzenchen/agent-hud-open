@@ -5,7 +5,9 @@
 //! events stand in for the cursor and the drag button. Without layer-shell (GNOME) Wayland refuses an
 //! edge HUD; on X11 it is an ordinary GTK/WebKit window whose placement depends
 //! on the window manager.
-pub(super) use super::generic::{measure_screens, panel_builder, screen, set_drag_cursor, shown};
+pub(super) use super::generic::{
+    measure_screens, panel_builder, screen, set_drag_cursor, set_glass, shown,
+};
 use super::{InteractiveRegion, LogicalRect, Point, Rect};
 use gtk::{cairo, prelude::*};
 use gtk_layer_shell::{self as layer, LayerShell};

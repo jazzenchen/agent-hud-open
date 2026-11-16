@@ -16,6 +16,7 @@
     "./PanelContext": "./src/PanelContext.tsx",
     "./bots/mark-director": "./src/bots/mark-director.ts",
     "./geometry": "./src/geometry.ts",
+    "./glass": "./src/glass.ts",
     "./ground": "./src/ground.tsx",
     "./model": "./src/model.ts",
     "./panel/added-sections": "./src/panel/added-sections.ts",

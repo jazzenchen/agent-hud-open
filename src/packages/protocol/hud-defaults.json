@@ -29,6 +29,7 @@
   "separatesAgents": false,
   "appearance": "dark",
   "solidTransparency": 0,
+  "hudMaterial": "solid",
   "hoverDelayMs": 400,
   "collapseDelayMs": 200,
   "messageFadeSeconds": 5,

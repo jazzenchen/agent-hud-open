@@ -5,6 +5,7 @@
 // paler shades on dark and deeper ones on light, and the greys become tints
 // of the ink (Open's Theme.under).
 
+import { glassLook } from "./glass.ts";
 export type Level = "ok" | "warning" | "critical";
 export type AlertTone = "turn" | "calm" | "warning";
 /** A mark's level as the HUD's vendors carry it: a quota level, or none. */
@@ -17,13 +18,16 @@ export interface Ground {
 }
 
 /** The ground a screen's look gives the HUD drawn on it (Open's
- * HUDLook.seeThrough): a solid surface with a transparency lets the desktop
- * through; an opaque one does not. */
+ * HUDLook.seeThrough): a solid surface with a transparency, or glass, lets the
+ * desktop through; an opaque one does not. */
 export function lookGround(
-  look: { solidTransparency: number },
+  look: { solidTransparency: number; hudMaterial?: string },
   light: boolean,
 ): Ground {
-  return { light, seeThrough: look.solidTransparency > 0 };
+  return {
+    light,
+    seeThrough: look.solidTransparency > 0 || glassLook(look),
+  };
 }
 
 /** The shares of the ink, white on dark and black on light, that the greys

@@ -19,9 +19,12 @@ use std::{
 use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
 #[path = "macos/displays.rs"]
 mod displays;
+#[path = "macos/glass.rs"]
+mod glass;
 #[path = "macos/text_focus.rs"]
 mod text_focus;
 pub(super) use displays::{measure_screens, screen};
+pub(super) use glass::set_glass;
 pub(super) use text_focus::{begin_text_focus, end_text_focus, TextFocusOrigin};
 
 /// NSEvent reports the pointer in one global point plane across displays.

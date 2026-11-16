@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { horizontal, type HUDRect } from "../geometry";
+import { glassLook } from "../glass";
 import { HUD_METRICS } from "../model";
 import type { useNotchGeometry } from "./NotchSurface";
 import { outsideSimplePanel } from "./simple-panel";
@@ -71,6 +72,26 @@ export function HUDExpandedSurface({
     return () => clearTimeout(timer);
   }, [atNotchRow, settle]);
   const inNotchRow = atNotchRow && rowSettled;
+  // Glass lies under what opens, never under the notch row, which stays one
+  // with the camera housing. The island's glass follows its shoulders and
+  // corners as they spring; the host reads them beside its box.
+  const glass = glassLook(config);
+  const surface = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!glass || config.mode !== "notch") return;
+    const write = () => {
+      const element = surface.current;
+      if (!element) return;
+      element.dataset.glassFlare = String(notchGeometry.shoulder.get());
+      element.dataset.glassRadius = String(notchGeometry.corner.get());
+    };
+    write();
+    const stops = [
+      notchGeometry.shoulder.on("change", write),
+      notchGeometry.corner.on("change", write),
+    ];
+    return () => stops.forEach((stop) => stop());
+  }, [glass, config.mode, notchGeometry]);
   const rowLight = inNotchRow ? false : light;
   const transition = {
     duration: reduceMotion || dragging ? 0 : 0.4,
@@ -105,6 +126,16 @@ export function HUDExpandedSurface({
       <AnimatePresence initial={false} custom={dragging}>
         {(config.mode === "notch" || cardVisible) && (
           <motion.div
+            ref={surface}
+            data-hud-glass={
+              !glass
+                ? undefined
+                : config.mode !== "notch"
+                  ? "box"
+                  : inNotchRow
+                    ? undefined
+                    : "island"
+            }
             key={config.mode === "notch" ? "notch-shell" : "hud-card"}
             className={`hud-expanded-surface ${detached ? "hud-detached-card" : ""} ${peek ? "hud-peek" : ""}`}
             initial={

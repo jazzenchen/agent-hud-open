@@ -19,6 +19,8 @@ import type {
   NativeHUDMonitor,
 } from "./lib/use-hud-geometry";
 import { useHUDPointer } from "./lib/use-hud-pointer";
+import { useHUDGlass } from "./lib/use-hud-glass";
+import { glassLook } from "@agent-hud/hud/glass";
 import { HUDCanvas } from "./HUDCanvas";
 import { useHUDTextFocus } from "./lib/use-hud-text-focus";
 import type { ProductGuide } from "./guide/plan";
@@ -90,6 +92,7 @@ export default function NativeHUDSurface({
     return () => clearTimeout(timer);
   }, [held, config.mode, config.edge, config.offset]);
   const shownConfig = held ? { ...config, ...held } : config;
+  useHUDGlass(glassLook(shownConfig));
   const configure = useCallback(() => {
     void invoke("hud_show_main");
   }, []);

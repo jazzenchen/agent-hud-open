@@ -1,5 +1,6 @@
 /* The resting HUD on the selected screen: a preview, its mode and that mode's
  * own rows, then its look. */
+import { HUD_GLASS } from "@agent-hud/hud/glass";
 import { modePatch } from "../../lib/mode-patch";
 import type { Snapshot } from "@agent-hud/protocol";
 import type { HUDConfig } from "@agent-hud/hud/model";
@@ -150,6 +151,21 @@ export function HUDSection({
           }
         />
       </Row>
+      {HUD_GLASS && (
+        <Row title={t("Material")} subtitle={t("Glass needs macOS 26.")}>
+          <Segments
+            label={t("HUD material")}
+            value={config.hudMaterial}
+            options={[
+              ["solid", t("Solid colour")],
+              ["glass", t("Glass")],
+            ]}
+            change={(value) =>
+              update({ hudMaterial: value as HUDConfig["hudMaterial"] })
+            }
+          />
+        </Row>
+      )}
       {slider("solidTransparency", t("Transparency"), 0, 1, 0.05, percent)}
     </Section>
   );
