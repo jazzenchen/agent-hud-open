@@ -3,14 +3,14 @@
   <channel>
     <title>Agent HUD</title>
     <item>
-      <title>0.6.5</title>
-      <pubDate>Mon, 16 Nov 2026 00:50:06 +0800</pubDate>
-      <link>https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.5</link>
-      <sparkle:version>502</sparkle:version>
-      <sparkle:shortVersionString>0.6.5</sparkle:shortVersionString>
+      <title>0.6.6</title>
+      <pubDate>Tue, 17 Nov 2026 02:32:27 +0800</pubDate>
+      <link>https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.6</link>
+      <sparkle:version>503</sparkle:version>
+      <sparkle:shortVersionString>0.6.6</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
       <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-      <description sparkle:format="markdown"># Agent HUD 0.6.5
+      <description sparkle:format="markdown"># Agent HUD 0.6.6
 
 ## Compatibility
 
@@ -22,13 +22,24 @@ Requires an Apple Silicon Mac running macOS 14 or later.
 
 ## Changes
 
+### New
+
+- An agent can now steer a message into a Codex session's turn in progress, when you ask it to (#68, thanks @xunhe730). `send_message` takes `delivery: steer`; without it the message still waits for the next turn. Only Codex takes a steer, `list_sessions` says which sessions can, and `get_message` reads the answer from the turn the message went into.
+- When a message from your iPhone can't reach the agent, the Mac now tells the phone why, and says so right away when Send messages is off (#104). The next iPhone update shows these reasons in plain words; until then the phone shows "Not delivered by the Mac". Send from this computer in Settings → Remote shows the same reasons.
+
 ### Fixes
 
-- Keeps the HUD's window only as large as the HUD needs at rest, so it no longer covers other apps' windows and dialogs (#84). The window was as tall as the screen, transparent but above everything, and macOS hid the App Store's Install button under it. It now grows to full size only when the panel starts to open, and shrinks back after it closes.
-- Stops a dark flash across the HUD's window when Agent HUD starts.
-- Names the folder and what to do when a private folder on Windows belongs to another account and Agent HUD cannot use it (#81, thanks @zqy5618).
+- Steers and automatic sends reach Codex in ChatGPT.app 157 again, which reports its threads in a newer format (thanks @xunhe730).
+- `send_message` and `start_session` work again with Codex command-line builds that have no message queue, such as 0.169.0-alpha (#94). Agent HUD now queues the message through the Codex app's own command line.
+- Claude Code and Codex can send agent messages again after Agent HUD moved to another folder (#100). At launch, Agent HUD now points their Agent HUD server entry at the copy that is running.
+- The HUD no longer shows 0% for a quota window whose reset time has passed (#90). Until the next read, that window sets neither the number, its colour nor its ring.
+- The hover panel shows only the agents that screen's HUD shows, as picked in Settings → Display (#85).
+- Settings, Statistics and sign-in windows open on the desktop you are on, instead of switching back to the desktop where they were first opened (#99).
+- A message's sender line names Grok Bot, Pi and OpenCode instead of calling them Codex (thanks @Alex-Liu-airjelly).
+- Settings and Statistics load their text before they first draw (#87, thanks @Ultroncn).
+- The release news beside the HUD is wider and sits on a solid background.
 </description>
-      <enclosure url="https://github.com/jazzenchen/agent-hud-open/releases/download/v0.6.5/Agent-HUD-0.6.5-arm64.dmg" length="54581653" type="application/octet-stream" sparkle:edSignature="FYAIhp49a/5WhPR2jIn3HzMbMU5yjC7teNsznlpPt460SZCUJRCDcy9eVeblkWTqQYlBgfo3LAIRc+R+VE2EBw==" />
+      <enclosure url="https://github.com/jazzenchen/agent-hud-open/releases/download/v0.6.6/Agent-HUD-0.6.6-arm64.dmg" length="54594602" type="application/octet-stream" sparkle:edSignature="wWDi4GLhixItagPy82wcsleK6UPHDfSCpSvMAq3NOMkDSDAREiIVN/gAXFqCIvrkpZckD32d8c+r6I8GX0/eBw==" />
       <agenthudMacOnly>false</agenthudMacOnly>
       <agenthudMinimumIOSVersion>1.7.2</agenthudMinimumIOSVersion>
     </item>
