@@ -102,6 +102,10 @@ pub const CLAUDE_MESSAGES_OFF: &str =
 pub const DEEPSEEK_MESSAGES_OFF: &str =
     "Sending messages to DeepSeek Harness is off (Settings → Agent plugins)";
 
+/// Why a steer that names no turn was refused: the session has no turn in
+/// progress, so nothing was sent.
+pub const NO_TURN_TO_STEER: &str = "No turn is in progress to steer";
+
 pub use provider::Provider;
 
 #[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]

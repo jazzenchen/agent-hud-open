@@ -850,6 +850,56 @@ mod native {
         }
     }
     #[test]
+    fn desktop_steer_naming_no_turn_goes_into_the_turn_in_progress_or_is_refused() {
+        for (active, version) in [(true, 11), (false, 11), (true, 13), (false, 13)] {
+            let fixture = Fixture::new();
+            let path = fixture.paths().codex_data.join("ipc/ipc.sock");
+            fs::create_dir_all(path.parent().unwrap()).unwrap(); // plain directory
+            let listener = UnixListener::bind(path).unwrap();
+            let worker = thread::spawn(move || {
+                let (mut socket, _) = listener.accept().unwrap();
+                socket
+                    .set_read_timeout(Some(Duration::from_secs(3)))
+                    .unwrap();
+                let initialize = frame_read(&mut socket);
+                desktop_response(
+                    &mut socket,
+                    &initialize,
+                    json!({"clientId":"fixture-client"}),
+                );
+                let discover = frame_read(&mut socket);
+                desktop_response(&mut socket, &discover, json!({}));
+                assert_eq!(frame_read(&mut socket)["params"]["following"], true);
+                frame_send(
+                    &mut socket,
+                    json!({"type":"broadcast","method":"thread-stream-state-changed","sourceClientId":"owner","version":version,"params":{"hostId":"local","conversationId":THREAD,"change":{"type":"snapshot","conversationState":{"turns":if active{json!([{"turnId":"turn-fixture","status":"inProgress"}])}else{json!([{"turnId":null,"id":"turn-done","status":"completed"}])}}}}}),
+                );
+                assert_eq!(frame_read(&mut socket)["params"]["following"], false);
+                if active {
+                    let send = frame_read(&mut socket);
+                    assert_eq!(send["method"], "thread-follower-steer-turn");
+                    desktop_response(
+                        &mut socket,
+                        &send,
+                        json!({"result":{"turnId":"turn-fixture"}}),
+                    );
+                }
+            });
+            let mut steer = request(Provider::Codex);
+            steer.operation = Operation::Steer;
+            let receipt = fixture.service(Provider::Codex).send(steer).unwrap();
+            worker.join().unwrap();
+            if active {
+                assert_eq!(receipt.state, DeliveryState::Steered);
+                assert_eq!(receipt.turn_id.as_deref(), Some("turn-fixture"));
+            } else {
+                // Nothing was sent: no turn runs, and no new one is started.
+                assert_eq!(receipt.state, DeliveryState::Failed);
+                assert!(receipt.reason.unwrap().contains(NO_TURN_TO_STEER));
+            }
+        }
+    }
+    #[test]
     fn desktop_after_mutation_disconnect_is_uncertain_without_cli_fallback() {
         let fixture = Fixture::new();
         let path = fixture.paths().codex_data.join("ipc/ipc.sock");
@@ -1110,6 +1160,7 @@ echo '{"id":2,"result":{"queuedSubmission":{"id":"q1"}}}'
         for operation in [
             Operation::Start,
             Operation::Automatic,
+            Operation::Steer,
             Operation::Interrupt,
             Operation::Enqueue,
         ] {
@@ -1149,7 +1200,7 @@ echo '{"id":2,"result":{"queuedSubmission":{"id":"q1"}}}'
                     json!({"data":[{"name":"codex_tui","httpOrigin":format!("http://127.0.0.1:{port}")}]}),
                 );
                 let _ = tui.accept().unwrap();
-                if operation == Operation::Automatic || operation == Operation::Interrupt {
+                if operation != Operation::Start {
                     let state = ws_read(&mut ws);
                     assert_eq!(state["method"], "thread/read");
                     ws_reply(
@@ -1171,7 +1222,8 @@ echo '{"id":2,"result":{"queuedSubmission":{"id":"q1"}}}'
                         assert_eq!(mutation["method"], "turn/start");
                         ws_reply(&mut ws, &mutation, json!({"turn":{"id":"turn-fixture"}}));
                     }
-                    Operation::Automatic => {
+                    // A steer naming no turn goes into the one in progress.
+                    Operation::Automatic | Operation::Steer => {
                         assert_eq!(mutation["method"], "turn/steer");
                         assert_eq!(mutation["params"]["expectedTurnId"], "turn-fixture");
                         ws_reply(&mut ws, &mutation, json!({"turnId":"turn-fixture"}));
@@ -1191,10 +1243,9 @@ echo '{"id":2,"result":{"queuedSubmission":{"id":"q1"}}}'
                 receipt.state,
                 match operation {
                     Operation::Start => DeliveryState::Started,
-                    Operation::Automatic => DeliveryState::Steered,
+                    Operation::Automatic | Operation::Steer => DeliveryState::Steered,
                     Operation::Interrupt => DeliveryState::Interrupted,
                     Operation::Enqueue => DeliveryState::Queued,
-                    _ => unreachable!(),
                 }
             );
             worker.join().unwrap();

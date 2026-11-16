@@ -75,7 +75,8 @@ pub(super) fn cli(
         .map_err(|_| Failure::Unavailable("CLI TUI listener is not alive".into()))?;
     let mut selected = request.operation;
     let mut expected = request.expected_turn_id.clone();
-    if selected == Operation::Automatic || (selected == Operation::Interrupt && expected.is_none())
+    if selected == Operation::Automatic
+        || (matches!(selected, Operation::Interrupt | Operation::Steer) && expected.is_none())
     {
         let state = connection.request(
             "thread/read",
@@ -91,6 +92,9 @@ pub(super) fn cli(
         }
         match state["thread"]["status"]["type"].as_str() {
             Some("idle") if selected == Operation::Automatic => selected = Operation::Start,
+            Some("idle") if selected == Operation::Steer => {
+                return Err(Failure::Rejected(NO_TURN_TO_STEER.into()))
+            }
             Some("active") => {
                 let page=connection.request("thread/turns/list",json!({"threadId":thread,"limit":1,"sortDirection":"desc","itemsView":"notLoaded"}),false)?;
                 let turn = page["data"]

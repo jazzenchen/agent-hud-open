@@ -227,15 +227,15 @@ fn validate(request: &SendRequest) -> Result<()> {
     {
         return Err(Failure::InvalidInput("session/request/text".into()));
     }
+    // A steer names the turn it expects, or none: then it goes into the turn
+    // in progress when the client is asked, and is refused when there is none.
     if request.operation == Operation::Steer
         && request
             .expected_turn_id
             .as_deref()
-            .is_none_or(|id| id.trim().is_empty())
+            .is_some_and(|id| id.trim().is_empty())
     {
-        return Err(Failure::InvalidInput(
-            "steer requires expectedTurnId".into(),
-        ));
+        return Err(Failure::InvalidInput("expectedTurnId".into()));
     }
     Ok(())
 }

@@ -6,6 +6,8 @@ use agent_hud_platform::delivery::PromptForm;
 
 mod delivery;
 pub use delivery::*;
+mod steer;
+pub use steer::*;
 
 fn client(client: &str) -> &'static str {
     match client {

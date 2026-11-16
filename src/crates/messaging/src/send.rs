@@ -13,6 +13,12 @@ impl Messaging {
         let text = arguments["text"].as_str().ok_or("text is required")?;
         let reply_to = arguments["reply_to"].as_str().filter(|id| !id.is_empty());
         let reply_hint = arguments["reply_hint"].as_bool().unwrap_or(true);
+        // Queued by default; a steer goes into the recipient's turn in progress.
+        let steer = match arguments["delivery"].as_str() {
+            None | Some("queue") => false,
+            Some("steer") => true,
+            Some(_) => return Err("delivery is queue or steer".into()),
+        };
         // A reply goes back to whoever sent the message it answers.
         let replied = reply_to
             .and_then(|parent| self.journal.find(parent))
@@ -57,6 +63,10 @@ impl Messaging {
         if !target["parentId"].is_null() {
             return Ok(refused(&words::child(language)));
         }
+        // Only Codex takes a message into a turn in progress (Open #68).
+        if steer && Provider::parse(client) != Some(Provider::Codex) {
+            return Ok(refused(&words::steer_unsupported(language, client)));
+        }
         let sender = party(host.snapshot, &caller.client, &caller.session_id);
         let recipient = party(host.snapshot, client, to);
         // One that cannot take it now is refused before anything is queued.
@@ -86,6 +96,11 @@ impl Messaging {
         let delivered = words::compose(
             language, form, &from, client, &id, reply_to, reply_hint, text,
         );
+        let delivered = if steer {
+            words::steered(language, form, delivered)
+        } else {
+            delivered
+        };
         // Where the recipient's transcript ends now: its answer is after this.
         // The store finds the answer by when it was sent instead.
         let cursor = match transcript::stored(host, client) {
@@ -99,13 +114,27 @@ impl Messaging {
             request_id: id.clone(),
             text: delivered.clone(),
             form,
-            operation: Operation::Enqueue,
+            // A steer names no turn: it goes into the one in progress, if any.
+            operation: if steer {
+                Operation::Steer
+            } else {
+                Operation::Enqueue
+            },
             expected_turn_id: None,
         });
         if let Ok(receipt) = &receipt {
             self.clients.delivered(receipt, &caller.surface(), now);
         }
         let (state, reason) = match &receipt {
+            Ok(receipt) if receipt.state == DeliveryState::Steered => ("steered", None),
+            Ok(receipt)
+                if receipt
+                    .reason
+                    .as_deref()
+                    .is_some_and(|reason| reason.contains(delivery::NO_TURN_TO_STEER)) =>
+            {
+                ("refused", Some(words::no_turn_to_steer(language)))
+            }
             Ok(receipt) => (
                 delivered_or_refused(receipt.state),
                 receipt.reason.as_deref().map(plain),

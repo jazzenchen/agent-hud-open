@@ -24,6 +24,7 @@ impl Messaging {
                 let client = session["source"].as_str().unwrap_or_default();
                 let (reachable, reason) =
                     self.reachable(client, id, &loaded, (session, host.snapshot), language);
+                let (steerable, steer_reason) = self.steerable(client, id, session, language);
                 json!({
                     "id": id,
                     "client": client,
@@ -32,6 +33,8 @@ impl Messaging {
                     "state": state(session),
                     "reachable": reachable,
                     "reason": reason,
+                    "steerable": steerable,
+                    "steerReason": steer_reason,
                     "self": caller.is_some_and(|caller| same_identity((&caller.client, &caller.session_id), (client, id))),
                     "updatedAt": session["updatedAt"],
                 })
@@ -50,6 +53,27 @@ impl Messaging {
             })
             .collect::<serde_json::Map<_, _>>();
         json!({"sessions":rows,"startFolders":starts,"passLimit":self.preferences.limit,"sendsAs":if self.preferences.as_user {"user"} else {"labelled"}})
+    }
+
+    /// Whether a message sent with `delivery: steer` would go into a turn of
+    /// `id` in progress now: only Codex takes one, while a turn runs in a
+    /// Codex that has the thread open. Read from the snapshot, so a send
+    /// still finds out for itself.
+    fn steerable(
+        &self,
+        client: &str,
+        id: &str,
+        session: &Value,
+        language: Language,
+    ) -> (bool, String) {
+        if Provider::parse(client) != Some(Provider::Codex) {
+            return (false, words::steer_unsupported(language, client));
+        }
+        if state(session) != "idle" && delivery::codex_thread_open(&self.places.codex_data, id) {
+            (true, words::steer_ready(language))
+        } else {
+            (false, words::steer_idle(language))
+        }
     }
 
     /// Whether `id` takes a message now, and why not or how. `rows` is the
