@@ -176,7 +176,7 @@ pub(crate) async fn web_sign_in(
         .ok_or("This provider takes no sign-in on that site")?;
     let label = label(&provider, &host);
     if let Some(window) = app.get_webview_window(&label) {
-        crate::shell::window_opened(&app);
+        crate::shell::window_opened(&window);
         let _ = window.show();
         return window.set_focus().map_err(|error| error.to_string());
     }
@@ -203,7 +203,7 @@ pub(crate) async fn web_sign_in(
     .await
     .map_err(|error| format!("Sign-in window worker failed: {error}"))??;
     let (window, desk) = built;
-    crate::shell::window_opened(&app);
+    crate::shell::window_opened(&window);
     let _ = window.show();
     let _ = window.set_focus();
     // The windows its page opened go with it.

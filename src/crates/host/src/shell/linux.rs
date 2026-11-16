@@ -7,7 +7,7 @@ pub(crate) fn prepare(_app: &tauri::AppHandle) -> Result<(), String> {
 
 pub(crate) fn install(_app: &tauri::AppHandle) {}
 
-pub(crate) fn window_opened(_app: &tauri::AppHandle) {}
+pub(crate) fn window_opened(_window: &tauri::WebviewWindow) {}
 
 pub(crate) fn windows_changed(_app: &tauri::AppHandle) {}
 

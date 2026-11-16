@@ -43,7 +43,7 @@ fn show_settings(app: &tauri::AppHandle) -> Result<(), String> {
                 .map_err(|error| format!("Could not create the Settings window: {error}"))?
         }
     };
-    shell::window_opened(app);
+    shell::window_opened(&window);
     window.unminimize().map_err(|error| error.to_string())?;
     window.show().map_err(|error| error.to_string())?;
     activity::notify(app, "main");
@@ -184,7 +184,7 @@ pub(crate) fn show_statistics(app: &tauri::AppHandle) -> Result<(), String> {
                 .map_err(|error| format!("Could not create the Statistics window: {error}"))?
         }
     };
-    shell::window_opened(app);
+    shell::window_opened(&window);
     window.unminimize().map_err(|error| error.to_string())?;
     window.show().map_err(|error| error.to_string())?;
     activity::notify(app, "statistics");
