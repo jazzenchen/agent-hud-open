@@ -9,6 +9,7 @@ import { useMarkLevelText } from "../ground";
 import {
   markUsed,
   meterLabel,
+  simpleNumberColor,
   vendorKey,
   type HUDConfig,
   type HUDEdge,
@@ -225,7 +226,11 @@ export function AgentMark({
         (config.showsNumbers || config.simpleStyle === "numbers") && (
           <span
             style={{
-              color: figureColor(vendor.level),
+              color: simpleNumberColor(
+                config,
+                light,
+                figureColor(vendor.level),
+              ),
               fontSize: metrics.font,
               fontWeight: 400,
               fontVariantNumeric: "tabular-nums",

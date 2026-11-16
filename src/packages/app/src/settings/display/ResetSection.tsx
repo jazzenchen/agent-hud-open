@@ -34,6 +34,8 @@ const styleKeys = [
   "ringWidth",
   "simpleStyle",
   "showsNumbers",
+  "greyNumbers",
+  "greyNumberOpacity",
   "separatesAgents",
   "appearance",
   "solidTransparency",

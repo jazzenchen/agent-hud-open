@@ -7,6 +7,7 @@ import {
   configuredVendors,
   defaultHUDConfig,
   meterLabel,
+  simpleNumberColor,
   statusColor,
   type HUDConfig,
 } from "@agent-hud/hud/model";
@@ -228,7 +229,11 @@ export function SmallHUDPreview({
                         <span
                           style={{
                             fontSize: metrics.font,
-                            color: statusColor(vendor.level),
+                            color: simpleNumberColor(
+                              sample,
+                              light,
+                              statusColor(vendor.level),
+                            ),
                             fontVariantNumeric: "tabular-nums",
                           }}
                         >
