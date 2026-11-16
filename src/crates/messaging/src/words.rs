@@ -12,6 +12,7 @@ fn client(client: &str) -> &'static str {
         "claude" => "Claude Code",
         "antigravity" => "Antigravity",
         "deepseek" => "DeepSeek Harness",
+        "grok-bot" => "Grok Bot",
         "cursor" => "Cursor",
         "trae" | "trae-cn" => "TRAE",
         "workbuddy" => "WorkBuddy",

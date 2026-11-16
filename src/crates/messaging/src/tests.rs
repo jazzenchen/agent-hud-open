@@ -1895,6 +1895,29 @@ fn the_reply_line_names_the_tool_as_the_recipients_client_does() {
     );
 }
 
+#[test]
+fn a_paired_grok_bot_message_names_the_bot_in_the_sender_label() {
+    let from = Party {
+        client: "grok-bot".into(),
+        session_id: "grok-bot:paired".into(),
+        title: Some("Paired Bot".into()),
+    };
+    let message = words::compose(
+        Language::En,
+        PromptForm::Labelled,
+        &from,
+        "codex",
+        "m-1",
+        None,
+        false,
+        "Check the release notes.",
+    );
+    assert_eq!(
+        message.lines().next(),
+        Some("[Agent HUD · from Grok Bot · Paired Bot · m-1]")
+    );
+}
+
 /// A sender that reads the answer itself leaves out the reply hint: the last
 /// line asks the recipient to answer in its turn and names no tool.
 #[test]

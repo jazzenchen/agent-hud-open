@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="618" viewBox="0 0 1080 618" role="img" aria-labelledby="title desc">
+  <title id="title">Grok Bot 和 Codex 怎么传话</title>
+  <desc id="desc">Grok Bot 的配对连接器调用 Agent HUD 原生消息服务，投递到指定 Codex 对话，再查询同一条消息的回复并显示在原 Bot 聊天。</desc>
+  <defs>
+    <style>
+      text{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif}
+      .ink{fill:#221a36}.muted{fill:#554969}.accent{fill:#603ab4}
+      .title{font-size:43px;font-weight:750}.name{font-size:24px;font-weight:700}
+      .section{font-size:19px;font-weight:700}.body{font-size:17px}.small{font-size:15px}
+    </style>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto" markerUnits="userSpaceOnUse">
+      <path d="M1 1l7 4-7 4" fill="none" stroke="#754bc7" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+  </defs>
+  <rect width="1080" height="618" fill="#faf8ff"/>
+  <path d="M53 109c69-13 147-4 203-10" fill="none" stroke="#dbcbff" stroke-width="8" stroke-linecap="round"/>
+  <text x="48" y="86" class="title ink">Grok Bot 和 Codex 怎么传话</text>
+  <text x="48" y="139" class="body muted">手动配对「MCP Ping 测试」与「HUD 传话测试」，消息往返都经过 Agent HUD。</text>
+
+  <rect x="48" y="170" width="304" height="86" rx="18" fill="#fff" stroke="#d8caef"/>
+  <rect x="388" y="170" width="304" height="86" rx="18" fill="#eee5ff" stroke="#d8caef"/>
+  <rect x="728" y="170" width="304" height="86" rx="18" fill="#fff" stroke="#d8caef"/>
+  <text x="70" y="204" class="name ink">Grok Bot</text>
+  <text x="70" y="232" class="small muted">MCP Ping 测试 · 一对一聊天</text>
+  <text x="410" y="204" class="name ink">Agent HUD</text>
+  <text x="410" y="232" class="small muted">配对连接器 → 本机原生消息服务</text>
+  <text x="750" y="204" class="name ink">Codex</text>
+  <text x="750" y="232" class="small muted">HUD 传话测试 · 指定对话</text>
+
+  <rect x="48" y="277" width="984" height="107" rx="17" fill="#fff" stroke="#e0d5f1"/>
+  <text x="68" y="307" class="section accent">去程 · 发消息</text>
+  <text x="68" y="340" class="body ink">通过 HTTPS MCP</text>
+  <text x="68" y="365" class="body ink">提交原句</text>
+  <path d="M335 345h38" stroke="#754bc7" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="410" y="340" class="body ink">连接器校验配对，附上来源</text>
+  <text x="410" y="365" class="body ink">HUD 投递到指定会话队列</text>
+  <path d="M672 345h41" stroke="#754bc7" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="750" y="340" class="body ink">空闲时开启新一轮</text>
+  <text x="750" y="365" class="body ink">处理消息并作答</text>
+
+  <rect x="48" y="401" width="984" height="108" rx="17" fill="#eee5ff"/>
+  <text x="68" y="431" class="section accent">回程 · 取回复</text>
+  <text x="68" y="464" class="body ink">用相同正文查询</text>
+  <text x="68" y="489" class="body ink">在原 Bot 聊天显示回复</text>
+  <path d="M372 472h-37" stroke="#754bc7" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="410" y="464" class="body ink">复用同一消息 ID</text>
+  <text x="410" y="489" class="body ink">读取该轮回复，无需再次投递</text>
+  <path d="M713 472h-41" stroke="#754bc7" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="750" y="464" class="body ink">回复留在</text>
+  <text x="750" y="489" class="body ink">「HUD 传话测试」对话</text>
+
+  <path d="M48 539h984" stroke="#e4d9f5"/>
+  <text x="48" y="567" class="small muted">实测「帮我总结昨天（11 月 15 日，北京时间）做了什么」只投递一次，摘要回到原 Bot 聊天。</text>
+  <text x="48" y="590" class="small muted">测试版 · 回程由原 Bot 主动查询 · 原生纸飞机动画未现场验收</text>
+</svg>
