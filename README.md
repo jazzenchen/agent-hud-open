@@ -47,6 +47,8 @@ npx @agenthud/install
 
 Or download the [release](https://agenthud.app/mac). Either command installs the newest release, betas included, and on a Mac Agent HUD then updates itself. If it is already in `/Applications`, add `--adopt` to the Homebrew command.
 
+For what works on macOS, Windows and Linux today, see [Agent HUD on macOS, Windows and Linux](docs/platforms.md). To set up your first agent-to-agent exchange, start with [Agents messaging each other](https://agenthud.app/docs/en/mcp/messaging/).
+
 ## On your screen.
 
 **Your agents, at a glance.** You write code, read docs or deal with something else while your agents keep working. The edge of your screen tells you who is still busy, who is done and who is waiting for you.
