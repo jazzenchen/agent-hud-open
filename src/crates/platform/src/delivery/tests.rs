@@ -1032,6 +1032,79 @@ for line in sys.stdin:
             receipt.reason
         );
     }
+    /// A shared daemon whose Codex has no queue refuses `thread/queue/add`
+    /// by name before queueing anything (Open #94), so the message goes
+    /// through the short-lived app-server instead of failing.
+    #[test]
+    fn enqueue_passes_a_daemon_without_the_queue() {
+        let fixture = Fixture::new();
+        let path = fixture
+            .paths()
+            .codex_data
+            .join("app-server-control/app-server-control.sock");
+        fs::create_dir_all(path.parent().unwrap()).unwrap(); // plain directory
+        let listener = UnixListener::bind(path).unwrap();
+        let daemon = thread::spawn(move || {
+            let (socket, _) = listener.accept().unwrap();
+            socket
+                .set_read_timeout(Some(Duration::from_secs(3)))
+                .unwrap();
+            let mut ws = tungstenite::accept(socket).unwrap();
+            let initialize = ws_read(&mut ws);
+            ws_reply(&mut ws, &initialize, json!({}));
+            assert_eq!(ws_read(&mut ws)["method"], "initialized");
+            let request = ws_read(&mut ws);
+            assert_eq!(request["method"], "thread/queue/add");
+            ws.send(tungstenite::Message::Text(
+                json!({"id":request["id"],"error":{"code":-32600,"message":"Invalid request: unknown variant `thread/queue/add`, expected one of `initialize`, `thread/start`"}})
+                    .to_string()
+                    .into(),
+            ))
+            .unwrap();
+        });
+        // A shell stand-in: `initialize` is id 1, the queued message id 2.
+        let script = fixture.0.join("bin/codex");
+        let log = fixture.0.join("app-server.log");
+        fs::create_dir_all(script.parent().unwrap()).unwrap(); // plain directory
+        fs::write(
+            &script,
+            r#"#!/bin/sh
+read -r line
+echo '{"id":1,"result":{}}'
+read -r line
+read -r line
+echo "$line" > "$QUEUE_LOG"
+echo '{"id":2,"result":{"queuedSubmission":{"id":"q1"}}}'
+"#,
+        )
+        .unwrap();
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(&script, fs::Permissions::from_mode(0o755)).unwrap();
+        let route = QueueRoute {
+            executable: script,
+            environment: [
+                ("PATH".to_owned(), "/usr/bin:/bin".to_owned()),
+                ("QUEUE_LOG".to_owned(), log.to_string_lossy().into_owned()),
+            ]
+            .into(),
+            applications: vec![fixture.0.join("Applications")],
+        };
+        let service = LocalClients::with_transport(
+            fixture.paths(),
+            vec![target(Provider::Codex)],
+            Arc::new(NativeCodexTransport { queue: Some(route) }),
+            Duration::from_secs(10),
+        )
+        .unwrap();
+        let mut send = request(Provider::Codex);
+        send.operation = Operation::Enqueue;
+        let receipt = service.send(send).unwrap();
+        daemon.join().unwrap();
+        assert_eq!(receipt.state, DeliveryState::Queued, "{:?}", receipt.reason);
+        let queued: Value = serde_json::from_str(&fs::read_to_string(&log).unwrap()).unwrap();
+        assert_eq!(queued["method"], "thread/queue/add");
+        assert_eq!(queued["params"]["threadId"], THREAD);
+    }
     #[test]
     fn cli_existing_tui_start_steer_interrupt_and_enqueue() {
         for operation in [

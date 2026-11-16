@@ -67,14 +67,8 @@ fn enqueue(
             Err(Failure::AcceptanceUncertain)
         }
     };
-    match Cli::connect(
-        &data.join("app-server-control/app-server-control.sock"),
-        timeout,
-    ) {
-        Ok(mut daemon) => {
-            let value = daemon.request("thread/queue/add", params, true)?;
-            accepted(value)?;
-        }
+    match queue_in_daemon(data, params.clone(), timeout) {
+        Ok(value) => accepted(value)?,
         Err(Failure::Unavailable(_)) if queue.is_some() => {
             let route = queue.unwrap();
             let mut server =
@@ -197,14 +191,35 @@ fn enqueue_created(
     message_id: &str,
     timeout: Duration,
 ) -> Result<()> {
-    let mut connection = Cli::connect(
-        &data.join("app-server-control/app-server-control.sock"),
+    let value = queue_in_daemon(
+        data,
+        json!({"threadId":thread,"clientUserMessageId":message_id,"input":[{"type":"text","text":text,"text_elements":[]}]}),
         timeout,
     )?;
-    let value=connection.request("thread/queue/add",json!({"threadId":thread,"clientUserMessageId":message_id,"input":[{"type":"text","text":text,"text_elements":[]}]}),true)?;
     if value["queuedSubmission"].is_object() {
         Ok(())
     } else {
         Err(Failure::AcceptanceUncertain)
+    }
+}
+
+/// Adds to Codex's queue through the shared daemon. The daemon runs a Codex
+/// of its own (`codex app-server daemon version` names it), and a build
+/// without the queue refuses the method by name before queueing anything
+/// (Open #94); such a daemon counts as none, so the message takes the
+/// short-lived app-server instead.
+fn queue_in_daemon(data: &Path, params: Value, timeout: Duration) -> Result<Value> {
+    let mut daemon = Cli::connect(
+        &data.join("app-server-control/app-server-control.sock"),
+        timeout,
+    )?;
+    match daemon.request("thread/queue/add", params, true) {
+        Err(Failure::Rejected(reason))
+            if reason.contains("thread/queue/add")
+                && (reason.contains("unknown variant") || reason.contains("not support")) =>
+        {
+            Err(Failure::Unavailable(reason))
+        }
+        result => result,
     }
 }
