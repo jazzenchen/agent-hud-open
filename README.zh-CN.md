@@ -47,6 +47,8 @@ npx @agenthud/install
 
 也可以直接下载[发行版](https://agenthud.app/mac)。两条命令都会安装最新的版本（包括 Beta），在 Mac 上之后 Agent HUD 会自己更新。`/Applications` 里已经装了的话，给 Homebrew 命令加上 `--adopt`。
 
+初次使用？先看[如何让 agents 互发消息](https://agenthud.app/docs/zh/mcp/messaging/)和[各平台支持情况](docs/platforms.md)。
+
 ## 在屏幕上
 
 **你的 agents，一目了然。** 你在写代码、读文档或处理别的事情，agents 继续工作。屏幕边缘告诉你：谁还在忙，谁已经完成，谁正在等你。
