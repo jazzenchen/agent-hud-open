@@ -18,6 +18,7 @@ mod service;
 mod setup;
 mod starts;
 mod targets;
+pub mod undelivered;
 // What sending and starting need from the operating system: private files
 // and folders, where apps and command lines are installed, and how a client
 // link opens. macOS and Linux share `unix.rs`.
