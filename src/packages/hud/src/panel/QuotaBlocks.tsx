@@ -6,6 +6,7 @@ import type {
   Snapshot,
 } from "@agent-hud/protocol";
 import { blockRows, quotaRowKey, vendorKey, type HUDConfig } from "../model";
+import { pickedAgents } from "../resting-agents";
 import { SourceProviderBlock } from "./QuotaSection";
 import { SourceBalances } from "./SourceBalances";
 import { blockLines, COMPACT_LEAST } from "./block-lines";
@@ -126,37 +127,41 @@ export function usePanelBlocks({
     }
     return groups;
   }, [rows]);
-  const vendorNames = useMemo(
-    () =>
-      [
-        ...new Set([
-          ...rows.map((row) => row.vendor),
-          ...snapshot.providers
-            .filter(
-              (provider) =>
-                provider.detected &&
-                provider.enabled &&
-                (!focusVendor ||
-                  vendorKey(provider.id) === vendorKey(focusVendor)) &&
-                !snapshot.billing.some(
-                  (account) =>
-                    vendorKey(account.vendor) === vendorKey(provider.id),
-                ),
-            )
-            .map((provider) => provider.id),
-        ]),
-      ].filter((vendor) => !config.panelLayout.blocks?.[vendor]?.hidden),
-    [
-      rows,
-      snapshot.providers,
-      snapshot.billing,
-      focusVendor,
-      config.panelLayout,
-    ],
-  );
   const billing = snapshot.billing.filter(
     (account) =>
       !focusVendor || vendorKey(account.vendor) === vendorKey(focusVendor),
+  );
+  const candidates = useMemo(
+    () => [
+      ...new Set([
+        ...rows.map((row) => row.vendor),
+        ...snapshot.providers
+          .filter(
+            (provider) =>
+              provider.detected &&
+              provider.enabled &&
+              (!focusVendor ||
+                vendorKey(provider.id) === vendorKey(focusVendor)) &&
+              !snapshot.billing.some(
+                (account) =>
+                  vendorKey(account.vendor) === vendorKey(provider.id),
+              ),
+          )
+          .map((provider) => provider.id),
+      ]),
+    ],
+    [rows, snapshot.providers, snapshot.billing, focusVendor],
+  );
+  // The agents this screen's HUD shows, so the panel that opens from it
+  // shows the same ones (Open #85).
+  const picked = pickedAgents(
+    [...candidates, ...billing.map((account) => account.vendor)].map(vendorKey),
+    config.panelLayout,
+  );
+  const vendorNames = candidates.filter(
+    (vendor) =>
+      picked.has(vendorKey(vendor)) &&
+      !config.panelLayout.blocks?.[vendor]?.hidden,
   );
   const blocks = inPanelOrder<{ key: string; content: ReactNode }>(
     [
@@ -183,7 +188,9 @@ export function usePanelBlocks({
       })),
       ...[...new Set(billing.map((account) => account.vendor))]
         .filter(
-          (vendor) => !config.panelLayout.blocks?.[`api:${vendor}`]?.hidden,
+          (vendor) =>
+            picked.has(vendorKey(vendor)) &&
+            !config.panelLayout.blocks?.[`api:${vendor}`]?.hidden,
         )
         .map((vendor) => ({
           key: `api:${vendor}`,

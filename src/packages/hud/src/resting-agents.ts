@@ -54,14 +54,29 @@ export function layoutMarks<T extends { key: string }>(
   available: T[],
   layout: { order?: string[]; hud?: { agents?: string[] } },
 ): T[] {
-  const marks = (layout.hud?.agents ?? []).map(vendorKey);
-  const named = available.filter((vendor) => marks.includes(vendor.key));
+  const picked = pickedAgents(
+    available.map((vendor) => vendor.key),
+    layout,
+  );
   const order = (layout.order ?? []).map((key) =>
     vendorKey(key.replace(/^api:/, "")),
   );
   const rank = (vendor: T) =>
     order.includes(vendor.key) ? order.indexOf(vendor.key) : order.length;
-  return (named.length ? named : [...available]).sort(
-    (a, b) => rank(a) - rank(b),
-  );
+  return available
+    .filter((vendor) => picked.has(vendor.key))
+    .sort((a, b) => rank(a) - rank(b));
+}
+
+/** Which of the agents `keys` (mark keys) a screen shows: those its layout's
+ * `hud.agents` names (Settings → Display), or all of them when it names
+ * none, so a list naming no agent at hand never empties a HUD. The HUD's
+ * marks and the panel that opens from it both follow it (Open #85). */
+export function pickedAgents(
+  keys: readonly string[],
+  layout: { hud?: { agents?: string[] } },
+): Set<string> {
+  const marks = (layout.hud?.agents ?? []).map(vendorKey);
+  const named = keys.filter((key) => marks.includes(key));
+  return new Set(named.length ? named : keys);
 }

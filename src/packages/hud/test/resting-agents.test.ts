@@ -1,6 +1,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { layoutMarks, restingAgents } from "../src/resting-agents.ts";
+import {
+  layoutMarks,
+  pickedAgents,
+  restingAgents,
+} from "../src/resting-agents.ts";
 
 const quota = (
   vendor: string,
@@ -102,4 +106,14 @@ test("marks follow the agent order set in Settings, also when the HUD has a list
     "openai",
     "deepseek",
   ]);
+});
+
+test("a screen's agent list picks the panel's agents too, and one naming none of them picks all (Open #85)", () => {
+  const keys = ["claude", "openai", "copilot", "workbuddy"];
+  assert.deepEqual(
+    [...pickedAgents(keys, { hud: { agents: ["claude", "codex"] } })],
+    ["claude", "openai"],
+  );
+  assert.deepEqual([...pickedAgents(keys, { hud: { agents: ["pi"] } })], keys);
+  assert.deepEqual([...pickedAgents(keys, {})], keys);
 });
