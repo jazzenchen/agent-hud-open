@@ -18,6 +18,27 @@ import type {
   StatisticsQuery,
   StatisticsResponse,
 } from "@agent-hud/protocol";
+import type {
+  InspectSendResult,
+  InspectTarget,
+  InspectTargets,
+  InspectView,
+} from "@agent-hud/protocol";
+/** The host's side of the clipboard window: each change answers the new
+ * state, which every screen's HUD also hears through `subscribe`. */
+export interface InspectServices {
+  state(): Promise<InspectView>;
+  subscribe(listener: (view: InspectView) => void): () => void;
+  /** Reads the latest copy's content: the person points at it. */
+  look(): Promise<InspectView>;
+  add(): Promise<InspectView>;
+  /** A comment on item `id`, or with none the note for the whole message. */
+  edit(id: string | null, text: string): Promise<InspectView>;
+  remove(id: string): Promise<InspectView>;
+  clear(): Promise<InspectView>;
+  targets(): Promise<InspectTargets>;
+  send(target: InspectTarget): Promise<InspectSendResult>;
+}
 /** What a panel section asks Core. */
 export type PanelQueryMethod =
   "statistics" | "sessions" | "quota_history" | "plan_value";
@@ -46,6 +67,8 @@ export interface PanelServices {
   sources?: Record<string, SourcePreferences>;
   /** The other screens' HUDs, for one set of dock ends on all of them. */
   ends?: EndsLink;
+  /** The clipboard bubble's window, kept by the host for every screen. */
+  inspect?: InspectServices;
   draft?: {
     unsaved: boolean;
     /** What waits: this display's own layout or the shared one, a HUD style, the app's settings. */

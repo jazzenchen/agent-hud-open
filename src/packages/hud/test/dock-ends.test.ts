@@ -236,3 +236,55 @@ test("a screen that starts late takes what the others hold, once each", () => {
   );
   assert.equal(mergeEnds(merged, theirs), merged);
 });
+
+test("the clipboard's end takes the tail's place, or sits past it, and the notch grows for both", () => {
+  const strip = { x: 700, y: 960, width: 200, height: 40 };
+  const config = { mode: "simple", simpleSize: 26 } as const;
+  const alone = dockEnds(strip, "bottom", config, marks, screen, {
+    head: 0,
+    tail: 0,
+    clip: 1,
+  });
+  assert.deepEqual(alone.clip, alone.tail);
+  const after = dockEnds(strip, "bottom", config, marks, screen, {
+    head: 0,
+    tail: 2,
+    clip: 1,
+  });
+  assert.equal(after.clip.x, after.tail.x + after.thick + 6);
+  // Squeezed to the screen's right: the tail goes before the dock, and the
+  // clipboard's end beyond the head.
+  const right = { x: 1560, y: 960, width: 40, height: 40 };
+  const squeezed = dockEnds(right, "bottom", config, marks, screen, {
+    head: 1,
+    tail: 1,
+    clip: 1,
+  });
+  assert.ok(squeezed.clip.x + squeezed.thick <= squeezed.head.x - 6);
+  const notch = { x: 700, y: 0, width: 200, height: 32 };
+  const one = dockEnds(
+    notch,
+    "top",
+    { mode: "notch", simpleSize: 26 },
+    marks,
+    screen,
+    {
+      head: 0,
+      tail: 1,
+    },
+  );
+  const two = dockEnds(
+    notch,
+    "top",
+    { mode: "notch", simpleSize: 26 },
+    marks,
+    screen,
+    {
+      head: 0,
+      tail: 1,
+      clip: 1,
+    },
+  );
+  assert.equal(two.wings.tail, one.wings.tail + two.thick + 6);
+  assert.ok(two.clip.x + two.thick <= notch.x + notch.width + two.wings.tail);
+});

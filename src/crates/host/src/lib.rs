@@ -16,6 +16,7 @@ mod deepseek_plugin;
 mod demo;
 pub mod extension;
 mod hud;
+mod inspect;
 mod instance;
 mod mcp_clients;
 mod messages;
@@ -121,6 +122,7 @@ pub fn run_with_options(
                 hud::hud_set_depth,
                 hud::hud_drag_start,
                 hud::hud_text_focus,
+                inspect::inspect_request,
                 auxiliary::hud_show_main,
                 auxiliary::quit_app,
                 auxiliary::open_statistics,
@@ -224,6 +226,7 @@ pub fn run_with_options(
                 }
                 app.manage(service);
             }
+            inspect::install(app.handle(), app.state::<AppState>().demo)?;
             app.manage(hud::HudWindows::default());
             app.manage(auxiliary::AuxiliaryWindows::default());
             app.manage(tray::TrayState::default());
@@ -281,6 +284,7 @@ pub fn run_with_options(
             if matches!(event, tauri::RunEvent::Exit) {
                 coordinator::stop(app);
                 screens::shutdown(app);
+                inspect::shutdown(app);
                 if let Some(service) = app.try_state::<Service>() {
                     service.stop();
                 }

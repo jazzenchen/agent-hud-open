@@ -18,6 +18,8 @@ const globalKeys = [
   "hoverDelayMs",
   "collapseDelayMs",
   "messageFadeSeconds",
+  "clipboardBubble",
+  "clipboardFadeSeconds",
   "requiresOptionToOpen",
   "openImmediatelyAtTop",
   "animations",

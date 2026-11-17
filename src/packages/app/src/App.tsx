@@ -28,6 +28,7 @@ import { SettingsWindow } from "./settings/SettingsWindow";
 import { SourceMenu } from "./SourceMenu";
 import { StatisticsWindow } from "./StatisticsWindow";
 import { hudEndsLink } from "./lib/hud-ends-link";
+import { hudInspect } from "./lib/hud-inspect";
 import "./lib/animation-handlers";
 
 // Windows load their own views. Statistics does not need the shader/bot renderer,
@@ -139,6 +140,7 @@ function AppContent({
   const panelServices: PanelServices = {
     sources: snapshot?.sourcePreferences ?? store.sources,
     ends: surface ? hudEndsLink : undefined,
+    inspect: surface ? hudInspect : undefined,
     openSession: async (session) => {
       try {
         await act("open_session", { id: session.id });

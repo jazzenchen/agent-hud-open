@@ -16,20 +16,8 @@ import { SIMPLE_EDGE_MARGIN } from "./simple-panel";
 import { useNotchGeometry } from "./NotchSurface";
 import { useRequestDelivery } from "./request-delivery";
 import { snapshotLanguage } from "@agent-hud/ui/format";
-
-/** The HUD's ground: its fill, and the outline and shadow that belong to it.
- * Transparency runs it from opaque (`alpha` 1) to fully clear, the outline
- * and shadow fading with it; logos, bots and text are drawn over it at full
- * strength. */
-export function hudGround(light: boolean, alpha: number) {
-  return {
-    fill: light ? `rgba(245,245,247,${alpha})` : `rgba(0,0,0,${alpha})`,
-    outline: light
-      ? `rgba(0,0,0,${0.106 * alpha})`
-      : `rgba(255,255,255,${0.075 * alpha})`,
-    shadow: `0 9px 30px rgba(0,0,0,${0.133 * alpha})`,
-  };
-}
+import { hudGround } from "./hud-ground";
+export { hudGround } from "./hud-ground";
 
 export interface UseHUDLayoutArgs {
   config: HUDConfig;
@@ -118,19 +106,23 @@ export function useHUDLayout({
     ? HUD_METRICS.expandedFlare
     : HUD_METRICS.collapsedFlare;
   const flared = !detached && config.mode !== "simple";
-  const fullWidth = standaloneAlert
-    ? 470
-    : focusedVendor
-      ? Math.max(440, config.panelWidth - 100)
-      : !horizontal(edge) && !detached
-        ? Math.min(
-            screen.width - 16,
-            Math.max(
-              config.panelWidth,
-              404 + metrics.width + 12 + surfaceFlare + 16,
-            ),
-          )
-        : config.panelWidth;
+  // The clipboard's window keeps narrow, beside a side edge's dock as well.
+  const fullWidth =
+    ends.view === "clip"
+      ? 380 + (horizontal(edge) ? 0 : metrics.width + 12)
+      : standaloneAlert
+        ? 470
+        : focusedVendor
+          ? Math.max(440, config.panelWidth - 100)
+          : !horizontal(edge) && !detached
+            ? Math.min(
+                screen.width - 16,
+                Math.max(
+                  config.panelWidth,
+                  404 + metrics.width + 12 + surfaceFlare + 16,
+                ),
+              )
+            : config.panelWidth;
   // On a side edge the line starts behind the dock, so it reads as the dock growing; that side carries no text.
   const peekTuck =
     simplePeek && !horizontal(edge) ? Math.round(strip.width / 2) : 0;

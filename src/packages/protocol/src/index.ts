@@ -7,3 +7,4 @@ export type * from "./providers.ts";
 export type * from "./prices-relays.ts";
 export type * from "./requests.ts";
 export type * from "./settings.ts";
+export type * from "./inspect.ts";

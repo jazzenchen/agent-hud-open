@@ -32,6 +32,8 @@
   "hoverDelayMs": 400,
   "collapseDelayMs": 200,
   "messageFadeSeconds": 5,
+  "clipboardBubble": true,
+  "clipboardFadeSeconds": 5,
   "requiresOptionToOpen": false,
   "openImmediatelyAtTop": false,
   "sessionList": true,

@@ -27,12 +27,15 @@ import {
   type HUDNativePointer,
 } from "./scene/useHUDInteraction";
 import { useHUDLayout } from "./scene/useHUDLayout";
+import { usePanelCommand } from "./scene/usePanelCommand";
 import { useDomTyping } from "./scene/useDomTyping";
 import { useEditHold } from "./scene/useEditHold";
 import { useHeldFrame } from "./scene/useHeldFrame";
 import { MeasuringCopy, useMeasured } from "./scene/MeasuringCopy";
 import { DockEnds } from "./ends/DockEnds";
 import { useDockEnds } from "./ends/useDockEnds";
+import { InspectPanel } from "./inspect/InspectPanel";
+import { useClipEnd } from "./inspect/useClipEnd";
 import { PanelBody } from "./scene/PanelBody";
 import { RestingStrip } from "./scene/RestingStrip";
 import { HoverFloor, SceneBackdrop } from "./scene/SceneFloors";
@@ -186,25 +189,16 @@ export function HUDScene({
     setPinned,
   });
   const { state, forceOpen, collapse } = hover;
-  useEffect(() => {
-    if (!panelCommand) return;
-    if (!panelCommand.open) {
-      setPinned(false);
-      collapse();
-      return;
-    }
-    // A docked HUD that separates agents opens on its first agent, as a hold does.
-    if (
-      config.mode !== "notch" &&
-      config.separatesAgents &&
-      vendors.length > 0
-    ) {
-      setHovered(vendors[0].key);
-      setPinned(true);
-    }
-    forceOpen();
-  }, [panelCommand?.sequence]);
+  usePanelCommand(panelCommand, {
+    config,
+    vendors,
+    setHovered,
+    setPinned,
+    forceOpen,
+    collapse,
+  });
   const open = hover.open || holdActive;
+  const clip = useClipEnd(config, ends.hovered, open);
 
   const safeSceneHeight = Math.max(180, height);
   const screen = { width, height: safeSceneHeight };
@@ -268,8 +262,10 @@ export function HUDScene({
       silenced: glowHidden || Boolean(snapshot.status?.paused),
       underPointer,
       open,
-      ends,
+      ends: { ...ends, clipOpen: clip.viewing },
     });
+  const endView = clip.viewing ? "clip" : news.ends.view;
+  const counts = { ...endCounts, clip: clip.shown ? 1 : 0 };
 
   const {
     edge,
@@ -316,7 +312,7 @@ export function HUDScene({
     event,
     inUsagePanel,
     requestsCount: requests.length,
-    ends: { view: news.ends.view, counts: endCounts },
+    ends: { view: endView, counts },
   });
 
   const { heldFrame, trackPointer } = useHeldFrame({
@@ -373,7 +369,7 @@ export function HUDScene({
     onConfigure,
     onStats,
     onEscape: endHold,
-    ends: { showing: Boolean(news.ends.view), hovered: ends.hovered },
+    ends: { showing: Boolean(endView), hovered: ends.hovered },
   });
 
   const { openSettings, listedSessions, footer } = usePanelHandoffs({
@@ -385,22 +381,23 @@ export function HUDScene({
     showPanelStats,
     onUpdate,
   });
-  const eventContent =
-    request || event ? (
-      <AlertStack
-        requests={requests}
-        request={request}
-        event={event}
-        news={news}
-        decide={onRequestDecision}
-        openSettings={openSettings}
-        onStats={showPanelStats}
-        handoff={handoff}
-        light={light}
-        snapshot={snapshot}
-        botLogos={config.botLogos}
-      />
-    ) : null;
+  const eventContent = clip.viewing ? (
+    <InspectPanel clip={clip} light={light} handoff={handoff} />
+  ) : request || event ? (
+    <AlertStack
+      requests={requests}
+      request={request}
+      event={event}
+      news={news}
+      decide={onRequestDecision}
+      openSettings={openSettings}
+      onStats={showPanelStats}
+      handoff={handoff}
+      light={light}
+      snapshot={snapshot}
+      botLogos={config.botLogos}
+    />
+  ) : null;
 
   // The panel's body, drawn by the visible panel and by the hidden copy
   // below, which measures its natural height (no `maxHeight`) over the
@@ -448,6 +445,7 @@ export function HUDScene({
       event,
       news.queue,
       news.ends.view === "tail" ? news.ends.tail : news.ends.view,
+      clip.viewing && clip.panel.shape,
       inUsagePanel,
       delivery,
     ],
@@ -599,14 +597,15 @@ export function HUDScene({
           <DockEnds
             ends={ends}
             geometry={endRects}
-            counts={endCounts}
+            counts={counts}
             fade={news.ends.fade}
+            clip={clip}
             config={config}
             edge={edge}
             strip={strip}
             frame={frame}
             cardVisible={cardVisible}
-            showing={Boolean(news.ends.view)}
+            showing={Boolean(endView)}
             dragging={dragging}
             light={light}
             fill={fill}

@@ -113,6 +113,27 @@ impl AgentMessages {
             .call(params, &host, chrono::Utc::now().timestamp_millis())
     }
 
+    /// Runs `work` with the group's senders and this moment's facts, for the
+    /// person's own words from the HUD's clipboard window, which do not need
+    /// the group switched on.
+    pub(crate) fn as_user<T>(
+        &self,
+        work: impl FnOnce(&mut Messaging, &Host<'_>) -> T,
+    ) -> Result<T, String> {
+        let snapshot = self.snapshot()?;
+        let query = self.query();
+        let host = Host {
+            snapshot: &snapshot,
+            query: &query,
+            conversations: self.conversations.as_deref(),
+        };
+        let mut messaging = self
+            .messaging
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
+        Ok(work(&mut messaging, &host))
+    }
+
     /// The 5-second look: the host's own senders' receipts and moves, and
     /// the messages that still wait for something while the group is on.
     fn look(&self) {

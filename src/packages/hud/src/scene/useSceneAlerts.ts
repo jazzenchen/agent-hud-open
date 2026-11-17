@@ -31,6 +31,8 @@ export function useSceneAlerts({
   ends: {
     /** The end the pointer is on. */
     hovered: EndSide | null;
+    /** The clipboard's window shows in the panel. */
+    clipOpen?: boolean;
     onPark: (card: ParkedCard, source: string) => void;
     arriving: ReadonlySet<string>;
   };
@@ -113,6 +115,7 @@ export function useSceneAlerts({
   const inUsagePanel = Boolean(
     open &&
     !parked.view &&
+    !ends.clipOpen &&
     !request &&
     event &&
     allowsInlineUsageAlert &&

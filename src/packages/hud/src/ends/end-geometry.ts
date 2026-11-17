@@ -1,17 +1,20 @@
-// Where the dock's two ends sit. The head holds the requests that wait for
-// the person, the tail the messages that came in. Pure geometry, no DOM.
+// Where the dock's ends sit. The head holds the requests that wait for the
+// person, the tail the messages that came in, and the clipboard's end, just
+// past the tail, the person's latest copy. Pure geometry, no DOM.
 import type { HUDRect, StripMetrics } from "../geometry.ts";
 import type { HUDConfig, HUDEdge } from "../model.ts";
 import { simplePanelRect } from "../scene/simple-panel.ts";
 
-export type EndSide = "head" | "tail";
-export const END_SIDES: readonly EndSide[] = ["head", "tail"];
+export type EndSide = "head" | "tail" | "clip";
+export const END_SIDES: readonly EndSide[] = ["head", "tail", "clip"];
 
 export interface DockEndsGeometry {
   head: HUDRect;
   tail: HUDRect;
-  /** How far the notch grows on each side to hold an end that shows. */
-  wings: Record<EndSide, number>;
+  clip: HUDRect;
+  /** How far the notch grows on each side to hold the ends that show; the
+   * clipboard's end grows the tail's side. */
+  wings: { head: number; tail: number };
   /** The pill's short side. */
   thick: number;
 }
@@ -40,16 +43,18 @@ export function endBadge(thick: number, count: number) {
 }
 
 /** The ends of the dock (`strip`) on `edge`, each a circle: the head before its first mark,
- * the tail after its last. Where the screen has no room on one side, both go
- * to the other, the head always first. In notch mode they sit inside the
- * notch, which grows sideways (`wings`) for the ones that show. */
+ * the tail after its last, the clipboard's end past the tail, or in its place
+ * while the tail is empty. Where the screen has no room on one side, the
+ * head and tail go to the other, the head always first. In notch mode they
+ * sit inside the notch, which grows sideways (`wings`) for the ones that
+ * show. */
 export function dockEnds(
   strip: HUDRect,
   edge: HUDEdge,
   config: Pick<HUDConfig, "mode" | "simpleSize">,
   metrics: Pick<StripMetrics, "mark" | "padding">,
   screen: { width: number; height: number },
-  counts: Record<EndSide, number>,
+  counts: { head: number; tail: number; clip?: number },
 ): DockEndsGeometry {
   const notch = config.mode === "notch";
   const across = notch || edge === "top" || edge === "bottom";
@@ -63,7 +68,7 @@ export function dockEnds(
     : metrics.mark +
       2 * Math.max(3, Math.round(clamp(config.simpleSize, 20, 60) * 0.18));
   // Each end is a circle as thick as the dock.
-  const length = { head: thick, tail: thick };
+  const length = { head: thick, tail: thick, clip: thick };
   // The circle's place across the dock: centred on the dock's own band, or
   // on a side edge's Simple panel, on its column of rings.
   const cross = across
@@ -72,15 +77,19 @@ export function dockEnds(
   const start = across ? strip.x : strip.y;
   const end = across ? strip.x + strip.width : strip.y + strip.height;
   const limit = across ? screen.width : screen.height;
+  const tailShows = counts.tail > 0;
+  const onTailSide = (tailShows ? 1 : 0) + ((counts.clip ?? 0) > 0 ? 1 : 0);
   const wings = {
     head: counts.head > 0 ? length.head + WING_PADDING * 2 : 0,
-    tail: counts.tail > 0 ? length.tail + WING_PADDING * 2 : 0,
+    tail: onTailSide
+      ? onTailSide * thick + (onTailSide - 1) * GAP + WING_PADDING * 2
+      : 0,
   };
-  let along: Record<EndSide, number>;
+  let along: Record<"head" | "tail", number>;
   if (notch) {
     along = {
       head: start - (length.head + WING_PADDING * 2) / 2 - length.head / 2,
-      tail: end + (length.tail + WING_PADDING * 2) / 2 - length.tail / 2,
+      tail: end + WING_PADDING,
     };
   } else if (start - GAP - length.head < 0) {
     along = { head: end + GAP, tail: end + GAP + length.head + GAP };
@@ -92,13 +101,22 @@ export function dockEnds(
   } else {
     along = { head: start - GAP - length.head, tail: end + GAP };
   }
+  // The clipboard's end goes on outward from the tail, or where it would be.
+  const outward = along.tail >= end;
+  const clip = !tailShows
+    ? along.tail
+    : outward
+      ? along.tail + thick + GAP
+      : Math.min(along.tail, along.head) - GAP - thick;
+  const at: Record<EndSide, number> = { ...along, clip };
   const rect = (side: EndSide): HUDRect =>
     across
-      ? { x: along[side], y: cross, width: length[side], height: thick }
-      : { x: cross, y: along[side], width: thick, height: length[side] };
+      ? { x: at[side], y: cross, width: length[side], height: thick }
+      : { x: cross, y: at[side], width: thick, height: length[side] };
   return {
     head: rect("head"),
     tail: rect("tail"),
+    clip: rect("clip"),
     wings: notch ? wings : { head: 0, tail: 0 },
     thick,
   };

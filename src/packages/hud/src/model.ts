@@ -73,6 +73,11 @@ export interface HUDConfig {
   /** How often the dock's tail lets its oldest message go, in seconds;
    * 0 keeps them until the person lets them go. */
   messageFadeSeconds: number;
+  /** A bubble at the dock's tail for each copy, which opens the window that
+   * sends copies into a session. */
+  clipboardBubble: boolean;
+  /** How long a copy's bubble stays, in seconds; 0 keeps it. */
+  clipboardFadeSeconds: number;
   requiresOptionToOpen: boolean;
   openImmediatelyAtTop: boolean;
   sessionList: boolean;

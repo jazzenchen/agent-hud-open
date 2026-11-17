@@ -1,16 +1,16 @@
 {
-  "src/crates/agents/src/account/fake.rs": 393,
+  "src/crates/agents/src/account/fake.rs": 367,
   "src/crates/agents/src/claude/live.rs": 353,
-  "src/crates/core/src/ingestion/scan.rs": 530,
+  "src/crates/core/src/ingestion/scan.rs": 527,
   "src/crates/core/src/sessions/list.rs": 527,
   "src/crates/platform/src/deepseek_plugin/agent-hud.mjs": 389,
-  "src/packages/app/src/sessions/SubagentTimeline.tsx": 463,
-  "src/packages/app/src/sessions/TurnBarsChart.tsx": 329,
-  "src/packages/hud/src/HUDScene.tsx": 653,
+  "src/packages/app/src/sessions/SubagentTimeline.tsx": 454,
+  "src/packages/app/src/sessions/TurnBarsChart.tsx": 325,
+  "src/packages/hud/src/HUDScene.tsx": 649,
   "src/packages/hud/src/bots/bot-motion.ts": 463,
   "src/packages/hud/src/bots/bot-spec.ts": 393,
   "src/packages/hud/src/bots/clawd-clips.ts": 301,
   "src/packages/hud/src/bots/clawd-player.ts": 526,
-  "src/packages/hud/src/panel/TokenChartSection.tsx": 340,
+  "src/packages/hud/src/panel/TokenChartSection.tsx": 328,
   "src/packages/hud/src/scene/flight-plan.ts": 395
 }

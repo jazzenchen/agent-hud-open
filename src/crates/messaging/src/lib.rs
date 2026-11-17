@@ -25,10 +25,12 @@ mod start;
 mod tests;
 mod tools;
 mod transcript;
+mod user;
 mod words;
 
 pub use preferences::{Preferences, DEFAULT_LIMIT};
 pub use transcript::{StoredTurn, Turns};
+pub use user::{UserTarget, USER_CLIENTS};
 
 use agent_hud_core::l10n::Language;
 use agent_hud_platform::delivery::{

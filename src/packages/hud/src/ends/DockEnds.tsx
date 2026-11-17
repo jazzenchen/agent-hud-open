@@ -15,14 +15,16 @@ const inside = (rect: HUDRect, point: { x: number; y: number }, pad = 0) =>
   point.y >= rect.y - pad &&
   point.y <= rect.y + rect.height + pad;
 
-/** The dock's two ends, the cards flying to them, and which end the pointer
- * is on: it stays the one whose panel shows until the pointer reaches the
- * dock or the HUD closes. */
+/** The dock's ends, the cards flying to them, and which end the pointer is
+ * on: it stays the one whose panel shows until the pointer reaches the dock
+ * or the HUD closes. The clipboard's end has its own countdown and shows how
+ * many wait in its draft. */
 export function DockEnds({
   ends,
   geometry,
   counts,
   fade,
+  clip,
   config,
   edge,
   strip,
@@ -46,6 +48,7 @@ export function DockEnds({
   geometry: DockEndsGeometry;
   counts: Record<EndSide, number>;
   fade: EndFade;
+  clip: { fade: EndFade; count: number };
   config: HUDConfig;
   edge: HUDEdge;
   strip: HUDRect;
@@ -91,7 +94,8 @@ export function DockEnds({
     const over = (event: PointerEvent) => {
       const target = event.target instanceof Element ? event.target : null;
       const side = target?.closest<HTMLElement>(".hud-dock-end")?.dataset.end;
-      if (side === "head" || side === "tail") setHovered(side);
+      if (side === "head" || side === "tail" || side === "clip")
+        setHovered(side);
       else if (target?.closest(".hud-resting-strip") && !(notch && cardVisible))
         setHovered(null);
     };
@@ -112,12 +116,12 @@ export function DockEnds({
               key={side}
               side={side}
               rect={geometry[side]}
-              count={counts[side]}
+              count={side === "clip" ? clip.count : counts[side]}
               mode={config.mode}
               light={rowDark ? false : light}
               fill={fill}
               outline={outline}
-              fade={fade}
+              fade={side === "clip" ? clip.fade : fade}
               reduceMotion={reduceMotion}
               onEnter={(altKey) => {
                 if (nativePointer) return;
