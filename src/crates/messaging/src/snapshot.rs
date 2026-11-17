@@ -86,6 +86,13 @@ pub(crate) fn find<'a>(snapshot: &'a Value, id: &str) -> Option<&'a Value> {
         .all(|other| other["source"] == first["source"] && other["id"] == first["id"])
         .then_some(first)
 }
+/// Whether the caller is a sub-agent: a session that another one started and
+/// that answers it in its own turn. It reports there, never through a message
+/// (Open #111: a Codex sub-agent queued six progress notes onto its parent).
+pub(crate) fn is_sub_agent(snapshot: &Value, caller: &Caller) -> bool {
+    find_in(snapshot, &caller.client, &caller.session_id)
+        .is_some_and(|session| !session["parentId"].is_null())
+}
 /// `client`'s session `id`.
 pub(crate) fn find_in<'a>(snapshot: &'a Value, client: &str, id: &str) -> Option<&'a Value> {
     snapshot["sessions"].as_array()?.iter().find(|session| {

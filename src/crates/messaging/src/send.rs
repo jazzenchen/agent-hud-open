@@ -11,6 +11,9 @@ impl Messaging {
     ) -> Result<Value> {
         let language = language(host.snapshot);
         let text = arguments["text"].as_str().ok_or("text is required")?;
+        if is_sub_agent(host.snapshot, caller) {
+            return Ok(refused(&words::from_sub_agent(language)));
+        }
         let reply_to = arguments["reply_to"].as_str().filter(|id| !id.is_empty());
         let reply_hint = arguments["reply_hint"].as_bool().unwrap_or(true);
         // Queued by default; a steer goes into the recipient's turn in progress.

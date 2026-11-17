@@ -1252,6 +1252,7 @@
   "Worth at API prices": "API 가격 환산",
   "Year": "1년",
   "Yesterday": "어제",
+  "You are a sub-agent: give your result back in your own turn, to the session that started you. Only main sessions send messages or start sessions.": "당신은 서브에이전트입니다. 결과는 자신의 턴 안에서 당신을 시작한 세션에 돌려주세요. 메시지를 보내거나 세션을 시작할 수 있는 것은 메인 세션뿐입니다.",
   "Your logs go back to {{day}} · tokens and costs are incomplete until it finishes": "로그가 {{day}}까지 있습니다 · 완료될 때까지 토큰과 비용이 불완전합니다",
   "Your own answer": "직접 입력한 답",
   "ZCode credentials have an unsupported format.": "ZCode 자격 증명 형식이 지원되지 않습니다.",

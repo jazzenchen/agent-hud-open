@@ -829,6 +829,35 @@ fn what_cannot_take_a_message_is_refused_with_the_reason() {
     assert!(world.codex.0.lock().unwrap().is_empty());
 }
 
+/// Open #111: a Codex sub-agent took send_message for a way to report to its
+/// parent and queued six turns onto it.
+#[test]
+fn a_sub_agent_neither_sends_nor_starts_a_session() {
+    let mut world = World::on();
+    for to in [CLAUDE, CODEX] {
+        let answer = world.send(("claude", CHILD), to, "Halfway through the tests");
+        assert_eq!(answer["state"], "refused", "{to}");
+        assert!(
+            answer["reason"].as_str().unwrap().contains("your own turn"),
+            "{answer}"
+        );
+    }
+    let answer = world.call(
+        Some(("claude", CHILD)),
+        "start_session",
+        json!({"client":"codex","text":"Review this"}),
+    );
+    assert_eq!(answer["state"], "refused");
+    assert!(
+        answer["reason"].as_str().unwrap().contains("sub-agent"),
+        "{answer}"
+    );
+    assert!(world.codex.0.lock().unwrap().is_empty());
+    // Its parent still sends.
+    let answer = world.send(("claude", CLAUDE), CODEX, "Run the tests");
+    assert_ne!(answer["state"], "refused", "{answer}");
+}
+
 #[test]
 fn a_deepseek_harness_session_takes_a_message_through_its_plugin_and_its_answer_is_read() {
     let mut world = World::on();

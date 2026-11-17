@@ -1252,6 +1252,7 @@
   "Worth at API prices": "API 価格での価値",
   "Year": "1 年",
   "Yesterday": "昨日",
+  "You are a sub-agent: give your result back in your own turn, to the session that started you. Only main sessions send messages or start sessions.": "あなたはサブエージェントです。結果は自分のターンの中で、あなたを起動したセッションに返してください。メッセージの送信やセッションの開始ができるのはメインセッションだけです。",
   "Your logs go back to {{day}} · tokens and costs are incomplete until it finishes": "ログは {{day}} までさかのぼれます · 完了するまでトークンとコストは不完全です",
   "Your own answer": "自分の回答",
   "ZCode credentials have an unsupported format.": "ZCode の認証情報が未対応の形式です。",

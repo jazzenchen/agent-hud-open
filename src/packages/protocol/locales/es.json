@@ -1274,6 +1274,7 @@
   "Worth at API prices": "Valor a precios de API",
   "Year": "Año",
   "Yesterday": "Ayer",
+  "You are a sub-agent: give your result back in your own turn, to the session that started you. Only main sessions send messages or start sessions.": "Eres un subagente: devuelve tu resultado en tu propio turno a la sesión que te inició. Solo las sesiones principales envían mensajes o inician sesiones.",
   "Your logs go back to {{day}} · tokens and costs are incomplete until it finishes": "Tus registros se remontan a {{day}} · los tokens y los costos estarán incompletos hasta que termine",
   "Your own answer": "Tu propia respuesta",
   "ZCode credentials have an unsupported format.": "Las credenciales de ZCode tienen un formato no compatible.",

@@ -12,6 +12,9 @@ impl Messaging {
         let language = language(host.snapshot);
         let client = arguments["client"].as_str().ok_or("client is required")?;
         let text = arguments["text"].as_str().ok_or("text is required")?;
+        if is_sub_agent(host.snapshot, caller) {
+            return Ok(refused(&words::from_sub_agent(language)));
+        }
         let reply_hint = arguments["reply_hint"].as_bool().unwrap_or(true);
         if !matches!(client, "claude" | "codex" | "antigravity" | "deepseek") {
             return Ok(refused(&words::other_client(language)));

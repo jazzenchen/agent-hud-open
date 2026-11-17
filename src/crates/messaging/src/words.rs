@@ -167,6 +167,12 @@ pub fn child(language: Language) -> String {
         "That is a sub-agent; messages go to main sessions only.",
     )
 }
+pub fn from_sub_agent(language: Language) -> String {
+    tr_in(
+        language,
+        "You are a sub-agent: give your result back in your own turn, to the session that started you. Only main sessions send messages or start sessions.",
+    )
+}
 pub fn unknown_reply(language: Language, id: &str) -> String {
     fill(
         &tr_in(

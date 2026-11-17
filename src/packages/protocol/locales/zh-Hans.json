@@ -1252,6 +1252,7 @@
   "Worth at API prices": "按 API 价格折合",
   "Year": "一年",
   "Yesterday": "昨天",
+  "You are a sub-agent: give your result back in your own turn, to the session that started you. Only main sessions send messages or start sessions.": "你是子 agent，结果请在自己这一轮里交回给启动你的会话。只有主会话能发消息或开新会话。",
   "Your logs go back to {{day}} · tokens and costs are incomplete until it finishes": "日志可追溯到 {{day}} · 完成前 Token 和费用不完整",
   "Your own answer": "补充回答",
   "ZCode credentials have an unsupported format.": "ZCode 账户凭证格式无法识别",
