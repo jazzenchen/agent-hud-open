@@ -78,7 +78,8 @@ impl AntigravityTransport for NativeAntigravityTransport {
                     ),
                     Operation::Interrupt => unreachable!(),
                 };
-                transport::send(
+                // Says why, when the message went in the default model.
+                let note = transport::send(
                     cascade_id,
                     &request.text,
                     strategy,
@@ -96,7 +97,7 @@ impl AntigravityTransport for NativeAntigravityTransport {
                     owner_client_id: None,
                     state,
                     at_ms: millis(SystemTime::now()),
-                    reason: None,
+                    reason: note,
                 })
             }
         }
@@ -129,14 +130,14 @@ pub fn start_cascade(folder: &Path, request: &StartRequest) -> Result<StartRecei
         .filter(|id| valid_uuid(id))
         .ok_or(Failure::AcceptanceUncertain)?
         .to_owned();
+    let (config, _) = resolve_cascade_config(None, request.model.as_deref());
     let sent = call(
         "SendUserCascadeMessage",
         message_body(
             &id,
             &request.text,
             "MESSAGE_DELIVERY_STRATEGY_UNSPECIFIED",
-            false,
-            request.model.as_deref(),
+            config,
         ),
     );
     Ok(StartReceipt {
@@ -151,27 +152,7 @@ pub fn start_cascade(folder: &Path, request: &StartRequest) -> Result<StartRecei
     })
 }
 
-fn message_body(
-    cascade_id: &str,
-    text: &str,
-    strategy: &str,
-    existing: bool,
-    model: Option<&str>,
-) -> Value {
-    message_body_with_config(
-        cascade_id,
-        text,
-        strategy,
-        resolve_cascade_config(existing.then_some(cascade_id), model),
-    )
-}
-
-fn message_body_with_config(
-    cascade_id: &str,
-    text: &str,
-    strategy: &str,
-    config: Option<Value>,
-) -> Value {
+fn message_body(cascade_id: &str, text: &str, strategy: &str, config: Option<Value>) -> Value {
     let mut body = json!({
         "metadata": metadata(),
         "cascadeId": cascade_id,

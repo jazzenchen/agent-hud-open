@@ -99,8 +99,9 @@ pub enum HttpFailure {
     Challenged,
     /// The body could not be read.
     Unreadable,
-    /// The body exceeded `MAX_BODY`.
-    TooLarge,
+    /// The body exceeded `MAX_BODY`; `size` is how long it was, when it
+    /// could be counted to its end.
+    TooLarge { size: Option<u64> },
     /// The body is not JSON.
     NotJson,
 }
@@ -130,7 +131,9 @@ impl HttpFailure {
                 tr!("Quota service returned HTTP {{code}}", code = code)
             }
             HttpFailure::Unreadable => tr!("The quota service's response could not be read"),
-            HttpFailure::TooLarge => tr!("The quota service's response exceeded the size limit"),
+            HttpFailure::TooLarge { .. } => {
+                tr!("The quota service's response exceeded the size limit")
+            }
             HttpFailure::NotJson => tr!("The quota service returned an unsupported format"),
         }
     }

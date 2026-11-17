@@ -10,7 +10,7 @@ fn pick(
     loaded: &[u8],
     lists: impl Fn(u8) -> Result<Value, String>,
     opens: &[u8],
-) -> (Result<(u8, Value), MessageError>, Vec<u8>) {
+) -> (Result<u8, MessageError>, Vec<u8>) {
     let opened = RefCell::new(Vec::new());
     let picked = pick_service(
         services,
@@ -25,7 +25,7 @@ fn pick(
         |n| {
             opened.borrow_mut().push(*n);
             if opens.contains(n) {
-                Ok(json!({"trajectory": {"service": n}}))
+                Ok(json!({}))
             } else {
                 Err(format!("service {n}: trajectory not found"))
             }
@@ -38,17 +38,17 @@ fn pick(
 fn a_conversation_no_service_has_loaded_is_opened_by_the_first_that_can() {
     // A service with nothing loaded leaves the map out.
     let (picked, opened) = pick(&[1], &[], |_| Ok(json!({})), &[1]);
-    assert_eq!(picked, Ok((1, json!({"trajectory": {"service": 1}}))));
+    assert_eq!(picked, Ok(1));
     assert_eq!(opened, [1]);
     let (picked, opened) = pick(&[1, 2, 3], &[], |_| Ok(json!({})), &[2, 3]);
-    assert_eq!(picked.unwrap().0, 2);
+    assert_eq!(picked, Ok(2));
     assert_eq!(opened, [1, 2]);
 }
 
 #[test]
 fn a_service_that_has_it_open_comes_first() {
     let (picked, opened) = pick(&[1, 2], &[2], |_| Ok(json!({})), &[1, 2]);
-    assert_eq!(picked.unwrap().0, 2);
+    assert_eq!(picked, Ok(2));
     assert_eq!(opened, [2]);
 }
 
@@ -61,7 +61,7 @@ fn an_unreadable_list_never_refuses_a_service() {
         Ok(json!({"trajectorySummaries": []})),
     ] {
         let (picked, _) = pick(&[1], &[], |_| list.clone(), &[1]);
-        assert_eq!(picked.unwrap().0, 1);
+        assert_eq!(picked, Ok(1));
     }
 }
 

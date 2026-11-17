@@ -17,20 +17,20 @@ pub enum MessageError {
 pub struct MessageSession {
     cascade_id: String,
     endpoint: Endpoint,
-    trajectory: Value,
 }
 
 /// The service a message goes to: one that already has the conversation
 /// open, else the first that can open it. `GetAllCascadeTrajectories` lists
 /// only the conversations a service has loaded (none: the map is left out),
 /// so it can prefer a service but never refuse one; any service opens a
-/// conversation from disk with `GetCascadeTrajectory`.
+/// conversation from disk when asked for its steps (`open`), and answers
+/// not_found for one it cannot find.
 fn pick_service<T: Clone>(
     endpoints: &[T],
     cascade_id: &str,
     mut loaded: impl FnMut(&T) -> Result<Value, String>,
     mut open: impl FnMut(&T) -> Result<Value, String>,
-) -> Result<(T, Value), MessageError> {
+) -> Result<T, MessageError> {
     let has_it = |body: Result<Value, String>| {
         body.ok().is_some_and(|body| {
             body["trajectorySummaries"]
@@ -44,7 +44,7 @@ fn pick_service<T: Clone>(
     let mut last = None;
     for endpoint in first.into_iter().chain(rest) {
         match open(endpoint) {
-            Ok(trajectory) => return Ok((endpoint.clone(), trajectory)),
+            Ok(_) => return Ok(endpoint.clone()),
             Err(error) => last = Some(error),
         }
     }
@@ -68,29 +68,34 @@ pub fn message_session(cascade_id: &str) -> Result<MessageSession, MessageError>
     let endpoints = service
         .discover(true, false)
         .map_err(MessageError::Unavailable)?;
-    let (endpoint, trajectory) = pick_service(
+    let endpoint = pick_service(
         &endpoints,
         cascade_id,
         |endpoint| service.send(endpoint, "GetAllCascadeTrajectories", &json!({})),
+        // The steps after the last there can be: none, so the answer is
+        // `{}` however long the conversation is.
         |endpoint| {
             service.send(
                 endpoint,
-                "GetCascadeTrajectory",
-                &json!({"cascadeId": cascade_id}),
+                "GetCascadeTrajectorySteps",
+                &json!({"cascadeId": cascade_id, "stepOffset": u32::MAX}),
             )
         },
     )?;
     Ok(MessageSession {
         cascade_id: cascade_id.to_owned(),
         endpoint,
-        trajectory,
     })
 }
 
 impl MessageSession {
-    /// The conversation as its service opened it.
-    pub fn trajectory(&self) -> Result<Value, MessageError> {
-        Ok(self.trajectory.clone())
+    /// A read of the conversation's latest turn from the service that opened
+    /// it: how many steps it has, or the turn holding a step.
+    pub fn read(&self, method: &str, params: &Value) -> Result<Value, String> {
+        if !matches!(method, "GetConversationMetadata" | "GetTrajectoryTurns") {
+            return Err("Unsupported public Antigravity service operation".into());
+        }
+        service()?.send(&self.endpoint, method, params)
     }
 
     pub fn user_status(&self) -> Result<Value, MessageError> {

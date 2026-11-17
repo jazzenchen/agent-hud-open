@@ -8,8 +8,11 @@ use std::{
     time::{Duration, Instant},
 };
 
+mod answers;
 mod message;
 mod running;
+
+use answers::answer_error;
 
 pub use message::{message_session, MessageError, MessageSession};
 
@@ -76,7 +79,8 @@ fn allowed(method: &str) -> Result<(), String> {
         "GetUserStatus"
             | "RetrieveUserQuotaSummary"
             | "GetAllCascadeTrajectories"
-            | "GetCascadeTrajectory"
+            | "GetConversationMetadata"
+            | "GetTrajectoryTurns"
             | "HandleCascadeUserInteraction"
             | "StartCascade"
             | "SendUserCascadeMessage"
@@ -104,8 +108,7 @@ impl Service {
         if !response.status().is_success() {
             return Err(service_error(response));
         }
-        crate::accounts::http::read_json(response)
-            .map_err(agent_hud_agents::account::HttpFailure::message)
+        crate::accounts::http::read_json(response).map_err(answer_error)
     }
     fn cached(&self) -> Vec<Endpoint> {
         self.state
