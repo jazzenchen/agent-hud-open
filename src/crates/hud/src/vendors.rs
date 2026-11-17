@@ -3,11 +3,13 @@
 //! `configuredVendors` do, for what the host draws itself: the menu bar item,
 //! the HUD windows' sizes and the Bots' directions.
 mod format;
+mod panel_rows;
 
 use crate::presentation::{mark, resting_agents};
 pub use format::{
     meter_label, money_amount, money_short, quota_percent, recent_label, tokens_short,
 };
+use panel_rows::{deepseek_balances, row_shown};
 use serde_json::Value;
 
 pub struct Vendor<'a> {
@@ -31,51 +33,6 @@ pub struct Vendor<'a> {
 
 fn list<'a>(snapshot: &'a Value, key: &str) -> impl Iterator<Item = &'a Value> {
     snapshot[key].as_array().into_iter().flatten()
-}
-
-/// DeepSeek can return several currencies for the same account. The row ID,
-/// rather than account ID, identifies the individual display preference.
-fn deepseek_balances<'a>(snapshot: &'a Value, layout: &Value) -> (Option<String>, &'a str) {
-    let mut rows: Vec<&Value> = list(snapshot, "billing")
-        .filter(|row| mark(row["vendor"].as_str().unwrap_or("")) == "deepseek")
-        .filter(|row| {
-            let id = row["id"].as_str().unwrap_or("");
-            let account = row["accountId"].as_str().unwrap_or(id);
-            let has = |key: &str, value: &str| {
-                layout[key]
-                    .as_array()
-                    .is_some_and(|items| items.iter().any(|item| item.as_str() == Some(value)))
-            };
-            !has("hiddenRows", id)
-                && !has("hiddenAccounts", account)
-                && (layout["accounts"]
-                    .as_array()
-                    .is_none_or(|items| items.is_empty())
-                    || has("accounts", account))
-        })
-        .collect();
-    let order = layout["rows"].as_array();
-    rows.sort_by_key(|row| {
-        order
-            .and_then(|items| items.iter().position(|item| item == &row["id"]))
-            .unwrap_or(usize::MAX)
-    });
-    let level = if rows.iter().any(|row| row["level"] == "critical") {
-        "critical"
-    } else if rows.iter().any(|row| row["level"] == "warning") {
-        "warning"
-    } else if rows.iter().any(|row| row["level"] == "normal") {
-        "normal"
-    } else {
-        "stale"
-    };
-    let balance = (!rows.is_empty()).then(|| {
-        rows.iter()
-            .map(|row| money_amount(&row["amount"], row["currency"].as_str().unwrap_or("USD")))
-            .collect::<Vec<_>>()
-            .join(" · ")
-    });
-    (balance, level)
 }
 
 /// Whether a window's reset has passed: its share has started over, so its
@@ -111,6 +68,19 @@ fn held(quotas: &[&Value], now_ms: i64) -> Option<f64> {
         })
 }
 
+/// The live window with the highest used percent, with that percent; the
+/// first of equal readings stays the tightest (model.ts `tightestWindow`).
+fn tightest<'a>(quotas: &[&'a Value], now_ms: i64) -> Option<(f64, &'a Value)> {
+    quotas
+        .iter()
+        .filter(|q| live(q, now_ms))
+        .filter_map(|q| Some((q["usedPercent"].as_f64()?, *q)))
+        .fold(None, |best, (used, q)| match best {
+            Some((most, _)) if used <= most => best,
+            _ => Some((used, q)),
+        })
+}
+
 /// Every agent a resting HUD in `mode` shows without a list, one per mark; `mode` is
 /// "notch", "simple" or the bots' [`crate::presentation::QUEUE`].
 pub fn vendors<'a>(snapshot: &'a Value, mode: &str, now_ms: i64) -> Vec<Vendor<'a>> {
@@ -121,15 +91,7 @@ pub fn vendors<'a>(snapshot: &'a Value, mode: &str, now_ms: i64) -> Vec<Vendor<'
             let quotas: Vec<&Value> = list(snapshot, "quotas")
                 .filter(|q| mark(q["vendor"].as_str().unwrap_or("")) == key)
                 .collect();
-            // The first of equal readings stays the tightest.
-            let tightest = quotas
-                .iter()
-                .filter(|q| live(q, now_ms))
-                .filter_map(|q| Some((q["usedPercent"].as_f64()?, *q)))
-                .fold(None::<(f64, &Value)>, |best, (used, q)| match best {
-                    Some((most, _)) if used <= most => best,
-                    _ => Some((used, q)),
-                });
+            let tightest = tightest(&quotas, now_ms);
             let sessions: Vec<&Value> = list(snapshot, "sessions")
                 .filter(|s| mark(s["source"].as_str().unwrap_or("")) == key)
                 .collect();
@@ -184,6 +146,23 @@ pub fn configured<'a>(
 ) -> Vec<Vendor<'a>> {
     let mut available = vendors(snapshot, mode, now_ms);
     for vendor in &mut available {
+        // The number and level follow the windows the panel shows: a row the
+        // person hid there no longer sets them (Open #91). The rings already
+        // draw only those (mark-windows.ts).
+        let shown: Vec<&Value> = vendor
+            .quotas
+            .iter()
+            .copied()
+            .filter(|q| row_shown(q, &layout["blocks"][q["vendor"].as_str().unwrap_or("")]))
+            .collect();
+        if shown.len() < vendor.quotas.len() {
+            let tightest = tightest(&shown, now_ms);
+            vendor.used = tightest.map(|(used, _)| used);
+            vendor.held = held(&shown, now_ms);
+            vendor.level = tightest
+                .and_then(|(_, q)| q["status"].as_str())
+                .unwrap_or("stale");
+        }
         if vendor.key == "deepseek" && vendor.quotas.is_empty() && vendor.balance.is_some() {
             let block = list(snapshot, "billing")
                 .find(|b| mark(b["vendor"].as_str().unwrap_or("")) == vendor.key)

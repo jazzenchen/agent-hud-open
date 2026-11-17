@@ -2,7 +2,7 @@
  * account, as the panel shows them. */
 import type { PanelLayout, Quota } from "@agent-hud/protocol";
 import { liveWindow, resetPassed } from "../held-reading.ts";
-import { blockRows, quotaAccountKey } from "../quota-rows.ts";
+import { blockRows, quotaAccountKey, shownRows } from "../quota-rows.ts";
 import { MAX_USAGE_ITEMS } from "./arcs.ts";
 
 /** One item a ring or bar draws: its share from 0 to 100, and the colour of its level. */
@@ -26,9 +26,7 @@ export function markWindows(
   layout?: PanelLayout,
   now = Date.now(),
 ): Quota[] {
-  const shown = vendor.quotas.filter(
-    (row) => blockRows([row], layout?.blocks?.[row.vendor]).length,
-  );
+  const shown = shownRows(vendor.quotas, layout);
   if (!shown.length) return [];
   const live = shown.filter((q) => liveWindow(q, now));
   const pool = live.length

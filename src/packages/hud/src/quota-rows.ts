@@ -1,4 +1,4 @@
-import type { PanelBlockLayout, Quota } from "@agent-hud/protocol";
+import type { PanelBlockLayout, PanelLayout, Quota } from "@agent-hud/protocol";
 
 /** The key a layout writes for a quota row: the Swift app's window id where the
  * row has one, so layouts carried over from it keep naming the same row. */
@@ -85,5 +85,16 @@ export function blockRows<T extends Quota>(
           block.accounts.includes(quotaAccountKey(row))),
     ),
     block?.rows ?? [],
+  );
+}
+
+/** An agent's rows the panel shows, each under its own block's layout
+ * (vendors.rs `row_shown`). */
+export function shownRows<T extends Quota>(
+  rows: readonly T[],
+  layout: PanelLayout | undefined,
+): T[] {
+  return rows.filter(
+    (row) => blockRows([row], layout?.blocks?.[row.vendor]).length,
   );
 }

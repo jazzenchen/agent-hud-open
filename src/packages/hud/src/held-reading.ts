@@ -42,3 +42,31 @@ export function heldUsed(
   }
   return held;
 }
+
+/** The live window with the highest used percent; the first of equal
+ * readings stays the tightest (vendors.rs `tightest`). */
+export function tightestWindow<T extends HeldWindow>(
+  quotas: readonly T[],
+  now: number,
+): T | undefined {
+  return quotas
+    .filter((q) => liveWindow(q, now))
+    .reduce<T | undefined>(
+      (a, b) => (!a || b.usedPercent! > a.usedPercent! ? b : a),
+      undefined,
+    );
+}
+
+/** What an agent's windows set on its mark: the tightest live window's share
+ * and level, else the share its last reading holds, in the stale grey. */
+export function windowReading<T extends HeldWindow>(
+  quotas: readonly T[],
+  now: number,
+): { used: number | null; heldUsed: number | null; level: T["status"] } {
+  const tightest = tightestWindow(quotas, now);
+  return {
+    used: tightest?.usedPercent ?? null,
+    heldUsed: heldUsed(quotas, now),
+    level: tightest?.status ?? "stale",
+  };
+}

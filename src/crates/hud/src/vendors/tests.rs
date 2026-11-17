@@ -125,6 +125,34 @@ fn deepseek_balances_follow_row_visibility_and_order() {
     );
 }
 
+/// Open #91: a window the person hid in the panel kept the HUD number on it.
+#[test]
+fn the_number_leaves_out_the_windows_the_panel_hides() {
+    let row = |window: &str, used: f64, status: &str| {
+        json!({"id": format!("acct:{window}"), "vendor": "antigravity", "name": window,
+            "usedPercent": used, "resetAt": "2099-01-01T00:00:00Z", "status": status,
+            "account": "a@example.com", "accountId": "acct"})
+    };
+    let snapshot = json!({
+        "language": "en", "billing": [], "sessions": [], "approvals": [], "providers": [],
+        "quotas": [row("claude-5h", 100.0, "critical"), row("gemini-5h", 20.0, "normal")]
+    });
+    let view = |layout: Value| {
+        let list = configured(&snapshot, "simple", &layout, 0);
+        let vendor = list.into_iter().next().unwrap();
+        (meter_label(&vendor, false), vendor.level.to_owned())
+    };
+    assert_eq!(view(json!({})), ("100%".into(), "critical".into()));
+    assert_eq!(
+        view(json!({"blocks":{"antigravity":{"hiddenRows":["acct:claude-5h"]}}})),
+        ("20%".into(), "normal".into())
+    );
+    assert_eq!(
+        view(json!({"blocks":{"antigravity":{"hiddenAccounts":["acct"]}}})),
+        ("--".into(), "stale".into())
+    );
+}
+
 #[test]
 fn vendors_follow_the_resting_order_and_a_layout_list() {
     let now = chrono::DateTime::parse_from_rfc3339("2026-10-21T12:00:00Z")
