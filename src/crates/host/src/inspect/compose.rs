@@ -27,6 +27,13 @@ pub(crate) fn message(items: &[Item], note: &str) -> String {
             }
             Content::Image { path, .. } => {
                 block.push_str(&format!(" {}", path.display()));
+                if !item.marks.is_empty() {
+                    block.push('\n');
+                    block.push_str(&tr("The numbers marked on the picture:"));
+                    for (number, mark) in item.marks.iter().enumerate() {
+                        block.push_str(&format!("\n{}. {mark}", number + 1));
+                    }
+                }
             }
             Content::Files(paths) => {
                 for path in paths {
@@ -45,14 +52,14 @@ pub(crate) fn message(items: &[Item], note: &str) -> String {
 }
 
 fn label(content: &Content, app: Option<&str>) -> String {
-    let (with_app, alone) = match content {
-        Content::Text(_) => ("Text copied from {{app}}:", "Copied text:"),
-        Content::Image { .. } => ("Picture copied from {{app}}:", "Copied picture:"),
-        Content::Files(_) => ("Files copied from {{app}}:", "Copied files:"),
-    };
-    match app.filter(|app| !app.is_empty()) {
-        Some(app) => fill(&tr(with_app), &[("app", &app)]),
-        None => tr(alone),
+    let from = |template: String, app: &str| fill(&template, &[("app", &app)]);
+    match (content, app.filter(|app| !app.is_empty())) {
+        (Content::Text(_), Some(app)) => from(tr("Text copied from {{app}}:"), app),
+        (Content::Text(_), None) => tr("Copied text:"),
+        (Content::Image { .. }, Some(app)) => from(tr("Picture copied from {{app}}:"), app),
+        (Content::Image { .. }, None) => tr("Copied picture:"),
+        (Content::Files(_), Some(app)) => from(tr("Files copied from {{app}}:"), app),
+        (Content::Files(_), None) => tr("Copied files:"),
     }
 }
 
@@ -78,6 +85,7 @@ mod tests {
             app: Some("Terminal".into()),
             content,
             comment: comment.into(),
+            marks: Vec::new(),
         }
     }
 
@@ -85,6 +93,31 @@ mod tests {
     fn one_copy_goes_alone_unnumbered() {
         let text = message(&[item(Content::Text("error: boom\n".into()), "")], "");
         assert_eq!(text, "Text copied from Terminal:\n```\nerror: boom\n```");
+    }
+
+    #[test]
+    fn a_marked_picture_lists_its_numbered_comments() {
+        let picture = std::env::temp_dir().join("m.png");
+        let marked = Item {
+            marks: vec!["too wide".into(), "wrong colour".into()],
+            ..item(
+                Content::Image {
+                    path: picture.clone(),
+                    thumbnail: None,
+                    width: 1,
+                    height: 1,
+                },
+                "fix both",
+            )
+        };
+        assert_eq!(
+            message(&[marked], ""),
+            format!(
+                "Picture copied from Terminal: {}\n\
+                 The numbers marked on the picture:\n1. too wide\n2. wrong colour\nfix both",
+                picture.display()
+            )
+        );
     }
 
     #[test]

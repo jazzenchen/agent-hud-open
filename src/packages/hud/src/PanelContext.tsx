@@ -37,6 +37,8 @@ export interface InspectServices {
   remove(id: string): Promise<InspectView>;
   clear(): Promise<InspectView>;
   targets(): Promise<InspectTargets>;
+  /** Opens picture `id` in the markup window, to draw on and pin comments. */
+  markPicture(id: string): Promise<unknown>;
   send(target: InspectTarget): Promise<InspectSendResult>;
 }
 /** What a panel section asks Core. */

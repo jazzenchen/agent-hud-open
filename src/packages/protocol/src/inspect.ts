@@ -33,6 +33,8 @@ export interface InspectItem {
   kind: ClipKind;
   app: string | null;
   comment: string;
+  /** The numbered comments pinned on a marked picture, first first. */
+  marks: string[];
   content: InspectContent;
 }
 

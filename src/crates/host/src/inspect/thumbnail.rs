@@ -21,9 +21,15 @@ pub(crate) fn size(png: &[u8]) -> Option<(u32, u32)> {
 
 /// A copy of `png` no larger than `BOX`, as a `data:` URL.
 pub(crate) fn data_url(png: &[u8]) -> Option<String> {
+    data_url_within(png, BOX)
+}
+
+/// A copy of `png` no larger than `within`, as a `data:` URL: the picture
+/// enlarged in the window asks for a larger one.
+pub(crate) fn data_url_within(png: &[u8], within: (u32, u32)) -> Option<String> {
     let (width, height, rgba) = decode(png)?;
-    let scale = (BOX.0 as f64 / width as f64)
-        .min(BOX.1 as f64 / height as f64)
+    let scale = (within.0 as f64 / width as f64)
+        .min(within.1 as f64 / height as f64)
         .min(1.0);
     let small_width = ((width as f64 * scale).round() as u32).max(1);
     let small_height = ((height as f64 * scale).round() as u32).max(1);

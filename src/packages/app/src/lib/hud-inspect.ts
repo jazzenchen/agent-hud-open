@@ -24,6 +24,7 @@ export const hudInspect: InspectServices | undefined = isTauri()
       remove: (id) => ask("remove", { id }),
       clear: () => ask("clear"),
       targets: () => ask("targets"),
+      markPicture: (id) => ask("mark_window", { id }),
       send: (target) => ask("send", { target }),
     }
   : undefined;

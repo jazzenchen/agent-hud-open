@@ -1496,5 +1496,15 @@
   "Copied files:": "Fichiers copiés :",
   "New session": "Nouvelle session",
   "No folder": "Aucun dossier",
-  "All {{number}} characters are sent": "Les {{number}} caractères sont tous envoyés"
+  "All {{number}} characters are sent": "Les {{number}} caractères sont tous envoyés",
+  "Mark up the picture": "Annoter l’image",
+  "Box": "Cadre",
+  "Pen": "Crayon",
+  "Comment": "Commentaire",
+  "Clear": "Effacer",
+  "Comments": "Commentaires",
+  "Choose Comment, then click the picture to pin a numbered note.": "Choisissez Commentaire, puis cliquez sur l’image pour épingler une note numérotée.",
+  "What about this spot": "Qu’y a-t-il ici",
+  "The picture could not be read.": "L’image n’a pas pu être lue.",
+  "The numbers marked on the picture:": "Les numéros marqués sur l’image :"
 }

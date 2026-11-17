@@ -27,6 +27,8 @@ pub(crate) struct Item {
     pub app: Option<String>,
     pub content: Content,
     pub comment: String,
+    /// The numbered comments pinned on a marked picture, first first.
+    pub marks: Vec<String>,
 }
 
 #[derive(Debug, Default)]
@@ -60,6 +62,7 @@ impl Draft {
             app: clip.app.clone(),
             content,
             comment: String::new(),
+            marks: Vec::new(),
         });
         true
     }
@@ -84,6 +87,38 @@ impl Draft {
         *self = Self::default();
     }
 
+    /// The marked picture `content` and its pinned `marks` in place of
+    /// picture `id`; the latest copy joins the draft for it. False when
+    /// there is no such picture.
+    pub(crate) fn marked(&mut self, id: &str, content: Content, marks: Vec<String>) -> bool {
+        if self.clip.as_ref().is_some_and(|clip| clip.id == id) {
+            self.add_clip();
+        }
+        let Some(item) = self.items.iter_mut().find(|item| item.id == id) else {
+            return false;
+        };
+        item.content = content;
+        item.marks = marks;
+        true
+    }
+
+    /// The file of picture `id`, in the draft or the latest copy.
+    pub(crate) fn picture(&self, id: &str) -> Option<std::path::PathBuf> {
+        let from_clip = self.clip.as_ref().filter(|clip| clip.id == id);
+        let content = from_clip
+            .and_then(|clip| clip.content.as_ref())
+            .or_else(|| {
+                self.items
+                    .iter()
+                    .find(|item| item.id == id)
+                    .map(|item| &item.content)
+            })?;
+        match content {
+            Content::Image { path, .. } => Some(path.clone()),
+            _ => None,
+        }
+    }
+
     /// What a send carries: the draft's items, or with none, the latest copy.
     pub(crate) fn outgoing(&self) -> Vec<Item> {
         if !self.items.is_empty() {
@@ -97,6 +132,7 @@ impl Draft {
                     app: clip.app.clone(),
                     content: clip.content.clone()?,
                     comment: String::new(),
+                    marks: Vec::new(),
                 })
             })
             .into_iter()
@@ -124,6 +160,7 @@ impl Draft {
                     "kind": item.content.kind(),
                     "app": item.app,
                     "comment": item.comment,
+                    "marks": item.marks,
                     "content": item.content.view(),
                 })
             })

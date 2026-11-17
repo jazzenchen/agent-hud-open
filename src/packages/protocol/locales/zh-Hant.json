@@ -1432,5 +1432,15 @@
   "Copied files:": "複製的檔案：",
   "New session": "新增工作階段",
   "No folder": "無目錄",
-  "All {{number}} characters are sent": "全部 {{number}} 個字元都會傳送"
+  "All {{number}} characters are sent": "全部 {{number}} 個字元都會傳送",
+  "Mark up the picture": "標註圖片",
+  "Box": "框選",
+  "Pen": "畫筆",
+  "Comment": "評論",
+  "Clear": "清除",
+  "Comments": "評論",
+  "Choose Comment, then click the picture to pin a numbered note.": "選擇「評論」，再點按圖片，即可釘上一則帶編號的說明。",
+  "What about this spot": "這裡怎麼了",
+  "The picture could not be read.": "無法讀取這張圖片。",
+  "The numbers marked on the picture:": "圖片上標註的編號："
 }

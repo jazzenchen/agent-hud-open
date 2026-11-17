@@ -163,6 +163,15 @@ pub(crate) fn take_statistics_target(
         .take()
 }
 
+/// The windows that end their page when closed (Settings, Statistics, the
+/// markup window); the others hide and keep it.
+pub(crate) fn closes(label: &str) -> bool {
+    matches!(
+        label,
+        "main" | "statistics" | crate::inspect::marking::LABEL
+    )
+}
+
 pub(crate) fn show_statistics(app: &tauri::AppHandle) -> Result<(), String> {
     let windows = app.state::<AuxiliaryWindows>();
     let _guard = windows.lock.lock().unwrap_or_else(PoisonError::into_inner);

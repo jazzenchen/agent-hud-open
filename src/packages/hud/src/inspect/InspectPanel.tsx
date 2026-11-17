@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useT } from "@agent-hud/ui/format-context";
+import { usePanelServices } from "../PanelContext";
 import { cardColumn } from "../card-column";
 import { useGround } from "../ground";
 import { alertInk, alertText } from "../tokens";
@@ -23,6 +24,7 @@ export function InspectPanel({
   const t = useT();
   const ground = useGround(light);
   const { view, panel } = clip;
+  const services = usePanelServices()?.inspect;
   const [note, setNote] = useState(view.note);
   const latest = view.clip && !view.clip.added ? view.clip : null;
   const rows: ClipRow[] = [
@@ -54,6 +56,11 @@ export function InspectPanel({
           key={row.id}
           row={row}
           number={rows.length > 1 ? index + 1 : undefined}
+          mark={() => {
+            // The markup window comes forward; the HUD steps aside for it.
+            void services?.markPicture(row.id);
+            handoff();
+          }}
           add={() => actions?.add()}
           edit={(text) => actions?.edit(row.id, text)}
           remove={() => actions?.remove(row.id)}

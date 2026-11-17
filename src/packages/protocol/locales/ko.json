@@ -1432,5 +1432,15 @@
   "Copied files:": "복사한 파일:",
   "New session": "새 세션",
   "No folder": "폴더 없음",
-  "All {{number}} characters are sent": "{{number}}자 모두 보냅니다"
+  "All {{number}} characters are sent": "{{number}}자 모두 보냅니다",
+  "Mark up the picture": "이미지에 표시",
+  "Box": "박스",
+  "Pen": "펜",
+  "Comment": "코멘트",
+  "Clear": "지우기",
+  "Comments": "코멘트",
+  "Choose Comment, then click the picture to pin a numbered note.": "코멘트를 선택한 뒤 이미지를 클릭하면 번호가 붙은 메모를 남길 수 있습니다.",
+  "What about this spot": "이 부분에 대해",
+  "The picture could not be read.": "이미지를 읽을 수 없습니다.",
+  "The numbers marked on the picture:": "이미지에 표시한 번호:"
 }

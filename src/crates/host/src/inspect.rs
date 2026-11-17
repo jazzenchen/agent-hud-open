@@ -13,6 +13,7 @@ mod commands;
 mod compose;
 mod content;
 mod draft;
+pub(crate) mod marking;
 mod target;
 mod thumbnail;
 mod watch;

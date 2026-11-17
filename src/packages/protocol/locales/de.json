@@ -1464,5 +1464,15 @@
   "Copied files:": "Kopierte Dateien:",
   "New session": "Neue Sitzung",
   "No folder": "Kein Ordner",
-  "All {{number}} characters are sent": "Alle {{number}} Zeichen werden gesendet"
+  "All {{number}} characters are sent": "Alle {{number}} Zeichen werden gesendet",
+  "Mark up the picture": "Bild markieren",
+  "Box": "Rahmen",
+  "Pen": "Stift",
+  "Comment": "Kommentar",
+  "Clear": "Löschen",
+  "Comments": "Kommentare",
+  "Choose Comment, then click the picture to pin a numbered note.": "Wähle Kommentar und klicke ins Bild, um eine nummerierte Notiz anzuheften.",
+  "What about this spot": "Was ist hier",
+  "The picture could not be read.": "Das Bild ließ sich nicht lesen.",
+  "The numbers marked on the picture:": "Die Nummern im Bild:"
 }

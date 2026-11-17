@@ -15,6 +15,8 @@ export interface ClipRow {
   kind: ClipKind;
   app: string | null;
   comment: string;
+  /** The comments pinned on a marked picture. */
+  marks?: string[];
   content: InspectContent | null;
   pending: boolean;
 }
@@ -34,9 +36,14 @@ function source(row: ClipRow, t: Translate) {
 
 function Preview({
   content,
+  marks,
+  mark,
   light,
 }: {
   content: InspectContent | null;
+  marks?: string[];
+  /** Opens the picture in the markup window. */
+  mark?: () => void;
   light: boolean;
 }) {
   const t = useT();
@@ -45,17 +52,38 @@ function Preview({
   if (!content) return <span style={quiet}>{t("Reading…")}</span>;
   if (content.kind === "image") {
     return content.thumbnail ? (
-      <img
-        src={content.thumbnail}
-        alt=""
-        style={{
-          display: "block",
-          maxWidth: 180,
-          maxHeight: 90,
-          borderRadius: 6,
-          boxShadow: `0 0 0 1px ${alertInk(0.12, ground)}`,
-        }}
-      />
+      <span style={cardColumn(4)}>
+        <button
+          type="button"
+          onClick={mark}
+          title={t("Mark up the picture")}
+          aria-label={t("Mark up the picture")}
+          style={{
+            justifySelf: "start",
+            padding: 0,
+            border: 0,
+            background: "transparent",
+            cursor: "zoom-in",
+          }}
+        >
+          <img
+            src={content.thumbnail}
+            alt=""
+            style={{
+              display: "block",
+              maxWidth: 180,
+              maxHeight: 90,
+              borderRadius: 6,
+              boxShadow: `0 0 0 1px ${alertInk(0.12, ground)}`,
+            }}
+          />
+        </button>
+        {marks?.map((text, index) => (
+          <span key={index} style={{ ...quiet, overflowWrap: "anywhere" }}>
+            {index + 1}. {text}
+          </span>
+        ))}
+      </span>
     ) : (
       <span style={quiet}>
         {content.width} × {content.height}
@@ -103,6 +131,7 @@ function Preview({
 export function InspectRow({
   row,
   number,
+  mark,
   add,
   edit,
   remove,
@@ -111,6 +140,7 @@ export function InspectRow({
 }: {
   row: ClipRow;
   number?: number;
+  mark?: () => void;
   add: () => void;
   edit: (text: string) => void;
   remove: () => void;
@@ -189,7 +219,12 @@ export function InspectRow({
           </button>
         )}
       </div>
-      <Preview content={row.content} light={light} />
+      <Preview
+        content={row.content}
+        marks={row.marks}
+        mark={mark}
+        light={light}
+      />
       <input
         type="text"
         value={comment}

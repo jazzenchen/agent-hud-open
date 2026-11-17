@@ -44,6 +44,7 @@ export interface AppProps {
   version?: string;
 }
 const PictureView = lazy(() => import("./HUDPicture"));
+const MarkWindow = lazy(() => import("./mark/MarkWindow"));
 export default function App(props: AppProps = {}) {
   if (new URLSearchParams(location.search).get("surface") === "picture")
     return <PictureView />;
@@ -59,7 +60,8 @@ function AppContent({
   const parameters = new URLSearchParams(location.search);
   const surface = parameters.get("surface") === "hud";
   const statistics = parameters.get("window") === "statistics";
-  const settings = !surface && !statistics;
+  const mark = parameters.get("window") === "mark";
+  const settings = !surface && !statistics && !mark;
   // The app plans the HUD windows, draws the menu bar and directs the Bots
   // itself. A page listens only while its window is on screen, and reads what
   // it missed when it is back.
@@ -238,6 +240,7 @@ function AppContent({
         </PanelServicesProvider>
       ) : null,
     );
+  if (mark) return provide(<MarkWindow theme={theme} />);
   if (statistics)
     return provide(
       <StatisticsWindow

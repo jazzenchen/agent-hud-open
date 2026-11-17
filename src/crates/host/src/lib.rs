@@ -247,7 +247,7 @@ pub fn run_with_options(
                 if web_sign_in::foreign(window.label()) {
                     return;
                 }
-                if matches!(window.label(), "main" | "statistics") {
+                if auxiliary::closes(window.label()) {
                     // Closing Settings or Statistics ends its page and web
                     // content process; the next open builds it again.
                     activity::forget(window.app_handle(), window.label());
@@ -257,9 +257,7 @@ pub fn run_with_options(
                 let _ = window.hide();
                 activity::notify(window.app_handle(), window.label());
             } else if let tauri::WindowEvent::Destroyed = event {
-                if matches!(window.label(), "main" | "statistics")
-                    || web_sign_in::foreign(window.label())
-                {
+                if auxiliary::closes(window.label()) || web_sign_in::foreign(window.label()) {
                     shell::windows_changed(window.app_handle());
                 }
             } else if let tauri::WindowEvent::ThemeChanged(theme) = event {
