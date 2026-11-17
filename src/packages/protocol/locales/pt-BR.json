@@ -151,6 +151,7 @@
   "At the recent burn rate, this window may run out before it resets.": "No ritmo de consumo recente, esta janela pode se esgotar antes de ser redefinida.",
   "At the recent pace": "No ritmo recente",
   "Attributed to models": "Atribuídos a modelos",
+  "Auto-reviews ({{total}})": "Revisões automáticas ({{total}})",
   "Automatic": "Automático",
   "Automatic counts a model with a list price as a gateway call.": "O modo Automático conta um modelo com preço de tabela como chamada de gateway.",
   "Automatic updates": "Atualizações automáticas",

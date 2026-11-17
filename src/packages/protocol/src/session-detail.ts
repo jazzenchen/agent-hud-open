@@ -102,10 +102,12 @@ export interface SessionDetail {
   contextFill?: number | null;
   /** From Core: cache reads as a share of every prompt; null when nothing was prompted. */
   cacheHitRate?: number | null;
-  /** From Core: the session's own log apart from its sub-agents'; null when no sub-agent spent any. */
+  /** From Core: the session's own logs apart from the logs under it (sub-agents, auto-reviews); null when none of those spent any. */
   own?: SessionTokens | null;
-  /** From Core: the sub-agents' part of the session's tokens (at any depth); already in `usage`, the turns and the models. Null when no sub-agent spent any. */
+  /** From Core: the sub-agents' part of the session's tokens (at any depth); already in `usage`, the turns and the models. Null when no sub-agent spent any. Codex's auto-reviews are apart, in `reviews`. */
   subagents?: SessionTokens | null;
+  /** From Core: Codex's auto-reviews of the session's approval requests: how many, and their part of the session's tokens (already in `usage`). They are not sessions of their own, so `children` leaves them out. Null when none spent any. */
+  reviews?: { count: number; tokens: SessionTokens } | null;
   /** From Core: the breakdown at API list prices, US dollars; null when a call has no list price. */
   listCost?: number | null;
   /** From Core: what the calls with a list price cost, US dollars; null when none has one. */

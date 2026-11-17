@@ -149,6 +149,7 @@
   "At the recent burn rate, this window may run out before it resets.": "按最近的消耗速率，預計將在重設前耗盡。",
   "At the recent pace": "按目前節奏",
   "Attributed to models": "已按模型歸因",
+  "Auto-reviews ({{total}})": "自動審查（{{total}}）",
   "Automatic": "自動",
   "Automatic counts a model with a list price as a gateway call.": "自動：有定價的模型視為閘道呼叫，其他視為本機模型。",
   "Automatic updates": "自動更新",

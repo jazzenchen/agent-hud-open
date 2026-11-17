@@ -318,15 +318,17 @@ fn guardian_reviews_count_their_usage_but_list_no_session() {
     let root = temp.path().join(".codex/sessions/2026/10/21");
     fs::create_dir_all(&root).unwrap();
     let at = Utc::now().to_rfc3339();
+    let main = "11111111-1111-4111-8111-111111111111";
     let rollout = |id: &str, source: Value, input: u64| {
+        // A review names the session whose approval request it reviews.
+        let parent = source["subagent"].is_object().then_some(main);
         format!(
             "{}\n{}\n{}\n",
-            json!({"timestamp":at,"type":"session_meta","payload":{"id":id,"timestamp":at,"cwd":"/w/repo","source":source,"originator":"codex_cli_rs"}}),
+            json!({"timestamp":at,"type":"session_meta","payload":{"id":id,"timestamp":at,"cwd":"/w/repo","source":source,"parent_thread_id":parent,"originator":"codex_cli_rs"}}),
             json!({"timestamp":at,"type":"turn_context","payload":{"model":"gpt-5.5"}}),
             json!({"timestamp":at,"type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":input,"output_tokens":10}}}}),
         )
     };
-    let main = "11111111-1111-4111-8111-111111111111";
     let review = "22222222-2222-4222-8222-222222222222";
     fs::write(
         root.join(format!("rollout-a-{main}.jsonl")),
@@ -366,6 +368,17 @@ fn guardian_reviews_count_their_usage_but_list_no_session() {
         .find(|row| row["id"] == "codex")
         .unwrap();
     assert_eq!(codex["sessions"], 1);
+    // The session's page names the review's part apart from its sub-agents',
+    // which it has none of (#102).
+    let detail = backend
+        .request("session_detail", json!({"id":main}))
+        .unwrap();
+    assert_eq!(detail["usage"]["total"], 170);
+    assert_eq!(detail["own"]["total"], 110);
+    assert_eq!(detail["subagents"], Value::Null);
+    assert_eq!(detail["reviews"]["count"], 1);
+    assert_eq!(detail["reviews"]["tokens"]["total"], 60);
+    assert_eq!(detail["children"], json!([]));
 }
 
 #[test]

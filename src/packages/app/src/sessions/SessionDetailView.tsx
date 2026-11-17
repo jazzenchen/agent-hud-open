@@ -66,7 +66,10 @@ export function InlineDetail({
   const picked = entries.find((entry) => entry.id === selectedEntry);
   const lastMessage = session.liveFacts?.message?.trim();
   const children = detail?.children ?? [];
-  const helped = Boolean(detail?.subagents) || children.length > 0;
+  const helped =
+    Boolean(detail?.subagents) ||
+    Boolean(detail?.reviews) ||
+    children.length > 0;
   const projectHasLocalWorkers =
     (detail?.session.desktopProject?.localWorkerCount ??
       session.desktopProject?.localWorkerCount ??

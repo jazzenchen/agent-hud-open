@@ -573,7 +573,11 @@ fn a_review_no_list_shows_still_adds_to_its_thread_and_moves_the_list() {
         json!([]),
         "nor named among its sub-agents"
     );
-    assert_eq!(detail["subagents"]["total"], 20);
+    // Its part is named apart from the sub-agents' (#102).
+    assert_eq!(detail["subagents"], Value::Null);
+    assert_eq!(detail["reviews"]["count"], 1);
+    assert_eq!(detail["reviews"]["tokens"]["total"], 20);
+    assert_eq!(detail["own"]["total"], 100);
 
     let mut file = fs::OpenOptions::new().append(true).open(&path).unwrap();
     writeln!(file, "{}", count(50)).unwrap();

@@ -74,11 +74,14 @@ impl AgentHudCore {
         let mut totals = json!({});
         Self::session_totals(&mut totals, selected, &family, currency.as_deref());
         // The sub-agents' part of the session's tokens (agent-hud-native-open's
-        // "含子 agent" note), from the same logs as the total.
-        let (_, subagent_usage) = family.usage(selected);
-        // The session's own logs apart from its sub-agents', which `usage` adds.
-        let own =
-            subagent_usage.map(|_| crate::session_usage::tokens_json(family.own_usage(selected)));
+        // "含子 agent" note) and Codex's auto-reviews' apart, from the same
+        // logs as the total.
+        let (_, helped) = family.usage(selected);
+        let (subagent_usage, reviews) = family.parts(selected);
+        let tokens = crate::session_usage::tokens_json;
+        // The session's own logs apart from the logs under it, which `usage` adds.
+        let own = helped.map(|_| tokens(family.own_usage(selected)));
+        let reviews = reviews.map(|(count, usage)| json!({"count":count,"tokens":tokens(usage)}));
         // A split session began when its first segment did.
         let started_at = segments
             .first()
@@ -193,7 +196,7 @@ impl AgentHudCore {
             &mut self.conversation_context,
         );
         let usage = session["usage"].clone();
-        let mut result = json!({"session":session,"usage":usage,"own":own,"subagents":subagent_usage.map(crate::session_usage::tokens_json),"turns":log.turns,"calls":[],"parent":parent,"children":children,"credits":credits});
+        let mut result = json!({"session":session,"usage":usage,"own":own,"subagents":subagent_usage.map(tokens),"reviews":reviews,"turns":log.turns,"calls":[],"parent":parent,"children":children,"credits":credits});
         // The ledger's breakdown replaces the parser's recent usage entries.
         if let Some(breakdown) = breakdown {
             for (key, value) in breakdown.as_object().unwrap() {

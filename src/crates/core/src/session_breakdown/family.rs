@@ -99,6 +99,28 @@ impl<'a> Family<'a> {
         (total, subagents)
     }
 
+    /// The part of a session's tokens its sub-agents spent, apart from that
+    /// of the internal logs under it (Codex's auto-reviews of approval
+    /// requests), which no list shows and so cannot be counted as sub-agents:
+    /// each None when it spent nothing, the reviews with how many there were.
+    pub(crate) fn parts(&self, head: &LogHead) -> (Option<Usage>, Option<(usize, Usage)>) {
+        let mut subagents = None::<Usage>;
+        let mut reviews = None::<(HashSet<&str>, Usage)>;
+        for log in self.descendants(&head.source, &head.id) {
+            if log.usage.total() == 0 {
+                continue;
+            }
+            if log.live.is_internal {
+                let (ids, usage) = reviews.get_or_insert_with(Default::default);
+                ids.insert(log.id.as_str());
+                usage.add(log.usage);
+            } else {
+                subagents.get_or_insert_with(Usage::default).add(log.usage);
+            }
+        }
+        (subagents, reviews.map(|(ids, usage)| (ids.len(), usage)))
+    }
+
     /// What a session's calls and its sub-agents' would cost at API list
     /// prices, in US dollars; None when one with calls has no list price.
     pub(crate) fn list_cost(&self, head: &LogHead) -> Option<f64> {

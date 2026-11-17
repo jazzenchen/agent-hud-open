@@ -149,6 +149,7 @@
   "At the recent burn rate, this window may run out before it resets.": "最近の消費ペースでは、リセット前に上限に達する可能性があります。",
   "At the recent pace": "最近のペースで",
   "Attributed to models": "モデルに割り当て済み",
+  "Auto-reviews ({{total}})": "自動レビュー（{{total}}）",
   "Automatic": "自動",
   "Automatic counts a model with a list price as a gateway call.": "「自動」では、公開価格のあるモデルをゲートウェイ経由の呼び出しとして扱います。",
   "Automatic updates": "自動アップデート",

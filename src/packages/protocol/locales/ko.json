@@ -149,6 +149,7 @@
   "At the recent burn rate, this window may run out before it resets.": "최근 소모 속도라면 초기화 전에 이 구간의 한도가 소진될 수 있습니다.",
   "At the recent pace": "최근 속도 기준",
   "Attributed to models": "모델별 귀속됨",
+  "Auto-reviews ({{total}})": "자동 검토({{total}})",
   "Automatic": "자동",
   "Automatic counts a model with a list price as a gateway call.": "자동은 정가가 있는 모델을 게이트웨이 호출로 계산합니다.",
   "Automatic updates": "자동 업데이트",
