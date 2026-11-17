@@ -41,8 +41,10 @@ a stopped turn: `rollout-<time>-<id>_<segment>.jsonl`, with the same
 `session_meta` id and a `history_base` pointing into the rollout before it.
 Every segment's calls count toward the session: its row, its page's tokens,
 breakdown and calls, and Statistics, which ranks it as one session. Lists show
-it once, under its newest segment; its page starts when its first segment did,
-and its messages are the newest segment's.
+it once, under its newest segment; its page starts when its first segment did.
+Its messages read on from one segment into the next, as one run of cursors:
+Codex never writes to an earlier segment again, so a cursor taken before the
+split still finds the same line after it.
 
 A session's `client` is the client that drives it, as its log names it
 ("Codex Desktop", "Claude Code IDE extension"). Devin CLI and Devin Desktop's

@@ -511,6 +511,16 @@ fn a_codex_conversation_split_across_rollouts_counts_every_segment_and_lists_onc
             "total_token_usage":{"input_tokens":total[0],"output_tokens":total[1]},
             "last_token_usage":{"input_tokens":last[0],"output_tokens":last[1]}}}})
     };
+    // No item id: rows take their ids from where their lines begin.
+    let said = |minutes_ago: i64, role: &str, text: &str| {
+        let kind = if role == "user" {
+            "input_text"
+        } else {
+            "output_text"
+        };
+        json!({"timestamp":iso(minutes_ago),"type":"response_item","payload":{"type":"message",
+            "role":role,"content":[{"type":kind,"text":text}]}})
+    };
     let first = rollout(
         id,
         &iso(120),
@@ -518,8 +528,10 @@ fn a_codex_conversation_split_across_rollouts_counts_every_segment_and_lists_onc
         &[
             model(120),
             started(119),
+            said(119, "user", "Fix the build"),
             count(118, [100, 10], [100, 10]),
             count(117, [300, 20], [200, 10]),
+            said(117, "assistant", "Fixed the first part."),
         ],
     );
     let first_name = format!("rollout-2026-10-03T01-55-07-{id}.jsonl");
@@ -538,8 +550,10 @@ fn a_codex_conversation_split_across_rollouts_counts_every_segment_and_lists_onc
             &[
                 model(60),
                 started(59),
+                said(59, "user", "Go on"),
                 count(58, [450, 30], [150, 10]),
                 count(57, [500, 40], [50, 10]),
+                said(57, "assistant", "All green."),
             ],
         ),
     )
@@ -580,6 +594,56 @@ fn a_codex_conversation_split_across_rollouts_counts_every_segment_and_lists_onc
             .ok()
             .map(|at| at.timestamp_millis()),
         "it began when its first segment did"
+    );
+    // Its messages read on from the first segment into the second.
+    let texts = |page: &Value| {
+        page["messages"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|row| row["text"].as_str().unwrap_or_default().to_owned())
+            .collect::<Vec<_>>()
+    };
+    let whole = [
+        "Fix the build",
+        "Fixed the first part.",
+        "Go on",
+        "All green.",
+    ];
+    assert_eq!(texts(&detail), whole);
+    assert_eq!(detail["messagesComplete"], true);
+    let (mut cursor, mut read, mut ids) = (0, Vec::new(), std::collections::HashSet::new());
+    for _ in 0..10 {
+        let page = backend
+            .request(
+                "session_detail",
+                json!({"id":id,"messageCursor":cursor,"messageLimit":1}),
+            )
+            .unwrap();
+        for row in page["messages"].as_array().unwrap() {
+            let row_id = row["id"].as_str().unwrap().to_owned();
+            assert!(ids.insert(row_id), "each row keeps an id of its own");
+        }
+        read.extend(texts(&page));
+        match page["nextMessageCursor"].as_u64() {
+            Some(next) if page["messagesComplete"] != true => cursor = next,
+            _ => break,
+        }
+    }
+    assert_eq!(
+        read, whole,
+        "a page at a time, each from where the last ended"
+    );
+    let tail = backend
+        .request(
+            "session_detail",
+            json!({"id":id,"messageTail":true,"messageLimit":3}),
+        )
+        .unwrap();
+    assert_eq!(texts(&tail), whole[1..]);
+    assert_eq!(
+        tail["messageCursor"], 0,
+        "the tail reaches back into the first segment"
     );
     let statistics = backend
         .request(

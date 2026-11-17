@@ -91,6 +91,11 @@ impl AgentHudCore {
             .iter()
             .map(|log| log.path.to_string_lossy().into_owned())
             .collect::<Vec<_>>();
+        // Its messages read on from one segment into the next.
+        let earlier = segments[..segments.len() - 1]
+            .iter()
+            .map(|log| log.path.clone())
+            .collect::<Vec<_>>();
         let credits = self.session_credits(id);
         let parent = selected
             .live
@@ -185,8 +190,13 @@ impl AgentHudCore {
             .transpose()?
             .unwrap_or(100)
             .min(200) as usize;
-        let page = conversation::page(
-            log.origin_path.as_deref().unwrap_or(&path),
+        let paths = earlier
+            .iter()
+            .map(PathBuf::as_path)
+            .chain([log.origin_path.as_deref().unwrap_or(&path)])
+            .collect::<Vec<_>>();
+        let page = conversation::segmented_page(
+            &paths,
             &source,
             &log.id,
             cursor,

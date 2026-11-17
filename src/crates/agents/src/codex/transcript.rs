@@ -5,7 +5,7 @@ use serde_json::{json, Value};
 use std::path::Path;
 
 /// The part of its conversation a rollout holds: its file name without
-/// `.zst`; "" for a file that is not a rollout.
+/// `.zst` (or `.zstd`); "" for a file that is not a rollout.
 ///
 /// Codex goes on with a conversation in a new rollout when it rewinds the
 /// conversation's history after a stopped turn (a retry or an edited
@@ -22,7 +22,10 @@ pub fn segment(path: &Path) -> &str {
         .file_name()
         .and_then(|name| name.to_str())
         .unwrap_or_default();
-    let name = name.strip_suffix(".zst").unwrap_or(name);
+    let name = [".zst", ".zstd"]
+        .into_iter()
+        .find_map(|suffix| name.strip_suffix(suffix))
+        .unwrap_or(name);
     if name.starts_with("rollout-") && name.ends_with(".jsonl") {
         name
     } else {
