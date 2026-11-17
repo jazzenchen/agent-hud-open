@@ -11,7 +11,8 @@
   const say = (key, ...values) => chrome.i18n.getMessage(key, values) || key;
   const INK = "#0A84FF";
   const host = document.createElement("div");
-  host.style.cssText = "position:fixed;inset:0;z-index:2147483647;cursor:crosshair;";
+  host.style.cssText =
+    "position:fixed;inset:0;z-index:2147483647;cursor:crosshair;";
   const shadow = host.attachShadow({ mode: "closed" });
   shadow.innerHTML = `
     <style>
@@ -35,7 +36,8 @@
   let area = null;
 
   const under = (x, y) =>
-    document.elementsFromPoint(x, y).find((element) => element !== host) ?? null;
+    document.elementsFromPoint(x, y).find((element) => element !== host) ??
+    null;
   const show = (rect, text) => {
     Object.assign(box.style, {
       display: "block",
@@ -51,7 +53,10 @@
   };
   const name = (element) => {
     const id = element.id ? `#${element.id}` : "";
-    const classes = [...element.classList].slice(0, 2).map((c) => `.${c}`).join("");
+    const classes = [...element.classList]
+      .slice(0, 2)
+      .map((c) => `.${c}`)
+      .join("");
     return `${element.tagName.toLowerCase()}${id}${classes}`;
   };
   const move = (event) => {
@@ -74,7 +79,10 @@
     hovered = under(event.clientX, event.clientY);
     if (!hovered) return;
     const rect = hovered.getBoundingClientRect();
-    show(rect, `${name(hovered)}  ${Math.round(rect.width)} × ${Math.round(rect.height)}`);
+    show(
+      rect,
+      `${name(hovered)}  ${Math.round(rect.width)} × ${Math.round(rect.height)}`,
+    );
   };
   const down = (event) => {
     event.preventDefault();
@@ -117,7 +125,9 @@
     stop();
     const rect = area ?? element.getBoundingClientRect();
     // Let the outline leave the screen before the tab is pictured.
-    await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
+    await new Promise((done) =>
+      requestAnimationFrame(() => requestAnimationFrame(done)),
+    );
     const pick = {
       kind: area ? "area" : "element",
       url: location.href,
@@ -189,17 +199,21 @@
   // at most five steps, with :nth-of-type where siblings share a tag.
   function selectorOf(element) {
     const steps = [];
-    for (let node = element; node && node.nodeType === 1 && steps.length < 5; ) {
+    for (let node = element; node && node.nodeType === 1 && steps.length < 5;) {
       if (node.id) {
         steps.unshift(`#${CSS.escape(node.id)}`);
         break;
       }
       let step = node.tagName.toLowerCase();
-      const classes = [...node.classList].slice(0, 2).map((c) => `.${CSS.escape(c)}`);
+      const classes = [...node.classList]
+        .slice(0, 2)
+        .map((c) => `.${CSS.escape(c)}`);
       step += classes.join("");
       const parent = node.parentElement;
       if (parent) {
-        const same = [...parent.children].filter((c) => c.tagName === node.tagName);
+        const same = [...parent.children].filter(
+          (c) => c.tagName === node.tagName,
+        );
         if (same.length > 1) step += `:nth-of-type(${same.indexOf(node) + 1})`;
       }
       steps.unshift(step);
@@ -212,24 +226,59 @@
   // The computed styles that make an element's look, leaving out defaults.
   function stylesOf(element) {
     const style = getComputedStyle(element);
-    const quiet = new Set(["none", "normal", "auto", "0px", "rgba(0, 0, 0, 0)", "static", "visible"]);
+    const quiet = new Set([
+      "none",
+      "normal",
+      "auto",
+      "0px",
+      "rgba(0, 0, 0, 0)",
+      "static",
+      "visible",
+    ]);
     const names = [
-      "display", "position", "box-sizing", "width", "height", "margin", "padding",
-      "gap", "flex-direction", "align-items", "justify-content", "grid-template-columns",
-      "font-family", "font-size", "font-weight", "line-height", "letter-spacing",
-      "text-align", "color", "background-color", "background-image", "border",
-      "border-radius", "box-shadow", "opacity", "overflow", "z-index",
+      "display",
+      "position",
+      "box-sizing",
+      "width",
+      "height",
+      "margin",
+      "padding",
+      "gap",
+      "flex-direction",
+      "align-items",
+      "justify-content",
+      "grid-template-columns",
+      "font-family",
+      "font-size",
+      "font-weight",
+      "line-height",
+      "letter-spacing",
+      "text-align",
+      "color",
+      "background-color",
+      "background-image",
+      "border",
+      "border-radius",
+      "box-shadow",
+      "opacity",
+      "overflow",
+      "z-index",
     ];
     return names
       .map((name) => [name, style.getPropertyValue(name)])
-      .filter(([name, value]) => value && !(quiet.has(value) && !["display", "position"].includes(name)))
+      .filter(
+        ([name, value]) =>
+          value &&
+          !(quiet.has(value) && !["display", "position"].includes(name)),
+      )
       .map(([name, value]) => `${name}: ${value};`)
       .join("\n");
   }
 
   function toast(text) {
     const card = document.createElement("div");
-    card.style.cssText = "position:fixed;inset:auto 0 0 0;z-index:2147483647;pointer-events:none;";
+    card.style.cssText =
+      "position:fixed;inset:auto 0 0 0;z-index:2147483647;pointer-events:none;";
     const inner = card.attachShadow({ mode: "closed" });
     inner.innerHTML = `<div style="position:fixed;left:50%;bottom:24px;transform:translateX(-50%);
       max-width:70vw;padding:8px 14px;border-radius:9px;background:rgba(28,28,30,0.92);color:#fff;

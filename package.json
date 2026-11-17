@@ -32,7 +32,8 @@
     "parity:ledger": "node src/tooling/parity-ledger.mjs",
     "parity:oracle": "swift run -Xswiftc -enable-testing --package-path src/tooling/parity-oracle parity-oracle src/fixtures/parity/contracts",
     "test:core": "cargo test --workspace",
-    "mcp": "pnpm --filter @agent-hud/mcp run start"
+    "mcp": "pnpm --filter @agent-hud/mcp run start",
+    "pack:browser-extension": "node src/tooling/pack-browser-extension.mjs"
   },
   "devDependencies": {
     "@playwright/test": "1.64.1",

@@ -1449,5 +1449,11 @@
   "Its words:": "テキスト：",
   "Its styles:": "スタイル：",
   "Picture:": "画像：",
-  "Selector:": "セレクタ："
+  "Selector:": "セレクタ：",
+  "Browser": "ブラウザ",
+  "Browser extension": "ブラウザ拡張機能",
+  "Pick an element or an area of a page and send it to an agent session.": "ページの要素や範囲を選んで、エージェントのセッションに送ります。",
+  "Reached Agent HUD from {{browser}}, {{when}}": "{{when}} に {{browser}} から接続",
+  "Not connected yet": "まだ接続していません",
+  "Chrome Web Store": "Chrome ウェブストア"
 }

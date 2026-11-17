@@ -1449,5 +1449,11 @@
   "Its words:": "텍스트:",
   "Its styles:": "스타일:",
   "Picture:": "이미지:",
-  "Selector:": "선택자:"
+  "Selector:": "선택자:",
+  "Browser": "브라우저",
+  "Browser extension": "브라우저 확장 프로그램",
+  "Pick an element or an area of a page and send it to an agent session.": "페이지의 요소나 영역을 골라 에이전트 세션으로 보냅니다.",
+  "Reached Agent HUD from {{browser}}, {{when}}": "{{when}} {{browser}}에서 연결됨",
+  "Not connected yet": "아직 연결되지 않음",
+  "Chrome Web Store": "Chrome 웹 스토어"
 }

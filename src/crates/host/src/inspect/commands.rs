@@ -1,8 +1,8 @@
 //! What the HUD's clipboard window asks of the host, as one command with a
 //! method: `state`, `look`, `add`, `edit`, `remove`, `clear`, `targets`,
-//! `mark_window`, `picture`, `mark`, `close_mark` and `send`. Every change answers the new state and sends it to
+//! `mark_window`, `picture`, `mark`, `close_mark`, `browser` and `send`. Every change answers the new state and sends it to
 //! every HUD window as well; all of it runs off the UI thread.
-use super::{clipboard, compose, content::Content, marking, target, Inspect};
+use super::{browser, clipboard, compose, content::Content, marking, target, Inspect};
 use crate::service::Service;
 use agent_hud_messaging::UserTarget;
 use serde_json::Value;
@@ -57,6 +57,7 @@ fn answer(app: &tauri::AppHandle, method: &str, params: &Value) -> Result<Value,
         "picture" => return marking::picture(&inspect, params["id"].as_str().unwrap_or_default()),
         "mark" => return marking::save(app, params),
         "close_mark" => return marking::close(app),
+        "browser" => return Ok(browser::status(&inspect)),
         "send" => return send(app, &params["target"]),
         _ => return Err("Unknown clipboard window request".into()),
     }

@@ -32,10 +32,35 @@ pub(super) fn listen(app: &tauri::AppHandle, data: &Path) -> Option<Server> {
 
 fn answer(app: &tauri::AppHandle, message: &Value) -> Result<Value, String> {
     match message["type"].as_str() {
-        Some("hello") => Ok(json!({ "app": "Agent HUD" })),
-        Some("pick") => pick(app, &message["pick"]),
+        Some("hello") => {
+            seen(app, &message["browser"]);
+            Ok(json!({ "app": "Agent HUD" }))
+        }
+        Some("pick") => {
+            seen(app, &message["pick"]["browser"]);
+            pick(app, &message["pick"])
+        }
         _ => Err("Unknown message from the browser".into()),
     }
+}
+
+/// Remembers the browser the extension last spoke from, for Settings.
+fn seen(app: &tauri::AppHandle, browser: &Value) {
+    let inspect = app.state::<Inspect>();
+    let note = json!({
+        "browser": browser.as_str().unwrap_or("Chrome"),
+        "at": chrono::Utc::now().timestamp_millis(),
+    });
+    let _ = agent_hud_runtime::delivery::atomic_json(&inspect.folder.join("browser.json"), &note);
+}
+
+/// For Settings: where the extension last spoke from, and where to get it.
+pub(super) fn status(inspect: &Inspect) -> Value {
+    let seen = std::fs::read(inspect.folder.join("browser.json"))
+        .ok()
+        .and_then(|bytes| serde_json::from_slice::<Value>(&bytes).ok())
+        .unwrap_or(Value::Null);
+    json!({ "seen": seen, "storeUrl": super::hosts::store_url() })
 }
 
 /// An element or an area, with its picture: into the draft, shown.

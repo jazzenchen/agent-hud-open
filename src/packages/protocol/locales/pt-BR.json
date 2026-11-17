@@ -1513,5 +1513,11 @@
   "Its words:": "Seu texto:",
   "Its styles:": "Seus estilos:",
   "Picture:": "Imagem:",
-  "Selector:": "Seletor:"
+  "Selector:": "Seletor:",
+  "Browser": "Navegador",
+  "Browser extension": "Extensão do navegador",
+  "Pick an element or an area of a page and send it to an agent session.": "Escolha um elemento ou uma área de uma página e envie a uma sessão de agente.",
+  "Reached Agent HUD from {{browser}}, {{when}}": "Conectou pelo {{browser}}, {{when}}",
+  "Not connected yet": "Ainda não conectado",
+  "Chrome Web Store": "Chrome Web Store"
 }

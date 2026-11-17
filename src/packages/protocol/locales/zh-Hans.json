@@ -1449,5 +1449,11 @@
   "Its words:": "它的文字：",
   "Its styles:": "它的样式：",
   "Picture:": "图片：",
-  "Selector:": "选择器："
+  "Selector:": "选择器：",
+  "Browser": "浏览器",
+  "Browser extension": "浏览器扩展",
+  "Pick an element or an area of a page and send it to an agent session.": "在网页上选取元素或框出区域，发给 agent 会话。",
+  "Reached Agent HUD from {{browser}}, {{when}}": "{{when}} 从 {{browser}} 连上过",
+  "Not connected yet": "还没连上",
+  "Chrome Web Store": "Chrome 应用商店"
 }
