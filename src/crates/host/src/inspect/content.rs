@@ -1,13 +1,17 @@
 //! What a copy holds, read out of the clipboard once the person points at
-//! it: the words, a picture kept as a PNG file in the app's data folder, or
+//! it: the words, a picture kept as a PNG file in `~/.agenthud/tmp`, or
 //! the paths of copied files.
 use super::clipboard::{self, ClipKind};
 use super::thumbnail;
 use serde_json::{json, Value};
 use std::path::{Path, PathBuf};
 
-/// How much of copied words a view carries; the message carries all of them.
-const PREVIEW_CHARS: usize = 600;
+/// The start of the pictures' file names: the folder is shared, and only
+/// these are pruned.
+const PREFIX: &str = "clip-";
+/// How much of copied words the window shows, scrolling; the message carries
+/// all of them.
+const PREVIEW_CHARS: usize = 4000;
 
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) enum Content {
@@ -24,7 +28,7 @@ pub(crate) enum Content {
 
 impl Content {
     /// Reads the clipboard's latest copy of `kind`; a picture is written to
-    /// `folder` as `<id>.png`. None when the copy holds nothing to send.
+    /// `folder` as `clip-<id>.png`. None when the copy holds nothing to send.
     pub(crate) fn read(kind: ClipKind, folder: &Path, id: &str) -> Option<Self> {
         match kind {
             ClipKind::Text => clipboard::text()
@@ -44,7 +48,7 @@ impl Content {
     pub(crate) fn image(png: Vec<u8>, folder: &Path, id: &str) -> Option<Self> {
         let (width, height) = thumbnail::size(&png)?;
         agent_hud_runtime::delivery::private_dir(folder).ok()?;
-        let path = folder.join(format!("{id}.png"));
+        let path = folder.join(format!("{PREFIX}{id}.png"));
         std::fs::write(&path, &png).ok()?;
         Some(Self::Image {
             thumbnail: thumbnail::data_url(&png),
@@ -105,7 +109,11 @@ pub(crate) fn prune(folder: &Path, days: u64) {
             .ok()
             .and_then(|modified| modified.elapsed().ok())
             .is_some_and(|age| age > limit);
-        if old && path.extension().is_some_and(|ext| ext == "png") {
+        let ours = path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .is_some_and(|name| name.starts_with(PREFIX) && name.ends_with(".png"));
+        if old && ours {
             let _ = std::fs::remove_file(path);
         }
     }

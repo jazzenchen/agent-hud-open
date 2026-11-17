@@ -1456,5 +1456,6 @@
   "Files copied from {{app}}:": "Aus {{app}} kopierte Dateien:",
   "Copied files:": "Kopierte Dateien:",
   "New session": "Neue Sitzung",
-  "No folder": "Kein Ordner"
+  "No folder": "Kein Ordner",
+  "All {{number}} characters are sent": "Alle {{number}} Zeichen werden gesendet"
 }

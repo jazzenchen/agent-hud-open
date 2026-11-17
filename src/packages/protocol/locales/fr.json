@@ -1488,5 +1488,6 @@
   "Files copied from {{app}}:": "Fichiers copiés depuis {{app}} :",
   "Copied files:": "Fichiers copiés :",
   "New session": "Nouvelle session",
-  "No folder": "Aucun dossier"
+  "No folder": "Aucun dossier",
+  "All {{number}} characters are sent": "Les {{number}} caractères sont tous envoyés"
 }

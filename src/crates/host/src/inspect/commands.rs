@@ -109,7 +109,7 @@ fn read_clip(app: &tauri::AppHandle) {
     if clipboard::change_count() != Some(change) {
         return;
     }
-    let Some(content) = Content::read(kind, &inspect.folder, &id) else {
+    let Some(content) = Content::read(kind, &inspect.pictures, &id) else {
         return;
     };
     inspect.change(app, |draft| {

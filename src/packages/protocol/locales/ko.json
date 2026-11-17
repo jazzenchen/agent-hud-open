@@ -1424,5 +1424,6 @@
   "Files copied from {{app}}:": "{{app}}에서 복사한 파일:",
   "Copied files:": "복사한 파일:",
   "New session": "새 세션",
-  "No folder": "폴더 없음"
+  "No folder": "폴더 없음",
+  "All {{number}} characters are sent": "{{number}}자 모두 보냅니다"
 }

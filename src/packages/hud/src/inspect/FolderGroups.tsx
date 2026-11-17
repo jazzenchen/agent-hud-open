@@ -12,9 +12,6 @@ import { useGround } from "../ground";
 import { alertInk } from "../tokens";
 import { folderName, newTarget, Place } from "./Place";
 
-/** How many sessions a folder lists, newest first. */
-const PER_FOLDER = 4;
-
 /** `sessions` by folder, in the order their newest session comes. */
 export function byFolder(sessions: InspectSessionRow[]) {
   const groups = new Map<string, InspectSessionRow[]>();
@@ -155,7 +152,7 @@ export function FolderGroups({
             pick={pick}
             light={light}
           />
-          {rows.slice(0, PER_FOLDER).map((row) => {
+          {rows.map((row) => {
             const place: InspectTarget = {
               kind: "session",
               client: row.client,

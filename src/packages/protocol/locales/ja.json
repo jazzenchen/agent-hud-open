@@ -1424,5 +1424,6 @@
   "Files copied from {{app}}:": "{{app}} からコピーしたファイル：",
   "Copied files:": "コピーしたファイル：",
   "New session": "新しいセッション",
-  "No folder": "フォルダなし"
+  "No folder": "フォルダなし",
+  "All {{number}} characters are sent": "{{number}} 文字すべてが送信されます"
 }

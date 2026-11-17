@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type {
   InspectTarget,
   InspectTargets,
@@ -47,7 +47,14 @@ export function useClipWindow(
   /** The client whose places the open list shows. */
   const [tab, setTab] = useState<string | null>(null);
   const [outcome, setOutcome] = useState<ClipOutcome | null>(null);
-  const keep = (work: Promise<InspectView>) => work.then(setView, () => {});
+  // Each change waits for the one before it, so the host stores them in the
+  // order they were typed, and a send goes after the last of them.
+  const queue = useRef<Promise<unknown>>(Promise.resolve());
+  const keep = (work: () => Promise<InspectView>) => {
+    const next = queue.current.then(work).then(setView, () => {});
+    queue.current = next;
+    return next;
+  };
   useEffect(() => {
     if (!viewing || !services) {
       setPicking(false);
@@ -72,7 +79,7 @@ export function useClipWindow(
   // A copy is read when the window shows it, and so is each new one.
   const unread = viewing && view.clip && !view.clip.content;
   useEffect(() => {
-    if (unread && services) void keep(services.look());
+    if (unread && services) void keep(() => services.look());
   }, [unread, view.clip?.id, services]);
 
   /** Sends the draft, and once it is on its way calls `sent`, before the
@@ -82,6 +89,7 @@ export function useClipWindow(
     setSending(true);
     setOutcome(null);
     try {
+      await queue.current;
       const result = await services.send(target);
       const went = result.state !== "refused" && result.state !== "expired";
       setOutcome({ sent: went, reason: went ? null : result.reason });
@@ -95,10 +103,11 @@ export function useClipWindow(
     }
   };
   const actions = services && {
-    add: () => keep(services.add()),
-    edit: (id: string | null, text: string) => keep(services.edit(id, text)),
-    remove: (id: string) => keep(services.remove(id)),
-    clear: () => keep(services.clear()),
+    add: () => keep(() => services.add()),
+    edit: (id: string | null, text: string) =>
+      keep(() => services.edit(id, text)),
+    remove: (id: string) => keep(() => services.remove(id)),
+    clear: () => keep(() => services.clear()),
   };
   // What the measuring copy draws again for.
   const shape = useMemo(

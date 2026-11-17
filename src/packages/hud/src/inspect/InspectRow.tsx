@@ -72,20 +72,30 @@ function Preview({
       </span>
     );
   }
+  // The window shows the copy whole, scrolling; past what it carries it
+  // says that all of it is sent.
+  const cut = content.length > content.text.length;
   return (
-    <span
-      style={{
-        fontSize: 11,
-        lineHeight: "15px",
-        maxHeight: 45,
-        overflow: "hidden",
-        whiteSpace: "pre-wrap",
-        overflowWrap: "anywhere",
-        fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
-        color: alertInk(0.8, ground),
-      }}
-    >
-      {content.text}
+    <span style={cardColumn(3)}>
+      <span
+        style={{
+          fontSize: 11,
+          lineHeight: "15px",
+          maxHeight: 112,
+          overflowY: "auto",
+          whiteSpace: "pre-wrap",
+          overflowWrap: "anywhere",
+          fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+          color: alertInk(0.8, ground),
+        }}
+      >
+        {content.text}
+      </span>
+      {cut && (
+        <span style={quiet}>
+          {t("All {{number}} characters are sent", { number: content.length })}
+        </span>
+      )}
     </span>
   );
 }

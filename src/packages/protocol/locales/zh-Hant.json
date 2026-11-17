@@ -1424,5 +1424,6 @@
   "Files copied from {{app}}:": "從 {{app}} 複製的檔案：",
   "Copied files:": "複製的檔案：",
   "New session": "新增工作階段",
-  "No folder": "無目錄"
+  "No folder": "無目錄",
+  "All {{number}} characters are sent": "全部 {{number}} 個字元都會傳送"
 }

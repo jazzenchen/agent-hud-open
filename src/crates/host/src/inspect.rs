@@ -5,8 +5,9 @@
 //! The watch reads the clipboard's change counter and the kinds of data a
 //! copy holds, never its content; the content is read when the person points
 //! at the bubble. Every HUD window draws the same state, sent as `hud:inspect`
-//! with each change. Pictures are kept in the data folder's `inspect` folder
-//! for a week, long enough for the session they went to to read them.
+//! with each change. Pictures are kept in `~/.agenthud/tmp` for a week, long
+//! enough for the session they went to to read them; the last place chosen is
+//! kept in the data folder's `inspect` folder.
 mod clipboard;
 mod commands;
 mod compose;
@@ -35,8 +36,10 @@ const KEEP_DAYS: u64 = 7;
 
 pub(crate) struct Inspect {
     draft: Mutex<Draft>,
-    /// Where pictures and the last choice are kept.
+    /// Where the last place chosen is kept.
     folder: PathBuf,
+    /// Where copied pictures are kept.
+    pictures: PathBuf,
     watch: Mutex<Option<(mpsc::Sender<()>, JoinHandle<()>)>>,
 }
 
@@ -45,10 +48,18 @@ pub(crate) struct Inspect {
 pub(crate) fn install(app: &tauri::AppHandle, demo: bool) -> Result<(), String> {
     let data = agent_hud_runtime::local_tools_directory()?;
     let folder = data.join(if demo { "demo-inspect" } else { "inspect" });
-    content::prune(&folder, KEEP_DAYS);
+    let pictures = if demo {
+        folder.clone()
+    } else {
+        agent_hud_runtime::home_directory()?
+            .join(".agenthud")
+            .join("tmp")
+    };
+    content::prune(&pictures, KEEP_DAYS);
     app.manage(Inspect {
         draft: Mutex::new(Draft::default()),
         folder,
+        pictures,
         watch: Mutex::new((!demo).then(|| watch::start(app.clone())).flatten()),
     });
     Ok(())

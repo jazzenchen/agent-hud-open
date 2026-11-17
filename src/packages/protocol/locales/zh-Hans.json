@@ -1424,5 +1424,6 @@
   "Files copied from {{app}}:": "从 {{app}} 复制的文件：",
   "Copied files:": "复制的文件：",
   "New session": "新建会话",
-  "No folder": "无目录"
+  "No folder": "无目录",
+  "All {{number}} characters are sent": "全部 {{number}} 个字符都会发送"
 }
