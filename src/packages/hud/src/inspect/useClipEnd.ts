@@ -44,16 +44,8 @@ function useClipFade(
   return { cycle, paused: paused || !active, ms: active ? ms : 0 };
 }
 
-/** The clipboard's end of the dock: the host's state of the clipboard
- * window, whether its bubble shows, its countdown, and the window's own
- * state while it shows.
- * A copy's bubble shows for `clipboardFadeSeconds`; with something in the
- * draft it stays until the draft is sent or cleared. */
-export function useClipEnd(
-  config: HUDConfig,
-  hovered: EndSide | null,
-  open: boolean,
-) {
+/** The host's state of the clipboard window, as every HUD window hears it. */
+export function useInspectView() {
   const services = usePanelServices()?.inspect;
   const [view, setView] = useState<InspectView>(EMPTY);
   useEffect(() => {
@@ -69,9 +61,27 @@ export function useClipEnd(
       stop();
     };
   }, [services]);
+  return { view, setView };
+}
+
+/** The clipboard's end of the dock: the host's state of the clipboard
+ * window, whether its bubble shows, its countdown, and the window's own
+ * state while it shows.
+ * A copy's bubble shows for `clipboardFadeSeconds`; with something in the
+ * draft, or a picture open in the markup window, it stays and its clock
+ * stops. */
+export function useClipEnd(
+  config: HUDConfig,
+  hovered: EndSide | null,
+  open: boolean,
+  { view, setView }: ReturnType<typeof useInspectView>,
+) {
+  const services = usePanelServices()?.inspect;
   const [faded, setFaded] = useState<string | null>(null);
   const copy = view.clip?.id ?? null;
-  const holding = view.items.length > 0 || view.note.trim() !== "";
+  // A picture open in the markup window holds the bubble too.
+  const holding =
+    view.items.length > 0 || view.note.trim() !== "" || Boolean(view.marking);
   // A send in progress keeps the window until it hands the HUD back.
   const [sending, setSending] = useState(false);
   const shown =

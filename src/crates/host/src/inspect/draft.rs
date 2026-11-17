@@ -36,6 +36,9 @@ pub(crate) struct Draft {
     pub clip: Option<Clip>,
     pub items: Vec<Item>,
     pub note: String,
+    /// The picture open in the markup window: the bubble and its window
+    /// wait for it.
+    pub marking: Option<String>,
 }
 
 impl Draft {
@@ -82,9 +85,13 @@ impl Draft {
         self.items.retain(|item| item.id != id);
     }
 
-    /// Lets go of everything: the draft, its note and the latest copy.
+    /// Lets go of everything: the draft, its note and the latest copy; a
+    /// picture still open in the markup window stays marked as open.
     pub(crate) fn clear(&mut self) {
-        *self = Self::default();
+        *self = Self {
+            marking: self.marking.take(),
+            ..Self::default()
+        };
     }
 
     /// The marked picture `content` and its pinned `marks` in place of
@@ -165,7 +172,7 @@ impl Draft {
                 })
             })
             .collect::<Vec<_>>();
-        json!({"clip": clip, "items": items, "note": self.note})
+        json!({"clip": clip, "items": items, "note": self.note, "marking": self.marking})
     }
 }
 

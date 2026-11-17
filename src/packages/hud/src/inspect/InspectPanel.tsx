@@ -56,11 +56,8 @@ export function InspectPanel({
           key={row.id}
           row={row}
           number={rows.length > 1 ? index + 1 : undefined}
-          mark={() => {
-            // The markup window comes forward; the HUD steps aside for it.
-            void services?.markPicture(row.id);
-            handoff();
-          }}
+          // The markup window comes forward; this window waits beside it.
+          mark={() => void services?.markPicture(row.id)}
           add={() => actions?.add()}
           edit={(text) => actions?.edit(row.id, text)}
           remove={() => actions?.remove(row.id)}

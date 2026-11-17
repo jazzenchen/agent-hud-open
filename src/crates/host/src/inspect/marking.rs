@@ -31,6 +31,16 @@ pub(super) fn open(app: &tauri::AppHandle, id: &str) -> Result<Value, String> {
         .build()
         .map_err(|error| format!("Could not open the markup window: {error}"))?;
     crate::shell::window_opened(&window);
+    // While it is open the clipboard window waits for it, however it closes.
+    let inspect = app.state::<Inspect>();
+    inspect.change(app, |draft| draft.marking = Some(id.to_owned()));
+    let closed = app.clone();
+    window.on_window_event(move |event| {
+        if let tauri::WindowEvent::Destroyed = event {
+            let inspect = closed.state::<Inspect>();
+            inspect.change(&closed, |draft| draft.marking = None);
+        }
+    });
     window.set_focus().map_err(|error| error.to_string())?;
     Ok(json!({ "opened": true }))
 }

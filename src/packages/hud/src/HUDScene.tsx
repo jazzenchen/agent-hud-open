@@ -35,12 +35,13 @@ import { MeasuringCopy, useMeasured } from "./scene/MeasuringCopy";
 import { DockEnds } from "./ends/DockEnds";
 import { useDockEnds } from "./ends/useDockEnds";
 import { InspectPanel } from "./inspect/InspectPanel";
-import { useClipEnd } from "./inspect/useClipEnd";
+import { useClipEnd, useInspectView } from "./inspect/useClipEnd";
 import { PanelBody } from "./scene/PanelBody";
 import { RestingStrip } from "./scene/RestingStrip";
 import { HoverFloor, SceneBackdrop } from "./scene/SceneFloors";
 import { usePanelHandoffs } from "./scene/usePanelHandoffs";
 import { useSceneAlerts } from "./scene/useSceneAlerts";
+import { useGlowColors } from "./scene/useGlowColors";
 import { useStripMetrics } from "./scene/useStripMetrics";
 import { useSceneWidth, useSystemLight } from "./scene/useSceneMeasures";
 import { GuideDock, type HUDGuide } from "./GuideDock";
@@ -50,7 +51,6 @@ import { useHoverMachine } from "./hover";
 import {
   defaultHUDConfig,
   HUD_METRICS,
-  statusColor,
   configuredVendors,
   type HUDConfig,
   type HUDDecision,
@@ -171,7 +171,9 @@ export function HUDScene({
   const [pinned, setPinned] = useState(false);
   const [pointerInside, setPointerInside] = useState(false);
   const { domTyping, checkDomTyping } = useDomTyping(scene);
-  const typing = Boolean(textFocused || domTyping);
+  // The markup window holds the clipboard window open, as typing does.
+  const inspected = useInspectView();
+  const typing = Boolean(textFocused || domTyping || inspected.view.marking);
   const suppressHover = useRef(false);
   const hover = useHoverMachine(config);
   const panelServices = usePanelServices();
@@ -198,7 +200,7 @@ export function HUDScene({
     collapse,
   });
   const open = hover.open || holdActive;
-  const clip = useClipEnd(config, ends.hovered, open);
+  const clip = useClipEnd(config, ends.hovered, open, inspected);
 
   const safeSceneHeight = Math.max(180, height);
   const screen = { width, height: safeSceneHeight };
@@ -237,17 +239,7 @@ export function HUDScene({
       onBotLooked?.(config.separatesAgents && hovered ? [hovered] : null);
   }, [open, hovered, config.separatesAgents]);
 
-  // Paused detection draws the still grey rim, as no readings do.
-  const detectionPaused = Boolean(snapshot.status?.paused);
-  const glowColors = useMemo(
-    () =>
-      detectionPaused
-        ? []
-        : vendors
-            .filter((vendor) => vendor.used != null)
-            .map((vendor) => statusColor(vendor.level)),
-    [vendors, detectionPaused],
-  );
+  const glowColors = useGlowColors(vendors, snapshot);
   const metrics = useStripMetrics(
     config,
     vendors,

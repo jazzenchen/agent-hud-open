@@ -42,6 +42,8 @@ export interface InspectView {
   clip: InspectClip | null;
   items: InspectItem[];
   note: string;
+  /** The picture open in the markup window, which holds this window open. */
+  marking?: string | null;
 }
 
 /** Where the words go: a session there is, or a new one in `folder`
