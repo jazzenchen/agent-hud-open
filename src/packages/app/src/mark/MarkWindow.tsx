@@ -3,7 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { useT } from "@agent-hud/ui/format-context";
 import { MarkLayer } from "./MarkLayer";
 import { MarkToolbar } from "./MarkToolbar";
-import { MarkNotes } from "./MarkNotes";
+import { PinNotes } from "./PinNotes";
 import { markedPicture, type Mark, type MarkTool } from "./mark-model";
 
 export interface MarkColors {
@@ -76,6 +76,8 @@ export default function MarkWindow({ theme }: { theme: "dark" | "light" }) {
   const [failure, setFailure] = useState<string | null>(null);
   const [tool, setTool] = useState<MarkTool>("box");
   const [marks, setMarks] = useState<Mark[]>([]);
+  /** The pin whose note is being written. */
+  const [editing, setEditing] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
   const stage = useRef<HTMLDivElement>(null);
   const fit = useFit(stage, size);
@@ -176,22 +178,35 @@ export default function MarkWindow({ theme }: { theme: "dark" | "light" }) {
                 size={size}
                 marks={marks}
                 tool={tool}
-                add={(mark) => setMarks((list) => [...list, mark])}
+                add={(mark) => {
+                  // A new pin opens its note at once.
+                  if (mark.kind === "pin") setEditing(marks.length);
+                  setMarks((list) => [...list, mark]);
+                }}
+              />
+              <PinNotes
+                size={size}
+                scale={fit.w / size.w}
+                marks={marks}
+                editing={editing}
+                edit={setEditing}
+                write={(index, text) =>
+                  setMarks((list) =>
+                    list.map((mark, at) =>
+                      at === index && mark.kind === "pin"
+                        ? { ...mark, text }
+                        : mark,
+                    ),
+                  )
+                }
+                drop={(index) =>
+                  setMarks((list) => list.filter((_, at) => at !== index))
+                }
+                colors={colors}
               />
             </div>
           ) : null}
         </div>
-        <MarkNotes
-          marks={marks}
-          write={(index, text) =>
-            setMarks((list) =>
-              list.map((mark, at) =>
-                at === index && mark.kind === "pin" ? { ...mark, text } : mark,
-              ),
-            )
-          }
-          colors={colors}
-        />
       </div>
     </div>
   );
