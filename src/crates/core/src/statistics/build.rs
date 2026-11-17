@@ -19,6 +19,7 @@ pub(super) fn build(
     ctx: &Context,
     metadata: impl Fn(&str) -> Option<Value>,
     root: impl Fn(&str) -> Option<String>,
+    listed_as: impl Fn(&str) -> Option<String>,
 ) -> Result<Value, String> {
     let periods = periods(query)?;
     let today = day_start(query.zone, local_date(query.zone, query.to))?;
@@ -69,6 +70,16 @@ pub(super) fn build(
         .collect::<BTreeSet<_>>()
         .into_iter()
         .filter_map(|path| Some((path.to_owned(), root(path)?)))
+        .collect::<HashMap<_, _>>();
+    // The log a session's row stands under, where a contribution is not it:
+    // an earlier segment of a session Codex split across several rollouts
+    // ranks with the rest of the session.
+    let listed = rows
+        .iter()
+        .map(|bucket| bucket.contribution.as_str())
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .filter_map(|path| Some((path.to_owned(), listed_as(path)?)))
         .collect::<HashMap<_, _>>();
     let mut columns = vec![Total::default(); periods.len()];
     let mut column_models = vec![BTreeMap::<&str, u64>::new(); periods.len()];
@@ -140,15 +151,18 @@ pub(super) fn build(
             .entry(&bucket.source)
             .or_default()
             .add(bucket, count, cost.as_ref());
+        let contribution = listed
+            .get(&bucket.contribution)
+            .map_or(bucket.contribution.as_str(), String::as_str);
         sessions
-            .entry((&bucket.source, &bucket.contribution))
+            .entry((&bucket.source, contribution))
             .or_default()
             .add(bucket, count, cost.as_ref());
         let column = periods
             .partition_point(|(_, end)| *end <= bucket.at.max(periods[0].0))
             .min(periods.len() - 1);
         columns[column].add(bucket, count, cost.as_ref());
-        activity.within(column, bucket, id, count, cost.as_ref());
+        activity.within(column, bucket, contribution, id, count, cost.as_ref());
         *column_models[column].entry(id).or_default() += count;
         series
             .entry(&bucket.source)

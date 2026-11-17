@@ -2,6 +2,33 @@
 //! and turns its page shows.
 use crate::transcript::items::{self, Items, Line, LineItem, ToolCall};
 use serde_json::{json, Value};
+use std::path::Path;
+
+/// The part of its conversation a rollout holds: its file name without
+/// `.zst`; "" for a file that is not a rollout.
+///
+/// Codex goes on with a conversation in a new rollout when it rewinds the
+/// conversation's history after a stopped turn (a retry or an edited
+/// resend): `rollout-<time>-<id>_<segment>.jsonl`, whose `session_meta`
+/// names the same id and whose `history_base` points into the rollout before
+/// it, and whose counts run on from that rollout's. Each segment holds calls
+/// of its own, and Codex's own total for the conversation adds them all. A
+/// copy of a rollout (moved to `archived_sessions`, compressed to
+/// `.jsonl.zst`) keeps its file name, so the name tells a copy from a
+/// segment, and the time it begins with orders the segments. Read from the
+/// rollouts themselves (Open #101); Codex documents neither.
+pub fn segment(path: &Path) -> &str {
+    let name = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or_default();
+    let name = name.strip_suffix(".zst").unwrap_or(name);
+    if name.starts_with("rollout-") && name.ends_with(".jsonl") {
+        name
+    } else {
+        ""
+    }
+}
 
 /// Whether a Codex user item holds the user's own words rather than context
 /// the client hands the model. Desktop rollouts name each part's role

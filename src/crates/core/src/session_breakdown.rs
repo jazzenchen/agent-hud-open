@@ -15,13 +15,18 @@ pub(crate) use family::Family;
 /// it began and was last heard from, and whether it still runs. Claude Code
 /// keeps a sub-agent's description, type and end beside its log
 /// (`agent-*.meta.json`); other clients' child sessions use their titles.
-fn turn_agents(own: &LogHead, subagents: &[&LogHead], calls: &[Call<'_>], now: i64) -> Vec<Value> {
+fn turn_agents(
+    own: &[&LogHead],
+    subagents: &[&LogHead],
+    calls: &[Call<'_>],
+    now: i64,
+) -> Vec<Value> {
     let called = calls
         .iter()
         .filter(|call| !call.own)
         .map(|call| call.row.contribution.as_str())
         .collect::<HashSet<_>>();
-    let logs = || std::iter::once(own).chain(subagents.iter().copied());
+    let logs = || own.iter().chain(subagents).copied();
     let at = |ms: Option<i64>| {
         ms.and_then(DateTime::<Utc>::from_timestamp_millis)
             .map(|at| at.to_rfc3339())
@@ -61,6 +66,13 @@ fn turn_agents(own: &LogHead, subagents: &[&LogHead], calls: &[Call<'_>], now: i
                 "running": running,
             }))
         })
+        .collect()
+}
+
+/// The ledger contributions of a session's own logs.
+fn own_paths(own: &[&LogHead]) -> Vec<String> {
+    own.iter()
+        .map(|log| log.path.to_string_lossy().into_owned())
         .collect()
 }
 
@@ -135,14 +147,15 @@ impl AgentHudCore {
         })
     }
 
-    /// The breakdown of the session whose own log is `own`, with the logs of
-    /// `subagents`, and the calls it was built from; None without calls.
+    /// The breakdown of the session whose own logs are `own` (its segments,
+    /// `Family::own`), with the logs of `subagents`, and the calls it was
+    /// built from; None without calls.
     fn session_usage(
         db: &Connection,
-        own: &LogHead,
+        own: &[&LogHead],
         subagents: &[&LogHead],
     ) -> Result<Option<(session_usage::SessionUsage, Vec<metering::CallRow>)>, String> {
-        let own_paths = vec![own.path.to_string_lossy().into_owned()];
+        let own_paths = own_paths(own);
         let mut paths = own_paths.clone();
         paths.extend(
             subagents
@@ -156,7 +169,7 @@ impl AgentHudCore {
         for row in &rows {
             builder.add(Call {
                 row,
-                own: row.contribution == own_paths[0],
+                own: own_paths.contains(&row.contribution),
             });
         }
         if builder.is_empty() {
@@ -181,8 +194,9 @@ impl AgentHudCore {
             return Value::Null;
         };
         let subagents = family.descendants(&own.source, &own.id);
+        let segments = family.own(own);
         let mut hash = std::collections::hash_map::DefaultHasher::new();
-        for log in std::iter::once(own).chain(subagents.iter().copied()) {
+        for log in segments.iter().chain(&subagents).copied() {
             log.path.hash(&mut hash);
             (log.offset, log.length, log.usage.total()).hash(&mut hash);
         }
@@ -193,7 +207,7 @@ impl AgentHudCore {
                 return value.clone();
             }
         }
-        let value = match Self::session_usage(db, own, &subagents) {
+        let value = match Self::session_usage(db, &segments, &subagents) {
             Ok(Some((usage, _))) => usage.row(),
             Ok(None) => Value::Null,
             // A failed read is not kept; the next page tries again.
@@ -203,27 +217,28 @@ impl AgentHudCore {
         value
     }
 
-    /// The breakdown of the session whose own log is `own`, with the logs of
-    /// `subagents`: its turns (or 15-minute periods), context, models and list
-    /// cost; and, for `turn` (a kept turn's id), that turn's calls and what
-    /// they add up to.
+    /// The breakdown of the session whose own logs are `own` (its segments,
+    /// `Family::own`), with the logs of `subagents`: its turns (or 15-minute
+    /// periods), context, models and list cost; and, for `turn` (a kept
+    /// turn's id), that turn's calls and what they add up to.
     pub(crate) fn session_breakdown(
         db: &Connection,
-        own: &LogHead,
+        own: &[&LogHead],
         subagents: &[&LogHead],
         turn: Option<&str>,
     ) -> Result<Option<Value>, String> {
         let Some((usage, rows)) = Self::session_usage(db, own, subagents)? else {
             return Ok(None);
         };
-        let own_paths = vec![own.path.to_string_lossy().into_owned()];
+        let own_paths = own_paths(own);
         let failed = |_| tr!("Could not read session usage");
         let mut value = usage.json();
         // The session at its account's own prices (agent-hud-native-open
         // `UsageLedger` costs): a currency only when every priced log of the
         // session and its sub-agents has a price in it.
-        let priced = std::iter::once(own)
-            .chain(subagents.iter().copied())
+        let priced = own
+            .iter()
+            .chain(subagents)
             .filter_map(|log| log.account_cost)
             .collect::<Vec<_>>();
         let mut costs = BTreeMap::new();
@@ -250,7 +265,7 @@ impl AgentHudCore {
                 .filter(|row| row.at >= turn.start && row.at <= turn.end)
                 .map(|row| Call {
                     row,
-                    own: row.contribution == own_paths[0],
+                    own: own_paths.contains(&row.contribution),
                 })
                 .collect::<Vec<_>>();
             let summary = session_usage::turn_summary(&calls);

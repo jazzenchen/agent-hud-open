@@ -62,8 +62,13 @@ impl AgentHudCore {
         let family = session_breakdown::Family::new(&every);
         let currency = self.deepseek_account_currency();
         let subagents = family.descendants(&source, id);
+        // The session's own logs: each segment of a session Codex split
+        // across several rollouts, earliest first, else its one log.
+        let segments = family.own(selected);
         let breakdown = match &self.database {
-            Some(db) => Self::session_breakdown(db, selected, &subagents, params["turn"].as_str())?,
+            Some(db) => {
+                Self::session_breakdown(db, &segments, &subagents, params["turn"].as_str())?
+            }
             None => None,
         };
         let mut totals = json!({});
@@ -71,8 +76,18 @@ impl AgentHudCore {
         // The sub-agents' part of the session's tokens (agent-hud-native-open's
         // "含子 agent" note), from the same logs as the total.
         let (_, subagent_usage) = family.usage(selected);
-        // The session's own log apart from its sub-agents', which `usage` adds.
-        let own = subagent_usage.map(|_| crate::session_usage::tokens_json(selected.usage));
+        // The session's own logs apart from its sub-agents', which `usage` adds.
+        let own =
+            subagent_usage.map(|_| crate::session_usage::tokens_json(family.own_usage(selected)));
+        // A split session began when its first segment did.
+        let started_at = segments
+            .first()
+            .filter(|first| first.path != path)
+            .and_then(|first| first.live.started_at());
+        let own_paths = segments
+            .iter()
+            .map(|log| log.path.to_string_lossy().into_owned())
+            .collect::<Vec<_>>();
         let credits = self.session_credits(id);
         let parent = selected
             .live
@@ -144,9 +159,8 @@ impl AgentHudCore {
         for (key, value) in totals.as_object().unwrap() {
             session[key] = value.clone();
         }
-        session["startedAt"] = log
-            .live
-            .started_at()
+        session["startedAt"] = started_at
+            .or_else(|| log.live.started_at())
             .and_then(DateTime::<Utc>::from_timestamp_millis)
             .map(|at| json!(at.to_rfc3339()))
             .unwrap_or(Value::Null);
@@ -214,13 +228,8 @@ impl AgentHudCore {
                 .transpose()?
                 .unwrap_or(200)
                 .min(500);
-            let (total, calls) = metering::session_calls(
-                database,
-                path.to_string_lossy().as_ref(),
-                &source,
-                offset,
-                limit,
-            )?;
+            let (total, calls) =
+                metering::session_calls(database, &own_paths, &source, offset, limit)?;
             let next = offset + calls.len() as u64;
             result["calls"] = json!(calls);
             result["callsTotal"] = json!(total);
@@ -233,10 +242,13 @@ impl AgentHudCore {
 
 impl crate::AgentHudCore {
     pub fn transcript_path(&self, id: &str) -> Result<PathBuf, String> {
+        // Of a session Codex split across several rollouts, the newest
+        // segment, the one Codex goes on writing.
         let log = self
             .selected()
             .into_iter()
-            .find(|log| log.id == id)
+            .filter(|log| log.id == id)
+            .max_by_key(|log| crate::usage::segment(log))
             .ok_or_else(|| tr!("Session was not found; refresh first"))?;
         let path = log
             .origin_path

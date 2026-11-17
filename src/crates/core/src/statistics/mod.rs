@@ -152,6 +152,12 @@ impl AgentHudCore {
                     let log = self.logs.get(Path::new(path))?;
                     Some(log.live.parent_id.clone().unwrap_or_else(|| log.id.clone()))
                 },
+                |path| {
+                    projection
+                        .earlier
+                        .get(Path::new(path))
+                        .map(|newest| newest.to_string_lossy().into_owned())
+                },
             )?;
             refresh_times(&mut response, &query, data, &context);
             if cache.responses.len() == 8 {

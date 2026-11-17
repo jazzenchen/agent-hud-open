@@ -1,5 +1,6 @@
-//! A session's family: its log and the sub-agent logs under it, with the
-//! tokens and money they add up to.
+//! A session's family: its log, or the segments of one Codex split across
+//! several rollouts, and the sub-agent logs under it, with the tokens and
+//! money they add up to.
 use crate::*;
 
 /// The selected logs by the session that started them, so a session's
@@ -8,12 +9,22 @@ use crate::*;
 /// its breakdown and its money.
 pub(crate) struct Family<'a> {
     children: HashMap<(&'a str, &'a str), Vec<&'a LogHead>>,
+    /// The segments of each session Codex split across several rollouts
+    /// (`usage::segment`), earliest first.
+    segments: HashMap<(&'a str, &'a str), Vec<&'a LogHead>>,
 }
 
 impl<'a> Family<'a> {
     pub(crate) fn new(logs: &[&'a LogHead]) -> Self {
         let mut children = HashMap::<(&str, &str), Vec<&LogHead>>::new();
+        let mut segments = HashMap::<(&str, &str), Vec<&LogHead>>::new();
         for log in logs {
+            if !crate::usage::segment(log).is_empty() {
+                segments
+                    .entry((log.source.as_str(), log.id.as_str()))
+                    .or_default()
+                    .push(log);
+            }
             if let Some(parent) = log
                 .live
                 .parent_id
@@ -26,7 +37,30 @@ impl<'a> Family<'a> {
                     .push(log);
             }
         }
-        Self { children }
+        segments.retain(|_, logs| logs.len() > 1);
+        for logs in segments.values_mut() {
+            logs.sort_unstable_by_key(|log| crate::usage::segment(log));
+        }
+        Self { children, segments }
+    }
+
+    /// The logs of a session's own calls: its log, or each segment of a
+    /// session Codex split across several rollouts, earliest first.
+    pub(crate) fn own<'b>(&'b self, head: &'b LogHead) -> Vec<&'b LogHead> {
+        match self.segments.get(&(head.source.as_str(), head.id.as_str())) {
+            Some(segments) => segments.to_vec(),
+            None => vec![head],
+        }
+    }
+
+    /// A session's own tokens, of every segment it has, without its
+    /// sub-agents'.
+    pub(crate) fn own_usage(&self, head: &LogHead) -> Usage {
+        let mut total = Usage::default();
+        for log in self.own(head) {
+            total.add(log.usage);
+        }
+        total
     }
 
     /// The sub-agent logs under a session, at any depth.
@@ -58,7 +92,7 @@ impl<'a> Family<'a> {
                 subagents.get_or_insert_with(Usage::default).add(log.usage);
             }
         }
-        let mut total = head.usage;
+        let mut total = self.own_usage(head);
         if let Some(part) = subagents {
             total.add(part);
         }
@@ -69,7 +103,11 @@ impl<'a> Family<'a> {
     /// prices, in US dollars; None when one with calls has no list price.
     pub(crate) fn list_cost(&self, head: &LogHead) -> Option<f64> {
         let mut total = None::<i128>;
-        for log in std::iter::once(head).chain(self.descendants(&head.source, &head.id)) {
+        for log in self
+            .own(head)
+            .into_iter()
+            .chain(self.descendants(&head.source, &head.id))
+        {
             match log.list_cost {
                 Some(cost) => total = Some(total.unwrap_or(0) + cost),
                 None if log.usage.total() == 0 => {}
@@ -85,7 +123,11 @@ impl<'a> Family<'a> {
     pub(crate) fn priced_cost(&self, head: &LogHead) -> (Option<f64>, u64) {
         let mut priced = None::<i128>;
         let mut unpriced = 0;
-        for log in std::iter::once(head).chain(self.descendants(&head.source, &head.id)) {
+        for log in self
+            .own(head)
+            .into_iter()
+            .chain(self.descendants(&head.source, &head.id))
+        {
             // A log priced before the priced part was kept has only its whole
             // cost until it is priced again.
             let part = match log.unpriced_tokens {

@@ -12,6 +12,7 @@ pub mod live;
 pub mod log;
 pub mod metering;
 pub mod records;
+pub mod segments;
 mod session_state;
 mod shared_items;
 pub mod turns;

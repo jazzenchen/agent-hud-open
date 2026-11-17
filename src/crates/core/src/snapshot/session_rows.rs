@@ -114,7 +114,7 @@ impl crate::AgentHudCore {
         let logs = every
             .iter()
             .copied()
-            .filter(|head| !head.gone && !head.archived && !head.live.is_internal)
+            .filter(|head| projection.lists(head))
             .collect::<Vec<_>>();
         let children = Self::active_subagents(&logs, now);
         let family = session_breakdown::Family::new(&every);

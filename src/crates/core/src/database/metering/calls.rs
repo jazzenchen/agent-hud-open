@@ -180,27 +180,28 @@ pub(crate) fn contribution_usage(db: &Connection, path: &str) -> rusqlite::Resul
 
 pub(crate) fn session_calls(
     db: &Connection,
-    path: &str,
+    paths: &[String],
     source: &str,
     offset: u64,
     limit: u64,
 ) -> Result<(u64, Vec<Value>), String> {
+    let selected = json!(paths).to_string();
     let total: u64 = db
         .query_row(
-            "SELECT COUNT(*) FROM usage_meter_event WHERE contribution=?1",
-            [path],
+            "SELECT COUNT(*) FROM usage_meter_event WHERE contribution IN (SELECT value FROM json_each(?1))",
+            [&selected],
             |row| row.get::<_, i64>(0).map(|n| n as u64),
         )
         .map_err(|_| "Could not count session calls")?;
     let mut statement = db
         .prepare(
             "SELECT event_key,model,at_ms,input,output,cache_read,cache_write,reasoning,tools
-             FROM usage_meter_event WHERE contribution=?1
+             FROM usage_meter_event WHERE contribution IN (SELECT value FROM json_each(?1))
              ORDER BY at_ms DESC,event_key DESC LIMIT ?2 OFFSET ?3",
         )
         .map_err(|_| "Could not read session calls")?;
     let calls = statement
-        .query_map(params![path, limit as i64, offset as i64], |row| {
+        .query_map(params![selected, limit as i64, offset as i64], |row| {
             let used = usage(row, 3)?;
             let Usage { input, output, read, write, reasoning } = used;
             let at: i64 = row.get(2)?;

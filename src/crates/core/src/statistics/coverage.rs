@@ -142,5 +142,5 @@ pub(super) fn unavailable(query: &Query, ctx: &Context) -> Result<Value, String>
         recached: Vec::new(),
         recached_from: i64::MIN,
     };
-    build(query, &data, ctx, |_| None, |_| None)
+    build(query, &data, ctx, |_| None, |_| None, |_| None)
 }

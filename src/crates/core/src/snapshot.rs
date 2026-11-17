@@ -175,7 +175,9 @@ impl crate::AgentHudCore {
             .selected
             .iter()
             .filter_map(|path| self.logs.get(path))
-            .filter(|head| !head.gone && !head.live.is_internal)
+            .filter(|head| {
+                !head.gone && !head.live.is_internal && !projection.earlier.contains_key(&head.path)
+            })
             .collect::<Vec<_>>();
         let children = Self::active_subagents(&logs, now);
         // Every state change a log can make without a new event falls within

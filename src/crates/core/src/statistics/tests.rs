@@ -143,6 +143,7 @@ fn a_range_counts_its_sessions_compares_with_the_stretch_before_and_prices_each_
             path.starts_with("/logs/a/")
                 .then(|| "/logs/a.jsonl".to_string())
         },
+        |_| None,
     )
     .unwrap();
     assert_eq!(report["sessionCount"], 2);
@@ -181,7 +182,7 @@ fn a_range_counts_its_sessions_compares_with_the_stretch_before_and_prices_each_
         ..data
     };
     assert!(
-        build(&query, &late, &ctx, |_| None, |_| None).unwrap()["previous"].is_null(),
+        build(&query, &late, &ctx, |_| None, |_| None, |_| None).unwrap()["previous"].is_null(),
         "no comparison with a stretch the record had not reached"
     );
     let data = Data {
@@ -191,7 +192,7 @@ fn a_range_counts_its_sessions_compares_with_the_stretch_before_and_prices_each_
     let month =
         Query::parse(&json!({"from": iso(to - 30 * DAY), "to": iso(to), "timeZone": "UTC"}))
             .unwrap();
-    let report = build(&month, &data, &ctx, |_| None, |_| None).unwrap();
+    let report = build(&month, &data, &ctx, |_| None, |_| None, |_| None).unwrap();
     assert!(
         report["previous"].is_null(),
         "the month before is not loaded"

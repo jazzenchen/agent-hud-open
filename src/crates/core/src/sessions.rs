@@ -73,30 +73,33 @@ impl AgentHudCore {
         self.sessions_checked = Some((inputs, now));
         let presentation = self.presentation(now);
         // The projection holds this pass's selection; both lists below sort it.
-        let selected = self
+        let projection = self
             .usage_projection
             .as_ref()
-            .expect("usage projection prepared")
+            .expect("usage projection prepared");
+        let selected = projection
             .selected
             .iter()
             .filter_map(|path| self.logs.get(path))
             .collect::<Vec<_>>();
         // A sub-agent no list shows (an internal review, an archived or gone
-        // log) still adds to its parent's tokens and cost.
+        // log) and an earlier segment of a session still add to the tokens
+        // and cost of the session they belong to.
         let mut unlisted = selected
             .iter()
             .filter(|log| {
-                log.live.parent_id.is_some() && (log.gone || log.archived || log.live.is_internal)
+                (log.live.parent_id.is_some() && (log.gone || log.archived || log.live.is_internal))
+                    || projection.earlier.contains_key(&log.path)
             })
             .map(|log| (log.path.as_path(), log.usage.total(), log.list_cost))
             .collect::<Vec<_>>();
         unlisted.sort_unstable();
         let logs = selected
             .into_iter()
-            .filter(|head| !head.gone && !head.archived && !head.live.is_internal)
+            .filter(|head| projection.lists(head))
             .collect::<Vec<_>>();
         let children = Self::active_subagents(&logs, now);
-        let titles = &self.usage_projection.as_ref().unwrap().titles;
+        let titles = &projection.titles;
         // Each log's part is hashed with its path and the parts are added, so
         // the logs need no sorting first.
         let mut listed = 0u64;

@@ -59,11 +59,13 @@ impl<'a> Activity<'a> {
         }
     }
 
-    /// A bucket in the range, in `column`, of the model `id`.
+    /// A bucket in the range, in `column`, of the model `id`, from a log of
+    /// the session whose row stands under `listed`.
     pub(super) fn within(
         &mut self,
         column: usize,
         b: &'a Bucket,
+        listed: &'a str,
         id: &'a str,
         count: u64,
         cost: Option<&pricing::ModelCost>,
@@ -71,7 +73,7 @@ impl<'a> Activity<'a> {
         if count == 0 {
             return;
         }
-        let key = (b.source.as_str(), b.contribution.as_str());
+        let key = (b.source.as_str(), listed);
         let session = self.session(b);
         self.sessions.insert(session);
         self.column_sessions[column].insert(session);

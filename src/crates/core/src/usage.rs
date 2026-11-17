@@ -12,6 +12,10 @@ use std::{
 /// UsageLedger/UsageStore: only source writes invalidate this numeric projection.
 pub(crate) struct UsageProjection {
     pub(crate) selected: Vec<PathBuf>,
+    /// The selected logs that hold an earlier part of a session, each with
+    /// the log the session lists as (`earlier_segments`): counted, never
+    /// listed.
+    pub(crate) earlier: HashMap<PathBuf, PathBuf>,
     pub(crate) totals: Usage,
     pub(crate) timeline: Vec<Value>,
     pub(crate) titles: HashMap<String, String>,
@@ -28,10 +32,57 @@ fn unwritten_buddy_transcript(log: &LogHead) -> bool {
     matches!(log.source.as_str(), "workbuddy" | "codebuddy") && !log.observed && log.length == 0
 }
 
+/// The part of its session a log holds, "" for the whole of it: each
+/// segment of a session Codex split across several rollouts counts, and
+/// copies of one segment count once (`agent_hud_agents::transcript::segments`).
+pub(crate) fn segment(log: &LogHead) -> &str {
+    agent_hud_agents::transcript::segments::of(&log.source, &log.path)
+}
+
+/// The selected logs that hold an earlier segment of their session
+/// (`segment`), each with the newest segment of it, which stands for the
+/// session in every list. The newest segment's name sorts last.
+pub(crate) fn earlier_segments<'a>(
+    logs: &[&'a LogHead],
+) -> HashMap<&'a std::path::Path, &'a std::path::Path> {
+    let mut sessions = HashMap::<(&str, &str), Vec<&LogHead>>::new();
+    for log in logs.iter().copied().filter(|log| !segment(log).is_empty()) {
+        sessions
+            .entry((log.source.as_str(), log.id.as_str()))
+            .or_default()
+            .push(log);
+    }
+    let mut earlier = HashMap::new();
+    for segments in sessions.into_values().filter(|segments| segments.len() > 1) {
+        let newest = segments
+            .iter()
+            .copied()
+            .max_by_key(|log| segment(log))
+            .unwrap();
+        for log in segments.into_iter().filter(|log| log.path != newest.path) {
+            earlier.insert(log.path.as_path(), newest.path.as_path());
+        }
+    }
+    earlier
+}
+
+impl UsageProjection {
+    /// Whether a session list shows the selected log: not gone, archived,
+    /// internal (Codex's guardian reviews) or an earlier segment of a session.
+    pub(crate) fn lists(&self, head: &LogHead) -> bool {
+        !head.gone
+            && !head.archived
+            && !head.live.is_internal
+            && !self.earlier.contains_key(&head.path)
+    }
+}
+
 impl AgentHudCore {
-    /// The logs whose usage counts: one copy per session, internal ones
-    /// (Codex's guardian reviews) included, as their usage counts in Open;
-    /// `listed_sessions` leaves those out of every list.
+    /// The logs whose usage counts: one copy per session, or per segment of
+    /// a session Codex split across several rollouts (`segment`), internal
+    /// ones (Codex's guardian reviews) included, as their usage counts in
+    /// Open; `listed_sessions` leaves those and earlier segments out of
+    /// every list.
     /// The logs whose usage counts (`select`), as the usage projection holds
     /// them: it keeps the selection it was built on until a change to the
     /// logs, the session map or the enabled clients drops it, so the queries a
@@ -58,7 +109,7 @@ impl AgentHudCore {
         let mapped_copy = |log: &LogHead| {
             mapped.contains(&(log.source.as_str(), log.id.as_str(), log.path.as_path()))
         };
-        let mut sessions: HashMap<(&str, &str), &LogHead> = HashMap::new();
+        let mut sessions: HashMap<(&str, &str, &str), &LogHead> = HashMap::new();
         for log in self.logs.values().filter(|log| {
             log.source != "codex-index"
                 && !unwritten_buddy_transcript(log)
@@ -70,7 +121,7 @@ impl AgentHudCore {
         }) {
             let is_mapped = mapped_copy(log);
             sessions
-                .entry((log.source.as_str(), &log.id))
+                .entry((log.source.as_str(), &log.id, segment(log)))
                 .and_modify(|current| {
                     let current_mapped = mapped_copy(current);
                     // Of a session's copies, a listed one before a gone one,
@@ -106,9 +157,23 @@ impl AgentHudCore {
     }
 
     pub(crate) fn listed_sessions(&self) -> Vec<&LogHead> {
-        self.selected()
+        if let Some(projection) = &self.usage_projection {
+            return self
+                .selected()
+                .into_iter()
+                .filter(|head| projection.lists(head))
+                .collect();
+        }
+        let selected = self.select();
+        let earlier = earlier_segments(&selected);
+        selected
             .into_iter()
-            .filter(|head| !head.gone && !head.archived && !head.live.is_internal)
+            .filter(|head| {
+                !head.gone
+                    && !head.archived
+                    && !head.live.is_internal
+                    && !earlier.contains_key(head.path.as_path())
+            })
             .collect()
     }
 
@@ -128,12 +193,17 @@ impl AgentHudCore {
         }
         self.statistics.revision = self.statistics.revision.wrapping_add(1);
         let logs = self.select();
+        let earlier = earlier_segments(&logs);
         let mut totals = Usage::default();
         let mut buckets = BTreeMap::<i64, TimelineBucket>::new();
         let mut counts = HashMap::<String, usize>::new();
         for log in &logs {
             totals.add(log.usage);
-            if !log.gone && !log.archived && !log.live.is_internal {
+            if !log.gone
+                && !log.archived
+                && !log.live.is_internal
+                && !earlier.contains_key(log.path.as_path())
+            {
                 *counts.entry(log.source.clone()).or_default() += 1;
             }
             for (at, value) in &log.buckets {
@@ -164,8 +234,13 @@ impl AgentHudCore {
                 )
             })
             .collect();
+        let earlier = earlier
+            .into_iter()
+            .map(|(log, newest)| (log.to_path_buf(), newest.to_path_buf()))
+            .collect();
         self.usage_projection = Some(UsageProjection {
             selected: logs.iter().map(|log| log.path.clone()).collect(),
+            earlier,
             totals,
             timeline,
             counts,
