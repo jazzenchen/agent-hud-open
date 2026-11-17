@@ -598,7 +598,7 @@ fn an_uncertain_antigravity_send_is_not_reported_as_refused() {
 }
 
 #[test]
-fn the_group_lists_its_four_tools_only_while_it_is_on() {
+fn the_group_lists_its_five_tools_only_while_it_is_on() {
     assert_eq!(Messaging::tools(false), json!({"tools":[]}));
     let names = Messaging::tools(true)["tools"]
         .as_array()
@@ -610,6 +610,7 @@ fn the_group_lists_its_four_tools_only_while_it_is_on() {
         names,
         [
             "list_sessions",
+            "list_models",
             "send_message",
             "start_session",
             "get_message"
@@ -2524,3 +2525,5 @@ fn list_sessions_says_a_running_codex_with_its_thread_open_can_be_steered() {
         .unwrap()
         .contains("a steer goes into it"));
 }
+
+mod models;

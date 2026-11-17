@@ -21,6 +21,8 @@ pub struct Host {
     pub process: u32,
     /// Whether it is the Desktop app's host, whose window shows the session.
     pub desktop: bool,
+    /// The plugin's channel version: 2 and later choose a model.
+    pub version: u64,
 }
 
 /// How a new session asked of a host stands, as the plugin wrote it.
@@ -63,6 +65,7 @@ impl DeepSeekChannel {
                 Some(Host {
                     process,
                     desktop: value["desktop"] == true,
+                    version: value["channelVersion"].as_u64().unwrap_or(0),
                 })
             })
             .collect::<Vec<_>>();
@@ -82,13 +85,15 @@ impl DeepSeekChannel {
     }
 
     /// Asks `host` for a new session in `folder` whose first message is
-    /// `text`, under the caller's identity `id`.
+    /// `text`, under the caller's identity `id`, in `model` when one is named
+    /// (`{"provider","model"}`).
     pub fn ask_start(
         &self,
         host: u32,
         id: &str,
         folder: &Path,
         text: &str,
+        model: Option<&Value>,
         now: SystemTime,
     ) -> Result<(), Refusal> {
         if !folder.is_absolute() {
@@ -99,10 +104,24 @@ impl DeepSeekChannel {
             return Err(Refusal::IdentityConflict);
         }
         let at = millis(now);
-        write_json(
-            &file,
-            &json!({"id":id,"cwd":folder,"text":text,"at":at,"expiresAt":at.saturating_add(START_LIFETIME.as_millis() as u64)}),
-        )
+        let mut start = json!({"id":id,"cwd":folder,"text":text,"at":at,"expiresAt":at.saturating_add(START_LIFETIME.as_millis() as u64)});
+        if let Some(model) = model {
+            start["model"] = model.clone();
+        }
+        write_json(&file, &start)
+    }
+
+    /// The models the hosts offer, as the first host that lists them wrote
+    /// at its check-in (the Desktop app's first): `{"default","groups"}`.
+    pub fn catalog(&self, now: SystemTime) -> Option<Value> {
+        self.hosts(now).into_iter().find_map(|host| {
+            let file = self
+                .directory
+                .join("hosts")
+                .join(format!("{}.json", host.process));
+            let value: Value = serde_json::from_slice(&fs::read(file).ok()?).ok()?;
+            value["models"].is_object().then(|| value["models"].clone())
+        })
     }
 
     /// How the session `id` asked of `host` stands; None when there is no

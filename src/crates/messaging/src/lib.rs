@@ -1,7 +1,7 @@
 //! Agent messages: an agent session asks Agent HUD, through its MCP server, to
 //! send words into another Claude Code, Codex, Antigravity or DeepSeek Harness
-//! session on this computer, or to start one, and later reads that session's
-//! answer. A tool group of its own, off until the user turns it on
+//! session on this computer, or to start one, in a model the user names or
+//! else the client's own, and later reads that session's answer. A tool group of its own, off until the user turns it on
 //! (`Preferences`). Delivery goes through `agent_hud_platform::delivery`, the
 //! same way as a message typed into a session from the HUD. A call runs at
 //! once on the caller's thread, so nothing is sent after its caller stopped
@@ -15,6 +15,7 @@ mod flights;
 mod get;
 mod journal;
 mod listing;
+mod models;
 mod outcome;
 mod preferences;
 mod send;
@@ -159,6 +160,7 @@ impl Messaging {
         let arguments = &params["arguments"];
         match params["name"].as_str().unwrap_or("") {
             "list_sessions" => Ok(self.list(caller.as_ref(), host)),
+            "list_models" => self.models(arguments),
             "send_message" => {
                 let Some(caller) = caller else {
                     return Ok(refused(&words::no_caller(language(host.snapshot))));

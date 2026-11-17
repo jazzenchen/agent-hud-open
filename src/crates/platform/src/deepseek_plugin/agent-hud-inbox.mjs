@@ -5,13 +5,14 @@
 //
 // In the folder the plugin shares with the app:
 // - prompts/<session>/<id>.json: words the app leaves for a session, which
-//   are queued as the session's next message;
+//   are queued as the session's next message, in the model they name, if any;
 // - hosts/<host>.json: this host checks in with its sessions, so the app
-//   knows a host is there to start a session in;
+//   knows a host is there to start a session in, and with the models Harness
+//   offers and the one new sessions start in;
 // - starts/<host>/<id>.json: a new session the app asks this host for, in a
-//   folder and with its first message. It is created in the folder's
-//   Workspace when Harness has one, and the file then says which session it
-//   is and how the message went.
+//   folder and with its first message, in the model it names, if any. It is
+//   created in the folder's Workspace when Harness has one, and the file then
+//   says which session it is and how the message went.
 
 /** The rounds that take words and starts, and the host's own check-in. */
 function inbox({ fs, path, service, read, write, remove, now, quietly, NAME, folder, host, version, desktop, roots }) {
@@ -24,6 +25,81 @@ function inbox({ fs, path, service, read, write, remove, now, quietly, NAME, fol
     process.argv.some((arg) => /dsh-desktop-host[\\/]lib[\\/]index\.js$/.test(String(arg)));
   const hostFile = folder("hosts", `${host}.json`);
 
+  // ---- Models: what Harness offers, and the one the app names ----
+  const CATALOG_MS = 600_000;
+  let catalog;
+  let catalogAt = -Infinity;
+  let catalogDefault;
+  let catalogPending = false;
+  const selection = (value) =>
+    typeof value?.provider === "string" && typeof value?.model === "string"
+      ? { provider: value.provider, model: value.model }
+      : undefined;
+  /** The model new sessions start in: the one the user last chose. */
+  const defaultModel = () => {
+    try {
+      return selection(service("agentDefaultModel")?.currentSelection?.()) ?? catalogDefault;
+    } catch {
+      return catalogDefault;
+    }
+  };
+  /** Asks Harness for its models now and then: each provider's list. */
+  const refreshCatalog = () => {
+    const controller = service("sessionController");
+    if (catalogPending || now() - catalogAt < CATALOG_MS || typeof controller?.modelCatalog !== "function")
+      return;
+    catalogPending = true;
+    Promise.resolve()
+      .then(() => controller.modelCatalog())
+      .then(
+        (found) => {
+          catalogDefault = selection(found?.default);
+          catalog = (Array.isArray(found?.groups) ? found.groups : []).map((group) => ({
+            id: String(group?.id ?? ""),
+            name: String(group?.name ?? ""),
+            models: (Array.isArray(group?.models) ? group.models : []).map((model) => ({
+              id: String(model?.id ?? ""),
+              name: String(model?.name ?? ""),
+            })),
+          }));
+          catalogAt = now();
+        },
+        () => {},
+      )
+      .finally(() => {
+        catalogPending = false;
+      });
+  };
+  const models = () => {
+    refreshCatalog();
+    return catalog === undefined ? undefined : { default: defaultModel(), groups: catalog };
+  };
+  /**
+   * Switches `sessionId` to `model` before the app's words go in. Harness
+   * also saves a session's choice as the model new sessions start in; the
+   * app names one for this session only, so the one before is put back.
+   */
+  const choose = async (sessionId, model) => {
+    if (model === undefined || model === null) return;
+    const chosen = selection(model);
+    if (chosen === undefined) throw new Error("Agent HUD named no model");
+    const controller = service("sessionController");
+    if (typeof controller?.selectModel !== "function")
+      throw new Error("This DeepSeek Harness cannot choose a session's model");
+    const defaults = service("agentDefaultModel");
+    let before;
+    try {
+      const current = defaults?.currentSelection?.();
+      // Whole, with its reasoning effort, as Harness saved it.
+      if (selection(current) !== undefined) before = { ...current };
+    } catch {}
+    await controller.selectModel({ sessionId, ...chosen });
+    if (before !== undefined && typeof defaults?.saveSelection === "function")
+      await Promise.resolve()
+        .then(() => defaults.saveSelection(before))
+        .catch(() => {});
+  };
+
   // ---- Words the app leaves for a session ----
   const submit = (sessionId, file, prompt) => {
     const controller = service("sessionController");
@@ -35,6 +111,7 @@ function inbox({ fs, path, service, read, write, remove, now, quietly, NAME, fol
       quietly(() => write(file, { takenAt, ...what }));
     const previous = queues.get(sessionId) ?? Promise.resolve();
     const next = previous
+      .then(() => choose(sessionId, prompt.model))
       .then(() =>
         controller.prompt(
           {
@@ -129,6 +206,7 @@ function inbox({ fs, path, service, read, write, remove, now, quietly, NAME, fol
       if (typeof sessionId !== "string" || !NAME.test(sessionId))
         return became({ refused: "DeepSeek Harness named no session" });
       became({ sessionId });
+      await choose(sessionId, request.model);
       const result = await controller.prompt(
         {
           requestId: String(request.id),
@@ -182,7 +260,15 @@ function inbox({ fs, path, service, read, write, remove, now, quietly, NAME, fol
   return {
     prompts,
     starts,
-    checkIn: () => write(hostFile, { at: now(), desktop: inDesktop, channelVersion: version }),
+    checkIn: () => {
+      const offered = models();
+      write(hostFile, {
+        at: now(),
+        desktop: inDesktop,
+        channelVersion: version,
+        ...(offered === undefined ? {} : { models: offered }),
+      });
+    },
     stop: () => remove(hostFile),
   };
 }

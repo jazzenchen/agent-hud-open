@@ -43,15 +43,37 @@ impl DeepSeekChannel {
     }
 
     /// Leaves `text` for `session` as its next message, under the caller's
-    /// identity `id`. The caller checks the session is loaded first.
+    /// identity `id`, switching the session to `model` first when one is
+    /// named (`{"provider","model"}`). The caller checks the session is
+    /// loaded first, and that its plugin takes a model
+    /// (`channel_version`).
     pub fn leave(
         &self,
         session: &str,
         id: &str,
         text: &str,
+        model: Option<&Value>,
         now: SystemTime,
     ) -> Result<(), Refusal> {
-        self.prompts.leave(session, id, text, false, now)
+        self.prompts
+            .leave_with(session, id, text, false, model, now)
+    }
+
+    /// The channel version of the plugin `session` last checked in from:
+    /// 2 and later choose a model for a message or a new session.
+    pub fn channel_version(&self, session: &str) -> u64 {
+        if !valid_name(session) {
+            return 0;
+        }
+        fs::read(
+            self.directory
+                .join("sessions")
+                .join(format!("{session}.json")),
+        )
+        .ok()
+        .and_then(|data| serde_json::from_slice::<Value>(&data).ok())
+        .and_then(|value| value["channelVersion"].as_u64())
+        .unwrap_or(0)
     }
 
     /// Leaves `text` for a loaded `session`; refused when it is empty or

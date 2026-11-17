@@ -7,6 +7,9 @@ use serde_json::{json, Value};
 use std::path::{Path, PathBuf};
 
 mod cascade_config;
+mod model_list;
+mod picker;
+pub(super) use model_list::models;
 // How a message reaches an existing cascade: straight to the language
 // server on macOS and Linux; to the service that opened the session on
 // Windows, where interrupting is not adapted.
@@ -75,7 +78,12 @@ impl AntigravityTransport for NativeAntigravityTransport {
                     ),
                     Operation::Interrupt => unreachable!(),
                 };
-                transport::send(cascade_id, &request.text, strategy)?;
+                transport::send(
+                    cascade_id,
+                    &request.text,
+                    strategy,
+                    request.model.as_deref(),
+                )?;
                 Ok(Receipt {
                     provider: Provider::Antigravity,
                     session_id: target.session_id.clone(),
@@ -128,6 +136,7 @@ pub fn start_cascade(folder: &Path, request: &StartRequest) -> Result<StartRecei
             &request.text,
             "MESSAGE_DELIVERY_STRATEGY_UNSPECIFIED",
             false,
+            request.model.as_deref(),
         ),
     );
     Ok(StartReceipt {
@@ -142,12 +151,18 @@ pub fn start_cascade(folder: &Path, request: &StartRequest) -> Result<StartRecei
     })
 }
 
-fn message_body(cascade_id: &str, text: &str, strategy: &str, existing: bool) -> Value {
+fn message_body(
+    cascade_id: &str,
+    text: &str,
+    strategy: &str,
+    existing: bool,
+    model: Option<&str>,
+) -> Value {
     message_body_with_config(
         cascade_id,
         text,
         strategy,
-        resolve_cascade_config(existing.then_some(cascade_id)),
+        resolve_cascade_config(existing.then_some(cascade_id), model),
     )
 }
 

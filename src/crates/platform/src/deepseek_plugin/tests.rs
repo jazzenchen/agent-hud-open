@@ -196,11 +196,22 @@ fn words_for_a_checked_in_session_wait_in_its_prompts_folder() {
         channel.state(SESSION, &id, now).unwrap(),
         Some((PromptState::Started, None))
     );
+    let flash = json!({"provider":"deepseek-official","model":"deepseek-flash"});
     channel
-        .leave(SESSION, "mine-1", "from a product", now)
+        .leave(SESSION, "mine-1", "from a product", Some(&flash), now)
         .unwrap();
+    let left: Value = serde_json::from_slice(
+        &fs::read(
+            channel
+                .directory()
+                .join(format!("prompts/{SESSION}/mine-1.json")),
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(left["model"], flash);
     assert_eq!(
-        channel.leave(SESSION, "mine-1", "again", now),
+        channel.leave(SESSION, "mine-1", "again", None, now),
         Err(Refusal::IdentityConflict)
     );
     channel.clear().unwrap();
@@ -486,7 +497,9 @@ fn host_check_in(channel: &DeepSeekChannel, process: u32, desktop: bool) {
     crate::os::private_directory(file.parent().unwrap()).unwrap();
     fs::write(
         file,
-        json!({"at": 1, "desktop": desktop, "channelVersion": 1}).to_string(),
+        json!({"at": 1, "desktop": desktop, "channelVersion": 2,
+            "models": {"default": {"provider": "deepseek-official", "model": "deepseek-flash"}, "groups": [], "from": process}})
+        .to_string(),
     )
     .unwrap();
 }
@@ -507,18 +520,23 @@ fn running_hosts_are_listed_with_the_desktop_apps_first() {
         vec![
             Host {
                 process: 300,
-                desktop: true
+                desktop: true,
+                version: 2,
             },
             Host {
                 process: 100,
-                desktop: false
+                desktop: false,
+                version: 2,
             },
             Host {
                 process: 200,
-                desktop: false
+                desktop: false,
+                version: 2,
             },
         ]
     );
+    // The Desktop app's host lists the models first.
+    assert_eq!(channel.catalog(now).unwrap()["from"], 300);
     // A host that stopped checking in is gone.
     assert!(channel
         .hosts(now + crate::claude_plugin::CHECK_IN_LIFETIME + Duration::from_secs(1))
@@ -533,16 +551,20 @@ fn a_session_asked_of_a_host_reports_how_it_went() {
     let folder = temp.path().join("project");
     assert_eq!(channel.started(7, "one", now).unwrap(), None);
     assert!(channel
-        .ask_start(7, "one", Path::new("project"), "hello", now)
+        .ask_start(7, "one", Path::new("project"), "hello", None, now)
         .is_err());
-    channel.ask_start(7, "one", &folder, "hello", now).unwrap();
+    let pro = json!({"provider":"deepseek-official","model":"deepseek-pro"});
+    channel
+        .ask_start(7, "one", &folder, "hello", Some(&pro), now)
+        .unwrap();
     assert_eq!(
-        channel.ask_start(7, "one", &folder, "again", now),
+        channel.ask_start(7, "one", &folder, "again", None, now),
         Err(Refusal::IdentityConflict)
     );
     let file = channel.directory().join("starts/7/one.json");
     let asked: Value = serde_json::from_slice(&fs::read(&file).unwrap()).unwrap();
     assert_eq!(asked["cwd"], json!(folder));
+    assert_eq!(asked["model"], pro);
     assert_eq!(asked["text"], "hello");
     let waiting = Started {
         session: None,

@@ -19,10 +19,15 @@ pub(super) fn interrupt(cascade_id: &str) -> Result<()> {
     Ok(())
 }
 
-pub(super) fn send(cascade_id: &str, text: &str, strategy: &str) -> Result<()> {
+pub(super) fn send(
+    cascade_id: &str,
+    text: &str,
+    strategy: &str,
+    model: Option<&str>,
+) -> Result<()> {
     call(
         "SendUserCascadeMessage",
-        message_body(cascade_id, text, strategy, true),
+        message_body(cascade_id, text, strategy, true, model),
     )?;
     Ok(())
 }

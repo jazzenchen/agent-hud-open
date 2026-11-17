@@ -67,6 +67,11 @@ impl Messaging {
         if steer && Provider::parse(client) != Some(Provider::Codex) {
             return Ok(refused(&words::steer_unsupported(language, client)));
         }
+        // A model only when named, and only where a message can switch it.
+        let model = match self.named_model(client, arguments, true, language) {
+            Ok(model) => model,
+            Err(reason) => return Ok(refused(&reason)),
+        };
         let sender = party(host.snapshot, &caller.client, &caller.session_id);
         let recipient = party(host.snapshot, client, to);
         // One that cannot take it now is refused before anything is queued.
@@ -121,6 +126,7 @@ impl Messaging {
                 Operation::Enqueue
             },
             expected_turn_id: None,
+            model,
         });
         if let Ok(receipt) = &receipt {
             self.clients.delivered(receipt, &caller.surface(), now);

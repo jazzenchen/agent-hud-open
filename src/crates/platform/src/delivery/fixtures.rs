@@ -184,6 +184,7 @@ impl StartFixture {
             text: "Look at the failing test".into(),
             folder: "~/project".into(),
             title: None,
+            model: None,
         }
     }
     pub fn saved_receipt(&self) -> StartReceipt {

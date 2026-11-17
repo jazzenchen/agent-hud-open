@@ -1,6 +1,8 @@
 {
   "+{{count}} resets_one": "+{{count, number}} reset",
   "+{{count}} resets_other": "+{{count, number}} resets",
+  "A message to a {{client}} session cannot choose its model; the session goes on in its own. Leave model out, or start a new session in that model with start_session.": "A message to a {{client}} session cannot choose its model; the session goes on in its own. Leave model out, or start a new session in that model with start_session.",
+  "Agent HUD could not read the models {{client}} offers: {{reason}}": "Agent HUD could not read the models {{client}} offers: {{reason}}",
   "Back [step]": "Back",
   "Dismiss [acknowledge]": "Dismiss",
   "Expiry unavailable for {{count}} resets_one": "Expiry unavailable for {{count, number}} reset",
@@ -30,6 +32,8 @@
   "Today · {{count}} sessions_other": "Today · {{count, number}} sessions",
   "{{calls}} by {{count}} sub-agents_one": "{{calls}} by a sub-agent",
   "{{calls}} by {{count}} sub-agents_other": "{{calls}} by {{count, number}} sub-agents",
+  "{{client}} offers no model named {{model}}; list_models lists the ones it does.": "{{client}} offers no model named {{model}}; list_models lists the ones it does.",
+  "{{client}}'s desktop app runs a new session's first message in the model chosen in the app, so a start here cannot name one. Leave model out.": "{{client}}'s desktop app runs a new session's first message in the model chosen in the app, so a start here cannot name one. Leave model out.",
   "{{count}} calls loaded_one": "{{count, number}} call loaded",
   "{{count}} calls loaded_other": "{{count, number}} calls loaded",
   "{{count}} calls_one": "{{count, number}} call",

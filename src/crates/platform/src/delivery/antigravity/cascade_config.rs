@@ -1,18 +1,57 @@
-//! The model configuration a message carries into a cascade: the latest one
-//! the cascade's own turns used, else the user's default model from the
-//! language server's status.
+//! The model configuration a message carries into a cascade: the cascade's
+//! own configuration from its latest turn, with the model named for this
+//! message, else the one Antigravity's picker last chose (what the user
+//! would send in now), else the one that turn used. A cascade with no turn
+//! yet takes the user's default model from the language server's status.
 use super::*;
 
-pub(super) fn resolve_cascade_config(cascade_id: Option<&str>) -> Option<Value> {
-    if let Some(id) = cascade_id {
-        if let Ok(trajectory) = call("GetCascadeTrajectory", json!({ "cascadeId": id })) {
-            if let Some(config) = trajectory_cascade_config(&trajectory) {
-                return Some(config);
-            }
-        }
+pub(super) fn resolve_cascade_config(
+    cascade_id: Option<&str>,
+    model: Option<&str>,
+) -> Option<Value> {
+    let trajectory =
+        cascade_id.and_then(|id| call("GetCascadeTrajectory", json!({ "cascadeId": id })).ok());
+    choose(
+        trajectory.as_ref(),
+        model.map(str::to_owned).or_else(picker::picked),
+        || call("GetUserStatus", json!({ "metadata": metadata() })).ok(),
+    )
+}
+
+/// The configuration a message carries: the cascade's own (`trajectory`)
+/// in the model `chosen`; without one chosen, the cascade's own model, else
+/// the default in the user's `status`.
+pub(super) fn choose(
+    trajectory: Option<&Value>,
+    chosen: Option<String>,
+    status: impl FnOnce() -> Option<Value>,
+) -> Option<Value> {
+    let own = trajectory.and_then(trajectory_cascade_config);
+    match chosen {
+        Some(model) => Some(with_model(own, &model)),
+        None => own.or_else(|| default_cascade_config_from_status(&status()?)),
     }
-    let status = call("GetUserStatus", json!({ "metadata": metadata() })).ok()?;
-    default_cascade_config_from_status(&status)
+}
+
+fn with_model(config: Option<Value>, model: &str) -> Value {
+    let mut config = config.filter(Value::is_object).unwrap_or_else(|| json!({}));
+    if !config["plannerConfig"].is_object() {
+        config["plannerConfig"] = json!({});
+    }
+    let planner = &mut config["plannerConfig"];
+    if planner.get("planModel").is_some() {
+        planner["planModel"] = json!(model);
+    }
+    planner["requestedModel"] = json!({ "model": model });
+    config
+}
+
+pub(super) fn model_data(body: &Value) -> &Value {
+    if body["userStatus"]["cascadeModelConfigData"].is_object() {
+        &body["userStatus"]["cascadeModelConfigData"]
+    } else {
+        &body["cascadeModelConfigData"]
+    }
 }
 
 pub(super) fn trajectory_cascade_config(body: &Value) -> Option<Value> {
@@ -30,12 +69,7 @@ pub(super) fn trajectory_cascade_config(body: &Value) -> Option<Value> {
 }
 
 pub(super) fn default_cascade_config_from_status(body: &Value) -> Option<Value> {
-    let data = if body["userStatus"]["cascadeModelConfigData"].is_object() {
-        &body["userStatus"]["cascadeModelConfigData"]
-    } else {
-        &body["cascadeModelConfigData"]
-    };
-    let model_or_alias = default_model_or_alias(data)?;
+    let model_or_alias = default_model_or_alias(model_data(body))?;
     Some(json!({
         "plannerConfig": {
             "requestedModel": model_or_alias,
@@ -43,7 +77,7 @@ pub(super) fn default_cascade_config_from_status(body: &Value) -> Option<Value> 
     }))
 }
 
-fn default_model_or_alias(data: &Value) -> Option<Value> {
+pub(super) fn default_model_or_alias(data: &Value) -> Option<Value> {
     let configs = data["clientModelConfigs"].as_array();
     let candidate = &data["defaultOverrideModelConfig"]["modelOrAlias"];
     if valid_model_or_alias(candidate)
@@ -97,12 +131,12 @@ fn has_valid_planner_model(planner: &Value) -> bool {
         || valid_model_or_alias(&planner["requestedModel"])
 }
 
-fn valid_model_or_alias(value: &Value) -> bool {
+pub(super) fn valid_model_or_alias(value: &Value) -> bool {
     value["model"].as_str().is_some_and(valid_enum_value)
         || value["alias"].as_str().is_some_and(valid_enum_value)
 }
 
-fn valid_enum_value(value: &str) -> bool {
+pub(super) fn valid_enum_value(value: &str) -> bool {
     let trimmed = value.trim();
     !trimmed.is_empty() && !trimmed.ends_with("_UNSPECIFIED")
 }
@@ -110,6 +144,48 @@ fn valid_enum_value(value: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_chosen_model_replaces_the_cascades_own_and_keeps_the_rest() {
+        let trajectory = json!({"trajectory":{"steps":[{"userInput":{"userConfig":{
+            "plannerConfig":{"planModel":"MODEL_PLACEHOLDER_M418","tools":[{"name":"read_file"}]}
+        }}}]}});
+        let status = || -> Option<Value> { panic!("the status is read only without a model") };
+        let config = choose(
+            Some(&trajectory),
+            Some("MODEL_PLACEHOLDER_M319".into()),
+            status,
+        )
+        .unwrap();
+        assert_eq!(
+            config["plannerConfig"]["planModel"],
+            "MODEL_PLACEHOLDER_M319"
+        );
+        assert_eq!(
+            config["plannerConfig"]["requestedModel"]["model"],
+            "MODEL_PLACEHOLDER_M319"
+        );
+        assert_eq!(config["plannerConfig"]["tools"][0]["name"], "read_file");
+        // A cascade with no turn yet gets only the model.
+        assert_eq!(
+            choose(None, Some("MODEL_PLACEHOLDER_M319".into()), status).unwrap(),
+            json!({"plannerConfig":{"requestedModel":{"model":"MODEL_PLACEHOLDER_M319"}}})
+        );
+        // Without a choice: the cascade's own, else the status's default.
+        assert_eq!(
+            choose(Some(&trajectory), None, status).unwrap()["plannerConfig"]["planModel"],
+            "MODEL_PLACEHOLDER_M418"
+        );
+        let defaulted = choose(None, None, || {
+            Some(
+                json!({"cascadeModelConfigData":{"defaultOverrideModelConfig":{"modelOrAlias":{"model":"MODEL_PLACEHOLDER_M437"}}}}),
+            )
+        });
+        assert_eq!(
+            defaulted.unwrap()["plannerConfig"]["requestedModel"]["model"],
+            "MODEL_PLACEHOLDER_M437"
+        );
+    }
 
     #[test]
     fn reuses_latest_valid_model_config_from_trajectory() {

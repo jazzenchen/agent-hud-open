@@ -50,6 +50,7 @@ function harness() {
     },
     get(key) {
       if (key === "sessionController") return ctx.controller;
+      if (key === "agentDefaultModel") return ctx.defaults;
       return key === "workspaceRegistry" ? ctx.workspaces : undefined;
     },
     agents: {
@@ -117,7 +118,7 @@ test("open sessions check in, subagents do not, and ended sessions say so", (t) 
   assert.deepEqual(files("sessions"), [`${session}.json`]);
   const checkIn = json("sessions", `${session}.json`);
   assert.equal(checkIn.host, 4242);
-  assert.equal(checkIn.channelVersion, 1);
+  assert.equal(checkIn.channelVersion, 2);
   assert.equal(typeof checkIn.at, "number");
   h.agents.delete(session);
   plugin.tick();
@@ -162,6 +163,64 @@ test("words left for a session are queued through the session controller", async
   assert.equal(typeof json("prompts", session, `${id}.json`).takenAt, "number");
   plugin.tick();
   assert.equal(sent.length, 2, "a taken prompt is never submitted again");
+});
+
+test("a named model switches the session first and keeps Harness's default; the host lists the models", async (t) => {
+  const { h, plugin, channel, json } = setup(t);
+  h.agents.set(session, { id: session });
+  const calls = [];
+  let current = { provider: "deepseek-official", model: "deepseek-flash", reasoningEffort: "high" };
+  h.ctx.defaults = {
+    currentSelection: () => current,
+    saveSelection: async (selection) => {
+      calls.push(["default", selection.model]);
+      current = selection;
+    },
+  };
+  h.ctx.controller = {
+    modelCatalog: async () => ({
+      default: current,
+      groups: [{ id: "deepseek-official", name: "DeepSeek", models: [{ id: "deepseek-flash", name: "Flash", reasoning: {} }, { id: "deepseek-pro", name: "Pro" }] }],
+    }),
+    // Harness saves a session's choice as the default for new sessions too.
+    selectModel: async (request) => {
+      calls.push(["select", request.sessionId, request.model]);
+      current = { provider: request.provider, model: request.model };
+      return { selected: current };
+    },
+    create: async () => ({ sessionId: "session-00000009-2222-4333-8444-555555555555" }),
+    prompt: async (input) => {
+      calls.push(["prompt", input.sessionId]);
+      return { accepted: true };
+    },
+  };
+  const pro = { provider: "deepseek-official", model: "deepseek-pro" };
+  const dir = path.join(channel, "prompts", session);
+  fs.mkdirSync(dir, { recursive: true });
+  const id = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee";
+  fs.writeFileSync(path.join(dir, `${id}.json`), JSON.stringify({ id, text: "in pro", at: 1, expiresAt: Date.now() + 60_000, model: pro }));
+  plugin.tick();
+  await until(() => json("prompts", session, `${id}.json`).startedAt);
+  assert.deepEqual(calls.splice(0), [["select", session, "deepseek-pro"], ["default", "deepseek-flash"], ["prompt", session]]);
+  assert.deepEqual(current, { provider: "deepseek-official", model: "deepseek-flash", reasoningEffort: "high" });
+
+  const starts = path.join(channel, "starts", "4242");
+  fs.mkdirSync(starts, { recursive: true });
+  fs.writeFileSync(path.join(starts, `${id}.json`), JSON.stringify({ id, cwd: "/work", text: "hi", at: 1, expiresAt: Date.now() + 60_000, model: pro }));
+  plugin.tick();
+  await until(() => json("starts", "4242", `${id}.json`).startedAt);
+  const made = "session-00000009-2222-4333-8444-555555555555";
+  assert.deepEqual(calls.splice(0), [["select", made, "deepseek-pro"], ["default", "deepseek-flash"], ["prompt", made]]);
+
+  const listed = await until(() => {
+    plugin.tick();
+    return json("hosts", "4242.json").models;
+  });
+  assert.equal(json("hosts", "4242.json").channelVersion, 2);
+  assert.deepEqual(listed, {
+    default: { provider: "deepseek-official", model: "deepseek-flash" },
+    groups: [{ id: "deepseek-official", name: "DeepSeek", models: [{ id: "deepseek-flash", name: "Flash" }, { id: "deepseek-pro", name: "Pro" }] }],
+  });
 });
 
 test("the host checks in, and says it is gone when it stops", (t) => {

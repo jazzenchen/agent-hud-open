@@ -69,6 +69,7 @@ fn request(provider: Provider) -> SendRequest {
         form: PromptForm::Labelled,
         operation: Operation::Automatic,
         expected_turn_id: None,
+        model: None,
     }
 }
 
@@ -417,6 +418,7 @@ fn harness_request() -> SendRequest {
         form: PromptForm::Labelled,
         operation: Operation::Enqueue,
         expected_turn_id: None,
+        model: None,
     }
 }
 #[test]

@@ -14,11 +14,14 @@ use super::claude::delivery;
 use super::*;
 use crate::claude_plugin::Refusal;
 use crate::deepseek_plugin::{DeepSeekChannel as Plugin, Started, START_LIFETIME};
+use catalog::{listed, selection};
 use std::{
     collections::HashSet,
     path::{Path, PathBuf},
     time::{Instant, SystemTime},
 };
+
+mod catalog;
 
 pub(super) const UNAVAILABLE_REASON: &str =
     "DeepSeek Harness plugin check-in is missing or expired";
@@ -70,7 +73,12 @@ impl DeepSeekChannel {
         if !self.runs(&request.session_id, now) {
             return Err(Failure::Unavailable(UNAVAILABLE_REASON.into()));
         }
-        Ok(())
+        if request.model.is_some()
+            && self.0.channel_version(bare(&request.session_id)) < MODEL_VERSION
+        {
+            return Err(Failure::Unsupported(OLD_PLUGIN.into()));
+        }
+        selection(request.model.as_deref()).map(|_| ())
     }
     pub(super) fn leave(&self, request: &SendRequest, now: SystemTime) -> Result<DeliveryState> {
         self.0
@@ -78,10 +86,29 @@ impl DeepSeekChannel {
                 bare(&request.session_id),
                 &request.request_id,
                 &request.text,
+                selection(request.model.as_deref())?.as_ref(),
                 now,
             )
             .map_err(failure)?;
         Ok(DeliveryState::Waiting)
+    }
+    /// The models Harness offers, as its plugin last listed them at a
+    /// check-in; its own choice is the model new sessions start in.
+    pub(super) fn models(&self, now: SystemTime) -> Result<models::Models> {
+        let catalog = self.0.catalog(now).ok_or_else(|| {
+            let hosts = self.0.hosts(now);
+            Failure::Unavailable(
+                if hosts.is_empty() {
+                    "No DeepSeek Harness is running with Agent HUD's plugin"
+                } else if hosts.iter().all(|host| host.version < MODEL_VERSION) {
+                    OLD_PLUGIN
+                } else {
+                    "DeepSeek Harness has not listed its models yet; ask again in a few seconds"
+                }
+                .into(),
+            )
+        })?;
+        Ok(listed(&catalog))
     }
     pub(super) fn state(
         &self,
@@ -148,12 +175,16 @@ impl DeepSeekChannel {
                 "DeepSeek Harness opened, but Agent HUD's plugin did not check in".into(),
             )
         })?;
+        if request.model.is_some() && host.version < MODEL_VERSION {
+            return Err(Failure::Unsupported(OLD_PLUGIN.into()));
+        }
         self.0
             .ask_start(
                 host.process,
                 &request.request_id,
                 folder,
                 &request.text,
+                selection(request.model.as_deref())?.as_ref(),
                 SystemTime::now(),
             )
             .map_err(failure)?;
@@ -224,6 +255,10 @@ impl DeepSeekChannel {
         }
     }
 }
+
+/// The plugin's channel version that chooses a model.
+const MODEL_VERSION: u64 = 2;
+const OLD_PLUGIN: &str = "DeepSeek Harness runs an older Agent HUD plugin that cannot choose a model; restart DeepSeek Harness to load the new one";
 
 fn failure(refusal: Refusal) -> Failure {
     match refusal {

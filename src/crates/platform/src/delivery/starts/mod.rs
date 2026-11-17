@@ -69,6 +69,10 @@ pub struct StartRequest {
     /// The new Codex thread's name; its first line of text when not given.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,
+    /// The model the new session runs, as `list_models` names it; none
+    /// leaves it to the client's own choice.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

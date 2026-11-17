@@ -349,6 +349,7 @@ mod tests {
                 form: PromptForm::Own,
                 operation: Operation::Enqueue,
                 expected_turn_id: None,
+                model: None,
             })
             .unwrap();
         assert_eq!(cursor_send.state, DeliveryState::Waiting);
@@ -401,6 +402,7 @@ mod tests {
                     form: PromptForm::Own,
                     operation: Operation::Enqueue,
                     expected_turn_id: None,
+                    model: None,
                 })
                 .unwrap();
             let args = [
@@ -470,6 +472,7 @@ mod tests {
                         form: PromptForm::Own,
                         operation: Operation::Enqueue,
                         expected_turn_id: None,
+                        model: None,
                     })
                     .unwrap();
             }

@@ -24,6 +24,10 @@ impl Messaging {
         if let Some(reason) = check_text(text, language) {
             return Ok(refused(&reason));
         }
+        let model = match self.named_model(client, arguments, false, language) {
+            Ok(model) => model,
+            Err(reason) => return Ok(refused(&reason)),
+        };
         let provider = provider(client);
         let offers = self.starts.offers_for(&all_sessions(host.snapshot));
         let Some(offer) = offers.iter().find(|offer| offer.provider == provider) else {
@@ -75,6 +79,7 @@ impl Messaging {
                 text: delivered.clone(),
                 folder,
                 title: Some(text.to_owned()),
+                model,
             },
             &offers,
         );

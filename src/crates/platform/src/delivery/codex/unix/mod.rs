@@ -12,6 +12,9 @@ mod tui;
 
 /// Agent HUD sends to Codex on this host.
 pub(crate) const SUPPORTED: bool = true;
+/// A new thread can start in a named model: the shared CLI daemon runs its
+/// first turn in it (`start_in_daemon`), when no desktop app takes it.
+pub(crate) const MODEL_AT_START: bool = true;
 /// What a send may ask for: start, steer and interrupt through the desktop
 /// app or the CLI daemon, and Codex's queue.
 pub(crate) const OPERATIONS: &[Operation] = &[
@@ -125,11 +128,7 @@ fn create_cli(
         &data.join("app-server-control/app-server-control.sock"),
         timeout,
     )?;
-    let value = connection.request(
-        "thread/start",
-        json!({"cwd":folder,"ephemeral":false}),
-        true,
-    )?;
+    let value = connection.request("thread/start", super::thread_start(folder, request), true)?;
     let thread = value["thread"]["id"]
         .as_str()
         .filter(|id| valid_uuid(id))
@@ -140,7 +139,11 @@ fn create_cli(
         .filter(|id| valid_uuid(id))
         .ok_or(Failure::AcceptanceUncertain)?
         .to_string();
-    let first=connection.request("turn/start",json!({"threadId":thread,"clientUserMessageId":message_id,"input":[{"type":"text","text":request.text,"text_elements":[]}]}),true);
+    let mut turn = json!({"threadId":thread,"clientUserMessageId":message_id,"input":[{"type":"text","text":request.text,"text_elements":[]}]});
+    if let Some(model) = &request.model {
+        turn["model"] = json!(model);
+    }
+    let first = connection.request("turn/start", turn, true);
     // Creating again would duplicate the session even when its first turn failed.
     let reason = match first {
         Ok(value)

@@ -61,6 +61,7 @@ fn send(clients: &LocalClients, session: &str, request: &str, text: &str) {
             form: PromptForm::Own,
             operation: Operation::Enqueue,
             expected_turn_id: None,
+            model: None,
         })
         .unwrap();
     assert_eq!(receipt.state, DeliveryState::Waiting);

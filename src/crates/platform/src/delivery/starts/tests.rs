@@ -219,6 +219,7 @@ fn without_project(request_id: &str) -> StartRequest {
         text: "Plan a trip".into(),
         folder: String::new(),
         title: None,
+        model: None,
     }
 }
 

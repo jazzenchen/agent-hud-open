@@ -11,6 +11,7 @@ mod files;
 pub mod fixtures;
 mod handoffs;
 mod journal;
+pub mod models;
 pub mod process;
 mod provider;
 mod sending;
@@ -166,6 +167,11 @@ pub struct SendRequest {
     #[serde(default)]
     pub operation: Operation,
     pub expected_turn_id: Option<String>,
+    /// The model the session runs from these words on, as `list_models`
+    /// names it; none keeps the client's own choice. Only clients that take
+    /// one with a message do (`models::per_message`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

@@ -135,3 +135,28 @@ pub(super) fn delivery(state: PromptState) -> DeliveryState {
         PromptState::Expired => DeliveryState::Expired,
     }
 }
+
+/// Claude Code's models: it has no list to ask, so the short names it
+/// resolves itself (any full model name is taken too). Its own choice is
+/// the `model` in its user settings; none leaves it to the account.
+pub(super) fn models(claude_config: &std::path::Path) -> models::Models {
+    let settings = std::fs::read(claude_config.join("settings.json"))
+        .ok()
+        .and_then(|bytes| serde_json::from_slice::<serde_json::Value>(&bytes).ok())
+        .unwrap_or_default();
+    let alias = |id: &str, name: &str| models::Model {
+        id: id.into(),
+        name: name.into(),
+        quota: None,
+    };
+    models::Models {
+        provider: Provider::Claude,
+        default: models::text(&settings["model"]),
+        models: vec![
+            alias("opus", "Opus"),
+            alias("sonnet", "Sonnet"),
+            alias("haiku", "Haiku"),
+        ],
+        aliases: true,
+    }
+}

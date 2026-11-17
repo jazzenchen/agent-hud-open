@@ -31,6 +31,7 @@ impl Messaging {
                     "title": session["title"],
                     "project": session["cwd"].as_str().or(session["project"].as_str()),
                     "state": state(session),
+                    "model": session["model"].as_str().filter(|model| !model.is_empty()),
                     "reachable": reachable,
                     "reason": reason,
                     "steerable": steerable,
