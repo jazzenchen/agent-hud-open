@@ -112,7 +112,10 @@ fn cached(
     now: i64,
     email: Option<&str>,
 ) -> Result<Reading, String> {
-    let value = bot::value_through(host, directory, &bot::quota_key(slot), 2)
+    // Grok Bot 1.1.0 writes schema v3 (it adds prepaid-balance fields); older
+    // Bot versions wrote v2. Accept either so a fresh cache is not discarded.
+    let value = bot::value_through(host, directory, &bot::quota_key(slot), 3)
+        .or_else(|| bot::value_through(host, directory, &bot::quota_key(slot), 2))
         .ok_or_else(|| tr!("Grok Bot cached quota is unavailable; refresh in Bot"))?;
     if value["kind"] != "present" || !value["selectedTeamId"].is_null() {
         return Err(no_personal_quota());
@@ -212,6 +215,14 @@ mod tests {
             .file(&quota_file, &quota)
     }
 
+    fn host_with_schema(quota: Value, schema: u64) -> FakeHost {
+        let (account_file, account) = entry(bot::ACCOUNT_KEY, 1, json!("slot-1"));
+        let (quota_file, quota) = entry(&bot::quota_key("slot-1"), schema, quota);
+        FakeHost::new("/u")
+            .file(&account_file, &account)
+            .file(&quota_file, &quota)
+    }
+
     fn fresh_quota(trial: bool) -> Value {
         let now = chrono::Utc::now().timestamp_millis();
         json!({
@@ -248,6 +259,13 @@ mod tests {
         assert_eq!(reading.quotas[1]["usedPercent"], 95.0);
         assert_eq!(reading.quotas[1]["status"], "critical");
         assert_eq!(reading.account.unwrap()["plan"], "SuperGrok");
+    }
+
+    #[test]
+    fn quota_from_schema_v3_cache_is_read() {
+        let reading = read(&host_with_schema(fresh_quota(false), 3)).unwrap();
+        assert_eq!(reading.quotas[0]["usedPercent"], 42.0);
+        assert_eq!(reading.quotas[0]["windowDurationSeconds"], 604800);
     }
 
     #[test]
