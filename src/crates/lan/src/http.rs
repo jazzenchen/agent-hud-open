@@ -14,9 +14,13 @@ pub enum Parse {
     Invalid,
     Request(Request),
 }
+/// The most a request may hold, headers and body: a phone's message of up to a megabyte, the words of a long recording
+/// sent to start a session (a quarter hour of talk is some 12 KB; 64 KB refused an hour of it).
+pub const MAX_REQUEST: usize = 1024 * 1024 + 16 * 1024;
+
 impl Request {
     pub fn parse(bytes: &[u8]) -> Parse {
-        if bytes.len() > 65536 {
+        if bytes.len() > MAX_REQUEST {
             return Parse::Invalid;
         }
         let Some(boundary) = bytes.windows(4).position(|s| s == b"\r\n\r\n") else {
@@ -74,7 +78,7 @@ impl Request {
             .map(|v: &String| v.parse::<usize>())
         {
             None => 0,
-            Some(Ok(size)) if size <= 8192 => size,
+            Some(Ok(size)) if size <= 1024 * 1024 => size,
             _ => return Parse::Invalid,
         };
         let body = &bytes[boundary + 4..];
