@@ -12,4 +12,4 @@ Pick an element or an area of a page and send it to an agent session through Age
 2. In Chrome, open `chrome://extensions`, turn on Developer mode, press **Load unpacked** and choose this folder.
 3. Press the toolbar button on any page.
 
-The `key` in `manifest.json` fixes the extension's id (`iihocfnohlhbepcckimekpoioandkpkl`), which the host's note allows. Windows is not served yet: Chrome reads the note's path from the registry there.
+The `key` in `manifest.json` fixes the id of the copy loaded from this folder (`iihocfnohlhbepcckimekpoioandkpkl`); the Chrome Web Store's copy has its own (`eaihfcfnoaafgcggajlbegjnfjinkckk`, `STORE_ID` in `src/crates/host/src/inspect/hosts.rs`). The host's note allows both. Windows is not served yet: Chrome reads the note's path from the registry there.

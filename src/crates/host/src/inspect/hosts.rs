@@ -21,9 +21,9 @@ pub(crate) const NAME: &str = "app.agenthud.inspect";
 /// The extension's id when loaded from its folder, fixed by the public key
 /// in its manifest.
 const EXTENSION_ID: &str = "iihocfnohlhbepcckimekpoioandkpkl";
-/// Its id in the Chrome Web Store, which the store gives it on the first
-/// upload; none until then.
-const STORE_ID: Option<&str> = None;
+/// Its id in the Chrome Web Store, which the store gave it on the first
+/// upload (2026-11-18).
+const STORE_ID: Option<&str> = Some("eaihfcfnoaafgcggajlbegjnfjinkckk");
 
 /// The extension's page in the Chrome Web Store, once it is there.
 pub(crate) fn store_url() -> Option<String> {
