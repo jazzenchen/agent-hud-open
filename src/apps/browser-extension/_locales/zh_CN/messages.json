@@ -1,0 +1,28 @@
+{
+  "name": {
+    "message": "Agent HUD"
+  },
+  "description": {
+    "message": "在网页上选取元素或框出区域，通过 Agent HUD 发给 agent 会话。"
+  },
+  "action": {
+    "message": "为 Agent HUD 选取元素或区域"
+  },
+  "hint": {
+    "message": "点按元素，或拖出一块区域 · Esc 取消"
+  },
+  "sent": {
+    "message": "已放进 Agent HUD 的草稿"
+  },
+  "notRunning": {
+    "message": "Agent HUD 没有运行，或这个浏览器还连不上它。装好扩展后请打开一次 Agent HUD。"
+  },
+  "failed": {
+    "message": "没有发出：$REASON$",
+    "placeholders": {
+      "reason": {
+        "content": "$1"
+      }
+    }
+  }
+}

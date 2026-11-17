@@ -1440,5 +1440,14 @@
   "Clear": "清除",
   "What about this spot": "這裡怎麼了",
   "The picture could not be read.": "無法讀取這張圖片。",
-  "The numbers marked on the picture:": "圖片上標註的編號："
+  "The numbers marked on the picture:": "圖片上標註的編號：",
+  "An area of {{page}}:": "{{page}} 的一塊區域：",
+  "An element on {{page}}:": "{{page}} 上的一個元素：",
+  "Area of {{host}}": "{{host}} 的區域",
+  "Element on {{host}}": "{{host}} 上的元素",
+  "Its HTML:": "它的 HTML：",
+  "Its words:": "它的文字：",
+  "Its styles:": "它的樣式：",
+  "Picture:": "圖片：",
+  "Selector:": "選擇器："
 }

@@ -30,6 +30,8 @@ pub(crate) enum ClipKind {
     Text,
     Image,
     Files,
+    /// Not a clipboard kind: what the browser extension picked on a page.
+    Page,
 }
 
 /// The app in front when a copy was seen.

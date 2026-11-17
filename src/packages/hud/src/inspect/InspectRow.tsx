@@ -25,6 +25,11 @@ const fileName = (path: string) =>
   path.split(/[\\/]/).filter(Boolean).pop() ?? path;
 
 function source(row: ClipRow, t: Translate) {
+  const page = row.content?.kind === "page" ? row.content : null;
+  if (page)
+    return page.area
+      ? t("Area of {{host}}", { host: page.host })
+      : t("Element on {{host}}", { host: page.host });
   const what =
     row.kind === "image"
       ? t("Picture")
@@ -50,43 +55,73 @@ function Preview({
   const ground = useGround(light);
   const quiet = { fontSize: 11, color: alertInk(0.5, ground) };
   if (!content) return <span style={quiet}>{t("Reading…")}</span>;
+  const picture = (thumbnail: string) => (
+    <span style={cardColumn(4)}>
+      <button
+        type="button"
+        onClick={mark}
+        title={t("Mark up the picture")}
+        aria-label={t("Mark up the picture")}
+        style={{
+          justifySelf: "start",
+          padding: 0,
+          border: 0,
+          background: "transparent",
+          cursor: "zoom-in",
+        }}
+      >
+        <img
+          src={thumbnail}
+          alt=""
+          style={{
+            display: "block",
+            maxWidth: 180,
+            maxHeight: 90,
+            borderRadius: 6,
+            boxShadow: `0 0 0 1px ${alertInk(0.12, ground)}`,
+          }}
+        />
+      </button>
+      {marks?.map((text, index) => (
+        <span key={index} style={{ ...quiet, overflowWrap: "anywhere" }}>
+          {index + 1}. {text}
+        </span>
+      ))}
+    </span>
+  );
   if (content.kind === "image") {
     return content.thumbnail ? (
-      <span style={cardColumn(4)}>
-        <button
-          type="button"
-          onClick={mark}
-          title={t("Mark up the picture")}
-          aria-label={t("Mark up the picture")}
-          style={{
-            justifySelf: "start",
-            padding: 0,
-            border: 0,
-            background: "transparent",
-            cursor: "zoom-in",
-          }}
-        >
-          <img
-            src={content.thumbnail}
-            alt=""
-            style={{
-              display: "block",
-              maxWidth: 180,
-              maxHeight: 90,
-              borderRadius: 6,
-              boxShadow: `0 0 0 1px ${alertInk(0.12, ground)}`,
-            }}
-          />
-        </button>
-        {marks?.map((text, index) => (
-          <span key={index} style={{ ...quiet, overflowWrap: "anywhere" }}>
-            {index + 1}. {text}
-          </span>
-        ))}
-      </span>
+      picture(content.thumbnail)
     ) : (
       <span style={quiet}>
         {content.width} × {content.height}
+      </span>
+    );
+  }
+  if (content.kind === "page") {
+    const line = {
+      overflow: "hidden",
+      textOverflow: "ellipsis",
+      whiteSpace: "nowrap",
+    } as const;
+    return (
+      <span style={cardColumn(4)}>
+        <span style={{ ...line, fontSize: 11.5, fontWeight: 500 }}>
+          {content.title}
+        </span>
+        {content.selector && (
+          <code
+            style={{
+              ...line,
+              fontSize: 10.5,
+              fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+              color: alertInk(0.6, ground),
+            }}
+          >
+            {content.selector}
+          </code>
+        )}
+        {content.thumbnail && picture(content.thumbnail)}
       </span>
     );
   }

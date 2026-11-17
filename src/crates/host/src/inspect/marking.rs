@@ -2,7 +2,7 @@
 //! window of its own to draw boxes and lines on it and pin numbered comments.
 //! What it sends back is the picture with the marks drawn in, and the
 //! comments' words, which take the picture's place in the draft.
-use super::{content::Content, thumbnail, Inspect};
+use super::{content::Picture, thumbnail, Inspect};
 use base64::Engine;
 use serde_json::{json, Value};
 use tauri::Manager;
@@ -78,9 +78,9 @@ pub(super) fn save(app: &tauri::AppHandle, params: &Value) -> Result<Value, Stri
         })
         .unwrap_or_default();
     let name = format!("{id}-{}", &uuid::Uuid::new_v4().simple().to_string()[..6]);
-    let content =
-        Content::image(png, &inspect.pictures, &name).ok_or("The marked picture is unreadable")?;
-    let marked = inspect.change(app, |draft| draft.marked(id, content, marks));
+    let picture =
+        Picture::save(png, &inspect.pictures, &name).ok_or("The marked picture is unreadable")?;
+    let marked = inspect.change(app, |draft| draft.marked(id, picture, marks));
     if !marked {
         return Err("No such picture".into());
     }

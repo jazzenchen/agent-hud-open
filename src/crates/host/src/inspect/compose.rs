@@ -21,12 +21,13 @@ pub(crate) fn message(items: &[Item], note: &str) -> String {
         }
         block.push_str(&label(&item.content, item.app.as_deref()));
         match &item.content {
+            Content::Page(page) => block.push_str(&page.message(&item.marks)),
             Content::Text(text) => {
                 let fence = fence_for(text);
                 block.push_str(&format!("\n{fence}\n{}\n{fence}", text.trim_end()));
             }
-            Content::Image { path, .. } => {
-                block.push_str(&format!(" {}", path.display()));
+            Content::Image(picture) => {
+                block.push_str(&format!(" {}", picture.path.display()));
                 if !item.marks.is_empty() {
                     block.push('\n');
                     block.push_str(&tr("The numbers marked on the picture:"));
@@ -56,16 +57,18 @@ fn label(content: &Content, app: Option<&str>) -> String {
     match (content, app.filter(|app| !app.is_empty())) {
         (Content::Text(_), Some(app)) => from(tr("Text copied from {{app}}:"), app),
         (Content::Text(_), None) => tr("Copied text:"),
-        (Content::Image { .. }, Some(app)) => from(tr("Picture copied from {{app}}:"), app),
-        (Content::Image { .. }, None) => tr("Copied picture:"),
+        (Content::Image(_), Some(app)) => from(tr("Picture copied from {{app}}:"), app),
+        (Content::Image(_), None) => tr("Copied picture:"),
         (Content::Files(_), Some(app)) => from(tr("Files copied from {{app}}:"), app),
         (Content::Files(_), None) => tr("Copied files:"),
+        // A pick from a page says what and where itself.
+        (Content::Page(_), _) => String::new(),
     }
 }
 
 /// Backticks enough to fence `text`: one more than its longest run, at
 /// least three.
-fn fence_for(text: &str) -> String {
+pub(super) fn fence_for(text: &str) -> String {
     let mut longest = 0;
     let mut run = 0;
     for character in text.chars() {
@@ -78,6 +81,7 @@ fn fence_for(text: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::inspect::content::Picture;
 
     fn item(content: Content, comment: &str) -> Item {
         Item {
@@ -101,12 +105,12 @@ mod tests {
         let marked = Item {
             marks: vec!["too wide".into(), "wrong colour".into()],
             ..item(
-                Content::Image {
+                Content::Image(Picture {
                     path: picture.clone(),
                     thumbnail: None,
                     width: 1,
                     height: 1,
-                },
+                }),
                 "fix both",
             )
         };
@@ -126,12 +130,12 @@ mod tests {
         let items = [
             item(Content::Text("a ``` b".into()), "why this"),
             item(
-                Content::Image {
+                Content::Image(Picture {
                     path: picture.clone(),
                     thumbnail: None,
                     width: 1,
                     height: 1,
-                },
+                }),
                 "",
             ),
             Item {

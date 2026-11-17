@@ -14,6 +14,10 @@ pub(super) fn resource(name: &str) -> Option<PathBuf> {
     .find(|path| path.is_file())
 }
 pub fn entry(arguments: &[String]) -> Option<i32> {
+    // Chrome starts the app as the browser extension's native host.
+    if let Some(status) = crate::inspect::relay(arguments) {
+        return Some(status);
+    }
     if !arguments.iter().skip(1).any(|arg| arg == "--mcp") {
         return None;
     }

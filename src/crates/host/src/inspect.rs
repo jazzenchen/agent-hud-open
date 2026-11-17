@@ -8,16 +8,20 @@
 //! with each change. Pictures are kept in `~/.agenthud/tmp` for a week, long
 //! enough for the session they went to to read them; the last place chosen is
 //! kept in the data folder's `inspect` folder.
+mod browser;
 mod clipboard;
 mod commands;
 mod compose;
 mod content;
 mod draft;
+mod hosts;
 pub(crate) mod marking;
+mod page;
 mod target;
 mod thumbnail;
 mod watch;
 
+pub(crate) use browser::relay;
 pub(crate) use commands::*;
 
 use crate::activity;
@@ -42,6 +46,8 @@ pub(crate) struct Inspect {
     /// Where copied pictures are kept.
     pictures: PathBuf,
     watch: Mutex<Option<(mpsc::Sender<()>, JoinHandle<()>)>>,
+    /// The socket the browser extension's relay speaks to.
+    browser: Mutex<Option<agent_hud_runtime::local_tools::Server>>,
 }
 
 /// Starts the window's owner in the app's data folder; the demo keeps a
@@ -57,11 +63,17 @@ pub(crate) fn install(app: &tauri::AppHandle, demo: bool) -> Result<(), String> 
             .join("tmp")
     };
     content::prune(&pictures, KEEP_DAYS);
+    if !demo {
+        if let Ok(executable) = std::env::current_exe() {
+            hosts::install(&executable);
+        }
+    }
     app.manage(Inspect {
         draft: Mutex::new(Draft::default()),
         folder,
         pictures,
         watch: Mutex::new((!demo).then(|| watch::start(app.clone())).flatten()),
+        browser: Mutex::new((!demo).then(|| browser::listen(app, &data)).flatten()),
     });
     Ok(())
 }
@@ -103,5 +115,9 @@ impl Inspect {
             let _ = stop.send(());
             let _ = thread.join();
         }
+        self.browser
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .take();
     }
 }

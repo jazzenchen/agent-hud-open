@@ -1,0 +1,28 @@
+{
+  "name": {
+    "message": "Agent HUD"
+  },
+  "description": {
+    "message": "Pick an element or an area of a page and send it to an agent session through Agent HUD."
+  },
+  "action": {
+    "message": "Pick an element or an area for Agent HUD"
+  },
+  "hint": {
+    "message": "Click an element, or drag out an area · Esc cancels"
+  },
+  "sent": {
+    "message": "In Agent HUD's draft"
+  },
+  "notRunning": {
+    "message": "Agent HUD isn't running, or this browser can't reach it yet. Open Agent HUD once after installing the extension."
+  },
+  "failed": {
+    "message": "Not sent: $REASON$",
+    "placeholders": {
+      "reason": {
+        "content": "$1"
+      }
+    }
+  }
+}

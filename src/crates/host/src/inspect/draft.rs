@@ -3,7 +3,7 @@
 //! each with a comment of its own, and a note for the whole message. With
 //! nothing added, the latest copy is what goes.
 use super::clipboard::ClipKind;
-use super::content::Content;
+use super::content::{Content, Picture};
 use serde_json::{json, Value};
 
 /// The latest copy. Its content is read when the person points at it.
@@ -39,6 +39,9 @@ pub(crate) struct Draft {
     /// The picture open in the markup window: the bubble and its window
     /// wait for it.
     pub marking: Option<String>,
+    /// The last pick from the browser: the HUD brings the window up once
+    /// for each.
+    pub presented: Option<String>,
 }
 
 impl Draft {
@@ -94,17 +97,17 @@ impl Draft {
         };
     }
 
-    /// The marked picture `content` and its pinned `marks` in place of
-    /// picture `id`; the latest copy joins the draft for it. False when
-    /// there is no such picture.
-    pub(crate) fn marked(&mut self, id: &str, content: Content, marks: Vec<String>) -> bool {
+    /// The marked `picture` and its pinned `marks` in place of picture
+    /// `id`'s; the latest copy joins the draft for it. False when there is
+    /// no such picture.
+    pub(crate) fn marked(&mut self, id: &str, picture: Picture, marks: Vec<String>) -> bool {
         if self.clip.as_ref().is_some_and(|clip| clip.id == id) {
             self.add_clip();
         }
         let Some(item) = self.items.iter_mut().find(|item| item.id == id) else {
             return false;
         };
-        item.content = content;
+        item.content = item.content.clone().with_picture(picture);
         item.marks = marks;
         true
     }
@@ -120,10 +123,20 @@ impl Draft {
                     .find(|item| item.id == id)
                     .map(|item| &item.content)
             })?;
-        match content {
-            Content::Image { path, .. } => Some(path.clone()),
-            _ => None,
-        }
+        content.picture().map(|picture| picture.path.clone())
+    }
+
+    /// A pick from the browser, straight into the draft, and shown: the
+    /// HUD brings the window up for it.
+    pub(crate) fn picked(&mut self, id: String, app: Option<String>, content: Content) {
+        self.items.push(Item {
+            id: id.clone(),
+            app,
+            content,
+            comment: String::new(),
+            marks: Vec::new(),
+        });
+        self.presented = Some(id);
     }
 
     /// What a send carries: the draft's items, or with none, the latest copy.
@@ -172,7 +185,13 @@ impl Draft {
                 })
             })
             .collect::<Vec<_>>();
-        json!({"clip": clip, "items": items, "note": self.note, "marking": self.marking})
+        json!({
+            "clip": clip,
+            "items": items,
+            "note": self.note,
+            "marking": self.marking,
+            "presented": self.presented,
+        })
     }
 }
 

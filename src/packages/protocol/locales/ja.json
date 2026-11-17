@@ -1440,5 +1440,14 @@
   "Clear": "消去",
   "What about this spot": "ここについて",
   "The picture could not be read.": "画像を読み込めませんでした。",
-  "The numbers marked on the picture:": "画像に付けた番号："
+  "The numbers marked on the picture:": "画像に付けた番号：",
+  "An area of {{page}}:": "{{page}} の範囲：",
+  "An element on {{page}}:": "{{page}} の要素：",
+  "Area of {{host}}": "{{host}} の範囲",
+  "Element on {{host}}": "{{host}} の要素",
+  "Its HTML:": "HTML：",
+  "Its words:": "テキスト：",
+  "Its styles:": "スタイル：",
+  "Picture:": "画像：",
+  "Selector:": "セレクタ："
 }

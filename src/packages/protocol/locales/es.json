@@ -1504,5 +1504,14 @@
   "Clear": "Borrar",
   "What about this spot": "Qué pasa aquí",
   "The picture could not be read.": "No se pudo leer la imagen.",
-  "The numbers marked on the picture:": "Los números marcados en la imagen:"
+  "The numbers marked on the picture:": "Los números marcados en la imagen:",
+  "An area of {{page}}:": "Un área de {{page}}:",
+  "An element on {{page}}:": "Un elemento de {{page}}:",
+  "Area of {{host}}": "Área de {{host}}",
+  "Element on {{host}}": "Elemento de {{host}}",
+  "Its HTML:": "Su HTML:",
+  "Its words:": "Su texto:",
+  "Its styles:": "Sus estilos:",
+  "Picture:": "Imagen:",
+  "Selector:": "Selector:"
 }

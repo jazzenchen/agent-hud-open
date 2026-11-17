@@ -44,8 +44,17 @@ function useClipFade(
   return { cycle, paused: paused || !active, ms: active ? ms : 0 };
 }
 
-/** The host's state of the clipboard window, as every HUD window hears it. */
-export function useInspectView() {
+/** How long a pick from the browser holds the window up unvisited. */
+const PRESENT_MS = 20_000;
+
+/** The host's state of the clipboard window, as every HUD window hears it,
+ * and whether the window is held up: while a picture is in the markup
+ * window, and for a pick from the browser, until the pointer has been on
+ * the window and left it, or for `PRESENT_MS`. */
+export function useInspectView(
+  pointerInside: boolean,
+  setHovered: (end: EndSide | null) => void,
+) {
   const services = usePanelServices()?.inspect;
   const [view, setView] = useState<InspectView>(EMPTY);
   useEffect(() => {
@@ -61,7 +70,29 @@ export function useInspectView() {
       stop();
     };
   }, [services]);
-  return { view, setView };
+  const [presenting, setPresenting] = useState(false);
+  const visited = useRef(false);
+  const shown = useRef(view.presented ?? null);
+  useEffect(() => {
+    const pick = view.presented ?? null;
+    if (!pick || pick === shown.current) return;
+    shown.current = pick;
+    visited.current = false;
+    setHovered("clip");
+    setPresenting(true);
+    const timer = setTimeout(() => setPresenting(false), PRESENT_MS);
+    return () => clearTimeout(timer);
+  }, [view.presented]);
+  useEffect(() => {
+    if (!presenting) return;
+    if (pointerInside) visited.current = true;
+    else if (visited.current) setPresenting(false);
+  }, [pointerInside, presenting]);
+  return {
+    view,
+    setView,
+    hold: Boolean(view.marking) || presenting,
+  };
 }
 
 /** The clipboard's end of the dock: the host's state of the clipboard
@@ -74,7 +105,10 @@ export function useClipEnd(
   config: HUDConfig,
   hovered: EndSide | null,
   open: boolean,
-  { view, setView }: ReturnType<typeof useInspectView>,
+  {
+    view,
+    setView,
+  }: Pick<ReturnType<typeof useInspectView>, "view" | "setView">,
 ) {
   const services = usePanelServices()?.inspect;
   const [faded, setFaded] = useState<string | null>(null);

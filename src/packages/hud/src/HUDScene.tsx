@@ -171,9 +171,9 @@ export function HUDScene({
   const [pinned, setPinned] = useState(false);
   const [pointerInside, setPointerInside] = useState(false);
   const { domTyping, checkDomTyping } = useDomTyping(scene);
-  // The markup window holds the clipboard window open, as typing does.
-  const inspected = useInspectView();
-  const typing = Boolean(textFocused || domTyping || inspected.view.marking);
+  // The markup window and a browser pick hold the clip window, as typing does.
+  const inspected = useInspectView(pointerInside, ends.setHovered);
+  const typing = Boolean(textFocused || domTyping || inspected.hold);
   const suppressHover = useRef(false);
   const hover = useHoverMachine(config);
   const panelServices = usePanelServices();
