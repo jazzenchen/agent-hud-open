@@ -184,7 +184,7 @@ impl AgentHudCore {
         }
         let enabled = serde_json::from_value(stored["providers"].clone()).unwrap_or_default();
         let opened = database::open(&app_data);
-        let (database, logs, session_map, last_synced_at_ms, storage_issue) = match opened {
+        let (database, mut logs, session_map, last_synced_at_ms, storage_issue) = match opened {
             Ok((database, logs, session_map, last_synced_at_ms)) => {
                 (Some(database), logs, session_map, last_synced_at_ms, None)
             }
@@ -200,9 +200,14 @@ impl AgentHudCore {
             ),
         };
         let recorded = database.as_ref().and_then(data_version::recorded);
+        // Logs whose calls the ledger lost are read again, as a run of its own.
+        let lost = database.as_ref().map_or(0, |db| {
+            data_version::mark_lost_calls(db, &mut logs).unwrap_or(0)
+        });
         let indexing_run = database
             .as_ref()
-            .and_then(|_| data_version::run_at_launch(recorded.as_deref(), &logs));
+            .and_then(|_| data_version::run_at_launch(recorded.as_deref(), &logs))
+            .or((lost > 0).then_some(data_version::Run::Again));
         let requests = requests::Requests::default();
         requests.set_hold_ms(
             settings["approvalWaitMinutes"]

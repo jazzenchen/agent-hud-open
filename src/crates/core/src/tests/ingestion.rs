@@ -743,3 +743,80 @@ fn a_ledger_is_indexed_with_its_progress_and_records_its_data_version() {
     let settled = backend.request("snapshot", json!({})).unwrap();
     assert_eq!(settled["indexing"]["kind"], Value::Null);
 }
+
+#[test]
+fn calls_the_ledger_lost_are_read_again_once_and_counted_once() {
+    let temp = tempfile::tempdir().unwrap();
+    let home = temp.path();
+    let root = home.join(".codex/sessions/2026/10/01");
+    fs::create_dir_all(&root).unwrap();
+    let id = "01a0aaaa-0000-7000-8000-000000000001";
+    let at = (Utc::now() - chrono::Duration::days(40)).to_rfc3339();
+    let count = |total: [u64; 2], last: [u64; 2]| {
+        json!({"timestamp":at,"type":"event_msg","payload":{"type":"token_count","info":{
+            "total_token_usage":{"input_tokens":total[0],"output_tokens":total[1]},
+            "last_token_usage":{"input_tokens":last[0],"output_tokens":last[1]}}}})
+    };
+    let lines = [
+        json!({"timestamp":at,"type":"session_meta","payload":{"id":id,"timestamp":at,"cwd":"/w","source":"cli","originator":"codex_cli_rs"}}),
+        json!({"timestamp":at,"type":"turn_context","payload":{"model":"gpt-5.5"}}),
+        count([100, 10], [100, 10]),
+        count([300, 20], [200, 10]),
+    ];
+    fs::write(
+        root.join(format!("rollout-2026-10-01T10-00-00-{id}.jsonl")),
+        lines
+            .iter()
+            .map(|line| format!("{line}\n"))
+            .collect::<String>(),
+    )
+    .unwrap();
+    let ledger = || rusqlite::Connection::open(home.join("app/ingestion.sqlite")).unwrap();
+    let recorded = || -> (i64, i64) {
+        ledger()
+            .query_row(
+                "SELECT count(*),coalesce(sum(input+output+cache_read+cache_write+reasoning),0) FROM usage_meter_event",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .unwrap()
+    };
+    let mut backend = fixture(home);
+    backend.request("snapshot", json!({})).unwrap();
+    backend.request("refresh", json!({})).unwrap();
+    drop(backend);
+    assert_eq!(recorded(), (2, 320));
+
+    // A build that still dropped calls older than 31 days ran on this
+    // ledger before the check existed: the log's head keeps its total.
+    let lost = ledger();
+    lost.execute("DELETE FROM usage_meter_event", []).unwrap();
+    lost.execute("DELETE FROM usage_meter_bucket", []).unwrap();
+    lost.execute(
+        "DELETE FROM ingestion_meta WHERE key='lost_calls_checked'",
+        [],
+    )
+    .unwrap();
+    drop(lost);
+    assert_eq!(recorded(), (0, 0));
+    let mut backend = fixture(home);
+    backend.request("snapshot", json!({})).unwrap();
+    let finished = backend.request("refresh", json!({})).unwrap();
+    assert_eq!(finished["indexing"]["kind"], Value::Null);
+    assert_eq!(finished["totals"]["total"], 320);
+    drop(backend);
+    assert_eq!(recorded(), (2, 320), "read again, counted once");
+    // The check is made once per ledger.
+    let checked: i64 = ledger()
+        .query_row(
+            "SELECT count(*) FROM ingestion_meta WHERE key='lost_calls_checked'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert_eq!(checked, 1);
+    let mut backend = fixture(home);
+    backend.request("snapshot", json!({})).unwrap();
+    drop(backend);
+    assert_eq!(recorded(), (2, 320));
+}

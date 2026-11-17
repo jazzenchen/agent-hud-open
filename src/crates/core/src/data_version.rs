@@ -8,6 +8,10 @@ use super::*;
 use rusqlite::OptionalExtension;
 use std::time::SystemTime;
 
+mod lost_calls;
+
+pub(crate) use lost_calls::mark_lost_calls;
+
 /// Why the ledger is being read through.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Run {
