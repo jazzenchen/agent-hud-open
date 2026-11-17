@@ -42,7 +42,11 @@ export function DetailsSection({
           subtitle={client.notice ?? undefined}
         >
           <Pill tone={client.installed ? "green" : "gray"} dot>
-            {client.installed ? t("Hooks installed") : t("No hooks")}
+            {client.installed
+              ? t("Hooks installed")
+              : client.unsupported
+                ? t("Not supported")
+                : t("No hooks")}
           </Pill>
         </Row>
       ))}

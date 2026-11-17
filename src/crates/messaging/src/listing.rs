@@ -147,6 +147,15 @@ fn hook_reachable(
     if waiting {
         return (json!(true), words::hook_waiting(language));
     }
+    let name = words::client_name(client);
+    // Not "no hooks seen", which reads as a setup gone wrong (Open #115).
+    if !agent_hud_platform::hooks::launches_here(client) {
+        let system = agent_hud_platform::hooks::system_name();
+        return (
+            json!(false),
+            words::hook_unsupported(language, name, system),
+        );
+    }
     let week_ago = chrono::Utc::now() - chrono::Duration::days(7);
     let recent = |row: &Value| {
         row["hooks"]["at"]
@@ -160,7 +169,6 @@ fn hook_reachable(
             rows.iter()
                 .any(|row| row["source"].as_str().and_then(family) == family(client) && recent(row))
         });
-    let name = words::client_name(client);
     if !hooked {
         return (json!(false), words::hook_unseen(language, name));
     }

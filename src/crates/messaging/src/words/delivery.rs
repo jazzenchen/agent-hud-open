@@ -99,6 +99,13 @@ pub fn observer_closed(language: Language, client: &str) -> String {
         &[("client", &client)],
     )
 }
+/// A client whose hooks Agent HUD does not put in on this system (Open #89).
+pub fn hook_unsupported(language: Language, client: &str, system: &str) -> String {
+    fill(
+        &tr_in(language, "Agent HUD doesn't put {{client}}'s hooks in on {{system}} yet, so its sessions can send agent messages but can't take them."),
+        &[("client", &client), ("system", &system)],
+    )
+}
 pub fn hook_unseen(language: Language, client: &str) -> String {
     let text = if client.starts_with("TRAE") {
         tr_in(language, "Agent HUD has not heard from {{client}}'s hooks yet, so nothing would take the message. Turn on client hooks in Agent HUD's settings, and TRAE's global hooks in TRAE Settings → Hooks.")

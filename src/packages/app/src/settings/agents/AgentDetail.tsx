@@ -77,10 +77,11 @@ export function AgentDetail({
 
   const enabled = source.enabled;
   // What the client needs before it runs the hooks Agent HUD put in, such as
-  // TRAE's own hooks switch.
+  // TRAE's own hooks switch, or that it gets none on this system yet.
   const hookStep =
     snapshot.connection.clientHooks?.clients?.find(
-      (client) => client.source === source.id && client.installed,
+      (client) =>
+        client.source === source.id && (client.installed || client.unsupported),
     )?.notice ?? null;
   // The clients whose approval hook goes in only once the user turns it on.
   const optInApprovals = snapshot.settings.optInApprovals ?? [];

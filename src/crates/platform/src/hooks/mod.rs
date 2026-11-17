@@ -9,6 +9,7 @@ use std::{
 
 mod callback;
 mod clients;
+pub use clients::{launches_here, system_name};
 mod completion;
 mod endpoint;
 mod entry;
