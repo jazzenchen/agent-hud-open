@@ -28,7 +28,7 @@
     "test:ts": "node --test \"src/packages/*/test/*.test.ts\"",
     "test:mcp": "node --test src/apps/mcp/test/*.test.mjs",
     "test:installer": "node --test src/apps/installer/test/*.test.mjs",
-    "test:plugins": "node --test src/crates/platform/src/deepseek_plugin/*.test.mjs",
+    "test:plugins": "node --test src/crates/platform/src/deepseek_plugin/*.test.mjs src/crates/agents/src/opencode/*.test.mjs",
     "parity:ledger": "node src/tooling/parity-ledger.mjs",
     "parity:oracle": "swift run -Xswiftc -enable-testing --package-path src/tooling/parity-oracle parity-oracle src/fixtures/parity/contracts",
     "test:core": "cargo test --workspace",

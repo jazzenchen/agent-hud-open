@@ -96,6 +96,29 @@ fn opencode_1_and_2_load_the_same_file_and_the_forks_load_it_as_before() {
 }
 
 #[test]
+fn opencode_1_and_2_hand_over_messages_through_one_mailbox() {
+    // Open #114: OpenCode 2's plugin reported turns but never took a
+    // message, which waited in its box until it expired. Both versions now
+    // start the same look (`handOver`); its behaviour is tested against
+    // stand-ins for each version in `observer.test.mjs`.
+    let observer = include_str!("observer.js");
+    let (one, two) = observer.split_at(observer.find("\nfunction setup(ctx)").unwrap());
+    let server = &one[one.find("\nasync function server(input)").unwrap()..];
+    assert!(server.contains("  handOver(mailbox, {\n"));
+    assert!(two.contains("  const stop = handOver(agentHudMailbox(SOURCE), {\n"));
+    assert_eq!(
+        observer.matches("handOver(").count(),
+        3,
+        "defined once, started twice"
+    );
+    // OpenCode 2 marks the prompt a message goes in as, and the turn names
+    // the message by that mark, so every copy of the plugin (one per folder
+    // OpenCode serves) records the same turn.
+    assert!(two.contains("metadata: { agentHud: { message: message.id } }"));
+    assert!(two.contains("message.metadata?.agentHud?.message"));
+}
+
+#[test]
 fn a_turn_recorded_under_opencode_2_is_a_completed_turn_without_a_terminal() {
     // OpenCode 2's plugin runs in its background service, which belongs to no
     // terminal, so its records carry no navigation target.

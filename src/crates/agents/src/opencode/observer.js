@@ -1,6 +1,6 @@
 // SOURCE and FOLDER, above, name the client: its sessions' id prefix and its data folder. What follows the script
-// exports `server`, OpenCode 1's plugin, and for OpenCode itself also `setup`, OpenCode 2's (`export.js`). OpenCode 1's
-// plugin also hands its sessions the messages other agents leave for them (`agentHudMailbox`, before this).
+// exports `server`, OpenCode 1's plugin, and for OpenCode itself also `setup`, OpenCode 2's (`export.js`). Both also
+// hand their sessions the messages other agents leave for them (`agentHudMailbox`, before this, and `handOver`).
 import { mkdirSync, writeFileSync, renameSync, readdirSync, readFileSync, statSync, unlinkSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -44,12 +44,36 @@ function inbox() {
   };
 }
 
+// Every two seconds: hands each idle session of this copy of the plugin its oldest waiting message, as a prompt; the
+// turn it starts names the message when it ends (`delivered`). Every half minute it lists the copy's main sessions
+// again, newest first (`list`), and says which this process can take messages for. `hand(id, take)` puts in the
+// message `take()` claims, once it knows the session takes a prompt now, and marks the session as having one on the
+// way in the same step. A look still waiting on the client is not overlapped by the next. Returns what stops it.
+function handOver(mailbox, { list, hand }) {
+  let known = [], listed = 0, looking = false;
+  const look = setInterval(async () => {
+    if (looking) return;
+    looking = true;
+    try {
+      if (Date.now() - listed > 30000) {
+        listed = Date.now();
+        known = await list();
+        mailbox.present(known);
+      }
+      for (const id of mailbox.boxes()) {
+        if (known.includes(id)) await hand(id, () => mailbox.take(id));
+      }
+    } catch { /* The next look tries again. */ } finally { looking = false; }
+  }, 2000);
+  look.unref?.();
+  return () => { clearInterval(look); mailbox.absent(); };
+}
+
 // OpenCode 1 and its forks.
 async function server(input) {
   const turns = inbox();
   const sessions = new Map();
   const mailbox = agentHudMailbox(SOURCE);
-  let known = [], listed = 0;
 
   function session(id) {
     let value = sessions.get(id);
@@ -108,33 +132,25 @@ async function server(input) {
     } catch { return {}; }
   }
 
-  // Every two seconds: hands each idle session of this server its oldest waiting message, as a prompt through the
-  // server's own client; the turn it starts names the message when it completes (`delivered`). Every half minute it
-  // lists the server's sessions again and says which this process can take messages for.
-  const look = setInterval(async () => {
-    try {
-      const client = input?.client;
-      if (!client?.session) return;
-      if (Date.now() - listed > 30000) {
-        listed = Date.now();
-        const answer = await client.session.list();
-        const list = Array.isArray(answer) ? answer : Array.isArray(answer?.data) ? answer.data : [];
-        known = list.filter((item) => item?.id && !item.parentID)
-          .sort((a, b) => (b.time?.updated || 0) - (a.time?.updated || 0)).map((item) => item.id);
-        mailbox.present(known);
-      }
-      for (const id of mailbox.boxes()) {
-        const value = sessions.get(id);
-        if (!known.includes(id) || value?.startedAtMs || value?.delivered) continue;
-        const message = mailbox.take(id);
-        if (!message) continue;
-        session(id).delivered = message.id;
-        const body = { ...(await asked(client, id)), parts: [{ type: "text", text: message.text }] };
-        client.session.promptAsync({ path: { id }, body }).catch(() => { session(id).delivered = undefined; });
-      }
-    } catch { /* The next look tries again. */ }
-  }, 2000);
-  look.unref?.();
+  // The server's sessions take messages through its own client; one is idle until its next busy stretch settles.
+  const client = input?.client;
+  handOver(mailbox, {
+    async list() {
+      const answer = await client.session.list();
+      const list = Array.isArray(answer) ? answer : Array.isArray(answer?.data) ? answer.data : [];
+      return list.filter((item) => item?.id && !item.parentID)
+        .sort((a, b) => (b.time?.updated || 0) - (a.time?.updated || 0)).map((item) => item.id);
+    },
+    async hand(id, take) {
+      const value = sessions.get(id);
+      if (value?.startedAtMs || value?.delivered) return;
+      const message = take();
+      if (!message) return;
+      session(id).delivered = message.id;
+      const body = { ...(await asked(client, id)), parts: [{ type: "text", text: message.text }] };
+      client.session.promptAsync({ path: { id }, body }).catch(() => { session(id).delivered = undefined; });
+    },
+  });
 
   return {
     // A call to Agent HUD's own MCP tools names its session, so Agent HUD knows who sends a message.
@@ -215,41 +231,99 @@ async function server(input) {
 function setup(ctx) {
   if (!ctx?.event?.subscribe || !ctx.session) return;
   const turns = inbox(), started = new Map(), controller = new AbortController();
+  const here = ctx.location?.directory, looking = {}, mine = new Set([looking]);
+  // The message on its way into each session (or `looking`, while a copy looks whether the session takes one now),
+  // shared by every copy in the process: two copies may serve one folder (under different workspaces), and each could
+  // otherwise hand the same session a message at once.
+  const handed = (globalThis[Symbol.for("agent-hud.opencode.handed")] ||= new Map());
   // Messages a person or OpenCode put in a session, as against marks such as when it went idle.
   const prompts = ["user", "synthetic", "skill", "shell"], entries = [...prompts, "assistant", "compaction"];
 
-  async function complete(id, at) {
+  // `stopReason` says the execution failed or was stopped, which is recorded only when it took another agent's message,
+  // so its sender learns. Such a message is named by the prompt it went in as (`metadata.agentHud`), among the prompts
+  // since the session last went idle, so every copy of the plugin records the same turn.
+  async function complete(id, at, stopReason) {
     const startedAtMs = started.get(id);
     started.delete(id);
     // Each folder OpenCode serves loads the plugin, and each sees every session: the folder a session runs in records it.
-    const info = await ctx.session.get({ sessionID: id }), directory = info?.location?.directory || ctx.location?.directory;
-    if (!info || info.parentID || (ctx.location?.directory && directory !== ctx.location.directory)) return;
+    const info = await ctx.session.get({ sessionID: id }), directory = info?.location?.directory || here;
+    if (!info || info.parentID || (here && directory !== here)) return;
     // A prompt sent after the execution ended belongs to the next one.
     const messages = (await ctx.session.context({ sessionID: id })).filter((message) => !(message.time?.created > at));
     const last = messages.findLastIndex((message) => entries.includes(message.type));
-    const reply = messages[last];
-    if (reply?.type !== "assistant" || reply.error || reply.finish !== "stop" || !reply.time?.completed) return;
-    const prompt = messages.slice(0, last).findLast((message) => prompts.includes(message.type));
-    turns.write({
+    if (last < 0) return;
+    const reply = messages[last], since = messages.slice(0, last).findLastIndex((message) => message.type === "idle");
+    const prompt = messages.slice(0, last + 1).findLast((message) => prompts.includes(message.type));
+    const asked = messages.slice(since + 1, last + 1).filter((message) => prompts.includes(message.type));
+    const record = {
       version: 1, sessionID: SOURCE + ":" + id, workspace: directory,
       title: info.title, model: reply.model?.id, providerID: reply.model?.providerID, turnID: prompt?.id || reply.id,
-      startedAtMs: startedAtMs || info.time?.busy || prompt?.time?.created || reply.time.created, completedAtMs: Date.now(),
-    });
+      startedAtMs: startedAtMs || info.time?.busy || prompt?.time?.created || reply.time?.created || at,
+      completedAtMs: Date.now(), delivered: asked.map((message) => message.metadata?.agentHud?.message).findLast(Boolean),
+    };
+    if (stopReason) {
+      if (record.delivered) turns.write({ ...record, state: "ended", stopReason });
+      return;
+    }
+    if (reply.type !== "assistant" || reply.error || reply.finish !== "stop" || !reply.time?.completed) return;
+    const words = (reply.content || []).filter((part) => part?.type === "text" && typeof part.text === "string");
+    turns.write({ ...record, message: words.map((part) => part.text).join("").slice(0, 40000) || undefined });
   }
+
+  // Messages go only to the main sessions of the folder this copy serves, and the claim beside a message (`take`) lets
+  // only one copy have it. A session takes one while no execution runs in it: OpenCode 2 notes when the newest started
+  // (`busy`) and when the last ended (`idle`); one with an undo still pending waits, since a prompt would make the undo
+  // final. The prompt joins the session's queue and runs on the session's own agent and model, as a typed one would;
+  // the next goes in once an execution has ended since.
+  const stop = handOver(agentHudMailbox(SOURCE), {
+    async list() {
+      if (!here) return [];
+      const answer = await ctx.session.list({ directory: here, parentID: null, order: "desc", limit: 200 });
+      const list = Array.isArray(answer) ? answer : Array.isArray(answer?.data) ? answer.data : [];
+      return list.filter((item) => item?.id && !item.parentID).map((item) => item.id);
+    },
+    async hand(id, take) {
+      if (started.has(id) || handed.has(id)) return;
+      handed.set(id, looking);
+      let message;
+      try {
+        const info = await ctx.session.get({ sessionID: id }), time = info?.time || {};
+        if (info && !info.parentID && !info.revert && info.location?.directory === here && !(time.busy > (time.idle || 0))
+          && handed.get(id) === looking) message = take();
+      } finally {
+        if (handed.get(id) === looking) handed.delete(id);
+      }
+      if (!message) return;
+      handed.set(id, message.id);
+      mine.add(message.id);
+      ctx.session.prompt({ sessionID: id, text: message.text, metadata: { agentHud: { message: message.id } }, delivery: "queue" })
+        .catch(() => { if (handed.get(id) === message.id) handed.delete(id); });
+    },
+  });
 
   (async () => {
     const types = ["session.execution.started", "session.execution.succeeded", "session.execution.failed",
       "session.execution.interrupted", "session.deleted"];
     for await (const event of ctx.event.subscribe({ types, signal: controller.signal })) {
       try {
-        const id = event?.data?.sessionID;
+        const id = event?.data?.sessionID, at = event?.created || Date.now();
         if (!id) continue;
-        if (event.type === "session.execution.started") started.set(id, event.created || Date.now());
-        else if (event.type === "session.execution.succeeded") complete(id, event.created || Date.now()).catch(() => {});
-        else if (event.type === "session.deleted") { started.delete(id); turns.forget(id); }
-        else started.delete(id);
+        if (event.type === "session.execution.started") started.set(id, at);
+        else if (event.type === "session.deleted") { started.delete(id); handed.delete(id); turns.forget(id); }
+        // A shutdown ends no turn: the execution resumes when OpenCode starts again.
+        else if (event.data.reason === "shutdown") started.delete(id);
+        else {
+          handed.delete(id);
+          const stopReason = { "session.execution.failed": "error", "session.execution.interrupted": "aborted" }[event.type];
+          complete(id, at, stopReason).catch(() => {});
+        }
       } catch { /* Observability must never interrupt the client. */ }
     }
   })().catch(() => {});
-  return () => controller.abort();
+  // A copy that is unloaded takes back its word for the messages it handed over.
+  return () => {
+    controller.abort();
+    stop();
+    for (const [id, message] of handed) if (mine.has(message)) handed.delete(id);
+  };
 }
