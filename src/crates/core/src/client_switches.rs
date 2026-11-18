@@ -76,7 +76,8 @@ impl AgentHudCore {
     /// whether it was found here and whether it is on. An agent of one client
     /// is found as its row in `providers` says; a client split off an agent is
     /// found by its own evidence or by a session of its own.
-    pub(super) fn client_rows(&self, providers: &[Value]) -> Vec<Value> {
+    pub(super) fn client_rows(&self, providers: &[Value], at: i64) -> Vec<Value> {
+        let spends = self.client_spends(at);
         let observed = self
             .usage_projection
             .as_ref()
@@ -84,7 +85,7 @@ impl AgentHudCore {
         let mut rows = Vec::new();
         for agent in agent_hud_agents::ALL {
             let (group, group_name) = split::vendor(agent.id);
-            let row = |id: &str, name: &str, detected: bool| json!({"id":id,"agent":agent.id,"name":name,"group":group,"groupName":group_name,"detected":detected,"enabled":self.client_on(id),"features":self.client_features.get(id).cloned().unwrap_or_default()});
+            let row = |id: &str, name: &str, detected: bool| json!({"id":id,"agent":agent.id,"name":name,"group":group,"groupName":group_name,"detected":detected,"enabled":self.client_on(id),"features":self.client_features.get(id).cloned().unwrap_or_default(),"spends":spends.get(id).map(|spends| spends.json())});
             let family = split::family(agent.id);
             if family.is_empty() {
                 let detected = providers

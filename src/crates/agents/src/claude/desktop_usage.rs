@@ -1,7 +1,7 @@
 //! Claude's plan limits through the Claude desktop app's claude.ai sign-in.
 use super::account::{profile, Folder};
 use super::quota_windows::{plan_reading, profile_plan, windows};
-use crate::account::{append_notice, merge};
+use crate::account::{append_notice, merge, names_none};
 use crate::account::{read_json, Answer, Host, HttpFailure, HttpRequest, Reading, Unread};
 use crate::l10n::tr;
 use crate::Base;
@@ -169,6 +169,12 @@ pub(super) fn with_desktop(
     });
     match (result, desktop) {
         (Ok(mut code), Ok(desktop)) if code.failure.is_none() || !covered => {
+            // A login with no plan limits (an API key, a relay) is no news
+            // beside the desktop app's account: the command line's own page
+            // tells where its calls go.
+            if names_none(&code) && !names_none(&desktop) {
+                code.notice = None;
+            }
             merge(&mut code, desktop);
             Ok(code)
         }

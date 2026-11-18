@@ -14,6 +14,7 @@ use std::{
 
 mod accounts;
 mod billing_metrics;
+mod client_spends;
 mod client_switches;
 mod clients;
 mod compressed;

@@ -70,6 +70,15 @@ export interface ClientRow {
   /** What the client can do with Agent HUD: live status, requests answered
    * in the HUD, messages between agents, HUD tools. */
   features?: ("live" | "answer" | "talk" | "tools")[];
+  /** What the client's calls went through in the last 30 days: the agent's
+   * own sign-in, relays by address, other providers by route; null without
+   * calls. */
+  spends?: ClientSpends | null;
+}
+export interface ClientSpends {
+  own: boolean;
+  relays: string[];
+  routes: string[];
 }
 export interface Account {
   id: string;

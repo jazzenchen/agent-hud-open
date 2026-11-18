@@ -106,3 +106,22 @@ fn without_sessions_a_sign_out_stays() {
     engine(&mut host, false);
     assert!(matches!(read(&host), Err(Unread::SignedOut(_))));
 }
+
+/// The command line on an API key, the desktop app on a ChatGPT plan: the
+/// desktop app's account shows, and the command line's "no plan limits" is
+/// no news beside it (its own page tells where its calls go).
+#[test]
+fn a_home_without_plan_limits_is_no_news_beside_its_sessions_account() {
+    let mut host = FakeHost::new("/u").file(
+        "/u/.codex/sessions/2026/11/18/rollout-a.jsonl",
+        &log("desk-ws", "Codex Desktop", 42.0),
+    );
+    engine(&mut host, false);
+    host.engine_replies.insert(
+        3,
+        json!({"id": 3, "result": {"account": {"type": "apiKey"}, "requiresOpenaiAuth": true}}),
+    );
+    let reading = read(&host).unwrap();
+    assert_eq!(reading.account.unwrap()["label"], "Codex Desktop");
+    assert_eq!(reading.notice, None);
+}

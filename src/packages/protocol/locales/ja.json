@@ -1485,5 +1485,9 @@
   "Browser extension": "ブラウザ拡張機能",
   "Reached Agent HUD from {{browser}}, {{when}}": "{{when}} に {{browser}} から接続",
   "Not connected yet": "まだ接続していません",
-  "Chrome Web Store": "Chrome ウェブストア"
+  "Chrome Web Store": "Chrome ウェブストア",
+  "Relay": "リレー",
+  "Custom provider": "カスタムプロバイダー",
+  "From this client's calls in the last 30 days.": "このクライアントの直近 30 日間の呼び出しから。",
+  "No calls from this client in the last 30 days.": "このクライアントは直近 30 日間に呼び出しがありません。"
 }

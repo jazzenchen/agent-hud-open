@@ -75,6 +75,12 @@ pub fn append_notice(reading: &mut Reading, notice: String) {
     }
 }
 
+/// Whether a reading names no account and no window: all it says is why
+/// there are none, such as a login with no plan limits (an API key, a relay).
+pub fn names_none(reading: &Reading) -> bool {
+    reading.account.is_none() && reading.additional_accounts.is_empty() && reading.quotas.is_empty()
+}
+
 /// Another home's reading of the same provider added to `reading`: its
 /// windows and accounts that `reading` does not have yet, by id, and its
 /// notice.

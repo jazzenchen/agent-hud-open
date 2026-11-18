@@ -971,3 +971,19 @@ fn the_desktop_apps_same_account_shows_once() {
     assert_eq!(host.asked.borrow().len(), 1);
     assert_eq!(reading.notice, None);
 }
+
+/// Claude Code on an API key or a relay, the desktop app on a subscription:
+/// the desktop app's account shows, and Claude Code's "no plan limits" is no
+/// news beside it (its own page tells where its calls go).
+#[test]
+fn a_login_without_plan_limits_is_no_news_beside_the_desktop_apps_account() {
+    let mut host = installed(json!({
+        "subtype": "success", "response": {"rate_limits_available": false},
+    }));
+    host.engine_output
+        .insert("auth".into(), vec![json!({"loggedIn": true})]);
+    let reading = read(&desktop_signed_in(host, "user-9")).unwrap();
+    assert_eq!(reading.account.unwrap()["label"], "desk@example.com");
+    assert!(!reading.quotas.is_empty());
+    assert_eq!(reading.notice, None);
+}

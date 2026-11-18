@@ -1,4 +1,4 @@
-import type { Provider, Snapshot } from "@agent-hud/protocol";
+import type { Provider, RelaySource, Snapshot } from "@agent-hud/protocol";
 import {
   moneyAmount,
   snapshotLanguage,
@@ -38,21 +38,28 @@ export function AgentRelays({
         <Row
           key={relay.provider}
           title={relay.name ?? relay.provider}
-          subtitle={
-            relay.balance
-              ? t("Balance {{amount}}", {
-                  amount: moneyAmount(
-                    relay.balance.amount,
-                    relay.balance.currency,
-                    snapshotLanguage(snapshot),
-                  ),
-                })
-              : !relay.consented
-                ? t("Balance not read")
-                : (relay.notice ?? t("Balance not read yet"))
-          }
+          subtitle={relayBalance(t, snapshot, relay)}
         />
       ))}
     </Section>
   );
+}
+
+/** A relay's balance as its row says it, or why there is none. */
+export function relayBalance(
+  t: Translate,
+  snapshot: Snapshot,
+  relay: RelaySource,
+): string {
+  return relay.balance
+    ? t("Balance {{amount}}", {
+        amount: moneyAmount(
+          relay.balance.amount,
+          relay.balance.currency,
+          snapshotLanguage(snapshot),
+        ),
+      })
+    : !relay.consented
+      ? t("Balance not read")
+      : (relay.notice ?? t("Balance not read yet"));
 }

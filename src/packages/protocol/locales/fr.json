@@ -1549,5 +1549,9 @@
   "Browser extension": "Extension de navigateur",
   "Reached Agent HUD from {{browser}}, {{when}}": "Joint depuis {{browser}}, {{when}}",
   "Not connected yet": "Pas encore connecté",
-  "Chrome Web Store": "Chrome Web Store"
+  "Chrome Web Store": "Chrome Web Store",
+  "Relay": "Relais",
+  "Custom provider": "Fournisseur personnalisé",
+  "From this client's calls in the last 30 days.": "D’après les appels de ce client sur les 30 derniers jours.",
+  "No calls from this client in the last 30 days.": "Aucun appel de ce client sur les 30 derniers jours."
 }

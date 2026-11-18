@@ -224,7 +224,7 @@ impl crate::AgentHudCore {
         let sessions = self.session_rows(presented_at, now, at);
         let approvals = self.answered_here(self.requests.views(now), &sessions);
         let providers = self.provider_rows(at);
-        let clients = self.client_rows(&providers);
+        let clients = self.client_rows(&providers, at);
         let pending_meter = self.pending_meter_bounds();
         // Pausing a failed read stops the indexing timer, but does not make
         // its unread history complete. Consumers use this fact, not notices.

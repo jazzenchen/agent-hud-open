@@ -11,8 +11,9 @@ import { Collapsible, Section } from "../SettingsPrimitives";
 import { featureName, features, uses } from "./features";
 
 /** The agents: the ones found here, each with the features it uses and a
- * mark while it waits for a step in it; then the rest, folded. The clients
- * of one vendor sit under its name, which opens the vendor's page. */
+ * mark while it waits for a step in it; then the rest, folded in a card of
+ * their own. The clients of one vendor sit under its name, which opens the
+ * vendor's page. */
 export function AgentList({
   t,
   snapshot,
@@ -78,20 +79,25 @@ export function AgentList({
     </button>
   );
   return (
-    <Section title={t("Your agents")}>
+    <Section title={t("Your agents")} plain>
       <div className="agents-rows" data-guide="agents-list">
         {grouped(found).map(([group, rows]) =>
           groupOf(group, rows, item, head),
         )}
       </div>
       {missing.length > 0 && (
-        <Collapsible title={t("Not on this computer")} summary={missing.length}>
-          <div className="agents-rows">
-            {grouped(missing).map(([group, rows]) =>
-              groupOf(group, rows, item, head),
-            )}
-          </div>
-        </Collapsible>
+        <div className="agents-missing">
+          <Collapsible
+            title={t("Not on this computer")}
+            summary={missing.length}
+          >
+            <div className="agents-rows">
+              {grouped(missing).map(([group, rows]) =>
+                groupOf(group, rows, item, head),
+              )}
+            </div>
+          </Collapsible>
+        </div>
       )}
     </Section>
   );

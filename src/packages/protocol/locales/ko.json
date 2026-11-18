@@ -1485,5 +1485,9 @@
   "Browser extension": "브라우저 확장 프로그램",
   "Reached Agent HUD from {{browser}}, {{when}}": "{{when}} {{browser}}에서 연결됨",
   "Not connected yet": "아직 연결되지 않음",
-  "Chrome Web Store": "Chrome 웹 스토어"
+  "Chrome Web Store": "Chrome 웹 스토어",
+  "Relay": "릴레이",
+  "Custom provider": "사용자 지정 제공자",
+  "From this client's calls in the last 30 days.": "이 클라이언트의 최근 30일 호출 기준입니다.",
+  "No calls from this client in the last 30 days.": "이 클라이언트는 최근 30일 동안 호출이 없습니다."
 }

@@ -157,7 +157,11 @@ signed-in folder the desktop app's sign-in is read too, every time, and the
 readings are merged by account: the same account shows once, from Claude
 Code's reading unless that is only a stale record, and another account shows
 as its own. A failure of either way says nothing while the other read the same
-account. Saving a changed
+account, and a login with no plan limits (an API key, a relay or another
+platform) says nothing once the desktop app's account is read: the command
+line's own page in Settings → Agents shows where its calls went. Codex does
+the same with a home that has no ChatGPT plan beside an account its sessions
+recorded. Saving a changed
 list discards readings from the previous list, including results still in
 flight.
 

@@ -8,7 +8,7 @@
 //! line's shows beside it (owner, 2026-11-18). Nothing is sent and no
 //! credential is read; the windows are as of the call that recorded them.
 use super::limits::parse;
-use crate::account::{append_notice, client_home_key, merge, Host, Reading, Unread};
+use crate::account::{append_notice, client_home_key, merge, names_none, Host, Reading, Unread};
 use crate::naming::clients::{client_name, codex_client};
 use serde_json::{json, Value};
 use std::path::{Path, PathBuf};
@@ -33,6 +33,12 @@ pub(super) fn with_sessions(
     let recorded = readings(host, home);
     match read {
         Ok(mut reading) => {
+            // A home with no plan limits (an API key, another provider) is no
+            // news beside an account its sessions recorded: the command
+            // line's own page tells where its calls go.
+            if names_none(&reading) && !recorded.is_empty() {
+                reading.notice = None;
+            }
             for other in recorded {
                 merge(&mut reading, other);
             }

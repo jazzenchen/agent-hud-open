@@ -83,6 +83,34 @@ impl View {
         found
     }
 
+    /// The routes each selected log's calls since `since` went through, by
+    /// log: what follows `#` in a recorded model, or None for the calls that
+    /// name none (the agent's own sign-in).
+    pub fn routes_by_log(
+        &self,
+        since: i64,
+    ) -> impl Iterator<Item = (&str, BTreeSet<Option<&str>>)> + '_ {
+        self.parts.iter().filter_map(move |(path, part)| {
+            let keys: BTreeSet<u32> = part
+                .buckets
+                .iter()
+                .filter(|(_, at, usage)| *at >= since && usage.total() > 0)
+                .map(|(key, _, _)| *key)
+                .collect();
+            let routes: BTreeSet<Option<&str>> = keys
+                .into_iter()
+                .map(|key| {
+                    let (_, model) = &self.keys[key as usize];
+                    model
+                        .split_once('#')
+                        .map(|(_, route)| route)
+                        .filter(|route| !route.is_empty())
+                })
+                .collect();
+            (!routes.is_empty()).then_some((path.as_str(), routes))
+        })
+    }
+
     /// Each client's calls in the 24 hours before `now`, by the client's
     /// source id: their tokens and what they cost at list prices, from the
     /// selected logs' buckets already in memory.

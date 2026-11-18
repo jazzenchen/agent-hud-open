@@ -1485,5 +1485,9 @@
   "Browser extension": "浏览器扩展",
   "Reached Agent HUD from {{browser}}, {{when}}": "{{when}} 从 {{browser}} 连上过",
   "Not connected yet": "还没连上",
-  "Chrome Web Store": "Chrome 应用商店"
+  "Chrome Web Store": "Chrome 应用商店",
+  "Relay": "中转站",
+  "Custom provider": "自定义服务商",
+  "From this client's calls in the last 30 days.": "按这个客户端近 30 天的调用。",
+  "No calls from this client in the last 30 days.": "这个客户端近 30 天没有调用。"
 }
