@@ -167,6 +167,9 @@ by client id: `claude`, `claude-desktop`, `codex`, `codex-desktop`, `pi`,
 one account read through several shows once, marked merged in Settings.
 Antigravity's language servers say which app runs them (their data folder,
 else where they are installed), and its CLI's reports count as the CLI.
+While the CLI is not running, the account its saved sign-in names counts as
+the CLI's too: only the email in `antigravity-cli/antigravity-oauth-token`
+(`id_token_email`), never its tokens.
 Cursor and Grok Bot each check whether the other is signed in to their
 account (Grok Bot's slot names Cursor's user): xAI merges a Cursor account
 into SuperGrok, and then one account serves both. Saving a changed

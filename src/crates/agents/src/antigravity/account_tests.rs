@@ -449,3 +449,39 @@ fn an_account_signed_in_to_in_several_clients_is_read_through_each() {
         json!(["antigravity-cli", "antigravity", "antigravity-ide"])
     );
 }
+
+#[test]
+fn the_clis_saved_sign_in_counts_while_it_is_not_running() {
+    let token = "/u/.gemini/antigravity-cli/antigravity-oauth-token";
+    let sign_in = |email: &str| {
+        json!({"token": {"access_token": "secret", "refresh_token": "secret"},
+               "auth_method": "oauth", "id_token_email": email})
+        .to_string()
+    };
+    let desktop = || {
+        let mut host = FakeHost::new("/u");
+        host.natives.insert(
+            ("antigravity".into(), "ReadAccounts".into()),
+            Ok(json!({"accounts":[
+                {"source":"desktop-1","client":"antigravity","status":status_body()}
+            ]})),
+        );
+        host
+    };
+    // Only the desktop app runs; the CLI is signed in to the same account.
+    let host = desktop().file(token, &sign_in("me@example.com"));
+    assert_eq!(
+        read(&host).unwrap().account.unwrap()["readBy"],
+        json!(["antigravity", "antigravity-cli"])
+    );
+    // Signed in to another account, or not at all: the desktop app's alone.
+    let host = desktop().file(token, &sign_in("other@example.com"));
+    assert_eq!(
+        read(&host).unwrap().account.unwrap()["readBy"],
+        json!(["antigravity"])
+    );
+    assert_eq!(
+        read(&desktop()).unwrap().account.unwrap()["readBy"],
+        json!(["antigravity"])
+    );
+}

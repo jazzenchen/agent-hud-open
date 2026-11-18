@@ -4,12 +4,16 @@
 //! Each account names the clients it was read through (`readBy`): the CLI
 //! for its reports and its fallback, and the desktop app, the IDE or the CLI
 //! for the language server each one runs; an account several of them are
-//! signed in to is shown once, with all of them.
+//! signed in to is shown once, with all of them. The CLI counts too while it
+//! is not running, for the account its saved sign-in names.
 use super::quotas::parse;
 use super::{ACCOUNT_SERVICE, AGENT};
-use crate::account::{add_readers, read_by, Host, Provider, Reading, Reported, Unread};
+use crate::account::{
+    add_readers, read_by, read_json_bounded, resolve, Host, Provider, Reading, Reported, Unread,
+};
 use crate::l10n::tr;
 use crate::split::ANTIGRAVITY_CLI;
+use crate::Location;
 use serde_json::{json, Value};
 use std::{collections::BTreeSet, path::Path};
 
@@ -144,6 +148,14 @@ pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
             tr!("No authenticated already-running Antigravity service is available").into(),
         );
     }
+    // The CLI, though it is not running: the account its saved sign-in names.
+    if let Some(email) = cli_email(host) {
+        add_reader(&mut reading, ANTIGRAVITY_CLI, |row| {
+            row["label"]
+                .as_str()
+                .is_some_and(|label| label.trim().eq_ignore_ascii_case(&email))
+        });
+    }
     reading.notice = if partial {
         Some(tr!("Some Antigravity accounts could not be read."))
     } else if reading.quotas.is_empty() {
@@ -206,6 +218,24 @@ fn merge(reading: &mut Reading, next: Reading) {
             reading.additional_accounts.push(account);
         }
     }
+}
+
+/// The sign-in the Antigravity CLI keeps.
+const CLI_SIGN_IN: Location = Location::home(
+    &["GEMINI_CLI_HOME"],
+    &[".gemini"],
+    "antigravity-cli/antigravity-oauth-token",
+);
+
+/// The account the Antigravity CLI is signed in to, by its email: only the
+/// sign-in's `id_token_email`, never its tokens.
+fn cli_email(host: &dyn Host) -> Option<String> {
+    let path = resolve(host, &CLI_SIGN_IN).into_iter().next()?;
+    read_json_bounded(host, &path, 64 * 1024).found()?["id_token_email"]
+        .as_str()
+        .map(str::trim)
+        .filter(|email| !email.is_empty())
+        .map(str::to_owned)
 }
 
 /// `client` among the readers of the accounts in `reading` that `which` picks.
