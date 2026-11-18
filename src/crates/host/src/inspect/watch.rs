@@ -62,6 +62,8 @@ fn new_id() -> String {
 
 /// The shortcut: the window comes up again, with what it held, or with
 /// what is on the clipboard now. Off the thread the key arrived on.
+// Called by the systems that hold the shortcut (`shell::CLIP_SHORTCUT`).
+#[allow(dead_code)]
 pub(crate) fn summon(app: &tauri::AppHandle) {
     let app = app.clone();
     std::thread::spawn(move || {

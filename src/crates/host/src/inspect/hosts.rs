@@ -58,7 +58,8 @@ pub(super) fn install(executable: &Path) {
 }
 
 /// The browser folders under `root` that exist, each with its host-manifest
-/// folder inside.
+/// folder inside. Windows names them in the registry instead.
+#[allow(dead_code)]
 fn existing(root: &Path, browsers: &[&str]) -> Vec<PathBuf> {
     browsers
         .iter()

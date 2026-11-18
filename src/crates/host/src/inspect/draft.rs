@@ -146,6 +146,8 @@ impl Draft {
 
     /// The shortcut calls the window up again; with nothing in it, what is
     /// on the clipboard now (`current`) becomes the latest copy.
+    // Called by the systems that hold the shortcut (`shell::CLIP_SHORTCUT`).
+    #[allow(dead_code)]
     pub(crate) fn summoned(&mut self, id: String, current: Option<Clip>) {
         if self.clip.is_none() && self.items.is_empty() {
             self.clip = current;

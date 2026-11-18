@@ -25,6 +25,8 @@ mod watch;
 pub(crate) use browser::relay;
 pub(crate) use commands::*;
 pub(crate) use shortcut::Shortcut;
+// The shortcut's callback, on the systems that hold one (`shell::CLIP_SHORTCUT`).
+#[allow(unused_imports)]
 pub(crate) use watch::summon;
 
 use crate::activity;
