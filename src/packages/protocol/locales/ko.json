@@ -1396,5 +1396,7 @@
   "{{vendor}} · Balance": "{{vendor}} · 잔액",
   "{{window}} reached 95% in {{ranOut}} of the last {{cycles}} cycles. {{plan}} ({{price}}/mo, {{delta}} more) would have kept the busiest under 80%.": "{{window}}이(가) 최근 {{cycles}}개 주기 중 {{ranOut}}개에서 95%에 도달했습니다. {{plan}}(월 {{price}}, {{delta}} 추가)이었다면 가장 바쁜 주기도 80% 미만이었을 것입니다.",
   "{{window}}: over the last {{cycles}} cycles no window went past {{busiest}}%. {{plan}} ({{price}}/mo, {{delta}} less) would still have stayed under 80%.": "{{window}}: 최근 {{cycles}}개 주기 동안 {{busiest}}%를 넘은 구간이 없습니다. {{plan}}(월 {{price}}, {{delta}} 절감)이어도 80% 미만이었을 것입니다.",
-  "≈ {{amount}} a day": "하루 ≈ {{amount}}"
+  "≈ {{amount}} a day": "하루 ≈ {{amount}}",
+  "Auto-hide at edge": "가장자리에서 자동 숨김",
+  "Hide into a thin edge tab when idle; hover the edge to expand.": "유휴 상태일 때 가장자리 얇은 탭으로 숨기고 마우스를 올리면 펼쳐집니다."
 }

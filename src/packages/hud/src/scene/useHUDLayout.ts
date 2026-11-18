@@ -15,21 +15,17 @@ import { peekLineWidth } from "./AgentPeek";
 import { SIMPLE_EDGE_MARGIN } from "./simple-panel";
 import { useNotchGeometry } from "./NotchSurface";
 import { useRequestDelivery } from "./request-delivery";
+import {
+  bodyMaxHeight,
+  expandedPanelHeight,
+  hudGround,
+  isSurfaceBordered,
+  peekBubbleHeight,
+  SURFACE_BORDER_PX,
+} from "./surface-size";
 import { snapshotLanguage } from "@agent-hud/ui/format";
 
-/** The HUD's ground: its fill, and the outline and shadow that belong to it.
- * Transparency runs it from opaque (`alpha` 1) to fully clear, the outline
- * and shadow fading with it; logos, bots and text are drawn over it at full
- * strength. */
-export function hudGround(light: boolean, alpha: number) {
-  return {
-    fill: light ? `rgba(245,245,247,${alpha})` : `rgba(0,0,0,${alpha})`,
-    outline: light
-      ? `rgba(0,0,0,${0.106 * alpha})`
-      : `rgba(255,255,255,${0.075 * alpha})`,
-    shadow: `0 9px 30px rgba(0,0,0,${0.133 * alpha})`,
-  };
-}
+export { hudGround } from "./surface-size";
 
 export interface UseHUDLayoutArgs {
   config: HUDConfig;
@@ -114,6 +110,8 @@ export function useHUDLayout({
     (config.mode === "simple" ? config.simpleSize : 26) / 26,
   );
   const simplePeek = Boolean(peek && config.mode === "simple");
+  const bordered = isSurfaceBordered(config.mode, detached, simplePeek);
+  const borderInset = bordered ? SURFACE_BORDER_PX : 0;
   const surfaceFlare = open
     ? HUD_METRICS.expandedFlare
     : HUD_METRICS.collapsedFlare;
@@ -170,16 +168,11 @@ export function useHUDLayout({
             width: peekWidth,
             height: simplePeek
               ? 26 * scale
-              : (20 +
-                  (1 +
-                    focusedVendor.quotas.length +
-                    (focusedVendor.balance ? 1 : 0)) *
-                    18) *
-                scale,
+              : peekBubbleHeight(focusedVendor, scale, bordered),
           }
         : {
             width: fullWidth,
-            height: Math.max(80, Math.min(contentHeight, screen.height - 80)),
+            height: expandedPanelHeight(contentHeight, screen.height, bordered),
           };
 
   const focusedIndex = vendors.findIndex((v) => v.key === focusedVendor?.key);
@@ -267,7 +260,11 @@ export function useHUDLayout({
           : edge === "left"
             ? { marginLeft: SIMPLE_EDGE_MARGIN }
             : { marginRight: SIMPLE_EDGE_MARGIN };
-  const measurementWidth = Math.max(1, Math.min(fullWidth, screen.width));
+  const measurementWidth = Math.max(
+    1,
+    Math.min(fullWidth, screen.width) - borderInset,
+  );
+  const maxBodyHeight = bodyMaxHeight(frame.height, surfacePadding, bordered);
 
   return {
     edge,
@@ -285,6 +282,8 @@ export function useHUDLayout({
     peek,
     scale,
     simplePeek,
+    bordered,
+    maxBodyHeight,
     peekTuck,
     targetSize,
     surfaceFlare,

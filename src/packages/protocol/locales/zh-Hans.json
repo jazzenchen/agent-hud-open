@@ -1396,5 +1396,7 @@
   "{{vendor}} · Balance": "{{vendor}} · 余额",
   "{{window}} reached 95% in {{ranOut}} of the last {{cycles}} cycles. {{plan}} ({{price}}/mo, {{delta}} more) would have kept the busiest under 80%.": "{{window}}：近 {{cycles}} 个周期有 {{ranOut}} 个用到 95% 以上。换 {{plan}}（每月 {{price}}，多 {{delta}}），最忙的周期也不超过 80%。",
   "{{window}}: over the last {{cycles}} cycles no window went past {{busiest}}%. {{plan}} ({{price}}/mo, {{delta}} less) would still have stayed under 80%.": "{{window}}：近 {{cycles}} 个周期，各窗口最多用到 {{busiest}}%。换 {{plan}}（每月 {{price}}，省 {{delta}}），也不超过 80%。",
-  "≈ {{amount}} a day": "日均 ≈ {{amount}}"
+  "≈ {{amount}} a day": "日均 ≈ {{amount}}",
+  "Auto-hide at edge": "贴边自动收起",
+  "Hide into a thin edge tab when idle; hover the edge to expand.": "空闲时收起为屏幕边缘细条，鼠标悬停边缘自动滑出。"
 }

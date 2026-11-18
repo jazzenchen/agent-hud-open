@@ -1460,5 +1460,7 @@
   "{{vendor}} · Balance": "{{vendor}} · Saldo",
   "{{window}} reached 95% in {{ranOut}} of the last {{cycles}} cycles. {{plan}} ({{price}}/mo, {{delta}} more) would have kept the busiest under 80%.": "{{window}} chegou a 95% em {{ranOut}} dos últimos {{cycles}} ciclos. {{plan}} ({{price}}/mês, {{delta}} a mais) teria mantido o mais intenso abaixo de 80%.",
   "{{window}}: over the last {{cycles}} cycles no window went past {{busiest}}%. {{plan}} ({{price}}/mo, {{delta}} less) would still have stayed under 80%.": "{{window}}: nos últimos {{cycles}} ciclos nenhuma janela passou de {{busiest}}%. {{plan}} ({{price}}/mês, {{delta}} a menos) ainda teria ficado abaixo de 80%.",
-  "≈ {{amount}} a day": "≈ {{amount}} por dia"
+  "≈ {{amount}} a day": "≈ {{amount}} por dia",
+  "Auto-hide at edge": "Ocultar automaticamente na borda",
+  "Hide into a thin edge tab when idle; hover the edge to expand.": "Oculta em uma aba fina na borda quando inativo; passe o mouse para expandir."
 }

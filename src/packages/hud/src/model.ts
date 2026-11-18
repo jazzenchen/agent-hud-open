@@ -59,6 +59,8 @@ export interface HUDConfig {
   hidesRequests: boolean;
   /** This screen's HUD plays no flights of messages between agents. */
   hidesFlights: boolean;
+  /** Whether a Simple dock tucks into a thin edge tab when idle. */
+  autoHideAtEdge: boolean;
   simpleSize: number;
   simpleGapScale: number;
   ringWidth: number;

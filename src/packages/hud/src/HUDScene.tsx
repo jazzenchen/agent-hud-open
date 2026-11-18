@@ -10,7 +10,6 @@ import { useReducedMotion } from "motion/react";
 import type { Snapshot } from "@agent-hud/protocol";
 export { HUDArtwork as HUDLogo } from "./HUDArtwork";
 import { DockMemory, type Direction } from "./bots/mark-director";
-import { AlertStack } from "./scene/AlertStack";
 import { HUDExpandedSurface } from "./scene/HUDExpandedSurface";
 import { HUDInstructions } from "./scene/HUDInstructions";
 import { HUDMarkStrip } from "./scene/HUDMarkStrip";
@@ -33,11 +32,14 @@ import { useHeldFrame } from "./scene/useHeldFrame";
 import { MeasuringCopy, useMeasured } from "./scene/MeasuringCopy";
 import { DockEnds } from "./ends/DockEnds";
 import { useDockEnds } from "./ends/useDockEnds";
-import { PanelBody } from "./scene/PanelBody";
+import { useScenePanelBody } from "./scene/useScenePanelBody";
 import { RestingStrip } from "./scene/RestingStrip";
 import { HoverFloor, SceneBackdrop } from "./scene/SceneFloors";
 import { usePanelHandoffs } from "./scene/usePanelHandoffs";
 import { useSceneAlerts } from "./scene/useSceneAlerts";
+import { compactStripMetrics } from "./scene/edge-retract";
+import { useEdgeRetract } from "./scene/useEdgeRetract";
+import { usePanelCommand } from "./scene/usePanelCommand";
 import { useStripMetrics } from "./scene/useStripMetrics";
 import { useSceneWidth, useSystemLight } from "./scene/useSceneMeasures";
 import { GuideDock, type HUDGuide } from "./GuideDock";
@@ -186,24 +188,15 @@ export function HUDScene({
     setPinned,
   });
   const { state, forceOpen, collapse } = hover;
-  useEffect(() => {
-    if (!panelCommand) return;
-    if (!panelCommand.open) {
-      setPinned(false);
-      collapse();
-      return;
-    }
-    // A docked HUD that separates agents opens on its first agent, as a hold does.
-    if (
-      config.mode !== "notch" &&
-      config.separatesAgents &&
-      vendors.length > 0
-    ) {
-      setHovered(vendors[0].key);
-      setPinned(true);
-    }
-    forceOpen();
-  }, [panelCommand?.sequence]);
+  usePanelCommand({
+    panelCommand,
+    config,
+    vendors,
+    setHovered,
+    setPinned,
+    forceOpen,
+    collapse,
+  });
   const open = hover.open || holdActive;
 
   const safeSceneHeight = Math.max(180, height);
@@ -287,6 +280,8 @@ export function HUDScene({
     peek,
     scale,
     simplePeek,
+    bordered,
+    maxBodyHeight,
     peekTuck,
     targetSize,
     surfaceFlare,
@@ -296,7 +291,6 @@ export function HUDScene({
     notchGeometry,
     bodyPadding,
     surfacePadding,
-    marginStyle,
     measurementWidth,
   } = useHUDLayout({
     config,
@@ -328,6 +322,25 @@ export function HUDScene({
     nativePointer,
     scene,
   });
+  const compactMetrics = compactStripMetrics(config, metrics);
+  const { retracted, effectiveStrip } = useEdgeRetract(
+    {
+      mode: config.mode,
+      autoHideAtEdge: config.autoHideAtEdge,
+      preview: Boolean(dragPreview || renderBackdrop),
+      open,
+      pinned,
+      pointerInside,
+      cardVisible,
+      dragVisual,
+      hasAlert: Boolean(request || event),
+      hasOpenEnd: Boolean(news.ends.view),
+    },
+    strip,
+    edge,
+    vendors.length,
+    compactMetrics,
+  );
 
   const {
     vendorUnderPointer,
@@ -385,43 +398,32 @@ export function HUDScene({
     showPanelStats,
     onUpdate,
   });
-  const eventContent =
-    request || event ? (
-      <AlertStack
-        requests={requests}
-        request={request}
-        event={event}
-        news={news}
-        decide={onRequestDecision}
-        openSettings={openSettings}
-        onStats={showPanelStats}
-        handoff={handoff}
-        light={light}
-        snapshot={snapshot}
-        botLogos={config.botLogos}
-      />
-    ) : null;
-
-  // The panel's body, drawn by the visible panel and by the hidden copy
-  // below, which measures its natural height (no `maxHeight`) over the
-  // snapshot it last drew.
-  const panelBody = (shown: Snapshot, maxHeight?: number) => (
-    <PanelBody
-      snapshot={shown}
-      maxHeight={maxHeight}
-      alertStack={eventContent}
-      inUsagePanel={inUsagePanel}
-      event={event}
-      open={open}
-      config={config}
-      focusVendor={focusedVendor?.name}
-      light={light}
-      footer={footer}
-      update={update}
-      dismissNews={news.dismiss}
-      delivery={delivery}
-    />
-  );
+  const panelBody = useScenePanelBody({
+    hasAlert: Boolean(request || event),
+    alertArgs: {
+      requests,
+      request,
+      event,
+      news,
+      decide: onRequestDecision,
+      openSettings,
+      onStats: showPanelStats,
+      handoff,
+      light,
+      snapshot,
+      botLogos: config.botLogos,
+    },
+    inUsagePanel: Boolean(inUsagePanel),
+    event,
+    open,
+    config,
+    focusVendor: focusedVendor?.name,
+    light,
+    footer,
+    update,
+    dismissNews: news.dismiss,
+    delivery,
+  });
   // The hidden copy measures the panel for its next opening, as the native
   // hosting view measured its fitting size. A pointer move never draws it
   // again, and at rest (collapsed, no card out, the pointer away) neither does
@@ -474,6 +476,7 @@ export function HUDScene({
             fontFamily:
               '-apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif',
             color: light ? "#1c1c1e" : "#f2f2f7",
+            colorScheme: light ? "light" : "dark",
             cursor: dragVisual ? "grabbing" : undefined,
           }}
           onFocusCapture={checkDomTyping}
@@ -512,6 +515,7 @@ export function HUDScene({
             detached={detached}
             peek={peek}
             simplePeek={simplePeek}
+            bordered={bordered}
             open={open}
             reduceMotion={reduceMotion}
             dragging={dragging}
@@ -543,19 +547,14 @@ export function HUDScene({
             surfacePadding={surfacePadding}
             inUsagePanel={inUsagePanel}
           >
-            {panelBody(
-              snapshot,
-              Math.max(
-                40,
-                frame.height - surfacePadding.top - surfacePadding.bottom,
-              ),
-            )}
+            {panelBody(snapshot, maxBodyHeight)}
           </HUDExpandedSurface>
           <RestingStrip
-            strip={strip}
+            strip={effectiveStrip}
             grab={grab}
             draggable={Boolean(onDragStart)}
             dragVisual={dragVisual}
+            retracted={retracted}
             considerDrag={considerDrag}
             suppressDragClick={suppressDragClick}
             nativePointer={nativePointer}
@@ -572,13 +571,14 @@ export function HUDScene({
               config={config}
               edge={edge}
               strip={strip}
+              compactStrip={effectiveStrip}
+              retracted={retracted}
               metrics={metrics}
               vendors={vendors}
               cardVisible={cardVisible}
               light={light}
               fill={fill}
               outline={outline}
-              marginStyle={marginStyle}
               dragVisual={dragVisual}
               hovered={hovered}
               pointerInside={pointerInside}
@@ -608,6 +608,7 @@ export function HUDScene({
             cardVisible={cardVisible}
             showing={Boolean(news.ends.view)}
             dragging={dragging}
+            retracted={retracted}
             light={light}
             fill={fill}
             outline={outline}

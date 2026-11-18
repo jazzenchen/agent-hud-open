@@ -121,6 +121,11 @@ export function HUDSection({
             t("Separate agents"),
             t("Hovering a logo opens only its agent."),
           )}
+          {toggle(
+            "autoHideAtEdge",
+            t("Auto-hide at edge"),
+            t("Hide into a thin edge tab when idle; hover the edge to expand."),
+          )}
         </>
       )}
       <AgentSelection

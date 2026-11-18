@@ -73,5 +73,7 @@
   "{{count}} usage resets were added to this account._one": "A usage reset was added to this account.",
   "{{count}} usage resets were added to this account._other": "{{count, number}} usage resets were added to this account.",
   "{{done}} of {{count}} days_one": "{{done}} of {{count, number}} day",
-  "{{done}} of {{count}} days_other": "{{done}} of {{count, number}} days"
+  "{{done}} of {{count}} days_other": "{{done}} of {{count, number}} days",
+  "Auto-hide at edge": "Auto-hide at edge",
+  "Hide into a thin edge tab when idle; hover the edge to expand.": "Hide into a thin edge tab when idle; hover the edge to expand."
 }

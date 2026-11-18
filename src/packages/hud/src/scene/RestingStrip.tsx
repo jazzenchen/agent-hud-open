@@ -14,6 +14,7 @@ export function RestingStrip({
   grab,
   draggable,
   dragVisual,
+  retracted = false,
   considerDrag,
   suppressDragClick,
   nativePointer,
@@ -31,6 +32,7 @@ export function RestingStrip({
   /** The host moves the HUD: the strip starts a drag. */
   draggable: boolean;
   dragVisual: boolean;
+  retracted?: boolean;
   considerDrag: (event: ReactPointerEvent<HTMLDivElement>) => void;
   suppressDragClick: MutableRefObject<boolean>;
   nativePointer?: HUDNativePointer;
@@ -51,6 +53,14 @@ export function RestingStrip({
   /** The marks. */
   children: ReactNode;
 }) {
+  const grabBox = retracted
+    ? { left: 0, top: 0, width: strip.width, height: strip.height }
+    : {
+        left: grab.frame.x - strip.x,
+        top: grab.frame.y - strip.y,
+        width: grab.frame.width,
+        height: grab.frame.height,
+      };
   return (
     <>
       <div
@@ -92,10 +102,7 @@ export function RestingStrip({
             // The resting strip owns drag/click capture and hover for this child.
             style={{
               position: "absolute",
-              left: grab.frame.x - strip.x,
-              top: grab.frame.y - strip.y,
-              width: grab.frame.width,
-              height: grab.frame.height,
+              ...grabBox,
               zIndex: 4,
               background: "transparent",
               cursor: dragVisual ? "grabbing" : "default",

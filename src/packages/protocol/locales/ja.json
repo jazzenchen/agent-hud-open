@@ -1396,5 +1396,7 @@
   "{{vendor}} · Balance": "{{vendor}} · 残高",
   "{{window}} reached 95% in {{ranOut}} of the last {{cycles}} cycles. {{plan}} ({{price}}/mo, {{delta}} more) would have kept the busiest under 80%.": "{{window}} は直近 {{cycles}} サイクル中 {{ranOut}} 回 95% に達しました。{{plan}}（{{price}}/月、{{delta}} 増）なら、最も忙しいサイクルでも 80% 未満に収まっていました。",
   "{{window}}: over the last {{cycles}} cycles no window went past {{busiest}}%. {{plan}} ({{price}}/mo, {{delta}} less) would still have stayed under 80%.": "{{window}}: 直近 {{cycles}} サイクルで {{busiest}}% を超えた枠はありません。{{plan}}（{{price}}/月、{{delta}} 減）でも 80% 未満に収まっていました。",
-  "≈ {{amount}} a day": "1 日あたり ≈ {{amount}}"
+  "≈ {{amount}} a day": "1 日あたり ≈ {{amount}}",
+  "Auto-hide at edge": "端で自動非表示",
+  "Hide into a thin edge tab when idle; hover the edge to expand.": "アイドル時は端の細いタブに格納し、端にカーソルを合わせると展開します。"
 }
