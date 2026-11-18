@@ -21,6 +21,7 @@ use std::{
 
 pub(super) use link::open_unregistered as open_unregistered_link;
 pub(super) use window::allow_foreground;
+pub(crate) use window::{bring_forward as bring_window_forward, is_main_window};
 
 pub(super) const CODEX: &str = "com.openai.codex";
 

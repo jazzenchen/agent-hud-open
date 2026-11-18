@@ -21,6 +21,8 @@ compile_error!("agent-hud-platform supports macOS, Windows and Linux host builds
 mod unix;
 #[cfg(target_os = "macos")]
 pub use target::registered_applications;
+#[cfg(target_os = "windows")]
+pub(crate) use target::{bring_window_forward, is_main_window};
 pub(crate) use target::*;
 
 /// A folder that only passes short-lived words between the app and a
