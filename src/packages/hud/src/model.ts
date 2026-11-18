@@ -60,6 +60,8 @@ export interface HUDConfig {
   hidesRequests: boolean;
   /** This screen's HUD plays no flights of messages between agents. */
   hidesFlights: boolean;
+  /** This screen's HUD hides while an app or video is full screen on it (macOS). */
+  hidesInFullScreen: boolean;
   simpleSize: number;
   simpleGapScale: number;
   ringWidth: number;

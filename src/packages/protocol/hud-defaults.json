@@ -10,6 +10,7 @@
   "hidesMessages": false,
   "hidesRequests": false,
   "hidesFlights": false,
+  "hidesInFullScreen": false,
   "breathSeconds": 3,
   "idleBreathSeconds": 7,
   "breathAmplitude": 0.6,

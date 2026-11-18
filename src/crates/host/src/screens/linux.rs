@@ -10,3 +10,8 @@ pub fn install(_app: &tauri::App) -> Result<(), String> {
 }
 
 pub fn shutdown(_app: &tauri::AppHandle) {}
+
+/// Not read on this host yet: no HUD hides for a full-screen app.
+pub fn full_screen() -> super::FullScreen {
+    super::FullScreen::default()
+}
