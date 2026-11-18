@@ -382,3 +382,30 @@ fn duplicate_cli_reports_use_newer_cycle_then_newer_sample_in_any_order() {
         );
     }
 }
+
+/// A current CLI report names its account by email alone; the language
+/// server names the same account with its team. They are one account, read
+/// through the CLI's exact windows.
+#[test]
+fn a_cli_report_is_the_servers_account_of_the_same_email_and_any_team() {
+    let mut status = status_body();
+    status["userStatus"]["teamId"] = json!("team-1");
+    let mut host = FakeHost::new("/u");
+    host.natives.insert(
+        ("antigravity".into(), "ReadAccounts".into()),
+        Ok(json!({"accounts":[{"source":"desktop","status":status}]})),
+    );
+    host.account_reports.insert(
+        "antigravity".into(),
+        vec![report(
+            "me@example.com",
+            &chrono::Utc::now().to_rfc3339(),
+            0.75,
+            "2026-12-30T00:00:00Z",
+        )],
+    );
+    let reading = read(&host).unwrap();
+    assert!(reading.additional_accounts.is_empty());
+    assert_eq!(reading.quotas.len(), 1);
+    assert_eq!(reading.quotas[0]["windowDurationSeconds"], 604800);
+}

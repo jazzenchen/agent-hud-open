@@ -43,6 +43,16 @@ pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
         .iter()
         .filter_map(|quota| quota["accountId"].as_str().map(str::to_owned))
         .collect();
+    // The CLI names its account by email alone, where a desktop or IDE
+    // language server adds the account's team: an email a current CLI report
+    // names is that account, however the server names it.
+    let reported_emails: BTreeSet<String> = reading
+        .account
+        .iter()
+        .chain(&reading.additional_accounts)
+        .filter(|row| row["stale"] != true)
+        .filter_map(|row| row["label"].as_str().map(str::to_lowercase))
+        .collect();
     let native = ACCOUNT_SERVICE.runs_on(host.os()).then(||host.native(
         AGENT.id,
         "ReadAccounts",
@@ -63,6 +73,14 @@ pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
                             continue;
                         };
                         match parse(scope, &account["status"], &account["summary"]) {
+                            Ok(next)
+                                if next
+                                    .account
+                                    .as_ref()
+                                    .and_then(|row| row["label"].as_str())
+                                    .is_some_and(|email| {
+                                        reported_emails.contains(&email.to_lowercase())
+                                    }) => {}
                             Ok(mut next) => {
                                 next.quotas.retain(|quota| {
                                     !quota["accountId"]

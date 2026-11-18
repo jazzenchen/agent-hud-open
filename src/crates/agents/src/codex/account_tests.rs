@@ -478,3 +478,38 @@ fn a_pi_error_preserves_an_additional_homes_error() {
     assert!(notice.contains("Sign-in expired"));
     assert!(notice.contains("Sign in to ChatGPT again in Pi"));
 }
+
+/// An id token whose claims name `email`.
+fn id_token(email: &str) -> String {
+    use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
+    let claims = URL_SAFE_NO_PAD.encode(json!({"email": email}).to_string());
+    format!("e30.{claims}.sig")
+}
+
+/// Codex left the email out: the home's own sign-in names it, so the reading
+/// is the account a full reading is, not a second one keyed by half.
+#[test]
+fn the_homes_sign_in_completes_an_email_codex_left_out() {
+    let host = installed(limits(), Value::Null).file(
+        "/u/.codex/auth.json",
+        &json!({"tokens": {"account_id": "ws", "id_token": id_token("A@example.com")}}).to_string(),
+    );
+    let account = read(&host).unwrap().account.unwrap();
+    assert_eq!(account["label"], "A@example.com");
+    assert_eq!(
+        account["id"],
+        legacy_account("Codex", "a@example.com", "ws").unwrap()
+    );
+}
+
+/// A sign-in for another workspace says nothing of this one's email.
+#[test]
+fn another_workspaces_sign_in_completes_nothing() {
+    let host = installed(limits(), Value::Null).file(
+        "/u/.codex/auth.json",
+        &json!({"tokens": {"account_id": "elsewhere", "id_token": id_token("b@example.com")}})
+            .to_string(),
+    );
+    let account = read(&host).unwrap().account.unwrap();
+    assert_ne!(account["label"], "b@example.com");
+}

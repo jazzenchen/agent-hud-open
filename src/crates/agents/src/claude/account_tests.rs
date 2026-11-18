@@ -895,3 +895,60 @@ fn a_signed_in_engine_never_reads_the_desktop_app() {
     assert_eq!(read(&host).unwrap().quotas.len(), 2);
     assert!(host.asked.borrow().is_empty());
 }
+
+fn desktop_signed_in(host: FakeHost, user: &str) -> FakeHost {
+    let mut host = host
+        .file(
+            "/u/AppData/Claude/config.json",
+            &json!({"lastKnownAccountUuid": user}).to_string(),
+        )
+        .answer(
+            "https://claude.ai/api/account",
+            Ok(json!({"email_address": "desk@example.com", "memberships": [
+                {"organization": {"uuid": "0a1b-2c3d", "rate_limit_tier": "default_claude_max_5x"}},
+            ]})),
+        )
+        .answer(
+            "https://claude.ai/api/organizations/0a1b-2c3d/usage",
+            Ok(web_limits()),
+        );
+    host.cookies.insert(
+        "Claude|claude.ai|sessionKey".into(),
+        Answer::Found("sk-ant-sid01-secret".into()),
+    );
+    host.cookies.insert(
+        "Claude|claude.ai|lastActiveOrg".into(),
+        Answer::Found("0a1b-2c3d".into()),
+    );
+    host
+}
+
+/// The desktop app signed in to another account than Claude Code: each is
+/// read, with its own windows (a desktop app and a command line are separate
+/// clients).
+#[test]
+fn the_desktop_apps_other_account_is_read_beside_claude_codes() {
+    let host = desktop_signed_in(installed(limits()), "user-9");
+    let reading = read(&host).unwrap();
+    let labels: Vec<_> = reading
+        .account
+        .iter()
+        .chain(&reading.additional_accounts)
+        .map(|account| account["label"].clone())
+        .collect();
+    assert_eq!(labels, [json!("me@example.com"), json!("desk@example.com")]);
+    let desktop = account_id("claude", &["user-9", "0a1b-2c3d"]);
+    assert!(reading
+        .quotas
+        .iter()
+        .any(|row| row["id"] == format!("{desktop}:claude-session")));
+    assert_eq!(reading.quotas.len(), 5);
+}
+
+/// The desktop app on Claude Code's own account is not read again.
+#[test]
+fn the_desktop_apps_same_account_is_not_read_again() {
+    let host = desktop_signed_in(installed(limits()), "user-1");
+    assert_eq!(read(&host).unwrap().quotas.len(), 2);
+    assert!(host.asked.borrow().is_empty());
+}

@@ -4,14 +4,15 @@
 //! Code's .claude.json names, read before and after. Without a Claude Code
 //! sign-in, the Claude desktop app's own claude.ai sign-in answers instead.
 //! Folders added in Settings (`claudeHomes`) are read after the default one,
-//! one at a time, each as its own account.
+//! one at a time, each as its own account. The desktop app signed in to
+//! another account is read beside them, as an account of its own.
 //!
 //! Claude Code's own record of its last usage answer (`usage_record`) comes
 //! first while it is under a minute old, which is what the engine would
 //! answer then, so the engine is not started for it. When every way fails,
 //! the record's windows stand in, as old as they are, and the failure stays
 //! what it was: a signed-out Claude Code is still told to sign in again.
-use super::desktop_usage::{desktop_is_claude_codes, from_desktop};
+use super::desktop_usage::{desktop_is_claude_codes, from_desktop, with_desktop};
 use super::engine_usage::{from_engine, EngineUnread};
 use super::quota_windows::{plan_reading, profile_plan, windows};
 use super::usage_record;
@@ -93,7 +94,7 @@ pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
     )
     .collect();
     if folders.len() == 1 {
-        return read_folder(host, &folders[0]);
+        return with_desktop(host, &folders, read_folder(host, &folders[0]));
     }
     let mut reading = Reading::empty("claude");
     let mut succeeded = false;
@@ -136,14 +137,15 @@ pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
         }
         merge(&mut reading, record);
     }
-    match failure {
+    let result = match failure {
         None => Ok(reading),
         Some(failure) if recorded => {
             reading.failure = Some(failure);
             Ok(reading)
         }
         Some(failure) => Err(failure),
-    }
+    };
+    with_desktop(host, &folders, result)
 }
 
 /// A reading's windows and accounts marked stale.

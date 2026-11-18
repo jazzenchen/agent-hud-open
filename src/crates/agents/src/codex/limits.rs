@@ -1,6 +1,8 @@
 //! Codex's plan windows and credits as its app-server reports them, and the
 //! sign-in identities Agent HUD remembers for them.
-use crate::account::{account_id, legacy_account, legacy_unresolved, status, Host, Reading};
+use crate::account::{
+    account_id, jwt_claims, legacy_account, legacy_unresolved, read_json, status, Host, Reading,
+};
 use crate::l10n::tr;
 use crate::naming::{vendor_windows, window_names};
 use serde_json::{json, Value};
@@ -57,6 +59,43 @@ fn remember_identity(
     }
     (ws, em)
 }
+/// The workspace and email the home's own sign-in names (`auth.json`): the
+/// account its tokens are for, and the email its id token carries. Read only
+/// to complete what Codex left out of a reading; nothing is sent.
+fn signed_in(host: &dyn Host, home: &str) -> (String, String) {
+    let Some(auth) = read_json(host, &std::path::Path::new(home).join("auth.json")) else {
+        return Default::default();
+    };
+    let tokens = &auth["tokens"];
+    let workspace = tokens["account_id"].as_str().unwrap_or_default();
+    let email = tokens["id_token"]
+        .as_str()
+        .and_then(jwt_claims)
+        .and_then(|claims| claims["email"].as_str().map(str::to_owned))
+        .unwrap_or_default();
+    (workspace.trim().to_owned(), email.trim().to_owned())
+}
+
+/// What Codex reported of the sign-in, with what it left out taken from the
+/// home's own sign-in when that is the same sign-in: an email only beside
+/// its workspace, a workspace only beside its email (or with neither
+/// reported). A reading whose identity stays half known would otherwise
+/// show the same subscription as a second account.
+fn completed(host: &dyn Host, home: &str, workspace: &str, email: &str) -> (String, String) {
+    let (mut workspace, mut email) = (workspace.trim().to_owned(), email.trim().to_owned());
+    if !workspace.is_empty() && !email.is_empty() {
+        return (workspace, email);
+    }
+    let (own_workspace, own_email) = signed_in(host, home);
+    if workspace.is_empty() && (email.is_empty() || email.eq_ignore_ascii_case(&own_email)) {
+        workspace = own_workspace.clone();
+    }
+    if email.is_empty() && !workspace.is_empty() && workspace == own_workspace {
+        email = own_email;
+    }
+    (workspace, email)
+}
+
 fn parse_reset_credits(limits: &Value) -> Option<Value> {
     let raw = limits
         .get("rateLimitResetCredits")
@@ -109,9 +148,13 @@ pub(super) fn parse(
     native: bool,
 ) -> Result<Reading, String> {
     let mut reading = Reading::empty("codex");
-    let raw_workspace = limits["accountId"].as_str().unwrap_or_default();
-    let raw_email = account["email"].as_str().unwrap_or_default();
-    let (workspace_str, email_str) = remember_identity(host, home, raw_workspace, raw_email);
+    let (raw_workspace, raw_email) = completed(
+        host,
+        home,
+        limits["accountId"].as_str().unwrap_or_default(),
+        account["email"].as_str().unwrap_or_default(),
+    );
+    let (workspace_str, email_str) = remember_identity(host, home, &raw_workspace, &raw_email);
     let workspace = workspace_str.as_str();
     let email = email_str.as_str();
     let identity = if workspace.is_empty() && email.is_empty() {

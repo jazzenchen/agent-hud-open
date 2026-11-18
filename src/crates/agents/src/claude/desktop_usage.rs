@@ -1,6 +1,7 @@
 //! Claude's plan limits through the Claude desktop app's claude.ai sign-in.
 use super::account::{profile, Folder};
 use super::quota_windows::{plan_reading, profile_plan, windows};
+use crate::account::{append_notice, merge};
 use crate::account::{read_json, Answer, Host, HttpFailure, HttpRequest, Reading, Unread};
 use crate::l10n::tr;
 use crate::Base;
@@ -138,4 +139,46 @@ pub(super) fn from_desktop(
     };
     let plan = profile_plan(&who);
     Some(Ok(plan_reading(host, windows, &who, plan, &folder.path)))
+}
+
+/// Claude Code's reading, with the account the Claude desktop app signed in
+/// to beside it when no folder Claude Code reads signed in to that account:
+/// a desktop app and a command line are separate clients, each with the
+/// account it uses (owner, 2026-11-18). Nothing more is read while the
+/// desktop app uses an account Claude Code already reads, or while the default
+/// folder is signed out (its reading came through the desktop app already).
+/// A failed desktop reading leaves Claude Code's as it is, with a notice.
+pub(super) fn with_desktop(
+    host: &dyn Host,
+    folders: &[Folder],
+    result: Result<Reading, Unread>,
+) -> Result<Reading, Unread> {
+    let Ok(mut reading) = result else {
+        return result;
+    };
+    let Some(user) = desktop_user(host) else {
+        return Ok(reading);
+    };
+    let accounts = folders
+        .iter()
+        .map(|folder| {
+            profile(host, folder)["accountUuid"]
+                .as_str()
+                .map(str::to_owned)
+        })
+        .collect::<Vec<_>>();
+    if accounts[0].as_deref().is_none_or(str::is_empty)
+        || accounts.iter().flatten().any(|account| *account == user)
+    {
+        return Ok(reading);
+    }
+    match from_desktop(host, &folders[0], false) {
+        Some(Ok(desktop)) => merge(&mut reading, desktop),
+        Some(Err(failure)) => append_notice(
+            &mut reading,
+            format!("Claude Desktop: {}", failure.reason()),
+        ),
+        None => {}
+    }
+    Ok(reading)
 }
