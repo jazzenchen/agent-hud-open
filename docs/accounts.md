@@ -122,7 +122,10 @@ default account only. The list is saved locally as `settings.codexHomes`.
 The account worker reads the homes sequentially, using the selected
 `CODEX_HOME` only for that child process. It resolves duplicate directories and
 merges repeated subscription identities, including Pi's ChatGPT sign-in. The
-same email in different workspaces remains separate. A failed home reports a
+same email in different workspaces remains separate. When Codex leaves the
+email or the workspace out of a reading, the home's own `auth.json` (its
+tokens' account id and its id token's email) completes them, only where it is
+the same sign-in, so one subscription never appears twice. A failed home reports a
 notice while successful homes still appear; if every reading fails, the last
 reading remains marked stale. Saving a changed list discards readings from the
 previous list, including results still in flight.
@@ -149,7 +152,10 @@ read once, and an account signed in from two folders appears once. A failed
 folder reports a notice while the other folders still appear, with the windows
 Claude Code last recorded in that folder, marked stale; if every reading fails,
 the last reading remains marked stale. The Claude desktop app's sign-in
-stands in only for the default folder, never for an added one. Saving a changed
+stands in only for the default folder, never for an added one. When the desktop
+app last signed in to an account no folder reads, that account is read too,
+through the desktop app's sign-in, as an account of its own; the desktop app on
+an account a folder already reads is not read again. Saving a changed
 list discards readings from the previous list, including results still in
 flight.
 
@@ -212,7 +218,9 @@ The installer currently supports macOS and Linux. On Windows, the connection
 controls report that callbacks are unavailable and leave CLI settings untouched.
 The callback retains only email, plan, quota percentages, reset times and the
 observation time. It does not retain the callback's workspace, conversation or
-transcript fields. No login, credential switching, or model request is needed.
+transcript fields. A current report's email is the account a language server
+reports for that email, whatever team the server adds: it shows once, with the
+CLI's windows. No login, credential switching, or model request is needed.
 
 Each reported email appears as a separate account. Switching accounts in a
 connected CLI retains the earlier account's latest observation; multiple
