@@ -231,6 +231,7 @@ pub(crate) fn open_url_in_app(_bundle_id: &str, _url: &str) -> bool {
 }
 
 pub(crate) fn open_session_url(url: &str) -> Result<(), String> {
+    let is_codex = url.starts_with("codex:");
     if let Some(opened) = apps::open_unregistered_link(url) {
         return opened;
     }
@@ -254,6 +255,7 @@ pub(crate) fn open_session_url(url: &str) -> Result<(), String> {
         .encode_wide()
         .chain(Some(0))
         .collect::<Vec<_>>();
+    apps::allow_foreground();
     if unsafe {
         ShellExecuteW(
             std::ptr::null_mut(),
@@ -266,6 +268,9 @@ pub(crate) fn open_session_url(url: &str) -> Result<(), String> {
     } as isize
         > 32
     {
+        if is_codex {
+            let _ = apps::launch_app(apps::CODEX);
+        }
         Ok(())
     } else {
         Err("The native client could not open this session".into())

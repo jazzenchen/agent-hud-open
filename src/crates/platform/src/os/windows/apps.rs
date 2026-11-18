@@ -20,8 +20,9 @@ use std::{
 };
 
 pub(super) use link::open_unregistered as open_unregistered_link;
+pub(super) use window::allow_foreground;
 
-const CODEX: &str = "com.openai.codex";
+pub(super) const CODEX: &str = "com.openai.codex";
 
 /// The program names that stand for an app's macOS bundle identifier.
 fn programs(bundle_id: &str) -> &'static [&'static str] {
