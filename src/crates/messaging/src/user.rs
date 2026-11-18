@@ -37,16 +37,18 @@ impl Messaging {
                 let client = session["source"].as_str().unwrap_or_default();
                 let (reachable, reason) =
                     self.reachable(client, id, &loaded, (session, host.snapshot), language);
+                let folder =
+                    started_in(session).or_else(|| session["cwd"].as_str().map(Into::into));
                 json!({
                     "id": id,
                     "client": client,
                     "title": session["title"],
-                    "folder": session["cwd"].as_str().or(session["project"].as_str()),
+                    "folder": folder.as_deref().or(session["project"].as_str()),
                     // The folder as the start offers write it, to start a
                     // new session beside this one.
-                    "startFolder": session["cwd"]
-                        .as_str()
-                        .and_then(|cwd| self.starts.offered_folder(cwd)),
+                    "startFolder": folder
+                        .as_deref()
+                        .and_then(|folder| self.starts.offered_folder(folder)),
                     "state": state(session),
                     "reachable": reachable,
                     "reason": reason,
@@ -205,7 +207,7 @@ impl Messaging {
                         "uncertain" => "uncertain",
                         _ => "refused",
                     },
-                    "reason": receipt.reason,
+                    "reason": receipt.reason.as_deref().map(plain),
                     "sessionId": receipt.session_id,
                 })
             }
@@ -223,6 +225,31 @@ fn title_of(text: &str) -> String {
         .find(|line| !line.is_empty())
         .unwrap_or_default();
     line.chars().take(80).collect()
+}
+
+/// The folder a Claude Code session was started in, which the window files
+/// it under: a `cd` inside the session moves its cwd, but not its log, which
+/// Claude keeps in a folder named after the start (every mark but letters
+/// and digits as `-`). The cwd or the folder above it that has that name.
+fn started_in(session: &Value) -> Option<String> {
+    if session["source"] != "claude" {
+        return None;
+    }
+    let cwd = session["cwd"].as_str()?;
+    let named = std::path::Path::new(session["logPath"].as_str()?)
+        .parent()?
+        .file_name()?
+        .to_str()?;
+    let mark = |path: &str| -> String {
+        path.chars()
+            .map(|c| if c.is_ascii_alphanumeric() { c } else { '-' })
+            .collect()
+    };
+    std::path::Path::new(cwd)
+        .ancestors()
+        .filter_map(|path| path.to_str())
+        .find(|path| mark(path) == named)
+        .map(Into::into)
 }
 
 #[cfg(test)]
@@ -252,6 +279,29 @@ mod user_tests {
                 folder: String::new()
             }
         );
+    }
+
+    #[test]
+    fn a_claude_session_is_filed_where_it_started_not_where_it_went() {
+        let session = |cwd: &str| {
+            json!({
+                "source": "claude",
+                "cwd": cwd,
+                "logPath": "/home/u/.claude/projects/-work-agent-hud-all/f95d.jsonl",
+            })
+        };
+        assert_eq!(
+            started_in(&session("/work/agent-hud-all/agent-hud-open/src")).as_deref(),
+            Some("/work/agent-hud-all")
+        );
+        assert_eq!(
+            started_in(&session("/work/agent-hud-all")).as_deref(),
+            Some("/work/agent-hud-all")
+        );
+        assert_eq!(started_in(&session("/elsewhere")), None);
+        let mut codex = session("/work/agent-hud-all/x");
+        codex["source"] = json!("codex");
+        assert_eq!(started_in(&codex), None);
     }
 
     #[test]

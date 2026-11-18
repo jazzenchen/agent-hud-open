@@ -41,9 +41,16 @@ impl SessionStarts {
             .flat_map(|line| line.split(|c: char| c.is_whitespace() || c == '·'))
             .find(|word| word.len() >= 6 && word.bytes().all(|b| b.is_ascii_hexdigit()));
         if output.code != Some(0) {
-            return Err(Failure::Rejected(
-                "Claude Code refused to start a background session".into(),
-            ));
+            // Claude Code says why, such as a folder it does not trust yet.
+            let why = String::from_utf8_lossy(&output.stderr)
+                .lines()
+                .map(str::trim)
+                .rfind(|line| !line.is_empty())
+                .map(|line| line.chars().take(400).collect::<String>());
+            return Err(Failure::Rejected(match why {
+                Some(why) => format!("Claude Code refused to start a background session: {why}"),
+                None => "Claude Code refused to start a background session".into(),
+            }));
         }
         let job = job.ok_or(Failure::AcceptanceUncertain)?;
         for _ in 0..20 {
