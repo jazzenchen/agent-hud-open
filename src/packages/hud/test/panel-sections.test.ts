@@ -85,3 +85,41 @@ test("a section keeps the last answer to its query while the next revision's is 
   });
   assert.equal(shownAnswer(kept, key(5), base).error, null);
 });
+
+test("two panels asking the same question show the same answer, whichever asked the query that answered", () => {
+  const base = JSON.stringify(["plan_value", { hiddenModels: [] }]);
+  const key = (revision: number) =>
+    JSON.stringify(["plan_value", revision, { hiddenModels: [] }]);
+  // The visible panel asked at revision 1 and has its answer; the measuring
+  // copy asked only at revision 2, which Core has not answered yet (Open #116).
+  const visible: PanelAnswer<string> = {
+    key: key(1),
+    base,
+    order: 1,
+    data: "three plans",
+    error: null,
+  };
+  const last = "three plans";
+  assert.equal(shownAnswer(visible, key(2), base, last).data, "three plans");
+  assert.equal(
+    shownAnswer(noAnswer, key(2), base, last).data,
+    "three plans",
+    "the copy measures the rows the visible panel shows, not Loading",
+  );
+  // A panel's own answer to its query comes first, an error included.
+  assert.equal(
+    shownAnswer({ ...visible, key: key(2) }, key(2), base, "older").data,
+    "three plans",
+  );
+  assert.deepEqual(
+    shownAnswer(
+      { ...visible, key: key(2), data: null, error: "Plan value failed" },
+      key(2),
+      base,
+      last,
+    ),
+    { data: null, error: "Plan value failed" },
+  );
+  // With no last answer to the question, a panel keeps its own.
+  assert.equal(shownAnswer(visible, key(2), base).data, "three plans");
+});

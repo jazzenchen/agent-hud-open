@@ -18,18 +18,24 @@ export const noAnswer: PanelAnswer<never> = {
 };
 
 /** What a panel shows for the query `key`: its answer, else, until that
- * comes, the last answer to the same parameters at an earlier revision. Core
- * moves its revision on with every read that changes usage, every 2 s while
- * logs are indexed; a section that showed only the current revision's answer
- * would go blank each time, and stay blank while answers take longer than
- * that. */
+ * comes, the last answer to the same parameters at an earlier revision:
+ * `last`, the last one any panel had, else its own. Core moves its revision
+ * on with every read that changes usage, every 2 s while logs are indexed; a
+ * section that showed only the current revision's answer would go blank each
+ * time, and stay blank while answers take longer than that. Two panels asking
+ * the same question show the same answer, whichever of them asked the query
+ * that answered. */
 export function shownAnswer<T>(
   answer: PanelAnswer<T>,
   key: string,
   base: string,
+  last?: T,
 ): { data: T | null; error: string | null } {
   if (answer.key === key) return { data: answer.data, error: answer.error };
-  return { data: answer.base === base ? answer.data : null, error: null };
+  return {
+    data: last ?? (answer.base === base ? answer.data : null),
+    error: null,
+  };
 }
 
 /** The answer kept when `next` comes: an answer to a query asked later

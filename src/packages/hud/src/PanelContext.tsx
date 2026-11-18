@@ -4,6 +4,7 @@ import {
   useEffect,
   useRef,
   useState,
+  useSyncExternalStore,
   type ReactNode,
 } from "react";
 import type { EndsLink } from "./ends/ends-link";
@@ -97,9 +98,18 @@ export const usePanelServices = () => useContext(Context);
 /** Shared by the measuring and visible panel: one query per committed revision/key. */
 const cache = new Map<string, Promise<unknown>>();
 /** The last answer to each question (its parameters without the time
- * window), whatever revision it came from: a panel that opens shows it at
- * once, and a refresh changes it instead of blanking it. */
+ * window), whatever revision it came from and whichever panel asked it: a
+ * panel that opens shows it at once, a refresh changes it instead of
+ * blanking it, and every section follows it as it changes. The measuring
+ * copy asks after the visible panel, at a newer revision when Core moved
+ * on, so it measures the rows the visible panel shows rather than
+ * "Loading" under them (Open #116). */
 const latest = new Map<string, unknown>();
+const listeners = new Set<() => void>();
+const listen = (listener: () => void) => {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
+};
 /** A section's query: its answer, or until that comes the last answer to the
  * same question (`shownAnswer`). An answer that comes after a newer query was
  * asked still counts while none newer has come (`settled`): while Core indexes,
@@ -116,10 +126,10 @@ export function usePanelQuery<T>(
     method,
     { ...params, from: undefined, to: undefined },
   ]);
-  const [answer, setAnswer] = useState<PanelAnswer<T>>(() =>
-    latest.has(base)
-      ? { key: "", base, order: 0, data: latest.get(base) as T, error: null }
-      : noAnswer,
+  const [answer, setAnswer] = useState<PanelAnswer<T>>(noAnswer);
+  const last = useSyncExternalStore(
+    listen,
+    () => latest.get(base) as T | undefined,
   );
   const asked = useRef(0);
   useEffect(() => {
@@ -140,6 +150,7 @@ export function usePanelQuery<T>(
         latest.delete(base);
         latest.set(base, value);
         while (latest.size > 32) latest.delete(latest.keys().next().value!);
+        listeners.forEach((listener) => listener());
         setAnswer((current) =>
           settled(current, { key, base, order, data: value as T, error: null }),
         );
@@ -156,7 +167,10 @@ export function usePanelQuery<T>(
         ),
     );
   }, [key, base, enabled, services]);
-  return { ...shownAnswer(answer, key, base), available: Boolean(services) };
+  return {
+    ...shownAnswer(answer, key, base, last),
+    available: Boolean(services),
+  };
 }
 export type PanelStatistics = StatisticsResponse;
 export type PanelSessions = SessionsResponse;
