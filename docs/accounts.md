@@ -42,6 +42,13 @@ What a 401 means is the provider's to say.
 
 Everything else is the same for every provider:
 
+- A provider is read every 2 minutes while a turn of a session source that
+  spends it runs, every 4 minutes otherwise, each plus a random 0–60 s drawn
+  again after every reading, so providers and vendors are not asked in step.
+  Where this computer's work moves a provider's windows, work that finished
+  since the last reading is read 0–15 s after it ended. No provider is read twice within 60 s, and one reading runs
+  at a time. DeepSeek's balance counts Claude Code, Codex and Pi sessions as
+  its own, since they can spend it through a DeepSeek key.
 - A reading that only missed an answer, while the last good one is under 10
   minutes old, changes nothing on screen. Any other failure shows at once with
   its reason, and the last reading stays, marked stale.

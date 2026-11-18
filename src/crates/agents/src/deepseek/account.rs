@@ -31,8 +31,11 @@ pub(super) fn decimal(value: &Value) -> Option<f64> {
 }
 
 /// DeepSeek's balance, with the key DeepSeek Harness or the user keeps, and
-/// with the keys other clients send to DeepSeek's API.
+/// with the keys other clients send to DeepSeek's API (`routes.rs`). Their
+/// turns spend it as Harness's own do, so they set when it is read in the
+/// same way.
 pub static PROVIDER: Provider = Provider {
+    work_sources: &["deepseek", "claude", "codex", "pi"],
     ..Provider::new("deepseek", read)
 };
 

@@ -1,7 +1,8 @@
 //! Provider account readings on one worker, one at a time, with one result
 //! cache outside the Runtime mutex. A reading holds the collection gate, so it
 //! never overlaps a local pass either.
-//! Cadence follows UsageRefresh: 300s quiet, 150s running, >=60s per account.
+//! Cadence (`schedule`): 240 s quiet, 120 s running, each plus a random spread
+//! of 0–60 s; a few seconds after work finishes; >= 60 s per account.
 //!
 //! Each provider states its own facts (`agents::account::Provider`): how it
 //! is read, whose work spends its windows, what a failure means. Everything

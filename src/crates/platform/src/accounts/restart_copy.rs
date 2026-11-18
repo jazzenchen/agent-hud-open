@@ -20,7 +20,7 @@ use std::{
 const FILE: &str = "last-account-readings.json";
 const VERSION: u64 = 1;
 const LIMIT: u64 = 32 * 1024 * 1024;
-/// UsageRefresh.accountInterval.
+/// The restart copy is written at most this often.
 pub(super) const SAVE_INTERVAL: Duration = Duration::from_secs(300);
 
 #[derive(Default)]

@@ -570,7 +570,7 @@ fn a_quiet_session_in_flight_keeps_its_provider_on_the_live_interval() {
     assert_eq!(
         due_after(facts("claude"), &claude, &state),
         Duration::ZERO,
-        "live: read every 300 s"
+        "live: read every 240 s"
     );
     state.running.insert("claude".into());
     assert_eq!(due_after(facts("claude"), &claude, &state), Duration::ZERO);
@@ -600,6 +600,46 @@ fn only_providers_this_macs_work_moves_wait_for_their_reset() {
         due_after(facts("glm"), &reset_later("glm"), &state),
         Duration::ZERO,
         "an open agent's work is the plans'"
+    );
+}
+
+#[test]
+fn a_deepseek_key_in_another_client_reads_the_balance_with_that_clients_work() {
+    let mut state = control();
+    let mut deepseek = entry(
+        AccountReading::empty("deepseek"),
+        Some("2026-11-18T08:00:00+00:00"),
+        false,
+    );
+    // The last reading ran 90 s ago.
+    deepseek.attempted -= Duration::from_secs(90);
+    deepseek.attempted_ms -= 90_000;
+    let quiet = due_after(facts("deepseek"), &deepseek, &state);
+    assert!(
+        quiet > Duration::from_secs(145) && quiet <= Duration::from_secs(150),
+        "quiet: every 240 s"
+    );
+    state.running.insert("claude".into());
+    let running = due_after(facts("deepseek"), &deepseek, &state);
+    assert!(
+        running > Duration::from_secs(25) && running <= Duration::from_secs(30),
+        "a Claude Code turn running: every 120 s"
+    );
+    state.running.clear();
+    state
+        .finished
+        .insert("pi".into(), chrono::Utc::now().timestamp_millis());
+    assert_eq!(
+        due_after(facts("deepseek"), &deepseek, &state),
+        Duration::ZERO,
+        "a Pi turn ended, with no spread: at once"
+    );
+    // The spread puts the reading after a turn's end off by up to 15 s.
+    deepseek.spread = 60;
+    let staggered = due_after(facts("deepseek"), &deepseek, &state);
+    assert!(
+        staggered > Duration::from_secs(14) && staggered <= Duration::from_secs(15),
+        "{staggered:?}"
     );
 }
 

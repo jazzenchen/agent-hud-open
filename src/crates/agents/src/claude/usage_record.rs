@@ -22,8 +22,8 @@ use serde_json::Value;
 /// the server, while it is under a minute old (`rt`, 60 000 ms in 2.1.316),
 /// so a record that young is what the engine would answer: reading it
 /// instead only saves starting the engine. Agent HUD's own readings write
-/// the record most of the time and are at least 60 s apart (150 s while a
-/// turn runs, 300 s otherwise), so a longer bound would read Agent HUD's
+/// the record most of the time and are at least 60 s apart (2–3 minutes
+/// while a turn runs, 4–5 otherwise), so a longer bound would read Agent HUD's
 /// previous answer back as a new one and halve how often the quota is
 /// really read.
 pub const FRESH_MS: i64 = 60_000;

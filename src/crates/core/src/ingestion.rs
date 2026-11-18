@@ -20,8 +20,7 @@ mod waiting;
 pub(crate) use lines::{line, read_lines};
 
 /// Logs whose last read failed. Each is tried again only after a pause that
-/// doubles with every failure in a row, from 30 s up to the 300 s account
-/// interval; what was read from it before stays in place, and its failure is
+/// doubles with every failure in a row, from 30 s up to 300 s; what was read from it before stays in place, and its failure is
 /// still reported while it pauses (agent-hud-native-open FailedReads).
 /// The logs waiting to be read, and how the listing finds them.
 #[derive(Default)]
