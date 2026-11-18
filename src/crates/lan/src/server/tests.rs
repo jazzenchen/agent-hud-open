@@ -486,6 +486,12 @@ fn a_request_may_carry_a_megabyte_and_no_more() {
         let body = "a".repeat(size);
         format!("POST /v1/prompt HTTP/1.1\r\nContent-Length: {size}\r\n\r\n{body}")
     };
-    assert!(matches!(Request::parse(request(1024 * 1024).as_bytes()), Parse::Request(_)));
-    assert!(matches!(Request::parse(request(1024 * 1024 + 32 * 1024).as_bytes()), Parse::Invalid));
+    assert!(matches!(
+        Request::parse(request(1024 * 1024).as_bytes()),
+        Parse::Request(_)
+    ));
+    assert!(matches!(
+        Request::parse(request(1024 * 1024 + 32 * 1024).as_bytes()),
+        Parse::Invalid
+    ));
 }
