@@ -13,7 +13,7 @@
 .agents-list {
   position: sticky;
   top: 0;
-  flex: 0 0 184px;
+  flex: 0 0 196px;
   max-height: calc(100vh - 128px);
   overflow-y: auto;
   display: flex;
