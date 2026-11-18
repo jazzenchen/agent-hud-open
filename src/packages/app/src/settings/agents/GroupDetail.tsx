@@ -8,6 +8,7 @@ import type {
   PanelLayout,
   Snapshot,
 } from "@agent-hud/protocol";
+import { ChevronLeft } from "lucide-react";
 import { HUDArtwork as HUDLogo } from "@agent-hud/hud/HUDArtwork";
 import type { Translate } from "@agent-hud/ui/format";
 import { LinkButton } from "../SettingsControls";
@@ -23,6 +24,7 @@ export function GroupDetail({
   action,
   layout,
   onLayout,
+  back,
 }: {
   t: Translate;
   snapshot: Snapshot;
@@ -35,6 +37,8 @@ export function GroupDetail({
   ) => Promise<unknown>;
   layout: PanelLayout;
   onLayout: (layout: PanelLayout) => Promise<unknown>;
+  /** Back to the list of agents. */
+  back: () => void;
 }) {
   const { pending, error, setError, perform } = usePerform();
   const agents = [...new Set(clients.map((client) => client.agent))]
@@ -42,6 +46,12 @@ export function GroupDetail({
     .filter((provider) => provider !== undefined);
   return (
     <Page>
+      <div>
+        <LinkButton onClick={back}>
+          <ChevronLeft size={13} />
+          {t("Agents")}
+        </LinkButton>
+      </div>
       <header className="agents-detail-header">
         <HUDLogo source={clients[0]?.agent ?? ""} size={24} />
         <div className="agents-detail-title">

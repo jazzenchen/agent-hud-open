@@ -143,7 +143,11 @@ export function useIslandNews(
     // A completion reminds while its client's live status and reminders are on.
     const remindsOf = (source: string, sessionId?: string) => {
       const prefs = services?.sources?.[clientID(snapshot, source, sessionId)];
-      return prefs?.live !== false && prefs?.reminders !== false;
+      return (
+        snapshot.settings.liveStatus !== false &&
+        prefs?.live !== false &&
+        prefs?.reminders !== false
+      );
     };
     const eligible = silenced
       ? []

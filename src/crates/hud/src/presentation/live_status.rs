@@ -66,14 +66,17 @@ impl Presentation {
             let s = self.state.lock().unwrap_or_else(PoisonError::into_inner);
             Self::preferences(&s.saved.sources, snapshot)
         };
-        if preferences.values().any(|p| p["live"] == false) {
+        // Live status turned off in Settings → Agents holds for every client;
+        // each client's own switch is kept for when it is on again.
+        let everywhere = snapshot["settings"]["liveStatus"] != false;
+        if !everywhere || preferences.values().any(|p| p["live"] == false) {
             for session in snapshot["sessions"].as_array_mut().into_iter().flatten() {
                 let client = session["clientId"]
                     .as_str()
                     .or_else(|| session["source"].as_str())
                     .unwrap_or("")
                     .to_ascii_lowercase();
-                if preferences.get(&client).is_some_and(|p| p["live"] == false) {
+                if !everywhere || preferences.get(&client).is_some_and(|p| p["live"] == false) {
                     session["state"] = json!("idle");
                     if let Some(object) = session.as_object_mut() {
                         object.remove("liveFacts");

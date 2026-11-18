@@ -72,6 +72,8 @@ export default function SettingsPane({
         onLayout={onLayout}
         preferences={preferences}
         onPreferences={onPreferences}
+        items={agentPlugins}
+        request={request}
       />
     );
   if (page === "agent-plugins")

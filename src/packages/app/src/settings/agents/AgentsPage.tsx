@@ -1,6 +1,7 @@
-/* Settings → Agents: the clients on the left, grouped by vendor, and on the
- * right the chosen client's settings, or a vendor's accounts when its name is
- * chosen. */
+/* Settings → Agents: what Agent HUD does, one switch each for every agent,
+ * then the agents, each with the features it uses. An agent opens its own
+ * page, where any feature can be turned off for it alone; a vendor's name
+ * opens the vendor's page, where its agents' accounts are set. */
 import { useRef, useState } from "react";
 import type {
   ClientRow,
@@ -10,8 +11,13 @@ import type {
   SourcePreferences,
 } from "@agent-hud/protocol";
 import { useT } from "@agent-hud/ui/format-context";
+import { Page } from "../SettingsPrimitives";
+import type { AgentPluginItem } from "../agent-plugins/types";
+import { ToolsSection } from "../agent-plugins/ToolsSection";
+import { useHudTools } from "../agent-plugins/use-status";
 import { AgentList } from "./AgentList";
 import { AgentDetail } from "./AgentDetail";
+import { FeaturesSection } from "./FeaturesSection";
 import { GroupDetail } from "./GroupDetail";
 import "./agents.css";
 
@@ -27,7 +33,12 @@ export interface AgentsPageProps {
   onLayout: (layout: PanelLayout) => Promise<unknown>;
   preferences: Record<string, SourcePreferences>;
   onPreferences: (source: string, patch: SourcePreferences) => Promise<unknown>;
+  /** A product build's own agent tools, shown with Agent HUD's. */
+  items?: AgentPluginItem[];
+  request: (method: string, params?: unknown) => Promise<unknown>;
 }
+
+type View = { kind: "list" } | { kind: "client" | "group"; id: string };
 
 export default function AgentsPage({
   snapshot,
@@ -37,14 +48,14 @@ export default function AgentsPage({
   onLayout,
   preferences,
   onPreferences,
+  items = [],
+  request,
 }: AgentsPageProps) {
   const t = useT();
-  // A client's id, or a vendor's group id when its name was chosen.
-  const [selectedID, setSelected] = useState<string>();
-  const [groupChosen, setGroupChosen] = useState(false);
+  const [view, setView] = useState<View>({ kind: "list" });
   const page = useRef<HTMLDivElement>(null);
-  // The order the runtime lists them in, so the list never jumps when the
-  // panel order changes; the list puts found ones first.
+  const tools = useHudTools(snapshot, action);
+  // The order the runtime lists them in, so the list never jumps.
   const clients: ClientRow[] = snapshot.clients?.length
     ? snapshot.clients
     : snapshot.providers.map((provider) => ({
@@ -58,67 +69,78 @@ export default function AgentsPage({
       }));
   const members = (group: string) =>
     clients.filter((row) => group && row.group === group);
-  const groupRows = groupChosen && selectedID ? members(selectedID) : [];
+  const go = (next: View) => {
+    setView(next);
+    // Each page starts at its top, wherever the last one was scrolled.
+    page.current?.closest(".settings-scroll")?.scrollTo({ top: 0 });
+  };
+  const back = () => go({ kind: "list" });
   const client =
-    clients.find((row) => row.id === selectedID) ??
-    clients.find((row) => row.detected) ??
-    clients[0];
-  // The agent whose data the client shares: its account, panel and relays.
+    view.kind === "client"
+      ? clients.find((row) => row.id === view.id)
+      : undefined;
   const source = snapshot.providers.find(
     (provider) => provider.id === client?.agent,
   );
-  const select = (id: string, group = false) => {
-    setSelected(id);
-    setGroupChosen(group);
-    // Show the new agent from its top, wherever the last one was scrolled.
-    page.current?.closest(".settings-scroll")?.scrollTo({ top: 0 });
-  };
+  const group = view.kind === "group" ? members(view.id) : [];
 
   return (
     <div className="agents-page" ref={page}>
-      <AgentList
-        t={t}
-        clients={clients}
-        selected={groupRows.length ? undefined : client?.id}
-        selectedGroup={groupRows.length ? selectedID : undefined}
-        select={select}
-        selectGroup={(group) => select(group, true)}
-      />
-      <div className="agents-detail">
-        {groupRows.length > 0 && (
-          <GroupDetail
-            key={`group:${selectedID}`}
-            t={t}
+      {client && source ? (
+        // Keyed by client, so a draft or an error never carries over.
+        <AgentDetail
+          key={client.id}
+          t={t}
+          snapshot={snapshot}
+          client={client}
+          source={source}
+          active={active}
+          action={action}
+          layout={layout}
+          onLayout={onLayout}
+          preferences={preferences}
+          onPreferences={onPreferences}
+          back={back}
+          openGroup={
+            members(client.group).length > 1 && client.groupName
+              ? () => go({ kind: "group", id: client.group })
+              : undefined
+          }
+        />
+      ) : group.length ? (
+        <GroupDetail
+          key={`group:${group[0].group}`}
+          t={t}
+          snapshot={snapshot}
+          clients={group}
+          active={active}
+          action={action}
+          layout={layout}
+          onLayout={onLayout}
+          back={back}
+        />
+      ) : (
+        <Page>
+          <FeaturesSection t={t} snapshot={snapshot} action={action} />
+          <ToolsSection
+            tools={tools}
+            groups={items.filter((item) => item.place === "tools")}
             snapshot={snapshot}
-            clients={groupRows}
-            active={active}
             action={action}
-            layout={layout}
-            onLayout={onLayout}
+            request={request}
+            active={active ?? true}
+            t={t}
           />
-        )}
-        {!groupRows.length && client && source && (
-          // Keyed by client, so a draft or an error never carries over.
-          <AgentDetail
-            key={client.id}
+          <AgentList
             t={t}
             snapshot={snapshot}
-            client={client}
-            source={source}
-            active={active}
-            action={action}
-            layout={layout}
-            onLayout={onLayout}
+            clients={clients}
             preferences={preferences}
-            onPreferences={onPreferences}
-            openGroup={
-              members(client.group).length > 1 && client.groupName
-                ? () => select(client.group, true)
-                : undefined
-            }
+            select={(id) => go({ kind: "client", id })}
+            selectGroup={(id) => go({ kind: "group", id })}
           />
-        )}
-      </div>
+        </Page>
+      )}
     </div>
   );
 }

@@ -1,8 +1,9 @@
 // Settings → Agent plugins: what Agent HUD adds to the agents on this computer.
-// Top to bottom: client hooks; one folding card per client (Agent HUD's plugin
-// for it with its switches, and HUD tools), then the settings to add HUD tools
-// to any other agent by hand; the app-wide Agent tools switches; and Details,
-// folded. A product build adds switches, rows and tool groups through
+// Top to bottom: one folding card per client (Agent HUD's plugin for it with
+// its switches, and HUD tools), then the settings to add HUD tools to any
+// other agent by hand; and Details, folded. Hooks, answers and the app-wide
+// agent tools are switched on the Agents page.
+// A product build adds switches, rows and tool groups through
 // `AgentPluginItem`, drawn with `PluginControl` and `ToolSwitchRow`, so both
 // builds read the same. The pieces live in ./agent-plugins/.
 import { Braces } from "lucide-react";
@@ -17,8 +18,6 @@ import {
 } from "./agent-plugins/ClientCards";
 import { KnownClientCard } from "./agent-plugins/KnownClientCard";
 import { DetailsSection } from "./agent-plugins/DetailsSection";
-import { HooksSection } from "./agent-plugins/HooksSection";
-import { ToolsSection } from "./agent-plugins/ToolsSection";
 import {
   knownClients,
   nativeClients,
@@ -109,7 +108,6 @@ export function AgentPluginsPane({
   return (
     <TooltipProvider delayDuration={300}>
       <Page>
-        <HooksSection snapshot={snapshot} action={action} t={t} />
         <Section
           anchor="clients"
           title={t("Clients")}
@@ -157,15 +155,6 @@ export function AgentPluginsPane({
             t={t}
           />
         </Section>
-        <ToolsSection
-          tools={tools}
-          groups={items.filter((item) => item.place === "tools")}
-          snapshot={snapshot}
-          action={action}
-          request={request}
-          active={active}
-          t={t}
-        />
         <DetailsSection
           snapshot={snapshot}
           clients={mcp.status}

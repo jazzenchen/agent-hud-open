@@ -8,6 +8,7 @@ pub mod instance;
 pub use file_changes::FileChanges;
 mod accounts;
 pub mod claude_plugin;
+pub mod client_features;
 pub mod clients;
 mod data_folder;
 pub mod deepseek_plugin;

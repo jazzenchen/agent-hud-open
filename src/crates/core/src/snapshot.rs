@@ -222,7 +222,7 @@ impl crate::AgentHudCore {
         let presented_at = now;
         let now = wall_clock_ms();
         let sessions = self.session_rows(presented_at, now, at);
-        let approvals = self.requests.views(now);
+        let approvals = self.answered_here(self.requests.views(now), &sessions);
         let providers = self.provider_rows(at);
         let clients = self.client_rows(&providers);
         let pending_meter = self.pending_meter_bounds();

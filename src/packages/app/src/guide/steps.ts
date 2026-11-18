@@ -27,8 +27,8 @@ export const openSettingsSteps: SettingsStep[] = [
   },
   {
     id: "client-hooks",
-    page: "agent-plugins",
-    anchor: "client-hooks",
+    page: "agents",
+    anchor: "agent-features",
     title: t("Hooks and plugins"),
     body: t(
       "Turn it on so Agent HUD hears your agents' messages and permission requests.",
@@ -37,7 +37,7 @@ export const openSettingsSteps: SettingsStep[] = [
   },
   {
     id: "hud-tools",
-    page: "agent-plugins",
+    page: "agents",
     anchor: "hud-tools",
     title: t("Let an agent restyle the HUD"),
     body: t(
@@ -47,7 +47,7 @@ export const openSettingsSteps: SettingsStep[] = [
   },
   {
     id: "agent-messages",
-    page: "agent-plugins",
+    page: "agents",
     anchor: "agent-messages",
     title: t("Let agents message each other"),
     body: t(

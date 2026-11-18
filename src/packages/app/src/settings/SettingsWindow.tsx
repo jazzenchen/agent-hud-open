@@ -177,9 +177,7 @@ export function SettingsWindow({
               {sourceMenu}
             </div>
           </aside>
-          <main
-            className={`apple-content${page === "agents" ? " is-wide" : ""}`}
-          >
+          <main className="apple-content">
             <div className="settings-header" data-tauri-drag-region="deep">
               <div className="settings-column">
                 <h1>{currentPage?.label}</h1>

@@ -1,8 +1,8 @@
-/* One client's settings: its switches, its approvals where it has a switch
- * of its own, Agent HUD's hooks in it, and its agent's accounts: in full when
- * the client is its vendor's only one, else as a list that leads to the
- * vendor's page, where they are set. */
-import { RefreshCw } from "lucide-react";
+/* One agent's own page: whether Agent HUD follows it, the step it still
+ * waits for, the features it uses (each can be turned off for it alone), and
+ * its accounts: in full when it is its vendor's only client, else as a list
+ * that leads to the vendor's page, where they are set. */
+import { ChevronLeft, RefreshCw } from "lucide-react";
 import type {
   ClientRow,
   NativeMethod,
@@ -12,17 +12,13 @@ import type {
   SourcePreferences,
 } from "@agent-hud/protocol";
 import { Button } from "@agent-hud/ui/components/button";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@agent-hud/ui/components/tooltip";
 import { HUDArtwork as HUDLogo } from "@agent-hud/hud/HUDArtwork";
 import { LinkButton, ToggleRow } from "../SettingsControls";
 import { Notice, Page, Section } from "../SettingsPrimitives";
 import type { Translate } from "@agent-hud/ui/format";
 import { AgentAccounts } from "./AgentAccounts";
-import { ClientAccounts, ClientHooks } from "./ClientSections";
+import { ClientAccounts } from "./ClientSections";
+import { ClientFeatures } from "./ClientFeatures";
 import { usePerform } from "./use-perform";
 
 export interface AgentDetailProps {
@@ -41,6 +37,8 @@ export interface AgentDetailProps {
   onLayout: (layout: PanelLayout) => Promise<unknown>;
   preferences: Record<string, SourcePreferences>;
   onPreferences: (source: string, patch: SourcePreferences) => Promise<unknown>;
+  /** Back to the list of agents. */
+  back: () => void;
   /** Opens the vendor's page; none for a vendor of this one client, whose
    * accounts this page shows itself. */
   openGroup?: () => void;
@@ -57,40 +55,43 @@ export function AgentDetail({
   onLayout,
   preferences,
   onPreferences,
+  back,
   openGroup,
 }: AgentDetailProps) {
   const { pending, error, setError, perform } = usePerform();
-
-  const enabled = client.enabled;
-  // The clients whose approval hook goes in only once the user turns it on.
-  const optInApprovals = snapshot.settings.optInApprovals ?? [];
-  const live = preferences[client.id]?.live !== false;
-  const reminders = preferences[client.id]?.reminders !== false;
-  const offReason = t("Turn on Enabled first.");
+  // The step the agent wants before it runs Agent HUD's hooks, such as
+  // Codex's review, or that it gets none on this system yet.
+  const step =
+    snapshot.connection.clientHooks?.clients?.find(
+      (entry) =>
+        entry.source === source.id && (entry.installed || entry.unsupported),
+    )?.notice ?? null;
   const refreshLabel = t("Read all agents again");
 
   return (
     <Page>
+      <div>
+        <LinkButton onClick={back}>
+          <ChevronLeft size={13} />
+          {t("Agents")}
+        </LinkButton>
+      </div>
       <header className="agents-detail-header">
         <HUDLogo source={client.agent} size={24} />
         <div className="agents-detail-title">
           <h2>{client.name}</h2>
           {!client.detected && <p>{t("Not on this computer")}</p>}
         </div>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              aria-label={refreshLabel}
-              disabled={pending}
-              onClick={() => void perform(() => action("refresh"))}
-            >
-              <RefreshCw size={14} />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>{refreshLabel}</TooltipContent>
-        </Tooltip>
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          aria-label={refreshLabel}
+          title={refreshLabel}
+          disabled={pending}
+          onClick={() => void perform(() => action("refresh"))}
+        >
+          <RefreshCw size={14} />
+        </Button>
       </header>
       {error && (
         <Notice
@@ -104,10 +105,11 @@ export function AgentDetail({
           {error}
         </Notice>
       )}
+      {client.enabled && step && <Notice>{step}</Notice>}
       <Section footer={source.notice ?? undefined}>
         <ToggleRow
           title={t("Enabled")}
-          checked={enabled}
+          checked={client.enabled}
           disabled={pending}
           change={(value) =>
             void perform(() =>
@@ -115,59 +117,17 @@ export function AgentDetail({
             )
           }
         />
-        <ToggleRow
-          title={t("Live status")}
-          subtitle={t("Running and waiting sessions on the HUD.")}
-          checked={live}
-          disabled={pending || !enabled}
-          reason={!enabled ? offReason : undefined}
-          change={(value) =>
-            void perform(() => onPreferences(client.id, { live: value }))
-          }
-        />
-        <ToggleRow
-          title={t("Completion reminders")}
-          checked={live && reminders}
-          disabled={pending || !enabled || !live}
-          reason={
-            !enabled ? offReason : !live ? t("Needs Live status.") : undefined
-          }
-          change={(value) =>
-            void perform(() => onPreferences(client.id, { reminders: value }))
-          }
-        />
       </Section>
-      {source.id === "copilot" && (
-        <Section
-          footer={
-            snapshot.settings.clientHooks
-              ? undefined
-              : t("Takes effect once client hooks are on in Agent plugins.")
-          }
-        >
-          <ToggleRow
-            title={t("Answer permission requests in the HUD")}
-            subtitle={t(
-              "Copilot then asks Agent HUD before its own rules and this session's approvals, so every tool call it would run or ask about waits for your answer in the HUD. Runs started with -p, --allow-all-tools, --allow-all or --yolo stay with Copilot.",
-            )}
-            checked={optInApprovals.includes(source.id)}
-            disabled={pending || !enabled}
-            reason={!enabled ? offReason : undefined}
-            change={(value) =>
-              void perform(() =>
-                action("set_setting", {
-                  key: "optInApprovals",
-                  value: [
-                    ...optInApprovals.filter((id) => id !== source.id),
-                    ...(value ? [source.id] : []),
-                  ],
-                }),
-              )
-            }
-          />
-        </Section>
-      )}
-      <ClientHooks t={t} snapshot={snapshot} source={source} />
+      <ClientFeatures
+        t={t}
+        snapshot={snapshot}
+        client={client}
+        action={action}
+        preferences={preferences}
+        onPreferences={onPreferences}
+        perform={perform}
+        pending={pending}
+      />
       {openGroup ? (
         <ClientAccounts
           t={t}

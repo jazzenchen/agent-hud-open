@@ -135,8 +135,11 @@ fn handle_payload(arguments: &[String], data: &Path, input: &[u8], output: &mut 
         {
             return 0;
         }
-        // A call the user's own rules in the client settle stays with it.
-        if !super::policy::screen(source, &mut payload, home.as_deref(), &env) {
+        // A call the user's own rules in the client settle stays with it, as
+        // does every call of a client whose requests are not answered here.
+        if !super::policy::screen(source, &mut payload, home.as_deref(), &env)
+            || super::switches::answers_off(data, source, home.as_deref(), &env)
+        {
             return 0;
         }
         if let Ok(Some(response)) = super::transport::send(data, source, flag, &payload) {

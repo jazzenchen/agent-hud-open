@@ -132,6 +132,8 @@ pub struct AgentHudCore {
     discovery: Vec<ProviderDiscovery>,
     /// What was found of each client an agent is split into (`agents::split`).
     client_discovery: Vec<ProviderDiscovery>,
+    /// What each client can do with Agent HUD, by client id (platform's).
+    client_features: HashMap<String, Vec<String>>,
     reads: ingestion::Reads,
     usage_projection: Option<UsageProjection>,
     accounts: AccountProjection,
@@ -174,7 +176,7 @@ impl AgentHudCore {
             .ok()
             .and_then(|bytes| serde_json::from_slice(&bytes).ok())
             .unwrap_or(Value::Null);
-        let mut settings = json!({"quotaDisplay":"consumed","codexHomes":[],"claudeHomes":[],"antigravityCliSettings":[],"appearance":"system","appearanceFollowsScreen":false,"language":"system","clientHooks":false,"optInApprovals":[],"readCopilotQuota":false,"approvalWaitMinutes":10,"launchAtLogin":true,"animations":true,"hudVisible":true,"showMenuBarIcon":true,"hudTools":false,"claudeAnswers":true,"agentMessages":false,"agentMessagesAsUser":false,"agentMessagesLimit":10,"claudeMessages":true,"deepseekMessages":true,"relayReading":[],"customPrices":{},"relayMultipliers":{},"localKinds":{},"guide":null});
+        let mut settings = json!({"quotaDisplay":"consumed","codexHomes":[],"claudeHomes":[],"antigravityCliSettings":[],"appearance":"system","appearanceFollowsScreen":false,"language":"system","clientHooks":false,"optInApprovals":[],"readCopilotQuota":false,"approvalWaitMinutes":10,"launchAtLogin":true,"animations":true,"hudVisible":true,"showMenuBarIcon":true,"hudTools":false,"claudeAnswers":true,"agentMessages":false,"agentMessagesAsUser":false,"agentMessagesLimit":10,"claudeMessages":true,"deepseekMessages":true,"liveStatus":true,"answerInHud":true,"answerOff":[],"relayReading":[],"customPrices":{},"relayMultipliers":{},"localKinds":{},"guide":null});
         if let Some(values) = stored["settings"].as_object() {
             for (key, value) in values {
                 if settings.get(key).is_some() {
@@ -253,6 +255,7 @@ impl AgentHudCore {
             listed_once: false,
             discovery: Vec::new(),
             client_discovery: Vec::new(),
+            client_features: HashMap::new(),
             reads: Default::default(),
             usage_projection: None,
             accounts: AccountProjection::default(),

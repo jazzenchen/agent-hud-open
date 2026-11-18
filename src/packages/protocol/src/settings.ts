@@ -81,6 +81,15 @@ export interface SourcePreferences {
   reminders?: boolean;
 }
 export interface AppSettings {
+  /** Live status and completion reminders for every client; each client's
+   * own switch holds beneath it. Default on. */
+  liveStatus?: boolean;
+  /** Approval requests and questions answered in the HUD; off, every client
+   * asks by itself. Default on. */
+  answerInHud?: boolean;
+  /** Clients (`ClientRow.id`) whose requests stay with them while answering
+   * in the HUD is on. */
+  answerOff?: string[];
   /** Display quota percentages as used or available; readings remain usedPercent. */
   quotaDisplay?: "consumed" | "remaining";
   /** Additional Codex CLI homes whose signed-in accounts should be read. */

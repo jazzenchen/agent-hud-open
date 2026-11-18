@@ -35,6 +35,43 @@ impl AgentHudCore {
         true
     }
 
+    /// Whether requests from a session of `source` are answered in the HUD:
+    /// answering is on (Settings → Agents) and the session's client is not one
+    /// whose requests stay with it. A session whose client is unknown is
+    /// answered here unless every client of its agent keeps its own.
+    pub(crate) fn answers_on(&self, source: &str, client: Option<&str>) -> bool {
+        if self.settings["answerInHud"] == false {
+            return false;
+        }
+        let off = |id: &str| {
+            self.settings["answerOff"]
+                .as_array()
+                .is_some_and(|ids| ids.iter().any(|value| value == id))
+        };
+        match client {
+            Some(id) => !off(id),
+            None => !split::ids(source).into_iter().all(off),
+        }
+    }
+
+    /// The requests the HUD shows: those of clients whose requests it answers,
+    /// each by the client its session belongs to.
+    pub(super) fn answered_here(&self, requests: Vec<Value>, sessions: &[Value]) -> Vec<Value> {
+        requests
+            .into_iter()
+            .filter(|request| {
+                let source = request["source"].as_str().unwrap_or_default();
+                let client = sessions
+                    .iter()
+                    .find(|session| {
+                        session["id"] == request["sessionId"] && session["source"] == source
+                    })
+                    .and_then(|session| session["clientId"].as_str());
+                self.answers_on(source, client)
+            })
+            .collect()
+    }
+
     /// Every client, in the agents' order: its agent, its vendor's group,
     /// whether it was found here and whether it is on. An agent of one client
     /// is found as its row in `providers` says; a client split off an agent is
@@ -47,7 +84,7 @@ impl AgentHudCore {
         let mut rows = Vec::new();
         for agent in agent_hud_agents::ALL {
             let (group, group_name) = split::vendor(agent.id);
-            let row = |id: &str, name: &str, detected: bool| json!({"id":id,"agent":agent.id,"name":name,"group":group,"groupName":group_name,"detected":detected,"enabled":self.client_on(id)});
+            let row = |id: &str, name: &str, detected: bool| json!({"id":id,"agent":agent.id,"name":name,"group":group,"groupName":group_name,"detected":detected,"enabled":self.client_on(id),"features":self.client_features.get(id).cloned().unwrap_or_default()});
             let family = split::family(agent.id);
             if family.is_empty() {
                 let detected = providers

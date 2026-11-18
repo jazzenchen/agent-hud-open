@@ -67,6 +67,9 @@ export interface ClientRow {
   groupName: string;
   detected: boolean;
   enabled: boolean;
+  /** What the client can do with Agent HUD: live status, requests answered
+   * in the HUD, messages between agents, HUD tools. */
+  features?: ("live" | "answer" | "talk" | "tools")[];
 }
 export interface Account {
   id: string;

@@ -155,6 +155,8 @@ impl crate::AgentHudCore {
             | "claudeMessages"
             | "deepseekMessages"
             | "readCopilotQuota"
+            | "liveStatus"
+            | "answerInHud"
             | "clientHooks"
             | "launchAtLogin"
             | "hudVisible"
@@ -167,6 +169,16 @@ impl crate::AgentHudCore {
                 if value
                     .as_u64()
                     .is_some_and(|v| [1, 3, 5, 10, 30, 60].contains(&v)) => {}
+            // Clients whose requests stay with them while answering in the HUD
+            // is on, each once.
+            "answerOff"
+                if value.as_array().is_some_and(|ids| {
+                    ids.iter().enumerate().all(|(index, id)| {
+                        id.as_str()
+                            .is_some_and(|id| agent_hud_agents::split::agent_of(id).is_some())
+                            && !ids[..index].contains(id)
+                    })
+                }) => {}
             // Clients whose approval hook waits for the user to turn it on
             // (agents `Permission::opt_in`), each once.
             "optInApprovals"

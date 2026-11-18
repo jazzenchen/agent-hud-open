@@ -1,69 +1,99 @@
 import type { ReactNode } from "react";
-import type { ClientRow } from "@agent-hud/protocol";
+import { ChevronRight, CircleAlert } from "lucide-react";
+import type {
+  ClientRow,
+  Snapshot,
+  SourcePreferences,
+} from "@agent-hud/protocol";
 import { HUDArtwork as HUDLogo } from "@agent-hud/hud/HUDArtwork";
 import type { Translate } from "@agent-hud/ui/format";
+import { Collapsible, Section } from "../SettingsPrimitives";
+import { featureName, features, uses } from "./features";
 
-/** The clients, found ones first; the rest under a small label, still
- * selectable so they can be set up before they are installed. Within each
- * part, the clients of one vendor sit together under its name. */
+/** The agents: the ones found here, each with the features it uses and a
+ * mark while it waits for a step in it; then the rest, folded. The clients
+ * of one vendor sit under its name, which opens the vendor's page. */
 export function AgentList({
   t,
+  snapshot,
   clients,
-  selected,
-  selectedGroup,
+  preferences,
   select,
   selectGroup,
 }: {
   t: Translate;
+  snapshot: Snapshot;
   clients: ClientRow[];
-  selected?: string;
-  /** The vendor whose page is shown, when it is. */
-  selectedGroup?: string;
+  preferences: Record<string, SourcePreferences>;
   select: (id: string) => void;
   selectGroup: (group: string) => void;
 }) {
   const found = clients.filter((client) => client.detected);
   const missing = clients.filter((client) => !client.detected);
-  const item = (client: ClientRow) => (
-    <button
-      key={client.id}
-      type="button"
-      className={`agents-list-item${client.id === selected ? " is-selected" : ""}${client.enabled ? "" : " is-off"}`}
-      aria-current={client.id === selected ? "true" : undefined}
-      onClick={() => select(client.id)}
-    >
-      <HUDLogo source={client.agent} size={18} />
-      <span className="agents-list-name">{client.name}</span>
-      {!client.enabled && <span className="agents-list-state">{t("Off")}</span>}
-    </button>
-  );
-  // A vendor's name opens its page, where its clients' accounts are set.
+  // An agent whose hooks wait for a step in it, such as Codex's review.
+  const waiting = (client: ClientRow) =>
+    snapshot.connection.clientHooks?.clients?.some(
+      (entry) =>
+        entry.source === client.agent && entry.installed && entry.notice,
+    ) ?? false;
+  const item = (client: ClientRow) => {
+    const used = features.filter((feature) =>
+      uses(client, feature, snapshot, preferences),
+    );
+    return (
+      <button
+        key={client.id}
+        type="button"
+        className={`agents-row${client.enabled ? "" : " is-off"}`}
+        onClick={() => select(client.id)}
+      >
+        <HUDLogo source={client.agent} size={18} />
+        <span className="agents-row-name">{client.name}</span>
+        <span className="agents-row-tags">
+          {!client.enabled ? (
+            <span className="agents-row-note">{t("Off")}</span>
+          ) : (
+            used.map((feature) => (
+              <span key={feature} className="agents-row-tag">
+                {featureName(feature, t)}
+              </span>
+            ))
+          )}
+        </span>
+        {client.enabled && waiting(client) && (
+          <CircleAlert size={15} className="agents-row-waiting" />
+        )}
+        <ChevronRight size={14} className="agents-row-chevron" />
+      </button>
+    );
+  };
   const head = (group: string, name: string) => (
     <button
       type="button"
-      className={`agents-list-group-name${group === selectedGroup ? " is-selected" : ""}`}
-      aria-current={group === selectedGroup ? "true" : undefined}
+      className="agents-row-group"
       onClick={() => selectGroup(group)}
     >
       {name}
+      <ChevronRight size={12} />
     </button>
   );
   return (
-    <nav
-      className="agents-list"
-      data-guide="agents-list"
-      aria-label={t("Agents")}
-    >
-      {grouped(found).map(([group, rows]) => groupOf(group, rows, item, head))}
+    <Section title={t("Your agents")}>
+      <div className="agents-rows" data-guide="agents-list">
+        {grouped(found).map(([group, rows]) =>
+          groupOf(group, rows, item, head),
+        )}
+      </div>
       {missing.length > 0 && (
-        <>
-          <div className="agents-list-label">{t("Not on this computer")}</div>
-          {grouped(missing).map(([group, rows]) =>
-            groupOf(group, rows, item, head),
-          )}
-        </>
+        <Collapsible title={t("Not on this computer")} summary={missing.length}>
+          <div className="agents-rows">
+            {grouped(missing).map(([group, rows]) =>
+              groupOf(group, rows, item, head),
+            )}
+          </div>
+        </Collapsible>
       )}
-    </nav>
+    </Section>
   );
 }
 
@@ -89,7 +119,7 @@ function groupOf(
   return (
     <div
       key={group}
-      className="agents-list-group"
+      className="agents-row-vendor"
       role="group"
       aria-label={name}
     >
