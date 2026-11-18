@@ -582,6 +582,8 @@
   "Local transcripts and client events; hook connection status is reported separately.": "ローカルのトランスクリプトとクライアントのイベント。フックの接続状態は別に表示されます。",
   "Local usage ingestion is unavailable for: {{sources}}": "次のソースではローカルの使用量を取り込めません: {{sources}}",
   "Logo spacing": "ロゴの間隔",
+  "Grey numbers": "グレーの数値",
+  "Number opacity": "数値の不透明度",
   "Long step (≥15 s)": "長いステップ（15 秒以上）",
   "Longest {{count}} days_other": "最長 {{count, number}} 日",
   "Main session": "メインセッション",
