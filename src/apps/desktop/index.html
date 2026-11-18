@@ -1,5 +1,35 @@
 <!doctype html>
-<html lang="en" class="dark">
-  <head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="theme-color" content="#101113" /><title>Agent HUD</title></head>
-  <body><div id="root"></div><script type="module" src="/src/main.tsx"></script></body>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
+    <title>Agent HUD</title>
+    <!-- Paint without waiting for the application or its language catalog.
+         Native document initialization supplies data-theme when known. -->
+    <link rel="stylesheet" href="/startup.css" />
+    <script>
+      const startupParameters = new URLSearchParams(location.search);
+      document.documentElement.dataset.startupSurface =
+        startupParameters.get("surface") ||
+        startupParameters.get("window") ||
+        "settings";
+    </script>
+  </head>
+  <body>
+    <div id="startup-shell" role="progressbar" aria-label="Agent HUD">
+      <div class="startup-sidebar" aria-hidden="true">
+        <div class="startup-line"></div>
+        <div class="startup-line"></div>
+        <div class="startup-line"></div>
+      </div>
+      <div class="startup-content" aria-hidden="true">
+        <div class="startup-line"></div>
+        <div class="startup-card"></div>
+        <div class="startup-card"></div>
+      </div>
+    </div>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
 </html>

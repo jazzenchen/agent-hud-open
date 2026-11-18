@@ -2,6 +2,7 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import "@agent-hud/app/styles.css";
 import App from "@agent-hud/app";
+import { StartupReady } from "./StartupReady";
 import { loadCatalog } from "@agent-hud/ui/catalogs";
 import { Button } from "@agent-hud/ui/components/button";
 import { interfaceLanguage } from "@agent-hud/ui/format";
@@ -15,7 +16,9 @@ const nativeSurface = surface === "hud" || surface === "picture";
 function render(children: React.ReactNode) {
   root.render(
     <React.StrictMode>
-      <React.Suspense fallback={null}>{children}</React.Suspense>
+      <React.Suspense fallback={null}>
+        <StartupReady>{children}</StartupReady>
+      </React.Suspense>
     </React.StrictMode>,
   );
 }

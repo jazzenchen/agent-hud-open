@@ -26,6 +26,7 @@ impl Backend {
         owner.project_snapshot(&mut value);
         self.projected = Some(owner.revision());
         app.state::<system::System>().project(&mut value);
+        crate::appearance::remember(app, &value["settings"]);
         if let Some(tools) = &self.tools {
             value["connection"]["localTools"] =
                 tools.configure(tools::channel_wanted(&value["settings"]));
