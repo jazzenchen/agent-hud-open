@@ -4,6 +4,7 @@ mod antigravity;
 mod apps;
 mod claude;
 mod codex;
+mod dacl;
 mod files;
 pub(crate) mod pipe;
 mod process;
