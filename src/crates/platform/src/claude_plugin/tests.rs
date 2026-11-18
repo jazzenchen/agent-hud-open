@@ -167,7 +167,7 @@ fn the_huds_answer_goes_to_a_loaded_session_and_tidies_what_was_taken() {
         .reaches("claude", SESSION)
         .unwrap_err()
         .note
-        .contains("Agent plugins"));
+        .contains("Settings → Agents"));
     check_in(&channel, SESSION, br#"{"at":1}"#);
     assert!(replies.reaches("claude", SESSION).is_ok());
     assert!(replies.reaches("codex", SESSION).is_err());

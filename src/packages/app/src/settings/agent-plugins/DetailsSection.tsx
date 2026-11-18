@@ -1,4 +1,4 @@
-// Details, folded at the bottom of the page: whether the pieces behind hooks
+// Details, folded at the bottom of Settings → Agents: whether the pieces behind hooks
 // and HUD tools are running, for when something doesn't work.
 import type { Snapshot } from "@agent-hud/protocol";
 import type { Translate } from "@agent-hud/ui/format";

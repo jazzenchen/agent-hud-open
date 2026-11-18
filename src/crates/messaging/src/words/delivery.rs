@@ -15,7 +15,7 @@ pub fn deepseek_ready(language: Language) -> String {
     tr_in(language, "Agent HUD's plugin checked in; the message joins the session's queue and goes in once it is idle.")
 }
 pub fn deepseek_not_loaded(language: Language) -> String {
-    tr_in(language, "Agent HUD's DeepSeek Harness plugin is not running in this session (install it in Settings → Agent plugins), or the session is closed.")
+    tr_in(language, "Agent HUD's DeepSeek Harness plugin is not running in this session (install it in Settings → Agents), or the session is closed.")
 }
 pub fn codex_open(language: Language) -> String {
     tr_in(

@@ -134,7 +134,7 @@ pub fn compose(
 pub fn off(language: Language) -> String {
     tr_in(
         language,
-        "Agent messages are off; the user can turn them on in Settings → Agent plugins.",
+        "Agent messages are off; the user can turn them on in Settings → Agents.",
     )
 }
 pub fn no_caller(language: Language) -> String {
@@ -219,7 +219,7 @@ pub fn unknown_message(language: Language) -> String {
 /// Harness has no command line that starts a session: Agent HUD's plugin in
 /// a running Harness does it.
 pub fn deepseek_cannot_start(language: Language) -> String {
-    tr_in(language, "Agent HUD cannot start a DeepSeek Harness session now: install Agent HUD's DeepSeek Harness plugin in Settings → Agent plugins, and open DeepSeek Harness.")
+    tr_in(language, "Agent HUD cannot start a DeepSeek Harness session now: install Agent HUD's DeepSeek Harness plugin in Settings → Agents, and open DeepSeek Harness.")
 }
 pub fn replied(language: Language, reply: &str) -> String {
     fill(

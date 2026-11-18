@@ -98,11 +98,10 @@ impl From<std::io::Error> for Failure {
 
 /// Why a message does not go into a Claude Code session: the "Send
 /// messages" switch on its Agent HUD plugin's row is off.
-pub const CLAUDE_MESSAGES_OFF: &str =
-    "Sending messages to Claude Code is off (Settings → Agent plugins)";
+pub const CLAUDE_MESSAGES_OFF: &str = "Sending messages to Claude Code is off (Settings → Agents)";
 /// The same, for a DeepSeek Harness session.
 pub const DEEPSEEK_MESSAGES_OFF: &str =
-    "Sending messages to DeepSeek Harness is off (Settings → Agent plugins)";
+    "Sending messages to DeepSeek Harness is off (Settings → Agents)";
 
 /// Why a steer that names no turn was refused: the session has no turn in
 /// progress, so nothing was sent.

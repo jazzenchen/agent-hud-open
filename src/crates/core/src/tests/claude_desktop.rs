@@ -435,7 +435,7 @@ fn turning_answer_questions_off_makes_a_reached_box_display_only_at_once() {
     assert_eq!(cards[0]["answersQuestion"], false);
     let note = cards[0]["answerNote"].as_str().unwrap();
     assert!(
-        note.contains("Agent plugins") || note.contains("智能体插件"),
+        note.contains("Settings → Agents") || note.contains("设置 → 智能体"),
         "{note}"
     );
     assert_eq!(cards[0]["answerFix"], "turnOnAnswers");

@@ -4,7 +4,7 @@ use serde_json::Value;
 /// Passes in a row before the user is asked to look, unless they chose another.
 pub const DEFAULT_LIMIT: u32 = 10;
 
-/// Settings → Agent plugins. Among the agent tools: "Let agents message each
+/// Settings → Agents. Among the agent tools: "Let agents message each
 /// other" (`agentMessages`), "Send as me" (`agentMessagesAsUser`) and how many
 /// passes in a row before the user looks (`agentMessagesLimit`, null for no
 /// limit). On the Claude Code and DeepSeek Harness plugins' rows: "Send

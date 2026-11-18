@@ -7,6 +7,7 @@ import type {
   SourcePreferences,
 } from "@agent-hud/protocol";
 import type { Translate } from "@agent-hud/ui/format";
+import { knownClients, type MCPClientsStatus } from "../agent-plugins/services";
 
 export type Feature = "live" | "answer" | "talk" | "tools";
 export const features: Feature[] = ["live", "answer", "talk", "tools"];
@@ -31,17 +32,30 @@ export function messagesKey(client: ClientRow) {
       : null;
 }
 
+/** The client in the host's list of those HUD tools can be added to
+ * (hud_tools::CLIENTS); null for one they can't. Claude Code's command line
+ * and desktop app share one setup, as Codex's do. */
+export function toolsClient(client: ClientRow) {
+  const id =
+    ({ claude: "claudeCode", "trae-cn": "traeCn" } as Record<string, string>)[
+      client.agent
+    ] ?? client.agent;
+  return knownClients.find((known) => known.id === id) ?? null;
+}
+
 /** Whether `client` can do `feature` at all. */
 export function can(client: ClientRow, feature: Feature) {
   return (client.features ?? []).includes(feature);
 }
 
-/** Whether `client` uses `feature` now. */
+/** Whether `client` uses `feature` now; HUD tools once they are added to
+ * it, when `added` has been read. */
 export function uses(
   client: ClientRow,
   feature: Feature,
   snapshot: Snapshot,
   preferences: Record<string, SourcePreferences>,
+  added?: MCPClientsStatus | null,
 ) {
   const settings = snapshot.settings;
   if (!client.enabled || !can(client, feature)) return false;
@@ -61,7 +75,12 @@ export function uses(
         settings.agentMessages === true && (!own || settings[own] !== false)
       );
     }
-    case "tools":
-      return settings.hudTools === true;
+    case "tools": {
+      const id = toolsClient(client)?.id;
+      const entry = added?.clients.find((item) => item.id === id);
+      return (
+        settings.hudTools === true && (!added || Boolean(entry?.installed))
+      );
+    }
   }
 }

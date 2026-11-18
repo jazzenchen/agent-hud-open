@@ -30,11 +30,11 @@ impl Unreachable {
 /// it (`answerFix`) for the HUD and the phone to word.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum AnswerFix {
-    /// The client's Agent HUD plugin is not installed: Settings → Agent plugins.
+    /// The client's Agent HUD plugin is not installed: Settings → Agents.
     InstallPlugin,
     /// Installed, but this session has not loaded it: `/reload-plugins` there.
     ReloadPlugins,
-    /// The user turned answering off on the plugin's row in Settings → Agent plugins.
+    /// The user turned answering off in Settings → Agents.
     TurnOnAnswers,
 }
 

@@ -1,4 +1,4 @@
-// The state behind Agent plugins: each plugin's and each client's status, the
+// The state behind what Agent HUD puts into agents: each plugin's and each client's status, the
 // commands that change them, and the app-wide HUD tools switch.
 import { useEffect, useRef, useState } from "react";
 import type { NativeMethod, Snapshot } from "@agent-hud/protocol";

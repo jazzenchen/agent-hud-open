@@ -21,7 +21,7 @@ import { withAppDraft } from "./lib/app-draft";
 import { useWebLinks } from "./lib/use-web-links";
 import type { HUDConfig } from "@agent-hud/hud/model";
 import { snapshotLanguage } from "@agent-hud/ui/format";
-import type { AgentPluginItem } from "./settings/AgentPluginsPane";
+import type { AgentPluginItem } from "./settings/agent-plugins/types";
 import type { AppExtensionPage } from "./settings/pages";
 import type { ProductGuide } from "./guide/plan";
 import { SettingsWindow } from "./settings/SettingsWindow";
@@ -37,7 +37,8 @@ const NativeHUDSurface = lazy(() => import("./HUDSurface"));
 
 export interface AppProps {
   extensionPages?: AppExtensionPage[];
-  /** Rows a product build adds to a client's card on Agent plugins. */ agentPlugins?: AgentPluginItem[];
+  /** Rows a product build adds to a client's page on Agents, and agent tools of its own. */
+  agentPlugins?: AgentPluginItem[];
   /** What the product adds to the guide: its news and its Settings steps. */
   guide?: ProductGuide;
   productName?: string;

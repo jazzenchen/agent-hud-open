@@ -39,7 +39,7 @@ impl ClaudeReplies {
     fn unreachable(&self, session: &str) -> Unreachable {
         if !installed(&self.claude_config) {
             return Unreachable::new(
-                tr!("Claude Code doesn't have Agent HUD's plugin yet. Install it to answer Claude's questions in Agent HUD (Settings → Agent plugins)."),
+                tr!("Claude Code doesn't have Agent HUD's plugin yet. Install it to answer Claude's questions in Agent HUD (Settings → Agents)."),
                 Some(AnswerFix::InstallPlugin),
             );
         }

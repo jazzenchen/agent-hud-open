@@ -1,4 +1,4 @@
-// The rows Agent plugins is made of, all on the Settings primitives: a status
+// The rows for what Agent HUD puts into agents, all on the Settings primitives: a status
 // row (pill, one action, a ⋯ menu, a next step when there is one), a plugin's
 // switch, and a tool group's switch. Product builds draw their own rows with
 // `PluginControl` and `ToolSwitchRow`, so both builds read the same.

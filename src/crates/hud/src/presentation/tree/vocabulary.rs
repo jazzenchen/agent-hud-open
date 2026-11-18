@@ -63,6 +63,8 @@ pub(super) const SETTINGS_PAGES: &[&str] = &[
     "general",
     "display",
     "agents",
+    // Gone: its rows are on each agent's page. Kept so a saved HUD that
+    // names it still opens, on Agents.
     "agent-plugins",
     "prices",
     "relays",
@@ -255,7 +257,7 @@ pub(in crate::presentation) fn catalog() -> Value {
         "data": data,
         "placeholders": "Write {item.field} in text, or {item.field|format} to pick a format: percent, number, money, tokens, countdown, relative, clock, date or weekday. A field has a format of its own when none is picked.",
         "actions": {
-            "open": "{\"open\": \"statistics\", \"tab\": \"tokens\" or \"sessions\", \"agent\": optional, \"session\": optional}, {\"open\": \"session\", \"session\": \"{session.id}\"}, {\"open\": \"settings\", \"page\": general, display, agents, agent-plugins, prices, relays, local-network or updates}",
+            "open": "{\"open\": \"statistics\", \"tab\": \"tokens\" or \"sessions\", \"agent\": optional, \"session\": optional}, {\"open\": \"session\", \"session\": \"{session.id}\"}, {\"open\": \"settings\", \"page\": general, display, agents, prices, relays, local-network or updates}",
             "set": "{\"set\": \"tab\", \"to\": \"week\"}: sets a state",
             "next": "{\"next\": \"tab\"}: the state's next option",
             "copy": "{\"copy\": \"{session.title}\"}: copies the text"

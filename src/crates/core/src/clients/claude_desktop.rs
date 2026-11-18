@@ -64,7 +64,7 @@ impl crate::AgentHudCore {
     pub(crate) fn claude_answers_off(&self) -> Option<Unreachable> {
         (self.settings[REPLIES.setting] == false).then(|| {
             Unreachable::new(
-                tr!("Answering Claude's questions in Agent HUD is off (Settings → Agent plugins)."),
+                tr!("Answering Claude's questions in Agent HUD is off (Settings → Agents)."),
                 Some(AnswerFix::TurnOnAnswers),
             )
         })

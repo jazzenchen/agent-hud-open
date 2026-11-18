@@ -7,7 +7,7 @@ Agent HUD can put words into a running Claude Code, Codex, Antigravity or DeepSe
 - `src/crates/platform/src/delivery/` (`agent_hud_platform::delivery`): sending into sessions (`LocalClients`, `Receipt`, `DeliveryState`), starting sessions (`SessionStarts`, `StartConfig`) and moving started Claude jobs into the desktop app (`Handoffs`). The `fixtures` cargo feature exposes `delivery::fixtures` to other crates' tests.
 - `src/crates/messaging/` (crate `agent-hud-messaging`): the agent messages tool group (`Messaging`), its journal, the reading of answers and the paper plane (`Flight`).
 - `src/crates/host/src/messages.rs` (`AgentMessages`): the host's owner of the group.
-- Settings: `src/packages/app/src/settings/agent-plugins/AgentMessagesRow.tsx` and the "Send messages" switches in `KnownClientCard.tsx`. The relay's side is in [the MCP app](../src/apps/mcp/README.md).
+- Settings: `src/packages/app/src/settings/agent-plugins/AgentMessagesRow.tsx` and the "Send messages" switch on a client's page (`src/packages/app/src/settings/agents/ClientFeatures.tsx`). The relay's side is in [the MCP app](../src/apps/mcp/README.md).
 
 ## Sending into a session
 
@@ -20,7 +20,7 @@ Agent HUD can put words into a running Claude Code, Codex, Antigravity or DeepSe
 
 ### Claude Code
 
-Through Agent HUD's Claude Code plugin (`src/crates/platform/src/claude_plugin`), installed from Settings → Agent plugins. Every session running it checks in to the folder it shares with the app every 5 seconds; a check-in counts for 20 seconds. A send is left in that folder, and the plugin claims it before calling `$.prompt.submit`. The words wait for the session to go idle while check-ins go on, and the receipt reads taken, started or refused.
+Through Agent HUD's Claude Code plugin (`src/crates/platform/src/claude_plugin`), installed from its page in Settings → Agents. Every session running it checks in to the folder it shares with the app every 5 seconds; a check-in counts for 20 seconds. A send is left in that folder, and the plugin claims it before calling `$.prompt.submit`. The words wait for the session to go idle while check-ins go on, and the receipt reads taken, started or refused.
 
 - Only automatic and enqueue sends; slash commands are refused. Words nobody claimed within an hour expire.
 - Cancelling is a request until the plugin acknowledges it; words already taken cannot be promised withdrawn.
@@ -84,7 +84,7 @@ The move runs on its own thread: `claude stop <job>`, up to 10 seconds for the j
 
 ## Agent messages
 
-Off until Settings → Agent plugins → Agent tools → "Let agents message each other" is on (`agentMessages`, off by default). Under it, "Send as me" (`agentMessagesAsUser`, marked Caution) sends the words as the user's own, and "Passes in a row" (`agentMessagesLimit`: 1 to 1000, or null for no limit; 10 by default) caps a chain. The plugin rows' "Send messages" switches still apply.
+Off until Settings → Agents → Agent tools → "Let agents message each other" is on (`agentMessages`, off by default). Under it, "Send as me" (`agentMessagesAsUser`, marked Caution) sends the words as the user's own, and "Passes in a row" (`agentMessagesLimit`: 1 to 1000, or null for no limit; 10 by default) caps a chain. Each client's own "Send messages" switch on its page still applies.
 
 The MCP relay asks the app for the group's tools (`host_tools`) and lists `list_sessions`, `list_models`, `send_message`, `start_session` and `get_message` only while `agentMessages` is on; a call reaches the app as `host_tool`. The local tools channel listens while `hudTools` or `agentMessages` is on; HUD tools still answer only with `hudTools`. `AgentMessages` answers on the caller's thread against the app's latest snapshot, never with the application's lock held, so nothing is sent after the relay stopped waiting. Every 5 seconds, while a message still waits for something, it captures Claude Code and Harness deliveries before the plugins' files go and throws planes back.
 

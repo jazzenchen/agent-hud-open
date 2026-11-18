@@ -627,7 +627,10 @@ fn while_the_switch_is_off_every_call_is_refused_saying_where_to_turn_it_on() {
     let mut world = World::new(Preferences::default());
     let answer = world.send(("claude", CLAUDE), CODEX, "Review this");
     assert_eq!(answer["state"], "refused");
-    assert!(answer["reason"].as_str().unwrap().contains("Agent plugins"));
+    assert!(answer["reason"]
+        .as_str()
+        .unwrap()
+        .contains("Settings → Agents"));
     assert!(world.codex.0.lock().unwrap().is_empty());
 }
 

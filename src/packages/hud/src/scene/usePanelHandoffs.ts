@@ -21,7 +21,7 @@ export function usePanelHandoffs({
   showPanelStats?: () => void;
   onUpdate?: () => void;
 }) {
-  // A card's Open Agent plugins hands over as the settings button does.
+  // A card's Open Settings hands over as the settings button does.
   const openSettings = useMemo(
     () =>
       openSettingsPage

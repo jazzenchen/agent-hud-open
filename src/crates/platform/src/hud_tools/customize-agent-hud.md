@@ -11,7 +11,7 @@ Agent HUD adds its tools to this client as an MCP server named `agent-hud`. This
 
 ## When the tools are missing or refuse
 
-- **No `get_hud` or `draft_hud` tool:** HUD tools have not been added to this client. Ask the person to open Agent HUD, go to **Settings → Agent plugins**, add **HUD tools** for this client and turn on **Let agents arrange the HUD**. For a client without its own card there, **Other agents → Copy settings** gives the settings to paste into its MCP configuration. Then they start a new session, because tools load when a session starts. Do not edit the client's configuration files yourself unless the person asks you to.
+- **No `get_hud` or `draft_hud` tool:** HUD tools have not been added to this client. Ask the person to open Agent HUD, go to **Settings → Agents**, turn on **Let agents arrange the HUD**, then open this client and add **HUD tools**. For a client not in the list, **Other agents → Copy settings** at the bottom of that page gives the settings to paste into its MCP configuration. Then they start a new session, because tools load when a session starts. Do not edit the client's configuration files yourself unless the person asks you to.
 - **"Open Agent HUD … turn on Let agents arrange the HUD …"** or **"Local tools are disabled":** either the app is not running or its switch is off. Pass that same instruction on to the person.
 - **"Application data is loading":** wait a few seconds and retry once.
 

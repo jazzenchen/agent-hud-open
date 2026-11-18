@@ -7,7 +7,6 @@ import {
   FlaskConical,
   Monitor,
   Network,
-  Plug,
   Puzzle,
   Settings2,
   Waypoints,
@@ -50,15 +49,6 @@ const builtInPages = (
     icon: Puzzle,
     color: "#30b0c7",
     description: t("Which agents Agent HUD follows, and their accounts."),
-    group: "agents",
-  },
-  {
-    // What Agent HUD installs into each client.
-    id: "agent-plugins",
-    label: t("Agent plugins"),
-    icon: Plug,
-    color: "#30b0c7",
-    description: t("What Agent HUD adds to the agents on this computer."),
     group: "agents",
   },
   {

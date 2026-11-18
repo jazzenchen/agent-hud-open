@@ -37,7 +37,7 @@ export function PermissionQuestionCard({
   pending: boolean;
   light?: boolean;
   answer: (decision: RequestDecision) => void | Promise<void>;
-  /** Settings, on a page such as "agent-plugins"; without it the card only says where to go. */
+  /** Settings, on a page such as "agents/claude"; without it the card only says where to go. */
   openSettings?: (page: string) => void;
 }) {
   const t = useT();

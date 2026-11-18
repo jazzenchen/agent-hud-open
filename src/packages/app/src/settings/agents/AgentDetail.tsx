@@ -1,6 +1,6 @@
 /* One agent's own page: whether Agent HUD follows it, the step it still
- * waits for, the features it uses (each can be turned off for it alone), and
- * its accounts: in full when it is its vendor's only client, else as a list
+ * waits for, the features it uses (each can be turned off for it alone) with
+ * what Agent HUD puts into it (its plugin, HUD tools), and its accounts: in full when it is its vendor's only client, else as a list
  * that leads to the vendor's page, where they are set. */
 import { ChevronLeft, RefreshCw } from "lucide-react";
 import type {
@@ -19,6 +19,9 @@ import type { Translate } from "@agent-hud/ui/format";
 import { AgentAccounts } from "./AgentAccounts";
 import { ClientAccounts } from "./ClientSections";
 import { ClientFeatures } from "./ClientFeatures";
+import { useClientInstalls } from "./ClientInstalls";
+import type { AgentPluginItem } from "../agent-plugins/types";
+import type { HudTools, McpClients } from "../agent-plugins/use-status";
 import { hookStep } from "./steps";
 import { usePerform } from "./use-perform";
 
@@ -43,6 +46,12 @@ export interface AgentDetailProps {
   /** Opens the vendor's page; none for a vendor of this one client, whose
    * accounts this page shows itself. */
   openGroup?: () => void;
+  /** Which clients have HUD tools, and the app-wide switch for them. */
+  clients: McpClients;
+  tools: HudTools;
+  /** A product build's own rows for this client. */
+  items: AgentPluginItem[];
+  request: (method: string, params?: unknown) => Promise<unknown>;
 }
 
 export function AgentDetail({
@@ -58,8 +67,22 @@ export function AgentDetail({
   onPreferences,
   back,
   openGroup,
+  clients,
+  tools,
+  items,
+  request,
 }: AgentDetailProps) {
   const { pending, error, setError, perform } = usePerform();
+  const installs = useClientInstalls({
+    client,
+    snapshot,
+    clients,
+    tools,
+    items,
+    request,
+    active: active ?? true,
+    t,
+  });
   // The step the agent wants before it runs Agent HUD's hooks, such as
   // Codex's review, or that it gets none on this system yet: a warning while
   // the agent says it waits for it, else a line under its switch.
@@ -129,6 +152,7 @@ export function AgentDetail({
         onPreferences={onPreferences}
         perform={perform}
         pending={pending}
+        installs={installs}
       />
       {openGroup ? (
         <ClientAccounts

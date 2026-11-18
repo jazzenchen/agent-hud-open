@@ -3,10 +3,7 @@ import type { NativeHUDMonitor } from "./lib/use-hud-geometry";
 import AgentsPage from "./settings/agents/AgentsPage";
 import { useT } from "@agent-hud/ui/format-context";
 import { LoadingState } from "./LoadingState";
-import {
-  AgentPluginsPane,
-  type AgentPluginItem,
-} from "./settings/AgentPluginsPane";
+import type { AgentPluginItem } from "./settings/agent-plugins/types";
 import { DisplayPane } from "./settings/DisplayPane";
 import { ExperimentalPane } from "./settings/ExperimentalPane";
 import { GeneralPane } from "./settings/GeneralPane";
@@ -29,6 +26,7 @@ export default function SettingsPane({
   onPreferences,
   agentPlugins = [],
   request,
+  agent,
 }: {
   page: string;
   settingsProps: SettingsPaneProps;
@@ -42,6 +40,8 @@ export default function SettingsPane({
   onPreferences: (source: string, patch: SourcePreferences) => Promise<unknown>;
   agentPlugins?: AgentPluginItem[];
   request: (method: string, params?: unknown) => Promise<unknown>;
+  /** On Agents, the client whose page a link opened. */
+  agent?: string | null;
 }) {
   const t = useT();
   if (page === "general") return <GeneralPane {...settingsProps} />;
@@ -65,6 +65,8 @@ export default function SettingsPane({
   if (page === "agents")
     return (
       <AgentsPage
+        key={agent ?? ""}
+        open={agent}
         snapshot={settingsProps.snapshot}
         action={settingsProps.action}
         active={settingsProps.active}
@@ -72,16 +74,6 @@ export default function SettingsPane({
         onLayout={onLayout}
         preferences={preferences}
         onPreferences={onPreferences}
-        items={agentPlugins}
-        request={request}
-      />
-    );
-  if (page === "agent-plugins")
-    return (
-      <AgentPluginsPane
-        snapshot={settingsProps.snapshot}
-        action={settingsProps.action}
-        active={settingsProps.active}
         items={agentPlugins}
         request={request}
       />

@@ -57,11 +57,11 @@ export const openSettingsSteps: SettingsStep[] = [
   },
   {
     id: "client-tools",
-    page: "agent-plugins",
-    anchor: "clients",
+    page: "agents",
+    anchor: "agents-list",
     title: t("Turn them on in each client too"),
     body: t(
-      "HUD tools and plugins are turned on in each client separately. See which ones are still missing here, and click Add.",
+      "HUD tools and plugins are turned on in each client separately. A client without the HUD tools tag doesn't have them yet: open it and click Add.",
     ),
   },
 ];

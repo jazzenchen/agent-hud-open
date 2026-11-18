@@ -1,4 +1,4 @@
-// The host calls behind Agent plugins: which clients have Agent HUD's MCP
+// The host calls behind what Agent HUD puts into agents: which clients have Agent HUD's MCP
 // server, and the state of Agent HUD's Claude Code and DeepSeek Harness
 // plugins. Pictures and tests pass fakes with the same shapes.
 import { invoke, isTauri } from "@tauri-apps/api/core";

@@ -1,8 +1,11 @@
 /* Settings → Agents: what Agent HUD does, one switch each for every agent,
- * then the agents, each with the features it uses. An agent opens its own
- * page, where any feature can be turned off for it alone; a vendor's name
- * opens the vendor's page, where its agents' accounts are set. */
+ * then the agents, each with the features it uses; at the bottom, HUD tools
+ * for any other agent and the details behind hooks and tools. An agent opens
+ * its own page, where any feature can be turned off for it alone and its
+ * plugin and HUD tools are added; a vendor's name opens the vendor's page,
+ * where its agents' accounts are set. */
 import { useLayoutEffect, useRef, useState } from "react";
+import { Braces } from "lucide-react";
 import type {
   ClientRow,
   NativeMethod,
@@ -13,8 +16,11 @@ import type {
 import { useT } from "@agent-hud/ui/format-context";
 import { Page } from "../SettingsPrimitives";
 import type { AgentPluginItem } from "../agent-plugins/types";
+import { OtherAgentsCard } from "../agent-plugins/OtherAgentsCard";
+import { DetailsSection } from "../agent-plugins/DetailsSection";
+import { nativeClients } from "../agent-plugins/services";
 import { ToolsSection } from "../agent-plugins/ToolsSection";
-import { useHudTools } from "../agent-plugins/use-status";
+import { useHudTools, useMcpClients } from "../agent-plugins/use-status";
 import { AgentList } from "./AgentList";
 import { AgentDetail } from "./AgentDetail";
 import { FeaturesSection } from "./FeaturesSection";
@@ -33,9 +39,12 @@ export interface AgentsPageProps {
   onLayout: (layout: PanelLayout) => Promise<unknown>;
   preferences: Record<string, SourcePreferences>;
   onPreferences: (source: string, patch: SourcePreferences) => Promise<unknown>;
-  /** A product build's own agent tools, shown with Agent HUD's. */
+  /** A product build's own agent tools, shown with Agent HUD's, and its
+   * rows for a client, on the client's page. */
   items?: AgentPluginItem[];
   request: (method: string, params?: unknown) => Promise<unknown>;
+  /** The client whose page opens first (a link to it); else the list. */
+  open?: string | null;
 }
 
 type View = { kind: "list" } | { kind: "client" | "group"; id: string };
@@ -50,11 +59,16 @@ export default function AgentsPage({
   onPreferences,
   items = [],
   request,
+  open,
 }: AgentsPageProps) {
   const t = useT();
-  const [view, setView] = useState<View>({ kind: "list" });
+  const [view, setView] = useState<View>(
+    open ? { kind: "client", id: open } : { kind: "list" },
+  );
   const page = useRef<HTMLDivElement>(null);
   const tools = useHudTools(snapshot, action);
+  // Which clients have HUD tools: the list's tags and each agent's row.
+  const mcp = useMcpClients(nativeClients, active ?? true, t);
   // The order the runtime lists them in, so the list never jumps.
   const clients: ClientRow[] = snapshot.clients?.length
     ? snapshot.clients
@@ -115,6 +129,10 @@ export default function AgentsPage({
               ? () => go({ kind: "group", id: client.group })
               : undefined
           }
+          clients={mcp}
+          tools={tools}
+          items={items.filter((item) => item.place !== "tools")}
+          request={request}
         />
       ) : group.length ? (
         <GroupDetail
@@ -147,6 +165,18 @@ export default function AgentsPage({
             preferences={preferences}
             select={(id) => go({ kind: "client", id })}
             selectGroup={(id) => go({ kind: "group", id })}
+            added={mcp.status}
+          />
+          <OtherAgentsCard
+            json={mcp.status?.json}
+            icon={<Braces size={16} strokeWidth={1.8} />}
+            t={t}
+          />
+          <DetailsSection
+            snapshot={snapshot}
+            clients={mcp.status}
+            tools={tools}
+            t={t}
           />
         </Page>
       )}

@@ -1,4 +1,4 @@
-//! Settings → Agent plugins: Agent HUD's DeepSeek Harness plugin,
+//! Settings → Agents → DeepSeek: Agent HUD's DeepSeek Harness plugin,
 //! which shows the questions and approvals Harness sessions wait on in the
 //! HUD, lets the app leave words for a running session, and tells the app
 //! which session called one of its MCP tools. It is installed and removed

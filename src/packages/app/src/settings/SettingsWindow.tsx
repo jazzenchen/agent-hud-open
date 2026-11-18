@@ -27,7 +27,7 @@ import appIcon from "../assets/app-icon.png";
 import type { NativeHUDMonitor } from "../lib/use-hud-geometry";
 import { LoadingState } from "../LoadingState";
 import { ViewErrorBoundary } from "../ViewErrorBoundary";
-import type { AgentPluginItem } from "./AgentPluginsPane";
+import type { AgentPluginItem } from "./agent-plugins/types";
 import { useFormat, useT } from "@agent-hud/ui/format-context";
 import { pageGroups, sidebarPages, type AppExtensionPage } from "./pages";
 import { SettingsNavigation } from "./SettingsNavigation";
@@ -40,6 +40,8 @@ import type { SettingsPaneProps } from "./SettingsPrimitives";
 const SettingsPane = lazy(() => import("../SettingsPanes"));
 
 type Page = string;
+/** Pages that moved: Agent plugins' rows are on each agent's own page. */
+const MOVED: Record<string, string> = { "agent-plugins": "agents" };
 
 /** The Settings window: the sidebar of pages, and the chosen page's header
  * and pane. */
@@ -97,6 +99,19 @@ export function SettingsWindow({
     [extensionPages, t, language],
   );
   const [page, setPage] = useState<Page>("display");
+  // On Agents, the client whose page a link opened ("agents/claude").
+  const [agent, setAgent] = useState<string | null>(null);
+  // A page by id, or one agent's page; a product page that takes a built-in
+  // page's place answers for it.
+  const go = (id: string) => {
+    const [name = "", ...rest] = id.split("/");
+    const moved = MOVED[name] ?? name;
+    const target =
+      extensionPages.find((item) => item.replaces === moved)?.id ?? moved;
+    if (!allPages.some((item) => item.id === target)) return;
+    setPage(target);
+    setAgent(rest.join("/") || null);
+  };
   // The running app's own version: a release is stamped with its version when
   // it is built (0.6.0-beta.1), which a product's front end cannot know.
   // `version` stands in outside the app; null until the app has said.
@@ -108,15 +123,11 @@ export function SettingsWindow({
     void getVersion().then(setRunningVersion);
   }, []);
   // A page the host asked for (the update notice opens Updates): taken when
-  // Settings starts and whenever the host asks again. A product page that
-  // takes a built-in page's place answers for it.
+  // Settings starts and whenever the host asks again.
   useEffect(() => {
     if (!isTauri()) return;
     const open = (id: string | null) => {
-      if (!id) return;
-      const target =
-        extensionPages.find((page) => page.replaces === id)?.id ?? id;
-      if (allPages.some((page) => page.id === target)) setPage(target);
+      if (id) go(id);
     };
     const take = () =>
       void invoke<string | null>("take_settings_page").then(open);
@@ -129,7 +140,7 @@ export function SettingsWindow({
   }, []);
   const currentPage = allPages.find((item) => item.id === page);
   return (
-    <SettingsNavigation.Provider value={setPage}>
+    <SettingsNavigation.Provider value={go}>
       <TooltipProvider delayDuration={400}>
         <div className="apple-app" data-theme={theme}>
           <aside className="apple-sidebar">
@@ -147,7 +158,7 @@ export function SettingsWindow({
                           key={id}
                           variant="ghost"
                           className={`apple-navigation ${page === id ? "is-selected" : ""}`}
-                          onClick={() => setPage(id)}
+                          onClick={() => go(id)}
                           aria-current={page === id ? "page" : undefined}
                         >
                           <span
@@ -229,6 +240,7 @@ export function SettingsWindow({
                         onPreferences={onPreferences}
                         agentPlugins={agentPlugins}
                         request={extensionRequest}
+                        agent={agent}
                       />
                     </Suspense>
                   </ViewErrorBoundary>
@@ -241,7 +253,7 @@ export function SettingsWindow({
             settingsProps={settingsProps}
             version={runningVersion}
             steps={[...openSettingsSteps, ...(guide?.steps ?? [])]}
-            setPage={setPage}
+            setPage={go}
           />
           <Toaster theme={theme} position="bottom-right" />
         </div>

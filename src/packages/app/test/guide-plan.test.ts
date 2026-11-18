@@ -87,7 +87,7 @@ test("closing keeps the newest version seen, and the menu shows the newest news"
 test("the tour goes from the HUD to each Settings row and ends with the Star", () => {
   const row = (id: string) => ({
     id,
-    page: "agent-plugins",
+    page: "agents",
     anchor: id,
     title: ["", ""] as [string, string],
     body: ["", ""] as [string, string],

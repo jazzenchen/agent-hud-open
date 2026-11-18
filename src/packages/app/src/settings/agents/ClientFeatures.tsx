@@ -1,7 +1,8 @@
 /* The features one agent can use, each turned off for it alone: live status
  * and its reminders, answers in the HUD (and the switches only some agents
  * have beneath it), and messages where its plugin carries them. A feature
- * turned off for every agent shows here off, with why. */
+ * turned off for every agent shows here off, with why. What Agent HUD puts
+ * into the agent sits with them: its plugin first, HUD tools last. */
 import type {
   ClientRow,
   NativeMethod,
@@ -9,6 +10,7 @@ import type {
   SourcePreferences,
 } from "@agent-hud/protocol";
 import type { Translate } from "@agent-hud/ui/format";
+import type { useClientInstalls } from "./ClientInstalls";
 import { ToggleRow } from "../SettingsControls";
 import { Pill, Row, Section } from "../SettingsPrimitives";
 import { can, messagesKey } from "./features";
@@ -23,6 +25,7 @@ export function ClientFeatures({
   onPreferences,
   perform,
   pending,
+  installs,
 }: {
   t: Translate;
   snapshot: Snapshot;
@@ -35,6 +38,8 @@ export function ClientFeatures({
   onPreferences: (source: string, patch: SourcePreferences) => Promise<unknown>;
   perform: Perform;
   pending: boolean;
+  /** The agent's plugin, a product's rows and HUD tools. */
+  installs: ReturnType<typeof useClientInstalls>;
 }) {
   const settings = snapshot.settings;
   const set = (key: string, value: unknown) =>
@@ -52,11 +57,15 @@ export function ClientFeatures({
   const messages = messagesKey(client);
   const why = (everywhereOn: boolean) =>
     !on ? offHere : !everywhereOn ? everywhere : undefined;
-  if (!["live", "answer", "talk", "tools"].some((f) => can(client, f as never)))
+  if (
+    !installs.plugin &&
+    !["live", "answer", "talk", "tools"].some((f) => can(client, f as never))
+  )
     return null;
 
   return (
-    <Section title={t("What it uses")}>
+    <Section title={t("What it uses")} footer={installs.note}>
+      {installs.plugin}
       {can(client, "live") && (
         <>
           <ToggleRow
@@ -96,7 +105,7 @@ export function ClientFeatures({
           }
         />
       )}
-      {can(client, "answer") && client.id === "claude-desktop" && (
+      {can(client, "answer") && client.agent === "claude" && (
         <ToggleRow
           title={t("Answer questions")}
           checked={
@@ -142,11 +151,13 @@ export function ClientFeatures({
             <Pill>{on && settings.agentMessages ? t("On") : t("Off")}</Pill>
           </Row>
         ))}
-      {can(client, "tools") && (
-        <Row title={t("HUD tools")}>
-          <Pill>{on && settings.hudTools ? t("On") : t("Off")}</Pill>
-        </Row>
-      )}
+      {installs.own}
+      {can(client, "tools") &&
+        (installs.tools ?? (
+          <Row title={t("HUD tools")}>
+            <Pill>{on && settings.hudTools ? t("On") : t("Off")}</Pill>
+          </Row>
+        ))}
     </Section>
   );
 }

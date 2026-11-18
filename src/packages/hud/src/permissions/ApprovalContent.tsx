@@ -100,7 +100,7 @@ export function ApprovalContent({
   selected: Approval;
   select: (id: string) => void;
   decide?: (id: string, decision: RequestDecision) => void | Promise<void>;
-  /** Settings, on a page such as "agent-plugins", with the HUD put away. */
+  /** Settings, on a page such as "agents/claude", with the HUD put away. */
   openSettings?: (page: string) => void;
   /** A request's way back to its session, false when it fails; none where
    * its session cannot be reached. */

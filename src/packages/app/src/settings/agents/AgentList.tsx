@@ -5,6 +5,7 @@ import type {
   Snapshot,
   SourcePreferences,
 } from "@agent-hud/protocol";
+import type { MCPClientsStatus } from "../agent-plugins/services";
 import { AgentLogo } from "../AgentLogo";
 import type { Translate } from "@agent-hud/ui/format";
 import { Collapsible, Section } from "../SettingsPrimitives";
@@ -23,6 +24,7 @@ export function AgentList({
   preferences,
   select,
   selectGroup,
+  added,
 }: {
   t: Translate;
   snapshot: Snapshot;
@@ -30,12 +32,14 @@ export function AgentList({
   preferences: Record<string, SourcePreferences>;
   select: (id: string) => void;
   selectGroup: (group: string) => void;
+  /** Which clients have HUD tools, once read. */
+  added: MCPClientsStatus | null;
 }) {
   const found = clients.filter((client) => client.detected);
   const missing = clients.filter((client) => !client.detected);
   const item = (client: ClientRow) => {
     const used = features.filter((feature) =>
-      uses(client, feature, snapshot, preferences),
+      uses(client, feature, snapshot, preferences, added),
     );
     // A step the agent waits for in it, such as Codex's hook review; its
     // words show on hover.

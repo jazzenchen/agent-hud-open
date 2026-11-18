@@ -11,7 +11,7 @@ import { cardColumn } from "./card-column";
 export interface RequestActionsProps {
   request: Approval;
   onDecision?: (decision: RequestDecision) => void | Promise<void>;
-  /** Settings, on a page such as "agent-plugins". */
+  /** Settings, on a page such as "agents/claude". */
   onOpenSettings?: (page: string) => void;
   light?: boolean;
 }
