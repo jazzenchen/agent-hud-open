@@ -5,7 +5,7 @@ import type {
   Snapshot,
   SourcePreferences,
 } from "@agent-hud/protocol";
-import { HUDArtwork as HUDLogo } from "@agent-hud/hud/HUDArtwork";
+import { AgentLogo } from "../AgentLogo";
 import type { Translate } from "@agent-hud/ui/format";
 import { Collapsible, Section } from "../SettingsPrimitives";
 import { featureName, features, uses } from "./features";
@@ -47,7 +47,7 @@ export function AgentList({
         className={`agents-row${client.enabled ? "" : " is-off"}`}
         onClick={() => select(client.id)}
       >
-        <HUDLogo source={client.agent} size={18} />
+        <AgentLogo source={client.agent} size={18} />
         <span className="agents-row-name">{client.name}</span>
         <span className="agents-row-tags">
           {!client.enabled ? (

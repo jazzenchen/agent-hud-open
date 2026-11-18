@@ -9,7 +9,7 @@ import type {
   Snapshot,
 } from "@agent-hud/protocol";
 import { ChevronLeft } from "lucide-react";
-import { HUDArtwork as HUDLogo } from "@agent-hud/hud/HUDArtwork";
+import { AgentLogo } from "../AgentLogo";
 import type { Translate } from "@agent-hud/ui/format";
 import { LinkButton } from "../SettingsControls";
 import { Notice, Page } from "../SettingsPrimitives";
@@ -53,7 +53,7 @@ export function GroupDetail({
         </LinkButton>
       </div>
       <header className="agents-detail-header">
-        <HUDLogo source={clients[0]?.agent ?? ""} size={24} />
+        <AgentLogo source={clients[0]?.agent ?? ""} size={24} />
         <div className="agents-detail-title">
           <h2>{clients[0]?.groupName}</h2>
         </div>
@@ -74,7 +74,7 @@ export function GroupDetail({
         <div key={source.id} className="agents-group-agent">
           {agents.length > 1 && (
             <h3 className="agents-group-agent-name">
-              <HUDLogo source={source.id} size={16} />
+              <AgentLogo source={source.id} size={16} />
               {source.name}
             </h3>
           )}

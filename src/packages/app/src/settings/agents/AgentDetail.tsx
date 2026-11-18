@@ -12,7 +12,7 @@ import type {
   SourcePreferences,
 } from "@agent-hud/protocol";
 import { Button } from "@agent-hud/ui/components/button";
-import { HUDArtwork as HUDLogo } from "@agent-hud/hud/HUDArtwork";
+import { AgentLogo } from "../AgentLogo";
 import { LinkButton, ToggleRow } from "../SettingsControls";
 import { Notice, Page, Section } from "../SettingsPrimitives";
 import type { Translate } from "@agent-hud/ui/format";
@@ -79,7 +79,7 @@ export function AgentDetail({
         </LinkButton>
       </div>
       <header className="agents-detail-header">
-        <HUDLogo source={client.agent} size={24} />
+        <AgentLogo source={client.agent} size={24} />
         <div className="agents-detail-title">
           <h2>{client.name}</h2>
           {!client.detected && <p>{t("Not on this computer")}</p>}

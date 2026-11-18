@@ -1,5 +1,5 @@
 import { Fragment, useCallback, useEffect, useState } from "react";
-import { HUDArtwork as HUDLogo } from "@agent-hud/hud/HUDArtwork";
+import { AgentLogo } from "./AgentLogo";
 import { useT } from "@agent-hud/ui/format-context";
 import {
   moneyAmount,
@@ -142,7 +142,7 @@ export function PricesPane({ snapshot, action }: SettingsPaneProps) {
             return (
               <Collapsible
                 key={client}
-                icon={<HUDLogo source={rows[0].source} size={18} />}
+                icon={<AgentLogo source={rows[0].source} size={18} />}
                 title={client}
                 defaultOpen={unpriced > 0}
                 summary={
