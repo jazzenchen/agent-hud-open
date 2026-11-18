@@ -3,14 +3,14 @@
   <channel>
     <title>Agent HUD</title>
     <item>
-      <title>0.6.6</title>
-      <pubDate>Tue, 17 Nov 2026 02:32:27 +0800</pubDate>
-      <link>https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.6</link>
-      <sparkle:version>503</sparkle:version>
-      <sparkle:shortVersionString>0.6.6</sparkle:shortVersionString>
+      <title>0.6.7</title>
+      <pubDate>Wed, 18 Nov 2026 19:16:12 +0800</pubDate>
+      <link>https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.7</link>
+      <sparkle:version>505</sparkle:version>
+      <sparkle:shortVersionString>0.6.7</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
       <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-      <description sparkle:format="markdown"># Agent HUD 0.6.6
+      <description sparkle:format="markdown"># Agent HUD 0.6.7
 
 ## Compatibility
 
@@ -24,22 +24,40 @@ Requires an Apple Silicon Mac running macOS 14 or later.
 
 ### New
 
-- An agent can now steer a message into a Codex session's turn in progress, when you ask it to (#68, thanks @xunhe730). `send_message` takes `delivery: steer`; without it the message still waits for the next turn. Only Codex takes a steer, `list_sessions` says which sessions can, and `get_message` reads the answer from the turn the message went into.
-- When a message from your iPhone can't reach the agent, the Mac now tells the phone why, and says so right away when Send messages is off (#104). The next iPhone update shows these reasons in plain words; until then the phone shows "Not delivered by the Mac". Send from this computer in Settings → Remote shows the same reasons.
+- **Inspector (experimental).** Copy something and a bubble appears at the end of the dock. Point at it to send the copy to a Claude Code, Codex or DeepSeek Harness session, or to start a new one with it. You can gather several copies, comment on each, and mark up a picture with boxes, circles, lines and numbered notes before sending. Turn it on in Settings → Experimental, a new page for features still being tried out. ⌥Z brings the inspector back after its bubble has gone; you can record another shortcut there, or clear it.
+- **Browser extension for Chrome (experimental).** Click an element, or drag over an area of a page, to send its screenshot, selector, text and HTML to an agent session through the inspector. When the page's dev server marks elements with their place in the source (Astro, Vue, code-inspector-plugin), that file and line come first. Install it from the [Chrome Web Store](https://chromewebstore.google.com/detail/agent-hud/eaihfcfnoaafgcggajlbegjnfjinkckk).
+- **Settings → Agents, rebuilt.** At the top, what Agent HUD does: live status, answering in the HUD and agent tools, each one switch for every agent. Below, your agents grouped by vendor, each with the features it uses. The command line and the desktop app of Claude Code, Codex and Antigravity are separate entries, and Cursor is now listed under xAI. Open an agent to turn a feature off for it alone, add Agent HUD's plugin or HUD tools to it (Agent plugins is now part of this page), and see which account, relay or other provider its own calls went through in the last 30 days. Click a vendor's name to manage its accounts. Turning an agent off also stops Agent HUD from taking its approval requests: its own client asks instead.
+- **Approve automatically**, off by default. Permission requests are allowed as they come, with no card, with one switch under Answer in the HUD and one on each agent's page. Questions and plans still wait for you. The agents it's on for are tagged in the list.
+- An account signed in to in more than one app shows once, marked Merged, with the apps it was read through: Claude Code and Claude Desktop, Codex's command line and desktop app, Antigravity's apps, and a Cursor account merged into SuperGrok with Grok Bot. A vendor's line in the agent list shows the account its apps share.
+- A screen's HUD can hide while an app or a video is full screen on it, with a switch per screen in Settings → Display, off unless you turn it on (#117, macOS).
+- The Simple HUD can show its numbers in grey, at an opacity you choose (#109, thanks @hbin-max).
+- Agents can list each client's models with `list_models`, and name one in `start_session` and `send_message` when you ask them to. A message into Antigravity now goes in the model you last picked there, not the one the conversation last ran.
 
 ### Fixes
 
-- Steers and automatic sends reach Codex in ChatGPT.app 157 again, which reports its threads in a newer format (thanks @xunhe730).
-- `send_message` and `start_session` work again with Codex command-line builds that have no message queue, such as 0.169.0-alpha (#94). Agent HUD now queues the message through the Codex app's own command line.
-- Claude Code and Codex can send agent messages again after Agent HUD moved to another folder (#100). At launch, Agent HUD now points their Agent HUD server entry at the copy that is running.
-- The HUD no longer shows 0% for a quota window whose reset time has passed (#90). Until the next read, that window sets neither the number, its colour nor its ring.
-- The hover panel shows only the agents that screen's HUD shows, as picked in Settings → Display (#85).
-- Settings, Statistics and sign-in windows open on the desktop you are on, instead of switching back to the desktop where they were first opened (#99).
-- A message's sender line names Grok Bot, Pi and OpenCode instead of calling them Codex (thanks @Alex-Liu-airjelly).
-- Settings and Statistics load their text before they first draw (#87, thanks @Ultroncn).
-- The release news beside the HUD is wider and sits on a solid background.
+- Long Antigravity conversations take messages again: Agent HUD reads only their last turns. A read that is still too large now reports its size and the limit, instead of pointing at quota (#93).
+- OpenCode 2 sessions now receive messages from other agents once they're idle, as OpenCode 1 sessions do (#114).
+- A sub-agent's `send_message` and `start_session` calls are refused. A sub-agent hands its result back in its own turn, rather than queuing extra turns onto its parent (#111).
+- Where Agent HUD doesn't install hooks for a client on your system yet, `list_sessions` and that client's Settings row now say so, instead of "no hooks seen" (#115).
+- A Codex conversation split across several files counts once, with all its tokens, under its newest part, and its page reads on from one part to the next (#101). Codex's auto-reviews are named apart from the session's sub-agents (#102).
+- The HUD's number and colour now leave out the windows the panel hides (#91, thanks @zqy5618 for the patch).
+- A section that loads after the panel opens no longer sits behind the panel's footer (#116).
+- Grok Bot 1.1's weekly quota shows again (#110, thanks @CJstate).
+- On a Mac, `send_message` and `start_session` to Codex now use the `codex` that Codex.app or ChatGPT.app carries before a standalone one, such as an old `~/.local/bin/codex` that refused messages; a saved standalone path gives way to the app's copy at launch (#94, thanks @23moriarty-cyber). Windows is unchanged.
+- Settings, Statistics and the markup window open on the screen under the pointer. With a Retina main screen and a second screen, they always went to the main one.
+- Settings and Statistics show their own background from the first frame, before their content loads (#83, thanks @Ultroncn).
+- If Claude Desktop is signed in to a different account than Claude Code, both accounts now show, and one Codex subscription no longer shows twice when Codex leaves out the email.
+- Statistics gets back token history from before 6 October that an earlier build dropped: at first launch, this version reads the affected logs once more, which can take a while on a long history.
+- A long recording sent from the iPhone over the local network no longer fails at 8 KB.
+- When Claude Code refuses to start a session from the inspector, the inspector shows Claude Code's own reason, such as a folder not trusted yet.
+- After you type in the HUD, the first agent logo no longer keeps a blue focus ring and opens the panel by itself.
+- The message bubble and the inspector bubble count down alike: pointing at one starts its time over.
+- The iPhone's Live Activity gets fewer, merged updates from the Mac.
+- Codex Desktop's quota shows when Codex's command line isn't signed in: Agent HUD reads it from the desktop app's own sessions.
+- Agent logos drawn in one colour (Cursor, Kimi, Pi, ZCode, Grok, TRAE) show on the light theme in Settings.
+- Coming back from an agent's page keeps the list where you left it, and the list's warning mark shows only while Codex waits for you to allow its hooks.
 </description>
-      <enclosure url="https://github.com/jazzenchen/agent-hud-open/releases/download/v0.6.6/Agent-HUD-0.6.6-arm64.dmg" length="54594602" type="application/octet-stream" sparkle:edSignature="wWDi4GLhixItagPy82wcsleK6UPHDfSCpSvMAq3NOMkDSDAREiIVN/gAXFqCIvrkpZckD32d8c+r6I8GX0/eBw==" />
+      <enclosure url="https://github.com/jazzenchen/agent-hud-open/releases/download/v0.6.7/Agent-HUD-0.6.7-arm64.dmg" length="55093635" type="application/octet-stream" sparkle:edSignature="cD6FFVTOh/WdTuVy9n5CpT56Xy3q270NfjWYFgx83fnu66RYhYV3i33bpEhfcUQByRB354oTB3cox+DPch6dDg==" />
       <agenthudMacOnly>false</agenthudMacOnly>
       <agenthudMinimumIOSVersion>1.7.2</agenthudMinimumIOSVersion>
     </item>
