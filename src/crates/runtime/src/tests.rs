@@ -75,3 +75,26 @@ fn antigravity_cli_rejects_invalid_lists_and_missing_owners_without_file_changes
         assert!(!temp.path().join("app-data/settings.json").exists());
     }
 }
+
+#[test]
+fn open_cached_session_skips_lock_only_when_snapshot_matches() {
+    let snapshot = json!({
+        "sessions": [
+            {"id": "s1", "navigationTarget": null},
+            {"id": "s2", "navigationTarget": {"kind": "antigravity-conversation", "id": "conv"}}
+        ],
+        "islandEvents": [
+            {"sessionId": "e1", "navigationTarget": {"kind": "antigravity-conversation", "id": "ev"}}
+        ]
+    });
+    assert!(open_cached_session(&snapshot, "missing", false).is_none());
+    assert!(open_cached_session(&snapshot, "s1", false).is_none());
+    assert_eq!(
+        open_cached_session(&snapshot, "s1", true).unwrap().unwrap(),
+        json!({"opened": true, "action": "demo"})
+    );
+    assert_eq!(
+        open_cached_session(&snapshot, "e1", true).unwrap().unwrap(),
+        json!({"opened": true, "action": "demo"})
+    );
+}
