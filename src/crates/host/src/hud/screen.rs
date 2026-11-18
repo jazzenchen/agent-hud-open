@@ -76,6 +76,12 @@ impl<'a> Screen<'a> {
         ])
     }
 
+    /// Whether this screen's Simple numbers follow the shortest live window
+    /// (Settings → Display → HUD), read as Settings reads it.
+    pub(crate) fn shortest_window_first(&self) -> bool {
+        self.flag("shortestWindowFirst")
+    }
+
     pub(crate) fn mode(&self) -> Mode {
         serde_json::from_value(self.value("mode")).unwrap_or(if self.has_notch {
             Mode::Notch

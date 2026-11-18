@@ -11,11 +11,13 @@ pub use format::{
 };
 use panel_rows::{deepseek_balances, row_shown};
 use serde_json::Value;
+use std::cmp::Ordering;
 
 pub struct Vendor<'a> {
     pub key: String,
     pub name: String,
-    /// The tightest measured window's used percent.
+    /// The measured window's used percent: the shortest, when the screen asks
+    /// for it, else the tightest.
     pub used: Option<f64>,
     /// The last reading's tightest window while every window waits on a
     /// failed read (`held`).
@@ -81,6 +83,37 @@ fn tightest<'a>(quotas: &[&'a Value], now_ms: i64) -> Option<(f64, &'a Value)> {
         })
 }
 
+/// The live window with the shortest reported window, with its percent; ties
+/// go to the highest used percent. When no live window reports a window
+/// length, the tightest window instead, so a screen without duration data
+/// reads as it did (held-reading.ts `shortestWindow`).
+fn shortest<'a>(quotas: &[&'a Value], now_ms: i64) -> Option<(f64, &'a Value)> {
+    quotas
+        .iter()
+        .filter(|q| live(q, now_ms))
+        .filter(|q| {
+            q["windowDurationSeconds"]
+                .as_f64()
+                .is_some_and(|duration| duration.is_finite() && duration > 0.0)
+        })
+        .min_by(|a, b| {
+            let duration = |q: &&Value| q["windowDurationSeconds"].as_f64().unwrap();
+            duration(a)
+                .partial_cmp(&duration(b))
+                .unwrap_or(Ordering::Equal)
+                .then_with(|| {
+                    // Ties: the highest used percent sorts first.
+                    b["usedPercent"]
+                        .as_f64()
+                        .unwrap()
+                        .partial_cmp(&a["usedPercent"].as_f64().unwrap())
+                        .unwrap_or(Ordering::Equal)
+                })
+        })
+        .map(|q| (q["usedPercent"].as_f64().unwrap(), *q))
+        .or_else(|| tightest(quotas, now_ms))
+}
+
 /// Every agent a resting HUD in `mode` shows without a list, one per mark; `mode` is
 /// "notch", "simple" or the bots' [`crate::presentation::QUEUE`].
 pub fn vendors<'a>(snapshot: &'a Value, mode: &str, now_ms: i64) -> Vec<Vendor<'a>> {
@@ -137,12 +170,15 @@ pub fn vendors<'a>(snapshot: &'a Value, mode: &str, now_ms: i64) -> Vec<Vendor<'
 /// The marks a screen's HUD shows, in Settings' agent order, the layout's `order`
 /// (resting-agents.ts `layoutMarks`). Its `hud.agents` picks which marks show but
 /// not their order; a list naming none of the available agents never empties a
-/// HUD (HUDAgentOrder.swift).
+/// HUD (HUDAgentOrder.swift). `shortest_first` is the screen's own switch
+/// (Settings → Display → HUD): its numbers follow the shortest live window,
+/// not the most used one.
 pub fn configured<'a>(
     snapshot: &'a Value,
     mode: &str,
     layout: &Value,
     now_ms: i64,
+    shortest_first: bool,
 ) -> Vec<Vendor<'a>> {
     let mut available = vendors(snapshot, mode, now_ms);
     for vendor in &mut available {
@@ -155,11 +191,15 @@ pub fn configured<'a>(
             .copied()
             .filter(|q| row_shown(q, &layout["blocks"][q["vendor"].as_str().unwrap_or("")]))
             .collect();
-        if shown.len() < vendor.quotas.len() {
-            let tightest = tightest(&shown, now_ms);
-            vendor.used = tightest.map(|(used, _)| used);
+        if shown.len() < vendor.quotas.len() || shortest_first {
+            let picked = if shortest_first {
+                shortest(&shown, now_ms)
+            } else {
+                tightest(&shown, now_ms)
+            };
+            vendor.used = picked.map(|(used, _)| used);
             vendor.held = held(&shown, now_ms);
-            vendor.level = tightest
+            vendor.level = picked
                 .and_then(|(_, q)| q["status"].as_str())
                 .unwrap_or("stale");
         }
