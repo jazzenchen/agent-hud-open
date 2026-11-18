@@ -584,6 +584,8 @@
   "Local transcripts and client events; hook connection status is reported separately.": "로컬 대화 기록과 클라이언트 이벤트. 훅 연결 상태는 별도로 표시됩니다.",
   "Local usage ingestion is unavailable for: {{sources}}": "다음 출처는 로컬 사용량을 수집할 수 없습니다: {{sources}}",
   "Logo spacing": "로고 간격",
+  "Grey numbers": "회색 숫자",
+  "Number opacity": "숫자 불투명도",
   "Long step (≥15 s)": "긴 단계(≥15초)",
   "Longest {{count}} days_other": "최장 {{count, number}}일",
   "Main session": "메인 세션",

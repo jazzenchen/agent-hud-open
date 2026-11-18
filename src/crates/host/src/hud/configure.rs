@@ -23,12 +23,6 @@ fn query_screen(screen_id: &str) -> String {
         .collect()
 }
 
-const HUD_DOCUMENT: &str = r#"(() => {
-  const mark = () => document.documentElement?.classList.add("native-hud-document");
-  mark();
-  if (!document.documentElement) document.addEventListener("readystatechange", mark, { once: true });
-})();"#;
-
 /// How deep a window reaches before its page has said: about what a HUD at
 /// rest takes, so a starting HUD never covers the screen.
 const STARTING_DEPTH: f64 = 192.0;
@@ -149,10 +143,8 @@ pub(super) fn configure(
                 .focused(false)
                 .focusable(false)
                 .accept_first_mouse(true)
-                // Transparent from the first frame: the stylesheet's dark page
-                // background would otherwise fill the window until React marks
-                // the document as a HUD.
-                .initialization_script(HUD_DOCUMENT)
+                // The document's surface attribute keeps the HUD transparent
+                // before its React surface loads.
                 .visible(false)
                 .build()
                 .map_err(|error| format!("Could not create the HUD surface: {error}"))?;

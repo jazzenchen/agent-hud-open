@@ -322,13 +322,6 @@ a:focus-visible {
 .statistics-page .usage-summary {
   margin-bottom: 18px;
 }
-.native-hud-document,
-.native-hud-document body,
-.native-hud-document #root {
-  background: transparent !important;
-  overflow: hidden;
-}
-
 .statistics-toolbar {
   height: 44px;
   min-height: 44px;

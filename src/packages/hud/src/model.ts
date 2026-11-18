@@ -1,10 +1,10 @@
-import hudDefaults from "@agent-hud/protocol/hud-defaults.json";
+import hudDefaults from "@agent-hud/protocol/hud-defaults.json" with { type: "json" };
 import type {
   PanelLayout,
   RequestDecision,
   Snapshot,
 } from "@agent-hud/protocol";
-import { agentArtworkKey, agentVendorName } from "./agent-artwork";
+import { agentArtworkKey, agentVendorName } from "./agent-artwork.ts";
 import { layoutMarks, restingAgents } from "./resting-agents.ts";
 import { recentLabel, recentUsage } from "./recent-usage.ts";
 import { visibleBalances } from "./balance-rows.ts";
@@ -18,7 +18,7 @@ import {
   quotaPercentLabel,
   type QuotaDisplay,
 } from "@agent-hud/ui/format";
-export { agentVendorName } from "./agent-artwork";
+export { agentVendorName } from "./agent-artwork.ts";
 
 export type HUDMode = "notch" | "simple";
 export type HUDEdge = "top" | "right" | "bottom" | "left";
@@ -66,6 +66,8 @@ export interface HUDConfig {
   /** How a Simple mark draws its usage: rings, a segmented ring, bars, or the number alone. */
   simpleStyle: UsageStyle;
   showsNumbers: boolean;
+  greyNumbers: boolean;
+  greyNumberOpacity: number;
   separatesAgents: boolean;
   appearance: "dark" | "light" | "system";
   solidTransparency: number;
@@ -228,15 +230,7 @@ export function meterLabel(vendor: HUDVendor, display?: QuotaDisplay): string {
     : quotaPercentLabel(used, display);
 }
 
-export function statusColor(level: HUDVendor["level"]): string {
-  return level === "critical"
-    ? "#ff453a"
-    : level === "warning"
-      ? "#ffd23f"
-      : level === "normal"
-        ? "#3ddc84"
-        : "#8e8e93";
-}
+export { simpleNumberColor, statusColor } from "./mark-colors.ts";
 
 /** HUDAgentOrder.swift: the marks a layout picks, in Settings' agent order; an unavailable list never empties a HUD. */
 export function configuredVendors(

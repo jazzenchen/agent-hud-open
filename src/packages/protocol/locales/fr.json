@@ -594,6 +594,8 @@
   "Local transcripts and client events; hook connection status is reported separately.": "Transcriptions locales et événements des clients ; l’état de connexion des hooks est indiqué séparément.",
   "Local usage ingestion is unavailable for: {{sources}}": "La collecte de l’usage local est indisponible pour : {{sources}}",
   "Logo spacing": "Espacement des logos",
+  "Grey numbers": "Nombres en gris",
+  "Number opacity": "Opacité des nombres",
   "Long step (≥15 s)": "Étape longue (≥ 15 s)",
   "Longest {{count}} days_many": "Record : {{count, number}} jours",
   "Longest {{count}} days_one": "Record : {{count, number}} jour",
