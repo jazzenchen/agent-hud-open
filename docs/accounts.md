@@ -161,7 +161,10 @@ account, and a login with no plan limits (an API key, a relay or another
 platform) says nothing once the desktop app's account is read: the command
 line's own page in Settings → Agents shows where its calls went. Codex does
 the same with a home that has no ChatGPT plan beside an account its sessions
-recorded. Saving a changed
+recorded. Each account names the clients whose sign-in read it (`readBy`,
+by client id: `claude`, `claude-desktop`, `codex`, `codex-desktop`, `pi`); one
+account read through several shows once, marked merged in Settings. Saving a
+changed
 list discards readings from the previous list, including results still in
 flight.
 

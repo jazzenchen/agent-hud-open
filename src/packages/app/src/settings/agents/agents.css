@@ -80,6 +80,7 @@
   background: color-mix(in srgb, var(--muted) 70%, transparent);
 }
 .agents-row-waiting {
+  display: inline-flex;
   flex-shrink: 0;
   color: var(--warning, #c98a00);
 }

@@ -8,8 +8,11 @@
 //! line's shows beside it (owner, 2026-11-18). Nothing is sent and no
 //! credential is read; the windows are as of the call that recorded them.
 use super::limits::parse;
-use crate::account::{append_notice, client_home_key, merge, names_none, Host, Reading, Unread};
+use crate::account::{
+    add_readers, append_notice, client_home_key, merge, names_none, read_by, Host, Reading, Unread,
+};
 use crate::naming::clients::{client_name, codex_client};
+use crate::split::of_log;
 use serde_json::{json, Value};
 use std::path::{Path, PathBuf};
 
@@ -31,6 +34,11 @@ pub(super) fn with_sessions(
     read: Result<Reading, Unread>,
 ) -> Result<Reading, Unread> {
     let recorded = readings(host, home);
+    // The engine reads the home's own sign-in, the command line's.
+    let read = read.map(|mut reading| {
+        read_by(&mut reading, super::AGENT.id);
+        reading
+    });
     match read {
         Ok(mut reading) => {
             // A home with no plan limits (an API key, another provider) is no
@@ -62,12 +70,18 @@ pub(super) fn with_sessions(
 /// sessions, one reading per account, the most recent first.
 pub(super) fn readings(host: &dyn Host, home: &Path) -> Vec<Reading> {
     let mut accounts: Vec<String> = Vec::new();
-    let mut readings = Vec::new();
+    let mut readings: Vec<Reading> = Vec::new();
     for path in newest_logs(host, &home.join("sessions")) {
         let Some(record) = record(host, &path) else {
             continue;
         };
-        if accounts.contains(&record.workspace) {
+        // An account seen in another client's sessions too is read through
+        // both.
+        if let Some(at) = accounts.iter().position(|seen| *seen == record.workspace) {
+            let client = of_log(super::AGENT.id, record.client.as_deref());
+            if let Some(account) = &mut readings[at].account {
+                add_readers(account, &json!({"readBy":[client]}));
+            }
             continue;
         }
         if let Some(reading) = reading(host, home, &record) {
@@ -193,6 +207,10 @@ fn reading(host: &dyn Host, home: &Path, record: &Record) -> Option<Reading> {
     for row in &mut reading.quotas {
         row["observedAt"] = record.at.clone();
     }
+    read_by(
+        &mut reading,
+        of_log(super::AGENT.id, record.client.as_deref()),
+    );
     if let Some(account) = &mut reading.account {
         account["checkedAt"] = record.at.clone();
         // An account seen only in sessions has no email: it is named by the

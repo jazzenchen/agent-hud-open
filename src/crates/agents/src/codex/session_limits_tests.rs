@@ -125,3 +125,31 @@ fn a_home_without_plan_limits_is_no_news_beside_its_sessions_account() {
     assert_eq!(reading.account.unwrap()["label"], "Codex Desktop");
     assert_eq!(reading.notice, None);
 }
+
+/// The command line and the desktop app on one account: it shows once, read
+/// through both; another account the command line's sessions alone name is
+/// read through it alone.
+#[test]
+fn an_account_used_in_both_clients_is_read_through_both() {
+    let mut host = FakeHost::new("/u")
+        .file(
+            "/u/.codex/sessions/2026/11/18/rollout-a.jsonl",
+            &log("cli-ws", "Codex Desktop", 42.0),
+        )
+        .file(
+            "/u/.codex/sessions/2026/11/17/rollout-b.jsonl",
+            &log("other-ws", "codex_cli_rs", 7.0),
+        );
+    engine(&mut host, true);
+    let reading = read(&host).unwrap();
+    let readers: Vec<_> = reading
+        .account
+        .iter()
+        .chain(&reading.additional_accounts)
+        .map(|account| account["readBy"].clone())
+        .collect();
+    assert_eq!(
+        readers,
+        [json!(["codex", "codex-desktop"]), json!(["codex"])]
+    );
+}

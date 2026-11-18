@@ -9,7 +9,7 @@ use super::limits::parse;
 use super::pi_usage::{read_pi, PI_ROUTE};
 use super::session_limits::with_sessions;
 use crate::account::{
-    append_notice, client_home_key, merge, variable, EngineStart, Host, Provider, Reading,
+    append_notice, client_home_key, merge, read_by, variable, EngineStart, Host, Provider, Reading,
     StatusPage, Unread,
 };
 use crate::l10n::tr;
@@ -47,7 +47,12 @@ pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
         )
         .map_err(|_| Unread::Failed(tr!("Install and sign in to read quota"))),
     };
-    let pi = read_pi(host);
+    let pi = read_pi(host).map(|found| {
+        found.map(|mut pi| {
+            read_by(&mut pi, crate::pi::AGENT.id);
+            pi
+        })
+    });
     match (native, pi) {
         (Ok(mut native), Ok(Some(pi))) => {
             // Pi signed in to the same ChatGPT account spends the same windows.

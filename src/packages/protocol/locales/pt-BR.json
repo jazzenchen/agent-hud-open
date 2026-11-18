@@ -1553,5 +1553,6 @@
   "Relay": "Relay",
   "Custom provider": "Provedor personalizado",
   "From this client's calls in the last 30 days.": "Com base nas chamadas deste cliente nos últimos 30 dias.",
-  "No calls from this client in the last 30 days.": "Nenhuma chamada deste cliente nos últimos 30 dias."
+  "No calls from this client in the last 30 days.": "Nenhuma chamada deste cliente nos últimos 30 dias.",
+  "Merged": "Mesclada"
 }

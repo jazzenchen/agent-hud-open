@@ -942,6 +942,15 @@ fn the_desktop_apps_other_account_is_read_beside_claude_codes() {
         .map(|account| account["label"].clone())
         .collect();
     assert_eq!(labels, [json!("me@example.com"), json!("desk@example.com")]);
+    // Each read through its own client: neither is merged.
+    assert_eq!(
+        reading.account.as_ref().unwrap()["readBy"],
+        json!(["claude"])
+    );
+    assert_eq!(
+        reading.additional_accounts[0]["readBy"],
+        json!(["claude-desktop"])
+    );
     let desktop = account_id("claude", &["user-9", "0a1b-2c3d"]);
     assert!(reading
         .quotas
@@ -964,6 +973,11 @@ fn the_desktop_apps_same_account_shows_once() {
     );
     let reading = read(&host).unwrap();
     assert!(reading.additional_accounts.is_empty());
+    // Read through both clients: merged.
+    assert_eq!(
+        reading.account.as_ref().unwrap()["readBy"],
+        json!(["claude", "claude-desktop"])
+    );
     // Claude Code's session and weekly windows, and the Fable window only
     // the desktop app's reading has.
     assert_eq!(reading.quotas.len(), 3);

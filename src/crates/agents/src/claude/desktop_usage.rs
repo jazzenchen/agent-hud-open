@@ -1,7 +1,7 @@
 //! Claude's plan limits through the Claude desktop app's claude.ai sign-in.
 use super::account::{profile, Folder};
 use super::quota_windows::{plan_reading, profile_plan, windows};
-use crate::account::{append_notice, merge, names_none};
+use crate::account::{add_readers, append_notice, merge, names_none, read_by};
 use crate::account::{read_json, Answer, Host, HttpFailure, HttpRequest, Reading, Unread};
 use crate::l10n::tr;
 use crate::Base;
@@ -138,7 +138,9 @@ pub(super) fn from_desktop(
         .into()));
     };
     let plan = profile_plan(&who);
-    Some(Ok(plan_reading(host, windows, &who, plan, &folder.path)))
+    let mut reading = plan_reading(host, windows, &who, plan, &folder.path);
+    read_by(&mut reading, crate::split::CLAUDE_DESKTOP);
+    Some(Ok(reading))
 }
 
 /// Claude Code's reading with the Claude desktop app's beside it: the
@@ -155,6 +157,12 @@ pub(super) fn with_desktop(
     result: Result<Reading, Unread>,
     consulted: bool,
 ) -> Result<Reading, Unread> {
+    // What Claude Code's folders read, unless the desktop app's sign-in
+    // stood in for one.
+    let result = result.map(|mut code| {
+        read_by(&mut code, super::AGENT.id);
+        code
+    });
     if consulted {
         return result;
     }
@@ -178,8 +186,22 @@ pub(super) fn with_desktop(
             merge(&mut code, desktop);
             Ok(code)
         }
-        // The same account, read fresh: Claude Code's stale record goes.
-        (Ok(_), Ok(desktop)) => Ok(desktop),
+        // The same account, read fresh: Claude Code's stale record goes, and
+        // the account is still read through both.
+        (Ok(code), Ok(mut desktop)) => {
+            for account in desktop
+                .account
+                .iter_mut()
+                .chain(&mut desktop.additional_accounts)
+            {
+                for known in code.account.iter().chain(&code.additional_accounts) {
+                    if known["id"] == account["id"] {
+                        add_readers(account, known);
+                    }
+                }
+            }
+            Ok(desktop)
+        }
         (Err(failure), Ok(mut desktop)) => {
             if !covered {
                 append_notice(&mut desktop, failure.reason().to_owned());

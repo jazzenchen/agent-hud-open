@@ -2,7 +2,7 @@
  * then the agents, each with the features it uses. An agent opens its own
  * page, where any feature can be turned off for it alone; a vendor's name
  * opens the vendor's page, where its agents' accounts are set. */
-import { useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import type {
   ClientRow,
   NativeMethod,
@@ -69,11 +69,20 @@ export default function AgentsPage({
       }));
   const members = (group: string) =>
     clients.filter((row) => group && row.group === group);
+  // Where the list was scrolled to when an agent or vendor was opened, so
+  // coming back lands there; null until a page is opened from it.
+  const listTop = useRef<number | null>(null);
+  const scroller = () => page.current?.closest(".settings-scroll");
   const go = (next: View) => {
+    if (view.kind === "list") listTop.current = scroller()?.scrollTop ?? 0;
     setView(next);
-    // Each page starts at its top, wherever the last one was scrolled.
-    page.current?.closest(".settings-scroll")?.scrollTo({ top: 0 });
   };
+  // An agent's or vendor's page starts at its top; the list, where it was
+  // left. Set once the page is drawn, so the list is tall enough again.
+  useLayoutEffect(() => {
+    if (listTop.current === null) return;
+    scroller()?.scrollTo({ top: view.kind === "list" ? listTop.current : 0 });
+  }, [view]);
   const back = () => go({ kind: "list" });
   const client =
     view.kind === "client"

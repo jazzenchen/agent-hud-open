@@ -43,6 +43,9 @@ export interface Provider {
       provider: string;
       sites: { host: string; name: string; signedIn: boolean }[];
     } | null;
+    /** The events whose Agent HUD hook the agent skips until the user allows
+     * it in the agent itself (Codex's hook review). */
+    unreviewedHooks?: string[];
   };
   /** Finding an installed/configured client does not imply its data adapter is ported. */
   dataStatus?: "supported" | "account-only" | "detection-only";
@@ -100,6 +103,9 @@ export interface Account {
   warning?: string | null;
   /** From Core: what the client said otherwise. */
   notice?: string | null;
+  /** The clients whose sign-in read this account, by client id: more than
+   * one when one account is signed in to in several and shown once. */
+  readBy?: string[];
   /** Codex's earned usage resets, from the account's rate limits. */
   resetCredits?: ResetCredits | null;
 }

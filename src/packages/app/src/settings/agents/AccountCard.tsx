@@ -12,6 +12,8 @@ import {
 import { quotaPercentLabel, type Translate } from "@agent-hud/ui/format";
 import { Card, Row } from "../SettingsPrimitives";
 import { moveAmong, ReorderButtons } from "./Reorder";
+import { accountLine } from "./ClientSections";
+import { mergedFrom } from "./steps";
 
 const dragType = "text/agent-hud-window";
 
@@ -53,6 +55,7 @@ export function AccountCard({
     accountWindows[0]?.account ??
     profile?.label ??
     t("Unknown account");
+  const merged = mergedFrom(snapshot, profile);
   const checked =
     !block.hidden &&
     !(block.hiddenAccounts ?? []).includes(account) &&
@@ -80,7 +83,8 @@ export function AccountCard({
     <Card>
       <Row
         title={name}
-        subtitle={profile?.planLabel ?? profile?.plan ?? undefined}
+        tag={merged ? t("Merged") : undefined}
+        subtitle={accountLine(profile?.planLabel ?? profile?.plan, merged)}
       >
         <Switch
           checked={checked}

@@ -9,9 +9,11 @@ import { HUDArtwork as HUDLogo } from "@agent-hud/hud/HUDArtwork";
 import type { Translate } from "@agent-hud/ui/format";
 import { Collapsible, Section } from "../SettingsPrimitives";
 import { featureName, features, uses } from "./features";
+import { hookStep } from "./steps";
 
 /** The agents: the ones found here, each with the features it uses and a
- * mark while it waits for a step in it; then the rest, folded in a card of
+ * mark while it waits for a step in it (only one it reports, such as Codex's
+ * hooks to allow); then the rest, folded in a card of
  * their own. The clients of one vendor sit under its name, which opens the
  * vendor's page. */
 export function AgentList({
@@ -31,16 +33,13 @@ export function AgentList({
 }) {
   const found = clients.filter((client) => client.detected);
   const missing = clients.filter((client) => !client.detected);
-  // An agent whose hooks wait for a step in it, such as Codex's review.
-  const waiting = (client: ClientRow) =>
-    snapshot.connection.clientHooks?.clients?.some(
-      (entry) =>
-        entry.source === client.agent && entry.installed && entry.notice,
-    ) ?? false;
   const item = (client: ClientRow) => {
     const used = features.filter((feature) =>
       uses(client, feature, snapshot, preferences),
     );
+    // A step the agent waits for in it, such as Codex's hook review; its
+    // words show on hover.
+    const step = hookStep(snapshot, client.agent);
     return (
       <button
         key={client.id}
@@ -61,8 +60,14 @@ export function AgentList({
             ))
           )}
         </span>
-        {client.enabled && waiting(client) && (
-          <CircleAlert size={15} className="agents-row-waiting" />
+        {client.enabled && step?.waiting && (
+          <span
+            className="agents-row-waiting"
+            title={step.text}
+            aria-label={step.text}
+          >
+            <CircleAlert size={15} />
+          </span>
         )}
         <ChevronRight size={14} className="agents-row-chevron" />
       </button>

@@ -19,6 +19,7 @@ import type { Translate } from "@agent-hud/ui/format";
 import { AgentAccounts } from "./AgentAccounts";
 import { ClientAccounts } from "./ClientSections";
 import { ClientFeatures } from "./ClientFeatures";
+import { hookStep } from "./steps";
 import { usePerform } from "./use-perform";
 
 export interface AgentDetailProps {
@@ -60,12 +61,13 @@ export function AgentDetail({
 }: AgentDetailProps) {
   const { pending, error, setError, perform } = usePerform();
   // The step the agent wants before it runs Agent HUD's hooks, such as
-  // Codex's review, or that it gets none on this system yet.
-  const step =
-    snapshot.connection.clientHooks?.clients?.find(
-      (entry) =>
-        entry.source === source.id && (entry.installed || entry.unsupported),
-    )?.notice ?? null;
+  // Codex's review, or that it gets none on this system yet: a warning while
+  // the agent says it waits for it, else a line under its switch.
+  const step = hookStep(snapshot, source.id);
+  const footer =
+    [source.notice, step && !step.waiting ? step.text : null]
+      .filter(Boolean)
+      .join(" ") || undefined;
   const refreshLabel = t("Read all agents again");
 
   return (
@@ -105,8 +107,8 @@ export function AgentDetail({
           {error}
         </Notice>
       )}
-      {client.enabled && step && <Notice>{step}</Notice>}
-      <Section footer={source.notice ?? undefined}>
+      {client.enabled && step?.waiting && <Notice>{step.text}</Notice>}
+      <Section footer={footer}>
         <ToggleRow
           title={t("Enabled")}
           checked={client.enabled}

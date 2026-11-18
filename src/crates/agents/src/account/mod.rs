@@ -83,7 +83,7 @@ pub fn names_none(reading: &Reading) -> bool {
 
 /// Another home's reading of the same provider added to `reading`: its
 /// windows and accounts that `reading` does not have yet, by id, and its
-/// notice.
+/// notice; an account both have gains the other's readers.
 pub fn merge(reading: &mut Reading, other: Reading) {
     for quota in other.quotas {
         if !reading.quotas.iter().any(|row| row["id"] == quota["id"]) {
@@ -91,12 +91,13 @@ pub fn merge(reading: &mut Reading, other: Reading) {
         }
     }
     for account in other.account.into_iter().chain(other.additional_accounts) {
-        if reading
+        if let Some(known) = reading
             .account
-            .iter()
-            .chain(&reading.additional_accounts)
-            .any(|row| row["id"] == account["id"])
+            .iter_mut()
+            .chain(&mut reading.additional_accounts)
+            .find(|row| row["id"] == account["id"])
         {
+            add_readers(known, &account);
             continue;
         }
         if reading.account.is_none() {
@@ -113,6 +114,35 @@ pub fn merge(reading: &mut Reading, other: Reading) {
             reading.unreviewed_hooks.push(event);
         }
     }
+}
+
+/// Names `client` as the reader of each of the reading's accounts that names
+/// none yet (`readBy`): the client whose sign-in read it.
+pub fn read_by(reading: &mut Reading, client: &str) {
+    for account in reading
+        .account
+        .iter_mut()
+        .chain(&mut reading.additional_accounts)
+    {
+        if account["readBy"].is_null() {
+            account["readBy"] = serde_json::json!([client]);
+        }
+    }
+}
+
+/// The clients that read `other`, the same account, added to `account`'s: an
+/// account read through more than one client shows once, marked merged.
+pub fn add_readers(account: &mut Value, other: &Value) {
+    let Some(others) = other["readBy"].as_array() else {
+        return;
+    };
+    let mut readers = account["readBy"].as_array().cloned().unwrap_or_default();
+    for reader in others {
+        if !readers.contains(reader) {
+            readers.push(reader.clone());
+        }
+    }
+    account["readBy"] = Value::Array(readers);
 }
 
 /// A provider's account reader.

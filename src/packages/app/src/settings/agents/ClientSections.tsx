@@ -7,6 +7,7 @@ import type { Translate } from "@agent-hud/ui/format";
 import { LinkButton } from "../SettingsControls";
 import { Row, Section } from "../SettingsPrimitives";
 import { relayBalance } from "./AgentRelays";
+import { mergedFrom } from "./steps";
 
 /** What the client's calls went through in the last 30 days: its agent's
  * accounts, each with its plan, when it used the agent's own sign-in; the
@@ -41,13 +42,17 @@ export function ClientAccounts({
           : t("No calls from this client in the last 30 days.")
       }
     >
-      {accounts.map((account) => (
-        <Row
-          key={account.id}
-          title={account.name ?? account.label}
-          tag={account.planLabel ?? account.plan ?? undefined}
-        />
-      ))}
+      {accounts.map((account) => {
+        const merged = mergedFrom(snapshot, account);
+        return (
+          <Row
+            key={account.id}
+            title={account.name ?? account.label}
+            tag={merged ? t("Merged") : undefined}
+            subtitle={accountLine(account.planLabel ?? account.plan, merged)}
+          />
+        );
+      })}
       {own && !accounts.length && (
         <Row muted title={t("No quota or balance read yet")} />
       )}
@@ -67,4 +72,13 @@ export function ClientAccounts({
       ))}
     </Section>
   );
+}
+
+/** An account's line: its plan, and the clients it was read through when it
+ * was merged from several. */
+export function accountLine(
+  plan: string | null | undefined,
+  merged: string[] | null,
+): string | undefined {
+  return [plan, merged?.join(" + ")].filter(Boolean).join(" · ") || undefined;
 }
