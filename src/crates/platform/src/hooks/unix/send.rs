@@ -23,8 +23,19 @@ pub(crate) fn send(
     }
     let mut stream = UnixStream::connect(socket_path(data))
         .map_err(|_| "Agent HUD hooks are disabled or not running")?;
+    // Both timeouts before the message goes: the app can answer and close its
+    // side at once (approving automatically), and macOS refuses a timeout on
+    // a socket whose peer has closed, which lost that answer.
+    let permission = flag == "--permission-hook";
     stream
         .set_write_timeout(Some(Duration::from_secs(2)))
+        .map_err(|_| "Hook timeout unavailable")?;
+    stream
+        .set_read_timeout(Some(if permission {
+            Duration::from_millis(100)
+        } else {
+            Duration::from_secs(3)
+        }))
         .map_err(|_| "Hook timeout unavailable")?;
     stream
         .write_all(&bytes)
@@ -32,15 +43,12 @@ pub(crate) fn send(
     // Keep the write side open: EOF means the waiting CLI was cancelled. The
     // JSONL request already frames its payload without requiring a half-close.
     let mut response = Vec::new();
-    if flag == "--permission-hook" {
+    if permission {
         let mut transcript = if super::super::settles_in_transcript(source) {
             super::super::transcript::Transcript::new(payload)
         } else {
             None
         };
-        stream
-            .set_read_timeout(Some(Duration::from_millis(100)))
-            .map_err(|_| "Hook timeout unavailable")?;
         let deadline = std::time::Instant::now() + Duration::from_secs(86_405);
         loop {
             if transcript.as_mut().is_some_and(|watch| watch.settled()) {
@@ -72,9 +80,6 @@ pub(crate) fn send(
             }
         }
     } else {
-        stream
-            .set_read_timeout(Some(Duration::from_secs(3)))
-            .map_err(|_| "Hook timeout unavailable")?;
         stream
             .take((PAYLOAD_LIMIT + 1) as u64)
             .read_to_end(&mut response)
