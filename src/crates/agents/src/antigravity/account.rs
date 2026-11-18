@@ -1,10 +1,15 @@
 //! Antigravity's quota (Open's AntigravityService and AntigravityClient):
 //! CLI status-line callbacks identify each account; running language servers
 //! supply accounts without callbacks. Anonymous `/usage` is the last fallback.
+//! Each account names the clients it was read through (`readBy`): the CLI
+//! for its reports and its fallback, and the desktop app, the IDE or the CLI
+//! for the language server each one runs; an account several of them are
+//! signed in to is shown once, with all of them.
 use super::quotas::parse;
 use super::{ACCOUNT_SERVICE, AGENT};
-use crate::account::{Host, Provider, Reading, Reported, Unread};
+use crate::account::{add_readers, read_by, Host, Provider, Reading, Reported, Unread};
 use crate::l10n::tr;
+use crate::split::ANTIGRAVITY_CLI;
 use serde_json::{json, Value};
 use std::{collections::BTreeSet, path::Path};
 
@@ -23,7 +28,10 @@ pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
     let mut partial = false;
     for report in host.account_reports("antigravity") {
         match super::statusline::parse(&report) {
-            Some(next) => merge(&mut reading, next),
+            Some(mut next) => {
+                read_by(&mut next, ANTIGRAVITY_CLI);
+                merge(&mut reading, next);
+            }
             None => partial = true,
         }
     }
@@ -72,6 +80,8 @@ pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
                             partial = true;
                             continue;
                         };
+                        // The client whose language server answered.
+                        let client = account["client"].as_str().unwrap_or(AGENT.id);
                         match parse(scope, &account["status"], &account["summary"]) {
                             Ok(next)
                                 if next
@@ -80,19 +90,30 @@ pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
                                     .and_then(|row| row["label"].as_str())
                                     .is_some_and(|email| {
                                         reported_emails.contains(&email.to_lowercase())
-                                    }) => {}
+                                    }) =>
+                            {
+                                // The CLI's report is this account: read here too.
+                                let email = next.account.as_ref().map(|row| &row["label"]);
+                                add_reader(&mut reading, client, |row| {
+                                    row["label"].as_str().map(str::to_lowercase)
+                                        == email.and_then(Value::as_str).map(str::to_lowercase)
+                                });
+                            }
                             Ok(mut next) => {
+                                read_by(&mut next, client);
                                 next.quotas.retain(|quota| {
                                     !quota["accountId"]
                                         .as_str()
                                         .is_some_and(|id| reported.contains(id))
                                 });
-                                if next
+                                if let Some(id) = next
                                     .account
                                     .as_ref()
                                     .and_then(|row| row["id"].as_str())
-                                    .is_some_and(|id| reported.contains(id))
+                                    .filter(|id| reported.contains(*id))
+                                    .map(str::to_owned)
                                 {
+                                    add_reader(&mut reading, client, |row| row["id"] == id);
                                     next.account = None;
                                 }
                                 merge(&mut reading, next);
@@ -115,7 +136,9 @@ pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
     }
     if reading.quotas.is_empty() && reading.account.is_none() {
         if let Some(executable) = executable {
-            return Ok(super::cli::read(host, Path::new(&executable))?);
+            let mut cli = super::cli::read(host, Path::new(&executable))?;
+            read_by(&mut cli, ANTIGRAVITY_CLI);
+            return Ok(cli);
         }
         return Err(
             tr!("No authenticated already-running Antigravity service is available").into(),
@@ -160,7 +183,7 @@ fn merge(reading: &mut Reading, next: Reading) {
             reading.quotas.push(quota);
         }
     }
-    for account in next.account.into_iter().chain(next.additional_accounts) {
+    for mut account in next.account.into_iter().chain(next.additional_accounts) {
         if reading.account.is_none() {
             reading.account = Some(account);
         } else if let Some(existing) = reading
@@ -169,12 +192,32 @@ fn merge(reading: &mut Reading, next: Reading) {
             .chain(reading.additional_accounts.iter_mut())
             .find(|row| row["id"] == account["id"])
         {
+            // One account through two clients: the newer reading, read by
+            // both, in the order they were read.
             if timestamp(&account, "checkedAt") > timestamp(existing, "checkedAt") {
+                let mut readers = json!({ "readBy": existing["readBy"].take() });
+                add_readers(&mut readers, &account);
+                account["readBy"] = readers["readBy"].take();
                 *existing = account;
+            } else {
+                add_readers(existing, &account);
             }
         } else {
             reading.additional_accounts.push(account);
         }
+    }
+}
+
+/// `client` among the readers of the accounts in `reading` that `which` picks.
+fn add_reader(reading: &mut Reading, client: &str, which: impl Fn(&Value) -> bool) {
+    let reader = json!({ "readBy": [client] });
+    for row in reading
+        .account
+        .iter_mut()
+        .chain(reading.additional_accounts.iter_mut())
+        .filter(|row| which(row))
+    {
+        add_readers(row, &reader);
     }
 }
 

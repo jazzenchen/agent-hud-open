@@ -109,6 +109,19 @@
 .agents-row-group:hover {
   color: var(--foreground);
 }
+/* The account a vendor's clients share, at the end of its name's line. */
+.agents-row-merged {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: 11px;
+  color: var(--muted-foreground);
+}
+.agents-row-merged + .agents-row-merged {
+  margin-left: 12px;
+}
 .agents-row-vendor .agents-row {
   padding-left: 24px;
   border-top: 0;

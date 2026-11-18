@@ -366,3 +366,31 @@ fn sign_in_problems_are_named() {
     odd.databases.insert(DB.into(), path);
     assert_eq!(read(&odd).err().unwrap(), database_format());
 }
+
+#[test]
+fn an_account_grok_bot_is_signed_in_to_is_read_through_both() {
+    let token = token(3600);
+    let dir = tempfile::tempdir().unwrap();
+    let alone = signed_in(&dir, &token).answer(SUMMARY, Ok(summary()));
+    assert_eq!(
+        read(&alone).unwrap().account.unwrap()["readBy"],
+        json!(["cursor"])
+    );
+    // Grok Bot signed in to the same user: xAI merged the account into SuperGrok.
+    let key = crate::grok::cache::ACCOUNT_KEY;
+    let file =
+        crate::grok::cache::path("/u/AppData/Grok Bot/sand-client-persistence".as_ref(), key);
+    let text = format!(
+        "{}\n{}",
+        serde_json::to_string(key).unwrap(),
+        json!({"schemaVersion": 1, "value": "auth0|user_123"})
+    );
+    let dir = tempfile::tempdir().unwrap();
+    let both = signed_in(&dir, &token)
+        .file(file.to_str().unwrap(), &text)
+        .answer(SUMMARY, Ok(summary()));
+    assert_eq!(
+        read(&both).unwrap().account.unwrap()["readBy"],
+        json!(["cursor", "grok-bot"])
+    );
+}

@@ -67,9 +67,17 @@ pub static PROVIDER: Provider = Provider {
 };
 
 pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
-    let Some(SignIn { user, token, email }) = sign_in(host)? else {
+    let Some(signed) = sign_in(host)? else {
         return Ok(Reading::empty("cursor"));
     };
+    // Grok Bot signed in to this account too: xAI merged it into SuperGrok,
+    // and one account serves both.
+    let readers = if crate::grok::account::bot_signed_in_to(host, &signed) {
+        json!(["cursor", "grok-bot"])
+    } else {
+        json!(["cursor"])
+    };
+    let SignIn { user, token, email } = signed;
     let cookie_str = format!("WorkosCursorSessionToken={user}%3A%3A{token}");
     // The web summary rides on a browser session cookie, which Cursor's
     // servers refuse (401/403/browser check) for some accounts while the
@@ -216,7 +224,7 @@ pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
         session_records: Vec::new(),
         services: Vec::new(),
         account: Some(
-            json!({"id":account_identity,"provider":"cursor","label":email,"plan":body["membershipType"],"checkedAt":Utc::now().to_rfc3339()}),
+            json!({"id":account_identity,"provider":"cursor","label":email,"plan":body["membershipType"],"checkedAt":Utc::now().to_rfc3339(),"readBy":readers}),
         ),
         unreviewed_hooks: vec![],
     })

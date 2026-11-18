@@ -409,3 +409,43 @@ fn a_cli_report_is_the_servers_account_of_the_same_email_and_any_team() {
     assert_eq!(reading.quotas.len(), 1);
     assert_eq!(reading.quotas[0]["windowDurationSeconds"], 604800);
 }
+
+#[test]
+fn an_account_signed_in_to_in_several_clients_is_read_through_each() {
+    let mut other = status_body();
+    other["userStatus"]["email"] = json!("other@example.com");
+    let mut host = FakeHost::new("/u");
+    host.natives.insert(
+        ("antigravity".into(), "ReadAccounts".into()),
+        Ok(json!({"accounts":[
+            {"source":"desktop-1","client":"antigravity","status":status_body()},
+            {"source":"ide-1","client":"antigravity-ide","status":status_body()},
+            {"source":"ide-2","client":"antigravity-ide","status":other}
+        ]})),
+    );
+    let reading = read(&host).unwrap();
+    // The desktop app's and the IDE's servers on one account: shown once.
+    assert_eq!(
+        reading.account.as_ref().unwrap()["readBy"],
+        json!(["antigravity", "antigravity-ide"])
+    );
+    assert_eq!(
+        reading.additional_accounts[0]["readBy"],
+        json!(["antigravity-ide"])
+    );
+    // The CLI reports the same account: its report stands, read by all three.
+    host.account_reports.insert(
+        "antigravity".into(),
+        vec![report(
+            "me@example.com",
+            "2026-10-23T08:00:00Z",
+            0.75,
+            "2026-10-30T00:00:00Z",
+        )],
+    );
+    let reading = read(&host).unwrap();
+    assert_eq!(
+        reading.account.as_ref().unwrap()["readBy"],
+        json!(["antigravity-cli", "antigravity", "antigravity-ide"])
+    );
+}

@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { ChevronRight, CircleAlert } from "lucide-react";
+import { vendorKey } from "@agent-hud/hud/model";
 import type {
   ClientRow,
   Snapshot,
@@ -10,13 +11,13 @@ import { AgentLogo } from "../AgentLogo";
 import type { Translate } from "@agent-hud/ui/format";
 import { Collapsible, Section } from "../SettingsPrimitives";
 import { featureName, features, uses } from "./features";
-import { hookStep } from "./steps";
+import { hookStep, mergedFrom } from "./steps";
 
 /** The agents: the ones found here, each with the features it uses and a
  * mark while it waits for a step in it (only one it reports, such as Codex's
  * hooks to allow); then the rest, folded in a card of
  * their own. The clients of one vendor sit under its name, which opens the
- * vendor's page. */
+ * vendor's page and names the account its clients share, marked merged. */
 export function AgentList({
   t,
   snapshot,
@@ -77,7 +78,7 @@ export function AgentList({
       </button>
     );
   };
-  const head = (group: string, name: string) => (
+  const head = (group: string, name: string, rows: ClientRow[]) => (
     <button
       type="button"
       className="agents-row-group"
@@ -85,6 +86,16 @@ export function AgentList({
     >
       {name}
       <ChevronRight size={12} />
+      {shared(snapshot, rows).map(([account, from]) => (
+        <span
+          key={account}
+          className="agents-row-merged"
+          title={from.join(" + ")}
+        >
+          {account}
+          <span className="agents-row-tag">{t("Merged")}</span>
+        </span>
+      ))}
     </button>
   );
   return (
@@ -112,6 +123,22 @@ export function AgentList({
   );
 }
 
+/** The accounts the clients in `rows` share, each once by name with the
+ * clients it was read through: one account signed in to in several of a
+ * vendor's clients, merged. */
+function shared(snapshot: Snapshot, rows: ClientRow[]): [string, string[]][] {
+  const agents = new Set(rows.map((row) => vendorKey(row.agent)));
+  const found = new Map<string, string[]>();
+  for (const account of snapshot.accounts ?? []) {
+    if (!agents.has(vendorKey(account.provider))) continue;
+    const from = mergedFrom(snapshot, account);
+    if (!from) continue;
+    const name = account.name ?? account.label ?? account.id;
+    found.set(name, [...new Set([...(found.get(name) ?? []), ...from])]);
+  }
+  return [...found];
+}
+
 /** The rows by vendor, each vendor where its first client is. */
 function grouped(rows: ClientRow[]): [string, ClientRow[]][] {
   const groups = new Map<string, ClientRow[]>();
@@ -127,7 +154,7 @@ function groupOf(
   group: string,
   rows: ClientRow[],
   item: (client: ClientRow) => ReactNode,
-  head: (group: string, name: string) => ReactNode,
+  head: (group: string, name: string, rows: ClientRow[]) => ReactNode,
 ) {
   const name = rows[0]?.groupName;
   if (!name) return rows.map(item);
@@ -138,7 +165,7 @@ function groupOf(
       role="group"
       aria-label={name}
     >
-      {head(group, name)}
+      {head(group, name, rows)}
       {rows.map(item)}
     </div>
   );

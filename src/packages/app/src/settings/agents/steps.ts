@@ -21,16 +21,21 @@ export function hookStep(
   return { text, waiting: skipped.length > 0 };
 }
 
-/** The clients an account was read through, by name, when it was more than
- * one: one account signed in to in a command line and a desktop app shows
- * once, marked merged. */
+/** The clients an account was read through, by name in the agent list's
+ * order, when it was more than one: one account signed in to in a command
+ * line and a desktop app shows once, marked merged. */
 export function mergedFrom(
   snapshot: Snapshot,
   account: Account | undefined,
 ): string[] | null {
   const readers = account?.readBy ?? [];
   if (readers.length < 2) return null;
-  return readers.map(
-    (id) => snapshot.clients?.find((client) => client.id === id)?.name ?? id,
-  );
+  const clients = snapshot.clients ?? [];
+  const place = (id: string) => {
+    const at = clients.findIndex((client) => client.id === id);
+    return at < 0 ? clients.length : at;
+  };
+  return [...readers]
+    .sort((a, b) => place(a) - place(b))
+    .map((id) => clients.find((client) => client.id === id)?.name ?? id);
 }

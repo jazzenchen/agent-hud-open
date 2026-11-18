@@ -72,3 +72,42 @@ fn tokenless_cli_fallback_uses_the_executable_not_command_arguments() {
     assert_eq!(found.as_deref(), Some(executable));
     assert!(cli_from(vec![process(1, "agy", "agy")]).is_none());
 }
+
+#[test]
+fn each_server_names_the_client_it_serves() {
+    let found = parse_servers(vec![
+        process(
+            1,
+            "/Applications/Antigravity.app/Contents/Resources/bin/language_server",
+            "server --csrf_token fixture-1",
+        ),
+        process(
+            2,
+            "/Applications/Antigravity IDE.app/Contents/Resources/bin/language_server",
+            "server --csrf_token fixture-2",
+        ),
+        process(
+            3,
+            "/u/.gemini/antigravity-cli/language_server",
+            "server --csrf_token fixture-3",
+        ),
+        process(
+            4,
+            "/opt/language_server",
+            "server --app_data_dir antigravity-ide --csrf_token fixture-4",
+        ),
+    ]);
+    let clients: Vec<_> = found
+        .iter()
+        .map(|server| (server.pid, server.client))
+        .collect();
+    assert_eq!(
+        clients,
+        [
+            (1, "antigravity"),
+            (2, "antigravity-ide"),
+            (3, "antigravity-cli"),
+            (4, "antigravity-ide"),
+        ]
+    );
+}

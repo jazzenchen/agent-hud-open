@@ -217,7 +217,8 @@ pub fn vendor(agent: &str) -> (String, String) {
         "claude" => group("anthropic", "Anthropic".into()),
         "codex" => group("openai", "OpenAI".into()),
         "antigravity" => group("google", "Google".into()),
-        "grok-cli" | "grok-bot" => group("xai", "xAI".into()),
+        // xAI owns Cursor; its accounts can be merged into SuperGrok.
+        "cursor" | "grok-cli" | "grok-bot" => group("xai", "xAI".into()),
         "zcode" | "glm" => group("zhipu", tr!("Zhipu AI")),
         "codebuddy" | "codebuddy-cn" | "workbuddy" => group("tencent", tr!("Tencent")),
         "qwen" | "qoder" | "qoder-cn" | "qoder-work" => group("alibaba", tr!("Alibaba")),

@@ -9,8 +9,10 @@
 //! the engine as it is, which keeps the last reading through a short outage.
 //! Any other server failure falls back to the cache, with the reason.
 use super::cache as bot;
-use crate::account::{legacy_unresolved, locate, status, Host, Provider, Reading, Unread};
-use crate::cursor::account::sign_in;
+use crate::account::{
+    add_readers, legacy_unresolved, locate, read_by, status, Host, Provider, Reading, Unread,
+};
+use crate::cursor::account::{sign_in, SignIn};
 use crate::naming::window_names;
 use crate::{iso, l10n::tr, Location, PerOs, Support};
 use serde_json::{json, Value};
@@ -67,7 +69,11 @@ pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
             }
             Err(_) => Err(why.reason().to_owned()),
         },
-    };
+    }
+    .map(|mut r| {
+        read_through(&mut r, same.is_some());
+        r
+    });
     let tokens = super::usage::read(host, &directory, &slot, &cursor, now);
     match (quota, tokens) {
         (Ok(mut r), Ok(records)) => {
@@ -88,6 +94,28 @@ pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
         }
         (Err(why), _) => Err(why.into()),
     }
+}
+
+/// The Bot's account is read through the Bot, and through Cursor too when
+/// Cursor is signed in to it: xAI merged that Cursor account into SuperGrok,
+/// so one account serves both.
+fn read_through(r: &mut Reading, cursor: bool) {
+    read_by(r, "grok-bot");
+    if cursor {
+        let reader = json!({ "readBy": ["cursor"] });
+        for account in r.account.iter_mut() {
+            add_readers(account, &reader);
+        }
+    }
+}
+
+/// Whether Grok Bot is signed in to `cursor`'s account, the one Cursor is
+/// signed in to.
+pub(crate) fn bot_signed_in_to(host: &dyn Host, cursor: &SignIn) -> bool {
+    locate(host, &CACHE)
+        .ok()
+        .and_then(|directory| bot::account_through(host, &directory))
+        .is_some_and(|slot| super::weekly::same_account(&slot, cursor))
 }
 
 /// `notice` and then `why`, each said once.
@@ -259,6 +287,21 @@ mod tests {
         assert_eq!(reading.quotas[1]["usedPercent"], 95.0);
         assert_eq!(reading.quotas[1]["status"], "critical");
         assert_eq!(reading.account.unwrap()["plan"], "SuperGrok");
+    }
+
+    #[test]
+    fn the_bots_account_is_read_through_cursor_too_when_cursor_is_signed_in_to_it() {
+        // No Cursor here: the Bot's account is the Bot's alone.
+        let mut reading = read(&host_with(fresh_quota(false))).unwrap();
+        assert_eq!(
+            reading.account.as_ref().unwrap()["readBy"],
+            json!(["grok-bot"])
+        );
+        read_through(&mut reading, true);
+        assert_eq!(
+            reading.account.unwrap()["readBy"],
+            json!(["grok-bot", "cursor"])
+        );
     }
 
     #[test]

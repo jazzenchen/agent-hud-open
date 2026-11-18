@@ -22,6 +22,8 @@ pub struct Endpoint {
     port: u16,
     pid: u32,
     csrf: HeaderValue,
+    /// The client the server belongs to (`running::Server::client`).
+    client: &'static str,
 }
 impl Endpoint {
     pub fn identity(&self) -> String {
@@ -163,6 +165,7 @@ impl Service {
                     port,
                     pid: server.pid,
                     csrf,
+                    client: server.client,
                 };
                 let handshake = json!({"metadata":{"ideName":"antigravity","extensionName":"antigravity","locale":"en","ideVersion":"unknown"}});
                 if self
@@ -208,7 +211,8 @@ pub fn read_accounts(params: &Value) -> Result<Value, String> {
     for endpoint in endpoints {
         match service.send(&endpoint, "GetUserStatus", params) {
             Ok(status) => {
-                let mut entry = json!({"source":endpoint.identity(),"status":status});
+                let mut entry =
+                    json!({"source":endpoint.identity(),"client":endpoint.client,"status":status});
                 if let Ok(summary) = service.send(
                     &endpoint,
                     "RetrieveUserQuotaSummary",

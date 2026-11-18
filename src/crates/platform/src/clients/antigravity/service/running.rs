@@ -1,8 +1,11 @@
 //! The running Antigravity language servers and CLI, found by their process.
+use agent_hud_agents::{antigravity, split};
 pub(super) struct Server {
     pub pid: u32,
     pub token: String,
     pub extension: Option<(u16, String)>,
+    /// The client it serves: the desktop app, the IDE or the CLI, by client id.
+    pub client: &'static str,
     priority: u8,
 }
 fn flag(command: &str, name: &str) -> Option<String> {
@@ -43,6 +46,7 @@ fn parse_servers(processes: Vec<crate::os::ProcessInfo>) -> Vec<Server> {
         let command = process.command.as_str();
         let executable = process.executable.to_lowercase().replace('\\', "/");
         let cli = matches!(executable.rsplit('/').next(), Some("agy" | "agy.exe"));
+        let data_dir = flag(command, "app_data_dir");
         let server = (executable.contains("language_server")
             || executable.contains("language-server"))
             && (executable.contains("antigravity.app/")
@@ -50,7 +54,8 @@ fn parse_servers(processes: Vec<crate::os::ProcessInfo>) -> Vec<Server> {
                 || executable.contains("/antigravity/")
                 || executable.contains("/antigravity-cli/")
                 || executable.contains("/antigravity_cli/")
-                || flag(command, "app_data_dir")
+                || data_dir
+                    .as_deref()
                     .is_some_and(|path| path.starts_with("antigravity")));
         if !server && !cli {
             continue;
@@ -67,10 +72,26 @@ fn parse_servers(processes: Vec<crate::os::ProcessInfo>) -> Vec<Server> {
         if token.is_empty() && extension.is_none() {
             continue;
         }
+        // The client: its data folder names it, else where it is installed
+        // (the CLI's folder, the IDE's app); the desktop app otherwise.
+        let client = match data_dir.as_deref() {
+            Some("antigravity-cli") => split::ANTIGRAVITY_CLI,
+            Some("antigravity-ide") => split::ANTIGRAVITY_IDE,
+            Some("antigravity") => antigravity::AGENT.id,
+            _ if cli
+                || executable.contains("/antigravity-cli/")
+                || executable.contains("/antigravity_cli/") =>
+            {
+                split::ANTIGRAVITY_CLI
+            }
+            _ if executable.contains("antigravity ide.app/") => split::ANTIGRAVITY_IDE,
+            _ => antigravity::AGENT.id,
+        };
         result.push(Server {
             pid,
             token,
             extension,
+            client,
             priority: if cli { 1 } else { 0 },
         });
     }

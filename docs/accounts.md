@@ -162,9 +162,14 @@ platform) says nothing once the desktop app's account is read: the command
 line's own page in Settings → Agents shows where its calls went. Codex does
 the same with a home that has no ChatGPT plan beside an account its sessions
 recorded. Each account names the clients whose sign-in read it (`readBy`,
-by client id: `claude`, `claude-desktop`, `codex`, `codex-desktop`, `pi`); one
-account read through several shows once, marked merged in Settings. Saving a
-changed
+by client id: `claude`, `claude-desktop`, `codex`, `codex-desktop`, `pi`,
+`antigravity`, `antigravity-ide`, `antigravity-cli`, `cursor`, `grok-bot`);
+one account read through several shows once, marked merged in Settings.
+Antigravity's language servers say which app runs them (their data folder,
+else where they are installed), and its CLI's reports count as the CLI.
+Cursor and Grok Bot each check whether the other is signed in to their
+account (Grok Bot's slot names Cursor's user): xAI merges a Cursor account
+into SuperGrok, and then one account serves both. Saving a changed
 list discards readings from the previous list, including results still in
 flight.
 

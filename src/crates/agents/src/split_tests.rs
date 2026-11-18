@@ -116,5 +116,7 @@ fn vendors_group_their_agents() {
     assert_eq!(vendor("qoder").0, vendor("qwen").0);
     assert_eq!(vendor("ark").0, vendor("trae").0);
     assert_eq!(vendor("claude").1, "Anthropic");
-    assert_eq!(vendor("cursor"), ("cursor".to_owned(), String::new()));
+    assert_eq!(vendor("cursor"), ("xai".to_owned(), "xAI".to_owned()));
+    assert_eq!(vendor("cursor").0, vendor("grok-bot").0);
+    assert_eq!(vendor("deepseek"), ("deepseek".to_owned(), String::new()));
 }
