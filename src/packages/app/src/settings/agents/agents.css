@@ -27,10 +27,16 @@
   line-height: 15px;
   color: var(--muted-foreground);
 }
+/* A vendor's clients sit indented under its name, with room after them, so a
+ * client of a vendor of its own never reads as one of theirs. */
 .agents-list-group {
   display: flex;
   flex-direction: column;
   gap: 1px;
+  margin-bottom: 8px;
+}
+.agents-list-group .agents-list-item {
+  padding-left: 20px;
 }
 .agents-list-group-name {
   padding: 8px 8px 2px;
