@@ -186,6 +186,20 @@ fn hook_reachable(
 mod hook_tests {
     use super::*;
 
+    /// Where `client`'s hooks have no launch on this system yet (Kimi's and
+    /// Qoder's on Windows), its sessions say so instead of waiting for
+    /// hooks: true there, after checking that answer.
+    fn unsupported_here(client: &str, session: &Value, snapshot: &Value) -> bool {
+        if agent_hud_platform::hooks::launches_here(client) {
+            return false;
+        }
+        let (reachable, reason) = hook_reachable(client, (session, snapshot), false, Language::En);
+        assert_eq!(reachable, json!(false));
+        let system = agent_hud_platform::hooks::system_name();
+        assert!(reason.contains(system), "{reason}");
+        true
+    }
+
     #[test]
     fn a_hook_client_session_is_reachable_while_its_hooks_see_a_turn_run() {
         let now = chrono::Utc::now().to_rfc3339();
@@ -195,6 +209,9 @@ mod hook_tests {
         let idle = json!({"id":"kimi:session_b:main","source":"kimi","state":"idle","hooks":{"at":now,"pids":[2],"state":"idle"}});
         let unseen = json!({"id":"trae:c","source":"trae","state":"idle"});
         let snapshot = json!({"sessions":[running.clone(), idle.clone(), unseen.clone()]});
+        if unsupported_here("kimi", &running, &snapshot) {
+            return;
+        }
         assert_eq!(
             hook_reachable("kimi", (&running, &snapshot), false, Language::En).0,
             json!(true)
@@ -222,6 +239,9 @@ mod hook_tests {
         let (reachable, reason) = hook_reachable("qoder", (&idle, &snapshot), true, Language::En);
         assert_eq!(reachable, json!(true));
         assert!(reason.contains("at once"), "{reason}");
+        if unsupported_here("qoder", &idle, &snapshot) {
+            return;
+        }
         // No waiter: it says why, and waits for the session's next turn.
         let (reachable, reason) = hook_reachable("qoder", (&idle, &snapshot), false, Language::En);
         assert_eq!(reachable, Value::Null);
