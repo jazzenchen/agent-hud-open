@@ -1,7 +1,7 @@
 //! Claude's plan limits through the Claude desktop app's claude.ai sign-in.
 use super::account::{profile, Folder};
 use super::quota_windows::{plan_reading, profile_plan, windows};
-use crate::account::{add_readers, append_notice, merge, names_none, read_by};
+use crate::account::{add_readers, append_notice, legacy_account, merge, names_none, read_by};
 use crate::account::{read_json, Answer, Host, HttpFailure, HttpRequest, Reading, Unread};
 use crate::l10n::tr;
 use crate::Base;
@@ -169,12 +169,21 @@ pub(super) fn with_desktop(
     let Some(desktop) = from_desktop(host, &folders[0], false) else {
         return result;
     };
-    // Whether the desktop app last signed in to an account a folder names.
-    let covered = desktop_user(host).is_some_and(|user| {
-        folders
-            .iter()
-            .any(|folder| profile(host, folder)["accountUuid"] == user.as_str())
-    });
+    // The accounts of the folders the desktop app last signed in to too.
+    let user = desktop_user(host);
+    let shared: Vec<String> = folders
+        .iter()
+        .map(|folder| profile(host, folder))
+        .filter(|who| user.is_some() && who["accountUuid"].as_str() == user.as_deref())
+        .filter_map(|who| {
+            legacy_account(
+                "Claude",
+                who["accountUuid"].as_str().unwrap_or(""),
+                who["organizationUuid"].as_str().unwrap_or(""),
+            )
+        })
+        .collect();
+    let covered = !shared.is_empty();
     match (result, desktop) {
         (Ok(mut code), Ok(desktop)) if code.failure.is_none() || !covered => {
             // A login with no plan limits (an API key, a relay) is no news
@@ -211,6 +220,18 @@ pub(super) fn with_desktop(
         (Ok(mut code), Err(failure)) => {
             if !covered {
                 append_notice(&mut code, format!("Claude Desktop: {}", failure.reason()));
+            }
+            // The desktop app is signed in to Claude Code's account though
+            // its own reading failed (claude.ai's browser check): the
+            // account is still used in both.
+            let desktop = json!({"readBy":[crate::split::CLAUDE_DESKTOP]});
+            for account in code.account.iter_mut().chain(&mut code.additional_accounts) {
+                if account["id"]
+                    .as_str()
+                    .is_some_and(|id| shared.iter().any(|known| known == id))
+                {
+                    add_readers(account, &desktop);
+                }
             }
             Ok(code)
         }

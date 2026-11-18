@@ -1001,3 +1001,29 @@ fn a_login_without_plan_limits_is_no_news_beside_the_desktop_apps_account() {
     assert!(!reading.quotas.is_empty());
     assert_eq!(reading.notice, None);
 }
+
+/// The desktop app on Claude Code's account, its own reading refused by
+/// claude.ai's browser check: nothing is said, and the account is still used
+/// in both.
+#[test]
+fn the_desktop_apps_account_counts_as_merged_when_its_reading_fails() {
+    let host = desktop_signed_in(installed(limits()), "user-1")
+        .file(
+            "/u/.claude.json",
+            &json!({"oauthAccount": {
+                "accountUuid": "user-1", "organizationUuid": "0a1b-2c3d",
+                "emailAddress": "me@example.com", "organizationType": "claude_max",
+            }})
+            .to_string(),
+        )
+        .answer(
+            "https://claude.ai/api/organizations/0a1b-2c3d/usage",
+            Err(HttpFailure::Challenged),
+        );
+    let reading = read(&host).unwrap();
+    assert_eq!(reading.notice, None);
+    assert_eq!(
+        reading.account.unwrap()["readBy"],
+        json!(["claude", "claude-desktop"])
+    );
+}
