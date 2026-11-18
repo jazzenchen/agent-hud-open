@@ -2,6 +2,7 @@
   "+{{count}} resets_one": "+{{count, number}} reset",
   "+{{count}} resets_other": "+{{count, number}} resets",
   "A message to a {{client}} session cannot choose its model; the session goes on in its own. Leave model out, or start a new session in that model with start_session.": "A message to a {{client}} session cannot choose its model; the session goes on in its own. Leave model out, or start a new session in that model with start_session.",
+  "Accounts": "Accounts",
   "Agent HUD could not read the models {{client}} offers: {{reason}}": "Agent HUD could not read the models {{client}} offers: {{reason}}",
   "Alibaba": "Alibaba",
   "Back [step]": "Back",

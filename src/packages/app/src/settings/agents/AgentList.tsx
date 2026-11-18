@@ -10,12 +10,17 @@ export function AgentList({
   t,
   clients,
   selected,
+  selectedGroup,
   select,
+  selectGroup,
 }: {
   t: Translate;
   clients: ClientRow[];
   selected?: string;
+  /** The vendor whose page is shown, when it is. */
+  selectedGroup?: string;
   select: (id: string) => void;
+  selectGroup: (group: string) => void;
 }) {
   const found = clients.filter((client) => client.detected);
   const missing = clients.filter((client) => !client.detected);
@@ -32,17 +37,30 @@ export function AgentList({
       {!client.enabled && <span className="agents-list-state">{t("Off")}</span>}
     </button>
   );
+  // A vendor's name opens its page, where its clients' accounts are set.
+  const head = (group: string, name: string) => (
+    <button
+      type="button"
+      className={`agents-list-group-name${group === selectedGroup ? " is-selected" : ""}`}
+      aria-current={group === selectedGroup ? "true" : undefined}
+      onClick={() => selectGroup(group)}
+    >
+      {name}
+    </button>
+  );
   return (
     <nav
       className="agents-list"
       data-guide="agents-list"
       aria-label={t("Agents")}
     >
-      {grouped(found).map(([group, rows]) => groupOf(group, rows, item))}
+      {grouped(found).map(([group, rows]) => groupOf(group, rows, item, head))}
       {missing.length > 0 && (
         <>
           <div className="agents-list-label">{t("Not on this computer")}</div>
-          {grouped(missing).map(([group, rows]) => groupOf(group, rows, item))}
+          {grouped(missing).map(([group, rows]) =>
+            groupOf(group, rows, item, head),
+          )}
         </>
       )}
     </nav>
@@ -64,6 +82,7 @@ function groupOf(
   group: string,
   rows: ClientRow[],
   item: (client: ClientRow) => ReactNode,
+  head: (group: string, name: string) => ReactNode,
 ) {
   const name = rows[0]?.groupName;
   if (!name) return rows.map(item);
@@ -74,7 +93,7 @@ function groupOf(
       role="group"
       aria-label={name}
     >
-      <div className="agents-list-group-name">{name}</div>
+      {head(group, name)}
       {rows.map(item)}
     </div>
   );

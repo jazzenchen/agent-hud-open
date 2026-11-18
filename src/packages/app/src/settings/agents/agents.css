@@ -38,11 +38,44 @@
 .agents-list-group .agents-list-item {
   padding-left: 20px;
 }
+/* A vendor's name opens its page: a quiet header that reacts like a row. */
 .agents-list-group-name {
-  padding: 8px 8px 2px;
+  width: 100%;
+  margin-top: 6px;
+  padding: 3px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  text-align: left;
+  font: inherit;
   font-size: 11px;
   line-height: 15px;
   color: var(--muted-foreground);
+  cursor: default;
+}
+.agents-list-group-name:hover {
+  color: var(--foreground);
+  background: color-mix(in srgb, var(--muted) 55%, transparent);
+}
+.agents-list-group-name.is-selected {
+  color: var(--foreground);
+  background: var(--muted);
+}
+.agents-list-group-name:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: -2px;
+}
+/* On a vendor's page, each of its agents under its own name. */
+.agents-group-agent + .agents-group-agent {
+  margin-top: 12px;
+}
+.agents-group-agent-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0 10px;
+  font-size: 13px;
+  font-weight: 600;
 }
 .agents-list-item {
   width: 100%;

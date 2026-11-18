@@ -135,6 +135,11 @@ export function PanelBlocks({
     );
   };
 
+  // The account a balance belongs to, by its name, when one is read.
+  const balanceAccount = (id?: string | null) => {
+    const profile = id ? profiles.find((account) => account.id === id) : null;
+    return profile ? (profile.name ?? profile.label) : undefined;
+  };
   const balanceRows = balances.map((item, index) => {
     const amount = moneyAmount(
       item.amount,
@@ -142,7 +147,12 @@ export function PanelBlocks({
       snapshotLanguage(snapshot),
     );
     return (
-      <Row key={item.id} title={item.label} tag={amount}>
+      <Row
+        key={item.id}
+        title={item.label}
+        subtitle={balanceAccount(item.accountId)}
+        tag={amount}
+      >
         <ReorderButtons
           t={t}
           name={`${item.label} ${amount}`}

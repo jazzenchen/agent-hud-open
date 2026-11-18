@@ -1,7 +1,7 @@
-/* One client's settings: its switches; then, from the agent whose data it
- * shares, where the accounts come from, what the panel shows, the relays it
- * uses and its API credentials. */
-import { useState } from "react";
+/* One client's settings: its switches, its approvals where it has a switch
+ * of its own, Agent HUD's hooks in it, and its agent's accounts: in full when
+ * the client is its vendor's only one, else as a list that leads to the
+ * vendor's page, where they are set. */
 import { RefreshCw } from "lucide-react";
 import type {
   ClientRow,
@@ -21,13 +21,9 @@ import { HUDArtwork as HUDLogo } from "@agent-hud/hud/HUDArtwork";
 import { LinkButton, ToggleRow } from "../SettingsControls";
 import { Notice, Page, Section } from "../SettingsPrimitives";
 import type { Translate } from "@agent-hud/ui/format";
-import AccountHomes from "../AccountHomes";
-import AntigravityAccounts from "../AntigravityAccounts";
-import { CodexModelSettings } from "../CodexModelSettings";
-import { PanelBlocks } from "./PanelBlocks";
-import { AgentRelays } from "./AgentRelays";
-import { AgentWebSignIn } from "./AgentWebSignIn";
-import { Connection } from "./Connection";
+import { AgentAccounts } from "./AgentAccounts";
+import { ClientAccounts, ClientHooks } from "./ClientSections";
+import { usePerform } from "./use-perform";
 
 export interface AgentDetailProps {
   t: Translate;
@@ -45,6 +41,9 @@ export interface AgentDetailProps {
   onLayout: (layout: PanelLayout) => Promise<unknown>;
   preferences: Record<string, SourcePreferences>;
   onPreferences: (source: string, patch: SourcePreferences) => Promise<unknown>;
+  /** Opens the vendor's page; none for a vendor of this one client, whose
+   * accounts this page shows itself. */
+  openGroup?: () => void;
 }
 
 export function AgentDetail({
@@ -58,37 +57,11 @@ export function AgentDetail({
   onLayout,
   preferences,
   onPreferences,
+  openGroup,
 }: AgentDetailProps) {
-  // One save at a time. Its failure shows at the top of the detail, or through
-  // `report` where the caller shows it beside its own buttons (Connection,
-  // at the bottom of the page, where the top is out of view).
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  async function perform(
-    job: () => Promise<unknown>,
-    report: (message: string) => void = setError,
-  ) {
-    setPending(true);
-    setError(null);
-    try {
-      await job();
-      return true;
-    } catch (error) {
-      report(String(error));
-      return false;
-    } finally {
-      setPending(false);
-    }
-  }
+  const { pending, error, setError, perform } = usePerform();
 
   const enabled = client.enabled;
-  // What the client needs before it runs the hooks Agent HUD put in, such as
-  // TRAE's own hooks switch, or that it gets none on this system yet.
-  const hookStep =
-    snapshot.connection.clientHooks?.clients?.find(
-      (client) =>
-        client.source === source.id && (client.installed || client.unsupported),
-    )?.notice ?? null;
   // The clients whose approval hook goes in only once the user turns it on.
   const optInApprovals = snapshot.settings.optInApprovals ?? [];
   const live = preferences[client.id]?.live !== false;
@@ -131,7 +104,7 @@ export function AgentDetail({
           {error}
         </Notice>
       )}
-      <Section footer={source.notice ?? hookStep ?? undefined}>
+      <Section footer={source.notice ?? undefined}>
         <ToggleRow
           title={t("Enabled")}
           checked={enabled}
@@ -164,120 +137,57 @@ export function AgentDetail({
           }
         />
       </Section>
-      {/* The agent's data is read while any of its clients is on. */}
-      <div
-        className={`agents-detail-rest${source.enabled ? "" : " is-off"}`}
-        inert={!source.enabled}
-      >
-        {source.id === "codex" && (
-          <AccountHomes
-            t={t}
-            label={t("More Codex accounts")}
-            variable="CODEX_HOME"
-            placeholder="~/.codex-work"
-            homes={snapshot.settings.codexHomes ?? []}
-            onSave={(homes) =>
-              action("set_setting", { key: "codexHomes", value: homes })
+      {source.id === "copilot" && (
+        <Section
+          footer={
+            snapshot.settings.clientHooks
+              ? undefined
+              : t("Takes effect once client hooks are on in Agent plugins.")
+          }
+        >
+          <ToggleRow
+            title={t("Answer permission requests in the HUD")}
+            subtitle={t(
+              "Copilot then asks Agent HUD before its own rules and this session's approvals, so every tool call it would run or ask about waits for your answer in the HUD. Runs started with -p, --allow-all-tools, --allow-all or --yolo stay with Copilot.",
+            )}
+            checked={optInApprovals.includes(source.id)}
+            disabled={pending || !enabled}
+            reason={!enabled ? offReason : undefined}
+            change={(value) =>
+              void perform(() =>
+                action("set_setting", {
+                  key: "optInApprovals",
+                  value: [
+                    ...optInApprovals.filter((id) => id !== source.id),
+                    ...(value ? [source.id] : []),
+                  ],
+                }),
+              )
             }
           />
-        )}
-        {source.id === "claude" && (
-          <AccountHomes
-            t={t}
-            label={t("More Claude Code accounts")}
-            variable="CLAUDE_CONFIG_DIR"
-            placeholder="~/.claude-work"
-            homes={snapshot.settings.claudeHomes ?? []}
-            onSave={(homes) =>
-              action("set_setting", { key: "claudeHomes", value: homes })
-            }
-          />
-        )}
-        {source.id === "antigravity" && (
-          <AntigravityAccounts
-            t={t}
-            settings={snapshot.settings.antigravityCliSettings ?? []}
-            action={action}
-          />
-        )}
-        {source.id === "copilot" && (
-          <Section>
-            <ToggleRow
-              title={t("Read GitHub Copilot quota")}
-              subtitle={t("Uses the GitHub sign-in on this computer.")}
-              checked={snapshot.settings.readCopilotQuota === true}
-              disabled={pending}
-              change={(value) =>
-                void perform(() =>
-                  action("set_setting", { key: "readCopilotQuota", value }),
-                )
-              }
-            />
-          </Section>
-        )}
-        {source.id === "copilot" && (
-          <Section
-            footer={
-              snapshot.settings.clientHooks
-                ? undefined
-                : t("Takes effect once client hooks are on in Agent plugins.")
-            }
-          >
-            <ToggleRow
-              title={t("Answer permission requests in the HUD")}
-              subtitle={t(
-                "Copilot then asks Agent HUD before its own rules and this session's approvals, so every tool call it would run or ask about waits for your answer in the HUD. Runs started with -p, --allow-all-tools, --allow-all or --yolo stay with Copilot.",
-              )}
-              checked={optInApprovals.includes(source.id)}
-              disabled={pending}
-              change={(value) =>
-                void perform(() =>
-                  action("set_setting", {
-                    key: "optInApprovals",
-                    value: [
-                      ...optInApprovals.filter((id) => id !== source.id),
-                      ...(value ? [source.id] : []),
-                    ],
-                  }),
-                )
-              }
-            />
-          </Section>
-        )}
-        <PanelBlocks
+        </Section>
+      )}
+      <ClientHooks t={t} snapshot={snapshot} source={source} />
+      {openGroup ? (
+        <ClientAccounts
+          t={t}
+          snapshot={snapshot}
+          client={client}
+          openGroup={openGroup}
+        />
+      ) : (
+        <AgentAccounts
           t={t}
           snapshot={snapshot}
           source={source}
+          active={active}
+          action={action}
           layout={layout}
           onLayout={onLayout}
           perform={perform}
           pending={pending}
         />
-        {source.id === "codex" && (
-          <CodexModelSettings
-            snapshot={snapshot}
-            action={action}
-            active={active}
-            layout={layout}
-            onLayout={onLayout}
-          />
-        )}
-        <AgentRelays t={t} snapshot={snapshot} source={source} />
-        <AgentWebSignIn
-          t={t}
-          source={source}
-          action={action}
-          perform={perform}
-          pending={pending}
-        />
-        <Connection
-          t={t}
-          source={source}
-          action={action}
-          perform={perform}
-          pending={pending}
-        />
-      </div>
+      )}
     </Page>
   );
 }
