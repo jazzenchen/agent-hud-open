@@ -582,6 +582,8 @@
   "Local transcripts and client events; hook connection status is reported separately.": "本机会话日志与客户端事件；回调连接状态另行显示",
   "Local usage ingestion is unavailable for: {{sources}}": "以下来源无法读取本地用量：{{sources}}",
   "Logo spacing": "Logo 间距",
+  "Grey numbers": "灰度数字",
+  "Number opacity": "数字不透明度",
   "Long step (≥15 s)": "长步骤（一步 ≥15 秒）",
   "Longest {{count}} days_other": "最长 {{count, number}} 天",
   "Main session": "主会话",

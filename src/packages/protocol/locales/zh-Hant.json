@@ -582,6 +582,8 @@
   "Local transcripts and client events; hook connection status is reported separately.": "本機工作階段記錄與用戶端事件；回呼連線狀態另行顯示",
   "Local usage ingestion is unavailable for: {{sources}}": "以下來源無法讀取本機用量：{{sources}}",
   "Logo spacing": "Logo 間距",
+  "Grey numbers": "灰階數字",
+  "Number opacity": "數字不透明度",
   "Long step (≥15 s)": "長步驟（一步 ≥15 秒）",
   "Longest {{count}} days_other": "最長 {{count, number}} 天",
   "Main session": "主工作階段",

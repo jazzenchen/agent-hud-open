@@ -26,6 +26,8 @@
   "ringWidth": 1.5,
   "simpleStyle": "segments",
   "showsNumbers": true,
+  "greyNumbers": false,
+  "greyNumberOpacity": 1,
   "separatesAgents": false,
   "appearance": "dark",
   "solidTransparency": 0,

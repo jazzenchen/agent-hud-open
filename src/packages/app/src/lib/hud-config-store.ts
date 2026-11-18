@@ -108,6 +108,9 @@ function pickSettings<K extends keyof HUDConfig>(
 }
 function screenSettings(value: unknown): HUDScreenSettings {
   const settings = pickSettings(value, settingKeys);
+  const opacity = settings.greyNumberOpacity;
+  if (opacity !== undefined && (opacity < 0.25 || opacity > 1))
+    delete settings.greyNumberOpacity;
   // Dynamic mode (`logos`) was retired: a screen saved in it opens as Simple,
   // at the same edge and place (screen.rs reads it the same way).
   const mode: string | undefined = settings.mode;

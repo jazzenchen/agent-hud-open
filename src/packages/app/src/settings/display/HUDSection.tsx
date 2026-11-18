@@ -116,6 +116,20 @@ export function HUDSection({
               t("Show numbers"),
               t("The most used window's percentage beside each logo."),
             )}
+          {(config.simpleStyle === "numbers" || config.showsNumbers) && (
+            <>
+              {toggle("greyNumbers", t("Grey numbers"))}
+              {config.greyNumbers &&
+                slider(
+                  "greyNumberOpacity",
+                  t("Number opacity"),
+                  0.25,
+                  1,
+                  0.05,
+                  percent,
+                )}
+            </>
+          )}
           {toggle(
             "separatesAgents",
             t("Separate agents"),
