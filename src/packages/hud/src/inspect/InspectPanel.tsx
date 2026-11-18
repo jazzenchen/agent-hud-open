@@ -95,26 +95,25 @@ export function InspectPanel({
           fontFamily: "inherit",
         }}
       />
+      {panel.outcome && !panel.outcome.sent && (
+        // Why it did not go, whole: it often says what to do.
+        <div
+          style={{
+            fontSize: 11,
+            lineHeight: 1.4,
+            color: alertText("warning", ground),
+            overflowWrap: "anywhere",
+            userSelect: "text",
+          }}
+        >
+          {panel.outcome.reason ?? t("Not sent")}
+        </div>
+      )}
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
         <button type="button" onClick={() => actions?.clear()} style={quiet}>
           {t("Clear all")}
         </button>
-        <span
-          style={{
-            flex: 1,
-            minWidth: 0,
-            fontSize: 11,
-            color: alertText("warning", ground),
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            whiteSpace: "nowrap",
-          }}
-          title={panel.outcome?.reason ?? undefined}
-        >
-          {panel.outcome && !panel.outcome.sent
-            ? (panel.outcome.reason ?? t("Not sent"))
-            : ""}
-        </span>
+        <span style={{ flex: 1 }} />
         <button
           type="button"
           onClick={send}

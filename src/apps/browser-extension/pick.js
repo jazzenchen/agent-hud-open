@@ -1,8 +1,8 @@
 // Pick mode, put into the page by the toolbar button: the element under the
 // pointer is outlined with its tag and size; a click picks it, a drag takes
 // an area, Esc lets go. A pick goes to Agent HUD with a picture cropped from
-// the visible tab, and for an element its selector, HTML, words and the
-// styles that make its look. Pressing the button again lets go too.
+// the visible tab, and for an element what describe.js says of it (put into
+// the page first). Pressing the button again lets go too.
 (() => {
   if (window.__agentHudPick) {
     window.__agentHudPick.stop();
@@ -134,7 +134,7 @@
       title: document.title,
       browser: browserName(),
       png: await crop(rect, area ? 0 : 8),
-      ...(element ? describe(element) : {}),
+      ...(element ? globalThis.__agentHudDescribe(element) : {}),
     };
     const answer = await chrome.runtime.sendMessage({ type: "send", pick });
     toast(
@@ -184,95 +184,6 @@
         canvas.height,
       );
     return canvas.toDataURL("image/png").split(",")[1];
-  }
-
-  function describe(element) {
-    return {
-      selector: selectorOf(element),
-      html: element.outerHTML.slice(0, 20000),
-      text: (element.innerText ?? "").trim().slice(0, 4000),
-      styles: stylesOf(element),
-    };
-  }
-
-  // A path of tags, ids and classes from the nearest element with an id,
-  // at most five steps, with :nth-of-type where siblings share a tag.
-  function selectorOf(element) {
-    const steps = [];
-    for (let node = element; node && node.nodeType === 1 && steps.length < 5;) {
-      if (node.id) {
-        steps.unshift(`#${CSS.escape(node.id)}`);
-        break;
-      }
-      let step = node.tagName.toLowerCase();
-      const classes = [...node.classList]
-        .slice(0, 2)
-        .map((c) => `.${CSS.escape(c)}`);
-      step += classes.join("");
-      const parent = node.parentElement;
-      if (parent) {
-        const same = [...parent.children].filter(
-          (c) => c.tagName === node.tagName,
-        );
-        if (same.length > 1) step += `:nth-of-type(${same.indexOf(node) + 1})`;
-      }
-      steps.unshift(step);
-      if (node === document.body) break;
-      node = parent;
-    }
-    return steps.join(" > ");
-  }
-
-  // The computed styles that make an element's look, leaving out defaults.
-  function stylesOf(element) {
-    const style = getComputedStyle(element);
-    const quiet = new Set([
-      "none",
-      "normal",
-      "auto",
-      "0px",
-      "rgba(0, 0, 0, 0)",
-      "static",
-      "visible",
-    ]);
-    const names = [
-      "display",
-      "position",
-      "box-sizing",
-      "width",
-      "height",
-      "margin",
-      "padding",
-      "gap",
-      "flex-direction",
-      "align-items",
-      "justify-content",
-      "grid-template-columns",
-      "font-family",
-      "font-size",
-      "font-weight",
-      "line-height",
-      "letter-spacing",
-      "text-align",
-      "color",
-      "background-color",
-      "background-image",
-      "border",
-      "border-radius",
-      "box-shadow",
-      "opacity",
-      "overflow",
-      "z-index",
-    ];
-    return names
-      .map((name) => [name, style.getPropertyValue(name)])
-      .filter(
-        ([name, value]) =>
-          value &&
-          !(quiet.has(value) && !["display", "position"].includes(name)),
-      )
-      .map(([name, value]) => `${name}: ${value};`)
-      .join("\n");
   }
 
   function toast(text) {

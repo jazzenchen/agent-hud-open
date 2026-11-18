@@ -1,8 +1,11 @@
-//! The markup window: a picture from the clipboard window, opened large in a
-//! window of its own to draw boxes and lines on it and pin numbered comments.
-//! What it sends back is the picture with the marks drawn in, and the
-//! comments' words, which take the picture's place in the draft.
+//! The markup window: a picture from the inspector, opened large in a window
+//! of its own to draw boxes and lines on it and pin numbered comments. What
+//! it sends back is the picture with the marks drawn in, and the comments'
+//! words, which take the picture's place in the draft. The window is sized
+//! to the picture, its toolbar in the title bar; while it is open the HUD
+//! goes on as usual, and once it closes the inspector comes up again.
 use super::{content::Picture, thumbnail, Inspect};
+use crate::placement::Area;
 use base64::Engine;
 use serde_json::{json, Value};
 use tauri::Manager;
@@ -22,27 +25,68 @@ pub(super) fn open(app: &tauri::AppHandle, id: &str) -> Result<Value, String> {
     if let Some(window) = app.get_webview_window(LABEL) {
         let _ = window.destroy();
     }
+    let inspect = app.state::<Inspect>();
+    // On the screen the HUD was clicked on, under the pointer.
+    let area = crate::placement::pointer_area(app);
+    let (width, height) = window_size(&inspect, id, area);
     let url = format!("index.html?window=mark&id={id}");
-    let window = tauri::WebviewWindowBuilder::new(app, LABEL, tauri::WebviewUrl::App(url.into()))
+    let builder = tauri::WebviewWindowBuilder::new(app, LABEL, tauri::WebviewUrl::App(url.into()))
         .title(agent_hud_runtime::l10n::tr("Mark up the picture"))
-        .inner_size(1100.0, 780.0)
-        .min_inner_size(640.0, 420.0)
-        .center()
-        .build()
+        .inner_size(width, height)
+        .min_inner_size(720.0, 460.0);
+    let builder = match area {
+        Some(area) => {
+            let (x, y) = area.centre(width, height);
+            builder.position(x, y)
+        }
+        None => builder.center(),
+    };
+    // Built hidden with the app's startup appearance, then shown.
+    let window = crate::appearance::build(app, crate::shell::toolbar_chrome(builder))
         .map_err(|error| format!("Could not open the markup window: {error}"))?;
     crate::shell::window_opened(&window);
-    // While it is open the clipboard window waits for it, however it closes.
-    let inspect = app.state::<Inspect>();
+    // The bubble waits for the window, however it closes; then the inspector
+    // comes up again, with the marked picture or as it was.
     inspect.change(app, |draft| draft.marking = Some(id.to_owned()));
     let closed = app.clone();
+    let marking = id.to_owned();
     window.on_window_event(move |event| {
         if let tauri::WindowEvent::Destroyed = event {
             let inspect = closed.state::<Inspect>();
-            inspect.change(&closed, |draft| draft.marking = None);
+            inspect.change(&closed, |draft| {
+                // A window opened on another picture since is its own.
+                if draft.marking.as_deref() == Some(marking.as_str()) {
+                    draft.marking = None;
+                    draft.presented = Some(uuid::Uuid::new_v4().simple().to_string());
+                }
+            });
         }
     });
+    window.show().map_err(|error| error.to_string())?;
     window.set_focus().map_err(|error| error.to_string())?;
     Ok(json!({ "opened": true }))
+}
+
+/// Room for picture `id` at one point per pixel, with its margins and the
+/// toolbar, within most of the free area of `screen`.
+fn window_size(inspect: &Inspect, id: &str, screen: Option<Area>) -> (f64, f64) {
+    let picture = inspect
+        .lock()
+        .picture(id)
+        .and_then(|path| std::fs::read(path).ok())
+        .and_then(|png| thumbnail::size(&png))
+        .map(|(width, height)| {
+            (
+                f64::from(width.min(LARGE.0)),
+                f64::from(height.min(LARGE.1)),
+            )
+        })
+        .unwrap_or((1000.0, 700.0));
+    let screen = screen.map_or((1440.0, 900.0), |area| (area.width, area.height));
+    (
+        (picture.0 + 56.0).clamp(720.0, (screen.0 * 0.9).max(720.0)),
+        (picture.1 + 56.0 + 52.0).clamp(460.0, (screen.1 * 0.9).max(460.0)),
+    )
 }
 
 /// Closes the window: its page has no right to close it itself.

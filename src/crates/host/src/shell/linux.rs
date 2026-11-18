@@ -16,7 +16,13 @@ pub(crate) fn reopened(_event: &tauri::RunEvent) -> bool {
     false
 }
 
-pub(crate) fn statistics_chrome<'a>(
+/// The screen under the pointer, both in physical pixels here.
+pub(crate) fn pointer_monitor(app: &tauri::AppHandle) -> Option<tauri::Monitor> {
+    let pointer = app.cursor_position().ok()?;
+    app.monitor_from_point(pointer.x, pointer.y).ok().flatten()
+}
+
+pub(crate) fn toolbar_chrome<'a>(
     builder: tauri::WebviewWindowBuilder<'a, tauri::Wry, tauri::AppHandle>,
 ) -> tauri::WebviewWindowBuilder<'a, tauri::Wry, tauri::AppHandle> {
     builder
@@ -36,3 +42,8 @@ pub(crate) fn system_languages() -> Vec<String> {
 pub(crate) fn alert(title: &str, body: &str, _ok: &str) {
     eprintln!("{title}: {body}");
 }
+
+/// No shortcut for the clipboard window on this system yet.
+pub(crate) const CLIP_SHORTCUT: bool = false;
+
+pub(crate) fn clip_shortcut(_app: &tauri::AppHandle, _shortcut: Option<crate::inspect::Shortcut>) {}

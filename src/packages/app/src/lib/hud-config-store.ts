@@ -20,6 +20,7 @@ const globalKeys = [
   "messageFadeSeconds",
   "clipboardBubble",
   "clipboardFadeSeconds",
+  "clipboardShortcut",
   "requiresOptionToOpen",
   "openImmediatelyAtTop",
   "animations",

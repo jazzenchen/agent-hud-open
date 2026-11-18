@@ -92,8 +92,11 @@ export function useHUDLayout({
 
   const delivery = useRequestDelivery(snapshot, request, focusedVendor?.key);
 
+  // The inspector, like a message, is a card of its own beside the dock;
+  // only the notch grows it out of itself.
   const detached =
-    config.mode !== "notch" && Boolean(focusedVendor || standaloneAlert);
+    config.mode !== "notch" &&
+    Boolean(focusedVendor || standaloneAlert || ends.view === "clip");
   const peek = Boolean(
     open && detached && !pinned && !standaloneAlert && focusedVendor,
   );
@@ -106,10 +109,11 @@ export function useHUDLayout({
     ? HUD_METRICS.expandedFlare
     : HUD_METRICS.collapsedFlare;
   const flared = !detached && config.mode !== "simple";
-  // The clipboard's window keeps narrow, beside a side edge's dock as well.
+  // The inspector keeps narrow; out of the notch it is a card beside the
+  // dock, at any edge.
   const fullWidth =
     ends.view === "clip"
-      ? 380 + (horizontal(edge) ? 0 : metrics.width + 12)
+      ? 380 + (detached || horizontal(edge) ? 0 : metrics.width + 12)
       : standaloneAlert
         ? 470
         : focusedVendor

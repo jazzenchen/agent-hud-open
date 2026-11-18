@@ -1,26 +1,30 @@
 import { useRef, useState, type PointerEvent } from "react";
 import {
-  boxFrom,
+  frameFrom,
   INK,
   pinNumbers,
   pinRadius,
+  ringFor,
+  RING,
   strokeFor,
   type Mark,
   type MarkTool,
 } from "./mark-model";
 
 /** The marks over the picture, drawn in its own pixels (`size`), and the
- * pointer that adds one with `tool`: a box dragged, a line drawn, a pin put
- * down with a click. */
+ * pointer that adds one with `tool`: a box or a circle dragged, a line
+ * drawn, a pin put down with a click. The lit pin has a halo. */
 export function MarkLayer({
   size,
   marks,
   tool,
+  lit,
   add,
 }: {
   size: { w: number; h: number };
   marks: Mark[];
   tool: MarkTool;
+  lit: number | null;
   add: (mark: Mark) => void;
 }) {
   const svg = useRef<SVGSVGElement>(null);
@@ -44,15 +48,17 @@ export function MarkLayer({
     event.currentTarget.setPointerCapture(event.pointerId);
     start.current = point;
     setDrawing(
-      tool === "box" ? boxFrom(point, point) : { kind: "pen", points: [point] },
+      tool === "box" || tool === "circle"
+        ? frameFrom(tool, point, point)
+        : { kind: "pen", points: [point] },
     );
   };
   const move = (event: PointerEvent) => {
     if (!start.current || !drawing) return;
     const point = at(event);
     setDrawing(
-      drawing.kind === "box"
-        ? boxFrom(start.current, point)
+      drawing.kind === "box" || drawing.kind === "circle"
+        ? frameFrom(drawing.kind, start.current, point)
         : drawing.kind === "pen"
           ? { kind: "pen", points: [...drawing.points, point] }
           : drawing,
@@ -63,8 +69,9 @@ export function MarkLayer({
     start.current = null;
     setDrawing(null);
     if (!done) return;
-    // A click with the box or the pen leaves nothing.
-    if (done.kind === "box" && done.w * done.h < 16) return;
+    // A click with the box, the circle or the pen leaves nothing.
+    if ((done.kind === "box" || done.kind === "circle") && done.w * done.h < 16)
+      return;
     if (done.kind === "pen" && done.points.length < 2) return;
     add(done);
   };
@@ -102,6 +109,17 @@ export function MarkLayer({
             stroke={INK}
             strokeWidth={stroke}
           />
+        ) : mark.kind === "circle" ? (
+          <ellipse
+            key={index}
+            cx={mark.x + mark.w / 2}
+            cy={mark.y + mark.h / 2}
+            rx={mark.w / 2}
+            ry={mark.h / 2}
+            fill="none"
+            stroke={INK}
+            strokeWidth={stroke}
+          />
         ) : mark.kind === "pen" ? (
           <polyline
             key={index}
@@ -114,7 +132,23 @@ export function MarkLayer({
           />
         ) : (
           <g key={index}>
-            <circle cx={mark.x} cy={mark.y} r={radius} fill={INK} />
+            {lit === index && (
+              <circle
+                cx={mark.x}
+                cy={mark.y}
+                r={radius * 1.8}
+                fill={INK}
+                opacity={0.28}
+              />
+            )}
+            <circle
+              cx={mark.x}
+              cy={mark.y}
+              r={radius}
+              fill={INK}
+              stroke={RING}
+              strokeWidth={ringFor(radius)}
+            />
             <text
               x={mark.x}
               y={mark.y + 1}

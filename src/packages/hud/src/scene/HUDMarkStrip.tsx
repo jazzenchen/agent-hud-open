@@ -29,8 +29,6 @@ export function HUDMarkStrip({
   dockMemory,
   nativePointer,
   reduceMotion,
-  hasAlert,
-  suppressHover,
   setHovered,
   forceOpen,
   pin,
@@ -56,8 +54,6 @@ export function HUDMarkStrip({
   dockMemory: MutableRefObject<DockMemory>;
   nativePointer?: HUDNativePointer;
   reduceMotion: boolean;
-  hasAlert: boolean;
-  suppressHover: MutableRefObject<boolean>;
   setHovered: (key: string | null) => void;
   forceOpen: () => void;
   pin: (key?: string) => void;
@@ -70,12 +66,10 @@ export function HUDMarkStrip({
         <div
           className="hud-classic-silhouette"
           aria-label={t("Hover to expand Agent HUD")}
-          tabIndex={0}
+          tabIndex={-1}
           role="button"
           aria-describedby={`hud-instructions-${id}`}
-          onFocus={() => {
-            if (!hasAlert && !suppressHover.current) forceOpen();
-          }}
+          onFocus={(event) => event.currentTarget.blur()}
           onKeyDown={(e) => {
             if (e.key === "Enter" || e.key === " ") forceOpen();
           }}
@@ -155,10 +149,7 @@ export function HUDMarkStrip({
               dockMemory={dockMemory}
               nativePointer={nativePointer}
               reduceMotion={reduceMotion}
-              hasAlert={hasAlert}
-              suppressHover={suppressHover}
               setHovered={setHovered}
-              forceOpen={forceOpen}
               pin={pin}
             />
           ))}

@@ -23,7 +23,7 @@ chrome.action.onClicked.addListener(async (tab) => {
   try {
     await chrome.scripting.executeScript({
       target: { tabId: tab.id },
-      files: ["pick.js"],
+      files: ["describe.js", "pick.js"],
     });
   } catch {
     // Chrome's own pages and the Web Store take no scripts.

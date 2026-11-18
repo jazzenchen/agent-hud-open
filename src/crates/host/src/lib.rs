@@ -23,6 +23,7 @@ mod mcp_clients;
 mod messages;
 mod phones;
 mod picture;
+mod placement;
 mod requests;
 mod screens;
 mod service;

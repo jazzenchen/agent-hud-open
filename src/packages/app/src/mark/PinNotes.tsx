@@ -1,24 +1,26 @@
-import { useState } from "react";
 import { useT } from "@agent-hud/ui/format-context";
 import { pinNumbers, pinRadius, type Mark } from "./mark-model";
-import type { MarkColors } from "./MarkWindow";
+import type { MarkColors } from "./mark-theme";
 
-/** Where a note sits beside its pin: to the right, or to the left near the
- * picture's right edge. */
-const beside = (x: number, width: number) =>
+/** Where a note sits beside its pin, `gap` clear of its centre: to the
+ * right, or to the left near the picture's right edge. */
+const beside = (x: number, gap: number, width: number) =>
   x / width > 0.7
-    ? { right: `${100 - (x / width) * 100}%`, marginRight: 4 }
-    : { left: `${(x / width) * 100}%`, marginLeft: 4 };
+    ? { right: `${100 - ((x - gap) / width) * 100}%` }
+    : { left: `${((x + gap) / width) * 100}%` };
 
-/** Each pin's note, on the picture beside its pin: the one being written as a
- * small field, the others only while the pointer is on their pin. Pressing
- * a pin opens its note again; a note left empty takes its pin away. */
+/** Each pin's note, on the picture beside its pin, on an opaque card so its
+ * words read on any picture: the one being written as a field, the others
+ * while their pin is lit. Pressing a pin opens its note again; a note left
+ * empty takes its pin away. */
 export function PinNotes({
   size,
   scale,
   marks,
   editing,
   edit,
+  lit,
+  light,
   write,
   drop,
   colors,
@@ -29,14 +31,15 @@ export function PinNotes({
   marks: Mark[];
   editing: number | null;
   edit: (index: number | null) => void;
+  lit: number | null;
+  light: (index: number | null) => void;
   write: (index: number, text: string) => void;
   drop: (index: number) => void;
   colors: MarkColors;
 }) {
   const t = useT();
-  const [hover, setHover] = useState<number | null>(null);
   const numbers = pinNumbers(marks);
-  const hit = pinRadius(size.w) * scale * 2;
+  const hit = Math.max(pinRadius(size.w) * scale * 2, 22);
   const finish = (index: number) => {
     const mark = marks[index];
     if (mark?.kind === "pin" && !mark.text.trim()) drop(index);
@@ -46,10 +49,11 @@ export function PinNotes({
     position: "absolute",
     transform: "translateY(-50%)",
     zIndex: 2,
-    borderRadius: 8,
-    background: colors.field,
+    border: `1px solid ${colors.cardLine}`,
+    borderRadius: 9,
+    background: colors.card,
     color: colors.text,
-    boxShadow: "0 4px 18px rgba(0,0,0,0.22)",
+    boxShadow: "0 6px 24px rgba(0,0,0,0.28)",
     fontSize: 13,
   } as const;
   return (
@@ -58,7 +62,11 @@ export function PinNotes({
         if (mark.kind !== "pin") return null;
         const left = `${(mark.x / size.w) * 100}%`;
         const top = `${(mark.y / size.h) * 100}%`;
-        const place = beside(mark.x + pinRadius(size.w) * 1.3, size.w);
+        const place = beside(
+          mark.x,
+          pinRadius(size.w) * 1.4 + 6 / scale,
+          size.w,
+        );
         return (
           <div key={index}>
             <button
@@ -66,8 +74,8 @@ export function PinNotes({
               aria-label={`${numbers.get(index)}. ${mark.text}`}
               onPointerDown={(event) => event.stopPropagation()}
               onClick={() => edit(index)}
-              onPointerEnter={() => setHover(index)}
-              onPointerLeave={() => setHover(null)}
+              onPointerEnter={() => light(index)}
+              onPointerLeave={() => light(null)}
               style={{
                 position: "absolute",
                 left,
@@ -101,24 +109,25 @@ export function PinNotes({
                   ...card,
                   top,
                   ...place,
-                  width: 240,
-                  height: 32,
-                  padding: "0 10px",
-                  border: 0,
+                  width: 260,
+                  height: 34,
+                  padding: "0 11px",
                   outline: 0,
                   fontFamily: "inherit",
+                  userSelect: "text",
                 }}
               />
-            ) : hover === index && mark.text ? (
+            ) : lit === index && mark.text ? (
               <span
                 style={{
                   ...card,
                   top,
                   ...place,
-                  maxWidth: 280,
-                  padding: "6px 10px",
+                  maxWidth: 300,
+                  padding: "7px 11px",
                   lineHeight: 1.4,
                   pointerEvents: "none",
+                  whiteSpace: "pre-wrap",
                 }}
               >
                 {mark.text}

@@ -12,6 +12,10 @@ export interface DisplayProps {
   t: Translate;
 }
 
+/** A fade slider's last stop, past 12 seconds: it never goes by itself
+ * (saved as 0). */
+const NEVER = 13;
+
 type KeysOf<T> = {
   [K in keyof HUDConfig]: HUDConfig[K] extends T ? K : never;
 }[keyof HUDConfig];
@@ -54,5 +58,25 @@ export function displayControls({ config, update, t }: DisplayProps) {
     />
   );
 
-  return { slider, toggle, pt, px, ms, percent, seconds, rows };
+  /** How long a bubble at a dock end stays, 3 to 12 seconds or never. */
+  const fadeSlide = (
+    key: "messageFadeSeconds" | "clipboardFadeSeconds",
+    title: string,
+  ) => (
+    <Slide
+      title={title}
+      value={config[key] > 0 ? Math.min(config[key], NEVER - 1) : NEVER}
+      min={3}
+      max={NEVER}
+      step={1}
+      format={(value) =>
+        value >= NEVER
+          ? t("Never")
+          : t("{{seconds}} s", { seconds: Math.round(value) })
+      }
+      change={(value) => update({ [key]: value >= NEVER ? 0 : value })}
+    />
+  );
+
+  return { slider, toggle, fadeSlide, pt, px, ms, percent, seconds, rows };
 }

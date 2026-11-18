@@ -45,6 +45,7 @@ fn show_settings(app: &tauri::AppHandle) -> Result<(), String> {
         }
     };
     shell::window_opened(&window);
+    crate::placement::bring_to_pointer(&window);
     window.unminimize().map_err(|error| error.to_string())?;
     window.show().map_err(|error| error.to_string())?;
     activity::notify(app, "main");
@@ -189,11 +190,13 @@ pub(crate) fn show_statistics(app: &tauri::AppHandle) -> Result<(), String> {
             .inner_size(1280.0, 820.0)
             .min_inner_size(720.0, 560.0)
             .center();
-            crate::appearance::build(app, shell::statistics_chrome(builder))
+            // Built hidden; shown below, on the screen under the pointer.
+            crate::appearance::build(app, shell::toolbar_chrome(builder))
                 .map_err(|error| format!("Could not create the Statistics window: {error}"))?
         }
     };
     shell::window_opened(&window);
+    crate::placement::bring_to_pointer(&window);
     window.unminimize().map_err(|error| error.to_string())?;
     window.show().map_err(|error| error.to_string())?;
     activity::notify(app, "statistics");

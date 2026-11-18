@@ -125,6 +125,7 @@ pub(crate) fn stop(app: &tauri::AppHandle) {
 /// HUD windows and the menu bar follow.
 pub(crate) fn presentation_changed(app: &tauri::AppHandle, view: &Value) {
     activity::publish(app, "hud:presentation", view);
+    crate::inspect::settings_changed(app, view);
     wake(app, DISPLAY, |_| {});
 }
 

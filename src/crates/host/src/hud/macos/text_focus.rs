@@ -96,9 +96,14 @@ pub(in crate::hud) fn end_text_focus(
         let native = unsafe { &*pointer.cast::<NSWindow>() };
         if native.isKindOfClass(objc2::class!(NSPanel)) {
             if native.isKeyWindow() {
-                native.makeFirstResponder(None);
+                // Out and back in gives up the keys; the web view lets go
+                // only after. A panel shown again with no first responder
+                // hands it to the web view as if Tab had been pressed, and
+                // WebKit then focuses the page's first control (a dock
+                // logo) and fires its focus handler.
                 native.orderOut(None);
                 native.orderFrontRegardless();
+                native.makeFirstResponder(None);
             }
             return Ok(());
         }

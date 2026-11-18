@@ -46,7 +46,7 @@ fn copied(app: &tauri::AppHandle, change: i64) {
         .then(clipboard::peek)
         .flatten()
         .map(|kind| Clip {
-            id: uuid::Uuid::new_v4().simple().to_string()[..12].to_owned(),
+            id: new_id(),
             kind,
             app: front.map(|front| front.name),
             at_ms: chrono::Utc::now().timestamp_millis(),
@@ -56,9 +56,35 @@ fn copied(app: &tauri::AppHandle, change: i64) {
     inspect.change(app, |draft| draft.copied(clip));
 }
 
-/// The "Clipboard bubble" display setting, on unless switched off.
+fn new_id() -> String {
+    uuid::Uuid::new_v4().simple().to_string()[..12].to_owned()
+}
+
+/// The shortcut: the window comes up again, with what it held, or with
+/// what is on the clipboard now. Off the thread the key arrived on.
+pub(crate) fn summon(app: &tauri::AppHandle) {
+    let app = app.clone();
+    std::thread::spawn(move || {
+        let Some(inspect) = app.try_state::<Inspect>() else {
+            return;
+        };
+        let current = clipboard::change_count().and_then(|change| {
+            Some(Clip {
+                id: new_id(),
+                kind: clipboard::peek()?,
+                app: None,
+                at_ms: chrono::Utc::now().timestamp_millis(),
+                change,
+                content: None,
+            })
+        });
+        inspect.change(&app, |draft| draft.summoned(new_id(), current));
+    });
+}
+
+/// The "Clipboard bubble" display setting: experimental, so off until the
+/// person switches it on.
 fn bubble_on(app: &tauri::AppHandle) -> bool {
-    app.try_state::<Presentation>().is_none_or(|presentation| {
-        presentation.view()["store"]["global"]["clipboardBubble"] != false
-    })
+    app.try_state::<Presentation>()
+        .is_some_and(|presentation| super::shortcut::bubble_on(&presentation.view()))
 }

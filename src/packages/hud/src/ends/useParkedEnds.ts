@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { Approval } from "@agent-hud/protocol";
 import type { EndSide } from "./end-geometry";
 import {
@@ -11,46 +11,10 @@ import {
   type ParkedCard,
 } from "./end-queue";
 import type { EndsLink } from "./ends-link";
+import { useEndFade } from "./useEndFade";
 import { useEndsSharing } from "./useEndsSharing";
 
-/** The time left of the tail's round: one message goes every `ms`, the
- * oldest first, and the clock stops while `paused`. `cycle` changes
- * whenever a round starts, for the ring that shows it. An `ms` of 0 keeps
- * every message until the person lets it go. */
-export function useTailFade(
-  count: number,
-  paused: boolean,
-  fade: () => void,
-  ms = TAIL_FADE_MS,
-) {
-  const [cycle, setCycle] = useState(0);
-  const left = useRef(ms);
-  const active = count > 0 && ms > 0;
-  useEffect(() => {
-    if (!active) return;
-    left.current = ms;
-    setCycle((n) => n + 1);
-  }, [active, ms]);
-  useEffect(() => {
-    if (!active || paused) return;
-    const start = performance.now();
-    let fired = false;
-    const timer = setTimeout(() => {
-      fired = true;
-      left.current = ms;
-      fade();
-      setCycle((n) => n + 1);
-    }, left.current);
-    return () => {
-      clearTimeout(timer);
-      if (!fired)
-        left.current = Math.max(0, left.current - (performance.now() - start));
-    };
-  }, [active, paused, cycle]);
-  return { cycle, paused: paused || !active, ms: ms > 0 ? ms : 0 };
-}
-
-export type EndFade = ReturnType<typeof useTailFade>;
+export type { EndFade } from "./useEndFade";
 
 /** The requests and messages parked at the dock's ends, which of them a
  * hovered end shows, and what the person can do with them there. With a
@@ -94,12 +58,13 @@ export function useParkedEnds({
   );
   // Each screen lets its own oldest go; holding the same messages, and
   // stopping together, they let the same ones go.
-  const fade = useTailFade(
-    parked.tail.length,
-    view === "tail" || heldElsewhere,
-    () => setParked(fadeOldest),
-    fadeMs,
-  );
+  const fade = useEndFade({
+    active: parked.tail.length > 0,
+    paused: view === "tail" || heldElsewhere,
+    ms: fadeMs ?? TAIL_FADE_MS,
+    done: () => setParked(fadeOldest),
+    repeat: true,
+  });
   const request =
     view === "head"
       ? (head.find((r) => r.id === picked) ?? head[0])

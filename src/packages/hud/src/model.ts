@@ -83,6 +83,8 @@ export interface HUDConfig {
   clipboardBubble: boolean;
   /** How long a copy's bubble stays, in seconds; 0 keeps it. */
   clipboardFadeSeconds: number;
+  /** Calls the clipboard window up again: `Alt+KeyZ`; empty for none. */
+  clipboardShortcut: string;
   requiresOptionToOpen: boolean;
   openImmediatelyAtTop: boolean;
   sessionList: boolean;

@@ -17,12 +17,15 @@ mod draft;
 mod hosts;
 pub(crate) mod marking;
 mod page;
+mod shortcut;
 mod target;
 mod thumbnail;
 mod watch;
 
 pub(crate) use browser::relay;
 pub(crate) use commands::*;
+pub(crate) use shortcut::Shortcut;
+pub(crate) use watch::summon;
 
 use crate::activity;
 use draft::Draft;
@@ -75,7 +78,22 @@ pub(crate) fn install(app: &tauri::AppHandle, demo: bool) -> Result<(), String> 
         watch: Mutex::new((!demo).then(|| watch::start(app.clone())).flatten()),
         browser: Mutex::new((!demo).then(|| browser::listen(app, &data)).flatten()),
     });
+    if !demo {
+        if let Some(presentation) = app.try_state::<agent_hud_hud::presentation::Presentation>() {
+            shortcut::apply(app, &presentation.view());
+        }
+    }
     Ok(())
+}
+
+/// The display settings changed: the shortcut follows them.
+pub(crate) fn settings_changed(app: &tauri::AppHandle, view: &Value) {
+    if app
+        .try_state::<Inspect>()
+        .is_some_and(|inspect| inspect.watch_running())
+    {
+        shortcut::apply(app, view);
+    }
 }
 
 /// Stops the clipboard watch as the app quits.
@@ -103,6 +121,14 @@ impl Inspect {
 
     fn lock(&self) -> std::sync::MutexGuard<'_, Draft> {
         self.draft.lock().unwrap_or_else(PoisonError::into_inner)
+    }
+
+    /// The clipboard is watched: not in the demo, nor where it cannot be.
+    fn watch_running(&self) -> bool {
+        self.watch
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .is_some()
     }
 
     pub(crate) fn stop(&self) {

@@ -39,8 +39,8 @@ pub(crate) struct Draft {
     /// The picture open in the markup window: the bubble and its window
     /// wait for it.
     pub marking: Option<String>,
-    /// The last pick from the browser: the HUD brings the window up once
-    /// for each.
+    /// The last time the window was called up, by a pick from the browser or
+    /// the shortcut: the HUD brings the window up once for each.
     pub presented: Option<String>,
 }
 
@@ -84,8 +84,13 @@ impl Draft {
         }
     }
 
+    /// Lets go of item `id`, or of the latest copy (an added copy keeps its
+    /// id, so it goes from both and does not come back as the latest).
     pub(crate) fn remove(&mut self, id: &str) {
         self.items.retain(|item| item.id != id);
+        if self.clip.as_ref().is_some_and(|clip| clip.id == id) {
+            self.clip = None;
+        }
     }
 
     /// Lets go of everything: the draft, its note and the latest copy; a
@@ -136,6 +141,15 @@ impl Draft {
             comment: String::new(),
             marks: Vec::new(),
         });
+        self.presented = Some(id);
+    }
+
+    /// The shortcut calls the window up again; with nothing in it, what is
+    /// on the clipboard now (`current`) becomes the latest copy.
+    pub(crate) fn summoned(&mut self, id: String, current: Option<Clip>) {
+        if self.clip.is_none() && self.items.is_empty() {
+            self.clip = current;
+        }
         self.presented = Some(id);
     }
 
@@ -225,6 +239,18 @@ mod tests {
         let out = draft.outgoing();
         assert_eq!(out.len(), 1);
         assert_eq!(out[0].id, "b");
+    }
+
+    #[test]
+    fn the_latest_copy_can_be_let_go_like_any_item() {
+        let mut draft = Draft::default();
+        draft.copied(Some(clip("a", Some("words"))));
+        draft.remove("a");
+        assert!(draft.clip.is_none() && draft.items.is_empty());
+        draft.copied(Some(clip("b", Some("more"))));
+        assert!(draft.add_clip());
+        draft.remove("b");
+        assert!(draft.clip.is_none() && draft.items.is_empty());
     }
 
     #[test]

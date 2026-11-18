@@ -1,56 +1,21 @@
 import { useEffect, useRef, useState } from "react";
 import type { InspectView } from "@agent-hud/protocol";
 import type { EndSide } from "../ends/end-geometry";
-import type { EndFade } from "../ends/useParkedEnds";
+import { useEndFade } from "../ends/useEndFade";
 import type { HUDConfig } from "../model";
 import { usePanelServices } from "../PanelContext";
 import { useClipWindow } from "./useClipWindow";
 
 const EMPTY: InspectView = { clip: null, items: [], note: "" };
 
-/** A copy's bubble lasts `ms` from the copy, the clock stopping while
- * `paused` (its window is open). A new copy starts it again; with no copy
- * (`key` null) or an `ms` of 0 it does not run. */
-function useClipFade(
-  key: string | null,
-  paused: boolean,
-  ms: number,
-  done: () => void,
-): EndFade {
-  const [cycle, setCycle] = useState(0);
-  const left = useRef(ms);
-  const finish = useRef(done);
-  finish.current = done;
-  const active = key !== null && ms > 0;
-  useEffect(() => {
-    if (!active) return;
-    left.current = ms;
-    setCycle((n) => n + 1);
-  }, [key, active, ms]);
-  useEffect(() => {
-    if (!active || paused) return;
-    const start = performance.now();
-    let fired = false;
-    const timer = setTimeout(() => {
-      fired = true;
-      finish.current();
-    }, left.current);
-    return () => {
-      clearTimeout(timer);
-      if (!fired)
-        left.current = Math.max(0, left.current - (performance.now() - start));
-    };
-  }, [active, paused, cycle]);
-  return { cycle, paused: paused || !active, ms: active ? ms : 0 };
-}
-
-/** How long a pick from the browser holds the window up unvisited. */
+/** How long the window, called up, stays up unvisited. */
 const PRESENT_MS = 20_000;
 
 /** The host's state of the clipboard window, as every HUD window hears it,
- * and whether the window is held up: while a picture is in the markup
- * window, and for a pick from the browser, until the pointer has been on
- * the window and left it, or for `PRESENT_MS`. */
+ * and whether the window is held up: when it is called up (a pick from the
+ * browser, ⌥Z, or the markup window closing), until the pointer has been on
+ * the window and left it, or for `PRESENT_MS`. The markup window itself
+ * holds nothing: the HUD goes on as usual while it is open. */
 export function useInspectView(
   pointerInside: boolean,
   setHovered: (end: EndSide | null) => void,
@@ -91,16 +56,16 @@ export function useInspectView(
   return {
     view,
     setView,
-    hold: Boolean(view.marking) || presenting,
+    hold: presenting,
   };
 }
 
 /** The clipboard's end of the dock: the host's state of the clipboard
  * window, whether its bubble shows, its countdown, and the window's own
  * state while it shows.
- * A copy's bubble shows for `clipboardFadeSeconds`; with something in the
- * draft, or a picture open in the markup window, it stays and its clock
- * stops. */
+ * A copy's bubble shows for `clipboardFadeSeconds`, counted again from the
+ * start once the pointer has been on it; with something in the draft, or a
+ * picture open in the markup window, it stays and its clock stops. */
 export function useClipEnd(
   config: HUDConfig,
   hovered: EndSide | null,
@@ -112,23 +77,29 @@ export function useClipEnd(
 ) {
   const services = usePanelServices()?.inspect;
   const [faded, setFaded] = useState<string | null>(null);
+  // Called up again, the latest copy shows again too.
+  useEffect(() => setFaded(null), [view.presented]);
   const copy = view.clip?.id ?? null;
   // A picture open in the markup window holds the bubble too.
   const holding =
     view.items.length > 0 || view.note.trim() !== "" || Boolean(view.marking);
   // A send in progress keeps the window until it hands the HUD back.
   const [sending, setSending] = useState(false);
+  // A pick from the browser shows with the bubble off too: only copies
+  // follow the switch.
   const shown =
     Boolean(services) &&
-    config.clipboardBubble &&
-    (holding || sending || (copy !== null && faded !== copy));
+    (holding ||
+      sending ||
+      (config.clipboardBubble && copy !== null && faded !== copy));
   const viewing = open && hovered === "clip" && shown;
-  const fade = useClipFade(
-    holding ? null : copy,
-    viewing,
-    config.clipboardFadeSeconds * 1000,
-    () => setFaded(copy),
-  );
+  const fade = useEndFade({
+    active: !holding && copy !== null,
+    begins: copy,
+    paused: viewing,
+    ms: config.clipboardFadeSeconds * 1000,
+    done: () => setFaded(copy),
+  });
   const panel = useClipWindow(services, viewing, view, setView, [
     sending,
     setSending,

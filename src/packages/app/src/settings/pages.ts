@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import {
   Coins,
   Download,
+  FlaskConical,
   Monitor,
   Network,
   Plug,
@@ -85,6 +86,17 @@ const builtInPages = (
     color: "#5e5ce6",
     description: t("Share quota and token usage with paired phones."),
     group: "devices",
+  },
+  {
+    // Features still being tried out, with their switches.
+    id: "experimental",
+    label: t("Experimental"),
+    icon: FlaskConical,
+    color: "#af52de",
+    description: t(
+      "Features still being tried out. They may change or go away.",
+    ),
+    group: "about",
   },
   {
     id: "updates",

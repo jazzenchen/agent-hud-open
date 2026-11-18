@@ -19,7 +19,6 @@ import { KnownClientCard } from "./agent-plugins/KnownClientCard";
 import { DetailsSection } from "./agent-plugins/DetailsSection";
 import { HooksSection } from "./agent-plugins/HooksSection";
 import { ToolsSection } from "./agent-plugins/ToolsSection";
-import { BrowserSection } from "./agent-plugins/BrowserSection";
 import {
   knownClients,
   nativeClients,
@@ -167,7 +166,6 @@ export function AgentPluginsPane({
           active={active}
           t={t}
         />
-        <BrowserSection active={active} t={t} />
         <DetailsSection
           snapshot={snapshot}
           clients={mcp.status}

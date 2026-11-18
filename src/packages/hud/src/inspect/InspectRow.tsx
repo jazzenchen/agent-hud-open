@@ -234,7 +234,7 @@ export function InspectRow({
         >
           {source(row, t)}
         </span>
-        {row.pending ? (
+        {row.pending && (
           <button
             type="button"
             onClick={add}
@@ -243,16 +243,15 @@ export function InspectRow({
             <Plus size={11} strokeWidth={2.4} />
             {t("Add")}
           </button>
-        ) : (
-          <button
-            type="button"
-            aria-label={t("Remove")}
-            onClick={remove}
-            style={{ ...button, color: alertInk(0.4, ground) }}
-          >
-            <X size={12} strokeWidth={2} />
-          </button>
         )}
+        <button
+          type="button"
+          aria-label={t("Remove")}
+          onClick={remove}
+          style={{ ...button, color: alertInk(0.4, ground) }}
+        >
+          <X size={12} strokeWidth={2} />
+        </button>
       </div>
       <Preview
         content={row.content}

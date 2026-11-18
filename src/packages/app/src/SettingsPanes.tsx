@@ -8,6 +8,7 @@ import {
   type AgentPluginItem,
 } from "./settings/AgentPluginsPane";
 import { DisplayPane } from "./settings/DisplayPane";
+import { ExperimentalPane } from "./settings/ExperimentalPane";
 import { GeneralPane } from "./settings/GeneralPane";
 import { LocalNetworkPane } from "./settings/LocalNetworkPane";
 import { PricesPane } from "./settings/PricesPane";
@@ -48,6 +49,7 @@ export default function SettingsPane({
   if (page === "relays") return <RelaysPane {...settingsProps} />;
   if (page === "local-network") return <LocalNetworkPane {...settingsProps} />;
   if (page === "updates") return <UpdatesPane {...settingsProps} />;
+  if (page === "experimental") return <ExperimentalPane {...settingsProps} />;
   if (page === "display")
     return ready && selectedId ? (
       <DisplayPane

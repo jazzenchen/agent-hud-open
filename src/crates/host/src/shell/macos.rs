@@ -1,5 +1,6 @@
-//! macOS: the Dock icon follows the open windows, ⌘⌥H shows Settings, a Dock
-//! click reopens Settings, and Statistics draws under a transparent title bar.
+//! macOS: the Dock icon follows the open windows, ⌘⌥H shows Settings, the
+//! clipboard window's shortcut calls it up, a Dock click reopens Settings,
+//! and Statistics draws under a transparent title bar.
 use tauri::Manager;
 
 #[path = "macos_hotkey.rs"]
@@ -12,6 +13,13 @@ pub(crate) fn prepare(_app: &tauri::AppHandle) -> Result<(), String> {
 pub(crate) fn install(app: &tauri::AppHandle) {
     hotkey::install(app);
     windows_changed(app);
+}
+
+pub(crate) const CLIP_SHORTCUT: bool = true;
+
+/// Holds the clipboard window's shortcut, or lets it go.
+pub(crate) fn clip_shortcut(app: &tauri::AppHandle, shortcut: Option<crate::inspect::Shortcut>) {
+    hotkey::set_clip(app, shortcut);
 }
 
 /// Settings, Statistics or a sign-in window is about to show: the app joins
@@ -60,7 +68,19 @@ pub(crate) fn reopened(event: &tauri::RunEvent) -> bool {
     matches!(event, tauri::RunEvent::Reopen { .. })
 }
 
-pub(crate) fn statistics_chrome<'a>(
+/// The screen under the pointer. Tauri gives the pointer in pixels at the
+/// main screen's scale but finds a screen by points, so the pointer goes
+/// back to points first; else a window lands on the wrong screen whenever
+/// the main screen is Retina.
+pub(crate) fn pointer_monitor(app: &tauri::AppHandle) -> Option<tauri::Monitor> {
+    let pointer = app.cursor_position().ok()?;
+    let scale = app.primary_monitor().ok().flatten()?.scale_factor();
+    app.monitor_from_point(pointer.x / scale, pointer.y / scale)
+        .ok()
+        .flatten()
+}
+
+pub(crate) fn toolbar_chrome<'a>(
     builder: tauri::WebviewWindowBuilder<'a, tauri::Wry, tauri::AppHandle>,
 ) -> tauri::WebviewWindowBuilder<'a, tauri::Wry, tauri::AppHandle> {
     builder

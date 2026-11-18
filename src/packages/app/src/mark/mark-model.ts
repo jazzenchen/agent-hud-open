@@ -1,10 +1,19 @@
 // What the markup window draws on a picture, in the picture's own pixels,
 // and the marked picture it sends back.
 
-export type MarkTool = "box" | "pen" | "pin";
+export type MarkTool = "box" | "circle" | "pen" | "pin";
+
+/** A box, or the circle drawn inside one. */
+export type Frame = {
+  kind: "box" | "circle";
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+};
 
 export type Mark =
-  | { kind: "box"; x: number; y: number; w: number; h: number }
+  | Frame
   | { kind: "pen"; points: [number, number][] }
   | { kind: "pin"; x: number; y: number; text: string };
 
@@ -14,6 +23,10 @@ export const INK = "#FF3B30";
 /** A line as thick as a picture this wide needs to be seen. */
 export const strokeFor = (width: number) =>
   Math.max(3, Math.round(width / 320));
+
+/** The white edge round a pin, so it reads on red and dark pictures too. */
+export const RING = "#FFFFFF";
+export const ringFor = (radius: number) => Math.max(2, radius * 0.16);
 
 /** A pin's radius on a picture this wide. */
 export const pinRadius = (width: number) =>
@@ -28,13 +41,14 @@ export function pinNumbers(marks: Mark[]): Map<number, number> {
   return numbers;
 }
 
-/** A box from two corners, whichever way it was dragged. */
-export function boxFrom(
+/** A box or a circle from two corners, whichever way it was dragged. */
+export function frameFrom(
+  kind: Frame["kind"],
   from: [number, number],
   to: [number, number],
-): Extract<Mark, { kind: "box" }> {
+): Frame {
   return {
-    kind: "box",
+    kind,
     x: Math.min(from[0], to[0]),
     y: Math.min(from[1], to[1]),
     w: Math.abs(to[0] - from[0]),
@@ -71,6 +85,18 @@ export async function markedPicture(url: string, marks: Mark[]) {
   marks.forEach((mark, index) => {
     if (mark.kind === "box") {
       context.strokeRect(mark.x, mark.y, mark.w, mark.h);
+    } else if (mark.kind === "circle") {
+      context.beginPath();
+      context.ellipse(
+        mark.x + mark.w / 2,
+        mark.y + mark.h / 2,
+        mark.w / 2,
+        mark.h / 2,
+        0,
+        0,
+        Math.PI * 2,
+      );
+      context.stroke();
     } else if (mark.kind === "pen") {
       context.beginPath();
       mark.points.forEach(([x, y], at) =>
@@ -82,6 +108,11 @@ export async function markedPicture(url: string, marks: Mark[]) {
       context.arc(mark.x, mark.y, radius, 0, Math.PI * 2);
       context.fillStyle = INK;
       context.fill();
+      context.strokeStyle = RING;
+      context.lineWidth = ringFor(radius);
+      context.stroke();
+      context.strokeStyle = INK;
+      context.lineWidth = strokeFor(width);
       context.fillStyle = "#FFFFFF";
       context.font = `600 ${Math.round(radius * 1.15)}px -apple-system, sans-serif`;
       context.textAlign = "center";

@@ -102,8 +102,13 @@ fn apply(window: &WebviewWindow, preference: Preference, system_light: bool) -> 
 /// the app-wide native theme: other windows may be on differently styled screens.
 #[tauri::command]
 pub(crate) fn window_appearance(window: WebviewWindow, theme: String) -> Result<(), String> {
-    if !matches!(window.label(), "main" | "statistics") {
-        return Err("Only Settings and Statistics have an opaque background".into());
+    if !matches!(
+        window.label(),
+        "main" | "statistics" | crate::inspect::marking::LABEL
+    ) {
+        return Err(
+            "Only Settings, Statistics and the markup window have an opaque background".into(),
+        );
     }
     if !matches!(theme.as_str(), "light" | "dark") {
         return Err("A resolved light or dark appearance is required".into());
