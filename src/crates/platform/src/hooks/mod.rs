@@ -38,6 +38,10 @@ mod transport;
 mod transport;
 pub use agent_hud_agents::windows_hook_handler;
 use callback::wait_for_answer;
+
+/// Where a permission hook names the client that asks, among the agent's
+/// clients, for approving automatically (`switches::auto_approve_on`).
+const CLIENT_KEY: &str = "agentHudClient";
 pub(crate) use callback::{handed_event, settles_in_transcript};
 pub use entry::{entry, handle_with_io};
 pub use inbox::{record_delivery, record_event};

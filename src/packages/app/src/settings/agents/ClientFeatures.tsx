@@ -53,6 +53,8 @@ export function ClientFeatures({
   const answerEverywhere = settings.answerInHud !== false;
   const answerOff = settings.answerOff ?? [];
   const answer = !answerOff.includes(client.id);
+  const autoEverywhere = settings.autoApprove === true;
+  const autoOff = settings.autoApproveOff ?? [];
   const optIn = settings.optInApprovals ?? [];
   const messages = messagesKey(client);
   const why = (everywhereOn: boolean) =>
@@ -100,6 +102,36 @@ export function ClientFeatures({
           change={(value) =>
             set("answerOff", [
               ...answerOff.filter((id) => id !== client.id),
+              ...(value ? [] : [client.id]),
+            ])
+          }
+        />
+      )}
+      {can(client, "answer") && (
+        <ToggleRow
+          title={t("Approve automatically")}
+          checked={
+            on &&
+            answerEverywhere &&
+            answer &&
+            autoEverywhere &&
+            !autoOff.includes(client.id)
+          }
+          disabled={
+            pending || !on || !answerEverywhere || !answer || !autoEverywhere
+          }
+          reason={
+            !on
+              ? offHere
+              : !answerEverywhere || !answer
+                ? t("Needs Answer in the HUD.")
+                : !autoEverywhere
+                  ? everywhere
+                  : undefined
+          }
+          change={(value) =>
+            set("autoApproveOff", [
+              ...autoOff.filter((id) => id !== client.id),
               ...(value ? [] : [client.id]),
             ])
           }

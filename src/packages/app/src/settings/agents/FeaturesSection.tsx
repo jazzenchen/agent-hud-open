@@ -4,9 +4,10 @@
  * the agents; turning either on puts them in, turning both off takes them
  * out, so the hooks are never a switch of their own. */
 import type { NativeMethod, Snapshot } from "@agent-hud/protocol";
+import { Switch } from "@agent-hud/ui/components/switch";
 import type { Translate } from "@agent-hud/ui/format";
 import { Menu, SmallButton, ToggleRow, Unavailable } from "../SettingsControls";
-import { Notice, Row, Section } from "../SettingsPrimitives";
+import { Notice, Pill, Row, Section } from "../SettingsPrimitives";
 import { usePerform } from "./use-perform";
 
 export function FeaturesSection({
@@ -89,6 +90,29 @@ export function FeaturesSection({
             disabled={pending}
             change={(value) =>
               void perform(() => set("approvalWaitMinutes", Number(value)))
+            }
+          />
+        </Row>
+      )}
+      {answer && (
+        // Off by default; each agent can be left out on its own page.
+        <Row
+          title={
+            <>
+              {t("Approve automatically")}{" "}
+              <Pill tone="orange">{t("Caution")}</Pill>
+            </>
+          }
+          subtitle={t(
+            "Permission requests are allowed without asking. Questions and plans still wait for you.",
+          )}
+        >
+          <Switch
+            aria-label={t("Approve automatically")}
+            checked={settings.autoApprove === true}
+            disabled={pending}
+            onCheckedChange={(value) =>
+              void perform(() => set("autoApprove", value))
             }
           />
         </Row>

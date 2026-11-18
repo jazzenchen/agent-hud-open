@@ -1482,5 +1482,9 @@
   "Custom provider": "사용자 지정 제공자",
   "From this client's calls in the last 30 days.": "이 클라이언트의 최근 30일 호출 기준입니다.",
   "No calls from this client in the last 30 days.": "이 클라이언트는 최근 30일 동안 호출이 없습니다.",
-  "Merged": "병합됨"
+  "Merged": "병합됨",
+  "Approve automatically": "자동 승인",
+  "Permission requests are allowed without asking. Questions and plans still wait for you.": "권한 요청은 묻지 않고 허용됩니다. 질문과 계획은 계속 사용자를 기다립니다.",
+  "Needs Answer in the HUD.": "HUD에서 응답이 필요합니다.",
+  "Auto-approve": "자동 승인"
 }

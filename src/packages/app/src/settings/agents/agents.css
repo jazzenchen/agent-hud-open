@@ -79,6 +79,15 @@
   color: var(--muted-foreground);
   background: color-mix(in srgb, var(--muted) 70%, transparent);
 }
+/* Approving automatically, in the colors of its Caution tag. */
+.agents-row-tag.is-caution {
+  color: #ffb340;
+  background: #ff9f0a24;
+}
+[data-theme="light"] .agents-row-tag.is-caution {
+  color: #b25f00;
+  background: #ff9f0a26;
+}
 .agents-row-waiting {
   display: inline-flex;
   flex-shrink: 0;

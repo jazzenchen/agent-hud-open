@@ -177,7 +177,7 @@ impl AgentHudCore {
             .ok()
             .and_then(|bytes| serde_json::from_slice(&bytes).ok())
             .unwrap_or(Value::Null);
-        let mut settings = json!({"quotaDisplay":"consumed","codexHomes":[],"claudeHomes":[],"antigravityCliSettings":[],"appearance":"system","appearanceFollowsScreen":false,"language":"system","clientHooks":false,"optInApprovals":[],"readCopilotQuota":false,"approvalWaitMinutes":10,"launchAtLogin":true,"animations":true,"hudVisible":true,"showMenuBarIcon":true,"hudTools":false,"claudeAnswers":true,"agentMessages":false,"agentMessagesAsUser":false,"agentMessagesLimit":10,"claudeMessages":true,"deepseekMessages":true,"liveStatus":true,"answerInHud":true,"answerOff":[],"relayReading":[],"customPrices":{},"relayMultipliers":{},"localKinds":{},"guide":null});
+        let mut settings = json!({"quotaDisplay":"consumed","codexHomes":[],"claudeHomes":[],"antigravityCliSettings":[],"appearance":"system","appearanceFollowsScreen":false,"language":"system","clientHooks":false,"optInApprovals":[],"readCopilotQuota":false,"approvalWaitMinutes":10,"launchAtLogin":true,"animations":true,"hudVisible":true,"showMenuBarIcon":true,"hudTools":false,"claudeAnswers":true,"agentMessages":false,"agentMessagesAsUser":false,"agentMessagesLimit":10,"claudeMessages":true,"deepseekMessages":true,"liveStatus":true,"answerInHud":true,"answerOff":[],"autoApprove":false,"autoApproveOff":[],"relayReading":[],"customPrices":{},"relayMultipliers":{},"localKinds":{},"guide":null});
         if let Some(values) = stored["settings"].as_object() {
             for (key, value) in values {
                 if settings.get(key).is_some() {
@@ -215,13 +215,7 @@ impl AgentHudCore {
             .and_then(|_| data_version::run_at_launch(recorded.as_deref(), &logs))
             .or((lost > 0).then_some(data_version::Run::Again));
         let requests = requests::Requests::default();
-        requests.set_hold_ms(
-            settings["approvalWaitMinutes"]
-                .as_u64()
-                .filter(|v| [1, 3, 5, 10, 30, 60].contains(v))
-                .unwrap_or(10)
-                * 60_000,
-        );
+        requests.apply_settings(&settings);
         Self {
             requests,
             hook_events: hook_events::HookEvidence::default(),

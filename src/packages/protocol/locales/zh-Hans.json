@@ -1482,5 +1482,9 @@
   "Custom provider": "自定义服务商",
   "From this client's calls in the last 30 days.": "按这个客户端近 30 天的调用。",
   "No calls from this client in the last 30 days.": "这个客户端近 30 天没有调用。",
-  "Merged": "已合并"
+  "Merged": "已合并",
+  "Approve automatically": "自动批准",
+  "Permission requests are allowed without asking. Questions and plans still wait for you.": "权限请求不再询问，直接允许。提问和计划仍然等你处理。",
+  "Needs Answer in the HUD.": "需要先打开「在 HUD 上回答」。",
+  "Auto-approve": "自动批准"
 }

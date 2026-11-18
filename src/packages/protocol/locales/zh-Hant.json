@@ -1482,5 +1482,9 @@
   "Custom provider": "自訂服務商",
   "From this client's calls in the last 30 days.": "依這個用戶端近 30 天的呼叫。",
   "No calls from this client in the last 30 days.": "這個用戶端近 30 天沒有呼叫。",
-  "Merged": "已合併"
+  "Merged": "已合併",
+  "Approve automatically": "自動核准",
+  "Permission requests are allowed without asking. Questions and plans still wait for you.": "權限請求不再詢問，直接允許。提問和計畫仍然等你處理。",
+  "Needs Answer in the HUD.": "需要先開啟「在 HUD 上回答」。",
+  "Auto-approve": "自動核准"
 }

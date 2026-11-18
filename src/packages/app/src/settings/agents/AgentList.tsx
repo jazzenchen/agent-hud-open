@@ -10,7 +10,7 @@ import type { MCPClientsStatus } from "../agent-plugins/services";
 import { AgentLogo } from "../AgentLogo";
 import type { Translate } from "@agent-hud/ui/format";
 import { Collapsible, Section } from "../SettingsPrimitives";
-import { featureName, features, uses } from "./features";
+import { autoApproves, featureName, features, uses } from "./features";
 import { hookStep, mergedFrom } from "./steps";
 
 /** The agents: the ones found here, each with the features it uses and a
@@ -58,11 +58,18 @@ export function AgentList({
           {!client.enabled ? (
             <span className="agents-row-note">{t("Off")}</span>
           ) : (
-            used.map((feature) => (
-              <span key={feature} className="agents-row-tag">
-                {featureName(feature, t)}
-              </span>
-            ))
+            <>
+              {used.map((feature) => (
+                <span key={feature} className="agents-row-tag">
+                  {featureName(feature, t)}
+                </span>
+              ))}
+              {autoApproves(client, snapshot, preferences) && (
+                <span className="agents-row-tag is-caution">
+                  {t("Auto-approve")}
+                </span>
+              )}
+            </>
           )}
         </span>
         {client.enabled && step?.waiting && (

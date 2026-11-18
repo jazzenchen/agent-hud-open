@@ -15,6 +15,8 @@ The public Swift implementation (`Sources/AgentHUDCore/Hooks` in `agent-hud-nati
 
 HUD text fields acquire temporary native keyboard focus only on an explicit text-control click, and release it on withdrawal, blur or unmount. On macOS the HUD is a nonactivating `NSPanel` (see `docs/tao-panel-patch.md`): the click makes it key without activating this app, so the frontmost application stays active, and releasing the lease hands keys back to that application. Other platforms focus a normal Tauri window. This keyboard handoff has not been verified in a live GUI.
 
+Approving automatically (`autoApprove`, off by default; `autoApproveOff` lists the clients left out on their own page) answers a permission request with the HUD's Allow as it arrives, with no card (`src/crates/core/src/requests/auto.rs`). It applies only where requests are answered in the HUD (`answerInHud`, `answerOff`); questions and plans still wait, and a call the client's own rules settle, or one Codex's own reviewer takes, never reaches it. A permission hook names the client that asks (`agentHudClient`, from its process ancestry) while the setting is on; a native card names it as `client` (Codex Desktop's). A request whose client is not known is approved only while no client of its agent is left out.
+
 The UI's acknowledgment means the local request owner accepted the decision. Native response receipts distinguish confirmed, failed, and uncertain delivery. A missing native acknowledgment never causes an automatic resend. Receipts are bounded and ephemeral; request bodies are not stored as history.
 
 ## Current adapters

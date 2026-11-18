@@ -53,7 +53,7 @@ fn scopes(value: &Value) -> Option<Vec<String>> {
     Some(values.into_iter().map(str::to_owned).collect())
 }
 fn view(thread: &str, summary: &str, tool: &str, cwd: &Value, kind: &str) -> Value {
-    json!({"source":AGENT.id,"vendor":AGENT.name,"sessionId":thread,"title":summary,"summary":summary,"toolName":tool,"kind":kind,"input":"","detail":null,"cwd":cwd,"createdAt":chrono::Utc::now().to_rfc3339(),"allowsAlways":false,"questions":[],"answersQuestion":kind=="question","answersPlan":false,"plan":null,"suggestions":[]})
+    json!({"source":AGENT.id,"client":agent_hud_agents::split::CODEX_DESKTOP,"vendor":AGENT.name,"sessionId":thread,"title":summary,"summary":summary,"toolName":tool,"kind":kind,"input":"","detail":null,"cwd":cwd,"createdAt":chrono::Utc::now().to_rfc3339(),"allowsAlways":false,"questions":[],"answersQuestion":kind=="question","answersPlan":false,"plan":null,"suggestions":[]})
 }
 
 pub(super) fn parse(state: &Value, thread: &str, owner: &str) -> Result<Vec<Pending>, IpcError> {

@@ -48,6 +48,21 @@ export function can(client: ClientRow, feature: Feature) {
   return (client.features ?? []).includes(feature);
 }
 
+/** Whether `client`'s permission requests are allowed at once, with no
+ * card: approving automatically is on, its answers are in the HUD, and it
+ * was not left out on its own page. */
+export function autoApproves(
+  client: ClientRow,
+  snapshot: Snapshot,
+  preferences: Record<string, SourcePreferences>,
+) {
+  return (
+    snapshot.settings.autoApprove === true &&
+    uses(client, "answer", snapshot, preferences) &&
+    !(snapshot.settings.autoApproveOff ?? []).includes(client.id)
+  );
+}
+
 /** Whether `client` uses `feature` now; HUD tools once they are added to
  * it, when `added` has been read. */
 export function uses(

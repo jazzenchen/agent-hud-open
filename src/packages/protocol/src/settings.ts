@@ -90,6 +90,11 @@ export interface AppSettings {
   /** Clients (`ClientRow.id`) whose requests stay with them while answering
    * in the HUD is on. */
   answerOff?: string[];
+  /** Permission requests allowed at once, with no card, while answering in
+   * the HUD is on; questions and plans still wait. Default off. */
+  autoApprove?: boolean;
+  /** Clients (`ClientRow.id`) not approved automatically while it is on. */
+  autoApproveOff?: string[];
   /** Display quota percentages as used or available; readings remain usedPercent. */
   quotaDisplay?: "consumed" | "remaining";
   /** Additional Codex CLI homes whose signed-in accounts should be read. */

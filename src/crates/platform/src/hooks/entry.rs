@@ -142,6 +142,13 @@ fn handle_payload(arguments: &[String], data: &Path, input: &[u8], output: &mut 
         {
             return 0;
         }
+        // Approving automatically can be off for one client of an agent: the
+        // app is told which one asks, when this hook can tell.
+        if super::switches::auto_approve_on(data) {
+            if let Some(client) = super::origins::caller_client(source, home.as_deref(), &env) {
+                payload[super::CLIENT_KEY] = json!(client);
+            }
+        }
         if let Ok(Some(response)) = super::transport::send(data, source, flag, &payload) {
             let _ = serde_json::to_writer(&mut *output, &response);
             let _ = output.write_all(b"\n");

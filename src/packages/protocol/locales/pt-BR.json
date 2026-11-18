@@ -1546,5 +1546,9 @@
   "Custom provider": "Provedor personalizado",
   "From this client's calls in the last 30 days.": "Com base nas chamadas deste cliente nos últimos 30 dias.",
   "No calls from this client in the last 30 days.": "Nenhuma chamada deste cliente nos últimos 30 dias.",
-  "Merged": "Mesclada"
+  "Merged": "Mesclada",
+  "Approve automatically": "Aprovar automaticamente",
+  "Permission requests are allowed without asking. Questions and plans still wait for you.": "Pedidos de permissão são permitidos sem perguntar. Perguntas e planos continuam esperando por você.",
+  "Needs Answer in the HUD.": "Requer Responder no HUD.",
+  "Auto-approve": "Aprovação automática"
 }

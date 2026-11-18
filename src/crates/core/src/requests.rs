@@ -9,8 +9,11 @@ use std::{
 };
 
 mod answer;
+mod auto;
 mod deliveries;
 mod views;
+
+pub use auto::AutoApprove;
 
 type Wake = Arc<dyn Fn() + Send + Sync>;
 
@@ -31,6 +34,8 @@ struct State {
     reviewers: HashMap<(String, String, String), Reviewer>,
     deliveries: VecDeque<Value>,
     native_waiting: HashMap<String, HashSet<String>>,
+    /// Which clients' permission requests are allowed at once.
+    auto: AutoApprove,
 }
 struct Reviewer {
     value: Option<String>,
@@ -71,6 +76,7 @@ impl Default for Requests {
                 reviewers: HashMap::new(),
                 deliveries: VecDeque::new(),
                 native_waiting: HashMap::new(),
+                auto: AutoApprove::default(),
             }),
             wake: Mutex::new(None),
         }))
@@ -124,6 +130,22 @@ impl Requests {
             let mut state = self.0.state.lock().unwrap_or_else(PoisonError::into_inner);
             if state.dismissed.contains(&id) || state.pending.iter().any(|p| p.id == id) {
                 return None;
+            }
+            // A permission its client approves automatically: allowed at
+            // once, with no card, and never shown again.
+            if view["kind"].as_str().unwrap_or("permission") == "permission"
+                && state.auto.approves(
+                    view["source"].as_str().unwrap_or_default(),
+                    view["client"].as_str(),
+                )
+            {
+                state.dismissed.insert(id.clone());
+                let _ = sender.send(Some(auto::allow()));
+                return Some(Ticket {
+                    id,
+                    response,
+                    deadline_ms: now_ms,
+                });
             }
             let deadline_ms = now_ms.saturating_add(state.hold_ms as i64);
             view["id"] = Value::String(id.clone());

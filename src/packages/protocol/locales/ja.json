@@ -1482,5 +1482,9 @@
   "Custom provider": "カスタムプロバイダー",
   "From this client's calls in the last 30 days.": "このクライアントの直近 30 日間の呼び出しから。",
   "No calls from this client in the last 30 days.": "このクライアントは直近 30 日間に呼び出しがありません。",
-  "Merged": "統合済み"
+  "Merged": "統合済み",
+  "Approve automatically": "自動で承認",
+  "Permission requests are allowed without asking. Questions and plans still wait for you.": "権限リクエストは確認なしで許可されます。質問とプランは引き続きあなたを待ちます。",
+  "Needs Answer in the HUD.": "「HUD で回答」が必要です。",
+  "Auto-approve": "自動承認"
 }

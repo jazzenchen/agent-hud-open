@@ -97,8 +97,7 @@ impl crate::AgentHudCore {
             self.settings = previous;
             return Err(error);
         }
-        self.requests
-            .set_hold_ms(self.settings["approvalWaitMinutes"].as_u64().unwrap_or(10) * 60_000);
+        self.requests.apply_settings(&self.settings);
         Ok(true)
     }
 
@@ -110,8 +109,11 @@ impl crate::AgentHudCore {
             self.settings = previous;
             return Err(error);
         }
-        if key == "approvalWaitMinutes" {
-            self.requests.set_hold_ms(value.as_u64().unwrap() * 60_000);
+        if matches!(
+            key,
+            "approvalWaitMinutes" | "autoApprove" | "autoApproveOff" | "answerInHud" | "answerOff"
+        ) {
+            self.requests.apply_settings(&self.settings);
         }
         self.apply_user_prices();
         Ok(())
@@ -157,6 +159,7 @@ impl crate::AgentHudCore {
             | "readCopilotQuota"
             | "liveStatus"
             | "answerInHud"
+            | "autoApprove"
             | "clientHooks"
             | "launchAtLogin"
             | "hudVisible"
@@ -170,8 +173,9 @@ impl crate::AgentHudCore {
                     .as_u64()
                     .is_some_and(|v| [1, 3, 5, 10, 30, 60].contains(&v)) => {}
             // Clients whose requests stay with them while answering in the HUD
-            // is on, each once.
-            "answerOff"
+            // is on, and those not approved automatically while that is on,
+            // each once.
+            "answerOff" | "autoApproveOff"
                 if value.as_array().is_some_and(|ids| {
                     ids.iter().enumerate().all(|(index, id)| {
                         id.as_str()
@@ -255,13 +259,7 @@ impl crate::AgentHudCore {
                 }
             }
         }
-        self.requests.set_hold_ms(
-            self.settings["approvalWaitMinutes"]
-                .as_u64()
-                .filter(|v| [1, 3, 5, 10, 30, 60].contains(v))
-                .unwrap_or(10)
-                * 60_000,
-        );
+        self.requests.apply_settings(&self.settings);
         self.apply_user_prices();
         let enabled = serde_json::from_value(stored["providers"].clone())
             .map_err(|e| format!("Provider preferences could not be read: {e}"))?;

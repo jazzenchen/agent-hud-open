@@ -59,6 +59,12 @@ pub(super) fn answers_off(
     super::origins::caller_client(source, home, env).is_some_and(|id| off.contains(&id))
 }
 
+/// Whether approving automatically is on (Settings → Agents): the app then
+/// needs to know which client a permission request comes from.
+pub(super) fn auto_approve_on(data: &Path) -> bool {
+    stored(data)["settings"]["autoApprove"] == true
+}
+
 /// What Settings saved; null when the file is missing or unreadable, where
 /// every client is on and answers in the HUD.
 fn stored(data: &Path) -> Value {
