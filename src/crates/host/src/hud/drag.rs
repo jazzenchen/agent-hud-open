@@ -13,7 +13,6 @@ pub(super) struct DragState {
     pub(super) config: HudConfig,
     pub(super) display: Display,
     pub(super) edge: Edge,
-    pub(super) mode: Mode,
     pub(super) runs: DragRuns,
     pub(super) grab_fraction: f64,
     pub(super) preview: Option<HudPlacement>,
@@ -133,8 +132,8 @@ pub async fn hud_drag_start(
             config,
             display,
             edge,
-            // The notch HUD leaves the notch as a Simple dock, and a dock stays one.
-            mode: Mode::Simple,
+            // Where it lands decides the mode: the notch HUD leaves the notch as a
+            // Simple dock, and a Simple dock dropped at the notch becomes the notch HUD.
             runs,
             grab_fraction: (grip / run).clamp(0.0, 1.0),
             preview: None,

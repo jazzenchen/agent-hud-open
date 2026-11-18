@@ -96,7 +96,7 @@ pub struct DragPointer {
     pub(super) y: f64,
 }
 
-/// Measured runs of the mode used after pickup (Logos when the original mode is Notch).
+/// Measured runs of the Simple dock a drag carries away from the notch.
 /// Simple's horizontal row and vertical stack have different lengths when labels are shown.
 #[derive(Clone, Copy, Deserialize)]
 #[serde(deny_unknown_fields)]
