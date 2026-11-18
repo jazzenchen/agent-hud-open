@@ -2,12 +2,14 @@
 //! NSPanel subclass for HUDs while ordinary Tauri windows remain NSWindow.
 use super::{LogicalRect, Point, PointerKeys, Rect, Shared};
 use objc2::MainThreadMarker;
+use objc2::{runtime::NSObjectProtocol, ClassType};
 use objc2_app_kit::{
-    NSCursor, NSScreen, NSStatusWindowLevel, NSWindow, NSWindowAnimationBehavior,
-    NSWindowCollectionBehavior,
+    NSAutoresizingMaskOptions, NSCursor, NSScreen, NSStatusWindowLevel, NSWindow,
+    NSWindowAnimationBehavior, NSWindowCollectionBehavior,
 };
 use objc2_core_foundation::CFUUID;
-use objc2_foundation::NSPoint;
+use objc2_foundation::{NSPoint, NSRect, NSSize};
+use objc2_web_kit::WKWebView;
 use std::ptr::NonNull;
 use std::{
     sync::{
@@ -58,20 +60,18 @@ pub(super) fn panel_builder<'a>(
 pub(super) fn place(
     window: &tauri::WebviewWindow,
     frame: Rect,
+    canvas: Rect,
     scale: f64,
     mode: super::types::Mode,
 ) -> Result<LogicalRect, String> {
     clear_under_page(window);
-    configure(
-        window,
-        mode,
-        LogicalRect {
-            x: f64::from(frame.x) / scale,
-            y: f64::from(frame.y) / scale,
-            width: f64::from(frame.width) / scale,
-            height: f64::from(frame.height) / scale,
-        },
-    )
+    let logical = |rect: Rect| LogicalRect {
+        x: f64::from(rect.x) / scale,
+        y: f64::from(rect.y) / scale,
+        width: f64::from(rect.width) / scale,
+        height: f64::from(rect.height) / scale,
+    };
+    configure(window, mode, logical(frame), logical(canvas))
 }
 
 /// The panel is ordered without Tao's show(), so the configuration says
@@ -208,6 +208,7 @@ fn configure(
     window: &tauri::WebviewWindow,
     mode: super::types::Mode,
     requested: LogicalRect,
+    canvas: LogicalRect,
 ) -> Result<LogicalRect, String> {
     let retained_window = window.clone();
     on_main(window.app_handle(), move |marker| {
@@ -263,13 +264,47 @@ fn configure(
             native.setFrame_display(target, false);
         }
         let content = native.contentRectForFrameRect(native.frame());
-        Ok(LogicalRect {
+        let content = LogicalRect {
             x: content.origin.x,
             y: primary_top - content.origin.y - content.size.height,
             width: content.size.width,
             height: content.size.height,
-        })
+        };
+        hold_page(native, canvas, content);
+        Ok(content)
     })
+}
+
+/// Sizes the web view to the whole canvas and holds it where the canvas is on
+/// the screen, so the window only shows part of it. Set in the same main-thread
+/// pass as the window's frame, a window that grows or shrinks away from its
+/// edge (a right or bottom HUD picked up, dropped, opened or closed) only
+/// uncovers or covers more of the page. Resizing the web view instead made
+/// WebKit show its old picture against the window's new corner for the frame
+/// or two it took to lay the page out again: the dock flashed out of sight,
+/// or across the screen.
+fn hold_page(native: &NSWindow, canvas: LogicalRect, content: LogicalRect) {
+    let Some(parent) = native.contentView() else {
+        return;
+    };
+    let below_top = canvas.y - content.y;
+    let frame = NSRect::new(
+        NSPoint::new(
+            canvas.x - content.x,
+            if parent.isFlipped() {
+                below_top
+            } else {
+                content.height - below_top - canvas.height
+            },
+        ),
+        NSSize::new(canvas.width, canvas.height),
+    );
+    for view in parent.subviews().iter() {
+        if view.isKindOfClass(WKWebView::class()) {
+            view.setAutoresizingMask(NSAutoresizingMaskOptions::empty());
+            view.setFrame(frame);
+        }
+    }
 }
 
 /// WebKit fills the part of a view it has not painted yet with the "under
@@ -278,7 +313,7 @@ fn configure(
 /// is clear, like the rest of its transparent window.
 fn clear_under_page(window: &tauri::WebviewWindow) {
     use objc2_app_kit::NSColor;
-    use objc2_web_kit::WKWebView;
+
     let _ = window.with_webview(|platform| {
         let pointer = platform.inner().cast::<WKWebView>();
         if pointer.is_null() {

@@ -111,11 +111,12 @@ fn on_gtk<T: Send + 'static>(
 pub(super) fn place(
     window: &tauri::WebviewWindow,
     frame: Rect,
+    canvas: Rect,
     scale: f64,
     mode: super::types::Mode,
 ) -> Result<LogicalRect, String> {
     if !layer_shell() {
-        return super::generic::place(window, frame, scale, mode);
+        return super::generic::place(window, frame, canvas, scale, mode);
     }
     let requested = LogicalRect {
         x: f64::from(frame.x) / scale,

@@ -20,6 +20,7 @@ pub(super) fn panel_builder<'a>(
 pub(super) fn place(
     window: &tauri::WebviewWindow,
     frame: Rect,
+    _canvas: Rect,
     scale: f64,
     _mode: super::types::Mode,
 ) -> Result<LogicalRect, String> {

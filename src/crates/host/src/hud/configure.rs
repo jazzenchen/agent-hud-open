@@ -163,7 +163,7 @@ pub(super) fn configure(
     if !keep_drag {
         state.drag = None;
     }
-    let placed = host::place(&window, frame, scale, config.mode)?;
+    let placed = host::place(&window, frame, canvas_frame, scale, config.mode)?;
     // The page keeps laying out on the whole canvas, wherever the window ends.
     let canvas = LogicalRect {
         x: placed.x - offset.0,
