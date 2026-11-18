@@ -50,6 +50,19 @@ impl Host for AccountContext {
             Err(error) => answer(error),
         }
     }
+    fn read_tail(&self, path: &Path, limit: u64) -> Answer<Vec<u8>> {
+        use std::io::{Seek, SeekFrom};
+        let mut bytes = Vec::new();
+        let read = fs::File::open(path).and_then(|mut file| {
+            let len = file.metadata()?.len();
+            file.seek(SeekFrom::Start(len.saturating_sub(limit)))?;
+            file.take(limit).read_to_end(&mut bytes)
+        });
+        match read {
+            Ok(_) => Answer::Found(bytes),
+            Err(error) => answer(error),
+        }
+    }
     fn canonical(&self, path: &Path) -> Option<PathBuf> {
         fs::canonicalize(path).ok()
     }

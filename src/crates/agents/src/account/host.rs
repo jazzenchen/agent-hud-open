@@ -213,6 +213,17 @@ pub trait Host {
     /// A file's first `limit + 1` bytes, so the caller can tell a file over
     /// its limit from one that fits.
     fn read_file(&self, path: &Path, limit: u64) -> Answer<Vec<u8>>;
+    /// A file's last `limit` bytes, all of a smaller one. The default reads
+    /// the file whole, up to 64 MiB; a host that can seek reads only the end.
+    fn read_tail(&self, path: &Path, limit: u64) -> Answer<Vec<u8>> {
+        match self.read_file(path, 64 * 1024 * 1024) {
+            Answer::Found(bytes) => {
+                let start = bytes.len().saturating_sub(limit as usize);
+                Answer::Found(bytes[start..].to_vec())
+            }
+            other => other,
+        }
+    }
     /// The path with links resolved, when it exists.
     fn canonical(&self, path: &Path) -> Option<PathBuf>;
     /// A path's size, time and kind, without following a final link.

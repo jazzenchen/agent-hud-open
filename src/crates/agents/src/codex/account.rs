@@ -1,10 +1,13 @@
 //! Codex's quota: its CLI's own `app-server` (account/rateLimits/read and
-//! account/read), and Pi's ChatGPT sign-in, which spends the same plan. The
+//! account/read), the windows Codex's own sessions recorded (the desktop
+//! app's account, which its engine signs in apart from `auth.json`), and Pi's
+//! ChatGPT sign-in, which spends the same plan. The
 //! same app-server also says which of Agent HUD's hooks wait for the user to
 //! allow them (`hook_review`).
 use super::hook_review;
 use super::limits::parse;
 use super::pi_usage::{read_pi, PI_ROUTE};
+use super::session_limits::with_sessions;
 use crate::account::{
     append_notice, client_home_key, merge, variable, EngineStart, Host, Provider, Reading,
     StatusPage, Unread,
@@ -35,7 +38,14 @@ pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
     let executable = host.executable("codex");
     let native = match executable.as_deref() {
         Some(executable) => read_native(host, executable),
-        None => Err(Unread::Failed(tr!("Install and sign in to read quota"))),
+        // No engine, as with the desktop app moved away: its sessions' record
+        // is no sign-in to ask for, and without it Codex is to install.
+        None => with_sessions(
+            host,
+            &default_home(host),
+            Err(Unread::SignedOut(String::new())),
+        )
+        .map_err(|_| Unread::Failed(tr!("Install and sign in to read quota"))),
     };
     let pi = read_pi(host);
     match (native, pi) {
@@ -71,8 +81,13 @@ pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
     }
 }
 
+/// `CODEX_HOME`, else `~/.codex`.
+fn default_home(host: &dyn Host) -> std::path::PathBuf {
+    variable(host, "CODEX_HOME").unwrap_or_else(|| host.home().join(".codex"))
+}
+
 fn read_native(host: &dyn Host, executable: &Path) -> Result<Reading, Unread> {
-    let home = variable(host, "CODEX_HOME").unwrap_or_else(|| host.home().join(".codex"));
+    let home = default_home(host);
     let mut seen = HashSet::new();
     let homes: Vec<_> = std::iter::once(home)
         .chain(host.account_homes("codex"))
@@ -91,7 +106,7 @@ fn read_native(host: &dyn Host, executable: &Path) -> Result<Reading, Unread> {
         } else {
             String::new()
         };
-        let notice = match read_home(host, executable, home) {
+        let notice = match with_sessions(host, home, read_home(host, executable, home)) {
             Ok(mut account) => {
                 succeeded = true;
                 let notice = account.notice.take();

@@ -9,6 +9,7 @@ mod pi_usage;
 pub mod plans;
 pub mod process;
 pub mod providers;
+mod session_limits;
 pub mod transcript;
 mod usage;
 
