@@ -102,6 +102,16 @@
   padding-left: 24px;
   border-top: 0;
 }
+/* Indented names keep the features in one column with the rest. */
+.agents-row-vendor .agents-row-name {
+  flex-basis: 156px;
+}
+/* Back to the list: the arrow on the line of its word. */
+.agents-back .settings-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
 
 /* On a vendor's page, each of its agents under its own name. */
 .agents-group-agent + .agents-group-agent {

@@ -10,7 +10,9 @@ pub fn client_features() -> HashMap<String, Vec<String>> {
     let mut features = HashMap::new();
     for agent in ALL {
         let mut can = Vec::new();
-        if agent.sessions {
+        // Live status comes from its sessions, or from its hooks alone (TRAE,
+        // whose conversations are sealed).
+        if agent.sessions || agent.hooks.is_some() {
             can.push("live");
         }
         let hooks_ask = agent.hooks.is_some_and(|hooks| hooks.permission.is_some());
@@ -52,5 +54,6 @@ mod tests {
         assert_eq!(features["codex-desktop"], features["codex"]);
         assert!(features["codex"].contains(&"answer".to_owned()));
         assert_eq!(features["grok-cli"], ["live"]);
+        assert!(features["trae"].contains(&"live".to_owned()));
     }
 }

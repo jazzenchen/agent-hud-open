@@ -70,7 +70,7 @@ export function AgentDetail({
 
   return (
     <Page>
-      <div>
+      <div className="agents-back">
         <LinkButton onClick={back}>
           <ChevronLeft size={13} />
           {t("Agents")}
