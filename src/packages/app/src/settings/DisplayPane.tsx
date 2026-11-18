@@ -77,6 +77,16 @@ export function DisplayPane({
         />
         {!config.hidden && (
           <>
+            {snapshot?.connection.platform === "macos" && (
+              <ToggleRow
+                title={t("Hide in full screen")}
+                subtitle={t(
+                  "While an app or video is full screen on this screen. The HUD comes back when it exits.",
+                )}
+                checked={config.hidesInFullScreen}
+                change={(value) => update({ hidesInFullScreen: value })}
+              />
+            )}
             <ToggleRow
               title={t("Messages")}
               subtitle={t(

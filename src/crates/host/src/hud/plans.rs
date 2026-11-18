@@ -201,11 +201,20 @@ impl Planner {
         now_ms: i64,
     ) {
         let visible = snapshot.is_none_or(|snapshot| snapshot["settings"]["hudVisible"] != false);
+        // Read only for a screen that asks: it is the system's own list.
+        let mut full_screen = None;
         for display in &self.displays {
-            // A screen's own Hide switch: it has no HUD, whatever the others show.
+            // A screen's own Hide switch: it has no HUD, whatever the others
+            // show. With Hide in full screen it has none while an app or video
+            // is full screen on it, and its HUD comes back where it was after
+            // (Open #117).
             let monitor = &display.info;
-            let hidden =
-                Screen::new(view, &monitor.screen_id, monitor.notch.is_some()).flag("hidden");
+            let screen = Screen::new(view, &monitor.screen_id, monitor.notch.is_some());
+            let hidden = screen.flag("hidden")
+                || (screen.flag("hidesInFullScreen")
+                    && full_screen
+                        .get_or_insert_with(crate::screens::full_screen)
+                        .holds(&monitor.screen_id));
             let config = plan(display, view, snapshot, visible && !hidden, now_ms);
             let id = display.info.screen_id.clone();
             let signature = (
