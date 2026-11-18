@@ -84,6 +84,7 @@ impl Runtime {
             .observe_local_clients()?;
         core.set_platform(platform.name());
         core.set_provider_discovery(platform.discover_providers());
+        core.set_client_discovery(platform.discover_clients());
         core.set_claude_desktop_bases(platform.claude_desktop_bases());
         core.set_claude_pids(platform.claude_pids());
         core.set_claude_projects_supported(platform.claude_projects_supported());

@@ -50,6 +50,17 @@ pub fn entry(arguments: &[String]) -> Option<i32> {
         &mut std::io::stdout().lock(),
     ))
 }
+/// What a hook answers when Agent HUD has nothing to add: the completion
+/// reply its client expects, else an empty object.
+fn default_reply(flag: &str, source: &str) -> Value {
+    (flag == "--completion-hook")
+        .then(|| agent_hud_agents::hooks::hooks_of(source).ok())
+        .flatten()
+        .and_then(|(_, hooks)| hooks.completion.as_ref())
+        .and_then(|completion| completion.reply)
+        .and_then(|text| serde_json::from_str::<Value>(text).ok())
+        .unwrap_or_else(|| json!({}))
+}
 /// Same early entry with injected I/O/data directory for isolated integrations.
 /// It never creates a Runtime and never installs a hook.
 pub fn handle_with_io(
@@ -102,6 +113,15 @@ fn handle_payload(arguments: &[String], data: &Path, input: &[u8], output: &mut 
     // (TRAE or Devin running Claude Code's) is no session of this client: no
     // opinion, nothing recorded.
     if super::origins::imported_by(source, home.as_deref(), &env, &payload).is_some() {
+        return 0;
+    }
+    // A client the person turned off in Settings asks and reports nothing
+    // through Agent HUD; its client hears what it would with Agent HUD gone.
+    if super::switches::turned_off(data, source, home.as_deref(), &env) {
+        if flag != "--permission-hook" && flag != "--rewake-hook" {
+            let _ = serde_json::to_writer(&mut *output, &default_reply(flag, source));
+            let _ = output.write_all(b"\n");
+        }
         return 0;
     }
     // A rewake hook waits for a message for its session; it reports nothing.
@@ -226,15 +246,7 @@ fn handle_payload(arguments: &[String], data: &Path, input: &[u8], output: &mut 
             }
         }
     }
-    let response = claimed.unwrap_or_else(|| {
-        (flag == "--completion-hook")
-            .then(|| agent_hud_agents::hooks::hooks_of(source).ok())
-            .flatten()
-            .and_then(|(_, hooks)| hooks.completion.as_ref())
-            .and_then(|completion| completion.reply)
-            .and_then(|text| serde_json::from_str::<Value>(text).ok())
-            .unwrap_or_else(|| json!({}))
-    });
+    let response = claimed.unwrap_or_else(|| default_reply(flag, source));
     let _ = serde_json::to_writer(&mut *output, &response);
     let _ = output.write_all(b"\n");
     0

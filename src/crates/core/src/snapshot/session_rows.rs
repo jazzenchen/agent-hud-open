@@ -70,16 +70,11 @@ impl crate::AgentHudCore {
             sessions.extend(
                 extras
                     .into_iter()
-                    .filter(|value| {
-                        self.enabled
-                            .get(value["source"].as_str().unwrap_or(""))
-                            .copied()
-                            .unwrap_or(true)
-                    })
+                    .filter(|value| self.agent_on(value["source"].as_str().unwrap_or("")))
                     .map(|row| self.protect_claude_project_extra(row)),
             );
         }
-        if self.enabled.get("claude").copied().unwrap_or(true) {
+        if self.client_on(agent_hud_agents::split::CLAUDE_DESKTOP) {
             sessions.extend(self.claude_project_rows().into_iter().filter(|row| {
                 row["lastMessageAt"]
                     .as_str()

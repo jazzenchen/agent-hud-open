@@ -59,6 +59,26 @@ fn with_caller<T>(
     };
     rule(&caller)
 }
+/// The id of the agent a hook names.
+pub(super) fn agent_id(source: &str) -> Option<&'static str> {
+    agent_of(source).map(|agent| agent.id)
+}
+/// The client a hook's caller is (`agents::split::of_caller`), when its
+/// agent's rule can tell the surface it runs in.
+pub(super) fn caller_client(
+    source: &str,
+    home: Option<&Path>,
+    env: &HashMap<String, String>,
+) -> Option<&'static str> {
+    let agent = agent_of(source)?;
+    let rule = agent.hooks?.origin?;
+    let (category, app) = with_caller(agent, home, env, |caller| {
+        let origin = rule(caller, "");
+        let app = origin.app.or_else(|| host_app(env, caller.ancestors));
+        (origin.category, app)
+    });
+    agent_hud_agents::split::of_caller(agent.id, category, app)
+}
 pub(super) fn origin(
     source: &str,
     session: &str,

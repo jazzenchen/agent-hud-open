@@ -49,23 +49,21 @@ impl AgentHudCore {
             .discovery
             .iter()
             .filter(|p| p.installed || p.configured || p.usage)
-            .filter(|p| self.enabled.get(&p.id).copied().unwrap_or(true))
+            .filter(|p| self.agent_on(&p.id))
             .map(|p| p.id.clone())
             .collect::<BTreeSet<_>>();
         available.extend(
             projection
                 .observed_providers
                 .iter()
-                .filter(|id| self.enabled.get(*id).copied().unwrap_or(true))
+                .filter(|id| self.agent_on(id))
                 .cloned(),
         );
         available.extend(
             self.accounts
                 .providers
                 .iter()
-                .filter(|(id, state)| {
-                    state["status"] == "ready" && self.enabled.get(*id).copied().unwrap_or(true)
-                })
+                .filter(|(id, state)| state["status"] == "ready" && self.agent_on(id))
                 .map(|(id, _)| id.clone()),
         );
         let pending = self
@@ -74,9 +72,7 @@ impl AgentHudCore {
             .iter()
             .filter_map(|path| {
                 let file = self.reads.listing.files.get(path)?;
-                if file.source == "codex-index"
-                    || !self.enabled.get(file.source).copied().unwrap_or(true)
-                {
+                if file.source == "codex-index" || !self.agent_on(file.source) {
                     return None;
                 }
                 Some((file.source.to_owned(), self.pending_meter_bound(path, file)))

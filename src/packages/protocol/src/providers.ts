@@ -54,6 +54,20 @@ export interface Provider {
     evidence: string[];
   };
 }
+/** One client as Settings lists it. A command line and a desktop app are
+ * separate clients, so one agent's data (`agent`, a provider's id) can hold
+ * several, each with its own switches; the agent's own id names the one left
+ * over. Clients of one vendor share a `group`; `groupName` is empty for a
+ * group of one. */
+export interface ClientRow {
+  id: string;
+  agent: string;
+  name: string;
+  group: string;
+  groupName: string;
+  detected: boolean;
+  enabled: boolean;
+}
 export interface Account {
   id: string;
   /** A sampled CLI report, whose freshness follows checkedAt. */

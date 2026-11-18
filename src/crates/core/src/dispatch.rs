@@ -46,14 +46,13 @@ impl AgentHudCore {
             }
             "set_provider" => {
                 let id = params["id"].as_str().ok_or("Provider ID is required")?;
-                if agent_hud_agents::by_id(id).is_none() {
+                if agent_hud_agents::split::agent_of(id).is_none() {
                     return Err("Provider ID is not in the supported client inventory".into());
                 }
                 let enabled = params["enabled"]
                     .as_bool()
                     .ok_or("enabled must be a boolean")?;
-                if self.enabled.get(id).copied().unwrap_or(true) != enabled {
-                    self.enabled.insert(id.into(), enabled);
+                if self.set_client(id, enabled) {
                     self.usage_projection = None;
                     self.meters.view = None;
                 }

@@ -18,6 +18,19 @@ export function sourceID(snapshot: Snapshot, source: string): string {
   );
 }
 
+/** The client whose switches an event of `source` follows: its session's
+ * client, else the agent's own (`ClientRow`). */
+export function clientID(
+  snapshot: Snapshot,
+  source: string,
+  sessionId?: string,
+): string {
+  const session = sessionId
+    ? snapshot.sessions.find((row) => row.id === sessionId)
+    : undefined;
+  return session?.clientId ?? sourceID(snapshot, source);
+}
+
 /** The agents a resting HUD in `mode` shows without a list, one per mark, in
  * Open's order (ScreenAgents.available):
  * - notch, the glow's parts: each window whose reading shows a level, then

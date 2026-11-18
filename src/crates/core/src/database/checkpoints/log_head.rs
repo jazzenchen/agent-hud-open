@@ -254,11 +254,7 @@ impl LogHead {
         // These are the log's own; `AgentHudCore::session_totals` adds its
         // sub-agents' wherever a session is shown.
         session["usage"] = self.usage.json();
-        if let Some(client) =
-            crate::naming::clients::client_name(&self.source, self.client.as_deref())
-        {
-            session["client"] = json!(client);
-        }
+        crate::client_switches::name_client(&mut session, &self.source, self.client.as_deref());
         // Where its first and latest prompts were typed, as the log tells;
         // the presentation adds what hooks and deliveries report.
         session["origins"] = crate::naming::surfaces::resolve(

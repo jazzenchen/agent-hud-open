@@ -124,7 +124,7 @@ export function vendorKey(source: string): string {
   return agentArtworkKey(source);
 }
 
-export { restingAgents, sourceID } from "./resting-agents.ts";
+export { clientID, restingAgents, sourceID } from "./resting-agents.ts";
 
 const vendorProjections = new WeakMap<Snapshot, Map<HUDMode, HUDVendor[]>>();
 

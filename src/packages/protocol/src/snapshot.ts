@@ -1,5 +1,10 @@
 // What Core broadcasts, and the methods it answers.
-import type { Account, BillingAccount, Provider } from "./providers.ts";
+import type {
+  Account,
+  BillingAccount,
+  ClientRow,
+  Provider,
+} from "./providers.ts";
 import type { RelaySource } from "./prices-relays.ts";
 import type { Quota } from "./quota.ts";
 import type {
@@ -128,6 +133,8 @@ export interface Snapshot {
   sessions: Session[];
   timeline: TimelinePoint[];
   providers: Provider[];
+  /** From Core: every client, in the agents' order (`ClientRow`). */
+  clients?: ClientRow[];
   accounts?: Account[];
   approvals: Approval[];
   /** Native client receipts; queue acceptance alone is not delivery confirmation. */

@@ -68,11 +68,12 @@ impl Presentation {
         };
         if preferences.values().any(|p| p["live"] == false) {
             for session in snapshot["sessions"].as_array_mut().into_iter().flatten() {
-                let source = session["source"]
+                let client = session["clientId"]
                     .as_str()
+                    .or_else(|| session["source"].as_str())
                     .unwrap_or("")
                     .to_ascii_lowercase();
-                if preferences.get(&source).is_some_and(|p| p["live"] == false) {
+                if preferences.get(&client).is_some_and(|p| p["live"] == false) {
                     session["state"] = json!("idle");
                     if let Some(object) = session.as_object_mut() {
                         object.remove("liveFacts");
@@ -98,10 +99,26 @@ impl Presentation {
             prefs.remove(CHOSEN);
             preferences.insert(id.clone(), Value::Object(prefs));
         }
+        // A client split off its agent starts from what the person chose for
+        // the agent, until they choose for it (`agents::split`).
+        let clients = snapshot["clients"]
+            .as_array()
+            .filter(|rows| !rows.is_empty());
+        for client in clients.into_iter().flatten() {
+            let (Some(id), Some(agent)) = (client["id"].as_str(), client["agent"].as_str()) else {
+                continue;
+            };
+            if id != agent && !preferences.contains_key(id) {
+                if let Some(chosen) = preferences.get(agent).cloned() {
+                    preferences.insert(id.to_owned(), chosen);
+                }
+            }
+        }
         if snapshot["mode"] == "demo" {
             return preferences;
         }
-        for provider in snapshot["providers"].as_array().into_iter().flatten() {
+        let rows = clients.or_else(|| snapshot["providers"].as_array());
+        for provider in rows.into_iter().flatten() {
             let Some(id) = provider["id"].as_str().map(str::to_ascii_lowercase) else {
                 continue;
             };

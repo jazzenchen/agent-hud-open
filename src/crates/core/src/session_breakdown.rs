@@ -80,7 +80,7 @@ impl AgentHudCore {
     /// The currency of the DeepSeek balance this Mac's Harness calls are billed
     /// to, when one is linked and switched on.
     pub(crate) fn deepseek_account_currency(&self) -> Option<String> {
-        if !self.enabled.get("deepseek").copied().unwrap_or(true) {
+        if !self.agent_on("deepseek") {
             return None;
         }
         self.accounts

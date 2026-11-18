@@ -1,8 +1,10 @@
-/* One agent's settings: its switches, where its accounts come from, what the
- * panel shows of it, the relays it uses and its API credentials. */
+/* One client's settings: its switches; then, from the agent whose data it
+ * shares, where the accounts come from, what the panel shows, the relays it
+ * uses and its API credentials. */
 import { useState } from "react";
 import { RefreshCw } from "lucide-react";
 import type {
+  ClientRow,
   NativeMethod,
   PanelLayout,
   Provider,
@@ -30,6 +32,9 @@ import { Connection } from "./Connection";
 export interface AgentDetailProps {
   t: Translate;
   snapshot: Snapshot;
+  /** The client this page sets. */
+  client: ClientRow;
+  /** The agent whose data the client shares. */
   source: Provider;
   active?: boolean;
   action: (
@@ -45,6 +50,7 @@ export interface AgentDetailProps {
 export function AgentDetail({
   t,
   snapshot,
+  client,
   source,
   active,
   action,
@@ -75,7 +81,7 @@ export function AgentDetail({
     }
   }
 
-  const enabled = source.enabled;
+  const enabled = client.enabled;
   // What the client needs before it runs the hooks Agent HUD put in, such as
   // TRAE's own hooks switch, or that it gets none on this system yet.
   const hookStep =
@@ -85,18 +91,18 @@ export function AgentDetail({
     )?.notice ?? null;
   // The clients whose approval hook goes in only once the user turns it on.
   const optInApprovals = snapshot.settings.optInApprovals ?? [];
-  const live = preferences[source.id]?.live !== false;
-  const reminders = preferences[source.id]?.reminders !== false;
+  const live = preferences[client.id]?.live !== false;
+  const reminders = preferences[client.id]?.reminders !== false;
   const offReason = t("Turn on Enabled first.");
   const refreshLabel = t("Read all agents again");
 
   return (
     <Page>
       <header className="agents-detail-header">
-        <HUDLogo source={source.id} size={24} />
+        <HUDLogo source={client.agent} size={24} />
         <div className="agents-detail-title">
-          <h2>{source.name}</h2>
-          {!source.detected && <p>{t("Not on this computer")}</p>}
+          <h2>{client.name}</h2>
+          {!client.detected && <p>{t("Not on this computer")}</p>}
         </div>
         <Tooltip>
           <TooltipTrigger asChild>
@@ -132,7 +138,7 @@ export function AgentDetail({
           disabled={pending}
           change={(value) =>
             void perform(() =>
-              action("set_provider", { id: source.id, enabled: value }),
+              action("set_provider", { id: client.id, enabled: value }),
             )
           }
         />
@@ -143,7 +149,7 @@ export function AgentDetail({
           disabled={pending || !enabled}
           reason={!enabled ? offReason : undefined}
           change={(value) =>
-            void perform(() => onPreferences(source.id, { live: value }))
+            void perform(() => onPreferences(client.id, { live: value }))
           }
         />
         <ToggleRow
@@ -154,13 +160,14 @@ export function AgentDetail({
             !enabled ? offReason : !live ? t("Needs Live status.") : undefined
           }
           change={(value) =>
-            void perform(() => onPreferences(source.id, { reminders: value }))
+            void perform(() => onPreferences(client.id, { reminders: value }))
           }
         />
       </Section>
+      {/* The agent's data is read while any of its clients is on. */}
       <div
-        className={`agents-detail-rest${enabled ? "" : " is-off"}`}
-        inert={!enabled}
+        className={`agents-detail-rest${source.enabled ? "" : " is-off"}`}
+        inert={!source.enabled}
       >
         {source.id === "codex" && (
           <AccountHomes

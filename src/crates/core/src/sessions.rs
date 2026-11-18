@@ -18,9 +18,7 @@ pub(crate) fn log_session(log: &Log, now: i64, subagents_at: Option<i64>) -> Val
         .unwrap_or_else(|| log.updated.clone());
     let mut session = json!({"id":log.id,"title":log.title(),"source":log.source,"model":log.model,"vendorName":crate::naming::model_names::vendor_name(&log.source),"modelName":(!log.model.is_empty()).then(||crate::naming::model_names::consumer_name(&format!("{}-model:{}",log.source,log.model))),"cwd":log.cwd,"updatedAt":updated,"state":log.live.session_state(now,&log.source,subagents_at),"tokens":log.usage.total(),"cost":null,"contextPercent":null,"logPath":log.origin_path.as_ref().unwrap_or(&log.path),"parentId":log.live.parent_id});
     session["project"] = json!(crate::projects::project_id(log.cwd.as_deref()));
-    if let Some(client) = crate::naming::clients::client_name(&log.source, log.client.as_deref()) {
-        session["client"] = json!(client);
-    }
+    crate::client_switches::name_client(&mut session, &log.source, log.client.as_deref());
     session["origins"] = crate::naming::surfaces::resolve(
         &log.source,
         &log.prompts,

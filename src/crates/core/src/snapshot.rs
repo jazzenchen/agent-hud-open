@@ -224,6 +224,7 @@ impl crate::AgentHudCore {
         let sessions = self.session_rows(presented_at, now, at);
         let approvals = self.requests.views(now);
         let providers = self.provider_rows(at);
+        let clients = self.client_rows(&providers);
         let pending_meter = self.pending_meter_bounds();
         // Pausing a failed read stops the indexing timer, but does not make
         // its unread history complete. Consumers use this fact, not notices.
@@ -261,7 +262,7 @@ impl crate::AgentHudCore {
             .as_ref()
             .expect("usage projection prepared");
         Ok(
-            json!({"islandEvents":island_events,"schemaVersion":1,"statisticsRevision":self.statistics.revision,"sessionsRevision":self.sessions_revision,"sessionScope":"recent","indexing":indexing,"generatedAt":Utc::now().to_rfc3339(),"mode":if self.demo{"demo"}else{"live"},"connection":{"status":"connected","platform":self.platform,"message":notice.unwrap_or_else(|| tr!("Local transcripts and client events; hook connection status is reported separately."))},"totals":projection.totals.json(),"quotas":quotas,"accounts":accounts,"sessions":sessions,"timeline":projection.timeline,"providers":providers,"approvals":approvals,"requestDeliveries":deliveries,"settings":self.settings,"language":crate::l10n::current().code(),"capabilities":serde_json::from_str::<Value>(include_str!("../../../packages/protocol/capabilities.json")).expect("checked-in capability manifest"),"billing":billing,"relays":relays}),
+            json!({"islandEvents":island_events,"schemaVersion":1,"statisticsRevision":self.statistics.revision,"sessionsRevision":self.sessions_revision,"sessionScope":"recent","indexing":indexing,"generatedAt":Utc::now().to_rfc3339(),"mode":if self.demo{"demo"}else{"live"},"connection":{"status":"connected","platform":self.platform,"message":notice.unwrap_or_else(|| tr!("Local transcripts and client events; hook connection status is reported separately."))},"totals":projection.totals.json(),"quotas":quotas,"accounts":accounts,"sessions":sessions,"timeline":projection.timeline,"providers":providers,"clients":clients,"approvals":approvals,"requestDeliveries":deliveries,"settings":self.settings,"language":crate::l10n::current().code(),"capabilities":serde_json::from_str::<Value>(include_str!("../../../packages/protocol/capabilities.json")).expect("checked-in capability manifest"),"billing":billing,"relays":relays}),
         )
     }
 

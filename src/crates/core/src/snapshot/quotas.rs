@@ -56,7 +56,7 @@ impl crate::AgentHudCore {
                 row
             })
             .collect::<Vec<_>>();
-        if self.enabled.get("workbuddy").copied().unwrap_or(true) {
+        if self.agent_on("workbuddy") {
             let cache_path = self
                 .settings_path
                 .parent()

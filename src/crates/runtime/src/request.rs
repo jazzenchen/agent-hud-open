@@ -174,6 +174,8 @@ impl Runtime {
         if method == "refresh" && self.discover_host {
             self.core
                 .set_provider_discovery(self.platform.discover_providers());
+            self.core
+                .set_client_discovery(self.platform.discover_clients());
         }
         let result = self.core.request(method, params)?;
         Ok(self.decorate_snapshot(result, true))

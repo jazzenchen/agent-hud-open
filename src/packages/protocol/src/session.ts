@@ -31,6 +31,9 @@ export interface Session {
   cwd: string | null;
   /** From Core: the client that drives the session ("Codex Desktop", "Claude Code IDE extension"). */
   client?: string | null;
+  /** The client whose switches the session follows (`ClientRow.id`); its
+   * `source` when the agent is one client. */
+  clientId?: string;
   /** From Core: where the session's first (`init`) and latest prompts were typed, as `category:source` tags ("cli:iterm", "desktop:claude", "mobile:iphone"). Categories: desktop, cli, ide, mobile, mcp, sdk, others; a source nobody can tell is `others`. Null when unknown. */
   origins?: { init: string | null; latest: string | null };
   /** From Core: the project id, the repository its worktrees share written with ~ ("unassigned" filters match none). */

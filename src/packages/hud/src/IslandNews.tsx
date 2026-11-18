@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { Approval, IslandEvent, Snapshot } from "@agent-hud/protocol";
 import type { Translate } from "@agent-hud/ui/format";
 import { usePanelServices } from "./PanelContext";
-import { agentVendorName, sourceID, vendorKey } from "./model";
+import { agentVendorName, clientID, vendorKey } from "./model";
 import type { EndSide } from "./ends/end-geometry";
 import { PARK_AFTER_MS, type ParkedCard } from "./ends/end-queue";
 import { CLAIM_GRACE_MS } from "./ends/ends-link";
@@ -140,6 +140,11 @@ export function useIslandNews(
       if (!activeRequestIds.has(id)) seenRequests.current.delete(id);
     }
     for (const request of requests) seenRequests.current.add(request.id);
+    // A completion reminds while its client's live status and reminders are on.
+    const remindsOf = (source: string, sessionId?: string) => {
+      const prefs = services?.sources?.[clientID(snapshot, source, sessionId)];
+      return prefs?.live !== false && prefs?.reminders !== false;
+    };
     const eligible = silenced
       ? []
       : fresh.filter(
@@ -147,10 +152,7 @@ export function useIslandNews(
             event.islandAlert !== false &&
             shown.includes(vendorKey(event.source)) &&
             (event.kind !== "completion" ||
-              (services?.sources?.[sourceID(snapshot, event.source)]?.live !==
-                false &&
-                services?.sources?.[sourceID(snapshot, event.source)]
-                  ?.reminders !== false)),
+              remindsOf(event.source, event.sessionId)),
         );
     const coming = startup ? [] : freshRequests;
     const visible = underPointer ? eligible : [];

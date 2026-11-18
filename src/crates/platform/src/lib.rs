@@ -2,7 +2,7 @@
 //! It does not parse transcripts, price tokens or decide session state.
 use agent_hud_core::{ProviderDiscovery, SourceRoot};
 mod discovery;
-pub use discovery::discover_at;
+pub use discovery::{discover_at, discover_clients_at};
 mod file_changes;
 pub mod instance;
 pub use file_changes::FileChanges;
@@ -65,6 +65,9 @@ impl NativePlatform {
     }
     pub fn discover_providers(&self) -> Vec<ProviderDiscovery> {
         discovery::discover(&self.home)
+    }
+    pub fn discover_clients(&self) -> Vec<ProviderDiscovery> {
+        discovery::discover_clients(&self.home)
     }
     pub fn account_service(
         &self,

@@ -165,17 +165,12 @@ impl AgentHudCore {
                 )
                 .into_iter()
                 .map(|row| self.protect_claude_project_extra(row))
-                .filter(|row| {
-                    self.enabled
-                        .get(row["source"].as_str().unwrap_or(""))
-                        .copied()
-                        .unwrap_or(true)
-                })
+                .filter(|row| self.agent_on(row["source"].as_str().unwrap_or("")))
                 .collect::<Vec<_>>()
         } else {
             vec![]
         };
-        if parent.is_none() && self.enabled.get("claude").copied().unwrap_or(true) {
+        if parent.is_none() && self.client_on(agent_hud_agents::split::CLAUDE_DESKTOP) {
             let max_age = if scope == "active" { 1 } else { 7 };
             extras.extend(self.claude_project_rows().into_iter().filter(|row| {
                 scope == "all"

@@ -163,7 +163,7 @@ impl crate::AgentHudCore {
         let mut active = HashMap::new();
         let mut standing = HashSet::new();
         let claude = agent_hud_agents::claude::AGENT.id;
-        if self.enabled.get(claude).copied().unwrap_or(true) {
+        if self.client_on(agent_hud_agents::split::CLAUDE_DESKTOP) {
             self.reword_desktop_asks(now);
             // Every pass prepares the projection first; its selection saves
             // choosing among each session's copies again.

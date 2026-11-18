@@ -109,8 +109,11 @@ pub fn resting_agents(snapshot: &Value, mode: &str, now: i64) -> Vec<String> {
                     let at = chrono::DateTime::parse_from_rfc3339(s["updatedAt"].as_str()?)
                         .ok()?
                         .timestamp_millis();
-                    let live =
-                        snapshot["sourcePreferences"][source_id(snapshot, source)]["live"] != false;
+                    let client = s["clientId"]
+                        .as_str()
+                        .map(str::to_owned)
+                        .unwrap_or_else(|| source_id(snapshot, source));
+                    let live = snapshot["sourcePreferences"][client]["live"] != false;
                     (now <= at + QUEUE_RECENCY_MS && live).then_some((at, source))
                 })
                 .collect();

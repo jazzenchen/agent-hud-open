@@ -1,7 +1,8 @@
-/* Settings → Agents: the list of agents on the left, the chosen one's
- * settings on the right. */
+/* Settings → Agents: the clients on the left, grouped by vendor, the chosen
+ * one's settings on the right. */
 import { useRef, useState } from "react";
 import type {
+  ClientRow,
   NativeMethod,
   PanelLayout,
   Snapshot,
@@ -38,13 +39,27 @@ export default function AgentsPage({
   const t = useT();
   const [selectedID, setSelected] = useState<string>();
   const page = useRef<HTMLDivElement>(null);
-  // Found agents first; otherwise the order the runtime lists them in, so
-  // the list never jumps when the panel order changes.
-  const providers = [...snapshot.providers].sort(
-    (a, b) => Number(b.detected) - Number(a.detected),
+  // The order the runtime lists them in, so the list never jumps when the
+  // panel order changes; the list puts found ones first.
+  const clients: ClientRow[] = snapshot.clients?.length
+    ? snapshot.clients
+    : snapshot.providers.map((provider) => ({
+        id: provider.id,
+        agent: provider.id,
+        name: provider.name,
+        group: provider.id,
+        groupName: "",
+        detected: provider.detected,
+        enabled: provider.enabled,
+      }));
+  const client =
+    clients.find((row) => row.id === selectedID) ??
+    clients.find((row) => row.detected) ??
+    clients[0];
+  // The agent whose data the client shares: its account, panel and relays.
+  const source = snapshot.providers.find(
+    (provider) => provider.id === client?.agent,
   );
-  const source =
-    providers.find((provider) => provider.id === selectedID) ?? providers[0];
   const select = (id: string) => {
     setSelected(id);
     // Show the new agent from its top, wherever the last one was scrolled.
@@ -55,17 +70,18 @@ export default function AgentsPage({
     <div className="agents-page" ref={page}>
       <AgentList
         t={t}
-        providers={providers}
-        selected={source?.id}
+        clients={clients}
+        selected={client?.id}
         select={select}
       />
       <div className="agents-detail">
-        {source && (
-          // Keyed by agent, so a draft or an error never carries over.
+        {client && source && (
+          // Keyed by client, so a draft or an error never carries over.
           <AgentDetail
-            key={source.id}
+            key={client.id}
             t={t}
             snapshot={snapshot}
+            client={client}
             source={source}
             active={active}
             action={action}

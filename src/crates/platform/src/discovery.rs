@@ -14,91 +14,116 @@ pub(super) fn discover(home: &Path) -> Vec<ProviderDiscovery> {
 /// Each client's descriptor says where to look (`Agent::discovery`).
 pub fn discover_at(home: &Path, env: &HashMap<String, String>) -> Vec<ProviderDiscovery> {
     let executable_dirs = crate::os::executable_dirs(home, env);
-    let look = Looking { home, env };
     ALL.iter()
-        .map(|agent| {
-            let found = &mut ProviderDiscovery {
-                id: agent.id.into(),
-                ..Default::default()
-            };
-            let discovery = agent.discovery;
-            found.navigation_target = crate::navigation::app_target(discovery);
-            let paths = |locations: &[agent_hud_agents::Location]| {
-                locations
-                    .iter()
-                    .map(|location| crate::os::resolve(home, env, location))
-                    .collect::<Vec<_>>()
-            };
-            if paths(discovery.storage)
-                .iter()
-                .flatten()
-                .any(|path| path.exists())
-            {
-                mark(found, "installed", "client-storage");
-            }
-            if paths(discovery.settings)
-                .iter()
-                .flatten()
-                .any(|path| path.exists())
-            {
-                mark(found, "configured", "configuration-file");
-            }
-            // One budget for a client's session folders; a location with
-            // profile folders gives each its own, as each is an installation.
-            let mut budget = 512;
-            let used = paths(discovery.sessions).into_iter().any(|group| {
-                if group.len() > 1 {
-                    group.iter().any(|path| has_session_file(path, 6, &mut 512))
-                } else {
-                    group
-                        .iter()
-                        .any(|path| has_session_file(path, 6, &mut budget))
-                }
-            });
-            if used {
-                mark(found, "usage", "local-session-files");
-            }
-            if paths(discovery.usage_files)
-                .iter()
-                .flatten()
-                .any(|path| path.is_file() && fs::metadata(path).is_ok_and(|meta| meta.len() > 0))
-            {
-                mark(found, "usage", "local-session-files");
-            }
-            if discovery.commands.iter().any(|name| {
-                executable_dirs
-                    .iter()
-                    .any(|dir| crate::os::discovered_executable(&dir.join(name)))
-            }) {
-                mark(found, "installed", "executable");
-            }
-            if !found.installed
-                && (discovery
-                    .apps
-                    .iter()
-                    .any(|name| crate::os::application_installed(home, env, name))
-                    || discovery
-                        .bundles
-                        .iter()
-                        .any(|id| crate::os::registered_bundle(id)))
-            {
-                mark(found, "installed", "desktop-application");
-            }
-            if discovery
-                .credentials_env
-                .iter()
-                .any(|key| env.get(*key).is_some_and(|value| !value.is_empty()))
-            {
-                mark(found, "configured", "provider-environment");
-            }
-            if let Some(rule) = discovery.configured {
-                for evidence in rule(&look) {
-                    mark(found, "configured", evidence);
-                }
-            }
-            std::mem::take(found)
-        })
+        .map(|agent| look_for(agent.id, agent.discovery, home, env, &executable_dirs))
         .collect()
+}
+
+/// What was found of each client an agent is split into (`agents::split`),
+/// each by its own evidence alone, so a desktop app is found apart from the
+/// agent's command line.
+pub(super) fn discover_clients(home: &Path) -> Vec<ProviderDiscovery> {
+    let env = std::env::vars().collect::<HashMap<_, _>>();
+    discover_clients_at(home, &env)
+}
+
+pub fn discover_clients_at(home: &Path, env: &HashMap<String, String>) -> Vec<ProviderDiscovery> {
+    let executable_dirs = crate::os::executable_dirs(home, env);
+    agent_hud_agents::split::SPLIT
+        .iter()
+        .flat_map(|clients| clients.iter())
+        .map(|client| look_for(client.id, client.discovery, home, env, &executable_dirs))
+        .collect()
+}
+
+/// What tells one client is here, by the descriptor's places.
+fn look_for(
+    id: &str,
+    discovery: &agent_hud_agents::Discovery,
+    home: &Path,
+    env: &HashMap<String, String>,
+    executable_dirs: &[std::path::PathBuf],
+) -> ProviderDiscovery {
+    let look = Looking { home, env };
+    let found = &mut ProviderDiscovery {
+        id: id.into(),
+        ..Default::default()
+    };
+    found.navigation_target = crate::navigation::app_target(discovery);
+    let paths = |locations: &[agent_hud_agents::Location]| {
+        locations
+            .iter()
+            .map(|location| crate::os::resolve(home, env, location))
+            .collect::<Vec<_>>()
+    };
+    if paths(discovery.storage)
+        .iter()
+        .flatten()
+        .any(|path| path.exists())
+    {
+        mark(found, "installed", "client-storage");
+    }
+    if paths(discovery.settings)
+        .iter()
+        .flatten()
+        .any(|path| path.exists())
+    {
+        mark(found, "configured", "configuration-file");
+    }
+    // One budget for a client's session folders; a location with
+    // profile folders gives each its own, as each is an installation.
+    let mut budget = 512;
+    let used = paths(discovery.sessions).into_iter().any(|group| {
+        if group.len() > 1 {
+            group.iter().any(|path| has_session_file(path, 6, &mut 512))
+        } else {
+            group
+                .iter()
+                .any(|path| has_session_file(path, 6, &mut budget))
+        }
+    });
+    if used {
+        mark(found, "usage", "local-session-files");
+    }
+    if paths(discovery.usage_files)
+        .iter()
+        .flatten()
+        .any(|path| path.is_file() && fs::metadata(path).is_ok_and(|meta| meta.len() > 0))
+    {
+        mark(found, "usage", "local-session-files");
+    }
+    if discovery.commands.iter().any(|name| {
+        executable_dirs
+            .iter()
+            .any(|dir| crate::os::discovered_executable(&dir.join(name)))
+    }) {
+        mark(found, "installed", "executable");
+    }
+    if !found.installed
+        && (discovery
+            .apps
+            .iter()
+            .any(|name| crate::os::application_installed(home, env, name))
+            || discovery
+                .bundles
+                .iter()
+                .any(|id| crate::os::registered_bundle(id)))
+    {
+        mark(found, "installed", "desktop-application");
+    }
+    if discovery
+        .credentials_env
+        .iter()
+        .any(|key| env.get(*key).is_some_and(|value| !value.is_empty()))
+    {
+        mark(found, "configured", "provider-environment");
+    }
+    if let Some(rule) = discovery.configured {
+        for evidence in rule(&look) {
+            mark(found, "configured", evidence);
+        }
+    }
+    std::mem::take(found)
 }
 
 /// The machine as a client's own configuration rule looks at it.

@@ -21,6 +21,7 @@ pub mod process;
 pub mod protobuf;
 pub mod relays;
 pub mod replies;
+pub mod split;
 pub mod sqlite;
 pub mod transcript;
 

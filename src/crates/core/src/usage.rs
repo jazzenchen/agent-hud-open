@@ -1,6 +1,7 @@
 //! Token counts as the ledger keeps them, and the usage projection a snapshot
 //! is drawn from until a source write changes it.
 use crate::{AgentHudCore, LogHead, TimelineBucket, Usage};
+use agent_hud_agents::split;
 use chrono::{DateTime, Utc};
 use serde_json::{json, Value};
 use std::{
@@ -21,6 +22,8 @@ pub(crate) struct UsageProjection {
     pub(crate) titles: HashMap<String, String>,
     pub(crate) context_percents: HashMap<String, f64>,
     pub(crate) observed_providers: HashSet<String>,
+    /// The clients those sessions belong to (`agents::split`).
+    pub(crate) observed_clients: HashSet<String>,
     pub(crate) counts: HashMap<String, usize>,
 }
 
@@ -113,11 +116,7 @@ impl AgentHudCore {
         for log in self.logs.values().filter(|log| {
             log.source != "codex-index"
                 && !unwritten_buddy_transcript(log)
-                && self
-                    .enabled
-                    .get(log.source.as_str())
-                    .copied()
-                    .unwrap_or(true)
+                && self.log_on(&log.source, log.client.as_deref())
         }) {
             let is_mapped = mapped_copy(log);
             sessions
@@ -251,6 +250,12 @@ impl AgentHudCore {
                 .values()
                 .filter(|log| log.observed && !log.live.is_internal)
                 .map(|log| log.source.clone())
+                .collect(),
+            observed_clients: self
+                .logs
+                .values()
+                .filter(|log| log.observed && !log.live.is_internal)
+                .map(|log| split::of_log(&log.source, log.client.as_deref()).to_owned())
                 .collect(),
         });
     }

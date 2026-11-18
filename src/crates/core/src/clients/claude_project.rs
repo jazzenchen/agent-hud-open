@@ -176,13 +176,15 @@ impl AgentHudCore {
         rows.into_values()
             .map(|(mut row, local)| {
                 local.apply(&mut row);
+                // A Project thread is the Claude desktop app's.
+                row["clientId"] = json!(agent_hud_agents::split::CLAUDE_DESKTOP);
                 row
             })
             .collect()
     }
 
     pub(crate) fn claude_project_detail(&self, key: &str, now: i64) -> Option<Value> {
-        if !self.enabled.get("claude").copied().unwrap_or(true) {
+        if !self.client_on(agent_hud_agents::split::CLAUDE_DESKTOP) {
             return None;
         }
         let session = self

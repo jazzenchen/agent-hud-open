@@ -14,6 +14,7 @@ use std::{
 
 mod accounts;
 mod billing_metrics;
+mod client_switches;
 mod clients;
 mod compressed;
 mod conversation;
@@ -57,7 +58,7 @@ pub(crate) use agent_hud_agents::claude::jobs as claude_jobs;
 pub use agent_hud_agents::grok::cache as grok_cache;
 #[cfg(test)]
 pub(crate) use agent_hud_agents::transcript::live as live_facts;
-pub use agent_hud_agents::{naming, protobuf};
+pub use agent_hud_agents::{naming, protobuf, split};
 pub(crate) use agent_hud_agents::{
     LiveLog, Log, TimelineBucket, Usage, DATA_VERSION, PARSER_VERSION,
 };
@@ -129,6 +130,8 @@ pub struct AgentHudCore {
     /// waiting means the ledger has been read through.
     listed_once: bool,
     discovery: Vec<ProviderDiscovery>,
+    /// What was found of each client an agent is split into (`agents::split`).
+    client_discovery: Vec<ProviderDiscovery>,
     reads: ingestion::Reads,
     usage_projection: Option<UsageProjection>,
     accounts: AccountProjection,
@@ -249,6 +252,7 @@ impl AgentHudCore {
             indexing_run,
             listed_once: false,
             discovery: Vec::new(),
+            client_discovery: Vec::new(),
             reads: Default::default(),
             usage_projection: None,
             accounts: AccountProjection::default(),

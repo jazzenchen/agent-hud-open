@@ -61,6 +61,16 @@ impl Presentation {
         let before = s.saved.clone();
         let source = params["source"].as_str().ok_or("Source is required")?;
         let patch = object(&params["patch"], "patch")?;
+        // The clients split off this one keep the switches they show now
+        // (`agents::split`).
+        if let Some(chosen) = s.saved.sources.get(source).cloned() {
+            for client in agent_hud_core::split::family(source).iter().skip(1) {
+                s.saved
+                    .sources
+                    .entry(client.id)
+                    .or_insert_with(|| chosen.clone());
+            }
+        }
         let target = s
             .saved
             .sources

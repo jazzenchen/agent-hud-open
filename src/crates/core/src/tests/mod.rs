@@ -3,6 +3,7 @@
 use super::*;
 
 mod claude_desktop;
+mod client_switches;
 mod conversation_feed;
 mod forks;
 mod ingestion;

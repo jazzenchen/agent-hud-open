@@ -26,6 +26,7 @@ mod reminders;
 mod reviewer;
 pub(crate) mod rewake;
 mod statusline;
+mod switches;
 mod transcript;
 mod turn_log;
 // The callback channel: a Unix socket, or a named pipe on Windows.
