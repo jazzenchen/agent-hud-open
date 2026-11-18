@@ -9,7 +9,7 @@ Pick an element or an area of a page and send it to an agent session through Age
 ## Try it
 
 1. Open Agent HUD once, so it writes the host's note.
-2. In Chrome, open `chrome://extensions`, turn on Developer mode, press **Load unpacked** and choose this folder.
+2. Add it to Chrome from the [Chrome Web Store](https://chromewebstore.google.com/detail/agent-hud/eaihfcfnoaafgcggajlbegjnfjinkckk). To run this folder's copy instead, open `chrome://extensions`, turn on Developer mode, press **Load unpacked** and choose this folder.
 3. Press the toolbar button on any page.
 
 The `key` in `manifest.json` fixes the id of the copy loaded from this folder (`iihocfnohlhbepcckimekpoioandkpkl`); the Chrome Web Store's copy has its own (`eaihfcfnoaafgcggajlbegjnfjinkckk`, `STORE_ID` in `src/crates/host/src/inspect/hosts.rs`). The host's note allows both. Windows is not served yet: Chrome reads the note's path from the registry there.
