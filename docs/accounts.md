@@ -152,10 +152,12 @@ read once, and an account signed in from two folders appears once. A failed
 folder reports a notice while the other folders still appear, with the windows
 Claude Code last recorded in that folder, marked stale; if every reading fails,
 the last reading remains marked stale. The Claude desktop app's sign-in
-stands in only for the default folder, never for an added one. When the desktop
-app last signed in to an account no folder reads, that account is read too,
-through the desktop app's sign-in, as an account of its own; the desktop app on
-an account a folder already reads is not read again. Saving a changed
+stands in only for the default folder, never for an added one. Beside a
+signed-in folder the desktop app's sign-in is read too, every time, and the
+readings are merged by account: the same account shows once, from Claude
+Code's reading unless that is only a stale record, and another account shows
+as its own. A failure of either way says nothing while the other read the same
+account. Saving a changed
 list discards readings from the previous list, including results still in
 flight.
 

@@ -885,15 +885,20 @@ fn a_failed_folder_shows_its_record_stale_beside_the_folders_that_read() {
     assert_eq!(reading.account.unwrap()["label"], "work@example.com");
 }
 
+/// A signed-in engine and the desktop app are both read; a desktop sign-in
+/// that fails, for an account no folder reads, is a notice beside the
+/// engine's windows.
 #[test]
-fn a_signed_in_engine_never_reads_the_desktop_app() {
+fn a_signed_in_engine_reads_the_desktop_app_too() {
     let mut host = installed(limits());
     host.cookies.insert(
         "Claude|claude.ai|sessionKey".into(),
         Answer::Found("sk-ant-sid01-secret".into()),
     );
-    assert_eq!(read(&host).unwrap().quotas.len(), 2);
-    assert!(host.asked.borrow().is_empty());
+    let reading = read(&host).unwrap();
+    assert_eq!(reading.quotas.len(), 2);
+    assert!(!host.asked.borrow().is_empty());
+    assert!(reading.notice.unwrap().starts_with("Claude Desktop: "));
 }
 
 fn desktop_signed_in(host: FakeHost, user: &str) -> FakeHost {
@@ -945,10 +950,24 @@ fn the_desktop_apps_other_account_is_read_beside_claude_codes() {
     assert_eq!(reading.quotas.len(), 5);
 }
 
-/// The desktop app on Claude Code's own account is not read again.
+/// The desktop app on Claude Code's own account is read too and shows once:
+/// Claude Code's windows, with any the desktop app's reading adds.
 #[test]
-fn the_desktop_apps_same_account_is_not_read_again() {
-    let host = desktop_signed_in(installed(limits()), "user-1");
-    assert_eq!(read(&host).unwrap().quotas.len(), 2);
-    assert!(host.asked.borrow().is_empty());
+fn the_desktop_apps_same_account_shows_once() {
+    let host = desktop_signed_in(installed(limits()), "user-1").file(
+        "/u/.claude.json",
+        &json!({"oauthAccount": {
+            "accountUuid": "user-1", "organizationUuid": "0a1b-2c3d",
+            "emailAddress": "me@example.com", "organizationType": "claude_max",
+        }})
+        .to_string(),
+    );
+    let reading = read(&host).unwrap();
+    assert!(reading.additional_accounts.is_empty());
+    // Claude Code's session and weekly windows, and the Fable window only
+    // the desktop app's reading has.
+    assert_eq!(reading.quotas.len(), 3);
+    assert_eq!(reading.quotas[0]["usedPercent"], 12.0);
+    assert_eq!(host.asked.borrow().len(), 1);
+    assert_eq!(reading.notice, None);
 }

@@ -4,8 +4,8 @@
 //! Code's .claude.json names, read before and after. Without a Claude Code
 //! sign-in, the Claude desktop app's own claude.ai sign-in answers instead.
 //! Folders added in Settings (`claudeHomes`) are read after the default one,
-//! one at a time, each as its own account. The desktop app signed in to
-//! another account is read beside them, as an account of its own.
+//! one at a time, each as its own account. The desktop app's own sign-in
+//! is read beside them every time, and the readings are merged by account.
 //!
 //! Claude Code's own record of its last usage answer (`usage_record`) comes
 //! first while it is under a minute old, which is what the engine would
@@ -94,9 +94,11 @@ pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
     )
     .collect();
     if folders.len() == 1 {
-        return with_desktop(host, &folders, read_folder(host, &folders[0]));
+        let (read, consulted) = read_folder(host, &folders[0]);
+        return with_desktop(host, &folders, read, consulted);
     }
     let mut reading = Reading::empty("claude");
+    let mut consulted = false;
     let mut succeeded = false;
     let mut failures = Vec::new();
     let mut records = Vec::new();
@@ -105,7 +107,9 @@ pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
             return Err(tr!("Account reading was stopped").into());
         }
         let prefix = format!("{}: ", folder.path.display());
-        let error = match read_folder(host, folder) {
+        let (read, desktop) = read_folder(host, folder);
+        consulted |= desktop;
+        let error = match read {
             Ok(mut account) => match account.failure.take() {
                 None => {
                     succeeded = true;
@@ -145,7 +149,7 @@ pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
         }
         Some(failure) => Err(failure),
     };
-    with_desktop(host, &folders, result)
+    with_desktop(host, &folders, result, consulted)
 }
 
 /// A reading's windows and accounts marked stale.
@@ -162,18 +166,20 @@ fn stale(reading: &mut Reading) {
     }
 }
 
-fn read_folder(host: &dyn Host, folder: &Folder) -> Result<Reading, Unread> {
+/// A folder's reading, and whether the desktop app's sign-in was asked for
+/// it (a signed-out default folder reads through it).
+fn read_folder(host: &dyn Host, folder: &Folder) -> (Result<Reading, Unread>, bool) {
     let config = global_config(host, folder);
     let now = chrono::Utc::now().timestamp_millis();
     if let Some(reading) = usage_record::read(&config, now)
         .filter(|record| record.fresh(now))
         .and_then(|record| recorded(host, folder, &config["oauthAccount"], &record))
     {
-        return Ok(reading);
+        return (Ok(reading), false);
     }
     match from_engine(host, folder, &config["oauthAccount"]) {
-        Ok(reading) => Ok(reading),
-        Err(EngineUnread::Failed(unread)) => kept(host, folder, unread),
+        Ok(reading) => (Ok(reading), false),
+        Err(EngineUnread::Failed(unread)) => (kept(host, folder, unread), false),
         // A Claude Code that is installed and signed out is the agent's own
         // state; no Claude Code at all is not a sign-out.
         Err(EngineUnread::NoLogin { reason, installed }) => {
@@ -182,7 +188,7 @@ fn read_folder(host: &dyn Host, folder: &Folder) -> Result<Reading, Unread> {
             } else {
                 from_desktop(host, folder, installed)
             };
-            match desktop {
+            let read = match desktop {
                 // The desktop app's account is the one read: Claude Code's
                 // record stands in for it only when it is the same account.
                 Some(Err(failure)) if desktop_is_claude_codes(host, folder) => {
@@ -198,7 +204,8 @@ fn read_folder(host: &dyn Host, folder: &Folder) -> Result<Reading, Unread> {
                         Unread::Failed(reason)
                     },
                 ),
-            }
+            };
+            (read, !folder.added)
         }
     }
 }

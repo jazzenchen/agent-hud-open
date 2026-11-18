@@ -141,44 +141,51 @@ pub(super) fn from_desktop(
     Some(Ok(plan_reading(host, windows, &who, plan, &folder.path)))
 }
 
-/// Claude Code's reading, with the account the Claude desktop app signed in
-/// to beside it when no folder Claude Code reads signed in to that account:
-/// a desktop app and a command line are separate clients, each with the
-/// account it uses (owner, 2026-11-18). Nothing more is read while the
-/// desktop app uses an account Claude Code already reads, or while the default
-/// folder is signed out (its reading came through the desktop app already).
-/// A failed desktop reading leaves Claude Code's as it is, with a notice.
+/// Claude Code's reading with the Claude desktop app's beside it: the
+/// desktop app's own sign-in is read every time, whatever Claude Code's
+/// folders said, and the readings are merged by account (a desktop app and
+/// a command line are separate clients, each read, owner 2026-11-18). One
+/// account read both ways shows once, from Claude Code's reading unless that
+/// is only a stale record. A failure of either way says nothing while the
+/// other read the same account. `consulted`: a signed-out default folder
+/// asked the desktop app already.
 pub(super) fn with_desktop(
     host: &dyn Host,
     folders: &[Folder],
     result: Result<Reading, Unread>,
+    consulted: bool,
 ) -> Result<Reading, Unread> {
-    let Ok(mut reading) = result else {
+    if consulted {
+        return result;
+    }
+    let Some(desktop) = from_desktop(host, &folders[0], false) else {
         return result;
     };
-    let Some(user) = desktop_user(host) else {
-        return Ok(reading);
-    };
-    let accounts = folders
-        .iter()
-        .map(|folder| {
-            profile(host, folder)["accountUuid"]
-                .as_str()
-                .map(str::to_owned)
-        })
-        .collect::<Vec<_>>();
-    if accounts[0].as_deref().is_none_or(str::is_empty)
-        || accounts.iter().flatten().any(|account| *account == user)
-    {
-        return Ok(reading);
+    // Whether the desktop app last signed in to an account a folder names.
+    let covered = desktop_user(host).is_some_and(|user| {
+        folders
+            .iter()
+            .any(|folder| profile(host, folder)["accountUuid"] == user.as_str())
+    });
+    match (result, desktop) {
+        (Ok(mut code), Ok(desktop)) if code.failure.is_none() || !covered => {
+            merge(&mut code, desktop);
+            Ok(code)
+        }
+        // The same account, read fresh: Claude Code's stale record goes.
+        (Ok(_), Ok(desktop)) => Ok(desktop),
+        (Err(failure), Ok(mut desktop)) => {
+            if !covered {
+                append_notice(&mut desktop, failure.reason().to_owned());
+            }
+            Ok(desktop)
+        }
+        (Ok(mut code), Err(failure)) => {
+            if !covered {
+                append_notice(&mut code, format!("Claude Desktop: {}", failure.reason()));
+            }
+            Ok(code)
+        }
+        (Err(failure), Err(_)) => Err(failure),
     }
-    match from_desktop(host, &folders[0], false) {
-        Some(Ok(desktop)) => merge(&mut reading, desktop),
-        Some(Err(failure)) => append_notice(
-            &mut reading,
-            format!("Claude Desktop: {}", failure.reason()),
-        ),
-        None => {}
-    }
-    Ok(reading)
 }
