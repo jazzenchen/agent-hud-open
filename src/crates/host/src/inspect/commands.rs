@@ -1,9 +1,11 @@
 //! What the HUD's clipboard window asks of the host, as one command with a
 //! method: `state`, `look`, `add`, `edit`, `remove`, `clear`, `targets`,
-//! `mark_window`, `picture`, `mark`, `close_mark`, `browser`, `shortcut`,
-//! `hold_shortcut` and `send`. Every change answers the new state and sends it to
-//! every HUD window as well; all of it runs off the UI thread.
-use super::{browser, clipboard, compose, content::Content, marking, shortcut, target, Inspect};
+//! `mark_window`, `picture`, `mark`, `close_mark`, `browser`, `open_store`,
+//! `shortcut`, `hold_shortcut` and `send`. Every change answers the new state and
+//! sends it to every HUD window as well; all of it runs off the UI thread.
+use super::{
+    browser, clipboard, compose, content::Content, hosts, marking, shortcut, target, Inspect,
+};
 use crate::service::Service;
 use agent_hud_messaging::UserTarget;
 use serde_json::Value;
@@ -59,6 +61,7 @@ fn answer(app: &tauri::AppHandle, method: &str, params: &Value) -> Result<Value,
         "mark" => return marking::save(app, params),
         "close_mark" => return marking::close(app),
         "browser" => return Ok(browser::status(&inspect)),
+        "open_store" => return hosts::open_store(),
         // Settings: whether the shortcut can be held here, and letting it
         // go while a new one is recorded.
         "shortcut" => return Ok(shortcut::status()),

@@ -1,7 +1,8 @@
 // The browser extension, on Experimental: it picks an element or an area of
 // a page and sends it through the inspector. Says where it last
-// reached Agent HUD from, turning as the extension first speaks, and links
-// its Chrome Web Store page.
+// reached Agent HUD from, turning as the extension first speaks, and opens
+// its Chrome Web Store page in a browser that can add it (Chrome, or the
+// system's browser when that is Chromium), not in Safari.
 import { useEffect, useState } from "react";
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
@@ -24,6 +25,13 @@ export function BrowserRow({
   t: Translate;
 }) {
   const [status, setStatus] = useState<BrowserStatus | null>(null);
+  const [opening, setOpening] = useState(false);
+  const openStore = () => {
+    setOpening(true);
+    void invoke("inspect_request", { method: "open_store", params: {} })
+      .catch((error) => console.warn("The store page could not open", error))
+      .finally(() => setOpening(false));
+  };
   useEffect(() => {
     if (!active || !isTauri()) return;
     // Subscribed before the read, so a hello between the two isn't missed.
@@ -63,7 +71,9 @@ export function BrowserRow({
       }
     >
       {status?.storeUrl && (
-        <LinkButton href={status.storeUrl}>{t("Chrome Web Store")}</LinkButton>
+        <LinkButton onClick={openStore} disabled={opening}>
+          {t("Chrome Web Store")}
+        </LinkButton>
       )}
     </Row>
   );

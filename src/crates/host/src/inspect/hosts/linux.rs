@@ -14,3 +14,8 @@ pub(super) fn folders(home: &Path) -> Vec<PathBuf> {
         ],
     )
 }
+
+/// None named here: the store's page opens in the system's browser.
+pub(super) fn browsers() -> Vec<&'static str> {
+    Vec::new()
+}

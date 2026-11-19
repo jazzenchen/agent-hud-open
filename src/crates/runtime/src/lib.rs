@@ -28,6 +28,7 @@ pub use agent_hud_platform::hooks;
 pub use agent_hud_platform::hud_tools;
 pub use agent_hud_platform::instance;
 pub use agent_hud_platform::local_tools;
+pub use agent_hud_platform::open_link_in;
 #[cfg(target_os = "macos")]
 pub use agent_hud_platform::registered_applications;
 #[cfg(target_os = "windows")]

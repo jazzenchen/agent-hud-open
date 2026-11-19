@@ -16,7 +16,7 @@ mod secrets;
 pub(crate) use app_cookies::{app_cookie, unseal_safe_storage};
 pub(crate) use apps::{activate_app, app_running, launch_app, ACTIVATES_APPS};
 pub use launch_services::registered_applications;
-pub(crate) use launch_services::{registered_bundle, registered_url};
+pub(crate) use launch_services::{default_browser, registered_bundle, registered_url};
 pub(crate) use process::{
     app_ancestors, codex_cli_on_port, parent_processes, process_runs, process_start, terminal_io,
 };

@@ -194,6 +194,11 @@ pub(crate) fn open_url_in_app(_bundle_id: &str, _url: &str) -> bool {
     false
 }
 
+/// Not implemented on this host: links open in the system's browser.
+pub(crate) fn default_browser() -> Option<String> {
+    None
+}
+
 pub(crate) fn open_session_url(url: &str) -> Result<(), String> {
     super::unix::spawn_script(
         include_str!("../../../scripts/linux/open-session-url.sh"),

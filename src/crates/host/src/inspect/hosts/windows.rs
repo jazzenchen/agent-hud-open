@@ -8,3 +8,8 @@ use std::path::{Path, PathBuf};
 pub(super) fn folders(_home: &Path) -> Vec<PathBuf> {
     Vec::new()
 }
+
+/// None named here: the store's page opens in the system's browser.
+pub(super) fn browsers() -> Vec<&'static str> {
+    Vec::new()
+}

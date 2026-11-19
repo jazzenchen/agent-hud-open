@@ -231,6 +231,11 @@ pub(crate) fn open_url_in_app(_bundle_id: &str, _url: &str) -> bool {
     false
 }
 
+/// Not implemented on this host: links open in the system's browser.
+pub(crate) fn default_browser() -> Option<String> {
+    None
+}
+
 pub(crate) fn open_session_url(url: &str) -> Result<(), String> {
     if let Some(opened) = apps::open_unregistered_link(url) {
         return opened;

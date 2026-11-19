@@ -1,5 +1,6 @@
 //! What Launch Services knows: the applications registered under a bundle
-//! identifier, and whether any application opens a URL.
+//! identifier, whether any application opens a URL, and which browser is the
+//! system's.
 use std::path::PathBuf;
 
 pub(crate) fn registered_bundle(id: &str) -> bool {
@@ -8,6 +9,51 @@ pub(crate) fn registered_bundle(id: &str) -> bool {
 
 /// Whether Launch Services has an application that can open this URL.
 pub(crate) fn registered_url(url: &str) -> bool {
+    default_application(url, |_| ()).is_some()
+}
+
+/// The bundle identifier of the system's web browser, the application that
+/// opens an `https` address.
+pub(crate) fn default_browser() -> Option<String> {
+    use std::{
+        ffi::{c_void, CStr},
+        ptr,
+    };
+    #[link(name = "CoreFoundation", kind = "framework")]
+    unsafe extern "C" {
+        fn CFBundleCreate(allocator: *const c_void, url: *const c_void) -> *const c_void;
+        fn CFBundleGetIdentifier(bundle: *const c_void) -> *const c_void;
+        fn CFStringGetCString(
+            text: *const c_void,
+            buffer: *mut i8,
+            size: isize,
+            encoding: u32,
+        ) -> u8;
+        fn CFRelease(value: *const c_void);
+    }
+    default_application("https://example.com/", |app| unsafe {
+        let bundle = CFBundleCreate(ptr::null(), app);
+        if bundle.is_null() {
+            return None;
+        }
+        // Owned by the bundle: read before it is released.
+        let id = CFBundleGetIdentifier(bundle);
+        let mut buffer = [0i8; 256];
+        let read = !id.is_null()
+            && CFStringGetCString(id, buffer.as_mut_ptr(), buffer.len() as isize, 0x08000100) != 0;
+        CFRelease(bundle);
+        read.then(|| {
+            CStr::from_ptr(buffer.as_ptr())
+                .to_string_lossy()
+                .into_owned()
+        })
+    })
+    .flatten()
+}
+
+/// What `read` makes of the application Launch Services opens `url` with;
+/// none when there is no such application.
+fn default_application<T>(url: &str, read: impl FnOnce(*const std::ffi::c_void) -> T) -> Option<T> {
     use std::{ffi::c_void, ptr};
     #[link(name = "CoreServices", kind = "framework")]
     unsafe extern "C" {
@@ -37,15 +83,16 @@ pub(crate) fn registered_url(url: &str) -> bool {
             ptr::null(),
         );
         if url.is_null() {
-            return false;
+            return None;
         }
         let app = LSCopyDefaultApplicationURLForURL(url, u32::MAX, ptr::null_mut());
         CFRelease(url);
         if app.is_null() {
-            return false;
+            return None;
         }
+        let read = read(app);
         CFRelease(app);
-        true
+        Some(read)
     }
 }
 
