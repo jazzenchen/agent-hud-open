@@ -9,14 +9,16 @@ use windows_sys::Win32::{
         WindowsAndMessaging::{
             AllowSetForegroundWindow, BringWindowToTop, EnumWindows, GetWindow, GetWindowLongW,
             GetWindowTextLengthW, GetWindowTextW, GetWindowThreadProcessId, IsIconic,
-            IsWindowVisible, SetForegroundWindow, SetWindowPos, ShowWindow, SwitchToThisWindow,
-            ASFW_ANY, GWL_EXSTYLE, GWL_STYLE, GW_OWNER, HWND_NOTOPMOST, HWND_TOPMOST, SWP_NOMOVE,
-            SWP_NOSIZE, SWP_SHOWWINDOW, SW_RESTORE, SW_SHOW, WS_EX_TOOLWINDOW, WS_THICKFRAME,
+            IsWindowVisible, SetForegroundWindow, SetWindowPos, ShowWindow, ASFW_ANY, GWL_EXSTYLE,
+            GW_OWNER, HWND_NOTOPMOST, HWND_TOPMOST, SWP_NOMOVE, SWP_NOSIZE, SWP_SHOWWINDOW,
+            SW_RESTORE, SW_SHOW, WS_EX_TOOLWINDOW, WS_EX_TOPMOST,
         },
     },
 };
 
-/// Whether `window` is a visible, unowned, resizable, titled top-level window.
+/// Whether `window` is a visible, unowned, titled top-level window that is
+/// not a tool window. It need not be resizable: a fixed-size window, and a
+/// full-screen one (which drops its resizing frame), are main windows too.
 pub(crate) fn is_main_window(window: HWND) -> bool {
     // SAFETY: plain queries on a top-level HWND enumerated by EnumWindows.
     unsafe {
@@ -24,7 +26,6 @@ pub(crate) fn is_main_window(window: HWND) -> bool {
             && GetWindow(window, GW_OWNER).is_null()
             && GetWindowTextLengthW(window) > 0
             && (GetWindowLongW(window, GWL_EXSTYLE) & WS_EX_TOOLWINDOW as i32) == 0
-            && (GetWindowLongW(window, GWL_STYLE) & WS_THICKFRAME as i32) != 0
     }
 }
 
@@ -82,6 +83,7 @@ pub(super) fn with_title_containing(pids: &[u32], needle: &str) -> Option<HWND> 
 
 /// Windows lets a process that is not in front raise another window only
 /// after a keyboard event; a lone Alt press is the usual way round that.
+/// True when the window took the foreground.
 pub(crate) fn bring_forward(window: HWND) -> bool {
     let key = |flags| INPUT {
         r#type: INPUT_KEYBOARD,
@@ -104,14 +106,17 @@ pub(crate) fn bring_forward(window: HWND) -> bool {
         } else {
             ShowWindow(window, SW_SHOW);
         }
-        let flags = SWP_NOSIZE | SWP_NOMOVE | SWP_SHOWWINDOW;
-        SetWindowPos(window, HWND_TOPMOST, 0, 0, 0, 0, flags);
-        SetWindowPos(window, HWND_NOTOPMOST, 0, 0, 0, 0, flags);
+        // Lifted over the other windows even where Windows keeps the
+        // foreground from it. One that keeps itself always on top is already
+        // over them, and lowering it again would take that away.
+        if GetWindowLongW(window, GWL_EXSTYLE) & WS_EX_TOPMOST as i32 == 0 {
+            let flags = SWP_NOSIZE | SWP_NOMOVE | SWP_SHOWWINDOW;
+            SetWindowPos(window, HWND_TOPMOST, 0, 0, 0, 0, flags);
+            SetWindowPos(window, HWND_NOTOPMOST, 0, 0, 0, 0, flags);
+        }
         SendInput(2, inputs.as_ptr(), size_of::<INPUT>() as i32);
         BringWindowToTop(window);
-        let _ = SetForegroundWindow(window);
-        SwitchToThisWindow(window, 1);
-        true
+        SetForegroundWindow(window) != 0
     }
 }
 

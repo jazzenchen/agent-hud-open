@@ -260,7 +260,9 @@ pub(crate) fn open_session_url(url: &str) -> Result<(), String> {
             .then_some(())
             .ok_or_else(|| "The native client could not open this session".into());
     }
-    let is_codex = url.starts_with("codex:");
+    // A Codex that runs already gets its link and may stay behind the window
+    // in front; one that does not is started by the link itself.
+    let codex_ran = url.starts_with("codex:") && app_running(apps::CODEX);
     if let Some(opened) = apps::open_unregistered_link(url) {
         return opened;
     }
@@ -297,8 +299,8 @@ pub(crate) fn open_session_url(url: &str) -> Result<(), String> {
     } as isize
         > 32
     {
-        if is_codex {
-            let _ = apps::launch_app(apps::CODEX);
+        if codex_ran {
+            apps::raise_app(apps::CODEX);
         }
         Ok(())
     } else {

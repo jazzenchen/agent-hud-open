@@ -156,6 +156,15 @@ pub(crate) fn open_deepseek() -> bool {
     deepseek_executable().is_some_and(|program| start(&program, None))
 }
 
+/// Brings a running app's window in front without starting anything: false
+/// when it shows no window.
+pub(crate) fn raise_app(bundle_id: &str) -> bool {
+    let pids = running_pids(programs(bundle_id));
+    window::of(&pids)
+        .first()
+        .is_some_and(|&window| window::bring_forward(window))
+}
+
 /// Starts a program as a click on it would, so a copy already running
 /// shows its window.
 pub(crate) fn start_program(program: &Path) -> bool {
