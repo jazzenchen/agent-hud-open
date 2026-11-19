@@ -1,4 +1,9 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "identifier": "app.agenthud.linux"
+  "identifier": "app.agenthud.linux",
+  "bundle": {
+    "linux": {
+      "deb": { "depends": ["libgtk-layer-shell0"] }
+    }
+  }
 }

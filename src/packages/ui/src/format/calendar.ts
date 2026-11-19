@@ -212,13 +212,22 @@ const firstDays = new Map<string, number>();
 export function systemCalendar(locale: string): WeekCalendar {
   let firstDay = firstDays.get(locale);
   if (firstDay === undefined) {
-    type WeekInfo = { firstDay: number };
-    const info = new Intl.Locale(locale) as Intl.Locale & {
-      getWeekInfo?: () => WeekInfo;
-      weekInfo?: WeekInfo;
-    };
-    firstDay = info.getWeekInfo?.().firstDay ?? info.weekInfo?.firstDay ?? 1;
+    firstDay = localeFirstDay(locale);
     firstDays.set(locale, firstDay);
   }
   return { timeZone: systemTimeZone(), firstWeekday: (firstDay % 7) + 1 };
+}
+
+/** The locale's first day of the week (1 = Monday … 7 = Sunday), Monday when
+ * Intl can't say. Linux with LANG=C.UTF-8 or POSIX gives WebKitGTK the
+ * language "c", which Intl.Locale refuses with a RangeError. */
+function localeFirstDay(locale: string): number {
+  type WeekInfo = { firstDay: number };
+  let info: Intl.Locale & { getWeekInfo?: () => WeekInfo; weekInfo?: WeekInfo };
+  try {
+    info = new Intl.Locale(locale);
+  } catch {
+    return 1;
+  }
+  return info.getWeekInfo?.().firstDay ?? info.weekInfo?.firstDay ?? 1;
 }
