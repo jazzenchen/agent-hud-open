@@ -56,6 +56,22 @@ fn plugin_answers(world: &World, answer: Value) -> std::thread::JoinHandle<Value
 }
 
 #[test]
+fn a_harness_session_on_an_older_plugin_is_not_listed_as_taking_a_steer() {
+    let mut world = World::on();
+    running_harness(&mut world, "7");
+    std::fs::write(
+        world
+            .harness_channel
+            .join(format!("sessions/{HARNESS_OWN}.json")),
+        br#"{"at":1,"channelVersion":2}"#,
+    )
+    .unwrap();
+    let row = listed(&mut world, HARNESS);
+    assert_eq!(row["reachable"], true, "{row}");
+    assert_eq!(row["steerable"], false, "{row}");
+}
+
+#[test]
 fn a_steer_goes_into_the_harness_turn_in_progress_and_its_answer_is_read_from_it() {
     let mut world = World::on();
     running_harness(&mut world, "7");
@@ -258,6 +274,19 @@ fn list_sessions_says_which_harness_sessions_can_be_steered() {
         .unwrap()
         .contains("No turn is in progress"));
     world.state(HARNESS, "running");
+    // A plugin that checked in without a channel version predates steering.
+    assert_eq!(
+        listed(&mut world, HARNESS)["steerable"],
+        false,
+        "old plugin"
+    );
+    std::fs::write(
+        world
+            .harness_channel
+            .join(format!("sessions/{HARNESS_OWN}.json")),
+        br#"{"at":1,"channelVersion":3}"#,
+    )
+    .unwrap();
     assert_eq!(listed(&mut world, HARNESS)["steerable"], true);
     world.snapshot["settings"]["deepseekMessages"] = json!(false);
     assert_eq!(

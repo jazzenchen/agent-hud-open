@@ -13,6 +13,11 @@ const STEER_NOT_TAKEN: &str =
     "DeepSeek Harness's plugin did not take the steer in time, so nothing was sent";
 
 impl DeepSeekChannel {
+    /// Whether the plugin `session` last checked in from is new enough to
+    /// take a steer.
+    pub(crate) fn takes_steer(&self, session: &str) -> bool {
+        self.0.channel_version(bare(session)) >= STEER_VERSION
+    }
     /// A steer names no turn ahead (the plugin finds the one in progress)
     /// and no model, and needs a plugin new enough to take it.
     pub(super) fn check_steer(&self, request: &SendRequest) -> Result<()> {
@@ -26,7 +31,7 @@ impl DeepSeekChannel {
                 "A steer goes into the turn in progress in its model; send a model with a queued message".into(),
             ));
         }
-        if self.0.channel_version(bare(&request.session_id)) < STEER_VERSION {
+        if !self.takes_steer(&request.session_id) {
             return Err(Failure::Unsupported(OLD_STEER_PLUGIN.into()));
         }
         Ok(())

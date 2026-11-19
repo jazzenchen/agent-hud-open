@@ -29,6 +29,7 @@
   "showsNumbers": true,
   "greyNumbers": false,
   "greyNumberOpacity": 1,
+  "shortestWindowFirst": false,
   "separatesAgents": false,
   "restStyle": "dock",
   "restBarLength": 64,

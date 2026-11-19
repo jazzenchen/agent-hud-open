@@ -129,6 +129,11 @@ export function HUDSection({
                   0.05,
                   percent,
                 )}
+              {toggle(
+                "shortestWindowFirst",
+                t("Shortest window first"),
+                t("The shortest window's percentage beside each logo."),
+              )}
             </>
           )}
           {toggle(

@@ -1,5 +1,8 @@
-//! Google AI subscription tiers that Antigravity spends
-//! (antigravity.google / one.google.com, checked as of `plans::CHECKED`).
+//! Google AI subscription tiers that Antigravity spends, at US monthly prices
+//! (antigravity.google / one.google.com, checked 2026-11-19). Google states how
+//! the Pro and Ultra tiers compare (Ultra 5x / 20x of Pro) but gives Plus no
+//! multiple for Antigravity, so Plus has a price and no multiple, and no
+//! downgrade advice points at it.
 //! The desktop/IDE language server reports `Google AI Pro` (and Ultra tiers);
 //! the CLI status line reports short names such as `Pro`. Bare `Google AI Ultra`
 //! or `Ultra` could be 5x or 20x and stays unpriced; free / starter tiers have
@@ -13,7 +16,7 @@ pub static CATALOG: Catalog = Catalog {
             id: "antigravity.plus",
             name: "Google AI Plus",
             monthly_usd: 4.99,
-            multiple: Some(0.5),
+            multiple: None,
             short_multiple: None,
             spellings: &["googleaiplus", "plus"],
         },

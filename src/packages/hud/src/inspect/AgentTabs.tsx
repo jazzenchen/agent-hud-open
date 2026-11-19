@@ -5,7 +5,7 @@ import { useGround } from "../ground";
 import { alertInk } from "../tokens";
 
 /** The clients the window sends to, in the order their tabs show. */
-const ORDER = ["claude", "codex", "antigravity", "deepseek"];
+const ORDER = ["claude", "codex", "antigravity", "deepseek", "pi", "opencode"];
 
 /** The clients with a session or a new one to offer. */
 export function tabClients(clients: Iterable<string>): string[] {

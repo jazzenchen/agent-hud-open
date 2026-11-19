@@ -28,7 +28,7 @@ fn strip_width(
             let size = screen.number("simpleSize").clamp(20.0, 60.0);
             let style = screen.simple_style();
             let rings = matches!(style, "rings" | "segments");
-            let numbers = style == "numbers" || screen.flag("showsNumbers");
+            let numbers = screen.shows_numbers();
             let logo = (size * if rings { 0.55 } else { 0.68 }).round();
             let mark = if rings { size } else { logo };
             // geometry.ts `bar`: bars beside the logo, 1.09 marks long.
@@ -94,15 +94,18 @@ fn plan(
     let layout = screen.layout();
     let labels: Vec<String> = snapshot
         .map(|snapshot| {
-            vendors::configured(snapshot, screen.mode_name(), layout, now_ms)
-                .iter()
-                .map(|vendor| {
-                    vendors::meter_label(
-                        vendor,
-                        snapshot["settings"]["quotaDisplay"] == "remaining",
-                    )
-                })
-                .collect()
+            vendors::configured(
+                snapshot,
+                screen.mode_name(),
+                layout,
+                now_ms,
+                screen.shortest_window_first(),
+            )
+            .iter()
+            .map(|vendor| {
+                vendors::meter_label(vendor, snapshot["settings"]["quotaDisplay"] == "remaining")
+            })
+            .collect()
         })
         .unwrap_or_default();
     let strip = strip_width(

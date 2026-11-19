@@ -137,10 +137,13 @@ pub(super) fn run(app: &tauri::AppHandle) {
         }
         if let Some(snapshot) = snapshot.as_deref().filter(|_| changed != 0) {
             // The primary screen's HUD names the menu's agents and its colors.
+            // Its headline stays the tightest window: Shortest window first
+            // moves only the numbers beside a display's logos.
             let (id, has_notch) = planner.primary().unwrap_or(("", false));
             let screen = hud::Screen::new(&view, id, has_notch);
             let appearance = screen.text("appearance");
-            let agents = vendors::configured(snapshot, screen.mode_name(), screen.layout(), now_ms);
+            let agents =
+                vendors::configured(snapshot, screen.mode_name(), screen.layout(), now_ms, false);
             let state = tray::project(
                 snapshot,
                 &agents,

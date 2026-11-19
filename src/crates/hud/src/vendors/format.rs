@@ -14,7 +14,7 @@ pub fn quota_percent(used: f64, remaining: bool) -> f64 {
     }
 }
 
-/// The number a Simple HUD writes beside a mark: its tightest window (held
+/// The number a Simple HUD writes beside a mark: its chosen window (held
 /// from the last reading when it failed), else its balance, else its last 24
 /// hours (model.ts `meterLabel`).
 pub fn meter_label(vendor: &Vendor, remaining: bool) -> String {

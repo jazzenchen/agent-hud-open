@@ -116,6 +116,7 @@ mod tests {
             io::{AsRawHandle, FromRawHandle, OwnedHandle},
             process::CommandExt,
         };
+        use std::process::Command;
         use windows_sys::Win32::{
             Foundation::WAIT_OBJECT_0,
             System::Threading::{
