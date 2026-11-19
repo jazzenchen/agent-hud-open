@@ -70,7 +70,10 @@ pub static PROVIDER: Provider = Provider {
 pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
     // Cursor's quota comes only from its sign-in sent to cursor.com: no
     // record on this computer or client interface to ask instead.
-    if !host.quota_reading(super::AGENT.id).allows(QuotaReading::Full) {
+    if !host
+        .quota_reading(super::AGENT.id)
+        .allows(QuotaReading::Full)
+    {
         let mut reading = Reading::empty("cursor");
         reading.notice = Some(quota_reading::off_notice());
         return Ok(reading);

@@ -327,7 +327,11 @@ mod tests {
         core.apply_setting("quotaReading", &levels).unwrap();
         let reopened = AgentHudCore::new(vec![], home.path().to_owned());
         assert_eq!(reopened.settings["quotaReading"], levels);
-        for invalid in [json!({"claude": "sometimes"}), json!(["claude"]), json!(null)] {
+        for invalid in [
+            json!({"claude": "sometimes"}),
+            json!(["claude"]),
+            json!(null),
+        ] {
             assert!(core.apply_setting("quotaReading", &invalid).is_err());
             assert_eq!(core.settings["quotaReading"], levels);
         }

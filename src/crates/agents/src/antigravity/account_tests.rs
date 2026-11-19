@@ -491,10 +491,18 @@ fn local_quota_reading_takes_only_the_clis_reports() {
     let mut host = answering(Ok(status_body()));
     host.quota_levels
         .insert("antigravity".into(), crate::account::QuotaReading::Local);
-    assert!(read(&host).is_err(), "no report, and the service is not asked");
+    assert!(
+        read(&host).is_err(),
+        "no report, and the service is not asked"
+    );
     host.account_reports.insert(
         "antigravity".into(),
-        vec![report("a@example.com", "2026-11-01T00:00:00Z", 0.6, "2026-11-02T00:00:00Z")],
+        vec![report(
+            "a@example.com",
+            "2026-11-01T00:00:00Z",
+            0.6,
+            "2026-11-02T00:00:00Z",
+        )],
     );
     let reading = read(&host).unwrap();
     assert!(reading.account.is_some());

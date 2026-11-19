@@ -1064,7 +1064,9 @@ fn an_old_record_at_local_shows_stale_and_none_is_an_error() {
     let mut host = at(signed_out_with_desktop(), QuotaReading::Local);
     record(&mut host, "/u/.claude.json", 2 * 86_400_000, None);
     let reading = read(&host).unwrap();
-    let failure = reading.failure.expect("an old record is not a fresh reading");
+    let failure = reading
+        .failure
+        .expect("an old record is not a fresh reading");
     assert!(failure.reason().starts_with(&quota_reading::local_only()));
     let host = at(signed_out_with_desktop(), QuotaReading::Local);
     assert!(read(&host).is_err());
@@ -1079,7 +1081,10 @@ fn official_quota_reading_asks_the_engine_but_not_the_desktop_sign_in() {
     let host = at(signed_out_with_desktop(), QuotaReading::Official);
     let _ = read(&host);
     assert!(
-        host.asked.borrow().iter().all(|(url, _)| !url.contains("claude.ai")),
+        host.asked
+            .borrow()
+            .iter()
+            .all(|(url, _)| !url.contains("claude.ai")),
         "the desktop app's sign-in is never sent"
     );
 }
