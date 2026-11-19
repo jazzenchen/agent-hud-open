@@ -5,44 +5,6 @@ use crate::{l10n, Runtime};
 use serde_json::{json, Value};
 use std::{path::PathBuf, sync::PoisonError};
 
-/// Navigates a session directly from a previously published snapshot without
-/// taking the collector's `Runtime` lock. Returns `None` when the session is
-/// absent from the snapshot or native navigation falls back to transcript lookup.
-pub fn open_cached_session(
-    snapshot: &Value,
-    id: &str,
-    demo: bool,
-) -> Option<Result<Value, String>> {
-    let session = snapshot["sessions"]
-        .as_array()
-        .and_then(|rows| rows.iter().find(|row| row["id"].as_str() == Some(id)));
-    let event = snapshot["islandEvents"].as_array().and_then(|events| {
-        events
-            .iter()
-            .find(|item| item["sessionId"].as_str() == Some(id))
-    });
-    if session.is_none() && event.is_none() {
-        return None;
-    }
-    if demo {
-        return Some(Ok(json!({"opened":true,"action":"demo"})));
-    }
-    let target = session
-        .map(|row| &row["navigationTarget"])
-        .filter(|target| !target.is_null())
-        .or_else(|| event.map(|item| &item["navigationTarget"]))
-        .filter(|target| !target.is_null())?;
-    let platform = match crate::NativePlatform::new() {
-        Ok(platform) => platform,
-        Err(error) => return Some(Err(error)),
-    };
-    match platform.navigate_session(target) {
-        Ok(true) => Some(Ok(json!({"opened":true,"action":"native_session"}))),
-        Ok(false) => None,
-        Err(error) => Some(Err(error)),
-    }
-}
-
 /// The queries answered from committed facts alone (`local_query`).
 const LOCAL_QUERIES: &[&str] = &[
     "statistics",
@@ -88,26 +50,7 @@ impl Runtime {
             };
         }
         if method == "open_session" {
-            let id = params["id"]
-                .as_str()
-                .ok_or_else(|| l10n::tr("Session ID is required"))?;
-            let detail = self.core.request("session_detail", params.clone())?;
-            if self.is_demo() {
-                // A demo session has nowhere to go; the HUD hands over as it would.
-                return Ok(json!({"opened":true,"action":"demo"}));
-            }
-            if self
-                .platform
-                .navigate_session(&detail["session"]["navigationTarget"])?
-            {
-                return Ok(json!({"opened":true,"action":"native_session"}));
-            }
-            if detail["session"]["desktopProject"].is_object() {
-                return Err(l10n::tr("The original Project session could not be opened"));
-            }
-            let path = self.core.transcript_path(id)?;
-            self.platform.reveal_transcript(&path)?;
-            return Ok(json!({"opened":true,"action":"reveal_transcript"}));
+            return self.open_session(params);
         }
         if method == "open_client" {
             // A step only the user can take in the client itself, such as

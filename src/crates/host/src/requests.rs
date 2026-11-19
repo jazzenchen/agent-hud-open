@@ -5,6 +5,7 @@ use crate::{
     service::{wake_collector, Service, DATA},
     system, AppState,
 };
+use agent_hud_runtime::CachedOpen;
 use serde_json::Value;
 use std::sync::{atomic::Ordering, Arc, PoisonError};
 use tauri::Manager;
@@ -26,20 +27,23 @@ pub(crate) async fn native_request(
     let collection = Arc::clone(&service.collection);
     let wake = Arc::clone(&service.wake);
     tauri::async_runtime::spawn_blocking(move || {
+        // A session the HUD shows opens from the published snapshot, never
+        // behind a collection pass. When its client could not open it, only
+        // its log takes the lock: the client is not asked a second time.
         if method == "open_session" {
-            if let Some(id) = params["id"].as_str() {
-                let snapshot = latest_snapshot
-                    .read()
-                    .unwrap_or_else(PoisonError::into_inner)
-                    .clone();
-                if let Some(snapshot) = snapshot {
-                    if let Some(result) = agent_hud_runtime::open_cached_session(
-                        &snapshot,
-                        id,
-                        app.state::<AppState>().demo,
-                    ) {
-                        return result;
+            let snapshot = latest_snapshot
+                .read()
+                .unwrap_or_else(PoisonError::into_inner)
+                .clone();
+            if let (Some(id), Some(snapshot)) = (params["id"].as_str(), snapshot) {
+                let demo = app.state::<AppState>().demo;
+                match agent_hud_runtime::open_cached_session(&snapshot, id, demo) {
+                    CachedOpen::Done(result) => return result,
+                    CachedOpen::Reveal => {
+                        let mut backend = backend.lock().unwrap_or_else(PoisonError::into_inner);
+                        return backend.runtime.reveal_session(id);
                     }
+                    CachedOpen::Unlisted => {}
                 }
             }
         }

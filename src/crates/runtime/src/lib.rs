@@ -10,6 +10,7 @@ use std::{
 
 mod demo;
 mod log_reminders;
+mod open;
 mod request;
 mod startup;
 #[cfg(test)]
@@ -34,7 +35,7 @@ pub use agent_hud_platform::registered_applications;
 #[cfg(target_os = "windows")]
 pub use agent_hud_platform::windows_session;
 pub use agent_hud_platform::CollectionGate;
-pub use request::open_cached_session;
+pub use open::{open_cached_session, CachedOpen};
 pub use startup::{claim_collector, home_directory, legacy_preferences, local_tools_directory};
 
 pub struct Runtime {

@@ -77,24 +77,31 @@ fn antigravity_cli_rejects_invalid_lists_and_missing_owners_without_file_changes
 }
 
 #[test]
-fn open_cached_session_skips_lock_only_when_snapshot_matches() {
+fn a_click_opens_from_the_snapshot_only_a_session_it_lists() {
     let snapshot = json!({
-        "sessions": [
-            {"id": "s1", "navigationTarget": null},
-            {"id": "s2", "navigationTarget": {"kind": "antigravity-conversation", "id": "conv"}}
-        ],
+        "sessions": [{"id": "s1", "navigationTarget": null}],
         "islandEvents": [
             {"sessionId": "e1", "navigationTarget": {"kind": "antigravity-conversation", "id": "ev"}}
         ]
     });
-    assert!(open_cached_session(&snapshot, "missing", false).is_none());
-    assert!(open_cached_session(&snapshot, "s1", false).is_none());
+    // Unlisted, even with an event's target: the Runtime resolves it as before.
+    for id in ["missing", "e1"] {
+        assert_eq!(
+            open_cached_session(&snapshot, id, false),
+            CachedOpen::Unlisted
+        );
+        assert_eq!(
+            open_cached_session(&json!({}), id, false),
+            CachedOpen::Unlisted
+        );
+    }
+    // No way back: straight to its log, with no client asked.
     assert_eq!(
-        open_cached_session(&snapshot, "s1", true).unwrap().unwrap(),
-        json!({"opened": true, "action": "demo"})
+        open_cached_session(&snapshot, "s1", false),
+        CachedOpen::Reveal
     );
     assert_eq!(
-        open_cached_session(&snapshot, "e1", true).unwrap().unwrap(),
-        json!({"opened": true, "action": "demo"})
+        open_cached_session(&snapshot, "s1", true),
+        CachedOpen::Done(Ok(json!({"opened": true, "action": "demo"})))
     );
 }
