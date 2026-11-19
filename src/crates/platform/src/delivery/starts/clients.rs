@@ -262,6 +262,10 @@ impl SessionStarts {
                     )
                 })?
                 .models(SystemTime::now()),
+            Provider::Pi | Provider::OpenCode => Err(Failure::Unsupported(format!(
+                "A new {} session starts in the model the client chooses itself",
+                provider.as_str()
+            ))),
             _ => Err(Failure::Unsupported(format!(
                 "Agent HUD does not start {} sessions",
                 provider.as_str()

@@ -21,6 +21,13 @@ pub(super) fn prepare(child: &mut Child, stdout: &ChildStdout, stderr: &ChildStd
     Ok(())
 }
 
+/// A launched client runs in a process group of its own, so a signal to the
+/// app's group (its terminal's Ctrl-C, say) does not end it with the app.
+pub(super) fn detach(command: &mut std::process::Command) {
+    use std::os::unix::process::CommandExt;
+    command.process_group(0);
+}
+
 /// No job on macOS and Linux: ending a server kills the process it started,
 /// and nothing tracks that process's own children (a process group would).
 pub(super) struct Job;

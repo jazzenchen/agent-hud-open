@@ -15,6 +15,10 @@ pub(super) fn prepare(
     Ok(())
 }
 
+/// A launched client is in no job of the app's, so it outlives the app as
+/// it is.
+pub(super) fn detach(_command: &mut std::process::Command) {}
+
 /// A temporary app-server may be launched by an npm cmd/Node shim. Closing its
 /// job terminates the shim and descendants; killing only Child would leave the
 /// server behind. Assign immediately after spawn, before any protocol request.

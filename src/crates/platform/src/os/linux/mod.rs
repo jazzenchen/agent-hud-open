@@ -135,6 +135,10 @@ pub(crate) fn engine_candidates(home: &Path, env: &Environment, name: &str) -> V
         ));
     }
     paths.extend(path_entries(env).into_iter().map(|dir| dir.join(name)));
+    if name == "opencode" {
+        // OpenCode's install script's folder.
+        paths.push(home.join(".opencode/bin/opencode"));
+    }
     paths
 }
 pub(crate) fn engine_path(home: &Path, env: &Environment) -> String {

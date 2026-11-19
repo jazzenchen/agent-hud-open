@@ -33,6 +33,25 @@ pub struct ProcessOutput {
 pub trait ProcessRunner: Send + Sync {
     fn run(&self, plan: &CommandPlan) -> Result<ProcessOutput>;
     fn open(&self, uri: &str) -> Result<()>;
+    /// Starts `plan` and leaves it running on its own, past the app's exit,
+    /// with `input` on its standard input, which then closes. The plan's
+    /// timeout is not used: the process ends when its work does.
+    fn launch(&self, plan: &CommandPlan, input: &str) -> Result<Launched>;
+}
+/// A process `ProcessRunner::launch` started: how it ended, once it did.
+#[derive(Clone, Default)]
+pub struct Launched(Arc<Mutex<Option<ProcessOutput>>>);
+impl Launched {
+    /// Its exit code and what it wrote; none while it still runs.
+    pub fn ended(&self) -> Option<ProcessOutput> {
+        self.0.lock().ok().and_then(|ended| ended.clone())
+    }
+    /// Records how it ended: a native process's watcher, or a test's fake.
+    pub fn end(&self, output: ProcessOutput) {
+        if let Ok(mut ended) = self.0.lock() {
+            *ended = Some(output);
+        }
+    }
 }
 pub struct NativeProcessRunner;
 /// The links a start or a send may open: a Claude Code session in the
@@ -113,6 +132,59 @@ impl ProcessRunner for NativeProcessRunner {
                 "Client link could not be opened".into(),
             ))
         }
+    }
+    fn launch(&self, plan: &CommandPlan, input: &str) -> Result<Launched> {
+        if !plan.executable.is_absolute() {
+            return Err(Failure::InvalidInput("Explicit executable required".into()));
+        }
+        // A Windows shim runs as the program it names, as `run` does.
+        let mut command = crate::os::engine_command(&plan.executable, &plan.arguments)
+            .map_err(Failure::Unsupported)?;
+        command
+            .envs(&plan.environment)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
+        if let Some(folder) = &plan.directory {
+            command.current_dir(folder);
+        }
+        crate::os::configure_command(&mut command);
+        children::detach(&mut command);
+        let mut child = crate::os::spawn(&mut command)?;
+        let mut stdin = child.stdin.take().expect("piped stdin");
+        let mut stdout = child.stdout.take().expect("piped stdout");
+        let mut stderr = child.stderr.take().expect("piped stderr");
+        children::prepare(&mut child, &stdout, &stderr)?;
+        let launched = Launched::default();
+        let watcher = launched.clone();
+        let input = input.to_owned();
+        // The input goes in from here too, so a process that never reads it
+        // cannot hold the start. What it prints is read as it comes, so a
+        // full pipe never stops it; only the first of it is kept.
+        std::thread::spawn(move || {
+            use std::io::Write;
+            let _ = stdin.write_all(input.as_bytes());
+            drop(stdin);
+            let (mut out, mut err) = (Vec::new(), Vec::new());
+            let code = loop {
+                let _ = children::drain(&mut stdout, &mut out);
+                let _ = children::drain(&mut stderr, &mut err);
+                match child.try_wait() {
+                    Ok(Some(status)) => break status.code(),
+                    Ok(None) => std::thread::sleep(Duration::from_millis(200)),
+                    Err(_) => break None,
+                }
+            };
+            let _ = children::drain(&mut stdout, &mut out);
+            let _ = children::drain(&mut stderr, &mut err);
+            watcher.end(ProcessOutput {
+                code,
+                stdout: out,
+                stderr: err,
+                timed_out: false,
+            });
+        });
+        Ok(launched)
     }
 }
 

@@ -43,10 +43,18 @@ impl Messaging {
             })
             .collect::<Vec<_>>();
         rows.sort_by(|a, b| b["updatedAt"].as_str().cmp(&a["updatedAt"].as_str()));
+        // The clients `start_session` starts; the phone and the person's own
+        // window also start Pi and OpenCode.
         let starts = self
             .starts
             .offers_for(&all_sessions(host.snapshot))
             .into_iter()
+            .filter(|offer| {
+                matches!(
+                    offer.provider,
+                    Provider::Claude | Provider::Codex | Provider::Antigravity | Provider::DeepSeek
+                )
+            })
             .map(|offer| {
                 (
                     offer.provider.as_str().to_owned(),

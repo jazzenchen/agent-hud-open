@@ -1,6 +1,6 @@
 //! Test doubles for session starts: a Claude Code that runs no process, and a
 //! home folder under the system temp directory with one trusted project.
-use super::process::{CommandPlan, ProcessOutput, ProcessRunner};
+use super::process::{CommandPlan, Launched, ProcessOutput, ProcessRunner};
 use super::*;
 use serde_json::{json, Value};
 use std::fs;
@@ -10,12 +10,20 @@ pub const SESSION: &str = "11111111-2222-4333-8444-555555555555";
 pub const REQUEST: &str = "22222222-3333-4444-8555-666666666666";
 const PID: u32 = 4242;
 
+/// What a launched client does in a test, in place of running: given the
+/// plan and its input, how it ended, or `None` while it still runs.
+pub type FakeLaunch = Box<dyn Fn(&CommandPlan, &str) -> Option<ProcessOutput> + Send + Sync>;
+
 /// Answers `claude --bg` and `claude stop` the way Claude Code 2.1.300 does on
-/// disk: a job state file, and a registry entry while its process lives.
+/// disk: a job state file, and a registry entry while its process lives. A
+/// launched client (Pi, OpenCode) does what `on_launch` says.
 pub struct FakeClaude {
     claude_config: PathBuf,
     pub calls: Mutex<Vec<Vec<String>>>,
     pub opened: Mutex<Vec<String>>,
+    /// Each launch: its plan and its input.
+    pub launches: Mutex<Vec<(CommandPlan, String)>>,
+    pub on_launch: Mutex<Option<FakeLaunch>>,
 }
 impl FakeClaude {
     pub fn new(claude_config: PathBuf) -> Self {
@@ -23,7 +31,12 @@ impl FakeClaude {
             claude_config,
             calls: Mutex::new(Vec::new()),
             opened: Mutex::new(Vec::new()),
+            launches: Mutex::new(Vec::new()),
+            on_launch: Mutex::new(None),
         }
+    }
+    pub fn launches(&self) -> Vec<(CommandPlan, String)> {
+        self.launches.lock().unwrap().clone()
     }
     fn state_file(&self) -> PathBuf {
         self.claude_config.join("jobs").join(JOB).join("state.json")
@@ -98,6 +111,23 @@ impl ProcessRunner for FakeClaude {
         self.opened.lock().unwrap().push(uri.into());
         Ok(())
     }
+    fn launch(&self, plan: &CommandPlan, input: &str) -> Result<Launched> {
+        self.launches
+            .lock()
+            .unwrap()
+            .push((plan.clone(), input.into()));
+        let launched = Launched::default();
+        if let Some(ended) = self
+            .on_launch
+            .lock()
+            .unwrap()
+            .as_ref()
+            .and_then(|act| act(plan, input))
+        {
+            launched.end(ended);
+        }
+        Ok(launched)
+    }
 }
 
 /// A home folder with Claude Code's settings trusting `~/project`, and an
@@ -169,6 +199,8 @@ impl StartFixture {
             self.root.join("Applications"),
             self.home().join("Applications"),
         ]);
+        // Neither Pi nor OpenCode, whatever this computer has.
+        starts.set_commands(Default::default());
         starts
     }
     /// The session list a collector reports: one Claude session in the project.
