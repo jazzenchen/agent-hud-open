@@ -166,7 +166,13 @@ impl AccountService {
     /// Takes the levels the settings name; an agent whose level changed is
     /// read again at once, its old reading dropped so none of it lingers.
     fn update_quota_levels(&self, setting: &Value) {
+        use agents::account::QuotaReading;
         let levels = agents::account::quota_reading::levels(setting);
+        // An agent the setting does not name reads in full, as one it names
+        // `full` does: neither is a change.
+        let level = |levels: &HashMap<String, QuotaReading>, agent: &str| {
+            levels.get(agent).copied().unwrap_or(QuotaReading::Full)
+        };
         let changed: Vec<String> = {
             let mut held = self
                 .context
@@ -176,7 +182,7 @@ impl AccountService {
             let changed = held
                 .keys()
                 .chain(levels.keys())
-                .filter(|agent| held.get(*agent) != levels.get(*agent))
+                .filter(|agent| level(&held, agent) != level(&levels, agent))
                 .cloned()
                 .collect::<HashSet<_>>()
                 .into_iter()

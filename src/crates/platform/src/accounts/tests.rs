@@ -870,3 +870,42 @@ fn a_claude_window_left_out_keeps_its_last_reading_while_the_account_stays() {
     assert!(agents::claude::account::PROVIDER.keeps_unreported_windows);
     assert!(!agents::codex::account::PROVIDER.keeps_unreported_windows);
 }
+
+#[test]
+fn naming_an_agents_quota_reading_full_keeps_its_reading_as_before() {
+    let directory = tempfile::tempdir().unwrap();
+    let service = AccountService::with_readers(
+        directory.path().join("home"),
+        directory.path().join("data"),
+        HashSet::new(),
+        CollectionGate::default(),
+        &[],
+    )
+    .unwrap();
+    let mut snapshot = json!({
+        "settings": {"quotaReading": {"claude": "full"}},
+        "providers": [{"id": "claude", "enabled": true, "detected": true}],
+        "sessions": [],
+    });
+    let kept = |service: &AccountService| {
+        let state = service.shared.state.lock().unwrap();
+        state.entries.contains_key("claude") && !state.force.contains("claude")
+    };
+    service
+        .shared
+        .state
+        .lock()
+        .unwrap()
+        .entries
+        .insert("claude", entry(AccountReading::empty("claude"), None, true));
+    // As at launch: the saved `full` is what was read before, not a change.
+    service.update_sources(&snapshot);
+    assert!(kept(&service), "a restored reading stays and is not forced");
+    snapshot["settings"]["quotaReading"] = json!({});
+    service.update_sources(&snapshot);
+    assert!(kept(&service), "full named or not is the same level");
+    snapshot["settings"]["quotaReading"] = json!({"claude": "off"});
+    service.update_sources(&snapshot);
+    let state = service.shared.state.lock().unwrap();
+    assert!(!state.entries.contains_key("claude") && state.force.contains("claude"));
+}
