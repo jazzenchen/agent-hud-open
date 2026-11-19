@@ -2,21 +2,20 @@
 //! NSPanel subclass for HUDs while ordinary Tauri windows remain NSWindow.
 use super::{LogicalRect, Rect};
 use objc2::MainThreadMarker;
-use objc2::{runtime::NSObjectProtocol, ClassType};
 use objc2_app_kit::{
-    NSAutoresizingMaskOptions, NSScreen, NSStatusWindowLevel, NSWindow, NSWindowAnimationBehavior,
-    NSWindowCollectionBehavior,
+    NSScreen, NSStatusWindowLevel, NSWindow, NSWindowAnimationBehavior, NSWindowCollectionBehavior,
 };
 use objc2_core_foundation::CFUUID;
-use objc2_foundation::{NSPoint, NSRect, NSSize};
-use objc2_web_kit::WKWebView;
 use std::ptr::NonNull;
 use std::{sync::mpsc, time::Duration};
 use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
+#[path = "macos/canvas.rs"]
+mod canvas;
 #[path = "macos/displays.rs"]
 mod displays;
 #[path = "macos/text_focus.rs"]
 mod text_focus;
+use canvas::{clear_under_page, hold_page};
 pub(super) use displays::{measure_screens, screen};
 pub(super) use text_focus::{begin_text_focus, end_text_focus, TextFocusOrigin};
 #[path = "macos/pointer.rs"]
@@ -189,53 +188,4 @@ fn configure(
         hold_page(native, canvas, content);
         Ok(content)
     })
-}
-
-/// Sizes the web view to the whole canvas and holds it where the canvas is on
-/// the screen, so the window only shows part of it. Set in the same main-thread
-/// pass as the window's frame, a window that grows or shrinks away from its
-/// edge (a right or bottom HUD picked up, dropped, opened or closed) only
-/// uncovers or covers more of the page. Resizing the web view instead made
-/// WebKit show its old picture against the window's new corner for the frame
-/// or two it took to lay the page out again: the dock flashed out of sight,
-/// or across the screen.
-fn hold_page(native: &NSWindow, canvas: LogicalRect, content: LogicalRect) {
-    let Some(parent) = native.contentView() else {
-        return;
-    };
-    let below_top = canvas.y - content.y;
-    let frame = NSRect::new(
-        NSPoint::new(
-            canvas.x - content.x,
-            if parent.isFlipped() {
-                below_top
-            } else {
-                content.height - below_top - canvas.height
-            },
-        ),
-        NSSize::new(canvas.width, canvas.height),
-    );
-    for view in parent.subviews().iter() {
-        if view.isKindOfClass(WKWebView::class()) {
-            view.setAutoresizingMask(NSAutoresizingMaskOptions::empty());
-            view.setFrame(frame);
-        }
-    }
-}
-
-/// WebKit fills the part of a view it has not painted yet with the "under
-/// page" color, dark by default. A HUD window that grows before its panel
-/// opens would show that as a wide black band for a frame or two, so the HUD's
-/// is clear, like the rest of its transparent window.
-fn clear_under_page(window: &tauri::WebviewWindow) {
-    use objc2_app_kit::NSColor;
-
-    let _ = window.with_webview(|platform| {
-        let pointer = platform.inner().cast::<WKWebView>();
-        if pointer.is_null() {
-            return;
-        }
-        let view = unsafe { &*pointer };
-        unsafe { view.setUnderPageBackgroundColor(Some(&NSColor::clearColor())) };
-    });
 }
