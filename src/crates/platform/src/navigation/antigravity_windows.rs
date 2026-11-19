@@ -137,8 +137,12 @@ fn find_matching_windows(home: &Path, port: u16) -> Option<(Vec<(HWND, u32)>, bo
         windows: Vec::new(),
         pids: Vec::new(),
     };
-    if unsafe { EnumWindows(Some(collect_window), (&mut candidates as *mut Candidates<'_>) as LPARAM) }
-        == 0
+    if unsafe {
+        EnumWindows(
+            Some(collect_window),
+            (&mut candidates as *mut Candidates<'_>) as LPARAM,
+        )
+    } == 0
     {
         return None;
     }

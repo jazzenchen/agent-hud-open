@@ -12,7 +12,7 @@ mod collector;
 
 pub(crate) struct Service {
     pub(crate) backend: Arc<Mutex<Backend>>,
-    pub(crate) latest_snapshot: Arc<RwLock<Option<Arc<Value>>>>,
+    pub(crate) latest_snapshot: Arc<RwLock<Option<Arc<serde_json::Value>>>>,
     pub(crate) stopped: Arc<AtomicBool>,
     pub(crate) wake: Arc<(Mutex<u8>, Condvar)>,
     pub(crate) hooks: Arc<Mutex<agent_hud_runtime::hooks::Hooks>>,

@@ -16,7 +16,7 @@ fn owner(scheme: &str) -> Option<&'static str> {
 }
 
 /// Whether an installer registered a command for the scheme.
-fn registered(scheme: &str) -> bool {
+pub(super) fn registered(scheme: &str) -> bool {
     let path = OsStr::new(&format!("{scheme}\\shell\\open\\command"))
         .encode_wide()
         .chain(Some(0))

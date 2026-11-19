@@ -15,8 +15,10 @@ mod window;
 
 use super::{codex, shortcut, Environment};
 use std::{
+    net::{SocketAddr, TcpStream},
     path::{Path, PathBuf},
     process::{Command, Stdio},
+    time::Duration,
 };
 
 pub(super) use link::open_unregistered as open_unregistered_link;
@@ -24,11 +26,14 @@ pub(super) use window::allow_foreground;
 pub(crate) use window::{bring_forward as bring_window_forward, is_main_window};
 
 pub(super) const CODEX: &str = "com.openai.codex";
+const DEEPSEEK: &str = "com.deepseek.dsh";
+const BROWSERS: &[&str] = &["msedge.exe", "chrome.exe", "firefox.exe", "brave.exe"];
 
 /// The program names that stand for an app's macOS bundle identifier.
 fn programs(bundle_id: &str) -> &'static [&'static str] {
     match bundle_id {
         CODEX => &["Codex.exe", "ChatGPT.exe"],
+        DEEPSEEK => &["DeepSeek Harness.exe"],
         "com.anthropic.claudefordesktop" => &["Claude.exe"],
         "com.google.antigravity" => &["Antigravity.exe", "Antigravity IDE.exe"],
         "com.exafunction.windsurf" => &["Windsurf.exe"],
@@ -94,6 +99,60 @@ pub(crate) fn launch_app(bundle_id: &str) -> bool {
         return surface(&processes);
     }
     installed_executable(bundle_id).is_some_and(|program| start(&program, None))
+}
+
+fn running_pids(names: &[&str]) -> Vec<u32> {
+    running::processes(names)
+        .into_iter()
+        .map(|(pid, _)| pid)
+        .collect()
+}
+
+fn deepseek_executable() -> Option<PathBuf> {
+    if let Some(found) = found_executable(DEEPSEEK) {
+        return Some(found);
+    }
+    ["ProgramFiles(x86)", "ProgramFiles"]
+        .into_iter()
+        .filter_map(std::env::var_os)
+        .map(|base| {
+            PathBuf::from(base)
+                .join("DeepSeek Harness")
+                .join("DeepSeek Harness.exe")
+        })
+        .find(|path| path.is_file())
+}
+
+fn dsh_web_listening() -> bool {
+    // DeepSeek Harness Web's default port (`clients/deepseek/questions/observer.rs`).
+    let addr = SocketAddr::from(([127, 0, 0, 1], 3080));
+    TcpStream::connect_timeout(&addr, Duration::from_millis(80)).is_ok()
+}
+
+pub(crate) fn registered_deepseek() -> bool {
+    link::registered("dsh")
+        || !running::processes(programs(DEEPSEEK)).is_empty()
+        || deepseek_executable().is_some()
+        || window::with_title_containing(&running_pids(BROWSERS), "DeepSeek Harness").is_some()
+}
+
+/// Brings DeepSeek Harness or a browser window hosting DeepSeek Harness Web
+/// forward on Windows, launching DeepSeek Harness if available.
+pub(crate) fn open_deepseek() -> bool {
+    let desktop = running::processes(programs(DEEPSEEK));
+    if !desktop.is_empty() {
+        return surface(&desktop);
+    }
+    let browser_pids = running_pids(BROWSERS);
+    if let Some(window) = window::with_title_containing(&browser_pids, "DeepSeek Harness") {
+        return window::bring_forward(window);
+    }
+    if dsh_web_listening() {
+        if let Some(window) = window::of(&browser_pids).into_iter().next() {
+            return window::bring_forward(window);
+        }
+    }
+    deepseek_executable().is_some_and(|program| start(&program, None))
 }
 
 fn surface(processes: &[(u32, PathBuf)]) -> bool {

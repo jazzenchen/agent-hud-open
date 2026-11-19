@@ -16,9 +16,11 @@ pub fn open_cached_session(
     let session = snapshot["sessions"]
         .as_array()
         .and_then(|rows| rows.iter().find(|row| row["id"].as_str() == Some(id)));
-    let event = snapshot["islandEvents"]
-        .as_array()
-        .and_then(|events| events.iter().find(|item| item["sessionId"].as_str() == Some(id)));
+    let event = snapshot["islandEvents"].as_array().and_then(|events| {
+        events
+            .iter()
+            .find(|item| item["sessionId"].as_str() == Some(id))
+    });
     if session.is_none() && event.is_none() {
         return None;
     }

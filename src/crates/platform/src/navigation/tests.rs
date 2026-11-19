@@ -2,28 +2,28 @@ use super::*;
 
 #[test]
 fn harness_opens_only_its_main_window_when_the_link_is_registered() {
-    for target in [
-        json!({"kind":"deepseek-app"}),
-        json!({"kind":"deepseek-app","id":"session/one?query=two","url":"https://example.com"}),
-    ] {
-        assert_eq!(
-            session_url_on(&target, Os::MacOs, |url| url == "dsh://open"),
-            Some("dsh://open".into())
-        );
-        assert_eq!(session_url_on(&target, Os::MacOs, |_| false), None);
+    for os in [Os::MacOs, Os::Windows] {
+        for target in [
+            json!({"kind":"deepseek-app"}),
+            json!({"kind":"deepseek-app","id":"session/one?query=two","url":"https://example.com"}),
+        ] {
+            assert_eq!(
+                session_url_on(&target, os, |url| url == "dsh://open"),
+                Some("dsh://open".into())
+            );
+            assert_eq!(session_url_on(&target, os, |_| false), None);
+        }
     }
 }
 
 #[test]
 fn harness_does_not_offer_an_unverified_desktop_link_on_other_hosts() {
-    for os in [Os::Windows, Os::Linux] {
-        assert_eq!(
-            session_url_on(&json!({"kind":"deepseek-app"}), os, |_| {
-                panic!("an unsupported link must not query the host")
-            }),
-            None
-        );
-    }
+    assert_eq!(
+        session_url_on(&json!({"kind":"deepseek-app"}), Os::Linux, |_| {
+            panic!("an unsupported link must not query the host")
+        }),
+        None
+    );
 }
 
 #[test]

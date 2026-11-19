@@ -16,7 +16,7 @@ static APP_NAVIGATION: crate::discovery::AppNavigation = crate::discovery::AppNa
     kind: "deepseek-app",
     url: PerOs {
         macos: Support::Verified("dsh://open"),
-        windows: Support::Unsupported("Harness's desktop link is not verified on Windows"),
+        windows: Support::Verified("dsh://open"),
         linux: Support::Unsupported("Harness's desktop link is not verified on Linux"),
     },
 };

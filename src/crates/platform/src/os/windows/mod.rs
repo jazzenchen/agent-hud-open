@@ -108,9 +108,9 @@ pub(crate) fn application_installed(home: &Path, env: &Environment, name: &str) 
     .iter()
     .any(|dir| dir.join(name).is_dir())
 }
-/// URL-handler lookup through Windows associations is not implemented.
-pub(crate) fn registered_url(_url: &str) -> bool {
-    false
+/// DeepSeek Harness (`dsh://open`) resolves to the desktop app or a hosted browser tab.
+pub(crate) fn registered_url(url: &str) -> bool {
+    url == "dsh://open" && apps::registered_deepseek()
 }
 pub(crate) fn executable_dirs(home: &Path, env: &Environment) -> Vec<PathBuf> {
     let mut dirs = path_entries(env);
@@ -233,6 +233,11 @@ pub(crate) fn open_url_in_app(_bundle_id: &str, _url: &str) -> bool {
 }
 
 pub(crate) fn open_session_url(url: &str) -> Result<(), String> {
+    if url == "dsh://open" {
+        return apps::open_deepseek()
+            .then_some(())
+            .ok_or_else(|| "The native client could not open this session".into());
+    }
     let is_codex = url.starts_with("codex:");
     if let Some(opened) = apps::open_unregistered_link(url) {
         return opened;

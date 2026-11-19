@@ -8,9 +8,9 @@ use windows_sys::Win32::{
         },
         WindowsAndMessaging::{
             AllowSetForegroundWindow, BringWindowToTop, EnumWindows, GetWindow, GetWindowLongW,
-            GetWindowTextLengthW, GetWindowThreadProcessId, IsIconic, IsWindowVisible,
-            SetForegroundWindow, SetWindowPos, ShowWindow, SwitchToThisWindow, ASFW_ANY,
-            GWL_EXSTYLE, GWL_STYLE, GW_OWNER, HWND_NOTOPMOST, HWND_TOPMOST, SWP_NOMOVE,
+            GetWindowTextLengthW, GetWindowTextW, GetWindowThreadProcessId, IsIconic,
+            IsWindowVisible, SetForegroundWindow, SetWindowPos, ShowWindow, SwitchToThisWindow,
+            ASFW_ANY, GWL_EXSTYLE, GWL_STYLE, GW_OWNER, HWND_NOTOPMOST, HWND_TOPMOST, SWP_NOMOVE,
             SWP_NOSIZE, SWP_SHOWWINDOW, SW_RESTORE, SW_SHOW, WS_EX_TOOLWINDOW, WS_THICKFRAME,
         },
     },
@@ -57,6 +57,29 @@ pub(super) fn of(pids: &[u32]) -> Vec<HWND> {
     search.found
 }
 
+fn window_title(window: HWND) -> String {
+    // SAFETY: `window` is a valid HWND from `of`.
+    let len = unsafe { GetWindowTextLengthW(window) };
+    if len <= 0 {
+        return String::new();
+    }
+    let mut buf = vec![0u16; len as usize + 1];
+    let copied = unsafe { GetWindowTextW(window, buf.as_mut_ptr(), buf.len() as i32) };
+    if copied <= 0 {
+        return String::new();
+    }
+    String::from_utf16_lossy(&buf[..copied as usize])
+}
+
+/// The frontmost visible main window among `pids` whose title contains `needle`
+/// (ASCII case-insensitive).
+pub(super) fn with_title_containing(pids: &[u32], needle: &str) -> Option<HWND> {
+    let needle = needle.to_ascii_lowercase();
+    of(pids)
+        .into_iter()
+        .find(|&window| window_title(window).to_ascii_lowercase().contains(&needle))
+}
+
 /// Windows lets a process that is not in front raise another window only
 /// after a keyboard event; a lone Alt press is the usual way round that.
 pub(crate) fn bring_forward(window: HWND) -> bool {
@@ -95,7 +118,7 @@ pub(crate) fn bring_forward(window: HWND) -> bool {
 /// Lets the app this process starts next take the foreground, which this
 /// process may hand on while it is in front. Without it a new window can
 /// open behind the one in front.
-pub(super) fn allow_foreground() {
+pub(crate) fn allow_foreground() {
     // SAFETY: takes no pointers; failure only means there is nothing to hand on.
     unsafe { AllowSetForegroundWindow(ASFW_ANY) };
 }
