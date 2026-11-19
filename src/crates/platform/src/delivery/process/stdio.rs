@@ -28,9 +28,10 @@ impl StdioServer {
         environment: &BTreeMap<String, String>,
         timeout: Duration,
     ) -> Result<Self> {
-        let mut command = Command::new(executable);
+        let mut command =
+            crate::os::engine_command(executable, &["app-server", "--listen", "stdio://"])
+                .map_err(Failure::Unsupported)?;
         command
-            .args(["app-server", "--listen", "stdio://"])
             .envs(environment)
             .env("CODEX_HOME", data)
             .stdin(Stdio::piped())

@@ -70,6 +70,7 @@ export interface HUDConfig {
   showsNumbers: boolean;
   greyNumbers: boolean;
   greyNumberOpacity: number;
+  shortestWindowFirst: boolean;
   separatesAgents: boolean;
   appearance: "dark" | "light" | "system";
   solidTransparency: number;
@@ -201,16 +202,35 @@ export function vendorsFromSnapshot(
 
 /** An agent whose number and level follow the windows the panel shows: a row
  * the person hid there no longer sets them (Open #91). Its rings already draw
- * only those (`markWindows`). */
+ * only those (`markWindows`). With the shortest window first, the number
+ * follows that window instead of the tightest; the level does not. */
 function withShownWindows(
   vendor: HUDVendor,
-  layout: HUDConfig["panelLayout"],
+  config: HUDConfig,
   now: number,
 ): HUDVendor {
-  const shown = shownRows(vendor.quotas, layout);
-  return shown.length === vendor.quotas.length
+  const shown = shownRows(vendor.quotas, config.panelLayout);
+  const shortestFirst = followsShortestWindow(config);
+  return shown.length === vendor.quotas.length && !shortestFirst
     ? vendor
-    : { ...vendor, ...windowReading(shown, now) };
+    : { ...vendor, ...windowReading(shown, now, shortestFirst) };
+}
+
+/** Whether a screen's numbers follow its shortest window: only where Settings
+ * offers the switch, a Simple dock that writes numbers (HUDSection.tsx). A
+ * Notch, or a dock without numbers, keeps the tightest (screen.rs
+ * `shortest_window_first`). */
+export function followsShortestWindow(
+  config: Pick<
+    HUDConfig,
+    "mode" | "simpleStyle" | "showsNumbers" | "shortestWindowFirst"
+  >,
+): boolean {
+  return (
+    config.shortestWindowFirst &&
+    config.mode === "simple" &&
+    (config.simpleStyle === "numbers" || config.showsNumbers)
+  );
 }
 
 /** A window's short name, as Core names it (the Swift `shortName`). */
@@ -221,12 +241,12 @@ export function quotaShortName(quota: {
   return quota.shortLabel || quota.name;
 }
 
-/** The share a Simple mark's ring and number show: its tightest live window, else the one its last reading holds, drawn grey since its level is then "stale". */
+/** The share a Simple mark's ring and number show: its chosen live window — the shortest when the screen asks for it, else the tightest — else the one its last reading holds, drawn grey since its level is then "stale". */
 export function markUsed(vendor: HUDVendor): number | null {
   return vendor.used ?? vendor.heldUsed;
 }
 
-/** The number a Simple HUD writes beside a mark: its tightest window (`markUsed`), else its balance, else its last 24 hours (vendors.rs `meter_label`). */
+/** The number a Simple HUD writes beside a mark: its chosen window (`markUsed`), else its balance, else its last 24 hours (vendors.rs `meter_label`). */
 export function meterLabel(vendor: HUDVendor, display?: QuotaDisplay): string {
   const used = markUsed(vendor);
   return used == null
@@ -243,8 +263,7 @@ export function configuredVendors(
 ): HUDVendor[] {
   const now = Date.now();
   const available = vendorsFromSnapshot(snapshot, config.mode).map((vendor) => {
-    if (vendor.quotas.length)
-      return withShownWindows(vendor, config.panelLayout, now);
+    if (vendor.quotas.length) return withShownWindows(vendor, config, now);
     if (vendor.key !== "deepseek") return vendor;
     const rows = snapshot.billing.filter(
       (row) => vendorKey(row.vendor) === vendor.key,

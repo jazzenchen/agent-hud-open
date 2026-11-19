@@ -3,6 +3,8 @@ interface HeldWindow {
   usedPercent: number | null;
   status: string;
   resetAt?: string | null;
+  /** The source's fixed window length; absent/null when it does not report one. */
+  windowDurationSeconds?: number | null;
 }
 
 /** Whether a window's reset has passed: its share has started over, so its
@@ -57,15 +59,48 @@ export function tightestWindow<T extends HeldWindow>(
     );
 }
 
-/** What an agent's windows set on its mark: the tightest live window's share
- * and level, else the share its last reading holds, in the stale grey. */
+/** The live window with the shortest reported window; ties go to the
+ * highest used percent. When no live window reports a window length, the
+ * tightest window instead, so a screen without duration data reads as it
+ * did (vendors.rs `shortest`). */
+export function shortestWindow<T extends HeldWindow>(
+  quotas: readonly T[],
+  now: number,
+): T | undefined {
+  const timed = quotas.filter(
+    (q) =>
+      liveWindow(q, now) &&
+      q.windowDurationSeconds != null &&
+      Number.isFinite(q.windowDurationSeconds) &&
+      q.windowDurationSeconds > 0,
+  );
+  if (!timed.length) return tightestWindow(quotas, now);
+  return timed.reduce<T | undefined>(
+    (a, b) =>
+      !a ||
+      b.windowDurationSeconds! < a.windowDurationSeconds! ||
+      (b.windowDurationSeconds === a.windowDurationSeconds &&
+        b.usedPercent! > a.usedPercent!)
+        ? b
+        : a,
+    undefined,
+  );
+}
+
+/** What an agent's windows set on its mark: the share of its tightest live
+ * window, or of its shortest when the screen asks for that, else the share
+ * its last reading holds, in the stale grey. The level, and with it every
+ * colour, stays the tightest window's either way, so a spent weekly window
+ * still glows while the number shows the 5-hour one. */
 export function windowReading<T extends HeldWindow>(
   quotas: readonly T[],
   now: number,
+  shortestFirst = false,
 ): { used: number | null; heldUsed: number | null; level: T["status"] } {
   const tightest = tightestWindow(quotas, now);
+  const shown = shortestFirst ? shortestWindow(quotas, now) : tightest;
   return {
-    used: tightest?.usedPercent ?? null,
+    used: shown?.usedPercent ?? null,
     heldUsed: heldUsed(quotas, now),
     level: tightest?.status ?? "stale",
   };

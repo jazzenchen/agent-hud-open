@@ -103,7 +103,7 @@ fn deepseek_balances_follow_row_visibility_and_order() {
         ]
     });
     let view = |layout: Value| {
-        let list = configured(&snapshot, "simple", &layout, 0);
+        let list = configured(&snapshot, "simple", &layout, 0, false);
         let vendor = list
             .into_iter()
             .find(|vendor| vendor.key == "deepseek")
@@ -138,7 +138,7 @@ fn the_number_leaves_out_the_windows_the_panel_hides() {
         "quotas": [row("claude-5h", 100.0, "critical"), row("gemini-5h", 20.0, "normal")]
     });
     let view = |layout: Value| {
-        let list = configured(&snapshot, "simple", &layout, 0);
+        let list = configured(&snapshot, "simple", &layout, 0, false);
         let vendor = list.into_iter().next().unwrap();
         (meter_label(&vendor, false), vendor.level.to_owned())
     };
@@ -151,6 +151,83 @@ fn the_number_leaves_out_the_windows_the_panel_hides() {
         view(json!({"blocks":{"antigravity":{"hiddenAccounts":["acct"]}}})),
         ("--".into(), "stale".into())
     );
+}
+
+/// A screen that asks for the shortest window first reads its shortest live
+/// window, not its most used one; without a reported window length it reads
+/// the tightest, as before.
+#[test]
+fn the_number_can_follow_the_shortest_window_first() {
+    let row = |window: &str, used: f64, status: &str, duration: Option<f64>| {
+        json!({"id": format!("acct:{window}"), "vendor": "antigravity", "name": window,
+            "usedPercent": used, "resetAt": "2099-01-01T00:00:00Z", "status": status,
+            "account": "a@example.com", "accountId": "acct",
+            "windowDurationSeconds": duration})
+    };
+    let snapshot = json!({
+        "language": "en", "billing": [], "sessions": [], "approvals": [], "providers": [],
+        "quotas": [
+            row("claude-5h", 80.0, "normal", Some(18_000.0)),
+            row("claude-7d", 90.0, "normal", Some(604_800.0)),
+        ]
+    });
+    let view = |layout: Value, shortest_first: bool| {
+        let list = configured(&snapshot, "simple", &layout, 0, shortest_first);
+        let vendor = list.into_iter().next().unwrap();
+        (meter_label(&vendor, false), vendor.level.to_owned())
+    };
+    assert_eq!(view(json!({}), false), ("90%".into(), "normal".into()));
+    assert_eq!(view(json!({}), true), ("80%".into(), "normal".into()));
+    assert_eq!(
+        view(
+            json!({"blocks":{"antigravity":{"hiddenRows":["acct:claude-5h"]}}}),
+            true
+        ),
+        ("90%".into(), "normal".into())
+    );
+    // The number moves; the level, and every colour with it, stays the
+    // tightest window's, so a spent weekly window still warns.
+    let spent = json!({
+        "language": "en", "billing": [], "sessions": [], "approvals": [], "providers": [],
+        "quotas": [
+            row("claude-5h", 30.0, "normal", Some(18_000.0)),
+            row("claude-7d", 100.0, "critical", Some(604_800.0)),
+        ]
+    });
+    let list = configured(&spent, "simple", &json!({}), 0, true);
+    assert_eq!(meter_label(&list[0], false), "30%");
+    assert_eq!(list[0].level, "critical");
+    // Ties on duration go to the highest used percent.
+    let tied = json!({
+        "language": "en", "billing": [], "sessions": [], "approvals": [], "providers": [],
+        "quotas": [
+            row("claude-5h-a", 60.0, "normal", Some(18_000.0)),
+            row("claude-5h-b", 80.0, "normal", Some(18_000.0)),
+            row("claude-7d", 90.0, "normal", Some(604_800.0)),
+        ]
+    });
+    let list = configured(&tied, "simple", &json!({}), 0, true);
+    assert_eq!(meter_label(&list[0], false), "80%");
+    // No window reports a length: the tightest window stands.
+    let untimed = json!({
+        "language": "en", "billing": [], "sessions": [], "approvals": [], "providers": [],
+        "quotas": [
+            row("claude-5h", 80.0, "normal", None),
+            row("claude-7d", 90.0, "normal", None),
+        ]
+    });
+    let list = configured(&untimed, "simple", &json!({}), 0, true);
+    assert_eq!(meter_label(&list[0], false), "90%");
+    // A stale window never sets the number, however short it is.
+    let stale = json!({
+        "language": "en", "billing": [], "sessions": [], "approvals": [], "providers": [],
+        "quotas": [
+            row("claude-5h", 100.0, "stale", Some(18_000.0)),
+            row("claude-7d", 20.0, "normal", Some(604_800.0)),
+        ]
+    });
+    let list = configured(&stale, "simple", &json!({}), 0, true);
+    assert_eq!(meter_label(&list[0], false), "20%");
 }
 
 #[test]
@@ -196,6 +273,7 @@ fn vendors_follow_the_resting_order_and_a_layout_list() {
         "simple",
         &json!({"hud": {"agents": ["DeepSeek", "Claude Code"]}}),
         now,
+        false,
     );
     let keys: Vec<&str> = named.iter().map(|v| v.key.as_str()).collect();
     // The list picks the marks; without an agent order they keep the resting order.
@@ -205,12 +283,13 @@ fn vendors_follow_the_resting_order_and_a_layout_list() {
         "simple",
         &json!({"hud": {"agents": ["kimi"]}}),
         now,
+        false,
     );
     assert_eq!(unknown.len(), 3);
     // The HUD follows Settings' agent order, the panel's blocks (Open #31); a balance block stands for its
     // agent, and an agent with no block keeps its place after them.
     let keys = |layout: Value| -> Vec<String> {
-        configured(&snapshot, "simple", &layout, now)
+        configured(&snapshot, "simple", &layout, now, false)
             .iter()
             .map(|v| v.key.clone())
             .collect()
@@ -329,7 +408,13 @@ fn detected_clients_without_readings_keep_their_marks_and_unknown_meter() {
         assert_eq!(codex.used, None);
         assert!(codex.quotas.is_empty());
         assert_eq!(meter_label(codex, false), "--");
-        let selected = configured(&snapshot, mode, &json!({"hud":{"agents":["codex"]}}), now);
+        let selected = configured(
+            &snapshot,
+            mode,
+            &json!({"hud":{"agents":["codex"]}}),
+            now,
+            false,
+        );
         assert_eq!(selected.len(), 1);
         assert_eq!(selected[0].key, "openai");
     }
