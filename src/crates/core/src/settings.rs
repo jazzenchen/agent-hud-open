@@ -319,6 +319,21 @@ mod tests {
     }
 
     #[test]
+    fn quota_reading_levels_persist_and_reject_unknown_levels() {
+        let home = tempfile::tempdir().unwrap();
+        let mut core = AgentHudCore::new(vec![], home.path().to_owned());
+        assert_eq!(core.settings["quotaReading"], json!({}));
+        let levels = json!({"claude": "local", "cursor": "off"});
+        core.apply_setting("quotaReading", &levels).unwrap();
+        let reopened = AgentHudCore::new(vec![], home.path().to_owned());
+        assert_eq!(reopened.settings["quotaReading"], levels);
+        for invalid in [json!({"claude": "sometimes"}), json!(["claude"]), json!(null)] {
+            assert!(core.apply_setting("quotaReading", &invalid).is_err());
+            assert_eq!(core.settings["quotaReading"], levels);
+        }
+    }
+
+    #[test]
     fn account_source_paths_persist_and_reject_invalid_entries() {
         for key in ["codexHomes", "claudeHomes", "antigravityCliSettings"] {
             let home = tempfile::tempdir().unwrap();

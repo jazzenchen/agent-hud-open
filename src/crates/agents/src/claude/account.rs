@@ -79,7 +79,10 @@ static STATUS: StatusPage = StatusPage {
 /// folder's last record shows stale beside the folders that read; when every
 /// folder fails, the records come with the failures.
 pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
-    if !host.quota_reading(super::AGENT.id).allows(QuotaReading::Local) {
+    if !host
+        .quota_reading(super::AGENT.id)
+        .allows(QuotaReading::Local)
+    {
         let mut reading = Reading::empty("claude");
         reading.notice = Some(quota_reading::off_notice());
         return Ok(reading);
@@ -177,7 +180,10 @@ fn stale(reading: &mut Reading) {
 fn read_folder(host: &dyn Host, folder: &Folder) -> (Result<Reading, Unread>, bool) {
     let config = global_config(host, folder);
     let now = chrono::Utc::now().timestamp_millis();
-    if !host.quota_reading(super::AGENT.id).allows(QuotaReading::Official) {
+    if !host
+        .quota_reading(super::AGENT.id)
+        .allows(QuotaReading::Official)
+    {
         // Only Claude Code's own record: no engine, no desktop sign-in. An
         // older record shows as stale, with its age.
         let fresh = usage_record::read(&config, now)
