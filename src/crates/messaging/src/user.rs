@@ -3,7 +3,8 @@
 //! go as the person typed them (`PromptForm::Own`), with no label, no reply
 //! line and no journal: the person reads the answer in the session itself.
 //! They do not need agent messages switched on, only each client's own
-//! "Send messages" switch.
+//! "Send messages" switch. Words that go throw the paper plane from the
+//! person to the session (`person_flight`).
 use super::*;
 use agent_hud_core::naming::surfaces::{Category, Surface, AGENT_HUD};
 
@@ -141,8 +142,12 @@ impl Messaging {
         Ok(match receipt {
             Ok(receipt) => {
                 self.clients.delivered(&receipt, surface, now);
+                let state = delivered(receipt.state);
+                if !matches!(state, "refused" | "expired") {
+                    (self.fly)(person_flight(&party(host.snapshot, client, &id), false));
+                }
                 json!({
-                    "state": delivered(receipt.state),
+                    "state": state,
                     "reason": receipt.reason.as_deref().map(plain),
                     "sessionId": id,
                 })
@@ -201,12 +206,21 @@ impl Messaging {
                 if receipt.handoff_pending {
                     (self.follow)(receipt.clone());
                 }
+                let state = match receipt.state.as_str() {
+                    "started" => "started",
+                    "uncertain" => "uncertain",
+                    _ => "refused",
+                };
+                if state != "refused" {
+                    let newcomer = Party {
+                        client: client.to_owned(),
+                        session_id: receipt.session_id.clone().unwrap_or_default(),
+                        title: None,
+                    };
+                    (self.fly)(person_flight(&newcomer, true));
+                }
                 json!({
-                    "state": match receipt.state.as_str() {
-                        "started" => "started",
-                        "uncertain" => "uncertain",
-                        _ => "refused",
-                    },
+                    "state": state,
                     "reason": receipt.reason.as_deref().map(plain),
                     "sessionId": receipt.session_id,
                 })

@@ -37,8 +37,8 @@ use agent_hud_platform::delivery::{
     self, DeliveryState, LocalClients, Operation, PromptForm, Provider, SendRequest, SessionStarts,
     SessionTarget, StartReceipt, StartRequest, CLAUDE_MESSAGES_OFF, DEEPSEEK_MESSAGES_OFF,
 };
-use flights::flight;
-pub use flights::Flight;
+use flights::{flight, person_flight};
+pub use flights::{Flight, PERSON};
 use journal::{Journal, Kind, Message, Party};
 use outcome::*;
 use serde::Deserialize;

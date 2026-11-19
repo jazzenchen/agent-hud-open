@@ -1,4 +1,5 @@
-// A host's flight between two agents' marks, told as a short story: an open
+// A host's flight between two agents' marks (or from the person's clipboard
+// bubble to an agent's), told as a short story: an open
 // envelope pops up beside the sender and a letter slides in from its mark; the
 // flap closes and the envelope folds into a paper plane; it flies a looping
 // route, a dashed trail fading behind it; beside the receiver it unfolds and
@@ -47,6 +48,9 @@ interface LayerProps {
   edge: HUDEdge;
   /** The notch around the notch; the dock's strip otherwise. */
   strip: HUDRect;
+  /** Where the clipboard's end sits on a dock, shown or not: the person's
+   * words leave from there. */
+  clipEnd?: HUDRect;
   scene: RefObject<HTMLElement | null>;
   botLogos: boolean;
   reduceMotion: boolean;
@@ -85,6 +89,7 @@ function FlightRun({
   mode,
   edge,
   strip,
+  clipEnd,
   scene,
   botLogos,
   reduceMotion,
@@ -130,7 +135,7 @@ function FlightRun({
   useLayoutEffect(() => {
     const measured = stage
       ? notchEnds(stage, flight)
-      : dockEnds(scene.current!, flight, strip, edge);
+      : dockEnds(scene.current!, flight, strip, edge, clipEnd);
     setSize(measured.size);
     const delay = notch ? STORY.enter : 0;
     const planned = reduceMotion

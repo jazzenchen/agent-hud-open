@@ -1,10 +1,16 @@
-// A host's flight between two agents' marks: which one is in the air and how
-// many ride along with it.
+// A host's flight between two agents' marks, or from the person's bubble to
+// an agent's: which one is in the air and how many ride along with it.
+
+/** The person as a flight's sender (the host's `PERSON`): their words from
+ * the clipboard window leave from its end of the dock, the bubble, or around
+ * the notch from that end's side, the right. */
+export const PERSON = "person";
 
 /** One flight the host asked for (the host's `Flight`). */
 export interface HUDFlight {
   /** Flights between the same two ends share a lane. */
   lane: string;
+  /** An agent's source, or `PERSON`. */
   from: string;
   to: string;
   /** Around the notch, the sender stands on the left; otherwise on the right. */

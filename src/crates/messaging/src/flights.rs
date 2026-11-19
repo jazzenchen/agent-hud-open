@@ -1,4 +1,5 @@
-//! The paper plane: one flight for each pass, and one back once an answer reads.
+//! The paper plane: one flight for each pass, and one back once an answer reads;
+//! one too for the person's own words from the clipboard window.
 use super::*;
 use serde::Serialize;
 
@@ -129,6 +130,22 @@ pub struct Flight {
     pub arrives: bool,
     /// It was refused: it falls halfway and the sender is left puzzled.
     pub falls: bool,
+}
+
+/// The person as a flight's sender: their own words from the clipboard
+/// window leave from its end of the dock, the bubble, not from an agent's
+/// mark. Around the notch that end sits on the tail's side, the right.
+pub const PERSON: &str = "person";
+
+/// The person's words on their way to `to`, a session there is or one that
+/// appears (`arrives`).
+pub(crate) fn person_flight(to: &Party, arrives: bool) -> Flight {
+    let person = Party {
+        client: PERSON.into(),
+        session_id: String::new(),
+        title: None,
+    };
+    flight(&person, to, false, arrives, false)
 }
 
 /// One flight from `from`'s mark to `to`'s.

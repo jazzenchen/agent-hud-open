@@ -1,9 +1,10 @@
 // Where a flight happens, measured as it starts: beside the sender's and the
-// receiver's marks on a dock, or beside the robots around the notch.
+// receiver's marks on a dock (the person's bubble for their own words), or
+// beside the robots around the notch.
 import { botKey } from "../bots/artwork";
 import type { HUDRect } from "../geometry";
 import type { HUDEdge } from "../model";
-import type { HUDFlight } from "./flight-queue";
+import { PERSON, type HUDFlight } from "./flight-queue";
 import {
   dockRoute,
   inward,
@@ -56,12 +57,15 @@ export function notchEnds(stage: NotchStage, flight: HUDFlight) {
   };
 }
 
-/** On a dock: beside the sender's mark and the receiver's, both found where the strip drew them. */
+/** On a dock: beside the sender's mark and the receiver's, both found where
+ * the strip drew them. The person sends from the clipboard's end, or where it
+ * sits (`clip`) when this HUD does not show it. */
 export function dockEnds(
   root: HTMLElement,
   flight: HUDFlight,
   strip: HUDRect,
   edge: HUDEdge,
+  clip?: HUDRect,
 ) {
   const bounds = root.getBoundingClientRect();
   // The whole mark (its ring included), not the logo inside it.
@@ -73,19 +77,31 @@ export function dockEnds(
     ].find((element) => !element.closest("[data-hud-measurement]"));
     return logo?.closest<HTMLElement>(".hud-agent-mark") ?? logo ?? null;
   };
-  const sender = mark(flight.from);
+  const person = flight.from === PERSON;
+  const sender = person
+    ? ([
+        ...root.querySelectorAll<HTMLElement>('.hud-dock-end[data-end="clip"]'),
+      ].find((element) => !element.closest("[data-hud-measurement]")) ?? null)
+    : mark(flight.from);
   const receiver = mark(flight.to);
-  const shelf = (sender ?? receiver)
-    ?.closest(".hud-resting-strip")
-    ?.getBoundingClientRect();
-  const box = (element: HTMLElement | null) => {
+  // The clipboard's end sits off the strip: the receiver's strip, or the
+  // HUD's own when the receiver is still to appear.
+  const shelf = (
+    [sender, receiver]
+      .map((element) => element?.closest(".hud-resting-strip"))
+      .find(Boolean) ??
+    [...root.querySelectorAll(".hud-resting-strip")].find(
+      (element) => !element.closest("[data-hud-measurement]"),
+    )
+  )?.getBoundingClientRect();
+  const box = (element: HTMLElement | null, away = strip) => {
     if (!element)
       return {
         center: {
-          x: strip.x + strip.width / 2,
-          y: strip.y + strip.height / 2,
+          x: away.x + away.width / 2,
+          y: away.y + away.height / 2,
         },
-        side: Math.min(strip.width, strip.height),
+        side: Math.min(away.width, away.height),
       };
     const rect = element.getBoundingClientRect();
     return {
@@ -96,7 +112,7 @@ export function dockEnds(
       side: Math.max(rect.width, rect.height),
     };
   };
-  const from = box(sender);
+  const from = box(sender, person && clip ? clip : strip);
   const to = box(receiver);
   const size = craftSize(from.side);
   const n = inward[edge];

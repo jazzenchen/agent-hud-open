@@ -110,7 +110,8 @@ export interface HUDSceneProps {
    * panel step gives (Open DemoScriptRunner: island forceOpen/forceCollapse).
    * Each new `sequence` is one order. */
   panelCommand?: { open: boolean; sequence: number };
-  /** The host's recent flights between two agents' marks, oldest first. */
+  /** The host's recent flights between two agents' marks (or from the
+   * person's bubble), oldest first. */
   flights?: readonly HUDFlightCommand[];
   /** The guide's small window beside the resting HUD (GuideDock). */
   guide?: HUDGuide | null;
@@ -615,6 +616,7 @@ export function HUDScene({
             mode={config.mode}
             edge={edge}
             strip={strip}
+            clipEnd={endRects.clip}
             scene={scene}
             botLogos={config.botLogos}
             reduceMotion={reduceMotion}

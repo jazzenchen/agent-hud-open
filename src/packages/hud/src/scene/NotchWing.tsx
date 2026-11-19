@@ -1,7 +1,9 @@
 import type { RefObject } from "react";
+import { ClipboardCopy } from "lucide-react";
 import { BotMark } from "../BotMark";
 import { botState, type BotCue } from "../bots/bot-state";
 import { islandPath } from "../geometry";
+import { PERSON } from "./flight-queue";
 import type { NotchStage } from "./flight-route";
 
 // At work, so each is drawn as its robot from the first frame (a calm mark
@@ -10,7 +12,8 @@ const facing = (side: "left" | "right") =>
   botState({ look: "plain", facing: side === "left" ? "right" : "left" });
 
 /** Around the notch, where agents have no marks: a small wing growing out of
- * the notch's side, with the agent's robot peeking out of it. */
+ * the notch's side, with the agent's robot peeking out of it, or for the
+ * person the clipboard end's icon. */
 export function NotchWing({
   side,
   stage,
@@ -64,15 +67,24 @@ export function NotchWing({
           opacity: 0,
         }}
       >
-        <BotMark
-          source={source}
-          size={stage.bot}
-          state={facing(side)}
-          cue={sending ? puzzled : null}
-          enabled={botLogos}
-          light={false}
-          awake
-        />
+        {source === PERSON ? (
+          <ClipboardCopy
+            size={Math.round(stage.bot * 0.62)}
+            strokeWidth={2}
+            color="rgba(255,255,255,0.86)"
+            style={{ display: "block", margin: "auto", height: "100%" }}
+          />
+        ) : (
+          <BotMark
+            source={source}
+            size={stage.bot}
+            state={facing(side)}
+            cue={sending ? puzzled : null}
+            enabled={botLogos}
+            light={false}
+            awake
+          />
+        )}
       </div>
     </div>
   );

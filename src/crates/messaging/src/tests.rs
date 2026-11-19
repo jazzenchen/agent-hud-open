@@ -509,6 +509,19 @@ impl World {
     fn send(&mut self, from: (&str, &str), to: &str, text: &str) -> Value {
         self.call(Some(from), "send_message", json!({"to":to,"text":text}))
     }
+    /// The person's own words from the clipboard window to `target`.
+    fn user_send(&mut self, target: Value, text: &str) -> Value {
+        let query = self.transcripts.query();
+        let host = Host {
+            snapshot: &self.snapshot,
+            query: &query,
+            conversations: None,
+        };
+        let target: UserTarget = serde_json::from_value(target).unwrap();
+        self.messaging
+            .user_send(&target, text, &host, 1_792_600_000_000)
+            .unwrap()
+    }
     fn get(&mut self, id: &Value) -> Value {
         self.call(Some(("claude", CLAUDE)), "get_message", json!({"id":id}))
     }
@@ -1555,6 +1568,34 @@ fn a_new_session_appears_before_it_catches() {
     assert_eq!(
         flown(&world),
         [json!({"from":"claude","to":"claude","fromLeft":true,"arrives":true,"falls":false})]
+    );
+}
+
+#[test]
+fn the_persons_words_fly_from_the_bubble_once_they_go() {
+    let mut world = World::new(Preferences::default());
+    let sent = world.user_send(
+        json!({"kind":"session","client":"codex","sessionId":CODEX}),
+        "Look at this",
+    );
+    assert_ne!(sent["state"], "refused", "{sent}");
+    // Not a client the window sends to: nothing goes, nothing flies.
+    let refused = world.user_send(
+        json!({"kind":"session","client":"gemini","sessionId":OTHER}),
+        "Hi",
+    );
+    assert_eq!(refused["state"], "refused");
+    let started = world.user_send(
+        json!({"kind":"new","client":"claude","folder":""}),
+        "Run the whole suite",
+    );
+    assert_ne!(started["state"], "refused", "{started}");
+    assert_eq!(
+        flown(&world),
+        [
+            json!({"from":"person","to":"codex","fromLeft":false,"arrives":false,"falls":false}),
+            json!({"from":"person","to":"claude","fromLeft":false,"arrives":true,"falls":false}),
+        ]
     );
 }
 
