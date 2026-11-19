@@ -36,6 +36,7 @@ const styleKeys = [
   "showsNumbers",
   "greyNumbers",
   "greyNumberOpacity",
+  "shortestWindowFirst",
   "separatesAgents",
   "appearance",
   "solidTransparency",

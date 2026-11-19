@@ -70,6 +70,7 @@ export interface HUDConfig {
   showsNumbers: boolean;
   greyNumbers: boolean;
   greyNumberOpacity: number;
+  shortestWindowFirst: boolean;
   separatesAgents: boolean;
   appearance: "dark" | "light" | "system";
   solidTransparency: number;
@@ -201,16 +202,17 @@ export function vendorsFromSnapshot(
 
 /** An agent whose number and level follow the windows the panel shows: a row
  * the person hid there no longer sets them (Open #91). Its rings already draw
- * only those (`markWindows`). */
+ * only those (`markWindows`); with the shortest window first, they follow that
+ * window instead of the tightest. */
 function withShownWindows(
   vendor: HUDVendor,
-  layout: HUDConfig["panelLayout"],
+  config: HUDConfig,
   now: number,
 ): HUDVendor {
-  const shown = shownRows(vendor.quotas, layout);
-  return shown.length === vendor.quotas.length
+  const shown = shownRows(vendor.quotas, config.panelLayout);
+  return shown.length === vendor.quotas.length && !config.shortestWindowFirst
     ? vendor
-    : { ...vendor, ...windowReading(shown, now) };
+    : { ...vendor, ...windowReading(shown, now, config.shortestWindowFirst) };
 }
 
 /** A window's short name, as Core names it (the Swift `shortName`). */
@@ -221,12 +223,12 @@ export function quotaShortName(quota: {
   return quota.shortLabel || quota.name;
 }
 
-/** The share a Simple mark's ring and number show: its tightest live window, else the one its last reading holds, drawn grey since its level is then "stale". */
+/** The share a Simple mark's ring and number show: its chosen live window — the shortest when the screen asks for it, else the tightest — else the one its last reading holds, drawn grey since its level is then "stale". */
 export function markUsed(vendor: HUDVendor): number | null {
   return vendor.used ?? vendor.heldUsed;
 }
 
-/** The number a Simple HUD writes beside a mark: its tightest window (`markUsed`), else its balance, else its last 24 hours (vendors.rs `meter_label`). */
+/** The number a Simple HUD writes beside a mark: its chosen window (`markUsed`), else its balance, else its last 24 hours (vendors.rs `meter_label`). */
 export function meterLabel(vendor: HUDVendor, display?: QuotaDisplay): string {
   const used = markUsed(vendor);
   return used == null
@@ -243,8 +245,7 @@ export function configuredVendors(
 ): HUDVendor[] {
   const now = Date.now();
   const available = vendorsFromSnapshot(snapshot, config.mode).map((vendor) => {
-    if (vendor.quotas.length)
-      return withShownWindows(vendor, config.panelLayout, now);
+    if (vendor.quotas.length) return withShownWindows(vendor, config, now);
     if (vendor.key !== "deepseek") return vendor;
     const rows = snapshot.billing.filter(
       (row) => vendorKey(row.vendor) === vendor.key,

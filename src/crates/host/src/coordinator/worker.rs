@@ -140,7 +140,13 @@ pub(super) fn run(app: &tauri::AppHandle) {
             let (id, has_notch) = planner.primary().unwrap_or(("", false));
             let screen = hud::Screen::new(&view, id, has_notch);
             let appearance = screen.text("appearance");
-            let agents = vendors::configured(snapshot, screen.mode_name(), screen.layout(), now_ms);
+            let agents = vendors::configured(
+                snapshot,
+                screen.mode_name(),
+                screen.layout(),
+                now_ms,
+                screen.shortest_window_first(),
+            );
             let state = tray::project(
                 snapshot,
                 &agents,

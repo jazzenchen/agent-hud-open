@@ -94,15 +94,18 @@ fn plan(
     let layout = screen.layout();
     let labels: Vec<String> = snapshot
         .map(|snapshot| {
-            vendors::configured(snapshot, screen.mode_name(), layout, now_ms)
-                .iter()
-                .map(|vendor| {
-                    vendors::meter_label(
-                        vendor,
-                        snapshot["settings"]["quotaDisplay"] == "remaining",
-                    )
-                })
-                .collect()
+            vendors::configured(
+                snapshot,
+                screen.mode_name(),
+                layout,
+                now_ms,
+                screen.shortest_window_first(),
+            )
+            .iter()
+            .map(|vendor| {
+                vendors::meter_label(vendor, snapshot["settings"]["quotaDisplay"] == "remaining")
+            })
+            .collect()
         })
         .unwrap_or_default();
     let strip = strip_width(
