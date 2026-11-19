@@ -19,24 +19,27 @@ fn npm_claude_cmd_unwraps_to_native_exe_before_cmd_fallback() {
     let home = tmp.path();
     let app_data = home.join("AppData/Roaming");
     let npm = app_data.join("npm");
-    let native = npm.join("node_modules/@anthropic-ai/claude-code/bin/claude.exe");
-    fs::create_dir_all(native.parent().unwrap()).unwrap();
-    fs::write(&native, b"MZ").unwrap();
-    fs::write(
-        npm.join("claude.cmd"),
-        "@ECHO off\r\n\"%dp0%\\node_modules\\@anthropic-ai\\claude-code\\bin\\claude.exe\"   %*\r\n",
-    )
-    .unwrap();
-
+    // Only the shim names this program; nothing looks for it there itself.
+    let native = npm.join("node_modules/@anthropic-ai/claude-code-win32-x64/claude.exe");
+    write(&native, "MZ");
     let env = Environment::from([("APPDATA".into(), app_data.to_string_lossy().into_owned())]);
+    assert!(!engine_candidates(home, &env, "claude").contains(&native));
+
+    let shim = npm.join("claude.cmd");
+    write(
+        &shim,
+        "@ECHO off\r\nGOTO start\r\n:find_dp0\r\nSET dp0=%~dp0\r\nEXIT /b\r\n:start\r\nSETLOCAL\r\nCALL :find_dp0\r\n\"%dp0%\\node_modules\\@anthropic-ai\\claude-code-win32-x64\\claude.exe\"   %*\r\n",
+    );
     let candidates = engine_candidates(home, &env, "claude");
     let exe_pos = candidates.iter().position(|p| p == &native).unwrap();
-    let cmd_pos = candidates
-        .iter()
-        .position(|p| p == &npm.join("claude.cmd"))
-        .unwrap();
+    let cmd_pos = candidates.iter().position(|p| p == &shim).unwrap();
     assert!(exe_pos < cmd_pos);
     assert!(engine_executable(&native));
+
+    // Started from the shim itself, the program runs without cmd.exe.
+    let command = engine_command(&shim, &["--bg", "--", "one\ntwo"]).unwrap();
+    assert_eq!(command.get_program(), native.as_os_str());
+    assert_eq!(command.get_args().last(), Some(OsStr::new("one\ntwo")));
 }
 
 #[test]
@@ -238,4 +241,36 @@ fn a_batch_file_that_is_not_unwrapped_refuses_line_breaks_with_why() {
     assert!(error.contains("line breaks"), "{error}");
     let command = engine_command(&shim, &["-p", "one line"]).unwrap();
     assert_eq!(command.get_program(), shim.as_os_str());
+}
+
+#[test]
+fn the_codex_apps_own_codex_comes_first_and_batch_files_last() {
+    let tmp = tempdir().unwrap();
+    let home = tmp.path();
+    let local = home.join("AppData/Local");
+    let app = local.join("Programs/Codex/resources/codex.exe");
+    let bin = home.join("bin");
+    let on_path = bin.join("codex.exe");
+    let shim = bin.join("codex.cmd");
+    write(&app, "MZ");
+    write(&on_path, "MZ");
+    write(&shim, NPM_NODE_SHIM);
+    let env = Environment::from([
+        ("LOCALAPPDATA".into(), local.to_string_lossy().into_owned()),
+        ("PATH".into(), bin.to_string_lossy().into_owned()),
+    ]);
+
+    let candidates = engine_candidates(home, &env, "codex");
+    let at = |path: &Path| candidates.iter().position(|c| c == path).unwrap();
+    assert!(at(&app) < at(&on_path), "{candidates:?}");
+    let batch = |path: &Path| {
+        path.extension()
+            .is_some_and(|ext| ext.eq_ignore_ascii_case("cmd") || ext.eq_ignore_ascii_case("bat"))
+    };
+    let first_batch = candidates.iter().position(|path| batch(path)).unwrap();
+    assert!(at(&on_path) < at(&shim), "{candidates:?}");
+    assert!(
+        candidates[first_batch..].iter().all(|path| batch(path)),
+        "{candidates:?}"
+    );
 }
