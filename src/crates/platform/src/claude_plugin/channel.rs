@@ -283,7 +283,7 @@ impl ClaudeChannel {
         }
     }
 
-    fn prompt(&self, session: &str, id: &str) -> Result<PathBuf, Refusal> {
+    pub(crate) fn prompt(&self, session: &str, id: &str) -> Result<PathBuf, Refusal> {
         if !valid_name(session) || !valid_name(id) {
             return Err(Refusal::InvalidInput("identity".into()));
         }

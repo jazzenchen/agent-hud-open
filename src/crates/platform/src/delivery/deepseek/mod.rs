@@ -1,7 +1,9 @@
 //! DeepSeek Harness sessions take a message through Agent HUD's DeepSeek
 //! Harness plugin (`crate::deepseek_plugin`: its files, its install, its
 //! check-ins and the HUD's answers). The plugin queues the words as the
-//! session's next message (Harness's own queue: it never interrupts a turn).
+//! session's next message (Harness's own queue: it never interrupts a turn),
+//! or, for a steer, puts them into the turn in progress (Harness's steer:
+//! the turn's next step reads them), which it refuses when no turn runs.
 //! Here a message goes into an existing session: a send is checked before it
 //! is journaled, left in the folder the plugin shares with the app, and read
 //! back for how it went. A new session is asked of a running Harness host the
@@ -22,6 +24,7 @@ use std::{
 };
 
 mod catalog;
+mod steer;
 
 pub(super) const UNAVAILABLE_REASON: &str =
     "DeepSeek Harness plugin check-in is missing or expired";
@@ -60,9 +63,13 @@ impl DeepSeekChannel {
     }
     /// Reject input that cannot be handed over before the caller journals a send.
     pub(super) fn check_request(&self, request: &SendRequest, now: SystemTime) -> Result<()> {
-        if request.operation != Operation::Automatic && request.operation != Operation::Enqueue {
+        let steer = request.operation == Operation::Steer;
+        if !steer
+            && request.operation != Operation::Automatic
+            && request.operation != Operation::Enqueue
+        {
             return Err(Failure::Unsupported(
-                "DeepSeek Harness's plugin only queues a message as the session's next one".into(),
+                "DeepSeek Harness's plugin queues a message as the session's next one, or steers it into the turn in progress".into(),
             ));
         }
         if request.text.starts_with('/') {
@@ -78,19 +85,36 @@ impl DeepSeekChannel {
         {
             return Err(Failure::Unsupported(OLD_PLUGIN.into()));
         }
+        if steer {
+            self.check_steer(request)?;
+        }
         selection(request.model.as_deref()).map(|_| ())
     }
-    pub(super) fn leave(&self, request: &SendRequest, now: SystemTime) -> Result<DeliveryState> {
+    /// Leaves the words for the plugin. A queued message is left and read
+    /// back later; a steer is waited for, since only the plugin can tell
+    /// whether a turn was in progress: it returns the turn it went into.
+    pub(super) fn leave(
+        &self,
+        request: &SendRequest,
+        now: SystemTime,
+    ) -> Result<(DeliveryState, Option<String>)> {
+        let session = bare(&request.session_id);
+        if request.operation == Operation::Steer {
+            self.0
+                .leave_steer(session, &request.request_id, &request.text, now)
+                .map_err(failure)?;
+            return self.steered(session, &request.request_id);
+        }
         self.0
             .leave(
-                bare(&request.session_id),
+                session,
                 &request.request_id,
                 &request.text,
                 selection(request.model.as_deref())?.as_ref(),
                 now,
             )
             .map_err(failure)?;
-        Ok(DeliveryState::Waiting)
+        Ok((DeliveryState::Waiting, None))
     }
     /// The models Harness offers, as its plugin last listed them at a
     /// check-in; its own choice is the model new sessions start in.

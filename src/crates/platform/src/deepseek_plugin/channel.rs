@@ -1,8 +1,10 @@
 //! The folder the plugin and the app share: check-ins and words for a
 //! session, the notes that name a call's session, and the module itself.
-use super::{file_name, CALL_LIFETIME, SCRIPT};
-use crate::claude_plugin::{file_age, valid_name, ClaudeChannel, PromptState, Refusal};
-use serde_json::Value;
+use super::{file_name, CALL_LIFETIME, SCRIPT, STEER_LIFETIME};
+use crate::claude_plugin::{
+    file_age, millis, valid_name, write_json, ClaudeChannel, PromptState, Refusal,
+};
+use serde_json::{json, Value};
 use std::{
     collections::HashSet,
     fs,
@@ -59,8 +61,47 @@ impl DeepSeekChannel {
             .leave_with(session, id, text, false, model, now)
     }
 
+    /// Leaves `text` for `session` to go into its turn in progress (a
+    /// steer), under the caller's identity `id`: the plugin refuses it when
+    /// no turn runs, or the session waits on an approval or a question, and
+    /// never queues it instead. It names the turn it went into
+    /// (`steer_outcome`). Taken only within `STEER_LIFETIME`, so a steer
+    /// never lands late. The caller checks the session is loaded first, and
+    /// that its plugin takes a steer (`channel_version`).
+    pub fn leave_steer(
+        &self,
+        session: &str,
+        id: &str,
+        text: &str,
+        now: SystemTime,
+    ) -> Result<(), Refusal> {
+        let file = self.prompts.prompt(session, id)?;
+        if file.exists() {
+            return Err(Refusal::IdentityConflict);
+        }
+        let at = millis(now);
+        write_json(
+            &file,
+            &json!({"id":id,"text":text,"at":at,"expiresAt":at.saturating_add(STEER_LIFETIME.as_millis() as u64),"asUser":false,"mode":"steer"}),
+        )
+    }
+
+    /// What the plugin wrote back for the words `id` left for `session`:
+    /// `takenAt`, then `steeredInto` (the turn a steer went into) with
+    /// `startedAt`, or `refused`, or `expiredAt`. None when there is no file.
+    pub fn outcome(&self, session: &str, id: &str) -> Result<Option<Value>, Refusal> {
+        match fs::read(self.prompts.prompt(session, id)?) {
+            Ok(data) => serde_json::from_slice(&data)
+                .map(Some)
+                .map_err(|e| Refusal::Protocol(e.to_string())),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
+            Err(error) => Err(error.into()),
+        }
+    }
+
     /// The channel version of the plugin `session` last checked in from:
-    /// 2 and later choose a model for a message or a new session.
+    /// 2 and later choose a model for a message or a new session; 3 and
+    /// later take a steer.
     pub fn channel_version(&self, session: &str) -> u64 {
         if !valid_name(session) {
             return 0;

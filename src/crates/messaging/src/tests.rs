@@ -2559,3 +2559,4 @@ fn list_sessions_says_a_running_codex_with_its_thread_open_can_be_steered() {
 }
 
 mod models;
+mod steer;

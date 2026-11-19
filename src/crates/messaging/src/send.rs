@@ -66,9 +66,19 @@ impl Messaging {
         if !target["parentId"].is_null() {
             return Ok(refused(&words::child(language)));
         }
-        // Only Codex takes a message into a turn in progress (Open #68).
-        if steer && Provider::parse(client) != Some(Provider::Codex) {
-            return Ok(refused(&words::steer_unsupported(language, client)));
+        // Only a client that takes a message into a turn in progress gets a
+        // steer (Open #68); a reply is always queued, and a session waiting on
+        // an approval or a question would not read one until it is answered.
+        if steer {
+            if !Provider::parse(client).is_some_and(Provider::takes_steer) {
+                return Ok(refused(&words::steer_unsupported(language, client)));
+            }
+            if reply_to.is_some() {
+                return Ok(refused(&words::steer_reply(language)));
+            }
+            if state(target) == "waitingForApproval" {
+                return Ok(refused(&words::steer_waiting(language)));
+            }
         }
         // A model only when named, and only where a message can switch it.
         let model = match self.named_model(client, arguments, true, language) {
@@ -99,13 +109,19 @@ impl Messaging {
             return Ok(refused(&words::limit(language, limit)));
         }
         let id = message_id();
-        let form = self.form();
+        // Another agent's words never read as the user's in the middle of a
+        // turn: a steer carries Agent HUD's label even under "Send as me".
+        let form = if steer {
+            PromptForm::Labelled
+        } else {
+            self.form()
+        };
         let from = sender.clone();
         let delivered = words::compose(
             language, form, &from, client, &id, reply_to, reply_hint, text,
         );
         let delivered = if steer {
-            words::steered(language, form, delivered)
+            words::steered(language, delivered)
         } else {
             delivered
         };
@@ -227,6 +243,28 @@ impl Messaging {
             // the message it answers, else the newest it received, goes on
             // counting.
             None => answers.or(received.first().copied()),
+        };
+        // A steer taken in the caller's turn in progress began no turn, so
+        // the prompt that began it names an earlier sender, or the user: the
+        // steer is that turn's parent too, and the later pass counts on.
+        let turn = caller.turn_id.clone().or_else(|| {
+            find_in(host.snapshot, &caller.client, &caller.session_id)
+                .and_then(|session| session["liveFacts"]["turnId"].as_str())
+                .map(str::to_owned)
+        });
+        let steered = turn.and_then(|turn| {
+            received
+                .iter()
+                .find(|message| message.steered_into.as_deref() == Some(turn.as_str()))
+                .copied()
+        });
+        let parent = match (parent, steered) {
+            (Some(parent), Some(steered)) => Some(if steered.count > parent.count {
+                steered
+            } else {
+                parent
+            }),
+            (parent, steered) => parent.or(steered),
         };
         match parent {
             Some(parent) => (Some(parent.chain.clone()), parent.count + 1),

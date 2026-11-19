@@ -37,10 +37,14 @@ pub use starts::{Host, Started, START_LIFETIME};
 /// The plugin module Harness loads.
 pub const SCRIPT: &str = concat!(
     include_str!("agent-hud.mjs"),
-    include_str!("agent-hud-inbox.mjs")
+    include_str!("agent-hud-inbox.mjs"),
+    include_str!("agent-hud-steer.mjs")
 );
 /// A note older than this belongs to a call that ended without removing it.
 pub const CALL_LIFETIME: Duration = Duration::from_secs(120);
+/// How long a steer may wait for the plugin to take it: past this the plugin
+/// drops it, so a steer the app gave up on never goes in late.
+pub const STEER_LIFETIME: Duration = Duration::from_secs(8);
 /// Every version's row id starts with this.
 const ROW: &str = "agent-hud-plugin";
 

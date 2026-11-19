@@ -5,7 +5,8 @@
 //
 // In the folder the plugin shares with the app:
 // - prompts/<session>/<id>.json: words the app leaves for a session, which
-//   are queued as the session's next message, in the model they name, if any;
+//   are queued as the session's next message, in the model they name, if any,
+//   or with mode steer go into its turn in progress (agent-hud-steer.mjs);
 // - hosts/<host>.json: this host checks in with its sessions, so the app
 //   knows a host is there to start a session in, and with the models Harness
 //   offers and the one new sessions start in;
@@ -15,7 +16,7 @@
 //   says which session it is and how the message went.
 
 /** The rounds that take words and starts, and the host's own check-in. */
-function inbox({ fs, path, service, read, write, remove, now, quietly, NAME, folder, host, version, desktop, roots }) {
+function inbox({ fs, path, service, read, write, remove, now, quietly, NAME, folder, host, version, desktop, roots, waiting }) {
   const queues = new Map();
   // The Desktop app's host is preferred for a new session: it has a window
   // the session shows in. The app starts its host from this entry file; the
@@ -101,7 +102,9 @@ function inbox({ fs, path, service, read, write, remove, now, quietly, NAME, fol
   };
 
   // ---- Words the app leaves for a session ----
+  const steer = steerer({ service, write, now, quietly, roots, waiting });
   const submit = (sessionId, file, prompt) => {
+    if (prompt.mode === "steer") return steer(sessionId, file, prompt);
     const controller = service("sessionController");
     if (typeof controller?.prompt !== "function") return;
     const takenAt = now();

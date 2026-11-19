@@ -72,6 +72,14 @@ impl Provider {
     pub fn uses_observer(self) -> bool {
         matches!(self, Self::Pi | Self::OpenCode)
     }
+    /// Whether a message may go into the session's turn in progress
+    /// (`Operation::Steer` naming no turn): Codex's desktop owner or command
+    /// line, and DeepSeek Harness through Agent HUD's plugin, take one and
+    /// refuse it when no turn runs. Other clients' plugins and hooks run a
+    /// message only once the session is idle or a turn ends.
+    pub fn takes_steer(self) -> bool {
+        matches!(self, Self::Codex | Self::DeepSeek)
+    }
     pub fn queues_in_channel(self) -> bool {
         matches!(self, Self::Claude | Self::DeepSeek) || self.uses_hook_channel()
     }

@@ -96,8 +96,9 @@ impl LocalClients {
             Provider::DeepSeek => self
                 .deepseek()
                 .and_then(|channel| channel.leave(&request, now))
-                .map(|state| {
+                .map(|(state, turn)| {
                     receipt.state = state;
+                    receipt.turn_id = turn;
                     receipt.reason = None;
                     receipt.clone()
                 }),
@@ -229,13 +230,20 @@ fn validate(request: &SendRequest) -> Result<()> {
     }
     // A steer names the turn it expects, or none: then it goes into the turn
     // in progress when the client is asked, and is refused when there is none.
-    if request.operation == Operation::Steer
-        && request
-            .expected_turn_id
-            .as_deref()
-            .is_some_and(|id| id.trim().is_empty())
-    {
-        return Err(Failure::InvalidInput("expectedTurnId".into()));
+    // Only a client that finds that turn itself takes one naming none.
+    if request.operation == Operation::Steer {
+        match request.expected_turn_id.as_deref() {
+            Some(id) if id.trim().is_empty() => {
+                return Err(Failure::InvalidInput("expectedTurnId".into()))
+            }
+            None if !request.provider.takes_steer() => {
+                return Err(Failure::Unsupported(format!(
+                    "{} sessions take no message into a turn in progress",
+                    request.provider.as_str()
+                )))
+            }
+            _ => {}
+        }
     }
     Ok(())
 }
