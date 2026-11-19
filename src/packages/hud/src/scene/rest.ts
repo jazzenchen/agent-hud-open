@@ -16,12 +16,13 @@ export const REST_MS = 240;
 /** The ways a dock rests that fold it. */
 export type FoldStyle = Exclude<RestStyle, "dock">;
 
-/** How this screen's dock rests, or null where it never folds: a notch, or
- * a dock that stays whole (anything else saved counts as that). */
+/** How this screen's dock rests, or null where it never folds: a notch, a
+ * dock with Auto-hide off, or one that stays whole (anything else saved
+ * counts as that). */
 export function foldStyle(
-  config: Pick<HUDConfig, "mode" | "restStyle">,
+  config: Pick<HUDConfig, "mode" | "autoHide" | "restStyle">,
 ): FoldStyle | null {
-  if (config.mode !== "simple") return null;
+  if (config.mode !== "simple" || !config.autoHide) return null;
   const style = config.restStyle;
   return style === "logos" || style === "bar" || style === "hidden"
     ? style

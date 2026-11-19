@@ -22,7 +22,8 @@ export { agentVendorName } from "./agent-artwork.ts";
 
 export type HUDMode = "notch" | "simple";
 export type HUDEdge = "top" | "right" | "bottom" | "left";
-/** What an idle Simple dock leaves at its edge (`scene/rest.ts`). */
+/** What an auto-hidden Simple dock leaves at its edge (`scene/rest.ts`);
+ * `dock`, from an earlier build, leaves the whole dock. */
 export type RestStyle = "dock" | "logos" | "bar" | "hidden";
 export type HUDDecision = RequestDecision;
 
@@ -74,8 +75,10 @@ export interface HUDConfig {
   greyNumberOpacity: number;
   shortestWindowFirst: boolean;
   separatesAgents: boolean;
-  /** What a Simple dock leaves at its edge while nothing needs it: the whole
-   * dock, its logos alone, a bar, or nothing the eye sees. */
+  /** Whether a Simple dock hides against its edge while nothing needs it. */
+  autoHide: boolean;
+  /** What an auto-hidden dock leaves at its edge: its logos alone, a bar, or
+   * nothing the eye sees. */
   restStyle: RestStyle;
   /** The rest bar's length along the edge and its depth, in points. */
   restBarLength: number;

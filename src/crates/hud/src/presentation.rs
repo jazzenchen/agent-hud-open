@@ -51,6 +51,7 @@ const PRESENCE: &[&str] = &[
     "hidesMessages",
     "hidesRequests",
     "hidesFlights",
+    "autoHide",
     "restStyle",
     "restBarLength",
     "restBarThickness",

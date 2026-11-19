@@ -60,15 +60,16 @@ const middle = (
   rect: { x: number; y: number; width: number; height: number },
 ) => (across(edge) ? rect.x + rect.width / 2 : rect.y + rect.height / 2);
 
-test("only a Simple dock set to logos, a bar or hidden ever folds", () => {
-  assert.equal(foldStyle({ mode: "simple", restStyle: "dock" }), null);
-  assert.equal(foldStyle({ mode: "notch", restStyle: "bar" }), null);
-  assert.equal(
-    foldStyle({ mode: "simple", restStyle: "sideways" as never }),
-    null,
-  );
-  for (const style of ["logos", "bar", "hidden"] as const)
-    assert.equal(foldStyle({ mode: "simple", restStyle: style }), style);
+test("only a Simple dock with Auto-hide on, leaving logos, a bar or nothing, ever folds", () => {
+  const on = { mode: "simple", autoHide: true } as const;
+  assert.equal(foldStyle({ ...on, restStyle: "dock" }), null);
+  assert.equal(foldStyle({ ...on, mode: "notch", restStyle: "bar" }), null);
+  assert.equal(foldStyle({ ...on, restStyle: "sideways" as never }), null);
+  for (const style of ["logos", "bar", "hidden"] as const) {
+    assert.equal(foldStyle({ ...on, restStyle: style }), style);
+    // Off keeps the whole dock, and the choice for when it is on again.
+    assert.equal(foldStyle({ ...on, autoHide: false, restStyle: style }), null);
+  }
 });
 
 test("the dock folds only when nothing is out, nothing waits and the pointer is away", () => {

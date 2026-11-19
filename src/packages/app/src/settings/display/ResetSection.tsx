@@ -38,6 +38,7 @@ const styleKeys = [
   "greyNumberOpacity",
   "shortestWindowFirst",
   "separatesAgents",
+  "autoHide",
   "restStyle",
   "restBarLength",
   "restBarThickness",
