@@ -1254,3 +1254,63 @@ echo '{"id":2,"result":{"queuedSubmission":{"id":"q1"}}}'
         }
     }
 }
+
+#[test]
+fn a_steer_naming_no_turn_is_refused_for_a_client_that_finds_no_turn_itself() {
+    let fixture = Fixture::new();
+    fixture.checkin();
+    let service = fixture.service(Provider::Claude);
+    let mut steer = request(Provider::Claude);
+    steer.operation = Operation::Steer;
+    assert!(matches!(service.send(steer), Err(Failure::Unsupported(_))));
+    assert!(!fixture.prompt().exists(), "nothing was left");
+}
+
+#[test]
+fn a_deepseek_steer_waits_for_the_plugin_and_names_the_turn_it_went_into() {
+    let fixture = Fixture::new();
+    let service = fixture.harness();
+    fixture.harness_checkin();
+    let mut steer = harness_request();
+    steer.operation = Operation::Steer;
+    // A plugin older than channel version 3 takes no steer.
+    assert!(matches!(
+        service.send(steer.clone()),
+        Err(Failure::Unsupported(reason)) if reason.contains("older Agent HUD plugin")
+    ));
+    let folder = fixture.harness_channel().join("sessions");
+    atomic_json(
+        &folder.join(format!("{HARNESS_OWN}.json")),
+        &json!({"at":millis(SystemTime::now()),"host":1,"channelVersion":3}),
+    )
+    .unwrap();
+    let file = fixture.harness_prompt();
+    let plugin = std::thread::spawn(move || {
+        for _ in 0..400 {
+            if let Some(left) = fs::read(&file)
+                .ok()
+                .and_then(|bytes| serde_json::from_slice::<Value>(&bytes).ok())
+            {
+                atomic_json(&file, &json!({"takenAt":1,"startedAt":2,"steeredInto":"7"})).unwrap();
+                return left;
+            }
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        panic!("no steer was left");
+    });
+    let receipt = service.send(steer).unwrap();
+    let left = plugin.join().unwrap();
+    assert_eq!(left["mode"], "steer");
+    assert_eq!(
+        left["expiresAt"].as_u64().unwrap() - left["at"].as_u64().unwrap(),
+        8_000,
+        "a steer is taken only while it is current"
+    );
+    assert_eq!(
+        receipt.state,
+        DeliveryState::Steered,
+        "{:?}",
+        receipt.reason
+    );
+    assert_eq!(receipt.turn_id.as_deref(), Some("7"));
+}

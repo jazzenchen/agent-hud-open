@@ -5,16 +5,16 @@
 // It shares one folder with the app, `config.channel`:
 // - sessions/<session>.json: every open session checks in every 5 seconds;
 // - prompts/<session>/<id>.json: words the app leaves for a session, which
-//   this plugin queues as the session's next message;
+//   this plugin queues as its next message, or steers into its turn;
 // - calls/<host>/<id>.json: which session is calling one of Agent HUD's MCP
 //   tools right now, so the app can tell who called;
 // - asks/<id>.json: a question or approval a session waits on. The HUD may
 //   answer it first, in asks/<id>.answer; whichever answer comes first wins,
 //   and the other side's card goes away.
 //
-// The file Harness loads is this one with agent-hud-inbox.mjs after it
-// (`SCRIPT` in mod.rs): `inbox` there takes what the app leaves for this
-// host, words for a session and new sessions, and checks the host in.
+// Harness loads this file with agent-hud-inbox.mjs and agent-hud-steer.mjs
+// after it (`SCRIPT` in mod.rs): `inbox` there takes what the app leaves for
+// this host, words for a session and new sessions, and checks the host in.
 //
 // It uses only ctx and Node's own modules: a package import fails outside a
 // profile. A throw that escapes a timer or a promise stops the whole Harness
@@ -29,7 +29,7 @@ export const name = "agent-hud";
 export const inject = ["agents"];
 
 /** The folder layout this file writes; the app reads it as `channelVersion`. */
-export const CHANNEL_VERSION = 2;
+export const CHANNEL_VERSION = 3;
 const CHECK_IN_MS = 5_000;
 const PROMPT_POLL_MS = 1_000;
 const ANSWER_POLL_MS = 250;
@@ -116,7 +116,7 @@ export function start(ctx, channel, options = {}) {
   };
 
   // ---- What the app leaves for this host (agent-hud-inbox.mjs) ----
-  const left = inbox({ fs, path, service, read, write, remove, now, quietly, NAME, folder, host, version: CHANNEL_VERSION, desktop: options.desktop, roots: () => roots() });
+  const left = inbox({ fs, path, service, read, write, remove, now, quietly, NAME, folder, host, version: CHANNEL_VERSION, desktop: options.desktop, roots: () => roots(), waiting: (id) => [...asks.values()].some((ask) => ask.sessionId === id) });
 
   // ---- Sessions ----
   const agents = () => {
@@ -240,7 +240,7 @@ export function start(ctx, channel, options = {}) {
     } catch {
       return next();
     }
-    asks.set(id, { kind, questions: (body.questions ?? []).map((q) => q.id), settle });
+    asks.set(id, { kind, sessionId, questions: (body.questions ?? []).map((q) => q.id), settle });
     if (!answerTimer) answerTimer = every(timing.answers, pollAnswers);
     const onAbort = () => settle(undefined);
     original?.addEventListener?.("abort", onAbort, { once: true });

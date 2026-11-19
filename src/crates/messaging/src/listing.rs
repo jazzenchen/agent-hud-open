@@ -24,7 +24,8 @@ impl Messaging {
                 let client = session["source"].as_str().unwrap_or_default();
                 let (reachable, reason) =
                     self.reachable(client, id, &loaded, (session, host.snapshot), language);
-                let (steerable, steer_reason) = self.steerable(client, id, session, language);
+                let (steerable, steer_reason) =
+                    self.steerable(client, id, session, &loaded, language);
                 json!({
                     "id": id,
                     "client": client,
@@ -57,23 +58,35 @@ impl Messaging {
     }
 
     /// Whether a message sent with `delivery: steer` would go into a turn of
-    /// `id` in progress now: only Codex takes one, while a turn runs in a
-    /// Codex that has the thread open. Read from the snapshot, so a send
-    /// still finds out for itself.
+    /// `id` in progress now: only a client that takes one
+    /// (`Provider::takes_steer`), while a turn runs and waits on nothing, in
+    /// a Codex that has the thread open or a DeepSeek Harness session whose
+    /// plugin checked in. Read from the snapshot, so a send still finds out
+    /// for itself.
     fn steerable(
         &self,
         client: &str,
         id: &str,
         session: &Value,
+        loaded: &std::collections::BTreeSet<String>,
         language: Language,
     ) -> (bool, String) {
-        if Provider::parse(client) != Some(Provider::Codex) {
+        let Some(provider) = Provider::parse(client).filter(|p| p.takes_steer()) else {
             return (false, words::steer_unsupported(language, client));
+        };
+        match state(session) {
+            "waitingForApproval" => return (false, words::steer_waiting(language)),
+            "idle" => return (false, words::steer_idle(language)),
+            _ => {}
         }
-        if state(session) != "idle" && delivery::codex_thread_open(&self.places.codex_data, id) {
+        let open = match provider {
+            Provider::Codex => delivery::codex_thread_open(&self.places.codex_data, id),
+            _ => self.preferences.deepseek && loaded.contains(id),
+        };
+        if open {
             (true, words::steer_ready(language))
         } else {
-            (false, words::steer_idle(language))
+            (false, words::steer_closed(language, client))
         }
     }
 
