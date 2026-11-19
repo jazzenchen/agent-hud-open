@@ -113,17 +113,24 @@ pub fn desktop_installed(applications: &[PathBuf]) -> bool {
     })
 }
 
+/// `GEMINI_CLI_HOME`, else `~/.gemini`: where Antigravity keeps its folders.
+pub(super) fn gemini_home() -> Option<PathBuf> {
+    std::env::var_os("GEMINI_CLI_HOME")
+        .filter(|value| !value.is_empty())
+        .map(PathBuf::from)
+        .or_else(|| crate::os::home_dir().ok().map(|home| home.join(".gemini")))
+}
+
 /// Starts a new Antigravity cascade in `folder` through the running language server
 /// and sends `request.text` as its first message.
 pub fn start_cascade(folder: &Path, request: &StartRequest) -> Result<StartReceipt> {
-    let uri = format!("file://{}", folder.to_string_lossy());
+    let projects = gemini_home().map(|home| home.join("config").join("projects"));
     let started = call(
         "StartCascade",
-        json!({
-            "metadata": metadata(),
-            "source": "CORTEX_TRAJECTORY_SOURCE_INTERACTIVE_CASCADE",
-            "workspaceUris": [uri],
-        }),
+        start_body(
+            folder,
+            projects.as_deref().filter(|_| !request.folder.is_empty()),
+        )?,
     )?;
     let id = started["cascadeId"]
         .as_str()
@@ -150,6 +157,72 @@ pub fn start_cascade(folder: &Path, request: &StartRequest) -> Result<StartRecei
         job_id: None,
         handoff_pending: false,
     })
+}
+
+/// The StartCascade request for `folder`. When the folder belongs to exactly one active
+/// Antigravity project, the conversation starts inside that project, so the sidebar lists
+/// it there; the language server refuses `workspaceUris` beside `projectEnvConfig`, so
+/// that request carries only the project. Any other folder, including one two projects
+/// share, starts as before: a standalone conversation in that workspace.
+fn start_body(folder: &Path, projects: Option<&Path>) -> Result<Value> {
+    let uri = reqwest::Url::from_file_path(folder)
+        .map_err(|_| Failure::Rejected("Invalid Antigravity workspace path".into()))?;
+    let mut body = json!({
+        "metadata": metadata(),
+        "source": "CORTEX_TRAJECTORY_SOURCE_INTERACTIVE_CASCADE",
+        "workspaceUris": [uri.as_str()],
+    });
+    let matching = projects.map_or_else(Vec::new, |dir| projects_holding(folder, dir));
+    if let [id] = matching.as_slice() {
+        body.as_object_mut()
+            .expect("StartCascade body is an object")
+            .remove("workspaceUris");
+        body["projectEnvConfig"] = json!({"projectId": id, "defaultProjectEnvironment": {}});
+    }
+    Ok(body)
+}
+
+/// The ids of the active projects in Antigravity's `projects` folder that hold `folder`.
+/// A project file that cannot be read is skipped rather than stopping the start.
+fn projects_holding(folder: &Path, projects: &Path) -> Vec<String> {
+    let (Ok(directory), Ok(entries)) = (folder.canonicalize(), std::fs::read_dir(projects)) else {
+        return Vec::new();
+    };
+    let same_folder = |uri: &str| {
+        reqwest::Url::parse(uri)
+            .ok()
+            .and_then(|url| url.to_file_path().ok())
+            .and_then(|path| path.canonicalize().ok())
+            .is_some_and(|path| path == directory)
+    };
+    entries
+        .flatten()
+        .map(|entry| entry.path())
+        .filter(|path| path.extension().is_some_and(|ext| ext == "json"))
+        .filter_map(|path| serde_json::from_slice::<Value>(&std::fs::read(path).ok()?).ok())
+        .filter(|project| {
+            project["archived"] != true
+                && project["isWorkspaceOnly"] != true
+                && project["sidecar"].is_null()
+        })
+        .filter(|project| {
+            project["projectResources"]["resources"]
+                .as_array()
+                .is_some_and(|resources| {
+                    resources
+                        .iter()
+                        .flat_map(|r| [&r["folderUri"], &r["gitFolder"]["folderUri"]])
+                        .filter_map(Value::as_str)
+                        .any(same_folder)
+                })
+        })
+        .filter_map(|project| {
+            project["id"]
+                .as_str()
+                .filter(|id| !id.is_empty())
+                .map(str::to_owned)
+        })
+        .collect()
 }
 
 fn message_body(cascade_id: &str, text: &str, strategy: &str, config: Option<Value>) -> Value {
@@ -182,4 +255,41 @@ fn call(method: &str, body: Value) -> Result<Value> {
             Failure::Rejected(error)
         }
     })
+}
+
+#[cfg(test)]
+mod project_start_tests {
+    use super::*;
+
+    #[test]
+    fn start_request_targets_only_a_unique_active_project() {
+        let temp = tempfile::tempdir().unwrap();
+        let folder = temp.path().join("a b");
+        std::fs::create_dir(&folder).unwrap();
+        let target = || start_body(&folder, Some(temp.path())).unwrap();
+        let uri = reqwest::Url::from_file_path(&folder).unwrap();
+        let standalone = json!([uri.as_str()]);
+        // No project holds the folder: a standalone conversation, as before.
+        assert_eq!(target()["workspaceUris"], standalone);
+        assert!(target()["projectEnvConfig"].is_null());
+        // One active project holds it; an archived one and an unreadable file are skipped.
+        let mut project = json!({"id":"one","projectResources":{"resources":[{"gitFolder":{"folderUri":uri.as_str()}}]}});
+        std::fs::write(temp.path().join("one.json"), project.to_string()).unwrap();
+        std::fs::write(temp.path().join("broken.json"), "{").unwrap();
+        project["archived"] = json!(true);
+        let second = temp.path().join("two.json");
+        std::fs::write(&second, project.to_string()).unwrap();
+        let body = target();
+        assert!(body.get("workspaceUris").is_none());
+        assert_eq!(
+            body["projectEnvConfig"],
+            json!({"projectId":"one","defaultProjectEnvironment":{}})
+        );
+        // Two active projects hold it: no guess, a standalone conversation again.
+        project["archived"] = json!(false);
+        project["id"] = json!("two");
+        std::fs::write(second, project.to_string()).unwrap();
+        assert_eq!(target()["workspaceUris"], standalone);
+        assert!(target()["projectEnvConfig"].is_null());
+    }
 }

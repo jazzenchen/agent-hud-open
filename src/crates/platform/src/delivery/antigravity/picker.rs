@@ -11,11 +11,11 @@ pub(super) fn picked() -> Option<String> {
 /// `antigravity/antigravity_state.pbtxt` under `GEMINI_CLI_HOME`, else
 /// under `~/.gemini`, as Antigravity's other folders are looked for.
 fn state_file() -> Option<PathBuf> {
-    let folder = std::env::var_os("GEMINI_CLI_HOME")
-        .filter(|value| !value.is_empty())
-        .map(PathBuf::from)
-        .or_else(|| crate::os::home_dir().ok().map(|home| home.join(".gemini")))?;
-    Some(folder.join("antigravity").join("antigravity_state.pbtxt"))
+    Some(
+        super::gemini_home()?
+            .join("antigravity")
+            .join("antigravity_state.pbtxt"),
+    )
 }
 
 /// The top-level `last_selected_agent_model` of the state file's text.
