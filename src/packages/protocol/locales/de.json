@@ -1518,5 +1518,17 @@
   "Approve automatically": "Automatisch genehmigen",
   "Permission requests are allowed without asking. Questions and plans still wait for you.": "Berechtigungsanfragen werden ohne Rückfrage erlaubt. Fragen und Pläne warten weiter auf Sie.",
   "Needs Answer in the HUD.": "Erfordert „Im HUD antworten“.",
-  "Auto-approve": "Automatisch"
+  "Auto-approve": "Automatisch",
+  "Quota reading is off for this agent in Settings. Sessions and tokens are still counted from its logs.": "Das Lesen des Kontingents ist für diesen Agenten in den Einstellungen aus. Sitzungen und Tokens werden weiter aus seinen Protokollen gezählt.",
+  "Quota reading is limited to what the agent records on this computer": "Das Lesen des Kontingents ist auf das beschränkt, was der Agent auf diesem Computer aufzeichnet",
+  "This computer's records": "Aufzeichnungen dieses Computers",
+  "The agent's own app": "Die eigene App des Agenten",
+  "Everything (default)": "Alles (Standard)",
+  "Quota is not read. Sessions and tokens are still counted from the agent's logs.": "Das Kontingent wird nicht gelesen. Sitzungen und Tokens werden weiter aus den Protokollen des Agenten gezählt.",
+  "Only what the agent's own app wrote on this computer. Nothing is started or sent.": "Nur was die eigene App des Agenten auf diesem Computer geschrieben hat. Nichts wird gestartet oder gesendet.",
+  "Also asks the agent's own app, which reads the account the way it always does.": "Fragt auch die eigene App des Agenten, die das Konto wie immer liest.",
+  "Also uses sign-ins other apps keep and the vendor's web service, as before.": "Nutzt auch Anmeldungen anderer Apps und den Webdienst des Anbieters, wie bisher.",
+  "Quota reading": "Kontingent lesen",
+  "Read quota from": "Kontingent lesen aus",
+  "Lower levels use fewer sign-ins and send less.": "Niedrigere Stufen nutzen weniger Anmeldungen und senden weniger."
 }

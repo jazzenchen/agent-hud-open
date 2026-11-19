@@ -16,6 +16,7 @@ import AccountHomes from "../AccountHomes";
 import AntigravityAccounts from "../AntigravityAccounts";
 import { CodexModelSettings } from "../CodexModelSettings";
 import { PanelBlocks } from "./PanelBlocks";
+import { AgentQuotaReading } from "./AgentQuotaReading";
 import { AgentRelays } from "./AgentRelays";
 import { AgentWebSignIn } from "./AgentWebSignIn";
 import { Connection } from "./Connection";
@@ -96,6 +97,17 @@ export function AgentAccounts({
             }
           />
         </Section>
+      )}
+      {/* Copilot already asks before reading, with its own switch. */}
+      {source.id !== "copilot" && (
+        <AgentQuotaReading
+          t={t}
+          snapshot={snapshot}
+          agent={source.id}
+          action={action}
+          perform={perform}
+          pending={pending}
+        />
       )}
       <PanelBlocks
         t={t}

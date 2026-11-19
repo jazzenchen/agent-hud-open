@@ -53,6 +53,8 @@ pub(super) struct AccountContext {
     pub copilot_consent: Arc<AtomicBool>,
     /// The relay addresses the owner agreed to read (`relays::CONSENT`).
     pub relay_consent: Arc<Mutex<HashSet<String>>>,
+    /// How far each agent's quota may be read (`quota_reading::SETTING`).
+    pub quota_levels: Arc<Mutex<HashMap<String, agents::account::QuotaReading>>>,
     /// A web sign-in being tried before it is kept (`WebSignInDesk::accepts`):
     /// the provider and the session, the only one a reading then sees.
     pub trial_web: Option<(String, agents::account::WebSession)>,
@@ -180,6 +182,7 @@ impl AccountService {
             cancelled: Arc::new(AtomicBool::new(false)),
             copilot_consent: Arc::new(AtomicBool::new(false)),
             relay_consent: Arc::new(Mutex::new(HashSet::new())),
+            quota_levels: Arc::new(Mutex::new(HashMap::new())),
             trial_web: None,
         };
         let shared = Arc::new(Shared {

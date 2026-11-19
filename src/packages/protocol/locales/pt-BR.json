@@ -1550,5 +1550,17 @@
   "Approve automatically": "Aprovar automaticamente",
   "Permission requests are allowed without asking. Questions and plans still wait for you.": "Pedidos de permissão são permitidos sem perguntar. Perguntas e planos continuam esperando por você.",
   "Needs Answer in the HUD.": "Requer Responder no HUD.",
-  "Auto-approve": "Aprovação automática"
+  "Auto-approve": "Aprovação automática",
+  "Quota reading is off for this agent in Settings. Sessions and tokens are still counted from its logs.": "A leitura da cota está desativada para este agente nos Ajustes. Sessões e tokens continuam sendo contados pelos registros dele.",
+  "Quota reading is limited to what the agent records on this computer": "A leitura da cota se limita ao que o agente registra neste computador",
+  "This computer's records": "Os registros deste computador",
+  "The agent's own app": "O app do próprio agente",
+  "Everything (default)": "Tudo (padrão)",
+  "Quota is not read. Sessions and tokens are still counted from the agent's logs.": "A cota não é lida. Sessões e tokens continuam sendo contados pelos registros do agente.",
+  "Only what the agent's own app wrote on this computer. Nothing is started or sent.": "Somente o que o app do próprio agente gravou neste computador. Nada é iniciado nem enviado.",
+  "Also asks the agent's own app, which reads the account the way it always does.": "Também consulta o app do próprio agente, que lê a conta como sempre.",
+  "Also uses sign-ins other apps keep and the vendor's web service, as before.": "Também usa os logins que outros apps guardam e o serviço web do fornecedor, como antes.",
+  "Quota reading": "Leitura da cota",
+  "Read quota from": "Ler a cota de",
+  "Lower levels use fewer sign-ins and send less.": "Quanto mais baixo o nível, menos logins são usados e menos é enviado."
 }

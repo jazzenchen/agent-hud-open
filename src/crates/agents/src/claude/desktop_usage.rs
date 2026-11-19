@@ -2,7 +2,8 @@
 use super::account::{profile, Folder};
 use super::quota_windows::{plan_reading, profile_plan, windows};
 use crate::account::{add_readers, append_notice, legacy_account, merge, names_none, read_by};
-use crate::account::{read_json, Answer, Host, HttpFailure, HttpRequest, Reading, Unread};
+use crate::account::{read_json, Answer, Host, HttpFailure, HttpRequest, QuotaReading};
+use crate::account::{Reading, Unread};
 use crate::l10n::tr;
 use crate::Base;
 use serde_json::{json, Value};
@@ -53,6 +54,13 @@ pub(super) fn from_desktop(
     folder: &Folder,
     signed_out: bool,
 ) -> Option<Result<Reading, Unread>> {
+    // Another app's sign-in: only when the user lets quota reading go that far.
+    if !host
+        .quota_reading(super::AGENT.id)
+        .allows(QuotaReading::Full)
+    {
+        return None;
+    }
     let session = match host.app_cookie(DESKTOP, SITE, "sessionKey") {
         Answer::Found(value) if !value.trim().is_empty() => value,
         Answer::Failed => return Some(Err(Unread::transient(desktop_unreadable()))),

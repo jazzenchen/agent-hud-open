@@ -25,8 +25,7 @@ pub struct FakeHost {
     pub secrets: HashMap<String, Answer<String>>,
     /// Desktop apps' cookies, by app, site and name joined with "|".
     pub cookies: HashMap<String, Answer<String>>,
-    /// Electron safe-storage blobs this host can open, by the exact
-    /// ciphertext `encryptString` produced.
+    /// Electron safe-storage blobs this host can open, by exact ciphertext.
     pub sealed: HashMap<Vec<u8>, Answer<String>>,
     pub saved: Result<Option<Value>, String>,
     /// File details by path; a listed file without them is a small regular file.
@@ -37,8 +36,7 @@ pub struct FakeHost {
     pub consent: AtomicBool,
     /// Answers by URL; a URL not listed is unreachable.
     pub web: HashMap<String, Result<Value, HttpFailure>>,
-    /// Sessions signed in in Agent HUD's window, by provider and host
-    /// joined with "|".
+    /// Sessions signed in in Agent HUD's window, by `provider|host`.
     pub web_sessions: HashMap<String, WebSession>,
     /// Answers by URL and the `Authorization` sent, before `web`.
     pub web_for: HashMap<(String, String), Result<Value, HttpFailure>>,
@@ -56,8 +54,7 @@ pub struct FakeHost {
     pub executables: HashMap<String, PathBuf>,
     /// What every engine answers, by the id of the request it answers.
     pub engine_replies: HashMap<u64, Value>,
-    /// Engine replies for a particular account home, the one an engine
-    /// is started with in `CODEX_HOME` or `CLAUDE_CONFIG_DIR`.
+    /// Engine replies by the account home an engine is started with.
     pub engine_replies_by_home: HashMap<PathBuf, HashMap<u64, Value>>,
     /// What an engine prints as soon as it starts, by its first argument.
     pub engine_output: HashMap<String, Vec<Value>>,
@@ -65,9 +62,10 @@ pub struct FakeHost {
     pub engine_output_by_home: HashMap<PathBuf, HashMap<String, Vec<Value>>>,
     /// Engine start failures, by the first argument.
     pub engine_start_errors: HashMap<String, String>,
-    /// Whether an engine's output ends once it has nothing more to say,
-    /// as when it exits; otherwise its wait runs out.
+    /// Whether an engine's output ends once it has nothing more to say.
     pub engine_ends: bool,
+    /// Quota reading levels by agent; an agent not listed reads in full.
+    pub quota_levels: HashMap<String, QuotaReading>,
     /// Every engine started: program, arguments, folder and environment.
     pub started: RefCell<Vec<(PathBuf, Vec<String>, String, Vec<(String, String)>)>>,
     /// Every message sent to an engine.
@@ -106,6 +104,7 @@ impl FakeHost {
             engine_output_by_home: HashMap::new(),
             engine_start_errors: HashMap::new(),
             engine_ends: true,
+            quota_levels: HashMap::new(),
             started: RefCell::new(vec![]),
             engine_sent: Rc::new(RefCell::new(vec![])),
         }
@@ -173,13 +172,10 @@ impl Host for FakeHost {
                 modified_ms: None,
                 symlink: false,
             }),
-            Some(other) => match other {
-                Answer::Missing => Answer::Missing,
-                Answer::Unsupported => Answer::Unsupported,
-                Answer::Denied => Answer::Denied,
-                _ => Answer::Failed,
-            },
-            None => Answer::Missing,
+            Some(Answer::Unsupported) => Answer::Unsupported,
+            Some(Answer::Denied) => Answer::Denied,
+            Some(Answer::Missing) | None => Answer::Missing,
+            Some(_) => Answer::Failed,
         }
     }
     /// The files and folders right under `path`, folders implied by the
@@ -312,6 +308,9 @@ impl Host for FakeHost {
     }
     fn consented(&self, _setting: &str) -> bool {
         self.consent.load(Ordering::Acquire)
+    }
+    fn quota_reading(&self, agent: &str) -> QuotaReading {
+        *self.quota_levels.get(agent).unwrap_or(&QuotaReading::Full)
     }
     fn http_json(&self, request: &HttpRequest) -> Result<Value, HttpFailure> {
         let pairs = |list: &[(&str, &str)]| {

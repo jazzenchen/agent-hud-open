@@ -1550,5 +1550,17 @@
   "Approve automatically": "Approuver automatiquement",
   "Permission requests are allowed without asking. Questions and plans still wait for you.": "Les demandes d'autorisation sont acceptées sans vous demander. Les questions et les plans vous attendent toujours.",
   "Needs Answer in the HUD.": "Nécessite Répondre dans le HUD.",
-  "Auto-approve": "Approbation auto"
+  "Auto-approve": "Approbation auto",
+  "Quota reading is off for this agent in Settings. Sessions and tokens are still counted from its logs.": "La lecture du quota est désactivée pour cet agent dans les réglages. Les sessions et les jetons sont toujours comptés depuis ses journaux.",
+  "Quota reading is limited to what the agent records on this computer": "La lecture du quota se limite à ce que l'agent enregistre sur cet ordinateur",
+  "This computer's records": "Les enregistrements de cet ordinateur",
+  "The agent's own app": "L'app de l'agent",
+  "Everything (default)": "Tout (par défaut)",
+  "Quota is not read. Sessions and tokens are still counted from the agent's logs.": "Le quota n'est pas lu. Les sessions et les jetons sont toujours comptés depuis les journaux de l'agent.",
+  "Only what the agent's own app wrote on this computer. Nothing is started or sent.": "Seulement ce que l'app de l'agent a écrit sur cet ordinateur. Rien n'est lancé ni envoyé.",
+  "Also asks the agent's own app, which reads the account the way it always does.": "Interroge aussi l'app de l'agent, qui lit le compte comme elle le fait toujours.",
+  "Also uses sign-ins other apps keep and the vendor's web service, as before.": "Utilise aussi les connexions que gardent d'autres apps et le service web du fournisseur, comme avant.",
+  "Quota reading": "Lecture du quota",
+  "Read quota from": "Lire le quota depuis",
+  "Lower levels use fewer sign-ins and send less.": "Plus le niveau est bas, moins de connexions sont utilisées et moins de données sont envoyées."
 }

@@ -1027,3 +1027,55 @@ fn the_desktop_apps_account_counts_as_merged_when_its_reading_fails() {
         json!(["claude", "claude-desktop"])
     );
 }
+
+fn at(mut host: FakeHost, level: QuotaReading) -> FakeHost {
+    host.quota_levels.insert("claude".into(), level);
+    host
+}
+
+#[test]
+fn quota_reading_off_starts_nothing_and_says_so() {
+    let mut host = at(signed_out_with_desktop(), QuotaReading::Off);
+    record(&mut host, "/u/.claude.json", 10_000, None);
+    let reading = read(&host).unwrap();
+    assert!(reading.quotas.is_empty() && reading.account.is_none());
+    assert_eq!(reading.notice, Some(quota_reading::off_notice()));
+    assert!(host.started.borrow().is_empty(), "no engine");
+    assert!(host.asked.borrow().is_empty(), "nothing sent");
+}
+
+#[test]
+fn local_quota_reading_takes_only_claude_codes_record() {
+    let mut host = at(signed_out_with_desktop(), QuotaReading::Local);
+    record(&mut host, "/u/.claude.json", 10_000, None);
+    let reading = read(&host).unwrap();
+    assert!(reading.failure.is_none());
+    assert!(!reading.quotas.is_empty());
+    assert!(host.started.borrow().is_empty(), "no engine");
+    assert!(host.asked.borrow().is_empty(), "no desktop sign-in sent");
+}
+
+#[test]
+fn an_old_record_at_local_shows_stale_and_none_is_an_error() {
+    let mut host = at(signed_out_with_desktop(), QuotaReading::Local);
+    record(&mut host, "/u/.claude.json", 2 * 86_400_000, None);
+    let reading = read(&host).unwrap();
+    let failure = reading.failure.expect("an old record is not a fresh reading");
+    assert!(failure.reason().starts_with(&quota_reading::local_only()));
+    let host = at(signed_out_with_desktop(), QuotaReading::Local);
+    assert!(read(&host).is_err());
+    assert!(host.started.borrow().is_empty() && host.asked.borrow().is_empty());
+}
+
+#[test]
+fn official_quota_reading_asks_the_engine_but_not_the_desktop_sign_in() {
+    let host = at(installed(limits()), QuotaReading::Official);
+    assert_eq!(read(&host).unwrap().quotas.len(), 2);
+    assert_eq!(host.started.borrow().len(), 1, "the engine answered");
+    let host = at(signed_out_with_desktop(), QuotaReading::Official);
+    let _ = read(&host);
+    assert!(
+        host.asked.borrow().iter().all(|(url, _)| !url.contains("claude.ai")),
+        "the desktop app's sign-in is never sent"
+    );
+}

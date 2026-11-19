@@ -9,6 +9,7 @@ pub mod cipher;
 mod host;
 mod ids;
 mod places;
+pub mod quota_reading;
 mod unread;
 
 pub use host::{
@@ -20,6 +21,7 @@ pub use places::{
     client_home_key, endpoint, locate, read_bounded, read_json, read_json_bounded, resolve,
     variable,
 };
+pub use quota_reading::QuotaReading;
 pub use unread::Unread;
 
 /// One reading of a provider's account: its quota windows, balances, the

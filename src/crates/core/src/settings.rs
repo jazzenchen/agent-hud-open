@@ -227,6 +227,9 @@ impl crate::AgentHudCore {
                                 && matches!(kind.as_str(), Some("model" | "gateway"))
                         })
                 }) => {}
+            // How far each agent's quota may be read, by agent id (agents
+            // `quota_reading::SETTING`).
+            "quotaReading" if agent_hud_agents::account::quota_reading::valid(value) => {}
             // The relay addresses whose balance may be read with the key the
             // client already sends them (agents `relays::CONSENT`).
             "relayReading"
