@@ -15,6 +15,9 @@ pub(super) use page::watch_page;
 /// Windows reports global physical desktop pixels, with a per-window DPI scale.
 pub(super) const GLOBAL_POINTS: bool = false;
 pub(super) const COORDINATE_SPACE: &str = "monitor-scaled-physical-top-left";
+/// The taskbar is a topmost window too: whichever was clicked last draws on top,
+/// so an edge HUD rests beside it, inside the work area, never under it.
+pub(super) const DOCK_IN_WORK_AREA: bool = true;
 
 pub(super) fn native_drag() -> bool {
     true

@@ -24,6 +24,7 @@ pub(super) use pointer::{global_pointer, left_mouse_down, pointer_keys};
 
 pub(super) const GLOBAL_POINTS: bool = false;
 pub(super) const COORDINATE_SPACE: &str = "monitor-scaled-physical-top-left";
+pub(super) const DOCK_IN_WORK_AREA: bool = false;
 
 /// Whether the compositor offers layer-shell; learned on the GTK thread when
 /// the first HUD is placed.

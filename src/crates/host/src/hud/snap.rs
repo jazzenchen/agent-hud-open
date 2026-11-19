@@ -3,8 +3,8 @@
 //! On a screen with a notch, a dock that would land on the notch, give or take,
 //! lands in it as the Notch HUD; anywhere else it lands as a Simple dock.
 use super::{
-    global_units_per_point, host, Bounds, Display, DragState, Edge, HudPlacement, LogicalRect,
-    Mode, Point,
+    dock_bounds, global_units_per_point, host, Bounds, Display, DragState, Edge, HudPlacement,
+    LogicalRect, Mode, Point,
 };
 
 /// How loosely a drop has to hit the notch, in points: the dock's middle this far
@@ -14,8 +14,8 @@ const NOTCH_REACH_BELOW: f64 = 60.0;
 
 pub(super) fn drop_placement(drag: &DragState, pointer: Point, display: &Display) -> HudPlacement {
     let monitor = &display.monitor;
-    let position = monitor.position();
-    let size = monitor.size();
+    // The same area the HUD is placed in, so a drop beside the taskbar lands on that edge.
+    let area = dock_bounds(monitor);
     // Tao expresses macOS positions using each monitor's own backing scale. Convert
     // every display to one global point space before comparing it with NSEvent's cursor.
     let divisor = if host::GLOBAL_POINTS {
@@ -24,10 +24,10 @@ pub(super) fn drop_placement(drag: &DragState, pointer: Point, display: &Display
         1.0
     };
     let bounds = Bounds {
-        x: f64::from(position.x) / divisor,
-        y: f64::from(position.y) / divisor,
-        width: f64::from(size.width) / divisor,
-        height: f64::from(size.height) / divisor,
+        x: f64::from(area.x) / divisor,
+        y: f64::from(area.y) / divisor,
+        width: f64::from(area.width) / divisor,
+        height: f64::from(area.height) / divisor,
     };
     let units = global_units_per_point(monitor.scale_factor());
     let edge_distance = |edge: Edge| match edge {

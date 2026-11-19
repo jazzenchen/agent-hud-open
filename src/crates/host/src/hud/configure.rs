@@ -4,7 +4,7 @@ use std::sync::{Arc, PoisonError};
 use tauri::{Emitter, Manager, WebviewUrl};
 
 use super::{
-    apply_ignore_cursor, depth_frame, edge_frame, emit_drag_end, host, monitor_bounds,
+    apply_ignore_cursor, depth_frame, dock_bounds, edge_frame, emit_drag_end, host,
     pointer_outside, publish_pointer, release_text_focus, restore_drag, Display, HudConfig,
     HudGeometry, HudPointer, HudState, HudWindows, LogicalRect, Shared,
 };
@@ -99,7 +99,7 @@ pub(super) fn configure(
     let monitor = &display.monitor;
     let scale = monitor.scale_factor();
     let measured = &display.measured;
-    let canvas_frame = edge_frame(monitor_bounds(monitor), scale, &config);
+    let canvas_frame = edge_frame(dock_bounds(monitor), scale, &config);
     // Report the actual clamped logical size, rather than an impossible requested canvas.
     config.width = f64::from(canvas_frame.width) / scale;
     config.height = f64::from(canvas_frame.height) / scale;

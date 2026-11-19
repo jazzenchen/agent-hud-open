@@ -29,6 +29,8 @@ pub(super) use text_focus::{begin_text_focus, end_text_focus, TextFocusOrigin};
 /// NSEvent reports the pointer in one global point plane across displays.
 pub(super) const GLOBAL_POINTS: bool = true;
 pub(super) const COORDINATE_SPACE: &str = "global-logical-top-left";
+/// The top edge and the Notch HUD sit over the menu bar on purpose.
+pub(super) const DOCK_IN_WORK_AREA: bool = false;
 
 pub(super) fn native_drag() -> bool {
     true

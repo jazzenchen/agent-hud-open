@@ -139,6 +139,21 @@ pub(super) fn monitor_bounds(monitor: &tauri::Monitor) -> Rect {
     }
 }
 
+/// The area an edge HUD rests against: the whole display, or on a host whose
+/// system bars must stay uncovered, the work area beside them.
+pub(super) fn dock_bounds(monitor: &tauri::Monitor) -> Rect {
+    if !host::DOCK_IN_WORK_AREA {
+        return monitor_bounds(monitor);
+    }
+    let work = monitor.work_area();
+    Rect {
+        x: work.position.x,
+        y: work.position.y,
+        width: work.size.width,
+        height: work.size.height,
+    }
+}
+
 pub(super) fn edge_frame(bounds: Rect, scale: f64, config: &HudConfig) -> Rect {
     let width = (config.width * scale)
         .round()

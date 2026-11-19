@@ -3,8 +3,8 @@ use std::sync::PoisonError;
 use tauri::Emitter;
 
 use super::{
-    apply_ignore_cursor, configure, drop_placement, edge_frame, emit_geometry, ensure_worker, host,
-    monitor_bounds, owner_for_window, resolve_display, restore_input, Display, DragEnd,
+    apply_ignore_cursor, configure, dock_bounds, drop_placement, edge_frame, emit_geometry,
+    ensure_worker, host, owner_for_window, resolve_display, restore_input, Display, DragEnd,
     DragPointer, DragRuns, Edge, HudConfig, HudPlacement, HudState, HudWindows, InteractiveRegion,
     Mode, Point, Shared,
 };
@@ -208,7 +208,7 @@ pub(super) fn preview_drag(
     // an edge-parallel move inside the column is laid out by the front end alone, and
     // re-running AppKit and Tao round trips on every 16 ms sample made the drag stutter.
     let scale = display.monitor.scale_factor();
-    let frame = edge_frame(monitor_bounds(&display.monitor), scale, &config);
+    let frame = edge_frame(dock_bounds(&display.monitor), scale, &config);
     // A host whose canvas covers the drag's whole display never needs one either.
     let unchanged = host::fixed_canvas() && state.geometry.is_some()
         || state.geometry.as_ref().is_some_and(|geometry| {
