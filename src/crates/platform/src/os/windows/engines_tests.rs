@@ -93,3 +93,28 @@ fn executable_dirs_and_versions_cover_windows_package_managers_and_agy() {
     assert!(engine_candidates(home, &env, "claude").contains(&versioned));
     assert!(application_installed(home, &env, "Claude"));
 }
+
+#[test]
+fn workbuddy_app_is_only_workbuddys_own_program() {
+    let tmp = tempdir().unwrap();
+    let home = tmp.path();
+    let bin = home.join("bin");
+    fs::create_dir_all(&bin).unwrap();
+    fs::write(bin.join("workbuddy-app.exe"), b"MZ").unwrap();
+    let local = home.join("AppData/Local");
+    let env = Environment::from([
+        ("LOCALAPPDATA".into(), local.to_string_lossy().into_owned()),
+        ("PATH".into(), bin.to_string_lossy().into_owned()),
+    ]);
+    let candidates = engine_candidates(home, &env, "workbuddy-app");
+    assert_eq!(
+        candidates.first(),
+        Some(&local.join("Programs/WorkBuddy/WorkBuddy.exe"))
+    );
+    assert!(
+        candidates
+            .iter()
+            .all(|path| path.ends_with("WorkBuddy/WorkBuddy.exe")),
+        "{candidates:?}"
+    );
+}

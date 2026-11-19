@@ -46,7 +46,8 @@ pub(crate) fn application_installed(home: &Path, env: &Environment, name: &str) 
         return super::codex::installation(home, env).installed;
     }
     if name == "Claude"
-        && (local_app(home, env).join("AnthropicClaude").is_dir()
+        && (super::registered_bundle("com.anthropic.claudefordesktop")
+            || local_app(home, env).join("AnthropicClaude").is_dir()
             || !find_store_packages(&local_app(home, env), "Claude_").is_empty())
     {
         return true;
@@ -158,6 +159,16 @@ fn claude_local_versions(root: &Path) -> Vec<PathBuf> {
 }
 
 pub(crate) fn engine_candidates(home: &Path, env: &Environment, name: &str) -> Vec<PathBuf> {
+    if name == "workbuddy-app" {
+        // Only WorkBuddy's own install, never whatever else carries the name.
+        let pf86 =
+            variable(env, "ProgramFiles(x86)").unwrap_or_else(|| "C:/Program Files (x86)".into());
+        return vec![
+            local_app(home, env).join("Programs/WorkBuddy/WorkBuddy.exe"),
+            program_files(env).join("WorkBuddy/WorkBuddy.exe"),
+            pf86.join("WorkBuddy/WorkBuddy.exe"),
+        ];
+    }
     let mut paths = if name == "codex" {
         super::codex::installation(home, env).engines
     } else {
