@@ -44,7 +44,12 @@ fn answer(app: &tauri::AppHandle, message: &Value) -> Result<Value, String> {
     }
 }
 
-/// Remembers the browser the extension last spoke from, for Settings.
+/// What Settings hears as the extension speaks, such as its hello right after
+/// it is added, so the row turns as it happens.
+const EVENT: &str = "inspect:browser";
+
+/// Remembers the browser the extension last spoke from, for Settings, and
+/// tells the windows on screen.
 fn seen(app: &tauri::AppHandle, browser: &Value) {
     let inspect = app.state::<Inspect>();
     let note = json!({
@@ -52,6 +57,7 @@ fn seen(app: &tauri::AppHandle, browser: &Value) {
         "at": chrono::Utc::now().timestamp_millis(),
     });
     let _ = agent_hud_runtime::delivery::atomic_json(&inspect.folder.join("browser.json"), &note);
+    crate::activity::publish(app, EVENT, &status(&inspect));
 }
 
 /// For Settings: where the extension last spoke from, and where to get it.

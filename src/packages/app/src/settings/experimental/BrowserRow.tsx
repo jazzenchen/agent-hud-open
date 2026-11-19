@@ -1,9 +1,10 @@
 // The browser extension, on Experimental: it picks an element or an area of
 // a page and sends it through the inspector. Says where it last
-// reached Agent HUD from, and links its Chrome Web Store page once it has
-// one.
+// reached Agent HUD from, turning as the extension first speaks, and links
+// its Chrome Web Store page.
 import { useEffect, useState } from "react";
 import { invoke, isTauri } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { dateFormat, type Translate } from "@agent-hud/ui/format";
 import { LinkButton } from "../SettingsControls";
 import { Pill, Row } from "../SettingsPrimitives";
@@ -17,17 +18,24 @@ export function BrowserRow({
   active,
   t,
 }: {
-  /** The window is on screen: the status is read again as it comes back. */
+  /** The window is on screen: the status is read again as it comes back,
+   * and follows the extension while it stays. */
   active: boolean;
   t: Translate;
 }) {
   const [status, setStatus] = useState<BrowserStatus | null>(null);
   useEffect(() => {
     if (!active || !isTauri()) return;
+    // Subscribed before the read, so a hello between the two isn't missed.
+    const subscription = listen<BrowserStatus>(
+      "inspect:browser",
+      ({ payload }) => setStatus(payload),
+    );
     invoke<BrowserStatus>("inspect_request", {
       method: "browser",
       params: {},
     }).then(setStatus, () => {});
+    return () => void subscription.then((unlisten) => unlisten());
   }, [active]);
   const seen = status?.seen;
   return (
