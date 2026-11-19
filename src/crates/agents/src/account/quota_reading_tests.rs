@@ -90,9 +90,10 @@ fn a_setting_names_levels_by_agent_and_skips_what_is_not_one() {
 }
 
 #[test]
-fn pis_level_governs_codexs_reader_which_reads_its_sign_in() {
-    assert_eq!(reader("pi"), "codex");
-    assert_eq!(reader("claude"), "claude");
+fn an_agents_level_governs_the_readers_that_read_its_sign_in() {
+    assert_eq!(readers("pi"), ["codex"]);
+    assert_eq!(readers("cursor"), ["cursor", "grok-bot"]);
+    assert_eq!(readers("claude"), ["claude"]);
     assert_eq!(level(&json!({"pi": "off"}), "pi"), Off);
 }
 

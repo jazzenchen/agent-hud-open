@@ -64,7 +64,7 @@ pub fn choices(agent: &str) -> &'static [QuotaReading] {
         "claude" | "codex" => &[Off, Official, Full],
         // Copilot asks first, with its own switch (`copilot::account::CONSENT`).
         "copilot" => &[],
-        // No reader of its own: Codex's reads its ChatGPT sign-in (`reader`).
+        // No reader of its own: Codex's reads its ChatGPT sign-in (`readers`).
         "pi" => &[Off, Full],
         _ if crate::agent::by_id(agent).is_some()
             && crate::agent::account_provider(agent).is_some() =>
@@ -76,12 +76,14 @@ pub fn choices(agent: &str) -> &'static [QuotaReading] {
     }
 }
 
-/// The account reader whose reading `agent`'s level governs: its own, or
-/// for Pi, Codex's, which reads Pi's ChatGPT sign-in (`codex::pi_usage`).
-pub fn reader(agent: &str) -> &str {
+/// The account readers whose reading `agent`'s level governs: its own, and
+/// those that read its sign-in. Codex's reads Pi's ChatGPT sign-in
+/// (`codex::pi_usage`), Grok Bot's reads Cursor's (`grok::account`).
+pub fn readers(agent: &str) -> Vec<&str> {
     match agent {
-        "pi" => "codex",
-        other => other,
+        "pi" => vec!["codex"],
+        "cursor" => vec!["cursor", "grok-bot"],
+        other => vec![other],
     }
 }
 

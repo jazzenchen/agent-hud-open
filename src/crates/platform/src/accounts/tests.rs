@@ -976,3 +976,36 @@ fn changing_pis_quota_reading_reads_codex_again() {
     assert!(!state.entries.contains_key("codex") && state.force.contains("codex"));
     assert!(!state.force.contains("pi"));
 }
+
+#[test]
+fn changing_cursors_quota_reading_reads_cursor_and_grok_bot_again() {
+    let directory = tempfile::tempdir().unwrap();
+    let service = AccountService::with_readers(
+        directory.path().join("home"),
+        directory.path().join("data"),
+        HashSet::new(),
+        CollectionGate::default(),
+        &[],
+    )
+    .unwrap();
+    for provider in ["cursor", "grok-bot", "codex"] {
+        service
+            .shared
+            .state
+            .lock()
+            .unwrap()
+            .entries
+            .insert(provider, entry(AccountReading::empty(provider), None, true));
+    }
+    service.update_sources(&json!({
+        "settings": {"quotaReading": {"cursor": "off"}},
+        "providers": [{"id": "cursor", "enabled": true, "detected": true}],
+        "sessions": [],
+    }));
+    let state = service.shared.state.lock().unwrap();
+    for provider in ["cursor", "grok-bot"] {
+        assert!(!state.entries.contains_key(provider), "{provider}");
+        assert!(state.force.contains(provider), "{provider}");
+    }
+    assert!(state.entries.contains_key("codex") && !state.force.contains("codex"));
+}

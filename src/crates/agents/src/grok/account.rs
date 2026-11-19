@@ -10,7 +10,8 @@
 //! Any other server failure falls back to the cache, with the reason.
 use super::cache as bot;
 use crate::account::{
-    add_readers, legacy_unresolved, locate, read_by, status, Host, Provider, Reading, Unread,
+    add_readers, legacy_unresolved, locate, read_by, status, Host, Provider, QuotaReading, Reading,
+    Unread,
 };
 use crate::cursor::account::{sign_in, SignIn};
 use crate::naming::window_names;
@@ -49,8 +50,16 @@ pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
         return Ok(r);
     };
     let now = chrono::Utc::now().timestamp_millis();
-    // Cursor's sign-in, read once: the Bot's account is read with it.
-    let cursor = sign_in(host).map_err(|why| why.reason().to_owned());
+    // Cursor's sign-in, read once: the Bot's account is read with it. It is
+    // another app's, so only while Cursor's own quota reading allows it.
+    let cursor_allowed = host
+        .quota_reading(crate::cursor::AGENT.id)
+        .allows(QuotaReading::Full);
+    let cursor = if cursor_allowed {
+        sign_in(host).map_err(|why| why.reason().to_owned())
+    } else {
+        Err(cursor_off())
+    };
     let same = match &cursor {
         Ok(Some(cursor)) if super::weekly::same_account(&slot, cursor) => Some(cursor),
         _ => None,
@@ -92,8 +101,19 @@ pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
             r.notice = Some(why);
             Ok(r)
         }
+        // Nothing left without Cursor's sign-in: say so, as an off reading does.
+        (Err(why), _) if !cursor_allowed => {
+            let mut r = Reading::empty("grok-bot");
+            r.notice = Some(joined(Some(cursor_off()), why));
+            Ok(r)
+        }
         (Err(why), _) => Err(why.into()),
     }
+}
+
+/// Why the Bot is read without Cursor's sign-in.
+fn cursor_off() -> String {
+    tr!("Cursor's quota reading is off in Settings, so Grok Bot is read without Cursor's sign-in.")
 }
 
 /// The Bot's account is read through the Bot, and through Cursor too when
@@ -361,5 +381,81 @@ mod tests {
             reading.quotas.is_empty(),
             "a linked account file is not read"
         );
+    }
+
+    /// The Bot signed in to the account Cursor is signed in to, with a
+    /// fresh cache, and Cursor's sign-in in its database.
+    fn with_cursor(dir: &tempfile::TempDir, quota: Value) -> FakeHost {
+        let slot = "auth0|user_123";
+        let (account_file, account) = entry(bot::ACCOUNT_KEY, 1, json!(slot));
+        let (quota_file, quota) = entry(&bot::quota_key(slot), 2, quota);
+        let claims = json!({"exp": chrono::Utc::now().timestamp() + 3600, "sub": slot});
+        let token = format!(
+            "h.{}.s",
+            base64::Engine::encode(
+                &base64::engine::general_purpose::URL_SAFE_NO_PAD,
+                serde_json::to_vec(&claims).unwrap(),
+            )
+        );
+        let path = dir.path().join("state.vscdb");
+        let db = rusqlite::Connection::open(&path).unwrap();
+        db.execute_batch(
+            "CREATE TABLE IF NOT EXISTS ItemTable (key TEXT PRIMARY KEY, value BLOB);",
+        )
+        .unwrap();
+        db.execute(
+            "INSERT OR REPLACE INTO ItemTable VALUES ('cursorAuth/accessToken', ?1)",
+            [&token],
+        )
+        .unwrap();
+        let mut host = FakeHost::new("/u")
+            .file(&account_file, &account)
+            .file(&quota_file, &quota);
+        host.databases.insert(CURSOR_DB.into(), path);
+        host
+    }
+
+    const CURSOR_DB: &str = "/u/AppData/Cursor/User/globalStorage/state.vscdb";
+
+    fn cursors(host: &FakeHost) -> bool {
+        let opened = host.read.borrow().iter().any(|path| {
+            path == std::path::Path::new(CURSOR_DB) || path == std::path::Path::new("Cursor")
+        });
+        opened
+            || host
+                .asked
+                .borrow()
+                .iter()
+                .any(|(url, _)| url.contains("cursor.sh"))
+    }
+
+    #[test]
+    fn cursor_off_opens_and_sends_nothing_of_cursors() {
+        let dir = tempfile::tempdir().unwrap();
+        // In full, Cursor's sign-in is read and sent.
+        let host = with_cursor(&dir, fresh_quota(false));
+        let _ = read(&host);
+        assert!(cursors(&host), "Cursor's sign-in is used in full");
+        let mut host = with_cursor(&dir, fresh_quota(false));
+        host.quota_levels.insert("cursor".into(), QuotaReading::Off);
+        let reading = read(&host).unwrap();
+        assert!(!cursors(&host), "nothing of Cursor's is opened or sent");
+        // The Bot's own cache still shows, and says why there are no tokens.
+        assert_eq!(reading.quotas[0]["usedPercent"], 42.0);
+        assert_eq!(reading.account.unwrap()["readBy"], json!(["grok-bot"]));
+        assert!(reading.notice.unwrap().contains(&cursor_off()));
+    }
+
+    #[test]
+    fn cursor_off_with_nothing_left_says_why() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut quota = fresh_quota(false);
+        quota["expiresAtMs"] = json!(1);
+        let mut host = with_cursor(&dir, quota);
+        host.quota_levels.insert("cursor".into(), QuotaReading::Off);
+        let reading = read(&host).unwrap();
+        assert!(reading.quotas.is_empty() && reading.account.is_none());
+        assert!(reading.notice.unwrap().starts_with(&cursor_off()));
+        assert!(!cursors(&host));
     }
 }

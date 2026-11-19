@@ -200,10 +200,12 @@ impl AccountService {
             .lock()
             .unwrap_or_else(PoisonError::into_inner);
         for agent in changed {
-            // Pi's level governs Codex's reader, which reads Pi's sign-in.
-            let reader = agents::account::quota_reading::reader(&agent);
-            state.entries.remove(reader);
-            state.force.insert(reader.to_owned());
+            // Pi's level governs Codex's reader too, Cursor's Grok Bot's:
+            // they read those agents' sign-ins.
+            for reader in agents::account::quota_reading::readers(&agent) {
+                state.entries.remove(reader);
+                state.force.insert(reader.to_owned());
+            }
         }
         self.shared.wake.notify_all();
     }

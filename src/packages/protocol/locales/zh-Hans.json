@@ -1517,5 +1517,6 @@
   "Everything": "全部",
   "Shows no quota. Sessions and tokens are still counted from the agent's own logs.": "不显示额度。会话和 token 仍从智能体自己的日志中统计。",
   "Uses only the agent's own app, not sign-ins other apps keep.": "只用智能体自己的程序，不用其他程序保存的登录信息。",
-  "Uses any sign-in or key found for this agent, including ones other apps keep.": "使用为此智能体找到的任何登录信息或密钥，包括其他程序保存的。"
+  "Uses any sign-in or key found for this agent, including ones other apps keep.": "使用为此智能体找到的任何登录信息或密钥，包括其他程序保存的。",
+  "Cursor's quota reading is off in Settings, so Grok Bot is read without Cursor's sign-in.": "Cursor 的额度读取已在设置中关闭，所以读取 Grok Bot 时不用 Cursor 的登录信息。"
 }

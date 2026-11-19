@@ -20,7 +20,7 @@ pub struct FakeHost {
     pub account_homes: HashMap<String, Vec<PathBuf>>,
     pub account_reports: HashMap<String, Vec<Value>>,
     pub files: HashMap<PathBuf, Answer<Vec<u8>>>,
-    /// Every file read, by path.
+    /// Every file and database read, by path, and safe storage, by app.
     pub read: RefCell<Vec<PathBuf>>,
     /// Canonical targets for paths that resolve to another location.
     pub canonical_paths: HashMap<PathBuf, PathBuf>,
@@ -293,6 +293,7 @@ impl Host for FakeHost {
             .unwrap_or(Answer::Missing)
     }
     fn unseal_safe_storage(&self, app: &str, encrypted: &[u8]) -> Answer<String> {
+        self.read.borrow_mut().push(app.into());
         let mut scoped = app.as_bytes().to_vec();
         scoped.push(b'|');
         scoped.extend_from_slice(encrypted);
@@ -347,6 +348,7 @@ impl Host for FakeHost {
         params: &[&str],
         wait: Duration,
     ) -> Result<Vec<Vec<Value>>, DatabaseFailure> {
+        self.read.borrow_mut().push(path.into());
         let real = self.databases.get(path).ok_or(DatabaseFailure::Missing)?;
         crate::sqlite::rows(real, sql, params, wait)
     }

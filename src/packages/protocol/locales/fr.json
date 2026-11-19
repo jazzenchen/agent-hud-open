@@ -1581,5 +1581,6 @@
   "Everything": "Tout",
   "Shows no quota. Sessions and tokens are still counted from the agent's own logs.": "N'affiche aucun quota. Les sessions et les jetons sont toujours comptés depuis les journaux de l'agent.",
   "Uses only the agent's own app, not sign-ins other apps keep.": "Utilise seulement l'app de l'agent, pas les connexions que gardent d'autres apps.",
-  "Uses any sign-in or key found for this agent, including ones other apps keep.": "Utilise toute connexion ou clé trouvée pour cet agent, y compris celles que gardent d'autres apps."
+  "Uses any sign-in or key found for this agent, including ones other apps keep.": "Utilise toute connexion ou clé trouvée pour cet agent, y compris celles que gardent d'autres apps.",
+  "Cursor's quota reading is off in Settings, so Grok Bot is read without Cursor's sign-in.": "La lecture du quota de Cursor est désactivée dans les réglages : Grok Bot est donc lu sans la connexion de Cursor."
 }
