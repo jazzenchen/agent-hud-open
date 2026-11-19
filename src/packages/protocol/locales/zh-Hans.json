@@ -1512,12 +1512,10 @@
   "Only a bar stays; it turns yellow or red as a usage limit nears.": "只留下一根细条，接近用量上限时变黄或变红。",
   "Nothing stays on screen.": "屏幕上什么都不留。",
   "Quota reading is off for this agent in Settings. Sessions and tokens are still counted from its logs.": "已在设置中关闭此智能体的额度读取。会话和 token 仍会从它的日志中统计。",
-  "The agent's own app": "智能体自己的应用",
-  "Everything (default)": "全部（默认）",
-  "Quota is not read. Sessions and tokens are still counted from the agent's logs.": "不读取额度。会话和 token 仍会从智能体的日志中统计。",
-  "Also asks the agent's own app, which reads the account the way it always does.": "另外会询问智能体自己的应用，由它按平常的方式读取账号。",
-  "Also uses sign-ins other apps keep and the vendor's web service, as before.": "另外会使用其他应用保存的登录信息和服务商的网页服务，与以前相同。",
-  "Quota reading": "额度读取",
-  "Read quota from": "额度读取来源",
-  "Lower levels use fewer sign-ins and send less.": "级别越低，用到的登录信息越少，发出的请求也越少。"
+  "Quota reading": "读取额度",
+  "Own app only": "仅限它自己的程序",
+  "Everything": "全部",
+  "Shows no quota. Sessions and tokens are still counted from the agent's own logs.": "不显示额度。会话和 token 仍从智能体自己的日志中统计。",
+  "Uses only the agent's own app, not sign-ins other apps keep.": "只用智能体自己的程序，不用其他程序保存的登录信息。",
+  "Uses any sign-in or key found for this agent, including ones other apps keep.": "使用为此智能体找到的任何登录信息或密钥，包括其他程序保存的。"
 }

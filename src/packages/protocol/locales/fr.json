@@ -1576,12 +1576,10 @@
   "Only a bar stays; it turns yellow or red as a usage limit nears.": "Seule une barre reste ; elle devient jaune ou rouge à l’approche d’une limite d’usage.",
   "Nothing stays on screen.": "Rien ne reste à l’écran.",
   "Quota reading is off for this agent in Settings. Sessions and tokens are still counted from its logs.": "La lecture du quota est désactivée pour cet agent dans les réglages. Les sessions et les jetons sont toujours comptés depuis ses journaux.",
-  "The agent's own app": "L'app de l'agent",
-  "Everything (default)": "Tout (par défaut)",
-  "Quota is not read. Sessions and tokens are still counted from the agent's logs.": "Le quota n'est pas lu. Les sessions et les jetons sont toujours comptés depuis les journaux de l'agent.",
-  "Also asks the agent's own app, which reads the account the way it always does.": "Interroge aussi l'app de l'agent, qui lit le compte comme elle le fait toujours.",
-  "Also uses sign-ins other apps keep and the vendor's web service, as before.": "Utilise aussi les connexions que gardent d'autres apps et le service web du fournisseur, comme avant.",
   "Quota reading": "Lecture du quota",
-  "Read quota from": "Lire le quota depuis",
-  "Lower levels use fewer sign-ins and send less.": "Plus le niveau est bas, moins de connexions sont utilisées et moins de données sont envoyées."
+  "Own app only": "Son app seulement",
+  "Everything": "Tout",
+  "Shows no quota. Sessions and tokens are still counted from the agent's own logs.": "N'affiche aucun quota. Les sessions et les jetons sont toujours comptés depuis les journaux de l'agent.",
+  "Uses only the agent's own app, not sign-ins other apps keep.": "Utilise seulement l'app de l'agent, pas les connexions que gardent d'autres apps.",
+  "Uses any sign-in or key found for this agent, including ones other apps keep.": "Utilise toute connexion ou clé trouvée pour cet agent, y compris celles que gardent d'autres apps."
 }

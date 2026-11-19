@@ -36,28 +36,24 @@ export function AgentQuotaReading({
   const value = reading.level;
   const names: Record<QuotaReadingLevel, string> = {
     off: t("Off"),
-    official: t("The agent's own app"),
-    full: t("Everything (default)"),
+    official: t("Own app only"),
+    full: t("Everything"),
   };
-  const explained: Record<QuotaReadingLevel, string> = {
+  // What the chosen level reads, under the row.
+  const reads: Record<QuotaReadingLevel, string> = {
     off: t(
-      "Quota is not read. Sessions and tokens are still counted from the agent's logs.",
+      "Shows no quota. Sessions and tokens are still counted from the agent's own logs.",
     ),
-    official: t(
-      "Also asks the agent's own app, which reads the account the way it always does.",
-    ),
+    official: t("Uses only the agent's own app, not sign-ins other apps keep."),
     full: t(
-      "Also uses sign-ins other apps keep and the vendor's web service, as before.",
+      "Uses any sign-in or key found for this agent, including ones other apps keep.",
     ),
   };
   return (
-    <Section title={t("Quota reading")} footer={explained[value]}>
-      <Row
-        title={t("Read quota from")}
-        subtitle={t("Lower levels use fewer sign-ins and send less.")}
-      >
+    <Section>
+      <Row title={t("Quota reading")} subtitle={reads[value]}>
         <Menu
-          label={t("Read quota from")}
+          label={t("Quota reading")}
           value={value}
           options={reading.choices.map((level) => [level, names[level]])}
           disabled={pending}

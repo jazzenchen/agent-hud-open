@@ -1544,12 +1544,10 @@
   "Only a bar stays; it turns yellow or red as a usage limit nears.": "Nur eine Leiste bleibt; sie wird gelb oder rot, wenn ein Nutzungslimit naht.",
   "Nothing stays on screen.": "Nichts bleibt auf dem Bildschirm.",
   "Quota reading is off for this agent in Settings. Sessions and tokens are still counted from its logs.": "Das Lesen des Kontingents ist für diesen Agenten in den Einstellungen aus. Sitzungen und Tokens werden weiter aus seinen Protokollen gezählt.",
-  "The agent's own app": "Die eigene App des Agenten",
-  "Everything (default)": "Alles (Standard)",
-  "Quota is not read. Sessions and tokens are still counted from the agent's logs.": "Das Kontingent wird nicht gelesen. Sitzungen und Tokens werden weiter aus den Protokollen des Agenten gezählt.",
-  "Also asks the agent's own app, which reads the account the way it always does.": "Fragt auch die eigene App des Agenten, die das Konto wie immer liest.",
-  "Also uses sign-ins other apps keep and the vendor's web service, as before.": "Nutzt auch Anmeldungen anderer Apps und den Webdienst des Anbieters, wie bisher.",
   "Quota reading": "Kontingent lesen",
-  "Read quota from": "Kontingent lesen aus",
-  "Lower levels use fewer sign-ins and send less.": "Niedrigere Stufen nutzen weniger Anmeldungen und senden weniger."
+  "Own app only": "Nur eigene App",
+  "Everything": "Alles",
+  "Shows no quota. Sessions and tokens are still counted from the agent's own logs.": "Zeigt kein Kontingent. Sitzungen und Tokens werden weiter aus den eigenen Protokollen des Agenten gezählt.",
+  "Uses only the agent's own app, not sign-ins other apps keep.": "Nutzt nur die eigene App des Agenten, keine Anmeldungen anderer Apps.",
+  "Uses any sign-in or key found for this agent, including ones other apps keep.": "Nutzt jede Anmeldung und jeden Schlüssel, die für diesen Agenten gefunden werden, auch die anderer Apps."
 }

@@ -1511,13 +1511,11 @@
   "Only the logos stay.": "只留下標誌。",
   "Only a bar stays; it turns yellow or red as a usage limit nears.": "只留下一根細條，接近用量上限時變黃或變紅。",
   "Nothing stays on screen.": "螢幕上什麼都不留。",
-  "Quota reading is off for this agent in Settings. Sessions and tokens are still counted from its logs.": "已在設定中關閉此智慧體的額度讀取。工作階段和 token 仍會從它的日誌中統計。",
-  "The agent's own app": "智慧體自己的應用程式",
-  "Everything (default)": "全部（預設）",
-  "Quota is not read. Sessions and tokens are still counted from the agent's logs.": "不讀取額度。工作階段和 token 仍會從智慧體的日誌中統計。",
-  "Also asks the agent's own app, which reads the account the way it always does.": "另外會詢問智慧體自己的應用程式，由它按平常的方式讀取帳號。",
-  "Also uses sign-ins other apps keep and the vendor's web service, as before.": "另外會使用其他應用程式保存的登入資訊和服務商的網頁服務，與以前相同。",
-  "Quota reading": "額度讀取",
-  "Read quota from": "額度讀取來源",
-  "Lower levels use fewer sign-ins and send less.": "級別越低，用到的登入資訊越少，送出的請求也越少。"
+  "Quota reading is off for this agent in Settings. Sessions and tokens are still counted from its logs.": "已在設定中關閉此 Agent 的額度讀取。工作階段和 token 仍會從它的日誌中統計。",
+  "Quota reading": "讀取額度",
+  "Own app only": "僅限它自己的程式",
+  "Everything": "全部",
+  "Shows no quota. Sessions and tokens are still counted from the agent's own logs.": "不顯示額度。工作階段和 token 仍從 Agent 自己的日誌中統計。",
+  "Uses only the agent's own app, not sign-ins other apps keep.": "只用 Agent 自己的程式，不用其他程式保存的登入資訊。",
+  "Uses any sign-in or key found for this agent, including ones other apps keep.": "使用為此 Agent 找到的任何登入資訊或金鑰，包括其他程式保存的。"
 }
