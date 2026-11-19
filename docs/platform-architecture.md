@@ -136,10 +136,12 @@ turns only typed client-owned destinations into fixed native schemes, and each
 link's OS support comes from host facts (`registered_url`, `registered_bundle`,
 `app_running`), never from a guess. The Harness's `deepseek-session` destination
 opens `dsh://open?session=<id>` on Windows only, where the registry owns `dsh://`
-and the id is one of the Harness's own session shapes; the desktop app then
-focuses and switches to that session. On macOS and Linux the app-level
-`deepseek-app` link stands in, until a parameterised URL is verified to focus
-the right session there.
+and the id is one of the Harness's own session shapes. Today's Harness ignores
+the query and only focuses its window; one that reads it (proposed upstream in
+deepseek-ai/deepseek-harness discussion 13820) switches to that session.
+Elsewhere, and on Windows without the registered scheme, the session opens the
+app-level `deepseek-app` link as before, and core offers a Harness session a
+way back only where that app link opens.
 
 Evidence for installation, configuration, log ingestion and account readings is
 separate. Finding an agent does not prove that its usage reader works. Unknown

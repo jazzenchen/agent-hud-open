@@ -11,8 +11,9 @@ use crate::Discovery;
 use crate::{Agent, Carries, Channel, PerOs, Support};
 use crate::{Location, Source};
 
-// Harness only shows and focuses its main window; its session links open
-// that window on one session, and only on Windows for now.
+// Harness's link shows and focuses its main window. On Windows a session's
+// link also names the session, which no released Harness reads yet (it only
+// focuses the window); see `session_target`.
 static APP_NAVIGATION: crate::discovery::AppNavigation = crate::discovery::AppNavigation {
     kind: "deepseek-app",
     url: PerOs {
@@ -56,9 +57,10 @@ pub fn is_session_id(id: &str) -> bool {
     false
 }
 
-/// Where a Harness session opens: its desktop window on that session. The
-/// engine keeps the id as `deepseek:<id>`; only the Harness's own id shapes
-/// are accepted, so anything else leaves the app link to stand in.
+/// Where a Harness session opens: its desktop window, named with the session
+/// for a Harness that switches to it (proposed upstream, not yet released).
+/// The engine keeps the id as `deepseek:<id>`; only the Harness's own id
+/// shapes are accepted, so anything else leaves the app link to stand in.
 fn session_target(
     id: &str,
     _cwd: Option<&str>,
