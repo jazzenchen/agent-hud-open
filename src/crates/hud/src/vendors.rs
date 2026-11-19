@@ -17,7 +17,7 @@ pub struct Vendor<'a> {
     pub key: String,
     pub name: String,
     /// The measured window's used percent: the shortest, when the screen asks
-    /// for it, else the tightest.
+    /// for it, else the tightest. `level` is the tightest's either way.
     pub used: Option<f64>,
     /// The last reading's tightest window while every window waits on a
     /// failed read (`held`).
@@ -192,14 +192,17 @@ pub fn configured<'a>(
             .filter(|q| row_shown(q, &layout["blocks"][q["vendor"].as_str().unwrap_or("")]))
             .collect();
         if shown.len() < vendor.quotas.len() || shortest_first {
-            let picked = if shortest_first {
+            let tightest = tightest(&shown, now_ms);
+            // The switch moves only the number: the level, and with it every
+            // colour, stays the tightest window's (held-reading.ts `windowReading`).
+            let number = if shortest_first {
                 shortest(&shown, now_ms)
             } else {
-                tightest(&shown, now_ms)
+                tightest
             };
-            vendor.used = picked.map(|(used, _)| used);
+            vendor.used = number.map(|(used, _)| used);
             vendor.held = held(&shown, now_ms);
-            vendor.level = picked
+            vendor.level = tightest
                 .and_then(|(_, q)| q["status"].as_str())
                 .unwrap_or("stale");
         }

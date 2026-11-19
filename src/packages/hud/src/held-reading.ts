@@ -87,20 +87,21 @@ export function shortestWindow<T extends HeldWindow>(
   );
 }
 
-/** What an agent's windows set on its mark: the chosen live window's share
- * and level — the shortest when the screen asks for it, else the tightest —
- * else the share its last reading holds, in the stale grey. */
+/** What an agent's windows set on its mark: the share of its tightest live
+ * window, or of its shortest when the screen asks for that, else the share
+ * its last reading holds, in the stale grey. The level, and with it every
+ * colour, stays the tightest window's either way, so a spent weekly window
+ * still glows while the number shows the 5-hour one. */
 export function windowReading<T extends HeldWindow>(
   quotas: readonly T[],
   now: number,
   shortestFirst = false,
 ): { used: number | null; heldUsed: number | null; level: T["status"] } {
-  const picked = shortestFirst
-    ? shortestWindow(quotas, now)
-    : tightestWindow(quotas, now);
+  const tightest = tightestWindow(quotas, now);
+  const shown = shortestFirst ? shortestWindow(quotas, now) : tightest;
   return {
-    used: picked?.usedPercent ?? null,
+    used: shown?.usedPercent ?? null,
     heldUsed: heldUsed(quotas, now),
-    level: picked?.status ?? "stale",
+    level: tightest?.status ?? "stale",
   };
 }

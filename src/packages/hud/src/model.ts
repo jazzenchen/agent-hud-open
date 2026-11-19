@@ -202,8 +202,8 @@ export function vendorsFromSnapshot(
 
 /** An agent whose number and level follow the windows the panel shows: a row
  * the person hid there no longer sets them (Open #91). Its rings already draw
- * only those (`markWindows`); with the shortest window first, they follow that
- * window instead of the tightest. */
+ * only those (`markWindows`). With the shortest window first, the number
+ * follows that window instead of the tightest; the level does not. */
 function withShownWindows(
   vendor: HUDVendor,
   config: HUDConfig,

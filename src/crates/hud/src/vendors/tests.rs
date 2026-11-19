@@ -185,6 +185,18 @@ fn the_number_can_follow_the_shortest_window_first() {
         ),
         ("90%".into(), "normal".into())
     );
+    // The number moves; the level, and every colour with it, stays the
+    // tightest window's, so a spent weekly window still warns.
+    let spent = json!({
+        "language": "en", "billing": [], "sessions": [], "approvals": [], "providers": [],
+        "quotas": [
+            row("claude-5h", 30.0, "normal", Some(18_000.0)),
+            row("claude-7d", 100.0, "critical", Some(604_800.0)),
+        ]
+    });
+    let list = configured(&spent, "simple", &json!({}), 0, true);
+    assert_eq!(meter_label(&list[0], false), "30%");
+    assert_eq!(list[0].level, "critical");
     // Ties on duration go to the highest used percent.
     let tied = json!({
         "language": "en", "billing": [], "sessions": [], "approvals": [], "providers": [],

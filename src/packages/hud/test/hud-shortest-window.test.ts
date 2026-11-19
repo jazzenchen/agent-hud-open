@@ -51,6 +51,15 @@ test("the number follows the shortest live window when the screen asks for it", 
   assert.deepEqual(reading(true), [80, null, "normal"]);
 });
 
+test("the shortest window moves only the number: the level stays the tightest window's", () => {
+  const spent = [
+    row("claude-5h", 30, "normal", 18_000),
+    row("claude-7d", 100, "critical", 604_800),
+  ];
+  const { used, level } = windowReading(spent, now, true);
+  assert.deepEqual([used, level], [30, "critical"]);
+});
+
 test("ties on duration go to the highest used percent", () => {
   const tied = [
     row("claude-5h-a", 60, "normal", 18_000),
