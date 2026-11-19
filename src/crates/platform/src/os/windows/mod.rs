@@ -13,6 +13,7 @@ mod shortcut;
 pub(crate) use crate::windows_session::spawn;
 pub(crate) use apps::{
     activate_app, app_running, bring_window_forward, is_main_window, launch_app, registered_bundle,
+    start_program,
 };
 pub(crate) use process::{
     codex_cli_on_port, parent_processes, process_runs, process_start, terminal_io,

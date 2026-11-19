@@ -156,6 +156,12 @@ pub(crate) fn open_deepseek() -> bool {
     deepseek_executable().is_some_and(|program| start(&program, None))
 }
 
+/// Starts a program as a click on it would, so a copy already running
+/// shows its window.
+pub(crate) fn start_program(program: &Path) -> bool {
+    start(program, None)
+}
+
 fn surface(processes: &[(u32, PathBuf)]) -> bool {
     let pids = processes.iter().map(|(pid, _)| *pid).collect::<Vec<_>>();
     if let Some(window) = window::of(&pids).into_iter().next() {
