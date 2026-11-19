@@ -37,6 +37,10 @@ const styleKeys = [
   "greyNumbers",
   "greyNumberOpacity",
   "separatesAgents",
+  "restStyle",
+  "restBarLength",
+  "restBarThickness",
+  "restBarColor",
   "appearance",
   "solidTransparency",
 ] as const;
