@@ -4,7 +4,9 @@ import type { PanelLayout, Quota, Snapshot } from "@agent-hud/protocol";
 import {
   configuredVendors,
   defaultHUDConfig,
+  followsShortestWindow,
   meterLabel,
+  type HUDConfig,
 } from "../src/model.ts";
 import { windowReading } from "../src/held-reading.ts";
 import { shownRows } from "../src/quota-rows.ts";
@@ -151,4 +153,47 @@ test("configuredVendors picks the shortest window per display, balance alone unc
   assert.equal(balance.used, null);
   assert.equal(meterLabel(balance), "¥8.85");
   assert.equal(balance.level, "normal");
+});
+
+test("the switch counts only where Settings offers it: a Simple dock with numbers", () => {
+  const on = (config: Partial<HUDConfig>) =>
+    followsShortestWindow({
+      ...defaultHUDConfig,
+      shortestWindowFirst: true,
+      ...config,
+    });
+  assert.equal(on({ mode: "simple" }), true);
+  assert.equal(on({ mode: "simple", shortestWindowFirst: false }), false);
+  assert.equal(on({ mode: "notch" }), false);
+  assert.equal(
+    on({ mode: "simple", simpleStyle: "rings", showsNumbers: false }),
+    false,
+  );
+  assert.equal(
+    on({ mode: "simple", simpleStyle: "numbers", showsNumbers: false }),
+    true,
+  );
+  const snapshot = {
+    language: "en",
+    settings: { language: "en", quotaDisplay: "consumed" },
+    quotas,
+    billing: [],
+    sessions: [],
+    approvals: [],
+    providers: [],
+  } as unknown as Snapshot;
+  const number = (config: Partial<HUDConfig>) =>
+    meterLabel(
+      configuredVendors(snapshot, {
+        ...defaultHUDConfig,
+        shortestWindowFirst: true,
+        ...config,
+      }).find((vendor) => vendor.key === "claude")!,
+    );
+  assert.equal(number({ mode: "simple" }), "80%");
+  assert.equal(number({ mode: "notch" }), "90%");
+  assert.equal(
+    number({ mode: "simple", simpleStyle: "bars", showsNumbers: false }),
+    "90%",
+  );
 });

@@ -76,10 +76,18 @@ impl<'a> Screen<'a> {
         ])
     }
 
-    /// Whether this screen's Simple numbers follow the shortest live window
-    /// (Settings → Display → HUD), read as Settings reads it.
-    pub(crate) fn shortest_window_first(&self) -> bool {
-        self.flag("shortestWindowFirst")
+    /// Whether a Simple HUD on this screen writes a number beside each logo
+    /// (geometry.ts `stripMetrics`).
+    pub(super) fn shows_numbers(&self) -> bool {
+        self.simple_style() == "numbers" || self.flag("showsNumbers")
+    }
+
+    /// Whether this screen's numbers follow the shortest live window: only
+    /// where Settings offers the switch, a Simple dock that writes numbers
+    /// (HUDSection.tsx). A Notch, or a dock without numbers, keeps the
+    /// tightest (model.ts `followsShortestWindow`).
+    pub(super) fn shortest_window_first(&self) -> bool {
+        self.mode() == Mode::Simple && self.shows_numbers() && self.flag("shortestWindowFirst")
     }
 
     pub(crate) fn mode(&self) -> Mode {

@@ -28,7 +28,7 @@ fn strip_width(
             let size = screen.number("simpleSize").clamp(20.0, 60.0);
             let style = screen.simple_style();
             let rings = matches!(style, "rings" | "segments");
-            let numbers = style == "numbers" || screen.flag("showsNumbers");
+            let numbers = screen.shows_numbers();
             let logo = (size * if rings { 0.55 } else { 0.68 }).round();
             let mark = if rings { size } else { logo };
             // geometry.ts `bar`: bars beside the logo, 1.09 marks long.

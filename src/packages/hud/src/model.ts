@@ -210,9 +210,27 @@ function withShownWindows(
   now: number,
 ): HUDVendor {
   const shown = shownRows(vendor.quotas, config.panelLayout);
-  return shown.length === vendor.quotas.length && !config.shortestWindowFirst
+  const shortestFirst = followsShortestWindow(config);
+  return shown.length === vendor.quotas.length && !shortestFirst
     ? vendor
-    : { ...vendor, ...windowReading(shown, now, config.shortestWindowFirst) };
+    : { ...vendor, ...windowReading(shown, now, shortestFirst) };
+}
+
+/** Whether a screen's numbers follow its shortest window: only where Settings
+ * offers the switch, a Simple dock that writes numbers (HUDSection.tsx). A
+ * Notch, or a dock without numbers, keeps the tightest (screen.rs
+ * `shortest_window_first`). */
+export function followsShortestWindow(
+  config: Pick<
+    HUDConfig,
+    "mode" | "simpleStyle" | "showsNumbers" | "shortestWindowFirst"
+  >,
+): boolean {
+  return (
+    config.shortestWindowFirst &&
+    config.mode === "simple" &&
+    (config.simpleStyle === "numbers" || config.showsNumbers)
+  );
 }
 
 /** A window's short name, as Core names it (the Swift `shortName`). */
