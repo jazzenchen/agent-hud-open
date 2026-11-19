@@ -255,7 +255,9 @@ pub(crate) fn default_browser() -> Option<String> {
 }
 
 pub(crate) fn open_session_url(url: &str) -> Result<(), String> {
-    if url == "dsh://open" {
+    // Harness's app link where no installer registered dsh://: Agent HUD
+    // finds Harness itself (`registered_url`).
+    if url == "dsh://open" && !apps::scheme_registered("dsh") {
         return apps::open_deepseek()
             .then_some(())
             .ok_or_else(|| "The native client could not open this session".into());

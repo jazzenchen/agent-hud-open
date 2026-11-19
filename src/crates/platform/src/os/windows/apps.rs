@@ -15,10 +15,8 @@ mod window;
 
 use super::{codex, shortcut, Environment};
 use std::{
-    net::{SocketAddr, TcpStream},
     path::{Path, PathBuf},
     process::{Command, Stdio},
-    time::Duration,
 };
 
 pub(super) use link::open_unregistered as open_unregistered_link;
@@ -124,20 +122,15 @@ fn deepseek_executable() -> Option<PathBuf> {
         .find(|path| path.is_file())
 }
 
-fn dsh_web_listening() -> bool {
-    // DeepSeek Harness Web's default port (`clients/deepseek/questions/observer.rs`).
-    let addr = SocketAddr::from(([127, 0, 0, 1], 3080));
-    TcpStream::connect_timeout(&addr, Duration::from_millis(80)).is_ok()
-}
-
+/// Whether DeepSeek Harness is here without a registered `dsh://`: its
+/// desktop app runs or is installed, or a browser window shows it.
 pub(crate) fn registered_deepseek() -> bool {
-    link::scheme_registered("dsh")
-        || !running::processes(programs(DEEPSEEK)).is_empty()
+    !running::processes(programs(DEEPSEEK)).is_empty()
         || deepseek_executable().is_some()
         || window::with_title_containing(&running_pids(BROWSERS), "DeepSeek Harness").is_some()
 }
 
-/// Brings DeepSeek Harness or a browser window hosting DeepSeek Harness Web
+/// Brings DeepSeek Harness or a browser window showing DeepSeek Harness Web
 /// forward on Windows, launching DeepSeek Harness if available.
 pub(crate) fn open_deepseek() -> bool {
     let desktop = running::processes(programs(DEEPSEEK));
@@ -147,11 +140,6 @@ pub(crate) fn open_deepseek() -> bool {
     let browser_pids = running_pids(BROWSERS);
     if let Some(window) = window::with_title_containing(&browser_pids, "DeepSeek Harness") {
         return window::bring_forward(window);
-    }
-    if dsh_web_listening() {
-        if let Some(window) = window::of(&browser_pids).into_iter().next() {
-            return window::bring_forward(window);
-        }
     }
     deepseek_executable().is_some_and(|program| start(&program, None))
 }

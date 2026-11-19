@@ -188,14 +188,16 @@ fn session_url_on(target: &Value, os: Os, registered: impl Fn(&str) -> bool) -> 
         // session's link names the session; a Harness that reads it switches
         // to it, and today's only shows its window. Elsewhere, or with no
         // registered link, the app link stands in, as before session links.
+        // The session link itself is asked about: Windows opens the bare app
+        // link even unregistered, by finding Harness, but not this one.
         "deepseek-session" => {
-            if os == Os::Windows
-                && agent_hud_agents::deepseek::is_session_id(id)
-                && registered("dsh://open")
-            {
+            if os == Os::Windows && agent_hud_agents::deepseek::is_session_id(id) {
                 let mut url = reqwest::Url::parse("dsh://open").ok()?;
                 url.query_pairs_mut().append_pair("session", id);
-                return Some(url.into());
+                let url = String::from(url);
+                if registered(&url) {
+                    return Some(url);
+                }
             }
             app_url(
                 agent_hud_agents::deepseek::AGENT.discovery.app_navigation?,

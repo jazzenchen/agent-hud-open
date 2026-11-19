@@ -46,13 +46,18 @@ fn harness_session_links_open_the_exact_session_on_windows() {
     ] {
         let target = json!({"kind":"deepseek-session","id":id,"url":"https://example.com"});
         assert_eq!(
-            session_url_on(&target, Os::Windows, |url| url == "dsh://open"),
+            session_url_on(&target, Os::Windows, |url| url.starts_with("dsh:")),
             Some(format!("dsh://open?session={id}"))
         );
     }
-    // An installer that never registered dsh:// leaves no way back to offer.
     let target =
         json!({"kind":"deepseek-session","id":"session-1456302e-07b2-4280-a8a6-986236e9094f"});
+    // Harness found without a registered dsh://: only the app link opens.
+    assert_eq!(
+        session_url_on(&target, Os::Windows, |url| url == "dsh://open"),
+        Some("dsh://open".into())
+    );
+    // An installer that never registered dsh:// leaves no way back to offer.
     assert_eq!(session_url_on(&target, Os::Windows, |_| false), None);
 }
 
