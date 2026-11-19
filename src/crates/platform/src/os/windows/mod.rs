@@ -23,6 +23,7 @@ pub(crate) use engines::{
 pub(crate) use process::{
     codex_cli_on_port, parent_processes, process_runs, process_start, terminal_io,
 };
+pub(crate) use shims::engine_command;
 /// No application bundles here: an MCP call is matched by its own parent.
 pub(crate) fn app_ancestors(_pid: u32) -> Vec<u32> {
     Vec::new()

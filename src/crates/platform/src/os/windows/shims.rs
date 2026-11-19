@@ -1,9 +1,14 @@
 //! What a client's shim in a command-line folder starts: npm's and pnpm's
 //! `.cmd` files and Scoop's `.shim` files. A shim that hands a script to Node,
 //! Python, PowerShell or another script host is never taken for the client's
-//! own program: that host would then run as `claude`.
+//! own program: that host would then run as `claude`. A client found only as
+//! an npm shim runs as Node on its entry script, the way the shim runs it.
 use super::{variable, Environment};
-use std::path::{Component, Path, PathBuf};
+use std::{
+    ffi::OsStr,
+    path::{Component, Path, PathBuf},
+    process::Command,
+};
 
 /// Programs that run a script they are given rather than being a client.
 const SCRIPT_HOSTS: [&str; 20] = [
@@ -112,12 +117,18 @@ fn words(line: &str) -> Vec<(bool, &str)> {
     words
 }
 
-/// The program a `.cmd` or `.bat` shim passes its arguments to unchanged
-/// (`claude.cmd` -> `...\claude-code\bin\claude.exe`), from its line that
-/// ends in `%*`. The program must stand on its own: first on the line, after
-/// `call`, or after `&`, `&&` or `||`. None for a shim that hands a script to
-/// a host first, or whose program is itself a script host.
-pub(super) fn cmd_target(shim: &Path, env: &Environment) -> Option<PathBuf> {
+/// What a batch shim starts with the arguments it is given.
+enum Launch {
+    /// `"<program>.exe" %*`: the client's own program.
+    Program(PathBuf),
+    /// npm's `"%_prog%" "<entry>.js" %*`: Node on the client's entry script.
+    Node(PathBuf),
+}
+
+/// Reads the shim's line that passes its arguments on (`... %*`). The
+/// command must stand on its own: first on the line, after `call`, or after
+/// `&`, `&&` or `||` as in npm's `endLocal & ... & "%_prog%" ...`.
+fn batch_launch(shim: &Path, env: &Environment) -> Option<Launch> {
     let bytes = std::fs::read(shim).ok()?;
     let text = String::from_utf8_lossy(&bytes[..bytes.len().min(16 * 1024)]);
     let dir = shim.parent()?;
@@ -133,12 +144,40 @@ pub(super) fn cmd_target(shim: &Path, env: &Environment) -> Option<PathBuf> {
             })
         };
         match rest {
+            [before @ .., (_, host), (_, script)] if alone(before) && node(dir, host, env) => {
+                let script = shim_path(dir, script, env)?;
+                (has_extension(&script, &["js", "cjs", "mjs"]) && script.is_file())
+                    .then_some(Launch::Node(script))
+            }
             [before @ .., (_, program)] if alone(before) => {
-                own_program(shim_path(dir, program, env)?)
+                own_program(shim_path(dir, program, env)?).map(Launch::Program)
             }
             _ => None,
         }
     })
+}
+
+/// Whether a shim's program word is Node: npm's `%_prog%`, which is the
+/// `node.exe` beside the shim or else `node` from PATH, or Node named directly.
+fn node(dir: &Path, word: &str, env: &Environment) -> bool {
+    word.eq_ignore_ascii_case("%_prog%")
+        || word.eq_ignore_ascii_case("node")
+        || word.eq_ignore_ascii_case("node.exe")
+        || shim_path(dir, word, env).is_some_and(|path| {
+            path.file_name()
+                .and_then(|name| name.to_str())
+                .is_some_and(|name| name.eq_ignore_ascii_case("node.exe"))
+        })
+}
+
+/// The program a `.cmd` or `.bat` shim passes its arguments to unchanged
+/// (`claude.cmd` -> `...\claude-code\bin\claude.exe`); none for a shim that
+/// hands a script to a host first.
+pub(super) fn cmd_target(shim: &Path, env: &Environment) -> Option<PathBuf> {
+    match batch_launch(shim, env)? {
+        Launch::Program(program) => Some(program),
+        Launch::Node(_) => None,
+    }
 }
 
 /// The program a Scoop shim starts, when it starts one on its own. A shim
@@ -159,4 +198,62 @@ pub(super) fn scoop_target(shim: &Path) -> Option<PathBuf> {
         }
     }
     own_program(target.filter(|path| path.is_absolute())?)
+}
+
+/// How an engine starts. A batch file runs through cmd.exe, which can't be
+/// given an argument with a line break (Rust refuses to quote one for it),
+/// and a message to Claude Code or Antigravity is an argument. So a shim
+/// runs as the program it names, an npm shim as Node on its entry script,
+/// and a message with line breaks to any other batch file is refused with
+/// why instead of "batch file arguments are invalid".
+pub(crate) fn engine_command<S: AsRef<OsStr>>(
+    executable: &Path,
+    arguments: &[S],
+) -> Result<Command, String> {
+    let batch = has_extension(executable, &["cmd", "bat"]);
+    let mut command = match batch.then(|| unwrapped(executable)).flatten() {
+        Some((program, script)) => {
+            let mut command = Command::new(program);
+            command.args(script);
+            command
+        }
+        None if batch
+            && arguments
+                .iter()
+                .any(|argument| argument.as_ref().to_string_lossy().contains(['\r', '\n'])) =>
+        {
+            return Err(format!(
+                "{} is a batch file, and Windows can't pass it text with line breaks. Send the message as one line, or install the command line as an .exe.",
+                executable.display()
+            ));
+        }
+        None => Command::new(executable),
+    };
+    command.args(arguments);
+    Ok(command)
+}
+
+/// The program a batch shim runs, and the script it gives it first.
+fn unwrapped(shim: &Path) -> Option<(PathBuf, Option<PathBuf>)> {
+    let env: Environment = std::env::vars().collect();
+    match batch_launch(shim, &env)? {
+        Launch::Program(program) => Some((program, None)),
+        Launch::Node(script) => Some((node_program(shim, &env)?, Some(script))),
+    }
+}
+
+/// The Node an npm shim runs: the `node.exe` beside it, else the first one
+/// in the folders command lines are found in.
+fn node_program(shim: &Path, env: &Environment) -> Option<PathBuf> {
+    let beside = shim.with_file_name("node.exe");
+    if beside.is_file() {
+        return Some(beside);
+    }
+    let dirs = match super::home_dir() {
+        Ok(home) => super::engines::executable_dirs(&home, env),
+        Err(_) => super::super::path_entries(env),
+    };
+    dirs.into_iter()
+        .map(|dir| dir.join("node.exe"))
+        .find(|path| path.is_file())
 }

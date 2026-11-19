@@ -1,12 +1,7 @@
 //! Runs client processes. Protocol decisions and retry identity stay with the
 //! callers; a fixture runner can stand in without running a client.
 use super::*;
-use std::{
-    collections::BTreeMap,
-    path::PathBuf,
-    process::{Command, Stdio},
-    time::Instant,
-};
+use std::{collections::BTreeMap, path::PathBuf, process::Stdio, time::Instant};
 
 mod stdio;
 // Reading a child's pipes without blocking, and ending its descendants with
@@ -56,9 +51,9 @@ impl ProcessRunner for NativeProcessRunner {
                 "Explicit executable and timeout required".into(),
             ));
         }
-        let mut command = Command::new(&plan.executable);
+        let mut command = crate::os::engine_command(&plan.executable, &plan.arguments)
+            .map_err(Failure::Unsupported)?;
         command
-            .args(&plan.arguments)
             .envs(&plan.environment)
             .stdin(Stdio::null())
             .stdout(Stdio::piped())

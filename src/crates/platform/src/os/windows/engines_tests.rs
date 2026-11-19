@@ -1,7 +1,12 @@
 use super::super::Environment;
+use super::engine_command;
 use super::engines::*;
-use std::{fs, path::Path};
+use std::{ffi::OsStr, fs, path::Path};
 use tempfile::tempdir;
+
+/// npm's cmd-shim for a package whose bin is a script: Node beside the
+/// shim, else `node` from PATH, on the entry script.
+const NPM_NODE_SHIM: &str = "@ECHO off\r\nGOTO start\r\n:find_dp0\r\nSET dp0=%~dp0\r\nEXIT /b\r\n:start\r\nSETLOCAL\r\nCALL :find_dp0\r\n\r\nIF EXIST \"%dp0%\\node.exe\" (\r\n  SET \"_prog=%dp0%\\node.exe\"\r\n) ELSE (\r\n  SET \"_prog=node\"\r\n  SET PATHEXT=%PATHEXT:;.JS;=;%\r\n)\r\n\r\nendLocal & goto #_undefined_# 2>NUL || title %COMSPEC% & \"%_prog%\"  \"%dp0%\\node_modules\\@openai\\codex\\bin\\codex.js\" %*\r\n";
 
 fn write(path: &Path, text: &str) {
     fs::create_dir_all(path.parent().unwrap()).unwrap();
@@ -186,4 +191,51 @@ fn cmd_shim_that_runs_a_script_host_alone_is_not_the_client() {
     let codex = engine_candidates(home, &env, "codex");
     assert!(!codex.contains(&bin.join("pwsh.exe")), "{codex:?}");
     assert!(codex.contains(&bin.join("codex.bat")), "{codex:?}");
+    // Started from the shim, it stays the shim rather than a bare host.
+    for shim in [bin.join("claude.cmd"), bin.join("codex.bat")] {
+        let command = engine_command(&shim, &["--version"]).unwrap();
+        assert_eq!(command.get_program(), shim.as_os_str());
+    }
+}
+
+#[test]
+fn npm_node_shim_runs_node_on_its_entry_script_with_the_message_as_given() {
+    let tmp = tempdir().unwrap();
+    let npm = tmp.path().join("npm");
+    let node = npm.join("node.exe");
+    let script = npm.join("node_modules/@openai/codex/bin/codex.js");
+    write(&node, "MZ");
+    write(&script, "");
+    let shim = npm.join("codex.cmd");
+    write(&shim, NPM_NODE_SHIM);
+
+    let message = "first line\r\nsecond line";
+    let command = engine_command(&shim, &["-p", message]).unwrap();
+    assert_eq!(command.get_program(), node.as_os_str());
+    let args: Vec<&OsStr> = command.get_args().collect();
+    assert_eq!(
+        args,
+        [script.as_os_str(), OsStr::new("-p"), OsStr::new(message)]
+    );
+    // Node itself is never the client.
+    let env = Environment::from([("PATH".into(), npm.to_string_lossy().into_owned())]);
+    let candidates = engine_candidates(tmp.path(), &env, "codex");
+    assert!(!candidates.contains(&node), "{candidates:?}");
+}
+
+#[test]
+fn a_batch_file_that_is_not_unwrapped_refuses_line_breaks_with_why() {
+    let tmp = tempdir().unwrap();
+    let bin = tmp.path().join("Antigravity/bin");
+    write(&tmp.path().join("Antigravity/Antigravity.exe"), "MZ");
+    let shim = bin.join("agy.cmd");
+    write(
+        &shim,
+        "@echo off\r\nsetlocal\r\nset ELECTRON_RUN_AS_NODE=1\r\ncall \"%~dp0..\\Antigravity.exe\" \"%~dp0..\\resources\\app\\out\\cli.js\" %*\r\nendlocal\r\n",
+    );
+
+    let error = engine_command(&shim, &["-p", "one\ntwo"]).unwrap_err();
+    assert!(error.contains("line breaks"), "{error}");
+    let command = engine_command(&shim, &["-p", "one line"]).unwrap();
+    assert_eq!(command.get_program(), shim.as_os_str());
 }

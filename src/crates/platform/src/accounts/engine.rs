@@ -6,7 +6,7 @@ use std::{
     fs,
     io::{BufRead, BufReader, Write},
     path::Path,
-    process::{Child, ChildStdin, Command, Stdio},
+    process::{Child, ChildStdin, Stdio},
     sync::{
         atomic::Ordering,
         mpsc::{self, Receiver},
@@ -36,9 +36,9 @@ impl Engine {
         extra: &[(&str, String)],
     ) -> Result<Self, String> {
         fs::create_dir_all(directory).map_err(|_| tr!("Account engine directory unavailable"))?;
-        let mut command = Command::new(executable);
+        let mut command = crate::os::engine_command(executable, args)
+            .map_err(|_| tr!("Account engine could not start"))?;
         command
-            .args(args)
             .current_dir(directory)
             .envs(&context.env)
             .env("PATH", crate::os::engine_path(&context.home, &context.env))
