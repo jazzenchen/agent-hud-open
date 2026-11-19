@@ -1621,6 +1621,47 @@ fn the_window_offers_only_agents_that_are_turned_on() {
 }
 
 #[test]
+fn the_window_offers_a_pi_session_only_while_it_is_open() {
+    let mut world = World::new(Preferences::default());
+    let project = world.fixture.home().join("project");
+    for id in ["pi:open", "pi:closed"] {
+        world.snapshot["sessions"].as_array_mut().unwrap().push(json!(
+            {"id":id,"source":"pi","title":id,"cwd":project,"state":"idle","parentId":null,"updatedAt":"2026-10-22T00:58:00Z","liveFacts":{}}
+        ));
+    }
+    // Agent HUD's observer in a running Pi holds the open one.
+    let observers = world
+        .fixture
+        .root
+        .join("client-receipts/hook-channel/observers");
+    std::fs::create_dir_all(&observers).unwrap();
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_millis() as i64;
+    std::fs::write(
+        observers.join("pi.json"),
+        json!({"client":"pi","at":now,"sessions":["open"],"pid":std::process::id()}).to_string(),
+    )
+    .unwrap();
+    let listing = world.user_sessions();
+    let pi = listing["sessions"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|row| row["client"] == "pi")
+        .map(|row| row["id"].as_str().unwrap())
+        .collect::<Vec<_>>();
+    assert_eq!(pi, ["pi:open"]);
+    // Agent HUD starts no Pi session.
+    assert!(listing["starts"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .all(|start| start["client"] != "pi"));
+}
+
+#[test]
 fn the_persons_words_fly_from_the_bubble_once_they_go() {
     let mut world = World::new(Preferences::default());
     let sent = world.user_send(

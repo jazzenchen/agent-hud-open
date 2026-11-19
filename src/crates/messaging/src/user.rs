@@ -1,17 +1,26 @@
 //! The person's own words from the HUD: what the clipboard window sends into
-//! a Claude Code, Codex, Antigravity or DeepSeek Harness session, or into a
-//! new one. They
-//! go as the person typed them (`PromptForm::Own`), with no label, no reply
-//! line and no journal: the person reads the answer in the session itself.
-//! They do not need agent messages switched on: the window offers each of
-//! these agents the person has turned on in Agent HUD and, where it has one,
-//! whose own "Send messages" switch is on (`user_client_off`). Words that go
-//! throw the paper plane from the person to the session (`person_flight`).
+//! a Claude Code, Codex, Antigravity, DeepSeek Harness, Pi or OpenCode
+//! session, or into a new one of the first four. They go as the person typed
+//! them (`PromptForm::Own`), with no label, no reply line and no journal: the
+//! person reads the answer in the session itself. They do not need agent
+//! messages switched on: the window offers each of these agents the person
+//! has turned on in Agent HUD and, where it has one, whose own "Send
+//! messages" switch is on (`user_client_off`); a Pi or OpenCode session only
+//! while it is open in its client, where Agent HUD's observer hands the words
+//! over. Words that go throw the paper plane from the person to the session
+//! (`person_flight`).
 use super::*;
 use agent_hud_core::naming::surfaces::{Category, Surface, AGENT_HUD};
 
 /// The clients the clipboard window sends to.
-pub const USER_CLIENTS: [&str; 4] = ["claude", "codex", "antigravity", "deepseek"];
+pub const USER_CLIENTS: [&str; 6] = [
+    "claude",
+    "codex",
+    "antigravity",
+    "deepseek",
+    "pi",
+    "opencode",
+];
 
 /// Where the person's words go: a session there is, or a new one of
 /// `client` in `folder` (empty: a task folder of its own).
@@ -41,14 +50,20 @@ impl Messaging {
         };
         let mut rows = sessions(host.snapshot)
             .filter(|session| offered(session["source"].as_str().unwrap_or("")))
-            .map(|session| {
+            .filter_map(|session| {
                 let id = session["id"].as_str().unwrap_or_default();
                 let client = session["source"].as_str().unwrap_or_default();
                 let (reachable, reason) =
                     self.reachable(client, id, &loaded, (session, host.snapshot), language);
+                // A Pi or OpenCode session no running client holds would only
+                // keep the words for an hour: not offered.
+                if Provider::parse(client).is_some_and(Provider::uses_observer) && reachable != true
+                {
+                    return None;
+                }
                 let folder =
                     started_in(session).or_else(|| session["cwd"].as_str().map(Into::into));
-                json!({
+                Some(json!({
                     "id": id,
                     "client": client,
                     "title": session["title"],
@@ -62,7 +77,7 @@ impl Messaging {
                     "reachable": reachable,
                     "reason": reason,
                     "updatedAt": session["updatedAt"],
-                })
+                }))
             })
             .collect::<Vec<_>>();
         rows.sort_by(|a, b| b["updatedAt"].as_str().cmp(&a["updatedAt"].as_str()));
