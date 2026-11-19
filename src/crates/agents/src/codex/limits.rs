@@ -163,6 +163,13 @@ pub(super) fn parse(
         account_id("codex", &[&email.to_lowercase(), workspace])
     };
     let legacy = legacy_account("Codex", &email.to_lowercase(), workspace);
+    // An email names one person on every computer, so the phone joins their readings into
+    // one card; a workspace alone is shared by its members and stays per computer.
+    let identity_kind = if email.trim().is_empty() {
+        "local-home"
+    } else {
+        "account"
+    };
     let account_identity = legacy.unwrap_or_else(|| legacy_unresolved("Codex", home_key));
     // A present multi-bucket map is authoritative, an empty one included;
     // only without it does the single legacy bucket count (agent-hud-native-open
@@ -196,7 +203,7 @@ pub(super) fn parse(
         .find_map(|(_, bucket)| bucket["planType"].as_str())
         .or_else(|| account["planType"].as_str());
     if account.is_object() || !workspace.is_empty() || !email.is_empty() {
-        let mut acct = json!({"id":account_identity,"provider":"codex","label":if email.is_empty(){None}else{Some(email)},"plan":plan});
+        let mut acct = json!({"id":account_identity,"provider":"codex","label":if email.is_empty(){None}else{Some(email)},"plan":plan,"identity":identity_kind});
         if let Some(credits) = parse_reset_credits(limits) {
             acct["resetCredits"] = credits;
         }

@@ -198,7 +198,12 @@ fn credits(host: &dyn Host, sign_in: &SignIn) -> Result<(Vec<Value>, Value), Unr
     let plan = get(host, SETTINGS, &sign_in.key)
         .ok()
         .and_then(|settings| text(&settings["subscription_tier_display"]));
-    let account = json!({"id":id,"provider":"grok-cli","label":sign_in.email,"plan":plan});
+    let identity = if sign_in.user.is_some() {
+        "account"
+    } else {
+        "local-home"
+    };
+    let account = json!({"id":id,"provider":"grok-cli","label":sign_in.email,"plan":plan,"identity":identity});
     Ok((quotas, account))
 }
 

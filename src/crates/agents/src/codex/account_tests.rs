@@ -238,6 +238,8 @@ fn the_app_server_reports_limits_and_the_account() {
     assert_eq!(account["id"], identity.as_str());
     assert_eq!(account["label"], "A@example.com");
     assert_eq!(account["plan"], "pro");
+    // A signed-in email: a phone joins this account's readings from every computer.
+    assert_eq!(account["identity"], "account");
     assert_eq!(reading.quotas.len(), 2);
     assert_eq!(reading.quotas[0]["consumerSource"], "codex");
     assert_eq!(reading.quotas[1]["usedPercent"], 40.0);

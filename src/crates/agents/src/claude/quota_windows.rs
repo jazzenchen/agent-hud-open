@@ -76,6 +76,13 @@ pub(super) fn plan_reading(
         who["accountUuid"].as_str().unwrap_or(""),
         who["organizationUuid"].as_str().unwrap_or(""),
     );
+    // Claude's own account id names the account the same way on every computer, so
+    // the phone joins their readings into one card; a home-folder key stays per computer.
+    let identity = if legacy.is_some() {
+        "account"
+    } else {
+        "local-home"
+    };
     let account_identity = legacy.unwrap_or_else(|| {
         legacy_unresolved(
             "Claude",
@@ -83,8 +90,9 @@ pub(super) fn plan_reading(
         )
     });
     let mut reading = Reading::empty("claude");
-    reading.account =
-        Some(json!({"id":account_identity,"provider":"claude","label":label,"plan":plan}));
+    reading.account = Some(
+        json!({"id":account_identity,"provider":"claude","label":label,"plan":plan,"identity":identity}),
+    );
     for window in windows {
         let Window {
             key,

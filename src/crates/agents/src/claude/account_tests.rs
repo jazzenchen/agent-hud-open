@@ -43,6 +43,8 @@ fn the_engine_reports_the_plans_windows() {
     assert_eq!(account["id"], identity.as_str());
     assert_eq!(account["label"], "me@example.com");
     assert_eq!(account["plan"], "max_20x");
+    // Claude's own account id: a phone joins this account's readings from every computer.
+    assert_eq!(account["identity"], "account");
     assert_eq!(reading.quotas.len(), 2);
     let id = account_id("claude", &["user-1", "org-1"]);
     assert_eq!(reading.quotas[0]["id"], format!("{id}:claude-session"));
@@ -588,6 +590,8 @@ fn an_added_folder_without_an_account_is_that_folders() {
         reading.additional_accounts[0]["id"],
         legacy_unresolved("Claude", &key).as_str()
     );
+    // A folder's own key names nothing beyond this computer, so it is never joined.
+    assert_eq!(reading.additional_accounts[0]["identity"], "local-home");
     let id = account_id("claude", &["unresolved", &work.to_string_lossy()]);
     assert_eq!(reading.quotas[2]["id"], format!("{id}:claude-session"));
 }
