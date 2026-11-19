@@ -154,3 +154,47 @@ fn a_revision_hashed_only_when_asked_is_still_the_whole_ones() {
     assert!(cache.head().is_none());
     std::fs::remove_dir_all(&folder).unwrap();
 }
+
+#[test]
+fn a_record_a_phone_would_refuse_stays_out_and_is_listed() {
+    let folder = std::env::temp_dir().join(format!("lan-refused-{}", std::process::id()));
+    crate::fs::private_dir(&folder).unwrap();
+    let list = folder.join("refused.json");
+    let mut cache =
+        SnapshotCache::<Item>::new("mac".into(), "Mac".into(), folder.join("cursor.json"))
+            .unwrap()
+            .with_rules(Arc::new(|item: &Item| {
+                (item.value < 0.0).then(|| format!("{} is below zero", item.key))
+            }));
+    let listed = || -> Value { serde_json::from_slice(&std::fs::read(&list).unwrap()).unwrap() };
+
+    // The rest goes out, whole, and the one left out is listed.
+    assert!(cache
+        .update(&[item("a", 1.0, 10), item("b", -1.0, 10)], 1_000)
+        .unwrap());
+    let start = cache.head().unwrap().cursor.clone();
+    assert_eq!(cache.snapshot().unwrap().records, vec![item("a", 1.0, 10)]);
+    assert_eq!(cache.head().unwrap().revision, whole(&cache));
+    assert_eq!(
+        listed()["records"],
+        json!([{"id": "b", "reason": "b is below zero"}])
+    );
+
+    // A published record that turns bad is deleted from the reading, and one
+    // that turns good goes out.
+    assert!(cache
+        .update(&[item("a", -2.0, 20), item("b", 2.0, 20)], 2_000)
+        .unwrap());
+    let changes = cache.changes(&start).unwrap();
+    assert_eq!(changes.records, vec![item("b", 2.0, 20)]);
+    assert_eq!(changes.deleted_ids, vec!["a".to_string()]);
+    assert_eq!(cache.head().unwrap().revision, whole(&cache));
+    assert_eq!(listed()["records"][0]["id"], "a");
+
+    // Once nothing is left out the list goes.
+    assert!(cache
+        .update(&[item("a", 2.0, 30), item("b", 2.0, 20)], 3_000)
+        .unwrap());
+    assert!(!list.exists());
+    std::fs::remove_dir_all(&folder).unwrap();
+}

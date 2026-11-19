@@ -6,7 +6,9 @@ use std::{
     sync::{Arc, Condvar, Mutex, PoisonError},
     time::Duration,
 };
+mod refusals;
 mod serve;
+pub use refusals::Rules;
 pub use serve::{Changes, Head, Snapshot};
 /// Counts the cache's commits so the event streams wait for the next one
 /// instead of polling it.
@@ -70,6 +72,9 @@ pub struct SnapshotCache<R> {
     oldest: u64,
     body: Option<Vec<u8>>,
     signal: Arc<Signal>,
+    /// The phone's checks on each record, when the owner gives them.
+    rules: Option<Rules<R>>,
+    refusals: refusals::Refusals,
 }
 impl<R: Record> SnapshotCache<R> {
     pub fn new(device: String, name: String, file: PathBuf) -> Result<Self> {
@@ -102,7 +107,15 @@ impl<R: Record> SnapshotCache<R> {
             oldest: 0,
             body: None,
             signal: Arc::default(),
+            rules: None,
+            refusals: refusals::Refusals::default(),
         })
+    }
+    /// Leaves out of every reading the records `rules` refuse, which a phone
+    /// would refuse the whole reading for, and lists them in `refused.json`.
+    pub fn with_rules(mut self, rules: Rules<R>) -> Self {
+        self.rules = Some(rules);
+        self
     }
     /// Moves on every commit and clear.
     pub fn signal(&self) -> Arc<Signal> {
@@ -121,11 +134,27 @@ impl<R: Record> SnapshotCache<R> {
         let mut changed = Vec::new();
         // What a changed record replaced, to put back should the commit fail.
         let mut replaced = BTreeMap::new();
+        self.refusals.start();
         for record in records
             .into_iter()
             .filter(|r| r.device_id() == self.device && r.is_visible(now))
         {
             let id = record.id();
+            // A record published unchanged was checked when it changed. One
+            // refused stays in `previous`, so a copy published before it
+            // changed is deleted.
+            let unchanged = previous
+                .get(&id)
+                .is_some_and(|old| old.same_content(record));
+            if let Some(reason) = self
+                .rules
+                .as_ref()
+                .filter(|_| !unchanged)
+                .and_then(|rules| rules(record))
+            {
+                self.refusals.note(id, reason);
+                continue;
+            }
             match previous.remove(&id) {
                 Some(old) if old.same_content(record) => {
                     named.insert(id, old);
@@ -139,6 +168,7 @@ impl<R: Record> SnapshotCache<R> {
                 }
             }
         }
+        self.refusals.finish(&self.file, now);
         // Records not named again are deleted.
         let deleted: Vec<String> = previous.keys().cloned().collect();
         if self.head.is_some() && changed.is_empty() && deleted.is_empty() {

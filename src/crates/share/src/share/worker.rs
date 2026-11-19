@@ -60,7 +60,8 @@ impl Worker {
             settings.device_id.clone(),
             name.clone(),
             directory.join("cursor.json"),
-        )?;
+        )?
+        .with_rules(std::sync::Arc::new(crate::phone_rules::refusal));
         Ok(Self {
             directory,
             query,

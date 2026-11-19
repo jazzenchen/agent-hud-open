@@ -6,6 +6,7 @@
 //! shares more runs its own sharing and builds on these records and
 //! projections; while it does, the host leaves [`PhoneShare`] off.
 pub mod keys;
+pub mod phone_rules;
 pub mod projection;
 pub mod record;
 mod share;
