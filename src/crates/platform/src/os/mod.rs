@@ -22,6 +22,8 @@ mod unix;
 #[cfg(target_os = "macos")]
 pub use target::registered_applications;
 pub(crate) use target::*;
+#[cfg(target_os = "windows")]
+pub(crate) use target::{bring_window_forward, is_main_window};
 
 /// A folder that only passes short-lived words between the app and a
 /// client's plugin or hooks. One another account made, as an elevated run or

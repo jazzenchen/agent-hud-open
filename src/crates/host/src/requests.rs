@@ -17,6 +17,7 @@ pub(crate) async fn native_request(
     service: tauri::State<'_, Service>,
 ) -> Result<Value, String> {
     let backend = Arc::clone(&service.backend);
+    let latest_snapshot = Arc::clone(&service.latest_snapshot);
     let hooks = Arc::clone(&service.hooks);
     let hook_actions = Arc::clone(&service.hook_actions);
     let stopped = Arc::clone(&service.stopped);
@@ -25,6 +26,23 @@ pub(crate) async fn native_request(
     let collection = Arc::clone(&service.collection);
     let wake = Arc::clone(&service.wake);
     tauri::async_runtime::spawn_blocking(move || {
+        if method == "open_session" {
+            if let Some(id) = params["id"].as_str() {
+                let snapshot = latest_snapshot
+                    .read()
+                    .unwrap_or_else(PoisonError::into_inner)
+                    .clone();
+                if let Some(snapshot) = snapshot {
+                    if let Some(result) = agent_hud_runtime::open_cached_session(
+                        &snapshot,
+                        id,
+                        app.state::<AppState>().demo,
+                    ) {
+                        return result;
+                    }
+                }
+            }
+        }
         // Answered by the share's own thread, never under the Backend lock
         // its usage reads take.
         if method == "phone_share" {

@@ -4,7 +4,7 @@ use crate::{backend::Backend, claude_plugin, coordinator, extension, messages, p
 use agent_hud_runtime::Runtime;
 use std::sync::{
     atomic::{AtomicBool, Ordering},
-    Arc, Condvar, Mutex, PoisonError,
+    Arc, Condvar, Mutex, PoisonError, RwLock,
 };
 use tauri::Manager;
 
@@ -12,6 +12,7 @@ mod collector;
 
 pub(crate) struct Service {
     pub(crate) backend: Arc<Mutex<Backend>>,
+    pub(crate) latest_snapshot: Arc<RwLock<Option<Arc<serde_json::Value>>>>,
     pub(crate) stopped: Arc<AtomicBool>,
     pub(crate) wake: Arc<(Mutex<u8>, Condvar)>,
     pub(crate) hooks: Arc<Mutex<agent_hud_runtime::hooks::Hooks>>,
@@ -53,9 +54,11 @@ impl Service {
         runtime.set_change_waker(Arc::new(move || wake_collector(&watcher_wake, DATA)));
         let request_wake = Arc::clone(&wake);
         runtime.set_request_waker(Arc::new(move || wake_collector(&request_wake, REQUEST)));
+        let latest_snapshot = Arc::new(RwLock::new(None));
         let backend = Arc::new(Mutex::new(Backend {
             runtime,
             snapshot: None,
+            latest_snapshot: Arc::clone(&latest_snapshot),
             projected: None,
             error: None,
             tools: None,
@@ -168,6 +171,7 @@ impl Service {
             .map_err(|error| error.to_string())?;
         Ok(Self {
             backend,
+            latest_snapshot,
             stopped,
             wake,
             hooks,

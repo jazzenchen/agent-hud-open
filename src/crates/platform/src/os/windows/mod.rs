@@ -11,7 +11,9 @@ mod process;
 mod secrets;
 mod shortcut;
 pub(crate) use crate::windows_session::spawn;
-pub(crate) use apps::{activate_app, app_running, launch_app, registered_bundle};
+pub(crate) use apps::{
+    activate_app, app_running, bring_window_forward, is_main_window, launch_app, registered_bundle,
+};
 pub(crate) use process::{
     codex_cli_on_port, parent_processes, process_runs, process_start, terminal_io,
 };
@@ -107,11 +109,13 @@ pub(crate) fn application_installed(home: &Path, env: &Environment, name: &str) 
     .iter()
     .any(|dir| dir.join(name).is_dir())
 }
-/// Whether an installer pointed this machine's link at a program, which is
-/// how a session link can open its app. Registry keys are case-insensitive,
-/// so the scheme goes to the lookup as the link wrote it.
+/// Whether this machine opens the link: an installer pointed its scheme at a
+/// program, or, for DeepSeek Harness's app link, Harness's desktop app or a
+/// browser window showing it is here. Registry keys are case-insensitive, so
+/// the scheme goes to the lookup as the link wrote it.
 pub(crate) fn registered_url(url: &str) -> bool {
     url_scheme(url).is_some_and(apps::scheme_registered)
+        || (url == "dsh://open" && apps::registered_deepseek())
 }
 /// A link's scheme: the letters before its first colon, as RFC 3986 spells
 /// it. Anything else opens no app.
@@ -250,6 +254,12 @@ pub(crate) fn default_browser() -> Option<String> {
 }
 
 pub(crate) fn open_session_url(url: &str) -> Result<(), String> {
+    if url == "dsh://open" {
+        return apps::open_deepseek()
+            .then_some(())
+            .ok_or_else(|| "The native client could not open this session".into());
+    }
+    let is_codex = url.starts_with("codex:");
     if let Some(opened) = apps::open_unregistered_link(url) {
         return opened;
     }
@@ -273,6 +283,7 @@ pub(crate) fn open_session_url(url: &str) -> Result<(), String> {
         .encode_wide()
         .chain(Some(0))
         .collect::<Vec<_>>();
+    apps::allow_foreground();
     if unsafe {
         ShellExecuteW(
             std::ptr::null_mut(),
@@ -285,6 +296,9 @@ pub(crate) fn open_session_url(url: &str) -> Result<(), String> {
     } as isize
         > 32
     {
+        if is_codex {
+            let _ = apps::launch_app(apps::CODEX);
+        }
         Ok(())
     } else {
         Err("The native client could not open this session".into())

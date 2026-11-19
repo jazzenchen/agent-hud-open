@@ -34,6 +34,7 @@ pub use agent_hud_platform::registered_applications;
 #[cfg(target_os = "windows")]
 pub use agent_hud_platform::windows_session;
 pub use agent_hud_platform::CollectionGate;
+pub use request::open_cached_session;
 pub use startup::{claim_collector, home_directory, legacy_preferences, local_tools_directory};
 
 pub struct Runtime {
