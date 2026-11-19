@@ -61,8 +61,9 @@ impl Messaging {
     /// `id` in progress now: only a client that takes one
     /// (`Provider::takes_steer`), while a turn runs and waits on nothing, in
     /// a Codex that has the thread open or a DeepSeek Harness session whose
-    /// plugin checked in. Read from the snapshot, so a send still finds out
-    /// for itself.
+    /// plugin checked in and is new enough to take one. Read from the
+    /// snapshot, so a send still finds out for itself (a headless Harness,
+    /// for one, refuses it then).
     fn steerable(
         &self,
         client: &str,
@@ -81,7 +82,11 @@ impl Messaging {
         }
         let open = match provider {
             Provider::Codex => delivery::codex_thread_open(&self.places.codex_data, id),
-            _ => self.preferences.deepseek && loaded.contains(id),
+            _ => {
+                self.preferences.deepseek
+                    && loaded.contains(id)
+                    && self.clients.deepseek_takes_steer(id)
+            }
         };
         if open {
             (true, words::steer_ready(language))
