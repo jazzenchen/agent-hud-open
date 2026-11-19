@@ -110,8 +110,7 @@ export interface HUDSceneProps {
    * panel step gives (Open DemoScriptRunner: island forceOpen/forceCollapse).
    * Each new `sequence` is one order. */
   panelCommand?: { open: boolean; sequence: number };
-  /** The host's recent flights between two agents' marks (or from the
-   * person's bubble), oldest first. */
+  /** Recent flights between two agents' marks or from the person's bubble, oldest first. */
   flights?: readonly HUDFlightCommand[];
   /** The guide's small window beside the resting HUD (GuideDock). */
   guide?: HUDGuide | null;

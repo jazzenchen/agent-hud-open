@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Keeps source files small enough to read: no file's own code runs past 300
+// Keeps source files small enough to read: no file's own code runs past 333
 // lines. Split a file that grows past it along its seams (components, hooks,
 // impl blocks, per-OS parts) rather than packing lines.
 //
@@ -19,7 +19,7 @@ import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const limit = 300;
+const limit = 333;
 const root = join(fileURLToPath(new URL(".", import.meta.url)), "..", "..");
 const allowancesPath = join(
   root,

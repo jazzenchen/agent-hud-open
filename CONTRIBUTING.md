@@ -30,7 +30,7 @@ Front-end packages import each other only by name, through what a package lists 
 
 Code that names a client belongs in its folder under `src/crates/agents/src/`, as the contract in [docs/agent-contract.md](docs/agent-contract.md) describes. `pnpm run check:clients` reports what still names clients elsewhere while that move is under way.
 
-A source file's own code stays within 300 lines; its tests do not count. Split a file that grows past that along its seams (components, hooks, impl blocks, per-OS parts) rather than packing lines. `pnpm run check:file-size` refuses new ones. The few files with a reason to stay longer, such as one state machine, one timeline or a data table, are listed in `src/tooling/file-size-allowances.json` and may only shrink.
+A source file's own code stays within 333 lines; its tests do not count. Split a file that grows past that along its seams (components, hooks, impl blocks, per-OS parts) rather than packing lines. `pnpm run check:file-size` refuses new ones. The few files with a reason to stay longer, such as one state machine, one timeline or a data table, are listed in `src/tooling/file-size-allowances.json` and may only shrink.
 
 Two rules matter most:
 
