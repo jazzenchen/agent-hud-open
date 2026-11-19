@@ -10,7 +10,6 @@ import { useReducedMotion } from "motion/react";
 import type { Snapshot } from "@agent-hud/protocol";
 export { HUDArtwork as HUDLogo } from "./HUDArtwork";
 import { DockMemory, type Direction } from "./bots/mark-director";
-import { AlertStack } from "./scene/AlertStack";
 import { HUDExpandedSurface } from "./scene/HUDExpandedSurface";
 import { HUDInstructions } from "./scene/HUDInstructions";
 import { HUDMarkStrip } from "./scene/HUDMarkStrip";
@@ -31,15 +30,14 @@ import { usePanelCommand } from "./scene/usePanelCommand";
 import { useDomTyping } from "./scene/useDomTyping";
 import { useEditHold } from "./scene/useEditHold";
 import { useHeldFrame } from "./scene/useHeldFrame";
-import { MeasuringCopy, useMeasured } from "./scene/MeasuringCopy";
+import { MeasuringCopy } from "./scene/MeasuringCopy";
 import { DockEnds } from "./ends/DockEnds";
 import { useDockEnds } from "./ends/useDockEnds";
-import { InspectPanel } from "./inspect/InspectPanel";
 import { useClipEnd, useInspectView } from "./inspect/useClipEnd";
-import { PanelBody } from "./scene/PanelBody";
 import { RestingStrip } from "./scene/RestingStrip";
 import { HoverFloor, SceneBackdrop } from "./scene/SceneFloors";
 import { usePanelHandoffs } from "./scene/usePanelHandoffs";
+import { useScenePanel } from "./scene/useScenePanel";
 import { useSceneAlerts } from "./scene/useSceneAlerts";
 import { useGlowColors } from "./scene/useGlowColors";
 import { useStripMetrics } from "./scene/useStripMetrics";
@@ -374,75 +372,30 @@ export function HUDScene({
     showPanelStats,
     onUpdate,
   });
-  const eventContent = clip.viewing ? (
-    <InspectPanel clip={clip} light={light} handoff={handoff} />
-  ) : request || event ? (
-    <AlertStack
-      requests={requests}
-      request={request}
-      event={event}
-      news={news}
-      decide={onRequestDecision}
-      openSettings={openSettings}
-      onStats={showPanelStats}
-      handoff={handoff}
-      light={light}
-      snapshot={snapshot}
-      botLogos={config.botLogos}
-    />
-  ) : null;
-
-  // The panel's body, drawn by the visible panel and by the hidden copy
-  // below, which measures its natural height (no `maxHeight`) over the
-  // snapshot it last drew.
-  const panelBody = (shown: Snapshot, maxHeight?: number) => (
-    <PanelBody
-      snapshot={shown}
-      maxHeight={maxHeight}
-      alertStack={eventContent}
-      inUsagePanel={inUsagePanel}
-      event={event}
-      open={open}
-      config={config}
-      focusVendor={focusedVendor?.name}
-      light={light}
-      footer={footer}
-      update={update}
-      dismissNews={news.dismiss}
-      delivery={delivery}
-    />
-  );
-  // The hidden copy measures the panel for its next opening, as the native
-  // hosting view measured its fitting size. A pointer move never draws it
-  // again, and at rest (collapsed, no card out, the pointer away) neither does
-  // a data update: it keeps the snapshot it last drew and catches up as the
-  // pointer arrives, the panel opens or a card comes out.
-  const measuring =
-    open ||
-    state.phase !== "collapsed" ||
-    pointerInside ||
-    Boolean(request || event);
-  const configKey = useMemo(() => JSON.stringify(config), [config]);
-  // What the copy draws, taken when something it shows changes.
-  const measured = useMeasured(
+  const { panelBody, measured } = useScenePanel({
     snapshot,
-    panelServices,
-    listedSessions,
-    measuring,
-    [
-      configKey,
-      light,
-      open,
-      focusedVendor?.name,
-      request,
-      event,
-      news.queue,
-      news.ends.view === "tail" ? news.ends.tail : news.ends.view,
-      clip.viewing && clip.panel.shape,
-      inUsagePanel,
-      delivery,
-    ],
-  );
+    config,
+    clip,
+    light,
+    handoff,
+    requests,
+    request,
+    event,
+    news,
+    decide: onRequestDecision,
+    openSettings,
+    onStats: showPanelStats,
+    inUsagePanel,
+    open,
+    phase: state.phase,
+    pointerInside,
+    focusedVendor,
+    footer,
+    update,
+    delivery,
+    services: panelServices,
+    listed: listedSessions,
+  });
   return (
     <HUDGroundProvider look={config}>
       <ListedSessionsContext.Provider value={listedSessions}>
