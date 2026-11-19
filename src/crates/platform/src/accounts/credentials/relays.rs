@@ -142,7 +142,8 @@ pub(super) fn relay_kind(params: &Value) -> Result<(String, Option<Value>), Stri
         });
         if !endpoint_ok
             || !path_ok
-            || !(divisor.is_finite() && divisor > 0.0)
+            || !divisor.is_finite()
+            || divisor <= 0.0
             || !matches!(currency, "USD" | "CNY")
             || !header_ok
         {
