@@ -36,23 +36,14 @@ static STATUS: StatusPage = StatusPage {
 
 pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
     let level = host.quota_reading(super::AGENT.id);
-    if !level.allows(QuotaReading::Local) {
+    if !level.allows(QuotaReading::Official) {
         let mut reading = Reading::empty("codex");
         reading.notice = Some(quota_reading::off_notice());
         return Ok(reading);
     }
-    // `local` reads only the windows Codex's own sessions recorded.
-    let executable = host
-        .executable("codex")
-        .filter(|_| level.allows(QuotaReading::Official));
+    let executable = host.executable("codex");
     let native = match executable.as_deref() {
         Some(executable) => read_native(host, executable),
-        None if !level.allows(QuotaReading::Official) => with_sessions(
-            host,
-            &default_home(host),
-            Err(Unread::SignedOut(String::new())),
-        )
-        .map_err(|_| Unread::Failed(quota_reading::local_only())),
         // No engine, as with the desktop app moved away: its sessions' record
         // is no sign-in to ask for, and without it Codex is to install.
         None => with_sessions(

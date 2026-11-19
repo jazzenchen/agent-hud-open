@@ -36,19 +36,15 @@ export function AgentQuotaReading({
   const value: QuotaReadingLevel = levels[agent] ?? "full";
   const names: Record<QuotaReadingLevel, string> = {
     off: t("Off"),
-    local: t("This computer's records"),
     official: t("The agent's own app"),
     full: t("Everything (default)"),
   };
   const offered: QuotaReadingLevel[] = GRADED.has(agent)
-    ? ["off", "local", "official", "full"]
+    ? ["off", "official", "full"]
     : ["off", "full"];
   const explained: Record<QuotaReadingLevel, string> = {
     off: t(
       "Quota is not read. Sessions and tokens are still counted from the agent's logs.",
-    ),
-    local: t(
-      "Only what the agent's own app wrote on this computer. Nothing is started or sent.",
     ),
     official: t(
       "Also asks the agent's own app, which reads the account the way it always does.",

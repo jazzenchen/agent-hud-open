@@ -80,10 +80,9 @@ export interface SourcePreferences {
   live?: boolean;
   reminders?: boolean;
 }
-/** `off`: no quota; `local`: the agent's own records on this computer;
- * `official`: also the agent's own app; `full`: also other apps' sign-ins and
- * the vendor's web service. */
-export type QuotaReadingLevel = "off" | "local" | "official" | "full";
+/** `off`: no quota; `official`: only the agent's own app; `full`: also other
+ * apps' sign-ins and the vendor's web service. */
+export type QuotaReadingLevel = "off" | "official" | "full";
 
 export interface AppSettings {
   /** Live status and completion reminders for every client; each client's

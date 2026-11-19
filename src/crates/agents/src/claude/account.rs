@@ -81,7 +81,7 @@ static STATUS: StatusPage = StatusPage {
 pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
     if !host
         .quota_reading(super::AGENT.id)
-        .allows(QuotaReading::Local)
+        .allows(QuotaReading::Official)
     {
         let mut reading = Reading::empty("claude");
         reading.notice = Some(quota_reading::off_notice());
@@ -180,21 +180,6 @@ fn stale(reading: &mut Reading) {
 fn read_folder(host: &dyn Host, folder: &Folder) -> (Result<Reading, Unread>, bool) {
     let config = global_config(host, folder);
     let now = chrono::Utc::now().timestamp_millis();
-    if !host
-        .quota_reading(super::AGENT.id)
-        .allows(QuotaReading::Official)
-    {
-        // Only Claude Code's own record: no engine, no desktop sign-in. An
-        // older record shows as stale, with its age.
-        let fresh = usage_record::read(&config, now)
-            .filter(|record| record.fresh(now))
-            .and_then(|record| recorded(host, folder, &config["oauthAccount"], &record));
-        let read = match fresh {
-            Some(reading) => Ok(reading),
-            None => kept(host, folder, Unread::Failed(quota_reading::local_only())),
-        };
-        return (read, false);
-    }
     if let Some(reading) = usage_record::read(&config, now)
         .filter(|record| record.fresh(now))
         .and_then(|record| recorded(host, folder, &config["oauthAccount"], &record))

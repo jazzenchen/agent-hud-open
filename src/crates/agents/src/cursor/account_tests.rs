@@ -399,7 +399,6 @@ fn an_account_grok_bot_is_signed_in_to_is_read_through_both() {
 fn below_full_quota_reading_never_sends_cursors_sign_in() {
     for level in [
         crate::account::QuotaReading::Off,
-        crate::account::QuotaReading::Local,
         crate::account::QuotaReading::Official,
     ] {
         let dir = tempfile::tempdir().unwrap();

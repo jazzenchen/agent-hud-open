@@ -3,12 +3,9 @@
 //!
 //! - `off`: no quota reading at all. Sessions and tokens are still counted
 //!   from the agent's own logs, which never needed its account.
-//! - `local`: only what the agent's own client wrote to this computer, such
-//!   as Claude Code's usage record or the rate limits in Codex's sessions. No
-//!   program is started and nothing is sent anywhere.
-//! - `official`: also asks the agent's own client through its own interface
-//!   (`claude -p`, `codex app-server`, the agent's local service), which
-//!   reads the account the way the client itself does.
+//! - `official`: only the agent's own client, through its own files and
+//!   interface (`claude -p`, `codex app-server`, the agent's local service),
+//!   which reads the account the way the client itself does.
 //! - `full`: also uses a sign-in another program keeps (a desktop app's
 //!   cookie, another tool's sign-in) or calls the vendor's web service with
 //!   it. This is how Agent HUD read before the setting existed, and it stays
@@ -33,7 +30,6 @@ pub fn blocked(agent: &str, level: QuotaReading) -> bool {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum QuotaReading {
     Off,
-    Local,
     Official,
     Full,
 }
@@ -42,8 +38,10 @@ impl QuotaReading {
     pub fn parse(value: &str) -> Option<Self> {
         Some(match value {
             "off" => Self::Off,
-            "local" => Self::Local,
-            "official" => Self::Official,
+            // `local` (only what the client recorded) was offered by test
+            // builds alone; `official` is the closest level that reads no
+            // other app's sign-in.
+            "official" | "local" => Self::Official,
             "full" => Self::Full,
             _ => return None,
         })
@@ -51,7 +49,6 @@ impl QuotaReading {
     pub fn as_str(self) -> &'static str {
         match self {
             Self::Off => "off",
-            Self::Local => "local",
             Self::Official => "official",
             Self::Full => "full",
         }
@@ -91,12 +88,6 @@ pub fn valid(value: &Value) -> bool {
 /// What an agent whose quota reading is off shows instead of a reading.
 pub fn off_notice() -> String {
     tr!("Quota reading is off for this agent in Settings. Sessions and tokens are still counted from its logs.")
-}
-
-/// Why a `local` reading has nothing new: it waits for the agent's own
-/// client to record its quota on this computer again.
-pub fn local_only() -> String {
-    tr!("Quota reading is limited to what the agent records on this computer")
 }
 
 #[cfg(test)]

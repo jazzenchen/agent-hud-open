@@ -517,16 +517,6 @@ fn another_workspaces_sign_in_completes_nothing() {
 }
 
 #[test]
-fn local_quota_reading_starts_no_app_server_and_reads_no_pi_sign_in() {
-    let mut host = pi_signed_in(installed(limits(), json!({"email": "a@example.com"})));
-    host.quota_levels
-        .insert("codex".into(), crate::account::QuotaReading::Local);
-    let _ = read(&host);
-    assert!(host.started.borrow().is_empty(), "no app-server");
-    assert!(host.asked.borrow().is_empty(), "Pi's sign-in is not sent");
-}
-
-#[test]
 fn official_quota_reading_asks_the_app_server_but_not_pi() {
     let mut host = pi_signed_in(installed(limits(), json!({"email": "a@example.com"})));
     host.quota_levels

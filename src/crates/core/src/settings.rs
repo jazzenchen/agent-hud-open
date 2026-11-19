@@ -323,7 +323,7 @@ mod tests {
         let home = tempfile::tempdir().unwrap();
         let mut core = AgentHudCore::new(vec![], home.path().to_owned());
         assert_eq!(core.settings["quotaReading"], json!({}));
-        let levels = json!({"claude": "local", "cursor": "off"});
+        let levels = json!({"claude": "official", "cursor": "off"});
         core.apply_setting("quotaReading", &levels).unwrap();
         let reopened = AgentHudCore::new(vec![], home.path().to_owned());
         assert_eq!(reopened.settings["quotaReading"], levels);

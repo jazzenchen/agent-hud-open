@@ -4,17 +4,15 @@ use serde_json::json;
 #[test]
 fn each_level_allows_the_ones_below_it() {
     use QuotaReading::*;
-    assert!(Full.allows(Official) && Full.allows(Local) && Full.allows(Off));
-    assert!(Official.allows(Local) && !Official.allows(Full));
-    assert!(Local.allows(Local) && !Local.allows(Official));
-    assert!(!Off.allows(Local));
+    assert!(Full.allows(Official) && Full.allows(Off));
+    assert!(Official.allows(Off) && !Official.allows(Full));
+    assert!(!Off.allows(Official));
 }
 
 #[test]
 fn levels_round_trip_through_their_names() {
     for level in [
         QuotaReading::Off,
-        QuotaReading::Local,
         QuotaReading::Official,
         QuotaReading::Full,
     ] {
@@ -24,9 +22,15 @@ fn levels_round_trip_through_their_names() {
 }
 
 #[test]
+fn a_saved_local_level_from_a_test_build_reads_as_the_agents_own_app() {
+    assert_eq!(QuotaReading::parse("local"), Some(QuotaReading::Official));
+    assert!(valid(&json!({"claude": "local"})));
+}
+
+#[test]
 fn a_setting_names_levels_by_agent_and_skips_what_is_not_one() {
     let levels = levels(&json!({"claude": "local", "cursor": "off", "codex": "most"}));
-    assert_eq!(levels.get("claude"), Some(&QuotaReading::Local));
+    assert_eq!(levels.get("claude"), Some(&QuotaReading::Official));
     assert_eq!(levels.get("cursor"), Some(&QuotaReading::Off));
     assert_eq!(levels.get("codex"), None);
     assert!(super::levels(&json!(null)).is_empty());
@@ -39,7 +43,7 @@ fn an_agent_whose_reader_is_not_graded_reads_only_in_full() {
     assert!(blocked("qoder", QuotaReading::Off));
     for agent in GRADED {
         assert!(!blocked(agent, QuotaReading::Off));
-        assert!(!blocked(agent, QuotaReading::Local));
+        assert!(!blocked(agent, QuotaReading::Official));
     }
 }
 
