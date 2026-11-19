@@ -485,12 +485,3 @@ fn the_clis_saved_sign_in_counts_while_it_is_not_running() {
         json!(["antigravity"])
     );
 }
-
-#[test]
-fn quota_reading_off_reads_no_antigravity_account() {
-    let mut host = answering(Ok(status_body()));
-    host.quota_levels
-        .insert("antigravity".into(), crate::account::QuotaReading::Off);
-    let reading = read(&host).unwrap();
-    assert!(reading.account.is_none() && reading.quotas.is_empty());
-}

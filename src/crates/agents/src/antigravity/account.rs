@@ -9,8 +9,7 @@
 use super::quotas::parse;
 use super::{ACCOUNT_SERVICE, AGENT};
 use crate::account::{
-    add_readers, quota_reading, read_by, read_json_bounded, resolve, Host, Provider, QuotaReading,
-    Reading, Reported, Unread,
+    add_readers, read_by, read_json_bounded, resolve, Host, Provider, Reading, Reported, Unread,
 };
 use crate::l10n::tr;
 use crate::split::ANTIGRAVITY_CLI;
@@ -29,12 +28,7 @@ pub static PROVIDER: Provider = Provider {
 };
 
 pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
-    let level = host.quota_reading(AGENT.id);
     let mut reading = Reading::empty("antigravity");
-    if !level.allows(QuotaReading::Official) {
-        reading.notice = Some(quota_reading::off_notice());
-        return Ok(reading);
-    }
     let mut partial = false;
     for report in host.account_reports("antigravity") {
         match super::statusline::parse(&report) {

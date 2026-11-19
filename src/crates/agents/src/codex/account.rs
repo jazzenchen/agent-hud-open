@@ -9,8 +9,8 @@ use super::limits::parse;
 use super::pi_usage::{read_pi, PI_ROUTE};
 use super::session_limits::with_sessions;
 use crate::account::{
-    append_notice, client_home_key, merge, quota_reading, read_by, variable, EngineStart, Host,
-    Provider, QuotaReading, Reading, StatusPage, Unread,
+    append_notice, client_home_key, merge, read_by, variable, EngineStart, Host, Provider,
+    QuotaReading, Reading, StatusPage, Unread,
 };
 use crate::l10n::tr;
 use serde_json::{json, Value};
@@ -36,11 +36,6 @@ static STATUS: StatusPage = StatusPage {
 
 pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
     let level = host.quota_reading(super::AGENT.id);
-    if !level.allows(QuotaReading::Official) {
-        let mut reading = Reading::empty("codex");
-        reading.notice = Some(quota_reading::off_notice());
-        return Ok(reading);
-    }
     let executable = host.executable("codex");
     let native = match executable.as_deref() {
         Some(executable) => read_native(host, executable),

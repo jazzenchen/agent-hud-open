@@ -6,8 +6,7 @@
 //! log), never from the dashboard.
 use super::periods::{current_period, summary_period};
 use crate::account::{
-    account_id, legacy_account, quota_reading, status, Host, HttpFailure, HttpRequest, Provider,
-    QuotaReading, Reading, Unread,
+    account_id, legacy_account, status, Host, HttpFailure, HttpRequest, Provider, Reading, Unread,
 };
 use crate::{l10n::tr, Location, PerOs, Support};
 use chrono::Utc;
@@ -68,16 +67,6 @@ pub static PROVIDER: Provider = Provider {
 };
 
 pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
-    // Cursor's quota comes only from its sign-in sent to cursor.com: no
-    // record on this computer or client interface to ask instead.
-    if !host
-        .quota_reading(super::AGENT.id)
-        .allows(QuotaReading::Full)
-    {
-        let mut reading = Reading::empty("cursor");
-        reading.notice = Some(quota_reading::off_notice());
-        return Ok(reading);
-    }
     let Some(signed) = sign_in(host)? else {
         return Ok(Reading::empty("cursor"));
     };

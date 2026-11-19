@@ -1,9 +1,9 @@
 use super::*;
 use serde_json::json;
+use QuotaReading::*;
 
 #[test]
 fn each_level_allows_the_ones_below_it() {
-    use QuotaReading::*;
     assert!(Full.allows(Official) && Full.allows(Off));
     assert!(Official.allows(Off) && !Official.allows(Full));
     assert!(!Off.allows(Official));
@@ -11,11 +11,7 @@ fn each_level_allows_the_ones_below_it() {
 
 #[test]
 fn levels_round_trip_through_their_names() {
-    for level in [
-        QuotaReading::Off,
-        QuotaReading::Official,
-        QuotaReading::Full,
-    ] {
+    for level in [Off, Official, Full] {
         assert_eq!(QuotaReading::parse(level.as_str()), Some(level));
     }
     assert_eq!(QuotaReading::parse("everything"), None);
@@ -23,28 +19,74 @@ fn levels_round_trip_through_their_names() {
 
 #[test]
 fn a_saved_local_level_from_a_test_build_reads_as_the_agents_own_app() {
-    assert_eq!(QuotaReading::parse("local"), Some(QuotaReading::Official));
+    assert_eq!(QuotaReading::parse("local"), Some(Official));
     assert!(valid(&json!({"claude": "local"})));
+    let setting = json!({"claude": "local", "codex": "local", "cursor": "local"});
+    assert_eq!(level(&setting, "claude"), Official);
+    assert_eq!(level(&setting, "codex"), Official);
+    // Cursor is not offered its own app alone: the next level down.
+    assert_eq!(level(&setting, "cursor"), Off);
+}
+
+#[test]
+fn each_agent_is_offered_only_the_levels_that_read_differently_for_it() {
+    for agent in ["claude", "codex"] {
+        assert_eq!(choices(agent), &[Off, Official, Full]);
+    }
+    for agent in [
+        "cursor",
+        "antigravity",
+        "grok-bot",
+        "deepseek",
+        "workbuddy",
+        "kimi",
+    ] {
+        assert_eq!(choices(agent), &[Off, Full], "{agent}");
+    }
+    // Copilot has its own switch; the rest have no quota reader at all.
+    for agent in [
+        "copilot",
+        "pi",
+        "omp",
+        "qwen",
+        "openclaw",
+        "goose",
+        "kilo",
+        "mimocode",
+        "teleagent",
+        "roo-code",
+        "relay",
+        "unknown",
+    ] {
+        assert!(choices(agent).is_empty(), "{agent}");
+    }
+    // Every agent with a reader of its own is offered a choice but Copilot.
+    for agent in crate::agent::ALL {
+        let reads = crate::agent::account_provider(agent.id).is_some();
+        if reads && agent.id != "copilot" {
+            assert!(!choices(agent.id).is_empty(), "{}", agent.id);
+        }
+    }
+}
+
+#[test]
+fn a_level_an_agent_is_not_offered_counts_as_the_next_one_down() {
+    let setting = json!({"cursor": "official", "claude": "official", "qwen": "off"});
+    assert_eq!(level(&setting, "cursor"), Off);
+    assert_eq!(level(&setting, "claude"), Official);
+    // Nothing to turn off: the setting changes nothing for it.
+    assert_eq!(level(&setting, "qwen"), Full);
+    assert_eq!(level(&setting, "codex"), Full);
+    assert_eq!(level(&json!(null), "claude"), Full);
 }
 
 #[test]
 fn a_setting_names_levels_by_agent_and_skips_what_is_not_one() {
     let levels = levels(&json!({"claude": "local", "cursor": "off", "codex": "most"}));
-    assert_eq!(levels.get("claude"), Some(&QuotaReading::Official));
-    assert_eq!(levels.get("cursor"), Some(&QuotaReading::Off));
+    assert_eq!(levels.get("claude"), Some(&Official));
+    assert_eq!(levels.get("cursor"), Some(&Off));
     assert_eq!(levels.get("codex"), None);
     assert!(super::levels(&json!(null)).is_empty());
-}
-
-#[test]
-fn an_agent_whose_reader_is_not_graded_reads_only_in_full() {
-    assert!(!blocked("qoder", QuotaReading::Full));
-    assert!(blocked("qoder", QuotaReading::Official));
-    assert!(blocked("qoder", QuotaReading::Off));
-    for agent in GRADED {
-        assert!(!blocked(agent, QuotaReading::Off));
-        assert!(!blocked(agent, QuotaReading::Official));
-    }
 }
 
 #[test]

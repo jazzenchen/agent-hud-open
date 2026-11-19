@@ -4,28 +4,22 @@
 //! - `off`: no quota reading at all. Sessions and tokens are still counted
 //!   from the agent's own logs, which never needed its account.
 //! - `official`: only the agent's own client, through its own files and
-//!   interface (`claude -p`, `codex app-server`, the agent's local service),
-//!   which reads the account the way the client itself does.
-//! - `full`: also uses a sign-in another program keeps (a desktop app's
-//!   cookie, another tool's sign-in) or calls the vendor's web service with
-//!   it. This is how Agent HUD read before the setting existed, and it stays
-//!   the default for an agent the setting does not name.
+//!   interface (`claude -p`, `codex app-server`), which reads the account the
+//!   way the client itself does.
+//! - `full`: also a sign-in another program keeps (a desktop app's cookie,
+//!   another tool's sign-in), sent to the vendor's web service. This is how
+//!   Agent HUD read before the setting existed, and it stays the default for
+//!   an agent the setting does not name.
+//!
+//! An agent is offered only the levels that read differently for it
+//! (`choices`); a saved level it is not offered counts as the next one down.
+//! Where only `off` and `full` are offered, `full` is all its reader reads.
 use crate::l10n::tr;
 use serde_json::Value;
 use std::collections::HashMap;
 
 /// The setting key: an object from an agent's id to its level.
 pub const SETTING: &str = "quotaReading";
-
-/// The agents whose readers sort their sources by level themselves. Any
-/// other agent reads only at `full`; a lower level turns its quota off.
-pub const GRADED: &[&str] = &["claude", "codex", "cursor", "antigravity"];
-
-/// Whether `agent`'s reader may not run at all at `level`: an agent not in
-/// `GRADED` below `full`. A graded reader is always run and decides itself.
-pub fn blocked(agent: &str, level: QuotaReading) -> bool {
-    level != QuotaReading::Full && !GRADED.contains(&agent)
-}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum QuotaReading {
@@ -59,14 +53,52 @@ impl QuotaReading {
     }
 }
 
-/// The levels a `quotaReading` setting names, by agent id. A value that is
-/// not a level is left out, so that agent reads as before.
+/// The levels Settings offers for `agent`, lowest first: empty where the
+/// setting changes nothing, and `official` only where the agent's reader
+/// asks its own client apart from other apps' sign-ins.
+pub fn choices(agent: &str) -> &'static [QuotaReading] {
+    use QuotaReading::*;
+    match agent {
+        // The engine before the Claude desktop app's sign-in; the app-server
+        // before Pi's ChatGPT sign-in.
+        "claude" | "codex" => &[Off, Official, Full],
+        // Copilot asks first, with its own switch (`copilot::account::CONSENT`).
+        "copilot" => &[],
+        _ if crate::agent::by_id(agent).is_some()
+            && crate::agent::account_provider(agent).is_some() =>
+        {
+            &[Off, Full]
+        }
+        // An agent with no quota reader, or no agent at all.
+        _ => &[],
+    }
+}
+
+/// `agent`'s level as `setting` names it: `full` when it names none, and a
+/// level the agent is not offered counts as the next one down.
+pub fn level(setting: &Value, agent: &str) -> QuotaReading {
+    let saved = setting[agent]
+        .as_str()
+        .and_then(QuotaReading::parse)
+        .unwrap_or(QuotaReading::Full);
+    choices(agent)
+        .iter()
+        .rev()
+        .copied()
+        .find(|choice| *choice <= saved)
+        .unwrap_or(QuotaReading::Full)
+}
+
+/// The levels a `quotaReading` setting names, by agent id, as `level` reads
+/// them. A value that is not a level is left out, so that agent reads as
+/// before.
 pub fn levels(setting: &Value) -> HashMap<String, QuotaReading> {
     setting
         .as_object()
         .into_iter()
         .flatten()
-        .filter_map(|(agent, level)| Some((agent.clone(), QuotaReading::parse(level.as_str()?)?)))
+        .filter(|(_, saved)| saved.as_str().and_then(QuotaReading::parse).is_some())
+        .map(|(agent, _)| (agent.clone(), level(setting, agent)))
         .collect()
 }
 

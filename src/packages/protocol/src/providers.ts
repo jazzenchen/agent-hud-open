@@ -1,4 +1,5 @@
 // Agents, their signed-in accounts and their balances.
+import type { QuotaReadingLevel } from "./settings.ts";
 
 export interface Provider {
   id: string;
@@ -47,6 +48,10 @@ export interface Provider {
      * it in the agent itself (Codex's hook review). */
     unreviewedHooks?: string[];
   };
+  /** From Core: the quota reading levels Settings offers the agent, lowest
+   * first, and the one it reads at (agents `quota_reading::choices`). Absent
+   * where the setting would change nothing. */
+  quotaReading?: { choices: QuotaReadingLevel[]; level: QuotaReadingLevel };
   /** Finding an installed/configured client does not imply its data adapter is ported. */
   dataStatus?: "supported" | "account-only" | "detection-only";
   discovery?: {

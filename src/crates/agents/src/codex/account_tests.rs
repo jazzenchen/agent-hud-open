@@ -529,13 +529,3 @@ fn official_quota_reading_asks_the_app_server_but_not_pi() {
         .iter()
         .all(|row| row["consumerRoutes"].is_null()));
 }
-
-#[test]
-fn quota_reading_off_reads_nothing() {
-    let mut host = pi_signed_in(installed(limits(), json!({"email": "a@example.com"})));
-    host.quota_levels
-        .insert("codex".into(), crate::account::QuotaReading::Off);
-    let reading = read(&host).unwrap();
-    assert!(reading.quotas.is_empty());
-    assert!(host.started.borrow().is_empty() && host.asked.borrow().is_empty());
-}

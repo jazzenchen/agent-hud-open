@@ -338,6 +338,35 @@ mod tests {
     }
 
     #[test]
+    fn each_agent_is_offered_the_quota_reading_levels_that_read_differently_for_it() {
+        let home = tempfile::tempdir().unwrap();
+        let mut core = AgentHudCore::new(vec![], home.path().to_owned());
+        let levels = json!({"claude": "official", "cursor": "local"});
+        core.apply_setting("quotaReading", &levels).unwrap();
+        let snapshot = core.request("snapshot", json!({})).unwrap();
+        let offered = |id: &str| {
+            snapshot["providers"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|row| row["id"] == id)
+                .unwrap()["quotaReading"]
+                .clone()
+        };
+        assert_eq!(
+            offered("claude"),
+            json!({"choices": ["off", "official", "full"], "level": "official"})
+        );
+        // Not offered its own app alone: a saved one counts as the next down.
+        assert_eq!(
+            offered("cursor"),
+            json!({"choices": ["off", "full"], "level": "off"})
+        );
+        assert_eq!(offered("codex")["level"], "full");
+        assert!(offered("copilot").is_null() && offered("qwen").is_null());
+    }
+
+    #[test]
     fn account_source_paths_persist_and_reject_invalid_entries() {
         for key in ["codexHomes", "claudeHomes", "antigravityCliSettings"] {
             let home = tempfile::tempdir().unwrap();

@@ -1032,28 +1032,20 @@ fn the_desktop_apps_account_counts_as_merged_when_its_reading_fails() {
     );
 }
 
-fn at(mut host: FakeHost, level: QuotaReading) -> FakeHost {
+fn at(mut host: FakeHost, level: crate::account::QuotaReading) -> FakeHost {
     host.quota_levels.insert("claude".into(), level);
     host
 }
 
 #[test]
-fn quota_reading_off_starts_nothing_and_says_so() {
-    let mut host = at(signed_out_with_desktop(), QuotaReading::Off);
-    record(&mut host, "/u/.claude.json", 10_000, None);
-    let reading = read(&host).unwrap();
-    assert!(reading.quotas.is_empty() && reading.account.is_none());
-    assert_eq!(reading.notice, Some(quota_reading::off_notice()));
-    assert!(host.started.borrow().is_empty(), "no engine");
-    assert!(host.asked.borrow().is_empty(), "nothing sent");
-}
-
-#[test]
 fn official_quota_reading_asks_the_engine_but_not_the_desktop_sign_in() {
-    let host = at(installed(limits()), QuotaReading::Official);
+    let host = at(installed(limits()), crate::account::QuotaReading::Official);
     assert_eq!(read(&host).unwrap().quotas.len(), 2);
     assert_eq!(host.started.borrow().len(), 1, "the engine answered");
-    let host = at(signed_out_with_desktop(), QuotaReading::Official);
+    let host = at(
+        signed_out_with_desktop(),
+        crate::account::QuotaReading::Official,
+    );
     let _ = read(&host);
     assert!(
         host.asked

@@ -98,17 +98,14 @@ export function AgentAccounts({
           />
         </Section>
       )}
-      {/* Copilot already asks before reading, with its own switch. */}
-      {source.id !== "copilot" && (
-        <AgentQuotaReading
-          t={t}
-          snapshot={snapshot}
-          agent={source.id}
-          action={action}
-          perform={perform}
-          pending={pending}
-        />
-      )}
+      <AgentQuotaReading
+        t={t}
+        snapshot={snapshot}
+        source={source}
+        action={action}
+        perform={perform}
+        pending={pending}
+      />
       <PanelBlocks
         t={t}
         snapshot={snapshot}

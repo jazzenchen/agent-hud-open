@@ -159,9 +159,9 @@ pub(super) fn run(
             let mut reading_context = context.clone();
             reading_context.account_homes = selected.2.clone();
             let level = agents::account::Host::quota_reading(&reading_context, selected.0);
-            if agents::account::quota_reading::blocked(selected.0, level) {
-                // A reader that does not sort its sources by level reads in
-                // full or not at all.
+            if level == agents::account::QuotaReading::Off {
+                // The reader is not run; a lower level than full is the
+                // reader's own to keep to.
                 let mut off = agents::account::Reading::empty(selected.1.id);
                 off.notice = Some(agents::account::quota_reading::off_notice());
                 Ok(off)

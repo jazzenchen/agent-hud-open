@@ -394,18 +394,3 @@ fn an_account_grok_bot_is_signed_in_to_is_read_through_both() {
         json!(["cursor", "grok-bot"])
     );
 }
-
-#[test]
-fn below_full_quota_reading_never_sends_cursors_sign_in() {
-    for level in [
-        crate::account::QuotaReading::Off,
-        crate::account::QuotaReading::Official,
-    ] {
-        let dir = tempfile::tempdir().unwrap();
-        let mut host = signed_in(&dir, &token(3600));
-        host.quota_levels.insert("cursor".into(), level);
-        let reading = read(&host).unwrap();
-        assert!(reading.quotas.is_empty() && reading.account.is_none());
-        assert!(host.asked.borrow().is_empty(), "{level:?} sent a request");
-    }
-}

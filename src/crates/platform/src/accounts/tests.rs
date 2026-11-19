@@ -909,3 +909,42 @@ fn naming_an_agents_quota_reading_full_keeps_its_reading_as_before() {
     let state = service.shared.state.lock().unwrap();
     assert!(!state.entries.contains_key("claude") && state.force.contains("claude"));
 }
+
+static OFF_READS: AtomicUsize = AtomicUsize::new(0);
+fn counted(_: &dyn agents::Host) -> Result<AccountReading, Unread> {
+    OFF_READS.fetch_add(1, Ordering::SeqCst);
+    Ok(AccountReading::empty("claude"))
+}
+static COUNTED: Provider = Provider::new("claude", counted);
+static COUNTED_ONLY: [&Provider; 1] = [&COUNTED];
+
+#[test]
+fn an_agent_whose_quota_reading_is_off_is_not_read_and_says_so() {
+    let directory = tempfile::tempdir().unwrap();
+    let service = AccountService::with_readers(
+        directory.path().join("home"),
+        directory.path().join("data"),
+        HashSet::new(),
+        CollectionGate::default(),
+        &COUNTED_ONLY,
+    )
+    .unwrap();
+    service.update_sources(&json!({
+        "settings": {"quotaReading": {"claude": "off"}},
+        "providers": [{"id": "claude", "enabled": true, "detected": true}],
+        "sessions": [],
+    }));
+    let deadline = Instant::now() + Duration::from_secs(5);
+    let notice = loop {
+        let state = service.shared.state.lock().unwrap();
+        if let Some(entry) = state.entries.get("claude") {
+            break entry.reading.notice.clone();
+        }
+        drop(state);
+        assert!(Instant::now() < deadline, "the off reading arrives");
+        std::thread::sleep(Duration::from_millis(10));
+    };
+    service.stop();
+    assert_eq!(notice, Some(agents::account::quota_reading::off_notice()));
+    assert_eq!(OFF_READS.load(Ordering::SeqCst), 0, "the reader never ran");
+}

@@ -2,6 +2,7 @@
 //! found of it, and each enabled client's accounts as their headers show them.
 use super::*;
 use crate::l10n::tr;
+use agent_hud_agents::account::quota_reading;
 
 impl crate::AgentHudCore {
     /// An account as its section header shows it (Open's AccountSectionHeader
@@ -81,6 +82,14 @@ impl crate::AgentHudCore {
                 // reader works is not the person's concern (Open shows none).
                 let notice = Value::Null;
                 let mut row = json!({"id":id,"name":provider.name,"recent":recent.get(id).map(metering::Recent::json),"detected":detected,"enabled":self.agent_on(id),"notice":notice,"sessions":projection.counts.get(id).copied().unwrap_or_default(),"discovery":discovery,"dataStatus":if provider.sessions {"supported"} else {"detection-only"}});
+                // The quota reading levels Settings offers this agent, and its
+                // own (agents `quota_reading::choices`); none where it changes
+                // nothing.
+                let choices = quota_reading::choices(id);
+                if !choices.is_empty() {
+                    let level = quota_reading::level(&self.settings[quota_reading::SETTING], id);
+                    row["quotaReading"] = json!({"choices":choices.iter().map(|c| c.as_str()).collect::<Vec<_>>(),"level":level.as_str()});
+                }
                 if let Some(account) = self.accounts.providers.get(id) {
                     row["accountStatus"] = account.clone();
                     row["notice"] = account["notice"].clone();
