@@ -55,31 +55,39 @@ fn harness_session_links_open_the_exact_session_on_windows() {
 }
 
 #[test]
-fn harness_session_links_stay_on_windows_and_reject_malformed_ids() {
-    let id = "session-1456302e-07b2-4280-a8a6-986236e9094f";
-    for os in [Os::MacOs, Os::Linux] {
-        assert_eq!(
-            session_url_on(&json!({"kind":"deepseek-session","id":id}), os, |_| {
-                panic!("an unverified host must not be queried")
-            }),
-            None
-        );
-    }
+fn a_harness_session_elsewhere_opens_the_app_as_before_session_links() {
+    let target =
+        json!({"kind":"deepseek-session","id":"session-1456302e-07b2-4280-a8a6-986236e9094f"});
+    // macOS keeps the app link: Harness's window, never a Finder transcript.
+    assert_eq!(
+        session_url_on(&target, Os::MacOs, |url| url == "dsh://open"),
+        Some("dsh://open".into())
+    );
+    assert_eq!(session_url_on(&target, Os::MacOs, |_| false), None);
+    assert_eq!(
+        session_url_on(&target, Os::Linux, |_| {
+            panic!("an unverified host must not be queried")
+        }),
+        None
+    );
+}
+
+#[test]
+fn a_malformed_harness_session_id_opens_only_the_app() {
     for bad in [
         "session-short",
         "orchestrator-",
         "../etc/passwd",
         "session-1456302E-07b2-4280-a8a6-986236e9094f",
     ] {
-        assert_eq!(
-            session_url_on(
-                &json!({"kind":"deepseek-session","id":bad}),
-                Os::Windows,
-                |_| { panic!("a malformed id must not query the host") }
-            ),
-            None,
-            "{bad}"
-        );
+        let target = json!({"kind":"deepseek-session","id":bad});
+        for os in [Os::Windows, Os::MacOs] {
+            assert_eq!(
+                session_url_on(&target, os, |url| url == "dsh://open"),
+                Some("dsh://open".into()),
+                "{bad}"
+            );
+        }
     }
 }
 

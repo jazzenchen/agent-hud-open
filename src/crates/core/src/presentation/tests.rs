@@ -318,6 +318,28 @@ fn a_harness_session_opens_its_own_window_while_other_ids_keep_the_app_fallback(
     };
     assert_eq!(target_of(own), json!({"kind":"deepseek-session","id":own}));
     assert_eq!(target_of("main"), json!({"kind":"deepseek-app"}));
+    // Where the desktop app's link does not open, neither session has a
+    // way back, as before session links: the log is shown instead.
+    core.set_provider_discovery(vec![crate::ProviderDiscovery {
+        id: source.into(),
+        installed: true,
+        ..Default::default()
+    }]);
+    core.request("snapshot", json!({})).unwrap();
+    let page = core.request("sessions", json!({})).unwrap();
+    for id in [own, "main"] {
+        let session = page["items"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|session| session["id"] == json!(format!("deepseek:{id}")))
+            .unwrap();
+        assert_eq!(session["navigationTarget"], Value::Null, "{id}");
+    }
+    let detail = core
+        .request("session_detail", json!({"id":format!("deepseek:{own}")}))
+        .unwrap();
+    assert_eq!(detail["session"]["navigationTarget"], Value::Null);
 }
 
 #[test]

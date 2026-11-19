@@ -130,13 +130,18 @@ impl Presentation<'_> {
         if claude && session["navigationTarget"].is_null() {
             self.background_job_target(session, desktop);
         }
+        let app = self
+            .discovery
+            .iter()
+            .find(|found| found.id == source)
+            .and_then(|found| found.navigation_target.as_ref());
+        // A Harness session opens through the desktop app's link, so it has
+        // a way back only where that link opens on this host.
+        if app.is_none() && session["navigationTarget"]["kind"] == "deepseek-session" {
+            session["navigationTarget"] = Value::Null;
+        }
         if session["navigationTarget"].is_null() {
-            if let Some(target) = self
-                .discovery
-                .iter()
-                .find(|found| found.id == source)
-                .and_then(|found| found.navigation_target.as_ref())
-            {
+            if let Some(target) = app {
                 session["navigationTarget"] = target.clone();
             }
         }
