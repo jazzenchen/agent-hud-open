@@ -38,7 +38,8 @@ fn npm_claude_cmd_unwraps_to_native_exe_before_cmd_fallback() {
 
     // Started from the shim itself, the program runs without cmd.exe.
     let command = engine_command(&shim, &["--bg", "--", "one\ntwo"]).unwrap();
-    assert_eq!(command.get_program(), native.as_os_str());
+    // As paths: the shim's backslashes and the test's slashes name one file.
+    assert_eq!(Path::new(command.get_program()), native);
     assert_eq!(command.get_args().last(), Some(OsStr::new("one\ntwo")));
 }
 
@@ -216,10 +217,9 @@ fn npm_node_shim_runs_node_on_its_entry_script_with_the_message_as_given() {
     let command = engine_command(&shim, &["-p", message]).unwrap();
     assert_eq!(command.get_program(), node.as_os_str());
     let args: Vec<&OsStr> = command.get_args().collect();
-    assert_eq!(
-        args,
-        [script.as_os_str(), OsStr::new("-p"), OsStr::new(message)]
-    );
+    assert_eq!(args.len(), 3, "{args:?}");
+    assert_eq!(Path::new(args[0]), script);
+    assert_eq!(args[1..], [OsStr::new("-p"), OsStr::new(message)]);
     // Node itself is never the client.
     let env = Environment::from([("PATH".into(), npm.to_string_lossy().into_owned())]);
     let candidates = engine_candidates(tmp.path(), &env, "codex");
