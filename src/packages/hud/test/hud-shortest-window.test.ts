@@ -9,13 +9,17 @@ import {
 import { windowReading } from "../src/held-reading.ts";
 import { shownRows } from "../src/quota-rows.ts";
 
-const now = Date.parse("2026-11-18T12:00:00Z");
+// Resets fall hours from now, never on a fixed date: configuredVendors reads
+// the clock itself, so a dated reset would pass and turn every window stale.
+const now = Date.now();
+const hoursFromNow = (hours: number) =>
+  new Date(now + hours * 3_600_000).toISOString();
 const row = (
   window: string,
   usedPercent: number,
   status: string,
   windowDurationSeconds?: number | null,
-  resetAt = "2026-11-18T17:00:00Z",
+  resetAt = hoursFromNow(5),
 ) =>
   ({
     id: `acct:${window}`,
@@ -82,7 +86,7 @@ test("stale and reset-passed windows never set the shortest number", () => {
     [20, null, "normal"],
   );
   const passed = [
-    row("claude-5h", 100, "critical", 18_000, "2026-11-18T11:00:00Z"),
+    row("claude-5h", 100, "critical", 18_000, hoursFromNow(-1)),
     row("claude-7d", 20, "normal", 604_800),
   ];
   assert.deepEqual(
