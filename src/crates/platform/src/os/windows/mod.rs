@@ -15,7 +15,10 @@ mod secrets;
 mod shims;
 mod shortcut;
 pub(crate) use crate::windows_session::spawn;
-pub(crate) use apps::{activate_app, app_running, launch_app, registered_bundle};
+pub(crate) use apps::{
+    activate_app, app_running, bring_window_forward, is_main_window, launch_app, registered_bundle,
+    start_program,
+};
 pub(crate) use engines::{
     application_installed, claude_desktop_bases, discovered_executable, engine_candidates,
     engine_executable, engine_path, executable_dirs,
@@ -79,9 +82,24 @@ pub(crate) fn environment_value<'a>(env: &'a Environment, key: &str) -> Option<&
 pub(super) fn local_app(home: &Path, env: &Environment) -> PathBuf {
     variable(env, "LOCALAPPDATA").unwrap_or_else(|| home.join("AppData/Local"))
 }
-/// URL-handler lookup through Windows associations is not implemented.
-pub(crate) fn registered_url(_url: &str) -> bool {
-    false
+/// Whether this machine opens the link: an installer pointed its scheme at a
+/// program, or, for DeepSeek Harness's app link, Harness's desktop app or a
+/// browser window showing it is here. Registry keys are case-insensitive, so
+/// the scheme goes to the lookup as the link wrote it.
+pub(crate) fn registered_url(url: &str) -> bool {
+    url_scheme(url).is_some_and(apps::scheme_registered)
+        || (url == "dsh://open" && apps::registered_deepseek())
+}
+/// A link's scheme: the letters before its first colon, as RFC 3986 spells
+/// it. Anything else opens no app.
+fn url_scheme(url: &str) -> Option<&str> {
+    let (scheme, rest) = url.split_once(':')?;
+    (!rest.is_empty()
+        && scheme.starts_with(|first: char| first.is_ascii_alphabetic())
+        && scheme
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'+' | b'-' | b'.')))
+    .then_some(scheme)
 }
 pub(crate) fn configure_command(command: &mut Command) {
     use std::os::windows::process::CommandExt;
@@ -146,6 +164,16 @@ pub(crate) fn default_browser() -> Option<String> {
 }
 
 pub(crate) fn open_session_url(url: &str) -> Result<(), String> {
+    // Harness's app link where no installer registered dsh://: Agent HUD
+    // finds Harness itself (`registered_url`).
+    if url == "dsh://open" && !apps::scheme_registered("dsh") {
+        return apps::open_deepseek()
+            .then_some(())
+            .ok_or_else(|| "The native client could not open this session".into());
+    }
+    // A Codex that runs already gets its link and may stay behind the window
+    // in front; one that does not is started by the link itself.
+    let codex_ran = url.starts_with("codex:") && app_running(apps::CODEX);
     if let Some(opened) = apps::open_unregistered_link(url) {
         return opened;
     }
@@ -169,6 +197,7 @@ pub(crate) fn open_session_url(url: &str) -> Result<(), String> {
         .encode_wide()
         .chain(Some(0))
         .collect::<Vec<_>>();
+    apps::allow_foreground();
     if unsafe {
         ShellExecuteW(
             std::ptr::null_mut(),
@@ -181,6 +210,9 @@ pub(crate) fn open_session_url(url: &str) -> Result<(), String> {
     } as isize
         > 32
     {
+        if codex_ran {
+            apps::raise_app(apps::CODEX);
+        }
         Ok(())
     } else {
         Err("The native client could not open this session".into())
@@ -211,5 +243,31 @@ mod tests {
             path_entries(&env),
             vec![PathBuf::from("C:\\tools"), PathBuf::from("D:\\bin")]
         );
+    }
+
+    #[test]
+    fn a_link_scheme_is_the_name_before_its_first_colon() {
+        for (url, scheme) in [
+            ("dsh://open", Some("dsh")),
+            ("dsh:open", Some("dsh")),
+            ("a+b-c.d://x", Some("a+b-c.d")),
+        ] {
+            assert_eq!(url_scheme(url), scheme, "{url}");
+        }
+        // Nothing before the colon, or a name that is not a scheme, opens nothing.
+        for url in ["", "open", "://x", "1dsh://x", "ds h://x"] {
+            assert_eq!(url_scheme(url), None, "{url}");
+        }
+    }
+
+    #[test]
+    fn a_scheme_no_installer_owning_and_a_name_that_is_not_a_scheme_open_nothing() {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let url = format!("agent-hud-unregistered-{}-{now}://open", std::process::id());
+        assert!(!registered_url(&url), "{url}");
+        assert!(!registered_url("open"));
     }
 }

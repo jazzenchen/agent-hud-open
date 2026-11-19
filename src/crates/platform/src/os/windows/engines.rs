@@ -206,6 +206,12 @@ pub(crate) fn engine_candidates(home: &Path, env: &Environment, name: &str) -> V
             paths.extend(super::claude::engines(home, env));
         }
         "codex" => paths.push(home.join(".codex/.sandbox-bin/codex.exe")),
+        // OpenCode's install script's folder, then the copy its desktop app
+        // carries (installed for the user under `Programs\OpenCode`).
+        "opencode" => {
+            paths.push(home.join(".opencode/bin/opencode.exe"));
+            paths.push(local_app(home, env).join("Programs/OpenCode/resources/opencode-cli.exe"));
+        }
         _ => {}
     }
 

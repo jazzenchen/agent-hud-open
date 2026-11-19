@@ -1,7 +1,7 @@
 //! Only typed client-owned destinations become fixed native URL schemes. No
 //! command, arbitrary URL or callback-declared host is accepted as navigation.
 use crate::hooks::origins::is_uuid;
-use agent_hud_agents::{Discovery, Os, ALL};
+use agent_hud_agents::{discovery::AppNavigation, Discovery, Os, ALL};
 use serde_json::{json, Value};
 mod antigravity;
 #[cfg(windows)]
@@ -114,6 +114,15 @@ pub(super) fn app_target(discovery: &Discovery) -> Option<Value> {
     let target = json!({"kind":discovery.app_navigation?.kind});
     session_url(&target).map(|_| target)
 }
+/// An agent's app link, where it is verified on `os` and the host can open it.
+fn app_url(
+    navigation: &AppNavigation,
+    os: Os,
+    registered: &impl Fn(&str) -> bool,
+) -> Option<String> {
+    let url = navigation.url.on(os).value()?;
+    registered(url).then(|| (*url).to_owned())
+}
 fn session_url_on(target: &Value, os: Os, registered: impl Fn(&str) -> bool) -> Option<String> {
     let kind = target["kind"].as_str()?;
     if let Some(navigation) = ALL
@@ -121,8 +130,7 @@ fn session_url_on(target: &Value, os: Os, registered: impl Fn(&str) -> bool) -> 
         .filter_map(|agent| agent.discovery.app_navigation)
         .find(|navigation| navigation.kind == kind)
     {
-        let url = navigation.url.on(os).value()?;
-        return registered(url).then(|| (*url).to_owned());
+        return app_url(navigation, os, &registered);
     }
     let id = target["id"].as_str()?;
     match kind {
@@ -175,6 +183,27 @@ fn session_url_on(target: &Value, os: Os, registered: impl Fn(&str) -> bool) -> 
             let mut url = reqwest::Url::parse("grokbot://app/v1/agent").ok()?;
             url.query_pairs_mut().append_pair("id", id);
             Some(url.into())
+        }
+        // On Windows, where its installer registered dsh://, a Harness
+        // session's link names the session; a Harness that reads it switches
+        // to it, and today's only shows its window. Elsewhere, or with no
+        // registered link, the app link stands in, as before session links.
+        // The session link itself is asked about: Windows opens the bare app
+        // link even unregistered, by finding Harness, but not this one.
+        "deepseek-session" => {
+            if os == Os::Windows && agent_hud_agents::deepseek::is_session_id(id) {
+                let mut url = reqwest::Url::parse("dsh://open").ok()?;
+                url.query_pairs_mut().append_pair("session", id);
+                let url = String::from(url);
+                if registered(&url) {
+                    return Some(url);
+                }
+            }
+            app_url(
+                agent_hud_agents::deepseek::AGENT.discovery.app_navigation?,
+                os,
+                &registered,
+            )
         }
         // A cloud agent opens in Cursor's Agents window by its `bc-` id. Cursor
         // has no link for a local session (its composers open only through

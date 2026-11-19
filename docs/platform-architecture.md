@@ -66,7 +66,7 @@ stubs are the list of open work for that operating system.
 
 | Capability | Selector | Host files | Items |
 | --- | --- | --- | --- |
-| Paths, discovery, processes, files, secrets, app activation | `crates/platform/src/os/mod.rs` | `os/macos/`, `os/windows/`, `os/linux/`; `os/unix/` is shared by macOS and Linux | `home_dir`, `launched_executable` (on Linux, the AppImage file rather than its mount), `data_dir`, `caches_dir`, `source_roots`, `engine_candidates`, `processes`, `process_runs` (whether a pid Claude Code registered still runs; signal 0 in `os/unix/`, the start time on macOS only, Windows not implemented), `listening_ports`, `parent_processes`, `codex_cli_on_port`, `private_directory`, `owned_by_user`, `owner_only`, `private_file`, `read_stdin`, `hook_configuration`, `stored_secret`, `app_running`, `activate_app`, `launch_app`, `registered_bundle` (Windows: running processes and Start menu/desktop shortcuts, plus Codex's Store package), `registered_url` (Launch Services URL handlers; Windows/Linux lookup is not implemented), `OS` (whose facts the agents' descriptors give), `folder` and `locate` (an agent's per-OS location), capability constants |
+| Paths, discovery, processes, files, secrets, app activation | `crates/platform/src/os/mod.rs` | `os/macos/`, `os/windows/`, `os/linux/`; `os/unix/` is shared by macOS and Linux | `home_dir`, `launched_executable` (on Linux, the AppImage file rather than its mount), `data_dir`, `caches_dir`, `source_roots`, `engine_candidates`, `processes`, `process_runs` (whether a pid Claude Code registered still runs; signal 0 in `os/unix/`, the start time on macOS only, Windows not implemented), `listening_ports`, `parent_processes`, `codex_cli_on_port`, `private_directory`, `owned_by_user`, `owner_only`, `private_file`, `read_stdin`, `hook_configuration`, `stored_secret`, `app_running`, `activate_app`, `launch_app`, `registered_bundle` (Windows: running processes and Start menu/desktop shortcuts, plus Codex's Store package), `registered_url` (whether this host opens a link: an installer owns its scheme, which macOS asks Launch Services and Windows the registry about; on Windows DeepSeek Harness's bare app link also opens where Harness's desktop app or a browser window titled with it is found, and `open_session_url` brings it forward itself; Linux lookup is not implemented), `OS` (whose facts the agents' descriptors give), `folder` and `locate` (an agent's per-OS location), capability constants |
 | Ingestion path keys | `crates/core/src/log_files.rs`, `database/mod.rs` | `log_files_windows.rs`, `log_files_unix.rs`, `database/windows_paths.rs`, `database/unix_paths.rs` | Native path spelling and Windows-only legacy key migration |
 | Antigravity session navigation | `crates/platform/src/navigation.rs` | `navigation/antigravity_windows.rs`, `navigation/antigravity_unix.rs` | `open` (shared DevTools transport stays in `antigravity.rs`) |
 | Hook callback channel | `crates/platform/src/hooks/mod.rs` | `hooks/unix/` (`send` in `unix/send.rs`), `hooks/windows.rs` | `Server`, `send` |
@@ -130,6 +130,18 @@ than a condition in shared code.
 - WSL is a distinct source environment. It must preserve source identity and
   Windows/WSL ownership when an adapter is added; scanning Windows and WSL paths
   indiscriminately would risk duplicate usage. Automatic WSL discovery is absent.
+
+Session deep links follow the same rule. `crates/platform/src/navigation.rs`
+turns only typed client-owned destinations into fixed native schemes, and each
+link's OS support comes from host facts (`registered_url`, `registered_bundle`,
+`app_running`), never from a guess. The Harness's `deepseek-session` destination
+opens `dsh://open?session=<id>` on Windows only, where the registry owns `dsh://`
+and the id is one of the Harness's own session shapes. Today's Harness ignores
+the query and only focuses its window; one that reads it (proposed upstream in
+deepseek-ai/deepseek-harness discussion 13820) switches to that session.
+Elsewhere, and on Windows without the registered scheme, the session opens the
+app-level `deepseek-app` link as before, and core offers a Harness session a
+way back only where that app link opens.
 
 Evidence for installation, configuration, log ingestion and account readings is
 separate. Finding an agent does not prove that its usage reader works. Unknown

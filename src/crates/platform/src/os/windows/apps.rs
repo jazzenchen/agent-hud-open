@@ -20,13 +20,19 @@ use std::{
 };
 
 pub(super) use link::open_unregistered as open_unregistered_link;
+pub(super) use link::scheme_registered;
+pub(super) use window::allow_foreground;
+pub(crate) use window::{bring_forward as bring_window_forward, is_main_window};
 
-const CODEX: &str = "com.openai.codex";
+pub(super) const CODEX: &str = "com.openai.codex";
+const DEEPSEEK: &str = "com.deepseek.dsh";
+const BROWSERS: &[&str] = &["msedge.exe", "chrome.exe", "firefox.exe", "brave.exe"];
 
 /// The program names that stand for an app's macOS bundle identifier.
 fn programs(bundle_id: &str) -> &'static [&'static str] {
     match bundle_id {
         CODEX => &["Codex.exe", "ChatGPT.exe"],
+        DEEPSEEK => &["DeepSeek Harness.exe"],
         "com.anthropic.claudefordesktop" => &["Claude.exe"],
         "com.google.antigravity" => &["Antigravity.exe", "Antigravity IDE.exe"],
         "com.exafunction.windsurf" => &["Windsurf.exe"],
@@ -92,6 +98,65 @@ pub(crate) fn launch_app(bundle_id: &str) -> bool {
         return surface(&processes);
     }
     installed_executable(bundle_id).is_some_and(|program| start(&program, None))
+}
+
+fn running_pids(names: &[&str]) -> Vec<u32> {
+    running::processes(names)
+        .into_iter()
+        .map(|(pid, _)| pid)
+        .collect()
+}
+
+fn deepseek_executable() -> Option<PathBuf> {
+    if let Some(found) = found_executable(DEEPSEEK) {
+        return Some(found);
+    }
+    ["ProgramFiles(x86)", "ProgramFiles"]
+        .into_iter()
+        .filter_map(std::env::var_os)
+        .map(|base| {
+            PathBuf::from(base)
+                .join("DeepSeek Harness")
+                .join("DeepSeek Harness.exe")
+        })
+        .find(|path| path.is_file())
+}
+
+/// Whether DeepSeek Harness is here without a registered `dsh://`: its
+/// desktop app runs or is installed, or a browser window shows it.
+pub(crate) fn registered_deepseek() -> bool {
+    !running::processes(programs(DEEPSEEK)).is_empty()
+        || deepseek_executable().is_some()
+        || window::with_title_containing(&running_pids(BROWSERS), "DeepSeek Harness").is_some()
+}
+
+/// Brings DeepSeek Harness or a browser window showing DeepSeek Harness Web
+/// forward on Windows, launching DeepSeek Harness if available.
+pub(crate) fn open_deepseek() -> bool {
+    let desktop = running::processes(programs(DEEPSEEK));
+    if !desktop.is_empty() {
+        return surface(&desktop);
+    }
+    let browser_pids = running_pids(BROWSERS);
+    if let Some(window) = window::with_title_containing(&browser_pids, "DeepSeek Harness") {
+        return window::bring_forward(window);
+    }
+    deepseek_executable().is_some_and(|program| start(&program, None))
+}
+
+/// Brings a running app's window in front without starting anything: false
+/// when it shows no window.
+pub(crate) fn raise_app(bundle_id: &str) -> bool {
+    let pids = running_pids(programs(bundle_id));
+    window::of(&pids)
+        .first()
+        .is_some_and(|&window| window::bring_forward(window))
+}
+
+/// Starts a program as a click on it would, so a copy already running
+/// shows its window.
+pub(crate) fn start_program(program: &Path) -> bool {
+    start(program, None)
 }
 
 fn surface(processes: &[(u32, PathBuf)]) -> bool {

@@ -175,6 +175,21 @@ mod tests {
         );
         assert_eq!(session_target("cursor", "cursor:3e8f", None, None), None);
         assert_eq!(
+            session_target(
+                "deepseek",
+                "deepseek:session-1456302e-07b2-4280-a8a6-986236e9094f",
+                None,
+                None
+            ),
+            Some(
+                json!({"kind":"deepseek-session","id":"session-1456302e-07b2-4280-a8a6-986236e9094f"})
+            )
+        );
+        assert_eq!(
+            session_target("deepseek", "deepseek:main", None, None),
+            None
+        );
+        assert_eq!(
             session_target("antigravity", "antigravity:c1", Some("/w"), Some("Desktop")),
             Some(json!({"kind":"antigravity-conversation","id":"c1","cwd":"/w"}))
         );

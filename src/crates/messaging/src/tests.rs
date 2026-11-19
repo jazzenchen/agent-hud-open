@@ -386,6 +386,13 @@ impl World {
         Self::new_with_antigravity(preferences, false)
     }
     fn new_with_antigravity(preferences: Preferences, uncertain: bool) -> Self {
+        Self::build(preferences, uncertain, &[])
+    }
+    /// With these clients' command lines installed (Pi, OpenCode).
+    fn new_with_commands(preferences: Preferences, installed: &[Provider]) -> Self {
+        Self::build(preferences, false, installed)
+    }
+    fn build(preferences: Preferences, uncertain: bool, installed: &[Provider]) -> Self {
         let fixture = StartFixture::new();
         let channel = fixture.root.join("claude-channel");
         let harness_channel = fixture.root.join("deepseek-channel");
@@ -417,9 +424,18 @@ impl World {
                 codex_command: true,
             },
             clients.clone(),
-            fixture
-                .starts()
-                .with_deepseek_channel(clients.deepseek_channel()),
+            {
+                let mut starts = fixture.starts();
+                starts.set_commands(
+                    installed
+                        .iter()
+                        .map(|provider| {
+                            (*provider, fixture.root.join("bin").join(provider.as_str()))
+                        })
+                        .collect(),
+                );
+                starts.with_deepseek_channel(clients.deepseek_channel())
+            },
             Arc::new(move |receipt| follow.lock().unwrap().push(receipt)),
             Arc::new(move |flight| fly.lock().unwrap().push(flight)),
         );
@@ -1653,12 +1669,42 @@ fn the_window_offers_a_pi_session_only_while_it_is_open() {
         .map(|row| row["id"].as_str().unwrap())
         .collect::<Vec<_>>();
     assert_eq!(pi, ["pi:open"]);
-    // Agent HUD starts no Pi session.
+    // Pi is not installed here: no new Pi session is offered.
     assert!(listing["starts"]
         .as_array()
         .unwrap()
         .iter()
         .all(|start| start["client"] != "pi"));
+}
+
+#[test]
+fn the_window_offers_a_new_pi_or_opencode_session_where_installed() {
+    let mut world = World::new_with_commands(Preferences::default(), &[Provider::Pi]);
+    let listing = world.user_sessions();
+    let pi = listing["starts"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|start| start["client"] == "pi")
+        .unwrap();
+    assert_eq!(pi["withoutFolder"], true);
+    assert!(listing["starts"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .all(|start| start["client"] != "opencode"));
+    // `start_session` starts none: its folders list leaves Pi out.
+    let mut world = World::new_with_commands(
+        Preferences {
+            enabled: true,
+            ..Default::default()
+        },
+        &[Provider::Pi, Provider::OpenCode],
+    );
+    let list = world.call(Some(("claude", CLAUDE)), "list_sessions", json!({}));
+    let folders = list["startFolders"].as_object().unwrap();
+    assert!(folders.contains_key("claude"), "{folders:?}");
+    assert!(!folders.contains_key("pi") && !folders.contains_key("opencode"));
 }
 
 #[test]

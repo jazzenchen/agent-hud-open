@@ -285,6 +285,64 @@ fn an_app_fallback_preserves_specific_targets_and_belongs_only_to_its_source() {
 }
 
 #[test]
+fn a_harness_session_opens_its_own_window_while_other_ids_keep_the_app_fallback() {
+    let temp = tempfile::tempdir().unwrap();
+    let home = temp.path();
+    let mut core = core(home);
+    let source = agent_hud_agents::deepseek::AGENT.id;
+    core.provider_roots = vec![(home.join(".dsh/sessions"), source)];
+    let own = "session-1456302e-07b2-4280-a8a6-986236e9094f";
+    for id in [own, "main"] {
+        let header =
+            json!({"type":"session","version":4,"id":id,"createdAt":Utc::now().to_rfc3339()});
+        let path = home.join(".dsh/sessions").join(id).join("session.jsonl");
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(path, format!("{header}\n")).unwrap();
+    }
+    core.set_provider_discovery(vec![crate::ProviderDiscovery {
+        id: source.into(),
+        installed: true,
+        navigation_target: Some(json!({"kind":"deepseek-app"})),
+        ..Default::default()
+    }]);
+    core.read_projection_sources();
+    core.request("snapshot", json!({})).unwrap();
+    let page = core.request("sessions", json!({})).unwrap();
+    let items = page["items"].as_array().unwrap();
+    let target_of = |id: &str| {
+        items
+            .iter()
+            .find(|session| session["id"] == json!(format!("deepseek:{id}")))
+            .unwrap()["navigationTarget"]
+            .clone()
+    };
+    assert_eq!(target_of(own), json!({"kind":"deepseek-session","id":own}));
+    assert_eq!(target_of("main"), json!({"kind":"deepseek-app"}));
+    // Where the desktop app's link does not open, neither session has a
+    // way back, as before session links: the log is shown instead.
+    core.set_provider_discovery(vec![crate::ProviderDiscovery {
+        id: source.into(),
+        installed: true,
+        ..Default::default()
+    }]);
+    core.request("snapshot", json!({})).unwrap();
+    let page = core.request("sessions", json!({})).unwrap();
+    for id in [own, "main"] {
+        let session = page["items"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|session| session["id"] == json!(format!("deepseek:{id}")))
+            .unwrap();
+        assert_eq!(session["navigationTarget"], Value::Null, "{id}");
+    }
+    let detail = core
+        .request("session_detail", json!({"id":format!("deepseek:{own}")}))
+        .unwrap();
+    assert_eq!(detail["session"]["navigationTarget"], Value::Null);
+}
+
+#[test]
 fn a_session_lists_where_its_first_and_latest_prompts_were_typed() {
     let temp = tempfile::tempdir().unwrap();
     let home = temp.path();

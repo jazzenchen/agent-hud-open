@@ -16,7 +16,7 @@ fn owner(scheme: &str) -> Option<&'static str> {
 }
 
 /// Whether an installer registered a command for the scheme.
-fn registered(scheme: &str) -> bool {
+pub(crate) fn scheme_registered(scheme: &str) -> bool {
     let path = OsStr::new(&format!("{scheme}\\shell\\open\\command"))
         .encode_wide()
         .chain(Some(0))
@@ -39,7 +39,7 @@ fn registered(scheme: &str) -> bool {
 pub(crate) fn open_unregistered(url: &str) -> Option<Result<(), String>> {
     let (scheme, _) = url.split_once(':')?;
     let app = owner(scheme)?;
-    if registered(scheme) {
+    if scheme_registered(scheme) {
         return None;
     }
     let program = super::installed_executable(app)?;

@@ -148,6 +148,19 @@ pub(crate) fn engine_candidates(home: &Path, env: &Environment, name: &str) -> V
         ));
     }
     paths.extend(path_entries(env).into_iter().map(|dir| dir.join(name)));
+    if name == "opencode" {
+        // OpenCode's install script's folder, then the copy of the command
+        // line its desktop app carries: `Resources/opencode-cli` in the
+        // Electron app, `MacOS/opencode-cli` in the earlier Tauri one.
+        paths.push(home.join(".opencode/bin/opencode"));
+        for root in [PathBuf::from("/Applications"), home.join("Applications")] {
+            for app in ["OpenCode.app", "OpenCode Beta.app"] {
+                let app = root.join(app).join("Contents");
+                paths.push(app.join("Resources/opencode-cli"));
+                paths.push(app.join("MacOS/opencode-cli"));
+            }
+        }
+    }
     if matches!(name, "agy" | "antigravity") {
         paths.push(home.join(".antigravity/antigravity/bin").join(name));
         let bundled = |app: PathBuf| {

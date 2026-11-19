@@ -2,12 +2,13 @@
 //! folders each client offers, one start per request identity, and moving a
 //! Claude Code background job into the desktop app once its turn stopped.
 //! DeepSeek Harness has no command that starts a session: Agent HUD's plugin
-//! in a running Harness host makes it (`delivery::deepseek`).
+//! in a running Harness host makes it (`delivery::deepseek`). Pi and OpenCode
+//! start one as a run of their command line (`runs`).
 use super::process::{NativeProcessRunner, ProcessRunner};
 use super::*;
 use serde_json::Value;
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, HashMap},
     fs,
     path::{Path, PathBuf},
 };
@@ -16,10 +17,21 @@ mod clients;
 mod commands;
 mod handoff;
 mod offers;
+mod runs;
 mod start;
 mod trust;
 use commands::environment;
 pub use handoff::ClaudeMove;
+
+/// The clients Agent HUD starts sessions in, in the order they are offered.
+pub const STARTED: [Provider; 6] = [
+    Provider::Claude,
+    Provider::Codex,
+    Provider::Antigravity,
+    Provider::DeepSeek,
+    Provider::Pi,
+    Provider::OpenCode,
+];
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -116,6 +128,9 @@ pub struct SessionStarts {
     /// The folder Agent HUD's DeepSeek Harness plugin shares with the app;
     /// none, and no Harness session is offered or started.
     deepseek: Option<DeepSeekChannel>,
+    /// Pi's and OpenCode's command lines as a test names them; none, and
+    /// they are looked up on disk at every offer and start (`command`).
+    commands: Option<HashMap<Provider, PathBuf>>,
 }
 impl SessionStarts {
     pub fn new(config: StartConfig, receipts: PathBuf) -> Result<Self> {
@@ -145,6 +160,7 @@ impl SessionStarts {
             runner,
             applications,
             deepseek: None,
+            commands: None,
         })
     }
     /// Harness sessions start through Agent HUD's plugin and the folder it
@@ -166,6 +182,34 @@ impl SessionStarts {
     #[cfg(any(test, feature = "fixtures"))]
     pub fn set_application_folders(&mut self, folders: Vec<PathBuf>) {
         self.applications = folders;
+    }
+    /// Tests name Pi's and OpenCode's command lines instead of this
+    /// computer's: those not named are not installed.
+    #[cfg(any(test, feature = "fixtures"))]
+    pub fn set_commands(&mut self, commands: HashMap<Provider, PathBuf>) {
+        self.commands = Some(commands);
+    }
+    /// The command line of a client started as a run (Pi, OpenCode), looked
+    /// up on disk each time, so one installed or removed while the app runs
+    /// is offered or dropped at once. The desktop app of OpenCode carries one.
+    fn command(&self, provider: Provider) -> Option<PathBuf> {
+        if let Some(commands) = &self.commands {
+            return commands.get(&provider).cloned();
+        }
+        let name = match provider {
+            Provider::Pi => "pi",
+            Provider::OpenCode => "opencode",
+            _ => return None,
+        };
+        crate::os::find_engine(&self.config.home, &self.client_environment(), name)
+    }
+    /// The environment a started client sees: this app's own, with the
+    /// configured variables and the command folders on its `PATH`.
+    fn client_environment(&self) -> HashMap<String, String> {
+        std::env::vars()
+            .filter(|(key, _)| !host::is_path_key(key))
+            .chain(environment(&self.config))
+            .collect()
     }
     fn executable(&self, provider: Provider) -> Option<&Path> {
         match provider {

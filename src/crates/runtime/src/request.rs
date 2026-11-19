@@ -50,26 +50,7 @@ impl Runtime {
             };
         }
         if method == "open_session" {
-            let id = params["id"]
-                .as_str()
-                .ok_or_else(|| l10n::tr("Session ID is required"))?;
-            let detail = self.core.request("session_detail", params.clone())?;
-            if self.is_demo() {
-                // A demo session has nowhere to go; the HUD hands over as it would.
-                return Ok(json!({"opened":true,"action":"demo"}));
-            }
-            if self
-                .platform
-                .navigate_session(&detail["session"]["navigationTarget"])?
-            {
-                return Ok(json!({"opened":true,"action":"native_session"}));
-            }
-            if detail["session"]["desktopProject"].is_object() {
-                return Err(l10n::tr("The original Project session could not be opened"));
-            }
-            let path = self.core.transcript_path(id)?;
-            self.platform.reveal_transcript(&path)?;
-            return Ok(json!({"opened":true,"action":"reveal_transcript"}));
+            return self.open_session(params);
         }
         if method == "open_client" {
             // A step only the user can take in the client itself, such as

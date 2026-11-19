@@ -1,6 +1,7 @@
 //! DeepSeek CLI JSONL session & child-session reducer, and what its lines
 //! show in a page of messages.
 use crate::transcript::items::{Items, Line, LineItem};
+use crate::transcript::live::{last_paragraph, newer};
 use crate::transcript::{at, n, parts, text};
 use crate::{Log, Usage};
 use serde_json::{json, Value};
@@ -128,6 +129,8 @@ impl Log {
         }
         if kind == "user/message" && d["source"]["kind"] == "user" {
             if let Some(prompt) = parts(&d["content"]) {
+                // The person's words order the session as a reply does.
+                newer(&mut self.live.last_message_at, at);
                 self.title_from(prompt);
             }
         }
@@ -144,6 +147,21 @@ impl Log {
             "assistant/chunk" | "assistant/message" | "assistant/attempt"
         ) {
             return;
+        }
+        if kind == "assistant/message" {
+            let content = d["message"].get("content").unwrap_or(&d["content"]);
+            let reply = words(content);
+            if let Some(msg) = last_paragraph(&reply) {
+                newer(&mut self.live.last_message_at, at);
+                if let Some(back) = self
+                    .live
+                    .turns
+                    .back_mut()
+                    .filter(|t| turn.is_none() || t.id.as_deref() == turn.as_deref())
+                {
+                    back.message = Some(msg);
+                }
+            }
         }
         let u = d
             .get("usage")
@@ -353,5 +371,56 @@ mod tests {
         let rows = (ITEMS.read)(&older, 0);
         assert_eq!(rows[0].text.as_deref(), Some("Fix the build"));
         assert!(rows[0].is_prompt);
+    }
+
+    #[test]
+    fn turn_keeps_latest_assistant_reply_summary() {
+        let mut log = Log::new(std::path::PathBuf::from("session.jsonl"), "deepseek");
+        log.deepseek(
+            &json!({"type":"session","version":4,"id":"s1","createdAt":1793127112000_i64}),
+        );
+        log.deepseek(
+            &json!({"type":"turn/start","seq":1,"time":1793127112393_i64,"data":{"turn":1}}),
+        );
+        log.deepseek(&json!({"type":"user/message","seq":2,"time":1793127112400_i64,"data":{"content":[{"type":"text","text":"Which model are you?"}],"source":{"kind":"user"},"role":"user"}}));
+        assert_eq!(log.live.last_message_at, Some(1793127112400));
+        log.deepseek(&json!({
+            "type":"assistant/message",
+            "seq":3,
+            "time":1793127114066_i64,
+            "data":{
+                "turn":1,
+                "step":1,
+                "message":{
+                    "role":"assistant",
+                    "content":[
+                        {"type":"reasoning","text":"Thinking..."},
+                        {"type":"text","text":"收到了你的消息；我是 DeepSeek Harness 中的 deepseek-flash 模型。"}
+                    ]
+                }
+            }
+        }));
+        log.deepseek(&json!({
+            "type":"assistant/message",
+            "seq":4,
+            "time":1793127114500_i64,
+            "data":{
+                "turn":1,
+                "step":2,
+                "message":{
+                    "role":"assistant",
+                    "content":[{"type":"tool-call","id":"call_01","name":"read","arguments":"{}"}]
+                }
+            }
+        }));
+        log.deepseek(&json!({"type":"turn/end","seq":5,"time":1793127115000_i64,"data":{"turn":1,"reason":{"kind":"completed"}}}));
+        // A step that only calls a tool says nothing: the reply stays latest.
+        assert_eq!(log.live.last_message_at, Some(1793127114066));
+        let turn = log.live.turns.back().expect("turn recorded");
+        assert_eq!(turn.outcome.as_deref(), Some("completed"));
+        assert_eq!(
+            turn.message.as_deref(),
+            Some("收到了你的消息；我是 DeepSeek Harness 中的 deepseek-flash 模型。")
+        );
     }
 }

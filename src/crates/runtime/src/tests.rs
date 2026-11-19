@@ -75,3 +75,33 @@ fn antigravity_cli_rejects_invalid_lists_and_missing_owners_without_file_changes
         assert!(!temp.path().join("app-data/settings.json").exists());
     }
 }
+
+#[test]
+fn a_click_opens_from_the_snapshot_only_a_session_it_lists() {
+    let snapshot = json!({
+        "sessions": [{"id": "s1", "navigationTarget": null}],
+        "islandEvents": [
+            {"sessionId": "e1", "navigationTarget": {"kind": "antigravity-conversation", "id": "ev"}}
+        ]
+    });
+    // Unlisted, even with an event's target: the Runtime resolves it as before.
+    for id in ["missing", "e1"] {
+        assert_eq!(
+            open_cached_session(&snapshot, id, false),
+            CachedOpen::Unlisted
+        );
+        assert_eq!(
+            open_cached_session(&json!({}), id, false),
+            CachedOpen::Unlisted
+        );
+    }
+    // No way back: straight to its log, with no client asked.
+    assert_eq!(
+        open_cached_session(&snapshot, "s1", false),
+        CachedOpen::Reveal
+    );
+    assert_eq!(
+        open_cached_session(&snapshot, "s1", true),
+        CachedOpen::Done(Ok(json!({"opened": true, "action": "demo"})))
+    );
+}

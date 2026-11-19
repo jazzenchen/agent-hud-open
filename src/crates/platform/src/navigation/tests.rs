@@ -2,27 +2,99 @@ use super::*;
 
 #[test]
 fn harness_opens_only_its_main_window_when_the_link_is_registered() {
-    for target in [
-        json!({"kind":"deepseek-app"}),
-        json!({"kind":"deepseek-app","id":"session/one?query=two","url":"https://example.com"}),
-    ] {
-        assert_eq!(
-            session_url_on(&target, Os::MacOs, |url| url == "dsh://open"),
-            Some("dsh://open".into())
-        );
-        assert_eq!(session_url_on(&target, Os::MacOs, |_| false), None);
+    for os in [Os::MacOs, Os::Windows] {
+        for target in [
+            json!({"kind":"deepseek-app"}),
+            json!({"kind":"deepseek-app","id":"session/one?query=two","url":"https://example.com"}),
+        ] {
+            assert_eq!(
+                session_url_on(&target, os, |url| url == "dsh://open"),
+                Some("dsh://open".into())
+            );
+            assert_eq!(session_url_on(&target, os, |_| false), None);
+        }
     }
 }
 
 #[test]
-fn harness_does_not_offer_an_unverified_desktop_link_on_other_hosts() {
-    for os in [Os::Windows, Os::Linux] {
+fn harness_opens_its_window_on_windows_when_the_scheme_is_registered() {
+    let target = json!({"kind":"deepseek-app"});
+    assert_eq!(
+        session_url_on(&target, Os::Windows, |url| url == "dsh://open"),
+        Some("dsh://open".into())
+    );
+    // An installer that never registered dsh:// leaves no way back to offer.
+    assert_eq!(session_url_on(&target, Os::Windows, |_| false), None);
+}
+
+#[test]
+fn harness_does_not_offer_an_unverified_desktop_link_on_linux() {
+    assert_eq!(
+        session_url_on(&json!({"kind":"deepseek-app"}), Os::Linux, |_| {
+            panic!("an unsupported link must not query the host")
+        }),
+        None
+    );
+}
+
+#[test]
+fn harness_session_links_open_the_exact_session_on_windows() {
+    for id in [
+        "session-1456302e-07b2-4280-a8a6-986236e9094f",
+        "session-a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4",
+        "orchestrator-a9ac75cc9a195e9c0bf7be76a6a21674",
+    ] {
+        let target = json!({"kind":"deepseek-session","id":id,"url":"https://example.com"});
         assert_eq!(
-            session_url_on(&json!({"kind":"deepseek-app"}), os, |_| {
-                panic!("an unsupported link must not query the host")
-            }),
-            None
+            session_url_on(&target, Os::Windows, |url| url.starts_with("dsh:")),
+            Some(format!("dsh://open?session={id}"))
         );
+    }
+    let target =
+        json!({"kind":"deepseek-session","id":"session-1456302e-07b2-4280-a8a6-986236e9094f"});
+    // Harness found without a registered dsh://: only the app link opens.
+    assert_eq!(
+        session_url_on(&target, Os::Windows, |url| url == "dsh://open"),
+        Some("dsh://open".into())
+    );
+    // An installer that never registered dsh:// leaves no way back to offer.
+    assert_eq!(session_url_on(&target, Os::Windows, |_| false), None);
+}
+
+#[test]
+fn a_harness_session_elsewhere_opens_the_app_as_before_session_links() {
+    let target =
+        json!({"kind":"deepseek-session","id":"session-1456302e-07b2-4280-a8a6-986236e9094f"});
+    // macOS keeps the app link: Harness's window, never a Finder transcript.
+    assert_eq!(
+        session_url_on(&target, Os::MacOs, |url| url == "dsh://open"),
+        Some("dsh://open".into())
+    );
+    assert_eq!(session_url_on(&target, Os::MacOs, |_| false), None);
+    assert_eq!(
+        session_url_on(&target, Os::Linux, |_| {
+            panic!("an unverified host must not be queried")
+        }),
+        None
+    );
+}
+
+#[test]
+fn a_malformed_harness_session_id_opens_only_the_app() {
+    for bad in [
+        "session-short",
+        "orchestrator-",
+        "../etc/passwd",
+        "session-1456302E-07b2-4280-a8a6-986236e9094f",
+    ] {
+        let target = json!({"kind":"deepseek-session","id":bad});
+        for os in [Os::Windows, Os::MacOs] {
+            assert_eq!(
+                session_url_on(&target, os, |url| url == "dsh://open"),
+                Some("dsh://open".into()),
+                "{bad}"
+            );
+        }
     }
 }
 
