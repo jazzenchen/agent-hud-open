@@ -163,8 +163,9 @@ impl AccountService {
         }
     }
 
-    /// Takes the levels the settings name; an agent whose level changed is
-    /// read again at once, its old reading dropped so none of it lingers.
+    /// Takes the levels the settings name; the reader of an agent whose level
+    /// changed reads again at once, its old reading dropped so none of it
+    /// lingers.
     fn update_quota_levels(&self, setting: &Value) {
         use agents::account::QuotaReading;
         let levels = agents::account::quota_reading::levels(setting);
@@ -199,8 +200,10 @@ impl AccountService {
             .lock()
             .unwrap_or_else(PoisonError::into_inner);
         for agent in changed {
-            state.entries.remove(agent.as_str());
-            state.force.insert(agent);
+            // Pi's level governs Codex's reader, which reads Pi's sign-in.
+            let reader = agents::account::quota_reading::reader(&agent);
+            state.entries.remove(reader);
+            state.force.insert(reader.to_owned());
         }
         self.shared.wake.notify_all();
     }

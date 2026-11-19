@@ -40,13 +40,13 @@ fn each_agent_is_offered_only_the_levels_that_read_differently_for_it() {
         "deepseek",
         "workbuddy",
         "kimi",
+        "pi",
     ] {
         assert_eq!(choices(agent), &[Off, Full], "{agent}");
     }
     // Copilot has its own switch; the rest have no quota reader at all.
     for agent in [
         "copilot",
-        "pi",
         "omp",
         "qwen",
         "openclaw",
@@ -87,6 +87,13 @@ fn a_setting_names_levels_by_agent_and_skips_what_is_not_one() {
     assert_eq!(levels.get("cursor"), Some(&Off));
     assert_eq!(levels.get("codex"), None);
     assert!(super::levels(&json!(null)).is_empty());
+}
+
+#[test]
+fn pis_level_governs_codexs_reader_which_reads_its_sign_in() {
+    assert_eq!(reader("pi"), "codex");
+    assert_eq!(reader("claude"), "claude");
+    assert_eq!(level(&json!({"pi": "off"}), "pi"), Off);
 }
 
 #[test]

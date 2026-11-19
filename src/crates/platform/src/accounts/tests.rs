@@ -948,3 +948,31 @@ fn an_agent_whose_quota_reading_is_off_is_not_read_and_says_so() {
     assert_eq!(notice, Some(agents::account::quota_reading::off_notice()));
     assert_eq!(OFF_READS.load(Ordering::SeqCst), 0, "the reader never ran");
 }
+
+#[test]
+fn changing_pis_quota_reading_reads_codex_again() {
+    let directory = tempfile::tempdir().unwrap();
+    let service = AccountService::with_readers(
+        directory.path().join("home"),
+        directory.path().join("data"),
+        HashSet::new(),
+        CollectionGate::default(),
+        &[],
+    )
+    .unwrap();
+    service
+        .shared
+        .state
+        .lock()
+        .unwrap()
+        .entries
+        .insert("codex", entry(AccountReading::empty("codex"), None, true));
+    service.update_sources(&json!({
+        "settings": {"quotaReading": {"pi": "off"}},
+        "providers": [{"id": "codex", "enabled": true, "detected": true}],
+        "sessions": [],
+    }));
+    let state = service.shared.state.lock().unwrap();
+    assert!(!state.entries.contains_key("codex") && state.force.contains("codex"));
+    assert!(!state.force.contains("pi"));
+}

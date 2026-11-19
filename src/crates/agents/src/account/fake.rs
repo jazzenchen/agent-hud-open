@@ -20,6 +20,8 @@ pub struct FakeHost {
     pub account_homes: HashMap<String, Vec<PathBuf>>,
     pub account_reports: HashMap<String, Vec<Value>>,
     pub files: HashMap<PathBuf, Answer<Vec<u8>>>,
+    /// Every file read, by path.
+    pub read: RefCell<Vec<PathBuf>>,
     /// Canonical targets for paths that resolve to another location.
     pub canonical_paths: HashMap<PathBuf, PathBuf>,
     pub secrets: HashMap<String, Answer<String>>,
@@ -80,6 +82,7 @@ impl FakeHost {
             account_homes: HashMap::new(),
             account_reports: HashMap::new(),
             files: HashMap::new(),
+            read: RefCell::new(vec![]),
             canonical_paths: HashMap::new(),
             secrets: HashMap::new(),
             cookies: HashMap::new(),
@@ -260,6 +263,7 @@ impl Host for FakeHost {
         self.env.get(name).map(String::as_str)
     }
     fn read_file(&self, path: &Path, limit: u64) -> Answer<Vec<u8>> {
+        self.read.borrow_mut().push(path.into());
         match self.files.get(path) {
             Some(Answer::Found(bytes)) => {
                 Answer::Found(bytes[..bytes.len().min(limit as usize + 1)].to_vec())
@@ -329,13 +333,7 @@ impl Host for FakeHost {
         self.sent
             .borrow_mut()
             .push((pairs(request.secrets), request.body.cloned()));
-        self.headers.borrow_mut().push(
-            request
-                .headers
-                .iter()
-                .map(|(name, value)| ((*name).to_owned(), (*value).to_owned()))
-                .collect(),
-        );
+        self.headers.borrow_mut().push(pairs(request.headers));
         authorization
             .and_then(|sent| self.web_for.get(&(request.url.to_owned(), sent)))
             .or_else(|| self.web.get(request.url))

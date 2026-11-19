@@ -64,6 +64,8 @@ pub fn choices(agent: &str) -> &'static [QuotaReading] {
         "claude" | "codex" => &[Off, Official, Full],
         // Copilot asks first, with its own switch (`copilot::account::CONSENT`).
         "copilot" => &[],
+        // No reader of its own: Codex's reads its ChatGPT sign-in (`reader`).
+        "pi" => &[Off, Full],
         _ if crate::agent::by_id(agent).is_some()
             && crate::agent::account_provider(agent).is_some() =>
         {
@@ -71,6 +73,15 @@ pub fn choices(agent: &str) -> &'static [QuotaReading] {
         }
         // An agent with no quota reader, or no agent at all.
         _ => &[],
+    }
+}
+
+/// The account reader whose reading `agent`'s level governs: its own, or
+/// for Pi, Codex's, which reads Pi's ChatGPT sign-in (`codex::pi_usage`).
+pub fn reader(agent: &str) -> &str {
+    match agent {
+        "pi" => "codex",
+        other => other,
     }
 }
 

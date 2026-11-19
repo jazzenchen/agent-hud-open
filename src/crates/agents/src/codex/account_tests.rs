@@ -529,3 +529,38 @@ fn official_quota_reading_asks_the_app_server_but_not_pi() {
         .iter()
         .all(|row| row["consumerRoutes"].is_null()));
 }
+
+#[test]
+fn pi_off_reads_no_pi_sign_in_even_when_codex_reads_everything() {
+    let mut host = pi_signed_in(installed(limits(), json!({"email": "a@example.com"})));
+    host.quota_levels
+        .insert("pi".into(), crate::account::QuotaReading::Off);
+    let reading = read(&host).unwrap();
+    assert!(
+        !host
+            .read
+            .borrow()
+            .iter()
+            .any(|path| path.ends_with("auth.json") && path.starts_with("/u/.pi")),
+        "Pi's auth.json is not read"
+    );
+    assert!(host.asked.borrow().is_empty(), "nothing is sent for Pi");
+    assert!(reading
+        .quotas
+        .iter()
+        .all(|row| row["consumerRoutes"].is_null()));
+    // Codex's own app still answers.
+    assert!(!host.started.borrow().is_empty() && !reading.quotas.is_empty());
+}
+
+#[test]
+fn pi_and_codex_in_full_read_pis_sign_in() {
+    let host = pi_signed_in(installed(limits(), json!({"email": "a@example.com"})));
+    let _ = read(&host);
+    assert!(host
+        .read
+        .borrow()
+        .iter()
+        .any(|path| path.starts_with("/u/.pi") && path.ends_with("auth.json")));
+    assert_eq!(host.asked.borrow().len(), 1, "Pi's sign-in is asked");
+}

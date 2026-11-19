@@ -48,8 +48,10 @@ pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
         )
         .map_err(|_| Unread::Failed(tr!("Install and sign in to read quota"))),
     };
-    // Pi's ChatGPT sign-in is another program's: only at `full`.
-    let pi = if level.allows(QuotaReading::Full) {
+    // Pi's ChatGPT sign-in is another program's: only when Codex reads in
+    // full and Pi's own level lets its sign-in be read.
+    let pi_level = host.quota_reading(crate::pi::AGENT.id);
+    let pi = if level.allows(QuotaReading::Full) && pi_level.allows(QuotaReading::Full) {
         read_pi(host)
     } else {
         Ok(None)
