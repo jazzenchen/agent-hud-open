@@ -80,6 +80,11 @@ export interface SourcePreferences {
   live?: boolean;
   reminders?: boolean;
 }
+/** `off`: no quota; `local`: the agent's own records on this computer;
+ * `official`: also the agent's own app; `full`: also other apps' sign-ins and
+ * the vendor's web service. */
+export type QuotaReadingLevel = "off" | "local" | "official" | "full";
+
 export interface AppSettings {
   /** Live status and completion reminders for every client; each client's
    * own switch holds beneath it. Default on. */
@@ -111,6 +116,8 @@ export interface AppSettings {
    * while client hooks are on. */
   optInApprovals?: string[];
   readCopilotQuota?: boolean;
+  /** How far each agent's quota may be read, by agent id; one not named reads in full. */
+  quotaReading?: Record<string, QuotaReadingLevel>;
   /** The relay hosts whose balance may be read with the key the client already sends them. */
   relayReading?: string[];
   /** The owner's prices per million tokens, by model as recorded (`model` or `model#route`). */

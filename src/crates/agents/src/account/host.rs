@@ -256,6 +256,12 @@ pub trait Host {
     /// Whether the user turned on a reading that needs their consent, by its
     /// setting key. Checked again during a reading, since it can change.
     fn consented(&self, setting: &str) -> bool;
+    /// How far the user lets Agent HUD go to read `agent`'s quota
+    /// (`quota_reading::SETTING`). Checked again during a reading, since it
+    /// can change; `Full`, as before the setting, unless the user chose.
+    fn quota_reading(&self, _agent: &str) -> super::QuotaReading {
+        super::QuotaReading::Full
+    }
     /// A JSON document over HTTPS, at most `MAX_BODY` long.
     fn http_json(&self, request: &HttpRequest) -> Result<Value, HttpFailure>;
     /// Rows of a read-only query on a client's SQLite database, waiting at

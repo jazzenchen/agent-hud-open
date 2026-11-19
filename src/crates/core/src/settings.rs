@@ -227,6 +227,9 @@ impl crate::AgentHudCore {
                                 && matches!(kind.as_str(), Some("model" | "gateway"))
                         })
                 }) => {}
+            // How far each agent's quota may be read, by agent id (agents
+            // `quota_reading::SETTING`).
+            "quotaReading" if agent_hud_agents::account::quota_reading::valid(value) => {}
             // The relay addresses whose balance may be read with the key the
             // client already sends them (agents `relays::CONSENT`).
             "relayReading"
@@ -313,6 +316,21 @@ mod tests {
         core.apply_setting("quotaDisplay", &json!("consumed"))
             .unwrap();
         assert_eq!(core.settings["quotaDisplay"], "consumed");
+    }
+
+    #[test]
+    fn quota_reading_levels_persist_and_reject_unknown_levels() {
+        let home = tempfile::tempdir().unwrap();
+        let mut core = AgentHudCore::new(vec![], home.path().to_owned());
+        assert_eq!(core.settings["quotaReading"], json!({}));
+        let levels = json!({"claude": "local", "cursor": "off"});
+        core.apply_setting("quotaReading", &levels).unwrap();
+        let reopened = AgentHudCore::new(vec![], home.path().to_owned());
+        assert_eq!(reopened.settings["quotaReading"], levels);
+        for invalid in [json!({"claude": "sometimes"}), json!(["claude"]), json!(null)] {
+            assert!(core.apply_setting("quotaReading", &invalid).is_err());
+            assert_eq!(core.settings["quotaReading"], levels);
+        }
     }
 
     #[test]

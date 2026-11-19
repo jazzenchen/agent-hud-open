@@ -158,7 +158,16 @@ pub(super) fn run(
             }
             let mut reading_context = context.clone();
             reading_context.account_homes = selected.2.clone();
-            (selected.1.read)(&reading_context)
+            let level = agents::account::Host::quota_reading(&reading_context, selected.0);
+            if agents::account::quota_reading::blocked(selected.0, level) {
+                // A reader that does not sort its sources by level reads in
+                // full or not at all.
+                let mut off = agents::account::Reading::empty(selected.1.id);
+                off.notice = Some(agents::account::quota_reading::off_notice());
+                Ok(off)
+            } else {
+                (selected.1.read)(&reading_context)
+            }
         };
         let (waker, copy) = {
             let mut state = shared.state.lock().unwrap_or_else(PoisonError::into_inner);

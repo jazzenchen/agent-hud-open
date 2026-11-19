@@ -1510,5 +1510,17 @@
   "Nothing": "なし",
   "Only the logos stay.": "ロゴだけが残ります。",
   "Only a bar stays; it turns yellow or red as a usage limit nears.": "バーだけが残り、使用上限が近づくと黄色や赤になります。",
-  "Nothing stays on screen.": "画面には何も残りません。"
+  "Nothing stays on screen.": "画面には何も残りません。",
+  "Quota reading is off for this agent in Settings. Sessions and tokens are still counted from its logs.": "このエージェントのクォータ読み取りは設定でオフになっています。セッションとトークンは引き続きログから集計されます。",
+  "Quota reading is limited to what the agent records on this computer": "クォータ読み取りは、このエージェントがこのコンピュータに記録した内容に限られます",
+  "This computer's records": "このコンピュータの記録",
+  "The agent's own app": "エージェント自身のアプリ",
+  "Everything (default)": "すべて（デフォルト）",
+  "Quota is not read. Sessions and tokens are still counted from the agent's logs.": "クォータを読み取りません。セッションとトークンは引き続きエージェントのログから集計されます。",
+  "Only what the agent's own app wrote on this computer. Nothing is started or sent.": "エージェント自身のアプリがこのコンピュータに書き込んだ内容のみ。何も起動せず、何も送信しません。",
+  "Also asks the agent's own app, which reads the account the way it always does.": "エージェント自身のアプリにも問い合わせ、いつもどおりの方法でアカウントを読み取ります。",
+  "Also uses sign-ins other apps keep and the vendor's web service, as before.": "他のアプリが保持するサインインとベンダーのウェブサービスも使用します（従来どおり）。",
+  "Quota reading": "クォータ読み取り",
+  "Read quota from": "クォータの読み取り元",
+  "Lower levels use fewer sign-ins and send less.": "レベルが低いほど、使うサインインが少なく、送信も少なくなります。"
 }

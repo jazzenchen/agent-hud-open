@@ -1510,5 +1510,17 @@
   "Nothing": "없음",
   "Only the logos stay.": "로고만 남습니다.",
   "Only a bar stays; it turns yellow or red as a usage limit nears.": "막대만 남으며, 사용량 한도가 가까워지면 노란색이나 빨간색으로 바뀝니다.",
-  "Nothing stays on screen.": "화면에 아무것도 남지 않습니다."
+  "Nothing stays on screen.": "화면에 아무것도 남지 않습니다.",
+  "Quota reading is off for this agent in Settings. Sessions and tokens are still counted from its logs.": "설정에서 이 에이전트의 할당량 읽기가 꺼져 있습니다. 세션과 토큰은 계속 로그에서 집계됩니다.",
+  "Quota reading is limited to what the agent records on this computer": "할당량 읽기는 이 에이전트가 이 컴퓨터에 기록한 내용으로 제한됩니다",
+  "This computer's records": "이 컴퓨터의 기록",
+  "The agent's own app": "에이전트 자체 앱",
+  "Everything (default)": "모두(기본값)",
+  "Quota is not read. Sessions and tokens are still counted from the agent's logs.": "할당량을 읽지 않습니다. 세션과 토큰은 계속 에이전트의 로그에서 집계됩니다.",
+  "Only what the agent's own app wrote on this computer. Nothing is started or sent.": "에이전트 자체 앱이 이 컴퓨터에 기록한 내용만 읽습니다. 아무것도 실행하거나 전송하지 않습니다.",
+  "Also asks the agent's own app, which reads the account the way it always does.": "에이전트 자체 앱에도 요청하며, 앱이 평소 방식대로 계정을 읽습니다.",
+  "Also uses sign-ins other apps keep and the vendor's web service, as before.": "다른 앱이 보관한 로그인 정보와 공급업체의 웹 서비스도 사용합니다(기존과 동일).",
+  "Quota reading": "할당량 읽기",
+  "Read quota from": "할당량 읽기 출처",
+  "Lower levels use fewer sign-ins and send less.": "수준이 낮을수록 사용하는 로그인 정보와 보내는 요청이 줄어듭니다."
 }

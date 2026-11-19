@@ -122,6 +122,14 @@ impl Host for AccountContext {
         setting == agent_hud_agents::copilot::account::CONSENT
             && self.copilot_consent.load(Ordering::Acquire)
     }
+    fn quota_reading(&self, agent: &str) -> agent_hud_agents::account::QuotaReading {
+        self.quota_levels
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .get(agent)
+            .copied()
+            .unwrap_or(agent_hud_agents::account::QuotaReading::Full)
+    }
     fn http_json(&self, request: &HttpRequest) -> Result<Value, HttpFailure> {
         let mut builder = match request.body {
             Some(body) => self.http.post(request.url).json(body),

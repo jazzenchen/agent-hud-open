@@ -45,6 +45,7 @@ impl AccountService {
                 .force
                 .insert("relay".into());
         }
+        self.update_quota_levels(&snapshot["settings"][agents::account::quota_reading::SETTING]);
         let mut enabled: HashSet<String> = snapshot["providers"]
             .as_array()
             .into_iter()
@@ -160,5 +161,41 @@ impl AccountService {
             state.finished = finished;
             self.shared.wake.notify_all();
         }
+    }
+
+    /// Takes the levels the settings name; an agent whose level changed is
+    /// read again at once, its old reading dropped so none of it lingers.
+    fn update_quota_levels(&self, setting: &Value) {
+        let levels = agents::account::quota_reading::levels(setting);
+        let changed: Vec<String> = {
+            let mut held = self
+                .context
+                .quota_levels
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner);
+            let changed = held
+                .keys()
+                .chain(levels.keys())
+                .filter(|agent| held.get(*agent) != levels.get(*agent))
+                .cloned()
+                .collect::<HashSet<_>>()
+                .into_iter()
+                .collect();
+            *held = levels;
+            changed
+        };
+        if changed.is_empty() {
+            return;
+        }
+        let mut state = self
+            .shared
+            .state
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
+        for agent in changed {
+            state.entries.remove(agent.as_str());
+            state.force.insert(agent);
+        }
+        self.shared.wake.notify_all();
     }
 }

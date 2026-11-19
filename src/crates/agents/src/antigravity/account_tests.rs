@@ -485,3 +485,27 @@ fn the_clis_saved_sign_in_counts_while_it_is_not_running() {
         json!(["antigravity"])
     );
 }
+
+#[test]
+fn local_quota_reading_takes_only_the_clis_reports() {
+    let mut host = answering(Ok(status_body()));
+    host.quota_levels
+        .insert("antigravity".into(), crate::account::QuotaReading::Local);
+    assert!(read(&host).is_err(), "no report, and the service is not asked");
+    host.account_reports.insert(
+        "antigravity".into(),
+        vec![report("a@example.com", "2026-11-01T00:00:00Z", 0.6, "2026-11-02T00:00:00Z")],
+    );
+    let reading = read(&host).unwrap();
+    assert!(reading.account.is_some());
+    assert!(host.started.borrow().is_empty(), "no CLI started");
+}
+
+#[test]
+fn quota_reading_off_reads_no_antigravity_account() {
+    let mut host = answering(Ok(status_body()));
+    host.quota_levels
+        .insert("antigravity".into(), crate::account::QuotaReading::Off);
+    let reading = read(&host).unwrap();
+    assert!(reading.account.is_none() && reading.quotas.is_empty());
+}

@@ -17,7 +17,8 @@ use super::engine_usage::{from_engine, EngineUnread};
 use super::quota_windows::{plan_reading, profile_plan, windows};
 use super::usage_record;
 use crate::account::{
-    append_notice, merge, read_json, variable, Host, Provider, Reading, StatusPage, Unread,
+    append_notice, merge, quota_reading, read_json, variable, Host, Provider, QuotaReading,
+    Reading, StatusPage, Unread,
 };
 use crate::l10n::tr;
 use serde_json::{json, Value};
@@ -78,6 +79,14 @@ static STATUS: StatusPage = StatusPage {
 /// folder's last record shows stale beside the folders that read; when every
 /// folder fails, the records come with the failures.
 pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
+    if !host
+        .quota_reading(super::AGENT.id)
+        .allows(QuotaReading::Local)
+    {
+        let mut reading = Reading::empty("claude");
+        reading.notice = Some(quota_reading::off_notice());
+        return Ok(reading);
+    }
     let default = config_dir(host);
     let canonical = |path: &Path| host.canonical(path).unwrap_or_else(|| path.to_path_buf());
     let mut seen = HashSet::from([canonical(&default)]);
@@ -171,6 +180,21 @@ fn stale(reading: &mut Reading) {
 fn read_folder(host: &dyn Host, folder: &Folder) -> (Result<Reading, Unread>, bool) {
     let config = global_config(host, folder);
     let now = chrono::Utc::now().timestamp_millis();
+    if !host
+        .quota_reading(super::AGENT.id)
+        .allows(QuotaReading::Official)
+    {
+        // Only Claude Code's own record: no engine, no desktop sign-in. An
+        // older record shows as stale, with its age.
+        let fresh = usage_record::read(&config, now)
+            .filter(|record| record.fresh(now))
+            .and_then(|record| recorded(host, folder, &config["oauthAccount"], &record));
+        let read = match fresh {
+            Some(reading) => Ok(reading),
+            None => kept(host, folder, Unread::Failed(quota_reading::local_only())),
+        };
+        return (read, false);
+    }
     if let Some(reading) = usage_record::read(&config, now)
         .filter(|record| record.fresh(now))
         .and_then(|record| recorded(host, folder, &config["oauthAccount"], &record))

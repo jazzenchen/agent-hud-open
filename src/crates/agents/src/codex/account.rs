@@ -9,8 +9,8 @@ use super::limits::parse;
 use super::pi_usage::{read_pi, PI_ROUTE};
 use super::session_limits::with_sessions;
 use crate::account::{
-    append_notice, client_home_key, merge, read_by, variable, EngineStart, Host, Provider, Reading,
-    StatusPage, Unread,
+    append_notice, client_home_key, merge, quota_reading, read_by, variable, EngineStart, Host,
+    Provider, QuotaReading, Reading, StatusPage, Unread,
 };
 use crate::l10n::tr;
 use serde_json::{json, Value};
@@ -35,9 +35,24 @@ static STATUS: StatusPage = StatusPage {
 };
 
 pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
-    let executable = host.executable("codex");
+    let level = host.quota_reading(super::AGENT.id);
+    if !level.allows(QuotaReading::Local) {
+        let mut reading = Reading::empty("codex");
+        reading.notice = Some(quota_reading::off_notice());
+        return Ok(reading);
+    }
+    // `local` reads only the windows Codex's own sessions recorded.
+    let executable = host
+        .executable("codex")
+        .filter(|_| level.allows(QuotaReading::Official));
     let native = match executable.as_deref() {
         Some(executable) => read_native(host, executable),
+        None if !level.allows(QuotaReading::Official) => with_sessions(
+            host,
+            &default_home(host),
+            Err(Unread::SignedOut(String::new())),
+        )
+        .map_err(|_| Unread::Failed(quota_reading::local_only())),
         // No engine, as with the desktop app moved away: its sessions' record
         // is no sign-in to ask for, and without it Codex is to install.
         None => with_sessions(
@@ -47,7 +62,13 @@ pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
         )
         .map_err(|_| Unread::Failed(tr!("Install and sign in to read quota"))),
     };
-    let pi = read_pi(host).map(|found| {
+    // Pi's ChatGPT sign-in is another program's: only at `full`.
+    let pi = if level.allows(QuotaReading::Full) {
+        read_pi(host)
+    } else {
+        Ok(None)
+    };
+    let pi = pi.map(|found| {
         found.map(|mut pi| {
             read_by(&mut pi, crate::pi::AGENT.id);
             pi

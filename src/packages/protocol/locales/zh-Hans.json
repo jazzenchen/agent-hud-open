@@ -1510,5 +1510,17 @@
   "Nothing": "无",
   "Only the logos stay.": "只留下标志。",
   "Only a bar stays; it turns yellow or red as a usage limit nears.": "只留下一根细条，接近用量上限时变黄或变红。",
-  "Nothing stays on screen.": "屏幕上什么都不留。"
+  "Nothing stays on screen.": "屏幕上什么都不留。",
+  "Quota reading is off for this agent in Settings. Sessions and tokens are still counted from its logs.": "已在设置中关闭此智能体的额度读取。会话和 token 仍会从它的日志中统计。",
+  "Quota reading is limited to what the agent records on this computer": "额度读取仅限此智能体在本机记录的内容",
+  "This computer's records": "本机记录",
+  "The agent's own app": "智能体自己的应用",
+  "Everything (default)": "全部（默认）",
+  "Quota is not read. Sessions and tokens are still counted from the agent's logs.": "不读取额度。会话和 token 仍会从智能体的日志中统计。",
+  "Only what the agent's own app wrote on this computer. Nothing is started or sent.": "只读取智能体自己的应用在本机写下的内容，不启动任何程序，也不发送任何数据。",
+  "Also asks the agent's own app, which reads the account the way it always does.": "另外会询问智能体自己的应用，由它按平常的方式读取账号。",
+  "Also uses sign-ins other apps keep and the vendor's web service, as before.": "另外会使用其他应用保存的登录信息和服务商的网页服务，与以前相同。",
+  "Quota reading": "额度读取",
+  "Read quota from": "额度读取来源",
+  "Lower levels use fewer sign-ins and send less.": "级别越低，用到的登录信息越少，发出的请求也越少。"
 }
