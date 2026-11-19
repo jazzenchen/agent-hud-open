@@ -4,7 +4,8 @@ use super::*;
 const HOUR: i64 = 3_600_000;
 const WEEK: i64 = 7 * DAY_MS;
 // The catalogs as the agents list them, named by their own ids.
-use agent_hud_agents::{claude, codex, grok};
+use agent_hud_agents::{antigravity, claude, codex, grok};
+const ANTIGRAVITY: &str = antigravity::plans::CATALOG.provider;
 const CLAUDE: &str = claude::plans::CATALOG.provider;
 const CODEX: &str = codex::plans::CATALOG.provider;
 
@@ -24,6 +25,20 @@ fn a_reported_plan_is_matched_by_its_normalised_spelling() {
         "an ambiguous tier is kept as reported"
     );
     assert!(tier(CLAUDE, "max").is_none());
+    assert_eq!(
+        plan_key(ANTIGRAVITY, "Google AI Pro").as_deref(),
+        Some("antigravity.pro")
+    );
+    assert_eq!(
+        tier(ANTIGRAVITY, "Pro").map(|plan| plan.monthly_usd),
+        Some(19.99)
+    );
+    assert_eq!(
+        plan_key(ANTIGRAVITY, "Google AI Ultra 5x").as_deref(),
+        Some("antigravity.ultra5x")
+    );
+    assert!(tier(ANTIGRAVITY, "Google AI Ultra").is_none());
+    assert!(tier(ANTIGRAVITY, "Antigravity Starter Quota").is_none());
     assert!(tier("no-such-provider", "pro").is_none(), "no catalog");
 }
 
