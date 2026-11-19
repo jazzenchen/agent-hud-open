@@ -80,7 +80,8 @@ export interface HUDConfig {
   /** The rest bar's length along the edge and its depth, in points. */
   restBarLength: number;
   restBarThickness: number;
-  /** The rest bar's colour: `auto` for the dock's own ground, else a CSS colour. */
+  /** The rest bar's colour: `auto` for the HUD's text colour in its
+   * appearance, else a hex colour. */
   restBarColor: string;
   appearance: "dark" | "light" | "system";
   solidTransparency: number;
