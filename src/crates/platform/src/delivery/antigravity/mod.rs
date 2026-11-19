@@ -116,14 +116,17 @@ pub fn desktop_installed(applications: &[PathBuf]) -> bool {
 /// Starts a new Antigravity cascade in `folder` through the running language server
 /// and sends `request.text` as its first message.
 pub fn start_cascade(folder: &Path, request: &StartRequest) -> Result<StartReceipt> {
-    let uri = format!("file://{}", folder.to_string_lossy());
+    let projects = std::env::var_os("GEMINI_CLI_HOME")
+        .filter(|value| !value.is_empty())
+        .map(PathBuf::from)
+        .or_else(|| crate::os::home_dir().ok().map(|home| home.join(".gemini")))
+        .map(|home| home.join("config/projects"));
     let started = call(
         "StartCascade",
-        json!({
-            "metadata": metadata(),
-            "source": "CORTEX_TRAJECTORY_SOURCE_INTERACTIVE_CASCADE",
-            "workspaceUris": [uri],
-        }),
+        start_body(
+            folder,
+            projects.as_deref().filter(|_| !request.folder.is_empty()),
+        )?,
     )?;
     let id = started["cascadeId"]
         .as_str()
@@ -150,6 +153,95 @@ pub fn start_cascade(folder: &Path, request: &StartRequest) -> Result<StartRecei
         job_id: None,
         handoff_pending: false,
     })
+}
+
+fn start_body(folder: &Path, projects: Option<&Path>) -> Result<Value> {
+    let uri = reqwest::Url::from_file_path(folder)
+        .map_err(|_| Failure::Rejected("Invalid Antigravity workspace path".into()))?;
+    let mut body = json!({
+        "metadata": metadata(),
+        "source": "CORTEX_TRAJECTORY_SOURCE_INTERACTIVE_CASCADE",
+        "workspaceUris": [uri.as_str()],
+    });
+    let Some(entries) = projects.and_then(|dir| std::fs::read_dir(dir).ok()) else {
+        return Ok(body);
+    };
+    let directory = folder.canonicalize()?;
+    for entry in entries {
+        let path = entry?.path();
+        if path.extension().is_none_or(|ext| ext != "json") {
+            continue;
+        }
+        let project: Value = serde_json::from_slice(&std::fs::read(path)?)
+            .map_err(|error| Failure::Protocol(error.to_string()))?;
+        if project["archived"] == true
+            || project["isWorkspaceOnly"] == true
+            || !project["sidecar"].is_null()
+        {
+            continue;
+        }
+        let matches = project["projectResources"]["resources"]
+            .as_array()
+            .is_some_and(|resources| {
+                resources
+                    .iter()
+                    .flat_map(|r| [&r["folderUri"], &r["gitFolder"]["folderUri"]])
+                    .filter_map(Value::as_str)
+                    .filter_map(|s| {
+                        reqwest::Url::parse(s)
+                            .ok()?
+                            .to_file_path()
+                            .ok()?
+                            .canonicalize()
+                            .ok()
+                    })
+                    .any(|resource| resource == directory)
+            });
+        if matches {
+            if !body["projectEnvConfig"].is_null() {
+                return Err(Failure::Rejected(
+                    "Multiple Antigravity projects match the selected folder".into(),
+                ));
+            }
+            let id = project["id"]
+                .as_str()
+                .filter(|id| !id.is_empty())
+                .ok_or_else(|| Failure::Rejected("Antigravity project has no ID".into()))?;
+            body.as_object_mut().unwrap().remove("workspaceUris");
+            body["projectEnvConfig"] = json!({"projectId": id, "defaultProjectEnvironment": {}});
+        }
+    }
+    Ok(body)
+}
+
+#[cfg(test)]
+mod project_start_tests {
+    use super::*;
+
+    #[test]
+    fn start_request_targets_only_a_unique_active_project() {
+        let temp = tempfile::tempdir().unwrap();
+        let folder = temp.path().join("a b");
+        std::fs::create_dir(&folder).unwrap();
+        let target = || start_body(&folder, Some(temp.path()));
+        assert!(target().unwrap()["projectEnvConfig"].is_null());
+        let uri = reqwest::Url::from_file_path(&folder).unwrap();
+        let mut project = json!({"id":"one","projectResources":{"resources":[{"gitFolder":{"folderUri":uri.as_str()}}]}});
+        std::fs::write(temp.path().join("one.json"), project.to_string()).unwrap();
+        project["archived"] = json!(true);
+        let second = temp.path().join("two.json");
+        std::fs::write(&second, project.to_string()).unwrap();
+        let body = target().unwrap();
+        assert!(body.get("workspaceUris").is_none());
+        assert_eq!(
+            body["projectEnvConfig"],
+            json!({"projectId":"one","defaultProjectEnvironment":{}})
+        );
+        project["archived"] = json!(false);
+        project["id"] = json!("two");
+        std::fs::write(second, project.to_string()).unwrap();
+        assert!(matches!(target(), Err(Failure::Rejected(_))));
+    }
 }
 
 fn message_body(cascade_id: &str, text: &str, strategy: &str, config: Option<Value>) -> Value {
