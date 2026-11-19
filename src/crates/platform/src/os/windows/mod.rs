@@ -1,17 +1,25 @@
-use super::{joined_path, path_entries, variable, Environment, ProcessInfo};
+use super::{variable, Environment, ProcessInfo};
 mod acl;
 mod antigravity;
 mod apps;
 mod claude;
 mod codex;
 mod dacl;
+mod engines;
+#[cfg(test)]
+mod engines_tests;
 mod files;
 pub(crate) mod pipe;
 mod process;
 mod secrets;
+mod shims;
 mod shortcut;
 pub(crate) use crate::windows_session::spawn;
 pub(crate) use apps::{activate_app, app_running, launch_app, registered_bundle};
+pub(crate) use engines::{
+    application_installed, claude_desktop_bases, discovered_executable, engine_candidates,
+    engine_executable, engine_path, executable_dirs,
+};
 pub(crate) use process::{
     codex_cli_on_port, parent_processes, process_runs, process_start, terminal_io,
 };
@@ -67,76 +75,12 @@ pub(crate) fn environment_value<'a>(env: &'a Environment, key: &str) -> Option<&
         .find(|(name, _)| name.eq_ignore_ascii_case(key))
         .map(|(_, value)| value.as_str())
 }
-fn local_app(home: &Path, env: &Environment) -> PathBuf {
+pub(super) fn local_app(home: &Path, env: &Environment) -> PathBuf {
     variable(env, "LOCALAPPDATA").unwrap_or_else(|| home.join("AppData/Local"))
-}
-/// Where the Claude desktop app keeps its session metadata: roaming AppData,
-/// and the Microsoft Store package's redirected copy of it
-/// (`Packages\Claude_<publisher>\LocalCache\Roaming\Claude`). Only folders that exist.
-pub(crate) fn claude_desktop_bases(home: &Path, env: &Environment) -> Vec<PathBuf> {
-    let mut bases = vec![app_support(home, env).join("Claude")];
-    let packages = local_app(home, env).join("Packages");
-    let mut store: Vec<PathBuf> = std::fs::read_dir(packages)
-        .into_iter()
-        .flatten()
-        .filter_map(Result::ok)
-        .filter(|entry| {
-            entry
-                .file_name()
-                .to_str()
-                .is_some_and(|name| name.starts_with("Claude_"))
-        })
-        .map(|entry| entry.path().join("LocalCache/Roaming/Claude"))
-        .collect();
-    store.sort();
-    bases.extend(store);
-    bases.retain(|base| base.is_dir());
-    bases
-}
-pub(crate) fn application_installed(home: &Path, env: &Environment, name: &str) -> bool {
-    if matches!(name, "Codex" | "ChatGPT") {
-        return codex::installation(home, env).installed;
-    }
-    if name == "Claude" && registered_bundle("com.anthropic.claudefordesktop") {
-        return true;
-    }
-    [
-        local_app(home, env).join("Programs"),
-        variable(env, "ProgramFiles").unwrap_or_else(|| PathBuf::from("C:/Program Files")),
-    ]
-    .iter()
-    .any(|dir| dir.join(name).is_dir())
 }
 /// URL-handler lookup through Windows associations is not implemented.
 pub(crate) fn registered_url(_url: &str) -> bool {
     false
-}
-pub(crate) fn executable_dirs(home: &Path, env: &Environment) -> Vec<PathBuf> {
-    let mut dirs = path_entries(env);
-    dirs.extend([
-        home.join(".local/bin"),
-        home.join(".bun/bin"),
-        home.join(".npm-global/bin"),
-        home.join(".kimi-code/bin"),
-        home.join(".zcode/bin"),
-        app_support(home, env).join("npm"),
-        local_app(home, env).join("Microsoft/WinGet/Links"),
-    ]);
-    dirs
-}
-pub(crate) fn discovered_executable(path: &Path) -> bool {
-    ["exe", "cmd", "bat", "ps1"]
-        .iter()
-        .any(|extension| path.with_extension(extension).is_file())
-        || path.is_file()
-}
-pub(crate) fn engine_executable(path: &Path) -> bool {
-    path.is_file()
-        && path.extension().is_some_and(|extension| {
-            extension
-                .to_str()
-                .is_some_and(|extension| extension.eq_ignore_ascii_case("exe"))
-        })
 }
 pub(crate) fn configure_command(command: &mut Command) {
     use std::os::windows::process::CommandExt;
@@ -156,42 +100,6 @@ pub(crate) fn is_shell(path: &Path) -> bool {
             .iter()
             .any(|shell| name.eq_ignore_ascii_case(shell))
         })
-}
-pub(crate) fn engine_candidates(home: &Path, env: &Environment, name: &str) -> Vec<PathBuf> {
-    if name == "workbuddy-app" {
-        // Only WorkBuddy's own install, never whatever else carries the name.
-        let pf = variable(env, "ProgramFiles").unwrap_or_else(|| "C:/Program Files".into());
-        let pf86 =
-            variable(env, "ProgramFiles(x86)").unwrap_or_else(|| "C:/Program Files (x86)".into());
-        return vec![
-            local_app(home, env).join("Programs/WorkBuddy/WorkBuddy.exe"),
-            pf.join("WorkBuddy/WorkBuddy.exe"),
-            pf86.join("WorkBuddy/WorkBuddy.exe"),
-        ];
-    }
-    let mut paths = if name == "codex" {
-        codex::installation(home, env).engines
-    } else {
-        Vec::new()
-    };
-    let mut dirs = vec![
-        home.join(".local/bin"),
-        home.join(".bun/bin"),
-        home.join(".claude/local"),
-    ];
-    dirs.extend(executable_dirs(home, env));
-    paths.extend(dirs.into_iter().map(|dir| dir.join(format!("{name}.exe"))));
-    // Fallbacks for desktop apps that keep their CLI off PATH.
-    match name {
-        "claude" => paths.extend(claude::engines(home, env)),
-        // The Codex desktop app's own copy of its CLI.
-        "codex" => paths.push(home.join(".codex/.sandbox-bin/codex.exe")),
-        _ => {}
-    }
-    paths
-}
-pub(crate) fn engine_path(home: &Path, env: &Environment) -> String {
-    joined_path(executable_dirs(home, env))
 }
 pub(crate) fn reveal_transcript(path: &Path) -> Result<(), String> {
     // Preserve literal argv. PowerShell -Command reparses trailing text, so this
@@ -285,6 +193,7 @@ pub(crate) fn legacy_preferences() -> Option<serde_json::Value> {
 
 #[cfg(test)]
 mod tests {
+    use super::super::path_entries;
     use super::*;
 
     #[test]
