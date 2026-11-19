@@ -51,6 +51,7 @@ pub struct Catalog {
 }
 
 static CATALOGS: &[&Catalog] = &[
+    &crate::antigravity::plans::CATALOG,
     &crate::claude::plans::CATALOG,
     &crate::codex::plans::CATALOG,
     &crate::cursor::plans::CATALOG,

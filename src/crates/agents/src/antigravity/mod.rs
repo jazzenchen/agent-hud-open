@@ -3,6 +3,7 @@ pub mod account;
 mod cli;
 mod hooks;
 pub mod permissions;
+pub mod plans;
 pub mod process;
 pub mod proto;
 mod quotas;
