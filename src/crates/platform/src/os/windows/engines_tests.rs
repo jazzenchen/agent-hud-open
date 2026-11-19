@@ -1,7 +1,12 @@
 use super::super::Environment;
 use super::engines::*;
-use std::fs;
+use std::{fs, path::Path};
 use tempfile::tempdir;
+
+fn write(path: &Path, text: &str) {
+    fs::create_dir_all(path.parent().unwrap()).unwrap();
+    fs::write(path, text).unwrap();
+}
 
 #[test]
 fn npm_claude_cmd_unwraps_to_native_exe_before_cmd_fallback() {
@@ -117,4 +122,68 @@ fn workbuddy_app_is_only_workbuddys_own_program() {
             .all(|path| path.ends_with("WorkBuddy/WorkBuddy.exe")),
         "{candidates:?}"
     );
+}
+
+#[test]
+fn scoop_shim_names_its_own_program_but_never_a_script_host_or_one_with_args() {
+    let tmp = tempdir().unwrap();
+    let home = tmp.path();
+    let shims = home.join("scoop/shims");
+    let apps = home.join("scoop/apps");
+    let claude = apps.join("claude/current/claude.exe");
+    let node = apps.join("nodejs/current/node.exe");
+    let python = apps.join("python/current/python.exe");
+    let gemini = apps.join("gemini/current/gemini.exe");
+    for program in [&claude, &node, &python, &gemini] {
+        write(program, "MZ");
+    }
+    let shim = |name: &str, body: String| write(&shims.join(format!("{name}.shim")), &body);
+    shim("claude", format!("path = \"{}\"\r\n", claude.display()));
+    // Scoop's shim for a script: node.exe, with the script in `args`.
+    let script = apps.join("codex/current/bin/codex.js");
+    write(&script, "");
+    shim(
+        "codex",
+        format!(
+            "path = \"{}\"\r\nargs = \"{}\"\r\n",
+            node.display(),
+            script.display()
+        ),
+    );
+    shim("kimi", format!("path = \"{}\"\r\n", python.display()));
+    shim(
+        "gemini",
+        format!("path = \"{}\"\r\nargs = --flag\r\n", gemini.display()),
+    );
+
+    let env = Environment::new();
+    assert!(engine_candidates(home, &env, "claude").contains(&claude));
+    for name in ["codex", "kimi", "gemini"] {
+        let candidates = engine_candidates(home, &env, name);
+        for wrong in [&node, &python, &gemini] {
+            assert!(!candidates.contains(wrong), "{name}: {candidates:?}");
+        }
+    }
+}
+
+#[test]
+fn cmd_shim_that_runs_a_script_host_alone_is_not_the_client() {
+    let tmp = tempdir().unwrap();
+    let home = tmp.path();
+    let bin = home.join("bin");
+    write(&bin.join("node.exe"), "MZ");
+    write(&bin.join("pwsh.exe"), "MZ");
+    write(
+        &bin.join("claude.cmd"),
+        "@echo off\r\n\"%~dp0\\node.exe\" %*\r\n",
+    );
+    write(&bin.join("codex.bat"), "@\"%~dp0pwsh.exe\" %*\r\n");
+    let env = Environment::from([("PATH".into(), bin.to_string_lossy().into_owned())]);
+
+    let claude = engine_candidates(home, &env, "claude");
+    assert!(!claude.contains(&bin.join("node.exe")), "{claude:?}");
+    assert!(claude.contains(&bin.join("claude.cmd")), "{claude:?}");
+    let codex = engine_candidates(home, &env, "codex");
+    assert!(!codex.contains(&bin.join("pwsh.exe")), "{codex:?}");
+    assert!(codex.contains(&bin.join("codex.bat")), "{codex:?}");
 }

@@ -1,5 +1,5 @@
 use super::super::{joined_path, path_entries};
-use super::shims::{resolve_cmd_exe, resolve_scoop_shim};
+use super::shims::{cmd_target, scoop_target, script_host};
 use super::{app_support, local_app, variable, Environment};
 use std::{
     collections::HashSet,
@@ -189,11 +189,11 @@ pub(crate) fn engine_candidates(home: &Path, env: &Environment, name: &str) -> V
         }
         for ext in ["cmd", "bat"] {
             let shim = dir.join(format!("{name}.{ext}"));
-            if let Some(target) = resolve_cmd_exe(dir, &shim, env) {
+            if let Some(target) = cmd_target(&shim, env) {
                 paths.push(target);
             }
         }
-        if let Some(target) = resolve_scoop_shim(&dir.join(format!("{name}.shim"))) {
+        if let Some(target) = scoop_target(&dir.join(format!("{name}.shim"))) {
             paths.push(target);
         }
     }
@@ -214,6 +214,8 @@ pub(crate) fn engine_candidates(home: &Path, env: &Environment, name: &str) -> V
         paths.push(dir.join(format!("{name}.bat")));
     }
 
+    // A script host is never the client itself, whichever way it was found.
+    paths.retain(|path| !script_host(path));
     dedup_paths(&mut paths);
     paths
 }
