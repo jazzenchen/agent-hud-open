@@ -5,7 +5,7 @@ import { useGround } from "../ground";
 import { alertInk } from "../tokens";
 
 /** The clients the window sends to, in the order their tabs show. */
-const ORDER = ["claude", "codex", "deepseek"];
+const ORDER = ["claude", "codex", "antigravity", "deepseek"];
 
 /** The clients with a session or a new one to offer. */
 export function tabClients(clients: Iterable<string>): string[] {
@@ -39,7 +39,9 @@ function Tab({
         display: "inline-flex",
         alignItems: "center",
         gap: 5,
-        flex: 1,
+        // As wide as its name, sharing what is left: a longer name such as
+        // Antigravity's is not cut while four tabs fit.
+        flex: "1 1 auto",
         minWidth: 0,
         justifyContent: "center",
         padding: "5px 6px",

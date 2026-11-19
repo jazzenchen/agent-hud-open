@@ -1486,5 +1486,6 @@
   "Approve automatically": "自动批准",
   "Permission requests are allowed without asking. Questions and plans still wait for you.": "权限请求不再询问，直接允许。提问和计划仍然等你处理。",
   "Needs Answer in the HUD.": "需要先打开「在 HUD 上回答」。",
-  "Auto-approve": "自动批准"
+  "Auto-approve": "自动批准",
+  "{{client}} is turned off in Agent HUD (Settings → Agents).": "{{client}} 已在 Agent HUD 里关闭（设置 → 智能体）。"
 }

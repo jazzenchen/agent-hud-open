@@ -106,6 +106,17 @@ pub(crate) fn state(session: &Value) -> &'static str {
         _ => "idle",
     }
 }
+/// Whether the person has `client` turned on in Agent HUD (Settings →
+/// Agents); one the snapshot does not list counts as on.
+pub(crate) fn agent_on(snapshot: &Value, client: &str) -> bool {
+    snapshot["providers"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .find(|row| row["id"] == client)
+        .is_none_or(|row| row["enabled"] != false)
+}
+
 pub(crate) fn party(snapshot: &Value, client: &str, id: &str) -> Party {
     Party {
         client: client.into(),

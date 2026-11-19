@@ -1486,5 +1486,6 @@
   "Approve automatically": "自動で承認",
   "Permission requests are allowed without asking. Questions and plans still wait for you.": "権限リクエストは確認なしで許可されます。質問とプランは引き続きあなたを待ちます。",
   "Needs Answer in the HUD.": "「HUD で回答」が必要です。",
-  "Auto-approve": "自動承認"
+  "Auto-approve": "自動承認",
+  "{{client}} is turned off in Agent HUD (Settings → Agents).": "{{client}} は Agent HUD でオフになっています（設定 → エージェント）。"
 }

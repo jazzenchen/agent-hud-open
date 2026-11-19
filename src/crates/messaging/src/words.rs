@@ -194,6 +194,17 @@ pub fn cannot_start(language: Language, which: &str) -> String {
         &[("client", &client(which))],
     )
 }
+/// The person turned the agent off in Agent HUD: the clipboard window offers
+/// it nothing.
+pub fn client_off(language: Language, which: &str) -> String {
+    fill(
+        &tr_in(
+            language,
+            "{{client}} is turned off in Agent HUD (Settings → Agents).",
+        ),
+        &[("client", &client(which))],
+    )
+}
 pub fn folder(language: Language, folder: &str, folders: &[String]) -> String {
     let list = if folders.is_empty() {
         "—".to_owned()

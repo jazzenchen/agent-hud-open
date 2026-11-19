@@ -1,15 +1,17 @@
 //! The person's own words from the HUD: what the clipboard window sends into
-//! a Claude Code, Codex or DeepSeek Harness session, or into a new one. They
+//! a Claude Code, Codex, Antigravity or DeepSeek Harness session, or into a
+//! new one. They
 //! go as the person typed them (`PromptForm::Own`), with no label, no reply
 //! line and no journal: the person reads the answer in the session itself.
-//! They do not need agent messages switched on, only each client's own
-//! "Send messages" switch. Words that go throw the paper plane from the
-//! person to the session (`person_flight`).
+//! They do not need agent messages switched on: the window offers each of
+//! these agents the person has turned on in Agent HUD and, where it has one,
+//! whose own "Send messages" switch is on (`user_client_off`). Words that go
+//! throw the paper plane from the person to the session (`person_flight`).
 use super::*;
 use agent_hud_core::naming::surfaces::{Category, Surface, AGENT_HUD};
 
 /// The clients the clipboard window sends to.
-pub const USER_CLIENTS: [&str; 3] = ["claude", "codex", "deepseek"];
+pub const USER_CLIENTS: [&str; 4] = ["claude", "codex", "antigravity", "deepseek"];
 
 /// Where the person's words go: a session there is, or a new one of
 /// `client` in `folder` (empty: a task folder of its own).
@@ -25,14 +27,20 @@ pub enum UserTarget {
 impl Messaging {
     /// The sessions the person can send to, newest first, each with whether
     /// it takes words now and why not; and the folders each client starts a
-    /// new session in.
+    /// new session in. Only clients the window offers now are there.
     pub fn user_sessions(&mut self, host: &Host<'_>) -> Value {
         self.preferences = Preferences::read(&host.snapshot["settings"]);
         self.clients.update_targets(sessions_targets(host.snapshot));
         let language = language(host.snapshot);
         let loaded = self.loaded();
+        let offered = |client: &str| {
+            USER_CLIENTS.contains(&client)
+                && self
+                    .user_client_off(client, host.snapshot, language)
+                    .is_none()
+        };
         let mut rows = sessions(host.snapshot)
-            .filter(|session| USER_CLIENTS.contains(&session["source"].as_str().unwrap_or("")))
+            .filter(|session| offered(session["source"].as_str().unwrap_or("")))
             .map(|session| {
                 let id = session["id"].as_str().unwrap_or_default();
                 let client = session["source"].as_str().unwrap_or_default();
@@ -62,8 +70,7 @@ impl Messaging {
             .starts
             .offers_for(&all_sessions(host.snapshot))
             .into_iter()
-            .filter(|offer| USER_CLIENTS.contains(&offer.provider.as_str()))
-            .filter(|offer| offer.provider != Provider::DeepSeek || self.preferences.deepseek)
+            .filter(|offer| offered(offer.provider.as_str()))
             .map(|offer| {
                 json!({
                     "client": offer.provider.as_str(),
@@ -73,6 +80,25 @@ impl Messaging {
             })
             .collect::<Vec<_>>();
         json!({"sessions": rows, "starts": starts})
+    }
+
+    /// Why the window does not offer `client` now, if it does not: the person
+    /// turned the agent off in Agent HUD, or its own "Send messages" switch
+    /// (Claude Code's and DeepSeek Harness's).
+    fn user_client_off(
+        &self,
+        client: &str,
+        snapshot: &Value,
+        language: Language,
+    ) -> Option<String> {
+        if !agent_on(snapshot, client) {
+            return Some(words::client_off(language, client));
+        }
+        match client {
+            "claude" if !self.preferences.claude => Some(CLAUDE_MESSAGES_OFF.into()),
+            "deepseek" if !self.preferences.deepseek => Some(DEEPSEEK_MESSAGES_OFF.into()),
+            _ => None,
+        }
     }
 
     /// Sends `text` to `target` as the person. Answers `{state, reason,
@@ -113,6 +139,9 @@ impl Messaging {
         let language = language(host.snapshot);
         if !USER_CLIENTS.contains(&client) {
             return Ok(refused(&words::other_client(language)));
+        }
+        if let Some(reason) = self.user_client_off(client, host.snapshot, language) {
+            return Ok(refused(&reason));
         }
         self.clients.update_targets(sessions_targets(host.snapshot));
         let Some(session) = find_in(host.snapshot, client, session_id) else {
@@ -169,8 +198,8 @@ impl Messaging {
         if !USER_CLIENTS.contains(&client) {
             return Ok(refused(&words::other_client(language)));
         }
-        if client == "deepseek" && !self.preferences.deepseek {
-            return Ok(refused(DEEPSEEK_MESSAGES_OFF));
+        if let Some(reason) = self.user_client_off(client, host.snapshot, language) {
+            return Ok(refused(&reason));
         }
         let provider = provider(client);
         let offers = self.starts.offers_for(&all_sessions(host.snapshot));

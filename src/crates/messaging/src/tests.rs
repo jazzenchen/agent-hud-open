@@ -509,6 +509,16 @@ impl World {
     fn send(&mut self, from: (&str, &str), to: &str, text: &str) -> Value {
         self.call(Some(from), "send_message", json!({"to":to,"text":text}))
     }
+    /// The places the clipboard window offers the person.
+    fn user_sessions(&mut self) -> Value {
+        let query = self.transcripts.query();
+        let host = Host {
+            snapshot: &self.snapshot,
+            query: &query,
+            conversations: None,
+        };
+        self.messaging.user_sessions(&host)
+    }
     /// The person's own words from the clipboard window to `target`.
     fn user_send(&mut self, target: Value, text: &str) -> Value {
         let query = self.transcripts.query();
@@ -1569,6 +1579,45 @@ fn a_new_session_appears_before_it_catches() {
         flown(&world),
         [json!({"from":"claude","to":"claude","fromLeft":true,"arrives":true,"falls":false})]
     );
+}
+
+#[test]
+fn the_window_offers_only_agents_that_are_turned_on() {
+    let mut world = World::new(Preferences::default());
+    let project = world.fixture.home().join("project");
+    world.snapshot["sessions"].as_array_mut().unwrap().push(json!(
+        {"id":"cascade-1","source":"antigravity","title":"Plan the move","cwd":project,"state":"idle","parentId":null,"updatedAt":"2026-10-22T00:58:00Z","liveFacts":{}}
+    ));
+    let offered = |listing: &Value| {
+        let rows = listing["sessions"].as_array().unwrap().iter();
+        let starts = listing["starts"].as_array().unwrap().iter();
+        rows.chain(starts)
+            .map(|row| row["client"].as_str().unwrap().to_owned())
+            .collect::<std::collections::BTreeSet<_>>()
+    };
+    let all = offered(&world.user_sessions());
+    assert!(
+        ["claude", "codex", "antigravity"]
+            .iter()
+            .all(|client| all.contains(*client)),
+        "{all:?}"
+    );
+    // Claude Code's own "Send messages" switch off.
+    world.snapshot["settings"]["claudeMessages"] = json!(false);
+    assert!(!offered(&world.user_sessions()).contains("claude"));
+    // Codex turned off in Agent HUD: not offered, and not sent to.
+    world.snapshot["providers"] = json!([{"id":"codex","enabled":false}]);
+    let left = offered(&world.user_sessions());
+    assert!(
+        !left.contains("codex") && left.contains("antigravity"),
+        "{left:?}"
+    );
+    let refused = world.user_send(
+        json!({"kind":"session","client":"codex","sessionId":CODEX}),
+        "Look at this",
+    );
+    assert_eq!(refused["state"], "refused");
+    assert!(flown(&world).is_empty());
 }
 
 #[test]

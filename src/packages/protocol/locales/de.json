@@ -1518,5 +1518,6 @@
   "Approve automatically": "Automatisch genehmigen",
   "Permission requests are allowed without asking. Questions and plans still wait for you.": "Berechtigungsanfragen werden ohne Rückfrage erlaubt. Fragen und Pläne warten weiter auf Sie.",
   "Needs Answer in the HUD.": "Erfordert „Im HUD antworten“.",
-  "Auto-approve": "Automatisch"
+  "Auto-approve": "Automatisch",
+  "{{client}} is turned off in Agent HUD (Settings → Agents).": "{{client}} ist in Agent HUD deaktiviert (Einstellungen → Agenten)."
 }
