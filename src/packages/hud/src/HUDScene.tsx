@@ -35,6 +35,7 @@ import { DockEnds } from "./ends/DockEnds";
 import { useDockEnds } from "./ends/useDockEnds";
 import { useClipEnd, useInspectView } from "./inspect/useClipEnd";
 import { RestingStrip } from "./scene/RestingStrip";
+import { useRest } from "./scene/useRest";
 import { HoverFloor, SceneBackdrop } from "./scene/SceneFloors";
 import { usePanelHandoffs } from "./scene/usePanelHandoffs";
 import { useScenePanel } from "./scene/useScenePanel";
@@ -306,6 +307,33 @@ export function HUDScene({
     ends: { view: endView, counts },
   });
 
+  // A Simple dock that rests folds while nothing needs it.
+  const rest = useRest({
+    config,
+    strip,
+    edge,
+    screen,
+    metrics,
+    vendors,
+    light,
+    reduceMotion,
+    gate: {
+      open: open || pinned || state.phase !== "collapsed",
+      pointerInside,
+      cardVisible,
+      alert:
+        Boolean(request || event || requests.length) ||
+        vendors.some((vendor) => vendor.waiting > 0),
+      ends:
+        Boolean(endView) ||
+        ends.flights.length > 0 ||
+        Object.values(counts).some(Boolean),
+      dragging: Boolean(dragVisual || dragPreview),
+      guide: Boolean(guide),
+      typing,
+    },
+  });
+
   const { heldFrame, trackPointer } = useHeldFrame({
     cardVisible,
     pointerInside,
@@ -510,6 +538,7 @@ export function HUDScene({
             vendorUnderPointer={vendorUnderPointer}
             hovered={hovered}
             pin={pin}
+            rest={rest}
           >
             <HUDMarkStrip
               id={id}
@@ -536,6 +565,7 @@ export function HUDScene({
               setHovered={setHovered}
               forceOpen={forceOpen}
               pin={pin}
+              rest={rest}
             />
           </RestingStrip>
           <DockEnds

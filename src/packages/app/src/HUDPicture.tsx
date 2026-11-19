@@ -225,7 +225,8 @@ export default function HUDPicture() {
         >
           {target === "hud" ? (
             <HUDScene
-              config={config}
+              // A picture shows the dock as it is when out, never folded.
+              config={{ ...config, restStyle: "dock" }}
               snapshot={{
                 ...filtered,
                 settings: { ...filtered.settings, animations: false },

@@ -242,7 +242,7 @@ export function useHUDInteraction({
     if (
       event?.relatedTarget instanceof Element &&
       event.relatedTarget.closest(
-        ".hud-resting-strip, .hud-expanded-surface, .hud-grab-surface, .hud-hover-floor, .hud-dock-end",
+        ".hud-resting-strip, .hud-rest-zone, .hud-expanded-surface, .hud-grab-surface, .hud-hover-floor, .hud-dock-end",
       )
     ) {
       return;

@@ -17,12 +17,14 @@ import {
 } from "../model";
 import { isRingStyle } from "../usage-meter/arcs";
 import { MarkBars, MarkRing, markItems } from "../usage-meter/mark-usage";
+import { compactMark } from "./rest-style";
 import type { HUDNativePointer } from "./useHUDInteraction";
 
 const clampedSize = (size: number) => Math.max(20, Math.min(60, size));
 
 /** One agent's mark on a dock: its bot or logo, with its usage as rings,
- * bars or a number in Simple mode, and a dot while it waits for an answer. */
+ * bars or a number in Simple mode, and a dot while it waits for an answer.
+ * On a dock that rests as its logos, `compact` folds it down to its logo. */
 export function AgentMark({
   vendor,
   index,
@@ -43,6 +45,7 @@ export function AgentMark({
   reduceMotion,
   setHovered,
   pin,
+  compact,
 }: {
   vendor: HUDVendor;
   index: number;
@@ -63,11 +66,42 @@ export function AgentMark({
   reduceMotion: boolean;
   setHovered: (key: string | null) => void;
   pin: (key?: string) => void;
+  /** Folded to its logo; undefined where the dock never rests as its logos. */
+  compact?: boolean;
 }) {
   const format = useFormat();
   const { quotaDisplay } = format;
   // A ring's figure is text: on a see-through ground, its level's see-through shade.
   const figureColor = useMarkLevelText(light);
+  const parts =
+    compact === undefined ? null : compactMark(compact, metrics, reduceMotion);
+  const bars = config.mode === "simple" && metrics.bar > 0 && (
+    <MarkBars
+      items={markItems(vendor, quotaDisplay, config.panelLayout)}
+      length={metrics.bar}
+      height={metrics.mark}
+      size={clampedSize(config.simpleSize)}
+      ringWidth={config.ringWidth}
+      light={light}
+      reduceMotion={reduceMotion}
+    />
+  );
+  const figure = config.mode === "simple" &&
+    (config.showsNumbers || config.simpleStyle === "numbers") && (
+      <span
+        style={{
+          color: simpleNumberColor(config, light, figureColor(vendor.level)),
+          fontSize: metrics.font,
+          fontWeight: 400,
+          fontVariantNumeric: "tabular-nums",
+          whiteSpace: "nowrap",
+          textAlign: "right",
+          minWidth: horizontal(edge) ? undefined : metrics.label,
+        }}
+      >
+        {meterLabel(vendor, quotaDisplay)}
+      </span>
+    );
   return (
     <button
       type="button"
@@ -99,6 +133,7 @@ export function AgentMark({
           : config.separatesAgents
             ? "pointer"
             : "default",
+        ...parts?.button,
       }}
     >
       <span
@@ -108,6 +143,7 @@ export function AgentMark({
           display: "inline-grid",
           placeItems: "center",
           position: "relative",
+          ...parts?.mark,
         }}
       >
         {config.mode === "simple" && isRingStyle(config.simpleStyle) && (
@@ -118,6 +154,7 @@ export function AgentMark({
             ringWidth={config.ringWidth}
             light={light}
             reduceMotion={reduceMotion}
+            styles={parts?.ring}
           />
         )}
         <BotMark
@@ -205,37 +242,15 @@ export function AgentMark({
           />
         )}
       </span>
-      {config.mode === "simple" && metrics.bar > 0 && (
-        <MarkBars
-          items={markItems(vendor, quotaDisplay, config.panelLayout)}
-          length={metrics.bar}
-          height={metrics.mark}
-          size={clampedSize(config.simpleSize)}
-          ringWidth={config.ringWidth}
-          light={light}
-          reduceMotion={reduceMotion}
-        />
-      )}
-      {config.mode === "simple" &&
-        (config.showsNumbers || config.simpleStyle === "numbers") && (
-          <span
-            style={{
-              color: simpleNumberColor(
-                config,
-                light,
-                figureColor(vendor.level),
-              ),
-              fontSize: metrics.font,
-              fontWeight: 400,
-              fontVariantNumeric: "tabular-nums",
-              whiteSpace: "nowrap",
-              textAlign: "right",
-              minWidth: horizontal(edge) ? undefined : metrics.label,
-            }}
-          >
-            {meterLabel(vendor, quotaDisplay)}
-          </span>
-        )}
+      {parts
+        ? (bars || figure) && (
+            <span aria-hidden={compact || undefined} style={parts.figures}>
+              {bars}
+              {figure}
+            </span>
+          )
+        : bars}
+      {!parts && figure}
     </button>
   );
 }

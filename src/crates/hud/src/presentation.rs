@@ -42,14 +42,19 @@ pub fn global_default(key: &str) -> Option<Value> {
     DEFAULTS.get(key).cloned()
 }
 const HARDWARE: &[&str] = &["monitorIndex", "hasNotch", "notchWidth", "notchHeight"];
-/// What a screen shows at all: only the person sets these, in Settings; they
-/// are no part of the look a tool reads, drafts or restores.
+/// What a screen shows at all, and what its Simple dock leaves at its edge
+/// when idle: only the person sets these, in Settings; they are no part of
+/// the look a tool reads, drafts or restores.
 const PRESENCE: &[&str] = &[
     "hidden",
     "hidesInFullScreen",
     "hidesMessages",
     "hidesRequests",
     "hidesFlights",
+    "restStyle",
+    "restBarLength",
+    "restBarThickness",
+    "restBarColor",
 ];
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]

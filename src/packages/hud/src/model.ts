@@ -22,6 +22,8 @@ export { agentVendorName } from "./agent-artwork.ts";
 
 export type HUDMode = "notch" | "simple";
 export type HUDEdge = "top" | "right" | "bottom" | "left";
+/** What an idle Simple dock leaves at its edge (`scene/rest.ts`). */
+export type RestStyle = "dock" | "logos" | "bar" | "hidden";
 export type HUDDecision = RequestDecision;
 
 /** Per-screen placement, with the same defaults and limits as ScreenPlacement.swift. */
@@ -71,6 +73,14 @@ export interface HUDConfig {
   greyNumbers: boolean;
   greyNumberOpacity: number;
   separatesAgents: boolean;
+  /** What a Simple dock leaves at its edge while nothing needs it: the whole
+   * dock, its logos alone, a bar, or nothing the eye sees. */
+  restStyle: RestStyle;
+  /** The rest bar's length along the edge and its depth, in points. */
+  restBarLength: number;
+  restBarThickness: number;
+  /** The rest bar's colour: `auto` for the dock's own ground, else a CSS colour. */
+  restBarColor: string;
   appearance: "dark" | "light" | "system";
   solidTransparency: number;
   hoverDelayMs: number;

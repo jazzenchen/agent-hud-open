@@ -5,7 +5,7 @@
   "src/crates/core/src/sessions/list.rs": 522,
   "src/crates/platform/src/deepseek_plugin/agent-hud.mjs": 389,
   "src/packages/app/src/sessions/SubagentTimeline.tsx": 454,
-  "src/packages/hud/src/HUDScene.tsx": 641,
+  "src/packages/hud/src/HUDScene.tsx": 624,
   "src/packages/hud/src/bots/bot-motion.ts": 463,
   "src/packages/hud/src/bots/bot-spec.ts": 393,
   "src/packages/hud/src/bots/clawd-player.ts": 526,

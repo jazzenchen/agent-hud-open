@@ -1,6 +1,7 @@
 /* What a Simple mark draws round and beside its logo: rings, a segmented
  * ring or bars. The HUD strip and Settings' preview both draw marks with
  * these. */
+import type { CSSProperties } from "react";
 import type { PanelLayout } from "@agent-hud/protocol";
 import { quotaPercent, type QuotaDisplay } from "@agent-hud/ui/format";
 import { statusColor, type HUDVendor } from "../model";
@@ -34,6 +35,7 @@ export function MarkRing({
   ringWidth,
   light,
   reduceMotion,
+  styles = { position: "absolute", inset: 0 },
 }: {
   style: RingStyle;
   items: RingItem[];
@@ -41,6 +43,8 @@ export function MarkRing({
   ringWidth: number;
   light: boolean;
   reduceMotion?: boolean;
+  /** Where it sits in the mark: over the whole of it unless told. */
+  styles?: CSSProperties;
 }) {
   return (
     <UsageRing
@@ -49,7 +53,7 @@ export function MarkRing({
       spec={simpleRingSpec(size, ringWidth)}
       track={markTrack(light)}
       reduceMotion={reduceMotion}
-      styles={{ position: "absolute", inset: 0 }}
+      styles={styles}
     />
   );
 }

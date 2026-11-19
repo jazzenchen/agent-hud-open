@@ -5,10 +5,16 @@ import type {
 } from "react";
 import { position, type HUDRect } from "../geometry";
 import type { dragSurfaceGeometry } from "../placement";
+import type { Rest } from "./rest";
+import { flushWith } from "./rest-style";
+import { RestZone } from "./RestZone";
 import type { HUDNativePointer } from "./useHUDInteraction";
 
 /** The resting strip the marks sit in: it takes the pointer for them, with
- * the surface a drag grabs it by and, while it is dragged, its outline. */
+ * the surface a drag grabs it by and, while it is dragged, its outline. A
+ * dock that folds at rest keeps it in place, still holding its marks, but
+ * lets the pointer through it while folded: its zone at the edge takes the
+ * pointer then. */
 export function RestingStrip({
   strip,
   grab,
@@ -24,6 +30,7 @@ export function RestingStrip({
   vendorUnderPointer,
   hovered,
   pin,
+  rest,
   children,
 }: {
   strip: HUDRect;
@@ -48,6 +55,8 @@ export function RestingStrip({
   }) => string | null;
   hovered: string | null;
   pin: (key?: string) => void;
+  /** How the dock rests, for a dock that folds. */
+  rest?: Rest;
   /** The marks. */
   children: ReactNode;
 }) {
@@ -55,12 +64,15 @@ export function RestingStrip({
     <>
       <div
         className="hud-resting-strip"
+        data-folded={rest?.folded || undefined}
         style={{
           ...position(strip),
           zIndex: 3,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
+          ...(rest && flushWith(rest.edge)),
+          ...(rest?.folded && { pointerEvents: "none" }),
           userSelect: "none",
           touchAction: draggable ? "none" : undefined,
           cursor: dragVisual ? "grabbing" : undefined,
@@ -134,6 +146,15 @@ export function RestingStrip({
             strokeDasharray="4 3"
           />
         </svg>
+      )}
+      {rest && (
+        <RestZone
+          rest={rest}
+          nativePointer={nativePointer}
+          entered={entered}
+          domExited={domExited}
+          considerDrag={considerDrag}
+        />
       )}
     </>
   );

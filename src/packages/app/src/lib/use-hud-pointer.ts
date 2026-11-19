@@ -26,10 +26,16 @@ function offGuide<T extends HUDNativePointer>(pointer: T): T {
     x >= guide.left && x <= guide.right && y >= guide.top && y <= guide.bottom;
   return over ? { ...pointer, inside: false } : pointer;
 }
+/** The HUD's parts the pointer can reach: where the host takes clicks. */
+const REGIONS =
+  ".hud-resting-strip, .hud-rest-zone, .hud-expanded-surface, .hud-grab-surface, .hud-hover-floor, .hud-dock-end, .hud-guide";
+/** A folded dock's strip keeps its place but lets clicks through: only its
+ * zone at the edge takes the pointer then. */
+const folded = (element: Element) =>
+  Boolean(element.closest(".hud-resting-strip[data-folded]"));
 /** Only outer HUD geometry wakes native reports; animated bot descendants never do. */
 function observeHUDContours(report: () => void) {
-  const selector =
-    ".hud-scene, .hud-resting-strip, .hud-expanded-surface, .hud-grab-surface, .hud-hover-floor, .hud-dock-end, .hud-guide";
+  const selector = `.hud-scene, ${REGIONS}`;
   let timer: ReturnType<typeof setTimeout> | null = null,
     last = 0;
   const queue = () => {
@@ -49,7 +55,7 @@ function observeHUDContours(report: () => void) {
     for (const element of document.querySelectorAll(selector))
       attributes.observe(element, {
         attributes: true,
-        attributeFilter: ["style", "class"],
+        attributeFilter: ["style", "class", "data-folded"],
       });
   };
   const relevant = (node: Node) =>
@@ -145,11 +151,8 @@ export function useHUDPointer(screenId: string) {
         const scene = document
           .querySelector(".hud-scene")
           ?.getBoundingClientRect();
-        const regions = [
-          ...document.querySelectorAll(
-            ".hud-resting-strip, .hud-expanded-surface, .hud-grab-surface, .hud-hover-floor, .hud-dock-end, .hud-guide",
-          ),
-        ]
+        const regions = [...document.querySelectorAll(REGIONS)]
+          .filter((element) => !folded(element))
           .map((element) => {
             const rect = element.getBoundingClientRect();
             return {

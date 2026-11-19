@@ -3,6 +3,8 @@ import type { DockMemory, Direction } from "../bots/mark-director";
 import { horizontal, type HUDRect, type stripMetrics } from "../geometry";
 import type { HUDConfig, HUDEdge, HUDVendor } from "../model";
 import { Silhouette } from "./NotchSurface";
+import type { Rest } from "./rest";
+import { restingDockStyle } from "./rest-style";
 import type { HUDNativePointer } from "./useHUDInteraction";
 import { useT } from "@agent-hud/ui/format-context";
 import { AgentMark } from "./AgentMark";
@@ -32,6 +34,7 @@ export function HUDMarkStrip({
   setHovered,
   forceOpen,
   pin,
+  rest,
 }: {
   id: string;
   config: HUDConfig;
@@ -57,6 +60,8 @@ export function HUDMarkStrip({
   setHovered: (key: string | null) => void;
   forceOpen: () => void;
   pin: (key?: string) => void;
+  /** How the dock rests, for a dock that folds. */
+  rest?: Rest;
 }) {
   const t = useT();
 
@@ -120,6 +125,7 @@ export function HUDMarkStrip({
                   border: 0,
                   boxShadow: `inset 0 0 0 1px ${outline}`,
                   backdropFilter: undefined,
+                  ...restingDockStyle(rest),
                 }
               : {
                   width: strip.width,
@@ -151,6 +157,7 @@ export function HUDMarkStrip({
               reduceMotion={reduceMotion}
               setHovered={setHovered}
               pin={pin}
+              compact={rest?.style === "logos" ? rest.folded : undefined}
             />
           ))}
         </div>
