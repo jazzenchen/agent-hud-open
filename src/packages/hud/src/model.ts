@@ -71,6 +71,9 @@ export interface HUDConfig {
   greyNumbers: boolean;
   greyNumberOpacity: number;
   separatesAgents: boolean;
+  /** A Simple dock folds to a thin bar at rest, unfolds under the pointer,
+   * and opens its panel on a click. */
+  drawer: boolean;
   appearance: "dark" | "light" | "system";
   solidTransparency: number;
   hoverDelayMs: number;

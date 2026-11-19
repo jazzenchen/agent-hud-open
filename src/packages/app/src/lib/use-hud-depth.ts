@@ -5,7 +5,7 @@ import type { HUDEdge } from "@agent-hud/hud/model";
 /** What the HUD shows at rest: its strip, the cards out beside it, a bot's
  * bubble, a paper plane in flight. */
 const PARTS =
-  ".hud-resting-strip, .hud-expanded-surface, .hud-grab-surface, .hud-hover-floor, .hud-dock-end, .hud-guide, .hud-agent-peek-bubble, .hud-flight";
+  ".hud-resting-strip, .hud-drawer-handle, .hud-expanded-surface, .hud-grab-surface, .hud-hover-floor, .hud-dock-end, .hud-guide, .hud-agent-peek-bubble, .hud-flight";
 /** Room beyond what is measured, for the glow, shadows and a card coming in. */
 const MARGIN = 72;
 /** A growing window rounds up to this, so a card animating in asks once or twice. */

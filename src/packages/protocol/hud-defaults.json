@@ -30,6 +30,7 @@
   "greyNumbers": false,
   "greyNumberOpacity": 1,
   "separatesAgents": false,
+  "drawer": true,
   "appearance": "dark",
   "solidTransparency": 0,
   "hoverDelayMs": 400,

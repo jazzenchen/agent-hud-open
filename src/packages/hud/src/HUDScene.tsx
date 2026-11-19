@@ -36,6 +36,7 @@ import { DockEnds } from "./ends/DockEnds";
 import { useDockEnds } from "./ends/useDockEnds";
 import { InspectPanel } from "./inspect/InspectPanel";
 import { useClipEnd, useInspectView } from "./inspect/useClipEnd";
+import { DrawerHandle, useDrawerFold } from "./scene/DrawerHandle";
 import { PanelBody } from "./scene/PanelBody";
 import { RestingStrip } from "./scene/RestingStrip";
 import { HoverFloor, SceneBackdrop } from "./scene/SceneFloors";
@@ -308,6 +309,9 @@ export function HUDScene({
     ends: { view: endView, counts },
   });
 
+  // The dock's drawer: closed at rest, so only its bar takes room.
+  const fold = useDrawerFold(config, { open, cardVisible, pointerInside });
+
   const { heldFrame, trackPointer } = useHeldFrame({
     cardVisible,
     pointerInside,
@@ -542,11 +546,21 @@ export function HUDScene({
               ),
             )}
           </HUDExpandedSurface>
+          <DrawerHandle
+            config={config}
+            folded={fold}
+            strip={strip}
+            metrics={metrics}
+            vendors={vendors}
+            onEnter={entered}
+            onOpen={forceOpen}
+          />
           <RestingStrip
             strip={strip}
             grab={grab}
             draggable={Boolean(onDragStart)}
             dragVisual={dragVisual}
+            folded={fold}
             considerDrag={considerDrag}
             suppressDragClick={suppressDragClick}
             nativePointer={nativePointer}

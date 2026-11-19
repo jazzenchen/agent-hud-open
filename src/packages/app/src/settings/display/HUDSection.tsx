@@ -135,6 +135,13 @@ export function HUDSection({
             t("Separate agents"),
             t("Hovering a logo opens only its agent."),
           )}
+          {toggle(
+            "drawer",
+            t("Fold at rest"),
+            t(
+              "A thin bar at the edge; the pointer unfolds it, a click opens the panel.",
+            ),
+          )}
         </>
       )}
       <AgentSelection

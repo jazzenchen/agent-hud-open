@@ -14,6 +14,7 @@ export function RestingStrip({
   grab,
   draggable,
   dragVisual,
+  folded,
   considerDrag,
   suppressDragClick,
   nativePointer,
@@ -31,6 +32,8 @@ export function RestingStrip({
   /** The host moves the HUD: the strip starts a drag. */
   draggable: boolean;
   dragVisual: boolean;
+  /** The dock's drawer is closed: its bar stands in for it, and this takes no room. */
+  folded: boolean;
   considerDrag: (event: ReactPointerEvent<HTMLDivElement>) => void;
   suppressDragClick: MutableRefObject<boolean>;
   nativePointer?: HUDNativePointer;
@@ -51,6 +54,7 @@ export function RestingStrip({
   /** The marks. */
   children: ReactNode;
 }) {
+  if (folded) return null;
   return (
     <>
       <div

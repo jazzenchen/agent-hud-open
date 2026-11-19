@@ -37,6 +37,7 @@ const styleKeys = [
   "greyNumbers",
   "greyNumberOpacity",
   "separatesAgents",
+  "drawer",
   "appearance",
   "solidTransparency",
 ] as const;

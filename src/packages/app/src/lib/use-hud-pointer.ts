@@ -29,7 +29,7 @@ function offGuide<T extends HUDNativePointer>(pointer: T): T {
 /** Only outer HUD geometry wakes native reports; animated bot descendants never do. */
 function observeHUDContours(report: () => void) {
   const selector =
-    ".hud-scene, .hud-resting-strip, .hud-expanded-surface, .hud-grab-surface, .hud-hover-floor, .hud-dock-end, .hud-guide";
+    ".hud-scene, .hud-resting-strip, .hud-drawer-handle, .hud-expanded-surface, .hud-grab-surface, .hud-hover-floor, .hud-dock-end, .hud-guide";
   let timer: ReturnType<typeof setTimeout> | null = null,
     last = 0;
   const queue = () => {
@@ -147,7 +147,7 @@ export function useHUDPointer(screenId: string) {
           ?.getBoundingClientRect();
         const regions = [
           ...document.querySelectorAll(
-            ".hud-resting-strip, .hud-expanded-surface, .hud-grab-surface, .hud-hover-floor, .hud-dock-end, .hud-guide",
+            ".hud-resting-strip, .hud-drawer-handle, .hud-expanded-surface, .hud-grab-surface, .hud-hover-floor, .hud-dock-end, .hud-guide",
           ),
         ]
           .map((element) => {

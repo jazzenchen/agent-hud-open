@@ -143,6 +143,10 @@ export function useHUDInteraction({
     return () => window.removeEventListener("keydown", key);
   }, [enter, pointerInside, suppressHover, onEscape]);
 
+  // A folded dock unfolds under the pointer; its panel waits for a click.
+  const drawer = Boolean(config.drawer) && config.mode === "simple";
+  const opens = drawer || config.separatesAgents;
+
   function vendorUnderPointer(event: { clientX: number; clientY: number }) {
     const bounds = scene.current?.getBoundingClientRect();
     if (!bounds || config.mode === "notch") return null;
@@ -191,6 +195,7 @@ export function useHUDInteraction({
 
   function entered(optionDown = false) {
     setPointerInside(true);
+    if (drawer && !open) return;
     if (
       !suppressHover.current &&
       !dragVisual &&
@@ -257,8 +262,7 @@ export function useHUDInteraction({
       suppressDragClick.current
     )
       return;
-    if (!config.separatesAgents || config.mode === "notch" || request || event)
-      return;
+    if (!opens || config.mode === "notch" || request || event) return;
     if (key) setHovered(key);
     setPinned(true);
     forceOpen();
