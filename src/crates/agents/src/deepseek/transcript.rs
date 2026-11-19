@@ -129,6 +129,8 @@ impl Log {
         }
         if kind == "user/message" && d["source"]["kind"] == "user" {
             if let Some(prompt) = parts(&d["content"]) {
+                // The person's words order the session as a reply does.
+                newer(&mut self.live.last_message_at, at);
                 self.title_from(prompt);
             }
         }
@@ -380,9 +382,11 @@ mod tests {
         log.deepseek(
             &json!({"type":"turn/start","seq":1,"time":1793127112393_i64,"data":{"turn":1}}),
         );
+        log.deepseek(&json!({"type":"user/message","seq":2,"time":1793127112400_i64,"data":{"content":[{"type":"text","text":"Which model are you?"}],"source":{"kind":"user"},"role":"user"}}));
+        assert_eq!(log.live.last_message_at, Some(1793127112400));
         log.deepseek(&json!({
             "type":"assistant/message",
-            "seq":2,
+            "seq":3,
             "time":1793127114066_i64,
             "data":{
                 "turn":1,
@@ -398,7 +402,7 @@ mod tests {
         }));
         log.deepseek(&json!({
             "type":"assistant/message",
-            "seq":3,
+            "seq":4,
             "time":1793127114500_i64,
             "data":{
                 "turn":1,
@@ -409,7 +413,9 @@ mod tests {
                 }
             }
         }));
-        log.deepseek(&json!({"type":"turn/end","seq":4,"time":1793127115000_i64,"data":{"turn":1,"reason":{"kind":"completed"}}}));
+        log.deepseek(&json!({"type":"turn/end","seq":5,"time":1793127115000_i64,"data":{"turn":1,"reason":{"kind":"completed"}}}));
+        // A step that only calls a tool says nothing: the reply stays latest.
+        assert_eq!(log.live.last_message_at, Some(1793127114066));
         let turn = log.live.turns.back().expect("turn recorded");
         assert_eq!(turn.outcome.as_deref(), Some("completed"));
         assert_eq!(
