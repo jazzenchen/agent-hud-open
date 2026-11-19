@@ -2,6 +2,19 @@
 
 Agent HUD can put words into a running Claude Code, Codex, Antigravity or DeepSeek Harness session, hand them to a Cursor, TRAE, WorkBuddy, ZCode, Qoder or Kimi Code session when one of its turns ends, or to an open Pi or OpenCode session once it is idle, and start a new Claude Code, Codex, Antigravity or DeepSeek Harness session. On top of that, agent messages let one agent session message, start and read another through Agent HUD's MCP server.
 
+## Keep approvals in the client
+
+In Agent HUD 0.6.7 on macOS, open **Settings → Agents**. Under **Agent tools**, turn on **Let agents message each other**. Then choose the client that should handle its own approvals.
+
+- Under **OpenAI → Codex CLI**, turn off **Answer in the HUD**. **Messages** still shows **On**.
+- Under **Anthropic → Claude Code CLI**, turn off **Answer in the HUD** and leave **Send messages** on. **Answer questions** is unavailable while **Answer in the HUD** is off.
+
+If you use Claude Desktop and turn off only **Answer questions**, you may still see a next-step question on the HUD. Answer it in Claude Desktop. **Dismiss** hides the card and leaves the question open in Claude.
+
+If the HUD says “This request is no longer waiting” after you answer elsewhere, check the result in the client that handled it. The HUD only accepts answers for requests it still has open.
+
+To check your setup, send a message between two sessions connected to Agent HUD's MCP server. Have the recipient reply with `send_message` and the original message ID in `reply_to`. The reply should arrive as a new turn in the sender's session. With Codex CLI 0.170.0 on macOS, this worked with client hooks uninstalled, and a file write in a read-only session still waited for **Yes, proceed** in Codex.
+
 ## Where the code lives
 
 - `src/crates/platform/src/delivery/` (`agent_hud_platform::delivery`): sending into sessions (`LocalClients`, `Receipt`, `DeliveryState`), starting sessions (`SessionStarts`, `StartConfig`) and moving started Claude jobs into the desktop app (`Handoffs`). The `fixtures` cargo feature exposes `delivery::fixtures` to other crates' tests.
