@@ -25,8 +25,12 @@ pub(super) use pointer::{global_pointer, left_mouse_down, pointer_keys};
 pub(super) const GLOBAL_POINTS: bool = false;
 pub(super) const COORDINATE_SPACE: &str = "monitor-scaled-physical-top-left";
 pub(super) const DOCK_IN_WORK_AREA: bool = false;
-/// The window reaches only as far from its edge as the HUD does (`depth.rs`).
-pub(super) const WINDOW_FOLLOWS_DEPTH: bool = true;
+/// The window keeps its whole canvas. A layer surface covers its output
+/// anyway, and an X11 HUD window cannot be resized: GTK gives one that is not
+/// resizable a fixed size (minimum and maximum the same in its size hints),
+/// so a shallower frame only moved it. Hanging from the right or bottom edge
+/// it then lay partly off the screen with the HUD out of sight, since 0.6.5.
+pub(super) const WINDOW_FOLLOWS_DEPTH: bool = false;
 
 /// Whether the compositor offers layer-shell; learned on the GTK thread when
 /// the first HUD is placed.
