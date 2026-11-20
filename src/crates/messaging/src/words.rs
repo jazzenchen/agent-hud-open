@@ -50,13 +50,10 @@ fn reply_tool(language: Language, client: &str) -> String {
 
 /// The words delivered. Labelled: a first line naming the sender and the
 /// message, the text, and a last line saying how to reply: with send_message
-/// and reply_to first, as the recipient's client names that tool, so the
-/// reply comes back as a message; a plain answer, which the sender reads with
-/// get_message, only without the tool. A reply's last line is shorter, so two
-/// agents do not thank each other back and forth. Without the reply hint, the
-/// sender asked to read the answer itself: the last line says to answer in the
-/// turn and send nothing back. As the user's own: the text alone.
-#[allow(clippy::too_many_arguments)]
+/// and reply_to, as the recipient's client names that tool, so the reply comes
+/// back as a message; the sender reads nothing else. A reply's last line is
+/// shorter, so two agents do not thank each other back and forth. As the
+/// user's own: the text alone.
 pub fn compose(
     language: Language,
     form: PromptForm,
@@ -64,7 +61,6 @@ pub fn compose(
     to_client: &str,
     id: &str,
     reply_to: Option<&str>,
-    reply_hint: bool,
     text: &str,
 ) -> String {
     if form == PromptForm::Own {
@@ -92,26 +88,16 @@ pub fn compose(
     let sender = client(&from.client);
     // The title last: it is the sender's text, and may hold braces.
     let (label, footer) = match reply_to {
-        None => {
-            (
-                tr_in(language, "[Agent HUD · from {{client}}{{title}} · {{id}}]"),
-                if reply_hint {
-                    tr_in(language, "Reply with {{tool}}, reply_to: {{id}}: your reply reaches the sender as a message. Without that tool, answer here: the sender can read this turn's last reply.")
-                } else {
-                    tr_in(language, "Answer here: the sender reads this turn's last reply, so send nothing back.")
-                },
-            )
-        }
+        None => (
+            tr_in(language, "[Agent HUD · from {{client}}{{title}} · {{id}}]"),
+            tr_in(language, "Reply with {{tool}}, reply_to: {{id}}: your reply reaches the sender as a message."),
+        ),
         Some(_) => (
             tr_in(
                 language,
                 "[Agent HUD · from {{client}}{{title}} · {{id}} · re {{parent}}]",
             ),
-            if reply_hint {
-                tr_in(language, "This answers {{parent}}. Only if more is needed, reply with {{tool}}, reply_to: {{id}}.")
-            } else {
-                tr_in(language, "This answers {{parent}}.")
-            },
+            tr_in(language, "This answers {{parent}}. Only if more is needed, reply with {{tool}}, reply_to: {{id}}."),
         ),
     };
     let parent = reply_to.unwrap_or_default();
@@ -221,20 +207,8 @@ pub fn folder(language: Language, folder: &str, folders: &[String]) -> String {
     };
     fill(&text, &[("list", &list), ("folder", &folder)])
 }
-pub fn unknown_message(language: Language) -> String {
-    tr_in(
-        language,
-        "No message has this id (messages are kept for a week).",
-    )
-}
 /// Harness has no command line that starts a session: Agent HUD's plugin in
 /// a running Harness does it.
 pub fn deepseek_cannot_start(language: Language) -> String {
     tr_in(language, "Agent HUD cannot start a DeepSeek Harness session now: install Agent HUD's DeepSeek Harness plugin in Settings → Agents, and open DeepSeek Harness.")
-}
-pub fn replied(language: Language, reply: &str) -> String {
-    fill(
-        &tr_in(language, "They answered with message {{reply}}; it comes to your session as a new turn once you are idle."),
-        &[("reply", &reply)],
-    )
 }

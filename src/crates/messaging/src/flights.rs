@@ -7,7 +7,7 @@ impl Messaging {
     /// Throws the plane back once for each message whose answer arrived: the
     /// collector's live facts say a turn ended (nothing is read while one
     /// runs), the message's own turn is found and ended, and its reply reads
-    /// as get_message would give it. Its own turn ended with nothing to read:
+    /// from the recipient's transcript. Its own turn ended with nothing to read:
     /// given up a minute on, not flown. Its own turn not found yet: looked for
     /// again, until the two-hour cutoff. A turn that ended long after is not
     /// flown; a message answered with send_message is already settled (its
@@ -51,8 +51,7 @@ impl Messaging {
             let Some(found) = transcript::answer(host, message) else {
                 continue;
             };
-            // Where the turn was found, as get_message keeps it: the next
-            // look starts there.
+            // Where the turn was found: the next look starts there.
             if message.turn.as_ref() != Some(&found.turn) {
                 message.turn = Some(found.turn.clone());
                 changed = true;
@@ -65,11 +64,7 @@ impl Messaging {
                 changed = true;
                 continue;
             }
-            if let Some(answer) = &found.answer {
-                if transcript::live_only(&message.to.client) {
-                    self.answers
-                        .keep(&message.id, answer, found.ended_at.clone());
-                }
+            if found.answer.is_some() {
                 message.answered = true;
                 flights.push(message.clone());
                 continue;

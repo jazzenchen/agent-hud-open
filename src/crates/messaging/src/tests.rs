@@ -497,7 +497,44 @@ impl World {
         self.harness_channel
             .join(format!("prompts/{HARNESS_OWN}/{id}.json"))
     }
+    /// One call from `caller`. A sending call's agent reads only `delivered`
+    /// (with `reason`, and a started session's `sessionId`); for the tests,
+    /// what the journal kept of the message it sent is added: `id`, `state`
+    /// (refused when nothing was journaled) and `pass`.
     fn call(&mut self, caller: Option<(&str, &str)>, name: &str, arguments: Value) -> Value {
+        let before = self.newest().map(|message| message.id);
+        let mut answer = self.raw(caller, name, arguments);
+        if !matches!(name, "send_message" | "start_session") {
+            return answer;
+        }
+        match self
+            .newest()
+            .filter(|message| Some(&message.id) != before.as_ref())
+        {
+            Some(message) => {
+                answer["id"] = json!(message.id);
+                answer["state"] = json!(message.state);
+                answer["pass"] = json!(message.count);
+            }
+            None if answer["delivered"] == false => answer["state"] = json!("refused"),
+            None => {}
+        }
+        answer
+    }
+    /// The reply that settled the message `id`, as the journal keeps it.
+    fn replied_by(&self, id: &str) -> Option<String> {
+        self.messaging.journal.find(id).unwrap().replied_by.clone()
+    }
+    /// The message the journal kept last.
+    fn newest(&mut self) -> Option<Message> {
+        self.messaging
+            .journal
+            .messages_mut()
+            .last()
+            .map(|m| m.clone())
+    }
+    /// One call from `caller`, answered as its agent reads it.
+    fn raw(&mut self, caller: Option<(&str, &str)>, name: &str, arguments: Value) -> Value {
         let query = self.transcripts.query();
         let host = Host {
             snapshot: &self.snapshot,
@@ -548,8 +585,49 @@ impl World {
             .user_send(&target, text, &host, 1_792_600_000_000)
             .unwrap()
     }
-    fn get(&mut self, id: &Value) -> Value {
-        self.call(Some(("claude", CLAUDE)), "get_message", json!({"id":id}))
+    /// Where a message stands as Agent HUD reads it now, the way the plane
+    /// back reads it: its delivery receipt, then its own turn in the
+    /// recipient's conversation (started, or done with that turn's last
+    /// reply). Where the turn was found is kept, as the plane back keeps it.
+    fn read(&mut self, id: &Value) -> Value {
+        let id = id.as_str().unwrap();
+        let mut message = self.messaging.journal.find(id).cloned().unwrap();
+        let mut state = message.state.clone();
+        if message.kind == Kind::Send {
+            if let Ok(Some(receipt)) = self.clients.receipt(
+                provider(&message.to.client),
+                &message.to.session_id,
+                &message.request_id,
+            ) {
+                state = delivered(receipt.state).to_owned();
+            }
+        }
+        let query = self.transcripts.query();
+        let host = Host {
+            snapshot: &self.snapshot,
+            query: &query,
+            conversations: self
+                .transcripts
+                .store
+                .as_deref()
+                .map(|store| store as &dyn Turns),
+        };
+        let mut answer = Value::Null;
+        let mut ended_at = Value::Null;
+        if !message.to.session_id.is_empty() && state != "refused" {
+            if let Some(found) = transcript::answer(&host, &message) {
+                message.turn = Some(found.turn.clone());
+                state = if found.done { "done" } else { "started" }.into();
+                if found.done {
+                    answer = found.answer.map(Value::String).unwrap_or(Value::Null);
+                    ended_at = found.ended_at.unwrap_or(Value::Null);
+                }
+            }
+        }
+        if let Some(kept) = self.messaging.journal.messages_mut().find(|m| m.id == id) {
+            kept.turn = message.turn.clone();
+        }
+        json!({"state": state, "answer": answer, "endedAt": ended_at})
     }
     fn maintain(&mut self, now: i64) {
         let query = self.transcripts.query();
@@ -632,12 +710,48 @@ fn an_uncertain_antigravity_send_is_not_reported_as_refused() {
     world.antigravity();
     let sent = world.send(("claude", CLAUDE), ANTIGRAVITY, "fixture message");
     assert_eq!(sent["state"], "uncertain", "{sent}");
-    let read = world.get(&sent["id"]);
+    let read = world.read(&sent["id"]);
     assert_eq!(read["state"], "uncertain", "{read}");
 }
 
+/// A sending call tells its agent only whether the words were handed over:
+/// no message id to look up and no state to follow, since the other side
+/// answers, if it does, with a message of its own.
 #[test]
-fn the_group_lists_its_five_tools_only_while_it_is_on() {
+fn a_send_answers_only_whether_the_words_were_handed_over() {
+    let mut world = World::on();
+    let sent = world.raw(
+        Some(("claude", CLAUDE)),
+        "send_message",
+        json!({"to":CODEX,"text":"Review this"}),
+    );
+    assert_eq!(sent, json!({"delivered": true}));
+    let refused = world.raw(
+        Some(("claude", CLAUDE)),
+        "send_message",
+        json!({"to":CLAUDE,"text":"Note to self"}),
+    );
+    assert_eq!(refused["delivered"], false, "{refused}");
+    assert_eq!(refused["reason"], "That is your own session.");
+    let mut world = World::new_with_antigravity(
+        Preferences {
+            enabled: true,
+            ..Default::default()
+        },
+        true,
+    );
+    world.antigravity();
+    let unsure = world.raw(
+        Some(("claude", CLAUDE)),
+        "send_message",
+        json!({"to":ANTIGRAVITY,"text":"Plan it"}),
+    );
+    assert!(unsure["delivered"].is_null(), "{unsure}");
+    assert!(unsure["reason"].is_string(), "{unsure}");
+}
+
+#[test]
+fn the_group_lists_its_four_tools_only_while_it_is_on() {
     assert_eq!(Messaging::tools(false), json!({"tools":[]}));
     let names = Messaging::tools(true)["tools"]
         .as_array()
@@ -651,8 +765,7 @@ fn the_group_lists_its_five_tools_only_while_it_is_on() {
             "list_sessions",
             "list_models",
             "send_message",
-            "start_session",
-            "get_message"
+            "start_session"
         ]
     );
     for tool in Messaging::tools(true)["tools"].as_array().unwrap() {
@@ -787,7 +900,7 @@ fn a_labelled_message_names_its_sender_and_says_how_to_reply_and_waits_in_the_qu
     );
     assert!(sent.text.contains(&text), "the text goes whole");
     // Codex names agent-hud's tool with an underscore.
-    assert!(sent.text.ends_with(&format!("Reply with agent-hud's MCP tool mcp__agent_hud__send_message, reply_to: {id}: your reply reaches the sender as a message. Without that tool, answer here: the sender can read this turn's last reply.")), "{}", sent.text);
+    assert!(sent.text.ends_with(&format!("Reply with agent-hud's MCP tool mcp__agent_hud__send_message, reply_to: {id}: your reply reaches the sender as a message.")), "{}", sent.text);
 }
 
 #[test]
@@ -800,7 +913,7 @@ fn chinese_labels_follow_the_app_language() {
     assert!(sent.starts_with(&format!(
         "[Agent HUD · 来自 Claude Code · Fix the login · {id}]"
     )));
-    assert!(sent.ends_with(&format!("请用 agent-hud 的 MCP 工具 mcp__agent_hud__send_message 回复，reply_to: {id}，回复会作为一条消息送到发件方。没有这个工具时就直接作答，发件方能取回你这一轮最后的回答。")), "{sent}");
+    assert!(sent.ends_with(&format!("请用 agent-hud 的 MCP 工具 mcp__agent_hud__send_message 回复，reply_to: {id}，回复会作为一条消息送到发件方。")), "{sent}");
 }
 
 #[test]
@@ -927,15 +1040,15 @@ fn a_deepseek_harness_session_takes_a_message_through_its_plugin_and_its_answer_
     assert!(delivered.starts_with(&format!(
         "[Agent HUD · from Claude Code · Fix the login · {id}]"
     )));
-    assert!(delivered.ends_with(&format!("Reply with agent-hud's MCP tool mcp__agent-hud__send_message, reply_to: {id}: your reply reaches the sender as a message. Without that tool, answer here: the sender can read this turn's last reply.")), "{delivered}");
+    assert!(delivered.ends_with(&format!("Reply with agent-hud's MCP tool mcp__agent-hud__send_message, reply_to: {id}: your reply reaches the sender as a message.")), "{delivered}");
     // Its compressed log's tail marks where it ended: the answer is after.
     assert_eq!(world.messaging.journal.find(&id).unwrap().cursor, Some(2));
     // Open decodes the log from its start to reach that point, a few looks.
     world.transcripts.decode.store(3, AtomicOrdering::SeqCst);
-    assert_eq!(world.get(&json!(id))["state"], "queued");
+    assert_eq!(world.read(&json!(id))["state"], "queued");
     // Harness put it in the session's queue; the plugin says so in its file.
     std::fs::write(world.harness_prompt(&id), br#"{"takenAt":1,"startedAt":2}"#).unwrap();
-    assert_eq!(world.get(&json!(id))["state"], "started");
+    assert_eq!(world.read(&json!(id))["state"], "started");
     // The answer is read from the session's transcript pages.
     world.transcripts.prompt(HARNESS, "h1", &delivered);
     world
@@ -943,13 +1056,11 @@ fn a_deepseek_harness_session_takes_a_message_through_its_plugin_and_its_answer_
         .reply(HARNESS, "h1", "Ported; the tests pass.");
     world.live(HARNESS, json!({"turnId":"h1","turnStartedAt":"2026-10-22T01:00:00Z","endedAt":"2026-10-22T01:03:00Z"}));
     // One look reaches it: the pending pages are asked for again.
-    let done = world.get(&json!(id));
+    let done = world.read(&json!(id));
     assert_eq!(done["state"], "done", "{done}");
     assert_eq!(done["answer"], "Ported; the tests pass.");
     // Read again from where the turn was found: as many looks, the same.
-    assert_eq!(world.get(&json!(id))["answer"], "Ported; the tests pass.");
-    assert_eq!(done["to"]["client"], "deepseek");
-    assert_eq!(done["to"]["sessionId"], HARNESS);
+    assert_eq!(world.read(&json!(id))["answer"], "Ported; the tests pass.");
     // Its own id, as Harness names it, reaches it too.
     let again = world.send(("claude", CLAUDE), HARNESS_OWN, "One more thing");
     assert_eq!(again["state"], "queued", "{again}");
@@ -1109,7 +1220,7 @@ fn a_deepseek_harness_session_starts_through_its_plugin_in_a_running_host() {
     world.transcripts.prompt(HARNESS_TWO, "h1", text);
     world.transcripts.reply(HARNESS_TWO, "h1", "Ported.");
     world.live(HARNESS_TWO, json!({"turnId":"h1","turnStartedAt":"2026-10-22T01:00:00Z","endedAt":"2026-10-22T01:03:00Z"}));
-    let done = world.get(&id);
+    let done = world.read(&id);
     assert_eq!(done["state"], "done", "{done}");
     assert_eq!(done["answer"], "Ported.");
 }
@@ -1299,13 +1410,13 @@ fn as_the_user_a_message_still_counts_because_agent_hud_knows_its_own_words() {
 }
 
 #[test]
-fn get_message_follows_the_turn_and_returns_the_whole_answer_once_it_ended() {
+fn an_answer_follows_the_turn_and_is_read_whole_once_it_ended() {
     let mut world = World::on();
     world.transcripts.prompt(CODEX, "x0", "Earlier work");
     world.transcripts.reply(CODEX, "x0", "Earlier answer");
     let sent = world.send(("claude", CLAUDE), CODEX, "Review this");
     let id = sent["id"].clone();
-    assert_eq!(world.get(&id)["state"], "queued");
+    assert_eq!(world.read(&id)["state"], "queued");
     let delivered = world.codex.0.lock().unwrap()[0].text.clone();
     world.transcripts.prompt(CODEX, "x1", &delivered);
     world.transcripts.reply(CODEX, "x1", "Looking");
@@ -1314,22 +1425,21 @@ fn get_message_follows_the_turn_and_returns_the_whole_answer_once_it_ended() {
         CODEX,
         json!({"turnId":"x1","turnStartedAt":"2026-10-22T01:00:00Z","endedAt":null}),
     );
-    let running = world.get(&id);
+    let running = world.read(&id);
     assert_eq!(running["state"], "started");
     assert_eq!(running["answer"], Value::Null);
     let long = "Two nits: rename the flag and add a test.\n".repeat(3000);
     world.transcripts.reply(CODEX, "x1", &long);
     world.live(CODEX, json!({"turnId":"x1","turnStartedAt":"2026-10-22T01:00:00Z","endedAt":"2026-10-22T01:02:00Z"}));
-    let done = world.get(&id);
+    let done = world.read(&id);
     assert_eq!(done["state"], "done");
     assert_eq!(done["answer"], json!(long), "whole, not cut");
-    assert_eq!(done["to"]["sessionId"], CODEX);
     assert_eq!(done["endedAt"], "2026-10-22T01:02:00Z");
     // Read again later, after the session went on to other turns: the same answer.
     world.transcripts.prompt(CODEX, "x2", "Something else");
     world.transcripts.reply(CODEX, "x2", "Other answer");
     world.live(CODEX, json!({"turnId":"x2","turnStartedAt":"2026-10-22T01:05:00Z","endedAt":"2026-10-22T01:06:00Z"}));
-    assert_eq!(world.get(&id)["answer"], json!(long));
+    assert_eq!(world.read(&id)["answer"], json!(long));
 }
 
 #[test]
@@ -1348,18 +1458,12 @@ fn a_message_sent_as_the_user_is_found_by_its_words() {
     world.transcripts.prompt(CODEX, "x1", "Ship it");
     world.transcripts.reply(CODEX, "x1", "Shipped");
     world.live(CODEX, json!({"turnId":"x1","turnStartedAt":"2026-10-22T01:00:00Z","endedAt":"2026-10-22T01:01:00Z"}));
-    let done = world.get(&sent["id"]);
+    let done = world.read(&sent["id"]);
     assert_eq!(done["state"], "done");
     assert_eq!(
         done["answer"], "Shipped",
         "the one after the send, not the earlier same words"
     );
-}
-
-#[test]
-fn an_unknown_message_id_says_so() {
-    let mut world = World::on();
-    assert_eq!(world.get(&json!("m-000000000000"))["state"], "unknown");
 }
 
 #[test]
@@ -1387,11 +1491,9 @@ fn start_session_opens_in_the_callers_project_and_its_first_answer_is_read_like_
     world.snapshot["sessions"].as_array_mut().unwrap().push(json!({"id":STARTED,"source":"claude","title":"Suite","state":"idle","parentId":null,"liveFacts":{"turnId":"s1","turnStartedAt":"2026-10-22T01:00:00Z","endedAt":"2026-10-22T01:03:00Z"}}));
     world.transcripts.prompt(STARTED, "s1", &first);
     world.transcripts.reply(STARTED, "s1", "All 312 tests pass");
-    let done = world.get(&id);
+    let done = world.read(&id);
     assert_eq!(done["state"], "done", "{done}");
     assert_eq!(done["answer"], "All 312 tests pass");
-    assert_eq!(done["to"]["sessionId"], STARTED);
-    assert_eq!(done["kind"], "start");
 }
 
 #[test]
@@ -1757,8 +1859,8 @@ fn stored_as_the_user_a_message_still_counts() {
     stored(as_the_user_a_message_still_counts_because_agent_hud_knows_its_own_words);
 }
 #[test]
-fn stored_get_message_follows_the_turn_and_returns_the_whole_answer_once_it_ended() {
-    stored(get_message_follows_the_turn_and_returns_the_whole_answer_once_it_ended);
+fn stored_an_answer_follows_the_turn_and_is_read_whole_once_it_ended() {
+    stored(an_answer_follows_the_turn_and_is_read_whole_once_it_ended);
 }
 #[test]
 fn stored_a_message_sent_as_the_user_is_found_by_its_words() {
@@ -1784,7 +1886,7 @@ fn a_stored_turn_that_ended_is_done_without_live_facts_even_inside_the_plugin_wr
     let wrapped = "The agent-hud plugin sent a message:\nRun the tests\n\nThis is how Claude Code surfaces a prompt a plugin submits.";
     world.transcripts.prompt(QUIET, "q1", wrapped);
     world.transcripts.reply(QUIET, "q1", "Running");
-    assert_eq!(world.get(&sent["id"])["state"], "started");
+    assert_eq!(world.read(&sent["id"])["state"], "started");
     world.transcripts.reply(QUIET, "q1", "All green");
     let store = world.transcripts.store.clone().unwrap();
     let ended = world.transcripts.tick();
@@ -1801,7 +1903,7 @@ fn a_stored_turn_that_ended_is_done_without_live_facts_even_inside_the_plugin_wr
             }],
         })
         .unwrap();
-    let done = world.get(&sent["id"]);
+    let done = world.read(&sent["id"]);
     assert_eq!(done["state"], "done", "{done}");
     assert_eq!(done["answer"], "All green");
     assert_eq!(
@@ -1859,7 +1961,7 @@ fn a_plane_comes_back_only_once_the_answer_reads() {
         json!({"turnId":"3","turnStartedAt":at(sent + 190),"endedAt":at(sent + 1_864),"outcome":"completed"}),
     );
     world.maintain(sent + 5_000);
-    let got = world.get(&first["id"]);
+    let got = world.read(&first["id"]);
     assert!(got["answer"].is_null(), "no answer can be read: {got}");
     assert_eq!(flown(&world).len(), 1, "no plane back without an answer");
     // Once its reply reads (Harness's pages show it), the plane comes back once.
@@ -1872,7 +1974,7 @@ fn a_plane_comes_back_only_once_the_answer_reads() {
         flown(&world)[1..],
         [json!({"from":"deepseek","to":"claude","fromLeft":false,"arrives":false,"falls":false})]
     );
-    assert_eq!(world.get(&first["id"])["answer"], "Received.");
+    assert_eq!(world.read(&first["id"])["answer"], "Received.");
 }
 
 /// The message's own turn that ended with nothing to read is looked at for a
@@ -1918,8 +2020,8 @@ fn an_answer_that_never_reads_is_given_up_a_minute_after_its_own_turn() {
 
 /// A reply through send_message settles the message it answers: its plane is
 /// the one back (the end of the turn that sent it throws no second one), and
-/// the sender's get_message says it was replied to, by which message, without
-/// its words. The reply's last line is the short one.
+/// the journal names the reply that settled it. The reply's last line is the
+/// short one.
 #[test]
 fn a_reply_settles_the_message_it_answers_and_is_the_one_plane_back() {
     let mut world = World::on();
@@ -1928,7 +2030,7 @@ fn a_reply_settles_the_message_it_answers_and_is_the_one_plane_back() {
     let first = world.send(("claude", CLAUDE), QUIET, "Review this");
     let id = first["id"].as_str().unwrap().to_owned();
     let delivered = world.claude_words(QUIET, &id);
-    assert!(delivered.ends_with(&format!("Reply with agent-hud's MCP tool mcp__agent-hud__send_message, reply_to: {id}: your reply reaches the sender as a message. Without that tool, answer here: the sender can read this turn's last reply.")), "{delivered}");
+    assert!(delivered.ends_with(&format!("Reply with agent-hud's MCP tool mcp__agent-hud__send_message, reply_to: {id}: your reply reaches the sender as a message.")), "{delivered}");
     world.transcripts.prompt(QUIET, "q1", &delivered);
     let reply = world.call(
         Some(("claude", QUIET)),
@@ -1940,11 +2042,7 @@ fn a_reply_settles_the_message_it_answers_and_is_the_one_plane_back() {
     let reply_id = reply["id"].as_str().unwrap().to_owned();
     let words = world.claude_words(CLAUDE, &reply_id);
     assert!(words.ends_with(&format!("This answers {id}. Only if more is needed, reply with agent-hud's MCP tool mcp__agent-hud__send_message, reply_to: {reply_id}.")), "{words}");
-    let original = world.get(&json!(id));
-    assert_eq!(original["state"], "replied", "{original}");
-    assert_eq!(original["reply"], reply_id);
-    assert!(original["answer"].is_null());
-    assert!(original["reason"].as_str().unwrap().contains(&reply_id));
+    assert_eq!(world.replied_by(&id), Some(reply_id.clone()));
     world.live(
         QUIET,
         json!({"turnId":"q1","turnStartedAt":at(sent + 1_000),"endedAt":at(sent + 4_000)}),
@@ -1957,9 +2055,9 @@ fn a_reply_settles_the_message_it_answers_and_is_the_one_plane_back() {
         "one reply, one plane back"
     );
     // The turn's own answer reads too: done, and the reply is still named.
-    let original = world.get(&json!(id));
+    let original = world.read(&json!(id));
     assert_eq!(original["state"], "done", "{original}");
-    assert_eq!(original["reply"], reply_id);
+    assert_eq!(world.replied_by(&id), Some(reply_id));
 }
 
 /// reply_to with another recipient is no reply to the sender: the message
@@ -1978,9 +2076,7 @@ fn a_reply_sent_elsewhere_leaves_the_message_open() {
         json!({"to":CODEX,"text":"Claude asks","reply_to":id}),
     );
     assert_eq!(onward["state"], "queued", "{onward}");
-    let original = world.get(&json!(id));
-    assert_ne!(original["state"], "replied", "{original}");
-    assert!(original["reply"].is_null());
+    assert_eq!(world.replied_by(&id), None);
 }
 
 /// The owner's case, with the Harness log's tail refused (as Open refused
@@ -2019,9 +2115,7 @@ fn a_harness_reply_joins_its_chain_settles_the_message_and_flies_back_once() {
     );
     let words = world.claude_words(CLAUDE, &reply_id);
     assert!(words.ends_with(&format!("This answers {first_id}. Only if more is needed, reply with agent-hud's MCP tool mcp__agent-hud__send_message, reply_to: {reply_id}.")), "{words}");
-    let original = world.get(&json!(first_id));
-    assert_eq!(original["state"], "replied", "{original}");
-    assert_eq!(original["reply"], reply_id);
+    assert_eq!(world.replied_by(&first_id), Some(reply_id.clone()));
     // The Harness turn ends: no second plane for the message the reply settled.
     let sent = 1_792_600_000_000i64;
     world.live(
@@ -2030,10 +2124,8 @@ fn a_harness_reply_joins_its_chain_settles_the_message_and_flies_back_once() {
     );
     world.maintain(sent + 5_000);
     assert_eq!(flown(&world).len(), 2, "out, and the reply back");
-    let original = world.get(&json!(first_id));
-    assert_eq!(original["state"], "replied", "{original}");
-    assert!(original["answer"].is_null());
-    assert!(original["reason"].as_str().unwrap().contains(&reply_id));
+    assert_eq!(world.replied_by(&first_id), Some(reply_id));
+    assert!(world.read(&json!(first_id))["answer"].is_null());
 }
 
 /// Sent as the user, the words carry no id: a Harness log read from its
@@ -2067,11 +2159,11 @@ fn as_the_user_a_harness_answer_is_the_one_after_the_send() {
         HARNESS,
         json!({"turnId":"2","turnStartedAt":at(sent + 1_000),"endedAt":at(sent + 3_000)}),
     );
-    let done = world.get(&message["id"]);
+    let done = world.read(&message["id"]);
     assert_eq!(done["state"], "done", "{done}");
     assert_eq!(done["answer"], "Shipped");
     // Read again from the page the turn was found on, which holds both.
-    assert_eq!(world.get(&message["id"])["answer"], "Shipped");
+    assert_eq!(world.read(&message["id"])["answer"], "Shipped");
 }
 
 /// The last line names agent-hud's tool as each client names it, and stays
@@ -2091,7 +2183,6 @@ fn the_reply_line_names_the_tool_as_the_recipients_client_does() {
             client,
             "m-1",
             reply_to,
-            true,
             "Hi",
         )
         .lines()
@@ -2104,7 +2195,7 @@ fn the_reply_line_names_the_tool_as_the_recipients_client_does() {
     assert!(line(Language::En, "codex", None).contains("mcp__agent_hud__send_message"));
     assert_eq!(
         line(Language::En, "antigravity", None),
-        "Reply with agent-hud's send_message tool, reply_to: m-1: your reply reaches the sender as a message. Without that tool, answer here: the sender can read this turn's last reply."
+        "Reply with agent-hud's send_message tool, reply_to: m-1: your reply reaches the sender as a message."
     );
     assert_eq!(
         line(Language::ZhHans, "deepseek", Some("m-0")),
@@ -2118,7 +2209,6 @@ fn the_reply_line_names_the_tool_as_the_recipients_client_does() {
             "codex",
             "m-1",
             None,
-            true,
             "Hi"
         ),
         "Hi"
@@ -2146,7 +2236,6 @@ fn a_message_from_grok_bot_pi_or_opencode_names_that_client_in_the_sender_label(
             "codex",
             "m-1",
             None,
-            false,
             "Check the release notes.",
         );
         assert_eq!(
@@ -2156,36 +2245,42 @@ fn a_message_from_grok_bot_pi_or_opencode_names_that_client_in_the_sender_label(
     }
 }
 
-/// A sender that reads the answer itself leaves out the reply hint: the last
-/// line asks the recipient to answer in its turn and names no tool.
+/// Every message asks the recipient to reply with send_message, which brings
+/// the reply back as a message of its own: no tool reads an answer, and no
+/// argument leaves the request out.
 #[test]
-fn without_the_reply_hint_the_recipient_is_asked_to_answer_in_its_turn() {
+fn every_message_asks_for_a_reply_with_send_message_and_no_tool_reads_answers() {
     let from = Party {
         client: "claude".into(),
         session_id: CLAUDE.into(),
         title: None,
     };
-    let line = |language, reply_to| {
-        let words = words::compose(
+    let line = |language| {
+        words::compose(
             language,
             PromptForm::Labelled,
             &from,
             "codex",
             "m-1",
-            reply_to,
-            false,
+            None,
             "Hi",
-        );
-        assert!(!words.contains("send_message"), "{words}");
-        words.lines().last().unwrap().to_owned()
+        )
+        .lines()
+        .last()
+        .unwrap()
+        .to_owned()
     };
     assert_eq!(
-        line(Language::En, None),
-        "Answer here: the sender reads this turn's last reply, so send nothing back."
+        line(Language::En),
+        "Reply with agent-hud's MCP tool mcp__agent_hud__send_message, reply_to: m-1: your reply reaches the sender as a message."
     );
-    assert_eq!(line(Language::ZhHans, Some("m-0")), "这是对 m-0 的回复。");
+    assert_eq!(
+        line(Language::ZhHans),
+        "请用 agent-hud 的 MCP 工具 mcp__agent_hud__send_message 回复，reply_to: m-1，回复会作为一条消息送到发件方。"
+    );
     let tools = Messaging::tools(true).to_string();
-    assert_eq!(tools.matches("\"reply_hint\"").count(), 2);
+    assert!(!tools.contains("reply_hint"), "{tools}");
+    assert!(!tools.contains("get_message"), "{tools}");
 }
 
 /// Open decodes a compressed log from its start, 2 MiB a look, with one
@@ -2237,8 +2332,8 @@ fn harness_answers_come_back_through_open_s_pending_pages() {
     assert!(!world.messaging.waiting());
     // Read in turn, each read starting the decoder over for its own log.
     for _ in 0..2 {
-        assert_eq!(world.get(&json!(one))["answer"], "Ported.");
-        assert_eq!(world.get(&json!(two))["answer"], "Written.");
+        assert_eq!(world.read(&json!(one))["answer"], "Ported.");
+        assert_eq!(world.read(&json!(two))["answer"], "Written.");
     }
     // A page Open never gets to (past the looks one read takes) is not
     // read: no answer, and not done with none.
@@ -2247,7 +2342,7 @@ fn harness_answers_come_back_through_open_s_pending_pages() {
         .decode
         .store(1_000, AtomicOrdering::SeqCst);
     let calls = world.transcripts.calls.load(AtomicOrdering::SeqCst);
-    let got = world.get(&json!(one));
+    let got = world.read(&json!(one));
     assert!(got["answer"].is_null(), "{got}");
     assert_ne!(got["state"], "done", "{got}");
     let looks = world.transcripts.calls.load(AtomicOrdering::SeqCst) - calls;
@@ -2293,7 +2388,7 @@ fn a_turn_harness_starts_by_itself_ends_the_message_s_turn() {
         HARNESS,
         json!({"turnId":"3","turnStartedAt":at(sent + 60_000),"endedAt":at(sent + 61_000)}),
     );
-    let done = world.get(&json!(id));
+    let done = world.read(&json!(id));
     assert_eq!(done["state"], "done", "{done}");
     assert_eq!(done["answer"], "Started it on port 5173.");
     world.maintain(sent + 65_000);
@@ -2346,7 +2441,7 @@ fn a_harness_session_the_user_spoke_to_starts_a_new_chain() {
 }
 
 /// A reply answered in plain text flies nothing back: those words reach no
-/// one. get_message on the reply still reads them.
+/// one, though they read in the session's own turn.
 #[test]
 fn a_plain_answer_to_a_reply_flies_nothing_back() {
     let mut world = World::on();
@@ -2376,7 +2471,7 @@ fn a_plain_answer_to_a_reply_flies_nothing_back() {
     world.maintain(sent + 15_000);
     assert_eq!(flown(&world).len(), 2, "no third plane");
     assert!(!world.messaging.waiting(), "settled");
-    let read = world.get(&json!(reply_id));
+    let read = world.read(&json!(reply_id));
     assert_eq!(read["state"], "done", "{read}");
     assert_eq!(read["answer"], "Fixed both, thanks.");
 }
@@ -2401,7 +2496,6 @@ fn an_antigravity_answer_flies_back_once_the_store_reads_it() {
         "antigravity",
         &id,
         None,
-        true,
         "Plan the opening shot",
     );
     world.antigravity_facts(vec![
@@ -2438,7 +2532,7 @@ fn an_antigravity_answer_flies_back_once_the_store_reads_it() {
             json!({"from":"antigravity","to":"claude","fromLeft":false,"arrives":false,"falls":false})
         ]
     );
-    let done = world.get(&json!(id));
+    let done = world.read(&json!(id));
     assert_eq!(done["state"], "done", "{done}");
     assert_eq!(done["answer"], "A runner's wrist, the watch face lit.");
 }
@@ -2473,7 +2567,6 @@ fn an_antigravity_answer_the_store_cannot_tie_to_the_message_flies_only_its_repl
         "antigravity",
         &id,
         None,
-        true,
         "Got your message",
     );
     let item = |turn: &str, id: &str, order: u64, role: Role, text: &str| {
@@ -2521,7 +2614,7 @@ fn an_antigravity_answer_the_store_cannot_tie_to_the_message_flies_only_its_repl
         1,
         "no plane for an answer that cannot be read"
     );
-    assert!(world.get(&json!(id))["answer"].is_null());
+    assert!(world.read(&json!(id))["answer"].is_null());
     assert!(world.messaging.waiting(), "not given up either");
     let reply = world.call(
         Some(("antigravity", ANTIGRAVITY)),
@@ -2531,7 +2624,10 @@ fn an_antigravity_answer_the_store_cannot_tie_to_the_message_flies_only_its_repl
     assert_eq!(reply["state"], "queued", "{reply}");
     assert_eq!(flown(&world).len(), 2);
     assert_eq!(flown(&world)[1]["from"], "antigravity");
-    assert_eq!(world.get(&json!(id))["state"], "replied");
+    assert_eq!(
+        world.replied_by(&id),
+        reply["id"].as_str().map(str::to_owned)
+    );
 }
 
 impl Preferences {
@@ -2548,9 +2644,9 @@ impl Preferences {
 }
 
 #[test]
-fn an_answer_a_later_turn_hides_is_still_given() {
-    // OpenCode is read only through its latest turn: once the next one ends,
-    // get_message gives the answer that was thrown back.
+fn an_answer_whose_turn_ended_while_the_next_runs_still_flies_back() {
+    // OpenCode is read only through its latest turn: live facts that name
+    // the message as the turn that ended are final while the next one runs.
     let mut world = World::on();
     let session = "opencode:ses_a1b2";
     world.snapshot["sessions"].as_array_mut().unwrap().push(json!(
@@ -2568,15 +2664,7 @@ fn an_answer_a_later_turn_hides_is_still_given() {
     );
     world.maintain(now + 4_000);
     assert_eq!(flown(&world).len(), 2, "sent and back");
-    world.state(session, "idle");
-    world.live(
-        session,
-        json!({"turnId":"t2","turnStartedAt":at(now + 5_000),"endedAt":at(now + 9_000),"message":"Something else."}),
-    );
-    let got = world.get(&json!(id));
-    assert_eq!(got["state"], "done", "{got}");
-    assert_eq!(got["answer"], "Ported.");
-    assert_eq!(got["endedAt"], at(now + 3_000));
+    assert!(!world.messaging.waiting(), "settled");
 }
 
 /// The row list_sessions gives for a session.
@@ -2629,7 +2717,7 @@ fn a_steer_goes_into_the_codex_turn_in_progress_marked_as_such_and_counts_as_a_p
 /// A steer's answer is that of the turn it went into, which began before the
 /// send, whether its words carry Agent HUD's label or go as the user's.
 #[test]
-fn get_message_reads_a_steers_answer_from_the_turn_it_went_into() {
+fn a_steers_answer_is_read_from_the_turn_it_went_into() {
     for as_user in [false, true] {
         let mut world = World::new(Preferences {
             enabled: true,
@@ -2655,20 +2743,20 @@ fn get_message_reads_a_steers_answer_from_the_turn_it_went_into() {
         let delivered = world.codex.0.lock().unwrap().last().unwrap().text.clone();
         world.transcripts.steered(CODEX, turn, &delivered);
         world.transcripts.reply(CODEX, turn, "Switched to v2");
-        let running = world.get(&sent["id"]);
+        let running = world.read(&sent["id"]);
         assert_eq!(running["state"], "started", "as the user: {as_user}");
         world.live(
             CODEX,
             json!({"turnId":turn,"turnStartedAt":"2026-10-21T16:00:00Z","endedAt":"2026-10-21T16:40:00Z"}),
         );
-        let done = world.get(&sent["id"]);
+        let done = world.read(&sent["id"]);
         assert_eq!(done["state"], "done", "as the user: {as_user}: {done}");
         assert_eq!(done["answer"], "Switched to v2");
     }
 }
 #[test]
-fn stored_get_message_reads_a_steers_answer_from_the_turn_it_went_into() {
-    stored(get_message_reads_a_steers_answer_from_the_turn_it_went_into);
+fn stored_a_steers_answer_is_read_from_the_turn_it_went_into() {
+    stored(a_steers_answer_is_read_from_the_turn_it_went_into);
 }
 
 #[test]

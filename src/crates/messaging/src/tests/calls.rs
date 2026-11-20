@@ -39,22 +39,19 @@ fn a_call_whose_answer_was_lost_is_found_by_its_name_and_sends_once() {
     let sent = world
         .named("call-1", "send_message", message.clone())
         .unwrap();
-    assert_eq!(sent["state"], "queued", "{sent}");
+    assert_eq!(sent, json!({"delivered": true}));
     // The relay never read that answer: it asks by the call's name.
     let found = world.result_of("call-1");
-    assert_eq!(found["found"], true, "{found}");
-    assert_eq!(found["result"]["id"], sent["id"]);
-    assert_eq!(found["result"]["state"], "queued");
-    assert_eq!(found["result"]["pass"], sent["pass"]);
+    assert_eq!(found, json!({"found": true, "result": sent}));
     // The same call again answers as the first time and sends nothing more.
     let again = world
         .named("call-1", "send_message", message.clone())
         .unwrap();
-    assert_eq!(again["id"], sent["id"]);
+    assert_eq!(again, sent);
     assert_eq!(world.sent(), 1);
     // Another call with the same words is a message of its own.
     let other = world.named("call-2", "send_message", message).unwrap();
-    assert_ne!(other["id"], sent["id"]);
+    assert_eq!(other, json!({"delivered": true}));
     assert_eq!(world.sent(), 2);
 }
 
@@ -84,10 +81,9 @@ fn a_start_found_by_its_call_names_the_session_it_started() {
             json!({"client":"claude","text":"Run the whole suite"}),
         )
         .unwrap();
-    assert_eq!(started["state"], "started", "{started}");
+    assert_eq!(started, json!({"delivered": true, "sessionId": STARTED}));
     let found = world.result_of("call-1");
-    assert_eq!(found["result"]["id"], started["id"]);
-    assert_eq!(found["result"]["sessionId"], STARTED);
+    assert_eq!(found["result"], started);
 }
 
 #[test]

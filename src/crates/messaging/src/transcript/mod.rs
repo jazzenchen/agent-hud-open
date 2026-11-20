@@ -7,7 +7,6 @@
 mod paged;
 mod stored;
 
-pub(crate) use paged::live_only;
 pub use stored::{StoredTurn, Turns};
 
 use super::{journal::Message, journal::Turn, Caller, Host};

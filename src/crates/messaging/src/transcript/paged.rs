@@ -183,7 +183,7 @@ pub(super) fn answer(host: &Host<'_>, message: &Message) -> Option<Found> {
 /// `liveFacts`.
 /// Clients whose turns Agent HUD reads only from what their hooks or
 /// observer report of the latest one (`liveFacts`).
-pub(crate) fn live_only(client: &str) -> bool {
+fn live_only(client: &str) -> bool {
     matches!(
         client,
         "trae" | "trae-cn" | "cursor" | "zcode" | "pi" | "opencode"

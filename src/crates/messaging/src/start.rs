@@ -15,7 +15,6 @@ impl Messaging {
         if is_sub_agent(host.snapshot, caller) {
             return Ok(refused(&words::from_sub_agent(language)));
         }
-        let reply_hint = arguments["reply_hint"].as_bool().unwrap_or(true);
         if !matches!(client, "claude" | "codex" | "antigravity" | "deepseek") {
             return Ok(refused(&words::other_client(language)));
         }
@@ -73,7 +72,7 @@ impl Messaging {
         let id = message_id();
         let form = self.form();
         let from = party(host.snapshot, &caller.client, &caller.session_id);
-        let delivered = words::compose(language, form, &from, client, &id, None, reply_hint, text);
+        let delivered = words::compose(language, form, &from, client, &id, None, text);
         let request_id = uuid::Uuid::new_v4().to_string();
         let receipt = self.starts.start_with(
             StartRequest {
@@ -145,6 +144,6 @@ impl Messaging {
             true,
             state == "refused",
         ));
-        Ok(json!({"id":id,"state":state,"reason":reason,"sessionId":session,"pass":count}))
+        Ok(json!({"state":state,"reason":reason,"sessionId":session}))
     }
 }

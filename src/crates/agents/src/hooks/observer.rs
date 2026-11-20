@@ -71,7 +71,7 @@ pub fn parse_observation(source: &str, record: &Value) -> Result<HookEvent, Stri
     };
     let mut data = json!({"turnId":turn,"state":state,"startedAtMs":start,"observedAtMs":at,"title":record["title"].as_str(),"workspace":record["workspace"].as_str(),"sessionFile":record["sessionFile"].as_str(),"model":record["model"].as_str(),"providerId":record["providerID"].as_str(),"outcome":outcome,"navigationTarget":target});
     // The message another agent left that started this turn, which the
-    // observer handed over (its mailbox): how `get_message` finds the turn.
+    // observer handed over (its mailbox): how the plane back finds the turn.
     if let Some(message) = record["delivered"].as_str().filter(|id| {
         !id.is_empty()
             && id.len() <= 128

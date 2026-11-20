@@ -110,12 +110,12 @@ fn a_steer_goes_into_the_harness_turn_in_progress_and_its_answer_is_read_from_it
     // Harness reads it before the turn's next step, and answers in that turn.
     world.transcripts.steered(HARNESS, "7", &delivered);
     world.transcripts.reply(HARNESS, "7", "Switched to v2");
-    assert_eq!(world.get(&sent["id"])["state"], "started");
+    assert_eq!(world.read(&sent["id"])["state"], "started");
     world.live(
         HARNESS,
         json!({"turnId":"7","turnStartedAt":"2026-10-22T01:00:00Z","endedAt":"2026-10-22T01:03:00Z"}),
     );
-    let done = world.get(&sent["id"]);
+    let done = world.read(&sent["id"]);
     assert_eq!(done["state"], "done", "{done}");
     assert_eq!(done["answer"], "Switched to v2");
 }

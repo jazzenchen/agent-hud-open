@@ -209,8 +209,8 @@ mod tests {
         put(
             &calls,
             "c.json",
-            json!({"tool":"get_message","arguments":{},"sessionId":"omp:s","at":at}),
+            json!({"tool":"list_sessions","arguments":{},"sessionId":"omp:s","at":at}),
         );
-        assert_eq!(caller(&data, 4242, "get_message", &json!({}), now), None);
+        assert_eq!(caller(&data, 4242, "list_sessions", &json!({}), now), None);
     }
 }

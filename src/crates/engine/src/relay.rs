@@ -146,7 +146,7 @@ mod tests {
 
     #[test]
     fn a_send_whose_answer_was_lost_answers_with_what_the_app_says_it_sent() {
-        let receipt = json!({"id":"m-1","state":"queued","reason":null,"pass":1});
+        let receipt = json!({"delivered":true});
         let (response, requests) = asked(
             &send(),
             vec![
@@ -212,7 +212,7 @@ mod tests {
     #[test]
     fn a_call_that_sends_nothing_or_has_no_name_is_never_asked_about() {
         for request in [
-            json!({"id":1,"method":"host_tool","params":{"name":"get_message","call":"c-1"}}),
+            json!({"id":1,"method":"host_tool","params":{"name":"list_sessions","call":"c-1"}}),
             json!({"id":1,"method":"host_tool","params":{"name":"send_message"}}),
             json!({"id":1,"method":"snapshot"}),
         ] {

@@ -109,12 +109,6 @@ impl Journal {
         self.messages.push(message);
         self.save();
     }
-    pub fn replace(&mut self, message: Message) {
-        if let Some(slot) = self.messages.iter_mut().find(|row| row.id == message.id) {
-            *slot = message;
-            self.save();
-        }
-    }
     pub fn find(&self, id: &str) -> Option<&Message> {
         self.messages.iter().find(|message| message.id == id)
     }

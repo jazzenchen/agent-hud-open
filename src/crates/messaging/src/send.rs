@@ -15,7 +15,6 @@ impl Messaging {
             return Ok(refused(&words::from_sub_agent(language)));
         }
         let reply_to = arguments["reply_to"].as_str().filter(|id| !id.is_empty());
-        let reply_hint = arguments["reply_hint"].as_bool().unwrap_or(true);
         // Queued by default; a steer goes into the recipient's turn in progress.
         let steer = match arguments["delivery"].as_str() {
             None | Some("queue") => false,
@@ -117,9 +116,7 @@ impl Messaging {
             self.form()
         };
         let from = sender.clone();
-        let delivered = words::compose(
-            language, form, &from, client, &id, reply_to, reply_hint, text,
-        );
+        let delivered = words::compose(language, form, &from, client, &id, reply_to, text);
         let delivered = if steer {
             words::steered(language, delivered)
         } else {
@@ -193,8 +190,8 @@ impl Messaging {
             call: self.calling.clone(),
         };
         // A reply that went back to its parent's sender settles the parent:
-        // get_message says it was replied to, and this reply's plane is the
-        // one back, so the end of the turn that sent it throws no second.
+        // the journal names this reply, and its plane is the one back, so the
+        // end of the turn that sent it throws no second.
         if state != "refused" {
             if let Some(parent) = replied
                 .filter(|parent| {
@@ -214,7 +211,7 @@ impl Messaging {
             false,
             state == "refused",
         ));
-        Ok(json!({"id":id,"state":state,"reason":reason,"pass":count}))
+        Ok(json!({"state":state,"reason":reason}))
     }
 
     /// The chain the caller's message joins and its pass in it. The caller's

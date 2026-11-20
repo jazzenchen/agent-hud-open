@@ -1,7 +1,9 @@
 //! Agent messages: an agent session asks Agent HUD, through its MCP server, to
 //! send words into another Claude Code, Codex, Antigravity or DeepSeek Harness
 //! session on this computer, or to start one, in a model the user names or
-//! else the client's own, and later reads that session's answer. A tool group of its own, off until the user turns it on
+//! else the client's own. A call says only whether the words were handed
+//! over: an answer comes back when the other session sends one with
+//! `send_message`, as a turn of its own. A tool group of its own, off until the user turns it on
 //! (`Preferences`). Delivery goes through `agent_hud_platform::delivery`, the
 //! same way as a message typed into a session from the HUD. A call runs on
 //! the caller's thread and may outlast the relay's wait for it (Open #118):
@@ -12,9 +14,7 @@
 //! The words are kept only while they are delivered: the journal keeps who sent
 //! what to whom, a fingerprint of the words and where the answer will be, and
 //! an answer is read again from the other session's transcript each time.
-mod answers;
 mod flights;
-mod get;
 mod journal;
 mod listing;
 mod models;
@@ -61,20 +61,39 @@ const GAVE_UP: &str = "The caller stopped waiting for this call; nothing was sen
 /// How many given-up calls are remembered: far more than can wait at once.
 const GIVEN_UP_KEPT: usize = 256;
 
-/// What a sending call answered when it sent `message`, as its caller reads
-/// it: the message as it stands now.
+/// What a sending call answered when it sent `message`, as it stands now.
 fn receipt(message: &Message) -> Value {
     let mut answer = json!({
-        "id": message.id,
         "state": message.state,
         "reason": message.reason,
-        "pass": message.count,
     });
     if message.kind == Kind::Start {
         answer["sessionId"] = match message.to.session_id.as_str() {
             "" => Value::Null,
             session => session.into(),
         };
+    }
+    answer
+}
+
+/// What a sending call tells its agent: `delivered` true once Agent HUD
+/// handed the words over (queued, steered, or a session started with them),
+/// false with the reason when nothing was sent, null with the reason when the
+/// client may have taken them without saying so. A started session's id when
+/// known. When the other side answers is its own affair: nothing here waits
+/// for it or reads it.
+fn handed(result: Value) -> Value {
+    let delivered = match result["state"].as_str() {
+        Some("refused") => Value::Bool(false),
+        Some("uncertain") => Value::Null,
+        _ => Value::Bool(true),
+    };
+    let mut answer = json!({ "delivered": delivered });
+    if delivered != Value::Bool(true) && !result["reason"].is_null() {
+        answer["reason"] = result["reason"].clone();
+    }
+    if !result["sessionId"].is_null() {
+        answer["sessionId"] = result["sessionId"].clone();
     }
     answer
 }
@@ -142,8 +161,6 @@ pub struct Messaging {
     starts: SessionStarts,
     follow: Follow,
     fly: Fly,
-    /// Answers thrown back, for `get_message` once a client's next turn hides them.
-    answers: answers::Answers,
     /// The relay's name for the sending call being answered, kept with the
     /// message it sends.
     calling: Option<String>,
@@ -169,14 +186,22 @@ impl Messaging {
             starts,
             follow,
             fly,
-            answers: Default::default(),
             calling: None,
             given_up: Default::default(),
         }
     }
 
-    /// `host_tool`: one call from the relay.
+    /// `host_tool`: one call from the relay. A sending call answers only
+    /// whether its words were handed over (`handed`).
     pub fn call(&mut self, params: &Value, host: &Host<'_>, now: i64) -> Result<Value> {
+        let answer = self.answer(params, host, now);
+        match params["name"].as_str() {
+            Some("send_message" | "start_session") => answer.map(handed),
+            _ => answer,
+        }
+    }
+
+    fn answer(&mut self, params: &Value, host: &Host<'_>, now: i64) -> Result<Value> {
         self.preferences = Preferences::read(&host.snapshot["settings"]);
         if !self.preferences.enabled {
             return Ok(refused(&words::off(language(host.snapshot))));
@@ -224,10 +249,6 @@ impl Messaging {
                 self.calling = None;
                 answer
             }
-            "get_message" => {
-                let id = arguments["id"].as_str().ok_or("id is required")?;
-                self.get(id, host, now)
-            }
             _ => Err("Unknown local application tool".into()),
         }
     }
@@ -239,7 +260,7 @@ impl Messaging {
     /// be: a call that has not begun yet is refused when it does.
     fn call_result(&mut self, call: &str) -> Value {
         if let Some(message) = self.journal.by_call(call) {
-            return json!({"found": true, "result": receipt(message)});
+            return json!({"found": true, "result": handed(receipt(message))});
         }
         if !self.given_up.iter().any(|given_up| given_up == call) {
             if self.given_up.len() >= GIVEN_UP_KEPT {
