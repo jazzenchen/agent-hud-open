@@ -45,7 +45,6 @@ fn control() -> Control {
         force: HashSet::new(),
         enabled: HashSet::new(),
         running: HashSet::new(),
-        live: HashSet::new(),
         finished: HashMap::new(),
         entries: BTreeMap::new(),
         pages: HashMap::new(),
@@ -161,11 +160,13 @@ fn connected_cli_reports_use_account_cadence_and_callback_requests_respect_spaci
         .quotas
         .push(json!({"resetAt": (chrono::Utc::now()+chrono::Duration::days(7)).to_rfc3339()}));
     let fresh = entry(reading, Some("2026-10-23T08:00:00Z"), false);
-    assert!(due_after(facts("antigravity"), &fresh, &state) > Duration::from_secs(300));
+    let quiet = due_after(facts("antigravity"), &fresh, &state);
+    assert!(quiet > Duration::from_secs(175) && quiet <= Duration::from_secs(180));
     state
         .account_homes
         .insert("antigravity".into(), vec!["/tmp/config.json".into()]);
-    assert!(due_after(facts("antigravity"), &fresh, &state) <= Duration::from_secs(300));
+    let homes = due_after(facts("antigravity"), &fresh, &state);
+    assert!(homes > Duration::from_secs(175) && homes <= Duration::from_secs(180));
     state.force.insert("antigravity".into());
     let pause = due_after(facts("antigravity"), &fresh, &state);
     assert!(pause > Duration::from_secs(59) && pause <= Duration::from_secs(60));
@@ -558,48 +559,118 @@ fn reset_later(provider: &'static str) -> Entry {
     entry
 }
 
-#[test]
-fn a_quiet_session_in_flight_keeps_its_provider_on_the_live_interval() {
-    let mut state = control();
-    let claude = reset_later("claude");
-    assert!(
-        due_after(facts("claude"), &claude, &state) > Duration::from_secs(3600),
-        "idle: wait for the reset"
+/// A provider whose last reading ran `ago` seconds ago.
+fn read_ago(provider: &'static str, ago: u64) -> Entry {
+    let mut entry = entry(
+        AccountReading::empty(provider),
+        Some("2026-11-20T08:00:00+00:00"),
+        false,
     );
-    state.live.insert("claude".into());
-    assert_eq!(
-        due_after(facts("claude"), &claude, &state),
-        Duration::ZERO,
-        "live: read every 240 s"
-    );
-    state.running.insert("claude".into());
-    assert_eq!(due_after(facts("claude"), &claude, &state), Duration::ZERO);
+    entry.attempted -= Duration::from_secs(ago);
+    entry.attempted_ms -= ago as i64 * 1000;
+    entry
 }
 
 #[test]
-fn only_providers_this_macs_work_moves_wait_for_their_reset() {
+fn every_provider_is_read_on_the_interval_whether_or_not_it_is_used_here() {
     let mut state = control();
-    for provider in ["copilot", "antigravity", "devin", "kimi"] {
-        assert!(
-            due_after(facts(provider), &reset_later(provider), &state) > Duration::from_secs(3600),
-            "{provider}"
-        );
-    }
-    for provider in ["codex", "cursor", "grok-bot"] {
+    // Whether used here or also on other devices, and with a reset hours
+    // away, an idle provider is read again after 180 s.
+    for provider in [
+        "claude",
+        "codex",
+        "cursor",
+        "grok-bot",
+        "copilot",
+        "antigravity",
+        "devin",
+        "kimi",
+        "minimax",
+    ] {
         assert_eq!(
             due_after(facts(provider), &reset_later(provider), &state),
             Duration::ZERO,
-            "{provider}"
+            "{provider}: ten minutes since the last reading"
+        );
+        let quiet = due_after(facts(provider), &read_ago(provider, 90), &state);
+        assert!(
+            quiet > Duration::from_secs(85) && quiet <= Duration::from_secs(90),
+            "{provider}: every 180 s, {quiet:?}"
         );
     }
-    // Work that finished since the last reading is read at once, but only
-    // where this Mac's work moves the windows.
-    let later = chrono::Utc::now().timestamp_millis();
-    state.finished.insert("opencode".into(), later);
-    assert_eq!(
-        due_after(facts("glm"), &reset_later("glm"), &state),
-        Duration::ZERO,
-        "an open agent's work is the plans'"
+    // A session that is quiet but not done changes nothing; a turn running
+    // reads every 120 s.
+    state.running.insert("codex".into());
+    let running = due_after(facts("codex"), &read_ago("codex", 90), &state);
+    assert!(
+        running > Duration::from_secs(25) && running <= Duration::from_secs(30),
+        "{running:?}"
+    );
+}
+
+#[test]
+fn a_turn_that_ended_is_read_once_its_sources_have_settled() {
+    let mut state = control();
+    let now = chrono::Utc::now().timestamp_millis();
+    let mut codex = read_ago("codex", 90);
+    // A Codex turn that ended now is read 5 s later, also for a provider
+    // other devices spend and while another of its sessions still runs.
+    state.finished.insert("codex".into(), now);
+    let settled = due_after(facts("codex"), &codex, &state);
+    assert!(
+        settled > Duration::from_secs(4) && settled <= Duration::from_secs(5),
+        "{settled:?}"
+    );
+    state.running.insert("codex".into());
+    let beside = due_after(facts("codex"), &codex, &state);
+    assert!(
+        beside > Duration::from_secs(4) && beside <= Duration::from_secs(5),
+        "{beside:?}"
+    );
+    state.running.clear();
+    // The spread adds up to 10 s, so readings one turn's end makes due are
+    // not asked back to back.
+    codex.spread = 60;
+    let staggered = due_after(facts("codex"), &codex, &state);
+    assert!(
+        staggered > Duration::from_secs(14) && staggered <= Duration::from_secs(15),
+        "{staggered:?}"
+    );
+    codex.spread = 0;
+    // A turn that ends meanwhile puts the reading off again: the two are
+    // read once, after the second.
+    state.finished.insert("codex".into(), now + 4_000);
+    let again = due_after(facts("codex"), &codex, &state);
+    assert!(
+        again > Duration::from_secs(8) && again <= Duration::from_secs(9),
+        "{again:?}"
+    );
+    // Turns that keep ending wait no longer than the interval.
+    state.finished.insert("codex".into(), now + 600_000);
+    let capped = due_after(facts("codex"), &codex, &state);
+    assert!(
+        capped > Duration::from_secs(85) && capped <= Duration::from_secs(90),
+        "{capped:?}"
+    );
+    // A turn that ended before the last reading is not read again.
+    state
+        .finished
+        .insert("codex".into(), codex.attempted_ms - 1);
+    assert!(due_after(facts("codex"), &codex, &state) > Duration::from_secs(85));
+    // No reading follows another within 60 s.
+    let recent = read_ago("codex", 20);
+    state.finished.insert("codex".into(), now);
+    let spaced = due_after(facts("codex"), &recent, &state);
+    assert!(
+        spaced > Duration::from_secs(35) && spaced <= Duration::from_secs(40),
+        "{spaced:?}"
+    );
+    // An open agent's turn is the coding plans' work.
+    state.finished.insert("opencode".into(), now);
+    let glm = due_after(facts("glm"), &read_ago("glm", 90), &state);
+    assert!(
+        glm > Duration::from_secs(4) && glm <= Duration::from_secs(5),
+        "{glm:?}"
     );
 }
 
@@ -616,8 +687,8 @@ fn a_deepseek_key_in_another_client_reads_the_balance_with_that_clients_work() {
     deepseek.attempted_ms -= 90_000;
     let quiet = due_after(facts("deepseek"), &deepseek, &state);
     assert!(
-        quiet > Duration::from_secs(145) && quiet <= Duration::from_secs(150),
-        "quiet: every 240 s"
+        quiet > Duration::from_secs(85) && quiet <= Duration::from_secs(90),
+        "quiet: every 180 s"
     );
     state.running.insert("claude".into());
     let running = due_after(facts("deepseek"), &deepseek, &state);
@@ -629,10 +700,10 @@ fn a_deepseek_key_in_another_client_reads_the_balance_with_that_clients_work() {
     state
         .finished
         .insert("pi".into(), chrono::Utc::now().timestamp_millis());
-    assert_eq!(
-        due_after(facts("deepseek"), &deepseek, &state),
-        Duration::ZERO,
-        "a Pi turn ended, with no spread: at once"
+    let settled = due_after(facts("deepseek"), &deepseek, &state);
+    assert!(
+        settled > Duration::from_secs(4) && settled <= Duration::from_secs(5),
+        "a Pi turn ended, with no spread: 5 s later, {settled:?}"
     );
     // The spread puts the reading after a turn's end off by up to 15 s.
     deepseek.spread = 60;

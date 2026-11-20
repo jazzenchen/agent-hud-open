@@ -59,12 +59,8 @@ pub(crate) fn dashboard(host: &dyn Host, token: &str, method: &str) -> Result<Va
 /// the pool Grok Bot shares, and the dashboard's monthly summary stays at 0.
 const MERGED_PLAN: &str = "super";
 
-/// Cursor's plan, read with the sign-in Cursor keeps. It is spent on every
-/// device the account signs in on, so it is read on the account interval.
-pub static PROVIDER: Provider = Provider {
-    local_work: false,
-    ..Provider::new("cursor", read)
-};
+/// Cursor's plan, read with the sign-in Cursor keeps.
+pub static PROVIDER: Provider = Provider::new("cursor", read);
 
 pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
     let Some(signed) = sign_in(host)? else {

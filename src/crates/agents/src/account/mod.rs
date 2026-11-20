@@ -158,11 +158,6 @@ pub struct Provider {
     /// The provider's id in readings and the snapshot.
     pub id: &'static str,
     pub read: Read,
-    /// Whether work on this computer is what moves the provider's windows,
-    /// so a reading can wait while nothing runs here. Windows that other
-    /// devices or servers spend are read on the account interval whatever
-    /// this computer does.
-    pub local_work: bool,
     /// The session sources whose work spends this provider's windows; empty
     /// means the provider's own id.
     pub work_sources: &'static [&'static str],
@@ -185,7 +180,6 @@ impl Provider {
         Self {
             id,
             read,
-            local_work: true,
             work_sources: &[],
             keeps_unreported_windows: false,
             reported: None,

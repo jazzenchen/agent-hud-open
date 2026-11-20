@@ -19,7 +19,6 @@ use credentials::{
 const BALANCE_URL: &str = "https://zcode.z.ai/api/v1/zcode-plan/billing/balance";
 
 pub static PROVIDER: Provider = Provider {
-    local_work: false,
     work_sources: &["zcode"],
     ..Provider::new("zcode", read)
 };

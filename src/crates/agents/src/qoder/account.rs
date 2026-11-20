@@ -34,7 +34,6 @@ pub static WEB_CHINA: WebSignIn = WebSignIn {
 };
 
 pub static QODER: Provider = Provider {
-    local_work: false,
     // QoderWork spends the same qoder.com credits.
     work_sources: &["qoder", "qoder-work"],
     web: Some(&WEB_GLOBAL),
@@ -42,14 +41,12 @@ pub static QODER: Provider = Provider {
 };
 
 pub static QODER_CN: Provider = Provider {
-    local_work: false,
     work_sources: &["qoder-cn"],
     web: Some(&WEB_CHINA),
     ..Provider::new("qoder-cn", read_qoder_cn)
 };
 
 pub static QODER_WORK: Provider = Provider {
-    local_work: false,
     work_sources: &["qoder-work"],
     ..Provider::new("qoder-work", read_qoder_work)
 };

@@ -1,8 +1,8 @@
 //! Provider account readings on one worker, one at a time, with one result
 //! cache outside the Runtime mutex. A reading holds the collection gate, so it
 //! never overlaps a local pass either.
-//! Cadence (`schedule`): 240 s quiet, 120 s running, each plus a random spread
-//! of 0–60 s; a few seconds after work finishes; >= 60 s per account.
+//! Cadence (`schedule`): 180 s quiet, 120 s running, each plus a random spread
+//! of 0–60 s; 5–15 s after the last turn that ended; >= 60 s per account.
 //!
 //! Each provider states its own facts (`agents::account::Provider`): how it
 //! is read, whose work spends its windows, what a failure means. Everything
@@ -105,9 +105,6 @@ struct Control {
     enabled: HashSet<String>,
     /// Sources with a turn running that was heard from in the last 300 s.
     running: HashSet<String>,
-    /// Sources with a session still in flight, however long it has been
-    /// quiet (agent-hud-native-open `LiveSession.isLive(at:)`).
-    live: HashSet<String>,
     finished: HashMap<String, i64>,
     entries: BTreeMap<&'static str, Entry>,
     /// Status pages by address.
@@ -191,7 +188,6 @@ impl AccountService {
                 force: HashSet::new(),
                 enabled,
                 running: HashSet::new(),
-                live: HashSet::new(),
                 finished: HashMap::new(),
                 entries,
                 pages: HashMap::new(),

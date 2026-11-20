@@ -21,10 +21,8 @@ use std::{
 };
 
 /// Codex's plan, read through its CLI's app-server and Pi's ChatGPT
-/// sign-in. Pi and other clients spend it without Codex rollouts here, so it
-/// is read on the account interval whatever this computer does.
+/// sign-in.
 pub static PROVIDER: Provider = Provider {
-    local_work: false,
     status: Some(&STATUS),
     ..Provider::new("codex", read)
 };

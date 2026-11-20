@@ -28,20 +28,17 @@ pub static WEB: WebSignIn = WebSignIn {
 };
 
 pub static WORKBUDDY: Provider = Provider {
-    local_work: false,
     work_sources: &["workbuddy"],
     web: Some(&WEB),
     ..Provider::new("workbuddy", read_workbuddy)
 };
 
 pub static CODEBUDDY: Provider = Provider {
-    local_work: false,
     work_sources: &["codebuddy"],
     ..Provider::new("codebuddy", read_codebuddy)
 };
 
 pub static CODEBUDDY_CN: Provider = Provider {
-    local_work: false,
     work_sources: &["codebuddy-cn"],
     ..Provider::new("codebuddy-cn", read_codebuddy_cn)
 };

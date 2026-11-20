@@ -16,8 +16,8 @@ The implementation follows the original Swift account readers:
 | Grok Bot     | The Bot's cache (`sand-client-persistence`), and Cursor's sign-in when it is the Bot's account | The Bot's weekly meter (`GetSandUsageStatus`) with Cursor's sign-in to the same account, which also names the account; else the Bot's cache. A server that misses an answer is a passing failure, so the last reading stays rather than an older cache; any other server failure falls back to the cache. Each bot's daily tokens from `GetDailySpendByCategory`, none for a merged account |
 | DeepSeek     | Harness settings and versioned credential reference; the key Claude Code (`ANTHROPIC_BASE_URL`) or Codex (`[model_providers.*]` `base_url`) sends to `api.deepseek.com`, and the API key of Pi's `deepseek` provider in `auth.json`, or of a Pi provider whose `models.json` `baseUrl` is on that host (Open #64) | Official API balance endpoint and response currency; each client's own key is its own balance, labelled with the clients that send it, and a key Harness shares with them is read once |
 | Kimi, GLM, OpenCode Go | Keys other clients hold: the environment, Claude Code's settings files (as for relays below), OpenCode, Pi, Kimi Code, WorkBuddy | Each plan's own usage endpoint |
-| MiniMax      | Plan keys other clients send to MiniMax's own API: `MINIMAX_CODING_API_KEY`, `MINIMAX_API_KEY`, Pi's `MINIMAX_CN_API_KEY`, Claude Code's `ANTHROPIC_BASE_URL`, Codex's `[model_providers.*]`, OpenCode's and Pi's sign-ins; pay-as-you-go keys (`sk-api-`) are left out | `GET /v1/token_plan/remains` on the key's platform (`www.minimax.io`, or `www.minimax.cn` for China), else the older Coding Plan `/v1/api/openplatform/coding_plan/remains`; a key no client places on a platform is tried on the other when the first refuses it. Each model family's 5-hour and weekly windows; prompts used of the total where the plan counts them; a key with no active plan (status 2062) shows nothing, with a notice, rather than a failed reading; read every five minutes whatever this computer does, since clients not read here and other devices spend the plan too |
-| Volcengine Ark | An installed `arkcli`, signed in through its own login; Agent HUD reads none of its credentials | `arkcli usage plan --format json`, with implicit updates off (`ARKCLI_NO_UPDATE_NOTIFIER=1`): Coding Plan and Agent Plan, personal and team, 5-hour, weekly and monthly windows; a plan the CLI could not read is named in a notice; no model call; read every five minutes whatever this computer does, since clients not read here and other devices spend the plan too |
+| MiniMax      | Plan keys other clients send to MiniMax's own API: `MINIMAX_CODING_API_KEY`, `MINIMAX_API_KEY`, Pi's `MINIMAX_CN_API_KEY`, Claude Code's `ANTHROPIC_BASE_URL`, Codex's `[model_providers.*]`, OpenCode's and Pi's sign-ins; pay-as-you-go keys (`sk-api-`) are left out | `GET /v1/token_plan/remains` on the key's platform (`www.minimax.io`, or `www.minimax.cn` for China), else the older Coding Plan `/v1/api/openplatform/coding_plan/remains`; a key no client places on a platform is tried on the other when the first refuses it. Each model family's 5-hour and weekly windows; prompts used of the total where the plan counts them; a key with no active plan (status 2062) shows nothing, with a notice, rather than a failed reading |
+| Volcengine Ark | An installed `arkcli`, signed in through its own login; Agent HUD reads none of its credentials | `arkcli usage plan --format json`, with implicit updates off (`ARKCLI_NO_UPDATE_NOTIFIER=1`): Coding Plan and Agent Plan, personal and team, 5-hour, weekly and monthly windows; a plan the CLI could not read is named in a notice; no model call |
 | Grok CLI     | The CLI's own xAI sign-in (`auth.json` in `GROK_HOME`, else `~/.grok`), never refreshed or rewritten; an expired one keeps the last credits until the CLI runs again (it renews its token on every run), and only a missing or refused sign-in counts as signed out | The CLI's billing endpoint (`cli-chat-proxy.grok.com/v1/billing?format=credits`): the share of the period's credits used, on-demand credits of their cap when reported, the plan from `/v1/settings` |
 | Copilot      | Once Copilot quota reading is on: the GitHub CLI's sign-in (environment, credential store, `hosts.yml`), then the one GitHub's Copilot clients keep (`github-copilot/apps.json`, older `hosts.json`); a token GitHub refuses gives way to the next | `copilot_internal/user`; premium requests beyond the plan as an estimated overage in US dollars (US$0.04 each, GitHub's published price) |
 | Hermes / Nous Portal | Hermes's own Nous Portal sign-in (`auth.json` in `HERMES_HOME`, else `~/.hermes`: `providers.nous`, else the credential pool; else `shared/nous_auth.json`), never refreshed or rewritten, since Nous rotates its refresh tokens and a reused one signs Hermes out; an expired access token is never sent: the reading is transient, so the last credits stay as they were for 10 minutes and then show stale with the reason that Hermes renews its Nous Portal sign-in the next time it runs and the credits update then; no Nous sign-in shows nothing | `GET /api/oauth/account` on the stored portal only when it is `https` on `nousresearch.com` or a subdomain, else `portal.nousresearch.com`: the month's subscription credits used of the grant (resetting at the period end), the top-up credits in US dollars, the plan; a refused token is a sign-out |
@@ -33,22 +33,26 @@ The implementation follows the original Swift account readers:
 
 Each provider states its own facts in its folder under `src/crates/agents/src/`
 (`agents::account::Provider`, listed in `agents::ACCOUNTS`): how it is read,
-whether this computer's work moves its windows, which session sources spend
-them, whether a window a reading leaves out keeps its last value, which rows a
-client reports by itself, and the vendor's status page. A reading that fails
-says why (`Unread`): the agent signed out, the reading only missed an answer
-(offline, a timeout, the service busy or asking to wait), or anything else.
+which session sources spend its windows, whether a window a reading leaves out
+keeps its last value, which rows a client reports by itself, and the vendor's
+status page. A reading that fails says why (`Unread`): the agent signed out,
+the reading only missed an answer (offline, a timeout, the service busy or
+asking to wait), or anything else.
 What a 401 means is the provider's to say.
 
 Everything else is the same for every provider:
 
-- A provider is read every 2 minutes while a turn of a session source that
-  spends it runs, every 4 minutes otherwise, each plus a random 0–60 s drawn
-  again after every reading, so providers and vendors are not asked in step.
-  Where this computer's work moves a provider's windows, work that finished
-  since the last reading is read 0–15 s after it ended. No provider is read twice within 60 s, and one reading runs
-  at a time. DeepSeek's balance counts Claude Code, Codex and Pi sessions as
-  its own, since they can spend it through a DeepSeek key.
+- Every provider the user has turned on is read whether or not anything uses
+  it here, since a reading is the vendor's own count wherever it was spent:
+  every 2 minutes while a turn of a session source that spends it runs, every
+  3 minutes otherwise, each plus a random 0–60 s drawn again after every
+  reading, so providers and vendors are not asked in step.
+- A turn of a source that ended since the last reading is read 5–15 s after
+  it ended. A turn that ends meanwhile puts that reading off again, so turns
+  that end together are read once; turns that keep ending still wait no
+  longer than the interval above. No provider is read twice within 60 s, and
+  one reading runs at a time. DeepSeek's balance counts Claude Code, Codex and
+  Pi sessions as its own, since they can spend it through a DeepSeek key.
 - A reading that only missed an answer, while the last good one is under 10
   minutes old, changes nothing on screen. Any other failure shows at once with
   its reason, and the last reading stays, marked stale.

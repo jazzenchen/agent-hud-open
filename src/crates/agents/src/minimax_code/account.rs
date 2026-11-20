@@ -15,7 +15,6 @@ const ORIGIN_CN: &str = "https://agent.minimax.cn";
 const ORIGIN_EN: &str = "https://agent.minimax.io";
 
 pub static PROVIDER: Provider = Provider {
-    local_work: false,
     work_sources: &["minimax-code"],
     ..Provider::new("minimax-code", read)
 };

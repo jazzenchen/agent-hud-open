@@ -35,7 +35,6 @@ pub static WEB_CHINA: WebSignIn = WebSignIn {
 
 /// International TRAE (`id: "trae"`).
 pub static TRAE: Provider = Provider {
-    local_work: false,
     work_sources: &["trae"],
     web: Some(&WEB_GLOBAL),
     ..Provider::new("trae", read_global)
@@ -43,7 +42,6 @@ pub static TRAE: Provider = Provider {
 
 /// China TRAE CN (`id: "trae-cn"`).
 pub static TRAE_CN: Provider = Provider {
-    local_work: false,
     work_sources: &["trae-cn"],
     web: Some(&WEB_CHINA),
     ..Provider::new("trae-cn", read_china)

@@ -105,23 +105,20 @@ impl AccountService {
         }
         let cutoff = chrono::Utc::now().timestamp_millis() - 300_000;
         let mut running = HashSet::new();
-        let mut live = HashSet::new();
         let mut finished = HashMap::<String, i64>::new();
         for session in snapshot["sessions"].as_array().into_iter().flatten() {
             let Some(provider) = session["source"].as_str() else {
                 continue;
             };
-            // A session's state is in flight only while its newest evidence is
-            // under 30 minutes old (Open's `SessionPhase.Limits.vouched`).
-            if matches!(session["state"].as_str(), Some("running" | "waiting")) {
-                live.insert(provider.to_owned());
-                if session["liveFacts"]["observedAt"]
+            // A turn counts as running while the session was heard from in
+            // the last 5 minutes.
+            if matches!(session["state"].as_str(), Some("running" | "waiting"))
+                && session["liveFacts"]["observedAt"]
                     .as_str()
                     .and_then(date_ms)
                     .is_some_and(|at| at > cutoff)
-                {
-                    running.insert(provider.to_owned());
-                }
+            {
+                running.insert(provider.to_owned());
             }
             if let Some(at) = session["liveFacts"]["endedAt"].as_str().and_then(date_ms) {
                 finished
@@ -150,14 +147,9 @@ impl AccountService {
             state.account_homes = account_homes;
             self.shared.wake.notify_all();
         }
-        if state.enabled != enabled
-            || state.running != running
-            || state.live != live
-            || state.finished != finished
-        {
+        if state.enabled != enabled || state.running != running || state.finished != finished {
             state.enabled = enabled;
             state.running = running;
-            state.live = live;
             state.finished = finished;
             self.shared.wake.notify_all();
         }

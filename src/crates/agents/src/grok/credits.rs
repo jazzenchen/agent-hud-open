@@ -424,7 +424,6 @@ mod tests {
     fn the_cli_is_its_own_provider() {
         let provider = crate::account_provider("grok-cli").unwrap();
         assert!(std::ptr::eq(provider, &PROVIDER));
-        assert!(provider.local_work);
         assert_eq!(provider.sources(), ["grok-cli"]);
     }
 }

@@ -28,9 +28,8 @@ pub const CACHE: PerOs<Location> = PerOs {
 };
 
 /// Grok's quota covers its CLI and its Bot, and the Bot's bots run on
-/// Cursor's servers, so it is read on the account interval.
+/// Cursor's servers.
 pub static PROVIDER: Provider = Provider {
-    local_work: false,
     work_sources: &["grok-bot", "grok-cli"],
     ..Provider::new("grok-bot", read)
 };
