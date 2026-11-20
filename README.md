@@ -57,7 +57,7 @@ The details are close at hand, and what needs your approval is answered right th
 
 - **Glow**: one colour per agent, from its most used quota: green under 70% used, yellow from 70%, red from 90%, with a warning before a quota runs out. It moves faster while an agent works.
 - **Hover**: quotas with their resets or burn rates, balances, the last 24 hours of tokens, and the sessions, those waiting for you first.
-- **Requests**: approve, deny or always allow, and answer an agent's questions, all on the HUD, the questions Claude asks in its desktop app included. Agent HUD never decides for you: a request you leave goes back to the agent after 10 minutes.
+- **Requests**: approve, deny or always allow, and answer any question an agent asks, right on the HUD, the questions Claude asks in its desktop app included. With Approve automatically on, Agent HUD allows permission requests for you.
 - **Jump back**: one click takes you to a session's thread, tab or terminal pane.
 
 **Two modes.** Each display runs one: Notch by default where there is a notch, Simple elsewhere.
