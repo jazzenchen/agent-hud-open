@@ -196,7 +196,7 @@ Agent HUD is built with Tauri 2: a Rust core, a React interface, and a thin nati
 When your iPhone and the release share a network, iPhone and Apple Watch show your Mac's quotas, token statistics and sessions without a subscription. Remote adds:
 
 - **Any network**: your quotas, token statistics and sessions, away from home too.
-- **Conversations**: read Claude Code, Codex, Antigravity and DeepSeek Harness sessions, and message Claude Code and Codex.
+- **Conversations**: read Claude Code, Codex, Antigravity and DeepSeek Harness sessions, and message Claude Code, Codex and Antigravity.
 - **Decisions**: allow or deny a tool call, answer a question, approve a plan.
 - **Your wrist**: an idea you say becomes a new session on your Mac, and the reply comes back to your watch.
 - **Alerts and Live Activities**: alerts on iPhone and Apple Watch, and your running sessions on the Lock Screen and in the Dynamic Island.
@@ -208,7 +208,7 @@ When your iPhone and the release share a network, iPhone and Apple Watch show yo
 | Widgets on the Home Screen, Lock Screen and StandBy | ✓ | — |
 | Several Macs | ✓ | ✓ |
 | Conversations | ★ | ★ |
-| Messages to Claude Code and Codex | ★ | ★ |
+| Messages to Claude Code, Codex and Antigravity | ★ | ★ |
 | A note that becomes a new session | ★ | ★ |
 | Tool calls, questions and plans | ★ | ★ |
 | Alerts | ★ | ★ |

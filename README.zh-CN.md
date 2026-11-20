@@ -196,7 +196,7 @@ Agent HUD 基于 Tauri 2 构建：Rust 核心、React 界面，每个操作系�
 iPhone 和发行版在同一个网络里，不订阅也能在 iPhone 与 Apple Watch 上看到 Mac 上的额度、Token 统计与会话。Remote 再加上：
 
 - **任何网络**：额度、Token 统计与会话，出门在外也看得到。
-- **对话**：阅读 Claude Code、Codex、Antigravity 与 DeepSeek Harness 的会话，并向 Claude Code 与 Codex 发送消息。
+- **对话**：阅读 Claude Code、Codex、Antigravity 与 DeepSeek Harness 的会话，并向 Claude Code、Codex 与 Antigravity 发送消息。
 - **决定**：允许或拒绝一次工具调用，回答提问，批准计划。
 - **手腕上**：说出的想法成为 Mac 上的新会话，回复回到你的手表。
 - **提醒与实时活动**：iPhone 与 Apple Watch 上的提醒，以及锁定屏幕和灵动岛上运行中的会话。
@@ -208,7 +208,7 @@ iPhone 和发行版在同一个网络里，不订阅也能在 iPhone 与 Apple W
 | 主屏幕、锁定屏幕与待机显示的小组件 | ✓ | — |
 | 多台 Mac | ✓ | ✓ |
 | 对话 | ★ | ★ |
-| 给 Claude Code 与 Codex 发消息 | ★ | ★ |
+| 给 Claude Code、Codex 与 Antigravity 发消息 | ★ | ★ |
 | 一条笔记变成新会话 | ★ | ★ |
 | 工具调用、提问与计划 | ★ | ★ |
 | 提醒 | ★ | ★ |
