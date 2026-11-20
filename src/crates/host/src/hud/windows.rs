@@ -18,6 +18,12 @@ pub(super) const COORDINATE_SPACE: &str = "monitor-scaled-physical-top-left";
 /// The taskbar is a topmost window too: whichever was clicked last draws on top,
 /// so an edge HUD rests beside it, inside the work area, never under it.
 pub(super) const DOCK_IN_WORK_AREA: bool = true;
+/// The window keeps its whole canvas. One hanging from the right or bottom
+/// edge grows by moving its top-left corner, and Windows shows the old
+/// picture at the new corner until WebView2 has drawn again: the HUD jumped
+/// aside as its panel began to open and blinked once it had closed (Open
+/// #129). A transparent window hides nothing of the windows under it here.
+pub(super) const WINDOW_FOLLOWS_DEPTH: bool = false;
 
 pub(super) fn native_drag() -> bool {
     true

@@ -27,6 +27,8 @@ pub(super) const GLOBAL_POINTS: bool = true;
 pub(super) const COORDINATE_SPACE: &str = "global-logical-top-left";
 /// The top edge and the Notch HUD sit over the menu bar on purpose.
 pub(super) const DOCK_IN_WORK_AREA: bool = false;
+/// The window reaches only as far from its edge as the HUD does (`depth.rs`).
+pub(super) const WINDOW_FOLLOWS_DEPTH: bool = true;
 
 pub(super) fn native_drag() -> bool {
     true

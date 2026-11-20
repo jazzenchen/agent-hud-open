@@ -104,14 +104,14 @@ pub(super) fn configure(
     config.width = f64::from(canvas_frame.width) / scale;
     config.height = f64::from(canvas_frame.height) / scale;
     // A drag previews across the whole canvas; otherwise the window reaches
-    // only as far from the edge as the page asked.
+    // only as far from the edge as the page asked, on a host that follows it.
     let asked = if state.depth_asked {
         state.depth
     } else {
         Some(STARTING_DEPTH)
     };
     let depth = asked
-        .filter(|_| state.drag.is_none())
+        .filter(|_| state.drag.is_none() && host::WINDOW_FOLLOWS_DEPTH)
         .map(|depth| (depth * scale).round().max(1.0) as u32);
     let frame = depth_frame(canvas_frame, config.edge, depth);
     let offset = (

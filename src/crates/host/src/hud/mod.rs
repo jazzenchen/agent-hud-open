@@ -27,6 +27,8 @@ mod worker;
 //   GLOBAL_POINTS, COORDINATE_SPACE      how the pointer and geometry are expressed
 //   DOCK_IN_WORK_AREA                    whether an edge HUD keeps clear of the
 //                                          system's own bars (the work area)
+//   WINDOW_FOLLOWS_DEPTH                 whether the window shrinks to the depth the
+//                                          page asks for, or keeps its whole canvas
 //   native_drag                          whether an edge drag can follow the button
 //   fixed_canvas                         whether the canvas stays put while a drag
 //                                          previews another edge or offset

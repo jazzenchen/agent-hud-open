@@ -3,7 +3,7 @@
 //! starts to open the panel, for the whole canvas, before the panel grows.
 use std::sync::PoisonError;
 
-use super::{configure, emit_geometry, owner_for_window, resolve_display, HudWindows};
+use super::{configure, emit_geometry, host, owner_for_window, resolve_display, HudWindows};
 
 /// `depth` in points from the window's edge; None for the whole canvas.
 #[tauri::command]
@@ -30,6 +30,10 @@ pub async fn hud_set_depth(
         }
         state.depth = depth;
         state.depth_asked = true;
+        if !host::WINDOW_FOLLOWS_DEPTH {
+            // The window already has its whole canvas, whatever is asked.
+            return Ok(());
+        }
         // A hidden HUD, a page being reloaded or a drag in progress takes the
         // depth at its next configuration.
         let Some(config) = state.config.clone().filter(|config| config.visible) else {
