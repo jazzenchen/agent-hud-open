@@ -2735,5 +2735,6 @@ fn list_sessions_says_a_running_codex_with_its_thread_open_can_be_steered() {
         .contains("a steer goes into it"));
 }
 
+mod calls;
 mod models;
 mod steer;

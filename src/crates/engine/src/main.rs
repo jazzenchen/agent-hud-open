@@ -4,60 +4,32 @@ use serde_json::{json, Value};
 use std::io::{self, BufRead, Write};
 use std::sync::PoisonError;
 
+mod relay;
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     if let Some(status) = agent_hud_runtime::hooks::entry(&std::env::args().collect::<Vec<_>>()) {
         std::process::exit(status);
     }
-    let app_channel = std::env::args().any(|arg| arg == "--app-channel");
-    let directory = if app_channel {
-        Some(agent_hud_runtime::local_tools_directory()?)
-    } else {
-        None
-    };
-    let executable = std::env::current_exe().ok();
-    let _ownership = if app_channel {
-        None
-    } else {
-        Some(agent_hud_runtime::claim_collector(
-            false,
-            executable.as_deref(),
-        )?)
-    };
     // App-channel mode is a transport only. No Runtime, watcher, database or
     // provider job is created, even when the application is absent or tools off.
-    let mut runtime = if app_channel {
-        None
-    } else {
-        Some(Runtime::new(None)?)
-    };
-    let collection = runtime.as_ref().map(Runtime::collection_gate);
+    if std::env::args().any(|arg| arg == "--app-channel") {
+        return Ok(relay::run(&agent_hud_runtime::local_tools_directory()?)?);
+    }
+    let executable = std::env::current_exe().ok();
+    let _ownership = agent_hud_runtime::claim_collector(false, executable.as_deref())?;
+    let mut runtime = Runtime::new(None)?;
+    let collection = runtime.collection_gate();
     let mut output = io::BufWriter::new(io::stdout().lock());
     for line in io::stdin().lock().lines() {
         let response = match serde_json::from_str::<Value>(&line?) {
-            Ok(request) if app_channel => {
-                let id = request.get("id").cloned().unwrap_or(Value::Null);
-                match agent_hud_runtime::local_tools::request(directory.as_ref().unwrap(), &request)
-                {
-                    Ok(response) => response,
-                    Err(error) => {
-                        json!({"id":id,"error":{"code":"tools_unavailable","message":error}})
-                    }
-                }
-            }
             Ok(request) => {
                 let id = request.get("id").cloned().unwrap_or(Value::Null);
                 match request["method"].as_str() {
                     Some(method) => {
                         // A collection pass waits for an account reading in progress.
-                        let _turn = collection
-                            .as_ref()
-                            .filter(|_| {
-                                matches!(method, "snapshot" | "refresh" | "request_snapshot")
-                            })
-                            .map(|gate| gate.lock().unwrap_or_else(PoisonError::into_inner));
+                        let _turn = matches!(method, "snapshot" | "refresh" | "request_snapshot")
+                            .then(|| collection.lock().unwrap_or_else(PoisonError::into_inner));
                         match runtime
-                            .as_mut()
-                            .unwrap()
                             .request(method, request.get("params").cloned().unwrap_or(json!({})))
                         {
                             Ok(result) => json!({"id":id,"result":result}),

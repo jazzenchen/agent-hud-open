@@ -84,6 +84,13 @@ const reader = {
   readOnly: true,
 };
 
+/** A sending call's params without the relay's own name for the call, which
+ * must be a UUID: the app answers by it when the call's answer is lost. */
+const unnamed = ({ call, ...params }) => {
+  assert.match(call, /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/);
+  return params;
+};
+
 test("host tools are listed with their schema and hand the Codex caller from the call", async () => {
   const fake = engine("codex", [tool, reader]);
   const client = await connect(fake.file);
@@ -114,7 +121,7 @@ test("host tools are listed with their schema and hand the Codex caller from the
     const call = fake
       .requests()
       .find((request) => request.method === "host_tool");
-    assert.deepEqual(call.params, {
+    assert.deepEqual(unnamed(call.params), {
       name: "some_tool",
       arguments: { text: "hello" },
       caller: { client: "codex", sessionId: "thread-1", turnId: "turn-9" },
@@ -168,7 +175,7 @@ test("an Antigravity caller comes from the conversation_id in the call's _meta",
     const call = fake
       .requests()
       .find((request) => request.method === "host_tool");
-    assert.deepEqual(call.params, {
+    assert.deepEqual(unnamed(call.params), {
       name: "some_tool",
       arguments: { text: "hello from antigravity" },
       caller: { client: "antigravity", sessionId: "cascade-3", turnId: null },
@@ -187,7 +194,10 @@ test("without a caller the host is told so, with the process that started the re
     // DeepSeek Harness names no caller: the app looks it up by the relay's
     // parent, the Harness host whose Agent HUD plugin noted the call.
     assert.deepEqual(
-      fake.requests().find((request) => request.method === "host_tool").params,
+      unnamed(
+        fake.requests().find((request) => request.method === "host_tool")
+          .params,
+      ),
       {
         name: "some_tool",
         arguments: { text: "hi" },

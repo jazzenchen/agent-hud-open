@@ -71,6 +71,11 @@ pub struct Message {
     /// that began after.
     #[serde(default)]
     pub steered_into: Option<String>,
+    /// The relay's own name for the tool call that sent it, when it gave
+    /// one: a caller whose answer was lost asks what became of the call by
+    /// it, and a call that comes twice sends once.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub call: Option<String>,
 }
 
 #[derive(Default, Serialize, Deserialize)]
@@ -112,6 +117,13 @@ impl Journal {
     }
     pub fn find(&self, id: &str) -> Option<&Message> {
         self.messages.iter().find(|message| message.id == id)
+    }
+    /// The message the relay's call `call` sent.
+    pub fn by_call(&self, call: &str) -> Option<&Message> {
+        self.messages
+            .iter()
+            .rev()
+            .find(|message| message.call.as_deref() == Some(call))
     }
     /// What `session` was sent and did not refuse, newest first.
     pub fn received<'a>(

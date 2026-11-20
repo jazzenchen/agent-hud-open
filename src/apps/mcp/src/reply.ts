@@ -48,9 +48,10 @@ export const guarded = async <T>(
   method: string,
   params: Record<string, unknown> = {},
   shape: (answer: T) => unknown = (answer) => answer,
+  wait?: number,
 ) => {
   try {
-    return result(shape(await engine.request<T>(method, params)));
+    return result(shape(await engine.request<T>(method, params, wait)));
   } catch (error) {
     return {
       isError: true,

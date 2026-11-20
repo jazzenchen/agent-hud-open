@@ -1,4 +1,4 @@
-use super::{socket_path, Handler, REQUEST_LIMIT, RESPONSE_LIMIT};
+use super::{socket_path, Handler, NO_ANSWER, REQUEST_LIMIT, RESPONSE_LIMIT};
 use serde_json::{json, Value};
 use std::{
     fs::{self, File},
@@ -159,7 +159,10 @@ pub fn request(data: &Path, request: &Value) -> Result<Value, String> {
     stream
         .take(RESPONSE_LIMIT + 1)
         .read_to_end(&mut bytes)
-        .map_err(|_| "Local tools response did not complete")?;
+        .map_err(|_| NO_ANSWER)?;
+    if bytes.is_empty() {
+        return Err(NO_ANSWER.into());
+    }
     if bytes.len() as u64 > RESPONSE_LIMIT {
         return Err("Local tools response is too large".into());
     }

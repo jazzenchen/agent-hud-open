@@ -3,9 +3,11 @@
 //! session on this computer, or to start one, in a model the user names or
 //! else the client's own, and later reads that session's answer. A tool group of its own, off until the user turns it on
 //! (`Preferences`). Delivery goes through `agent_hud_platform::delivery`, the
-//! same way as a message typed into a session from the HUD. A call runs at
-//! once on the caller's thread, so nothing is sent after its caller stopped
-//! waiting.
+//! same way as a message typed into a session from the HUD. A call runs on
+//! the caller's thread and may outlast the relay's wait for it (Open #118):
+//! the relay names each sending call (`call`), asks what became of one whose
+//! answer never came (`call_result`), and a call it gave up on before it
+//! began sends nothing.
 //!
 //! The words are kept only while they are delivered: the journal keeps who sent
 //! what to whom, a fingerprint of the words and where the answer will be, and
@@ -52,6 +54,30 @@ pub type Result<T> = std::result::Result<T, String>;
 /// How long after the message's own turn ended its answer is looked for, to
 /// throw its plane back: about twelve looks of the 5-second maintenance.
 const ANSWER_WAIT_MS: i64 = 60_000;
+
+/// What a sending call is told when the relay stopped waiting for it before
+/// it began.
+const GAVE_UP: &str = "The caller stopped waiting for this call; nothing was sent";
+/// How many given-up calls are remembered: far more than can wait at once.
+const GIVEN_UP_KEPT: usize = 256;
+
+/// What a sending call answered when it sent `message`, as its caller reads
+/// it: the message as it stands now.
+fn receipt(message: &Message) -> Value {
+    let mut answer = json!({
+        "id": message.id,
+        "state": message.state,
+        "reason": message.reason,
+        "pass": message.count,
+    });
+    if message.kind == Kind::Start {
+        answer["sessionId"] = match message.to.session_id.as_str() {
+            "" => Value::Null,
+            session => session.into(),
+        };
+    }
+    answer
+}
 
 /// The tag a phone's words start with. The owner's own instructions take it
 /// as the owner speaking, so no agent may start with it.
@@ -118,6 +144,12 @@ pub struct Messaging {
     fly: Fly,
     /// Answers thrown back, for `get_message` once a client's next turn hides them.
     answers: answers::Answers,
+    /// The relay's name for the sending call being answered, kept with the
+    /// message it sends.
+    calling: Option<String>,
+    /// Calls the relay asked about before they began: it stopped waiting and
+    /// told its agent nothing was sent, so they send nothing. Newest last.
+    given_up: std::collections::VecDeque<String>,
 }
 
 impl Messaging {
@@ -138,6 +170,8 @@ impl Messaging {
             follow,
             fly,
             answers: Default::default(),
+            calling: None,
+            given_up: Default::default(),
         }
     }
 
@@ -160,20 +194,35 @@ impl Messaging {
                 caller
             });
         let arguments = &params["arguments"];
-        match params["name"].as_str().unwrap_or("") {
+        let name = params["name"].as_str().unwrap_or("");
+        let call = params["call"].as_str().filter(|call| !call.is_empty());
+        if name == "call_result" {
+            return Ok(self.call_result(call.ok_or("call is required")?));
+        }
+        if let Some(call) = call.filter(|_| matches!(name, "send_message" | "start_session")) {
+            if self.given_up.iter().any(|given_up| given_up == call) {
+                return Err(GAVE_UP.into());
+            }
+            // The same call again: what it sent the first time, sent once.
+            if let Some(message) = self.journal.by_call(call) {
+                return Ok(receipt(message));
+            }
+        }
+        match name {
             "list_sessions" => Ok(self.list(caller.as_ref(), host)),
             "list_models" => self.models(arguments),
-            "send_message" => {
+            "send_message" | "start_session" => {
                 let Some(caller) = caller else {
                     return Ok(refused(&words::no_caller(language(host.snapshot))));
                 };
-                self.send(&caller, arguments, host, now)
-            }
-            "start_session" => {
-                let Some(caller) = caller else {
-                    return Ok(refused(&words::no_caller(language(host.snapshot))));
+                self.calling = call.map(str::to_owned);
+                let answer = if name == "send_message" {
+                    self.send(&caller, arguments, host, now)
+                } else {
+                    self.start(&caller, arguments, host, now)
                 };
-                self.start(&caller, arguments, host, now)
+                self.calling = None;
+                answer
             }
             "get_message" => {
                 let id = arguments["id"].as_str().ok_or("id is required")?;
@@ -181,6 +230,24 @@ impl Messaging {
             }
             _ => Err("Unknown local application tool".into()),
         }
+    }
+
+    /// What became of the relay's sending call `call`, asked when its answer
+    /// never reached the relay. Asked while the call still runs, this waits
+    /// with every other call for it to end. `found` with the answer the call
+    /// gave when it sent a message; else nothing was sent, and nothing will
+    /// be: a call that has not begun yet is refused when it does.
+    fn call_result(&mut self, call: &str) -> Value {
+        if let Some(message) = self.journal.by_call(call) {
+            return json!({"found": true, "result": receipt(message)});
+        }
+        if !self.given_up.iter().any(|given_up| given_up == call) {
+            if self.given_up.len() >= GIVEN_UP_KEPT {
+                self.given_up.pop_front();
+            }
+            self.given_up.push_back(call.to_owned());
+        }
+        json!({"found": false})
     }
 
     /// Captures each waiting Claude Code or DeepSeek Harness message's state

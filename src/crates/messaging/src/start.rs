@@ -132,6 +132,7 @@ impl Messaging {
             answered: false,
             replied_by: None,
             steered_into: None,
+            call: self.calling.clone(),
         });
         let newcomer = Party {
             session_id: session.clone().unwrap_or_default(),

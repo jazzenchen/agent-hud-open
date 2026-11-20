@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { McpServer, type RegisteredTool } from "@modelcontextprotocol/server";
 import { serveStdio } from "@modelcontextprotocol/server/stdio";
 import * as z from "zod/v4";
@@ -25,6 +26,10 @@ import {
  * as notifications/tools/list_changed. An app that cannot be asked leaves
  * the list as it was. */
 let hostTools = (await askHost()) ?? [];
+/** How long a call that sends waits for its answer: the engine goes on
+ * asking the app what became of it for 100 s, and its last question may
+ * take 40 s more. */
+const SEND_WAIT_MS = 150_000;
 const hostInterval =
   Number(process.env.AGENTHUD_HOST_TOOLS_MS) > 0
     ? Number(process.env.AGENTHUD_HOST_TOOLS_MS)
@@ -250,15 +255,24 @@ serveStdio(() => {
             const named = caller(
               context.mcpReq._meta as Record<string, unknown> | undefined,
             );
-            return guarded("host_tool", {
-              name: tool.name,
-              arguments: params,
-              caller: named,
-              // Always, so the app can tell a client its hooks name (TRAE,
-              // Kimi, ...) from Claude Code's session id inherited through
-              // the environment by an agent started inside Claude Code.
-              parent: launchedBy,
-            });
+            return guarded(
+              "host_tool",
+              {
+                name: tool.name,
+                arguments: params,
+                caller: named,
+                // Always, so the app can tell a client its hooks name (TRAE,
+                // Kimi, ...) from Claude Code's session id inherited through
+                // the environment by an agent started inside Claude Code.
+                parent: launchedBy,
+                // A call that sends gets a name of its own: when its answer
+                // does not come in time the engine asks the app what became
+                // of it, and the app never sends for one name twice.
+                ...(tool.readOnly ? {} : { call: randomUUID() }),
+              },
+              undefined,
+              tool.readOnly ? undefined : SEND_WAIT_MS,
+            );
           },
         );
         hosted.set(tool.name, { tool, registered });

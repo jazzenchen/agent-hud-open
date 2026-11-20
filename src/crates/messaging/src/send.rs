@@ -190,6 +190,7 @@ impl Messaging {
             answered: false,
             replied_by: None,
             steered_into,
+            call: self.calling.clone(),
         };
         // A reply that went back to its parent's sender settles the parent:
         // get_message says it was replied to, and this reply's plane is the

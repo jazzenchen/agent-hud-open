@@ -96,6 +96,8 @@ export class EngineClient {
   async request<T = unknown>(
     method: NativeMethod | string,
     params: Record<string, unknown> = {},
+    /** How long to wait for the answer before giving the engine up. */
+    wait = 45000,
   ): Promise<T> {
     const child = this.start();
     const id = ++this.sequence;
@@ -105,7 +107,7 @@ export class EngineClient {
           "Engine request timed out. The last operation was not retried.",
         );
         this.close();
-      }, 45000);
+      }, wait);
       this.pending.set(id, {
         resolve: (value) => resolve(value as T),
         reject,

@@ -1,4 +1,4 @@
-use super::{Handler, REQUEST_LIMIT, RESPONSE_LIMIT};
+use super::{Handler, NO_ANSWER, REQUEST_LIMIT, RESPONSE_LIMIT};
 use serde_json::Value;
 use std::{path::Path, sync::Arc, time::Duration};
 pub struct Server(crate::os::pipe::Server);
@@ -27,5 +27,5 @@ pub fn request(data: &Path, request: &Value) -> Result<Value, String> {
         Duration::from_secs(40),
         || false,
     )?
-    .ok_or_else(|| "The local tools response did not complete".into())
+    .ok_or_else(|| NO_ANSWER.into())
 }
