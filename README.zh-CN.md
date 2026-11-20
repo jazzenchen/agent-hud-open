@@ -13,7 +13,7 @@
 
 <p align="center">
   <a href="#安装"><img src="docs/badges/macos.svg" alt="macOS 14+" height="22"></a>
-  <a href="#跨平台一套核心"><img src="docs/badges/windows-linux.svg" alt="Windows 与 Linux 预览" height="22"></a>
+  <a href="#跨平台一套核心"><img src="docs/badges/windows-linux.svg" alt="Windows，以及 Linux 预览" height="22"></a>
   <a href="docs/platform-architecture.md"><img src="docs/badges/rust-tauri.svg" alt="Rust 与 Tauri 2" height="22"></a>
   <a href="LICENSE"><img src="docs/badges/license.svg" alt="Apache-2.0 许可证" height="22"></a>
 </p>
@@ -184,7 +184,7 @@ Agent HUD 基于 Tauri 2 构建：Rust 核心、React 界面，每个操作系�
 
 - **一套核心。** 读取 agent 的记录、统计 Token、计算额度、价格与会话，都只在 Rust 里做一次，每个系统的结果完全一致。窗口只负责显示核心算好的内容。
 - **每个系统各有自己的文件。** 路径、进程、凭据、回调与窗口，每个系统各写一份；改进 Windows 或 Linux，不会碰到共享代码。
-- **macOS 已可用，Windows 与 Linux 处于预览。** 两者都能从本仓库源码构建，每次发布也附带未签名的测试安装包。Linux 版尚未在真机桌面上试过；还缺的部分见[即将推出](#即将推出)。
+- **macOS 与 Windows 已可用，Linux 处于预览。** 三者都能从本仓库源码构建，每次发布也附带 Windows 与 Linux 的未签名安装包。Linux 版尚未在真机桌面上试过；还缺的部分见[即将推出](#即将推出)。
 - **iPhone 与 Apple Watch 可与 Mac 或 Windows 电脑配对。** Agent HUD Remote 经由 iCloud 同步，所以暂时只在 macOS 上提供；配对 Windows 电脑时，手机在同一局域网内连接。
 
 ## Agent HUD Remote
@@ -220,7 +220,7 @@ iPhone 和发行版在同一个网络里，不订阅也能在 iPhone 与 Apple W
 
 ## 即将推出
 
-- **Windows 与 Linux 结束预览。** [欢迎参与](CONTRIBUTING.md)。
+- **Linux 结束预览。** [欢迎参与](CONTRIBUTING.md)。
 - **支持更多 agent**，不止下面表格里的 27 款。
 - **按 Token 计费的 API**：用 API 密钥付费的账户，也能看到用量、花费与余额，和订阅的额度放在一起。
 - **UI 提示词模板。** 现成的提示词，一次就把 HUD 改成你想要的样子。

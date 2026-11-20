@@ -14,7 +14,7 @@ It downloads the build for your system from [the releases](https://github.com/ja
 | Windows | Runs the setup program. |
 | Linux, x86_64 | `~/Applications/Agent-HUD.AppImage`. Some systems need FUSE 2 (`libfuse2`) to run AppImages. |
 
-The Windows and Linux builds are unsigned test builds that have not been checked on real machines yet. On those systems, run `npx @agenthud/install` again to update.
+The Windows and Linux builds are unsigned, and the Linux build is a preview that has not been checked on a real desktop yet. On those systems, run `npx @agenthud/install` again to update.
 
 ## Options
 

@@ -1,15 +1,15 @@
 # Agent HUD on macOS, Windows and Linux
 
-What Agent HUD documents for **[0.6.5][release]**, checked on 2026-11-16. macOS is the main release; Windows and Linux are test builds. For what each agent supports, see [Supported agents](https://agenthud.app/docs/en/agents/supported/); for agent messages, [Agents messaging each other](https://agenthud.app/docs/en/mcp/messaging/).
+What Agent HUD documents for **[0.6.5][release]**, checked on 2026-11-16. macOS is the main release, Windows has an unsigned installer, and Linux is a test build. For what each agent supports, see [Supported agents](https://agenthud.app/docs/en/agents/supported/); for agent messages, [Agents messaging each other](https://agenthud.app/docs/en/mcp/messaging/).
 
 ## How to read the table
 
 - **✓** works in the release download and has been tried on that system.
-- **Preview** is in the Windows or Linux test build, with the limits its release notes list. It does not mean the feature has been tried.
+- **Preview** is in the Linux test build, with the limits its release notes list. It does not mean the feature has been tried.
 - **—** is not available on that system.
 - **Not verified** is described in the code or the release notes but has not been tried on that system for this table.
 
-The macOS column has been tried on the macOS release. The Windows and Linux columns are a source-based comparison, not a GUI acceptance report: **Preview; Not verified** means a documented test-build capability, not a failed test or a confirmed working workflow. The 0.6.5 release notes explicitly say the Linux packages have not been tested on a real Linux desktop.
+The macOS column has been tried on the macOS release. The Windows and Linux columns are a source-based comparison, not a GUI acceptance report: **Not verified** means a documented capability, not a failed test or a confirmed working workflow. The 0.6.5 release notes explicitly say the Linux packages have not been tested on a real Linux desktop.
 
 The table describes the release downloads. A build from this repository can differ: it does not install client hooks, so approvals, questions and most replies stay in each agent's own prompt; Agent HUD Remote is release-only. See [Build from source][source-build]. Each row links versioned release notes, documentation or implementation; the live guides above may describe a newer version.
 
@@ -17,19 +17,19 @@ The table describes the release downloads. A build from this repository can diff
 
 | Feature | macOS | Windows | Linux | Source |
 | --- | :---: | :---: | :---: | --- |
-| Install and updates | ✓; macOS 14+, Apple silicon or Intel; self-updates | Preview; Not verified; x64 unsigned installer; manual updates | Preview; Not verified; x86_64 unsigned AppImage or `.deb`; manual updates | [0.6.5 release][release], [Installer][installer] |
-| HUD: Notch mode | ✓; hardware notch or a stand-in bar | Preview; Not verified; stand-in bar | Preview; Not verified; stand-in bar; same compositor limits as Simple mode | [Screen modes][screen], [Notch setting][notch-setting], [Linux HUD][linux-hud] |
-| HUD: Simple mode on any edge | ✓ | Preview; Not verified | Preview; Not verified; Wayland needs wlr-layer-shell; X11 placement depends on the window manager | [Screen modes][screen], [0.6.5 release][release], [Platform builds][builds] |
-| Quotas, balances and tokens | ✓; varies by agent | Preview; Not verified; no Claude desktop sign-in quota | Preview; Not verified; no Claude desktop sign-in quota | [Supported agents][agents], [0.6.5 release][release], [Shared readers][readers] |
-| Approvals and questions on the HUD | ✓; supported clients and their setup required | Preview; Not verified; client and adapter dependent | Preview; Not verified; client and adapter dependent | [Screen requests][screen], [Supported agents][agents], [Platform builds][builds] |
-| Reply reminders and Return to session | ✓; terminal-pane jumps need iTerm2 | Preview; Not verified; client and native navigation dependent | Preview; Not verified; client and native navigation dependent | [Screen requests and navigation][screen], [Supported agents][agents], [Platform adapters][adapters] |
-| Agent messages: send and receive | ✓; supported clients and their setup required | Preview; Not verified; client and transport dependent | Preview; Not verified; client and transport dependent | [Messaging overview][messages-overview], [Delivery and client limits][messages], [Platform adapters][adapters] |
-| Agent messages: start a session | ✓; Claude Code, Codex, Antigravity or DeepSeek Harness | Preview; Not verified; Codex starts use its desktop app | Preview; Not verified; available clients and commands required | [Messaging overview][messages-overview], [Starting sessions][starts] |
-| HUD tools (MCP) | ✓; layout, appearance, usage, sessions and statistics | Preview; Not verified | Preview; Not verified | [HUD tools][hud-tools], [Local MCP and capture adapters][adapters] |
-| Statistics window | ✓ | Preview; Not verified | Preview; Not verified | [Statistics][statistics], [Shared readers][readers] |
-| iPhone and Apple Watch over the local network | ✓; paired devices on the same network | Preview; Not verified; paired iPhone; iPhone app 1.7.9+ | Not verified; release pairing is not documented; source sharing unavailable | [Supported hosts][desktop], [Mobile features][remote], [0.6.5 release][release], [Phone sharing adapter][adapters] |
+| Install and updates | ✓; macOS 14+, Apple silicon or Intel; self-updates | Not verified; x64 unsigned installer; manual updates | Preview; Not verified; x86_64 unsigned AppImage or `.deb`; manual updates | [0.6.5 release][release], [Installer][installer] |
+| HUD: Notch mode | ✓; hardware notch or a stand-in bar | Not verified; stand-in bar | Preview; Not verified; stand-in bar; same compositor limits as Simple mode | [Screen modes][screen], [Notch setting][notch-setting], [Linux HUD][linux-hud] |
+| HUD: Simple mode on any edge | ✓ | Not verified | Preview; Not verified; Wayland needs wlr-layer-shell; X11 placement depends on the window manager | [Screen modes][screen], [0.6.5 release][release], [Platform builds][builds] |
+| Quotas, balances and tokens | ✓; varies by agent | Not verified; no Claude desktop sign-in quota | Preview; Not verified; no Claude desktop sign-in quota | [Supported agents][agents], [0.6.5 release][release], [Shared readers][readers] |
+| Approvals and questions on the HUD | ✓; supported clients and their setup required | Not verified; client and adapter dependent | Preview; Not verified; client and adapter dependent | [Screen requests][screen], [Supported agents][agents], [Platform builds][builds] |
+| Reply reminders and Return to session | ✓; terminal-pane jumps need iTerm2 | Not verified; client and native navigation dependent | Preview; Not verified; client and native navigation dependent | [Screen requests and navigation][screen], [Supported agents][agents], [Platform adapters][adapters] |
+| Agent messages: send and receive | ✓; supported clients and their setup required | Not verified; client and transport dependent | Preview; Not verified; client and transport dependent | [Messaging overview][messages-overview], [Delivery and client limits][messages], [Platform adapters][adapters] |
+| Agent messages: start a session | ✓; Claude Code, Codex, Antigravity or DeepSeek Harness | Not verified; Codex starts use its desktop app | Preview; Not verified; available clients and commands required | [Messaging overview][messages-overview], [Starting sessions][starts] |
+| HUD tools (MCP) | ✓; layout, appearance, usage, sessions and statistics | Not verified | Preview; Not verified | [HUD tools][hud-tools], [Local MCP and capture adapters][adapters] |
+| Statistics window | ✓ | Not verified | Preview; Not verified | [Statistics][statistics], [Shared readers][readers] |
+| iPhone and Apple Watch over the local network | ✓; paired devices on the same network | Not verified; paired iPhone; iPhone app 1.7.9+ | Not verified; release pairing is not documented; source sharing unavailable | [Supported hosts][desktop], [Mobile features][remote], [0.6.5 release][release], [Phone sharing adapter][adapters] |
 | Agent HUD Remote (iCloud) | ✓; release-only; subscription required | — | — | [Remote and subscription features][remote], [0.6.5 release][release] |
-| Languages | ✓; nine languages, or follow the system | Preview; Not verified; same language choices | Preview; Not verified; same language choices | [0.6.4 language addition][languages-release], [0.6.5 language choices][languages] |
+| Languages | ✓; nine languages, or follow the system | Not verified; same language choices | Preview; Not verified; same language choices | [0.6.4 language addition][languages-release], [0.6.5 language choices][languages] |
 
 ## Limits to check before installing
 

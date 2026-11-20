@@ -13,7 +13,7 @@
 
 <p align="center">
   <a href="#install"><img src="docs/badges/macos.svg" alt="macOS 14+" height="22"></a>
-  <a href="#built-for-every-desktop"><img src="docs/badges/windows-linux.svg" alt="Windows and Linux in preview" height="22"></a>
+  <a href="#built-for-every-desktop"><img src="docs/badges/windows-linux.svg" alt="Windows, and Linux in preview" height="22"></a>
   <a href="docs/platform-architecture.md"><img src="docs/badges/rust-tauri.svg" alt="Rust and Tauri 2" height="22"></a>
   <a href="LICENSE"><img src="docs/badges/license.svg" alt="Apache-2.0 license" height="22"></a>
 </p>
@@ -184,7 +184,7 @@ Agent HUD is built with Tauri 2: a Rust core, a React interface, and a thin nati
 
 - **One core.** Reading your agents' records, counting tokens and working out quotas, prices and sessions happen once, in Rust, the same way on every system. The windows only display what the core computes.
 - **Each system in its own files.** Paths, processes, credentials, hooks and windows are written once per system, so work on Windows or Linux never touches shared code.
-- **macOS today; Windows and Linux in preview.** Both build from this source, and each release carries unsigned test packages for them. The Linux build has not been tried on a real desktop yet; what is still missing is under [Coming soon](#coming-soon).
+- **macOS and Windows today; Linux in preview.** All three build from this source, and each release carries unsigned packages for Windows and Linux. The Linux build has not been tried on a real desktop yet; what is still missing is under [Coming soon](#coming-soon).
 - **iPhone and Apple Watch pair with a Mac or a Windows PC.** Agent HUD Remote syncs through iCloud, so for now it is available on macOS only; with Windows, the phone connects on the same network.
 
 ## Agent HUD Remote.
@@ -220,7 +220,7 @@ When your iPhone and the release share a network, iPhone and Apple Watch show yo
 
 ## Coming soon
 
-- **Windows and Linux out of preview.** [Contributions are welcome](CONTRIBUTING.md).
+- **Linux out of preview.** [Contributions are welcome](CONTRIBUTING.md).
 - **More agents**, beyond the 27 in the table below.
 - **API keys billed by the token**: their usage, spend and balance, next to your plans' quotas.
 - **UI prompt templates.** Ready-made prompts that reshape your HUD in one go.
