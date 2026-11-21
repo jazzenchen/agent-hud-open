@@ -45,8 +45,15 @@ pub struct LocalSocket {
 impl LocalSocket {
     pub fn connect(path: &Path, timeout: Duration) -> Result<Self, IpcError> {
         use std::os::unix::ffi::OsStrExt;
-        let info = fs::symlink_metadata(path).map_err(|_| IpcError::Unavailable)?;
-        if !info.file_type().is_socket() || info.uid() != unsafe { libc::getuid() } {
+        // Codex's CLI daemon leaves a link here to its socket in the system's
+        // temporary folder: the user's own link is followed, to a socket that
+        // is the user's too.
+        let me = unsafe { libc::getuid() };
+        let mut info = fs::symlink_metadata(path).map_err(|_| IpcError::Unavailable)?;
+        if info.file_type().is_symlink() && info.uid() == me {
+            info = fs::metadata(path).map_err(|_| IpcError::Unavailable)?;
+        }
+        if !info.file_type().is_socket() || info.uid() != me {
             return Err(IpcError::Unavailable);
         }
         let bytes = path.as_os_str().as_bytes();
@@ -257,5 +264,34 @@ impl Drop for Frame {
                 libc::munmap(memory.as_ptr().cast(), *length);
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::LocalSocket;
+    use std::{os::unix::net::UnixListener, time::Duration};
+
+    /// The socket itself, and the user's own link to it, as Codex's CLI
+    /// daemon leaves one; a link to anything else, or to nothing, is refused.
+    #[test]
+    fn a_socket_is_reached_directly_and_through_the_users_own_link() {
+        let root = tempfile::tempdir().unwrap();
+        let socket = root.path().join("daemon");
+        let _listener = UnixListener::bind(&socket).unwrap();
+        let wait = Duration::from_secs(2);
+        assert!(LocalSocket::connect(&socket, wait).is_ok());
+        let link = root.path().join("control.sock");
+        std::os::unix::fs::symlink(&socket, &link).unwrap();
+        assert!(LocalSocket::connect(&link, wait).is_ok());
+        let file = root.path().join("file");
+        std::fs::write(&file, "").unwrap();
+        let to_file = root.path().join("to-file");
+        std::os::unix::fs::symlink(&file, &to_file).unwrap();
+        assert!(LocalSocket::connect(&to_file, wait).is_err());
+        let dangling = root.path().join("dangling");
+        std::os::unix::fs::symlink(root.path().join("gone"), &dangling).unwrap();
+        assert!(LocalSocket::connect(&dangling, wait).is_err());
+        assert!(LocalSocket::connect(&file, wait).is_err());
     }
 }
