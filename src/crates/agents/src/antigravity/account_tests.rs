@@ -272,13 +272,14 @@ fn cli_summary_supersedes_native_same_account_and_keeps_other_accounts() {
             "accounts":[{"source":"ide-1","status":status_body()},{"source":"ide-2","status":other}],
             "cliExecutable":"/installed/agy"
         })));
+    let observed = chrono::Utc::now().to_rfc3339();
     host.account_reports.insert(
         "antigravity".into(),
         vec![report(
             "me@example.com",
-            "2026-10-23T08:00:00Z",
+            &observed,
             0.75,
-            "2026-10-30T00:00:00Z",
+            "2099-10-30T00:00:00Z",
         )],
     );
     let reading = read(&host).unwrap();
@@ -293,10 +294,66 @@ fn cli_summary_supersedes_native_same_account_and_keeps_other_accounts() {
     assert_eq!(cli_rows.len(), 1);
     assert_eq!(cli_rows[0]["windowDurationSeconds"], 604800);
     assert_eq!(
-        reading.account.as_ref().unwrap()["checkedAt"],
-        "2026-10-23T08:00:00+00:00"
+        timestamp(reading.account.as_ref().unwrap(), "checkedAt"),
+        chrono::DateTime::parse_from_rfc3339(&observed).ok()
     );
     assert!(host.started.borrow().is_empty());
+}
+
+/// A report the CLI stopped sending days ago gives way to a service that
+/// reads the same account now, with or without its team; another account's
+/// old report stays, as nothing reads it now.
+#[test]
+fn a_stale_cli_report_gives_way_to_a_service_reading_the_account_now() {
+    for team in [None, Some("team-1")] {
+        let mut status = status_body();
+        if let Some(team) = team {
+            status["userStatus"]["teamId"] = json!(team);
+        }
+        let mut host = FakeHost::new("/u");
+        host.natives.insert(
+            ("antigravity".into(), "ReadAccounts".into()),
+            Ok(json!({"accounts":[{"source":"desktop","client":"antigravity","status":status}]})),
+        );
+        host.account_reports.insert(
+            "antigravity".into(),
+            vec![
+                report(
+                    "me@example.com",
+                    "2026-10-23T08:00:00Z",
+                    0.75,
+                    "2099-10-30T00:00:00Z",
+                ),
+                report(
+                    "work@example.com",
+                    "2026-10-23T08:00:00Z",
+                    0.5,
+                    "2099-10-30T00:00:00Z",
+                ),
+            ],
+        );
+        let reading = read(&host).unwrap();
+        let rows = |email: &str| {
+            let account = reading
+                .account
+                .iter()
+                .chain(&reading.additional_accounts)
+                .find(|row| row["label"].as_str().map(str::to_lowercase).as_deref() == Some(email))
+                .unwrap_or_else(|| panic!("{email} is kept"));
+            reading
+                .quotas
+                .iter()
+                .filter(|quota| quota["accountId"] == account["id"])
+                .collect::<Vec<_>>()
+        };
+        let mine = rows("me@example.com");
+        assert_eq!(mine.len(), 2, "the service's two families, team {team:?}");
+        assert!(mine.iter().all(|quota| quota["status"] != "stale"));
+        let work = rows("work@example.com");
+        assert_eq!(work.len(), 1);
+        assert_eq!(work[0]["status"], "stale");
+        assert_eq!(reading.additional_accounts.len(), 1);
+    }
 }
 
 #[test]
@@ -438,9 +495,9 @@ fn an_account_signed_in_to_in_several_clients_is_read_through_each() {
         "antigravity".into(),
         vec![report(
             "me@example.com",
-            "2026-10-23T08:00:00Z",
+            &chrono::Utc::now().to_rfc3339(),
             0.75,
-            "2026-10-30T00:00:00Z",
+            "2099-10-30T00:00:00Z",
         )],
     );
     let reading = read(&host).unwrap();
