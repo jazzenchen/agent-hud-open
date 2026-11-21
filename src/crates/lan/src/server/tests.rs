@@ -380,6 +380,7 @@ fn peer_version_is_trimmed_and_bounded() {
         query: None,
         headers: BTreeMap::from([("x-agenthud-client-version".into(), value.into())]),
         body: Vec::new(),
+        nearby: false,
     };
     assert_eq!(
         peer_version(&request(" 1.7.4 (96) ")).as_deref(),
@@ -428,7 +429,10 @@ fn a_host_route_may_answer_with_json() {
             Ok((request.path == "/v1/echo").then(|| Handled {
                 status: 200,
                 remember: false,
-                body: Some(serde_json::json!({"echo": String::from_utf8_lossy(&request.body)})),
+                body: Some(serde_json::json!({
+                    "echo": String::from_utf8_lossy(&request.body),
+                    "nearby": request.nearby,
+                })),
             }))
         }),
     );
@@ -475,7 +479,11 @@ fn a_host_route_may_answer_with_json() {
             .contains("content-type: application/json"),
         "{response}"
     );
-    assert!(response.ends_with("{\"echo\":\"hi\"}"), "{response}");
+    // A caller on this computer itself counts as on its network.
+    assert!(
+        response.ends_with("{\"echo\":\"hi\",\"nearby\":true}"),
+        "{response}"
+    );
     server.stop(false).unwrap();
     let _ = std::fs::remove_dir_all(&directory);
 }

@@ -7,6 +7,11 @@ pub struct Request {
     pub query: Option<String>,
     pub headers: BTreeMap<String, String>,
     pub body: Vec<u8>,
+    /// Whether the caller is on this computer's own network: it came in on an
+    /// Ethernet or Wi-Fi address from a private address beside it, not through
+    /// a tunnel (Tailscale and its like) or from outside. The connection sets
+    /// it; a request only parsed is not nearby.
+    pub nearby: bool,
 }
 #[derive(Debug)]
 pub enum Parse {
@@ -94,6 +99,7 @@ impl Request {
             query: query.map(str::to_owned),
             headers,
             body: body.into(),
+            nearby: false,
         })
     }
     pub fn bearer(&self) -> Option<&str> {
@@ -230,6 +236,7 @@ mod encoding_tests {
             query: None,
             headers,
             body: Vec::new(),
+            nearby: false,
         }
     }
 
