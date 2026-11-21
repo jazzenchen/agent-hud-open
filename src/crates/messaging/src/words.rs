@@ -52,11 +52,13 @@ fn reply_tool(language: Language, client: &str) -> String {
 /// message, the text, and a last line saying how to reply: with send_message
 /// and reply_to, as the recipient's client names that tool, so the reply comes
 /// back as a message; the sender reads nothing else. A reply's last line is
-/// shorter, so two agents do not thank each other back and forth. As the
+/// shorter, so two agents do not thank each other back and forth. Without
+/// `ask`, the last line is left out: the sender needs no reply. As the
 /// user's own: the text alone.
 pub fn compose(
     language: Language,
     form: PromptForm,
+    ask: bool,
     from: &Party,
     to_client: &str,
     id: &str,
@@ -110,6 +112,9 @@ pub fn compose(
             ("title", &title),
         ],
     );
+    if !ask {
+        return format!("{label}\n\n{text}");
+    }
     let footer = fill(
         &footer,
         &[("tool", &tool), ("id", &id), ("parent", &parent)],

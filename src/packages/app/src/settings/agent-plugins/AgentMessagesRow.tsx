@@ -1,8 +1,9 @@
 // "Let agents message each other" in Agent tools: agents message, start and
 // read other Claude Code, Codex, Antigravity and DeepSeek Harness sessions on
 // this computer through Agent HUD's MCP server. Off unless turned on. While
-// on: "Send as me", and how many passes in a row before the user takes a
-// look. A message waits until its session is idle, unless the user asks an
+// on: "Send as me", "Ask for replies only when needed" (the sending agent
+// says which messages need a reply), and how many passes in a row before the
+// user takes a look. A message waits until its session is idle, unless the user asks an
 // agent to steer it into a Codex or DeepSeek Harness session's turn in
 // progress.
 import { useState } from "react";
@@ -45,6 +46,7 @@ export function AgentMessagesRow({
   const limits =
     limit !== null && !LIMITS.includes(limit) ? [...LIMITS, limit] : LIMITS;
   const asMe = t("Send as me");
+  const askWhenNeeded = t("Ask for replies only when needed");
   return (
     <>
       <ToolSwitchRow
@@ -70,6 +72,19 @@ export function AgentMessagesRow({
             checked={asUser}
             disabled={pending}
             onCheckedChange={(value) => set("agentMessagesAsUser", value)}
+          />
+        </Row>
+        <Row
+          title={askWhenNeeded}
+          subtitle={t(
+            "The sending agent decides. Off: every labelled message asks.",
+          )}
+        >
+          <Switch
+            aria-label={askWhenNeeded}
+            checked={settings.agentMessagesRequireReply === true}
+            disabled={pending}
+            onCheckedChange={(value) => set("agentMessagesRequireReply", value)}
           />
         </Row>
         <Row

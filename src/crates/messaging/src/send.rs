@@ -110,13 +110,9 @@ impl Messaging {
         let id = message_id();
         // Another agent's words never read as the user's in the middle of a
         // turn: a steer carries Agent HUD's label even under "Send as me".
-        let form = if steer {
-            PromptForm::Labelled
-        } else {
-            self.form()
-        };
+        let (form, ask) = self.shape(arguments, steer);
         let from = sender.clone();
-        let delivered = words::compose(language, form, &from, client, &id, reply_to, text);
+        let delivered = words::compose(language, form, ask, &from, client, &id, reply_to, text);
         let delivered = if steer {
             words::steered(language, delivered)
         } else {
@@ -270,11 +266,19 @@ impl Messaging {
         }
     }
 
-    pub(crate) fn form(&self) -> PromptForm {
-        if self.preferences.as_user {
-            PromptForm::Own
+    /// How a message goes in, and whether its last line asks for a reply.
+    /// The user's "Send as me" makes it their own words, except a `labelled`
+    /// one (a steer). With "Ask for replies only when needed" the sender's
+    /// `require_reply` decides the reply line, and a message that needs a
+    /// reply is labelled under "Send as me" too: the recipient has to know
+    /// whom it answers. Without it every labelled message asks.
+    pub(crate) fn shape(&self, arguments: &Value, labelled: bool) -> (PromptForm, bool) {
+        let ask = !self.preferences.require_reply || arguments["require_reply"] == true;
+        let own = self.preferences.as_user && !labelled && !(self.preferences.require_reply && ask);
+        if own {
+            (PromptForm::Own, false)
         } else {
-            PromptForm::Labelled
+            (PromptForm::Labelled, ask)
         }
     }
 }

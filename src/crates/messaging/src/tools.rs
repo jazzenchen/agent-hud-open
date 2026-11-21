@@ -3,10 +3,18 @@ use super::*;
 
 impl Messaging {
     /// The group's tools while it is on, nothing while it is off.
-    pub fn tools(enabled: bool) -> Value {
-        if !enabled {
+    pub fn tools(preferences: &Preferences) -> Value {
+        if !preferences.enabled {
             return json!({"tools":[]});
         }
+        let mut tools = Self::listed();
+        if preferences.require_reply {
+            reply_choice(&mut tools);
+        }
+        tools
+    }
+
+    fn listed() -> Value {
         json!({"tools":[
             {"name":"list_sessions","readOnly":true,
              "description":"List the Claude Code, Codex, Antigravity, DeepSeek Harness, Cursor, TRAE, WorkBuddy, ZCode, Qoder, Kimi Code, Pi and OpenCode sessions on this computer that Agent HUD sees (main sessions only): id, client, title, project folder, state (idle, running or waitingForApproval), model (the model it last ran, when known), reachable (true, false or null with the reason), steerable (whether send_message with delivery steer would go into a turn in progress now, with steerReason) and self (your own session). startFolders says where start_session can open a session for each client.",
@@ -21,5 +29,26 @@ impl Messaging {
              "description":"Start a new Claude Code, Codex, Antigravity or DeepSeek Harness session with text as its first message, in a folder the user already works in with that client (startFolders in list_sessions; an empty folder starts it in its own task folder). The folder defaults to your own session's project. Where the client's desktop app is installed the session lands there. A DeepSeek Harness session is made by Agent HUD's plugin in a running Harness, the desktop app's first; with none running, the desktop app is opened. Counts as one pass, like send_message. Only a main session starts one; a sub-agent is refused. Returns delivered: true with the new session's id (sessionId, once its client gave one), or false or null with the reason, as send_message does. The new session's answer, if it sends one with send_message, comes to your session as a new turn once you are idle.",
              "inputSchema":{"type":"object","properties":{"client":{"type":"string","enum":["claude","codex","antigravity","deepseek"]},"folder":{"type":"string","description":"A folder from startFolders, or empty for none. Defaults to your session's project."},"text":{"type":"string","description":"The first message, whole."},"model":{"type":"string","description":"Only when the user asked for a model: an id or name from list_models, for a client whose atStart is true. Left out, the session starts in its client's own choice."}},"required":["client","text"],"additionalProperties":false}}
         ]})
+    }
+}
+
+/// What a message tells its recipient about replying, as `send_message`
+/// describes it while every labelled message asks for a reply.
+const ALWAYS_ASKS: &str = "Unless the user chose to send as themselves, the recipient sees a first line naming you and a message id, and a last line asking it to reply with send_message and reply_to that id.";
+/// The same, while the sender says which messages need a reply.
+const ASKS_WHEN_REQUIRED: &str = "Unless the user chose to send as themselves, the recipient sees a first line naming you and a message id. A message ends with a line asking it to reply with send_message and reply_to that id only when you pass require_reply true, and then it carries the first line even when the user sends as themselves. Ask for a reply only when you need the answer.";
+
+/// "Ask for replies only when needed" is on: `send_message` and
+/// `start_session` take `require_reply`, and `send_message` says what it does.
+fn reply_choice(tools: &mut Value) {
+    for tool in tools["tools"].as_array_mut().into_iter().flatten() {
+        let name = tool["name"].as_str().unwrap_or_default().to_owned();
+        if name != "send_message" && name != "start_session" {
+            continue;
+        }
+        tool["inputSchema"]["properties"]["require_reply"] = json!({"type":"boolean","description":"true when you need an answer back: the message carries Agent HUD's label and a last line asking the recipient to reply with send_message. Left out or false: no such line, and the recipient is not asked to answer."});
+        if let Some(description) = tool["description"].as_str() {
+            tool["description"] = json!(description.replace(ALWAYS_ASKS, ASKS_WHEN_REQUIRED));
+        }
     }
 }

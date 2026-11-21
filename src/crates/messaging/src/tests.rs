@@ -752,8 +752,14 @@ fn a_send_answers_only_whether_the_words_were_handed_over() {
 
 #[test]
 fn the_group_lists_its_four_tools_only_while_it_is_on() {
-    assert_eq!(Messaging::tools(false), json!({"tools":[]}));
-    let names = Messaging::tools(true)["tools"]
+    assert_eq!(
+        Messaging::tools(&Preferences::default()),
+        json!({"tools":[]})
+    );
+    let names = Messaging::tools(&Preferences {
+        enabled: true,
+        ..Default::default()
+    })["tools"]
         .as_array()
         .unwrap()
         .iter()
@@ -768,7 +774,13 @@ fn the_group_lists_its_four_tools_only_while_it_is_on() {
             "start_session"
         ]
     );
-    for tool in Messaging::tools(true)["tools"].as_array().unwrap() {
+    for tool in Messaging::tools(&Preferences {
+        enabled: true,
+        ..Default::default()
+    })["tools"]
+        .as_array()
+        .unwrap()
+    {
         assert_eq!(tool["inputSchema"]["type"], "object");
         assert!(tool["description"].as_str().unwrap().len() > 80);
     }
@@ -928,6 +940,104 @@ fn as_the_user_the_words_go_bare() {
     let sent = world.codex.0.lock().unwrap()[0].clone();
     assert_eq!(sent.text, "Ship it");
     assert_eq!(sent.form, PromptForm::Own);
+}
+
+/// "Ask for replies only when needed": the sender's `require_reply` decides
+/// the reply line. A message that needs a reply is labelled, under "Send as
+/// me" too; one that does not ends with its own words.
+#[test]
+fn with_the_reply_choice_the_sender_says_which_messages_ask_for_a_reply() {
+    for as_user in [false, true] {
+        let mut world = World::new(Preferences {
+            enabled: true,
+            as_user,
+            require_reply: true,
+            limit: Some(10),
+            ..Default::default()
+        });
+        let send = |world: &mut World, arguments: Value| {
+            let answer = world.call(Some(("claude", CLAUDE)), "send_message", arguments);
+            assert_eq!(answer["state"], "queued", "{answer}");
+            world.codex.0.lock().unwrap().last().unwrap().clone()
+        };
+        let plain = send(&mut world, json!({"to":CODEX,"text":"Ship it"}));
+        if as_user {
+            assert_eq!(plain.text, "Ship it");
+            assert_eq!(plain.form, PromptForm::Own);
+        } else {
+            assert!(
+                plain.text.starts_with("[Agent HUD · from Claude Code"),
+                "{}",
+                plain.text
+            );
+            assert!(plain.text.ends_with("\n\nShip it"), "{}", plain.text);
+            assert_eq!(plain.form, PromptForm::Labelled);
+        }
+        let unasked = send(
+            &mut world,
+            json!({"to":CODEX,"text":"Ship it","require_reply":false}),
+        );
+        assert_eq!(unasked.text.lines().last(), Some("Ship it"));
+        let asked = send(
+            &mut world,
+            json!({"to":CODEX,"text":"Ship it","require_reply":true}),
+        );
+        assert_eq!(asked.form, PromptForm::Labelled, "as_user {as_user}");
+        assert!(
+            asked.text.starts_with("[Agent HUD · from Claude Code"),
+            "{}",
+            asked.text
+        );
+        assert!(
+            asked
+                .text
+                .lines()
+                .last()
+                .unwrap()
+                .starts_with("Reply with "),
+            "{}",
+            asked.text
+        );
+    }
+    // Off: the argument changes nothing, and every labelled message asks.
+    let mut world = World::on();
+    let answer = world.call(
+        Some(("claude", CLAUDE)),
+        "send_message",
+        json!({"to":CODEX,"text":"Ship it","require_reply":false}),
+    );
+    assert_eq!(answer["state"], "queued", "{answer}");
+    let sent = world.codex.0.lock().unwrap().last().unwrap().clone();
+    assert!(sent.text.lines().last().unwrap().starts_with("Reply with "));
+}
+
+/// `require_reply` is listed only while the user's switch is on, and
+/// `send_message` then says what it does.
+#[test]
+fn the_reply_choice_is_listed_only_while_its_switch_is_on() {
+    let listed = |require_reply| {
+        Messaging::tools(&Preferences {
+            enabled: true,
+            require_reply,
+            ..Default::default()
+        })
+    };
+    let off = listed(false).to_string();
+    assert!(!off.contains("require_reply"), "{off}");
+    assert!(off.contains("and a last line asking it to reply with send_message"));
+    let on = listed(true);
+    for tool in on["tools"].as_array().unwrap() {
+        let takes = tool["inputSchema"]["properties"]["require_reply"].is_object();
+        let name = tool["name"].as_str().unwrap();
+        assert_eq!(
+            takes,
+            name == "send_message" || name == "start_session",
+            "{name}"
+        );
+    }
+    let on = on.to_string();
+    assert!(on.contains("only when you pass require_reply true"), "{on}");
+    assert!(!on.contains("and a last line asking it to reply with send_message"));
 }
 
 #[test]
@@ -2179,6 +2289,7 @@ fn the_reply_line_names_the_tool_as_the_recipients_client_does() {
         words::compose(
             language,
             PromptForm::Labelled,
+            true,
             &from,
             client,
             "m-1",
@@ -2205,6 +2316,7 @@ fn the_reply_line_names_the_tool_as_the_recipients_client_does() {
         words::compose(
             Language::En,
             PromptForm::Own,
+            true,
             &from,
             "codex",
             "m-1",
@@ -2232,6 +2344,7 @@ fn a_message_from_grok_bot_pi_or_opencode_names_that_client_in_the_sender_label(
         let message = words::compose(
             Language::En,
             PromptForm::Labelled,
+            true,
             &from,
             "codex",
             "m-1",
@@ -2259,6 +2372,7 @@ fn every_message_asks_for_a_reply_with_send_message_and_no_tool_reads_answers() 
         words::compose(
             language,
             PromptForm::Labelled,
+            true,
             &from,
             "codex",
             "m-1",
@@ -2278,7 +2392,11 @@ fn every_message_asks_for_a_reply_with_send_message_and_no_tool_reads_answers() 
         line(Language::ZhHans),
         "请用 agent-hud 的 MCP 工具 mcp__agent_hud__send_message 回复，reply_to: m-1，回复会作为一条消息送到发件方。"
     );
-    let tools = Messaging::tools(true).to_string();
+    let tools = Messaging::tools(&Preferences {
+        enabled: true,
+        ..Default::default()
+    })
+    .to_string();
     assert!(!tools.contains("reply_hint"), "{tools}");
     assert!(!tools.contains("get_message"), "{tools}");
 }
@@ -2492,6 +2610,7 @@ fn an_antigravity_answer_flies_back_once_the_store_reads_it() {
     let words = words::compose(
         Language::En,
         PromptForm::Labelled,
+        true,
         &party(&world.snapshot, "claude", CLAUDE),
         "antigravity",
         &id,
@@ -2563,6 +2682,7 @@ fn an_antigravity_answer_the_store_cannot_tie_to_the_message_flies_only_its_repl
     let words = words::compose(
         Language::En,
         PromptForm::Labelled,
+        true,
         &party(&world.snapshot, "claude", CLAUDE),
         "antigravity",
         &id,
@@ -2636,6 +2756,7 @@ impl Preferences {
         json!({
             "agentMessages": self.enabled,
             "agentMessagesAsUser": self.as_user,
+            "agentMessagesRequireReply": self.require_reply,
             "agentMessagesLimit": self.limit,
             "claudeMessages": self.claude,
             "deepseekMessages": self.deepseek,

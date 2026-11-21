@@ -138,6 +138,8 @@ export interface AppSettings {
   agentMessages?: boolean;
   /** Agents' messages go in as the user's own words, with no label. */
   agentMessagesAsUser?: boolean;
+  /** The sending agent says of each message whether it needs a reply. */
+  agentMessagesRequireReply?: boolean;
   /** Passes in a row with no word from the user before agents' messages stop; null for no limit. */
   agentMessagesLimit?: number | null;
   /** Messages may go into Claude Code sessions through Agent HUD's plugin; on unless turned off. */

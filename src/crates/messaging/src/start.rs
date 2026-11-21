@@ -70,9 +70,9 @@ impl Messaging {
             return Ok(refused(&words::limit(language, limit)));
         }
         let id = message_id();
-        let form = self.form();
+        let (form, ask) = self.shape(arguments, false);
         let from = party(host.snapshot, &caller.client, &caller.session_id);
-        let delivered = words::compose(language, form, &from, client, &id, None, text);
+        let delivered = words::compose(language, form, ask, &from, client, &id, None, text);
         let request_id = uuid::Uuid::new_v4().to_string();
         let receipt = self.starts.start_with(
             StartRequest {

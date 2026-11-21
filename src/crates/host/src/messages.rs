@@ -95,7 +95,7 @@ impl AgentMessages {
 
     /// The group's tools while it is on, as the relay lists them.
     pub(crate) fn tools(snapshot: &Value) -> Value {
-        Messaging::tools(Preferences::read(&snapshot["settings"]).enabled)
+        Messaging::tools(&Preferences::read(&snapshot["settings"]))
     }
 
     /// One tool call from the relay: `{name, arguments, caller}`.

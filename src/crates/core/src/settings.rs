@@ -154,6 +154,7 @@ impl crate::AgentHudCore {
             | "claudeAnswers"
             | "agentMessages"
             | "agentMessagesAsUser"
+            | "agentMessagesRequireReply"
             | "claudeMessages"
             | "deepseekMessages"
             | "readCopilotQuota"
