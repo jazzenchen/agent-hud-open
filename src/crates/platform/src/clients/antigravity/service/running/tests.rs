@@ -1,5 +1,10 @@
 use super::*;
 
+/// The servers found with no saved token files.
+fn parse_servers(processes: Vec<crate::os::ProcessInfo>) -> Vec<Server> {
+    super::parse_servers(processes, &HashMap::new())
+}
+
 fn process(pid: u32, executable: &str, command: &str) -> crate::os::ProcessInfo {
     crate::os::ProcessInfo {
         pid,
@@ -109,5 +114,51 @@ fn each_server_names_the_client_it_serves() {
             (3, "antigravity-cli"),
             (4, "antigravity-ide"),
         ]
+    );
+}
+
+#[test]
+fn a_server_with_no_token_on_its_command_line_takes_the_one_it_saved() {
+    let root = tempfile::tempdir().unwrap();
+    let daemon = root.path().join("antigravity/daemon");
+    std::fs::create_dir_all(&daemon).unwrap();
+    std::fs::write(
+        daemon.join("hub_57399.json"),
+        r#"{"pid":1,"httpsPort":57398,"httpPort":57399,"lsVersion":"2.34.0","csrfToken":"saved-1"}"#,
+    )
+    .unwrap();
+    // Not a server here, a broken file and one too large: all passed over.
+    std::fs::write(
+        daemon.join("hub_1.json"),
+        r#"{"pid":9,"csrfToken":"saved-9"}"#,
+    )
+    .unwrap();
+    std::fs::write(daemon.join("hub_2.json"), "{").unwrap();
+    std::fs::write(
+        daemon.join("hub_3.json"),
+        format!(r#"{{"pid":3,"csrfToken":"{}"}}"#, "x".repeat(5000)),
+    )
+    .unwrap();
+    let saved = saved_tokens(root.path());
+    assert_eq!(saved.len(), 2);
+    let server = "/Applications/Antigravity.app/Contents/Resources/bin/language_server";
+    let found = super::parse_servers(
+        vec![
+            process(1, server, "server --app_data_dir antigravity"),
+            process(
+                2,
+                server,
+                "server --app_data_dir antigravity --csrf_token typed-2",
+            ),
+            process(3, server, "server --app_data_dir antigravity"),
+        ],
+        &saved,
+    );
+    assert_eq!(
+        found
+            .iter()
+            .map(|server| (server.pid, server.token.as_str()))
+            .collect::<Vec<_>>(),
+        [(1, "saved-1"), (2, "typed-2")]
     );
 }

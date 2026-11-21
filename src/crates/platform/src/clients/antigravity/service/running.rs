@@ -1,5 +1,8 @@
 //! The running Antigravity language servers and CLI, found by their process.
+//! A server's token is on its command line, or, since Antigravity 2.34 keeps
+//! it off there, in the file the server writes about itself when it starts.
 use agent_hud_agents::{antigravity, split};
+use std::{collections::HashMap, path::Path};
 pub(super) struct Server {
     pub pid: u32,
     pub token: String,
@@ -36,10 +39,62 @@ fn flag(command: &str, name: &str) -> Option<String> {
 }
 
 pub(super) fn servers() -> Result<Vec<Server>, String> {
-    Ok(parse_servers(crate::os::processes()?))
+    let processes = crate::os::processes()?;
+    let saved = crate::os::home_dir()
+        .map(|home| saved_tokens(&home.join(".gemini")))
+        .unwrap_or_default();
+    Ok(parse_servers(processes, &saved))
 }
 
-fn parse_servers(processes: Vec<crate::os::ProcessInfo>) -> Vec<Server> {
+/// The data folders a server may write its own file under: the desktop
+/// app's, the IDE's and the CLI's.
+const DATA_DIRS: [&str; 3] = ["antigravity", "antigravity-ide", "antigravity-cli"];
+/// Such a file holds a few short fields; anything larger is not one.
+const MAX_SAVED_BYTES: u64 = 4096;
+
+/// The token each server saved with its process id, from the files under
+/// `<gemini>/<data folder>/daemon` (`{"pid", "httpsPort", "csrfToken", …}`).
+/// A file left by a server that is gone names a process that is no longer a
+/// server here, or one whose service refuses the token; both are passed over.
+fn saved_tokens(gemini: &Path) -> HashMap<u32, String> {
+    let mut tokens = HashMap::new();
+    for dir in DATA_DIRS {
+        let Ok(entries) = std::fs::read_dir(gemini.join(dir).join("daemon")) else {
+            continue;
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.extension().is_none_or(|ext| ext != "json")
+                || !entry
+                    .metadata()
+                    .is_ok_and(|meta| meta.is_file() && meta.len() <= MAX_SAVED_BYTES)
+            {
+                continue;
+            }
+            let Some(saved) = std::fs::read(&path)
+                .ok()
+                .and_then(|bytes| serde_json::from_slice::<serde_json::Value>(&bytes).ok())
+            else {
+                continue;
+            };
+            let pid = saved["pid"]
+                .as_u64()
+                .and_then(|pid| u32::try_from(pid).ok());
+            let token = saved["csrfToken"].as_str().filter(|token| {
+                !token.is_empty() && !token.bytes().any(|byte| byte.is_ascii_control())
+            });
+            if let (Some(pid), Some(token)) = (pid, token) {
+                tokens.insert(pid, token.to_owned());
+            }
+        }
+    }
+    tokens
+}
+
+fn parse_servers(
+    processes: Vec<crate::os::ProcessInfo>,
+    saved: &HashMap<u32, String>,
+) -> Vec<Server> {
     let mut result = Vec::new();
     for process in processes {
         let pid = process.pid;
@@ -60,7 +115,9 @@ fn parse_servers(processes: Vec<crate::os::ProcessInfo>) -> Vec<Server> {
         if !server && !cli {
             continue;
         }
-        let token = flag(command, "csrf_token").unwrap_or_default();
+        let token = flag(command, "csrf_token")
+            .or_else(|| saved.get(&pid).cloned())
+            .unwrap_or_default();
         let extension = flag(command, "extension_server_port")
             .and_then(|value| value.parse::<u16>().ok())
             .filter(|port| *port != 0)
