@@ -22,7 +22,9 @@ pub(super) fn run(
     // can reach the watcher late, and sends the windows the time.
     const LOOK: Duration = Duration::from_secs(3);
     // File events and account readings are read at most this often
-    // (UsageCollector's 2 s read spacing).
+    // (UsageCollector's 2 s read spacing). A pass that falls due with no
+    // event keeps the same spacing: a due time a pass did not move on would
+    // otherwise start the next pass at once, and the one after.
     const SPACING: Duration = Duration::from_secs(2);
     enum Turn {
         Pass,
@@ -49,9 +51,9 @@ pub(super) fn run(
                 return;
             }
             let now = Instant::now();
-            let reading = *changed & DATA != 0 || indexing;
+            let reading = *changed & DATA != 0 || indexing || pass_at.is_some_and(|at| at <= now);
             let read_due = read_at + SPACING;
-            if (reading && read_due <= now) || pass_at.is_some_and(|at| at <= now) {
+            if reading && read_due <= now {
                 break Turn::Pass;
             }
             if *changed & REQUEST != 0 || due_at.is_some_and(|at| at <= now) {
@@ -68,7 +70,8 @@ pub(super) fn run(
                 reading.then_some(read_due),
                 reminder_at,
                 due_at,
-                pass_at,
+                // One already due waits for `read_due` above.
+                pass_at.filter(|at| *at > now),
             ]
             .into_iter()
             .flatten()

@@ -613,6 +613,16 @@ fn grok_bot_session_works_while_a_message_has_no_reply_and_idles_once_answered()
     backend.reads.bot_poll.as_mut().unwrap().0 = 0;
     assert!(backend.look());
     assert!(backend.reads.bot_poll.is_none());
+    // A pass the poll made due takes it too and reads the roster again, so
+    // the next pass is due 10 seconds on, not at once for as long as the
+    // turn works.
+    assert_eq!(state(&mut backend), "running");
+    backend.reads.bot_poll.as_mut().unwrap().0 = 0;
+    assert!(backend.next_pass_due().unwrap() <= std::time::Instant::now());
+    backend.file_changes(Some(Default::default()));
+    backend.collect();
+    assert!(backend.reads.bot_poll.as_ref().unwrap().0 > 0);
+    assert!(backend.next_pass_due().unwrap() > std::time::Instant::now());
     write(
         &bot::transcript_key("slot-1", "bot-a"),
         1,

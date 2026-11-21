@@ -57,6 +57,7 @@ impl crate::AgentHudCore {
     pub(crate) fn collect(&mut self) {
         let previous_pending = self.reads.pending.len();
         let started = std::time::Instant::now();
+        self.queue_due_bot_poll();
         let notice = self.scan(None).err();
         self.pace_reads(started.elapsed());
         if previous_pending != self.reads.pending.len() {

@@ -63,15 +63,7 @@ impl AgentHudCore {
     pub fn look(&mut self) -> bool {
         let active = self.active_logs();
         let mut due = self.reads.listing.stale(&self.provider_roots, &active);
-        if let Some((at, _)) = &self.reads.bot_poll {
-            if Utc::now().timestamp_millis() >= *at {
-                if let Some((_, path)) = self.reads.bot_poll.take() {
-                    self.reads.pending.insert(path.clone());
-                    self.reads.forced.insert(path);
-                    due = true;
-                }
-            }
-        }
+        due |= self.queue_due_bot_poll();
         if due {
             // The pass rechecks the logs held open at once and reads them.
             self.reads.active_checked_at = None;
@@ -83,6 +75,27 @@ impl AgentHudCore {
             due = true;
         }
         due
+    }
+
+    /// Queues a working Grok Bot turn's roster to be read again once its
+    /// poll falls due; true when it did. A look and a pass both take it: the
+    /// poll makes a pass due (`next_pass_due`), and a pass that left it in
+    /// place would stay due and run again at once, for as long as the turn
+    /// works.
+    pub(crate) fn queue_due_bot_poll(&mut self) -> bool {
+        if !self
+            .reads
+            .bot_poll
+            .as_ref()
+            .is_some_and(|(at, _)| Utc::now().timestamp_millis() >= *at)
+        {
+            return false;
+        }
+        if let Some((_, path)) = self.reads.bot_poll.take() {
+            self.reads.pending.insert(path.clone());
+            self.reads.forced.insert(path);
+        }
+        true
     }
 
     /// When a pass is due with no event to wake it: the next walk of every
