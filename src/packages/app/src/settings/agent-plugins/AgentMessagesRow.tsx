@@ -82,7 +82,7 @@ export function AgentMessagesRow({
         >
           <Switch
             aria-label={askWhenNeeded}
-            checked={settings.agentMessagesRequireReply === true}
+            checked={settings.agentMessagesRequireReply !== false}
             disabled={pending}
             onCheckedChange={(value) => set("agentMessagesRequireReply", value)}
           />

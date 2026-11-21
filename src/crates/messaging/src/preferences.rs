@@ -17,8 +17,8 @@ pub struct Preferences {
     pub as_user: bool,
     /// The sender says of each message whether it needs a reply
     /// (`require_reply`): one that does carries the label and the reply line,
-    /// under "Send as me" too; one that does not carries no reply line. Off:
-    /// every labelled message asks for a reply.
+    /// under "Send as me" too; one that does not carries no reply line. On
+    /// unless turned off; off, every labelled message asks for a reply.
     pub require_reply: bool,
     /// Passes in a row with no word from the user; None is no limit.
     pub limit: Option<u32>,
@@ -32,7 +32,7 @@ impl Default for Preferences {
         Self {
             enabled: false,
             as_user: false,
-            require_reply: false,
+            require_reply: true,
             limit: Some(DEFAULT_LIMIT),
             claude: true,
             deepseek: true,
@@ -54,7 +54,7 @@ impl Preferences {
         Self {
             enabled: settings["agentMessages"] == true,
             as_user: settings["agentMessagesAsUser"] == true,
-            require_reply: settings["agentMessagesRequireReply"] == true,
+            require_reply: settings["agentMessagesRequireReply"] != false,
             limit,
             claude: settings["claudeMessages"] != false,
             deepseek: settings["deepseekMessages"] != false,

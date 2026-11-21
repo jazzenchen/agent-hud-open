@@ -138,7 +138,7 @@ export interface AppSettings {
   agentMessages?: boolean;
   /** Agents' messages go in as the user's own words, with no label. */
   agentMessagesAsUser?: boolean;
-  /** The sending agent says of each message whether it needs a reply. */
+  /** The sending agent says of each message whether it needs a reply; on unless turned off. */
   agentMessagesRequireReply?: boolean;
   /** Passes in a row with no word from the user before agents' messages stop; null for no limit. */
   agentMessagesLimit?: number | null;

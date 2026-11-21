@@ -466,7 +466,7 @@ impl World {
     fn on() -> Self {
         Self::new(Preferences {
             enabled: true,
-            ..Default::default()
+            ..every_message_asks()
         })
     }
     /// The session runs Agent HUD's plugin: it checked in just now.
@@ -703,7 +703,7 @@ fn an_uncertain_antigravity_send_is_not_reported_as_refused() {
     let mut world = World::new_with_antigravity(
         Preferences {
             enabled: true,
-            ..Default::default()
+            ..every_message_asks()
         },
         true,
     );
@@ -736,7 +736,7 @@ fn a_send_answers_only_whether_the_words_were_handed_over() {
     let mut world = World::new_with_antigravity(
         Preferences {
             enabled: true,
-            ..Default::default()
+            ..every_message_asks()
         },
         true,
     );
@@ -758,7 +758,7 @@ fn the_group_lists_its_four_tools_only_while_it_is_on() {
     );
     let names = Messaging::tools(&Preferences {
         enabled: true,
-        ..Default::default()
+        ..every_message_asks()
     })["tools"]
         .as_array()
         .unwrap()
@@ -776,7 +776,7 @@ fn the_group_lists_its_four_tools_only_while_it_is_on() {
     );
     for tool in Messaging::tools(&Preferences {
         enabled: true,
-        ..Default::default()
+        ..every_message_asks()
     })["tools"]
         .as_array()
         .unwrap()
@@ -934,7 +934,7 @@ fn as_the_user_the_words_go_bare() {
         enabled: true,
         as_user: true,
         limit: Some(10),
-        ..Default::default()
+        ..every_message_asks()
     });
     world.send(("claude", CLAUDE), CODEX, "Ship it");
     let sent = world.codex.0.lock().unwrap()[0].clone();
@@ -953,7 +953,7 @@ fn with_the_reply_choice_the_sender_says_which_messages_ask_for_a_reply() {
             as_user,
             require_reply: true,
             limit: Some(10),
-            ..Default::default()
+            ..every_message_asks()
         });
         let send = |world: &mut World, arguments: Value| {
             let answer = world.call(Some(("claude", CLAUDE)), "send_message", arguments);
@@ -1019,9 +1019,12 @@ fn the_reply_choice_is_listed_only_while_its_switch_is_on() {
         Messaging::tools(&Preferences {
             enabled: true,
             require_reply,
-            ..Default::default()
+            ..every_message_asks()
         })
     };
+    // On unless the user turned it off.
+    assert!(Preferences::read(&json!({})).require_reply);
+    assert!(!Preferences::read(&json!({"agentMessagesRequireReply":false})).require_reply);
     let off = listed(false).to_string();
     assert!(!off.contains("require_reply"), "{off}");
     assert!(off.contains("and a last line asking it to reply with send_message"));
@@ -1374,7 +1377,7 @@ fn passes_count_while_messages_wake_each_other_and_stop_at_the_limit() {
         enabled: true,
         as_user: false,
         limit: Some(3),
-        ..Default::default()
+        ..every_message_asks()
     });
     world.check_in(CLAUDE);
     // The user asked Claude for a review; Claude sends to Codex: pass 1.
@@ -1478,7 +1481,7 @@ fn with_no_limit_the_passes_go_on() {
         enabled: true,
         as_user: false,
         limit: None,
-        ..Default::default()
+        ..every_message_asks()
     });
     let mut last = String::new();
     for pass in 1..=12 {
@@ -1511,7 +1514,7 @@ fn as_the_user_a_message_still_counts_because_agent_hud_knows_its_own_words() {
         enabled: true,
         as_user: true,
         limit: Some(1),
-        ..Default::default()
+        ..every_message_asks()
     });
     world.send(("claude", CLAUDE), CODEX, "Review this");
     world.transcripts.prompt(CODEX, "x1", "Review this");
@@ -1558,7 +1561,7 @@ fn a_message_sent_as_the_user_is_found_by_its_words() {
         enabled: true,
         as_user: true,
         limit: Some(10),
-        ..Default::default()
+        ..every_message_asks()
     });
     world.transcripts.prompt(CODEX, "x0", "Ship it");
     world
@@ -1628,7 +1631,7 @@ fn words_sent_as_the_user_never_start_a_session_with_a_slash_command() {
         enabled: true,
         as_user: true,
         limit: Some(10),
-        ..Default::default()
+        ..every_message_asks()
     });
     let refused = world.call(
         Some(("claude", CLAUDE)),
@@ -1726,7 +1729,7 @@ fn every_pass_flies_the_plane_and_a_refusal_drops_it() {
         enabled: true,
         as_user: false,
         limit: Some(1),
-        ..Default::default()
+        ..every_message_asks()
     });
     world.send(("claude", CLAUDE), CODEX, "Review this");
     // Codex's turn began with that message: its reply would be pass 2, over the limit.
@@ -1909,7 +1912,7 @@ fn the_window_offers_a_new_pi_or_opencode_session_where_installed() {
     let mut world = World::new_with_commands(
         Preferences {
             enabled: true,
-            ..Default::default()
+            ..every_message_asks()
         },
         &[Provider::Pi, Provider::OpenCode],
     );
@@ -1988,7 +1991,7 @@ fn a_stored_turn_that_ended_is_done_without_live_facts_even_inside_the_plugin_wr
         enabled: true,
         as_user: true,
         limit: Some(10),
-        ..Default::default()
+        ..every_message_asks()
     });
     world.check_in(QUIET);
     let sent = world.send(("codex", CODEX), QUIET, "Run the tests");
@@ -2031,7 +2034,7 @@ fn a_caller_turn_the_store_has_not_caught_up_with_keeps_the_chain_counting() {
         enabled: true,
         as_user: false,
         limit: Some(2),
-        ..Default::default()
+        ..every_message_asks()
     });
     world
         .transcripts
@@ -2247,7 +2250,7 @@ fn as_the_user_a_harness_answer_is_the_one_after_the_send() {
         enabled: true,
         as_user: true,
         limit: Some(10),
-        ..Default::default()
+        ..every_message_asks()
     });
     world.harness();
     let sent = 1_792_600_000_000i64;
@@ -2394,7 +2397,7 @@ fn every_message_asks_for_a_reply_with_send_message_and_no_tool_reads_answers() 
     );
     let tools = Messaging::tools(&Preferences {
         enabled: true,
-        ..Default::default()
+        ..every_message_asks()
     })
     .to_string();
     assert!(!tools.contains("reply_hint"), "{tools}");
@@ -2527,7 +2530,7 @@ fn a_harness_session_the_user_spoke_to_starts_a_new_chain() {
             enabled: true,
             as_user: false,
             limit: Some(1),
-            ..Default::default()
+            ..every_message_asks()
         });
         world.harness();
         world.check_in(QUIET);
@@ -2750,6 +2753,15 @@ fn an_antigravity_answer_the_store_cannot_tie_to_the_message_flies_only_its_repl
     );
 }
 
+/// The choices most tests here start from: every labelled message asks for
+/// a reply, as with "Ask for replies only when needed" off.
+fn every_message_asks() -> Preferences {
+    Preferences {
+        require_reply: false,
+        ..Default::default()
+    }
+}
+
 impl Preferences {
     /// The app's settings that say these choices.
     fn settings(&self) -> Value {
@@ -2844,7 +2856,7 @@ fn a_steers_answer_is_read_from_the_turn_it_went_into() {
             enabled: true,
             as_user,
             limit: Some(10),
-            ..Default::default()
+            ..every_message_asks()
         });
         let turn = "turn-in-progress";
         world
