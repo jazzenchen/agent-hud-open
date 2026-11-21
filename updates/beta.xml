@@ -45,14 +45,14 @@ Requires an Apple Silicon Mac running macOS 14 or later.
       <agenthudMinimumIOSVersion>1.7.2</agenthudMinimumIOSVersion>
     </item>
     <item>
-      <title>0.6.9</title>
-      <pubDate>Sat, 21 Nov 2026 02:10:53 +0800</pubDate>
-      <link>https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.9</link>
-      <sparkle:version>507</sparkle:version>
-      <sparkle:shortVersionString>0.6.9</sparkle:shortVersionString>
+      <title>0.6.10</title>
+      <pubDate>Sun, 22 Nov 2026 02:03:13 +0800</pubDate>
+      <link>https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.10</link>
+      <sparkle:version>508</sparkle:version>
+      <sparkle:shortVersionString>0.6.10</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
       <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-      <description sparkle:format="markdown"># Agent HUD 0.6.9
+      <description sparkle:format="markdown"># Agent HUD 0.6.10
 
 ## Compatibility
 
@@ -66,16 +66,16 @@ Requires an Apple Silicon Mac running macOS 14 or later.
 
 ### Changed
 
-- **Agent messages: a send says only whether it was delivered.** `send_message` and `start_session` now answer `delivered: true`, `false` with the reason when nothing was sent, or `null` with the reason when the client may have taken the words without saying so. `get_message` and the `reply_hint` argument are gone: the other session answers with `send_message` and `reply_to`, and its reply arrives in the sender's session as a new turn, so there is nothing to poll. A session without Agent HUD's tools can no longer answer a message. Agents that still call `get_message` get an unknown-tool error; start a new session so they read the new tool list.
+- **Agent messages: a message asks for a reply only when its sender says it needs one.** A new switch, "Ask for replies only when needed" (Settings → Agents → Agent tools, under "Let agents message each other"), is on unless you turn it off. With it on, `send_message` and `start_session` take `require_reply`: a message ends with the line asking for a reply only when the sending agent passes `require_reply: true`, and such a message carries Agent HUD's label under "Send as me" too, so the recipient knows whom to answer. Turn the switch off and every labelled message asks for a reply, as before.
 
 ### Fixes
 
-- `send_message` no longer reports "The local tools response did not complete" for a message that did go out, which made the sender send it again. When the answer is late, Agent HUD is asked what became of that very call and the agent gets the real result; one call never sends twice. A slow send also no longer holds up the other sessions of Antigravity or DeepSeek Harness, which share one connection to Agent HUD (#118, thanks @zqy5618).
-- Quotas are read sooner after you use them: 5–15 seconds after the last turn that spends a quota ends, and every 3 minutes otherwise, whether or not the plan is also used on another device. Codex, Cursor and several others used to wait up to 4 minutes after a turn, and an idle Claude could go hours unread (#135, thanks @Kki1ds).
-- A HUD on the right or bottom edge no longer jumps aside when its panel starts to open or blinks after it closes (#129, Windows, thanks @xiaofanghao).
-- A HUD on the right edge is on the screen again. Since 0.6.5 it sat beyond the edge, out of sight and out of reach of the pointer (Linux, X11).
+- Agent HUD no longer keeps a processor core busy while a Grok Bot turn waits for its reply. Its data collection ran back to back for as long as the turn was open, instead of every 2 seconds at most, which showed as Agent HUD at 60–90% CPU.
+- Antigravity 2.34.0: Agent HUD finds the desktop app's local service again, so its quota is read and `send_message` and `start_session` reach it. 2.34.0 stopped putting the service's token on the server's command line; Agent HUD now also reads it from the file the server saves at start. Tested on macOS (#139, thanks @JadeY001 and @cdk1025).
+- An Antigravity CLI quota reading that has gone stale no longer hides the current one: once the desktop app or the IDE reads the same account, their reading is shown (#136, thanks @DDDYong).
+- Linux: Agent HUD's tools and agent messages start from an installed package. `Agent HUD --mcp` answered "The installed MCP relay is missing", because the helpers a package puts under `/usr/lib` were not looked for there.
 </description>
-      <enclosure url="https://github.com/jazzenchen/agent-hud-open/releases/download/v0.6.9/Agent-HUD-0.6.9-arm64.dmg" length="55235056" type="application/octet-stream" sparkle:edSignature="9z2FNkijIM2VDGHjnGh6El+B4QgBc9UFD8BfhjcDYCsxM5NWzaYVJW0yhJMsP4wx8mOfGGWRlV9wZENwMAlMAQ==" />
+      <enclosure url="https://github.com/jazzenchen/agent-hud-open/releases/download/v0.6.10/Agent-HUD-0.6.10-arm64.dmg" length="55261748" type="application/octet-stream" sparkle:edSignature="6kCEuv/Gofpdwduc9h8Gi08nKDDFwORGRWe/0sJzB4G7f5unrSsSYUiOdTNl6UsxHYNuQ47H5yR/jsl5079OCw==" />
       <agenthudMacOnly>false</agenthudMacOnly>
       <agenthudMinimumIOSVersion>1.7.2</agenthudMinimumIOSVersion>
     </item>
