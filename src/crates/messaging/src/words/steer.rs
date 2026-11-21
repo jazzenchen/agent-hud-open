@@ -4,14 +4,24 @@ use agent_hud_core::l10n::{fill, tr_in, Language};
 
 /// The words delivered, marked on their first line as going into the turn
 /// in progress, so the recipient reads them as a correction to the work at
-/// hand and not as a task of its own. A steer always carries the label.
-pub fn steered(language: Language, delivered: String) -> String {
+/// hand and not as a task of its own. A steer always carries the label. Its
+/// last line asks for no reply: one would stop the turn it went into, and
+/// what the steer changes shows in that turn's result. Only a question is
+/// answered.
+pub fn steered(language: Language, to_client: &str, id: &str, delivered: String) -> String {
     let (label, rest) = delivered.split_once('\n').unwrap_or((&delivered, ""));
     let Some(label) = label.strip_suffix(']') else {
         return delivered;
     };
     let mark = tr_in(language, "into your current turn");
-    format!("{label} · {mark}]\n{rest}")
+    // The queued last line asks for a reply; it holds no blank line, so the
+    // last blank line ends the text.
+    let text = rest.rsplit_once("\n\n").map_or(rest, |(text, _)| text);
+    let footer = fill(
+        &tr_in(language, "This goes into your current turn: take it into the work at hand, with no reply of its own. What it changes belongs in this turn's result. Only if it asks you something, answer with {{tool}}, reply_to: {{id}}."),
+        &[("tool", &super::reply_tool(language, to_client)), ("id", &id)],
+    );
+    format!("{label} · {mark}]\n{text}\n\n{footer}")
 }
 /// The recipient's client takes no message into a turn in progress.
 pub fn steer_unsupported(language: Language, client: &str) -> String {

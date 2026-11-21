@@ -900,7 +900,7 @@ fn a_labelled_message_names_its_sender_and_says_how_to_reply_and_waits_in_the_qu
     );
     assert!(sent.text.contains(&text), "the text goes whole");
     // Codex names agent-hud's tool with an underscore.
-    assert!(sent.text.ends_with(&format!("Reply with agent-hud's MCP tool mcp__agent_hud__send_message, reply_to: {id}: your reply reaches the sender as a message.")), "{}", sent.text);
+    assert!(sent.text.ends_with(&format!("Reply with agent-hud's MCP tool mcp__agent_hud__send_message, reply_to: {id}: your reply reaches the sender as a message. Send one when you have an answer, a result or a question for the sender; not just to say this arrived.")), "{}", sent.text);
 }
 
 #[test]
@@ -913,7 +913,7 @@ fn chinese_labels_follow_the_app_language() {
     assert!(sent.starts_with(&format!(
         "[Agent HUD · 来自 Claude Code · Fix the login · {id}]"
     )));
-    assert!(sent.ends_with(&format!("请用 agent-hud 的 MCP 工具 mcp__agent_hud__send_message 回复，reply_to: {id}，回复会作为一条消息送到发件方。")), "{sent}");
+    assert!(sent.ends_with(&format!("请用 agent-hud 的 MCP 工具 mcp__agent_hud__send_message 回复，reply_to: {id}，回复会作为一条消息送到发件方。有发件方需要的答案、结果或问题时再回；只为说一声收到，不必回。")), "{sent}");
 }
 
 #[test]
@@ -1040,7 +1040,7 @@ fn a_deepseek_harness_session_takes_a_message_through_its_plugin_and_its_answer_
     assert!(delivered.starts_with(&format!(
         "[Agent HUD · from Claude Code · Fix the login · {id}]"
     )));
-    assert!(delivered.ends_with(&format!("Reply with agent-hud's MCP tool mcp__agent-hud__send_message, reply_to: {id}: your reply reaches the sender as a message.")), "{delivered}");
+    assert!(delivered.ends_with(&format!("Reply with agent-hud's MCP tool mcp__agent-hud__send_message, reply_to: {id}: your reply reaches the sender as a message. Send one when you have an answer, a result or a question for the sender; not just to say this arrived.")), "{delivered}");
     // Its compressed log's tail marks where it ended: the answer is after.
     assert_eq!(world.messaging.journal.find(&id).unwrap().cursor, Some(2));
     // Open decodes the log from its start to reach that point, a few looks.
@@ -2030,7 +2030,7 @@ fn a_reply_settles_the_message_it_answers_and_is_the_one_plane_back() {
     let first = world.send(("claude", CLAUDE), QUIET, "Review this");
     let id = first["id"].as_str().unwrap().to_owned();
     let delivered = world.claude_words(QUIET, &id);
-    assert!(delivered.ends_with(&format!("Reply with agent-hud's MCP tool mcp__agent-hud__send_message, reply_to: {id}: your reply reaches the sender as a message.")), "{delivered}");
+    assert!(delivered.ends_with(&format!("Reply with agent-hud's MCP tool mcp__agent-hud__send_message, reply_to: {id}: your reply reaches the sender as a message. Send one when you have an answer, a result or a question for the sender; not just to say this arrived.")), "{delivered}");
     world.transcripts.prompt(QUIET, "q1", &delivered);
     let reply = world.call(
         Some(("claude", QUIET)),
@@ -2195,7 +2195,7 @@ fn the_reply_line_names_the_tool_as_the_recipients_client_does() {
     assert!(line(Language::En, "codex", None).contains("mcp__agent_hud__send_message"));
     assert_eq!(
         line(Language::En, "antigravity", None),
-        "Reply with agent-hud's send_message tool, reply_to: m-1: your reply reaches the sender as a message."
+        "Reply with agent-hud's send_message tool, reply_to: m-1: your reply reaches the sender as a message. Send one when you have an answer, a result or a question for the sender; not just to say this arrived."
     );
     assert_eq!(
         line(Language::ZhHans, "deepseek", Some("m-0")),
@@ -2213,6 +2213,44 @@ fn the_reply_line_names_the_tool_as_the_recipients_client_does() {
         ),
         "Hi"
     );
+}
+
+/// A steer's last line is its own: it asks for no reply, which would stop the
+/// turn it went into, and offers the tool only for a question. A queued
+/// message's asks for a reply with something the sender needs.
+#[test]
+fn a_steer_asks_for_no_reply_and_a_queued_message_for_no_bare_acknowledgement() {
+    let from = Party {
+        client: "claude".into(),
+        session_id: CLAUDE.into(),
+        title: None,
+    };
+    let queued = |language| {
+        words::compose(
+            language,
+            PromptForm::Labelled,
+            &from,
+            "codex",
+            "m-1",
+            None,
+            "Use v2.\n\nNot v1.",
+        )
+    };
+    let steered = |language| words::steered(language, "codex", "m-1", queued(language));
+    let last = |words: String| words.lines().last().unwrap().to_owned();
+    assert_ne!(last(steered(Language::En)), last(queued(Language::En)));
+    assert_eq!(
+        last(steered(Language::En)),
+        "This goes into your current turn: take it into the work at hand, with no reply of its own. What it changes belongs in this turn's result. Only if it asks you something, answer with agent-hud's MCP tool mcp__agent_hud__send_message, reply_to: m-1."
+    );
+    assert_eq!(
+        last(steered(Language::ZhHans)),
+        "这段话进入你当前这一轮：照着调整手上的工作，不用单独回复。它带来的改变写进这一轮的结果里。只有它向你提了问题时，才用 agent-hud 的 MCP 工具 mcp__agent_hud__send_message 回复，reply_to: m-1。"
+    );
+    assert!(!steered(Language::En).contains("Reply with"));
+    // The text, blank lines and all, is kept between the two.
+    assert!(steered(Language::En).contains("\n\nUse v2.\n\nNot v1.\n\n"));
+    assert!(last(queued(Language::En)).ends_with("not just to say this arrived."));
 }
 
 /// A message's first line names the client it came from. Grok Bot, Pi and
@@ -2245,9 +2283,10 @@ fn a_message_from_grok_bot_pi_or_opencode_names_that_client_in_the_sender_label(
     }
 }
 
-/// Every message asks the recipient to reply with send_message, which brings
-/// the reply back as a message of its own: no tool reads an answer, and no
-/// argument leaves the request out.
+/// Every queued message asks the recipient to reply with send_message, which
+/// brings the reply back as a message of its own: no tool reads an answer, and
+/// no argument leaves the request out. It asks for no reply that only says the
+/// message arrived.
 #[test]
 fn every_message_asks_for_a_reply_with_send_message_and_no_tool_reads_answers() {
     let from = Party {
@@ -2272,11 +2311,11 @@ fn every_message_asks_for_a_reply_with_send_message_and_no_tool_reads_answers() 
     };
     assert_eq!(
         line(Language::En),
-        "Reply with agent-hud's MCP tool mcp__agent_hud__send_message, reply_to: m-1: your reply reaches the sender as a message."
+        "Reply with agent-hud's MCP tool mcp__agent_hud__send_message, reply_to: m-1: your reply reaches the sender as a message. Send one when you have an answer, a result or a question for the sender; not just to say this arrived."
     );
     assert_eq!(
         line(Language::ZhHans),
-        "请用 agent-hud 的 MCP 工具 mcp__agent_hud__send_message 回复，reply_to: m-1，回复会作为一条消息送到发件方。"
+        "请用 agent-hud 的 MCP 工具 mcp__agent_hud__send_message 回复，reply_to: m-1，回复会作为一条消息送到发件方。有发件方需要的答案、结果或问题时再回；只为说一声收到，不必回。"
     );
     let tools = Messaging::tools(true).to_string();
     assert!(!tools.contains("reply_hint"), "{tools}");

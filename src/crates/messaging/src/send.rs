@@ -118,7 +118,7 @@ impl Messaging {
         let from = sender.clone();
         let delivered = words::compose(language, form, &from, client, &id, reply_to, text);
         let delivered = if steer {
-            words::steered(language, delivered)
+            words::steered(language, client, &id, delivered)
         } else {
             delivered
         };

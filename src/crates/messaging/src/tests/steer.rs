@@ -96,6 +96,13 @@ fn a_steer_goes_into_the_harness_turn_in_progress_and_its_answer_is_read_from_it
         delivered.lines().next().unwrap(),
         format!("[Agent HUD · from Claude Code · Fix the login · {id} · into your current turn]")
     );
+    // Its last line asks for no reply, which would stop the turn it went
+    // into, and names the tool only for a question.
+    assert_eq!(
+        delivered.lines().last().unwrap(),
+        format!("This goes into your current turn: take it into the work at hand, with no reply of its own. What it changes belongs in this turn's result. Only if it asks you something, answer with agent-hud's MCP tool mcp__agent-hud__send_message, reply_to: {id}.")
+    );
+    assert!(!delivered.contains("Reply with"), "{delivered}");
     assert!(left.get("model").is_none());
     assert_eq!(
         world
@@ -226,6 +233,8 @@ fn a_steer_carries_agent_huds_label_even_sent_as_the_user() {
             .starts_with("[Agent HUD · from Claude Code"),
         "{text}"
     );
+    // The text is kept whole; only the last line is the steer's own.
+    assert_eq!(text.split("\n\n").nth(1), Some("Stop: the API is v2 now."));
     // A queued message still goes as the user's own words.
     world.send(("claude", CLAUDE), CODEX, "Then review it.");
     assert_eq!(world.codex.0.lock().unwrap()[1].text, "Then review it.");

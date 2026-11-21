@@ -51,8 +51,10 @@ fn reply_tool(language: Language, client: &str) -> String {
 /// The words delivered. Labelled: a first line naming the sender and the
 /// message, the text, and a last line saying how to reply: with send_message
 /// and reply_to, as the recipient's client names that tool, so the reply comes
-/// back as a message; the sender reads nothing else. A reply's last line is
-/// shorter, so two agents do not thank each other back and forth. As the
+/// back as a message; the sender reads nothing else. It asks for a reply only
+/// with something the sender needs: a reply that just says the message
+/// arrived costs both a turn and a pass toward the limit. A reply's last line
+/// is shorter, so two agents do not thank each other back and forth. As the
 /// user's own: the text alone.
 pub fn compose(
     language: Language,
@@ -90,7 +92,7 @@ pub fn compose(
     let (label, footer) = match reply_to {
         None => (
             tr_in(language, "[Agent HUD · from {{client}}{{title}} · {{id}}]"),
-            tr_in(language, "Reply with {{tool}}, reply_to: {{id}}: your reply reaches the sender as a message."),
+            tr_in(language, "Reply with {{tool}}, reply_to: {{id}}: your reply reaches the sender as a message. Send one when you have an answer, a result or a question for the sender; not just to say this arrived."),
         ),
         Some(_) => (
             tr_in(
