@@ -4,8 +4,8 @@
 // brings the dock back, as does anything that wants the person: a request,
 // a message, a card. Pure, so the tests run it in Node.
 import type { HUDRect, StripMetrics } from "../geometry.ts";
+import type { GlowAlert } from "../glow-alert.ts";
 import type { HUDConfig, HUDEdge, HUDVendor, RestStyle } from "../model.ts";
-import { statusColor } from "../mark-colors.ts";
 import { hudGround } from "./hud-ground.ts";
 
 /** How deep the edge stays live where the dock hides, in points. */
@@ -175,42 +175,19 @@ export function restZone(shape: HUDRect, edge: HUDEdge): HUDRect {
 
 /** The bar's paint: the colour chosen, else (automatic) the HUD's text
  * colour for its appearance, as see-through as its transparency lets the dock
- * be but never gone. When a window runs low, its level colours the bar's two
- * ends (`tip`), so the chosen colour still shows. Its edge is the dock's
- * ground, so it reads on any wallpaper. */
+ * be but never gone. Usage shows in the glow round it, as round the notch,
+ * never in the bar itself. Its edge is the dock's ground, so it reads on any
+ * wallpaper. */
 export function barPaint(
   look: Pick<HUDConfig, "restBarColor" | "solidTransparency">,
-  levels: readonly HUDVendor["level"][],
   light: boolean,
-): { fill: string; edge: string; tip: string | null } {
+): { fill: string; edge: string } {
   const alpha = Math.max(0.3, 1 - look.solidTransparency);
   const edge = hudGround(light, alpha).fill;
-  const worst = levels.includes("critical")
-    ? "critical"
-    : levels.includes("warning")
-      ? "warning"
-      : null;
-  const tip = worst ? statusColor(worst) : null;
   if (/^#[0-9a-f]{3,8}$/i.test(look.restBarColor))
-    return { fill: look.restBarColor, edge, tip };
+    return { fill: look.restBarColor, edge };
   const ink = light ? "28,28,30" : "242,242,247";
-  return { fill: `rgba(${ink},${(0.8 * alpha).toFixed(2)})`, edge, tip };
-}
-
-/** How much of the bar's length each end takes in a low window's level. */
-export const BAR_TIP_SHARE = 0.22;
-
-/** The bar's ends in its tip colour, along its length: across for a top or
- * bottom edge, down for a side. None without a tip. */
-export function barTips(
-  tip: string | null,
-  edge: HUDConfig["edge"],
-): string | undefined {
-  if (!tip) return undefined;
-  const along = edge === "top" || edge === "bottom" ? "to right" : "to bottom";
-  const a = `${BAR_TIP_SHARE * 100}%`,
-    b = `${100 - BAR_TIP_SHARE * 100}%`;
-  return `linear-gradient(${along}, ${tip} ${a}, transparent ${a}, transparent ${b}, ${tip} ${b})`;
+  return { fill: `rgba(${ink},${(0.8 * alpha).toFixed(2)})`, edge };
 }
 
 /** Everything the scene draws of a dock that folds. */
@@ -225,5 +202,36 @@ export interface Rest {
   logos: ReturnType<typeof logoStrip>;
   /** The bar's paint, for a dock that rests as a bar. */
   bar: ReturnType<typeof barPaint> | null;
+  /** The glow round the bar; none with the glow off or hidden. */
+  glow: BarGlow | null;
   reduceMotion: boolean;
+}
+
+/** The glow round a resting bar: the notch's, in the soft style, so a bar
+ * shows each agent's usage and work as the notch does. */
+export interface BarGlow {
+  config: HUDConfig;
+  /** The vendors' colours with readings, none while detection is paused. */
+  colors: string[];
+  /** An agent is working: the glow breathes at the working period. */
+  active: boolean;
+  alert: GlowAlert | null;
+}
+
+/** The glow a dock resting as a bar wears: the notch's, unless the glow is
+ * off in Settings or hidden for now (the tray, ⌥⌘H). It breathes at the
+ * working period while any agent works. */
+export function barGlow(
+  style: FoldStyle | null,
+  config: HUDConfig,
+  glow: { hidden: boolean; colors: string[]; alert: GlowAlert | null },
+  vendors: readonly Pick<HUDVendor, "working">[],
+): BarGlow | null {
+  if (style !== "bar" || !config.glowEnabled || glow.hidden) return null;
+  return {
+    config,
+    colors: glow.colors,
+    active: vendors.some((vendor) => vendor.working > 0),
+    alert: glow.alert,
+  };
 }

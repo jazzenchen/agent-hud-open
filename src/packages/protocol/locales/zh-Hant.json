@@ -728,7 +728,6 @@
   "Not supported": "不支援",
   "Not used yet": "還沒有 Agent 在用",
   "Notch": "瀏海",
-  "Notch glow": "瀏海光暈",
   "Nothing read that day": "這天沒有讀數",
   "Nothing shows here, cards included. The menu bar's Hide HUD still turns it off on every screen.": "這個螢幕什麼都不顯示，卡片也不彈。選單列的「隱藏 HUD」仍然管所有螢幕。",
   "Nous Portal could not be reached": "無法連線 Nous Portal",
@@ -1504,7 +1503,7 @@
   "At the edge": "邊緣保留",
   "Nothing": "無",
   "Only the logos stay.": "只留下標誌。",
-  "Only a bar stays, in the colour below; its ends turn yellow or red as a usage limit nears.": "只留下一根細條，顏色在下方選；接近用量上限時兩端變黃或變紅。",
+  "Only a bar stays, in the colour below, with the glow round it.": "只留下一根細條，顏色在下方選，外圍有光暈。",
   "Nothing stays on screen.": "螢幕上什麼都不留。",
   "Quota reading is off for this agent in Settings. Sessions and tokens are still counted from its logs.": "已在設定中關閉此 Agent 的額度讀取。工作階段和 token 仍會從它的日誌中統計。",
   "Quota reading": "讀取額度",
@@ -1518,5 +1517,10 @@
   "The quota is read through the Claude desktop app's sign-in. To keep Claude from taking it for abuse, that is done only every {{minutes}} minutes. Install Claude Code (the claude command) and sign in for more frequent updates.": "現透過 Claude 桌面版的登入讀取額度。為避免被 Claude 視為異常存取，每 {{minutes}} 分鐘才讀取一次。安裝 Claude Code（claude 指令）並登入後更新更頻繁。",
   "sender {{session}}": "發送方 {{session}}",
   "to {{to}} and the sender of the reply_to message, {{sender}}, are different sessions. Leave to out to answer the sender, or send a separate message to {{to}} without reply_to.": "to {{to}} 與 reply_to 那則來件的發件方 {{sender}} 不是同一個工作階段。要回給來件方，就省略 to；要發給 {{to}}，就另發一則、不帶 reply_to。",
-  "Read just now": "剛剛讀取"
+  "Read just now": "剛剛讀取",
+  "Glow": "光暈",
+  "Show glow": "顯示光暈",
+  "Hide when idle": "閒置時隱藏",
+  "Round the bar while the HUD is hidden: each agent's colour by its usage, yellow from 70% and red from 90%, breathing faster while one works.": "HUD 隱藏時圍在細條外：每個 Agent 一種顏色，依用量變化，70% 起變黃、90% 起變紅；有 Agent 工作時呼吸更快。",
+  "Round the notch: each agent's colour by its usage, yellow from 70% and red from 90%, breathing faster while one works.": "圍在瀏海外：每個 Agent 一種顏色，依用量變化，70% 起變黃、90% 起變紅；有 Agent 工作時呼吸更快。"
 }

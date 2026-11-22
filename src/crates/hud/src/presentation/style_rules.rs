@@ -104,6 +104,12 @@ struct GlowField {
 
 const GLOW: &[GlowField] = &[
     GlowField {
+        name: "enabled",
+        stored: "glowEnabled",
+        range: None,
+        step: None,
+    },
+    GlowField {
         name: "style",
         stored: "glowStyle",
         range: None,

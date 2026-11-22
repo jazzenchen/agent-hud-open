@@ -1,8 +1,9 @@
-/* Auto-hide for a Simple HUD: whether it steps back against its edge while
- * nothing needs it, what it leaves there, and, when that is a bar, the bar's
- * length, thickness and colour. */
+/* Auto-hide for a Simple HUD, a section of its own: whether it steps back
+ * against its edge while nothing needs it, what it leaves there, and, when
+ * that is a bar, the bar's length, thickness and colour. The glow round the
+ * bar is the Glow section's. */
 import type { HUDConfig, RestStyle } from "@agent-hud/hud/model";
-import { Row } from "../SettingsPrimitives";
+import { Row, Section } from "../SettingsPrimitives";
 import { Segments, ToggleRow } from "../SettingsControls";
 import { displayControls, type DisplayProps } from "./controls";
 
@@ -14,7 +15,7 @@ function restSubtitle(style: RestStyle, t: DisplayProps["t"]): string {
   switch (style) {
     case "bar":
       return t(
-        "Only a bar stays, in the colour below; its ends turn yellow or red as a usage limit nears.",
+        "Only a bar stays, in the colour below, with the glow round it.",
       );
     case "hidden":
       return t("Nothing stays on screen.");
@@ -37,7 +38,17 @@ function barColours(t: DisplayProps["t"]): [string, string][] {
   ];
 }
 
-export function RestRows({ config, update, t }: DisplayProps) {
+/** Auto-hide, for a Simple HUD only. */
+export function AutoHideSection({ config, update, t }: DisplayProps) {
+  if (config.mode !== "simple") return null;
+  return (
+    <Section title={t("Auto-hide")}>
+      <RestRows config={config} update={update} t={t} />
+    </Section>
+  );
+}
+
+function RestRows({ config, update, t }: DisplayProps) {
   const { slider, pt } = displayControls({ config, update, t });
   // `dock`, saved by an earlier build, leaves the logos once Auto-hide is on.
   const style: RestStyle =
@@ -45,7 +56,7 @@ export function RestRows({ config, update, t }: DisplayProps) {
   return (
     <>
       <ToggleRow
-        title={t("Auto-hide")}
+        title={t("Hide when idle")}
         subtitle={t(
           "While nothing needs it, the HUD steps back against its edge. Pointing at the edge, or a request or message, brings it back.",
         )}

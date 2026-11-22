@@ -1,18 +1,20 @@
 //! A proposal's style: what it changes against what the screen has saved, and what
 //! the screen's resting HUD would not draw as asked.
-use super::look::{default_look, drawn, patch, reduced};
+use super::look::{default_look, drawn, patch, reduced, rests_as_bar};
 use super::*;
 
 // MARK: What a screen can draw
 
 /// Every field a reduced style sets that the screen's resting HUD would not draw as
 /// asked (HUDStyle.issues): `notch` without a notch, a field the mode the HUD would
-/// have does not draw, a glow on a Simple panel, a glow field of another glow style, a
-/// breath's depth under another effect, and a glow number between Settings' steps.
+/// have does not draw, a glow on a Simple panel that leaves no auto-hide bar, a glow
+/// field of another glow style (a bar's glow is always the soft one), a breath's depth
+/// under another effect, and a glow number between Settings' steps.
 fn issues(
     changes: &Map<String, Value>,
     saved: &Map<String, Value>,
     has_notch: bool,
+    rests_as_bar: bool,
     screen: &str,
 ) -> Vec<String> {
     let mut placed = saved.clone();
@@ -45,20 +47,30 @@ fn issues(
         }
     }
     let (style, effect) = (text("glowStyle"), text("glowEffect"));
+    // A Simple HUD that auto-hides to a bar draws the glow round the bar, always soft.
+    let bar = mode == "simple" && rests_as_bar;
     let grids = quoted(&GLOW_STYLES[1..]);
     for field in GLOW {
         let Some(value) = changes.get(field.stored) else {
             continue;
         };
         let path = format!("hud.glow.{}", field.name);
+        let grid = matches!(
+            field.name,
+            "gridPitch" | "gridDensity" | "gridCore" | "gridFade"
+        );
         let drawn_in_style = match field.name {
-            "range" | "blur" | "outwardOnly" => style == "blur",
-            "gridPitch" | "gridDensity" | "gridCore" | "gridFade" => style != "blur",
+            "range" | "blur" | "outwardOnly" => style == "blur" || bar,
+            _ if grid => style != "blur",
             _ => true,
         };
-        if mode == "simple" {
+        if mode == "simple" && !bar {
             found.push(format!(
-                "{path}: A \"simple\" HUD draws no glow, and {named}."
+                "{path}: A \"simple\" HUD draws a glow only round the bar it leaves when it auto-hides, which only the person turns on in Settings, and {named} without one."
+            ));
+        } else if bar && (grid || field.name == "style") {
+            found.push(format!(
+                "{path}: the glow round an auto-hide bar is always the soft (\"blur\") one, and {named} with a bar."
             ));
         } else if !drawn_in_style {
             let styles = if style == "blur" {
@@ -182,7 +194,8 @@ pub(in crate::presentation) fn proposal(
         let mut placed = patch(hud);
         let clear = placed_clear_of_the_notch(&mut placed, &saved, has_notch);
         let changes = reduced(&placed, &saved);
-        let reasons = issues(&changes, &saved, has_notch, name);
+        let bar = rests_as_bar(&s.saved, scope);
+        let reasons = issues(&changes, &saved, has_notch, bar, name);
         (changes, clear, reasons)
     };
     let mut after = saved.clone();

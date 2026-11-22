@@ -390,7 +390,7 @@ fn style_fields_the_mode_or_glow_does_not_draw_are_refused() {
         &owner,
         json!({"screen": "side", "hud": {"mode": "simple", "glow": {"brightness": 0.5}}}),
     );
-    assert!(error.contains("hud.glow.brightness: A \"simple\" HUD draws no glow, and the HUD of \"Display 2\" would be \"simple\"."), "{error}");
+    assert!(error.contains("hud.glow.brightness: A \"simple\" HUD draws a glow only round the bar it leaves when it auto-hides, which only the person turns on in Settings, and the HUD of \"Display 2\" would be \"simple\" without one."), "{error}");
     let error = refused(
         &owner,
         json!({"screen": "all", "hud": {"appearance": "light"}}),
@@ -409,6 +409,33 @@ fn style_fields_the_mode_or_glow_does_not_draw_are_refused() {
     draft(
         &owner,
         json!({"screen": "main", "hud": {"glow": {"style": "dots", "gridPitch": 7, "gridDensity": 0.55, "idleSpeed": 2.5}}}),
+    );
+}
+
+#[test]
+fn a_simple_hud_that_auto_hides_to_a_bar_takes_the_soft_glow_round_it() {
+    let (_folder, owner) = owner();
+    owner
+        .update(json!({"screen": "side", "patch": {"mode": "simple", "autoHide": true, "restStyle": "bar"}}))
+        .unwrap();
+    draft(
+        &owner,
+        json!({"screen": "side", "hud": {"glow": {"brightness": 0.5, "range": 10, "enabled": false}}}),
+    );
+    let error = refused(
+        &owner,
+        json!({"screen": "side", "hud": {"glow": {"style": "dots", "gridPitch": 6}}}),
+    );
+    for field in ["style", "gridPitch"] {
+        assert!(error.contains(&format!("hud.glow.{field}: the glow round an auto-hide bar is always the soft (\"blur\") one, and the HUD of \"Display 2\" would be \"simple\" with a bar.")), "{error}");
+    }
+    let error = refused(
+        &owner,
+        json!({"screen": "side", "hud": {"glow": {"enabled": "yes"}}}),
+    );
+    assert!(
+        error.contains("hud.glow.enabled is true or false."),
+        "{error}"
     );
 }
 

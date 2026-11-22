@@ -13,6 +13,7 @@ import {
 } from "./SettingsPrimitives";
 import { AllScreensSection } from "./display/AllScreensSection";
 import { GlowSection } from "./display/GlowSection";
+import { AutoHideSection } from "./display/RestRows";
 import { HUDSection } from "./display/HUDSection";
 import { PanelSection } from "./display/PanelSection";
 import { ResetSection } from "./display/ResetSection";
@@ -113,6 +114,7 @@ export function DisplayPane({
         )}
       </Section>
       <HUDSection snapshot={snapshot} active={active} {...shared} />
+      <AutoHideSection {...shared} />
       <GlowSection {...shared} />
       <PanelSection snapshot={snapshot} {...shared} />
       <AllScreensSection {...shared} />

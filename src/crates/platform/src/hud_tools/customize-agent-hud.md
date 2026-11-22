@@ -103,7 +103,8 @@ The same style name can mean the resting HUD or the panel. When the person talks
   - `transparency`: 0–1
 - **`simple` only:** `edge` (top, right, bottom or left), `position` (0–1), `separateAgents`, `simpleSize` (20–60), `simpleGap` (0.1–0.6), `ringWidth` (1–4), `simpleStyle` and `showNumbers`. `simpleStyle` is how each logo shows its usage: `rings` (concentric rings round it), `segments` (one ring split per window, the default), `bars` (bars beside it) or `numbers` (the most used window's percentage alone). `ringWidth` is also the bars' thickness, and `showNumbers` adds the percentage beside rings, segments or bars.
 - **`reset: true`:** restores the default look. Send it alone, with no other style field.
-- **`glow` (not drawn in `simple`):**
+- **`glow`:** round the notch in `notch`. In `simple`, only round the bar a Simple HUD leaves when it auto-hides (the person turns that on in Settings): there it is always the soft glow, so `style` and the `grid*` fields do not apply.
+  - `enabled`: true or false; false leaves the notch and the bar without a glow
   - `style`: `blur`, `dots`, `ascii`, `blocks`, `braille` or `binary`
   - `effect`: `breathe`, `flow`, `scan`, `ripple`, `shimmer` or `boot`
   - `brightness`: 0.2–1

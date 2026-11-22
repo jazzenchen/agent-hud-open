@@ -728,7 +728,6 @@
   "Not supported": "지원되지 않음",
   "Not used yet": "아직 사용되지 않음",
   "Notch": "노치",
-  "Notch glow": "노치 글로우",
   "Nothing read that day": "그날 읽은 값 없음",
   "Nothing shows here, cards included. The menu bar's Hide HUD still turns it off on every screen.": "카드를 포함해 아무것도 표시되지 않습니다. 메뉴 막대의 HUD 가리기는 여전히 모든 화면에서 HUD를 끕니다.",
   "Nous Portal could not be reached": "Nous Portal에 연결할 수 없습니다",
@@ -1504,7 +1503,7 @@
   "At the edge": "가장자리에 남길 것",
   "Nothing": "없음",
   "Only the logos stay.": "로고만 남습니다.",
-  "Only a bar stays, in the colour below; its ends turn yellow or red as a usage limit nears.": "막대만 남습니다. 색은 아래에서 고릅니다. 사용량 한도가 가까워지면 양 끝이 노란색이나 빨간색이 됩니다.",
+  "Only a bar stays, in the colour below, with the glow round it.": "막대만 남습니다. 색은 아래에서 고르고, 주위에 글로우가 생깁니다.",
   "Nothing stays on screen.": "화면에 아무것도 남지 않습니다.",
   "Quota reading is off for this agent in Settings. Sessions and tokens are still counted from its logs.": "설정에서 이 에이전트의 사용량 한도 읽기가 꺼져 있습니다. 세션과 토큰은 계속 로그에서 집계됩니다.",
   "Quota reading": "사용량 한도 읽기",
@@ -1518,5 +1517,10 @@
   "The quota is read through the Claude desktop app's sign-in. To keep Claude from taking it for abuse, that is done only every {{minutes}} minutes. Install Claude Code (the claude command) and sign in for more frequent updates.": "Claude 데스크톱 앱의 로그인으로 사용량 한도를 읽습니다. Claude가 이를 악용으로 보지 않도록 {{minutes}}분마다 한 번만 읽습니다. Claude Code(claude 명령)를 설치하고 로그인하면 더 자주 업데이트됩니다.",
   "sender {{session}}": "발신 {{session}}",
   "to {{to}} and the sender of the reply_to message, {{sender}}, are different sessions. Leave to out to answer the sender, or send a separate message to {{to}} without reply_to.": "to {{to}}와 reply_to 메시지의 발신 세션 {{sender}}가 서로 다릅니다. 발신자에게 답하려면 to를 빼고, {{to}}에 보내려면 reply_to 없이 따로 보내세요.",
-  "Read just now": "방금 읽음"
+  "Read just now": "방금 읽음",
+  "Glow": "글로우",
+  "Show glow": "글로우 표시",
+  "Hide when idle": "유휴 시 숨기기",
+  "Round the bar while the HUD is hidden: each agent's colour by its usage, yellow from 70% and red from 90%, breathing faster while one works.": "HUD가 숨겨진 동안 막대 주위에 표시: 에이전트마다 사용량에 따라 색이 바뀌며 70%부터 노랑, 90%부터 빨강입니다. 에이전트가 작업 중이면 더 빨리 숨 쉽니다.",
+  "Round the notch: each agent's colour by its usage, yellow from 70% and red from 90%, breathing faster while one works.": "노치 주위에 표시: 에이전트마다 사용량에 따라 색이 바뀌며 70%부터 노랑, 90%부터 빨강입니다. 에이전트가 작업 중이면 더 빨리 숨 쉽니다."
 }

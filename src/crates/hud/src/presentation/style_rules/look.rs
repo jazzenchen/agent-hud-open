@@ -41,6 +41,18 @@ pub(super) fn drawn(saved: &Saved, key: &str, has_notch: bool) -> Map<String, Va
     style
 }
 
+/// Whether a screen's Simple HUD auto-hides to a bar, which wears the glow. Only the
+/// person sets that (`PRESENCE`), so it is read here and never shown to a tool.
+pub(super) fn rests_as_bar(saved: &Saved, key: &str) -> bool {
+    let mut style = DEFAULTS.clone();
+    merge(&mut style, &saved.screen_defaults);
+    if let Some(own) = saved.screens.get(key).and_then(Value::as_object) {
+        merge(&mut style, own);
+    }
+    style.get("autoHide") == Some(&json!(true))
+        && style.get("restStyle").and_then(Value::as_str) == Some("bar")
+}
+
 /// The look a screen has saved, with its style draft drawn over it.
 pub(in crate::presentation) fn effective(
     s: &State,

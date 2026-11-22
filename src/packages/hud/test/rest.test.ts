@@ -2,8 +2,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   REST_EDGE,
+  barGlow,
   barPaint,
-  barTips,
   foldStyle,
   mayRest,
   restShape,
@@ -11,7 +11,7 @@ import {
   type RestGate,
 } from "../src/scene/rest.ts";
 import { compactMark, restingDockStyle } from "../src/scene/rest-style.ts";
-import type { HUDEdge } from "../src/model.ts";
+import { defaultHUDConfig, type HUDEdge } from "../src/model.ts";
 
 const idle: RestGate = {
   open: false,
@@ -107,6 +107,7 @@ test("a dock that folds changes only its transition while it is out", () => {
       zone: restZone(shape, "right"),
       logos: { mark: 12, pad: 4, gap: 8, radius: 10 },
       bar: null,
+      glow: null,
       reduceMotion: false,
     };
     assert.deepEqual(Object.keys(restingDockStyle(rest)), ["transition"]);
@@ -240,26 +241,36 @@ test("the pointer's zone is at least a few points deep and still flush", () => {
   }
 });
 
-test("the bar keeps its colour and wears a low window's level at its ends", () => {
+test("the bar keeps the colour chosen, whatever the usage: the glow round it shows that", () => {
   const look = { restBarColor: "#0a84ff", solidTransparency: 0 };
-  const critical = barPaint(look, ["normal", "critical", "warning"], false);
-  assert.equal(critical.fill, "#0a84ff");
-  assert.equal(critical.tip, "#ff453a");
-  assert.equal(barPaint(look, ["normal", "warning"], false).tip, "#ffd23f");
-  assert.equal(barPaint(look, ["normal", "stale"], false).tip, null);
-  assert.equal(barTips(null, "top"), undefined);
-  assert.match(
-    barTips("#ff453a", "top")!,
-    /^linear-gradient\(to right, #ff453a 22%/,
-  );
-  assert.match(barTips("#ff453a", "right")!, /^linear-gradient\(to bottom, /);
+  assert.deepEqual(Object.keys(barPaint(look, false)).sort(), ["edge", "fill"]);
+  assert.equal(barPaint(look, false).fill, "#0a84ff");
   const auto = { restBarColor: "auto", solidTransparency: 0 };
-  assert.equal(barPaint(auto, [], false).fill, "rgba(242,242,247,0.80)");
-  assert.equal(barPaint(auto, [], true).fill, "rgba(28,28,30,0.80)");
-  assert.equal(barPaint(auto, ["critical"], true).fill, "rgba(28,28,30,0.80)");
+  assert.equal(barPaint(auto, false).fill, "rgba(242,242,247,0.80)");
+  assert.equal(barPaint(auto, true).fill, "rgba(28,28,30,0.80)");
   // Anything that is not a colour is automatic; full transparency still leaves it seen.
   assert.equal(
-    barPaint({ restBarColor: "url(x)", solidTransparency: 1 }, [], false).fill,
+    barPaint({ restBarColor: "url(x)", solidTransparency: 1 }, false).fill,
     "rgba(242,242,247,0.24)",
   );
+});
+
+test("a bar wears the notch's glow unless it is off or hidden, breathing faster while an agent works", () => {
+  const config = { ...defaultHUDConfig, glowEnabled: true };
+  const glow = { hidden: false, colors: ["#ff453a", "#3ddc84"], alert: null };
+  const idle = [{ working: 0 }, { working: 0 }];
+  const worn = barGlow("bar", config, glow, idle)!;
+  assert.deepEqual(worn.colors, ["#ff453a", "#3ddc84"]);
+  assert.equal(worn.active, false);
+  assert.equal(
+    barGlow("bar", config, glow, [{ working: 0 }, { working: 2 }])!.active,
+    true,
+  );
+  assert.equal(barGlow("logos", config, glow, idle), null);
+  assert.equal(barGlow(null, config, glow, idle), null);
+  assert.equal(
+    barGlow("bar", { ...config, glowEnabled: false }, glow, idle),
+    null,
+  );
+  assert.equal(barGlow("bar", config, { ...glow, hidden: true }, idle), null);
 });

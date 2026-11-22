@@ -94,7 +94,7 @@ export function SmallHUDPreview({
               height: metrics.height,
             }}
           >
-            {!simple && (
+            {!simple && sample.glowEnabled && (
               <HUDGlow
                 outwardOnly={sample.glowOutwardOnly}
                 width={metrics.width}

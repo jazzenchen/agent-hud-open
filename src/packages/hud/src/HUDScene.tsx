@@ -317,6 +317,7 @@ export function HUDScene({
     vendors,
     light,
     reduceMotion,
+    glow: { hidden: glowHidden, colors: glowColors, alert: glowFlash },
     gate: {
       open: open || pinned || state.phase !== "collapsed",
       pointerInside,
@@ -333,7 +334,6 @@ export function HUDScene({
       typing,
     },
   });
-
   const { heldFrame, trackPointer } = useHeldFrame({
     cardVisible,
     pointerInside,
@@ -461,7 +461,7 @@ export function HUDScene({
             onHeight={setContentHeight}
           />
           <SceneBackdrop>{renderBackdrop}</SceneBackdrop>
-          {config.mode === "notch" && !glowHidden && (
+          {config.mode === "notch" && config.glowEnabled && !glowHidden && (
             <NotchGlow
               geometry={notchGeometry}
               config={config}

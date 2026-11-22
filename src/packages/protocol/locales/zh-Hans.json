@@ -728,7 +728,6 @@
   "Not supported": "不支持",
   "Not used yet": "还没有智能体在用",
   "Notch": "刘海",
-  "Notch glow": "刘海光晕",
   "Nothing read that day": "这天没有读数",
   "Nothing shows here, cards included. The menu bar's Hide HUD still turns it off on every screen.": "这块屏幕什么都不显示，卡片也不弹。菜单栏的「隐藏 HUD」仍然管所有屏幕。",
   "Nous Portal could not be reached": "无法连接 Nous Portal",
@@ -1504,7 +1503,7 @@
   "At the edge": "边缘保留",
   "Nothing": "无",
   "Only the logos stay.": "只留下标志。",
-  "Only a bar stays, in the colour below; its ends turn yellow or red as a usage limit nears.": "只留下一根细条，颜色在下方选；接近用量上限时两端变黄或变红。",
+  "Only a bar stays, in the colour below, with the glow round it.": "只留下一根细条，颜色在下方选，外围有光晕。",
   "Nothing stays on screen.": "屏幕上什么都不留。",
   "Quota reading is off for this agent in Settings. Sessions and tokens are still counted from its logs.": "已在设置中关闭此智能体的额度读取。会话和 token 仍会从它的日志中统计。",
   "Quota reading": "读取额度",
@@ -1518,5 +1517,10 @@
   "The quota is read through the Claude desktop app's sign-in. To keep Claude from taking it for abuse, that is done only every {{minutes}} minutes. Install Claude Code (the claude command) and sign in for more frequent updates.": "现通过 Claude 桌面版的登录读取额度。为避免被 Claude 视为异常访问，每 {{minutes}} 分钟才读取一次。安装 Claude Code（claude 命令）并登录后更新更频繁。",
   "sender {{session}}": "发送方 {{session}}",
   "to {{to}} and the sender of the reply_to message, {{sender}}, are different sessions. Leave to out to answer the sender, or send a separate message to {{to}} without reply_to.": "to {{to}} 与 reply_to 那条来件的发件方 {{sender}} 不是同一个会话。要回给来件方，就省略 to；要发给 {{to}}，就另发一条、不带 reply_to。",
-  "Read just now": "刚刚读取"
+  "Read just now": "刚刚读取",
+  "Glow": "光晕",
+  "Show glow": "显示光晕",
+  "Hide when idle": "空闲时隐藏",
+  "Round the bar while the HUD is hidden: each agent's colour by its usage, yellow from 70% and red from 90%, breathing faster while one works.": "HUD 隐藏时围在细条外：每个 Agent 一种颜色，按用量变化，70% 起变黄、90% 起变红；有 Agent 工作时呼吸更快。",
+  "Round the notch: each agent's colour by its usage, yellow from 70% and red from 90%, breathing faster while one works.": "围在刘海外：每个 Agent 一种颜色，按用量变化，70% 起变黄、90% 起变红；有 Agent 工作时呼吸更快。"
 }

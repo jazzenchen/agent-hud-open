@@ -1,6 +1,7 @@
 {
   "panelLayout": {},
   "mode": "notch",
+  "glowEnabled": true,
   "glowStyle": "blur",
   "glowEffect": "breathe",
   "edge": "top",

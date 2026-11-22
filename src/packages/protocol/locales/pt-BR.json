@@ -744,7 +744,6 @@
   "Not supported": "Não compatível",
   "Not used yet": "Ainda não usado",
   "Notch": "Entalhe",
-  "Notch glow": "Brilho do entalhe",
   "Nothing read that day": "Nada lido nesse dia",
   "Nothing shows here, cards included. The menu bar's Hide HUD still turns it off on every screen.": "Nada aparece aqui, nem os cartões. A opção Ocultar HUD da barra de menus continua desativando-o em todas as telas.",
   "Nous Portal could not be reached": "Não foi possível acessar o Nous Portal",
@@ -1568,7 +1567,7 @@
   "At the edge": "Na borda",
   "Nothing": "Nada",
   "Only the logos stay.": "Só os logos ficam.",
-  "Only a bar stays, in the colour below; its ends turn yellow or red as a usage limit nears.": "Fica só uma barra, na cor abaixo; as pontas ficam amarelas ou vermelhas quando um limite de uso se aproxima.",
+  "Only a bar stays, in the colour below, with the glow round it.": "Fica só uma barra, na cor abaixo, com o brilho em volta.",
   "Nothing stays on screen.": "Nada fica na tela.",
   "Quota reading is off for this agent in Settings. Sessions and tokens are still counted from its logs.": "A leitura da cota está desativada para este agente nos Ajustes. Sessões e tokens continuam sendo contados pelos registros dele.",
   "Quota reading": "Leitura da cota",
@@ -1582,5 +1581,10 @@
   "The quota is read through the Claude desktop app's sign-in. To keep Claude from taking it for abuse, that is done only every {{minutes}} minutes. Install Claude Code (the claude command) and sign in for more frequent updates.": "A cota é lida pelo login do app Claude para desktop. Para que o Claude não considere isso um abuso, a leitura ocorre só a cada {{minutes}} minutos. Instale o Claude Code (o comando claude) e faça login para receber atualizações mais frequentes.",
   "sender {{session}}": "remetente {{session}}",
   "to {{to}} and the sender of the reply_to message, {{sender}}, are different sessions. Leave to out to answer the sender, or send a separate message to {{to}} without reply_to.": "to {{to}} e o remetente da mensagem de reply_to, {{sender}}, são sessões diferentes. Omita to para responder ao remetente ou envie uma mensagem separada para {{to}} sem reply_to.",
-  "Read just now": "Lido agora mesmo"
+  "Read just now": "Lido agora mesmo",
+  "Glow": "Brilho",
+  "Show glow": "Mostrar brilho",
+  "Hide when idle": "Ocultar quando ocioso",
+  "Round the bar while the HUD is hidden: each agent's colour by its usage, yellow from 70% and red from 90%, breathing faster while one works.": "Em volta da barra enquanto o HUD está oculto: cada agente numa cor conforme o uso, amarelo a partir de 70% e vermelho a partir de 90%; pulsa mais rápido enquanto um trabalha.",
+  "Round the notch: each agent's colour by its usage, yellow from 70% and red from 90%, breathing faster while one works.": "Em volta do entalhe: cada agente numa cor conforme o uso, amarelo a partir de 70% e vermelho a partir de 90%; pulsa mais rápido enquanto um trabalha."
 }

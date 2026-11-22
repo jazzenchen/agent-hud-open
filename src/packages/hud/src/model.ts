@@ -37,6 +37,9 @@ export interface HUDUpdateNotice {
 export interface HUDConfig {
   panelLayout: PanelLayout;
   mode: HUDMode;
+  /** The glow round the notch, and round an auto-hide bar: off leaves both
+   * without one. The tray's switch hides it until the app quits. */
+  glowEnabled: boolean;
   glowStyle: GlowStyle;
   glowEffect: GlowEffect;
   breathSeconds: number;

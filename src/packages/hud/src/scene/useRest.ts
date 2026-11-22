@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 import type { HUDRect, StripMetrics } from "../geometry";
+import type { GlowAlert } from "../glow-alert";
 import type { HUDConfig, HUDEdge, HUDVendor } from "../model";
 import {
+  barGlow,
   barPaint,
   foldStyle,
   logoStrip,
@@ -25,6 +27,7 @@ export function useRest({
   vendors,
   light,
   reduceMotion,
+  glow,
 }: {
   config: HUDConfig;
   gate: RestGate;
@@ -35,6 +38,9 @@ export function useRest({
   vendors: HUDVendor[];
   light: boolean;
   reduceMotion: boolean;
+  /** The notch's glow, which a bar wears: hidden for now (tray, ⌥⌘H), its
+   * colours and the alert it flashes. */
+  glow: { hidden: boolean; colors: string[]; alert: GlowAlert | null };
 }): Rest | undefined {
   const style = foldStyle(config);
   const resting = style !== null && mayRest(gate);
@@ -66,14 +72,8 @@ export function useRest({
     shape,
     zone: restZone(shape, edge),
     logos: logoStrip(metrics),
-    bar:
-      style === "bar"
-        ? barPaint(
-            config,
-            vendors.map((vendor) => vendor.level),
-            light,
-          )
-        : null,
+    bar: style === "bar" ? barPaint(config, light) : null,
+    glow: barGlow(style, config, glow, vendors),
     reduceMotion,
   };
 }

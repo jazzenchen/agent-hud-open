@@ -7,7 +7,6 @@ import { Row, Section } from "../SettingsPrimitives";
 import { Segments } from "../SettingsControls";
 import { SmallHUDPreview } from "../SmallHUDPreview";
 import { AgentSelection } from "./AgentSelection";
-import { RestRows } from "./RestRows";
 import { displayControls, type DisplayProps } from "./controls";
 
 /** What a Simple mark draws, in a sentence. */
@@ -141,7 +140,6 @@ export function HUDSection({
             t("Separate agents"),
             t("Hovering a logo opens only its agent."),
           )}
-          <RestRows config={config} update={update} t={t} />
         </>
       )}
       <AgentSelection

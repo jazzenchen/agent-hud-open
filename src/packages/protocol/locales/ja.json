@@ -728,7 +728,6 @@
   "Not supported": "非対応",
   "Not used yet": "まだ使用されていません",
   "Notch": "ノッチ",
-  "Notch glow": "ノッチのグロー",
   "Nothing read that day": "この日の読み取り値はありません",
   "Nothing shows here, cards included. The menu bar's Hide HUD still turns it off on every screen.": "カードも含め、ここには何も表示されません。メニューバーの「HUD を隠す」は引き続きすべての画面に適用されます。",
   "Nous Portal could not be reached": "Nous Portal に接続できませんでした",
@@ -1504,7 +1503,7 @@
   "At the edge": "端に残すもの",
   "Nothing": "なし",
   "Only the logos stay.": "ロゴだけが残ります。",
-  "Only a bar stays, in the colour below; its ends turn yellow or red as a usage limit nears.": "バーだけが残ります。色は下で選べます。使用量の上限が近づくと両端が黄色か赤になります。",
+  "Only a bar stays, in the colour below, with the glow round it.": "バーだけが残ります。色は下で選べ、周りにグローが付きます。",
   "Nothing stays on screen.": "画面には何も残りません。",
   "Quota reading is off for this agent in Settings. Sessions and tokens are still counted from its logs.": "このエージェントの使用上限の読み取りは設定でオフになっています。セッションとトークンは引き続きログから集計されます。",
   "Quota reading": "使用上限の読み取り",
@@ -1518,5 +1517,10 @@
   "The quota is read through the Claude desktop app's sign-in. To keep Claude from taking it for abuse, that is done only every {{minutes}} minutes. Install Claude Code (the claude command) and sign in for more frequent updates.": "Claude デスクトップアプリのサインインで使用上限を読み取っています。Claude に不正利用と見なされないよう、読み取りは {{minutes}} 分ごとです。Claude Code（claude コマンド）をインストールしてサインインすると、より頻繁に更新されます。",
   "sender {{session}}": "送信元 {{session}}",
   "to {{to}} and the sender of the reply_to message, {{sender}}, are different sessions. Leave to out to answer the sender, or send a separate message to {{to}} without reply_to.": "to {{to}} と reply_to のメッセージの送信元 {{sender}} は別のセッションです。送信元に返すなら to を省き、{{to}} に送るなら reply_to なしで別のメッセージとして送ってください。",
-  "Read just now": "たった今読み取り"
+  "Read just now": "たった今読み取り",
+  "Glow": "グロー",
+  "Show glow": "グローを表示",
+  "Hide when idle": "アイドル時に隠す",
+  "Round the bar while the HUD is hidden: each agent's colour by its usage, yellow from 70% and red from 90%, breathing faster while one works.": "HUD が隠れている間、バーの周りに表示：エージェントごとの色が使用量で変わり、70% から黄、90% から赤。エージェントの作業中は速く呼吸します。",
+  "Round the notch: each agent's colour by its usage, yellow from 70% and red from 90%, breathing faster while one works.": "ノッチの周りに表示：エージェントごとの色が使用量で変わり、70% から黄、90% から赤。エージェントの作業中は速く呼吸します。"
 }
