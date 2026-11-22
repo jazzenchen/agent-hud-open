@@ -2390,7 +2390,10 @@ fn a_message_from_grok_bot_pi_or_opencode_names_that_client_in_the_sender_label(
         );
         assert_eq!(
             message.lines().next(),
-            Some(format!("[Agent HUD · from {name} · Paired · m-1 · sender {client}:paired]").as_str())
+            Some(
+                format!("[Agent HUD · from {name} · Paired · m-1 · sender {client}:paired]")
+                    .as_str()
+            )
         );
     }
 }

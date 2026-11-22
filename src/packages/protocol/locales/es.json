@@ -1580,5 +1580,7 @@
   "Shows no quota. Sessions and tokens are still counted from the agent's own logs.": "No muestra la cuota. Las sesiones y los tokens se siguen contando desde los registros del propio agente.",
   "Uses only the agent's own app, not sign-ins other apps keep.": "Usa solo la app del propio agente, no los inicios de sesión que guardan otras apps.",
   "Uses any sign-in or key found for this agent, including ones other apps keep.": "Usa cualquier inicio de sesión o clave que se encuentre para este agente, incluidos los que guardan otras apps.",
-  "Cursor's quota reading is off in Settings, so Grok Bot is read without Cursor's sign-in.": "La lectura de la cuota de Cursor está desactivada en Ajustes, así que Grok Bot se lee sin el inicio de sesión de Cursor."
+  "Cursor's quota reading is off in Settings, so Grok Bot is read without Cursor's sign-in.": "La lectura de la cuota de Cursor está desactivada en Ajustes, así que Grok Bot se lee sin el inicio de sesión de Cursor.",
+  "sender {{session}}": "remitente {{session}}",
+  "to {{to}} and the sender of the reply_to message, {{sender}}, are different sessions. Leave to out to answer the sender, or send a separate message to {{to}} without reply_to.": "to {{to}} y el remitente del mensaje de reply_to, {{sender}}, son sesiones distintas. Omite to para responder al remitente, o envía a {{to}} un mensaje aparte sin reply_to."
 }

@@ -1516,5 +1516,7 @@
   "Shows no quota. Sessions and tokens are still counted from the agent's own logs.": "사용량 한도를 표시하지 않습니다. 세션과 토큰은 계속 에이전트 자체 로그에서 집계됩니다.",
   "Uses only the agent's own app, not sign-ins other apps keep.": "에이전트 자체 앱만 사용하고, 다른 앱이 보관한 로그인 정보는 사용하지 않습니다.",
   "Uses any sign-in or key found for this agent, including ones other apps keep.": "이 에이전트용으로 찾은 모든 로그인 정보와 키를 사용하며, 다른 앱이 보관한 것도 포함합니다.",
-  "Cursor's quota reading is off in Settings, so Grok Bot is read without Cursor's sign-in.": "설정에서 Cursor의 사용량 한도 읽기가 꺼져 있어, Grok Bot은 Cursor의 로그인 정보 없이 읽습니다."
+  "Cursor's quota reading is off in Settings, so Grok Bot is read without Cursor's sign-in.": "설정에서 Cursor의 사용량 한도 읽기가 꺼져 있어, Grok Bot은 Cursor의 로그인 정보 없이 읽습니다.",
+  "sender {{session}}": "발신 {{session}}",
+  "to {{to}} and the sender of the reply_to message, {{sender}}, are different sessions. Leave to out to answer the sender, or send a separate message to {{to}} without reply_to.": "to {{to}}와 reply_to 메시지의 발신 세션 {{sender}}가 서로 다릅니다. 발신자에게 답하려면 to를 빼고, {{to}}에 보내려면 reply_to 없이 따로 보내세요."
 }
