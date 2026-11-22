@@ -44,10 +44,22 @@ pub(super) fn deliver(
     }
     // Only a proven absence before mutation permits another route. A timeout,
     // malformed owner reply, or uncertain acceptance must never fall through.
-    if let Some(receipt) = desktop(data, target, request, thread, timeout)? {
-        return Ok(receipt);
+    let direct = desktop(data, target, request, thread, timeout).and_then(|receipt| {
+        if let Some(receipt) = receipt {
+            Ok(receipt)
+        } else {
+            tui::cli(data, target, request, thread, timeout)
+        }
+    });
+    match direct {
+        Err(Failure::Unavailable(_))
+            if matches!(request.operation, Operation::Automatic | Operation::Start)
+                && super::thread_open(data, thread) =>
+        {
+            enqueue(data, target, request, thread, timeout, queue)
+        }
+        result => result,
     }
-    tui::cli(data, target, request, thread, timeout)
 }
 /// Codex's queue takes the input without loading the thread: whichever app
 /// has the thread open sends it as a new turn once the thread is idle, after

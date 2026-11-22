@@ -920,6 +920,11 @@ mod native {
             let mutation = frame_read(&mut socket);
             assert_eq!(mutation["method"], "thread-follower-start-turn");
         });
+        // Keep the thread open so the queue would be eligible after a safe refusal.
+        let locks = fixture.paths().codex_data.join("thread-writer-locks");
+        fs::create_dir_all(&locks).unwrap(); // plain directory
+        let lock = fs::File::create(locks.join(format!("{THREAD}.lock"))).unwrap();
+        lock.lock().unwrap();
         let service = fixture.service(Provider::Codex);
         let mut send = request(Provider::Codex);
         send.operation = Operation::Start;
@@ -1050,7 +1055,7 @@ for line in sys.stdin:
             added["message"]["params"],
             json!({"threadId":THREAD,"clientUserMessageId":format!("agent-hud:{REQUEST}"),"input":[{"type":"text","text":"fixture prompt only","text_elements":[]}]})
         );
-        // A thread an app holds open: queued with nothing more to do.
+        // An open thread without direct IPC falls back to the same queue.
         let locks = fixture.paths().codex_data.join("thread-writer-locks");
         fs::create_dir_all(&locks).unwrap(); // plain directory
         let lock = fs::File::create(locks.join(format!("{THREAD}.lock"))).unwrap();
@@ -1060,10 +1065,28 @@ for line in sys.stdin:
             THREAD
         ));
         send.request_id = "00000000-0000-4000-8000-000000000004".into();
-        let receipt = service(Some(route)).send(send.clone()).unwrap();
+        send.operation = Operation::Automatic;
+        let receipt = service(Some(route.clone())).send(send.clone()).unwrap();
         assert_eq!(
             (receipt.state, receipt.reason),
             (DeliveryState::Queued, None)
+        );
+        assert_eq!(receipt.thread_id.as_deref(), Some(THREAD));
+        send.operation = Operation::Steer;
+        send.request_id = "00000000-0000-4000-8000-000000000006".into();
+        let receipt = service(Some(route)).send(send.clone()).unwrap();
+        assert_eq!(receipt.state, DeliveryState::Failed);
+        let lines = fs::read_to_string(&log).unwrap();
+        let queued: Vec<_> = lines
+            .lines()
+            .map(|line| serde_json::from_str::<Value>(line).unwrap())
+            .filter(|line| line["message"]["method"] == "thread/queue/add")
+            .collect();
+        assert_eq!(queued.len(), 2);
+        assert_eq!(queued[1]["message"]["params"]["threadId"], THREAD);
+        assert_eq!(
+            queued[1]["message"]["params"]["clientUserMessageId"],
+            "agent-hud:00000000-0000-4000-8000-000000000004"
         );
         lock.unlock().unwrap();
         assert!(!super::super::codex_thread_open(
@@ -1071,6 +1094,7 @@ for line in sys.stdin:
             THREAD
         ));
         // No daemon and no route: nothing was sent.
+        send.operation = Operation::Enqueue;
         send.request_id = "00000000-0000-4000-8000-000000000005".into();
         let receipt = service(None).send(send).unwrap();
         assert_eq!(receipt.state, DeliveryState::Failed);
