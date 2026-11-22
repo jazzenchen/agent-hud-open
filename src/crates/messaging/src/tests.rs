@@ -908,7 +908,7 @@ fn a_labelled_message_names_its_sender_and_says_how_to_reply_and_waits_in_the_qu
     let first = sent.text.lines().next().unwrap();
     assert_eq!(
         first,
-        format!("[Agent HUD · from Claude Code · Fix the login · {id}]")
+        format!("[Agent HUD · from Claude Code · Fix the login · {id} · sender {CLAUDE}]")
     );
     assert!(sent.text.contains(&text), "the text goes whole");
     // Codex names agent-hud's tool with an underscore.
@@ -923,7 +923,7 @@ fn chinese_labels_follow_the_app_language() {
     let id = answer["id"].as_str().unwrap();
     let sent = world.codex.0.lock().unwrap()[0].text.clone();
     assert!(sent.starts_with(&format!(
-        "[Agent HUD · 来自 Claude Code · Fix the login · {id}]"
+        "[Agent HUD · 来自 Claude Code · Fix the login · {id} · 发送方 {CLAUDE}]"
     )));
     assert!(sent.ends_with(&format!("请用 agent-hud 的 MCP 工具 mcp__agent_hud__send_message 回复，reply_to: {id}，回复会作为一条消息送到发件方。")), "{sent}");
 }
@@ -1151,7 +1151,7 @@ fn a_deepseek_harness_session_takes_a_message_through_its_plugin_and_its_answer_
         serde_json::from_slice(&std::fs::read(world.harness_prompt(&id)).unwrap()).unwrap();
     let delivered = left["text"].as_str().unwrap().to_owned();
     assert!(delivered.starts_with(&format!(
-        "[Agent HUD · from Claude Code · Fix the login · {id}]"
+        "[Agent HUD · from Claude Code · Fix the login · {id} · sender {CLAUDE}]"
     )));
     assert!(delivered.ends_with(&format!("Reply with agent-hud's MCP tool mcp__agent-hud__send_message, reply_to: {id}: your reply reaches the sender as a message.")), "{delivered}");
     // Its compressed log's tail marks where it ended: the answer is after.
@@ -1216,7 +1216,7 @@ fn a_deepseek_harness_session_sends_under_its_own_id_and_the_passes_count() {
     .unwrap();
     let delivered = left["text"].as_str().unwrap().to_owned();
     assert!(delivered.starts_with(&format!(
-        "[Agent HUD · from DeepSeek Harness · Port the parser · {first_id}]"
+        "[Agent HUD · from DeepSeek Harness · Port the parser · {first_id} · sender {HARNESS}]"
     )));
     // Claude's turn began with it; its reply goes back to the Harness session.
     world.transcripts.prompt(QUIET, "q1", &delivered);
@@ -1414,7 +1414,7 @@ fn passes_count_while_messages_wake_each_other_and_stop_at_the_limit() {
     )
     .unwrap();
     assert!(left["text"].as_str().unwrap().starts_with(&format!(
-        "[Agent HUD · from Codex · Review · {second_id} · re {first_id}]"
+        "[Agent HUD · from Codex · Review · {second_id} · sender {CODEX} · re {first_id}]"
     )));
     // Claude's next turn began with Codex's reply: pass 3.
     world
@@ -2173,10 +2173,11 @@ fn a_reply_settles_the_message_it_answers_and_is_the_one_plane_back() {
     assert_eq!(world.replied_by(&id), Some(reply_id));
 }
 
-/// reply_to with another recipient is no reply to the sender: the message
-/// it names stays open.
+/// reply_to with another recipient is no reply to the sender: the caller has
+/// named two destinations, so the call is refused and the message it names
+/// stays open.
 #[test]
-fn a_reply_sent_elsewhere_leaves_the_message_open() {
+fn a_reply_sent_elsewhere_is_refused_and_leaves_the_message_open() {
     let mut world = World::on();
     world.check_in(QUIET);
     let first = world.send(("claude", CLAUDE), QUIET, "Ask Codex");
@@ -2188,8 +2189,41 @@ fn a_reply_sent_elsewhere_leaves_the_message_open() {
         "send_message",
         json!({"to":CODEX,"text":"Claude asks","reply_to":id}),
     );
-    assert_eq!(onward["state"], "queued", "{onward}");
+    assert_eq!(onward["state"], "refused", "{onward}");
+    let reason = onward["reason"].as_str().unwrap();
+    assert!(reason.contains(CODEX), "{reason}");
+    assert!(reason.contains(CLAUDE), "{reason}");
+    assert!(world.codex.0.lock().unwrap().is_empty());
     assert_eq!(world.replied_by(&id), None);
+}
+
+#[test]
+fn a_reply_whose_to_names_another_session_is_refused_with_both_sessions() {
+    let mut world = World::on();
+    // Claude asks Codex; the message it must answer comes from Claude.
+    let first = world.send(("claude", CLAUDE), CODEX, "Review this");
+    assert_eq!(first["state"], "queued", "{first}");
+    let first_id = first["id"].as_str().unwrap().to_owned();
+    // Codex answers that message but also names a third session as `to`.
+    let refused = world.call(
+        Some(("codex", CODEX)),
+        "send_message",
+        json!({"text":"Two nits","to":QUIET,"reply_to":first_id}),
+    );
+    assert_eq!(refused["state"], "refused", "{refused}");
+    let reason = refused["reason"].as_str().unwrap();
+    assert!(reason.contains(QUIET), "{reason}");
+    assert!(reason.contains(CLAUDE), "{reason}");
+    // Nothing went out for either reading of the call.
+    assert_eq!(world.codex.0.lock().unwrap().len(), 1);
+    assert!(!world.channel.join("prompts").join(QUIET).exists());
+    // Naming the sender is the reply it already means.
+    let answer = world.call(
+        Some(("codex", CODEX)),
+        "send_message",
+        json!({"text":"Two nits","to":CLAUDE,"reply_to":first_id}),
+    );
+    assert_eq!(answer["state"], "queued", "{answer}");
 }
 
 /// The owner's case, with the Harness log's tail refused (as Open refused
@@ -2356,7 +2390,7 @@ fn a_message_from_grok_bot_pi_or_opencode_names_that_client_in_the_sender_label(
         );
         assert_eq!(
             message.lines().next(),
-            Some(format!("[Agent HUD · from {name} · Paired · m-1]").as_str())
+            Some(format!("[Agent HUD · from {name} · Paired · m-1 · sender {client}:paired]").as_str())
         );
     }
 }
@@ -2831,7 +2865,7 @@ fn a_steer_goes_into_the_codex_turn_in_progress_marked_as_such_and_counts_as_a_p
     );
     assert_eq!(
         sent.text.lines().next().unwrap(),
-        format!("[Agent HUD · from Claude Code · Fix the login · {id} · into your current turn]")
+        format!("[Agent HUD · from Claude Code · Fix the login · {id} · sender {CLAUDE} · into your current turn]")
     );
     assert!(sent.text.contains("Stop: the API is v2 now, not v1."));
     // queue, or no delivery at all, is the queue as before.

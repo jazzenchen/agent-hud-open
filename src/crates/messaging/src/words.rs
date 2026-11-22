@@ -112,6 +112,16 @@ pub fn compose(
             ("title", &title),
         ],
     );
+    let label = if from.session_id.is_empty() {
+        label
+    } else {
+        let tag = if language.is_chinese() { "发送方" } else { "sender" };
+        label.replacen(
+            &format!(" · {id}"),
+            &format!(" · {id} · {tag} {}", from.session_id),
+            1,
+        )
+    };
     if !ask {
         return format!("{label}\n\n{text}");
     }
@@ -172,6 +182,15 @@ pub fn unknown_reply(language: Language, id: &str) -> String {
         ),
         &[("id", &id)],
     )
+}
+/// `to` and `reply_to` name different sessions: say both, and how to mean
+/// one of them.
+pub fn conflicting_targets(language: Language, to: &str, sender: &str) -> String {
+    if language.is_chinese() {
+        format!("to {to} 与 reply_to 那条来件的发件方 {sender} 不是同一个会话。要回给来件方，就省略 to；要发给 {to}，就另发一条、不带 reply_to。")
+    } else {
+        format!("to {to} and the sender of the reply_to message, {sender}, are different sessions. Leave to out to answer the sender, or send a separate message to {to} without reply_to.")
+    }
 }
 pub fn limit(language: Language, limit: u32) -> String {
     fill(
