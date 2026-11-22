@@ -229,22 +229,14 @@ fn a_reading_without_the_session_or_weekly_window_is_unrecognised() {
     assert_eq!(windows(&weekly_only).unwrap().len(), 1);
 }
 
-/// An engine that is installed but signed out, and the desktop app's
-/// claude.ai sign-in beside it.
+/// An engine that is installed but signed out, and the desktop app signed in
+/// to the same account beside it, keeping a token that may read the usage.
 fn signed_out_with_desktop() -> FakeHost {
     let mut host =
         installed(json!({"subtype": "success", "response": {"rate_limits_available": false}}));
     host.engine_output
         .insert("auth".into(), vec![json!({"loggedIn": false})]);
-    host.cookies.insert(
-        "Claude|claude.ai|sessionKey".into(),
-        Answer::Found("sk-ant-sid01-secret".into()),
-    );
-    host.cookies.insert(
-        "Claude|claude.ai|lastActiveOrg".into(),
-        Answer::Found("0a1b-2c3d".into()),
-    );
-    host
+    desktop_tokens(host, "user-1", &[DESKTOP_TOKEN])
 }
 
 fn web_limits() -> Value {
@@ -256,148 +248,44 @@ fn web_limits() -> Value {
 }
 
 #[test]
-fn a_signed_out_engine_reads_through_the_desktop_apps_sign_in() {
-    let host = signed_out_with_desktop()
-        .file(
-            "/u/.claude.json",
-            &json!({"oauthAccount": {
-                "accountUuid": "user-1", "organizationUuid": "0a1b-2c3d",
-                "emailAddress": "me@example.com", "organizationType": "claude_max",
-                "organizationRateLimitTier": "default_claude_max_20x",
-            }})
-            .to_string(),
-        )
-        .file(
-            "/u/AppData/Claude/config.json",
-            &json!({"lastKnownAccountUuid": "user-1"}).to_string(),
-        )
-        .answer(
-            "https://claude.ai/api/organizations/0a1b-2c3d/usage",
-            Ok(web_limits()),
-        );
-    let reading = read(&host).unwrap();
-    // The same account as Claude Code's last sign-in: its windows carry on.
-    let id = account_id("claude", &["user-1", "0a1b-2c3d"]);
-    assert_eq!(reading.quotas[0]["id"], format!("{id}:claude-session"));
-    assert_eq!(reading.quotas[0]["usedPercent"], 18.0);
-    assert_eq!(reading.quotas[1]["usedPercent"], 79.0);
-    assert_eq!(reading.quotas[2]["id"], format!("{id}:claude-weekly-fable"));
-    let account = reading.account.unwrap();
-    assert_eq!(account["label"], "me@example.com");
-    assert_eq!(account["plan"], "max_20x");
-    // Claude Code's profile names the account, so only the usage is asked,
-    // with the session as a cookie.
-    let asked = host.asked.borrow();
-    assert_eq!(asked.len(), 1);
-    assert_eq!(
-        host.sent.borrow()[0].0,
-        vec![(
-            "Cookie".to_owned(),
-            "sessionKey=sk-ant-sid01-secret".to_owned()
-        )]
-    );
-}
-
-#[test]
-fn without_claude_code_the_desktop_apps_account_names_itself() {
-    let mut host = FakeHost::new("/u")
-        .file(
-            "/u/AppData/Claude/config.json",
-            &json!({"lastKnownAccountUuid": "user-9"}).to_string(),
-        )
-        .answer(
-            "https://claude.ai/api/account",
-            Ok(json!({"email_address": "desk@example.com", "memberships": [
-                {"organization": {"uuid": "ffff", "rate_limit_tier": "default_claude_pro"}},
-                {"organization": {"uuid": "0a1b-2c3d", "rate_limit_tier": "default_claude_max_5x"}},
-            ]})),
-        )
-        .answer(
-            "https://claude.ai/api/organizations/0a1b-2c3d/usage",
-            Ok(web_limits()),
-        );
-    host.cookies.insert(
-        "Claude|claude.ai|sessionKey".into(),
-        Answer::Found("sk-ant-sid01-secret".into()),
-    );
-    host.cookies.insert(
-        "Claude|claude.ai|lastActiveOrg".into(),
-        Answer::Found("0a1b-2c3d".into()),
-    );
-    let reading = read(&host).unwrap();
-    let id = account_id("claude", &["user-9", "0a1b-2c3d"]);
-    assert_eq!(reading.quotas[0]["id"], format!("{id}:claude-session"));
-    let account = reading.account.unwrap();
-    assert_eq!(account["label"], "desk@example.com");
-    assert_eq!(account["plan"], "max_5x");
-}
-
-#[test]
 fn a_desktop_sign_in_that_is_refused_or_ended_leaves_the_engines_reason() {
     let signed_out = "Claude Code is signed out. Run claude to sign in again to update the quota";
+    // The user refused the keychain: nothing is asked.
     let mut denied = signed_out_with_desktop();
-    denied
-        .cookies
-        .insert("Claude|claude.ai|sessionKey".into(), Answer::Denied);
+    denied.sealed.insert(b"v10sealed".to_vec(), Answer::Denied);
     assert_eq!(
         read(&denied).err().as_ref().map(Unread::reason),
         Some(signed_out)
     );
     assert!(denied.asked.borrow().is_empty());
 
-    let ended = signed_out_with_desktop()
-        .file(
-            "/u/AppData/Claude/config.json",
-            &json!({"lastKnownAccountUuid": "user-1"}).to_string(),
-        )
-        .answer(
-            "https://claude.ai/api/account",
-            Err(HttpFailure::Status(401)),
+    // A token the service refuses is not sent again while the desktop app
+    // keeps the same one.
+    let ended = signed_out_with_desktop().answer(TOKEN_USAGE, Err(HttpFailure::Status(401)));
+    for _ in 0..2 {
+        assert_eq!(
+            read(&ended).err().as_ref().map(Unread::reason),
+            Some(signed_out)
         );
-    assert_eq!(
-        read(&ended).err().as_ref().map(Unread::reason),
-        Some(signed_out)
-    );
-
-    let mut unreadable = signed_out_with_desktop();
-    unreadable
-        .cookies
-        .insert("Claude|claude.ai|sessionKey".into(), Answer::Failed);
-    assert_eq!(
-        read(&unreadable).err().as_ref().map(Unread::reason),
-        Some("Couldn't read the Claude desktop app's sign-in; retrying shortly")
-    );
+    }
+    assert_eq!(ended.asked.borrow().len(), 1);
 }
 
+/// A token reading that only missed an answer passes, and waits its pace
+/// like one that read.
 #[test]
-fn a_browser_check_is_named_not_taken_for_an_ended_sign_in() {
-    let challenged = signed_out_with_desktop()
-        .file(
-            "/u/AppData/Claude/config.json",
-            &json!({"lastKnownAccountUuid": "user-1"}).to_string(),
-        )
-        .answer(
-            "https://claude.ai/api/account",
-            Err(HttpFailure::Challenged),
+fn a_token_reading_that_misses_an_answer_passes() {
+    let desktop_only = desktop_tokens(FakeHost::new("/u"), "user-9", &[DESKTOP_TOKEN])
+        .answer(TOKEN_USAGE, Err(HttpFailure::Challenged));
+    for _ in 0..2 {
+        let failure = read(&desktop_only).err().unwrap();
+        assert!(matches!(failure, Unread::Transient { .. }));
+        assert_eq!(
+            failure.reason(),
+            "The quota service asked for a browser check; retrying later"
         );
-    assert_eq!(
-            read(&challenged).err().as_ref().map(Unread::reason),
-            Some("Claude Code is signed out and claude.ai asked for a browser check. Run claude to sign in again to update the quota")
-        );
-
-    // Without Claude Code there is no sign-in to point to: it retries.
-    let mut desktop_only = FakeHost::new("/u").answer(
-        "https://claude.ai/api/account",
-        Err(HttpFailure::Challenged),
-    );
-    desktop_only.cookies.insert(
-        "Claude|claude.ai|sessionKey".into(),
-        Answer::Found("sk-ant-sid01-secret".into()),
-    );
-    assert_eq!(
-            read(&desktop_only).err().as_ref().map(Unread::reason),
-            Some("claude.ai asked for a browser check, so the Claude desktop app's sign-in can't read the quota; retrying shortly")
-        );
+    }
+    assert_eq!(desktop_only.asked.borrow().len(), 1);
 }
 
 /// A folder added in Settings, signed in to `user`'s own account, whose
@@ -481,14 +369,7 @@ fn an_added_folder_never_reads_the_desktop_apps_sign_in() {
             }})
             .to_string(),
         )
-        .file(
-            "/u/AppData/Claude/config.json",
-            &json!({"lastKnownAccountUuid": "user-1"}).to_string(),
-        )
-        .answer(
-            "https://claude.ai/api/organizations/0a1b-2c3d/usage",
-            Ok(web_limits()),
-        );
+        .answer(TOKEN_USAGE, Ok(web_limits()));
     let work = host.home().join("claude-work");
     added(
         &mut host,
@@ -509,11 +390,16 @@ fn an_added_folder_never_reads_the_desktop_apps_sign_in() {
     assert_eq!(
         host.asked.borrow().len(),
         1,
-        "only the default folder asks claude.ai"
+        "only the default folder asks with the desktop app's sign-in"
     );
+    // The default folder says how it was read; the added one stays signed out.
     assert_eq!(
         reading.notice,
-        Some(format!("{}: {signed_out}", work.display()))
+        Some(format!(
+            "/u/.claude: {}\n{}: {signed_out}",
+            through_desktop(true),
+            work.display()
+        ))
     );
     {
         let started = host.started.borrow();
@@ -526,7 +412,7 @@ fn an_added_folder_never_reads_the_desktop_apps_sign_in() {
     }
 
     // Without the desktop app's sign-in both folders are signed out.
-    host.cookies.clear();
+    host.sealed.clear();
     let error = read(&host).err().unwrap();
     assert!(matches!(error, Unread::SignedOut(_)));
     assert_eq!(error.reason().matches(signed_out).count(), 2);
@@ -784,24 +670,16 @@ fn a_failure_that_passes_keeps_its_kind_beside_the_record() {
             "Claude Code engine query failed: The engine returned no usage within 40 s · Showing Claude Code's own reading from 30m ago"
         );
 
-    // Signed out, and claude.ai asked the desktop app's sign-in for a
-    // browser check.
-    let mut challenged = signed_out_with_desktop()
-        .file(
-            "/u/AppData/Claude/config.json",
-            &json!({"lastKnownAccountUuid": "user-1"}).to_string(),
-        )
-        .answer(
-            "https://claude.ai/api/account",
-            Err(HttpFailure::Challenged),
-        );
-    record(&mut challenged, "/u/.claude.json", 5 * 86_400_000, None);
-    let reading = read(&challenged).unwrap();
+    // Signed out, and the desktop app's sign-in got no answer.
+    let mut unanswered =
+        signed_out_with_desktop().answer(TOKEN_USAGE, Err(HttpFailure::Unreachable));
+    record(&mut unanswered, "/u/.claude.json", 5 * 86_400_000, None);
+    let reading = read(&unanswered).unwrap();
     let failure = reading.failure.unwrap();
-    assert!(matches!(failure, Unread::SignedOut(_)));
+    assert!(matches!(failure, Unread::Transient { .. }));
     assert!(failure
         .reason()
-        .starts_with("Claude Code is signed out and claude.ai asked for a browser check"));
+        .starts_with("The quota service could not be reached"));
     assert!(failure
         .reason()
         .ends_with(" · Showing Claude Code's own reading from 5d ago"));
@@ -812,18 +690,11 @@ fn a_failure_that_passes_keeps_its_kind_beside_the_record() {
 fn claude_codes_record_never_stands_in_for_another_desktop_account() {
     // Signed out; the desktop app last signed in to someone else, and
     // its reading failed: the record is of an account not being read.
-    let mut other = signed_out_with_desktop()
-        .file(
-            "/u/AppData/Claude/config.json",
-            &json!({"lastKnownAccountUuid": "user-2"}).to_string(),
-        )
-        .answer(
-            "https://claude.ai/api/account",
-            Err(HttpFailure::Challenged),
-        );
+    let mut other = desktop_tokens(signed_out_with_desktop(), "user-2", &[DESKTOP_TOKEN])
+        .answer(TOKEN_USAGE, Err(HttpFailure::Status(500)));
     record(&mut other, "/u/.claude.json", 5 * 86_400_000, None);
     let failure = read(&other).err().unwrap();
-    assert!(matches!(failure, Unread::SignedOut(_)));
+    assert!(matches!(failure, Unread::Transient { .. }));
     assert!(!failure
         .reason()
         .contains("Showing Claude Code's own reading"));
@@ -894,11 +765,7 @@ fn a_failed_folder_shows_its_record_stale_beside_the_folders_that_read() {
 /// engine's windows.
 #[test]
 fn a_signed_in_engine_reads_the_desktop_app_too() {
-    let mut host = installed(limits());
-    host.cookies.insert(
-        "Claude|claude.ai|sessionKey".into(),
-        Answer::Found("sk-ant-sid01-secret".into()),
-    );
+    let host = desktop_tokens(installed(limits()), "user-9", &[DESKTOP_TOKEN]);
     let reading = read(&host).unwrap();
     assert_eq!(reading.quotas.len(), 2);
     assert!(!host.asked.borrow().is_empty());
@@ -906,30 +773,12 @@ fn a_signed_in_engine_reads_the_desktop_app_too() {
 }
 
 fn desktop_signed_in(host: FakeHost, user: &str) -> FakeHost {
-    let mut host = host
-        .file(
-            "/u/AppData/Claude/config.json",
-            &json!({"lastKnownAccountUuid": user}).to_string(),
-        )
+    desktop_tokens(host, user, &[DESKTOP_TOKEN])
+        .answer(TOKEN_USAGE, Ok(web_limits()))
         .answer(
-            "https://claude.ai/api/account",
-            Ok(json!({"email_address": "desk@example.com", "memberships": [
-                {"organization": {"uuid": "0a1b-2c3d", "rate_limit_tier": "default_claude_max_5x"}},
-            ]})),
+            "https://api.anthropic.com/api/oauth/profile",
+            Ok(json!({"account": {"email": "desk@example.com"}})),
         )
-        .answer(
-            "https://claude.ai/api/organizations/0a1b-2c3d/usage",
-            Ok(web_limits()),
-        );
-    host.cookies.insert(
-        "Claude|claude.ai|sessionKey".into(),
-        Answer::Found("sk-ant-sid01-secret".into()),
-    );
-    host.cookies.insert(
-        "Claude|claude.ai|lastActiveOrg".into(),
-        Answer::Found("0a1b-2c3d".into()),
-    );
-    host
 }
 
 /// The desktop app signed in to another account than Claude Code: each is
@@ -1006,8 +855,8 @@ fn a_login_without_plan_limits_is_no_news_beside_the_desktop_apps_account() {
     assert_eq!(reading.notice, None);
 }
 
-/// The desktop app on Claude Code's account, its own reading refused by
-/// claude.ai's browser check: nothing is said, and the account is still used
+/// The desktop app on Claude Code's account, its own reading unanswered:
+/// nothing is said, and the account is still used
 /// in both.
 #[test]
 fn the_desktop_apps_account_counts_as_merged_when_its_reading_fails() {
@@ -1020,10 +869,7 @@ fn the_desktop_apps_account_counts_as_merged_when_its_reading_fails() {
             }})
             .to_string(),
         )
-        .answer(
-            "https://claude.ai/api/organizations/0a1b-2c3d/usage",
-            Err(HttpFailure::Challenged),
-        );
+        .answer(TOKEN_USAGE, Err(HttpFailure::Unreachable));
     let reading = read(&host).unwrap();
     assert_eq!(reading.notice, None);
     assert_eq!(
@@ -1051,7 +897,146 @@ fn official_quota_reading_asks_the_engine_but_not_the_desktop_sign_in() {
         host.asked
             .borrow()
             .iter()
-            .all(|(url, _)| !url.contains("claude.ai")),
+            .all(|(url, _)| !url.contains("/api/oauth/")),
         "the desktop app's sign-in is never sent"
     );
+}
+
+const TOKEN_USAGE: &str = "https://api.anthropic.com/api/oauth/usage";
+
+/// The desktop app signed in as `user`, keeping `entries` in its token cache
+/// (`(organization, scopes, token, expires in ms from now)`).
+fn desktop_tokens(host: FakeHost, user: &str, entries: &[(&str, &str, &str, i64)]) -> FakeHost {
+    use base64::{engine::general_purpose::STANDARD, Engine};
+    let now = chrono::Utc::now().timestamp_millis();
+    let cache: serde_json::Map<String, Value> = entries
+        .iter()
+        .map(|(organization, scopes, token, lasts)| {
+            (
+                format!("acct:{user}|client-1:{organization}:https://api.anthropic.com:{scopes}"),
+                json!({"token": token, "refreshToken": "never-sent", "expiresAt": now + lasts,
+                    "subscriptionType": "max", "rateLimitTier": "default_claude_max_5x"}),
+            )
+        })
+        .collect();
+    let mut host = host.file(
+        "/u/AppData/Claude/config.json",
+        &json!({"lastKnownAccountUuid": user, "oauth:tokenCacheV2": STANDARD.encode(b"v10sealed")})
+            .to_string(),
+    );
+    host.sealed.insert(
+        b"v10sealed".to_vec(),
+        Answer::Found(Value::Object(cache).to_string()),
+    );
+    host
+}
+const DAY: i64 = 86_400_000;
+/// A token of organization `0a1b-2c3d` that may read the usage.
+const DESKTOP_TOKEN: (&str, &str, &str, i64) = ("0a1b-2c3d", "user:profile", "tok-profile", DAY);
+
+/// Signed out, the desktop app on the same account: its token reads the
+/// usage from api.anthropic.com, and the user is told
+/// the sign-in ended and why the quota now moves less often.
+#[test]
+fn a_signed_out_engine_reads_with_the_desktop_apps_token() {
+    let host = desktop_tokens(
+        signed_out_with_desktop().file(
+            "/u/.claude.json",
+            &json!({"oauthAccount": {
+                "accountUuid": "user-1", "organizationUuid": "0a1b-2c3d",
+                "emailAddress": "me@example.com", "organizationType": "claude_max",
+                "organizationRateLimitTier": "default_claude_max_20x",
+            }})
+            .to_string(),
+        ),
+        "user-1",
+        &[
+            ("0a1b-2c3d", "user:inference", "tok-inference", DAY),
+            ("0a1b-2c3d", "user:inference user:profile", "tok-expired", 0),
+            ("ffff", "user:profile", "tok-other-org", 9 * DAY),
+            (
+                "0a1b-2c3d",
+                "user:inference user:file_upload user:profile",
+                "tok-profile",
+                DAY,
+            ),
+        ],
+    )
+    .answer(TOKEN_USAGE, Ok(web_limits()));
+    let reading = read(&host).unwrap();
+    assert_eq!(
+        *host.asked.borrow(),
+        vec![(
+            TOKEN_USAGE.to_owned(),
+            Some("Bearer tok-profile".to_owned())
+        )],
+        "the organization last used, a token that may read the usage, nothing else"
+    );
+    let id = account_id("claude", &["user-1", "0a1b-2c3d"]);
+    assert_eq!(reading.quotas[1]["id"], format!("{id}:claude-weekly"));
+    assert_eq!(reading.quotas[1]["usedPercent"], 79.0);
+    let account = reading.account.unwrap();
+    assert_eq!(account["label"], "me@example.com");
+    assert_eq!(account["plan"], "max_20x");
+    assert_eq!(account["readBy"], json!(["claude-desktop"]));
+    let notice = reading.notice.unwrap();
+    assert!(notice.starts_with("Claude Code's sign-in has ended"));
+    assert!(notice.contains("only every 5 minutes"));
+}
+
+/// No Claude Code: the token's account names itself once, the user is told
+/// to install Claude Code, and a second reading inside the pace asks nothing.
+#[test]
+fn without_claude_code_the_token_is_asked_at_most_once_in_its_pace() {
+    let host = desktop_tokens(
+        FakeHost::new("/u"),
+        "user-9",
+        &[("0a1b-2c3d", "user:profile", "tok-profile", DAY)],
+    )
+    .answer(TOKEN_USAGE, Ok(web_limits()))
+    .answer(
+        "https://api.anthropic.com/api/oauth/profile",
+        Ok(json!({"account": {"email": "desk@example.com"}})),
+    );
+    let first = read(&host).unwrap();
+    let account = first.account.unwrap();
+    assert_eq!(account["label"], "desk@example.com");
+    assert_eq!(account["plan"], "max_5x");
+    assert!(account["checkedAt"].is_null(), "read just now");
+    assert!(first
+        .notice
+        .unwrap()
+        .contains("Install Claude Code (the claude command)"));
+    assert_eq!(host.asked.borrow().len(), 2);
+
+    let second = read(&host).unwrap();
+    assert_eq!(host.asked.borrow().len(), 2, "the kept answer stands");
+    assert_eq!(second.quotas, {
+        let mut rows = first.quotas.clone();
+        for row in &mut rows {
+            row["observedAt"] = second.quotas[0]["observedAt"].clone();
+        }
+        rows
+    });
+    assert!(
+        second.quotas[0]["observedAt"].is_string(),
+        "as old as it is"
+    );
+    assert!(second.notice.unwrap().contains("Install Claude Code"));
+
+    // The pace over, the usage is asked again; the name is not.
+    let mut memo: Value =
+        serde_json::from_slice(&host.own.borrow()["claude-desktop-reading.json"]).unwrap();
+    // Each asking is due five minutes on, give or take half a minute.
+    let wait = memo["due"].as_i64().unwrap() - memo["at"].as_i64().unwrap();
+    assert!((270_000..=330_000).contains(&wait));
+    memo["due"] = memo["at"].clone();
+    host.own.borrow_mut().insert(
+        "claude-desktop-reading.json".into(),
+        memo.to_string().into_bytes(),
+    );
+    read(&host).unwrap();
+    let asked = host.asked.borrow();
+    assert_eq!(asked.len(), 3);
+    assert_eq!(asked[2].0, TOKEN_USAGE);
 }

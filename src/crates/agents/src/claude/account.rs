@@ -2,7 +2,7 @@
 //! ClaudeEngineUsageClient), and `claude auth status` tells a signed-out
 //! engine from an API-key login. The signed-in account is the one Claude
 //! Code's .claude.json names, read before and after. Without a Claude Code
-//! sign-in, the Claude desktop app's own claude.ai sign-in answers instead.
+//! sign-in, the Claude desktop app's own sign-in answers instead.
 //! Folders added in Settings (`claudeHomes`) are read after the default one,
 //! one at a time, each as its own account. The desktop app's own sign-in
 //! is read beside them every time, and the readings are merged by account.
@@ -186,13 +186,19 @@ fn read_folder(host: &dyn Host, folder: &Folder) -> (Result<Reading, Unread>, bo
             let desktop = if folder.added {
                 None
             } else {
-                from_desktop(host, folder, installed)
+                from_desktop(host, folder)
             };
             let read = match desktop {
                 // The desktop app's account is the one read: Claude Code's
                 // record stands in for it only when it is the same account.
                 Some(Err(failure)) if desktop_is_claude_codes(host, folder) => {
                     kept(host, folder, failure)
+                }
+                // Read, but less often than Claude Code's own sign-in is:
+                // the user is told why, and what brings the usual pace back.
+                Some(Ok(mut reading)) => {
+                    append_notice(&mut reading, through_desktop(installed));
+                    Ok(reading)
                 }
                 Some(read) => read,
                 None => kept(
@@ -207,6 +213,19 @@ fn read_folder(host: &dyn Host, folder: &Folder) -> (Result<Reading, Unread>, bo
             };
             (read, !folder.added)
         }
+    }
+}
+
+/// Says that the quota comes through the desktop app's sign-in, why that is
+/// read less often, and what brings the usual pace back: signing in again
+/// for an `installed` Claude Code, installing it otherwise. A login with no
+/// plan limits (an API key, a relay) is signed in and never comes here.
+fn through_desktop(installed: bool) -> String {
+    let minutes = super::desktop_pace::EVERY_MS / 60_000;
+    if installed {
+        tr!("Claude Code's sign-in has ended, so the quota is read through the Claude desktop app's sign-in. To keep Claude from taking it for abuse, that is done only every {{minutes}} minutes. Run claude to sign in again for more frequent updates.", minutes = minutes)
+    } else {
+        tr!("The quota is read through the Claude desktop app's sign-in. To keep Claude from taking it for abuse, that is done only every {{minutes}} minutes. Install Claude Code (the claude command) and sign in for more frequent updates.", minutes = minutes)
     }
 }
 

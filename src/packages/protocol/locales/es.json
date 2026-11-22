@@ -238,7 +238,6 @@
   "Claude Code doesn't have Agent HUD's plugin yet. Install it to answer Claude's questions in Agent HUD (Settings → Agents).": "Claude Code aún no tiene el plugin de Agent HUD. Instálalo para responder a las preguntas de Claude en Agent HUD (Ajustes → Agentes).",
   "Claude Code engine (claude command) not found": "No se encontró el motor de Claude Code (comando claude)",
   "Claude Code engine query failed: {{reason}}": "Falló la consulta al motor de Claude Code: {{reason}}",
-  "Claude Code is signed out and claude.ai asked for a browser check. Run claude to sign in again to update the quota": "Claude Code cerró la sesión y claude.ai pidió una verificación del navegador. Ejecuta claude para volver a iniciar sesión y actualizar la cuota",
   "Claude Code is signed out. Run claude to sign in again to update the quota": "Claude Code cerró la sesión. Ejecuta claude para volver a iniciar sesión y actualizar la cuota",
   "Clear all": "Borrar todo",
   "Clear filter": "Borrar filtro",
@@ -320,7 +319,6 @@
   "Couldn't add: {{message}}": "No se pudo añadir: {{message}}",
   "Couldn't finish: {{message}}": "No se pudo completar: {{message}}",
   "Couldn't install: {{message}}": "No se pudo instalar: {{message}}",
-  "Couldn't read the Claude desktop app's sign-in; retrying shortly": "No se pudo leer la sesión de la app de escritorio de Claude; se reintentará en breve",
   "Couldn't read the Claude quota this time; retrying shortly": "Esta vez no se pudo leer la cuota de Claude; se reintentará en breve",
   "Couldn't remove: {{message}}": "No se pudo eliminar: {{message}}",
   "Couldn't return to session. Retry or view token usage.": "No se pudo volver a la sesión. Reintenta o consulta el uso de tokens.",
@@ -1322,7 +1320,6 @@
   "arkcli returned no usage within 20 s; retrying later": "arkcli no devolvió el uso en 20 s; se reintentará más tarde",
   "arkcli's output could not be read; update arkcli": "No se pudo leer la salida de arkcli; actualiza arkcli",
   "available": "disponibles",
-  "claude.ai asked for a browser check, so the Claude desktop app's sign-in can't read the quota; retrying shortly": "claude.ai pidió una verificación del navegador, así que la sesión de la app de escritorio de Claude no puede leer la cuota; se reintentará en breve",
   "e.g. 0.3": "p. ej., 0.3",
   "first expires": "primero caduca",
   "from this quota cycle's readings": "a partir de las lecturas de este ciclo de cuota",
@@ -1580,5 +1577,7 @@
   "Shows no quota. Sessions and tokens are still counted from the agent's own logs.": "No muestra la cuota. Las sesiones y los tokens se siguen contando desde los registros del propio agente.",
   "Uses only the agent's own app, not sign-ins other apps keep.": "Usa solo la app del propio agente, no los inicios de sesión que guardan otras apps.",
   "Uses any sign-in or key found for this agent, including ones other apps keep.": "Usa cualquier inicio de sesión o clave que se encuentre para este agente, incluidos los que guardan otras apps.",
-  "Cursor's quota reading is off in Settings, so Grok Bot is read without Cursor's sign-in.": "La lectura de la cuota de Cursor está desactivada en Ajustes, así que Grok Bot se lee sin el inicio de sesión de Cursor."
+  "Cursor's quota reading is off in Settings, so Grok Bot is read without Cursor's sign-in.": "La lectura de la cuota de Cursor está desactivada en Ajustes, así que Grok Bot se lee sin el inicio de sesión de Cursor.",
+  "Claude Code's sign-in has ended, so the quota is read through the Claude desktop app's sign-in. To keep Claude from taking it for abuse, that is done only every {{minutes}} minutes. Run claude to sign in again for more frequent updates.": "La sesión de Claude Code ha caducado, así que la cuota se lee con la sesión de la app de escritorio de Claude. Para que Claude no lo tome por un abuso, solo se hace cada {{minutes}} minutos. Ejecuta claude para volver a iniciar sesión y recibir actualizaciones más frecuentes.",
+  "The quota is read through the Claude desktop app's sign-in. To keep Claude from taking it for abuse, that is done only every {{minutes}} minutes. Install Claude Code (the claude command) and sign in for more frequent updates.": "La cuota se lee con la sesión de la app de escritorio de Claude. Para que Claude no lo tome por un abuso, solo se hace cada {{minutes}} minutos. Instala Claude Code (el comando claude) e inicia sesión para recibir actualizaciones más frecuentes."
 }

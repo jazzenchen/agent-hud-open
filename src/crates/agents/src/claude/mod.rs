@@ -3,6 +3,8 @@ pub mod account;
 mod button_text;
 mod desktop_ask;
 mod desktop_index;
+mod desktop_pace;
+mod desktop_token;
 mod desktop_usage;
 mod engine_usage;
 mod hooks;

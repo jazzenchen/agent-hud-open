@@ -236,7 +236,6 @@
   "Claude Code doesn't have Agent HUD's plugin yet. Install it to answer Claude's questions in Agent HUD (Settings → Agents).": "Claude Code にはまだ Agent HUD のプラグインがありません。インストールすると、Agent HUD で Claude の質問に回答できます（設定 → エージェント）。",
   "Claude Code engine (claude command) not found": "Claude Code エンジン（claude コマンド）が見つかりません",
   "Claude Code engine query failed: {{reason}}": "Claude Code エンジンの照会に失敗しました: {{reason}}",
-  "Claude Code is signed out and claude.ai asked for a browser check. Run claude to sign in again to update the quota": "Claude Code がサインアウトしており、claude.ai からブラウザでの確認を求められました。claude を実行して再度サインインすると使用上限を更新します",
   "Claude Code is signed out. Run claude to sign in again to update the quota": "Claude Code はサインアウトしています。claude を実行して再度サインインすると使用上限を更新します",
   "Clear all": "すべて消去",
   "Clear filter": "フィルタをクリア",
@@ -318,7 +317,6 @@
   "Couldn't add: {{message}}": "追加できませんでした: {{message}}",
   "Couldn't finish: {{message}}": "完了できませんでした: {{message}}",
   "Couldn't install: {{message}}": "インストールできませんでした: {{message}}",
-  "Couldn't read the Claude desktop app's sign-in; retrying shortly": "Claude デスクトップアプリのサインインを読み取れませんでした。まもなく再試行します",
   "Couldn't read the Claude quota this time; retrying shortly": "今回は Claude の使用上限を読み取れませんでした。まもなく再試行します",
   "Couldn't remove: {{message}}": "削除できませんでした: {{message}}",
   "Couldn't return to session. Retry or view token usage.": "セッションに戻れませんでした。再試行するか、トークン使用量を表示してください。",
@@ -1300,7 +1298,6 @@
   "arkcli returned no usage within 20 s; retrying later": "arkcli が 20 秒以内に使用量を返しませんでした。後で再試行します",
   "arkcli's output could not be read; update arkcli": "arkcli の出力を読み取れませんでした。arkcli をアップデートしてください",
   "available": "利用可能",
-  "claude.ai asked for a browser check, so the Claude desktop app's sign-in can't read the quota; retrying shortly": "claude.ai からブラウザでの確認を求められたため、Claude デスクトップアプリのサインインでは使用上限を読み取れません。まもなく再試行します",
   "e.g. 0.3": "例: 0.3",
   "first expires": "最初の期限",
   "from this quota cycle's readings": "このサイクルの読み取り値から",
@@ -1516,5 +1513,7 @@
   "Shows no quota. Sessions and tokens are still counted from the agent's own logs.": "使用上限を表示しません。セッションとトークンは引き続きエージェント自身のログから集計されます。",
   "Uses only the agent's own app, not sign-ins other apps keep.": "エージェント自身のアプリだけを使い、他のアプリが保持するサインインは使いません。",
   "Uses any sign-in or key found for this agent, including ones other apps keep.": "このエージェント用に見つかったサインインやキーをすべて使います。他のアプリが保持するものも含みます。",
-  "Cursor's quota reading is off in Settings, so Grok Bot is read without Cursor's sign-in.": "Cursor の使用上限の読み取りが設定でオフのため、Grok Bot は Cursor のサインインを使わずに読み取ります。"
+  "Cursor's quota reading is off in Settings, so Grok Bot is read without Cursor's sign-in.": "Cursor の使用上限の読み取りが設定でオフのため、Grok Bot は Cursor のサインインを使わずに読み取ります。",
+  "Claude Code's sign-in has ended, so the quota is read through the Claude desktop app's sign-in. To keep Claude from taking it for abuse, that is done only every {{minutes}} minutes. Run claude to sign in again for more frequent updates.": "Claude Code のサインインが切れたため、Claude デスクトップアプリのサインインで使用上限を読み取っています。Claude に不正利用と見なされないよう、読み取りは {{minutes}} 分ごとです。claude を実行して再度サインインすると、より頻繁に更新されます。",
+  "The quota is read through the Claude desktop app's sign-in. To keep Claude from taking it for abuse, that is done only every {{minutes}} minutes. Install Claude Code (the claude command) and sign in for more frequent updates.": "Claude デスクトップアプリのサインインで使用上限を読み取っています。Claude に不正利用と見なされないよう、読み取りは {{minutes}} 分ごとです。Claude Code（claude コマンド）をインストールしてサインインすると、より頻繁に更新されます。"
 }

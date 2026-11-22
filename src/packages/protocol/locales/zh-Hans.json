@@ -236,7 +236,6 @@
   "Claude Code doesn't have Agent HUD's plugin yet. Install it to answer Claude's questions in Agent HUD (Settings → Agents).": "Claude Code 还没装 Agent HUD 插件，装好后就能在 Agent HUD 里回答 Claude 的提问（设置 → 智能体）。",
   "Claude Code engine (claude command) not found": "未找到 Claude Code 引擎（claude 命令）",
   "Claude Code engine query failed: {{reason}}": "Claude Code 引擎查询失败：{{reason}}",
-  "Claude Code is signed out and claude.ai asked for a browser check. Run claude to sign in again to update the quota": "Claude Code 已退出登录，claude.ai 也要求浏览器验证；运行 claude 重新登录后更新额度",
   "Claude Code is signed out. Run claude to sign in again to update the quota": "Claude Code 已退出登录，运行 claude 重新登录后更新额度",
   "Clear all": "全部清空",
   "Clear filter": "清除筛选",
@@ -318,7 +317,6 @@
   "Couldn't add: {{message}}": "没能添加：{{message}}",
   "Couldn't finish: {{message}}": "没能完成：{{message}}",
   "Couldn't install: {{message}}": "没能安装：{{message}}",
-  "Couldn't read the Claude desktop app's sign-in; retrying shortly": "暂时无法读取 Claude 桌面版的登录，稍后自动重试",
   "Couldn't read the Claude quota this time; retrying shortly": "这次没有读到 Claude 额度，稍后自动重试",
   "Couldn't remove: {{message}}": "没能移除：{{message}}",
   "Couldn't return to session. Retry or view token usage.": "无法回到会话，请重试或查看 Token 用量",
@@ -1300,7 +1298,6 @@
   "arkcli returned no usage within 20 s; retrying later": "arkcli 没有在 20 秒内返回用量，稍后自动重试",
   "arkcli's output could not be read; update arkcli": "arkcli 的输出无法识别，请更新 arkcli",
   "available": "可用次数",
-  "claude.ai asked for a browser check, so the Claude desktop app's sign-in can't read the quota; retrying shortly": "claude.ai 要求浏览器验证，暂时无法通过 Claude 桌面版读取额度，稍后自动重试",
   "e.g. 0.3": "如 0.3",
   "first expires": "最早到期",
   "from this quota cycle's readings": "这个周期的读数",
@@ -1516,5 +1513,7 @@
   "Shows no quota. Sessions and tokens are still counted from the agent's own logs.": "不显示额度。会话和 token 仍从智能体自己的日志中统计。",
   "Uses only the agent's own app, not sign-ins other apps keep.": "只用智能体自己的程序，不用其他程序保存的登录信息。",
   "Uses any sign-in or key found for this agent, including ones other apps keep.": "使用为此智能体找到的任何登录信息或密钥，包括其他程序保存的。",
-  "Cursor's quota reading is off in Settings, so Grok Bot is read without Cursor's sign-in.": "Cursor 的额度读取已在设置中关闭，所以读取 Grok Bot 时不用 Cursor 的登录信息。"
+  "Cursor's quota reading is off in Settings, so Grok Bot is read without Cursor's sign-in.": "Cursor 的额度读取已在设置中关闭，所以读取 Grok Bot 时不用 Cursor 的登录信息。",
+  "Claude Code's sign-in has ended, so the quota is read through the Claude desktop app's sign-in. To keep Claude from taking it for abuse, that is done only every {{minutes}} minutes. Run claude to sign in again for more frequent updates.": "Claude Code 的登录已失效，现通过 Claude 桌面版的登录读取额度。为避免被 Claude 视为异常访问，每 {{minutes}} 分钟才读取一次。运行 claude 重新登录后更新更频繁。",
+  "The quota is read through the Claude desktop app's sign-in. To keep Claude from taking it for abuse, that is done only every {{minutes}} minutes. Install Claude Code (the claude command) and sign in for more frequent updates.": "现通过 Claude 桌面版的登录读取额度。为避免被 Claude 视为异常访问，每 {{minutes}} 分钟才读取一次。安装 Claude Code（claude 命令）并登录后更新更频繁。"
 }
