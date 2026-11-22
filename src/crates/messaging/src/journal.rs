@@ -112,6 +112,10 @@ impl Journal {
     pub fn find(&self, id: &str) -> Option<&Message> {
         self.messages.iter().find(|message| message.id == id)
     }
+    /// Every message kept, oldest first.
+    pub fn messages(&self) -> impl DoubleEndedIterator<Item = &Message> {
+        self.messages.iter()
+    }
     /// The message the relay's call `call` sent.
     pub fn by_call(&self, call: &str) -> Option<&Message> {
         self.messages
