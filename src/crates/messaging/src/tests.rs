@@ -769,7 +769,7 @@ fn a_queued_message_that_waits_for_its_thread_to_open_says_so() {
 }
 
 #[test]
-fn the_group_lists_its_four_tools_only_while_it_is_on() {
+fn the_group_lists_its_five_tools_only_while_it_is_on() {
     assert_eq!(
         Messaging::tools(&Preferences::default()),
         json!({"tools":[]})
@@ -789,7 +789,8 @@ fn the_group_lists_its_four_tools_only_while_it_is_on() {
             "list_sessions",
             "list_models",
             "send_message",
-            "start_session"
+            "start_session",
+            "list_sent_messages"
         ]
     );
     for tool in Messaging::tools(&Preferences {
@@ -802,6 +803,55 @@ fn the_group_lists_its_four_tools_only_while_it_is_on() {
         assert_eq!(tool["inputSchema"]["type"], "object");
         assert!(tool["description"].as_str().unwrap().len() > 80);
     }
+}
+
+#[test]
+fn the_outbox_lists_this_sessions_own_sends_newest_first() {
+    let mut world = World::on();
+    world.check_in(QUIET);
+    let first = world.send(("claude", CLAUDE), CODEX, "Review this");
+    let first_id = first["id"].as_str().unwrap().to_owned();
+    let second = world.send(("claude", CLAUDE), QUIET, "Second");
+    let second_id = second["id"].as_str().unwrap().to_owned();
+    // Another session's send stays out of this session's outbox.
+    let other = world.send(("codex", CODEX), CLAUDE, "Not mine");
+    assert_eq!(other["state"], "queued", "{other}");
+    let outbox = world.call(Some(("claude", CLAUDE)), "list_sent_messages", json!({}));
+    let ids = outbox["messages"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|message| message["id"].as_str().unwrap().to_owned())
+        .collect::<Vec<_>>();
+    assert_eq!(ids, [second_id.clone(), first_id.clone()], "{outbox}");
+    assert_eq!(outbox["count"], 2);
+    assert_eq!(outbox["messages"][0]["to"]["sessionId"], QUIET);
+    assert_eq!(outbox["messages"][0]["state"], "queued");
+    // The limit takes the newest only.
+    let one = world.call(
+        Some(("claude", CLAUDE)),
+        "list_sent_messages",
+        json!({"limit":1}),
+    );
+    assert_eq!(one["messages"].as_array().unwrap().len(), 1);
+    assert_eq!(one["messages"][0]["id"], second_id);
+    // `since` keeps what was sent at or after it.
+    let at = world.messaging.journal.find(&first_id).unwrap().sent_at_ms;
+    let after = world.call(
+        Some(("claude", CLAUDE)),
+        "list_sent_messages",
+        json!({"since": at + 1}),
+    );
+    assert_eq!(after["messages"].as_array().unwrap().len(), 0, "{after}");
+    let all = world.call(
+        Some(("claude", CLAUDE)),
+        "list_sent_messages",
+        json!({"since": at}),
+    );
+    assert_eq!(all["messages"].as_array().unwrap().len(), 2, "{all}");
+    // Without a caller it refuses rather than listing everyone's sends.
+    let anonymous = world.call(None, "list_sent_messages", json!({}));
+    assert_eq!(anonymous["state"], "refused");
 }
 
 #[test]

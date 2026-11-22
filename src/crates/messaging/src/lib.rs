@@ -21,6 +21,7 @@ mod models;
 mod outcome;
 mod preferences;
 mod send;
+mod sent;
 mod snapshot;
 mod start;
 #[cfg(test)]
@@ -239,6 +240,7 @@ impl Messaging {
         match name {
             "list_sessions" => Ok(self.list(caller.as_ref(), host)),
             "list_models" => self.models(arguments),
+            "list_sent_messages" => Ok(self.sent(caller.as_ref(), arguments, host)),
             "send_message" | "start_session" => {
                 let Some(caller) = caller else {
                     return Ok(refused(&words::no_caller(language(host.snapshot))));
