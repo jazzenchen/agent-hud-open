@@ -39,6 +39,25 @@ impl Messaging {
         if named.is_none() && replied.is_none() {
             return Err("to is required, unless reply_to names a message you received".into());
         }
+        // A reply and a target that name different sessions: the caller has
+        // two answers to where this goes. Sending it to `to` and filing it as
+        // a reply to the other party's message was the wrong one, silently.
+        if let (Some(target), Some(parent)) = (named, replied.as_ref()) {
+            if let Some(found) = find(host.snapshot, target) {
+                let found_id = found["id"].as_str().unwrap_or(target);
+                let found_client = found["source"].as_str().unwrap_or_default();
+                if !same_identity(
+                    (found_client, found_id),
+                    (parent.from.client.as_str(), parent.from.session_id.as_str()),
+                ) {
+                    return Ok(refused(&words::conflicting_targets(
+                        language,
+                        found_id,
+                        &parent.from.session_id,
+                    )));
+                }
+            }
+        }
         if let Some(reason) = check_text(text, language) {
             return Ok(refused(&reason));
         }

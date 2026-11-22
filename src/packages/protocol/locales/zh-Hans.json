@@ -1515,5 +1515,7 @@
   "Uses any sign-in or key found for this agent, including ones other apps keep.": "使用为此智能体找到的任何登录信息或密钥，包括其他程序保存的。",
   "Cursor's quota reading is off in Settings, so Grok Bot is read without Cursor's sign-in.": "Cursor 的额度读取已在设置中关闭，所以读取 Grok Bot 时不用 Cursor 的登录信息。",
   "Claude Code's sign-in has ended, so the quota is read through the Claude desktop app's sign-in. To keep Claude from taking it for abuse, that is done only every {{minutes}} minutes. Run claude to sign in again for more frequent updates.": "Claude Code 的登录已失效，现通过 Claude 桌面版的登录读取额度。为避免被 Claude 视为异常访问，每 {{minutes}} 分钟才读取一次。运行 claude 重新登录后更新更频繁。",
-  "The quota is read through the Claude desktop app's sign-in. To keep Claude from taking it for abuse, that is done only every {{minutes}} minutes. Install Claude Code (the claude command) and sign in for more frequent updates.": "现通过 Claude 桌面版的登录读取额度。为避免被 Claude 视为异常访问，每 {{minutes}} 分钟才读取一次。安装 Claude Code（claude 命令）并登录后更新更频繁。"
+  "The quota is read through the Claude desktop app's sign-in. To keep Claude from taking it for abuse, that is done only every {{minutes}} minutes. Install Claude Code (the claude command) and sign in for more frequent updates.": "现通过 Claude 桌面版的登录读取额度。为避免被 Claude 视为异常访问，每 {{minutes}} 分钟才读取一次。安装 Claude Code（claude 命令）并登录后更新更频繁。",
+  "sender {{session}}": "发送方 {{session}}",
+  "to {{to}} and the sender of the reply_to message, {{sender}}, are different sessions. Leave to out to answer the sender, or send a separate message to {{to}} without reply_to.": "to {{to}} 与 reply_to 那条来件的发件方 {{sender}} 不是同一个会话。要回给来件方，就省略 to；要发给 {{to}}，就另发一条、不带 reply_to。"
 }

@@ -94,7 +94,7 @@ fn a_steer_goes_into_the_harness_turn_in_progress_and_its_answer_is_read_from_it
     let delivered = left["text"].as_str().unwrap().to_owned();
     assert_eq!(
         delivered.lines().next().unwrap(),
-        format!("[Agent HUD · from Claude Code · Fix the login · {id} · into your current turn]")
+        format!("[Agent HUD · from Claude Code · Fix the login · {id} · sender {CLAUDE} · into your current turn]")
     );
     assert!(left.get("model").is_none());
     assert_eq!(

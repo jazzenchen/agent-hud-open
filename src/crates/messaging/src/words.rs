@@ -112,6 +112,15 @@ pub fn compose(
             ("title", &title),
         ],
     );
+    let label = if from.session_id.is_empty() {
+        label
+    } else {
+        let sender = fill(
+            &tr_in(language, "sender {{session}}"),
+            &[("session", &from.session_id.as_str())],
+        );
+        label.replacen(&format!(" · {id}"), &format!(" · {id} · {sender}"), 1)
+    };
     if !ask {
         return format!("{label}\n\n{text}");
     }
@@ -171,6 +180,17 @@ pub fn unknown_reply(language: Language, id: &str) -> String {
             "reply_to {{id}} names no message this session received.",
         ),
         &[("id", &id)],
+    )
+}
+/// `to` and `reply_to` name different sessions: say both, and how to mean
+/// one of them.
+pub fn conflicting_targets(language: Language, to: &str, sender: &str) -> String {
+    fill(
+        &tr_in(
+            language,
+            "to {{to}} and the sender of the reply_to message, {{sender}}, are different sessions. Leave to out to answer the sender, or send a separate message to {{to}} without reply_to.",
+        ),
+        &[("to", &to), ("sender", &sender)],
     )
 }
 pub fn limit(language: Language, limit: u32) -> String {

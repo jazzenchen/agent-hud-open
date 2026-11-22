@@ -1515,5 +1515,7 @@
   "Uses any sign-in or key found for this agent, including ones other apps keep.": "이 에이전트용으로 찾은 모든 로그인 정보와 키를 사용하며, 다른 앱이 보관한 것도 포함합니다.",
   "Cursor's quota reading is off in Settings, so Grok Bot is read without Cursor's sign-in.": "설정에서 Cursor의 사용량 한도 읽기가 꺼져 있어, Grok Bot은 Cursor의 로그인 정보 없이 읽습니다.",
   "Claude Code's sign-in has ended, so the quota is read through the Claude desktop app's sign-in. To keep Claude from taking it for abuse, that is done only every {{minutes}} minutes. Run claude to sign in again for more frequent updates.": "Claude Code 로그인이 만료되어 Claude 데스크톱 앱의 로그인으로 사용량 한도를 읽습니다. Claude가 이를 악용으로 보지 않도록 {{minutes}}분마다 한 번만 읽습니다. claude를 실행해 다시 로그인하면 더 자주 업데이트됩니다.",
-  "The quota is read through the Claude desktop app's sign-in. To keep Claude from taking it for abuse, that is done only every {{minutes}} minutes. Install Claude Code (the claude command) and sign in for more frequent updates.": "Claude 데스크톱 앱의 로그인으로 사용량 한도를 읽습니다. Claude가 이를 악용으로 보지 않도록 {{minutes}}분마다 한 번만 읽습니다. Claude Code(claude 명령)를 설치하고 로그인하면 더 자주 업데이트됩니다."
+  "The quota is read through the Claude desktop app's sign-in. To keep Claude from taking it for abuse, that is done only every {{minutes}} minutes. Install Claude Code (the claude command) and sign in for more frequent updates.": "Claude 데스크톱 앱의 로그인으로 사용량 한도를 읽습니다. Claude가 이를 악용으로 보지 않도록 {{minutes}}분마다 한 번만 읽습니다. Claude Code(claude 명령)를 설치하고 로그인하면 더 자주 업데이트됩니다.",
+  "sender {{session}}": "발신 {{session}}",
+  "to {{to}} and the sender of the reply_to message, {{sender}}, are different sessions. Leave to out to answer the sender, or send a separate message to {{to}} without reply_to.": "to {{to}}와 reply_to 메시지의 발신 세션 {{sender}}가 서로 다릅니다. 발신자에게 답하려면 to를 빼고, {{to}}에 보내려면 reply_to 없이 따로 보내세요."
 }
