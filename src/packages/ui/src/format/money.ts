@@ -1,5 +1,6 @@
 // Money
 import { numberFormat } from "./intl.ts";
+import { tokensShort } from "./numbers.ts";
 import { locale as localeOf, type Language } from "./language.ts";
 
 type Amount = number | string;
@@ -80,6 +81,25 @@ export function moneyShort(amount: Amount, code: string, language: Language) {
     currency(language, code, [digits, digits], "halfEven"),
     cents,
   );
+}
+
+/**
+ * A balance where room is short, as the Simple dock writes it: two decimals
+ * below ten ("¥5.37"), whole units up to a thousand ("¥105"), then k, M and B
+ * with one decimal below ten of them ("¥1.2k", "$48k", "¥2.4M"). The symbol
+ * sits where the language puts it.
+ */
+export function moneyCompact(amount: Amount, code: string, language: Language) {
+  const value = Number(amount);
+  if (!Number.isFinite(value) || Math.abs(value) < 10)
+    return moneyAmount(amount, code, language);
+  const whole = currency(language, code, [0, 0], "halfEven");
+  if (Math.abs(value) < 999.5) return formatAmount(whole, amount);
+  const short = tokensShort(Math.max(1000, Math.abs(value)));
+  return whole
+    .formatToParts(value < 0 ? -1 : 1)
+    .map((part) => (part.type === "integer" ? short : part.value))
+    .join("");
 }
 
 /**

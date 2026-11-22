@@ -3,6 +3,7 @@ import {
   dateFormat,
   locale,
   moneyAmount,
+  moneyCompact,
   translator,
   type Language,
 } from "@agent-hud/ui/format";
@@ -107,4 +108,27 @@ export function balanceColumns(
       value: cost ? money(cost.amount, cost.currency) : "—",
     },
   ];
+}
+
+/** Balances in their currencies, " · " between them; `compact` for the dock (`moneyCompact`). */
+export function balanceText(
+  rows: readonly { amount: number | string; currency: string }[],
+  language: Language,
+  compact = false,
+): string | null {
+  const format = compact ? moneyCompact : moneyAmount;
+  return rows.length
+    ? rows.map((b) => format(b.amount, b.currency, language)).join(" · ")
+    : null;
+}
+
+/** An agent billed by balance alone takes its balances' worst level. */
+export function balanceLevel(
+  rows: readonly BillingAccount[],
+): "normal" | "warning" | "critical" | "stale" | undefined {
+  if (!rows.length) return undefined;
+  if (rows.some((row) => row.level === "critical")) return "critical";
+  if (rows.some((row) => row.level === "warning")) return "warning";
+  if (rows.some((row) => row.level === "normal")) return "normal";
+  return "stale";
 }

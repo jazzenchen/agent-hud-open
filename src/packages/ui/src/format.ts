@@ -38,6 +38,7 @@ export {
   listCost,
   listPrice,
   moneyAmount,
+  moneyCompact,
   moneyPrice,
   moneyShort,
 } from "./format/money.ts";

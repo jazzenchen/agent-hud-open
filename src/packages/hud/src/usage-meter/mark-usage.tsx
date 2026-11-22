@@ -27,7 +27,9 @@ export function markItems(
   }));
 }
 
-/** A Simple mark's ring, filling the mark round its logo. */
+/** A Simple mark's ring, filling the mark round its logo. A mark with no
+ * window to draw, such as one billed by balance alone, keeps an empty track,
+ * so its logo sits in the same ring as its neighbours'. */
 export function MarkRing({
   style,
   items,
@@ -49,7 +51,9 @@ export function MarkRing({
   return (
     <UsageRing
       style={style}
-      items={items}
+      items={
+        items.length ? items : [{ percent: null, color: markTrack(light) }]
+      }
       spec={simpleRingSpec(size, ringWidth)}
       track={markTrack(light)}
       reduceMotion={reduceMotion}

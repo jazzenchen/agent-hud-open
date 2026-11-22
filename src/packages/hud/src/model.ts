@@ -7,13 +7,12 @@ import type {
 import { agentArtworkKey, agentVendorName } from "./agent-artwork.ts";
 import { layoutMarks, restingAgents } from "./resting-agents.ts";
 import { recentLabel, recentUsage } from "./recent-usage.ts";
-import { visibleBalances } from "./balance-rows.ts";
+import { balanceLevel, balanceText, visibleBalances } from "./balance-rows.ts";
 import { heldUsed, tightestWindow, windowReading } from "./held-reading.ts";
 import { shownRows } from "./quota-rows.ts";
 import type { GlowEffect, GlowStyle } from "./HUDGlow";
 import type { UsageStyle } from "./usage-meter/arcs";
 import {
-  moneyAmount,
   snapshotLanguage,
   quotaPercentLabel,
   type QuotaDisplay,
@@ -134,6 +133,8 @@ export interface HUDVendor {
   working: number;
   waiting: number;
   balance: string | null;
+  /** `balance` as the Simple dock writes it beside the mark, where room is short (`moneyCompact`). */
+  balanceShort?: string | null;
   /** What an agent with no window and no balance shows instead: its last 24 hours at list prices, else their tokens (`recentLabel`). */
   usage: string | null;
   quotas: Snapshot["quotas"];
@@ -188,19 +189,15 @@ export function vendorsFromSnapshot(
       ).length,
       waiting: snapshot.approvals.filter((a) => vendorKey(a.source) === key)
         .length,
-      balance: deepseekBalances.length
-        ? deepseekBalances
-            .map((b) =>
-              moneyAmount(b.amount, b.currency, snapshotLanguage(snapshot)),
-            )
-            .join(" · ")
-        : balance
-          ? moneyAmount(
-              balance.amount,
-              balance.currency,
-              snapshotLanguage(snapshot),
-            )
-          : null,
+      balance: balanceText(
+        deepseekBalances.length ? deepseekBalances : balance ? [balance] : [],
+        snapshotLanguage(snapshot),
+      ),
+      balanceShort: balanceText(
+        deepseekBalances.length ? deepseekBalances : balance ? [balance] : [],
+        snapshotLanguage(snapshot),
+        true,
+      ),
       usage:
         quotas.length || balance
           ? null
@@ -264,7 +261,7 @@ export function markUsed(vendor: HUDVendor): number | null {
 export function meterLabel(vendor: HUDVendor, display?: QuotaDisplay): string {
   const used = markUsed(vendor);
   return used == null
-    ? (vendor.balance ?? vendor.usage ?? "--")
+    ? (vendor.balanceShort ?? vendor.balance ?? vendor.usage ?? "--")
     : quotaPercentLabel(used, display);
 }
 
@@ -287,28 +284,13 @@ export function configuredVendors(
     const visible = visibleBalances(rows, block);
     return {
       ...vendor,
-      balance: visible.length
-        ? visible
-            .map((b) =>
-              moneyAmount(b.amount, b.currency, snapshotLanguage(snapshot)),
-            )
-            .join(" · ")
-        : null,
+      balance: balanceText(visible, snapshotLanguage(snapshot)),
+      balanceShort: balanceText(visible, snapshotLanguage(snapshot), true),
       level: balanceLevel(visible) ?? "stale",
       usage: null,
     };
   });
   return layoutMarks(available, config.panelLayout);
-}
-
-function balanceLevel(
-  rows: Snapshot["billing"],
-): HUDVendor["level"] | undefined {
-  if (!rows.length) return undefined;
-  if (rows.some((row) => row.level === "critical")) return "critical";
-  if (rows.some((row) => row.level === "warning")) return "warning";
-  if (rows.some((row) => row.level === "normal")) return "normal";
-  return "stale";
 }
 
 export function sourcesForMark(snapshot: Snapshot, mark: string): string[] {
