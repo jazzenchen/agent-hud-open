@@ -9,9 +9,9 @@ use windows_sys::Win32::{
         WindowsAndMessaging::{
             AllowSetForegroundWindow, BringWindowToTop, EnumWindows, GetWindow, GetWindowLongW,
             GetWindowTextLengthW, GetWindowTextW, GetWindowThreadProcessId, IsIconic,
-            IsWindowVisible, SetForegroundWindow, SetWindowPos, ShowWindow, ASFW_ANY, GWL_EXSTYLE,
-            GW_OWNER, HWND_NOTOPMOST, HWND_TOPMOST, SWP_NOMOVE, SWP_NOSIZE, SWP_SHOWWINDOW,
-            SW_RESTORE, SW_SHOW, WS_EX_TOOLWINDOW, WS_EX_TOPMOST,
+            IsWindowVisible, SetForegroundWindow, SetWindowPos, ShowWindow, SwitchToThisWindow,
+            ASFW_ANY, GWL_EXSTYLE, GW_OWNER, HWND_NOTOPMOST, HWND_TOPMOST, SWP_NOMOVE,
+            SWP_NOSIZE, SWP_SHOWWINDOW, SW_RESTORE, SW_SHOW, WS_EX_TOOLWINDOW, WS_EX_TOPMOST,
         },
     },
 };
@@ -116,7 +116,9 @@ pub(crate) fn bring_forward(window: HWND) -> bool {
         }
         SendInput(2, inputs.as_ptr(), size_of::<INPUT>() as i32);
         BringWindowToTop(window);
-        SetForegroundWindow(window) != 0
+        SwitchToThisWindow(window, 1);
+        let _ = SetForegroundWindow(window);
+        true
     }
 }
 

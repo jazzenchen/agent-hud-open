@@ -16,6 +16,21 @@ pub enum CachedOpen {
     Reveal,
 }
 
+fn forbids_transcript_reveal(target: &Value) -> bool {
+    matches!(
+        target["kind"].as_str(),
+        Some(
+            "antigravity-conversation"
+                | "antigravityConversation"
+                | "codex-thread"
+                | "codexThread"
+                | "deepseek-session"
+                | "deepseek-app"
+                | "deepseek-windows"
+        )
+    )
+}
+
 /// Opens a session the published snapshot lists, by the way back it shows
 /// there, without the Runtime's lock. Only the snapshot's own row counts:
 /// a session it does not list is resolved by the Runtime, as before.
@@ -37,6 +52,9 @@ pub fn open_cached_session(snapshot: &Value, id: &str, demo: bool) -> CachedOpen
         crate::NativePlatform::new().and_then(|platform| platform.navigate_session(target));
     match opened {
         Ok(true) => CachedOpen::Done(Ok(json!({"opened":true,"action":"native_session"}))),
+        Ok(false) if forbids_transcript_reveal(target) => CachedOpen::Done(Err(l10n::tr(
+            "The native client could not open this session",
+        ))),
         Ok(false) => CachedOpen::Reveal,
         Err(error) => CachedOpen::Done(Err(error)),
     }
@@ -52,11 +70,12 @@ impl Runtime {
             // A demo session has nowhere to go; the HUD hands over as it would.
             return Ok(json!({"opened":true,"action":"demo"}));
         }
-        if self
-            .platform
-            .navigate_session(&detail["session"]["navigationTarget"])?
-        {
+        let target = &detail["session"]["navigationTarget"];
+        if self.platform.navigate_session(target)? {
             return Ok(json!({"opened":true,"action":"native_session"}));
+        }
+        if forbids_transcript_reveal(target) {
+            return Err(l10n::tr("The native client could not open this session"));
         }
         self.reveal(id, &detail["session"])
     }
@@ -78,5 +97,20 @@ impl Runtime {
         let path = self.core.transcript_path(id)?;
         self.platform.reveal_transcript(&path)?;
         Ok(json!({"opened":true,"action":"reveal_transcript"}))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::forbids_transcript_reveal;
+    use serde_json::json;
+
+    #[test]
+    fn native_chat_clients_do_not_fall_back_to_revealing_transcript_folder() {
+        assert!(forbids_transcript_reveal(&json!({"kind": "antigravity-conversation", "id": "abc"})));
+        assert!(forbids_transcript_reveal(&json!({"kind": "codex-thread", "id": "abc"})));
+        assert!(forbids_transcript_reveal(&json!({"kind": "deepseek-session", "id": "abc"})));
+        assert!(!forbids_transcript_reveal(&json!(null)));
+        assert!(!forbids_transcript_reveal(&json!({"kind": "other"})));
     }
 }

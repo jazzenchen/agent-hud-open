@@ -189,13 +189,11 @@ pub(super) fn open(home: &Path, id: &str, _cwd: Option<&str>) -> Result<bool, St
             }
         }
     }
-    // With more than one window it is not known which one the conversation
-    // opens in, so the log is shown instead.
-    let [(window, _)] = windows.as_slice() else {
+    // Prefer the frontmost matching window when multiple windows exist, and
+    // still bring Antigravity forward if DevTools navigation did not match.
+    let Some((window, _)) = windows.first().copied() else {
         return Ok(false);
     };
-    if !super::antigravity::navigate(id, port)? {
-        return Ok(false);
-    }
-    Ok(crate::os::bring_window_forward(*window))
+    let _ = super::antigravity::navigate(id, port);
+    Ok(crate::os::bring_window_forward(window))
 }
