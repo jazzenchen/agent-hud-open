@@ -1517,5 +1517,6 @@
   "Claude Code's sign-in has ended, so the quota is read through the Claude desktop app's sign-in. To keep Claude from taking it for abuse, that is done only every {{minutes}} minutes. Run claude to sign in again for more frequent updates.": "Claude Code のサインインが切れたため、Claude デスクトップアプリのサインインで使用上限を読み取っています。Claude に不正利用と見なされないよう、読み取りは {{minutes}} 分ごとです。claude を実行して再度サインインすると、より頻繁に更新されます。",
   "The quota is read through the Claude desktop app's sign-in. To keep Claude from taking it for abuse, that is done only every {{minutes}} minutes. Install Claude Code (the claude command) and sign in for more frequent updates.": "Claude デスクトップアプリのサインインで使用上限を読み取っています。Claude に不正利用と見なされないよう、読み取りは {{minutes}} 分ごとです。Claude Code（claude コマンド）をインストールしてサインインすると、より頻繁に更新されます。",
   "sender {{session}}": "送信元 {{session}}",
-  "to {{to}} and the sender of the reply_to message, {{sender}}, are different sessions. Leave to out to answer the sender, or send a separate message to {{to}} without reply_to.": "to {{to}} と reply_to のメッセージの送信元 {{sender}} は別のセッションです。送信元に返すなら to を省き、{{to}} に送るなら reply_to なしで別のメッセージとして送ってください。"
+  "to {{to}} and the sender of the reply_to message, {{sender}}, are different sessions. Leave to out to answer the sender, or send a separate message to {{to}} without reply_to.": "to {{to}} と reply_to のメッセージの送信元 {{sender}} は別のセッションです。送信元に返すなら to を省き、{{to}} に送るなら reply_to なしで別のメッセージとして送ってください。",
+  "Read just now": "たった今読み取り"
 }

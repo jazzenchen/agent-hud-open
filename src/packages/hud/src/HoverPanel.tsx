@@ -18,6 +18,7 @@ import { usePanelServices } from "./PanelContext";
 import { useGround } from "./ground";
 import { PanelDraftBar } from "./panel/PanelDraftBar";
 import { PanelFooter } from "./panel/PanelFooter";
+import { latestReading } from "./panel/account-labels";
 import { QuotaBlocks, usePanelBlocks } from "./panel/QuotaBlocks";
 import {
   card,
@@ -271,6 +272,8 @@ export const SourceHoverPanel = memo(function SourceHoverPanel({
         onStats={onStats}
         update={update}
         onUpdate={onUpdate}
+        readAt={latestReading(snapshot)}
+        onRefresh={services?.refresh}
       />
     </div>
   );

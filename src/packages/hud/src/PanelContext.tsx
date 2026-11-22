@@ -60,6 +60,9 @@ export interface PanelServices {
   selectProvider?(provider: string): void;
   /** Resolves false when the session could not be reached (the reply card then offers a retry). */
   openSession?(session: Session): void | Promise<boolean | void>;
+  /** Reads every agent again now, as Settings' "Read all agents again" does
+   * (the panel footer's refresh button). */
+  refresh?(): Promise<unknown>;
   /** Settings, on the page with this id, such as "agents" (an agent's own: "agents/claude"). */
   openSettingsPage?(page: string): void;
   /** Agent HUD's own sign-in window on `host`, for `provider`'s quota. */

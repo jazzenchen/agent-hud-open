@@ -1517,5 +1517,6 @@
   "Claude Code's sign-in has ended, so the quota is read through the Claude desktop app's sign-in. To keep Claude from taking it for abuse, that is done only every {{minutes}} minutes. Run claude to sign in again for more frequent updates.": "Claude Code 的登入已失效，現透過 Claude 桌面版的登入讀取額度。為避免被 Claude 視為異常存取，每 {{minutes}} 分鐘才讀取一次。執行 claude 重新登入後更新更頻繁。",
   "The quota is read through the Claude desktop app's sign-in. To keep Claude from taking it for abuse, that is done only every {{minutes}} minutes. Install Claude Code (the claude command) and sign in for more frequent updates.": "現透過 Claude 桌面版的登入讀取額度。為避免被 Claude 視為異常存取，每 {{minutes}} 分鐘才讀取一次。安裝 Claude Code（claude 指令）並登入後更新更頻繁。",
   "sender {{session}}": "發送方 {{session}}",
-  "to {{to}} and the sender of the reply_to message, {{sender}}, are different sessions. Leave to out to answer the sender, or send a separate message to {{to}} without reply_to.": "to {{to}} 與 reply_to 那則來件的發件方 {{sender}} 不是同一個工作階段。要回給來件方，就省略 to；要發給 {{to}}，就另發一則、不帶 reply_to。"
+  "to {{to}} and the sender of the reply_to message, {{sender}}, are different sessions. Leave to out to answer the sender, or send a separate message to {{to}} without reply_to.": "to {{to}} 與 reply_to 那則來件的發件方 {{sender}} 不是同一個工作階段。要回給來件方，就省略 to；要發給 {{to}}，就另發一則、不帶 reply_to。",
+  "Read just now": "剛剛讀取"
 }

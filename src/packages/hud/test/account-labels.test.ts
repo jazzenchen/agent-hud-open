@@ -2,10 +2,13 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import type { Snapshot } from "@agent-hud/protocol";
 import { addCatalog } from "@agent-hud/ui/format";
 import {
   accountReadLabel,
+  latestReading,
   missingReadingNotice,
+  readAgoLabel,
   serviceNotice,
   nextExpiryLabel,
   webSignInOffer,
@@ -169,4 +172,19 @@ test("a sign-in is offered until a site has a session, and again when it ends", 
     { provider: "qoder", sites: [{ host: "qoder.com", name: "Qoder" }] },
   );
   assert.equal(webSignInOffer(providers([false, false]), "claude"), null);
+});
+
+test("the panel footer says when the newest reading was taken", () => {
+  const at = Date.parse("2026-11-23T10:00:00Z");
+  const snapshot = {
+    accounts: [
+      { checkedAt: "2026-11-23T09:50:00Z" },
+      { checkedAt: null },
+    ] as Snapshot["accounts"],
+    quotas: [{ observedAt: "2026-11-23T10:00:00Z" }] as Snapshot["quotas"],
+  };
+  assert.equal(latestReading(snapshot), at);
+  assert.equal(latestReading({ accounts: [], quotas: [] }), null);
+  assert.equal(readAgoLabel(at, at + 30_000, "en"), "Read just now");
+  assert.equal(readAgoLabel(at, at + 5 * 60_000, "en"), "Last read 5m ago");
 });
