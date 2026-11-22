@@ -121,6 +121,7 @@ impl Service {
             extension.as_ref().and_then(|product| product.delivery()),
             tools_directory,
         )?;
+        app.manage(Arc::clone(&messages));
         backend
             .lock()
             .unwrap_or_else(PoisonError::into_inner)

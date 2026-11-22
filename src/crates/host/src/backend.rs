@@ -44,6 +44,9 @@ impl Backend {
             .latest_snapshot
             .write()
             .unwrap_or_else(PoisonError::into_inner) = self.snapshot.clone();
+        if let (Some(messages), Some(snapshot)) = (&self.messages, &self.snapshot) {
+            messages.observe_snapshot(Arc::clone(snapshot));
+        }
         if changed || recovered {
             self.publish_snapshot(app);
             if let (Some(extension), Some(snapshot)) = (&self.extension, &self.snapshot) {
@@ -79,6 +82,7 @@ impl Backend {
 
     pub(crate) fn publish_snapshot(&self, app: &tauri::AppHandle) {
         if let Some(snapshot) = &self.snapshot {
+            if let Some(messages) = &self.messages { messages.observe_snapshot(Arc::clone(snapshot)); }
             activity::publish(app, "hud:snapshot", snapshot.as_ref());
             coordinator::snapshot(app, snapshot, true);
         }

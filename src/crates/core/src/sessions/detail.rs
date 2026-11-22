@@ -55,6 +55,21 @@ impl AgentHudCore {
                 json!({"session":session,"usage":Usage::default().json(),"turns":[],"calls":[],"parent":null,"children":[]}),
             );
         };
+        // Message tracking needs only the committed session identity and log page.
+        // Do not load token totals, account billing or tool-call history for every page.
+        if params["messagesOnly"] == true {
+            let path = selected.origin_path.as_ref().unwrap_or(&selected.path).clone();
+            let source = selected.source.clone();
+            let session = self.presentation(now).session(selected, None);
+            let cursor = params.get("messageCursor").map(|v| v.as_u64()
+                .ok_or("messageCursor must be a nonnegative byte offset")).transpose()?.unwrap_or(0);
+            let limit = params.get("messageLimit").map(|v| v.as_u64().filter(|n| *n > 0)
+                .ok_or("messageLimit must be positive")).transpose()?.unwrap_or(100).min(200) as usize;
+            let mut page = conversation::page(&path, &source, id, cursor, limit,
+                params["messageTail"] == true, &mut self.conversations, &mut self.conversation_context)?;
+            page["session"] = session;
+            return Ok(page);
+        }
         let child_activity = Self::active_subagents(&logs, now);
         let source = selected.source.clone();
         let path = selected.path.clone();

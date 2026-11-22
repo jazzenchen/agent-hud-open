@@ -99,27 +99,31 @@ fn handle(
     if HOST_METHODS.contains(&method) {
         // Agent messages: never with the application's lock held, which
         // their queries take.
-        let (messages, snapshot) = {
-            let owner = backend.lock().unwrap_or_else(PoisonError::into_inner);
-            (owner.messages.clone(), owner.snapshot.clone())
-        };
+        let messages = app.try_state::<Arc<AgentMessages>>()
+            .ok_or("Application data is loading")?;
+        let snapshot = messages.snapshot()?;
         if !active.load(Ordering::Acquire) {
             return Err("Local tools are disabled".into());
         }
         if method == "host_tools" {
-            return Ok(AgentMessages::tools(
-                snapshot.as_deref().unwrap_or(&Value::Null),
-            ));
+            return Ok(AgentMessages::tools(snapshot.as_ref()));
         }
         let plugin = app.state::<super::deepseek_plugin::DeepSeekPlugin>();
         let data = agent_hud_runtime::local_tools_directory().ok();
         let params = with_caller(
             (plugin.channel(), data.as_deref()),
-            snapshot.as_deref(),
+            Some(snapshot.as_ref()),
             params,
             std::time::SystemTime::now(),
         );
-        return messages.ok_or("Application data is loading")?.call(&params);
+        return messages.call(&params);
+    }
+    if matches!(method, "snapshot" | "refresh") {
+        let messages = app.try_state::<Arc<AgentMessages>>()
+            .ok_or("Application data is loading")?;
+        let snapshot = messages.snapshot()?;
+        if snapshot["settings"]["hudTools"] != true { return Err("Local tools are disabled".into()); }
+        return Ok(snapshot.as_ref().clone());
     }
     let mut owner = backend.lock().unwrap_or_else(PoisonError::into_inner);
     if !active.load(Ordering::Acquire) {

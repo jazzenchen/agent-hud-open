@@ -22,6 +22,9 @@ use std::{
 };
 use tauri::Manager;
 
+mod cache;
+use cache::{SnapshotCache, lock_for_query};
+
 const LOOK: Duration = Duration::from_secs(5);
 
 /// The host's own senders: their receipts, and the Claude jobs it follows.
@@ -33,6 +36,7 @@ struct Own {
 
 pub(crate) struct AgentMessages {
     messaging: Mutex<Messaging>,
+    latest: SnapshotCache,
     conversations: Option<Arc<dyn Turns>>,
     own: Option<Arc<Own>>,
     backend: Weak<Mutex<Backend>>,
@@ -71,6 +75,7 @@ impl AgentMessages {
         );
         let owner = Arc::new(Self {
             messaging: Mutex::new(messaging),
+            latest: SnapshotCache::default(),
             conversations: delivery.conversations,
             own,
             backend,
@@ -101,16 +106,24 @@ impl AgentMessages {
     /// One tool call from the relay: `{name, arguments, caller}`.
     pub(crate) fn call(&self, params: &Value) -> Result<Value, String> {
         let snapshot = self.snapshot()?;
-        let query = self.query();
+        let base_query = self.query();
+        let query_error = std::cell::RefCell::new(None);
+        let query = |method: &str, args: Value| {
+            let result = base_query(method, args);
+            if let Err(error) = &result { *query_error.borrow_mut() = Some(error.clone()); }
+            result
+        };
         let host = Host {
             snapshot: &snapshot,
             query: &query,
             conversations: self.conversations.as_deref(),
         };
-        self.messaging
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .call(params, &host, chrono::Utc::now().timestamp_millis())
+        let mut result = lock_for_query(&self.messaging)?
+            .call(params, &host, chrono::Utc::now().timestamp_millis())?;
+        if let Some(error) = query_error.borrow().as_ref() {
+            result["readNotice"] = Value::String(error.clone());
+        }
+        Ok(result)
     }
 
     /// Runs `work` with the group's senders and this moment's facts, for the
@@ -166,25 +179,26 @@ impl AgentMessages {
         messaging.maintain(&host, chrono::Utc::now().timestamp_millis());
     }
 
-    fn snapshot(&self) -> Result<Arc<Value>, String> {
-        let backend = self
-            .backend
-            .upgrade()
-            .ok_or("The application is stopping")?;
-        let backend = backend.lock().unwrap_or_else(PoisonError::into_inner);
-        backend
-            .snapshot
-            .clone()
-            .ok_or_else(|| "Application data is loading".into())
+    pub(crate) fn observe_snapshot(&self, snapshot: Arc<Value>) {
+        self.latest.store(snapshot);
+    }
+
+    pub(crate) fn snapshot(&self) -> Result<Arc<Value>, String> {
+        self.latest.read()
     }
 
     /// The app's queries (`session_detail` pages), each under the
     /// application's lock only while it runs.
     fn query(&self) -> impl Fn(&str, Value) -> Result<Value, String> {
         let backend = self.backend.clone();
-        move |method, params| {
+        let deadline = std::time::Instant::now() + Duration::from_secs(90);
+        move |method, mut params| {
+            if std::time::Instant::now() >= deadline {
+                return Err("Transcript read budget exhausted; delivery state is unchanged".into());
+            }
             let backend = backend.upgrade().ok_or("The application is stopping")?;
-            let mut backend = backend.lock().unwrap_or_else(PoisonError::into_inner);
+            let mut backend = lock_for_query(&backend)?;
+            if method == "session_detail" { params["messagesOnly"] = Value::Bool(true); }
             backend.runtime.local_query(method, params)
         }
     }
