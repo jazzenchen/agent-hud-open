@@ -396,7 +396,8 @@ fn an_added_folder_never_reads_the_desktop_apps_sign_in() {
     assert_eq!(
         reading.notice,
         Some(format!(
-            "/u/.claude: {}\n{}: {signed_out}",
+            "{}: {}\n{}: {signed_out}",
+            host.home().join(".claude").display(),
             through_desktop(true),
             work.display()
         ))
