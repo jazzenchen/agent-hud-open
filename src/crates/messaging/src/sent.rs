@@ -9,7 +9,12 @@ const DEFAULT_LIMIT: u64 = 20;
 const MAX_LIMIT: u64 = 100;
 
 impl Messaging {
-    pub(crate) fn sent(&self, caller: Option<&Caller>, arguments: &Value, host: &Host<'_>) -> Value {
+    pub(crate) fn sent(
+        &self,
+        caller: Option<&Caller>,
+        arguments: &Value,
+        host: &Host<'_>,
+    ) -> Value {
         let Some(caller) = caller else {
             return refused(&words::no_caller(language(host.snapshot)));
         };
@@ -30,7 +35,7 @@ impl Messaging {
             })
             .filter(|message| since.is_none_or(|since| message.sent_at_ms >= since))
             .collect::<Vec<_>>();
-        messages.sort_by(|a, b| b.sent_at_ms.cmp(&a.sent_at_ms));
+        messages.sort_by_key(|message| std::cmp::Reverse(message.sent_at_ms));
         messages.truncate(limit);
         let rows = messages
             .into_iter()
