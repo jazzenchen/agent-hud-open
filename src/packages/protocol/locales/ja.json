@@ -1504,7 +1504,7 @@
   "At the edge": "端に残すもの",
   "Nothing": "なし",
   "Only the logos stay.": "ロゴだけが残ります。",
-  "Only a bar stays; it turns yellow or red as a usage limit nears.": "バーだけが残り、使用上限が近づくと黄色や赤になります。",
+  "Only a bar stays, in the colour below; its ends turn yellow or red as a usage limit nears.": "バーだけが残ります。色は下で選べます。使用量の上限が近づくと両端が黄色か赤になります。",
   "Nothing stays on screen.": "画面には何も残りません。",
   "Quota reading is off for this agent in Settings. Sessions and tokens are still counted from its logs.": "このエージェントの使用上限の読み取りは設定でオフになっています。セッションとトークンは引き続きログから集計されます。",
   "Quota reading": "使用上限の読み取り",

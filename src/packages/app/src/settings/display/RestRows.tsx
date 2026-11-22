@@ -14,7 +14,7 @@ function restSubtitle(style: RestStyle, t: DisplayProps["t"]): string {
   switch (style) {
     case "bar":
       return t(
-        "Only a bar stays; it turns yellow or red as a usage limit nears.",
+        "Only a bar stays, in the colour below; its ends turn yellow or red as a usage limit nears.",
       );
     case "hidden":
       return t("Nothing stays on screen.");

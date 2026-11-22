@@ -1504,7 +1504,7 @@
   "At the edge": "邊緣保留",
   "Nothing": "無",
   "Only the logos stay.": "只留下標誌。",
-  "Only a bar stays; it turns yellow or red as a usage limit nears.": "只留下一根細條，接近用量上限時變黃或變紅。",
+  "Only a bar stays, in the colour below; its ends turn yellow or red as a usage limit nears.": "只留下一根細條，顏色在下方選；接近用量上限時兩端變黃或變紅。",
   "Nothing stays on screen.": "螢幕上什麼都不留。",
   "Quota reading is off for this agent in Settings. Sessions and tokens are still counted from its logs.": "已在設定中關閉此 Agent 的額度讀取。工作階段和 token 仍會從它的日誌中統計。",
   "Quota reading": "讀取額度",

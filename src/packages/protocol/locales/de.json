@@ -1536,7 +1536,7 @@
   "At the edge": "Am Rand",
   "Nothing": "Nichts",
   "Only the logos stay.": "Nur die Logos bleiben.",
-  "Only a bar stays; it turns yellow or red as a usage limit nears.": "Nur eine Leiste bleibt; sie wird gelb oder rot, wenn ein Nutzungslimit naht.",
+  "Only a bar stays, in the colour below; its ends turn yellow or red as a usage limit nears.": "Nur ein Balken bleibt, in der Farbe unten; seine Enden werden gelb oder rot, wenn ein Nutzungslimit naht.",
   "Nothing stays on screen.": "Nichts bleibt auf dem Bildschirm.",
   "Quota reading is off for this agent in Settings. Sessions and tokens are still counted from its logs.": "Das Lesen des Kontingents ist für diesen Agenten in den Einstellungen aus. Sitzungen und Tokens werden weiter aus seinen Protokollen gezählt.",
   "Quota reading": "Kontingent lesen",

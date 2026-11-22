@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   REST_EDGE,
   barPaint,
+  barTips,
   foldStyle,
   mayRest,
   restShape,
@@ -239,17 +240,23 @@ test("the pointer's zone is at least a few points deep and still flush", () => {
   }
 });
 
-test("the bar wears a low window's level over any colour, else its own", () => {
+test("the bar keeps its colour and wears a low window's level at its ends", () => {
   const look = { restBarColor: "#0a84ff", solidTransparency: 0 };
-  assert.equal(
-    barPaint(look, ["normal", "critical", "warning"], false).fill,
-    "#ff453a",
+  const critical = barPaint(look, ["normal", "critical", "warning"], false);
+  assert.equal(critical.fill, "#0a84ff");
+  assert.equal(critical.tip, "#ff453a");
+  assert.equal(barPaint(look, ["normal", "warning"], false).tip, "#ffd23f");
+  assert.equal(barPaint(look, ["normal", "stale"], false).tip, null);
+  assert.equal(barTips(null, "top"), undefined);
+  assert.match(
+    barTips("#ff453a", "top")!,
+    /^linear-gradient\(to right, #ff453a 22%/,
   );
-  assert.equal(barPaint(look, ["normal", "warning"], false).fill, "#ffd23f");
-  assert.equal(barPaint(look, ["normal", "stale"], false).fill, "#0a84ff");
+  assert.match(barTips("#ff453a", "right")!, /^linear-gradient\(to bottom, /);
   const auto = { restBarColor: "auto", solidTransparency: 0 };
   assert.equal(barPaint(auto, [], false).fill, "rgba(242,242,247,0.80)");
   assert.equal(barPaint(auto, [], true).fill, "rgba(28,28,30,0.80)");
+  assert.equal(barPaint(auto, ["critical"], true).fill, "rgba(28,28,30,0.80)");
   // Anything that is not a colour is automatic; full transparency still leaves it seen.
   assert.equal(
     barPaint({ restBarColor: "url(x)", solidTransparency: 1 }, [], false).fill,

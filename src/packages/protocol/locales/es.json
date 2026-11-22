@@ -1568,7 +1568,7 @@
   "At the edge": "En el borde",
   "Nothing": "Nada",
   "Only the logos stay.": "Solo quedan los logos.",
-  "Only a bar stays; it turns yellow or red as a usage limit nears.": "Solo queda una barra, que se vuelve amarilla o roja al acercarse un límite de uso.",
+  "Only a bar stays, in the colour below; its ends turn yellow or red as a usage limit nears.": "Solo queda una barra, del color de abajo; sus extremos se vuelven amarillos o rojos al acercarse un límite de uso.",
   "Nothing stays on screen.": "No queda nada en pantalla.",
   "Quota reading is off for this agent in Settings. Sessions and tokens are still counted from its logs.": "La lectura de la cuota está desactivada para este agente en Ajustes. Las sesiones y los tokens se siguen contando desde sus registros.",
   "Quota reading": "Lectura de la cuota",

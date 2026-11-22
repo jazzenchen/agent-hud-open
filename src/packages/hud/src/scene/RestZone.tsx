@@ -1,6 +1,6 @@
 import type { PointerEvent as ReactPointerEvent } from "react";
 import { position } from "../geometry";
-import type { Rest } from "./rest";
+import { barTips, type Rest } from "./rest";
 import { innerCorners, intoEdge, restTransition } from "./rest-style";
 import type { HUDNativePointer } from "./useHUDInteraction";
 
@@ -47,6 +47,7 @@ export function RestZone({
             height: shape.height,
             borderRadius: innerCorners(edge, depth),
             backgroundColor: bar.fill,
+            backgroundImage: barTips(bar.tip, edge),
             boxShadow: `0 0 0 0.5px ${bar.edge}`,
             // Out of the edge as the dock folds, back into it as it unfolds.
             opacity: folded ? 1 : 0,

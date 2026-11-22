@@ -1568,7 +1568,7 @@
   "At the edge": "Au bord",
   "Nothing": "Rien",
   "Only the logos stay.": "Seuls les logos restent.",
-  "Only a bar stays; it turns yellow or red as a usage limit nears.": "Seule une barre reste ; elle devient jaune ou rouge à l’approche d’une limite d’usage.",
+  "Only a bar stays, in the colour below; its ends turn yellow or red as a usage limit nears.": "Seule une barre reste, de la couleur ci-dessous ; ses extrémités deviennent jaunes ou rouges à l’approche d’une limite d’utilisation.",
   "Nothing stays on screen.": "Rien ne reste à l’écran.",
   "Quota reading is off for this agent in Settings. Sessions and tokens are still counted from its logs.": "La lecture du quota est désactivée pour cet agent dans les réglages. Les sessions et les jetons sont toujours comptés depuis ses journaux.",
   "Quota reading": "Lecture du quota",
