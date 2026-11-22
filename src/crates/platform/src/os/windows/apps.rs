@@ -80,6 +80,15 @@ pub(crate) fn registered_bundle(bundle_id: &str) -> bool {
     found_executable(bundle_id).is_some()
 }
 
+/// The Codex desktop app's own programs, to open a thread link in: none
+/// when it is not installed or no program of it was found.
+pub(crate) fn codex_applications() -> Vec<PathBuf> {
+    codex_installation()
+        .filter(|found| found.installed)
+        .map(|found| found.applications)
+        .unwrap_or_default()
+}
+
 fn codex_installation() -> Option<codex::Installation> {
     let home = super::home_dir().ok()?;
     let env: Environment = std::env::vars().collect();

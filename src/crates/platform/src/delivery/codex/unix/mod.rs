@@ -88,21 +88,10 @@ fn enqueue(
         Err(error) => return Err(error),
     }
     let mut receipt = base_receipt(target, request, DeliveryState::Queued, None, None);
-    if !super::thread_open(data, thread) {
-        use process::ProcessRunner;
-        receipt.reason = Some(
-            match queue.filter(|route| super::desktop_installed(&route.applications)) {
-                Some(_) => match process::NativeProcessRunner
-                    .open(&format!("codex://threads/wake/{thread}"))
-                {
-                    Ok(()) => "Woke the thread in the Codex app",
-                    Err(_) => "Queued; the Codex app did not open the thread",
-                },
-                None => "Queued until Codex opens the thread",
-            }
-            .into(),
-        );
-    }
+    let applications = queue
+        .map(|route| route.applications.as_slice())
+        .unwrap_or(&[]);
+    receipt.reason = super::queued_reason(data, thread, applications);
     Ok(receipt)
 }
 

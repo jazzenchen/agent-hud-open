@@ -50,7 +50,7 @@ pub(super) fn deliver(
         owner_client_id: None,
         state: DeliveryState::Queued,
         at_ms: millis(SystemTime::now()),
-        reason: Some("Queued until Codex opens the thread".into()),
+        reason: super::queued_reason(data, thread, &route.applications),
     })
 }
 

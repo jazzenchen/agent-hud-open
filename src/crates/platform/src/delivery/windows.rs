@@ -41,6 +41,12 @@ pub(crate) fn applications(_home: &Path) -> Vec<PathBuf> {
     Vec::new()
 }
 
+/// The Codex desktop app's programs (`Codex.exe`, `ChatGPT.exe` or the Store
+/// package's), so a queued message can wake its thread as on macOS.
+pub(crate) fn codex_applications(_home: &Path) -> Vec<PathBuf> {
+    crate::os::codex_applications()
+}
+
 /// The command that opens a client link: `url.dll`'s protocol handler.
 pub(crate) fn link_opener(uri: &str) -> Result<(PathBuf, Vec<String>)> {
     Ok((

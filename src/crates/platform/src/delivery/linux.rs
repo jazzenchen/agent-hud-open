@@ -12,6 +12,11 @@ pub(crate) fn applications(_home: &Path) -> Vec<PathBuf> {
     Vec::new()
 }
 
+/// No Codex desktop app on Linux.
+pub(crate) fn codex_applications(_home: &Path) -> Vec<PathBuf> {
+    Vec::new()
+}
+
 /// The command that opens a client link.
 pub(crate) fn link_opener(uri: &str) -> Result<(PathBuf, Vec<String>)> {
     Ok((PathBuf::from("/usr/bin/xdg-open"), vec![uri.to_string()]))

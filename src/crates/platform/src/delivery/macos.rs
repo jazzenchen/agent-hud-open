@@ -10,6 +10,11 @@ pub(crate) fn applications(home: &Path) -> Vec<PathBuf> {
     vec![PathBuf::from("/Applications"), home.join("Applications")]
 }
 
+/// Where the Codex desktop app is looked for: the app folders.
+pub(crate) fn codex_applications(home: &Path) -> Vec<PathBuf> {
+    applications(home)
+}
+
 /// The command that opens a client link, in the background.
 pub(crate) fn link_opener(uri: &str) -> Result<(PathBuf, Vec<String>)> {
     Ok((

@@ -54,7 +54,7 @@ impl AgentMessages {
         };
         let places = Places {
             codex_data: delivery.starts.codex_data.clone(),
-            applications: delivery.starts.applications(),
+            applications: delivery.starts.codex_applications(),
             codex_command: delivery.starts.codex_executable.is_some(),
         };
         let starts = SessionStarts::new(delivery.starts, delivery.start_receipts)

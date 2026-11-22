@@ -61,8 +61,13 @@ impl StartConfig {
         Some(QueueRoute {
             executable: self.codex_executable.clone()?,
             environment: environment(self),
-            applications: self.applications(),
+            applications: self.codex_applications(),
         })
+    }
+    /// Where the Codex desktop app is: its app folders on macOS, its own
+    /// programs on Windows, none on Linux.
+    pub fn codex_applications(&self) -> Vec<PathBuf> {
+        host::codex_applications(&self.home)
     }
     /// Where desktop apps are installed: `/Applications` and `~/Applications`
     /// on macOS; empty where they are not looked for yet (Linux, Windows).

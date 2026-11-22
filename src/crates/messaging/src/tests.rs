@@ -72,7 +72,9 @@ impl CodexTransport for Codex {
                 DeliveryState::Queued
             },
             at_ms: 0,
-            reason: None,
+            // No app has the thread open when the words say so (Open #154).
+            reason: (!steer && request.text.contains("closed thread"))
+                .then(|| "Queued until Codex opens the thread".into()),
         })
     }
 }
@@ -748,6 +750,22 @@ fn a_send_answers_only_whether_the_words_were_handed_over() {
     );
     assert!(unsure["delivered"].is_null(), "{unsure}");
     assert!(unsure["reason"].is_string(), "{unsure}");
+}
+
+/// A message Codex queued for a thread no app has open is handed over, and
+/// the sender reads that it still waits, not that it went in (Open #154).
+#[test]
+fn a_queued_message_that_waits_for_its_thread_to_open_says_so() {
+    let mut world = World::on();
+    let sent = world.raw(
+        Some(("claude", CLAUDE)),
+        "send_message",
+        json!({"to":CODEX,"text":"Review this closed thread"}),
+    );
+    assert_eq!(
+        sent,
+        json!({"delivered": true, "reason": "Queued until Codex opens the thread"})
+    );
 }
 
 #[test]

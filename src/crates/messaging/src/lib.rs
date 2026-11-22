@@ -78,6 +78,7 @@ fn receipt(message: &Message) -> Value {
 
 /// What a sending call tells its agent: `delivered` true once Agent HUD
 /// handed the words over (queued, steered, or a session started with them),
+/// with a reason when they still wait for the client to open the session,
 /// false with the reason when nothing was sent, null with the reason when the
 /// client may have taken them without saying so. A started session's id when
 /// known. When the other side answers is its own affair: nothing here waits
@@ -89,7 +90,9 @@ fn handed(result: Value) -> Value {
         _ => Value::Bool(true),
     };
     let mut answer = json!({ "delivered": delivered });
-    if delivered != Value::Bool(true) && !result["reason"].is_null() {
+    // A queued message that waits for its client to open the session says
+    // so, as a refused or uncertain one says why (Open #154).
+    if !result["reason"].is_null() {
         answer["reason"] = result["reason"].clone();
     }
     if !result["sessionId"].is_null() {

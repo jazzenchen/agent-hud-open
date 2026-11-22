@@ -96,13 +96,40 @@ pub fn thread_open(data: &Path, thread: &str) -> bool {
     }
 }
 /// Whether Codex's desktop app is installed in one of `applications`:
-/// Codex.app, or ChatGPT.app that carries it.
+/// Codex.app, or ChatGPT.app that carries it, in an app folder (macOS), or
+/// one of the app's own programs (Windows lists those).
 pub fn desktop_installed(applications: &[std::path::PathBuf]) -> bool {
     applications.iter().any(|folder| {
-        ["Codex.app", "ChatGPT.app"]
-            .iter()
-            .any(|app| folder.join(app).is_dir())
+        folder.is_file()
+            || ["Codex.app", "ChatGPT.app"]
+                .iter()
+                .any(|app| folder.join(app).is_dir())
     })
+}
+
+/// Why a message Codex queued has not gone in yet: none while an app has the
+/// thread open, which runs it once idle. Otherwise the desktop app, when
+/// installed, is asked to open the thread so it runs the queue.
+pub(super) fn queued_reason(
+    data: &Path,
+    thread: &str,
+    applications: &[std::path::PathBuf],
+) -> Option<String> {
+    use process::ProcessRunner;
+    if thread_open(data, thread) {
+        return None;
+    }
+    Some(
+        if desktop_installed(applications) {
+            match process::NativeProcessRunner.open(&format!("codex://threads/wake/{thread}")) {
+                Ok(()) => "Woke the thread in the Codex app",
+                Err(_) => "Queued; the Codex app did not open the thread",
+            }
+        } else {
+            "Queued until Codex opens the thread"
+        }
+        .into(),
+    )
 }
 
 /// Desktop's current-turn selector, including canonical history with empty turns.
