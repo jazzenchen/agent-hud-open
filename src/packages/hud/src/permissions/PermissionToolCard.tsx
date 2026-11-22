@@ -6,6 +6,10 @@ import { useGround } from "../ground";
 import { cardColumn } from "../card-column";
 import { CardButton } from "./CardButton";
 
+/** How tall a request's detail or edit grows before it scrolls inside: the
+ * plan card's own limit. */
+const DETAIL_MAX_HEIGHT = 150;
+
 export function PermissionToolCard({
   request,
   disabled,
@@ -45,62 +49,60 @@ export function PermissionToolCard({
             background: inset,
             fontSize: 11,
             fontVariantNumeric: "tabular-nums",
+            // As tall as the edit, up to the plan card's height; past it the
+            // edit scrolls inside, so Deny and Allow never leave the card.
+            maxHeight: DETAIL_MAX_HEIGHT,
+            overflowY: "auto",
           }}
         >
           {request.removed &&
-            request.removed
-              .split("\n")
-              .slice(0, 4)
-              .map((line, idx) => (
-                <div
-                  key={`r-${idx}`}
+            request.removed.split("\n").map((line, idx) => (
+              <div
+                key={`r-${idx}`}
+                style={{
+                  display: "flex",
+                  gap: 6,
+                  color: denyText,
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                <span>−</span>
+                <span
                   style={{
-                    display: "flex",
-                    gap: 6,
-                    color: denyText,
                     overflow: "hidden",
                     textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
                   }}
                 >
-                  <span>−</span>
-                  <span
-                    style={{
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                    }}
-                  >
-                    {line}
-                  </span>
-                </div>
-              ))}
+                  {line}
+                </span>
+              </div>
+            ))}
           {request.added &&
-            request.added
-              .split("\n")
-              .slice(0, 4)
-              .map((line, idx) => (
-                <div
-                  key={`a-${idx}`}
+            request.added.split("\n").map((line, idx) => (
+              <div
+                key={`a-${idx}`}
+                style={{
+                  display: "flex",
+                  gap: 6,
+                  color: allowText,
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                <span>+</span>
+                <span
                   style={{
-                    display: "flex",
-                    gap: 6,
-                    color: allowText,
                     overflow: "hidden",
                     textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
                   }}
                 >
-                  <span>+</span>
-                  <span
-                    style={{
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                    }}
-                  >
-                    {line}
-                  </span>
-                </div>
-              ))}
+                  {line}
+                </span>
+              </div>
+            ))}
         </div>
       ) : (
         (request.detail ?? request.input) && (
@@ -112,10 +114,10 @@ export function PermissionToolCard({
               fontSize: 11,
               fontVariantNumeric: "tabular-nums",
               color: text(0.84),
-              display: "-webkit-box",
-              WebkitLineClamp: 6,
-              WebkitBoxOrient: "vertical",
-              overflow: "hidden",
+              // All of it, as tall as it is up to the plan card's height; past
+              // it the text scrolls inside, so Deny and Allow never leave the card.
+              maxHeight: DETAIL_MAX_HEIGHT,
+              overflowY: "auto",
               whiteSpace: "pre-wrap",
               overflowWrap: "anywhere",
             }}

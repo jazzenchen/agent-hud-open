@@ -274,3 +274,31 @@ test("a bar wears the notch's glow unless it is off or hidden, breathing faster 
   );
   assert.equal(barGlow("bar", config, { ...glow, hidden: true }, idle), null);
 });
+
+test("a card or Simple panel outlines its body inside its frame, so the body is measured that much narrower", async () => {
+  const { surfaceBorder } = await import("../src/scene/simple-panel.ts");
+  assert.equal(surfaceBorder("simple", false, false), 1);
+  assert.equal(surfaceBorder("notch", true, false), 1);
+  assert.equal(surfaceBorder("notch", false, false), 0);
+  // A Simple dock's peek line draws no outline.
+  assert.equal(surfaceBorder("simple", false, true), 0);
+});
+
+test("a bar of no thickness is none, and the pointer still finds its zone", () => {
+  for (const edge of edges) {
+    const none = restShape(
+      "bar",
+      { restBarLength: 64, restBarThickness: 0 },
+      strips[edge],
+      edge,
+      screen,
+      metrics,
+      3,
+    );
+    assert.equal(across(edge) ? none.height : none.width, 0, edge);
+    assert.equal(across(edge) ? none.width : none.height, 64, edge);
+    const zone = restZone(none, edge);
+    assert.equal(across(edge) ? zone.height : zone.width, REST_EDGE, edge);
+    assert.equal(offEdge(edge, zone), 0, edge);
+  }
+});

@@ -82,7 +82,7 @@ function RestRows({ config, update, t }: DisplayProps) {
       {config.autoHide && style === "bar" && (
         <>
           {slider("restBarLength", t("Length"), 24, 240, 4, pt)}
-          {slider("restBarThickness", t("Thickness"), 2, 10, 1, pt)}
+          {slider("restBarThickness", t("Thickness"), 0, 10, 1, pt)}
           <Row title={t("Colour")}>
             <div
               role="radiogroup"

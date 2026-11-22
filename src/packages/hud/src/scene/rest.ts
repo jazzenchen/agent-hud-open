@@ -99,7 +99,8 @@ export function againstEdge(
     0,
     Math.min(run - long, Math.round(middle - long / 2)),
   );
-  const deep = Math.max(1, Math.round(depth));
+  // A bar may have no depth; the pointer still finds it (`restZone`).
+  const deep = Math.max(0, Math.round(depth));
   switch (edge) {
     case "top":
       return { x: start, y: strip.y, width: long, height: deep };
@@ -151,7 +152,8 @@ export function restShape(
       edge,
       screen,
       clamp(config.restBarLength, 16, 400),
-      clamp(config.restBarThickness, 1, 12),
+      // 0 leaves no bar: only the glow round where it would be.
+      clamp(config.restBarThickness, 0, 12),
     );
   const long = across(edge) ? strip.width : strip.height;
   return againstEdge(strip, edge, screen, long, REST_EDGE);

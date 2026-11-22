@@ -12,7 +12,7 @@ import {
   type HUDVendor,
 } from "../model";
 import { peekLineWidth } from "./AgentPeek";
-import { SIMPLE_EDGE_MARGIN } from "./simple-panel";
+import { SIMPLE_EDGE_MARGIN, surfaceBorder } from "./simple-panel";
 import { useNotchGeometry } from "./NotchSurface";
 import { useRequestDelivery } from "./request-delivery";
 import { snapshotLanguage } from "@agent-hud/ui/format";
@@ -111,6 +111,8 @@ export function useHUDLayout({
   const flared = !detached && config.mode !== "simple";
   // The inspector keeps narrow; out of the notch it is a card beside the
   // dock, at any edge.
+  // The frame's outline, inside its width and height (border-box).
+  const border = surfaceBorder(config.mode, detached, simplePeek);
   const fullWidth =
     ends.view === "clip"
       ? 380 + (detached || horizontal(edge) ? 0 : metrics.width + 12)
@@ -175,7 +177,10 @@ export function useHUDLayout({
           }
         : {
             width: fullWidth,
-            height: Math.max(80, Math.min(contentHeight, screen.height - 80)),
+            height: Math.max(
+              80,
+              Math.min(contentHeight + 2 * border, screen.height - 80),
+            ),
           };
 
   const focusedIndex = vendors.findIndex((v) => v.key === focusedVendor?.key);
@@ -263,7 +268,11 @@ export function useHUDLayout({
           : edge === "left"
             ? { marginLeft: SIMPLE_EDGE_MARGIN }
             : { marginRight: SIMPLE_EDGE_MARGIN };
-  const measurementWidth = Math.max(1, Math.min(fullWidth, screen.width));
+  // The body's own width: the frame's, less its outline on both sides.
+  const measurementWidth = Math.max(
+    1,
+    Math.min(fullWidth, screen.width) - 2 * border,
+  );
 
   return {
     edge,

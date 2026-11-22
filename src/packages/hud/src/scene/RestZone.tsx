@@ -26,6 +26,13 @@ export function RestZone({
 }) {
   const { zone, shape, bar, glow, folded, edge } = rest;
   const depth = Math.min(shape.width, shape.height);
+  // The glow's colours run along x, one per agent in the dock's order. A
+  // bar standing on a side edge draws it lying down and turns it a quarter
+  // clockwise, so the agents' colours run top to bottom as their marks do.
+  const upright = edge === "left" || edge === "right";
+  const length = upright ? shape.height : shape.width;
+  // A bar of no thickness still wears its glow, round a hairline.
+  const glowDepth = Math.max(1, depth);
   return (
     <div
       className="hud-rest-zone"
@@ -55,28 +62,39 @@ export function RestZone({
             pointerEvents: "none",
           }}
         >
-          <HUDGlow
-            width={shape.width}
-            height={shape.height}
-            attached={false}
-            radius={depth / 2}
-            style="blur"
-            effect={glow.config.glowEffect}
-            colors={glow.colors}
-            active={glow.active}
-            period={
-              glow.active
-                ? glow.config.breathSeconds
-                : glow.config.idleBreathSeconds
-            }
-            amplitude={glow.config.breathAmplitude}
-            brightness={glow.config.glowBrightness}
-            range={glow.config.glowRange}
-            blur={glow.config.glowBlur}
-            outwardOnly={glow.config.glowOutwardOnly}
-            reduceMotion={rest.reduceMotion}
-            alert={glow.alert}
-          />
+          <div
+            style={{
+              position: "absolute",
+              left: (shape.width - (upright ? length : shape.width)) / 2,
+              top: (shape.height - (upright ? glowDepth : shape.height)) / 2,
+              width: length,
+              height: glowDepth,
+              transform: upright ? "rotate(90deg)" : undefined,
+            }}
+          >
+            <HUDGlow
+              width={length}
+              height={glowDepth}
+              attached={false}
+              radius={glowDepth / 2}
+              style="blur"
+              effect={glow.config.glowEffect}
+              colors={glow.colors}
+              active={glow.active}
+              period={
+                glow.active
+                  ? glow.config.breathSeconds
+                  : glow.config.idleBreathSeconds
+              }
+              amplitude={glow.config.breathAmplitude}
+              brightness={glow.config.glowBrightness}
+              range={glow.config.glowRange}
+              blur={glow.config.glowBlur}
+              outwardOnly={glow.config.glowOutwardOnly}
+              reduceMotion={rest.reduceMotion}
+              alert={glow.alert}
+            />
+          </div>
         </div>
       )}
       {bar && (

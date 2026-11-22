@@ -4,6 +4,7 @@ import { horizontal, type HUDRect } from "../geometry";
 import { HUD_METRICS } from "../model";
 import type { useNotchGeometry } from "./NotchSurface";
 import { outsideSimplePanel } from "./simple-panel";
+import { surfaceBorder } from "./simple-panel";
 import { SurfaceContent, type SurfaceContentProps } from "./SurfaceContent";
 
 export function HUDExpandedSurface({
@@ -183,10 +184,9 @@ export function HUDExpandedSurface({
               background:
                 detached || config.mode === "simple" ? fill : "transparent",
               // The Simple line is the panel growing: no outline of its own.
-              border:
-                (detached || config.mode === "simple") && !simplePeek
-                  ? `1px solid ${outline}`
-                  : "none",
+              border: surfaceBorder(config.mode, detached, simplePeek)
+                ? `${surfaceBorder(config.mode, detached, simplePeek)}px solid ${outline}`
+                : "none",
               boxShadow: config.mode === "notch" ? undefined : shadow,
             }}
           >
