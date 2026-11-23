@@ -39,21 +39,58 @@ export const launchedBy = (() => {
   const named = Number(process.env.AGENTHUD_MCP_PARENT);
   return Number.isSafeInteger(named) && named > 0 ? named : process.ppid;
 })();
+const parseTurnMetadata = (
+  raw: unknown,
+): Record<string, unknown> | undefined => {
+  if (typeof raw === "string") {
+    try {
+      const parsed = JSON.parse(raw);
+      return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+        ? (parsed as Record<string, unknown>)
+        : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+  return raw && typeof raw === "object" && !Array.isArray(raw)
+    ? (raw as Record<string, unknown>)
+    : undefined;
+};
+const firstString = (
+  meta: Record<string, unknown> | undefined,
+  keys: readonly string[],
+): string | undefined => {
+  if (!meta) return undefined;
+  for (const key of keys) {
+    const value = meta[key];
+    if (typeof value === "string" && value) return value;
+  }
+  return undefined;
+};
 export const caller = (meta: Record<string, unknown> | undefined) => {
-  const turn = meta?.["x-codex-turn-metadata"] as
-    Record<string, unknown> | undefined;
-  const thread = meta?.threadId ?? turn?.thread_id;
-  if (typeof thread === "string" && thread)
-    return {
-      client: "codex",
-      sessionId: thread,
-      turnId: typeof turn?.turn_id === "string" ? turn.turn_id : null,
-    };
+  const turn = parseTurnMetadata(meta?.["x-codex-turn-metadata"]);
+  const turnId = typeof turn?.turn_id === "string" ? turn.turn_id : null;
+  // Prefer client-qualified keys before generic `threadId`/`thread_id` so
+  // another client that happens to set `thread_id` alongside its own key
+  // (for example Antigravity) is never misidentified as Codex.
+  const explicitCodex =
+    (typeof turn?.thread_id === "string" && turn.thread_id
+      ? turn.thread_id
+      : undefined) ??
+    firstString(meta, [
+      "openai/threadId",
+      "openai/thread_id",
+      "codexThreadId",
+      "codex_thread_id",
+    ]);
+  if (explicitCodex)
+    return { client: "codex", sessionId: explicitCodex, turnId };
   const cascade = meta?.["antigravity.google/conversation_id"];
   if (typeof cascade === "string" && cascade)
     return { client: "antigravity", sessionId: cascade, turnId: null };
   const session = process.env.CLAUDE_CODE_SESSION_ID;
-  return session
-    ? { client: "claude", sessionId: session, turnId: null }
-    : null;
+  if (session) return { client: "claude", sessionId: session, turnId: null };
+  const genericCodex = firstString(meta, ["threadId", "thread_id"]);
+  if (genericCodex) return { client: "codex", sessionId: genericCodex, turnId };
+  return null;
 };

@@ -1349,3 +1349,72 @@ fn a_deepseek_steer_waits_for_the_plugin_and_names_the_turn_it_went_into() {
     );
     assert_eq!(receipt.turn_id.as_deref(), Some("7"));
 }
+
+#[test]
+fn codex_open_threads_and_active_checks_exclude_archived_deleted_and_subagents() {
+    let temp = tempfile::tempdir().unwrap();
+    let data = temp.path().join("codex");
+    let locks = data.join("thread-writer-locks");
+    let archived = data.join("archived_sessions");
+    let sessions = data.join("sessions");
+    fs::create_dir_all(&locks).unwrap(); // plain directory
+    fs::create_dir_all(&archived).unwrap(); // plain directory
+    fs::create_dir_all(&sessions).unwrap(); // plain directory
+
+    let locked = fs::File::create(locks.join("t-open.lock")).unwrap();
+    locked.lock().unwrap();
+    let _unlocked = fs::File::create(locks.join("t-closed.lock")).unwrap();
+    let in_snap = fs::File::create(locks.join("t-in-snap.lock")).unwrap();
+    in_snap.lock().unwrap();
+    assert_eq!(
+        codex_open_threads_excluding(&data, |id| id == "t-in-snap"),
+        vec!["t-open"]
+    );
+    assert!(codex_thread_active(&data, "t-open"));
+    assert!(!codex_thread_active(&data, "t-closed"));
+    assert!(!codex_thread_active(&data, "t-deleted"));
+
+    // An archived rollout in archived_sessions disqualifies even a locked id.
+    fs::write(archived.join("rollout-2026-t-open.jsonl"), "{}\n").unwrap();
+    assert!(codex_thread_archived(&data, "t-open"));
+    assert!(!codex_thread_active(&data, "t-open"));
+
+    // state_5.sqlite distinguishes active root threads from archived, deleted, and subagent rows.
+    let db = rusqlite::Connection::open(data.join("state_5.sqlite")).unwrap();
+    db.execute(
+        "CREATE TABLE threads (id TEXT PRIMARY KEY, archived INTEGER NOT NULL, rollout_path TEXT NOT NULL, source TEXT NOT NULL)",
+        [],
+    )
+    .unwrap();
+    let live_rollout = sessions.join("rollout-t-live.jsonl");
+    fs::write(&live_rollout, "{}\n").unwrap();
+    db.execute(
+        "INSERT INTO threads VALUES (?1, 0, ?2, 'vscode')",
+        rusqlite::params!["t-live", live_rollout.to_string_lossy().as_ref()],
+    )
+    .unwrap();
+    db.execute(
+        "INSERT INTO threads VALUES ('t-db-archived', 1, ?1, 'vscode')",
+        rusqlite::params![live_rollout.to_string_lossy().as_ref()],
+    )
+    .unwrap();
+    db.execute(
+        "INSERT INTO threads VALUES ('t-subagent', 0, ?1, '{\"subagent\":{\"other\":\"guardian\"}}')",
+        rusqlite::params![live_rollout.to_string_lossy().as_ref()],
+    )
+    .unwrap();
+    db.execute(
+        "INSERT INTO threads VALUES ('t-missing-file', 0, ?1, 'vscode')",
+        rusqlite::params![sessions.join("gone.jsonl").to_string_lossy().as_ref()],
+    )
+    .unwrap();
+    drop(db);
+
+    assert!(codex_thread_active(&data, "t-live"));
+    assert!(!codex_thread_archived(&data, "t-live"));
+    assert!(!codex_thread_active(&data, "t-db-archived"));
+    assert!(codex_thread_archived(&data, "t-db-archived"));
+    assert!(!codex_thread_active(&data, "t-subagent"));
+    assert!(codex_thread_archived(&data, "t-subagent"));
+    assert!(!codex_thread_active(&data, "t-missing-file"));
+}
