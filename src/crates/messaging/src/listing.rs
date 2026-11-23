@@ -15,14 +15,9 @@ impl Messaging {
             .map(|row| row.target.session_id)
             .collect()
     }
-    pub(crate) fn list(&self, caller: Option<&Caller>, host: &Host<'_>) -> Value {
+    pub(crate) fn list(&self, caller: Option<&Caller>, host: &Host<'_>, extras: &[Value]) -> Value {
         let language = language(host.snapshot);
         let loaded = self.loaded();
-        let extras = deepseek_extras(
-            self.clients.deepseek_channel().as_ref(),
-            host,
-            std::time::SystemTime::now(),
-        );
         let mut rows = sessions(host.snapshot)
             .chain(extras.iter())
             .map(|session| {

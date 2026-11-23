@@ -189,7 +189,6 @@ fn has_session_file(path: &Path, depth: usize, budget: &mut usize) -> bool {
         return meta.len() > 0
             && (name.ends_with(".jsonl")
                 || name.ends_with(".jsonl.zstd")
-                || name.ends_with(".jsonl.zst")
                 || name == "session.json");
     }
     depth > 0

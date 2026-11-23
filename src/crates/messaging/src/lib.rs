@@ -14,6 +14,7 @@
 //! The words are kept only while they are delivered: the journal keeps who sent
 //! what to whom, a fingerprint of the words and where the answer will be, and
 //! an answer is read again from the other session's transcript each time.
+mod extras;
 mod flights;
 mod journal;
 mod listing;
@@ -40,6 +41,7 @@ use agent_hud_platform::delivery::{
     self, DeliveryState, LocalClients, Operation, PromptForm, Provider, SendRequest, SessionStarts,
     SessionTarget, StartReceipt, StartRequest, CLAUDE_MESSAGES_OFF, DEEPSEEK_MESSAGES_OFF,
 };
+use extras::*;
 use flights::{flight, person_flight};
 pub use flights::{Flight, PERSON};
 use journal::{Journal, Kind, Message, Party};
@@ -171,6 +173,8 @@ pub struct Messaging {
     /// Calls the relay asked about before they began: it stopped waiting and
     /// told its agent nothing was sent, so they send nothing. Newest last.
     given_up: std::collections::VecDeque<String>,
+    /// Cached `session_detail` lookups for live sessions outside the snapshot.
+    extra_cache: ExtraCache,
 }
 
 impl Messaging {
@@ -192,6 +196,7 @@ impl Messaging {
             fly,
             calling: None,
             given_up: Default::default(),
+            extra_cache: ExtraCache::default(),
         }
     }
 
@@ -210,31 +215,11 @@ impl Messaging {
         if !self.preferences.enabled {
             return Ok(refused(&words::off(language(host.snapshot))));
         }
-        let now_system = std::time::SystemTime::now();
-        let channel = self.clients.deepseek_channel();
-        // The sessions a message can go to, from this snapshot and live Harness check-ins.
-        self.clients.update_targets(with_deepseek_targets(
-            host.snapshot,
-            channel.as_ref(),
-            now_system,
-        ));
+        let extras = self.live_extras(host);
+        self.sync_targets(host, &extras);
         let caller = serde_json::from_value::<Caller>(params["caller"].clone())
             .ok()
-            .map(|mut caller| {
-                if let Some(session_id) = find_in(host.snapshot, &caller.client, &caller.session_id)
-                    .and_then(|s| s["id"].as_str())
-                {
-                    caller.session_id = session_id.to_owned();
-                } else if caller.client == "deepseek"
-                    && !caller.session_id.starts_with("deepseek:")
-                    && channel
-                        .as_ref()
-                        .is_some_and(|ch| ch.runs(&caller.session_id, now_system))
-                {
-                    caller.session_id = format!("deepseek:{}", caller.session_id);
-                }
-                caller
-            });
+            .map(|caller| self.canonical_caller(host.snapshot, &extras, caller));
         let arguments = &params["arguments"];
         let name = params["name"].as_str().unwrap_or("");
         let call = params["call"].as_str().filter(|call| !call.is_empty());
@@ -251,7 +236,7 @@ impl Messaging {
             }
         }
         match name {
-            "list_sessions" => Ok(self.list(caller.as_ref(), host)),
+            "list_sessions" => Ok(self.list(caller.as_ref(), host, &extras)),
             "list_models" => self.models(arguments),
             "list_sent_messages" => Ok(self.sent(caller.as_ref(), arguments, host)),
             "send_message" | "start_session" => {
@@ -260,7 +245,7 @@ impl Messaging {
                 };
                 self.calling = call.map(str::to_owned);
                 let answer = if name == "send_message" {
-                    self.send(&caller, arguments, host, now)
+                    self.send(&caller, arguments, host, &extras, now)
                 } else {
                     self.start(&caller, arguments, host, now)
                 };

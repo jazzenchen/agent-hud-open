@@ -138,9 +138,10 @@ impl Location {
                 env(key)
                     .map(|value| value.trim().to_owned())
                     .filter(|value| !value.is_empty())
+                    .map(|value| (*key, value))
             })
-            .map(|value| {
-                if self.base == Base::Home {
+            .map(|(key, value)| {
+                if self.base == Base::Home && key == "DSH_HOME" {
                     expand_home(base, &value)
                 } else {
                     PathBuf::from(value)
@@ -322,22 +323,34 @@ mod tests {
     }
 
     #[test]
-    fn a_home_location_expands_leading_tilde_in_its_variable() {
+    fn only_dsh_home_expands_leading_tilde_in_location_resolution() {
         let home = std::env::temp_dir().join("agent-hud-location-tilde");
         let dsh = Location::home(&["DSH_HOME"], &[".dsh"], "sessions");
+        let other = Location::home(&["OTHER_HOME"], &[".other"], "sessions");
         let disk = Disk {
             present: HashSet::new(),
         };
-        let lookup = |value: &str| {
-            dsh.resolve(
-                &home,
-                &|key| (key == "DSH_HOME").then(|| value.to_owned()),
-                &disk,
-            )
+        let lookup = |loc: &Location, var: &str, value: &str| {
+            loc.resolve(&home, &|key| (key == var).then(|| value.to_owned()), &disk)
         };
-        assert_eq!(lookup("~/custom-dsh"), [home.join("custom-dsh/sessions")]);
-        assert_eq!(lookup("~\\custom-dsh"), [home.join("custom-dsh/sessions")]);
-        assert_eq!(lookup("~"), [home.join("sessions")]);
+        assert_eq!(
+            lookup(&dsh, "DSH_HOME", "~/custom-dsh"),
+            [home.join("custom-dsh/sessions")]
+        );
+        assert_eq!(
+            lookup(&dsh, "DSH_HOME", "~\\custom-dsh"),
+            [home.join("custom-dsh/sessions")]
+        );
+        assert_eq!(lookup(&dsh, "DSH_HOME", "~"), [home.join("sessions")]);
+        // Other clients' home variables stay literal, never changing `~` or `~\` paths.
+        assert_eq!(
+            lookup(&other, "OTHER_HOME", "~/custom-other"),
+            [PathBuf::from("~/custom-other").join("sessions")]
+        );
+        assert_eq!(
+            lookup(&other, "OTHER_HOME", "~\\custom-other"),
+            [PathBuf::from("~\\custom-other").join("sessions")]
+        );
     }
 
     #[test]

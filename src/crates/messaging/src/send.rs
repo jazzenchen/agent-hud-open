@@ -7,6 +7,7 @@ impl Messaging {
         caller: &Caller,
         arguments: &Value,
         host: &Host<'_>,
+        extras: &[Value],
         now: i64,
     ) -> Result<Value> {
         let language = language(host.snapshot);
@@ -39,16 +40,11 @@ impl Messaging {
         if named.is_none() && replied.is_none() {
             return Err("to is required, unless reply_to names a message you received".into());
         }
-        let extras = deepseek_extras(
-            self.clients.deepseek_channel().as_ref(),
-            host,
-            std::time::SystemTime::now(),
-        );
         // A reply and a target that name different sessions: the caller has
         // two answers to where this goes. Sending it to `to` and filing it as
         // a reply to the other party's message was the wrong one, silently.
         if let (Some(target), Some(parent)) = (named, replied.as_ref()) {
-            if let Some(found) = find_any(host.snapshot, &extras, target) {
+            if let Some(found) = find_any(host.snapshot, extras, target) {
                 let found_id = found["id"].as_str().unwrap_or(target);
                 let found_client = found["source"].as_str().unwrap_or_default();
                 if !same_identity(
@@ -69,10 +65,10 @@ impl Messaging {
         // A reply goes to the very session that sent its parent, in that
         // session's client; a `to` names a session of whichever client has it.
         let target = match (named, &replied) {
-            (Some(to), _) => find_any(host.snapshot, &extras, to),
+            (Some(to), _) => find_any(host.snapshot, extras, to),
             (None, Some(parent)) => find_in_any(
                 host.snapshot,
-                &extras,
+                extras,
                 &parent.from.client,
                 &parent.from.session_id,
             ),
@@ -111,8 +107,8 @@ impl Messaging {
             Ok(model) => model,
             Err(reason) => return Ok(refused(&reason)),
         };
-        let sender = party_any(host.snapshot, &extras, &caller.client, &caller.session_id);
-        let recipient = party_any(host.snapshot, &extras, client, to);
+        let sender = party_any(host.snapshot, extras, &caller.client, &caller.session_id);
+        let recipient = party_any(host.snapshot, extras, client, to);
         // One that cannot take it now is refused before anything is queued.
         if let (Value::Bool(false), reason) = self.reachable(
             client,
@@ -197,7 +193,7 @@ impl Messaging {
             chain: chain.unwrap_or_else(|| id.clone()),
             count,
             from,
-            to: party_any(host.snapshot, &extras, client, to),
+            to: party_any(host.snapshot, extras, client, to),
             form,
             reply_to: reply_to.map(str::to_owned),
             request_id: id.clone(),

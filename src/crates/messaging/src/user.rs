@@ -39,16 +39,10 @@ impl Messaging {
     /// new session in. Only clients the window offers now are there.
     pub fn user_sessions(&mut self, host: &Host<'_>) -> Value {
         self.preferences = Preferences::read(&host.snapshot["settings"]);
-        let now_system = std::time::SystemTime::now();
-        let channel = self.clients.deepseek_channel();
-        self.clients.update_targets(with_deepseek_targets(
-            host.snapshot,
-            channel.as_ref(),
-            now_system,
-        ));
+        let extras = self.live_extras(host);
+        self.sync_targets(host, &extras);
         let language = language(host.snapshot);
         let loaded = self.loaded();
-        let extras = deepseek_extras(channel.as_ref(), host, now_system);
         let offered = |client: &str| {
             USER_CLIENTS.contains(&client)
                 && self
@@ -166,14 +160,8 @@ impl Messaging {
         if let Some(reason) = self.user_client_off(client, host.snapshot, language) {
             return Ok(refused(&reason));
         }
-        let now_system = std::time::SystemTime::now();
-        let channel = self.clients.deepseek_channel();
-        self.clients.update_targets(with_deepseek_targets(
-            host.snapshot,
-            channel.as_ref(),
-            now_system,
-        ));
-        let extras = deepseek_extras(channel.as_ref(), host, now_system);
+        let extras = self.live_extras(host);
+        self.sync_targets(host, &extras);
         let Some(session) = find_in_any(host.snapshot, &extras, client, session_id) else {
             return Ok(refused(&words::unknown(language)));
         };

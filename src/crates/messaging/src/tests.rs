@@ -1466,6 +1466,26 @@ fn a_checked_in_deepseek_session_missing_from_snapshot_is_listed_and_takes_repli
     assert_eq!(row["client"], "deepseek");
     assert_eq!(row["reachable"], true);
     assert_eq!(row["self"], true);
+    // Repeated list_sessions calls reuse the cached session_detail lookup
+    // until sessionsRevision changes.
+    assert_eq!(world.transcripts.calls.load(AtomicOrdering::SeqCst), 1);
+    let _ = world.call(
+        Some(("deepseek", HARNESS_TWO_OWN)),
+        "list_sessions",
+        json!({}),
+    );
+    assert_eq!(
+        world.transcripts.calls.load(AtomicOrdering::SeqCst),
+        1,
+        "extra session_detail lookup is cached across calls"
+    );
+    world.snapshot["sessionsRevision"] = json!(2);
+    let _ = world.call(Some(("codex", CODEX)), "list_sessions", json!({}));
+    assert_eq!(
+        world.transcripts.calls.load(AtomicOrdering::SeqCst),
+        2,
+        "bumping sessionsRevision refreshes the cached detail"
+    );
 
     // DSH sends a message to Codex; Codex replies via reply_to alone and with bare `to`.
     let sent = world.send(("deepseek", HARNESS_TWO_OWN), CODEX, "Ping from DSH");
