@@ -1,7 +1,7 @@
 //! ChatGPT's tiers that Codex spends (chatgpt.com/pricing, checked as of
 //! `plans::CHECKED`). The reader reports the plan type its limits name:
-//! `plus`, `prolite` for Pro 5x and `pro` for Pro 20x, among others.
-//! Business, Team, Enterprise and Edu are priced per seat.
+//! `plus`, `prolite` for Pro 10x (Pro 100) and `pro` for Pro 20x (Pro 200),
+//! among others. Business, Team, Enterprise and Edu are priced per seat.
 use crate::plans::{Catalog, Plan};
 
 pub static CATALOG: Catalog = Catalog {
@@ -17,9 +17,11 @@ pub static CATALOG: Catalog = Catalog {
         },
         Plan {
             id: "codex.pro5x",
-            name: "Pro 5x",
+            // OpenAI doubled Pro 100's Work and Codex allowance in November
+            // 2026, from five times Plus to ten; the id stays as shipped.
+            name: "Pro 10x",
             monthly_usd: 100.0,
-            multiple: Some(5.0),
+            multiple: Some(10.0),
             short_multiple: None,
             spellings: &["prolite", "pro5x"],
         },

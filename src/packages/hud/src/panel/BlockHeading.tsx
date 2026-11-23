@@ -113,7 +113,7 @@ export function BlockHeading({
   );
 }
 
-/** A compact block's plan beside its name: Ultra, Pro x5. Pointing at it
+/** A compact block's plan beside its name: Ultra, Pro x10. Pointing at it
  * shows the account and what it notes; a dot says it notes something, in the
  * warning's colour for a warning. */
 export function PlanBadge({
