@@ -6,7 +6,6 @@
 use super::super::process::StdioServer;
 use super::handoff::job_state;
 use super::*;
-use serde_json::json;
 
 impl SessionStarts {
     pub(super) fn start_claude(
@@ -122,7 +121,9 @@ impl SessionStarts {
             .take(40)
             .collect::<String>();
         let result = (|| {
-            server.mutation("thread/name/set", json!({"threadId":id,"name":title}))?;
+            codex::persist_started_thread(&id, &title, &value, |method, params| {
+                server.mutation(method, params)
+            })?;
             server.end();
             codex::queue_created(
                 &self
