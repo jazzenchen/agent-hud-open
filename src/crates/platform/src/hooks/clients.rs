@@ -227,7 +227,11 @@ impl Clients {
                     }
                 }
             }
-            if !known && !hooked && agent_hud_agents::hooks::hooks_by_id(&source).is_some() {
+            if !known
+                && !hooked
+                && agent_hud_agents::hooks::hooks_by_id(&source)
+                    .is_some_and(|hooks| !hooks.all_flags().is_empty())
+            {
                 self.rows
                     .push(json!({"source":source,"installed":false,"active":false,
                     "unsupported":true,"notice":unsupported_notice(&source)}));
@@ -405,5 +409,32 @@ mod tests {
         assert!(error.starts_with("copilot: "), "{error}");
         assert!(clients.opted_in().is_empty());
         assert_eq!(fs::read_to_string(&file).unwrap(), "{ not json");
+    }
+
+    #[test]
+    fn a_client_with_no_hooks_is_never_marked_unsupported() {
+        use super::{Clients, InstallContext};
+        use std::{collections::HashMap, fs};
+        let temp = tempfile::tempdir().unwrap();
+        let home = temp.path().join("home");
+        fs::create_dir_all(home.join(".dsh")).unwrap(); // plain directory
+        fs::write(home.join(".dsh/settings.yaml"), "{}").unwrap();
+        let executable = temp.path().join("fixed hook owner");
+        fs::write(&executable, "fixture only").unwrap();
+        let mut clients = Clients::default();
+        clients
+            .delegate(InstallContext {
+                home,
+                environment: HashMap::new(),
+                canonical_executable: Some(executable.clone()),
+                executable,
+            })
+            .unwrap();
+        let status = clients.status(true, true);
+        let rows = status["clients"].as_array().unwrap();
+        assert!(
+            !rows.iter().any(|row| row["source"] == "deepseek"),
+            "hookless DeepSeek Harness should not appear as unsupported: {rows:?}"
+        );
     }
 }

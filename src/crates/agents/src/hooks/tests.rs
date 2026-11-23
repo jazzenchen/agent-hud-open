@@ -59,6 +59,13 @@ fn flags_follow_each_clients_hooks() {
     for os in [crate::Os::MacOs, crate::Os::Windows, crate::Os::Linux] {
         assert!(goose.launch.on(os).value().is_none(), "{os:?}");
     }
+    // DeepSeek Harness has no hooks at all on any OS.
+    let deepseek = hooks_by_id("deepseek").unwrap();
+    assert!(deepseek.all_flags().is_empty());
+    assert!(deepseek.settings.is_none());
+    for os in [crate::Os::MacOs, crate::Os::Windows, crate::Os::Linux] {
+        assert!(deepseek.launch.on(os).value().is_none(), "{os:?}");
+    }
     for agent in ALL {
         for (flag, _) in agent.hooks.map(Hooks::all_flags).unwrap_or_default() {
             assert!(crate::HOOK_FLAGS.contains(&flag), "{} {flag}", agent.id);
