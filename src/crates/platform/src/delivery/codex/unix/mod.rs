@@ -53,8 +53,7 @@ pub(super) fn deliver(
     });
     match direct {
         Err(Failure::Unavailable(_))
-            if matches!(request.operation, Operation::Automatic | Operation::Start)
-                && super::thread_open(data, thread) =>
+            if matches!(request.operation, Operation::Automatic | Operation::Start) =>
         {
             enqueue(data, target, request, thread, timeout, queue)
         }

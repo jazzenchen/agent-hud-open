@@ -1033,10 +1033,38 @@ for line in sys.stdin:
             )
             .unwrap()
         };
+        // Desktop IPC is reachable, but no desktop client owns the thread.
+        let path = fixture.paths().codex_data.join("ipc/ipc.sock");
+        fs::create_dir_all(path.parent().unwrap()).unwrap(); // plain directory
+        let listener = UnixListener::bind(path).unwrap();
+        let worker = thread::spawn(move || {
+            let (mut socket, _) = listener.accept().unwrap();
+            socket
+                .set_read_timeout(Some(Duration::from_secs(3)))
+                .unwrap();
+            let initialize = frame_read(&mut socket);
+            desktop_response(
+                &mut socket,
+                &initialize,
+                json!({"clientId":"fixture-client"}),
+            );
+            let discover = frame_read(&mut socket);
+            assert_eq!(discover["method"], "thread-owner-discovery");
+            frame_send(
+                &mut socket,
+                json!({"type":"response","requestId":discover["requestId"],"resultType":"error","error":"no-client-found"}),
+            );
+        });
         let mut send = request(Provider::Codex);
-        send.operation = Operation::Enqueue;
+        send.operation = Operation::Automatic;
+        assert!(!super::super::codex_thread_open(
+            &fixture.paths().codex_data,
+            THREAD
+        ));
         let receipt = service(Some(route.clone())).send(send.clone()).unwrap();
+        worker.join().unwrap();
         assert_eq!(receipt.state, DeliveryState::Queued);
+        assert_eq!(receipt.thread_id.as_deref(), Some(THREAD));
         assert_eq!(
             receipt.reason.as_deref(),
             Some("Queued until Codex opens the thread")
