@@ -251,26 +251,39 @@ fn creation_unix_seconds(handle: windows_sys::Win32::Foundation::HANDLE) -> Opti
         .flatten()
 }
 
+fn handle_runs(handle: windows_sys::Win32::Foundation::HANDLE) -> bool {
+    use windows_sys::Win32::{Foundation::WAIT_TIMEOUT, System::Threading::WaitForSingleObject};
+    // SAFETY: `handle` is a valid process handle opened with SYNCHRONIZE.
+    // Checking the handle's wait state avoids misclassifying a process whose
+    // exit code happens to equal STILL_ACTIVE (259).
+    unsafe { WaitForSingleObject(handle, 0) == WAIT_TIMEOUT }
+}
+
 /// Whether a process still runs on `pid` and started when `started` says (in
 /// Unix seconds, +/- 2 s tolerance for PID-reuse checks). Matches Unix `pids`:
 /// `pid <= 0` or an unopenable elevated/other-user process (`ERROR_ACCESS_DENIED`)
 /// is taken on trust; exited or missing processes return `false`.
 pub(crate) fn process_runs(pid: i32, started: Option<i64>) -> bool {
     use windows_sys::Win32::{
-        Foundation::{GetLastError, ERROR_ACCESS_DENIED, STILL_ACTIVE},
-        System::Threading::{GetExitCodeProcess, OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION},
+        Foundation::{GetLastError, ERROR_ACCESS_DENIED},
+        System::Threading::{OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION, PROCESS_SYNCHRONIZE},
     };
     if pid <= 0 {
         return true;
     }
-    // SAFETY: OpenProcess only requests limited query access to `pid`.
-    let handle = unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid as u32) };
+    // SAFETY: OpenProcess only requests limited query + wait access to `pid`.
+    let handle = unsafe {
+        OpenProcess(
+            PROCESS_QUERY_LIMITED_INFORMATION | PROCESS_SYNCHRONIZE,
+            0,
+            pid as u32,
+        )
+    };
     if handle.is_null() {
         return unsafe { GetLastError() } == ERROR_ACCESS_DENIED;
     }
     let handle = ProcessHandle(handle);
-    let mut code = 0u32;
-    if unsafe { GetExitCodeProcess(handle.0, &mut code) } == 0 || code != STILL_ACTIVE as u32 {
+    if !handle_runs(handle.0) {
         return false;
     }
     match (started, creation_unix_seconds(handle.0)) {
@@ -281,21 +294,25 @@ pub(crate) fn process_runs(pid: i32, started: Option<i64>) -> bool {
 
 /// When the running process on `pid` started, in Unix seconds.
 pub(crate) fn process_start(pid: i32) -> Option<i64> {
-    use windows_sys::Win32::{
-        Foundation::STILL_ACTIVE,
-        System::Threading::{GetExitCodeProcess, OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION},
+    use windows_sys::Win32::System::Threading::{
+        OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION, PROCESS_SYNCHRONIZE,
     };
     if pid <= 0 {
         return None;
     }
-    // SAFETY: OpenProcess only requests limited query access to `pid`.
-    let handle = unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid as u32) };
+    // SAFETY: OpenProcess only requests limited query + wait access to `pid`.
+    let handle = unsafe {
+        OpenProcess(
+            PROCESS_QUERY_LIMITED_INFORMATION | PROCESS_SYNCHRONIZE,
+            0,
+            pid as u32,
+        )
+    };
     if handle.is_null() {
         return None;
     }
     let handle = ProcessHandle(handle);
-    let mut code = 0u32;
-    if unsafe { GetExitCodeProcess(handle.0, &mut code) } == 0 || code != STILL_ACTIVE as u32 {
+    if !handle_runs(handle.0) {
         return None;
     }
     creation_unix_seconds(handle.0)
@@ -456,20 +473,30 @@ mod tests {
         assert_eq!(process_start(-1), None);
 
         let system = std::env::var_os("SystemRoot").unwrap();
-        let mut child = Command::new(PathBuf::from(system).join("System32/cmd.exe"))
-            .args(["/C", "exit", "0"])
-            .stdin(Stdio::null())
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .spawn()
-            .unwrap();
-        let pid = child.id() as i32;
-        child.wait().unwrap();
-        // While `child` still holds the process handle (exited, exit code 0):
-        assert!(!process_runs(pid, None), "exited process with open handle");
-        assert_eq!(process_start(pid), None);
-        // After closing the handle:
-        drop(child);
-        assert!(!process_runs(pid, None), "exited process after close");
+        let cmd = PathBuf::from(system).join("System32\\cmd.exe");
+        for exit_code in [0i32, 259] {
+            let mut child = Command::new(&cmd)
+                .args(["/D", "/C", &format!("exit {exit_code}")])
+                .stdin(Stdio::null())
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .spawn()
+                .unwrap();
+            let pid = child.id() as i32;
+            let status = child.wait().unwrap();
+            assert_eq!(status.code(), Some(exit_code));
+            // While `child` still holds the process handle (even with exit code 259 == STILL_ACTIVE):
+            assert!(
+                !process_runs(pid, None),
+                "exited process ({exit_code}) with open handle"
+            );
+            assert_eq!(process_start(pid), None);
+            // After closing the handle:
+            drop(child);
+            assert!(
+                !process_runs(pid, None),
+                "exited process ({exit_code}) after close"
+            );
+        }
     }
 }

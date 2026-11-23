@@ -149,7 +149,10 @@ impl LocalClients {
                         if provider.uses_hook_channel()
                             && !hook_supported_on(provider, crate::os::OS) =>
                     {
-                        Cow::Owned(hook_unsupported_notice(crate::os::OS))
+                        Cow::Owned(crate::hooks::unsupported_notice_on(
+                            provider.as_str(),
+                            crate::os::OS,
+                        ))
                     }
                     provider
                         if provider.uses_hook_channel()
@@ -189,11 +192,15 @@ impl LocalClients {
     }
 }
 
+fn client_hook_supported_on(client: &str, provider: Provider, os: agent_hud_agents::Os) -> bool {
+    provider.uses_observer() || crate::hooks::launches_on(client, os)
+}
+
 /// Whether `provider`'s hook-channel delivery runs on `os`: observer-backed
 /// clients (Pi, OpenCode) run everywhere; hook-backed clients run only where
 /// Agent HUD installs their hooks (`hooks::launches_on`).
 pub(crate) fn hook_supported_on(provider: Provider, os: agent_hud_agents::Os) -> bool {
-    provider.uses_observer() || crate::hooks::launches_on(provider.as_str(), os)
+    client_hook_supported_on(provider.as_str(), provider, os)
 }
 
 /// Whether `client` (an agent id from `agent_hud_agents::ALL`) can receive
@@ -203,16 +210,7 @@ pub fn takes_messages_on(client: &str, os: agent_hud_agents::Os) -> bool {
     let Some(provider) = Provider::parse(client) else {
         return false;
     };
-    !provider.uses_hook_channel()
-        || provider.uses_observer()
-        || crate::hooks::launches_on(client, os)
-}
-
-fn hook_unsupported_notice(os: agent_hud_agents::Os) -> String {
-    let system = crate::hooks::os_name(os);
-    format!(
-        "Agent HUD doesn't put this client's hooks in on {system} yet, so its sessions can send agent messages but can't take them."
-    )
+    !provider.uses_hook_channel() || client_hook_supported_on(client, provider, os)
 }
 
 fn hook_capability(provider: Provider) -> Capability {
@@ -227,7 +225,7 @@ fn hook_capability_on(provider: Provider, os: agent_hud_agents::Os) -> Capabilit
             operations: Vec::new(),
             plugin_preparation: false,
             automatic_installation: false,
-            notice: hook_unsupported_notice(os),
+            notice: crate::hooks::unsupported_notice_on(provider.as_str(), os),
         };
     }
     let wakes = wakes_idle(provider.as_str());

@@ -9,6 +9,7 @@ use std::{
 
 mod callback;
 mod clients;
+pub(crate) use clients::unsupported_notice_on;
 pub use clients::{launches_here, launches_on, os_name, system_name};
 mod completion;
 mod endpoint;
