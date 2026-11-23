@@ -135,6 +135,9 @@ struct Transcripts {
     decoder: Arc<Mutex<Option<(String, u64, usize)>>>,
     /// `session_detail` calls answered.
     calls: Arc<AtomicUsize>,
+    /// Extra indexed session heads returned by `session_detail` for sessions
+    /// outside the 24-hour snapshot.
+    sessions: Arc<Mutex<BTreeMap<String, Value>>>,
 }
 /// A product's store of conversation turns, in memory: the turns of each
 /// session, built from the facts the collector hands it.
@@ -311,13 +314,14 @@ impl Transcripts {
                 "with a store no page is read, but DeepSeek Harness's"
             );
             self.calls.fetch_add(1, AtomicOrdering::SeqCst);
-            let rows = self
-                .rows
-                .lock()
-                .unwrap()
-                .get(id)
-                .cloned()
-                .ok_or("Session was not found; refresh first")?;
+            let session_head = self.sessions.lock().unwrap().get(id).cloned();
+            let rows = self.rows.lock().unwrap().get(id).cloned();
+            let Some(rows) = rows else {
+                if let Some(session) = session_head {
+                    return Ok(json!({"session": session, "messages": []}));
+                }
+                return Err("Session was not found; refresh first".into());
+            };
             let limit = params["messageLimit"].as_u64().unwrap_or(100) as usize;
             let end = rows.len() as u64;
             if params["messageTail"] == true && compressed(id) {
@@ -3144,6 +3148,135 @@ fn list_sessions_says_a_running_codex_with_its_thread_open_can_be_steered() {
         .as_str()
         .unwrap()
         .contains("a steer goes into it"));
+}
+
+#[test]
+fn open_codex_thread_outside_snapshot_is_listed_and_cached() {
+    let mut world = World::on();
+    let old = "01a10000-0000-7000-8000-000000000001";
+    let locks = world.fixture.home().join(".codex/thread-writer-locks");
+    std::fs::create_dir_all(&locks).unwrap();
+    let lock = std::fs::File::create(locks.join(format!("{old}.lock"))).unwrap();
+    lock.lock().unwrap();
+    world.transcripts.sessions.lock().unwrap().insert(
+        old.into(),
+        json!({
+            "id": old,
+            "source": "codex",
+            "title": "Older desktop thread",
+            "cwd": world.fixture.home().join("project"),
+            "state": "idle",
+            "parentId": null,
+            "updatedAt": "2026-10-01T00:00:00Z",
+        }),
+    );
+
+    let list = world.call(Some(("claude", CLAUDE)), "list_sessions", json!({}));
+    assert!(list["sessions"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|row| row["id"] == old && row["client"] == "codex"));
+    assert_eq!(world.transcripts.calls.load(AtomicOrdering::SeqCst), 1);
+    let _ = world.call(Some(("claude", CLAUDE)), "list_sessions", json!({}));
+    assert_eq!(
+        world.transcripts.calls.load(AtomicOrdering::SeqCst),
+        1,
+        "repeated list_sessions reuses cached open-thread scan and session_detail"
+    );
+}
+
+#[test]
+fn reply_to_unindexed_codex_sender_requires_live_non_archived_root_thread() {
+    let mut world = World::on();
+    let work_live = "01a10000-0000-7000-8000-000000000002";
+    let work_gone = "01a10000-0000-7000-8000-000000000003";
+    let work_archived = "01a10000-0000-7000-8000-000000000004";
+    let work_sub = "01a10000-0000-7000-8000-000000000005";
+    world.check_in(CLAUDE);
+
+    // Keep live writer locks for `work_live` and `work_archived`, then archive `work_archived`.
+    let locks = world.fixture.home().join(".codex/thread-writer-locks");
+    let archived_dir = world.fixture.home().join(".codex/archived_sessions");
+    std::fs::create_dir_all(&locks).unwrap();
+    std::fs::create_dir_all(&archived_dir).unwrap();
+    let lock_live = std::fs::File::create(locks.join(format!("{work_live}.lock"))).unwrap();
+    lock_live.lock().unwrap();
+    let lock_arch = std::fs::File::create(locks.join(format!("{work_archived}.lock"))).unwrap();
+    lock_arch.lock().unwrap();
+    std::fs::write(
+        archived_dir.join(format!("rollout-2026-{work_archived}.jsonl")),
+        "{}\n",
+    )
+    .unwrap();
+    // `work_sub` is indexed as a sub-agent (parentId non-null).
+    world.transcripts.sessions.lock().unwrap().insert(
+        work_sub.into(),
+        json!({
+            "id": work_sub,
+            "source": "codex",
+            "title": "Sub-agent",
+            "parentId": CODEX,
+            "state": "idle",
+        }),
+    );
+
+    // Live, non-archived unindexed Codex sender: reply succeeds.
+    let m_live = world.send(("codex", work_live), CLAUDE, "Hi from live Work");
+    let reply_live = world.call(
+        Some(("claude", CLAUDE)),
+        "send_message",
+        json!({"reply_to": m_live["id"], "text": "Reply to live"}),
+    );
+    assert_eq!(reply_live["delivered"], true, "{reply_live}");
+
+    // Deleted / unindexed thread with no lock or rollout: reply is refused.
+    let m_gone = world.send(("codex", work_gone), CLAUDE, "Hi before delete");
+    let reply_gone = world.call(
+        Some(("claude", CLAUDE)),
+        "send_message",
+        json!({"reply_to": m_gone["id"], "text": "Reply to deleted"}),
+    );
+    assert_eq!(reply_gone["delivered"], false, "{reply_gone}");
+
+    // Archived thread: reply is refused even if a writer lock remains.
+    let m_arch = world.send(("codex", work_archived), CLAUDE, "Hi before archive");
+    let reply_arch = world.call(
+        Some(("claude", CLAUDE)),
+        "send_message",
+        json!({"reply_to": m_arch["id"], "text": "Reply to archived"}),
+    );
+    assert_eq!(reply_arch["delivered"], false, "{reply_arch}");
+
+    // Indexed archived thread (`archived: true` from session_detail): reply is refused.
+    let work_detail_arch = "01a10000-0000-7000-8000-000000000006";
+    world.transcripts.sessions.lock().unwrap().insert(
+        work_detail_arch.into(),
+        json!({
+            "id": work_detail_arch,
+            "source": "codex",
+            "title": "Archived in index",
+            "parentId": null,
+            "archived": true,
+            "state": "idle",
+        }),
+    );
+    let m_detail_arch = world.send(("codex", work_detail_arch), CLAUDE, "Hi");
+    let reply_detail_arch = world.call(
+        Some(("claude", CLAUDE)),
+        "send_message",
+        json!({"reply_to": m_detail_arch["id"], "text": "Should refuse"}),
+    );
+    assert_eq!(reply_detail_arch["delivered"], false, "{reply_detail_arch}");
+
+    // Sub-agent sender in session_detail: reply is refused (never falls through to fallback).
+    let m_sub = world.send(("codex", work_sub), CLAUDE, "Hi from sub");
+    let reply_sub = world.call(
+        Some(("claude", CLAUDE)),
+        "send_message",
+        json!({"reply_to": m_sub["id"], "text": "Should refuse sub"}),
+    );
+    assert_eq!(reply_sub["delivered"], false, "{reply_sub}");
 }
 
 mod calls;

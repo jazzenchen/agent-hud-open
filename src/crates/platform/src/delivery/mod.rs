@@ -41,7 +41,9 @@ pub use antigravity::{
 };
 pub use claude::ClaudeChannel;
 pub use codex::{
-    desktop_installed as codex_desktop_installed, thread_open as codex_thread_open, CodexTransport,
+    desktop_installed as codex_desktop_installed,
+    open_threads_excluding as codex_open_threads_excluding, thread_active as codex_thread_active,
+    thread_archived as codex_thread_archived, thread_open as codex_thread_open, CodexTransport,
     NativeCodexTransport, QueueRoute,
 };
 pub use deepseek::DeepSeekChannel;

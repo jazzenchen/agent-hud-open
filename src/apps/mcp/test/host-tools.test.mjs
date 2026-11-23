@@ -127,6 +127,53 @@ test("host tools are listed with their schema and hand the Codex caller from the
       caller: { client: "codex", sessionId: "thread-1", turnId: "turn-9" },
       parent: process.pid,
     });
+    await client.callTool({
+      name: "some_tool",
+      arguments: { text: "from work mode" },
+      _meta: {
+        "x-codex-turn-metadata": JSON.stringify({
+          thread_id: "work-thread-2",
+          turn_id: "turn-10",
+        }),
+      },
+    });
+    const workCall = fake
+      .requests()
+      .filter((request) => request.method === "host_tool")
+      .at(-1);
+    assert.deepEqual(unnamed(workCall.params), {
+      name: "some_tool",
+      arguments: { text: "from work mode" },
+      caller: {
+        client: "codex",
+        sessionId: "work-thread-2",
+        turnId: "turn-10",
+      },
+      parent: process.pid,
+    });
+    // Generic `thread_id` must not shadow an explicit Antigravity conversation id.
+    await client.callTool({
+      name: "some_tool",
+      arguments: { text: "from antigravity" },
+      _meta: {
+        thread_id: "unrelated-thread",
+        "antigravity.google/conversation_id": "cascade-99",
+      },
+    });
+    const agCall = fake
+      .requests()
+      .filter((request) => request.method === "host_tool")
+      .at(-1);
+    assert.deepEqual(unnamed(agCall.params), {
+      name: "some_tool",
+      arguments: { text: "from antigravity" },
+      caller: {
+        client: "antigravity",
+        sessionId: "cascade-99",
+        turnId: null,
+      },
+      parent: process.pid,
+    });
   } finally {
     await client.close();
   }

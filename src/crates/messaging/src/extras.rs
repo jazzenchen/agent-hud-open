@@ -10,18 +10,22 @@ use std::{
     time::{Duration, Instant, SystemTime},
 };
 
-/// How long cached `session_detail` lookups for out-of-snapshot live sessions
-/// are reused while `snapshot["sessionsRevision"]` is unchanged.
+/// How long cached `session_detail` lookups and open-thread scans for
+/// out-of-snapshot live sessions are reused while `snapshot["sessionsRevision"]`
+/// is unchanged.
 const EXTRA_DETAIL_TTL: Duration = Duration::from_secs(30);
 
 type DetailKey = (String, String);
 type DetailEntry = (Option<u64>, Instant, Option<Value>);
+type OpenThreadsEntry = (Option<u64>, Instant, Vec<String>);
 
-/// Per-`Messaging` cache for `session_detail` enrichment of live sessions
-/// outside the 24-hour snapshot, shared by every client extra-session provider.
+/// Per-`Messaging` cache for `session_detail` enrichment and Codex open-lock
+/// scans of live sessions outside the 24-hour snapshot, shared by every client
+/// extra-session provider.
 #[derive(Default)]
 pub(crate) struct ExtraCache {
     details: Mutex<HashMap<DetailKey, DetailEntry>>,
+    codex_open: Mutex<Option<OpenThreadsEntry>>,
 }
 
 impl ExtraCache {
@@ -56,6 +60,35 @@ impl ExtraCache {
         }
         value
     }
+
+    pub(crate) fn codex_open_threads(
+        &self,
+        codex_data: &Path,
+        snapshot: &Value,
+        mono: Instant,
+    ) -> Vec<String> {
+        let rev = snapshot["sessionsRevision"].as_u64();
+        if let Ok(cache) = self.codex_open.lock() {
+            if let Some((cached_rev, at, ids)) = cache.as_ref() {
+                if *cached_rev == rev && mono.saturating_duration_since(*at) < EXTRA_DETAIL_TTL {
+                    return ids.clone();
+                }
+            }
+        }
+        let ids = delivery::codex_open_threads_excluding(codex_data, |id| {
+            find_in(snapshot, "codex", id).is_some()
+        });
+        if let Ok(mut cache) = self.codex_open.lock() {
+            *cache = Some((rev, mono, ids.clone()));
+        }
+        ids
+    }
+}
+
+/// Whether an indexed session is an active, visible root session (not a
+/// sub-agent and not archived).
+fn is_visible_root(session: &Value) -> bool {
+    session["parentId"].is_null() && session["archived"] != true
 }
 
 impl Messaging {
@@ -65,7 +98,57 @@ impl Messaging {
         let now = SystemTime::now();
         let mono = Instant::now();
         let channel = self.clients.deepseek_channel();
-        deepseek_extras(channel.as_ref(), host, &self.extra_cache, now, mono)
+        let mut extras = deepseek_extras(channel.as_ref(), host, &self.extra_cache, now, mono);
+        extras.extend(codex_extras(
+            &self.places.codex_data,
+            host,
+            &self.extra_cache,
+            mono,
+        ));
+        extras
+    }
+
+    /// Resolves a journaled Codex sender for `reply_to` when it is absent from
+    /// both the 24-hour snapshot and `extras`, refusing sub-agents and any
+    /// archived or deleted thread.
+    pub(crate) fn reply_extra(
+        &self,
+        host: &Host<'_>,
+        extras: &[Value],
+        from: &Party,
+    ) -> Option<Value> {
+        if from.client != "codex"
+            || !agent_on(host.snapshot, "codex")
+            || find_in_any(host.snapshot, extras, &from.client, &from.session_id).is_some()
+        {
+            return None;
+        }
+        let mono = Instant::now();
+        if let Some(session) =
+            self.extra_cache
+                .session_detail(host, "codex", &from.session_id, mono)
+        {
+            if is_visible_root(&session)
+                && !delivery::codex_thread_archived(&self.places.codex_data, &from.session_id)
+            {
+                return Some(session);
+            }
+            return None;
+        }
+        if !delivery::codex_thread_active(&self.places.codex_data, &from.session_id) {
+            return None;
+        }
+        Some(json!({
+            "id": from.session_id,
+            "source": "codex",
+            "title": from.title,
+            "cwd": Value::Null,
+            "project": Value::Null,
+            "state": "idle",
+            "model": Value::Null,
+            "parentId": Value::Null,
+            "updatedAt": Value::Null,
+        }))
     }
 
     /// Updates `LocalClients` targets with both snapshot sessions and `extras`.
@@ -152,7 +235,7 @@ fn deepseek_extras(
         }
         let id = format!("deepseek:{bare}");
         if let Some(session) = cache.session_detail(host, "deepseek", &id, mono) {
-            if session["parentId"].is_null() {
+            if is_visible_root(&session) {
                 extras.push(session);
             }
             continue;
@@ -171,6 +254,34 @@ fn deepseek_extras(
             "parentId": Value::Null,
             "updatedAt": updated,
         }));
+    }
+    extras
+}
+
+/// Live Codex threads whose writer lock an app holds outside the 24-hour
+/// snapshot, enriched via cached `session_detail` and excluding sub-agents and
+/// archived threads.
+fn codex_extras(
+    codex_data: &Path,
+    host: &Host<'_>,
+    cache: &ExtraCache,
+    mono: Instant,
+) -> Vec<Value> {
+    if !agent_on(host.snapshot, "codex") {
+        return Vec::new();
+    }
+    let mut extras = Vec::new();
+    for id in cache.codex_open_threads(codex_data, host.snapshot, mono) {
+        if find_in(host.snapshot, "codex", &id).is_some()
+            || delivery::codex_thread_archived(codex_data, &id)
+        {
+            continue;
+        }
+        if let Some(session) = cache.session_detail(host, "codex", &id, mono) {
+            if is_visible_root(&session) {
+                extras.push(session);
+            }
+        }
     }
     extras
 }

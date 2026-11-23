@@ -40,6 +40,18 @@ impl Messaging {
         if named.is_none() && replied.is_none() {
             return Err("to is required, unless reply_to names a message you received".into());
         }
+        let mut owned_extras;
+        let extras = if let Some(row) = replied
+            .as_ref()
+            .and_then(|parent| self.reply_extra(host, extras, &parent.from))
+        {
+            owned_extras = extras.to_vec();
+            owned_extras.push(row);
+            self.sync_targets(host, &owned_extras);
+            owned_extras.as_slice()
+        } else {
+            extras
+        };
         // A reply and a target that name different sessions: the caller has
         // two answers to where this goes. Sending it to `to` and filing it as
         // a reply to the other party's message was the wrong one, silently.
