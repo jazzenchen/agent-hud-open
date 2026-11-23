@@ -71,6 +71,12 @@ pub(super) fn fixed_canvas() -> bool {
     wayland_session() && LAYER_SHELL.load(Ordering::Acquire) == AVAILABLE
 }
 
+/// An X11 window manager may finish placement after the initial readback.
+/// Unlike a layer surface, this full-canvas window has a live global origin.
+pub(super) fn live_pointer_origin() -> bool {
+    !layer_shell()
+}
+
 pub(super) fn edge_hud_unsupported() -> Option<&'static str> {
     (wayland_session() && !layer_shell()).then_some(
         "Edge HUD positioning on Wayland needs the wlr-layer-shell protocol, which this compositor does not offer. Use the dashboard or tray.",

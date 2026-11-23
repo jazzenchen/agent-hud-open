@@ -33,6 +33,10 @@ pub(super) fn fixed_canvas() -> bool {
     false
 }
 
+pub(super) fn live_pointer_origin() -> bool {
+    false
+}
+
 pub(super) fn edge_hud_unsupported() -> Option<&'static str> {
     None
 }

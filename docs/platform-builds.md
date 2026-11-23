@@ -43,6 +43,46 @@ The runner checks the Rust compiler's host OS before compiling and rejects a dif
 
 The installed Tauri CLI reports missing native dependencies. Current prerequisites are maintained in [Tauri's official platform instructions](https://v2.tauri.app/start/prerequisites/); use the instructions for the actual host rather than attempting to satisfy a Windows/Linux build from macOS.
 
+## Linux troubleshooting
+
+### The HUD is visible but hover and clicks pass through it
+
+On X11, the window manager can finish placing a window after the first position
+readback. Pointer hit tests therefore use the live native content origin rather
+than the origin cached during configuration. This does not change the saved HUD
+placement or make the whole transparent canvas accept input. Wayland layer
+surfaces retain their compositor-relative geometry.
+
+When checking an X11 build, test a HUD away from the screen origin:
+
+- Hover a visible agent icon and click a control in the expanded panel.
+- Move to the transparent part of the canvas and verify the underlying app
+  receives input.
+- Restart Agent HUD and repeat both checks without changing its placement.
+
+### DeepSeek Harness sessions are missing
+
+Agent HUD reads Harness sessions from `$DSH_HOME/sessions` when `DSH_HOME` is set,
+or `~/.dsh/sessions` otherwise. A desktop installation can use a different home. Point
+**Agent HUD's launch environment** at the folder that contains that installation's
+`sessions` directory; do not move the logs or change Harness's own configuration.
+For example, for an installation whose home is
+`~/.local/share/deepseek-harness-desktop`:
+
+```sh
+DSH_HOME="$HOME/.local/share/deepseek-harness-desktop" "/path/to/Agent HUD"
+```
+
+Replace the example paths with the actual Harness home and Agent HUD executable.
+Fully quit Agent HUD before relaunching so the new process receives the variable.
+For a desktop launcher, set it in that launcher's wrapper; exporting it in an
+unrelated terminal does not change the desktop session's environment.
+
+Session/token collection and the DeepSeek API balance reader are separate.
+A notice asking for a DeepSeek API key for the balance can remain while local
+Harness sessions are being collected successfully; it does not by itself mean
+the session directory was not recognized.
+
 ## Windows builds on GitHub
 
 The `Windows desktop` workflow (`.github/workflows/windows.yml`) uses an actual
