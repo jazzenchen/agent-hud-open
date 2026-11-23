@@ -91,7 +91,6 @@ export const caller = (meta: Record<string, unknown> | undefined) => {
   const session = process.env.CLAUDE_CODE_SESSION_ID;
   if (session) return { client: "claude", sessionId: session, turnId: null };
   const genericCodex = firstString(meta, ["threadId", "thread_id"]);
-  if (genericCodex)
-    return { client: "codex", sessionId: genericCodex, turnId };
+  if (genericCodex) return { client: "codex", sessionId: genericCodex, turnId };
   return null;
 };
