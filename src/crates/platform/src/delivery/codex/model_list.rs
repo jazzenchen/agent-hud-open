@@ -28,8 +28,9 @@ pub(crate) fn started_effort(started: &Value) -> Option<String> {
 /// Materializes a newly started thread with its title and persists any
 /// configured reasoning effort (`thread/settings/update`) so a later
 /// `thread/resume` draining `thread/queue/add` does not fall back to `null`
-/// (Open #153). Older Codex builds without `thread/settings/update` reject
-/// the method and are ignored; transport failures still propagate.
+/// (Open #153). Persisting the effort is best-effort: any failure (including
+/// older builds rejecting the method, timeouts, or a broken pipe) is logged
+/// and ignored so the already-created thread still queues its first message.
 pub(crate) fn persist_started_thread(
     id: &str,
     title: &str,
@@ -38,12 +39,11 @@ pub(crate) fn persist_started_thread(
 ) -> Result<()> {
     mutate("thread/name/set", json!({"threadId": id, "name": title}))?;
     if let Some(effort) = started_effort(started) {
-        match mutate(
+        if let Err(error) = mutate(
             "thread/settings/update",
             json!({"threadId": id, "effort": effort}),
         ) {
-            Ok(_) | Err(Failure::Rejected(_)) => {}
-            Err(error) => return Err(error),
+            eprintln!("Codex thread/settings/update for {id} skipped: {error}");
         }
     }
     Ok(())
@@ -199,26 +199,33 @@ mod tests {
     }
 
     #[test]
-    fn an_older_codex_rejecting_settings_update_still_starts_while_transport_errors_fail() {
-        persist_started_thread(
-            "t3",
-            "Older build",
-            &json!({"reasoningEffort":"high"}),
-            |method, _| {
-                if method == "thread/settings/update" {
-                    Err(Failure::Rejected("unknown variant".into()))
-                } else {
-                    Ok(json!({}))
-                }
-            },
-        )
-        .unwrap();
+    fn settings_update_errors_are_best_effort_and_do_not_abort_start() {
+        for failure in [
+            Failure::Rejected("unknown variant".into()),
+            Failure::TimedOut,
+            Failure::AcceptanceUncertain,
+            Failure::Io("broken pipe".into()),
+        ] {
+            persist_started_thread(
+                "t3",
+                "Best effort",
+                &json!({"reasoningEffort":"high"}),
+                |method, _| {
+                    if method == "thread/settings/update" {
+                        Err(failure.clone())
+                    } else {
+                        Ok(json!({}))
+                    }
+                },
+            )
+            .unwrap();
+        }
         let err = persist_started_thread(
             "t4",
-            "Broken pipe",
+            "Materialize failure still aborts",
             &json!({"reasoningEffort":"high"}),
             |method, _| {
-                if method == "thread/settings/update" {
+                if method == "thread/name/set" {
                     Err(Failure::AcceptanceUncertain)
                 } else {
                     Ok(json!({}))
