@@ -13,8 +13,9 @@ mod package;
 mod running;
 mod window;
 
-use super::{codex, shortcut, Environment};
+use super::{codex, engines, local_app, shortcut, variable, Environment};
 use std::{
+    collections::HashSet,
     path::{Path, PathBuf},
     process::{Command, Stdio},
 };
@@ -25,6 +26,8 @@ pub(super) use window::allow_foreground;
 pub(crate) use window::{bring_forward as bring_window_forward, is_main_window};
 
 pub(super) const CODEX: &str = "com.openai.codex";
+const CLAUDE: &str = "com.anthropic.claudefordesktop";
+const ANTIGRAVITY: &str = "com.google.antigravity";
 const DEEPSEEK: &str = "com.deepseek.dsh";
 const BROWSERS: &[&str] = &["msedge.exe", "chrome.exe", "firefox.exe", "brave.exe"];
 
@@ -33,8 +36,8 @@ fn programs(bundle_id: &str) -> &'static [&'static str] {
     match bundle_id {
         CODEX => &["Codex.exe", "ChatGPT.exe"],
         DEEPSEEK => &["DeepSeek Harness.exe"],
-        "com.anthropic.claudefordesktop" => &["Claude.exe"],
-        "com.google.antigravity" => &["Antigravity.exe", "Antigravity IDE.exe"],
+        CLAUDE => &["Claude.exe"],
+        ANTIGRAVITY => &["Antigravity.exe", "Antigravity IDE.exe"],
         "com.exafunction.windsurf" => &["Windsurf.exe"],
         "com.todesktop.230313mzl4w4u92" => &["Cursor.exe"],
         "com.trae.app" => &["Trae.exe"],
@@ -68,7 +71,108 @@ fn installed_executable(bundle_id: &str) -> Option<PathBuf> {
     if bundle_id == CODEX {
         return codex_installation()?.applications.into_iter().next();
     }
-    found_executable(bundle_id)
+    if let Some(found) = found_executable(bundle_id) {
+        return Some(found);
+    }
+    let home = super::home_dir().ok()?;
+    let env: Environment = std::env::vars().collect();
+    installed_in(&home, &env, bundle_id)
+        .into_iter()
+        .find(|path| path.is_file())
+}
+
+/// Standard install locations on disk for a Windows desktop app, independent
+/// of running processes or Start menu shortcuts.
+pub(super) fn installed_in(home: &Path, env: &Environment, bundle_id: &str) -> Vec<PathBuf> {
+    let local = local_app(home, env);
+    let mut bases = vec![
+        local.join("Programs"),
+        variable(env, "ProgramFiles").unwrap_or_else(|| PathBuf::from("C:/Program Files")),
+    ];
+    if let Some(x86) = variable(env, "ProgramFiles(x86)") {
+        bases.push(x86);
+    }
+    let mut found = Vec::new();
+    match bundle_id {
+        CLAUDE => {
+            let squirrel = local.join("AnthropicClaude");
+            let launcher = squirrel.join("Claude.exe");
+            if launcher.is_file() {
+                found.push(launcher);
+            }
+            for entry in std::fs::read_dir(&squirrel).into_iter().flatten().flatten() {
+                if entry
+                    .file_name()
+                    .to_str()
+                    .is_some_and(|name| name.starts_with("app-"))
+                {
+                    let exe = entry.path().join("Claude.exe");
+                    if exe.is_file() {
+                        found.push(exe);
+                    }
+                }
+            }
+            for base in &bases {
+                let exe = base.join("Claude").join("Claude.exe");
+                if exe.is_file() {
+                    found.push(exe);
+                }
+            }
+            found.extend(engines::find_store_packages(&local, "Claude_"));
+        }
+        ANTIGRAVITY => {
+            for base in &bases {
+                for (folder, exe) in [
+                    ("antigravity", "Antigravity.exe"),
+                    ("Antigravity IDE", "Antigravity IDE.exe"),
+                ] {
+                    let path = base.join(folder).join(exe);
+                    if path.is_file() {
+                        found.push(path);
+                    }
+                }
+            }
+        }
+        DEEPSEEK => {
+            for base in &bases {
+                let path = base.join("DeepSeek Harness").join("DeepSeek Harness.exe");
+                if path.is_file() {
+                    found.push(path);
+                }
+            }
+        }
+        _ => {}
+    }
+    dedup_paths(&mut found);
+    found
+}
+
+fn dedup_paths(paths: &mut Vec<PathBuf>) {
+    let mut seen = HashSet::new();
+    paths.retain(|path| seen.insert(path.to_string_lossy().to_ascii_lowercase()));
+}
+
+/// Installed desktop executables (or Store package directories for Store
+/// Claude) for one app, checked from running processes, shortcuts and standard
+/// install folders.
+pub(crate) fn desktop_for(home: &Path, bundle_id: &str) -> Vec<PathBuf> {
+    if bundle_id == CODEX {
+        let env: Environment = std::env::vars().collect();
+        let found = codex::installation(home, &env);
+        return if found.installed {
+            found.applications
+        } else {
+            Vec::new()
+        };
+    }
+    let mut found = Vec::new();
+    if let Some(path) = found_executable(bundle_id) {
+        found.push(path);
+    }
+    let env: Environment = std::env::vars().collect();
+    found.extend(installed_in(home, &env, bundle_id));
+    dedup_paths(&mut found);
+    found
 }
 
 /// Whether this user has the app somewhere it can be started from. A Store
@@ -120,14 +224,10 @@ fn deepseek_executable() -> Option<PathBuf> {
     if let Some(found) = found_executable(DEEPSEEK) {
         return Some(found);
     }
-    ["ProgramFiles(x86)", "ProgramFiles"]
+    let home = super::home_dir().ok()?;
+    let env: Environment = std::env::vars().collect();
+    installed_in(&home, &env, DEEPSEEK)
         .into_iter()
-        .filter_map(std::env::var_os)
-        .map(|base| {
-            PathBuf::from(base)
-                .join("DeepSeek Harness")
-                .join("DeepSeek Harness.exe")
-        })
         .find(|path| path.is_file())
 }
 
@@ -208,4 +308,49 @@ fn start(program: &Path, link: Option<&str>) -> bool {
         .stderr(Stdio::null());
     window::allow_foreground();
     super::spawn(&mut command).is_ok()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn installed_in_finds_standard_windows_desktop_layouts() {
+        let temp = tempfile::tempdir().unwrap();
+        let home = temp.path().join("home");
+        let local = temp.path().join("Local");
+        let pf = temp.path().join("ProgramFiles");
+        let pf86 = temp.path().join("ProgramFiles86");
+        let env = Environment::from([
+            ("LOCALAPPDATA".into(), local.to_string_lossy().into_owned()),
+            ("ProgramFiles".into(), pf.to_string_lossy().into_owned()),
+            (
+                "ProgramFiles(x86)".into(),
+                pf86.to_string_lossy().into_owned(),
+            ),
+        ]);
+        for id in [CLAUDE, ANTIGRAVITY, DEEPSEEK] {
+            assert!(installed_in(&home, &env, id).is_empty(), "{id}");
+        }
+        let touch = |path: PathBuf| {
+            std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+            std::fs::write(&path, b"MZ").unwrap();
+            path
+        };
+        let claude_squirrel = touch(local.join("AnthropicClaude/app-1.0.0/Claude.exe"));
+        let claude_store = local.join("Packages/Claude_pzs8sxrjxfjjc");
+        std::fs::create_dir_all(&claude_store).unwrap();
+        let antigravity = touch(local.join("Programs/antigravity/Antigravity.exe"));
+        let antigravity_ide = touch(local.join("Programs/Antigravity IDE/Antigravity IDE.exe"));
+        let deepseek = touch(local.join("Programs/DeepSeek Harness/DeepSeek Harness.exe"));
+
+        let claude_found = installed_in(&home, &env, CLAUDE);
+        assert!(claude_found.contains(&claude_squirrel), "{claude_found:?}");
+        assert!(claude_found.contains(&claude_store), "{claude_found:?}");
+        assert_eq!(
+            installed_in(&home, &env, ANTIGRAVITY),
+            vec![antigravity, antigravity_ide]
+        );
+        assert_eq!(installed_in(&home, &env, DEEPSEEK), vec![deepseek]);
+    }
 }

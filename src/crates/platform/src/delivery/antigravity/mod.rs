@@ -104,13 +104,11 @@ impl AntigravityTransport for NativeAntigravityTransport {
     }
 }
 
-/// Whether Antigravity's desktop or IDE app is installed in one of `applications`.
+/// Whether Antigravity's desktop or IDE app is installed in one of `applications`:
+/// `Antigravity.app` / `Antigravity IDE.app` on macOS, or `Antigravity.exe` /
+/// `Antigravity IDE.exe` on Windows.
 pub fn desktop_installed(applications: &[PathBuf]) -> bool {
-    applications.iter().any(|folder| {
-        ["Antigravity.app", "Antigravity IDE.app"]
-            .iter()
-            .any(|app| folder.join(app).is_dir())
-    })
+    super::starts::desktop_in(applications, Provider::Antigravity)
 }
 
 /// `GEMINI_CLI_HOME`, else `~/.gemini`: where Antigravity keeps its folders.

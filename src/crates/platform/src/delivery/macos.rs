@@ -6,8 +6,14 @@ use super::Result;
 use std::path::{Path, PathBuf};
 
 /// Where desktop apps are installed: `/Applications` and `~/Applications`.
-pub(crate) fn applications(home: &Path) -> Vec<PathBuf> {
+fn applications(home: &Path) -> Vec<PathBuf> {
     vec![PathBuf::from("/Applications"), home.join("Applications")]
+}
+
+/// Whether `provider`'s desktop app is installed in `/Applications` or
+/// `~/Applications`.
+pub(crate) fn desktop_installed(home: &Path, provider: super::Provider) -> bool {
+    super::starts::desktop_in(&applications(home), provider)
 }
 
 /// Where the Codex desktop app is looked for: the app folders.

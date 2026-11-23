@@ -16,8 +16,8 @@ mod shims;
 mod shortcut;
 pub(crate) use crate::windows_session::spawn;
 pub(crate) use apps::{
-    activate_app, app_running, bring_window_forward, codex_applications, is_main_window,
-    launch_app, registered_bundle, start_program,
+    activate_app, app_running, bring_window_forward, codex_applications, desktop_for,
+    is_main_window, launch_app, registered_bundle, start_program,
 };
 pub(crate) use engines::{
     application_installed, claude_desktop_bases, discovered_executable, engine_candidates,
