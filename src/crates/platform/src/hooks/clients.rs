@@ -33,19 +33,28 @@ fn launches(source: &str, os: agent_hud_agents::Os) -> bool {
     agent_hud_agents::hooks::hooks_by_id(source)
         .is_some_and(|hooks| hooks.launch.on(os).value().is_some())
 }
+/// Whether Agent HUD puts `source`'s hooks in on `os`. Where it does not, a
+/// client that takes messages through its hooks cannot take one there (Open #89).
+pub fn launches_on(source: &str, os: agent_hud_agents::Os) -> bool {
+    launches(source, os)
+}
 /// Whether Agent HUD puts `source`'s hooks in on this operating system. Where
 /// it does not, a client that takes messages through its hooks cannot take
 /// one here (Open #89).
 pub fn launches_here(source: &str) -> bool {
     launches(source, crate::os::OS)
 }
-/// This operating system's name as people read it.
-pub fn system_name() -> &'static str {
-    match crate::os::OS {
+/// An operating system's name as people read it.
+pub fn os_name(os: agent_hud_agents::Os) -> &'static str {
+    match os {
         agent_hud_agents::Os::MacOs => "macOS",
         agent_hud_agents::Os::Windows => "Windows",
         agent_hud_agents::Os::Linux => "Linux",
     }
+}
+/// This operating system's name as people read it.
+pub fn system_name() -> &'static str {
+    os_name(crate::os::OS)
 }
 /// Why a client found here has no hooks: Agent HUD does not put them in on
 /// this system yet. Said in Settings, so its sessions never look like a

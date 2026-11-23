@@ -274,4 +274,59 @@ mod hook_tests {
         assert!(reason.contains("interactive"), "{reason}");
         assert!(reason.contains("next turn"), "{reason}");
     }
+
+    #[test]
+    fn list_sessions_capabilities_and_client_features_agree_on_hook_clients() {
+        let root = std::env::temp_dir().join(format!(
+            "agent-hud-listing-{}",
+            uuid::Uuid::new_v4().simple()
+        ));
+        let clients = agent_hud_platform::delivery::LocalClients::new(
+            agent_hud_platform::delivery::LocalClientPaths {
+                claude_channel: root.join("claude"),
+                codex_data: root.join("codex"),
+                receipts: root.join("receipts"),
+            },
+            Vec::new(),
+        )
+        .unwrap();
+        let capabilities = clients.capabilities();
+        let features = agent_hud_platform::client_features::client_features();
+        let now = chrono::Utc::now().to_rfc3339();
+        for id in [
+            "cursor",
+            "trae",
+            "trae-cn",
+            "workbuddy",
+            "codebuddy",
+            "zcode",
+            "qoder",
+            "qoder-cn",
+            "qoder-work",
+            "kimi",
+        ] {
+            let provider = Provider::parse(id).unwrap();
+            let launches = agent_hud_platform::hooks::launches_here(id);
+            let cap = capabilities
+                .iter()
+                .find(|cap| cap.provider == provider)
+                .unwrap();
+            assert_eq!(cap.supported, launches, "{id} capability");
+            assert_eq!(
+                features[id].contains(&"talk".to_owned()),
+                launches,
+                "{id} client_features"
+            );
+            let running = json!({
+                "id": format!("{id}:s1"),
+                "source": id,
+                "state": "running",
+                "hooks": {"at": now, "state": "running"},
+            });
+            let snapshot = json!({"sessions": [running.clone()]});
+            let (reachable, _) = hook_reachable(id, (&running, &snapshot), false, Language::En);
+            assert_eq!(reachable, json!(launches), "{id} hook_reachable");
+        }
+        let _ = std::fs::remove_dir_all(&root);
+    }
 }
