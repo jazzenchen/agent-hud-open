@@ -40,53 +40,54 @@ fn flag(command: &str, name: &str) -> Option<String> {
 
 pub(super) fn servers() -> Result<Vec<Server>, String> {
     let processes = crate::os::processes()?;
-    let gemini = std::env::var_os("GEMINI_CLI_HOME")
-        .filter(|value| !value.is_empty())
-        .map(std::path::PathBuf::from)
-        .or_else(|| crate::os::home_dir().ok().map(|home| home.join(".gemini")));
-    let saved = gemini.map(|dir| saved_tokens(&dir)).unwrap_or_default();
+    let env = std::env::vars().collect::<crate::os::Environment>();
+    let saved = crate::os::home_dir()
+        .ok()
+        .map(|home| saved_tokens(&home, &env))
+        .unwrap_or_default();
     Ok(parse_servers(processes, &saved))
 }
 
-/// The data folders a server may write its own file under: the desktop
-/// app's, the IDE's and the CLI's.
-const DATA_DIRS: [&str; 3] = ["antigravity", "antigravity-ide", "antigravity-cli"];
 /// Such a file holds a few short fields; anything larger is not one.
 const MAX_SAVED_BYTES: u64 = 4096;
 
 /// The token each server saved with its process id, from the files under
-/// `<gemini>/<data folder>/daemon` (`{"pid", "httpsPort", "csrfToken", …}`).
-/// A file left by a server that is gone names a process that is no longer a
-/// server here, or one whose service refuses the token; both are passed over.
-fn saved_tokens(gemini: &Path) -> HashMap<u32, String> {
+/// `<gemini>/<data folder>/daemon` (`{"pid", "httpsPort", "csrfToken", …}`),
+/// resolved through Antigravity's `Location` descriptors (`GEMINI_CLI_HOME`
+/// or `~/.gemini`). A file left by a server that is gone names a process
+/// that is no longer a server here, or one whose service refuses the token;
+/// both are passed over.
+fn saved_tokens(home: &Path, env: &crate::os::Environment) -> HashMap<u32, String> {
     let mut tokens = HashMap::new();
-    for dir in DATA_DIRS {
-        let Ok(entries) = std::fs::read_dir(gemini.join(dir).join("daemon")) else {
-            continue;
-        };
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if path.extension().is_none_or(|ext| ext != "json")
-                || !entry
-                    .metadata()
-                    .is_ok_and(|meta| meta.is_file() && meta.len() <= MAX_SAVED_BYTES)
-            {
-                continue;
-            }
-            let Some(saved) = std::fs::read(&path)
-                .ok()
-                .and_then(|bytes| serde_json::from_slice::<serde_json::Value>(&bytes).ok())
-            else {
+    for location in antigravity::AGENT.discovery.storage {
+        for dir in crate::os::resolve(home, env, location) {
+            let Ok(entries) = std::fs::read_dir(dir.join("daemon")) else {
                 continue;
             };
-            let pid = saved["pid"]
-                .as_u64()
-                .and_then(|pid| u32::try_from(pid).ok());
-            let token = saved["csrfToken"].as_str().filter(|token| {
-                !token.is_empty() && !token.bytes().any(|byte| byte.is_ascii_control())
-            });
-            if let (Some(pid), Some(token)) = (pid, token) {
-                tokens.insert(pid, token.to_owned());
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.extension().is_none_or(|ext| ext != "json")
+                    || !entry
+                        .metadata()
+                        .is_ok_and(|meta| meta.is_file() && meta.len() <= MAX_SAVED_BYTES)
+                {
+                    continue;
+                }
+                let Some(saved) = std::fs::read(&path)
+                    .ok()
+                    .and_then(|bytes| serde_json::from_slice::<serde_json::Value>(&bytes).ok())
+                else {
+                    continue;
+                };
+                let pid = saved["pid"]
+                    .as_u64()
+                    .and_then(|pid| u32::try_from(pid).ok());
+                let token = saved["csrfToken"].as_str().filter(|token| {
+                    !token.is_empty() && !token.bytes().any(|byte| byte.is_ascii_control())
+                });
+                if let (Some(pid), Some(token)) = (pid, token) {
+                    tokens.insert(pid, token.to_owned());
+                }
             }
         }
     }
