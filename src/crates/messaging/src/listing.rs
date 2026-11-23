@@ -15,10 +15,11 @@ impl Messaging {
             .map(|row| row.target.session_id)
             .collect()
     }
-    pub(crate) fn list(&self, caller: Option<&Caller>, host: &Host<'_>) -> Value {
+    pub(crate) fn list(&self, caller: Option<&Caller>, host: &Host<'_>, extras: &[Value]) -> Value {
         let language = language(host.snapshot);
         let loaded = self.loaded();
         let mut rows = sessions(host.snapshot)
+            .chain(extras.iter())
             .map(|session| {
                 let id = session["id"].as_str().unwrap_or_default();
                 let client = session["source"].as_str().unwrap_or_default();

@@ -40,6 +40,8 @@ fn each_client_reads_the_skill_from_its_own_folder() {
     let defaults = Places::new(&home, &HashMap::from([("DSH_HOME".into(), " ".into())]));
     assert_eq!(defaults.claude, home.join(".claude"));
     assert_eq!(defaults.deepseek, home.join(".dsh"));
+    let backslash = Places::new(&home, &HashMap::from([("DSH_HOME".into(), "~\\d".into())]));
+    assert_eq!(backslash.deepseek, home.join("d"));
     for client in CLIENTS {
         assert_eq!(Client::from_id(client.id()), Some(client));
     }

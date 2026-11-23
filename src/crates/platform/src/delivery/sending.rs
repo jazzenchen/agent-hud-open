@@ -45,6 +45,9 @@ impl LocalClients {
                         || (request.provider == Provider::Antigravity
                             && antigravity_cascade_id(&target.session_id)
                                 == antigravity_cascade_id(&request.session_id))
+                        || (request.provider == Provider::DeepSeek
+                            && deepseek::bare(&target.session_id)
+                                == deepseek::bare(&request.session_id))
                         || (request.provider.uses_hook_channel()
                             && hook_session_key(request.provider, &target.session_id)
                                 == hook_session_key(request.provider, &request.session_id)))

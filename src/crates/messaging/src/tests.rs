@@ -1440,6 +1440,91 @@ fn a_deepseek_harness_session_is_refused_without_its_plugin_or_switch() {
 }
 
 #[test]
+fn a_checked_in_deepseek_session_missing_from_snapshot_is_listed_and_takes_replies() {
+    let mut world = World::on();
+    // Only check the session in via deepseek-channel; leave it absent from
+    // `snapshot["sessions"]` (as happens for a brand-new or >24h reopened session).
+    let folder = world.harness_channel.join("sessions");
+    std::fs::create_dir_all(&folder).unwrap();
+    std::fs::write(
+        folder.join(format!("{HARNESS_TWO_OWN}.json")),
+        json!({"at": 1, "host": 4242, "channelVersion": 3}).to_string(),
+    )
+    .unwrap();
+
+    let list = world.call(
+        Some(("deepseek", HARNESS_TWO_OWN)),
+        "list_sessions",
+        json!({}),
+    );
+    let row = list["sessions"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|row| row["id"] == HARNESS_TWO)
+        .expect("checked-in Harness session appears in list_sessions");
+    assert_eq!(row["client"], "deepseek");
+    assert_eq!(row["reachable"], true);
+    assert_eq!(row["self"], true);
+    // Repeated list_sessions calls reuse the cached session_detail lookup
+    // until sessionsRevision changes.
+    assert_eq!(world.transcripts.calls.load(AtomicOrdering::SeqCst), 1);
+    let _ = world.call(
+        Some(("deepseek", HARNESS_TWO_OWN)),
+        "list_sessions",
+        json!({}),
+    );
+    assert_eq!(
+        world.transcripts.calls.load(AtomicOrdering::SeqCst),
+        1,
+        "extra session_detail lookup is cached across calls"
+    );
+    world.snapshot["sessionsRevision"] = json!(2);
+    let _ = world.call(Some(("codex", CODEX)), "list_sessions", json!({}));
+    assert_eq!(
+        world.transcripts.calls.load(AtomicOrdering::SeqCst),
+        2,
+        "bumping sessionsRevision refreshes the cached detail"
+    );
+
+    // DSH sends a message to Codex; Codex replies via reply_to alone and with bare `to`.
+    let sent = world.send(("deepseek", HARNESS_TWO_OWN), CODEX, "Ping from DSH");
+    assert_eq!(sent["state"], "queued", "{sent}");
+    let first_id = sent["id"].as_str().unwrap().to_owned();
+
+    let reply = world.call(
+        Some(("codex", CODEX)),
+        "send_message",
+        json!({"reply_to": first_id, "text": "Reply via reply_to"}),
+    );
+    assert_eq!(reply["delivered"], true, "{reply}");
+    let prompts = world
+        .harness_channel
+        .join(format!("prompts/{HARNESS_TWO_OWN}"));
+    assert_eq!(
+        std::fs::read_dir(&prompts).unwrap().count(),
+        1,
+        "reply landed in DSH prompts folder"
+    );
+
+    let reply_with_to = world.call(
+        Some(("codex", CODEX)),
+        "send_message",
+        json!({"to": HARNESS_TWO_OWN, "reply_to": first_id, "text": "Reply with bare to"}),
+    );
+    assert_eq!(reply_with_to["delivered"], true, "{reply_with_to}");
+
+    // Turning DeepSeek off hides the checked-in session from list_sessions.
+    world.snapshot["providers"] = json!([{"id": "deepseek", "enabled": false}]);
+    let hidden = world.call(Some(("codex", CODEX)), "list_sessions", json!({}));
+    assert!(!hidden["sessions"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|row| row["id"] == HARNESS_TWO));
+}
+
+#[test]
 fn passes_count_while_messages_wake_each_other_and_stop_at_the_limit() {
     let mut world = World::new(Preferences {
         enabled: true,

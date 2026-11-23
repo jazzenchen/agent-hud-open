@@ -442,6 +442,12 @@ fn deepseek_words_go_to_the_plugin_under_harnesss_own_session_id() {
     let receipt = service.send(harness_request()).unwrap();
     assert_eq!(receipt.state, DeliveryState::Waiting);
     assert_eq!(receipt.session_id, HARNESS);
+    // Harness's bare session id matches the snapshot-prefixed target too.
+    let mut bare = harness_request();
+    bare.session_id = HARNESS_OWN.into();
+    bare.request_id = "req_bare_harness".into();
+    let bare_receipt = service.send(bare).unwrap();
+    assert_eq!(bare_receipt.state, DeliveryState::Waiting);
     let payload: Value =
         serde_json::from_slice(&fs::read(fixture.harness_prompt()).unwrap()).unwrap();
     assert_eq!(payload["id"], REQUEST);

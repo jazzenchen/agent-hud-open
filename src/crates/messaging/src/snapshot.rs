@@ -118,11 +118,5 @@ pub(crate) fn agent_on(snapshot: &Value, client: &str) -> bool {
 }
 
 pub(crate) fn party(snapshot: &Value, client: &str, id: &str) -> Party {
-    Party {
-        client: client.into(),
-        session_id: id.into(),
-        title: find_in(snapshot, client, id)
-            .and_then(|session| session["title"].as_str())
-            .map(str::to_owned),
-    }
+    party_any(snapshot, &[], client, id)
 }

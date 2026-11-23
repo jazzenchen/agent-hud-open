@@ -39,7 +39,8 @@ impl Messaging {
     /// new session in. Only clients the window offers now are there.
     pub fn user_sessions(&mut self, host: &Host<'_>) -> Value {
         self.preferences = Preferences::read(&host.snapshot["settings"]);
-        self.clients.update_targets(sessions_targets(host.snapshot));
+        let extras = self.live_extras(host);
+        self.sync_targets(host, &extras);
         let language = language(host.snapshot);
         let loaded = self.loaded();
         let offered = |client: &str| {
@@ -49,6 +50,7 @@ impl Messaging {
                     .is_none()
         };
         let mut rows = sessions(host.snapshot)
+            .chain(extras.iter())
             .filter(|session| offered(session["source"].as_str().unwrap_or("")))
             .filter_map(|session| {
                 let id = session["id"].as_str().unwrap_or_default();
@@ -158,8 +160,9 @@ impl Messaging {
         if let Some(reason) = self.user_client_off(client, host.snapshot, language) {
             return Ok(refused(&reason));
         }
-        self.clients.update_targets(sessions_targets(host.snapshot));
-        let Some(session) = find_in(host.snapshot, client, session_id) else {
+        let extras = self.live_extras(host);
+        self.sync_targets(host, &extras);
+        let Some(session) = find_in_any(host.snapshot, &extras, client, session_id) else {
             return Ok(refused(&words::unknown(language)));
         };
         let id = session["id"].as_str().unwrap_or(session_id).to_owned();
@@ -188,7 +191,10 @@ impl Messaging {
                 self.clients.delivered(&receipt, surface, now);
                 let state = delivered(receipt.state);
                 if !matches!(state, "refused" | "expired") {
-                    (self.fly)(person_flight(&party(host.snapshot, client, &id), false));
+                    (self.fly)(person_flight(
+                        &party_any(host.snapshot, &extras, client, &id),
+                        false,
+                    ));
                 }
                 json!({
                     "state": state,

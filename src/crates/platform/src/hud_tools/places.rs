@@ -22,14 +22,13 @@ impl Places {
             .map(PathBuf::from)
             .filter(|path| path.is_absolute())
             .unwrap_or_else(|| home.join(".claude"));
-        let deepseek = match environment
-            .get("DSH_HOME")
-            .map(String::as_str)
-            .filter(|path| !path.trim().is_empty())
+        let deepseek = match crate::os::environment_value(environment, "DSH_HOME")
+            .map(str::trim)
+            .filter(|path| !path.is_empty())
         {
             None => home.join(".dsh"),
             Some("~") => home.to_path_buf(),
-            Some(path) => match path.strip_prefix("~/") {
+            Some(path) => match path.strip_prefix("~/").or_else(|| path.strip_prefix("~\\")) {
                 Some(tail) => home.join(tail),
                 None => PathBuf::from(path),
             },

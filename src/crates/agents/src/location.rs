@@ -138,8 +138,15 @@ impl Location {
                 env(key)
                     .map(|value| value.trim().to_owned())
                     .filter(|value| !value.is_empty())
+                    .map(|value| (*key, value))
             })
-            .map(PathBuf::from)
+            .map(|(key, value)| {
+                if self.base == Base::Home && key == "DSH_HOME" {
+                    expand_home(base, &value)
+                } else {
+                    PathBuf::from(value)
+                }
+            })
             .filter(|folder| {
                 !self.not_if.is_some_and(|other| {
                     let other = base.join(other);
@@ -205,6 +212,21 @@ impl Location {
         } else {
             folder.join(self.path)
         }
+    }
+}
+
+/// Expands a leading `~`, `~/`, or `~\` against `home`, matching clients such
+/// as DeepSeek Harness (`dsh-home-paths`).
+fn expand_home(home: &Path, value: &str) -> PathBuf {
+    if value == "~" {
+        home.to_path_buf()
+    } else if let Some(tail) = value
+        .strip_prefix("~/")
+        .or_else(|| value.strip_prefix("~\\"))
+    {
+        home.join(tail)
+    } else {
+        PathBuf::from(value)
     }
 }
 
@@ -297,6 +319,37 @@ mod tests {
         assert_eq!(
             resolve(&qwen, &[("QWEN_RUNTIME_DIR", " ")], &[]),
             [PathBuf::from("/h/.qwen/projects")]
+        );
+    }
+
+    #[test]
+    fn only_dsh_home_expands_leading_tilde_in_location_resolution() {
+        let home = std::env::temp_dir().join("agent-hud-location-tilde");
+        let dsh = Location::home(&["DSH_HOME"], &[".dsh"], "sessions");
+        let other = Location::home(&["OTHER_HOME"], &[".other"], "sessions");
+        let disk = Disk {
+            present: HashSet::new(),
+        };
+        let lookup = |loc: &Location, var: &str, value: &str| {
+            loc.resolve(&home, &|key| (key == var).then(|| value.to_owned()), &disk)
+        };
+        assert_eq!(
+            lookup(&dsh, "DSH_HOME", "~/custom-dsh"),
+            [home.join("custom-dsh/sessions")]
+        );
+        assert_eq!(
+            lookup(&dsh, "DSH_HOME", "~\\custom-dsh"),
+            [home.join("custom-dsh/sessions")]
+        );
+        assert_eq!(lookup(&dsh, "DSH_HOME", "~"), [home.join("sessions")]);
+        // Other clients' home variables stay literal, never changing `~` or `~\` paths.
+        assert_eq!(
+            lookup(&other, "OTHER_HOME", "~/custom-other"),
+            [PathBuf::from("~/custom-other").join("sessions")]
+        );
+        assert_eq!(
+            lookup(&other, "OTHER_HOME", "~\\custom-other"),
+            [PathBuf::from("~\\custom-other").join("sessions")]
         );
     }
 

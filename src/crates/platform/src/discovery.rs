@@ -182,11 +182,14 @@ fn has_session_file(path: &Path, depth: usize, budget: &mut usize) -> bool {
     if meta.is_file() {
         // A database's existence proves a client storage installation, not that it
         // contains billable usage. Readers for those formats remain detection-only.
+        let name = path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or("");
         return meta.len() > 0
-            && (path
-                .extension()
-                .is_some_and(|extension| extension == "jsonl")
-                || path.file_name().is_some_and(|name| name == "session.json"));
+            && (name.ends_with(".jsonl")
+                || name.ends_with(".jsonl.zstd")
+                || name == "session.json");
     }
     depth > 0
         && fs::read_dir(path).is_ok_and(|entries| {
@@ -245,6 +248,10 @@ mod tests {
         file(&home.join(".codebuddy/projects/p/s.jsonl"), "x");
         file(&home.join(".workbuddy/settings.json"), "{}");
         file(&home.join(".local/share/devin/cli/sessions.db"), "x");
+        file(
+            &home.join(".dsh/sessions/--work--/session-1/session.v4.jsonl.zstd"),
+            "x",
+        );
         let found = from_files(home, &[]);
         assert_eq!(found["codex"], ["client-storage", "configuration-file"]);
         assert_eq!(found["kimi"], ["client-storage", "local-session-files"]);
@@ -253,6 +260,7 @@ mod tests {
             ["client-storage", "local-session-files"]
         );
         assert_eq!(found["workbuddy"], ["configuration-file"]);
+        assert_eq!(found["deepseek"], ["client-storage", "local-session-files"]);
         assert_eq!(
             found["devin"],
             ["client-storage"],
