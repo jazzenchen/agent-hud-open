@@ -60,6 +60,34 @@ When checking an X11 build, test a HUD away from the screen origin:
   receives input.
 - Restart Agent HUD and repeat both checks without changing its placement.
 
+### White lines or stale frames after the HUD collapses on NVIDIA/X11
+
+On Ubuntu 25.04 with NVIDIA 580.95.05 and WebKitGTK
+`2.50.4-0ubuntu0.25.04.1`, the transparent HUD can retain old animation frames
+after its panel closes. Restarting clears the old pixels but is not a lasting
+fix. A process-local workaround tested with Agent HUD 0.6.12 is:
+
+```sh
+WEBKIT_FORCE_DMABUF_RENDERER=1 WEBKIT_DMABUF_RENDERER_FORCE_SHM=1 "/path/to/Agent HUD"
+```
+
+Quit Agent HUD fully first. If this fixes the artifact, set both variables only
+in Agent HUD's X11 launch wrapper. Retain any existing `DSH_HOME` or library-path
+settings; do not export these variables for the whole desktop session.
+
+Both variables matter for this distribution build: its NVIDIA blacklist returns
+before WebKit considers the shared-memory option. The first variable bypasses
+that blacklist; the second selects shared-memory buffers rather than hardware
+DMA-BUF buffers. See the [Ubuntu package patch](https://launchpad.net/ubuntu/+archive/primary/+sourcefiles/webkit2gtk/2.50.4-0ubuntu0.25.04.1/webkit2gtk_2.50.4-0ubuntu0.25.04.1.debian.tar.xz)
+and [WebKit 2.50.4 buffer selection](https://github.com/WebKit/WebKit/blob/webkitgtk-2.50.4/Source/WebKit/UIProcess/gtk/AcceleratedBackingStore.cpp).
+
+This retains animations and saved placement, but buffer copies can add CPU
+overhead. It is a workaround for the tested stack, not a default for every Linux
+driver or WebKit version. Verify repeated expansion/collapse, settings clicks,
+transparent-area pass-through and a full restart. Remove both wrapper variables
+to undo it. Do not combine it with `WEBKIT_DISABLE_DMABUF_RENDERER=1`, which
+disables the path being selected.
+
 ### DeepSeek Harness sessions are missing
 
 Agent HUD reads Harness sessions from `$DSH_HOME/sessions` when `DSH_HOME` is set,
