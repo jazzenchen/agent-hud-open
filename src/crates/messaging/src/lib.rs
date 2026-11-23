@@ -210,8 +210,14 @@ impl Messaging {
         if !self.preferences.enabled {
             return Ok(refused(&words::off(language(host.snapshot))));
         }
-        // The sessions a message can go to, from this very snapshot.
-        self.clients.update_targets(sessions_targets(host.snapshot));
+        let now_system = std::time::SystemTime::now();
+        let channel = self.clients.deepseek_channel();
+        // The sessions a message can go to, from this snapshot and live Harness check-ins.
+        self.clients.update_targets(with_deepseek_targets(
+            host.snapshot,
+            channel.as_ref(),
+            now_system,
+        ));
         let caller = serde_json::from_value::<Caller>(params["caller"].clone())
             .ok()
             .map(|mut caller| {
@@ -219,6 +225,13 @@ impl Messaging {
                     .and_then(|s| s["id"].as_str())
                 {
                     caller.session_id = session_id.to_owned();
+                } else if caller.client == "deepseek"
+                    && !caller.session_id.starts_with("deepseek:")
+                    && channel
+                        .as_ref()
+                        .is_some_and(|ch| ch.runs(&caller.session_id, now_system))
+                {
+                    caller.session_id = format!("deepseek:{}", caller.session_id);
                 }
                 caller
             });

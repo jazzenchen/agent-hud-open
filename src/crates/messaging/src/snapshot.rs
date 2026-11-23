@@ -118,11 +118,131 @@ pub(crate) fn agent_on(snapshot: &Value, client: &str) -> bool {
 }
 
 pub(crate) fn party(snapshot: &Value, client: &str, id: &str) -> Party {
+    party_any(snapshot, &[], client, id)
+}
+
+pub(crate) fn party_any(snapshot: &Value, extras: &[Value], client: &str, id: &str) -> Party {
     Party {
         client: client.into(),
         session_id: id.into(),
-        title: find_in(snapshot, client, id)
+        title: find_in_any(snapshot, extras, client, id)
             .and_then(|session| session["title"].as_str())
             .map(str::to_owned),
     }
+}
+
+/// Snapshot targets plus live checked-in DeepSeek Harness root sessions not
+/// currently in the 24-hour snapshot (for example, a newly opened session
+/// before its log is collected or a reopened older session).
+pub(crate) fn with_deepseek_targets(
+    snapshot: &Value,
+    channel: Option<&delivery::DeepSeekChannel>,
+    now: std::time::SystemTime,
+) -> Vec<SessionTarget> {
+    let mut targets = sessions_targets(snapshot);
+    if !agent_on(snapshot, "deepseek") {
+        return targets;
+    }
+    let Some(channel) = channel else {
+        return targets;
+    };
+    let mut ids = channel.loaded(now).into_iter().collect::<Vec<_>>();
+    ids.sort();
+    for bare in ids {
+        let id = format!("deepseek:{bare}");
+        if !targets.iter().any(|target| {
+            target.provider == Provider::DeepSeek && same_session(&target.session_id, &id)
+        }) {
+            targets.push(SessionTarget {
+                provider: Provider::DeepSeek,
+                session_id: id,
+                thread_id: None,
+                parent_id: None,
+            });
+        }
+    }
+    targets
+}
+
+/// Checked-in DeepSeek Harness root sessions missing from `host.snapshot`:
+/// enriched from `session_detail` when already indexed, otherwise represented
+/// from their live plugin check-in so `list_sessions` and `send_message` can
+/// address and reply to them immediately.
+pub(crate) fn deepseek_extras(
+    channel: Option<&delivery::DeepSeekChannel>,
+    host: &Host<'_>,
+    now: std::time::SystemTime,
+) -> Vec<Value> {
+    if !agent_on(host.snapshot, "deepseek") {
+        return Vec::new();
+    }
+    let Some(channel) = channel else {
+        return Vec::new();
+    };
+    let mut ids = channel.loaded(now).into_iter().collect::<Vec<_>>();
+    ids.sort();
+    let mut extras = Vec::new();
+    for bare in ids {
+        if find_in(host.snapshot, "deepseek", &bare).is_some() {
+            continue;
+        }
+        let id = format!("deepseek:{bare}");
+        if let Ok(detail) = (host.query)("session_detail", json!({"id": &id})) {
+            let session = &detail["session"];
+            if session.is_object() && session["source"] == "deepseek" {
+                if session["parentId"].is_null() {
+                    extras.push(session.clone());
+                }
+                continue;
+            }
+        }
+        let updated = channel
+            .last_check_in(&bare)
+            .map(|at| chrono::DateTime::<chrono::Utc>::from(at).to_rfc3339());
+        extras.push(json!({
+            "id": id,
+            "source": "deepseek",
+            "title": Value::Null,
+            "cwd": Value::Null,
+            "project": Value::Null,
+            "state": "idle",
+            "model": Value::Null,
+            "parentId": Value::Null,
+            "updatedAt": updated,
+        }));
+    }
+    extras
+}
+
+/// Like `find`, also considering live checked-in sessions outside the snapshot.
+pub(crate) fn find_any<'a>(
+    snapshot: &'a Value,
+    extras: &'a [Value],
+    id: &str,
+) -> Option<&'a Value> {
+    let mut found = snapshot["sessions"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .chain(extras.iter())
+        .filter(|session| session["id"].as_str().is_some_and(|s| same_session(s, id)));
+    let first = found.next()?;
+    found
+        .all(|other| other["source"] == first["source"] && other["id"] == first["id"])
+        .then_some(first)
+}
+
+/// Like `find_in`, also considering live checked-in sessions outside the snapshot.
+pub(crate) fn find_in_any<'a>(
+    snapshot: &'a Value,
+    extras: &'a [Value],
+    client: &str,
+    id: &str,
+) -> Option<&'a Value> {
+    find_in(snapshot, client, id).or_else(|| {
+        extras.iter().find(|session| {
+            session["source"] == client
+                && session["id"].as_str().is_some_and(|s| same_session(s, id))
+        })
+    })
 }

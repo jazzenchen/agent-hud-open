@@ -139,7 +139,13 @@ impl Location {
                     .map(|value| value.trim().to_owned())
                     .filter(|value| !value.is_empty())
             })
-            .map(PathBuf::from)
+            .map(|value| {
+                if self.base == Base::Home {
+                    expand_home(base, &value)
+                } else {
+                    PathBuf::from(value)
+                }
+            })
             .filter(|folder| {
                 !self.not_if.is_some_and(|other| {
                     let other = base.join(other);
@@ -205,6 +211,21 @@ impl Location {
         } else {
             folder.join(self.path)
         }
+    }
+}
+
+/// Expands a leading `~`, `~/`, or `~\` against `home`, matching clients such
+/// as DeepSeek Harness (`dsh-home-paths`).
+fn expand_home(home: &Path, value: &str) -> PathBuf {
+    if value == "~" {
+        home.to_path_buf()
+    } else if let Some(tail) = value
+        .strip_prefix("~/")
+        .or_else(|| value.strip_prefix("~\\"))
+    {
+        home.join(tail)
+    } else {
+        PathBuf::from(value)
     }
 }
 
@@ -298,6 +319,25 @@ mod tests {
             resolve(&qwen, &[("QWEN_RUNTIME_DIR", " ")], &[]),
             [PathBuf::from("/h/.qwen/projects")]
         );
+    }
+
+    #[test]
+    fn a_home_location_expands_leading_tilde_in_its_variable() {
+        let home = std::env::temp_dir().join("agent-hud-location-tilde");
+        let dsh = Location::home(&["DSH_HOME"], &[".dsh"], "sessions");
+        let disk = Disk {
+            present: HashSet::new(),
+        };
+        let lookup = |value: &str| {
+            dsh.resolve(
+                &home,
+                &|key| (key == "DSH_HOME").then(|| value.to_owned()),
+                &disk,
+            )
+        };
+        assert_eq!(lookup("~/custom-dsh"), [home.join("custom-dsh/sessions")]);
+        assert_eq!(lookup("~\\custom-dsh"), [home.join("custom-dsh/sessions")]);
+        assert_eq!(lookup("~"), [home.join("sessions")]);
     }
 
     #[test]

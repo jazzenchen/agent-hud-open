@@ -34,7 +34,7 @@ fn directory(host: &dyn Host) -> PathBuf {
     };
     if path == "~" {
         host.home().to_path_buf()
-    } else if let Some(tail) = path.strip_prefix("~/") {
+    } else if let Some(tail) = path.strip_prefix("~/").or_else(|| path.strip_prefix("~\\")) {
         host.home().join(tail)
     } else {
         PathBuf::from(path)
