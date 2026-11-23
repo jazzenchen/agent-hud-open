@@ -70,7 +70,7 @@ impl StartConfig {
         host::codex_applications(&self.home)
     }
     /// Where desktop apps are installed: `/Applications` and `~/Applications`
-    /// on macOS; empty where they are not looked for yet (Linux, Windows).
+    /// on macOS, installed app executables/packages on Windows, empty on Linux.
     pub fn applications(&self) -> Vec<PathBuf> {
         host::applications(&self.home)
     }
@@ -128,8 +128,9 @@ pub struct SessionStarts {
     receipts: PathBuf,
     offers: Vec<StartOffer>,
     runner: Arc<dyn ProcessRunner>,
-    /// Where desktop apps are installed: `/Applications` and `~/Applications`.
-    applications: Vec<PathBuf>,
+    /// Test override for desktop app entries (`set_application_folders`); none
+    /// asks the host adapter (`host::desktop_installed`) live on every check.
+    applications: Option<Vec<PathBuf>>,
     /// The folder Agent HUD's DeepSeek Harness plugin shares with the app;
     /// none, and no Harness session is offered or started.
     deepseek: Option<DeepSeekChannel>,
@@ -157,13 +158,12 @@ impl SessionStarts {
             ));
         }
         private_dir(&receipts)?;
-        let applications = config.applications();
         Ok(Self {
             config,
             receipts,
             offers: Vec::new(),
             runner,
-            applications,
+            applications: None,
             deepseek: None,
             commands: None,
         })
@@ -186,7 +186,7 @@ impl SessionStarts {
     /// Tests look for desktop apps in fixture folders instead of this computer's.
     #[cfg(any(test, feature = "fixtures"))]
     pub fn set_application_folders(&mut self, folders: Vec<PathBuf>) {
-        self.applications = folders;
+        self.applications = Some(folders);
     }
     /// Tests name Pi's and OpenCode's command lines instead of this
     /// computer's: those not named are not installed.
@@ -233,28 +233,61 @@ impl SessionStarts {
         }
     }
     /// Whether the client's desktop app is installed, looked up on disk each
-    /// time: Claude.app for Claude; Codex.app or ChatGPT.app for Codex;
-    /// Antigravity.app or Antigravity IDE.app for Antigravity; DeepSeek
-    /// Harness.app for DeepSeek Harness.
+    /// time: Claude, Codex/ChatGPT, Antigravity/Antigravity IDE, DeepSeek
+    /// Harness.
     fn desktop(&self, provider: Provider) -> bool {
-        let names: &[&str] = match provider {
-            Provider::Claude => &["Claude.app"],
-            Provider::Codex => &["Codex.app", "ChatGPT.app"],
-            Provider::Antigravity => &["Antigravity.app", "Antigravity IDE.app"],
-            Provider::DeepSeek => &["DeepSeek Harness.app"],
-            Provider::Cursor
-            | Provider::Trae
-            | Provider::WorkBuddy
-            | Provider::ZCode
-            | Provider::Qoder
-            | Provider::Kimi
-            | Provider::Pi
-            | Provider::OpenCode => &[],
-        };
-        self.applications
-            .iter()
-            .any(|folder| names.iter().any(|name| folder.join(name).is_dir()))
+        match &self.applications {
+            Some(entries) => desktop_in(entries, provider),
+            None => host::desktop_installed(&self.config.home, provider),
+        }
     }
+}
+
+/// Whether `entries` (macOS application folders, Windows desktop executable
+/// paths, folders containing them, or Store package directories) includes
+/// `provider`'s desktop app.
+pub(crate) fn desktop_in(entries: &[PathBuf], provider: Provider) -> bool {
+    let (bundles, executables, store_prefix): (&[&str], &[&str], Option<&str>) = match provider {
+        Provider::Claude => (&["Claude.app"], &["Claude.exe"], Some("Claude_")),
+        Provider::Codex => (
+            &["Codex.app", "ChatGPT.app"],
+            &["Codex.exe", "ChatGPT.exe"],
+            None,
+        ),
+        Provider::Antigravity => (
+            &["Antigravity.app", "Antigravity IDE.app"],
+            &["Antigravity.exe", "Antigravity IDE.exe"],
+            None,
+        ),
+        Provider::DeepSeek => (&["DeepSeek Harness.app"], &["DeepSeek Harness.exe"], None),
+        Provider::Cursor
+        | Provider::Trae
+        | Provider::WorkBuddy
+        | Provider::ZCode
+        | Provider::Qoder
+        | Provider::Kimi
+        | Provider::Pi
+        | Provider::OpenCode => return false,
+    };
+    entries.iter().any(|entry| {
+        if entry.is_file() {
+            return entry
+                .file_name()
+                .and_then(|name| name.to_str())
+                .is_some_and(|name| executables.iter().any(|exe| name.eq_ignore_ascii_case(exe)));
+        }
+        if !entry.is_dir() {
+            return false;
+        }
+        bundles.iter().any(|bundle| entry.join(bundle).is_dir())
+            || executables.iter().any(|exe| entry.join(exe).is_file())
+            || store_prefix.is_some_and(|prefix| {
+                entry
+                    .file_name()
+                    .and_then(|name| name.to_str())
+                    .is_some_and(|name| name.starts_with(prefix))
+            })
+    })
 }
 
 /// A JSON file under 1 MiB, or null when it is missing, larger or not JSON.

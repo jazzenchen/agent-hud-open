@@ -784,3 +784,79 @@ fn an_opencode_start_finds_its_new_session_in_opencodes_database() {
     );
     assert_eq!(input, "Look at the failing test");
 }
+
+#[test]
+fn windows_desktop_executables_and_packages_are_matched_per_provider() {
+    let fixture = StartFixture::new();
+    let apps_dir = fixture.root.join("win-apps");
+    let touch = |rel: &str| {
+        let path = apps_dir.join(rel);
+        fs::create_dir_all(path.parent().unwrap()).unwrap(); // plain directory
+        fs::write(&path, b"MZ").unwrap();
+        path
+    };
+    let antigravity_exe = touch("antigravity/Antigravity.exe");
+    let antigravity_ide_exe = touch("Antigravity IDE/Antigravity IDE.exe");
+    let deepseek_exe = touch("DeepSeek Harness/DeepSeek Harness.exe");
+    let codex_exe = touch("Codex/Codex.exe");
+    let claude_store = apps_dir.join("Packages/Claude_pzs8sxrjxfjjc");
+    fs::create_dir_all(&claude_store).unwrap(); // plain directory
+
+    // Each executable matches only its own provider.
+    assert!(desktop_in(
+        std::slice::from_ref(&antigravity_exe),
+        Provider::Antigravity
+    ));
+    assert!(!desktop_in(
+        std::slice::from_ref(&antigravity_exe),
+        Provider::Codex
+    ));
+    assert!(!desktop_in(
+        std::slice::from_ref(&antigravity_exe),
+        Provider::Claude
+    ));
+    assert!(antigravity::desktop_installed(std::slice::from_ref(
+        &antigravity_exe
+    )));
+    assert!(antigravity::desktop_installed(std::slice::from_ref(
+        &antigravity_ide_exe
+    )));
+    assert!(!antigravity::desktop_installed(std::slice::from_ref(
+        &codex_exe
+    )));
+    assert!(desktop_in(
+        std::slice::from_ref(&deepseek_exe),
+        Provider::DeepSeek
+    ));
+    assert!(desktop_in(
+        std::slice::from_ref(&codex_exe),
+        Provider::Codex
+    ));
+    assert!(desktop_in(
+        std::slice::from_ref(&claude_store),
+        Provider::Claude
+    ));
+    assert!(!desktop_in(
+        std::slice::from_ref(&claude_store),
+        Provider::Antigravity
+    ));
+
+    // Antigravity without a CLI executable is offered as a desktop app once
+    // Antigravity.exe is present, and DeepSeek Harness with its plugin is too.
+    let mut starts = fixture.starts();
+    assert!(!starts
+        .offers_for(&fixture.sessions())
+        .iter()
+        .any(|offer| offer.provider == Provider::Antigravity));
+    starts.set_application_folders(vec![antigravity_exe, codex_exe, claude_store]);
+    let offers = starts.offers_for(&fixture.sessions());
+    let find_app = |provider| {
+        offers
+            .iter()
+            .find(|offer| offer.provider == provider)
+            .map(|offer| offer.app.as_str())
+    };
+    assert_eq!(find_app(Provider::Antigravity), Some("desktop"));
+    assert_eq!(find_app(Provider::Codex), Some("desktop"));
+    assert_eq!(find_app(Provider::Claude), Some("desktop"));
+}

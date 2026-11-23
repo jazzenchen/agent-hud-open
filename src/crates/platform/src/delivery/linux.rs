@@ -12,6 +12,11 @@ pub(crate) fn applications(_home: &Path) -> Vec<PathBuf> {
     Vec::new()
 }
 
+/// Desktop apps are not looked for on Linux yet.
+pub(crate) fn desktop_installed(_home: &Path, _provider: super::Provider) -> bool {
+    false
+}
+
 /// No Codex desktop app on Linux.
 pub(crate) fn codex_applications(_home: &Path) -> Vec<PathBuf> {
     Vec::new()
