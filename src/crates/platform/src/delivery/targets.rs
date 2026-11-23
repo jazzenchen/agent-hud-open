@@ -1,7 +1,7 @@
 //! What each client takes from Agent HUD on this computer, and which of the
 //! host's known sessions can take a message.
 use super::*;
-use std::sync::PoisonError;
+use std::{borrow::Cow, sync::PoisonError};
 
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -111,51 +111,61 @@ impl LocalClients {
                         None
                     }
                     Provider::Antigravity => Some(false),
-                    provider if provider.uses_hook_channel() => {
-                        Some(valid_session_id(provider, &target.session_id))
-                    }
+                    provider if provider.uses_hook_channel() => Some(
+                        hook_supported_on(provider, crate::os::OS)
+                            && valid_session_id(provider, &target.session_id),
+                    ),
                     _ => Some(false),
                 };
-                let notice = match target.provider {
+                let notice: Cow<'static, str> = match target.provider {
                     Provider::Claude if reachable == Some(true) => {
-                        "Plugin checked in; submission will wait for idle"
+                        Cow::Borrowed("Plugin checked in; submission will wait for idle")
                     }
-                    Provider::Claude => "Plugin is not loaded or its check-in expired",
-                    Provider::DeepSeek if reachable == Some(true) => {
-                        "Plugin checked in; the message joins the session's queue"
+                    Provider::Claude => {
+                        Cow::Borrowed("Plugin is not loaded or its check-in expired")
                     }
-                    Provider::DeepSeek => "DeepSeek Harness plugin is not loaded or its check-in expired",
-                    Provider::Codex => {
-                        "Known thread; native owner availability is verified at submission"
-                    }
-                    Provider::Antigravity => {
-                        "Known cascade; local language server availability is verified at submission"
-                    }
+                    Provider::DeepSeek if reachable == Some(true) => Cow::Borrowed(
+                        "Plugin checked in; the message joins the session's queue",
+                    ),
+                    Provider::DeepSeek => Cow::Borrowed(
+                        "DeepSeek Harness plugin is not loaded or its check-in expired",
+                    ),
+                    Provider::Codex => Cow::Borrowed(
+                        "Known thread; native owner availability is verified at submission",
+                    ),
+                    Provider::Antigravity => Cow::Borrowed(
+                        "Known cascade; local language server availability is verified at submission",
+                    ),
                     provider
                         if provider.uses_observer()
                             && self.hook_waiting(provider, &target.session_id) =>
                     {
-                        "Agent HUD's observer in the session hands it over at once, even while the session is idle"
+                        Cow::Borrowed("Agent HUD's observer in the session hands it over at once, even while the session is idle")
                     }
-                    provider if provider.uses_observer() => {
-                        "Waits until the session is open in its client again, whose Agent HUD observer then hands it over"
+                    provider if provider.uses_observer() => Cow::Borrowed(
+                        "Waits until the session is open in its client again, whose Agent HUD observer then hands it over",
+                    ),
+                    provider
+                        if provider.uses_hook_channel()
+                            && !hook_supported_on(provider, crate::os::OS) =>
+                    {
+                        Cow::Owned(hook_unsupported_notice(crate::os::OS))
                     }
                     provider
                         if provider.uses_hook_channel()
                             && self.hook_waiting(provider, &target.session_id) =>
                     {
-                        "A rewake hook waits in the session and hands it over at once, even while the session is idle"
+                        Cow::Borrowed("A rewake hook waits in the session and hands it over at once, even while the session is idle")
                     }
-                    provider if provider.uses_hook_channel() => {
-                        "Waits for the session's own stop hook, which hands it over when one of its turns ends"
-                    }
-                    _ => "Unsupported provider",
-                }
-                .into();
+                    provider if provider.uses_hook_channel() => Cow::Borrowed(
+                        "Waits for the session's own stop hook, which hands it over when one of its turns ends",
+                    ),
+                    _ => Cow::Borrowed("Unsupported provider"),
+                };
                 ReachableTarget {
                     target,
                     reachable,
-                    notice,
+                    notice: notice.into_owned(),
                 }
             })
             .collect()
@@ -179,7 +189,47 @@ impl LocalClients {
     }
 }
 
+/// Whether `provider`'s hook-channel delivery runs on `os`: observer-backed
+/// clients (Pi, OpenCode) run everywhere; hook-backed clients run only where
+/// Agent HUD installs their hooks (`hooks::launches_on`).
+pub(crate) fn hook_supported_on(provider: Provider, os: agent_hud_agents::Os) -> bool {
+    provider.uses_observer() || crate::hooks::launches_on(provider.as_str(), os)
+}
+
+/// Whether `client` (an agent id from `agent_hud_agents::ALL`) can receive
+/// agent messages on `os`. Shared by `client_features`, delivery capabilities
+/// and `list_sessions` reachability so every OS gives one consistent answer.
+pub fn takes_messages_on(client: &str, os: agent_hud_agents::Os) -> bool {
+    let Some(provider) = Provider::parse(client) else {
+        return false;
+    };
+    !provider.uses_hook_channel()
+        || provider.uses_observer()
+        || crate::hooks::launches_on(client, os)
+}
+
+fn hook_unsupported_notice(os: agent_hud_agents::Os) -> String {
+    let system = crate::hooks::os_name(os);
+    format!(
+        "Agent HUD doesn't put this client's hooks in on {system} yet, so its sessions can send agent messages but can't take them."
+    )
+}
+
 fn hook_capability(provider: Provider) -> Capability {
+    hook_capability_on(provider, crate::os::OS)
+}
+
+fn hook_capability_on(provider: Provider, os: agent_hud_agents::Os) -> Capability {
+    if !hook_supported_on(provider, os) {
+        return Capability {
+            provider,
+            supported: false,
+            operations: Vec::new(),
+            plugin_preparation: false,
+            automatic_installation: false,
+            notice: hook_unsupported_notice(os),
+        };
+    }
     let wakes = wakes_idle(provider.as_str());
     Capability {
         provider,
@@ -195,5 +245,85 @@ fn hook_capability(provider: Provider) -> Capability {
             "Queues input for the session's own stop hook, which hands it over as the next input when one of its turns ends; an idle session takes it only after its next turn."
         }
         .into(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use agent_hud_agents::Os;
+
+    const POSIX_HOOK_PROVIDERS: [Provider; 6] = [
+        Provider::Cursor,
+        Provider::Trae,
+        Provider::WorkBuddy,
+        Provider::ZCode,
+        Provider::Qoder,
+        Provider::Kimi,
+    ];
+
+    #[test]
+    fn hook_capabilities_match_hook_launch_support_on_every_os() {
+        for os in [Os::MacOs, Os::Linux, Os::Windows] {
+            let expected = os != Os::Windows;
+            for provider in POSIX_HOOK_PROVIDERS {
+                let cap = hook_capability_on(provider, os);
+                assert_eq!(cap.supported, expected, "{provider:?} on {os:?}");
+                assert_eq!(
+                    cap.automatic_installation, expected,
+                    "{provider:?} on {os:?}"
+                );
+                if expected {
+                    assert_eq!(cap.operations, [Operation::Automatic, Operation::Enqueue]);
+                } else {
+                    assert!(cap.operations.is_empty(), "{provider:?} on {os:?}");
+                    assert!(cap.notice.contains("Windows"), "{}", cap.notice);
+                }
+            }
+            for observer in [Provider::Pi, Provider::OpenCode] {
+                let cap = hook_capability_on(observer, os);
+                assert!(cap.supported, "{observer:?} on {os:?}");
+                assert!(cap.automatic_installation, "{observer:?} on {os:?}");
+                assert_eq!(cap.operations, [Operation::Automatic, Operation::Enqueue]);
+            }
+        }
+    }
+
+    #[test]
+    fn targets_and_capabilities_agree_on_hook_support_for_current_os() {
+        let temp = tempfile::tempdir().unwrap();
+        let paths = LocalClientPaths {
+            claude_channel: temp.path().join("claude"),
+            codex_data: temp.path().join("codex"),
+            receipts: temp.path().join("receipts"),
+        };
+        let targets = POSIX_HOOK_PROVIDERS
+            .into_iter()
+            .chain([Provider::Pi, Provider::OpenCode])
+            .map(|provider| SessionTarget {
+                provider,
+                session_id: format!("{}:s1", provider.as_str()),
+                thread_id: None,
+                parent_id: None,
+            })
+            .collect();
+        let service = LocalClients::new(paths, targets).unwrap();
+        let caps = service.capabilities();
+        for row in service.targets(SystemTime::now()) {
+            let expected = hook_supported_on(row.target.provider, crate::os::OS);
+            let cap = caps
+                .iter()
+                .find(|cap| cap.provider == row.target.provider)
+                .unwrap();
+            assert_eq!(cap.supported, expected, "{:?}", row.target.provider);
+            assert_eq!(row.reachable, Some(expected), "{:?}", row.target.provider);
+            if !expected {
+                assert!(
+                    row.notice.contains(crate::hooks::system_name()),
+                    "{}",
+                    row.notice
+                );
+            }
+        }
     }
 }

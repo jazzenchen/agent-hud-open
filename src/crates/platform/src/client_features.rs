@@ -7,6 +7,10 @@ use agent_hud_agents::{split, Carries, ALL};
 use std::collections::HashMap;
 
 pub fn client_features() -> HashMap<String, Vec<String>> {
+    client_features_on(crate::os::OS)
+}
+
+fn client_features_on(os: agent_hud_agents::Os) -> HashMap<String, Vec<String>> {
     let mut features = HashMap::new();
     for agent in ALL {
         let mut can = Vec::new();
@@ -22,7 +26,7 @@ pub fn client_features() -> HashMap<String, Vec<String>> {
         if hooks_ask || channel_asks {
             can.push("answer");
         }
-        if crate::delivery::Provider::parse(agent.id).is_some() {
+        if crate::delivery::takes_messages_on(agent.id, os) {
             can.push("talk");
         }
         let tools = match agent.id {
@@ -43,6 +47,7 @@ pub fn client_features() -> HashMap<String, Vec<String>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use agent_hud_agents::Os;
 
     /// The clients split off an agent can do what it can; one that takes
     /// neither requests nor messages only shows its live status.
@@ -55,5 +60,43 @@ mod tests {
         assert!(features["codex"].contains(&"answer".to_owned()));
         assert_eq!(features["grok-cli"], ["live"]);
         assert!(features["trae"].contains(&"live".to_owned()));
+    }
+
+    #[test]
+    fn talk_matches_os_hook_support_for_every_message_client() {
+        let posix_only = [
+            "cursor",
+            "trae",
+            "trae-cn",
+            "workbuddy",
+            "codebuddy",
+            "zcode",
+            "qoder",
+            "qoder-cn",
+            "qoder-work",
+            "kimi",
+        ];
+        let everywhere = [
+            "claude",
+            "codex",
+            "antigravity",
+            "deepseek",
+            "pi",
+            "opencode",
+        ];
+        for os in [Os::MacOs, Os::Linux, Os::Windows] {
+            let features = client_features_on(os);
+            let posix_supported = os != Os::Windows;
+            for id in posix_only {
+                assert_eq!(
+                    features[id].contains(&"talk".to_owned()),
+                    posix_supported,
+                    "{id} on {os:?}"
+                );
+            }
+            for id in everywhere {
+                assert!(features[id].contains(&"talk".to_owned()), "{id} on {os:?}");
+            }
+        }
     }
 }

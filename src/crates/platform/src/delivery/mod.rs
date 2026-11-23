@@ -60,7 +60,7 @@ use std::{
     sync::{Arc, Mutex},
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
-pub use targets::{Capability, ReachableTarget};
+pub use targets::{takes_messages_on, Capability, ReachableTarget};
 
 pub type Result<T> = std::result::Result<T, Failure>;
 
