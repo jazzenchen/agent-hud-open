@@ -57,10 +57,10 @@ pub fn system_name() -> &'static str {
     os_name(crate::os::OS)
 }
 /// Why a client found here has no hooks: Agent HUD does not put them in on
-/// this system yet. Said in Settings, so its sessions never look like a
-/// setup the person got wrong (Open #115).
-fn unsupported_notice(source: &str) -> String {
-    let system = system_name();
+/// `os` yet. Shared by Settings and delivery capabilities so every surface
+/// uses the same localized notice (Open #115).
+pub(crate) fn unsupported_notice_on(source: &str, os: agent_hud_agents::Os) -> String {
+    let system = os_name(os);
     if crate::delivery::Provider::parse(source).is_some_and(|p| p.uses_hook_channel()) {
         tr!("Agent HUD doesn't put this client's hooks in on {{system}} yet, so its sessions can send agent messages but can't take them.", system = system)
     } else {
@@ -69,6 +69,9 @@ fn unsupported_notice(source: &str) -> String {
             system = system
         )
     }
+}
+fn unsupported_notice(source: &str) -> String {
+    unsupported_notice_on(source, crate::os::OS)
 }
 /// Whether the client reports its sessions through an observer plugin.
 fn observed(source: &str) -> bool {
@@ -430,15 +433,19 @@ mod tests {
         fs::write(home.join(".dsh/settings.yaml"), "{}").unwrap();
         let executable = temp.path().join("fixed hook owner");
         fs::write(&executable, "fixture only").unwrap();
+        let context = InstallContext {
+            home,
+            environment: HashMap::new(),
+            canonical_executable: Some(executable.clone()),
+            executable,
+        };
+        let discovered = super::found(&context);
+        assert!(
+            discovered.iter().any(|id| id == "deepseek"),
+            "fixture must discover DeepSeek Harness before checking rows: {discovered:?}"
+        );
         let mut clients = Clients::default();
-        clients
-            .delegate(InstallContext {
-                home,
-                environment: HashMap::new(),
-                canonical_executable: Some(executable.clone()),
-                executable,
-            })
-            .unwrap();
+        clients.delegate(context).unwrap();
         let status = clients.status(true, true);
         let rows = status["clients"].as_array().unwrap();
         assert!(
