@@ -34,19 +34,12 @@ pub(crate) fn command_folders() -> Vec<PathBuf> {
         .collect()
 }
 
-/// Installed Windows desktop apps (Claude, Codex, Antigravity, DeepSeek
-/// Harness), found from running processes, Start menu / desktop shortcuts,
-/// standard install folders and Store packages.
-pub(crate) fn applications(home: &Path) -> Vec<PathBuf> {
-    crate::os::desktop_applications(home)
-}
-
 /// Whether `provider`'s desktop app is installed on Windows. Checked per
-/// provider so asking about Claude, Antigravity or DeepSeek never runs Codex's
-/// Store package lookup.
+/// provider so asking about Antigravity or DeepSeek never runs Codex's Store
+/// package lookup. Claude Desktop (`claude://resume` hand-off) stays excluded
+/// on Windows until verified on a machine with Claude Desktop installed.
 pub(crate) fn desktop_installed(home: &Path, provider: super::Provider) -> bool {
     let bundle = match provider {
-        super::Provider::Claude => "com.anthropic.claudefordesktop",
         super::Provider::Codex => "com.openai.codex",
         super::Provider::Antigravity => "com.google.antigravity",
         super::Provider::DeepSeek => "com.deepseek.dsh",

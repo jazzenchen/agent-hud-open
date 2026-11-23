@@ -799,10 +799,12 @@ fn windows_desktop_executables_and_packages_are_matched_per_provider() {
     let antigravity_ide_exe = touch("Antigravity IDE/Antigravity IDE.exe");
     let deepseek_exe = touch("DeepSeek Harness/DeepSeek Harness.exe");
     let codex_exe = touch("Codex/Codex.exe");
+    let claude_exe = touch("Claude/Claude.exe");
     let claude_store = apps_dir.join("Packages/Claude_pzs8sxrjxfjjc");
     fs::create_dir_all(&claude_store).unwrap(); // plain directory
 
-    // Each executable matches only its own provider.
+    // Each executable matches only its own provider; Windows Claude Desktop
+    // stays excluded until its hand-off is verified on Windows.
     assert!(desktop_in(
         std::slice::from_ref(&antigravity_exe),
         Provider::Antigravity
@@ -832,7 +834,11 @@ fn windows_desktop_executables_and_packages_are_matched_per_provider() {
         std::slice::from_ref(&codex_exe),
         Provider::Codex
     ));
-    assert!(desktop_in(
+    assert!(!desktop_in(
+        std::slice::from_ref(&claude_exe),
+        Provider::Claude
+    ));
+    assert!(!desktop_in(
         std::slice::from_ref(&claude_store),
         Provider::Claude
     ));
@@ -842,13 +848,13 @@ fn windows_desktop_executables_and_packages_are_matched_per_provider() {
     ));
 
     // Antigravity without a CLI executable is offered as a desktop app once
-    // Antigravity.exe is present, and DeepSeek Harness with its plugin is too.
+    // Antigravity.exe is present, while Claude remains CLI-only on Windows.
     let mut starts = fixture.starts();
     assert!(!starts
         .offers_for(&fixture.sessions())
         .iter()
         .any(|offer| offer.provider == Provider::Antigravity));
-    starts.set_application_folders(vec![antigravity_exe, codex_exe, claude_store]);
+    starts.set_application_folders(vec![antigravity_exe, codex_exe, claude_exe, claude_store]);
     let offers = starts.offers_for(&fixture.sessions());
     let find_app = |provider| {
         offers
@@ -858,5 +864,38 @@ fn windows_desktop_executables_and_packages_are_matched_per_provider() {
     };
     assert_eq!(find_app(Provider::Antigravity), Some("desktop"));
     assert_eq!(find_app(Provider::Codex), Some("desktop"));
-    assert_eq!(find_app(Provider::Claude), Some("desktop"));
+    assert_eq!(find_app(Provider::Claude), Some("cli"));
+}
+
+#[test]
+fn desktop_detection_caches_live_probes_until_ttl_expires() {
+    let fixture = StartFixture::new();
+    let starts = fixture.starts();
+    let start = std::time::Instant::now();
+    let mut probes = 0usize;
+
+    assert!(starts.desktop_cached(Provider::Antigravity, start, |_| {
+        probes += 1;
+        true
+    }));
+    assert!(starts.desktop_cached(
+        Provider::Antigravity,
+        start + Duration::from_secs(59),
+        |_| {
+            probes += 1;
+            false
+        },
+    ));
+    assert_eq!(
+        probes, 1,
+        "within TTL returns cached result without re-probing"
+    );
+
+    assert!(
+        !starts.desktop_cached(Provider::Antigravity, start + DESKTOP_CACHE_TTL, |_| {
+            probes += 1;
+            false
+        },)
+    );
+    assert_eq!(probes, 2, "once TTL expires, re-probes live desktop state");
 }

@@ -175,17 +175,6 @@ pub(crate) fn desktop_for(home: &Path, bundle_id: &str) -> Vec<PathBuf> {
     found
 }
 
-/// Installed Windows desktop apps for all startable clients (Claude, Codex,
-/// Antigravity, DeepSeek Harness).
-pub(crate) fn desktop_applications(home: &Path) -> Vec<PathBuf> {
-    let mut found = Vec::new();
-    for bundle_id in [CLAUDE, CODEX, ANTIGRAVITY, DEEPSEEK] {
-        found.extend(desktop_for(home, bundle_id));
-    }
-    dedup_paths(&mut found);
-    found
-}
-
 /// Whether this user has the app somewhere it can be started from. A Store
 /// Codex has no shortcut and counts too, so its thread links open it.
 pub(crate) fn registered_bundle(bundle_id: &str) -> bool {

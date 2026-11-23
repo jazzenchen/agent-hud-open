@@ -6,7 +6,7 @@ use super::Result;
 use std::path::{Path, PathBuf};
 
 /// Where desktop apps are installed: `/Applications` and `~/Applications`.
-pub(crate) fn applications(home: &Path) -> Vec<PathBuf> {
+fn applications(home: &Path) -> Vec<PathBuf> {
     vec![PathBuf::from("/Applications"), home.join("Applications")]
 }
 

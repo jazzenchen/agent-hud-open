@@ -69,11 +69,6 @@ impl StartConfig {
     pub fn codex_applications(&self) -> Vec<PathBuf> {
         host::codex_applications(&self.home)
     }
-    /// Where desktop apps are installed: `/Applications` and `~/Applications`
-    /// on macOS, installed app executables/packages on Windows, empty on Linux.
-    pub fn applications(&self) -> Vec<PathBuf> {
-        host::applications(&self.home)
-    }
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -123,14 +118,20 @@ pub enum HandoffCheck {
     Drop(String),
 }
 
+/// How long live desktop-app probes are cached per provider so refreshing
+/// `startFolders` does not repeatedly enumerate processes, shortcuts and
+/// Windows Store packages.
+const DESKTOP_CACHE_TTL: Duration = Duration::from_secs(60);
+
 pub struct SessionStarts {
     config: StartConfig,
     receipts: PathBuf,
     offers: Vec<StartOffer>,
     runner: Arc<dyn ProcessRunner>,
     /// Test override for desktop app entries (`set_application_folders`); none
-    /// asks the host adapter (`host::desktop_installed`) live on every check.
+    /// asks the host adapter (`host::desktop_installed`) with a 60s TTL cache.
     applications: Option<Vec<PathBuf>>,
+    desktop_cache: Mutex<HashMap<Provider, (std::time::Instant, bool)>>,
     /// The folder Agent HUD's DeepSeek Harness plugin shares with the app;
     /// none, and no Harness session is offered or started.
     deepseek: Option<DeepSeekChannel>,
@@ -164,6 +165,7 @@ impl SessionStarts {
             offers: Vec::new(),
             runner,
             applications: None,
+            desktop_cache: Mutex::new(HashMap::new()),
             deepseek: None,
             commands: None,
         })
@@ -232,34 +234,51 @@ impl SessionStarts {
             | Provider::OpenCode => None,
         }
     }
-    /// Whether the client's desktop app is installed, looked up on disk each
-    /// time: Claude, Codex/ChatGPT, Antigravity/Antigravity IDE, DeepSeek
-    /// Harness.
+    /// Whether the client's desktop app is installed (cached for 60s when
+    /// probing the host live): Claude (macOS), Codex/ChatGPT,
+    /// Antigravity/Antigravity IDE, DeepSeek Harness.
     fn desktop(&self, provider: Provider) -> bool {
-        match &self.applications {
-            Some(entries) => desktop_in(entries, provider),
-            None => host::desktop_installed(&self.config.home, provider),
+        if let Some(entries) = &self.applications {
+            return desktop_in(entries, provider);
         }
+        self.desktop_cached(provider, std::time::Instant::now(), |provider| {
+            host::desktop_installed(&self.config.home, provider)
+        })
+    }
+    fn desktop_cached(
+        &self,
+        provider: Provider,
+        now: std::time::Instant,
+        probe: impl FnOnce(Provider) -> bool,
+    ) -> bool {
+        if let Ok(cache) = self.desktop_cache.lock() {
+            if let Some(&(at, installed)) = cache.get(&provider) {
+                if now.saturating_duration_since(at) < DESKTOP_CACHE_TTL {
+                    return installed;
+                }
+            }
+        }
+        let installed = probe(provider);
+        if let Ok(mut cache) = self.desktop_cache.lock() {
+            cache.insert(provider, (now, installed));
+        }
+        installed
     }
 }
 
 /// Whether `entries` (macOS application folders, Windows desktop executable
-/// paths, folders containing them, or Store package directories) includes
-/// `provider`'s desktop app.
+/// paths, or folders containing them) includes `provider`'s desktop app.
+/// Windows Claude Desktop is intentionally omitted until `claude://resume`
+/// hand-off is verified on Windows.
 pub(crate) fn desktop_in(entries: &[PathBuf], provider: Provider) -> bool {
-    let (bundles, executables, store_prefix): (&[&str], &[&str], Option<&str>) = match provider {
-        Provider::Claude => (&["Claude.app"], &["Claude.exe"], Some("Claude_")),
-        Provider::Codex => (
-            &["Codex.app", "ChatGPT.app"],
-            &["Codex.exe", "ChatGPT.exe"],
-            None,
-        ),
+    let (bundles, executables): (&[&str], &[&str]) = match provider {
+        Provider::Claude => (&["Claude.app"], &[]),
+        Provider::Codex => (&["Codex.app", "ChatGPT.app"], &["Codex.exe", "ChatGPT.exe"]),
         Provider::Antigravity => (
             &["Antigravity.app", "Antigravity IDE.app"],
             &["Antigravity.exe", "Antigravity IDE.exe"],
-            None,
         ),
-        Provider::DeepSeek => (&["DeepSeek Harness.app"], &["DeepSeek Harness.exe"], None),
+        Provider::DeepSeek => (&["DeepSeek Harness.app"], &["DeepSeek Harness.exe"]),
         Provider::Cursor
         | Provider::Trae
         | Provider::WorkBuddy
@@ -281,12 +300,6 @@ pub(crate) fn desktop_in(entries: &[PathBuf], provider: Provider) -> bool {
         }
         bundles.iter().any(|bundle| entry.join(bundle).is_dir())
             || executables.iter().any(|exe| entry.join(exe).is_file())
-            || store_prefix.is_some_and(|prefix| {
-                entry
-                    .file_name()
-                    .and_then(|name| name.to_str())
-                    .is_some_and(|name| name.starts_with(prefix))
-            })
     })
 }
 

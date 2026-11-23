@@ -8,11 +8,6 @@ use std::path::{Path, PathBuf};
 /// Desktop apps are not looked for on Linux yet, so offers and starts go by
 /// the command lines alone; an adapter would read the apps' installed
 /// `.desktop` entries.
-pub(crate) fn applications(_home: &Path) -> Vec<PathBuf> {
-    Vec::new()
-}
-
-/// Desktop apps are not looked for on Linux yet.
 pub(crate) fn desktop_installed(_home: &Path, _provider: super::Provider) -> bool {
     false
 }
