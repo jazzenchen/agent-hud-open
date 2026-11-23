@@ -58,10 +58,22 @@ fn discovers_windows_language_server_and_cli_with_native_paths() {
             r"C:\Other\language_server.exe",
             "server --app_data_dir unrelated --csrf_token fixture",
         ),
+        process(
+            4,
+            r"C:\Program Files\Antigravity IDE\resources\bin\language_server_windows_x64.exe",
+            "server --csrf_token fixture-ide",
+        ),
     ]);
     assert_eq!(
-        found.iter().map(|server| server.pid).collect::<Vec<_>>(),
-        [1, 2]
+        found
+            .iter()
+            .map(|server| (server.pid, server.client))
+            .collect::<Vec<_>>(),
+        [
+            (1, "antigravity"),
+            (4, "antigravity-ide"),
+            (2, "antigravity-cli")
+        ]
     );
 }
 
@@ -120,7 +132,7 @@ fn each_server_names_the_client_it_serves() {
 #[test]
 fn a_server_with_no_token_on_its_command_line_takes_the_one_it_saved() {
     let root = tempfile::tempdir().unwrap();
-    let daemon = root.path().join("antigravity/daemon");
+    let daemon = root.path().join(".gemini/antigravity/daemon");
     std::fs::create_dir_all(&daemon).unwrap();
     std::fs::write(
         daemon.join("hub_57399.json"),
@@ -139,7 +151,7 @@ fn a_server_with_no_token_on_its_command_line_takes_the_one_it_saved() {
         format!(r#"{{"pid":3,"csrfToken":"{}"}}"#, "x".repeat(5000)),
     )
     .unwrap();
-    let saved = saved_tokens(root.path());
+    let saved = saved_tokens(root.path(), &HashMap::new());
     assert_eq!(saved.len(), 2);
     let server = "/Applications/Antigravity.app/Contents/Resources/bin/language_server";
     let found = super::parse_servers(
@@ -161,4 +173,21 @@ fn a_server_with_no_token_on_its_command_line_takes_the_one_it_saved() {
             .collect::<Vec<_>>(),
         [(1, "saved-1"), (2, "typed-2")]
     );
+
+    // GEMINI_CLI_HOME overrides ~/.gemini through Location resolution.
+    let custom = root.path().join("custom-gemini");
+    let custom_daemon = custom.join("antigravity-ide/daemon");
+    std::fs::create_dir_all(&custom_daemon).unwrap();
+    std::fs::write(
+        custom_daemon.join("hub_10.json"),
+        r#"{"pid":10,"csrfToken":"custom-10"}"#,
+    )
+    .unwrap();
+    let env = HashMap::from([(
+        "GEMINI_CLI_HOME".into(),
+        custom.to_string_lossy().into_owned(),
+    )]);
+    let custom_saved = saved_tokens(root.path(), &env);
+    assert_eq!(custom_saved.get(&10).map(String::as_str), Some("custom-10"));
+    assert!(!custom_saved.contains_key(&1));
 }

@@ -20,7 +20,6 @@ use windows_sys::Win32::{
     },
 };
 
-const NAMES: [&str; 2] = ["language_server.exe", "agy.exe"];
 /// UNICODE_STRING lengths are u16 byte counts, so a command line is < 64 KiB.
 const MAX_COMMAND_BYTES: u32 = 64 * 1024 + 64;
 
@@ -56,13 +55,47 @@ pub(super) fn processes() -> Result<Vec<ProcessInfo>, String> {
 
 fn is_wanted(name: &[u16]) -> bool {
     let len = name.iter().position(|c| *c == 0).unwrap_or(name.len());
-    let name = String::from_utf16_lossy(&name[..len]);
-    NAMES.iter().any(|wanted| name.eq_ignore_ascii_case(wanted))
+    let name = String::from_utf16_lossy(&name[..len]).to_ascii_lowercase();
+    name == "agy.exe"
+        || (name.ends_with(".exe")
+            && (name.starts_with("language_server") || name.starts_with("language-server")))
+}
+
+/// Filter language server binaries by install folder BEFORE reading their
+/// command line, so unrelated servers (such as Windsurf/Codeium's
+/// `language_server_windows_x64.exe`) never have their credential-bearing
+/// command line inspected.
+fn is_antigravity_image(executable: &str) -> bool {
+    let normalized = executable.to_ascii_lowercase().replace('\\', "/");
+    let Some((dir, name)) = normalized.rsplit_once('/') else {
+        return false;
+    };
+    if name == "agy.exe" {
+        return true;
+    }
+    if !(name.ends_with(".exe")
+        && (name.starts_with("language_server") || name.starts_with("language-server")))
+    {
+        return false;
+    }
+    let dir = format!("{dir}/");
+    dir.contains("/antigravity/")
+        || dir.contains("/antigravity ide/")
+        || dir.contains("/antigravity-cli/")
+        || dir.contains("/antigravity_cli/")
 }
 
 /// Holds one handle while reading owner, image and command line, so all three
 /// describe the same process even if its PID is reused right after.
 fn same_user_process(pid: u32, me: &[u64]) -> Option<ProcessInfo> {
+    same_user_process_with_filter(pid, me, is_antigravity_image)
+}
+
+fn same_user_process_with_filter(
+    pid: u32,
+    me: &[u64],
+    allow_image: fn(&str) -> bool,
+) -> Option<ProcessInfo> {
     let process = unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid) };
     if process.is_null() {
         return None;
@@ -73,6 +106,9 @@ fn same_user_process(pid: u32, me: &[u64]) -> Option<ProcessInfo> {
         return None;
     }
     let executable = image_path(process.0)?;
+    if !allow_image(&executable) {
+        return None;
+    }
     let command = command_line(process.0)?;
     (!executable.is_empty() && !command.is_empty()).then_some(ProcessInfo {
         pid,
@@ -277,18 +313,44 @@ mod tests {
     fn only_antigravity_server_and_cli_images_are_wanted() {
         let utf16 = |s: &str| s.encode_utf16().chain([0, 'x' as u16]).collect::<Vec<_>>();
         assert!(is_wanted(&utf16("Language_Server.EXE")));
+        assert!(is_wanted(&utf16("language_server_windows_x64.exe")));
+        assert!(is_wanted(&utf16("language-server.exe")));
         assert!(is_wanted(&utf16("agy.exe")));
         assert!(!is_wanted(&utf16("language_server.exe.bak")));
         assert!(!is_wanted(&utf16("Antigravity.exe")));
     }
     #[test]
+    fn only_antigravity_install_folders_pass_before_command_line_read() {
+        assert!(is_antigravity_image(
+            r"C:\Users\admin\AppData\Local\Programs\antigravity\resources\bin\language_server.exe"
+        ));
+        assert!(is_antigravity_image(
+            r"C:\Program Files\Antigravity IDE\resources\bin\language_server_windows_x64.exe"
+        ));
+        assert!(is_antigravity_image(
+            r"C:\Users\admin\.gemini\antigravity-cli\language-server.exe"
+        ));
+        assert!(is_antigravity_image(r"C:\Tools\agy.exe"));
+        assert!(!is_antigravity_image(
+            r"C:\Users\admin\AppData\Local\Programs\Windsurf\resources\app\extensions\windsurf\bin\language_server_windows_x64.exe"
+        ));
+        assert!(!is_antigravity_image(
+            r"C:\Users\admin\.codeium\bin\language_server_windows_x64.exe"
+        ));
+        assert!(!is_antigravity_image(
+            r"C:\Program Files\Antigravity\Antigravity.exe"
+        ));
+    }
+    #[test]
     fn reads_this_process_owner_image_and_command_line_quickly() {
         let started = std::time::Instant::now();
-        let info = same_user_process(
-            std::process::id(),
-            &token_user(unsafe { GetCurrentProcess() }).unwrap(),
-        )
-        .expect("this process is readable");
+        let me = token_user(unsafe { GetCurrentProcess() }).unwrap();
+        assert!(
+            same_user_process(std::process::id(), &me).is_none(),
+            "unrelated test runner image is skipped before reading command line"
+        );
+        let info = same_user_process_with_filter(std::process::id(), &me, |_| true)
+            .expect("this process is readable");
         let exe = std::env::current_exe().unwrap();
         assert!(info.executable.eq_ignore_ascii_case(&exe.to_string_lossy()));
         assert!(!info.command.is_empty());

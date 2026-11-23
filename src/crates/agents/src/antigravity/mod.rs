@@ -23,9 +23,7 @@ pub static LOCAL_SERVICE: Channel = Channel {
     carries: &[Carries::Requests, Carries::Quota],
     support: PerOs {
         macos: Support::Verified(()),
-        windows: Support::Unsupported(
-            "Antigravity local-service discovery is not implemented on Windows",
-        ),
+        windows: Support::Unverified(()),
         linux: Support::Unverified(()),
     },
 };
@@ -135,3 +133,17 @@ pub static AGENT: Agent = Agent {
     sources: crate::everywhere(&SOURCES),
     discovery: &DISCOVERY,
 };
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::Os;
+
+    #[test]
+    fn local_service_runs_on_all_supported_desktop_oses() {
+        for os in [Os::MacOs, Os::Windows, Os::Linux] {
+            assert!(LOCAL_SERVICE.runs_on(os), "{os:?}");
+            assert_ne!(LOCAL_SERVICE.support.on(os).label(), "unsupported");
+        }
+    }
+}
