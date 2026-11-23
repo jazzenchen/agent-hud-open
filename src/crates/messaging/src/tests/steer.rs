@@ -295,3 +295,104 @@ fn list_sessions_says_which_harness_sessions_can_be_steered() {
         "messages off"
     );
 }
+
+/// "Let agents decide when to steer" off: send_message and its delivery field
+/// say word for word what they said before the switch, so nothing changes for
+/// anyone who leaves it off. On: they say to steer only for a short
+/// correction of the work in progress, and to queue everything else.
+#[test]
+fn the_steer_descriptions_change_only_while_agents_may_decide() {
+    let send_message = |steer_on_own| {
+        let tools = Messaging::tools(&Preferences {
+            enabled: true,
+            steer_on_own,
+            ..Default::default()
+        });
+        tools["tools"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|tool| tool["name"] == "send_message")
+            .unwrap()
+            .clone()
+    };
+    let delivery = |tool: &Value| {
+        tool["inputSchema"]["properties"]["delivery"]["description"]
+            .as_str()
+            .unwrap()
+            .to_owned()
+    };
+    assert!(!Preferences::read(&json!({})).steer_on_own);
+    assert!(Preferences::read(&json!({"agentMessagesSteerOnOwn":true})).steer_on_own);
+    let off = send_message(false);
+    let description = off["description"].as_str().unwrap();
+    assert!(description.contains("Use delivery steer only when the user has explicitly asked you to put these words into that session's current turn. Never choose it on your own, even when a turn looks wrong: tell the user and let them decide. Keep a steer short and about what the user asked. Handoffs, new tasks, review requests and replies are queued."), "{description}");
+    assert!(
+        description.contains("A steer always carries Agent HUD's label. Returns at once"),
+        "{description}"
+    );
+    assert_eq!(
+        delivery(&off),
+        "Default queue: a new turn once the recipient is idle. steer: into the recipient's turn in progress; Codex and DeepSeek Harness only, and only when the user explicitly asked for it."
+    );
+    let on = send_message(true);
+    let description = on["description"].as_str().unwrap();
+    assert!(!description.contains("explicitly asked"), "{description}");
+    assert!(description.contains("Use delivery steer when your words correct or change the work that session's turn is doing now"), "{description}");
+    assert!(
+        description.contains("keep it to a few sentences and to that correction"),
+        "{description}"
+    );
+    assert!(
+        description.contains("anything that can wait for the turn to end are queued"),
+        "{description}"
+    );
+    assert_eq!(
+        delivery(&on),
+        "Default queue: a new turn once the recipient is idle. steer: into the recipient's turn in progress, only for a short correction of the work it is doing now; Codex and DeepSeek Harness only."
+    );
+    // Only those words change.
+    assert_eq!(
+        on["inputSchema"]["required"],
+        off["inputSchema"]["required"]
+    );
+    assert_eq!(on["name"], off["name"]);
+}
+
+/// With "Let agents decide when to steer", a steer ends with its own line,
+/// which asks for no reply, even where the sender asked for one: a reply
+/// would stop the turn it went into. Off, a steer ends as before.
+#[test]
+fn a_steer_an_agent_may_choose_asks_for_no_reply_of_its_own() {
+    let steer_line = "This goes into your current turn: take it into the work at hand, with no reply of its own. What it changes belongs in this turn's result. Only if it asks you something, answer with agent-hud's MCP tool mcp__agent_hud__send_message, reply_to: ";
+    for (steer_on_own, require_reply) in
+        [(false, false), (false, true), (true, false), (true, true)]
+    {
+        let mut world = World::new(Preferences {
+            enabled: true,
+            steer_on_own,
+            require_reply,
+            limit: Some(10),
+            ..Default::default()
+        });
+        let sent = world.call(
+            Some(("claude", CLAUDE)),
+            "send_message",
+            json!({"to":CODEX,"text":"Stop: the API is v2 now.\n\nNot v1.","delivery":"steer","require_reply":true}),
+        );
+        assert_eq!(sent["state"], "steered", "{sent}");
+        let id = sent["id"].as_str().unwrap();
+        let text = world.codex.0.lock().unwrap()[0].text.clone();
+        assert!(
+            text.contains("· into your current turn]\n\nStop: the API is v2 now.\n\nNot v1."),
+            "{text}"
+        );
+        let last = text.lines().last().unwrap();
+        if steer_on_own {
+            assert_eq!(last, format!("{steer_line}{id}."), "{text}");
+            assert!(!text.contains("Reply with"), "{text}");
+        } else {
+            assert!(!text.contains("with no reply of its own"), "{text}");
+        }
+    }
+}

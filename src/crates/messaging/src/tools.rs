@@ -11,6 +11,9 @@ impl Messaging {
         if preferences.require_reply {
             reply_choice(&mut tools);
         }
+        if preferences.steer_on_own {
+            steer_choice(&mut tools);
+        }
         tools
     }
 
@@ -53,5 +56,40 @@ fn reply_choice(tools: &mut Value) {
         if let Some(description) = tool["description"].as_str() {
             tool["description"] = json!(description.replace(ALWAYS_ASKS, ASKS_WHEN_REQUIRED));
         }
+    }
+}
+
+/// When `send_message` says to steer, while only the user decides.
+const STEER_WHEN_ASKED: [&str; 3] = [
+    "Use delivery steer only when the user has explicitly asked you to put these words into that session's current turn. Never choose it on your own, even when a turn looks wrong: tell the user and let them decide. Keep a steer short and about what the user asked. Handoffs, new tasks, review requests and replies are queued.",
+    "A steer always carries Agent HUD's label.",
+    "steer: into the recipient's turn in progress; Codex and DeepSeek Harness only, and only when the user explicitly asked for it.",
+];
+/// The same, while the user lets agents decide: a steer interrupts the
+/// recipient's turn with no one asked, so it is only for a short correction
+/// of the work that turn is doing.
+const STEER_ON_OWN: [&str; 3] = [
+    "Use delivery steer when your words correct or change the work that session's turn is doing now: a wrong assumption, a changed requirement, or a check that failed on that work. The user lets you decide this, and a steer interrupts the turn with no one asked, so keep it to a few sentences and to that correction. Handoffs, new tasks, review requests, replies and anything that can wait for the turn to end are queued.",
+    "A steer always carries Agent HUD's label, and its last line tells the recipient to take it into the work at hand with no reply of its own.",
+    "steer: into the recipient's turn in progress, only for a short correction of the work it is doing now; Codex and DeepSeek Harness only.",
+];
+
+/// "Let agents decide when to steer" is on: `send_message` says when an
+/// agent steers on its own. What Agent HUD accepts does not change.
+fn steer_choice(tools: &mut Value) {
+    for tool in tools["tools"].as_array_mut().into_iter().flatten() {
+        if tool["name"] != "send_message" {
+            continue;
+        }
+        let words = |text: &str| {
+            STEER_WHEN_ASKED
+                .iter()
+                .zip(STEER_ON_OWN)
+                .fold(text.to_owned(), |text, (off, on)| text.replace(off, on))
+        };
+        let description = words(tool["description"].as_str().unwrap_or_default());
+        tool["description"] = json!(description);
+        let delivery = &mut tool["inputSchema"]["properties"]["delivery"]["description"];
+        *delivery = json!(words(delivery.as_str().unwrap_or_default()));
     }
 }

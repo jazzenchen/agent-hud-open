@@ -6,7 +6,8 @@ pub const DEFAULT_LIMIT: u32 = 10;
 
 /// Settings → Agents. Among the agent tools: "Let agents message each
 /// other" (`agentMessages`), "Send as me" (`agentMessagesAsUser`), "Ask for
-/// replies only when needed" (`agentMessagesRequireReply`) and how many
+/// replies only when needed" (`agentMessagesRequireReply`), "Let agents
+/// decide when to steer" (`agentMessagesSteerOnOwn`) and how many
 /// passes in a row before the user looks (`agentMessagesLimit`, null for no
 /// limit). On the Claude Code and DeepSeek Harness plugins' rows: "Send
 /// messages" (`claudeMessages`, `deepseekMessages`).
@@ -20,6 +21,10 @@ pub struct Preferences {
     /// under "Send as me" too; one that does not carries no reply line. On
     /// unless turned off; off, every labelled message asks for a reply.
     pub require_reply: bool,
+    /// Agents may steer on their own, to correct the work a turn in progress
+    /// is doing, and a steer's last line asks for no reply of its own. Off:
+    /// the tools allow a steer only when the user asked for one.
+    pub steer_on_own: bool,
     /// Passes in a row with no word from the user; None is no limit.
     pub limit: Option<u32>,
     /// Messages may go into Claude Code sessions.
@@ -33,6 +38,7 @@ impl Default for Preferences {
             enabled: false,
             as_user: false,
             require_reply: true,
+            steer_on_own: false,
             limit: Some(DEFAULT_LIMIT),
             claude: true,
             deepseek: true,
@@ -55,6 +61,7 @@ impl Preferences {
             enabled: settings["agentMessages"] == true,
             as_user: settings["agentMessagesAsUser"] == true,
             require_reply: settings["agentMessagesRequireReply"] != false,
+            steer_on_own: settings["agentMessagesSteerOnOwn"] == true,
             limit,
             claude: settings["claudeMessages"] != false,
             deepseek: settings["deepseekMessages"] != false,

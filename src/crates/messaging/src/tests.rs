@@ -2874,6 +2874,7 @@ impl Preferences {
             "agentMessages": self.enabled,
             "agentMessagesAsUser": self.as_user,
             "agentMessagesRequireReply": self.require_reply,
+            "agentMessagesSteerOnOwn": self.steer_on_own,
             "agentMessagesLimit": self.limit,
             "claudeMessages": self.claude,
             "deepseekMessages": self.deepseek,

@@ -2,10 +2,12 @@
 // read other Claude Code, Codex, Antigravity and DeepSeek Harness sessions on
 // this computer through Agent HUD's MCP server. Off unless turned on. While
 // on: "Send as me", "Ask for replies only when needed" (the sending agent
-// says which messages need a reply), and how many passes in a row before the
-// user takes a look. A message waits until its session is idle, unless the user asks an
-// agent to steer it into a Codex or DeepSeek Harness session's turn in
-// progress.
+// says which messages need a reply), "Let agents decide when to steer", and
+// how many passes in a row before the user takes a look. A message waits until
+// its session is idle, unless it is steered into a Codex or DeepSeek Harness
+// session's turn in progress: when the user asks an agent to, or, with
+// "Let agents decide when to steer" on, when the agent corrects that turn's
+// work on its own.
 import { useState } from "react";
 import { toast } from "sonner";
 import type { Snapshot } from "@agent-hud/protocol";
@@ -47,6 +49,7 @@ export function AgentMessagesRow({
     limit !== null && !LIMITS.includes(limit) ? [...LIMITS, limit] : LIMITS;
   const asMe = t("Send as me");
   const askWhenNeeded = t("Ask for replies only when needed");
+  const steerOnOwn = t("Let agents decide when to steer");
   return (
     <>
       <ToolSwitchRow
@@ -85,6 +88,25 @@ export function AgentMessagesRow({
             checked={settings.agentMessagesRequireReply !== false}
             disabled={pending}
             onCheckedChange={(value) => set("agentMessagesRequireReply", value)}
+          />
+        </Row>
+        {/* Off unless turned on: an agent then interrupts another session's
+         * turn with no one asked, so it carries the caution tag too. */}
+        <Row
+          title={
+            <>
+              {steerOnOwn} <Pill tone="orange">{t("Caution")}</Pill>
+            </>
+          }
+          subtitle={t(
+            "Agents then interrupt each other's turns without asking you, to correct work in progress.",
+          )}
+        >
+          <Switch
+            aria-label={steerOnOwn}
+            checked={settings.agentMessagesSteerOnOwn === true}
+            disabled={pending}
+            onCheckedChange={(value) => set("agentMessagesSteerOnOwn", value)}
           />
         </Row>
         <Row

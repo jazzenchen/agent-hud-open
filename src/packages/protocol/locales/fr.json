@@ -1586,5 +1586,8 @@
   "Show glow": "Afficher le halo",
   "Hide when idle": "Masquer au repos",
   "Round the bar while the HUD is hidden: each agent's colour by its usage, yellow from 70% and red from 90%, breathing faster while one works.": "Autour de la barre tant que le HUD est masqué : chaque agent dans une couleur selon son usage, jaune dès 70 % et rouge dès 90 % ; il respire plus vite quand un agent travaille.",
-  "Round the notch: each agent's colour by its usage, yellow from 70% and red from 90%, breathing faster while one works.": "Autour de l’encoche : chaque agent dans une couleur selon son usage, jaune dès 70 % et rouge dès 90 % ; il respire plus vite quand un agent travaille."
+  "Round the notch: each agent's colour by its usage, yellow from 70% and red from 90%, breathing faster while one works.": "Autour de l’encoche : chaque agent dans une couleur selon son usage, jaune dès 70 % et rouge dès 90 % ; il respire plus vite quand un agent travaille.",
+  "Let agents decide when to steer": "Laisser les agents décider quand intervenir",
+  "Agents then interrupt each other's turns without asking you, to correct work in progress.": "Les agents interrompent alors le tour en cours des autres sessions sans vous demander, pour corriger le travail.",
+  "This goes into your current turn: take it into the work at hand, with no reply of its own. What it changes belongs in this turn's result. Only if it asks you something, answer with {{tool}}, reply_to: {{id}}.": "Ceci entre dans votre tour en cours : intégrez-le au travail en cours, sans réponse à part. Ce qu’il change a sa place dans le résultat de ce tour. Seulement si l’on vous pose une question, répondez avec {{tool}}, reply_to: {{id}}."
 }

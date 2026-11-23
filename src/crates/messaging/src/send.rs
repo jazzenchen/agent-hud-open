@@ -130,12 +130,26 @@ impl Messaging {
         // Another agent's words never read as the user's in the middle of a
         // turn: a steer carries Agent HUD's label even under "Send as me".
         let (form, ask) = self.shape(arguments, steer);
+        // A steer the agent chose itself ends with its own last line, which
+        // asks for no reply, in place of the reply line.
+        let own_steer = steer && self.preferences.steer_on_own;
         let from = sender.clone();
-        let delivered = words::compose(language, form, ask, &from, client, &id, reply_to, text);
-        let delivered = if steer {
-            words::steered(language, delivered)
-        } else {
-            delivered
+        let delivered = words::compose(
+            language,
+            form,
+            ask && !own_steer,
+            &from,
+            client,
+            &id,
+            reply_to,
+            text,
+        );
+        let delivered = match (steer, own_steer) {
+            (true, true) => {
+                words::steer_last_line(language, client, &id, words::steered(language, delivered))
+            }
+            (true, false) => words::steered(language, delivered),
+            _ => delivered,
         };
         // Where the recipient's transcript ends now: its answer is after this.
         // The store finds the answer by when it was sent instead.

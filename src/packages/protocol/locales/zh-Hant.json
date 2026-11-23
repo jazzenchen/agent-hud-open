@@ -1522,5 +1522,8 @@
   "Show glow": "顯示光暈",
   "Hide when idle": "閒置時隱藏",
   "Round the bar while the HUD is hidden: each agent's colour by its usage, yellow from 70% and red from 90%, breathing faster while one works.": "HUD 隱藏時圍在細條外：每個 Agent 一種顏色，依用量變化，70% 起變黃、90% 起變紅；有 Agent 工作時呼吸更快。",
-  "Round the notch: each agent's colour by its usage, yellow from 70% and red from 90%, breathing faster while one works.": "圍在瀏海外：每個 Agent 一種顏色，依用量變化，70% 起變黃、90% 起變紅；有 Agent 工作時呼吸更快。"
+  "Round the notch: each agent's colour by its usage, yellow from 70% and red from 90%, breathing faster while one works.": "圍在瀏海外：每個 Agent 一種顏色，依用量變化，70% 起變黃、90% 起變紅；有 Agent 工作時呼吸更快。",
+  "Let agents decide when to steer": "讓 Agent 自己決定何時插話",
+  "Agents then interrupt each other's turns without asking you, to correct work in progress.": "開啟後，Agent 會不經詢問打斷其他會話正在進行的這一輪，用來糾正手上的工作。",
+  "This goes into your current turn: take it into the work at hand, with no reply of its own. What it changes belongs in this turn's result. Only if it asks you something, answer with {{tool}}, reply_to: {{id}}.": "這段話進入你目前這一輪：照著調整手上的工作，不用單獨回覆。它帶來的改變寫進這一輪的結果裡。只有它向你提了問題時，才用 {{tool}} 回覆，reply_to: {{id}}。"
 }
