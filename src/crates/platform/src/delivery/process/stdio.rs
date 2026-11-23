@@ -182,6 +182,26 @@ impl StdioServer {
             }
         })
     }
+    /// Closes stdin and waits briefly for the app-server to flush its rollout
+    /// and SQLite state and exit cleanly, falling back to `end` if it stays up.
+    pub fn finish(&mut self) {
+        self.finish_within(Duration::from_secs(3));
+    }
+    fn finish_within(&mut self, wait: Duration) {
+        self.input.take();
+        let deadline = Instant::now() + wait;
+        while Instant::now() < deadline {
+            match self.child.try_wait() {
+                Ok(Some(_)) => {
+                    self.job.take();
+                    return;
+                }
+                Ok(None) => std::thread::sleep(Duration::from_millis(10)),
+                Err(_) => break,
+            }
+        }
+        self.end();
+    }
     pub fn end(&mut self) {
         self.input.take();
         self.job.take();
@@ -193,5 +213,82 @@ impl StdioServer {
 impl Drop for StdioServer {
     fn drop(&mut self) {
         self.end();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::process::Command;
+
+    #[test]
+    fn finish_waits_for_clean_exit_after_stdin_eof_and_kills_if_hung() {
+        const CHILD_ENV: &str = "AGENT_HUD_TEST_STDIO_FINISH_CHILD";
+        const MARKER_ENV: &str = "AGENT_HUD_TEST_STDIO_FINISH_MARKER";
+        if let Some(mode) = std::env::var_os(CHILD_ENV) {
+            let mut sink = Vec::new();
+            let _ = std::io::stdin().read_to_end(&mut sink);
+            if mode == "flush" {
+                std::thread::sleep(Duration::from_millis(80));
+                if let Some(marker) = std::env::var_os(MARKER_ENV) {
+                    let _ = std::fs::write(marker, b"flushed");
+                }
+            } else {
+                std::thread::sleep(Duration::from_secs(30));
+            }
+            return;
+        }
+        let temp = tempfile::tempdir().unwrap();
+        let marker = temp.path().join("flushed.txt");
+        let test_name = format!(
+            "{}::finish_waits_for_clean_exit_after_stdin_eof_and_kills_if_hung",
+            module_path!().split_once("::").unwrap().1
+        );
+        let spawn_server = |mode: &str| {
+            let mut cmd = Command::new(std::env::current_exe().unwrap());
+            cmd.args(["--exact", &test_name, "--nocapture"])
+                .env(CHILD_ENV, mode)
+                .env(MARKER_ENV, &marker)
+                .stdin(Stdio::piped())
+                .stdout(Stdio::null())
+                .stderr(Stdio::null());
+            let job = children::Job::new().unwrap();
+            let mut child = cmd.spawn().unwrap();
+            job.assign(&child).unwrap();
+            let mut stdin = child.stdin.take().unwrap();
+            let (input, queued) = std::sync::mpsc::channel::<Vec<u8>>();
+            let (_done, written) = std::sync::mpsc::channel();
+            std::thread::spawn(move || {
+                for bytes in queued {
+                    let _ = stdin.write_all(&bytes);
+                }
+            });
+            let (_tx, lines) = std::sync::mpsc::channel();
+            StdioServer {
+                child,
+                job: Some(job),
+                input: Some(input),
+                written,
+                lines,
+                next: 1,
+                timeout: Duration::from_secs(5),
+            }
+        };
+
+        let mut flushing = spawn_server("flush");
+        flushing.finish_within(Duration::from_secs(5));
+        assert_eq!(
+            std::fs::read_to_string(&marker).unwrap_or_default(),
+            "flushed",
+            "finish must let the child flush state after stdin EOF"
+        );
+
+        let mut hung = spawn_server("hang");
+        let started = Instant::now();
+        hung.finish_within(Duration::from_millis(150));
+        assert!(
+            started.elapsed() < Duration::from_secs(5),
+            "hung server must be terminated after the grace window"
+        );
     }
 }

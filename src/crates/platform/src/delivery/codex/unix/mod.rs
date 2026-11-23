@@ -89,7 +89,7 @@ fn enqueue(
             let mut server =
                 process::StdioServer::open(&route.executable, data, &route.environment, timeout)?;
             let value = server.mutation("thread/queue/add", params)?;
-            server.end();
+            server.finish();
             accepted(value)?;
         }
         Err(Failure::Unavailable(_)) => {

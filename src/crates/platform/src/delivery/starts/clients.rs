@@ -124,7 +124,7 @@ impl SessionStarts {
             codex::persist_started_thread(&id, &title, &value, |method, params| {
                 server.mutation(method, params)
             })?;
-            server.end();
+            server.finish();
             codex::queue_created(
                 &self
                     .config

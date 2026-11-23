@@ -68,7 +68,7 @@ fn enqueue_stdio(
         serde_json::json!({"threadId":thread,"clientUserMessageId":message_id,
         "input":[{"type":"text","text":text,"text_elements":[]}]}),
     )?;
-    server.end();
+    server.finish();
     if value["queuedSubmission"].is_object() {
         Ok(())
     } else {
