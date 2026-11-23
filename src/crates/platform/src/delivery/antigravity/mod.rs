@@ -292,4 +292,35 @@ mod project_start_tests {
         assert_eq!(target()["workspaceUris"], standalone);
         assert!(target()["projectEnvConfig"].is_null());
     }
+
+    #[test]
+    fn percent_encoded_windows_drive_uri_matches_project_folder() {
+        let temp = tempfile::tempdir().unwrap();
+        let folder = temp.path().join("repo");
+        std::fs::create_dir(&folder).unwrap();
+        let uri = reqwest::Url::from_file_path(&folder).unwrap();
+        let encoded = if let Some(rest) = uri.as_str().strip_prefix("file:///") {
+            if rest.as_bytes().get(1) == Some(&b':') {
+                format!(
+                    "file:///{}%3A{}",
+                    rest[..1].to_ascii_lowercase(),
+                    &rest[2..]
+                )
+            } else {
+                uri.as_str().to_owned()
+            }
+        } else {
+            uri.as_str().to_owned()
+        };
+        let project = json!({
+            "id": "encoded-drive",
+            "projectResources": { "resources": [{ "gitFolder": { "folderUri": encoded } }] }
+        });
+        std::fs::write(temp.path().join("p.json"), project.to_string()).unwrap();
+        let body = start_body(&folder, Some(temp.path())).unwrap();
+        assert_eq!(
+            body["projectEnvConfig"],
+            json!({"projectId": "encoded-drive", "defaultProjectEnvironment": {}})
+        );
+    }
 }

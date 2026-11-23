@@ -58,10 +58,22 @@ fn discovers_windows_language_server_and_cli_with_native_paths() {
             r"C:\Other\language_server.exe",
             "server --app_data_dir unrelated --csrf_token fixture",
         ),
+        process(
+            4,
+            r"C:\Program Files\Antigravity IDE\resources\bin\language_server_windows_x64.exe",
+            "server --csrf_token fixture-ide",
+        ),
     ]);
     assert_eq!(
-        found.iter().map(|server| server.pid).collect::<Vec<_>>(),
-        [1, 2]
+        found
+            .iter()
+            .map(|server| (server.pid, server.client))
+            .collect::<Vec<_>>(),
+        [
+            (1, "antigravity"),
+            (4, "antigravity-ide"),
+            (2, "antigravity-cli")
+        ]
     );
 }
 

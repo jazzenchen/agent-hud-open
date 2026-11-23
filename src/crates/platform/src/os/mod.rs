@@ -332,6 +332,18 @@ mod tests {
         };
         assert_eq!(goose, [expected]);
     }
+
+    #[test]
+    fn capabilities_reports_antigravity_local_service_available() {
+        let label = capabilities()["antigravityLocalService"]
+            .as_str()
+            .unwrap()
+            .to_owned();
+        assert!(
+            matches!(label.as_str(), "live-verified" | "unverified"),
+            "unexpected antigravityLocalService label: {label}"
+        );
+    }
 }
 
 #[cfg(test)]

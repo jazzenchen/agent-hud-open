@@ -150,10 +150,15 @@ fn antigravity_targets_and_delivery_preserve_durable_identity() {
         Operation::Start,
         Operation::Steer,
         Operation::Enqueue,
+        Operation::Interrupt,
     ] {
         assert!(capability.operations.contains(&operation));
     }
     assert_eq!(capability.operations, antigravity::OPERATIONS);
+    assert!(!capability
+        .notice
+        .to_ascii_lowercase()
+        .contains("unavailable"));
     assert_eq!(service.targets(SystemTime::now())[0].reachable, None);
     let receipt = service.send(request(Provider::Antigravity)).unwrap();
     assert_eq!(receipt.state, DeliveryState::Started);

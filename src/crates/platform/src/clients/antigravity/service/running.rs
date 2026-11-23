@@ -40,9 +40,11 @@ fn flag(command: &str, name: &str) -> Option<String> {
 
 pub(super) fn servers() -> Result<Vec<Server>, String> {
     let processes = crate::os::processes()?;
-    let saved = crate::os::home_dir()
-        .map(|home| saved_tokens(&home.join(".gemini")))
-        .unwrap_or_default();
+    let gemini = std::env::var_os("GEMINI_CLI_HOME")
+        .filter(|value| !value.is_empty())
+        .map(std::path::PathBuf::from)
+        .or_else(|| crate::os::home_dir().ok().map(|home| home.join(".gemini")));
+    let saved = gemini.map(|dir| saved_tokens(&dir)).unwrap_or_default();
     Ok(parse_servers(processes, &saved))
 }
 
@@ -107,6 +109,7 @@ fn parse_servers(
             && (executable.contains("antigravity.app/")
                 || executable.contains("antigravity ide.app/")
                 || executable.contains("/antigravity/")
+                || executable.contains("/antigravity ide/")
                 || executable.contains("/antigravity-cli/")
                 || executable.contains("/antigravity_cli/")
                 || data_dir
@@ -141,7 +144,11 @@ fn parse_servers(
             {
                 split::ANTIGRAVITY_CLI
             }
-            _ if executable.contains("antigravity ide.app/") => split::ANTIGRAVITY_IDE,
+            _ if executable.contains("antigravity ide.app/")
+                || executable.contains("/antigravity ide/") =>
+            {
+                split::ANTIGRAVITY_IDE
+            }
             _ => antigravity::AGENT.id,
         };
         result.push(Server {

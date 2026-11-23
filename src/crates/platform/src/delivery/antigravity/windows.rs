@@ -1,25 +1,23 @@
-//! Antigravity on Windows: a message goes to the service that opened its
-//! session (`crate::clients::antigravity::service::message_session`).
-//! Interrupting is not adapted yet; an adapter would send
-//! `CancelCascadeInvocation` to that same service, as `MessageSession::send`
-//! does for a message.
+//! Antigravity on Windows: messages and interrupts go to the running local
+//! language server that opened the session
+//! (`crate::clients::antigravity::service::message_session`).
 use super::cascade_config::{choose, latest_turn_config};
 use super::*;
 
-/// What a message may ask for: no interrupt.
 pub(crate) const OPERATIONS: &[Operation] = &[
     Operation::Automatic,
     Operation::Start,
     Operation::Steer,
     Operation::Enqueue,
+    Operation::Interrupt,
 ];
-pub(crate) const NOTICE: &str = "Sends to an existing uniquely identified session on its running Antigravity local language server. Interrupt and new-session start remain unavailable on Windows.";
+pub(crate) const NOTICE: &str = "Connects to the running Antigravity local language server for existing sessions and new-session starts.";
 
-/// Interrupting is not adapted on Windows.
-pub(super) fn interrupt(_cascade_id: &str) -> Result<()> {
-    Err(Failure::Unsupported(
-        "Interrupting Antigravity sessions is unavailable on Windows".into(),
-    ))
+pub(super) fn interrupt(cascade_id: &str) -> Result<()> {
+    use crate::clients::antigravity::service::message_session;
+    let session = message_session(cascade_id).map_err(windows_message_error)?;
+    session.interrupt().map_err(windows_message_error)?;
+    Ok(())
 }
 
 /// Read a model configuration from the same verified owner that will receive

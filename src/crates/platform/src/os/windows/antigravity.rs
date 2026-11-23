@@ -20,7 +20,6 @@ use windows_sys::Win32::{
     },
 };
 
-const NAMES: [&str; 2] = ["language_server.exe", "agy.exe"];
 /// UNICODE_STRING lengths are u16 byte counts, so a command line is < 64 KiB.
 const MAX_COMMAND_BYTES: u32 = 64 * 1024 + 64;
 
@@ -56,8 +55,10 @@ pub(super) fn processes() -> Result<Vec<ProcessInfo>, String> {
 
 fn is_wanted(name: &[u16]) -> bool {
     let len = name.iter().position(|c| *c == 0).unwrap_or(name.len());
-    let name = String::from_utf16_lossy(&name[..len]);
-    NAMES.iter().any(|wanted| name.eq_ignore_ascii_case(wanted))
+    let name = String::from_utf16_lossy(&name[..len]).to_ascii_lowercase();
+    name == "agy.exe"
+        || (name.ends_with(".exe")
+            && (name.starts_with("language_server") || name.starts_with("language-server")))
 }
 
 /// Holds one handle while reading owner, image and command line, so all three
@@ -277,6 +278,8 @@ mod tests {
     fn only_antigravity_server_and_cli_images_are_wanted() {
         let utf16 = |s: &str| s.encode_utf16().chain([0, 'x' as u16]).collect::<Vec<_>>();
         assert!(is_wanted(&utf16("Language_Server.EXE")));
+        assert!(is_wanted(&utf16("language_server_windows_x64.exe")));
+        assert!(is_wanted(&utf16("language-server.exe")));
         assert!(is_wanted(&utf16("agy.exe")));
         assert!(!is_wanted(&utf16("language_server.exe.bak")));
         assert!(!is_wanted(&utf16("Antigravity.exe")));
