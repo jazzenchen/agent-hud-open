@@ -141,19 +141,15 @@ mod tests {
             "pi:a1",
             now + Duration::from_secs(120)
         ));
-        // Said by a process that is gone: held only where the OS adapter
-        // cannot tell yet (Windows' `process_runs` answers yes for any pid),
-        // and there the note stands until it is too old.
+        // Said by a process that is gone: no longer held once the OS reports it exited.
         let gone = 999_999_999;
         put(
             &observers,
             "pi@1.json",
             json!({"pid":gone,"at":millis(now),"client":"pi","sessions":["a1"]}),
         );
-        assert_eq!(
-            standing(&data, "pi", "pi:a1", now),
-            crate::os::process_runs(gone, None)
-        );
+        assert!(!crate::os::process_runs(gone, None));
+        assert!(!standing(&data, "pi", "pi:a1", now));
     }
 
     #[test]

@@ -208,17 +208,97 @@ pub(crate) fn codex_cli_on_port(
     None
 }
 
-/// Not asked on Windows yet: every process Claude Code's registry names
-/// runs, so a killed one keeps the transcript's half hour. An adapter would
-/// open the pid (`OpenProcess`) and compare `GetProcessTimes`' creation time
-/// with `started`.
-pub(crate) fn process_runs(_pid: i32, _started: Option<i64>) -> bool {
-    true
+const WINDOWS_TO_UNIX_EPOCH_SECS: u64 = 11_644_473_600;
+const TICKS_PER_SECOND: u64 = 10_000_000;
+
+struct ProcessHandle(windows_sys::Win32::Foundation::HANDLE);
+impl Drop for ProcessHandle {
+    fn drop(&mut self) {
+        // SAFETY: `self.0` is a valid non-null handle returned by OpenProcess.
+        unsafe { windows_sys::Win32::Foundation::CloseHandle(self.0) };
+    }
 }
 
-/// Not read on Windows yet.
-pub(crate) fn process_start(_pid: i32) -> Option<i64> {
-    None
+fn filetime_to_unix_seconds(ft: windows_sys::Win32::Foundation::FILETIME) -> Option<i64> {
+    let ticks = ((ft.dwHighDateTime as u64) << 32) | (ft.dwLowDateTime as u64);
+    let secs = ticks / TICKS_PER_SECOND;
+    let unix = secs.checked_sub(WINDOWS_TO_UNIX_EPOCH_SECS)?;
+    i64::try_from(unix).ok()
+}
+
+fn creation_unix_seconds(handle: windows_sys::Win32::Foundation::HANDLE) -> Option<i64> {
+    use windows_sys::Win32::{Foundation::FILETIME, System::Threading::GetProcessTimes};
+    let mut created = FILETIME {
+        dwLowDateTime: 0,
+        dwHighDateTime: 0,
+    };
+    let mut exited = FILETIME {
+        dwLowDateTime: 0,
+        dwHighDateTime: 0,
+    };
+    let mut kernel = FILETIME {
+        dwLowDateTime: 0,
+        dwHighDateTime: 0,
+    };
+    let mut user = FILETIME {
+        dwLowDateTime: 0,
+        dwHighDateTime: 0,
+    };
+    // SAFETY: `handle` is a valid process handle with PROCESS_QUERY_LIMITED_INFORMATION.
+    let ok = unsafe { GetProcessTimes(handle, &mut created, &mut exited, &mut kernel, &mut user) };
+    (ok != 0)
+        .then(|| filetime_to_unix_seconds(created))
+        .flatten()
+}
+
+/// Whether a process still runs on `pid` and started when `started` says (in
+/// Unix seconds, +/- 2 s tolerance for PID-reuse checks). Matches Unix `pids`:
+/// `pid <= 0` or an unopenable elevated/other-user process (`ERROR_ACCESS_DENIED`)
+/// is taken on trust; exited or missing processes return `false`.
+pub(crate) fn process_runs(pid: i32, started: Option<i64>) -> bool {
+    use windows_sys::Win32::{
+        Foundation::{GetLastError, ERROR_ACCESS_DENIED, STILL_ACTIVE},
+        System::Threading::{GetExitCodeProcess, OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION},
+    };
+    if pid <= 0 {
+        return true;
+    }
+    // SAFETY: OpenProcess only requests limited query access to `pid`.
+    let handle = unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid as u32) };
+    if handle.is_null() {
+        return unsafe { GetLastError() } == ERROR_ACCESS_DENIED;
+    }
+    let handle = ProcessHandle(handle);
+    let mut code = 0u32;
+    if unsafe { GetExitCodeProcess(handle.0, &mut code) } == 0 || code != STILL_ACTIVE as u32 {
+        return false;
+    }
+    match (started, creation_unix_seconds(handle.0)) {
+        (Some(said), Some(began)) => (said - began).abs() <= 2,
+        _ => true,
+    }
+}
+
+/// When the running process on `pid` started, in Unix seconds.
+pub(crate) fn process_start(pid: i32) -> Option<i64> {
+    use windows_sys::Win32::{
+        Foundation::STILL_ACTIVE,
+        System::Threading::{GetExitCodeProcess, OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION},
+    };
+    if pid <= 0 {
+        return None;
+    }
+    // SAFETY: OpenProcess only requests limited query access to `pid`.
+    let handle = unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid as u32) };
+    if handle.is_null() {
+        return None;
+    }
+    let handle = ProcessHandle(handle);
+    let mut code = 0u32;
+    if unsafe { GetExitCodeProcess(handle.0, &mut code) } == 0 || code != STILL_ACTIVE as u32 {
+        return None;
+    }
+    creation_unix_seconds(handle.0)
 }
 
 /// Not asked on Windows yet: no process counts as reading a terminal, so a
@@ -334,5 +414,62 @@ mod tests {
             String::from_utf8_lossy(&output.stdout),
             String::from_utf8_lossy(&output.stderr)
         );
+    }
+
+    #[test]
+    fn filetime_converts_epoch_and_modern_timestamps() {
+        use windows_sys::Win32::Foundation::FILETIME;
+        let from_ticks = |ticks: u64| FILETIME {
+            dwLowDateTime: ticks as u32,
+            dwHighDateTime: (ticks >> 32) as u32,
+        };
+        assert_eq!(filetime_to_unix_seconds(from_ticks(0)), None);
+        assert_eq!(
+            filetime_to_unix_seconds(from_ticks(WINDOWS_TO_UNIX_EPOCH_SECS * TICKS_PER_SECOND)),
+            Some(0)
+        );
+        let sample: u64 = 1_750_000_000;
+        assert_eq!(
+            filetime_to_unix_seconds(from_ticks(
+                (WINDOWS_TO_UNIX_EPOCH_SECS + sample) * TICKS_PER_SECOND
+            )),
+            Some(sample as i64)
+        );
+    }
+
+    #[test]
+    fn a_pid_runs_while_its_process_does_and_started_when_said() {
+        let own = std::process::id() as i32;
+        let began = process_start(own).expect("current process start time is readable");
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs() as i64;
+        assert!(began <= now + 2 && began >= now - 86_400, "began={began}");
+        assert!(process_runs(own, None));
+        assert!(process_runs(own, Some(began)), "the same process");
+        assert!(process_runs(own, Some(began + 2)), "within tolerance");
+        assert!(!process_runs(own, Some(began - 86_400)), "a reused pid");
+        assert!(process_runs(0, None));
+        assert!(process_runs(-1, None));
+        assert_eq!(process_start(0), None);
+        assert_eq!(process_start(-1), None);
+
+        let system = std::env::var_os("SystemRoot").unwrap();
+        let mut child = Command::new(PathBuf::from(system).join("System32/cmd.exe"))
+            .args(["/C", "exit", "0"])
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .unwrap();
+        let pid = child.id() as i32;
+        child.wait().unwrap();
+        // While `child` still holds the process handle (exited, exit code 0):
+        assert!(!process_runs(pid, None), "exited process with open handle");
+        assert_eq!(process_start(pid), None);
+        // After closing the handle:
+        drop(child);
+        assert!(!process_runs(pid, None), "exited process after close");
     }
 }
