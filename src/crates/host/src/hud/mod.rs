@@ -25,7 +25,7 @@ mod worker;
 // The native HUD host. macos.rs, windows.rs and linux.rs each provide the same
 // items, and the rest of this folder never branches on the operating system:
 //   GLOBAL_POINTS, COORDINATE_SPACE      how the pointer and geometry are expressed
-//   DOCK_IN_WORK_AREA                    whether an edge HUD keeps clear of the
+//   dock_in_work_area                    whether an edge HUD keeps clear of the
 //                                          system's own bars (the work area)
 //   WINDOW_FOLLOWS_DEPTH                 whether the window shrinks to the depth the
 //                                          page asks for, or keeps its whole canvas

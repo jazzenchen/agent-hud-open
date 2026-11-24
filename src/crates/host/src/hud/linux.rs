@@ -24,7 +24,6 @@ pub(super) use pointer::{global_pointer, left_mouse_down, pointer_keys};
 
 pub(super) const GLOBAL_POINTS: bool = false;
 pub(super) const COORDINATE_SPACE: &str = "monitor-scaled-physical-top-left";
-pub(super) const DOCK_IN_WORK_AREA: bool = false;
 /// The window keeps its whole canvas. A layer surface covers its output
 /// anyway, and an X11 HUD window cannot be resized: GTK gives one that is not
 /// resizable a fixed size (minimum and maximum the same in its size hints),
@@ -59,6 +58,14 @@ fn surface(label: &str) -> Option<(Point, f64)> {
         .as_ref()?
         .get(label)
         .copied()
+}
+
+/// A layer surface covers its whole output above every panel. An X11 window
+/// manager keeps an ordinary window out of its panels' reserved space: XFCE
+/// moved a full-height HUD 27 px down below its top panel, which put a bottom
+/// HUD below the screen. There the HUD rests inside the work area.
+pub(super) fn dock_in_work_area() -> bool {
+    !layer_shell()
 }
 
 pub(super) fn native_drag() -> bool {
