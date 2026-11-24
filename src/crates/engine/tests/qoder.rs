@@ -11,7 +11,10 @@ fn qoder_session_details_include_runtime_segments_without_double_counting_the_tr
     let temp = tempfile::tempdir().unwrap();
     let home = temp.path().join("home");
     let config = home.join(".qoder");
-    let segments = config.join(format!("logs/sessions/-fixture/{ID}/segments"));
+    // One part at a time, so the path is spelled as the app spells it on Windows.
+    let segments = ["logs", "sessions", "-fixture", ID, "segments"]
+        .iter()
+        .fold(config.clone(), |path, part| path.join(part));
     let first = segments.join("2026-11-23T10-00-first.jsonl");
     let second = segments.join("2026-11-23T10-00-second.jsonl");
     fs::create_dir_all(&segments).unwrap();
@@ -70,7 +73,7 @@ fn qoder_session_details_include_runtime_segments_without_double_counting_the_tr
     assert!(detail["messages"][2].is_null());
     assert!(detail["messageNotice"].is_string());
 
-    let project = config.join("projects/-fixture");
+    let project = config.join("projects").join("-fixture");
     fs::create_dir_all(&project).unwrap();
     let transcript = project.join(format!("{ID}.jsonl"));
     let assistant = json!({"type":"assistant","sessionId":ID,
