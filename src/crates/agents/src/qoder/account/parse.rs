@@ -35,8 +35,16 @@ pub(super) fn finish_reading(
     let mut reading = Reading::empty(spec.provider);
     let organization = match summary.organization {
         Some(OrganizationQuota::Available(quota)) => Some(quota),
+        // Said only when no personal credits show either: Qoder may mark the
+        // package unavailable for accounts that never had one.
         Some(OrganizationQuota::Unavailable) => {
-            reading.notice = Some(tr!("Organization credits are unavailable."));
+            if !summary
+                .personal
+                .as_ref()
+                .is_some_and(|quota| quota.total > 0.0)
+            {
+                reading.notice = Some(tr!("Organization credits are unavailable."));
+            }
             None
         }
         None => None,

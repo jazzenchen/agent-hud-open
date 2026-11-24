@@ -2,7 +2,7 @@ use super::*;
 use crate::account::fake::FakeHost;
 use crate::account::{Answer, HttpFailure, WebSession};
 use rusqlite::Connection;
-use serde_json::json;
+use serde_json::{json, Value};
 
 const OPENAPI_GLOBAL: &str = "https://openapi.qoder.sh/sash/api/v2/me/usage";
 const OPENAPI_CN: &str = "https://openapi.qoder.com.cn/sash/api/v2/me/usage";
@@ -268,39 +268,41 @@ fn teams_organization_credits_are_independent_of_personal_credits() {
     assert_eq!(reading.quotas[1]["usedPercent"], 20.0);
 }
 
+fn teams_reading(personal: Value, package: Value) -> Reading {
+    let summary = parse(&json!({
+        "qoderUsage": {"userQuota": personal, "orgResourcePackage": package},
+        "orgResourcePackage": {"used": 600, "cap": 3000}
+    }))
+    .unwrap();
+    finish_reading(
+        &SPEC_QODER,
+        "fixture",
+        "Teams",
+        &None,
+        None,
+        "local",
+        summary,
+    )
+}
+
 #[test]
-fn teams_unavailable_organization_credits_keep_personal_credits() {
-    for (personal, package) in [
-        (json!({"used": 0, "total": 0}), json!({"available": false})),
-        (
-            json!({"used": 20, "total": 100}),
-            json!({"used": 600, "cap": 3000, "available": false}),
-        ),
-    ] {
-        let summary = parse(&json!({
-            "qoderUsage": {"userQuota": personal, "orgResourcePackage": package},
-            "orgResourcePackage": {"used": 600, "cap": 3000}
-        }))
-        .unwrap();
-        let reading = finish_reading(
-            &SPEC_QODER,
-            "fixture",
-            "Teams",
-            &None,
-            None,
-            "local",
-            summary,
-        );
-        assert_eq!(
-            reading.notice,
-            Some(tr!("Organization credits are unavailable."))
-        );
-        if personal["total"] == 0 {
-            assert!(reading.quotas.is_empty());
-        } else {
-            assert_eq!(reading.quotas.len(), 1);
-            assert_eq!(reading.quotas[0]["id"], "fixture:credits");
-            assert_eq!(reading.quotas[0]["usedPercent"], 20.0);
-        }
-    }
+fn unavailable_organization_credits_are_noted_when_nothing_else_shows() {
+    let reading = teams_reading(json!({"used": 0, "total": 0}), json!({"available": false}));
+    assert_eq!(
+        reading.notice,
+        Some(tr!("Organization credits are unavailable."))
+    );
+    assert!(reading.quotas.is_empty());
+}
+
+#[test]
+fn unavailable_organization_credits_keep_personal_credits_without_a_notice() {
+    let reading = teams_reading(
+        json!({"used": 20, "total": 100}),
+        json!({"used": 600, "cap": 3000, "available": false}),
+    );
+    assert_eq!(reading.notice, None);
+    assert_eq!(reading.quotas.len(), 1);
+    assert_eq!(reading.quotas[0]["id"], "fixture:credits");
+    assert_eq!(reading.quotas[0]["usedPercent"], 20.0);
 }
