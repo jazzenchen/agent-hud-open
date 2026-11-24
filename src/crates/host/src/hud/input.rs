@@ -168,7 +168,7 @@ fn pointer_in_viewport(
     geometry: Option<&HudGeometry>,
 ) -> Result<Point, String> {
     let pointer = host::global_pointer(app)?;
-    if let Some(geometry) = geometry {
+    if let Some(geometry) = geometry.filter(|_| !host::live_pointer_origin()) {
         // configure() records the actual native content rectangle, including every
         // drag preview and constrained placement. Keep the same coordinate planes:
         // uniform global points on macOS; physical pixels / selected DPI elsewhere.
@@ -178,8 +178,9 @@ fn pointer_in_viewport(
             y: pointer.y / units - geometry.canvas.y,
         });
     }
-    // Configuration/rollback hit tests run before the new canvas readback is stored.
-    // Their infrequent checks must use the live native frame instead of old geometry.
+    // X11 placement is asynchronous: the WM may move the window after configure()
+    // cached its origin. Its full-canvas window must use the live content origin.
+    // Configuration/rollback also use this path before geometry has been stored.
     let position = window.inner_position().map_err(|error| error.to_string())?;
     let scale = window.scale_factor().map_err(|error| error.to_string())?;
     let divisor = if host::GLOBAL_POINTS { scale } else { 1.0 };

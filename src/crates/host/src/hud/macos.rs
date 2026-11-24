@@ -38,6 +38,10 @@ pub(super) fn fixed_canvas() -> bool {
     false
 }
 
+pub(super) fn live_pointer_origin() -> bool {
+    false
+}
+
 /// Tauri itself reloads a WKWebView whose content process ended.
 pub(super) fn watch_page(
     _window: &tauri::WebviewWindow,

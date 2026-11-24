@@ -32,6 +32,7 @@ mod worker;
 //   native_drag                          whether an edge drag can follow the button
 //   fixed_canvas                         whether the canvas stays put while a drag
 //                                          previews another edge or offset
+//   live_pointer_origin                  whether hit tests read the window's live origin
 //   panel_builder, place, shown          create, position and show a HUD window
 //   measure_screens, screen              display identity, notch and menu bar
 //   TextFocusOrigin, begin_text_focus,   the explicit keyboard-focus lease
