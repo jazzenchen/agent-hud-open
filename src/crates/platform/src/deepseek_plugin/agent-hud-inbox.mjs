@@ -185,7 +185,11 @@ function inbox({ fs, path, service, read, write, remove, now, quietly, NAME, fol
   const workspaceAt = (cwd) => {
     try {
       const list = service("workspaceRegistry")?.list?.();
-      const found = (Array.isArray(list) ? list : []).find((w) => w?.path === cwd);
+      // HUD and Harness can spell the same Windows directory with different separators.
+      const target = path.resolve(cwd);
+      const found = (Array.isArray(list) ? list : []).find(
+        (w) => typeof w?.path === "string" && path.isAbsolute(w.path) && path.resolve(w.path) === target,
+      );
       return typeof found?.id === "string" ? found.id : undefined;
     } catch {
       return undefined;

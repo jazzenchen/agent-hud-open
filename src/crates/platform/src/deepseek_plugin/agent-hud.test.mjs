@@ -6,18 +6,18 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 
 // The plugin as Harness loads it: agent-hud.mjs with agent-hud-inbox.mjs and
 // agent-hud-steer.mjs after it, as `SCRIPT` in mod.rs joins them.
-const here = path.dirname(new URL(import.meta.url).pathname);
 const joined = fs.mkdtempSync(path.join(os.tmpdir(), "dsh-plugin-module-"));
 fs.writeFileSync(
   path.join(joined, "agent-hud.mjs"),
   ["agent-hud.mjs", "agent-hud-inbox.mjs", "agent-hud-steer.mjs"]
-    .map((name) => fs.readFileSync(path.join(here, name), "utf8"))
+    .map((name) => fs.readFileSync(new URL(name, import.meta.url), "utf8"))
     .join(""),
 );
-const { start, apply } = await import(path.join(joined, "agent-hud.mjs"));
+const { start, apply } = await import(pathToFileURL(path.join(joined, "agent-hud.mjs")).href);
 test.after(() => fs.rmSync(joined, { recursive: true, force: true }));
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -295,7 +295,7 @@ test("a named model switches the session first and keeps Harness's default; the 
 
   const starts = path.join(channel, "starts", "4242");
   fs.mkdirSync(starts, { recursive: true });
-  fs.writeFileSync(path.join(starts, `${id}.json`), JSON.stringify({ id, cwd: "/work", text: "hi", at: 1, expiresAt: Date.now() + 60_000, model: pro }));
+  fs.writeFileSync(path.join(starts, `${id}.json`), JSON.stringify({ id, cwd: path.join(channel, "work"), text: "hi", at: 1, expiresAt: Date.now() + 60_000, model: pro }));
   plugin.tick();
   await until(() => json("starts", "4242", `${id}.json`).startedAt);
   const made = "session-00000009-2222-4333-8444-555555555555";
@@ -325,7 +325,9 @@ test("a start makes a session in the folder's workspace and queues its first mes
   const { h, plugin, channel, json } = setup(t);
   const made = [];
   const sent = [];
-  h.ctx.workspaces = { list: () => [{ id: "ws-1", path: "/work/known" }] };
+  const knownFolder = path.join(channel, "斗蛐蛐2");
+  const otherFolder = path.join(channel, "other");
+  h.ctx.workspaces = { list: () => [{ id: "ws-1", path: knownFolder }] };
   h.ctx.controller = {
     create: async (request) => {
       made.push(request);
@@ -343,13 +345,14 @@ test("a start makes a session in the folder's workspace and queues its first mes
   const other = "bbbbbbbb-bbbb-4ccc-8ddd-eeeeeeeeeeee";
   const ask = (id, cwd) =>
     fs.writeFileSync(path.join(dir, `${id}.json`), JSON.stringify({ id, cwd, text: `hello ${id}`, at: 1, expiresAt: Date.now() + 60_000 }));
-  ask(known, "/work/known");
+  // The HUD can join the last path component with a forward slash on Windows.
+  ask(known, `${path.dirname(knownFolder)}/${path.basename(knownFolder)}`);
   plugin.tick();
   await until(() => json("starts", "4242", `${known}.json`).startedAt);
-  ask(other, "/work/other");
+  ask(other, otherFolder);
   plugin.tick();
   await until(() => json("starts", "4242", `${other}.json`).startedAt);
-  assert.deepEqual(made, [{ workspaceId: "ws-1" }, { cwd: "/work/other" }]);
+  assert.deepEqual(made, [{ workspaceId: "ws-1" }, { cwd: otherFolder }]);
   const first = json("starts", "4242", `${known}.json`);
   assert.equal(first.sessionId, "session-00000001-2222-4333-8444-555555555555");
   assert.deepEqual(
@@ -368,7 +371,7 @@ test("a start waits for the controller, and refusals and expiry are written", as
   const dir = path.join(channel, "starts", "4242");
   fs.mkdirSync(dir, { recursive: true });
   const ask = (id, more = {}) =>
-    fs.writeFileSync(path.join(dir, `${id}.json`), JSON.stringify({ id, cwd: "/work", text: "hi", at: 1, expiresAt: Date.now() + 60_000, ...more }));
+    fs.writeFileSync(path.join(dir, `${id}.json`), JSON.stringify({ id, cwd: path.join(channel, "work"), text: "hi", at: 1, expiresAt: Date.now() + 60_000, ...more }));
   ask("waits");
   ask("relative", { cwd: "work" });
   plugin.tick();
