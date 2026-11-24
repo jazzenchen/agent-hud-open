@@ -768,6 +768,7 @@
   "Organization": "组织",
   "Organization and project are supported only for a GLM team plan": "只有 GLM 团队套餐支持组织和项目",
   "Organization credits are unavailable.": "组织额度不可用。",
+  "Qoder's runtime log contains prompt previews but no reply text.": "Qoder 的运行日志里只有提示词预览，没有回复内容。",
   "Other": "其他",
   "Other agents": "其他智能体",
   "Other answer": "其他回答",

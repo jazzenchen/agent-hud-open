@@ -88,6 +88,15 @@ pub(crate) fn accepts_source(path: &Path, source: &str) -> bool {
         "antigravity" => {
             name == "transcript.jsonl" && path.components().any(|p| p.as_os_str() == "brain")
         }
+        // Under `logs/sessions` only the runtime event segments; transcripts elsewhere.
+        "qoder" => {
+            name.ends_with(".jsonl")
+                && (!path.components().any(|p| p.as_os_str() == "logs")
+                    || path
+                        .parent()
+                        .and_then(Path::file_name)
+                        .is_some_and(|s| s == "segments"))
+        }
         "grok-cli" => name == "updates.jsonl" || name == "unified.jsonl",
         "copilot" => name == "events.jsonl",
         _ => name.ends_with(".jsonl"),

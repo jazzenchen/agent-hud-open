@@ -768,6 +768,7 @@
   "Organization": "조직",
   "Organization and project are supported only for a GLM team plan": "조직과 프로젝트는 GLM 팀 요금제에서만 지원됩니다",
   "Organization credits are unavailable.": "조직 크레딧을 사용할 수 없습니다.",
+  "Qoder's runtime log contains prompt previews but no reply text.": "Qoder 실행 로그에는 프롬프트 미리보기만 있고 답변 내용은 없습니다.",
   "Other": "기타",
   "Other agents": "기타 에이전트",
   "Other answer": "다른 답",

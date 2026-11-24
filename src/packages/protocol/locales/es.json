@@ -784,6 +784,7 @@
   "Organization": "Organización",
   "Organization and project are supported only for a GLM team plan": "La organización y el proyecto solo se admiten en un plan de equipo de GLM",
   "Organization credits are unavailable.": "Los créditos de la organización no están disponibles.",
+  "Qoder's runtime log contains prompt previews but no reply text.": "El registro de ejecución de Qoder contiene vistas previas de los mensajes, pero no el texto de las respuestas.",
   "Other": "Otra",
   "Other agents": "Otros agentes",
   "Other answer": "Otra respuesta",
