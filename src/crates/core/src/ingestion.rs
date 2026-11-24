@@ -246,18 +246,27 @@ impl AgentHudCore {
     }
 
     /// Up to when a pending log's usage is known: its last update when only
-    /// the parser changed, else its read's target.
+    /// the parser changed, else its read's target, else when the file was
+    /// last written, since it holds no call from after that. Without the last,
+    /// one old log never read, or failing to read, would keep every recent
+    /// range incomplete, and the phone's usage with it (Open #163).
     pub(crate) fn pending_meter_bound(&self, path: &Path, file: &FileStamp) -> Option<i64> {
-        self.logs.get(path).and_then(|log| {
-            if log.parser_version != PARSER_VERSION
-                && log.length == file.length
-                && log.modified == file.modified
-            {
-                metering::date_ms(&log.updated)
-            } else {
-                log.meter_target_at
-            }
-        })
+        self.logs
+            .get(path)
+            .and_then(|log| {
+                if log.parser_version != PARSER_VERSION
+                    && log.length == file.length
+                    && log.modified == file.modified
+                {
+                    metering::date_ms(&log.updated)
+                } else {
+                    log.meter_target_at
+                }
+            })
+            .or_else(|| {
+                file.modified
+                    .map(|at| chrono::DateTime::<Utc>::from(at).timestamp_millis())
+            })
     }
 
     pub(crate) fn pending_meter_bounds(&self) -> HashMap<&str, Option<i64>> {
