@@ -45,14 +45,14 @@ Requires an Apple Silicon Mac running macOS 14 or later.
       <agenthudMinimumIOSVersion>1.7.2</agenthudMinimumIOSVersion>
     </item>
     <item>
-      <title>0.6.13</title>
-      <pubDate>Tue, 24 Nov 2026 01:17:45 +0800</pubDate>
-      <link>https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.13</link>
-      <sparkle:version>513</sparkle:version>
-      <sparkle:shortVersionString>0.6.13</sparkle:shortVersionString>
+      <title>0.6.14</title>
+      <pubDate>Wed, 25 Nov 2026 04:42:20 +0800</pubDate>
+      <link>https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.14</link>
+      <sparkle:version>514</sparkle:version>
+      <sparkle:shortVersionString>0.6.14</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
       <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-      <description sparkle:format="markdown"># Agent HUD 0.6.13
+      <description sparkle:format="markdown"># Agent HUD 0.6.14
 
 ## Compatibility
 
@@ -66,26 +66,21 @@ Requires an Apple Silicon Mac running macOS 14 or later.
 
 ### New
 
-- The panel's footer says when the numbers were last read ("Read just now", "Last read 5m ago") and has a button that reads every agent again, so a reading after a Claude chat shows without waiting (#135). Each vendor's own spacing between reads still applies.
-- The auto-hide bar keeps the colour you chose, and usage shows as a soft glow round it, as round the notch: each agent's colour by its level, breathing faster while one works, flashing on alerts (#140). Settings → Display has its own Auto-hide section with a switch for the glow.
-- `list_sent_messages` lists the messages the calling session has already sent, newest first, so an agent whose send timed out can check before sending again (#92, #151, thanks @zqy5618).
-- A send whose `to` and `reply_to` name different sessions is refused with a reason, and a message's label names the sender's session (#150, thanks @zqy5618).
-- Windows: Antigravity's local service now works on Windows. `list_models`, Antigravity sessions in `list_sessions`, starting a session, sending, answering its approvals and interrupting all work there.
-- Windows: Agent HUD finds the installed Codex, Antigravity and DeepSeek Harness desktop apps, so sessions can be started in them.
+- A switch in Settings, "Let agents decide when to steer", off by default. With it on, `send_message` tells agents to steer a short correction into the turn in progress and to queue everything else, and a steer asks for no reply of its own (#144).
+- Qoder: a Teams account shows its organization's credits as a row of its own, next to the personal credits (#176, thanks @mrdrivingduck).
+- Qoder: a desktop session that has no transcript is read from Qoder's runtime log, with its turns, model and prompt previews; a session with a transcript is not counted twice (#177, thanks @mrdrivingduck).
+- WorkBuddy's international build, which keeps its data in `.workbuddy-ai`, is found (#157).
+- `start_session` for DeepSeek Harness offers Harness's own workspaces, not only the folders of recent sessions, so a workspace left for a day can still be started in.
 
 ### Fixes
 
-- With Rings or Segments, an agent billed by balance only, such as DeepSeek, gets an empty track ring, so its icon and spacing match its neighbours. In Simple mode its balance is written short (¥5.37, ¥105, ¥1.2k); the panel keeps the full amount (#137).
-- The Mac no longer counts an iPhone, or its Apple Watch, that has not written for three days when it checks whether every device is new enough to read its data. An old record of a reinstalled iPhone made the iPhone warn that "another iPhone and Apple Watch" needed updating (#138); the iPhone's own side of the fix comes in a later iPhone update.
-- A card's text that wraps one more line no longer hides under its buttons, and a request's long detail scrolls inside the card past 150 points, so Deny and Allow stay in view.
-- Windows: DeepSeek Harness sessions that are running now appear in `list_sessions` and take `send_message`, by session ID or by `reply_to`, even when they are not in the last 24 hours' index. `.jsonl.zstd` logs are read, and `DSH_HOME` may start with `~` (#164).
-- Windows: Settings no longer shows DeepSeek Harness, which needs no hooks, as not supported.
-- Windows: Cursor, TRAE, WorkBuddy, Qoder, ZCode and Kimi Code no longer claim they can take messages on Windows, where their hooks don't run yet. `list_sessions`, sending and the client pages now say the same.
-- Windows: Agent HUD now checks whether a Claude Code, Pi or OpenCode process still runs, so a session whose process ended no longer stays as it last was.
-- A reply to a conversation in ChatGPT desktop's Work mode finds its sender, so an Antigravity answer reaches it (#155). If the sender is not in the session list, the reply goes to the Codex thread recorded with the original message, but only while that thread exists and is not archived or deleted.
-- A Codex session started through `start_session` runs at the reasoning effort set in Codex's config, not at medium (#153).
+- The iPhone's calendar on the home page shows usage again: one old log that could not be read no longer leaves the last 30 days marked incomplete (#163).
+- An ordinary message to a Codex conversation that no app has open is queued and the conversation woken, instead of failing as "not open" (#161, thanks @cdk1025).
+- Codex Pro 100 counts as ten times Plus and reads "Pro x10", now that OpenAI has doubled its allowance (#162, thanks @MoriAss).
+- Windows: a DeepSeek Harness session started from Agent HUD lands in the chosen workspace, not Ungrouped, when the folder is written with forward slashes (#174, thanks @walker95478).
+- Linux (X11): pointing at and clicking the HUD work wherever the window manager placed its window (#159, thanks @xiaolin778877), and a HUD on the bottom edge stays on the screen with a panel at the top.
 </description>
-      <enclosure url="https://github.com/jazzenchen/agent-hud-open/releases/download/v0.6.13/Agent-HUD-0.6.13-arm64.dmg" length="55346688" type="application/octet-stream" sparkle:edSignature="cGyEB/5DLN3VSD4OnSxh0nIvszbS4jKtxP+bnB4msjz3T9TLbU4+RxZOTQH8jq756RmEHT+UHPTg78hS+tJFBQ==" />
+      <enclosure url="https://github.com/jazzenchen/agent-hud-open/releases/download/v0.6.14/Agent-HUD-0.6.14-arm64.dmg" length="55363525" type="application/octet-stream" sparkle:edSignature="gLvOdvdTjC03LGwCsjgEo1EDhh0SD4WiJGGSMA7bEv78CsqcM6H1MXGpOl9me4ji5x8nx3gnKNkJv/zk7Ox7Ag==" />
       <agenthudMacOnly>false</agenthudMacOnly>
       <agenthudMinimumIOSVersion>1.7.2</agenthudMinimumIOSVersion>
     </item>
