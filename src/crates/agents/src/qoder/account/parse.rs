@@ -6,11 +6,21 @@ use chrono::{DateTime, Utc};
 use serde_json::{json, Value};
 
 pub(super) struct Summary {
-    pub used: f64,
-    pub total: f64,
-    pub percent: f64,
-    pub reset: Option<String>,
+    personal: Option<Quota>,
+    organization: Option<OrganizationQuota>,
     pub plan: Option<String>,
+}
+
+struct Quota {
+    used: f64,
+    total: f64,
+    percent: f64,
+    reset: Option<String>,
+}
+
+enum OrganizationQuota {
+    Available(Quota),
+    Unavailable,
 }
 
 pub(super) fn finish_reading(
@@ -23,22 +33,42 @@ pub(super) fn finish_reading(
     summary: Summary,
 ) -> Reading {
     let mut reading = Reading::empty(spec.provider);
-    if summary.total > 0.0 {
+    let organization = match summary.organization {
+        Some(OrganizationQuota::Available(quota)) => Some(quota),
+        Some(OrganizationQuota::Unavailable) => {
+            reading.notice = Some(tr!("Organization credits are unavailable."));
+            None
+        }
+        None => None,
+    };
+    for (quota, key, name, short) in [
+        (summary.personal, "credits", "Model credits", "Credits"),
+        (
+            organization,
+            "org-credits",
+            "Organization credits",
+            "Org credits",
+        ),
+    ] {
+        let Some(quota) = quota.filter(|quota| quota.total > 0.0) else {
+            continue;
+        };
         reading.quotas.push(json!({
-            "id": format!("{id}:credits"),
+            "id": format!("{id}:{key}"),
             "vendor": spec.provider,
             "consumerSource": spec.provider,
             "accountId": id,
             "account": label,
-            "name": "Model credits",
-            "shortLabel": "Credits",
-            "usedPercent": summary.percent,
-            "resetAt": summary.reset,
+            "name": name,
+            "shortLabel": short,
+            "usedPercent": quota.percent,
+            "resetAt": quota.reset,
             "allModels": true,
-            "status": status(summary.percent),
-            "nativeUsage": {"used": summary.used, "capacity": summary.total, "unit": "credits"},
+            "status": status(quota.percent),
+            "nativeUsage": {"used": quota.used, "capacity": quota.total, "unit": "credits"},
         }));
-    } else {
+    }
+    if reading.quotas.is_empty() && reading.notice.is_none() {
         reading.notice = Some(tr!(
             "{{names}} reports no credit allowance for this plan.",
             names = spec.label
@@ -82,6 +112,19 @@ pub(super) fn parse(raw: &Value) -> Option<Summary> {
         .filter(|v| v.is_object())
         .unwrap_or(root);
     let plan = plan_name(usage).or_else(|| plan_name(root));
+    let personal = personal_quota(usage, root);
+    let organization =
+        organization_quota(field(usage, "orgResourcePackage", "org_resource_package")).or_else(
+            || organization_quota(field(root, "orgResourcePackage", "org_resource_package")),
+        );
+    (personal.is_some() || organization.is_some()).then_some(Summary {
+        personal,
+        organization,
+        plan,
+    })
+}
+
+fn personal_quota(usage: &Value, root: &Value) -> Option<Quota> {
     let reset = parse_reset(field(usage, "expiresAt", "expires_at"))
         .or_else(|| parse_reset(field(usage, "nextResetAt", "next_reset_at")))
         .or_else(|| parse_reset(field(root, "nextResetAt", "next_reset_at")));
@@ -94,7 +137,7 @@ pub(super) fn parse(raw: &Value) -> Option<Summary> {
         } else {
             (u, t, g)
         };
-        return build_summary(used, total, given, reset, plan);
+        return build_quota(used, total, given, reset);
     }
     if let Some((u, t, g)) = quota_summary(field(usage, "totalQuota", "total_quota")) {
         let (su, st, _) =
@@ -104,19 +147,24 @@ pub(super) fn parse(raw: &Value) -> Option<Summary> {
         } else {
             (u, t, g)
         };
-        return build_summary(used, total, given, reset, plan);
+        return build_quota(used, total, given, reset);
     }
     let (u, t, g) = quota_pair(usage)?;
-    build_summary(u, t, g, reset, plan)
+    build_quota(u, t, g, reset)
 }
 
-fn build_summary(
-    used: f64,
-    total: f64,
-    given: Option<f64>,
-    reset: Option<String>,
-    plan: Option<String>,
-) -> Option<Summary> {
+fn organization_quota(package: &Value) -> Option<OrganizationQuota> {
+    if package["available"] == false {
+        return Some(OrganizationQuota::Unavailable);
+    }
+    let total = amount(&package["cap"]).filter(|&total| total > 0.0)?;
+    let used = amount(field(package, "used", "used_value"))?;
+    let given = amount(&package["percentage"]);
+    let reset = parse_reset(field(package, "expiresAt", "expires_at"));
+    build_quota(used, total, given, reset).map(OrganizationQuota::Available)
+}
+
+fn build_quota(used: f64, total: f64, given: Option<f64>, reset: Option<String>) -> Option<Quota> {
     if total == 0.0 && used > 0.0 {
         return None;
     }
@@ -127,12 +175,11 @@ fn build_summary(
             100.0
         })
         .clamp(0.0, 100.0);
-    Some(Summary {
+    Some(Quota {
         used,
         total,
         percent,
         reset,
-        plan,
     })
 }
 
