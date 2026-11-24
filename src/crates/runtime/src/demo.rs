@@ -270,6 +270,9 @@ mod tests {
             .iter()
             .filter(|bucket| bucket["selectedTokens"].as_u64().unwrap_or(0) > 0)
             .count();
-        assert!(days >= 28, "{days} days with usage");
+        // The sample rests about half its weekends and a weekday now and then
+        // (`day_pace`), so a month has some empty days; a month read whole has
+        // most days used.
+        assert!(days >= 20, "{days} days with usage");
     }
 }
