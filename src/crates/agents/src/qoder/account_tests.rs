@@ -212,3 +212,95 @@ fn web_sign_in_fallback_and_legacy_qoder_cn_session_still_work() {
     assert_eq!(c.quotas[0]["vendor"], "qoder-cn");
     assert_eq!(c.quotas[0]["usedPercent"], 10.0);
 }
+
+#[test]
+fn teams_organization_credits_are_independent_of_personal_credits() {
+    let web = FakeHost::new(&home());
+    let mut web = web.answer(
+        WEB_GLOBAL_CREDITS,
+        Ok(json!({
+            "data": {
+                "qoderUsage": {
+                    "planTierName": "Teams",
+                    "userQuota": {"used": 0, "total": 0},
+                    "orgResourcePackage": {"used": 0, "cap": 3000, "available": true}
+                }
+            }
+        })),
+    );
+    web.web_sessions.insert(
+        "qoder|qoder.com".into(),
+        WebSession {
+            host: "qoder.com".into(),
+            cookie: "fixture".into(),
+            user_agent: crate::account::WEB_USER_AGENT.into(),
+        },
+    );
+    let reading = read_qoder(&web).unwrap();
+    assert_eq!(reading.notice, None);
+    assert_eq!(reading.quotas.len(), 1);
+    let quota = &reading.quotas[0];
+    assert!(quota["id"].as_str().unwrap().ends_with(":org-credits"));
+    assert_eq!(quota["usedPercent"], 0.0);
+    assert_eq!(
+        quota["nativeUsage"],
+        json!({"used":0.0,"capacity":3000.0,"unit":"credits"})
+    );
+    assert_eq!(reading.account.unwrap()["plan"], "Teams");
+
+    let summary = parse(&json!({
+        "userQuota": {"used": 20, "total": 100},
+        "org_resource_package": {"used_value": 600, "cap": 3000}
+    }))
+    .unwrap();
+    let reading = finish_reading(
+        &SPEC_QODER,
+        "fixture",
+        "Teams",
+        &None,
+        None,
+        "local",
+        summary,
+    );
+    assert_eq!(reading.quotas.len(), 2);
+    assert_eq!(reading.quotas[0]["nativeUsage"]["capacity"], 100.0);
+    assert_eq!(reading.quotas[1]["nativeUsage"]["capacity"], 3000.0);
+    assert_eq!(reading.quotas[1]["usedPercent"], 20.0);
+}
+
+#[test]
+fn teams_unavailable_organization_credits_keep_personal_credits() {
+    for (personal, package) in [
+        (json!({"used": 0, "total": 0}), json!({"available": false})),
+        (
+            json!({"used": 20, "total": 100}),
+            json!({"used": 600, "cap": 3000, "available": false}),
+        ),
+    ] {
+        let summary = parse(&json!({
+            "qoderUsage": {"userQuota": personal, "orgResourcePackage": package},
+            "orgResourcePackage": {"used": 600, "cap": 3000}
+        }))
+        .unwrap();
+        let reading = finish_reading(
+            &SPEC_QODER,
+            "fixture",
+            "Teams",
+            &None,
+            None,
+            "local",
+            summary,
+        );
+        assert_eq!(
+            reading.notice,
+            Some(tr!("Organization credits are unavailable."))
+        );
+        if personal["total"] == 0 {
+            assert!(reading.quotas.is_empty());
+        } else {
+            assert_eq!(reading.quotas.len(), 1);
+            assert_eq!(reading.quotas[0]["id"], "fixture:credits");
+            assert_eq!(reading.quotas[0]["usedPercent"], 20.0);
+        }
+    }
+}
