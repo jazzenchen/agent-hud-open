@@ -110,11 +110,14 @@ impl Log {
         // A Codex rollout's name ends with its thread's id, which its first
         // line confirms: a session read before that line is whole already
         // has the id it keeps, so the phone never sees it change.
-        let id = stem
-            .len()
-            .checked_sub(36)
-            .and_then(|start| stem.get(start..))
-            .filter(|tail| source == "codex" && crate::claude::transcript::uuid(tail))
+        let id = crate::qoder::events::session_id(&path)
+            .filter(|_| source == "qoder")
+            .or_else(|| {
+                stem.len()
+                    .checked_sub(36)
+                    .and_then(|start| stem.get(start..))
+                    .filter(|tail| source == "codex" && crate::claude::transcript::uuid(tail))
+            })
             .unwrap_or(stem)
             .to_owned();
         let live = LiveLog::new(&path, source);
@@ -168,6 +171,10 @@ impl Log {
     }
 
     pub fn parse(&mut self, value: &Value) {
+        if self.source == "qoder" && crate::qoder::events::session_id(&self.path).is_some() {
+            crate::qoder::events::parse(self, value);
+            return;
+        }
         if self.source == "codex-index" {
             if let (Some(id), Some(title)) = (
                 value["id"].as_str(),

@@ -274,6 +274,7 @@ mod tests {
             ("pi", ".pi/agent/sessions"),
             ("qoder", ".qoder/projects"),
             ("qoder", "<app>/Qoder/SharedClientCache/cli/projects"),
+            ("qoder", ".qoder/logs/sessions"),
             ("qoder-cn", ".qoder-cn/projects"),
             (
                 "qoder-cn",

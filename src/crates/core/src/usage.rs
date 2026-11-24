@@ -13,9 +13,8 @@ use std::{
 /// UsageLedger/UsageStore: only source writes invalidate this numeric projection.
 pub(crate) struct UsageProjection {
     pub(crate) selected: Vec<PathBuf>,
-    /// The selected logs that hold an earlier part of a session, each with
-    /// the log the session lists as (`earlier_segments`): counted, never
-    /// listed.
+    /// The other segments of a session, each with its representative
+    /// (`earlier_segments`): counted, never listed on their own.
     pub(crate) earlier: HashMap<PathBuf, PathBuf>,
     pub(crate) totals: Usage,
     pub(crate) timeline: Vec<Value>,
@@ -42,9 +41,8 @@ pub(crate) fn segment(log: &LogHead) -> &str {
     agent_hud_agents::transcript::segments::of(&log.source, &log.path)
 }
 
-/// The selected logs that hold an earlier segment of their session
-/// (`segment`), each with the newest segment of it, which stands for the
-/// session in every list. The newest segment's name sorts last.
+/// The other segments of each session, each with the one that represents it.
+/// Prefer existing files, then the newest segment name.
 pub(crate) fn earlier_segments<'a>(
     logs: &[&'a LogHead],
 ) -> HashMap<&'a std::path::Path, &'a std::path::Path> {
@@ -60,7 +58,7 @@ pub(crate) fn earlier_segments<'a>(
         let newest = segments
             .iter()
             .copied()
-            .max_by_key(|log| segment(log))
+            .max_by_key(|log| (!log.gone, segment(log)))
             .unwrap();
         for log in segments.into_iter().filter(|log| log.path != newest.path) {
             earlier.insert(log.path.as_path(), newest.path.as_path());
@@ -112,10 +110,12 @@ impl AgentHudCore {
         let mapped_copy = |log: &LogHead| {
             mapped.contains(&(log.source.as_str(), log.id.as_str(), log.path.as_path()))
         };
+        let qoder = agent_hud_agents::qoder::QODER.id;
         let mut sessions: HashMap<(&str, &str, &str), &LogHead> = HashMap::new();
         for log in self.logs.values().filter(|log| {
             log.source != "codex-index"
                 && !unwritten_buddy_transcript(log)
+                && (log.observed || log.source != qoder || segment(log).is_empty())
                 && self.log_on(&log.source, log.client.as_deref())
         }) {
             let is_mapped = mapped_copy(log);
@@ -144,7 +144,27 @@ impl AgentHudCore {
                 })
                 .or_insert(log);
         }
-        let mut logs: Vec<_> = sessions.into_values().collect();
+        // Qoder's runtime events and its transcript can describe the same
+        // work. Use the transcript while it exists; otherwise the segments
+        // replace its retained contribution.
+        let mut fallback = HashMap::<&str, bool>::new();
+        for (&(source, id, part), log) in &sessions {
+            if source == qoder && !part.is_empty() {
+                *fallback.entry(id).or_default() |= !log.gone;
+            }
+        }
+        let mut logs: Vec<_> = sessions
+            .iter()
+            .filter_map(|(&(source, id, part), &log)| {
+                let Some(&has_live_segment) = fallback.get(id).filter(|_| source == qoder) else {
+                    return Some(log);
+                };
+                let use_transcript = sessions
+                    .get(&(source, id, ""))
+                    .is_some_and(|whole| whole.observed && (!whole.gone || !has_live_segment));
+                (part.is_empty() == use_transcript).then_some(log)
+            })
+            .collect();
         logs.sort_by(|a, b| {
             b.updated
                 .cmp(&a.updated)

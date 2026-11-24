@@ -212,12 +212,19 @@ impl HookEvidence {
             }
         }
 
+        let qoder_segment = session["source"] == agent_hud_agents::qoder::QODER.id
+            && session["logPath"].as_str().is_some_and(|path| {
+                agent_hud_agents::qoder::events::session_id(std::path::Path::new(path)).is_some()
+            });
+        let turn_started = date(&session["liveFacts"]["turnStartedAt"]);
         if let Some(completion) = entry.completion.as_ref().filter(|e| {
             valid(e, now, 30 * DAY)
                 && (last_event.is_none_or(|at| e.at_ms > at)
                     || (log_event.is_none() && last_event.is_none_or(|at| e.at_ms + 60_000 >= at))
+                    // Qoder may write turn.finished just after sending Stop.
+                    || (qoder_segment && turn_started.is_some_and(|at| e.at_ms >= at))
                     || session["evidence"] == "completion-hook")
-                && date(&session["liveFacts"]["turnStartedAt"]).is_none_or(|at| e.at_ms >= at)
+                && turn_started.is_none_or(|at| e.at_ms >= at)
         }) {
             session["state"] = json!("idle");
             advance(session, completion.at_ms);
