@@ -66,6 +66,7 @@ use std::collections::HashSet;
 /// Qoder builds), so one parser and one live reducer read them all.
 pub fn claude_lines(source: &str) -> bool {
     source == "claude"
+        || crate::qoder::transcript::is_build(source)
         || crate::by_id(source)
             .and_then(|agent| agent.turns)
             .is_some_and(|turns| std::ptr::eq(turns, &crate::claude::transcript::TURNS))

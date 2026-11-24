@@ -91,9 +91,10 @@ impl AgentHudCore {
             .iter()
             .map(|log| log.path.to_string_lossy().into_owned())
             .collect::<Vec<_>>();
-        // Its messages read on from one segment into the next.
-        let earlier = segments[..segments.len() - 1]
+        // Read messages from the available segments, ending at the selected one.
+        let earlier = segments
             .iter()
+            .filter(|log| !log.gone && log.path != path)
             .map(|log| log.path.clone())
             .collect::<Vec<_>>();
         let credits = self.session_credits(id);
@@ -218,6 +219,13 @@ impl AgentHudCore {
                 for (key, value) in page.as_object().unwrap() {
                     result[key] = value.clone();
                 }
+                if source == agent_hud_agents::qoder::QODER.id
+                    && agent_hud_agents::qoder::events::session_id(&path).is_some()
+                {
+                    result["messageNotice"] = json!(tr!(
+                        "Qoder's runtime log contains prompt previews but no reply text."
+                    ));
+                }
             }
             Err(error) => {
                 result["messages"] = json!([]);
@@ -255,12 +263,11 @@ impl AgentHudCore {
 
 impl crate::AgentHudCore {
     pub fn transcript_path(&self, id: &str) -> Result<PathBuf, String> {
-        // Of a session Codex split across several rollouts, the newest
-        // segment, the one Codex goes on writing.
+        // A split session reveals its newest segment still on disk.
         let log = self
             .selected()
             .into_iter()
-            .filter(|log| log.id == id)
+            .filter(|log| log.id == id && !log.gone)
             .max_by_key(|log| crate::usage::segment(log))
             .ok_or_else(|| tr!("Session was not found; refresh first"))?;
         let path = log

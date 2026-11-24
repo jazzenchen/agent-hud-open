@@ -12,8 +12,8 @@
 //! started with `QODER_CONFIG_DIR`, else `.qoder` in `QODER_CLI_HOME` or
 //! the home folder (its `cliConfigDirectoryName`): its sessions are the
 //! CLI's lines in the CLI's `projects` folder, read with the CLI's. Its own
-//! chat list, an SQLite store in its data folder, is not read. That is the
-//! app's code as installed, not yet seen on a machine where it ran.
+//! chat list, an SQLite store in its data folder, is not read. When a
+//! transcript is absent, runtime segments supply turn usage and prompt previews.
 //!
 //! `Qoder/SharedClientCache/cli/projects` is the Qoder IDE's client cache
 //! as agentsview reads it, and QoderWork's folder is agentsview's too;
@@ -24,6 +24,7 @@
 //! credits the builds spend are read with a sign-in the user makes in Agent
 //! HUD, else the CLI's own (`account`).
 pub mod account;
+pub mod events;
 mod hooks;
 pub mod legacy;
 pub mod transcript;
@@ -42,6 +43,7 @@ const fn unverified(sources: &'static [Source]) -> PerOs<&'static [Source]> {
 }
 
 const QODER_PROJECTS: Location = Location::home(&["QODER_CONFIG_DIR"], &[".qoder"], "projects");
+const QODER_EVENTS: Location = Location::home(&["QODER_CONFIG_DIR"], &[".qoder"], "logs/sessions");
 /// The Qoder IDE's agent transcripts, flat in its client cache
 /// (agentsview). The Qoder desktop app writes to `QODER_PROJECTS` instead.
 const QODER_IDE_PROJECTS: Location =
@@ -53,7 +55,7 @@ const QODER_CN_STORE: Location =
     Location::app_data(&["QoderCN"], "SharedClientCache/cache/db/local.db");
 const QODER_WORK_PROJECTS: Location = Location::home(&[], &[".qoderwork"], "projects");
 
-static QODER_SOURCES: [Source; 2] = [
+static QODER_SOURCES: [Source; 3] = [
     Source {
         reads_as: "qoder",
         location: QODER_PROJECTS,
@@ -61,6 +63,10 @@ static QODER_SOURCES: [Source; 2] = [
     Source {
         reads_as: "qoder",
         location: QODER_IDE_PROJECTS,
+    },
+    Source {
+        reads_as: "qoder",
+        location: QODER_EVENTS,
     },
 ];
 static QODER_CN_SOURCES: [Source; 2] = [
@@ -85,7 +91,7 @@ static QODER_DISCOVERY: Discovery = Discovery {
         Location::app_data(&["Qoder"], "User/globalStorage/state.vscdb"),
     ],
     settings: &[Location::home(&[], &[".qoder"], "settings.json")],
-    sessions: &[QODER_PROJECTS, QODER_IDE_PROJECTS],
+    sessions: &[QODER_PROJECTS, QODER_IDE_PROJECTS, QODER_EVENTS],
     commands: &["qoder", "qodercli"],
     apps: &["Qoder"],
     ..Discovery::NONE
@@ -124,8 +130,8 @@ pub static QODER: Agent = Agent {
     channel: None,
     program: None,
     replies: None,
-    turns: Some(&TURNS),
-    items: Some(&ITEMS),
+    turns: Some(&events::TURNS),
+    items: Some(&events::ITEMS),
     // `~/.qoder/projects` is read on a Mac, the IDE's cache is not.
     sources: unverified(&QODER_SOURCES),
     discovery: &QODER_DISCOVERY,

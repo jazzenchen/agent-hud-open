@@ -52,6 +52,39 @@ fn a_cursor_prompt_makes_its_session_run_until_the_stop_hook() {
 }
 
 #[test]
+fn a_qoder_stop_hook_still_completes_a_turn_recorded_by_a_runtime_segment() {
+    let at = 1_792_470_000_000i64;
+    let id = "11111111-1111-4111-8111-111111111111";
+    let mut evidence = HookEvidence::default();
+    assert!(evidence.ingest(
+        &[HookEvent {
+            source: "qoder".into(),
+            session_id: id.into(),
+            kind: "completion".into(),
+            at_ms: at + 1_000,
+            data: json!({"turnId":"stop-1","message":"Done"}),
+        }],
+        at + 1_100,
+    ));
+    let mut session = json!({
+        "source":"qoder", "id":id, "state":"idle",
+        "logPath":format!("/fixture/logs/sessions/project/{id}/segments/first.jsonl"),
+        "liveFacts":{"turnStartedAt":iso(at),"lastEventAt":iso(at + 1_100)}
+    });
+    evidence.overlay(&mut session, at + 1_200, None, None);
+    assert_eq!(session["liveFacts"]["outcome"], "completed");
+    assert_eq!(session["liveFacts"]["turnId"], "stop-1");
+    assert_eq!(session["liveFacts"]["message"], "Done");
+
+    // A stale Stop cannot finish the next turn.
+    session["state"] = json!("running");
+    session["liveFacts"] = json!({"turnStartedAt":iso(at + 2_000),"lastEventAt":iso(at + 2_000)});
+    evidence.overlay(&mut session, at + 2_100, None, None);
+    assert_eq!(session["state"], "running");
+    assert!(session["liveFacts"]["outcome"].is_null());
+}
+
+#[test]
 fn a_turn_that_asked_for_the_user_waits_past_its_heartbeat() {
     let at = 1_792_470_000_000i64;
     let event = |kind: &str, at: i64, data: Value| HookEvent {
