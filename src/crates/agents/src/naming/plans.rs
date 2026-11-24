@@ -10,9 +10,10 @@ pub fn plan_label(provider: &str, plan: &str) -> Option<String> {
     }
     let tier = match (provider, plan.to_lowercase().as_str()) {
         // Anthropic's names since October 2026: Max 5x is Max, Max 20x Ultra.
+        // OpenAI's Pro 100 allows ten times Plus since November 2026.
         ("claude", "max_5x") => Some("Max"),
         ("claude", "max_20x") => Some("Ultra"),
-        ("codex", "prolite") => Some("Pro x5"),
+        ("codex", "prolite") => Some("Pro x10"),
         ("codex", "pro") => Some("Pro x20"),
         _ => None,
     };

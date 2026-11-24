@@ -49,6 +49,10 @@
       "next": "Ultra",
       "reason": "Anthropic renamed Max 20x to Ultra on 2026-10-30; the badge follows the vendor's current name."
     },
+    "plan-labels/codex-prolite": {
+      "next": "Pro x10",
+      "reason": "OpenAI doubled Pro 100's Work and Codex allowance in November 2026, from five times Plus to ten; the badge follows the vendor's current allowance."
+    },
     "plan-labels/claude-MAX_20X": {
       "next": "Ultra",
       "reason": "Anthropic renamed Max 20x to Ultra on 2026-10-30; the badge follows the vendor's current name, whatever the code's case."

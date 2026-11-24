@@ -73,7 +73,7 @@ fn running_out_twice_in_four_weeks_names_the_cheapest_tier_that_holds_the_busies
     assert_eq!(advice["kind"], "upgrade");
     assert_eq!(
         advice["plan"]["id"], "codex.pro5x",
-        "100% on Plus is 20% on Pro 5x"
+        "100% on Plus is 10% on Pro 10x"
     );
     assert_eq!(advice["monthlyDeltaUSD"], 80.0);
     assert_eq!(
@@ -95,15 +95,15 @@ fn a_lower_tier_needs_every_window_to_fit_and_readings_under_this_plan() {
         weekly(start + 3 * WEEK),
         weeks(start, &[12.0, 15.0, 5.0], pro.id),
     );
-    // 15% of Pro 20x is 60% of Pro 5x, and 300% of Plus.
+    // 15% of Pro 20x is 30% of Pro 10x, and 300% of Plus.
     let advice = advise(catalog, pro, &long, std::slice::from_ref(&long)).unwrap();
     assert_eq!(advice["kind"], "downgrade");
     assert_eq!(advice["plan"]["id"], "codex.pro5x");
     assert_eq!(advice["monthlyDeltaUSD"], -100.0);
-    // A five-hour window that peaked at 30% would not fit Pro 5x.
+    // A five-hour window that peaked at 50% would not fit Pro 10x.
     let session = (
         json!({"id":"s","windowDurationSeconds":18_000.0,"usedPercent":2.0}),
-        vec![(start + HOUR, 30.0, Some(pro.id.to_owned()))],
+        vec![(start + HOUR, 50.0, Some(pro.id.to_owned()))],
     );
     let both = [long.clone(), session];
     assert!(advise(catalog, pro, &long, &both).is_none());
