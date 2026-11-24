@@ -266,6 +266,7 @@ mod tests {
             ("zcode", ".zcode/cli/db"),
             ("codebuddy", ".codebuddy/projects"),
             ("workbuddy", ".workbuddy/projects"),
+            ("workbuddy", ".workbuddy-ai/projects"),
             ("qwen", ".qwen/projects"),
             ("opencode", ".local/share/opencode"),
             ("opencode", ".local/share/opencode/storage/message"),

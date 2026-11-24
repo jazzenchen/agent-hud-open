@@ -279,6 +279,20 @@ mod tests {
     }
 
     #[test]
+    fn the_international_workbuddy_folder_holds_workbuddy_sessions() {
+        let dir = tempfile::tempdir().unwrap();
+        let home = dir.path();
+        file(&home.join(".workbuddy-ai/projects/p/s.jsonl"), "x");
+        file(&home.join(".workbuddy-ai/workbuddy.db"), "x");
+        let found = from_files(home, &[]);
+        assert_eq!(
+            found["workbuddy"],
+            ["client-storage", "local-session-files"]
+        );
+        assert!(found["codebuddy"].is_empty());
+    }
+
+    #[test]
     fn glm_is_configured_by_keys_or_by_another_clients_route() {
         let dir = tempfile::tempdir().unwrap();
         let home = dir.path();

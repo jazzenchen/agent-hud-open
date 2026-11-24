@@ -16,10 +16,18 @@ static CODEBUDDY_SOURCES: [Source; 1] = [Source {
         ..Location::home(&["CODEBUDDY_CONFIG_DIR"], &[".codebuddy"], "projects")
     },
 }];
-static WORKBUDDY_SOURCES: [Source; 1] = [Source {
-    reads_as: "workbuddy",
-    location: Location::home(&[], &[".workbuddy"], "projects"),
-}];
+/// The international WorkBuddy AI build keeps the same files in
+/// `~/.workbuddy-ai` (#157); its hooks are not installed, only its sessions read.
+static WORKBUDDY_SOURCES: [Source; 2] = [
+    Source {
+        reads_as: "workbuddy",
+        location: Location::home(&[], &[".workbuddy"], "projects"),
+    },
+    Source {
+        reads_as: "workbuddy",
+        location: Location::home(&[], &[".workbuddy-ai"], "projects"),
+    },
+];
 static CODEBUDDY_DISCOVERY: Discovery = Discovery {
     storage: &[
         Location {
@@ -54,6 +62,8 @@ static WORKBUDDY_DISCOVERY: Discovery = Discovery {
     storage: &[
         Location::home(&[], &[".workbuddy"], "projects"),
         Location::home(&[], &[".workbuddy"], "workbuddy.db"),
+        Location::home(&[], &[".workbuddy-ai"], "projects"),
+        Location::home(&[], &[".workbuddy-ai"], "workbuddy.db"),
         Location::app_data(
             &["CodeBuddyExtension"],
             "Data/Public/auth/workbuddy-desktop.info",
@@ -66,6 +76,8 @@ static WORKBUDDY_DISCOVERY: Discovery = Discovery {
     sessions: &[
         Location::home(&[], &[".workbuddy"], "projects"),
         Location::home(&[], &[".workbuddy"], "workbuddy.db"),
+        Location::home(&[], &[".workbuddy-ai"], "projects"),
+        Location::home(&[], &[".workbuddy-ai"], "workbuddy.db"),
     ],
     commands: &["workbuddy"],
     apps: &["WorkBuddy"],
