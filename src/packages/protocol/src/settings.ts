@@ -140,6 +140,8 @@ export interface AppSettings {
   agentMessagesAsUser?: boolean;
   /** The sending agent says of each message whether it needs a reply; on unless turned off. */
   agentMessagesRequireReply?: boolean;
+  /** Agents steer on their own to correct a turn in progress; off unless turned on. */
+  agentMessagesSteerOnOwn?: boolean;
   /** Passes in a row with no word from the user before agents' messages stop; null for no limit. */
   agentMessagesLimit?: number | null;
   /** Messages may go into Claude Code sessions through Agent HUD's plugin; on unless turned off. */

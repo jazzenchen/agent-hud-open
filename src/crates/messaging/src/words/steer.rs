@@ -13,6 +13,16 @@ pub fn steered(language: Language, delivered: String) -> String {
     let mark = tr_in(language, "into your current turn");
     format!("{label} · {mark}]\n{rest}")
 }
+/// With "Let agents decide when to steer", a steer's last line: it asks for
+/// no reply, which would stop the turn it went into, since what it changes
+/// shows in that turn's result. Only a question is answered.
+pub fn steer_last_line(language: Language, to_client: &str, id: &str, delivered: String) -> String {
+    let line = fill(
+        &tr_in(language, "This goes into your current turn: take it into the work at hand, with no reply of its own. What it changes belongs in this turn's result. Only if it asks you something, answer with {{tool}}, reply_to: {{id}}."),
+        &[("tool", &super::reply_tool(language, to_client)), ("id", &id)],
+    );
+    format!("{delivered}\n\n{line}")
+}
 /// The recipient's client takes no message into a turn in progress.
 pub fn steer_unsupported(language: Language, client: &str) -> String {
     fill(

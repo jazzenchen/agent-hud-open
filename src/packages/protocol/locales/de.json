@@ -1554,5 +1554,8 @@
   "Show glow": "Leuchten anzeigen",
   "Hide when idle": "Im Leerlauf ausblenden",
   "Round the bar while the HUD is hidden: each agent's colour by its usage, yellow from 70% and red from 90%, breathing faster while one works.": "Um den Balken, solange das HUD ausgeblendet ist: jeder Agent in einer Farbe nach seiner Nutzung, gelb ab 70 % und rot ab 90 %; es atmet schneller, während einer arbeitet.",
-  "Round the notch: each agent's colour by its usage, yellow from 70% and red from 90%, breathing faster while one works.": "Um die Notch: jeder Agent in einer Farbe nach seiner Nutzung, gelb ab 70 % und rot ab 90 %; es atmet schneller, während einer arbeitet."
+  "Round the notch: each agent's colour by its usage, yellow from 70% and red from 90%, breathing faster while one works.": "Um die Notch: jeder Agent in einer Farbe nach seiner Nutzung, gelb ab 70 % und rot ab 90 %; es atmet schneller, während einer arbeitet.",
+  "Let agents decide when to steer": "Agenten entscheiden lassen, wann sie eingreifen",
+  "Agents then interrupt each other's turns without asking you, to correct work in progress.": "Agenten unterbrechen dann ohne Rückfrage den laufenden Turn anderer Sitzungen, um die Arbeit zu korrigieren.",
+  "This goes into your current turn: take it into the work at hand, with no reply of its own. What it changes belongs in this turn's result. Only if it asks you something, answer with {{tool}}, reply_to: {{id}}.": "Dies geht in Ihren laufenden Turn: Übernehmen Sie es in die aktuelle Arbeit, ohne eigene Antwort. Was sich dadurch ändert, gehört in das Ergebnis dieses Turns. Nur wenn Sie etwas gefragt werden, antworten Sie mit {{tool}}, reply_to: {{id}}."
 }
