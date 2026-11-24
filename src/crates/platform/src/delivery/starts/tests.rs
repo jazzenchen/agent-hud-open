@@ -477,6 +477,46 @@ fn harness_is_offered_with_its_plugin_and_a_host_or_the_desktop_app() {
 }
 
 #[test]
+fn harness_offers_its_own_workspaces_after_its_recent_folders() {
+    let fixture = StartFixture::new();
+    let channel = fixture.root.join("deepseek-channel");
+    crate::os::private_directory(&channel.join("hosts")).unwrap();
+    fixture.install("DeepSeek Harness.app", false, true);
+    let home = fixture.home();
+    for folder in ["project", "Documents/old-workspace"] {
+        fs::create_dir_all(home.join(folder)).unwrap(); // plain directory
+    }
+    let storages = home.join(".dsh").join("storages");
+    fs::create_dir_all(&storages).unwrap(); // plain directory
+    let path = |folder: &str| home.join(folder).to_string_lossy().into_owned();
+    fs::write(
+        storages.join("workspace.json"),
+        json!({
+            "global": {"workspaceIds": ["w-old", "w-project", "w-gone", "w-relative"]},
+            "tables": {"workspaces": {
+                "w-project": {"path": path("project")},
+                "w-old": {"path": path("Documents/old-workspace")},
+                "w-gone": {"path": path("removed")},
+                "w-relative": {"path": "relative/folder"}
+            }}
+        })
+        .to_string(),
+    )
+    .unwrap();
+    let mut starts = fixture
+        .starts()
+        .with_deepseek_channel(Some(DeepSeekChannel::new(channel)));
+    let offer = starts
+        .update_offers(&harness_sessions(&fixture))
+        .into_iter()
+        .find(|offer| offer.provider == Provider::DeepSeek)
+        .unwrap();
+    // The recent session's folder first, then the workspace no session has
+    // used lately; a missing or relative workspace is left out.
+    assert_eq!(offer.folders, ["~/project", "~/Documents/old-workspace"]);
+}
+
+#[test]
 fn a_harness_start_opens_the_desktop_app_when_no_host_runs() {
     let fixture = StartFixture::new();
     let channel = fixture.root.join("deepseek-channel");

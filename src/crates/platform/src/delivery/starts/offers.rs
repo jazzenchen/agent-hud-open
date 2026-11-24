@@ -1,5 +1,6 @@
 //! The folders each client offers to start in: the latest ten of its own
-//! sessions' projects, and a task with no project.
+//! sessions' projects (and Harness's own workspaces), and a task with no
+//! project.
 use super::*;
 
 impl SessionStarts {
@@ -57,6 +58,16 @@ impl SessionStarts {
                 }
                 if folders.len() == 10 {
                     break;
+                }
+            }
+            // Harness also offers the workspaces of its own sidebar, however
+            // long since a session ran in them.
+            if provider == Provider::DeepSeek {
+                for folder in self.deepseek_workspaces() {
+                    let written = self.written(&folder);
+                    if folder.is_dir() && !folders.contains(&written) {
+                        folders.push(written);
+                    }
                 }
             }
             // Each client also offers a task with no project, in a folder of

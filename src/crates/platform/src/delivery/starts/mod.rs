@@ -20,6 +20,7 @@ mod offers;
 mod runs;
 mod start;
 mod trust;
+mod workspaces;
 use commands::environment;
 pub use handoff::ClaudeMove;
 
