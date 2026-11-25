@@ -14,9 +14,14 @@ impl Steers {
         let file = self.folder.join("on.json");
         if !on {
             let _ = fs::remove_file(file);
-        } else if read::<i64>(&file).is_none() {
+        } else if self.on().is_none() {
             let _ = atomic_json(&file, &now);
         }
+    }
+
+    /// When it was turned on; None while it is off.
+    pub(super) fn on(&self) -> Option<i64> {
+        read(&self.folder.join("on.json"))
     }
 
     /// Whether a session opened at `opened` has the tool to read a message.
@@ -24,7 +29,7 @@ impl Steers {
         let opened = opened
             .and_then(|at| at.duration_since(UNIX_EPOCH).ok())
             .map(|at| at.as_millis() as i64);
-        matches!((read::<i64>(&self.folder.join("on.json")), opened),
+        matches!((self.on(), opened),
             (Some(on), Some(opened)) if opened >= on)
     }
 

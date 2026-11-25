@@ -76,7 +76,11 @@ fn handle(
         Kind::Compacted => told(steers.tell_again(session), true),
         Kind::End => {
             let turn = call.turn.as_deref()?;
-            let notice = told(steers.tell_at_end(session, turn), false);
+            // Turned off in the middle of the turn: it ends as it would have.
+            let on = steers.in_progress(session).is_some();
+            let notice = on
+                .then(|| told(steers.tell_at_end(session, turn), false))
+                .flatten();
             if notice.is_none() {
                 steers.end(session, Some(turn), false, now);
             }

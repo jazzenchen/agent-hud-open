@@ -38,6 +38,7 @@ fn waiting(data: &Path, turn: &str) -> std::thread::JoinHandle<Option<String>> {
 fn a_waiting_hook_tells_the_turn_and_never_says_the_words() {
     let temp = tempfile::tempdir().unwrap();
     let data = temp.path().join("data");
+    Steers::new(&data).turn_on(1);
     let hook = waiting(&data, "t1");
     let steers = Steers::new(&data);
     steers.leave("s1", "m-1", "SECRET WORDS", 1).unwrap();
@@ -56,6 +57,7 @@ fn a_waiting_hook_tells_the_turn_and_never_says_the_words() {
 fn the_end_of_the_turn_carries_it_on_for_what_is_unread_and_ends_it_otherwise() {
     let temp = tempfile::tempdir().unwrap();
     let data = temp.path().join("data");
+    Steers::new(&data).turn_on(1);
     let steers = Steers::new(&data);
     steers.begin("s1", "t1", (me(), me()), 1);
     steers.leave("s1", "m-1", "words", 1).unwrap();
@@ -73,12 +75,14 @@ fn a_waiting_hook_leaves_when_its_turn_ends_is_stopped_or_gives_way() {
     for event in ["Stop", "Interrupt"] {
         let temp = tempfile::tempdir().unwrap();
         let data = temp.path().join("data");
+        Steers::new(&data).turn_on(1);
         let waiter = waiting(&data, "t1");
         assert_eq!(hook(&data, event, "t1"), None);
         assert_eq!(waiter.join().unwrap(), None, "{event}");
     }
     let temp = tempfile::tempdir().unwrap();
     let data = temp.path().join("data");
+    Steers::new(&data).turn_on(1);
     let waiter = waiting(&data, "t1");
     Steers::new(&data).begin("s1", "t2", (me(), me()), 1);
     assert_eq!(waiter.join().unwrap(), None);
@@ -88,6 +92,7 @@ fn a_waiting_hook_leaves_when_its_turn_ends_is_stopped_or_gives_way() {
 fn a_hook_whose_client_quit_takes_nothing() {
     let temp = tempfile::tempdir().unwrap();
     let data = temp.path().join("data");
+    Steers::new(&data).turn_on(1);
     let gone = Process {
         pid: i32::MAX - 7,
         started: Some(1),
@@ -105,6 +110,7 @@ fn a_hook_whose_client_quit_takes_nothing() {
 fn a_second_hook_of_the_turn_does_not_wait_beside_the_first() {
     let temp = tempfile::tempdir().unwrap();
     let data = temp.path().join("data");
+    Steers::new(&data).turn_on(1);
     let first = waiting(&data, "t1");
     let other = Process::of(std::os::unix::process::parent_id() as i32);
     assert_eq!(
@@ -124,6 +130,7 @@ fn a_second_hook_of_the_turn_does_not_wait_beside_the_first() {
 fn a_compacted_turn_is_told_again() {
     let temp = tempfile::tempdir().unwrap();
     let data = temp.path().join("data");
+    Steers::new(&data).turn_on(1);
     let steers = Steers::new(&data);
     assert_eq!(hook(&data, "SessionStart", ""), None);
     steers.begin("s1", "t1", (me(), me()), 1);
@@ -139,6 +146,7 @@ fn a_compacted_turn_is_told_again() {
 fn one_hook_waits_for_a_turn_and_a_dead_one_is_replaced() {
     let temp = tempfile::tempdir().unwrap();
     let steers = Steers::new(&temp.path().join("data"));
+    steers.turn_on(1);
     assert!(steers.stand(
         "s1",
         "t1",
@@ -162,6 +170,7 @@ fn one_hook_waits_for_a_turn_and_a_dead_one_is_replaced() {
 fn the_turn_is_not_told_of_what_it_is_reading() {
     let temp = tempfile::tempdir().unwrap();
     let data = temp.path().join("data");
+    Steers::new(&data).turn_on(1);
     let steers = Steers::new(&data);
     steers.begin("s1", "t1", (me(), me()), 1);
     steers.leave("s1", "m-1", "words", 1).unwrap();
@@ -177,4 +186,26 @@ fn the_turn_is_not_told_of_what_it_is_reading() {
     assert!(!hook.is_finished(), "nothing left to tell");
     steers.leave("s1", "m-2", "more", 2).unwrap();
     assert!(hook.join().unwrap().unwrap().contains("m-2"));
+}
+
+#[test]
+fn turned_off_in_the_middle_of_a_turn_nothing_waits_tells_or_reads() {
+    let temp = tempfile::tempdir().unwrap();
+    let data = temp.path().join("data");
+    let steers = Steers::new(&data);
+    steers.turn_on(1);
+    let waiter = waiting(&data, "t1");
+    steers.turned(false, 2);
+    assert_eq!(waiter.join().unwrap(), None);
+    assert!(!steers.stands("s1", "t1", me()));
+    // One left before: not told at the turn's end, and not read any more.
+    steers.turn_on(3);
+    steers.leave("s1", "m-1", "words", 4).unwrap();
+    steers.turned(false, 5);
+    assert_eq!(steers.state("s1", "m-1"), crate::steers::Steered::Missed);
+    assert!(steers.read("s1", Some("t1")).is_empty());
+    assert_eq!(hook(&data, "Stop", "t1"), None);
+    assert_eq!(hook(&data, "PreToolUse", "t1"), None);
+    assert_eq!(hook(&data, "SessionStart", ""), None);
+    assert_eq!(steers.leave("s1", "m-2", "words", 6).unwrap(), None);
 }

@@ -73,8 +73,10 @@ impl Steers {
     }
 
     /// The session's turn in progress, while the client that runs its steer
-    /// hooks still runs.
+    /// hooks still runs and steering through them is on: turned off, nothing
+    /// waits for a turn any more.
     pub fn in_progress(&self, session: &str) -> Option<String> {
+        self.on()?;
         self.turn(session)
             .filter(|turn| turn.ended.is_none() && turn.client.runs())
             .map(|turn| turn.id)
@@ -323,6 +325,7 @@ mod tests {
     fn a_message_is_left_only_for_a_turn_whose_hooks_and_client_run() {
         let data = tempfile::tempdir().unwrap();
         let steers = Steers::new(&data.path().join("data"));
+        steers.turn_on(1);
         assert_eq!(steers.leave("s1", "m-1", "words", 1).unwrap(), None);
         assert!(steers.begin("s1", "t1", (gone(), me()), 1));
         assert_eq!(steers.in_progress("s1"), None, "its client quit");
@@ -340,6 +343,7 @@ mod tests {
     fn each_message_is_told_once_read_once_and_reminded_once_at_the_end() {
         let data = tempfile::tempdir().unwrap();
         let steers = Steers::new(&data.path().join("data"));
+        steers.turn_on(1);
         steers.begin("s1", "t1", (me(), me()), 1);
         steers.leave("s1", "m-b", "second", 2).unwrap();
         steers.leave("s1", "m-a", "first", 1).unwrap();
@@ -364,6 +368,7 @@ mod tests {
     fn a_message_never_reaches_a_later_turn() {
         let data = tempfile::tempdir().unwrap();
         let steers = Steers::new(&data.path().join("data"));
+        steers.turn_on(1);
         steers.begin("s1", "t1", (me(), me()), 1);
         steers.leave("s1", "m-1", "words", 1).unwrap();
         // The caller says it is in another turn.
@@ -383,6 +388,7 @@ mod tests {
     fn a_turn_begins_again_only_for_a_hook_started_after_it_ended() {
         let data = tempfile::tempdir().unwrap();
         let steers = Steers::new(&data.path().join("data"));
+        steers.turn_on(1);
         let at = |started| Process { started, ..me() };
         let began = |hook, now| steers.begin("s1", "t1", (me(), hook), now);
         assert!(began(at(Some(10)), 10_000));
@@ -406,6 +412,7 @@ mod tests {
     fn after_a_compaction_what_the_turn_was_told_and_read_is_there_again() {
         let data = tempfile::tempdir().unwrap();
         let steers = Steers::new(&data.path().join("data"));
+        steers.turn_on(1);
         steers.begin("s1", "t1", (me(), me()), 1);
         steers.leave("s1", "m-1", "words", 1).unwrap();
         steers.tell("s1", "t1");
@@ -422,6 +429,7 @@ mod tests {
     fn old_messages_go_with_their_markers() {
         let data = tempfile::tempdir().unwrap();
         let steers = Steers::new(&data.path().join("data"));
+        steers.turn_on(1);
         steers.begin("s1", "t1", (me(), me()), 1);
         steers.leave("s1", "m-1", "words", 1).unwrap();
         steers.tell("s1", "t1");
