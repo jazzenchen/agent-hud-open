@@ -1231,3 +1231,94 @@ fn an_added_section_shows_only_once_it_is_asked_for() {
         "reordering keeps them hidden"
     );
 }
+
+#[test]
+fn antigravity_window_keys_keep_layout_across_accounts_and_accept_hashed_ids() {
+    let ag_snapshot = |hash: &str, email: &str| {
+        json!({
+            "generatedAt": "2026-11-25T09:00:00Z",
+            "settings": {"appearance": "dark", "appearanceFollowsScreen": false, "showMenuBarIcon": true, "language": "en"},
+            "providers": [{"id": "antigravity", "name": "Antigravity", "detected": true, "enabled": true}],
+            "quotas": [
+                {"id": format!("antigravity:{hash}:gemini-weekly"), "windowKey": "antigravity:gemini-weekly",
+                 "vendor": "antigravity", "account": email, "accountId": format!("account:{hash}"),
+                 "usedPercent": 50, "status": "normal"},
+                {"id": format!("antigravity:{hash}:gemini-5h"), "windowKey": "antigravity:gemini-5h",
+                 "vendor": "antigravity", "account": email, "accountId": format!("account:{hash}"),
+                 "usedPercent": 90, "status": "warning"},
+                {"id": format!("antigravity:{hash}:3p-5h"), "windowKey": "antigravity:3p-5h",
+                 "vendor": "antigravity", "account": email, "accountId": format!("account:{hash}"),
+                 "usedPercent": 10, "status": "normal"}
+            ],
+            "billing": [],
+            "sessions": []
+        })
+    };
+    let account_a = ag_snapshot("aaaa", "a@example.com");
+    let account_b = ag_snapshot("bbbb", "b@example.com");
+    let (_folder, owner) = owner();
+
+    // get_hud advertises the account-free windowKey as each row's id.
+    let listed = owner
+        .tool(
+            "get_hud",
+            json!({"screen": "all"}),
+            &account_a,
+            Some(&catalog()),
+        )
+        .unwrap();
+    let row_ids: Vec<&str> = listed["blocks"][0]["rows"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter_map(|row| row["id"].as_str())
+        .collect();
+    assert_eq!(
+        row_ids,
+        [
+            "antigravity:gemini-weekly",
+            "antigravity:gemini-5h",
+            "antigravity:3p-5h"
+        ]
+    );
+
+    // Ordering and hiding by windowKey succeeds on account A, and stays valid after
+    // switching to account B.
+    let proposal = json!({
+        "screen": "all",
+        "blocks": {
+            "antigravity": {
+                "rows": ["antigravity:gemini-5h", "antigravity:gemini-weekly"],
+                "hiddenRows": ["antigravity:3p-5h"]
+            }
+        }
+    });
+    owner
+        .tool("draft_hud", proposal.clone(), &account_a, Some(&catalog()))
+        .unwrap();
+    owner.save_panel_with("all", |_| Ok(())).unwrap();
+
+    // Sending the same windowKey layout under account B is accepted with no draft.
+    owner
+        .tool("draft_hud", proposal, &account_b, Some(&catalog()))
+        .unwrap();
+    assert_eq!(drafts(&owner)["layouts"], json!([]));
+
+    // Earlier hashed keys are still accepted for both rows and hiddenRows on account A.
+    owner
+        .tool(
+            "draft_hud",
+            json!({
+                "screen": "all",
+                "blocks": {
+                    "antigravity": {
+                        "rows": ["antigravity:aaaa:gemini-5h"],
+                        "hiddenRows": ["antigravity:aaaa:3p-5h"]
+                    }
+                }
+            }),
+            &account_a,
+            Some(&catalog()),
+        )
+        .unwrap();
+}

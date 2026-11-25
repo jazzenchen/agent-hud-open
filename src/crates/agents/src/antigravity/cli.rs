@@ -106,7 +106,7 @@ fn parse(scope: &str, body: &Value) -> Result<Reading, String> {
                 .as_str()
                 .filter(|value| chrono::DateTime::parse_from_rfc3339(value).is_ok());
             let lower = group_name.to_lowercase();
-            let mut quota = json!({"id":format!("{id}:{key}"),"vendor":"antigravity","accountId":account,
+            let mut quota = json!({"id":format!("{id}:{key}"),"windowKey":format!("antigravity:{key}"),"vendor":"antigravity","accountId":account,
                 "account":"Antigravity CLI","name":name,"shortLabel":short,"usedPercent":used,
                 "status":status(used),"resetAt":reset,"windowDurationSeconds":duration});
             if lower.contains("gemini") {
@@ -158,6 +158,8 @@ mod tests {
         assert_eq!(reading.quotas[0]["resetAt"], "2026-10-23T00:00:00Z");
         assert_eq!(reading.quotas[1]["windowDurationSeconds"], 18000);
         assert_eq!(reading.quotas[2]["shortLabel"], "3rd-party 7d");
+        assert_eq!(reading.quotas[0]["windowKey"], "antigravity:gemini-weekly");
+        assert_eq!(reading.quotas[3]["windowKey"], "antigravity:3p-5h");
         assert_eq!(reading.quotas[3]["usedPercent"], 100.0);
         assert_eq!(reading.account.unwrap()["identity"], "local-home");
     }

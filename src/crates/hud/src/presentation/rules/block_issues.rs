@@ -166,7 +166,9 @@ fn block_issues(
         format!("Its rows: {}.", quoted(&block.rows))
     };
     for (index, row) in entries(&change["rows"]) {
-        if !block.rows.iter().any(|r| r == row) && !held_rows.iter().any(|r| r == row) {
+        if !block.rows.iter().chain(&block.aliases).any(|r| r == row)
+            && !held_rows.iter().any(|r| r == row)
+        {
             found.push(format!(
                 "{path}.rows[{index}]: \"{key}\" has no row \"{row}\". {order}"
             ));

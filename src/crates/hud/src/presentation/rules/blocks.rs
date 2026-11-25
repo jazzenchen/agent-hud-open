@@ -81,9 +81,18 @@ pub(in crate::presentation) fn present_blocks(snapshot: &Value) -> Vec<Block> {
             Kind::Quota,
         );
         let id = quota["id"].as_str().unwrap_or("");
+        let window_key = quota["windowKey"].as_str().unwrap_or("");
         let legacy = quota["legacyWindowId"].as_str().unwrap_or("");
-        push_unique(&mut block.rows, if legacy.is_empty() { id } else { legacy });
+        let primary = if !window_key.is_empty() {
+            window_key
+        } else if !legacy.is_empty() {
+            legacy
+        } else {
+            id
+        };
+        push_unique(&mut block.rows, primary);
         push_unique(&mut block.aliases, id);
+        push_unique(&mut block.aliases, window_key);
         push_unique(&mut block.aliases, legacy);
         if let Some(account) = quota["accountId"].as_str() {
             if let Some(window) = legacy.strip_prefix(&format!("{account}/")) {

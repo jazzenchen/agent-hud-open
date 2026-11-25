@@ -7,6 +7,9 @@ export interface Quota {
   /** Stable old-provider identities used by saved account/row visibility. */
   accountId?: string | null;
   legacyWindowId?: string | null;
+  /** Account-free window key when `id` embeds the account, so one layout
+   * order and hidden set apply to every account of the vendor. */
+  windowKey?: string | null;
   vendor: string;
   name: string;
   /** Core's short name for tight places: distinct among the account's

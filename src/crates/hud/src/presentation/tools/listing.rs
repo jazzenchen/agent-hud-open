@@ -39,8 +39,12 @@ fn blocks(snapshot: &Value, layout: &Value) -> Vec<Value> {
                         continue;
                     }
                     let mut row = quota.clone();
-                    if quota["legacyWindowId"].is_string() {
-                        row["id"] = quota["legacyWindowId"].clone();
+                    if let Some(row_id) = quota["windowKey"]
+                        .as_str()
+                        .filter(|s| !s.is_empty())
+                        .or_else(|| quota["legacyWindowId"].as_str().filter(|s| !s.is_empty()))
+                    {
+                        row["id"] = json!(row_id);
                     }
                     group["rows"].as_array_mut().unwrap().push(row);
                 }
