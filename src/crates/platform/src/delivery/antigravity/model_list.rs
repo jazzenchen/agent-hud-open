@@ -35,6 +35,8 @@ pub(super) fn listed(status: &Value, picked: Option<String>) -> models::Models {
                 name: models::text(&item["label"]).unwrap_or_else(|| id.clone()),
                 id,
                 quota,
+                supported_reasoning_efforts: None,
+                default_reasoning_effort: None,
             })
         })
         .collect::<Vec<_>>();
@@ -44,6 +46,7 @@ pub(super) fn listed(status: &Value, picked: Option<String>) -> models::Models {
     models::Models {
         provider: Provider::Antigravity,
         default,
+        default_reasoning_effort: None,
         models,
         aliases: false,
     }

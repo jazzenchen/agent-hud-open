@@ -247,6 +247,7 @@ impl Messaging {
                 folder: folder.to_owned(),
                 title: Some(title_of(text)),
                 model: None,
+                reasoning_effort: None,
             },
             &offers,
         );

@@ -246,6 +246,14 @@ impl SessionStarts {
             _ => false,
         }
     }
+    /// Whether this start route lets a caller choose independent effort.
+    pub fn effort_at_start(&self, provider: Provider) -> bool {
+        match provider {
+            Provider::DeepSeek => true,
+            Provider::Codex => self.model_at_start(provider),
+            _ => false,
+        }
+    }
     /// The models `provider` offers now, asked of the client itself: Codex's
     /// app-server, Antigravity's language server, Harness's plugin; Claude
     /// Code has no list to ask, so its aliases.

@@ -13,7 +13,7 @@ import { pathToFileURL } from "node:url";
 const joined = fs.mkdtempSync(path.join(os.tmpdir(), "dsh-plugin-module-"));
 fs.writeFileSync(
   path.join(joined, "agent-hud.mjs"),
-  ["agent-hud.mjs", "agent-hud-inbox.mjs", "agent-hud-steer.mjs"]
+  ["agent-hud.mjs", "agent-hud-inbox.mjs", "agent-hud-starts.mjs", "agent-hud-steer.mjs"]
     .map((name) => fs.readFileSync(new URL(name, import.meta.url), "utf8"))
     .join(""),
 );
@@ -118,7 +118,7 @@ test("open sessions check in, subagents do not, and ended sessions say so", (t) 
   assert.deepEqual(files("sessions"), [`${session}.json`]);
   const checkIn = json("sessions", `${session}.json`);
   assert.equal(checkIn.host, 4242);
-  assert.equal(checkIn.channelVersion, 3);
+  assert.equal(checkIn.channelVersion, 4);
   assert.equal(typeof checkIn.at, "number");
   h.agents.delete(session);
   plugin.tick();
@@ -254,7 +254,7 @@ test("a steer whose turn ended while Harness took it names no turn", async (t) =
   assert.equal(done.steeredInto, undefined, "it may have started a turn of its own");
 });
 
-test("a named model switches the session first and keeps Harness's default; the host lists the models", async (t) => {
+test("a named start uses a session-only model and effort; the host lists available efforts", async (t) => {
   const { h, plugin, channel, json } = setup(t);
   h.agents.set(session, { id: session });
   const calls = [];
@@ -267,9 +267,10 @@ test("a named model switches the session first and keeps Harness's default; the 
     },
   };
   h.ctx.controller = {
+    resolveAgent: async (id) => ({ agent: { model: { select: (choice) => calls.push(["session-only", id, choice]) } } }),
     modelCatalog: async () => ({
       default: current,
-      groups: [{ id: "deepseek-official", name: "DeepSeek", models: [{ id: "deepseek-flash", name: "Flash", reasoning: {} }, { id: "deepseek-pro", name: "Pro" }] }],
+      groups: [{ id: "deepseek-official", name: "DeepSeek", models: [{ id: "deepseek-flash", name: "Flash", reasoning: {} }, { id: "deepseek-pro", name: "Pro", reasoning: { efforts: [{ id: "low", name: "Low" }], defaultEffort: "low" } }] }],
     }),
     // Harness saves a session's choice as the default for new sessions too.
     selectModel: async (request) => {
@@ -295,20 +296,34 @@ test("a named model switches the session first and keeps Harness's default; the 
 
   const starts = path.join(channel, "starts", "4242");
   fs.mkdirSync(starts, { recursive: true });
-  fs.writeFileSync(path.join(starts, `${id}.json`), JSON.stringify({ id, cwd: path.join(channel, "work"), text: "hi", at: 1, expiresAt: Date.now() + 60_000, model: pro }));
+  fs.writeFileSync(path.join(starts, `${id}.json`), JSON.stringify({ id, cwd: path.join(channel, "work"), text: "hi", at: 1, expiresAt: Date.now() + 60_000, model: { ...pro, reasoningEffort: "low" } }));
   plugin.tick();
   await until(() => json("starts", "4242", `${id}.json`).startedAt);
   const made = "session-00000009-2222-4333-8444-555555555555";
-  assert.deepEqual(calls.splice(0), [["select", made, "deepseek-pro"], ["default", "deepseek-flash"], ["prompt", made]]);
+  assert.deepEqual(calls.splice(0), [["session-only", made, { ...pro, reasoningEffort: "low" }], ["prompt", made]]);
+  assert.equal(current.reasoningEffort, "high");
+  const invalid = "unsupported-effort";
+  fs.writeFileSync(path.join(starts, `${invalid}.json`), JSON.stringify({
+    id: invalid, cwd: path.join(channel, "work"), text: "hi",
+    model: { ...pro, reasoningEffort: "high" },
+  }));
+  plugin.tick();
+  assert.match(await until(() => json("starts", "4242", `${invalid}.json`).refused), /does not offer effort high/);
+  assert.equal(json("starts", "4242", `${invalid}.json`).sessionId, undefined);
+  assert.deepEqual(calls.splice(0), []);
+
 
   const listed = await until(() => {
     plugin.tick();
     return json("hosts", "4242.json").models;
   });
-  assert.equal(json("hosts", "4242.json").channelVersion, 3);
+  assert.equal(json("hosts", "4242.json").channelVersion, 4);
   assert.deepEqual(listed, {
-    default: { provider: "deepseek-official", model: "deepseek-flash" },
-    groups: [{ id: "deepseek-official", name: "DeepSeek", models: [{ id: "deepseek-flash", name: "Flash" }, { id: "deepseek-pro", name: "Pro" }] }],
+    default: { provider: "deepseek-official", model: "deepseek-flash", reasoningEffort: "high" },
+    groups: [{ id: "deepseek-official", name: "DeepSeek", models: [
+      { id: "deepseek-flash", name: "Flash" },
+      { id: "deepseek-pro", name: "Pro", reasoning: { efforts: [{ id: "low", name: "Low" }], defaultEffort: "low" } },
+    ] }],
   });
 });
 

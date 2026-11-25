@@ -33,8 +33,17 @@ function inbox({ fs, path, service, read, write, remove, now, quietly, NAME, fol
   let catalogDefault;
   let catalogPending = false;
   const selection = (value) =>
-    typeof value?.provider === "string" && typeof value?.model === "string"
-      ? { provider: value.provider, model: value.model }
+    typeof value?.provider === "string" &&
+    value.provider.trim() !== "" &&
+    typeof value?.model === "string" &&
+    value.model.trim() !== ""
+      ? {
+          provider: value.provider,
+          model: value.model,
+          ...(typeof value.reasoningEffort === "string" && value.reasoningEffort.trim() !== ""
+            ? { reasoningEffort: value.reasoningEffort.trim() }
+            : {}),
+        }
       : undefined;
   /** The model new sessions start in: the one the user last chose. */
   const defaultModel = () => {
@@ -61,6 +70,24 @@ function inbox({ fs, path, service, read, write, remove, now, quietly, NAME, fol
             models: (Array.isArray(group?.models) ? group.models : []).map((model) => ({
               id: String(model?.id ?? ""),
               name: String(model?.name ?? ""),
+              ...(model?.reasoning && Array.isArray(model.reasoning.efforts)
+                ? {
+                    reasoning: {
+                      efforts: model.reasoning.efforts
+                        .filter((effort) => typeof effort?.id === "string")
+                        .map((effort) => ({
+                          id: effort.id,
+                          name: String(effort.name ?? effort.id),
+                          ...(typeof effort.description === "string"
+                            ? { description: effort.description }
+                            : {}),
+                        })),
+                      ...(typeof model.reasoning.defaultEffort === "string"
+                        ? { defaultEffort: model.reasoning.defaultEffort }
+                        : {}),
+                    },
+                  }
+                : {}),
             })),
           }));
           catalogAt = now();
@@ -74,6 +101,63 @@ function inbox({ fs, path, service, read, write, remove, now, quietly, NAME, fol
   const models = () => {
     refreshCatalog();
     return catalog === undefined ? undefined : { default: defaultModel(), groups: catalog };
+  };
+  /**
+   * Checks a model against Harness's live catalog before touching a session.
+   * The controller's `selectModel` would also save the choice as the user's
+   * default for new sessions, which a start must never do.
+   */
+  const advertised = async (chosen) => {
+    const controller = service("sessionController");
+    if (typeof controller?.modelCatalog !== "function")
+      throw new Error("This DeepSeek Harness cannot verify a session's model");
+    const found = await controller.modelCatalog();
+    const group = (Array.isArray(found?.groups) ? found.groups : []).find(
+      (entry) => entry?.id === chosen.provider,
+    );
+    const model = (Array.isArray(group?.models) ? group.models : []).find(
+      (entry) => entry?.id === chosen.model,
+    );
+    if (model === undefined)
+      throw new Error(`DeepSeek Harness does not offer ${chosen.provider}/${chosen.model}`);
+    if (chosen.reasoningEffort !== undefined) {
+      const efforts = Array.isArray(model.reasoning?.efforts) ? model.reasoning.efforts : [];
+      if (!efforts.some((effort) => effort?.id === chosen.reasoningEffort))
+        throw new Error(
+          `DeepSeek Harness does not offer effort ${chosen.reasoningEffort} for ${chosen.provider}/${chosen.model}`,
+        );
+    }
+    return model;
+  };
+  /**
+   * Whether a session-only selector can exist before a session is made. This
+   * is a host-interface check, separate from checking the live model catalog:
+   * `resolveAgent` and `agents.get` are the two known DSH entry points, and
+   * neither requires an existing same-model session.
+   */
+  const hasSessionSelector = () => {
+    const controller = service("sessionController");
+    return (
+      typeof controller?.resolveAgent === "function" ||
+      typeof service("agents")?.get === "function"
+    );
+  };
+  const resolveAgent = async (sessionId) => {
+    const controller = service("sessionController");
+    let agent;
+    if (typeof controller?.resolveAgent === "function") {
+      const found = await controller.resolveAgent(sessionId);
+      if (found?.error !== undefined)
+        throw new Error(found.error.message ?? String(found.error));
+      agent = found?.agent;
+    }
+    return agent ?? service("agents")?.get?.(sessionId);
+  };
+  const selectSession = async (sessionId, chosen) => {
+    const agent = await resolveAgent(sessionId);
+    if (typeof agent?.model?.select !== "function")
+      throw new Error("This DeepSeek Harness exposes no session-only model selector");
+    agent.model.select(chosen);
   };
   /**
    * Switches `sessionId` to `model` before the app's words go in. Harness
@@ -180,90 +264,10 @@ function inbox({ fs, path, service, read, write, remove, now, quietly, NAME, fol
     }
   };
 
-  // ---- New sessions the app asks this host for ----
-  /** The Workspace whose folder is `cwd`, so the session joins its group. */
-  const workspaceAt = (cwd) => {
-    try {
-      const list = service("workspaceRegistry")?.list?.();
-      // HUD and Harness can spell the same Windows directory with different separators.
-      const target = path.resolve(cwd);
-      const found = (Array.isArray(list) ? list : []).find(
-        (w) => typeof w?.path === "string" && path.isAbsolute(w.path) && path.resolve(w.path) === target,
-      );
-      return typeof found?.id === "string" ? found.id : undefined;
-    } catch {
-      return undefined;
-    }
-  };
-  const create = async (file, request) => {
-    const controller = service("sessionController");
-    if (typeof controller?.create !== "function" || typeof controller?.prompt !== "function")
-      return;
-    const takenAt = now();
-    // Claimed before the session is made, so a reload never makes it twice.
-    write(file, { takenAt });
-    const became = (what) => quietly(() => write(file, { takenAt, ...what }));
-    let sessionId;
-    try {
-      const workspaceId = workspaceAt(request.cwd);
-      const created = await controller.create(
-        workspaceId === undefined ? { cwd: request.cwd } : { workspaceId },
-      );
-      sessionId = created?.sessionId;
-      if (typeof sessionId !== "string" || !NAME.test(sessionId))
-        return became({ refused: "DeepSeek Harness named no session" });
-      became({ sessionId });
-      await choose(sessionId, request.model);
-      const result = await controller.prompt(
-        {
-          requestId: String(request.id),
-          sessionId,
-          mode: "queue",
-          content: [{ type: "text", text: request.text }],
-        },
-        new AbortController().signal,
-      );
-      became(
-        result?.accepted === false
-          ? { sessionId, refused: String(result?.reason ?? "refused") }
-          : { sessionId, startedAt: now() },
-      );
-    } catch (error) {
-      became({
-        ...(sessionId === undefined ? {} : { sessionId }),
-        refused: String(error?.message ?? error),
-      });
-    }
-  };
-  const starts = () => {
-    const dir = folder("starts", String(host));
-    let names;
-    try {
-      names = fs.readdirSync(dir).filter((entry) => entry.endsWith(".json"));
-    } catch {
-      return;
-    }
-    for (const entry of names) {
-      const file = path.join(dir, entry);
-      const request = read(file);
-      if (
-        !request ||
-        typeof request.text !== "string" ||
-        typeof request.cwd !== "string" ||
-        !path.isAbsolute(request.cwd) ||
-        !NAME.test(String(request.id)) ||
-        request.takenAt !== undefined ||
-        request.expiredAt !== undefined
-      )
-        continue;
-      quietly(() => {
-        if (typeof request.expiresAt === "number" && request.expiresAt <= now())
-          return write(file, { expiredAt: now() });
-        return create(file, request);
-      });
-    }
-  };
-
+  const starts = sessionStarts({
+    fs, path, service, read, write, now, quietly, NAME, folder, host,
+    selection, advertised, hasSessionSelector, selectSession,
+  });
   return {
     prompts,
     starts,

@@ -38,6 +38,7 @@ pub use starts::{Host, Started, START_LIFETIME};
 pub const SCRIPT: &str = concat!(
     include_str!("agent-hud.mjs"),
     include_str!("agent-hud-inbox.mjs"),
+    include_str!("agent-hud-starts.mjs"),
     include_str!("agent-hud-steer.mjs")
 );
 /// A note older than this belongs to a call that ended without removing it.

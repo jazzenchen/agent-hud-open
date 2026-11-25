@@ -92,7 +92,7 @@ impl DeepSeekChannel {
         if steer {
             self.check_steer(request)?;
         }
-        selection(request.model.as_deref()).map(|_| ())
+        selection(request.model.as_deref(), None).map(|_| ())
     }
     /// Leaves the words for the plugin. A queued message is left and read
     /// back later; a steer is waited for, since only the plugin can tell
@@ -114,7 +114,7 @@ impl DeepSeekChannel {
                 session,
                 &request.request_id,
                 &request.text,
-                selection(request.model.as_deref())?.as_ref(),
+                selection(request.model.as_deref(), None)?.as_ref(),
                 now,
             )
             .map_err(failure)?;
@@ -206,13 +206,20 @@ impl DeepSeekChannel {
         if request.model.is_some() && host.version < MODEL_VERSION {
             return Err(Failure::Unsupported(OLD_PLUGIN.into()));
         }
+        if request.reasoning_effort.is_some() && host.version < START_REASONING_VERSION {
+            return Err(Failure::Unsupported("DeepSeek Harness must load the updated Agent HUD plugin to choose a reasoning effort at start".into()));
+        }
         self.0
             .ask_start(
                 host.process,
                 &request.request_id,
                 folder,
                 &request.text,
-                selection(request.model.as_deref())?.as_ref(),
+                selection(
+                    request.model.as_deref(),
+                    request.reasoning_effort.as_deref(),
+                )?
+                .as_ref(),
                 SystemTime::now(),
             )
             .map_err(failure)?;
@@ -286,6 +293,7 @@ impl DeepSeekChannel {
 
 /// The plugin's channel version that chooses a model.
 const MODEL_VERSION: u64 = 2;
+const START_REASONING_VERSION: u64 = 4;
 const OLD_PLUGIN: &str = "DeepSeek Harness runs an older Agent HUD plugin that cannot choose a model; restart DeepSeek Harness to load the new one";
 
 fn failure(refusal: Refusal) -> Failure {
