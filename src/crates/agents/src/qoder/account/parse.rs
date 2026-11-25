@@ -167,9 +167,9 @@ fn organization_quota(package: &Value) -> Option<OrganizationQuota> {
     }
     let total = amount(&package["cap"]).filter(|&total| total > 0.0)?;
     let used = amount(field(package, "used", "used_value"))?;
-    let given = amount(&package["percentage"]);
     let reset = parse_reset(field(package, "expiresAt", "expires_at"));
-    build_quota(used, total, given, reset).map(OrganizationQuota::Available)
+    // Qoder can report percentage as a rounded fraction. The counts give the exact share.
+    build_quota(used, total, None, reset).map(OrganizationQuota::Available)
 }
 
 fn build_quota(used: f64, total: f64, given: Option<f64>, reset: Option<String>) -> Option<Quota> {
