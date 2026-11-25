@@ -14,7 +14,11 @@ mod transport;
 mod transport;
 pub(super) use transport::{queue_created, start_in_daemon, MODEL_AT_START, OPERATIONS, SUPPORTED};
 mod model_list;
+#[cfg(windows)]
+mod projects;
 pub(super) use model_list::{models, persist_started_thread, thread_start};
+#[cfg(windows)]
+pub(super) use projects::{project_for_folder, projects, Project};
 
 /// Host injection point for isolated fixtures or a shared native state adapter.
 pub trait CodexTransport: Send + Sync {

@@ -74,6 +74,7 @@ impl SessionStarts {
         &self,
         folder: &Path,
         request: &StartRequest,
+        project: Option<&str>,
     ) -> Result<StartReceipt> {
         let message_id = format!("agent-hud:{}", request.request_id);
         if request.model.is_some() && !self.model_at_start(Provider::Codex) {
@@ -103,7 +104,11 @@ impl SessionStarts {
             &environment(&self.config),
             Duration::from_secs(20),
         )?;
-        let value = server.mutation("thread/start", codex::thread_start(folder, request))?;
+        let mut params = codex::thread_start(folder, request);
+        if let Some(project) = project {
+            params["projectId"] = serde_json::json!(project);
+        }
+        let value = server.mutation("thread/start", params)?;
         let id = value["thread"]["id"]
             .as_str()
             .filter(|id| valid_uuid(id))

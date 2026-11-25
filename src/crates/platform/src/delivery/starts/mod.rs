@@ -14,6 +14,13 @@ use std::{
 };
 
 mod clients;
+// Only Windows has a Desktop project catalog on this start route.
+#[cfg(windows)]
+#[path = "codex_projects_windows.rs"]
+mod codex_host;
+#[cfg(unix)]
+#[path = "codex_projects_unix.rs"]
+mod codex_host;
 mod commands;
 mod handoff;
 mod offers;
@@ -133,6 +140,7 @@ pub struct SessionStarts {
     /// asks the host adapter (`host::desktop_installed`) with a 60s TTL cache.
     applications: Option<Vec<PathBuf>>,
     desktop_cache: Mutex<HashMap<Provider, (std::time::Instant, bool)>>,
+    codex_projects: codex_host::ProjectCatalog,
     /// The folder Agent HUD's DeepSeek Harness plugin shares with the app;
     /// none, and no Harness session is offered or started.
     deepseek: Option<DeepSeekChannel>,
@@ -167,6 +175,7 @@ impl SessionStarts {
             runner,
             applications: None,
             desktop_cache: Mutex::new(HashMap::new()),
+            codex_projects: Default::default(),
             deepseek: None,
             commands: None,
         })
