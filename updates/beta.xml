@@ -45,14 +45,14 @@ Requires an Apple Silicon Mac running macOS 14 or later.
       <agenthudMinimumIOSVersion>1.7.2</agenthudMinimumIOSVersion>
     </item>
     <item>
-      <title>0.6.14</title>
-      <pubDate>Wed, 25 Nov 2026 04:42:20 +0800</pubDate>
-      <link>https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.14</link>
-      <sparkle:version>514</sparkle:version>
-      <sparkle:shortVersionString>0.6.14</sparkle:shortVersionString>
+      <title>0.6.15</title>
+      <pubDate>Thu, 26 Nov 2026 00:43:53 +0800</pubDate>
+      <link>https://github.com/jazzenchen/agent-hud-open/releases/tag/v0.6.15</link>
+      <sparkle:version>515</sparkle:version>
+      <sparkle:shortVersionString>0.6.15</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
       <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-      <description sparkle:format="markdown"># Agent HUD 0.6.14
+      <description sparkle:format="markdown"># Agent HUD 0.6.15
 
 ## Compatibility
 
@@ -66,21 +66,15 @@ Requires an Apple Silicon Mac running macOS 14 or later.
 
 ### New
 
-- A switch in Settings, "Let agents decide when to steer", off by default. With it on, `send_message` tells agents to steer a short correction into the turn in progress and to queue everything else, and a steer asks for no reply of its own (#144).
-- Qoder: a Teams account shows its organization's credits as a row of its own, next to the personal credits (#176, thanks @mrdrivingduck).
-- Qoder: a desktop session that has no transcript is read from Qoder's runtime log, with its turns, model and prompt previews; a session with a transcript is not counted twice (#177, thanks @mrdrivingduck).
-- WorkBuddy's international build, which keeps its data in `.workbuddy-ai`, is found (#157).
-- `start_session` for DeepSeek Harness offers Harness's own workspaces, not only the folders of recent sessions, so a workspace left for a day can still be started in.
+- The completion reminder also speaks up when a turn fails or hits a limit, and when a Claude Code session closes in the middle of a turn. The HUD card reads Turn failed, Hit a limit or Session closed and flashes as a warning, and the iPhone's alert says the same. An interrupted turn, or a session quit at its prompt, stays quiet.
 
 ### Fixes
 
-- The iPhone's calendar on the home page shows usage again: one old log that could not be read no longer leaves the last 30 days marked incomplete (#163).
-- An ordinary message to a Codex conversation that no app has open is queued and the conversation woken, instead of failing as "not open" (#161, thanks @cdk1025).
-- Codex Pro 100 counts as ten times Plus and reads "Pro x10", now that OpenAI has doubled its allowance (#162, thanks @MoriAss).
-- Windows: a DeepSeek Harness session started from Agent HUD lands in the chosen workspace, not Ungrouped, when the folder is written with forward slashes (#174, thanks @walker95478).
-- Linux (X11): pointing at and clicking the HUD work wherever the window manager placed its window (#159, thanks @xiaolin778877), and a HUD on the bottom edge stays on the screen with a panel at the top.
+- Codex: `list_sessions` offers a steer only when the Codex desktop app or the CLI daemon will take one. The current ChatGPT desktop app doesn't, and a steer to it now says to send with `delivery: queue` instead of failing with "Native owner socket" (#178, thanks @xunhe730).
+- Codex desktop: approvals show again with the desktop app's newer stream (version 13, Codex 26.1111 to 26.1116). An extra-permissions request reads as the model's reason, with the network and each folder it asks for on a line of its own, instead of raw JSON. Settings names the Codex hooks still waiting for your review (#184, thanks @Niko-Echo).
+- Windows: Return to session for Antigravity brings its window forward, or starts it, when the conversation can't be opened directly, instead of showing its log in File Explorer (#185, thanks @newlandbamboo-afk).
 </description>
-      <enclosure url="https://github.com/jazzenchen/agent-hud-open/releases/download/v0.6.14/Agent-HUD-0.6.14-arm64.dmg" length="55363525" type="application/octet-stream" sparkle:edSignature="gLvOdvdTjC03LGwCsjgEo1EDhh0SD4WiJGGSMA7bEv78CsqcM6H1MXGpOl9me4ji5x8nx3gnKNkJv/zk7Ox7Ag==" />
+      <enclosure url="https://github.com/jazzenchen/agent-hud-open/releases/download/v0.6.15/Agent-HUD-0.6.15-arm64.dmg" length="55399407" type="application/octet-stream" sparkle:edSignature="5/0B7Ov0iooeQlI1uuNT/5MLQmtwBh1iWEM9Gn+1m01p2UvEcQdaiRAaJP/a85a3wnE/B9jIjkzQ6R4Aq+OKBA==" />
       <agenthudMacOnly>false</agenthudMacOnly>
       <agenthudMinimumIOSVersion>1.7.2</agenthudMinimumIOSVersion>
     </item>
