@@ -4,7 +4,7 @@ function selectedPrompts({ fs, path, crypto, service, folder, roots, read, write
   const pending = new Set();
 
   const end = (id) => {
-    leases.get(id)?.abort.abort();
+    leases.get(id)?.abort.abort(new Error("DeepSeek Harness's Agent HUD plugin stopped or reloaded before admission"));
     leases.delete(id);
   };
 
