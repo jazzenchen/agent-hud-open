@@ -129,7 +129,10 @@ unsafe extern "system" fn collect_window(window: HWND, parameter: LPARAM) -> i32
     1
 }
 
-fn find_matching_windows(home: &Path, port: u16) -> Option<(Vec<(HWND, u32)>, bool)> {
+/// The installed Antigravity's visible windows, front to back, and whether
+/// one of its processes listens on `port`; with no port, every window, and
+/// listening means it runs at all.
+fn find_matching_windows(home: &Path, port: Option<u16>) -> Option<(Vec<(HWND, u32)>, bool)> {
     let mut candidates = Candidates {
         home,
         windows: Vec::new(),
@@ -144,6 +147,10 @@ fn find_matching_windows(home: &Path, port: u16) -> Option<(Vec<(HWND, u32)>, bo
     {
         return None;
     }
+    let Some(port) = port else {
+        let running = !candidates.pids.is_empty();
+        return Some((candidates.windows, running));
+    };
     let listening_pids: Vec<u32> = candidates
         .pids
         .into_iter()
@@ -166,31 +173,35 @@ fn wake_desktop(home: &Path) -> bool {
     exe.is_file() && crate::os::start_program(&exe)
 }
 
+/// What a click on an Antigravity session does here: open the conversation
+/// in the one Antigravity window when its debugging port allows, else bring
+/// Antigravity forward (starting it if it is closed), as on macOS (#185).
+/// Only when Antigravity is not installed is the log shown instead.
 pub(super) fn open(home: &Path, id: &str, _cwd: Option<&str>) -> Result<bool, String> {
     if !super::is_uuid(id) {
         return Ok(false);
     }
-    let Some(port) = super::antigravity::devtools_port(home) else {
-        return Ok(false);
-    };
-    let Some((mut windows, listening)) = find_matching_windows(home, port) else {
+    if let Some(port) = super::antigravity::devtools_port(home) {
+        if open_conversation(home, id, port)? {
+            return Ok(true);
+        }
+    }
+    Ok(raise_desktop(home))
+}
+
+/// Opens conversation `id` through the debugging port `port` and brings its
+/// window forward. False when that is not certain: no window listens on the
+/// port, there is more than one (which one the conversation opens in is not
+/// known), or Antigravity did not navigate.
+fn open_conversation(home: &Path, id: &str, port: u16) -> Result<bool, String> {
+    let Some((mut windows, listening)) = find_matching_windows(home, Some(port)) else {
         return Ok(false);
     };
     // Closed to the tray, it still listens but shows no window: woken, it
     // shows one within a few seconds.
     if windows.is_empty() && listening && wake_desktop(home) {
-        for _ in 0..40 {
-            thread::sleep(Duration::from_millis(100));
-            if let Some((shown, _)) = find_matching_windows(home, port) {
-                if !shown.is_empty() {
-                    windows = shown;
-                    break;
-                }
-            }
-        }
+        windows = shown_windows(home, Some(port));
     }
-    // With more than one window it is not known which one the conversation
-    // opens in, so the log is shown instead.
     let [(window, _)] = windows.as_slice() else {
         return Ok(false);
     };
@@ -198,4 +209,37 @@ pub(super) fn open(home: &Path, id: &str, _cwd: Option<&str>) -> Result<bool, St
         return Ok(false);
     }
     Ok(crate::os::bring_window_forward(*window))
+}
+
+/// Brings the installed Antigravity's front window forward; one closed to
+/// the tray, or not running, is started, which shows its window. False when
+/// Antigravity is not installed.
+fn raise_desktop(home: &Path) -> bool {
+    let windows = match find_matching_windows(home, None) {
+        Some((windows, _)) if !windows.is_empty() => windows,
+        _ => {
+            if !wake_desktop(home) {
+                return false;
+            }
+            shown_windows(home, None)
+        }
+    };
+    match windows.first() {
+        Some((window, _)) => crate::os::bring_window_forward(*window),
+        // Started, and its window is still on its way.
+        None => true,
+    }
+}
+
+/// The windows that show within four seconds of a start.
+fn shown_windows(home: &Path, port: Option<u16>) -> Vec<(HWND, u32)> {
+    for _ in 0..40 {
+        thread::sleep(Duration::from_millis(100));
+        if let Some((shown, _)) = find_matching_windows(home, port) {
+            if !shown.is_empty() {
+                return shown;
+            }
+        }
+    }
+    Vec::new()
 }
