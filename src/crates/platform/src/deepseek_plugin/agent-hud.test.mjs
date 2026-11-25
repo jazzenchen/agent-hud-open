@@ -254,7 +254,51 @@ test("a steer whose turn ended while Harness took it names no turn", async (t) =
   assert.equal(done.steeredInto, undefined, "it may have started a turn of its own");
 });
 
-test("a named model switches the session first and keeps Harness's default; the host lists the models", async (t) => {
+test("reloaded plugin refuses stale explicit choices without submitting any to Harness", async (t) => {
+  const { h, plugin, channel, json } = setup(t);
+  h.agents.set(session, { id: session, status: "running", phase: { kind: "running", turn: 1 } });
+  const submitted = [];
+  const selected = [];
+  h.ctx.controller = {
+    prompt: async (input) => (submitted.push(input), { accepted: true }),
+    selectModel: async (input) => selected.push(input),
+  };
+  const dir = path.join(channel, "prompts", session);
+  fs.mkdirSync(dir, { recursive: true });
+  const explicit = [
+    { model: { provider: "deepseek-official", model: "deepseek-pro" } },
+    { reasoningEffort: "low" },
+    { model: { provider: "deepseek-official", model: "deepseek-pro" }, reasoningEffort: "low" },
+    { mode: "steer", reasoningEffort: "low" },
+    { model: null },
+  ];
+  const leave = (n, choice) => {
+    const id = `legacy-choice-${n}`;
+    fs.writeFileSync(path.join(dir, `${id}.json`), JSON.stringify({
+      id, text: "forward this", at: n, expiresAt: Date.now() + 60_000, ...choice,
+    }));
+    return `${id}.json`;
+  };
+  const stale = explicit.map((choice, n) => leave(n, choice));
+  plugin.stop();
+  const reloaded = start(h.ctx, channel, { host: 4242, checkInMs: 60_000, promptPollMs: 60_000 });
+  t.after(() => reloaded.stop());
+  reloaded.tick();
+  assert.deepEqual(submitted, []);
+  assert.deepEqual(selected, []);
+  for (const file of stale) {
+    const receipt = json("prompts", session, file);
+    assert.match(receipt.refused, /cannot choose a model or reasoning effort/);
+    assert.equal(receipt.startedAt, undefined);
+  }
+  const plain = leave(stale.length, {});
+  reloaded.tick();
+  await until(() => json("prompts", session, plain).startedAt);
+  assert.deepEqual(submitted.map((input) => input.mode), ["queue"]);
+  assert.deepEqual(selected, []);
+});
+
+test("a named start keeps Harness's default; the host lists the models", async (t) => {
   const { h, plugin, channel, json } = setup(t);
   h.agents.set(session, { id: session });
   const calls = [];
@@ -284,15 +328,7 @@ test("a named model switches the session first and keeps Harness's default; the 
     },
   };
   const pro = { provider: "deepseek-official", model: "deepseek-pro" };
-  const dir = path.join(channel, "prompts", session);
-  fs.mkdirSync(dir, { recursive: true });
   const id = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee";
-  fs.writeFileSync(path.join(dir, `${id}.json`), JSON.stringify({ id, text: "in pro", at: 1, expiresAt: Date.now() + 60_000, model: pro }));
-  plugin.tick();
-  await until(() => json("prompts", session, `${id}.json`).startedAt);
-  assert.deepEqual(calls.splice(0), [["select", session, "deepseek-pro"], ["default", "deepseek-flash"], ["prompt", session]]);
-  assert.deepEqual(current, { provider: "deepseek-official", model: "deepseek-flash", reasoningEffort: "high" });
-
   const starts = path.join(channel, "starts", "4242");
   fs.mkdirSync(starts, { recursive: true });
   fs.writeFileSync(path.join(starts, `${id}.json`), JSON.stringify({ id, cwd: path.join(channel, "work"), text: "hi", at: 1, expiresAt: Date.now() + 60_000, model: pro }));
@@ -300,6 +336,7 @@ test("a named model switches the session first and keeps Harness's default; the 
   await until(() => json("starts", "4242", `${id}.json`).startedAt);
   const made = "session-00000009-2222-4333-8444-555555555555";
   assert.deepEqual(calls.splice(0), [["select", made, "deepseek-pro"], ["default", "deepseek-flash"], ["prompt", made]]);
+  assert.deepEqual(current, { provider: "deepseek-official", model: "deepseek-flash", reasoningEffort: "high" });
 
   const listed = await until(() => {
     plugin.tick();

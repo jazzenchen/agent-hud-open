@@ -197,19 +197,19 @@ fn words_for_a_checked_in_session_wait_in_its_prompts_folder() {
         Some((PromptState::Started, None))
     );
     let flash = json!({"provider":"deepseek-official","model":"deepseek-flash"});
+    assert!(matches!(
+        channel.leave(SESSION, "mine-1", "from a product", Some(&flash), now),
+        Err(Refusal::Unsupported(reason)) if reason.contains("start_session")
+    ));
+    let pending = channel
+        .directory()
+        .join(format!("prompts/{SESSION}/mine-1.json"));
+    assert!(!pending.exists());
     channel
-        .leave(SESSION, "mine-1", "from a product", Some(&flash), now)
+        .leave(SESSION, "mine-1", "from a product", None, now)
         .unwrap();
-    let left: Value = serde_json::from_slice(
-        &fs::read(
-            channel
-                .directory()
-                .join(format!("prompts/{SESSION}/mine-1.json")),
-        )
-        .unwrap(),
-    )
-    .unwrap();
-    assert_eq!(left["model"], flash);
+    let left: Value = serde_json::from_slice(&fs::read(pending).unwrap()).unwrap();
+    assert!(left.get("model").is_none());
     assert_eq!(
         channel.leave(SESSION, "mine-1", "again", None, now),
         Err(Refusal::IdentityConflict)

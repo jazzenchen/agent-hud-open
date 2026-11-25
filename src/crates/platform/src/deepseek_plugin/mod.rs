@@ -34,6 +34,9 @@ mod starts;
 pub use channel::DeepSeekChannel;
 pub use starts::{Host, Started, START_LIFETIME};
 
+/// The current Harness prompt API cannot bind an explicit selection to a message.
+pub const EXISTING_SESSION_SELECTION_UNSUPPORTED: &str = "DeepSeek Harness cannot choose a model or reasoning effort for a message to an existing session. Leave model and reasoningEffort out, or use start_session to start a new session in the chosen model.";
+
 /// The plugin module Harness loads.
 pub const SCRIPT: &str = concat!(
     include_str!("agent-hud.mjs"),

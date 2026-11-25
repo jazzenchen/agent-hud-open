@@ -1,6 +1,8 @@
 //! The folder the plugin and the app share: check-ins and words for a
 //! session, the notes that name a call's session, and the module itself.
-use super::{file_name, CALL_LIFETIME, SCRIPT, STEER_LIFETIME};
+use super::{
+    file_name, CALL_LIFETIME, EXISTING_SESSION_SELECTION_UNSUPPORTED, SCRIPT, STEER_LIFETIME,
+};
 use crate::claude_plugin::{
     file_age, millis, valid_name, write_json, ClaudeChannel, PromptState, Refusal,
 };
@@ -45,10 +47,8 @@ impl DeepSeekChannel {
     }
 
     /// Leaves `text` for `session` as its next message, under the caller's
-    /// identity `id`, switching the session to `model` first when one is
-    /// named (`{"provider","model"}`). The caller checks the session is
-    /// loaded first, and that its plugin takes a model
-    /// (`channel_version`).
+    /// identity `id`. The caller checks the session is loaded first.
+    /// Harness's native inbox cannot bind a model to that message.
     pub fn leave(
         &self,
         session: &str,
@@ -57,8 +57,12 @@ impl DeepSeekChannel {
         model: Option<&Value>,
         now: SystemTime,
     ) -> Result<(), Refusal> {
-        self.prompts
-            .leave_with(session, id, text, false, model, now)
+        if model.is_some() {
+            return Err(Refusal::Unsupported(
+                EXISTING_SESSION_SELECTION_UNSUPPORTED.into(),
+            ));
+        }
+        self.prompts.leave(session, id, text, false, now)
     }
 
     /// Leaves `text` for `session` to go into its turn in progress (a
@@ -100,8 +104,7 @@ impl DeepSeekChannel {
     }
 
     /// The channel version of the plugin `session` last checked in from:
-    /// 2 and later choose a model for a message or a new session; 3 and
-    /// later take a steer.
+    /// 3 and later take a steer; 2 and later take a model on a new session.
     pub fn channel_version(&self, session: &str) -> u64 {
         if !valid_name(session) {
             return 0;

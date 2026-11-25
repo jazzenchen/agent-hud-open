@@ -29,7 +29,7 @@ fn list_models_says_what_each_client_offers_and_its_own_choice() {
     let harness = &listed["clients"][0];
     assert_eq!(harness["client"], "deepseek");
     assert_eq!(harness["default"], "deepseek-official/deepseek-flash");
-    assert_eq!(harness["perMessage"], true);
+    assert_eq!(harness["perMessage"], false);
     assert_eq!(harness["models"][1]["id"], "deepseek-official/deepseek-pro");
     assert_eq!(harness["models"][1]["name"], "DeepSeek · Pro");
     // Claude Code has no list to ask: its aliases, and no settings say more.
@@ -41,7 +41,7 @@ fn list_models_says_what_each_client_offers_and_its_own_choice() {
 }
 
 #[test]
-fn a_named_model_goes_only_where_the_client_takes_one_and_only_one_it_offers() {
+fn named_selections_are_refused_before_a_harness_message_is_left() {
     let mut world = World::on();
     world.harness();
     harness_offers(&world);
@@ -58,49 +58,28 @@ fn a_named_model_goes_only_where_the_client_takes_one_and_only_one_it_offers() {
         .unwrap()
         .contains("cannot choose its model"));
     assert!(world.codex.0.lock().unwrap().is_empty());
-    // A model Harness does not offer.
-    let unknown = world.call(
-        Some(me),
-        "send_message",
-        json!({"to":HARNESS,"text":"Port it","model":"gpt-6-luna"}),
-    );
-    assert!(unknown["reason"]
-        .as_str()
-        .unwrap()
-        .contains("offers no model named gpt-6-luna"));
-    // The session's plugin is older and could not switch it.
-    let old = world.call(
-        Some(me),
-        "send_message",
-        json!({"to":HARNESS,"text":"Port it","model":"deepseek-official/deepseek-pro"}),
-    );
-    assert_eq!(old["state"], "refused", "{old}");
-    assert!(old["reason"]
-        .as_str()
-        .unwrap()
-        .contains("restart DeepSeek Harness"));
-    std::fs::write(
-        world
-            .harness_channel
-            .join(format!("sessions/{HARNESS_OWN}.json")),
-        br#"{"at":1,"channelVersion":2}"#,
-    )
-    .unwrap();
-    // By its name, in any case: the words go with the model.
-    let sent = world.call(
-        Some(me),
-        "send_message",
-        json!({"to":HARNESS,"text":"Port it","model":"deepseek · pro"}),
-    );
-    assert_eq!(sent["state"], "queued", "{sent}");
-    let left: Value = serde_json::from_slice(
-        &std::fs::read(world.harness_prompt(sent["id"].as_str().unwrap())).unwrap(),
-    )
-    .unwrap();
-    assert_eq!(
-        left["model"],
-        json!({"provider":"deepseek-official","model":"deepseek-pro"})
-    );
+    // The advertised model exists and the plugin is running. Its native
+    // inbox still cannot bind the selection to this message.
+    for selection in [
+        json!({"model":"deepseek · pro"}),
+        json!({"reasoningEffort":"low"}),
+        json!({"model":"deepseek · pro","reasoningEffort":"low"}),
+        json!({"model":null}),
+        json!({"model":"  "}),
+        json!({"reasoningEffort":false}),
+    ] {
+        let mut args = json!({"to":HARNESS,"text":"Port it"});
+        args.as_object_mut()
+            .unwrap()
+            .extend(selection.as_object().unwrap().clone());
+        let refused = world.call(Some(me), "send_message", args);
+        assert_eq!(refused["state"], "refused", "{refused}");
+        let reason = refused["reason"].as_str().unwrap();
+        assert!(reason.contains("cannot choose a model or reasoning effort"));
+        assert!(reason.contains("start_session"));
+    }
+    assert!(world.messaging.journal.messages().next().is_none());
+    assert!(!world.harness_channel.join("prompts").exists());
     // Without one the session keeps its own.
     let plain = world.send(me, HARNESS, "And the tests");
     let left: Value = serde_json::from_slice(

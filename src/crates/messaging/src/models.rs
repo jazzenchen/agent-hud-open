@@ -45,6 +45,16 @@ impl Messaging {
         per_message: bool,
         language: Language,
     ) -> std::result::Result<Option<String>, String> {
+        let provider = provider(client);
+        if per_message
+            && provider == Provider::DeepSeek
+            && (arguments.get("model").is_some() || arguments.get("reasoningEffort").is_some())
+        {
+            return Err(agent_hud_core::l10n::tr_in(
+                language,
+                agent_hud_platform::deepseek_plugin::EXISTING_SESSION_SELECTION_UNSUPPORTED,
+            ));
+        }
         let Some(asked) = arguments["model"]
             .as_str()
             .map(str::trim)
@@ -52,7 +62,6 @@ impl Messaging {
         else {
             return Ok(None);
         };
-        let provider = provider(client);
         if per_message && !models::per_message(provider) {
             return Err(words::model_per_message(language, client));
         }

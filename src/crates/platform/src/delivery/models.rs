@@ -72,12 +72,10 @@ impl Models {
     }
 }
 
-/// Whether a message into a session it already runs can name the model it
-/// goes on in: Antigravity takes a model with each message and Harness's
-/// plugin switches the session first. Codex's queue and Claude Code's channel
-/// carry words only.
+/// Whether a message to an existing session can carry a model choice.
+/// Antigravity takes a model with each message.
 pub fn per_message(provider: Provider) -> bool {
-    matches!(provider, Provider::Antigravity | Provider::DeepSeek)
+    provider == Provider::Antigravity
 }
 /// A string field of `value`, when it holds one that is not blank.
 pub(crate) fn text(value: &Value) -> Option<String> {

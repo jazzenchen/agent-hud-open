@@ -15,7 +15,9 @@
 use super::claude::delivery;
 use super::*;
 use crate::claude_plugin::Refusal;
-use crate::deepseek_plugin::{DeepSeekChannel as Plugin, Started, START_LIFETIME};
+use crate::deepseek_plugin::{
+    DeepSeekChannel as Plugin, Started, EXISTING_SESSION_SELECTION_UNSUPPORTED, START_LIFETIME,
+};
 use catalog::{listed, selection};
 use std::{
     collections::HashSet,
@@ -67,6 +69,11 @@ impl DeepSeekChannel {
     }
     /// Reject input that cannot be handed over before the caller journals a send.
     pub(super) fn check_request(&self, request: &SendRequest, now: SystemTime) -> Result<()> {
+        if request.model.is_some() {
+            return Err(Failure::Unsupported(
+                EXISTING_SESSION_SELECTION_UNSUPPORTED.into(),
+            ));
+        }
         let steer = request.operation == Operation::Steer;
         if !steer
             && request.operation != Operation::Automatic
@@ -84,15 +91,10 @@ impl DeepSeekChannel {
         if !self.runs(&request.session_id, now) {
             return Err(Failure::Unavailable(UNAVAILABLE_REASON.into()));
         }
-        if request.model.is_some()
-            && self.0.channel_version(bare(&request.session_id)) < MODEL_VERSION
-        {
-            return Err(Failure::Unsupported(OLD_PLUGIN.into()));
-        }
         if steer {
             self.check_steer(request)?;
         }
-        selection(request.model.as_deref()).map(|_| ())
+        Ok(())
     }
     /// Leaves the words for the plugin. A queued message is left and read
     /// back later; a steer is waited for, since only the plugin can tell
@@ -110,13 +112,7 @@ impl DeepSeekChannel {
             return self.steered(session, &request.request_id);
         }
         self.0
-            .leave(
-                session,
-                &request.request_id,
-                &request.text,
-                selection(request.model.as_deref())?.as_ref(),
-                now,
-            )
+            .leave(session, &request.request_id, &request.text, None, now)
             .map_err(failure)?;
         Ok((DeliveryState::Waiting, None))
     }
