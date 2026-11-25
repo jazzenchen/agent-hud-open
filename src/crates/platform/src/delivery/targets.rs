@@ -72,6 +72,12 @@ impl LocalClients {
             hook_capability(Provider::OpenCode),
         ]
     }
+    /// Whether a Codex app or daemon that takes a steer answers now: the
+    /// thread being open is not enough when the desktop app no longer
+    /// listens on its owner socket (#178).
+    pub fn codex_takes_steer(&self) -> bool {
+        self.codex.steer_owner(&self.paths.codex_data)
+    }
     /// Whether DeepSeek Harness session `session_id` runs a plugin that takes
     /// a steer; an older one refuses it until Harness restarts.
     pub fn deepseek_takes_steer(&self, session_id: &str) -> bool {

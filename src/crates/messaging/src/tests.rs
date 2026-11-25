@@ -41,8 +41,10 @@ fn compressed(session: &str) -> bool {
 
 /// A Codex that queues what it is given and remembers it. A steer goes into
 /// its turn in progress, unless it has none (`.1`, idle): then nothing goes in.
+/// With `.2`, nothing that takes a steer answers, as with the current
+/// desktop app (#178).
 #[derive(Default)]
-struct Codex(Mutex<Vec<SendRequest>>, AtomicBool);
+struct Codex(Mutex<Vec<SendRequest>>, AtomicBool, AtomicBool);
 impl CodexTransport for Codex {
     fn deliver(
         &self,
@@ -53,6 +55,9 @@ impl CodexTransport for Codex {
     ) -> delivery::Result<Receipt> {
         self.0.lock().unwrap().push(request.clone());
         let steer = request.operation == Operation::Steer;
+        if steer && self.2.load(AtomicOrdering::SeqCst) {
+            return Err(delivery::Failure::Unavailable("Native owner socket".into()));
+        }
         if steer && self.1.load(AtomicOrdering::SeqCst) {
             return Err(delivery::Failure::Rejected(
                 delivery::NO_TURN_TO_STEER.into(),
@@ -76,6 +81,9 @@ impl CodexTransport for Codex {
             reason: (!steer && request.text.contains("closed thread"))
                 .then(|| "Queued until Codex opens the thread".into()),
         })
+    }
+    fn steer_owner(&self, _data: &Path) -> bool {
+        !self.2.load(AtomicOrdering::SeqCst)
     }
 }
 
@@ -3149,6 +3157,32 @@ fn list_sessions_says_a_running_codex_with_its_thread_open_can_be_steered() {
         .as_str()
         .unwrap()
         .contains("a steer goes into it"));
+}
+
+#[test]
+fn a_codex_whose_app_answers_no_steer_is_not_offered_one_and_the_refusal_says_queue() {
+    let mut world = World::on();
+    world.state(CODEX, "running");
+    let locks = world.fixture.home().join(".codex/thread-writer-locks");
+    std::fs::create_dir_all(&locks).unwrap();
+    let lock = std::fs::File::create(locks.join(format!("{CODEX}.lock"))).unwrap();
+    lock.lock().unwrap();
+    world.codex.2.store(true, AtomicOrdering::SeqCst);
+    let codex = listed(&mut world, CODEX);
+    assert_eq!(codex["steerable"], false, "{codex}");
+    assert!(codex["steerReason"]
+        .as_str()
+        .unwrap()
+        .contains("does not take a steer"));
+    let answer = world.call(
+        Some(("claude", CLAUDE)),
+        "send_message",
+        json!({"to":CODEX,"text":"Stop: the API is v2 now.","delivery":"steer"}),
+    );
+    assert_eq!(answer["state"], "refused", "{answer}");
+    let reason = answer["reason"].as_str().unwrap();
+    assert!(reason.contains("delivery queue"), "{reason}");
+    assert!(!reason.contains("socket"), "{reason}");
 }
 
 #[test]

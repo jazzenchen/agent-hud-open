@@ -1340,6 +1340,7 @@
   "{{client}} offers no model named {{model}}; list_models lists the ones it does.": "{{client}} に {{model}} という名前のモデルはありません。list_models で使えるモデルを確認できます。",
   "{{client}} offers no supported way to start a turn in an idle session: the message waits for this session's next turn to end, when its stop hook hands it over, and expires if no turn ends within an hour.": "{{client}} には、アイドル状態のセッションでターンを開始する公式な方法がありません。メッセージはこのセッションの次のターンが終わるまで待ち、そのとき停止フックが渡します。1 時間以内にターンが終わらない場合は期限切れになります。",
   "{{client}} sessions cannot be steered; send it with delivery queue to have it taken as a new turn.": "{{client}} のセッションには割り込めません。delivery queue で送ると、新しいターンとして受け取られます。",
+  "This Codex app does not take a steer, so nothing goes into the turn in progress. Send it with delivery queue to have it taken as the next turn.": "この Codex アプリは割り込みを受け付けないため、進行中のターンには何も入りません。delivery queue で送ると、次のターンとして受け取られます。",
   "{{client}}'s desktop app runs a new session's first message in the model chosen in the app, so a start here cannot name one. Leave model out.": "{{client}} のデスクトップアプリは、新しいセッションの最初のメッセージをアプリで選んだモデルで実行します。そのため、ここからの開始ではモデルを指定できません。model を外してください。",
   "{{cost}} at API prices": "API 価格で {{cost}}",
   "{{count}} calls loaded_other": "{{count, number}} 回の呼び出しを読み込み済み",

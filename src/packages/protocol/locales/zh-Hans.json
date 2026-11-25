@@ -1340,6 +1340,7 @@
   "{{client}} offers no model named {{model}}; list_models lists the ones it does.": "{{client}} 没有名为 {{model}} 的模型；list_models 会列出它提供的模型。",
   "{{client}} offers no supported way to start a turn in an idle session: the message waits for this session's next turn to end, when its stop hook hands it over, and expires if no turn ends within an hour.": "{{client}} 没有让空闲会话开始新一轮的受支持方式：消息会等到这个会话下一轮结束时由停止钩子交给它；一小时内没有轮次结束就过期。",
   "{{client}} sessions cannot be steered; send it with delivery queue to have it taken as a new turn.": "{{client}} 会话不能插话；改用 delivery queue 发送，它会作为新的一轮收到。",
+  "This Codex app does not take a steer, so nothing goes into the turn in progress. Send it with delivery queue to have it taken as the next turn.": "这个 Codex 应用不接收插话，所以不会有内容进入正在进行的一轮。改用 delivery queue 发送，它会作为下一轮收到。",
   "{{client}}'s desktop app runs a new session's first message in the model chosen in the app, so a start here cannot name one. Leave model out.": "{{client}} 桌面版会用它里面选好的模型跑新会话的第一条消息，所以在这里新开会话不能指定模型。去掉 model 即可。",
   "{{cost}} at API prices": "{{cost}} 按 API 价",
   "{{count}} calls loaded_other": "已加载 {{count, number}} 次调用",

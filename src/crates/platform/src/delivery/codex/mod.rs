@@ -25,6 +25,11 @@ pub trait CodexTransport: Send + Sync {
         request: &SendRequest,
         timeout: Duration,
     ) -> Result<Receipt>;
+    /// Whether something that takes a steer answers in `data` now. A
+    /// fixture always does.
+    fn steer_owner(&self, _data: &Path) -> bool {
+        true
+    }
 }
 /// The installed clients. With `queue` set, an `enqueue` that finds no
 /// shared daemon goes into Codex's queue through a short-lived app-server.
@@ -49,6 +54,9 @@ impl CodexTransport for NativeCodexTransport {
         timeout: Duration,
     ) -> Result<Receipt> {
         transport::deliver(data, target, request, timeout, self.queue.as_ref())
+    }
+    fn steer_owner(&self, data: &Path) -> bool {
+        transport::steer_owner(data)
     }
 }
 

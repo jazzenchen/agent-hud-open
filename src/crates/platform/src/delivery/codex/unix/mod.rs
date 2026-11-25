@@ -25,6 +25,20 @@ pub(crate) const OPERATIONS: &[Operation] = &[
     Operation::Interrupt,
 ];
 
+/// Whether the desktop app's owner socket or the shared CLI daemon answers a
+/// connection, closed at once. A socket file left behind by an app that no
+/// longer listens on it refuses the connection (#178).
+pub(super) fn steer_owner(data: &Path) -> bool {
+    use crate::clients::codex::desktop_io::{endpoint, LocalSocket};
+    let quick = Duration::from_millis(300);
+    LocalSocket::connect(&endpoint(data), quick).is_ok()
+        || LocalSocket::connect(
+            &data.join("app-server-control/app-server-control.sock"),
+            quick,
+        )
+        .is_ok()
+}
+
 pub(super) fn deliver(
     data: &Path,
     target: &SessionTarget,

@@ -69,7 +69,8 @@ impl Messaging {
     /// Whether a message sent with `delivery: steer` would go into a turn of
     /// `id` in progress now: only a client that takes one
     /// (`Provider::takes_steer`), while a turn runs and waits on nothing, in
-    /// a Codex that has the thread open or a DeepSeek Harness session whose
+    /// a Codex that has the thread open and whose desktop app (or CLI daemon)
+    /// answers, or a DeepSeek Harness session whose
     /// plugin checked in and is new enough to take one. Read from the
     /// snapshot, so a send still finds out for itself (a headless Harness,
     /// for one, refuses it then).
@@ -90,7 +91,15 @@ impl Messaging {
             _ => {}
         }
         let open = match provider {
-            Provider::Codex => delivery::codex_thread_open(&self.places.codex_data, id),
+            Provider::Codex => {
+                if !delivery::codex_thread_open(&self.places.codex_data, id) {
+                    false
+                } else if !self.clients.codex_takes_steer() {
+                    return (false, words::steer_codex_unanswered(language));
+                } else {
+                    true
+                }
+            }
             _ => {
                 self.preferences.deepseek
                     && loaded.contains(id)

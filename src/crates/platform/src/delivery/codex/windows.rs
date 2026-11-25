@@ -18,6 +18,13 @@ pub(crate) const OPERATIONS: &[Operation] = &[
     Operation::Enqueue,
 ];
 
+/// Whether the desktop app's owner pipe answers a connection, closed at
+/// once. The current desktop app no longer opens it (#178).
+pub(super) fn steer_owner(data: &Path) -> bool {
+    use crate::clients::codex::desktop_io::{endpoint, LocalSocket};
+    LocalSocket::connect(&endpoint(data), Duration::from_millis(300)).is_ok()
+}
+
 pub(super) fn deliver(
     data: &Path,
     target: &SessionTarget,

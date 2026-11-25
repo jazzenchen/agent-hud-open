@@ -55,6 +55,12 @@ pub fn steer_closed(language: Language, client: &str) -> String {
         &[("client", &super::client(client))],
     )
 }
+/// A Codex session open in an app that answers no steer: the current Codex
+/// desktop app no longer listens where a steer goes (#178). Said in
+/// list_sessions and when a steer is refused.
+pub fn steer_codex_unanswered(language: Language) -> String {
+    tr_in(language, "This Codex app does not take a steer, so nothing goes into the turn in progress. Send it with delivery queue to have it taken as the next turn.")
+}
 /// A session waiting on an approval or a question reads no steer until it
 /// is answered.
 pub fn steer_waiting(language: Language) -> String {

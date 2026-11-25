@@ -202,6 +202,19 @@ impl Messaging {
             {
                 ("refused", Some(words::no_turn_to_steer(language)))
             }
+            // Nothing that takes a steer answers for this Codex thread: say
+            // what the sender can do instead of naming a socket (#178).
+            Ok(receipt)
+                if steer
+                    && client == "codex"
+                    && receipt.state == DeliveryState::Failed
+                    && receipt
+                        .reason
+                        .as_deref()
+                        .is_some_and(|reason| reason.starts_with("Unavailable(")) =>
+            {
+                ("refused", Some(words::steer_codex_unanswered(language)))
+            }
             Ok(receipt) => (
                 delivered_or_refused(receipt.state),
                 receipt.reason.as_deref().map(plain),
