@@ -11,6 +11,10 @@ In Agent HUD 0.6.7 on macOS, open **Settings → Agents**. Under **Agent tools**
 
 If you use Claude Desktop and turn off only **Answer questions**, you may still see a next-step question on the HUD. Answer it in Claude Desktop. **Dismiss** hides the card and leaves the question open in Claude.
 
+With Agent HUD 0.6.14 and DeepSeek Harness 0.2.2-rc.5 on macOS, the same multiple-choice question appeared in the HUD and in Harness's web interface. Submitting an answer in either place closed the question in the other. When both submitted different choices almost together, Harness recorded a single answer. If that happens, check the result in the Harness session to see which choice took effect.
+
+Tool approvals appeared in both apps on the same setup. Denying a file write in the HUD dismissed the Harness prompt and left the file untouched. Choosing **Allow once** in either app wrote one test entry and cleared the prompt in the other app.
+
 If the HUD says “This request is no longer waiting” after you answer elsewhere, check the result in the client that handled it. The HUD only accepts answers for requests it still has open.
 
 To check your setup, send a message between two sessions connected to Agent HUD's MCP server. Have the recipient reply with `send_message` and the original message ID in `reply_to`. The reply should arrive as a new turn in the sender's session. With Codex CLI 0.170.0 on macOS, this worked with client hooks uninstalled, and a file write in a read-only session still waited for **Yes, proceed** in Codex.
