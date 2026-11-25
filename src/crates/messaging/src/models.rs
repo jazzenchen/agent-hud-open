@@ -28,11 +28,68 @@ impl Messaging {
                 };
                 row["client"] = json!(client);
                 row["atStart"] = json!(self.starts.model_at_start(provider));
-                row["perMessage"] = json!(models::per_message(provider));
+                row["perMessage"] = json!(
+                    models::per_message(provider)
+                        || (provider == Provider::DeepSeek
+                            && self
+                                .loaded()
+                                .iter()
+                                .any(|id| self.clients.deepseek_can_select(id)))
+                );
+
                 row
             })
             .collect::<Vec<_>>();
         Ok(json!({"clients": rows}))
+    }
+
+    pub(crate) fn send_options(
+        &self,
+        client: &str,
+        to: &str,
+        arguments: &Value,
+        steer: bool,
+        language: Language,
+    ) -> std::result::Result<(Option<String>, Option<String>), String> {
+        let selected = client == "deepseek"
+            && (arguments.get("model").is_some() || arguments.get("reasoningEffort").is_some());
+        if selected && !self.clients.deepseek_can_select(to) {
+            return Err(agent_hud_core::l10n::tr_in(
+                language,
+                agent_hud_platform::deepseek_plugin::EXISTING_SESSION_SELECTION_UNSUPPORTED,
+            )
+            .to_owned());
+        }
+        if selected && steer {
+            return Err("A steer cannot choose a model or reasoning effort".into());
+        }
+        if selected
+            && arguments.get("model").is_some()
+            && arguments["model"]
+                .as_str()
+                .is_none_or(|model| model.trim().is_empty())
+        {
+            return Err("model must be a non-empty string".into());
+        }
+        let reasoning_effort = match arguments.get("reasoningEffort") {
+            None => None,
+            Some(_) if client != "deepseek" => {
+                return Err(
+                    "Only DeepSeek Harness supports choosing a reasoning effort on a message"
+                        .into(),
+                )
+            }
+            Some(value) => match value
+                .as_str()
+                .map(str::trim)
+                .filter(|effort| !effort.is_empty())
+            {
+                Some(effort) => Some(effort.to_owned()),
+                None => return Err("reasoningEffort must be a non-empty string".into()),
+            },
+        };
+        let model = self.named_model(client, arguments, true, language)?;
+        Ok((model, reasoning_effort))
     }
 
     /// The model `arguments` names for `client`, as the client names it:
@@ -46,15 +103,6 @@ impl Messaging {
         language: Language,
     ) -> std::result::Result<Option<String>, String> {
         let provider = provider(client);
-        if per_message
-            && provider == Provider::DeepSeek
-            && (arguments.get("model").is_some() || arguments.get("reasoningEffort").is_some())
-        {
-            return Err(agent_hud_core::l10n::tr_in(
-                language,
-                agent_hud_platform::deepseek_plugin::EXISTING_SESSION_SELECTION_UNSUPPORTED,
-            ));
-        }
         let Some(asked) = arguments["model"]
             .as_str()
             .map(str::trim)
@@ -62,7 +110,7 @@ impl Messaging {
         else {
             return Ok(None);
         };
-        if per_message && !models::per_message(provider) {
+        if per_message && provider != Provider::DeepSeek && !models::per_message(provider) {
             return Err(words::model_per_message(language, client));
         }
         if !per_message && !self.starts.model_at_start(provider) {

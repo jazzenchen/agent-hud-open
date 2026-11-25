@@ -88,3 +88,59 @@ fn named_selections_are_refused_before_a_harness_message_is_left() {
     .unwrap();
     assert!(left.get("model").is_none());
 }
+
+#[test]
+fn harness_explicit_selection_is_delivered_only_through_the_bound_host_request() {
+    let mut world = World::on();
+    world.harness();
+    harness_offers(&world);
+    std::fs::write(
+        world
+            .harness_channel
+            .join(format!("sessions/{HARNESS_OWN}.json")),
+        br#"{"at":1,"channelVersion":3,"selectedGeneration":"h-42"}"#,
+    )
+    .unwrap();
+    let me = ("claude", CLAUDE);
+    let advertised = world.call(Some(me), "list_models", json!({"client":"deepseek"}));
+    assert_eq!(advertised["clients"][0]["perMessage"], true, "{advertised}");
+    let queue = world
+        .harness_channel
+        .join("selected")
+        .join("prompts")
+        .join(HARNESS_OWN);
+    let responder = std::thread::spawn(move || {
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(4);
+        while std::time::Instant::now() < deadline {
+            let entry = std::fs::read_dir(&queue).ok().and_then(|files| {
+                files
+                    .flatten()
+                    .find(|entry| entry.path().extension().is_some_and(|ext| ext == "json"))
+            });
+            if let Some(entry) = entry {
+                let before: Value =
+                    serde_json::from_slice(&std::fs::read(entry.path()).unwrap()).unwrap();
+                let temporary = entry.path().with_extension("answer");
+                std::fs::write(&temporary, br#"{"takenAt":1,"startedAt":2}"#).unwrap();
+                std::fs::rename(&temporary, entry.path()).unwrap();
+                return before;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+        panic!("no guarded request reached the Harness");
+    });
+    let delivered = world.call(
+        Some(me),
+        "send_message",
+        json!({"to":HARNESS,"text":"Review using Pro","model":"deepseek · pro","reasoningEffort":"low"}),
+    );
+    assert_eq!(delivered["delivered"], true, "{delivered}");
+    let selection = responder.join().unwrap();
+    assert_eq!(selection["generation"], "h-42");
+    assert_eq!(
+        selection["model"],
+        json!({"provider":"deepseek-official","model":"deepseek-pro"})
+    );
+    assert_eq!(selection["reasoningEffort"], "low");
+    assert!(!world.harness_channel.join("prompts").exists());
+}

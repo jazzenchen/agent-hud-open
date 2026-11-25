@@ -13,7 +13,7 @@ import { pathToFileURL } from "node:url";
 const joined = fs.mkdtempSync(path.join(os.tmpdir(), "dsh-plugin-module-"));
 fs.writeFileSync(
   path.join(joined, "agent-hud.mjs"),
-  ["agent-hud.mjs", "agent-hud-inbox.mjs", "agent-hud-steer.mjs"]
+  ["agent-hud.mjs", "agent-hud-inbox.mjs", "agent-hud-selected.mjs", "agent-hud-steer.mjs"]
     .map((name) => fs.readFileSync(new URL(name, import.meta.url), "utf8"))
     .join(""),
 );
@@ -347,6 +347,87 @@ test("a named start keeps Harness's default; the host lists the models", async (
     default: { provider: "deepseek-official", model: "deepseek-flash" },
     groups: [{ id: "deepseek-official", name: "DeepSeek", models: [{ id: "deepseek-flash", name: "Flash" }, { id: "deepseek-pro", name: "Pro" }] }],
   });
+});
+
+
+function leaveSelected(channel, id, generation, fields = {}) {
+  const folder = path.join(channel, "selected", "prompts", session);
+  fs.mkdirSync(folder, { recursive: true });
+  fs.writeFileSync(path.join(folder, id + ".json"), JSON.stringify({
+    id, generation, text: id, expiresAt: Date.now() + 5000, ...fields,
+  }));
+}
+
+test("the bound host method takes model and effort, or the current session model for effort alone", async (t) => {
+  const { h, plugin, channel, json } = setup(t);
+  const current = { provider: "p", model: "current", reasoningEffort: "max" };
+  h.agents.set(session, { id: session, model: { current: () => current } });
+  const taken = [];
+  h.ctx.controller = {
+    prompt() { assert.fail("must not enter the ordinary queue"); },
+    async promptWithSelection(request, signal) {
+      assert.equal(signal.aborted, false);
+      taken.push(request);
+      if (request.requestId === "busy") throw new Error("Session is busy");
+      return { accepted: true };
+    },
+  };
+  plugin.tick();
+  const generation = json("sessions", session + ".json").selectedGeneration;
+  assert.ok(generation);
+  leaveSelected(channel, "both", generation, { model: { provider: "p", model: "other" }, reasoningEffort: "high" });
+  leaveSelected(channel, "effort", generation, { reasoningEffort: "low" });
+  leaveSelected(channel, "busy", generation, { reasoningEffort: "high" });
+  plugin.tick();
+  const outcome = (id) => json("selected", "prompts", session, id + ".json");
+  await until(() => outcome("both").startedAt && outcome("effort").startedAt && outcome("busy").refused);
+  const selection = (id) => taken.find((request) => request.requestId === id).selection;
+  assert.deepEqual(selection("both"), { provider: "p", model: "other", reasoningEffort: "high" });
+  assert.deepEqual(selection("effort"), { provider: "p", model: "current", reasoningEffort: "low" });
+  assert.equal(outcome("busy").refused, "Session is busy");
+  assert.equal(outcome("busy").startedAt, undefined);
+  assert.equal(current.reasoningEffort, "max");
+});
+
+test("stopping revokes work before host admission and a restart refuses the prior generation", async (t) => {
+  const { h, plugin, channel, json } = setup(t);
+  h.agents.set(session, { id: session, model: { current: () => ({ provider: "p", model: "m" }) } });
+  const calls = [];
+  h.ctx.controller = {
+    prompt() { assert.fail("must not enter the ordinary queue"); },
+    promptWithSelection(request, signal) {
+      calls.push(request.requestId);
+      return new Promise((resolve, reject) => {
+        signal.addEventListener("abort", () => reject(new Error("Plugin stopped before admission")), { once: true });
+      });
+    },
+  };
+  plugin.tick();
+  const gen = json("sessions", session + ".json").selectedGeneration;
+  leaveSelected(channel, "pending", gen, { reasoningEffort: "low" });
+  plugin.tick();
+  leaveSelected(channel, "not-picked-up", gen, { reasoningEffort: "low" });
+  plugin.stop();
+  const replacement = start(h.ctx, channel, { host: 4242, checkInMs: 60000, promptPollMs: 60000 });
+  t.after(() => replacement.stop());
+  replacement.tick();
+  const outcome = (id) => json("selected", "prompts", session, id + ".json");
+  await until(() => outcome("pending").refused && outcome("not-picked-up").refused);
+  assert.notEqual(json("sessions", session + ".json").selectedGeneration, gen);
+  assert.match(outcome("pending").refused, /stopped before admission/);
+  assert.match(outcome("not-picked-up").refused, /stopped or reloaded/);
+  assert.deepEqual(calls, ["pending"]);
+});
+
+test("ordinary hosts advertise no selection capability and cannot pick up a selected prompt", (t) => {
+  const { h, plugin, channel, json } = setup(t);
+  h.agents.set(session, { id: session });
+  h.ctx.controller = { prompt() { assert.fail("an old host must not see selected text"); } };
+  plugin.tick();
+  assert.equal(json("sessions", session + ".json").selectedGeneration, undefined);
+  leaveSelected(channel, "stale-selection", "earlier-generation", { reasoningEffort: "low" });
+  plugin.tick();
+  assert.match(json("selected", "prompts", session, "stale-selection.json").refused, /stopped or reloaded/);
 });
 
 test("the host checks in, and says it is gone when it stops", (t) => {

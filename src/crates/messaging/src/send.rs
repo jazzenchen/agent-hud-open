@@ -22,7 +22,6 @@ impl Messaging {
             Some("steer") => true,
             Some(_) => return Err("delivery is queue or steer".into()),
         };
-        // A reply goes back to whoever sent the message it answers.
         let replied = reply_to
             .and_then(|parent| self.journal.find(parent))
             .cloned();
@@ -114,11 +113,11 @@ impl Messaging {
                 return Ok(refused(&words::steer_waiting(language)));
             }
         }
-        // A model only when named, and only where a message can switch it.
-        let model = match self.named_model(client, arguments, true, language) {
-            Ok(model) => model,
-            Err(reason) => return Ok(refused(&reason)),
-        };
+        let (model, reasoning_effort) =
+            match self.send_options(client, to, arguments, steer, language) {
+                Ok(options) => options,
+                Err(reason) => return Ok(refused(&reason)),
+            };
         let sender = party_any(host.snapshot, extras, &caller.client, &caller.session_id);
         let recipient = party_any(host.snapshot, extras, client, to);
         // One that cannot take it now is refused before anything is queued.
@@ -188,6 +187,7 @@ impl Messaging {
             },
             expected_turn_id: None,
             model,
+            reasoning_effort,
         });
         if let Ok(receipt) = &receipt {
             self.clients.delivered(receipt, &caller.surface(), now);

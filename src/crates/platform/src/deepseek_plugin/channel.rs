@@ -133,12 +133,20 @@ impl DeepSeekChannel {
         id: &str,
         now: SystemTime,
     ) -> Result<Option<(PromptState, Option<String>)>, Refusal> {
-        self.prompts.state(session, id, now)
+        match self.selected_state(session, id, now)? {
+            Some(state) => Ok(Some(state)),
+            None => self.prompts.state(session, id, now),
+        }
     }
 
     /// Asks the plugin not to submit `id`.
     pub fn cancel(&self, session: &str, id: &str) -> Result<PromptState, Refusal> {
-        self.prompts.cancel(session, id)
+        let selected = self.selected();
+        if selected.prompt(session, id)?.is_file() {
+            selected.cancel(session, id)
+        } else {
+            self.prompts.cancel(session, id)
+        }
     }
 
     /// The session calling `tool` with `arguments` in the Harness host whose
@@ -222,6 +230,7 @@ impl DeepSeekChannel {
     /// and asks and answers a stopped host left behind.
     pub fn sweep(&self, now: SystemTime) {
         self.prompts.sweep(now);
+        self.selected().sweep(now);
         if let Ok(hosts) = fs::read_dir(self.directory.join("calls")) {
             for host in hosts.flatten() {
                 if let Ok(notes) = fs::read_dir(host.path()) {

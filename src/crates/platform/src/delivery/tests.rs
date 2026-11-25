@@ -70,6 +70,7 @@ fn request(provider: Provider) -> SendRequest {
         operation: Operation::Automatic,
         expected_turn_id: None,
         model: None,
+        reasoning_effort: None,
     }
 }
 
@@ -424,6 +425,7 @@ fn harness_request() -> SendRequest {
         operation: Operation::Enqueue,
         expected_turn_id: None,
         model: None,
+        reasoning_effort: None,
     }
 }
 #[test]

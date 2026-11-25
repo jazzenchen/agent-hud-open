@@ -24,6 +24,14 @@ pub struct ReachableTarget {
 }
 
 impl LocalClients {
+    /// Current capability of this Harness session, not just an installed plugin.
+    pub fn deepseek_can_select(&self, session: &str) -> bool {
+        self.deepseek
+            .as_ref()
+            .and_then(|channel| channel.selected_generation(session, SystemTime::now()))
+            .is_some()
+    }
+
     /// Replace the host's existing projection; no disk scan or ingestion is triggered.
     pub fn update_targets(&self, targets: Vec<SessionTarget>) {
         *self.targets.lock().unwrap_or_else(PoisonError::into_inner) = targets;
