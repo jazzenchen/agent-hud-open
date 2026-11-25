@@ -21,13 +21,12 @@ const TURNS: usize = 20;
 pub(super) fn resolve_cascade_config(
     cascade_id: Option<&str>,
     model: Option<&str>,
+    mut read: impl FnMut(&str, Value) -> Answer<Value>,
 ) -> (Option<Value>, Option<String>) {
-    let read =
-        |method: &str, body: Value| crate::clients::antigravity::service::call(method, &body);
     choose(
-        cascade_id.map_or(Ok(None), |id| latest_turn_config(id, read)),
+        cascade_id.map_or(Ok(None), |id| latest_turn_config(id, &mut read)),
         model.map(str::to_owned).or_else(picker::picked),
-        || call("GetUserStatus", json!({ "metadata": metadata() })).ok(),
+        || read("GetUserStatus", json!({ "metadata": metadata() })).ok(),
     )
 }
 
