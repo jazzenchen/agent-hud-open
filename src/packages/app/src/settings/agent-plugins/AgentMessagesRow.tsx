@@ -60,6 +60,9 @@ export function AgentMessagesRow({
     always: t("Every message but a reply asks."),
   }[replies];
   const steerOnOwn = t("Let agents decide when to steer");
+  const steerCodex = t("Steer Codex through its hooks");
+  // The hooks are Agent HUD's client hooks, so they go in only with those on.
+  const clientHooks = settings.clientHooks === true;
   return (
     <>
       <ToolSwitchRow
@@ -119,6 +122,33 @@ export function AgentMessagesRow({
             onCheckedChange={(value) => set("agentMessagesSteerOnOwn", value)}
           />
         </Row>
+        {/* Only where the hooks were checked (macOS). */}
+        {snapshot.connection.clientHooks?.steers?.includes("codex") && (
+          <Row
+            title={
+              <>
+                {steerCodex} <Pill tone="orange">{t("Caution")}</Pill>
+              </>
+            }
+            subtitle={
+              clientHooks
+                ? t(
+                    "Where the Codex app takes no steer. Allow its hooks once in Codex (Settings → Hooks), then quit and reopen it. While a turn runs, a small process waits beside it.",
+                  )
+                : t(
+                    'Needs Agent HUD\'s hooks: turn on live status or answers under "{{section}}".',
+                    { section: t("What Agent HUD does") },
+                  )
+            }
+          >
+            <Switch
+              aria-label={steerCodex}
+              checked={settings.codexHookSteer === true}
+              disabled={pending || !clientHooks}
+              onCheckedChange={(value) => set("codexHookSteer", value)}
+            />
+          </Row>
+        )}
         <Row
           title={t("Passes in a row")}
           subtitle={t("Then they wait for you. Your next message resets it.")}

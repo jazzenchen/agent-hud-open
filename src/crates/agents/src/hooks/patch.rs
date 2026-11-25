@@ -6,9 +6,20 @@ use super::configuration::{
 use super::{Hooks, Layout, Reply};
 use serde_json::{json, Map, Value};
 
+/// The hook's own entry for `event`, for the one hook whose events differ.
+fn steer_event<'a>(hooks: &'a Hooks, flag: &str, event: &str) -> Option<&'a super::steer::Event> {
+    (flag == "--steer-hook")
+        .then_some(hooks.steer.as_ref())
+        .flatten()
+        .and_then(|steer| steer.event(event))
+}
+
 /// Keys every handler of this hook carries. A hooks-only file's client
 /// (`Layout::Events`) runs its hooks one way and takes no `async`.
-fn fixed(hooks: &Hooks, flag: &str) -> Map<String, Value> {
+fn fixed(hooks: &Hooks, flag: &str, event: &str) -> Map<String, Value> {
+    if let Some(event) = steer_event(hooks, flag, event) {
+        return Map::from_iter(event.background.then(|| ("async".into(), json!(true))));
+    }
     if flag == "--rewake-hook" {
         return hooks
             .rewake
@@ -28,12 +39,17 @@ fn fixed(hooks: &Hooks, flag: &str) -> Map<String, Value> {
     }
 }
 
-fn new_group(hooks: &Hooks, flag: &str, command: &str) -> Value {
-    let mut handler = json!({"type":"command","command":command,"timeout":timeout(hooks, flag)});
-    for (key, value) in fixed(hooks, flag) {
+fn new_group(hooks: &Hooks, flag: &str, event: &str, command: &str) -> Value {
+    let steer = steer_event(hooks, flag, event);
+    let timeout = steer.map_or_else(|| timeout(hooks, flag), |event| event.timeout);
+    let mut handler = json!({"type":"command","command":command,"timeout":timeout});
+    for (key, value) in fixed(hooks, flag, event) {
         handler[&key] = value;
     }
     let mut group = json!({"hooks":[handler]});
+    if let Some(matcher) = steer.and_then(|event| event.matcher) {
+        group["matcher"] = json!(matcher);
+    }
     if flag == "--permission-hook" && !matches!(hooks.layout, Layout::NestedGroups) {
         group["matcher"] = match hooks.permission.as_ref().map(|p| &p.reply) {
             Some(Reply::PreToolUse { matcher, .. }) => json!(matcher),
@@ -51,9 +67,12 @@ fn new_group(hooks: &Hooks, flag: &str, command: &str) -> Value {
     }
     group
 }
+/// Whose handlers are set: the client, its hooks, the hook and its event.
+type Owner<'a> = (&'a str, &'a Hooks, &'a str, &'a str);
+
 fn setting_handlers(
     handlers: Vec<Value>,
-    (source, hooks, flag): (&str, &Hooks, &str),
+    (source, hooks, flag, event): Owner<'_>,
     key: &str,
     command: Option<&str>,
     placed: &mut bool,
@@ -71,14 +90,14 @@ fn setting_handlers(
             let mut fields = handler.as_object()?.clone();
             *placed = true;
             fields.insert(key.into(), json!(command));
-            fields.extend(fixed(hooks, flag));
+            fields.extend(fixed(hooks, flag, event));
             Some(Value::Object(fields))
         })
         .collect()
 }
 fn setting_groups(
     groups: Vec<Value>,
-    (source, hooks, flag): (&str, &Hooks, &str),
+    (source, hooks, flag, event): Owner<'_>,
     command: Option<&str>,
 ) -> Vec<Value> {
     let mut placed = false;
@@ -94,7 +113,7 @@ fn setting_groups(
         };
         let kept = setting_handlers(
             handlers.clone(),
-            (source, hooks, flag),
+            (source, hooks, flag, event),
             "command",
             command,
             &mut placed,
@@ -109,7 +128,7 @@ fn setting_groups(
     }
     if let Some(command) = command {
         if !placed {
-            result.push(new_group(hooks, flag, command));
+            result.push(new_group(hooks, flag, event, command));
         }
     }
     result
@@ -164,7 +183,7 @@ pub fn patch_configuration(
     if let Layout::Events { .. } = hooks.layout {
         for event in &desc.events {
             let groups = optional_array(&root, event)?;
-            let result = setting_groups(groups, (source, hooks, flag), command);
+            let result = setting_groups(groups, (source, hooks, flag, event), command);
             if result.is_empty() {
                 root.remove(event);
             } else {
@@ -185,8 +204,13 @@ pub fn patch_configuration(
         for event in &desc.events {
             let handlers = optional_array(&hooks_object, event)?;
             let mut placed = false;
-            let mut result =
-                setting_handlers(handlers, (source, hooks, flag), key, command, &mut placed);
+            let mut result = setting_handlers(
+                handlers,
+                (source, hooks, flag, event),
+                key,
+                command,
+                &mut placed,
+            );
             if let Some(command) = command {
                 if !placed {
                     let mut new = Map::new();
@@ -219,7 +243,7 @@ pub fn patch_configuration(
     };
     for event in &desc.events {
         let groups = optional_array(&events, event)?;
-        let result = setting_groups(groups, (source, hooks, flag), command);
+        let result = setting_groups(groups, (source, hooks, flag, event), command);
         if result.is_empty() {
             events.remove(event);
         } else {

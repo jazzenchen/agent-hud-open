@@ -94,8 +94,10 @@ impl Messaging {
             Provider::Codex => {
                 if !delivery::codex_thread_open(&self.places.codex_data, id) {
                     false
-                } else if !self.clients.codex_takes_steer() {
-                    return (false, words::steer_codex_unanswered(language));
+                } else if !self.clients.codex_takes_steer()
+                    && !self.clients.codex_hooks_take_steer(id)
+                {
+                    return (false, self.codex_unanswered(id, language));
                 } else {
                     true
                 }
@@ -110,6 +112,17 @@ impl Messaging {
             (true, words::steer_ready(language))
         } else {
             (false, words::steer_closed(language, client))
+        }
+    }
+
+    /// Why nothing takes a steer into a Codex turn in progress.
+    pub(crate) fn codex_unanswered(&self, id: &str, language: Language) -> String {
+        if !self.preferences.codex_hook_steer {
+            words::steer_codex_unanswered(language)
+        } else if self.clients.codex_reads_steers(id) {
+            words::steer_codex_hooks_silent(language)
+        } else {
+            words::steer_codex_reopen(language)
         }
     }
 

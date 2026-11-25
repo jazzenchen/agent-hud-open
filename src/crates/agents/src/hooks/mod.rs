@@ -12,6 +12,7 @@ pub mod observer;
 mod patch;
 mod permission;
 pub mod request;
+pub mod steer;
 pub mod turn_log;
 pub mod windows;
 
@@ -45,6 +46,8 @@ pub struct Hooks {
     /// A hook that waits in the background for a message queued for the
     /// session and hands it over even while the session is idle.
     pub rewake: Option<Rewake>,
+    /// Hooks that tell a turn in progress a message waits for it.
+    pub steer: Option<steer::Steer>,
     /// Its session ids carry the client's id in front (`codebuddy:<id>`).
     pub prefixed_sessions: bool,
     /// How a hook is launched on each OS.
@@ -63,7 +66,8 @@ impl Hooks {
     }
 
     /// Every hook flag this client has, in install order, each with whether
-    /// it goes in only once the user turns it on (`Permission::opt_in`).
+    /// it goes in only once the user turns it on (`Permission::opt_in`, and
+    /// always the steer hooks).
     pub fn all_flags(&self) -> Vec<(&'static str, bool)> {
         let mut flags = Vec::new();
         if let Some(permission) = &self.permission {
@@ -74,6 +78,9 @@ impl Hooks {
         }
         if self.rewake.is_some() {
             flags.push(("--rewake-hook", false));
+        }
+        if self.steer.is_some() {
+            flags.push(("--steer-hook", true));
         }
         if self.attention {
             flags.push(("--attention-hook", false));
@@ -87,9 +94,9 @@ impl Hooks {
         flags
     }
 
-    /// Whether one of its hooks goes in only once the user turns it on.
+    /// Whether its approval hook goes in only once the user turns it on.
     pub fn opt_in(&self) -> bool {
-        self.all_flags().iter().any(|(_, opt_in)| *opt_in)
+        self.permission.as_ref().is_some_and(|hook| hook.opt_in)
     }
 }
 

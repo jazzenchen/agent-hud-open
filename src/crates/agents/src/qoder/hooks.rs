@@ -78,6 +78,7 @@ pub static QODER: Hooks = Hooks {
     attention: false,
     compaction: None,
     rewake: Some(REWAKE),
+    steer: None,
     prefixed_sessions: false,
     launch: POSIX_ONLY,
 };
@@ -97,6 +98,7 @@ pub static QODER_CN: Hooks = Hooks {
     attention: false,
     compaction: None,
     rewake: Some(REWAKE),
+    steer: None,
     prefixed_sessions: false,
     launch: POSIX_ONLY,
 };
@@ -113,6 +115,7 @@ pub static QODER_WORK: Hooks = Hooks {
     compaction: None,
     // Not checked in QoderWork's desktop app, which may wait for the hook.
     rewake: None,
+    steer: None,
     prefixed_sessions: false,
     launch: POSIX_ONLY,
 };

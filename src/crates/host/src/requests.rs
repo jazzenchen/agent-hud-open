@@ -70,7 +70,7 @@ pub(crate) async fn native_request(
         let mut params=params;
         // The demo never reaches outside its own folder: no login item, no
         // client's hooks.
-        if method=="set_setting" && app.state::<AppState>().demo && matches!(params["key"].as_str(),Some("launchAtLogin"|"clientHooks"|"optInApprovals")) {
+        if method=="set_setting" && app.state::<AppState>().demo && matches!(params["key"].as_str(),Some("launchAtLogin"|"clientHooks"|"optInApprovals"|"codexHookSteer")) {
             return Err(agent_hud_runtime::l10n::tr("The demo leaves this setting alone."));
         }
         if method=="set_setting" {if let Some(value)=app.state::<system::System>().set_setting(params["key"].as_str().ok_or("Setting key is required")?,&params["value"])? {params["value"]=value;}}
@@ -91,19 +91,20 @@ pub(crate) async fn native_request(
             }
             return result;
         }
-        // A changed client's opt-in approval hook goes in or comes out as
-        // client hooks do: before the setting is saved, and back when it is not.
-        if method=="set_setting" && params["key"]=="optInApprovals" {
-            let sources:Vec<String>=serde_json::from_value(params["value"].clone()).map_err(|_|"optInApprovals must be a list of client ids")?;
+        // A changed client's opt-in hooks (its approval hook, or Codex's steer
+        // hooks) go in or come out as client hooks do: before the setting is
+        // saved, and back when it is not.
+        if method=="set_setting" && matches!(params["key"].as_str(),Some("optInApprovals"|"codexHookSteer")) {
+            let change=OptIn::read(&params)?;
             let _action=hook_actions.lock().unwrap_or_else(PoisonError::into_inner);
             if stopped.load(Ordering::Acquire){return Err("The application is stopping".into());}
             let previous={
                 let mut hooks=hooks.lock().unwrap_or_else(PoisonError::into_inner);
-                let previous=hooks.opted_in();hooks.set_opted_in(sources)?;previous
+                let previous=hooks.opted_in();hooks.set_opted_in(change.applied(&previous))?;previous
             };
             let result=backend.lock().unwrap_or_else(PoisonError::into_inner).request(&app,&method,params);
             if result.is_err() && hooks.lock().unwrap_or_else(PoisonError::into_inner).set_opted_in(previous).is_err(){
-                return Err("The approval setting failed and its previous hooks could not be restored".into());
+                return Err("The hook setting failed and its previous hooks could not be restored".into());
             }
             return result;
         }
@@ -151,4 +152,69 @@ pub(crate) async fn presentation_request(
         };
         coordinator::presentation_changed(&app,&value);Ok(value)
     }).await.map_err(|e|e.to_string())?
+}
+
+/// The client whose steer hooks are opt-in, in the list of opted-in clients.
+const STEERED: &str = "codex";
+
+/// A change of one setting that says which opt-in hooks go in.
+enum OptIn {
+    /// `optInApprovals`: the clients whose approval hook goes in.
+    Approvals(Vec<String>),
+    /// `codexHookSteer`: whether Codex's steer hooks go in.
+    Steer(bool),
+}
+
+impl OptIn {
+    fn read(params: &Value) -> Result<Self, String> {
+        let value = &params["value"];
+        if params["key"] == "codexHookSteer" {
+            return value
+                .as_bool()
+                .map(Self::Steer)
+                .ok_or_else(|| "codexHookSteer must be a boolean".into());
+        }
+        serde_json::from_value(value.clone())
+            .map(Self::Approvals)
+            .map_err(|_| "optInApprovals must be a list of client ids".into())
+    }
+
+    /// The opted-in clients after the change: each setting leaves the
+    /// other's clients as they were in `previous`.
+    fn applied(&self, previous: &[String]) -> Vec<String> {
+        let (approvals, steer) = match self {
+            Self::Approvals(clients) => {
+                (clients.as_slice(), previous.iter().any(|id| id == STEERED))
+            }
+            Self::Steer(on) => (previous, *on),
+        };
+        approvals
+            .iter()
+            .filter(|id| *id != STEERED)
+            .cloned()
+            .chain(steer.then(|| STEERED.to_owned()))
+            .collect()
+    }
+}
+
+#[cfg(test)]
+mod opt_in_tests {
+    use super::*;
+
+    #[test]
+    fn each_opt_in_setting_leaves_the_others_clients_as_they_were() {
+        let read =
+            |key: &str, value: Value| OptIn::read(&serde_json::json!({"key":key,"value":value}));
+        let on = read("codexHookSteer", true.into()).unwrap();
+        assert_eq!(on.applied(&["copilot".into()]), ["copilot", "codex"]);
+        let off = read("codexHookSteer", false.into()).unwrap();
+        assert_eq!(
+            off.applied(&["copilot".into(), "codex".into()]),
+            ["copilot"]
+        );
+        let none = read("optInApprovals", serde_json::json!([])).unwrap();
+        assert_eq!(none.applied(&["copilot".into(), "codex".into()]), ["codex"]);
+        assert!(read("codexHookSteer", "yes".into()).is_err());
+        assert!(read("optInApprovals", true.into()).is_err());
+    }
 }

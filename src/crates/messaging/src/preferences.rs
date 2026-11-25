@@ -7,7 +7,8 @@ pub const DEFAULT_LIMIT: u32 = 10;
 /// Settings → Agents. Among the agent tools: "Let agents message each
 /// other" (`agentMessages`), "Send as me" (`agentMessagesAsUser`), "Ask for
 /// replies" (`agentMessagesReplies`: never, when needed or always), "Let agents
-/// decide when to steer" (`agentMessagesSteerOnOwn`) and how many
+/// decide when to steer" (`agentMessagesSteerOnOwn`), "Steer Codex through
+/// its hooks" (`codexHookSteer`) and how many
 /// passes in a row before the user looks (`agentMessagesLimit`, null for no
 /// limit). On the Claude Code and DeepSeek Harness plugins' rows: "Send
 /// messages" (`claudeMessages`, `deepseekMessages`).
@@ -22,6 +23,9 @@ pub struct Preferences {
     /// is doing, and a steer's last line asks for no reply of its own. Off:
     /// the tools allow a steer only when the user asked for one.
     pub steer_on_own: bool,
+    /// A steer into a Codex turn may go through Codex's own hooks where its
+    /// app takes none from outside.
+    pub codex_hook_steer: bool,
     /// Passes in a row with no word from the user; None is no limit.
     pub limit: Option<u32>,
     /// Messages may go into Claude Code sessions.
@@ -66,6 +70,7 @@ impl Default for Preferences {
             as_user: false,
             replies: Replies::WhenNeeded,
             steer_on_own: false,
+            codex_hook_steer: false,
             limit: Some(DEFAULT_LIMIT),
             claude: true,
             deepseek: true,
@@ -89,6 +94,7 @@ impl Preferences {
             as_user: settings["agentMessagesAsUser"] == true,
             replies: Replies::read(settings),
             steer_on_own: settings["agentMessagesSteerOnOwn"] == true,
+            codex_hook_steer: settings["codexHookSteer"] == true,
             limit,
             claude: settings["claudeMessages"] != false,
             deepseek: settings["deepseekMessages"] != false,

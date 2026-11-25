@@ -86,7 +86,12 @@ pub(super) fn answer(host: &Host<'_>, message: &Message) -> Option<Found> {
     let mut live_facts = None;
     let _ = pages(host.query, id, from, &mut live_facts, |row, cursor| {
         let Some((found, started)) = &mut turn else {
-            if is_message(row, message) && !before(row) {
+            // A steer its turn read with read_message has no prompt of its
+            // own there: the turn it was read in is the answer's.
+            let read_in = message.steer_waits
+                && message.steered_into.is_some()
+                && row["turnId"].as_str() == message.steered_into.as_deref();
+            if read_in || is_message(row, message) && !before(row) {
                 turn = Some((
                     Turn {
                         // A compressed log's page names the turn only when it

@@ -40,7 +40,7 @@ impl Process {
             started: crate::os::process_start(pid),
         }
     }
-    fn runs(self) -> bool {
+    pub(crate) fn runs(self) -> bool {
         crate::os::process_runs(self.pid, self.started)
     }
 }
@@ -55,7 +55,7 @@ pub(super) struct Client {
 
 /// The client that ran this hook: the nearest parent process that is no
 /// shell (a shell that ran the command and did not exec it).
-fn client() -> Option<Client> {
+pub(super) fn client() -> Option<Client> {
     let parent = crate::os::parent_processes()
         .into_iter()
         .find(|parent| !crate::os::is_shell(&parent.executable))?;

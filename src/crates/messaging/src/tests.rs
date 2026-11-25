@@ -551,6 +551,12 @@ impl World {
     }
     /// One call from `caller`, answered as its agent reads it.
     fn raw(&mut self, caller: Option<(&str, &str)>, name: &str, arguments: Value) -> Value {
+        let caller =
+            caller.map(|(client, id)| json!({"client":client,"sessionId":id,"turnId":null}));
+        self.raw_params(&json!({"name":name,"arguments":arguments,"caller":caller}))
+    }
+    /// One call as the relay sends it.
+    fn raw_params(&mut self, params: &Value) -> Value {
         let query = self.transcripts.query();
         let host = Host {
             snapshot: &self.snapshot,
@@ -565,15 +571,7 @@ impl World {
             Some(_) => self.transcripts.tick(),
             None => 1_792_600_000_000,
         };
-        let caller =
-            caller.map(|(client, id)| json!({"client":client,"sessionId":id,"turnId":null}));
-        self.messaging
-            .call(
-                &json!({"name":name,"arguments":arguments,"caller":caller}),
-                &host,
-                now,
-            )
-            .unwrap()
+        self.messaging.call(params, &host, now).unwrap()
     }
     fn send(&mut self, from: (&str, &str), to: &str, text: &str) -> Value {
         self.call(Some(from), "send_message", json!({"to":to,"text":text}))
@@ -3120,6 +3118,7 @@ impl Preferences {
                 Replies::Always => "always",
             },
             "agentMessagesSteerOnOwn": self.steer_on_own,
+            "codexHookSteer": self.codex_hook_steer,
             "agentMessagesLimit": self.limit,
             "claudeMessages": self.claude,
             "deepseekMessages": self.deepseek,

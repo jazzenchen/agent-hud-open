@@ -37,6 +37,7 @@ impl LocalClients {
             antigravity: Arc::new(NativeAntigravityTransport),
             deepseek: None,
             timeout,
+            hook_steer: Default::default(),
             deliveries: None,
         })
     }

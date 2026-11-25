@@ -25,6 +25,17 @@ impl crate::AgentHudCore {
             .collect()
     }
 
+    /// The clients whose opt-in hooks go in while client hooks are on: the
+    /// approval hooks above, and Codex's steer hooks with "Steer Codex
+    /// through its hooks" (`codexHookSteer`) on.
+    pub fn opt_in_hooks(&self) -> Vec<String> {
+        let mut clients = self.opt_in_approvals();
+        if self.settings["codexHookSteer"] == true {
+            clients.push("codex".into());
+        }
+        clients
+    }
+
     pub fn antigravity_cli_settings(&self) -> Vec<PathBuf> {
         self.settings["antigravityCliSettings"]
             .as_array()
@@ -161,6 +172,7 @@ impl crate::AgentHudCore {
             | "agentMessages"
             | "agentMessagesAsUser"
             | "agentMessagesSteerOnOwn"
+            | "codexHookSteer"
             | "claudeMessages"
             | "deepseekMessages"
             | "readCopilotQuota"

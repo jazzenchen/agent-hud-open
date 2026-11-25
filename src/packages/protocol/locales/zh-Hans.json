@@ -1545,5 +1545,13 @@
   "Let agents decide when to steer": "让智能体自己决定何时插话",
   "Agents then interrupt each other's turns without asking you, to correct work in progress.": "打开后，智能体会不经询问打断其他会话正在进行的这一轮，用来纠正手上的工作。",
   "This goes into your current turn: take it into the work at hand, with no reply of its own. What it changes belongs in this turn's result. Only if it asks you something, answer with {{tool}}, reply_to: {{id}}.": "这段话进入你当前这一轮：照着调整手上的工作，不用单独回复。它带来的改变写进这一轮的结果里。只有它向你提了问题时，才用 {{tool}} 回复，reply_to: {{id}}。",
-  "An agent set on its own page keeps that setting.": "在智能体自己页面上设过的，以那里为准。"
+  "An agent set on its own page keeps that setting.": "在智能体自己页面上设过的，以那里为准。",
+  "Steer Codex through its hooks": "通过钩子给 Codex 插话",
+  "Where the Codex app takes no steer. Allow its hooks once in Codex (Settings → Hooks), then quit and reopen it. While a turn runs, a small process waits beside it.": "用于不接收插话的 Codex 应用。要在 Codex 里允许一次它的钩子（设置 → Hooks），再退出重开；一轮运行期间，旁边会有一个小进程等消息。",
+  "Needs Agent HUD's hooks: turn on live status or answers under \"{{section}}\".": "需要 Agent HUD 的钩子：在「{{section}}」里打开实时状态或回答。",
+  "This Codex app does not take a steer, and Agent HUD's steer hooks have not run in this turn: they run once the user allows them in Codex (Settings → Hooks), from the next turn on. Send it with delivery queue to have it taken as the next turn.": "这个 Codex 应用不接收插话，Agent HUD 的插话钩子在这一轮里也没有运行：用户在 Codex 里（设置 → Hooks）允许之后，从下一轮起才会运行。请用 delivery queue 发送，作为它的下一轮。",
+  "This Codex session was opened before \"Steer Codex through its hooks\" was turned on, so it has no read_message to read a steer with: it takes one once the Codex app was quit and opened again. Send it with delivery queue to have it taken as the next turn.": "这个 Codex 会话是在打开「通过钩子给 Codex 插话」之前打开的，没有读取插话用的 read_message：退出并重新打开 Codex 应用后才能接收。请用 delivery queue 发送，作为它的下一轮。",
+  "The session's turn is told that this waits and reads it at its next step. If that turn is stopped first, this does not go in and is not queued: list_sent_messages then shows it as expired.": "这个会话的当前这一轮会被告知有消息在等，并在下一步读取。如果这一轮先被停止，消息就不会进去，也不会排队，list_sent_messages 会显示为 expired。",
+  "No message waits for this turn. Go on with your work.": "没有消息在等这一轮，继续你的工作。",
+  "From other agents, not from the user: take these into the work at hand. Where they differ from what the user asked, the user's words stand.": "这些话来自其他 agent，不是用户：并入手上的工作。与用户的要求不一致时，以用户的话为准。"
 }

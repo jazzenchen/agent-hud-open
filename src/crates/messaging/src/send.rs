@@ -113,6 +113,9 @@ impl Messaging {
             if state(target) == "waitingForApproval" {
                 return Ok(refused(&words::steer_waiting(language)));
             }
+            if self.no_codex_turn(target) {
+                return Ok(refused(&words::no_turn_to_steer(language)));
+            }
         }
         // A model only when named, and only where a message can switch it.
         let model = match self.named_model(client, arguments, true, language) {
@@ -192,35 +195,7 @@ impl Messaging {
         if let Ok(receipt) = &receipt {
             self.clients.delivered(receipt, &caller.surface(), now);
         }
-        let (state, reason) = match &receipt {
-            Ok(receipt) if receipt.state == DeliveryState::Steered => ("steered", None),
-            Ok(receipt)
-                if receipt
-                    .reason
-                    .as_deref()
-                    .is_some_and(|reason| reason.contains(delivery::NO_TURN_TO_STEER)) =>
-            {
-                ("refused", Some(words::no_turn_to_steer(language)))
-            }
-            // Nothing that takes a steer answers for this Codex thread: say
-            // what the sender can do instead of naming a socket (#178).
-            Ok(receipt)
-                if steer
-                    && client == "codex"
-                    && receipt.state == DeliveryState::Failed
-                    && receipt
-                        .reason
-                        .as_deref()
-                        .is_some_and(|reason| reason.starts_with("Unavailable(")) =>
-            {
-                ("refused", Some(words::steer_codex_unanswered(language)))
-            }
-            Ok(receipt) => (
-                delivered_or_refused(receipt.state),
-                receipt.reason.as_deref().map(plain),
-            ),
-            Err(error) => ("refused", Some(plain(&error.to_string()))),
-        };
+        let (state, reason) = self.outcome(&receipt, steer, (client, to), language);
         let steered_into = receipt
             .as_ref()
             .ok()
@@ -245,6 +220,9 @@ impl Messaging {
             answered: false,
             replied_by: None,
             steered_into,
+            steer_waits: receipt
+                .as_ref()
+                .is_ok_and(|receipt| steer && receipt.state == DeliveryState::Waiting),
             call: self.calling.clone(),
             asked: ask && !own_steer,
             ended_at_ms: None,
