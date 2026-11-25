@@ -8,7 +8,12 @@ import {
 } from "lucide-react";
 import type { IslandEvent, Session, Snapshot } from "@agent-hud/protocol";
 import { usePanelServices } from "../PanelContext";
-import { clientDisplayName, compactDuration, newsTitle } from "../IslandNews";
+import {
+  clientDisplayName,
+  compactDuration,
+  completionLabel,
+  newsTitle,
+} from "../IslandNews";
 import { ReminderMark } from "./ReminderMark";
 import { dateFormat } from "@agent-hud/ui/format";
 import { alertFill, alertInk, alertText, onAlertFill } from "../tokens";
@@ -131,7 +136,7 @@ export function CompletionAlertView({
         </div>
         <MessageSquareText size={12} strokeWidth={2.2} color={turnText} />
         <span style={{ color: turnText, fontSize: 12, fontWeight: 500 }}>
-          {t("New reply")}
+          {completionLabel(event, t)}
         </span>
         <button
           type="button"

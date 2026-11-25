@@ -40,11 +40,18 @@ pub(crate) fn settle(session: &mut Value, processes: &ClaudeProcesses) {
     let Some(told) = state(processes, id, last, session["state"].as_str().unwrap_or("")) else {
         return;
     };
+    // A process that left mid-turn closed the session: one the user quits
+    // at its prompt is idle already and tells nothing.
+    let closed = processes.closed_at(id);
     session["state"] = json!(told);
     if told == "idle" {
         if let Some(facts) = session["liveFacts"].as_object_mut() {
             facts.insert("requests".to_owned(), json!([]));
             facts.remove("attention");
+            if let Some(at) = closed {
+                facts.insert("outcome".to_owned(), json!("closed"));
+                facts.insert("endedAt".to_owned(), json!(crate::iso(at)));
+            }
         }
     }
 }
@@ -90,6 +97,19 @@ mod tests {
         assert_eq!(session["state"], "idle");
         assert_eq!(session["liveFacts"]["requests"], json!([]));
         assert!(session["liveFacts"].get("attention").is_none());
+    }
+
+    #[test]
+    fn a_process_seen_leaving_mid_turn_closes_the_session() {
+        let (_temp, processes) = gone();
+        let mut session = row("claude", "running", "1970-01-01T00:16:00Z");
+        settle(&mut session, &processes);
+        assert_eq!(session["liveFacts"]["outcome"], "closed");
+        assert_eq!(session["liveFacts"]["endedAt"], "1970-01-01T00:16:40+00:00");
+        // Already idle at its prompt: quitting it tells nothing.
+        let mut quit = row("claude", "idle", "1970-01-01T00:16:00Z");
+        settle(&mut quit, &processes);
+        assert!(quit["liveFacts"].get("outcome").is_none());
     }
 
     /// The session as a snapshot lists it.

@@ -144,3 +144,46 @@ fn only_the_permission_hook_keeps_approvals_from_the_hud() {
     let progress = reviews(&mut tracker, codex(&["userPromptSubmit"]), at);
     assert_ne!(approvals[0]["message"], progress[0]["message"]);
 }
+
+#[test]
+fn a_failed_or_limited_turn_and_a_closed_session_alert_but_an_interrupted_one_does_not() {
+    let mut tracker = Tracker::new();
+    let at = tracker.started + 30_000;
+    let ended = |id: &str, outcome: &str, turn: Option<&str>| {
+        json!({"id":id,"source":"claude","title":id,"parentId":null,
+            "liveFacts":{"outcome":outcome,"endedAt":iso(at),"turnId":turn}})
+    };
+    let sessions = [
+        ended("failed", "failed", Some("t1")),
+        ended("limited", "limited", Some("t1")),
+        ended("closed", "closed", None),
+        ended("interrupted", "interrupted", Some("t1")),
+        ended("no-turn", "completed", None),
+    ];
+    let outcomes = |events: Value| {
+        let mut told = events["items"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|event| event["kind"] == "completion")
+            .map(|event| {
+                format!(
+                    "{}:{}",
+                    event["sessionId"].as_str().unwrap(),
+                    event["outcome"].as_str().unwrap()
+                )
+            })
+            .collect::<Vec<_>>();
+        told.sort();
+        told
+    };
+    assert_eq!(
+        outcomes(tracker.update(&sessions, &[], &[], &[], at)),
+        ["closed:closed", "failed:failed", "limited:limited"]
+    );
+    // Told once.
+    assert_eq!(
+        outcomes(tracker.update(&sessions, &[], &[], &[], at + 1)).len(),
+        3
+    );
+}

@@ -25,6 +25,15 @@ test("accents follow Open's IslandAlert: blue turns, warm warnings, calm news", 
       span: { from: 1 / 3, to: 2 / 3, feather: 0.15 / 3 },
     },
   );
+  for (const outcome of ["failed", "limited", "closed"])
+    assert.equal(
+      glowAlert(
+        { id: "f", kind: "completion", vendor: "claude", outcome },
+        vendors,
+      )?.color,
+      "#e9a16d",
+      `a turn that ${outcome} warns`,
+    );
   assert.equal(
     glowAlert({ id: "c", kind: "request", vendor: "kimi" }, vendors)?.warning,
     true,

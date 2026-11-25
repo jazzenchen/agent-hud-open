@@ -274,3 +274,35 @@ fn config_homes_are_the_claude_roots_parents_once_each() {
         vec![home.join(".claude"), home.join("work")]
     );
 }
+
+#[test]
+fn only_a_process_seen_running_then_leaving_closes_its_session() {
+    let temp = tempfile::tempdir().unwrap();
+    let config = temp.path().join(".claude");
+    let roots = vec![(config.join("projects"), "claude")];
+    // Found already dead on the first look: gone, but no close was seen.
+    write(
+        &config.join("sessions").join("5.json"),
+        json!({"pid":5,"sessionId":B}),
+    );
+    write(
+        &config.join("sessions").join("6.json"),
+        json!({"pid":6,"sessionId":A}),
+    );
+    let mut processes = on(Host(vec![(6, 0)]));
+    processes.refresh(&roots, 1_000);
+    assert!(processes.ended(B, None));
+    assert_eq!(processes.closed_at(B), None);
+    assert_eq!(processes.closed_at(A), None);
+    // A's process leaves while watched.
+    let mut watched = on(Host(vec![(6, 0)]));
+    watched.refresh(&roots, 1_000);
+    watched.set_pids(Arc::new(Host(vec![])));
+    watched.refresh(&roots, 2_000);
+    assert_eq!(watched.closed_at(A), Some(2_000));
+    assert_eq!(watched.closed_at(B), None);
+    // Taken again by a new process: no longer closed.
+    watched.set_pids(Arc::new(Host(vec![(6, 0)])));
+    watched.refresh(&roots, 3_000);
+    assert_eq!(watched.closed_at(A), None);
+}

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { MessageSquareText } from "lucide-react";
 import type { IslandEvent } from "@agent-hud/protocol";
 import { HUDArtwork } from "../HUDArtwork";
-import { clientDisplayName, newsTitle } from "../IslandNews";
+import { clientDisplayName, completionLabel, newsTitle } from "../IslandNews";
 import { alertText } from "../tokens";
 import { useGround } from "../ground";
 import { dateFormat } from "@agent-hud/ui/format";
@@ -80,7 +80,7 @@ export function CompletionClosedRow({
             fontVariantNumeric: "tabular-nums",
           }}
         >
-          {t("New reply")}
+          {completionLabel(event, t)}
         </span>
       </span>
       <span

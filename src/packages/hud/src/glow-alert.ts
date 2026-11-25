@@ -26,6 +26,8 @@ export function glowAlert(
       | "hooks-review-needed"
       | "request";
     vendor: string;
+    /** A completion's outcome: one that ended without a reply warns. */
+    outcome?: string | null;
   } | null,
   glowVendors: string[],
 ): GlowAlert | null {
@@ -34,9 +36,17 @@ export function glowAlert(
     alert.kind === "quota-exhaustion" ||
     alert.kind === "sign-in-needed" ||
     alert.kind === "hooks-review-needed" ||
-    alert.kind === "request";
+    alert.kind === "request" ||
+    (alert.kind === "completion" &&
+      (alert.outcome === "failed" ||
+        alert.outcome === "limited" ||
+        alert.outcome === "closed"));
   const color =
-    alert.kind === "completion" ? "#82aaff" : warning ? "#e9a16d" : "#6cd8ac";
+    alert.kind === "completion" && !warning
+      ? "#82aaff"
+      : warning
+        ? "#e9a16d"
+        : "#6cd8ac";
   const first = glowVendors.indexOf(alert.vendor);
   const last = glowVendors.lastIndexOf(alert.vendor);
   const count = glowVendors.length;

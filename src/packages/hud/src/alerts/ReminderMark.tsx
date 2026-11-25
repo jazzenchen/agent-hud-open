@@ -52,7 +52,13 @@ export function ReminderMark({
         enabled={botLogos}
         staysBot
         awake
-        state={botState({ look: "done", card })}
+        state={
+          event.outcome === "failed" || event.outcome === "limited"
+            ? botState({ badge: event.outcome })
+            : event.outcome === "closed"
+              ? botState({ look: "idle" })
+              : botState({ look: "done", card })
+        }
       />
     );
   }

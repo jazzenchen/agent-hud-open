@@ -97,6 +97,7 @@ export function useSceneAlerts({
                 id: freshEvent.id,
                 kind: freshEvent.kind,
                 vendor: vendorKey(freshEvent.source),
+                outcome: freshEvent.outcome,
               }
             : null,
         vendors

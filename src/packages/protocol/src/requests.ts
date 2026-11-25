@@ -105,6 +105,11 @@ export interface IslandEvent {
   source: string;
   sessionId?: string;
   turnId?: string;
+  /** How a completion's turn or session ended: "completed" (or absent) is a
+   * reply; "failed" and "limited" end the turn without one; "closed" is a
+   * session whose process left mid-turn. */
+  outcome?: "completed" | "failed" | "limited" | "closed" | null;
+  limitedUntil?: string | null;
   title?: string;
   model?: string;
   message?: string | null;

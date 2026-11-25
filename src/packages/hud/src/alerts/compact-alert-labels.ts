@@ -6,7 +6,7 @@ import {
   type Language,
 } from "@agent-hud/ui/format";
 import { agentVendorName } from "../model";
-import { clientDisplayName } from "../IslandNews";
+import { clientDisplayName, completionLabel } from "../IslandNews";
 import { projectName } from "../project-path";
 import { quotaAlertCopy } from "./quota-alert-copy";
 
@@ -49,7 +49,7 @@ export function compactAlertLabels(
   if (event.kind === "completion") {
     return {
       who: clientDisplayName(event.source),
-      status: t("New reply"),
+      status: completionLabel(event, t),
     };
   }
   if (event.kind === "sign-in-needed") {

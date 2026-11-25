@@ -258,9 +258,27 @@ export function useIslandNews(
   };
 }
 
+/** A completion that ended without a reply: its turn failed or hit a
+ * limit, or its session closed mid-turn. */
+export const endedBadly = (event: Pick<IslandEvent, "kind" | "outcome">) =>
+  event.kind === "completion" &&
+  (event.outcome === "failed" ||
+    event.outcome === "limited" ||
+    event.outcome === "closed");
+
+/** What a completion says of how it ended. */
+export const completionLabel = (event: IslandEvent, t: Translate) =>
+  event.outcome === "failed"
+    ? t("Turn failed")
+    : event.outcome === "limited"
+      ? t("Hit a limit")
+      : event.outcome === "closed"
+        ? t("Session closed")
+        : t("New reply");
+
 export const newsTitle = (event: IslandEvent, t: Translate) =>
   event.kind === "completion"
-    ? t("New reply")
+    ? completionLabel(event, t)
     : event.kind === "quota-reset"
       ? t("Quota reset")
       : event.kind === "reset-credits"

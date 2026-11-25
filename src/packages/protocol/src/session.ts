@@ -97,7 +97,8 @@ export interface AttentionFact {
 export interface SessionLiveFacts {
   turnId: string | null;
   turnStartedAt: string | null;
-  outcome: "completed" | "interrupted" | "failed" | "limited" | null;
+  /** "closed": the session's process left mid-turn (Claude Code only). */
+  outcome: "completed" | "interrupted" | "failed" | "limited" | "closed" | null;
   endedAt: string | null;
   message?: string | null;
   limitedUntil: string | null;

@@ -81,14 +81,26 @@ impl Tracker {
             .iter()
             .filter_map(|session| {
                 let facts = &session["liveFacts"];
-                if session["parentId"].is_string() || facts["outcome"] != "completed" {
+                // A turn that finished, failed or hit a limit, and a session
+                // whose process closed (`clients::claude_processes`). An
+                // interrupted turn is the user's own doing.
+                let outcome = facts["outcome"].as_str()?;
+                if session["parentId"].is_string()
+                    || !matches!(outcome, "completed" | "failed" | "limited" | "closed")
+                {
                     return None;
                 }
                 let at = date(&facts["endedAt"])?;
-                let turn = facts["turnId"].as_str()?;
+                let turn = facts["turnId"].as_str();
                 let source = session["source"].as_str()?;
                 let id = session["id"].as_str()?;
-                Some((at, format!("{source}:{id}:{turn}"), session))
+                let key = match (outcome, turn) {
+                    ("completed", Some(turn)) => format!("{source}:{id}:{turn}"),
+                    ("completed", None) => return None,
+                    (_, Some(turn)) => format!("{source}:{id}:{turn}:{outcome}"),
+                    (_, None) => format!("{source}:{id}:{at}:{outcome}"),
+                };
+                Some((at, key, session))
             })
             .collect::<Vec<_>>();
         completions.sort_by_key(|(at, key, _)| (*at, key.clone()));
@@ -96,7 +108,7 @@ impl Tracker {
             if at <= self.started || at > now || self.seen.insert(key.clone(), at).is_some() {
                 continue;
             }
-            self.push(&key,json!({"kind":"completion","at":iso(at),"startedAt":session["liveFacts"]["turnStartedAt"],"source":session["source"],"sessionId":session["id"],"turnId":session["liveFacts"]["turnId"],"title":session["title"],"model":session["model"],"message":session["liveFacts"]["message"],"navigationTarget":session["navigationTarget"],"cwd":session["cwd"],"logPath":session["logPath"]}));
+            self.push(&key,json!({"kind":"completion","at":iso(at),"startedAt":session["liveFacts"]["turnStartedAt"],"source":session["source"],"sessionId":session["id"],"turnId":session["liveFacts"]["turnId"],"outcome":session["liveFacts"]["outcome"],"limitedUntil":session["liveFacts"]["limitedUntil"],"title":session["title"],"model":session["model"],"message":session["liveFacts"]["message"],"navigationTarget":session["navigationTarget"],"cwd":session["cwd"],"logPath":session["logPath"]}));
         }
         let ids = quotas
             .iter()

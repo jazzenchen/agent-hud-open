@@ -69,6 +69,9 @@ pub struct ClaudeProcesses {
     live: HashMap<String, Live>,
     /// Sessions whose last process left, and when that was first seen.
     gone: HashMap<String, i64>,
+    /// Sessions whose process was seen running and then seen leave, and
+    /// when: a close this app watched, not one it found on launch.
+    closed: HashMap<String, i64>,
     /// The oldest Claude Code version seen writing the registry: from it on,
     /// every process registers.
     registering: Option<Version>,
@@ -143,12 +146,19 @@ impl ClaudeProcesses {
                 changed = true;
             }
         }
+        for session in &self.held {
+            if !held.contains(session) {
+                self.closed.insert(session.clone(), now);
+            }
+        }
         for session in &held {
             changed |= self.gone.remove(session).is_some();
+            self.closed.remove(session);
         }
         self.held = held;
         self.gone
             .retain(|session, at| now - *at < GONE_KEPT_MS || dead.contains(session));
+        self.closed.retain(|_, at| now - *at < GONE_KEPT_MS);
         if changed {
             self.revision = self.revision.wrapping_add(1);
         }
@@ -193,6 +203,12 @@ impl ClaudeProcesses {
         self.gone
             .get(session)
             .is_some_and(|gone| last_event.is_none_or(|last| last <= *gone))
+    }
+
+    /// When the session's process was seen to leave while this app watched
+    /// it run; none for a session found already gone.
+    pub fn closed_at(&self, session: &str) -> Option<i64> {
+        self.closed.get(session).copied()
     }
 
     /// What a running process says the session does now; none when no
