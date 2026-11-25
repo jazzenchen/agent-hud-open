@@ -73,7 +73,6 @@ export interface ClientHooksStatus {
   clients?: {
     source: string;
     installed: boolean;
-    active: boolean;
     /** Agent HUD puts no hooks in for this client on this system yet; the
      * notice says what its sessions can't do then (Open #115). */
     unsupported?: boolean;

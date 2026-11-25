@@ -204,7 +204,10 @@ fn serve(shared: &Arc<Shared>, connection: &mut DesktopIpc) -> Result<(), IpcErr
                         if message["sourceClientId"] != entry.owner {
                             continue;
                         }
-                        if message["version"] != 11 {
+                        // 13 is what Codex in ChatGPT.app 26.1111 sends, the
+                        // same state as 11 (Open #184); a patch that does
+                        // not apply asks for a fresh snapshot.
+                        if !matches!(message["version"].as_i64(), Some(11 | 13)) {
                             let owner = entry.owner.clone();
                             let _ = follow(connection, &client, thread, &owner, false);
                             followed.remove(thread);

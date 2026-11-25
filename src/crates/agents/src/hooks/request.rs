@@ -118,6 +118,11 @@ fn summary(tool: Option<&str>, input: &Value) -> String {
         "WebFetch" => trimmed(&input["url"]).unwrap_or_else(|| tool.into()),
         "WebSearch" => trimmed(&input["query"]).unwrap_or_else(|| tool.into()),
         "Task" | "Agent" => trimmed(&input["description"]).unwrap_or_else(|| tool.into()),
+        // Codex asking for more than its sandbox allows: folders or the
+        // network, with the model's reason (#184).
+        "request_permissions" => {
+            trimmed(&input["reason"]).unwrap_or_else(|| "Extra permissions".into())
+        }
         "ExitPlanMode" => input["plan"]
             .as_str()
             .and_then(|s| {
@@ -146,6 +151,7 @@ fn detail(tool: Option<&str>, input: &Value) -> Option<String> {
         Some("Read" | "Write" | "Edit" | "MultiEdit" | "NotebookEdit") => file_path(input),
         Some("WebFetch") => trimmed(&input["url"]),
         Some("ExitPlanMode") => trimmed(&input["plan"]),
+        Some("request_permissions") => requested_permissions(&input["permissions"]),
         _ => None,
     };
     subject
@@ -169,6 +175,34 @@ fn detail(tool: Option<&str>, input: &Value) -> Option<String> {
             })
         })
         .map(|s| s.chars().take(2048).collect())
+}
+/// What Codex's `request_permissions` asks for, a line each: network access,
+/// and each folder with the access it wants. Codex writes folders either as
+/// `read` and `write` lists or as `entries` with an access each.
+fn requested_permissions(permissions: &Value) -> Option<String> {
+    let mut lines = Vec::new();
+    if permissions["network"]["enabled"] == true {
+        lines.push("network: on".to_owned());
+    }
+    let files = &permissions["file_system"];
+    for access in ["read", "write"] {
+        for path in files[access].as_array().into_iter().flatten() {
+            if let Some(path) = path.as_str() {
+                lines.push(format!("{access}: {path}"));
+            }
+        }
+    }
+    for entry in files["entries"].as_array().into_iter().flatten() {
+        let path = &entry["path"];
+        let path = path
+            .as_str()
+            .or_else(|| path["path"].as_str())
+            .map(str::to_owned)
+            .unwrap_or_else(|| path.to_string());
+        let access = entry["access"].as_str().unwrap_or("access");
+        lines.push(format!("{access}: {path}"));
+    }
+    (!lines.is_empty()).then(|| lines.join("\n"))
 }
 fn rules(value: &Value) -> Option<String> {
     let rules = value["rules"].as_array().filter(|v| !v.is_empty())?;

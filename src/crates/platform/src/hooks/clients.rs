@@ -244,8 +244,7 @@ impl Clients {
                 && agent_hud_agents::hooks::hooks_by_id(&source)
                     .is_some_and(|hooks| !hooks.all_flags().is_empty())
             {
-                self.rows
-                    .push(json!({"source":source,"installed":false,"active":false,
+                self.rows.push(json!({"source":source,"installed":false,
                     "unsupported":true,"notice":unsupported_notice(&source)}));
                 continue;
             }
@@ -256,9 +255,8 @@ impl Clients {
                         .then(|| agent_hud_agents::hooks::setup_step(&source))
                         .flatten()
                 });
-                self.rows.push(
-                    json!({"source":source,"installed":installed,"active":false,"notice":notice}),
-                );
+                self.rows
+                    .push(json!({"source":source,"installed":installed,"notice":notice}));
             }
         }
     }

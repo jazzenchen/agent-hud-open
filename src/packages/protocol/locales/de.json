@@ -856,6 +856,7 @@
   "Range": "Reichweite",
   "Read GitHub Copilot quota": "GitHub Copilot-Kontingent lesen",
   "Read all agents again": "Alle Agenten erneut lesen",
+  "Waiting for review: {{hooks}}.": "Warten auf Prüfung: {{hooks}}.",
   "Read {{relay}}'s balance": "Guthaben von {{relay}} lesen",
   "Reading account usage": "Account-Nutzung wird gelesen",
   "Reading displays…": "Bildschirme werden gelesen …",

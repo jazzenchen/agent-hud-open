@@ -864,6 +864,7 @@
   "Range": "Alcance",
   "Read GitHub Copilot quota": "Leer la cuota de GitHub Copilot",
   "Read all agents again": "Volver a leer todos los agentes",
+  "Waiting for review: {{hooks}}.": "Pendientes de revisión: {{hooks}}.",
   "Read {{relay}}'s balance": "Leer el saldo de {{relay}}",
   "Reading account usage": "Leyendo el uso de la cuenta",
   "Reading displays…": "Leyendo pantallas…",

@@ -130,7 +130,14 @@ export function AgentDetail({
           {error}
         </Notice>
       )}
-      {client.enabled && step?.waiting && <Notice>{step.text}</Notice>}
+      {client.enabled && step?.waiting && (
+        <Notice>
+          {step.text}{" "}
+          {t("Waiting for review: {{hooks}}.", {
+            hooks: step.hooks.join(", "),
+          })}
+        </Notice>
+      )}
       <Section footer={footer}>
         <ToggleRow
           title={t("Enabled")}

@@ -10,7 +10,7 @@ import type { Account, Snapshot } from "@agent-hud/protocol";
 export function hookStep(
   snapshot: Snapshot,
   agent: string,
-): { text: string; waiting: boolean } | null {
+): { text: string; waiting: boolean; hooks: string[] } | null {
   const text = snapshot.connection.clientHooks?.clients?.find(
     (entry) => entry.source === agent && (entry.installed || entry.unsupported),
   )?.notice;
@@ -18,7 +18,12 @@ export function hookStep(
   const skipped =
     snapshot.providers.find((provider) => provider.id === agent)?.accountStatus
       ?.unreviewedHooks ?? [];
-  return { text, waiting: skipped.length > 0 };
+  // As the agent's own review names them (Codex: PermissionRequest), so
+  // the person sees which hooks wait and need not review a trusted one.
+  const hooks = skipped.map(
+    (event) => event.charAt(0).toUpperCase() + event.slice(1),
+  );
+  return { text, waiting: skipped.length > 0, hooks };
 }
 
 /** The clients an account was read through, by name in the agent list's

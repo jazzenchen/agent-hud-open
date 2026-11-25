@@ -137,3 +137,36 @@ fn claude_style_transcripts_settle_requests() {
         assert!(!settles(name), "{name}");
     }
 }
+
+#[test]
+fn codex_asking_for_folders_or_the_network_reads_as_its_reason_and_what_it_wants() {
+    let request = |permissions: serde_json::Value| {
+        let parsed = crate::parse_request(
+            "codex",
+            &serde_json::json!({
+                "session_id": "019a0000-0000-7000-8000-000000000001",
+                "turn_id": "turn-1",
+                "hook_event_name": "PermissionRequest",
+                "cwd": "/Users/a/project",
+                "tool_name": "request_permissions",
+                "tool_input": {"reason": "Write the build output to ~/dist", "permissions": permissions},
+            }),
+        )
+        .unwrap()
+        .unwrap();
+        serde_json::to_value(parsed).unwrap()
+    };
+    let legacy = request(serde_json::json!({
+        "network": {"enabled": true},
+        "file_system": {"write": ["/Users/a/dist"], "read": ["/Users/a/data"]},
+    }));
+    assert_eq!(legacy["summary"], "Write the build output to ~/dist");
+    assert_eq!(
+        legacy["detail"],
+        "network: on\nread: /Users/a/data\nwrite: /Users/a/dist"
+    );
+    let entries = request(serde_json::json!({
+        "file_system": {"entries": [{"path": "/Users/a/dist", "access": "write"}]},
+    }));
+    assert_eq!(entries["detail"], "write: /Users/a/dist");
+}

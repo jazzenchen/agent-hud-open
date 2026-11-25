@@ -848,6 +848,7 @@
   "Range": "範圍",
   "Read GitHub Copilot quota": "讀取 GitHub Copilot 額度",
   "Read all agents again": "重新讀取所有 Agent",
+  "Waiting for review: {{hooks}}.": "等待審查：{{hooks}}。",
   "Read {{relay}}'s balance": "讀取 {{relay}} 的餘額",
   "Reading account usage": "正在讀取額度",
   "Reading displays…": "正在讀取顯示器…",

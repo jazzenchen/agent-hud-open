@@ -848,6 +848,7 @@
   "Range": "범위",
   "Read GitHub Copilot quota": "GitHub Copilot 사용량 한도 읽기",
   "Read all agents again": "모든 에이전트 다시 읽기",
+  "Waiting for review: {{hooks}}.": "검토 대기 중: {{hooks}}.",
   "Read {{relay}}'s balance": "{{relay}} 잔액 읽기",
   "Reading account usage": "계정 사용량 읽는 중",
   "Reading displays…": "디스플레이 읽는 중…",

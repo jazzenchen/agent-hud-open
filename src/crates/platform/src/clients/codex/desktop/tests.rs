@@ -179,11 +179,16 @@ fn wait(mut condition: impl FnMut() -> bool) {
 }
 #[test]
 fn observer_owned_reply_settle_and_disconnect_fixture() {
-    for uncertain in [false, true] {
+    // Codex in ChatGPT.app 26.1111 streams at version 13 (Open #184).
+    for (uncertain, version) in [(false, 11), (true, 11), (false, 13)] {
         // No prefix, one-letter names: the IPC socket path must stay short
         // under macOS's long temporary folder.
         let temporary = tempfile::Builder::new().prefix("").tempdir().unwrap();
-        let directory = temporary.path().join(if uncertain { "u" } else { "c" });
+        let directory = temporary.path().join(match (uncertain, version) {
+            (true, _) => "u",
+            (false, 11) => "c",
+            _ => "t",
+        });
         let _ = fs::remove_dir_all(&directory);
         fs::create_dir_all(directory.join("ipc")).unwrap();
         let listener = UnixListener::bind(directory.join("ipc/ipc.sock")).unwrap();
@@ -211,7 +216,7 @@ fn observer_owned_reply_settle_and_disconnect_fixture() {
             state["largeToolResult"] = json!("x".repeat(2 * 1024 * 1024));
             send(
                 &mut stream,
-                json!({"type":"broadcast","method":"thread-stream-state-changed","version":11,"sourceClientId":"owner","params":{"hostId":"local","conversationId":THREAD,"change":{"type":"snapshot","revision":1,"conversationState":state}}}),
+                json!({"type":"broadcast","method":"thread-stream-state-changed","version":version,"sourceClientId":"owner","params":{"hostId":"local","conversationId":THREAD,"change":{"type":"snapshot","revision":1,"conversationState":state}}}),
             );
             let (mut answer, _) = listener.accept().unwrap();
             let init = read(&mut answer);
@@ -235,7 +240,7 @@ fn observer_owned_reply_settle_and_disconnect_fixture() {
             ready.recv_timeout(Duration::from_secs(4)).unwrap();
             send(
                 &mut stream,
-                json!({"type":"broadcast","method":"thread-stream-state-changed","version":11,"sourceClientId":"owner","params":{"hostId":"local","conversationId":THREAD,"change":{"type":"patches","baseRevision":1,"revision":2,"patches":[{"op":"replace","path":["requests"],"value":[]}]}}}),
+                json!({"type":"broadcast","method":"thread-stream-state-changed","version":version,"sourceClientId":"owner","params":{"hostId":"local","conversationId":THREAD,"change":{"type":"patches","baseRevision":1,"revision":2,"patches":[{"op":"replace","path":["requests"],"value":[]}]}}}),
             );
             done.send(()).unwrap();
         });

@@ -864,6 +864,7 @@
   "Range": "Portée",
   "Read GitHub Copilot quota": "Lire le quota GitHub Copilot",
   "Read all agents again": "Relire tous les agents",
+  "Waiting for review: {{hooks}}.": "En attente de vérification : {{hooks}}.",
   "Read {{relay}}'s balance": "Lire le solde de {{relay}}",
   "Reading account usage": "Lecture de l’usage du compte",
   "Reading displays…": "Lecture des écrans…",
