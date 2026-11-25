@@ -4,6 +4,7 @@ import {
   ChartNoAxesColumn,
   MessageSquareText,
   RotateCcw,
+  TriangleAlert,
   X,
 } from "lucide-react";
 import type { IslandEvent, Session, Snapshot } from "@agent-hud/protocol";
@@ -12,6 +13,7 @@ import {
   clientDisplayName,
   compactDuration,
   completionLabel,
+  endedBadly,
   newsTitle,
 } from "../IslandNews";
 import { ReminderMark } from "./ReminderMark";
@@ -51,6 +53,10 @@ export function CompletionAlertView({
   const ink = (alpha: number) => alertInk(alpha, ground);
   const turnAccent = alertFill("turn", ground);
   const turnText = alertText("turn", ground);
+  // A turn that ended without a reply warns, as its glow does.
+  const bad = endedBadly(event);
+  const HeadIcon = bad ? TriangleAlert : MessageSquareText;
+  const headText = bad ? alertText("warning", ground) : turnText;
   const onTurnAccent = onAlertFill(ground);
 
   const startedRaw = event.startedAt ?? session?.liveFacts?.turnStartedAt;
@@ -134,8 +140,8 @@ export function CompletionAlertView({
             </span>
           )}
         </div>
-        <MessageSquareText size={12} strokeWidth={2.2} color={turnText} />
-        <span style={{ color: turnText, fontSize: 12, fontWeight: 500 }}>
+        <HeadIcon size={12} strokeWidth={2.2} color={headText} />
+        <span style={{ color: headText, fontSize: 12, fontWeight: 500 }}>
           {completionLabel(event, t)}
         </span>
         <button

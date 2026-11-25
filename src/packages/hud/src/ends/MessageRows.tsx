@@ -3,7 +3,7 @@ import { MessageSquareText, TriangleAlert, X } from "lucide-react";
 import type { IslandEvent } from "@agent-hud/protocol";
 import { dateFormat } from "@agent-hud/ui/format";
 import { HUDArtwork } from "../HUDArtwork";
-import { clientDisplayName, newsTitle } from "../IslandNews";
+import { clientDisplayName, endedBadly, newsTitle } from "../IslandNews";
 import { cardColumn } from "../card-column";
 import { useGround } from "../ground";
 import { alertInk, alertText } from "../tokens";
@@ -92,7 +92,8 @@ function MessageRow({
   const t = useT();
   const [hover, setHover] = useState(false);
   const ground = useGround(light);
-  const reply = event.kind === "completion";
+  // A turn that ended without a reply reads as a warning, not a reply.
+  const reply = event.kind === "completion" && !endedBadly(event);
   const Icon = reply ? MessageSquareText : TriangleAlert;
   return (
     <div

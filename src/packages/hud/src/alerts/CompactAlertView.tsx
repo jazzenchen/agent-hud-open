@@ -5,11 +5,13 @@ import {
   MessageSquareText,
   RotateCcw,
   ShieldAlert,
+  TriangleAlert,
 } from "lucide-react";
 import type { Approval, IslandEvent } from "@agent-hud/protocol";
 import { labelWidth } from "../geometry";
 import { ReminderMark } from "./ReminderMark";
 import { compactAlertLabels } from "./compact-alert-labels";
+import { endedBadly } from "../IslandNews";
 import { alertInk, alertText } from "../tokens";
 import { useGround } from "../ground";
 import type { Language } from "@agent-hud/ui/format";
@@ -103,15 +105,17 @@ export function CompactAlertView({
     words?: string;
   } = request
     ? { Icon: Hand, color: signalText, filled: true, words: secondary }
-    : event?.kind === "completion"
-      ? { Icon: MessageSquareText, color: turnText, stroke: 2.2 }
-      : event?.kind === "sign-in-needed"
-        ? { Icon: KeyRound, color: warnAccent, stroke: 2.4 }
-        : event?.kind === "hooks-review-needed"
-          ? { Icon: ShieldAlert, color: warnAccent, stroke: 2.4 }
-          : event?.kind === "reset-credits" || event?.kind === "quota-reset"
-            ? { Icon: RotateCcw, color: calmAccent, stroke: 2.4 }
-            : { Icon: Flame, color: warnAccent, filled: true };
+    : event && endedBadly(event)
+      ? { Icon: TriangleAlert, color: warnAccent, stroke: 2.4 }
+      : event?.kind === "completion"
+        ? { Icon: MessageSquareText, color: turnText, stroke: 2.2 }
+        : event?.kind === "sign-in-needed"
+          ? { Icon: KeyRound, color: warnAccent, stroke: 2.4 }
+          : event?.kind === "hooks-review-needed"
+            ? { Icon: ShieldAlert, color: warnAccent, stroke: 2.4 }
+            : event?.kind === "reset-credits" || event?.kind === "quota-reset"
+              ? { Icon: RotateCcw, color: calmAccent, stroke: 2.4 }
+              : { Icon: Flame, color: warnAccent, filled: true };
   const trailingWhat = (
     <>
       <look.Icon
