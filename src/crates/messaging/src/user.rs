@@ -185,6 +185,7 @@ impl Messaging {
             operation: Operation::Enqueue,
             expected_turn_id: None,
             model: None,
+            reasoning_effort: None,
         });
         Ok(match receipt {
             Ok(receipt) => {

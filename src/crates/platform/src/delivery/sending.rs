@@ -58,9 +58,11 @@ impl LocalClients {
         if request.provider == Provider::Claude {
             ClaudeChannel::new(self.paths.claude_channel.clone()).check_request(&request, now)?;
         }
-        if request.provider == Provider::DeepSeek {
-            self.deepseek()?.check_request(&request, now)?;
-        }
+        let selected_generation = if request.provider == Provider::DeepSeek {
+            self.deepseek()?.check_request(&request, now)?
+        } else {
+            None
+        };
         if request.provider.uses_hook_channel() {
             self.hook_channel().check_hook_request(&request)?;
         }
@@ -98,7 +100,7 @@ impl LocalClients {
             Provider::Antigravity => self.antigravity.deliver(&target, &request, self.timeout),
             Provider::DeepSeek => self
                 .deepseek()
-                .and_then(|channel| channel.leave(&request, now))
+                .and_then(|channel| channel.leave(&request, now, selected_generation.as_deref()))
                 .map(|(state, turn)| {
                     receipt.state = state;
                     receipt.turn_id = turn;
@@ -224,6 +226,16 @@ impl LocalClients {
 }
 
 fn validate(request: &SendRequest) -> Result<()> {
+    if let Some(effort) = request.reasoning_effort.as_deref() {
+        if effort.trim().is_empty() {
+            return Err(Failure::InvalidInput("reasoningEffort".into()));
+        }
+        if request.provider != Provider::DeepSeek {
+            return Err(Failure::Unsupported(
+                "Only DeepSeek Harness can accept an explicit reasoning effort on a message".into(),
+            ));
+        }
+    }
     if !valid_session_id(request.provider, &request.session_id)
         || !valid_name(&request.request_id)
         || (request.operation != Operation::Interrupt && request.text.trim().is_empty())

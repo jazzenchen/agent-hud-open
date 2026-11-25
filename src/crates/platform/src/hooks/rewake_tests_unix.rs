@@ -62,6 +62,7 @@ fn send(clients: &LocalClients, session: &str, request: &str, text: &str) {
             operation: Operation::Enqueue,
             expected_turn_id: None,
             model: None,
+            reasoning_effort: None,
         })
         .unwrap();
     assert_eq!(receipt.state, DeliveryState::Waiting);

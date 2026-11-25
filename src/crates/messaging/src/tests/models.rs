@@ -29,7 +29,7 @@ fn list_models_says_what_each_client_offers_and_its_own_choice() {
     let harness = &listed["clients"][0];
     assert_eq!(harness["client"], "deepseek");
     assert_eq!(harness["default"], "deepseek-official/deepseek-flash");
-    assert_eq!(harness["perMessage"], true);
+    assert_eq!(harness["perMessage"], false);
     assert_eq!(harness["models"][1]["id"], "deepseek-official/deepseek-pro");
     assert_eq!(harness["models"][1]["name"], "DeepSeek · Pro");
     // Claude Code has no list to ask: its aliases, and no settings say more.
@@ -41,7 +41,7 @@ fn list_models_says_what_each_client_offers_and_its_own_choice() {
 }
 
 #[test]
-fn a_named_model_goes_only_where_the_client_takes_one_and_only_one_it_offers() {
+fn named_selections_are_refused_before_a_harness_message_is_left() {
     let mut world = World::on();
     world.harness();
     harness_offers(&world);
@@ -58,49 +58,28 @@ fn a_named_model_goes_only_where_the_client_takes_one_and_only_one_it_offers() {
         .unwrap()
         .contains("cannot choose its model"));
     assert!(world.codex.0.lock().unwrap().is_empty());
-    // A model Harness does not offer.
-    let unknown = world.call(
-        Some(me),
-        "send_message",
-        json!({"to":HARNESS,"text":"Port it","model":"gpt-6-luna"}),
-    );
-    assert!(unknown["reason"]
-        .as_str()
-        .unwrap()
-        .contains("offers no model named gpt-6-luna"));
-    // The session's plugin is older and could not switch it.
-    let old = world.call(
-        Some(me),
-        "send_message",
-        json!({"to":HARNESS,"text":"Port it","model":"deepseek-official/deepseek-pro"}),
-    );
-    assert_eq!(old["state"], "refused", "{old}");
-    assert!(old["reason"]
-        .as_str()
-        .unwrap()
-        .contains("restart DeepSeek Harness"));
-    std::fs::write(
-        world
-            .harness_channel
-            .join(format!("sessions/{HARNESS_OWN}.json")),
-        br#"{"at":1,"channelVersion":2}"#,
-    )
-    .unwrap();
-    // By its name, in any case: the words go with the model.
-    let sent = world.call(
-        Some(me),
-        "send_message",
-        json!({"to":HARNESS,"text":"Port it","model":"deepseek · pro"}),
-    );
-    assert_eq!(sent["state"], "queued", "{sent}");
-    let left: Value = serde_json::from_slice(
-        &std::fs::read(world.harness_prompt(sent["id"].as_str().unwrap())).unwrap(),
-    )
-    .unwrap();
-    assert_eq!(
-        left["model"],
-        json!({"provider":"deepseek-official","model":"deepseek-pro"})
-    );
+    // The advertised model exists and the plugin is running. Its native
+    // inbox still cannot bind the selection to this message.
+    for selection in [
+        json!({"model":"deepseek · pro"}),
+        json!({"reasoningEffort":"low"}),
+        json!({"model":"deepseek · pro","reasoningEffort":"low"}),
+        json!({"model":null}),
+        json!({"model":"  "}),
+        json!({"reasoningEffort":false}),
+    ] {
+        let mut args = json!({"to":HARNESS,"text":"Port it"});
+        args.as_object_mut()
+            .unwrap()
+            .extend(selection.as_object().unwrap().clone());
+        let refused = world.call(Some(me), "send_message", args);
+        assert_eq!(refused["state"], "refused", "{refused}");
+        let reason = refused["reason"].as_str().unwrap();
+        assert!(reason.contains("cannot choose a model or reasoning effort"));
+        assert!(reason.contains("start_session"));
+    }
+    assert!(world.messaging.journal.messages().next().is_none());
+    assert!(!world.harness_channel.join("prompts").exists());
     // Without one the session keeps its own.
     let plain = world.send(me, HARNESS, "And the tests");
     let left: Value = serde_json::from_slice(
@@ -108,4 +87,60 @@ fn a_named_model_goes_only_where_the_client_takes_one_and_only_one_it_offers() {
     )
     .unwrap();
     assert!(left.get("model").is_none());
+}
+
+#[test]
+fn harness_explicit_selection_is_delivered_only_through_the_bound_host_request() {
+    let mut world = World::on();
+    world.harness();
+    harness_offers(&world);
+    std::fs::write(
+        world
+            .harness_channel
+            .join(format!("sessions/{HARNESS_OWN}.json")),
+        br#"{"at":1,"channelVersion":3,"selectedGeneration":"h-42"}"#,
+    )
+    .unwrap();
+    let me = ("claude", CLAUDE);
+    let advertised = world.call(Some(me), "list_models", json!({"client":"deepseek"}));
+    assert_eq!(advertised["clients"][0]["perMessage"], true, "{advertised}");
+    let queue = world
+        .harness_channel
+        .join("selected")
+        .join("prompts")
+        .join(HARNESS_OWN);
+    let responder = std::thread::spawn(move || {
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(4);
+        while std::time::Instant::now() < deadline {
+            let entry = std::fs::read_dir(&queue).ok().and_then(|files| {
+                files
+                    .flatten()
+                    .find(|entry| entry.path().extension().is_some_and(|ext| ext == "json"))
+            });
+            if let Some(entry) = entry {
+                let before: Value =
+                    serde_json::from_slice(&std::fs::read(entry.path()).unwrap()).unwrap();
+                let temporary = entry.path().with_extension("answer");
+                std::fs::write(&temporary, br#"{"takenAt":1,"startedAt":2}"#).unwrap();
+                std::fs::rename(&temporary, entry.path()).unwrap();
+                return before;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+        panic!("no guarded request reached the Harness");
+    });
+    let delivered = world.call(
+        Some(me),
+        "send_message",
+        json!({"to":HARNESS,"text":"Review using Pro","model":"deepseek · pro","reasoningEffort":"low"}),
+    );
+    assert_eq!(delivered["delivered"], true, "{delivered}");
+    let selection = responder.join().unwrap();
+    assert_eq!(selection["generation"], "h-42");
+    assert_eq!(
+        selection["model"],
+        json!({"provider":"deepseek-official","model":"deepseek-pro"})
+    );
+    assert_eq!(selection["reasoningEffort"], "low");
+    assert!(!world.harness_channel.join("prompts").exists());
 }

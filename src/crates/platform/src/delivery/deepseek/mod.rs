@@ -14,8 +14,10 @@
 //! session's own tools use the bare `<id>` (`session-<uuid>`). Both are taken.
 use super::claude::delivery;
 use super::*;
-use crate::claude_plugin::Refusal;
-use crate::deepseek_plugin::{DeepSeekChannel as Plugin, Started, START_LIFETIME};
+use crate::claude_plugin::{PromptState, Refusal};
+use crate::deepseek_plugin::{
+    DeepSeekChannel as Plugin, Started, EXISTING_SESSION_SELECTION_UNSUPPORTED, START_LIFETIME,
+};
 use catalog::{listed, selection};
 use std::{
     collections::HashSet,
@@ -24,6 +26,7 @@ use std::{
 };
 
 mod catalog;
+mod selected;
 mod steer;
 
 pub(super) const UNAVAILABLE_REASON: &str =
@@ -66,8 +69,27 @@ impl DeepSeekChannel {
         self.loaded(now).contains(bare(session))
     }
     /// Reject input that cannot be handed over before the caller journals a send.
-    pub(super) fn check_request(&self, request: &SendRequest, now: SystemTime) -> Result<()> {
+    pub(super) fn check_request(
+        &self,
+        request: &SendRequest,
+        now: SystemTime,
+    ) -> Result<Option<String>> {
         let steer = request.operation == Operation::Steer;
+        let mut generation = None;
+        if request.model.is_some() || request.reasoning_effort.is_some() {
+            generation = Some(
+                self.selected_generation(&request.session_id, now)
+                    .ok_or_else(|| {
+                        Failure::Unsupported(EXISTING_SESSION_SELECTION_UNSUPPORTED.into())
+                    })?,
+            );
+            if steer {
+                return Err(Failure::Unsupported(
+                    "A steer cannot choose a model or reasoning effort".into(),
+                ));
+            }
+            selection(request.model.as_deref())?;
+        }
         if !steer
             && request.operation != Operation::Automatic
             && request.operation != Operation::Enqueue
@@ -84,15 +106,10 @@ impl DeepSeekChannel {
         if !self.runs(&request.session_id, now) {
             return Err(Failure::Unavailable(UNAVAILABLE_REASON.into()));
         }
-        if request.model.is_some()
-            && self.0.channel_version(bare(&request.session_id)) < MODEL_VERSION
-        {
-            return Err(Failure::Unsupported(OLD_PLUGIN.into()));
-        }
         if steer {
             self.check_steer(request)?;
         }
-        selection(request.model.as_deref()).map(|_| ())
+        Ok(generation)
     }
     /// Leaves the words for the plugin. A queued message is left and read
     /// back later; a steer is waited for, since only the plugin can tell
@@ -101,8 +118,15 @@ impl DeepSeekChannel {
         &self,
         request: &SendRequest,
         now: SystemTime,
+        selected_generation: Option<&str>,
     ) -> Result<(DeliveryState, Option<String>)> {
         let session = bare(&request.session_id);
+        if request.model.is_some() || request.reasoning_effort.is_some() {
+            let generation = selected_generation.ok_or_else(|| {
+                Failure::Unsupported(EXISTING_SESSION_SELECTION_UNSUPPORTED.into())
+            })?;
+            return self.leave_selected(request, generation);
+        }
         if request.operation == Operation::Steer {
             self.0
                 .leave_steer(session, &request.request_id, &request.text, now)
@@ -110,13 +134,7 @@ impl DeepSeekChannel {
             return self.steered(session, &request.request_id);
         }
         self.0
-            .leave(
-                session,
-                &request.request_id,
-                &request.text,
-                selection(request.model.as_deref())?.as_ref(),
-                now,
-            )
+            .leave(session, &request.request_id, &request.text, None, now)
             .map_err(failure)?;
         Ok((DeliveryState::Waiting, None))
     }
@@ -144,11 +162,22 @@ impl DeepSeekChannel {
         request: &str,
         now: SystemTime,
     ) -> Result<Option<(DeliveryState, Option<String>)>> {
-        Ok(self
-            .0
-            .state(bare(session), request, now)
-            .map_err(failure)?
-            .map(|(state, reason)| (delivery(state), reason)))
+        let session = bare(session);
+        let state = self.0.state(session, request, now).map_err(failure)?;
+        if matches!(state, Some((PromptState::Taken, _)))
+            && self
+                .0
+                .selected_outcome(session, request)
+                .map_err(failure)?
+                .is_some()
+        {
+            // The plugin took the file, but Harness has not acknowledged the turn.
+            return Ok(Some((
+                DeliveryState::Uncertain,
+                Some(Failure::AcceptanceUncertain.to_string()),
+            )));
+        }
+        Ok(state.map(|(state, reason)| (delivery(state), reason)))
     }
     pub(super) fn cancel(&self, session: &str, request: &str) -> Result<DeliveryState> {
         match self.0.cancel(bare(session), request) {

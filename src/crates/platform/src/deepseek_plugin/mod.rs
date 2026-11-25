@@ -29,15 +29,21 @@ use std::{
 
 pub mod asks;
 mod channel;
+mod selected;
 mod starts;
+pub(crate) use selected::SELECTED_LIFETIME;
 
 pub use channel::DeepSeekChannel;
 pub use starts::{Host, Started, START_LIFETIME};
+
+/// The current Harness prompt API cannot bind an explicit selection to a message.
+pub const EXISTING_SESSION_SELECTION_UNSUPPORTED: &str = "DeepSeek Harness cannot choose a model or reasoning effort for a message to an existing session. A compatible Harness and an online Agent HUD plugin are required. Leave model and reasoningEffort out, or use start_session to start a new session in the chosen model.";
 
 /// The plugin module Harness loads.
 pub const SCRIPT: &str = concat!(
     include_str!("agent-hud.mjs"),
     include_str!("agent-hud-inbox.mjs"),
+    include_str!("agent-hud-selected.mjs"),
     include_str!("agent-hud-steer.mjs")
 );
 /// A note older than this belongs to a call that ended without removing it.

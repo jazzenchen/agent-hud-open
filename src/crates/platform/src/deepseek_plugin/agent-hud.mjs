@@ -58,7 +58,6 @@ export function start(ctx, channel, options = {}) {
   };
   const folder = (...parts) => path.join(channel, ...parts);
   const timers = new Set();
-  const checkedIn = new Set();
   const asks = new Map();
   const calls = new Map();
   const notes = new Set();
@@ -118,40 +117,11 @@ export function start(ctx, channel, options = {}) {
   // ---- What the app leaves for this host (agent-hud-inbox.mjs) ----
   const left = inbox({ fs, path, service, read, write, remove, now, quietly, NAME, folder, host, version: CHANNEL_VERSION, desktop: options.desktop, roots: () => roots(), waiting: (id) => [...asks.values()].some((ask) => ask.sessionId === id) });
 
-  // ---- Sessions ----
-  const agents = () => {
-    try {
-      const list = ctx.agents?.list?.();
-      return Array.isArray(list) ? list : [];
-    } catch {
-      return [];
-    }
-  };
-  /** A session the user talks to: a root agent, not a subagent. */
-  const root = (agent) =>
-    agent && typeof agent.id === "string" && NAME.test(agent.id) && !agent.parent;
-  const roots = () => agents().filter(root);
-  const checkIn = (id) => {
-    write(folder("sessions", `${id}.json`), {
-      at: now(),
-      host,
-      channelVersion: CHANNEL_VERSION,
-    });
-    checkedIn.add(id);
-  };
-  const end = (id) => {
-    if (!checkedIn.delete(id)) return;
-    quietly(() => write(folder("sessions", `${id}.json`), { ended: now() }));
-  };
-  const checkIns = () => {
-    const open = new Set();
-    for (const agent of roots()) {
-      open.add(agent.id);
-      quietly(() => checkIn(agent.id));
-    }
-    for (const id of [...checkedIn]) if (!open.has(id)) end(id);
-    quietly(left.checkIn);
-  };
+  const selected = selectedPrompts({ fs, path, crypto, service, folder, roots: () => roots(), read, write, now, NAME });
+
+  const { roots, root, checkIn, end, checkIns, endAll } = checkInSessions({
+    ctx, NAME, selected, write, folder, now, host, version: CHANNEL_VERSION, quietly, checkInHost: left.checkIn,
+  });
 
   // ---- Who calls Agent HUD's MCP tools ----
   const callNote = (exec) => {
@@ -352,7 +322,7 @@ export function start(ctx, channel, options = {}) {
   });
   ctx.on("agent/created", (event) => {
     quietly(() => {
-      if (root(event?.agent)) checkIn(event.agent.id);
+      if (root(event?.agent)) checkIn(event.agent);
     });
     return undefined;
   });
@@ -363,6 +333,7 @@ export function start(ctx, channel, options = {}) {
   quietly(checkIns);
   every(timing.checkIn, checkIns);
   every(timing.prompts, left.prompts);
+  every(timing.prompts, selected.poll);
   every(timing.prompts, left.starts);
 
   return {
@@ -373,8 +344,9 @@ export function start(ctx, channel, options = {}) {
       for (const timer of timers) clearInterval(timer);
       timers.clear();
       for (const ask of asks.values()) ask.settle(undefined);
-      for (const id of [...checkedIn]) end(id);
+      endAll();
       left.stop();
+      selected.stop();
       for (const note of notes) remove(note);
       notes.clear();
     },
@@ -382,6 +354,7 @@ export function start(ctx, channel, options = {}) {
     tick() {
       quietly(checkIns);
       quietly(left.prompts);
+      quietly(selected.poll);
       quietly(left.starts);
       quietly(pollAnswers);
     },

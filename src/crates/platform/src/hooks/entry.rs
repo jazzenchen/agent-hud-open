@@ -372,6 +372,7 @@ mod tests {
                 operation: Operation::Enqueue,
                 expected_turn_id: None,
                 model: None,
+                reasoning_effort: None,
             })
             .unwrap();
         assert_eq!(cursor_send.state, DeliveryState::Waiting);
@@ -425,6 +426,7 @@ mod tests {
                     operation: Operation::Enqueue,
                     expected_turn_id: None,
                     model: None,
+                    reasoning_effort: None,
                 })
                 .unwrap();
             let args = [
@@ -495,6 +497,7 @@ mod tests {
                         operation: Operation::Enqueue,
                         expected_turn_id: None,
                         model: None,
+                        reasoning_effort: None,
                     })
                     .unwrap();
             }

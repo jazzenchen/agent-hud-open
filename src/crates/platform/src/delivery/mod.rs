@@ -173,6 +173,9 @@ pub struct SendRequest {
     /// one with a message do (`models::per_message`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub model: Option<String>,
+    /// An effort explicitly requested for a supported DeepSeek Harness turn.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reasoning_effort: Option<String>,
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

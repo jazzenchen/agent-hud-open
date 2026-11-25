@@ -70,6 +70,7 @@ fn request(provider: Provider) -> SendRequest {
         operation: Operation::Automatic,
         expected_turn_id: None,
         model: None,
+        reasoning_effort: None,
     }
 }
 
@@ -424,6 +425,7 @@ fn harness_request() -> SendRequest {
         operation: Operation::Enqueue,
         expected_turn_id: None,
         model: None,
+        reasoning_effort: None,
     }
 }
 #[test]
@@ -506,6 +508,17 @@ fn deepseek_refuses_what_its_plugin_cannot_queue_before_journaling() {
     assert!(service.known_receipts().unwrap().is_empty());
     assert!(!fixture.harness_prompt().exists());
     fixture.harness_checkin();
+    for operation in [Operation::Automatic, Operation::Enqueue, Operation::Steer] {
+        let mut named = harness_request();
+        named.operation = operation;
+        named.model = Some("deepseek-official/deepseek-pro".into());
+        assert!(matches!(
+            service.send(named),
+            Err(Failure::Unsupported(reason)) if reason.contains("start_session")
+        ));
+    }
+    assert!(service.known_receipts().unwrap().is_empty());
+    assert!(!fixture.harness_prompt().exists());
     let mut start = harness_request();
     start.operation = Operation::Start;
     assert!(matches!(service.send(start), Err(Failure::Unsupported(_))));

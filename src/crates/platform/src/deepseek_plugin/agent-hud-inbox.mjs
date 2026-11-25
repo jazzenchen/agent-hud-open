@@ -5,8 +5,8 @@
 //
 // In the folder the plugin shares with the app:
 // - prompts/<session>/<id>.json: words the app leaves for a session, which
-//   are queued as the session's next message, in the model they name, if any,
-//   or with mode steer go into its turn in progress (agent-hud-steer.mjs);
+//   are queued as the session's next message, or with mode steer go into its
+//   turn in progress (agent-hud-steer.mjs);
 // - hosts/<host>.json: this host checks in with its sessions, so the app
 //   knows a host is there to start a session in, and with the models Harness
 //   offers and the one new sessions start in;
@@ -76,9 +76,8 @@ function inbox({ fs, path, service, read, write, remove, now, quietly, NAME, fol
     return catalog === undefined ? undefined : { default: defaultModel(), groups: catalog };
   };
   /**
-   * Switches `sessionId` to `model` before the app's words go in. Harness
-   * also saves a session's choice as the model new sessions start in; the
-   * app names one for this session only, so the one before is put back.
+   * Selects `model` for a newly created session before its first prompt.
+   * Harness also saves that choice as the default, so put the prior one back.
    */
   const choose = async (sessionId, model) => {
     if (model === undefined || model === null) return;
@@ -104,6 +103,15 @@ function inbox({ fs, path, service, read, write, remove, now, quietly, NAME, fol
   // ---- Words the app leaves for a session ----
   const steer = steerer({ service, write, now, quietly, roots, waiting });
   const submit = (sessionId, file, prompt) => {
+    // Older HUD versions may have left explicit choices on disk. Never give
+    // those prompts to Harness: it would read the session model at claim time.
+    if (Object.hasOwn(prompt, "model") || Object.hasOwn(prompt, "reasoningEffort")) {
+      write(file, {
+        takenAt: now(),
+        refused: "DeepSeek Harness cannot choose a model or reasoning effort for a message to an existing session. Leave model and reasoningEffort out, or use start_session to start a new session in the chosen model.",
+      });
+      return;
+    }
     if (prompt.mode === "steer") return steer(sessionId, file, prompt);
     const controller = service("sessionController");
     if (typeof controller?.prompt !== "function") return;
@@ -114,7 +122,6 @@ function inbox({ fs, path, service, read, write, remove, now, quietly, NAME, fol
       quietly(() => write(file, { takenAt, ...what }));
     const previous = queues.get(sessionId) ?? Promise.resolve();
     const next = previous
-      .then(() => choose(sessionId, prompt.model))
       .then(() =>
         controller.prompt(
           {
