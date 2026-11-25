@@ -7,17 +7,18 @@ use std::{
 };
 use windows_sys::Win32::{
     Foundation::{
-        CloseHandle, LocalFree, ERROR_ALREADY_EXISTS, GENERIC_READ, GENERIC_WRITE, HANDLE,
-        INVALID_HANDLE_VALUE,
+        CloseHandle, LocalFree, ERROR_ACCESS_DENIED, ERROR_ALREADY_EXISTS, GENERIC_READ,
+        GENERIC_WRITE, HANDLE, INVALID_HANDLE_VALUE,
     },
     Security::{
         Authorization::{
             ConvertSidToStringSidW, ConvertStringSecurityDescriptorToSecurityDescriptorW,
             GetNamedSecurityInfoW, SE_FILE_OBJECT,
         },
-        GetTokenInformation, SetFileSecurityW, TokenOwner, TokenUser, DACL_SECURITY_INFORMATION,
+        GetSidSubAuthority, GetSidSubAuthorityCount, GetTokenInformation, SetFileSecurityW,
+        TokenIntegrityLevel, TokenOwner, TokenUser, DACL_SECURITY_INFORMATION,
         OWNER_SECURITY_INFORMATION, PROTECTED_DACL_SECURITY_INFORMATION, PSID, SECURITY_ATTRIBUTES,
-        TOKEN_OWNER, TOKEN_QUERY, TOKEN_USER,
+        TOKEN_MANDATORY_LABEL, TOKEN_OWNER, TOKEN_QUERY, TOKEN_USER,
     },
     Storage::FileSystem::{
         CreateDirectoryW, CreateFileW, CREATE_NEW, FILE_ATTRIBUTE_REPARSE_POINT,
@@ -69,6 +70,62 @@ fn token_sid(class: i32) -> Result<String, String> {
         };
         sid_text(sid).ok_or_else(|| "Current-user identity unavailable".into())
     }
+}
+/// Whether Windows runs this process below medium integrity. It does so for
+/// a program started from a folder labelled Low, such as some sandboxed
+/// agents' workspaces, and such a process may write nothing the user's
+/// ordinary programs own: every write in `%LOCALAPPDATA%` is denied.
+fn low_integrity() -> bool {
+    /// SECURITY_MANDATORY_MEDIUM_RID.
+    const MEDIUM: u32 = 0x2000;
+    unsafe {
+        let mut token: HANDLE = std::ptr::null_mut();
+        if OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &mut token) == 0 {
+            return false;
+        }
+        let mut bytes = 0;
+        GetTokenInformation(
+            token,
+            TokenIntegrityLevel,
+            std::ptr::null_mut(),
+            0,
+            &mut bytes,
+        );
+        let mut buffer = vec![0usize; (bytes as usize).div_ceil(size_of::<usize>())];
+        let ok = GetTokenInformation(
+            token,
+            TokenIntegrityLevel,
+            buffer.as_mut_ptr().cast(),
+            bytes,
+            &mut bytes,
+        );
+        CloseHandle(token);
+        if ok == 0 {
+            return false;
+        }
+        let sid = (*buffer.as_ptr().cast::<TOKEN_MANDATORY_LABEL>()).Label.Sid;
+        let count = *GetSidSubAuthorityCount(sid);
+        count > 0 && *GetSidSubAuthority(sid, u32::from(count) - 1) < MEDIUM
+    }
+}
+/// A denied write in the app's own folders, with the reason and the way out
+/// when this process runs at low integrity, where the bare "Access is denied"
+/// says nothing about either.
+fn denied(context: &str, error: io::Error) -> String {
+    if error.raw_os_error() != Some(ERROR_ACCESS_DENIED as i32) || !low_integrity() {
+        return format!("{context}: {error}");
+    }
+    let folder = std::env::current_exe()
+        .ok()
+        .and_then(|exe| exe.parent().map(Path::to_path_buf))
+        .map(|folder| folder.display().to_string())
+        .unwrap_or_else(|| "the folder it was started from".into());
+    low_integrity_hint(context, &error, &folder)
+}
+fn low_integrity_hint(context: &str, error: &io::Error, folder: &str) -> String {
+    format!(
+        "{context}: {error}. Windows runs Agent HUD at low integrity, because it was started from a folder marked Low ({folder}), so it may not write its own data. Run the installer from another folder, such as Downloads, and start Agent HUD from the Start menu. To clear the mark, run in an administrator terminal: icacls \"{folder}\" /setintegritylevel Medium"
+    )
 }
 /// A SID as text, such as `S-1-5-18`.
 pub(super) fn sid_text(sid: PSID) -> Option<String> {
@@ -194,9 +251,9 @@ pub(crate) fn private_directory(path: &Path) -> Result<(), String> {
         )
     } == 0
     {
-        return Err(format!(
-            "The private IPC directory ACL could not be set: {}",
-            io::Error::last_os_error()
+        return Err(denied(
+            "The private IPC directory ACL could not be set",
+            io::Error::last_os_error(),
         ));
     }
     Ok(())
@@ -213,7 +270,7 @@ fn create_directory(path: &[u16], descriptor: &Local) -> Result<(), String> {
     if unsafe { CreateDirectoryW(path.as_ptr(), &attributes) } == 0 {
         let error = io::Error::last_os_error();
         if error.raw_os_error() != Some(ERROR_ALREADY_EXISTS as i32) {
-            return Err(format!("The private IPC directory is unavailable: {error}"));
+            return Err(denied("The private IPC directory is unavailable", error));
         }
     }
     Ok(())
@@ -262,9 +319,10 @@ pub(crate) fn private_file(path: &Path, create_new: bool) -> io::Result<std::fs:
 mod tests {
     use super::super::dacl;
     use super::{
-        create_directory, descriptor, ownership_hint, private_directory, security, sid, wide,
+        create_directory, denied, descriptor, low_integrity, low_integrity_hint, ownership_hint,
+        private_directory, security, sid, wide,
     };
-    use std::path::Path;
+    use std::{io, path::Path};
 
     #[test]
     fn a_new_directory_is_private_from_its_creation() {
@@ -292,5 +350,50 @@ mod tests {
         let message = ownership_hint(Path::new(r"C:\Users\me\AppData\Local\AgentHUD\ipc"));
         assert!(message.contains(r"C:\Users\me\AppData\Local\AgentHUD\ipc"));
         assert!(message.contains("Set the folder's owner"));
+    }
+
+    #[test]
+    fn a_low_integrity_denial_names_the_folder_and_the_way_out() {
+        let error = io::Error::from_raw_os_error(5);
+        let message = low_integrity_hint(
+            "The private IPC directory is unavailable",
+            &error,
+            r"D:\Codex\project013",
+        );
+        assert!(message.starts_with("The private IPC directory is unavailable: "));
+        assert!(message.contains(r"(D:\Codex\project013)"));
+        assert!(message.contains(r#"icacls "D:\Codex\project013" /setintegritylevel Medium"#));
+    }
+
+    #[test]
+    fn other_failures_read_as_before() {
+        // Tests run at medium integrity or above, so even a denial reads plainly.
+        assert!(!low_integrity());
+        let message = denied(
+            "The private IPC directory is unavailable",
+            io::Error::from_raw_os_error(5),
+        );
+        assert!(!message.contains("low integrity"));
+        let message = denied(
+            "The private IPC directory is unavailable",
+            io::Error::from_raw_os_error(3),
+        );
+        assert!(!message.contains("low integrity"));
+    }
+
+    /// Run by hand from a folder labelled Low (`icacls <dir> /setintegritylevel Low`,
+    /// then this test binary copied there and started with `--ignored`): a
+    /// directory in `%LOCALAPPDATA%` is refused with the explanation.
+    #[test]
+    #[ignore]
+    fn started_from_a_low_folder_the_denial_explains_itself() {
+        assert!(low_integrity(), "not running at low integrity");
+        let path = Path::new(&std::env::var("LOCALAPPDATA").unwrap())
+            .join("agent-hud-low-integrity-probe")
+            .join("ipc");
+        let message = private_directory(&path).unwrap_err();
+        println!("{message}");
+        assert!(message.contains("low integrity"));
+        assert!(message.contains("/setintegritylevel Medium"));
     }
 }
