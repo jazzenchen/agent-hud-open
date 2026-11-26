@@ -85,19 +85,27 @@ export interface SourcePreferences {
 export type QuotaReadingLevel = "off" | "official" | "full";
 
 export interface AppSettings {
-  /** Live status and completion reminders for every client; each client's
-   * own switch holds beneath it. Default on. */
+  /** Live status and completion reminders for every client that has not
+   * been set on its own page (`SourcePreferences.live`). Default on. */
   liveStatus?: boolean;
-  /** Approval requests and questions answered in the HUD; off, every client
-   * asks by itself. Default on. */
+  /** Approval requests and questions answered in the HUD, for every client
+   * not in `answerOn` or `answerOff`. Default on. */
   answerInHud?: boolean;
-  /** Clients (`ClientRow.id`) whose requests stay with them while answering
-   * in the HUD is on. */
+  /** Clients (`ClientRow.id`) turned on for answering in the HUD on their
+   * own page, whatever `answerInHud` says. */
+  answerOn?: string[];
+  /** Clients (`ClientRow.id`) turned off for answering in the HUD on their
+   * own page, whatever `answerInHud` says. */
   answerOff?: string[];
-  /** Permission requests allowed at once, with no card, while answering in
-   * the HUD is on; questions and plans still wait. Default off. */
+  /** Permission requests allowed at once, with no card, for every client
+   * not in `autoApproveOn` or `autoApproveOff`; only for clients answered in
+   * the HUD. Questions and plans still wait. Default off. */
   autoApprove?: boolean;
-  /** Clients (`ClientRow.id`) not approved automatically while it is on. */
+  /** Clients (`ClientRow.id`) turned on for approving automatically on their
+   * own page, whatever `autoApprove` says. */
+  autoApproveOn?: string[];
+  /** Clients (`ClientRow.id`) turned off for approving automatically on
+   * their own page, whatever `autoApprove` says. */
   autoApproveOff?: string[];
   /** Display quota percentages as used or available; readings remain usedPercent. */
   quotaDisplay?: "consumed" | "remaining";

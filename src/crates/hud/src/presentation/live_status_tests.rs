@@ -120,3 +120,26 @@ fn the_demo_finds_nothing_and_shows_every_client_live() {
     demo.project_snapshot(&mut sample);
     assert!(sample["sourcePreferences"].get("codex").is_none());
 }
+
+#[test]
+fn a_client_turned_on_by_itself_stays_live_with_the_main_switch_off() {
+    let folder = tempfile::tempdir().unwrap();
+    let owner = Presentation::new(folder.path().to_path_buf()).unwrap();
+    let off = |owner: &Presentation| {
+        let mut value = snapshot(true);
+        value["settings"] = json!({"liveStatus": false});
+        owner.project_snapshot(&mut value);
+        value
+    };
+    let before = off(&owner);
+    assert_eq!(before["sourcePreferences"]["claude"]["live"], false);
+    assert_eq!(before["sourcePreferences"]["codex"]["live"], false);
+    assert_eq!(before["sessions"][0]["state"], "idle");
+    owner
+        .source_update(json!({"source": "codex", "patch": {"live": true}}))
+        .unwrap();
+    let after = off(&owner);
+    assert_eq!(after["sourcePreferences"]["claude"]["live"], false);
+    assert_eq!(after["sourcePreferences"]["codex"]["live"], true);
+    assert_eq!(after["sessions"][0]["state"], "running");
+}

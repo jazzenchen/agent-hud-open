@@ -1,56 +1,46 @@
 //! Approve automatically (Settings → Agents): a permission request from a
 //! client it is on for is allowed at once, with no card. Questions and plans
 //! still wait for the user, and a call the client's own rules settle never
-//! reaches Agent HUD. Off by default; once turned on it is on for every
-//! client that answers in the HUD, but those turned off on their own page.
+//! reaches Agent HUD. Off by default; the switch for every agent sets what a
+//! client does until it is turned on or off on its own page
+//! (`agents::switches`).
 use super::Requests;
-use agent_hud_agents::split;
+use agent_hud_agents::{split, switches};
 use serde_json::{json, Value};
 use std::sync::PoisonError;
 
 /// Which clients' permission requests are allowed at once.
 #[derive(Clone, Default, Debug, PartialEq)]
 pub struct AutoApprove {
-    on: bool,
-    /// Clients it is off for: turned off on their own page, or whose
-    /// requests are not answered in the HUD.
-    off: Vec<String>,
+    /// The saved switches it is read from.
+    settings: Value,
 }
 
 impl AutoApprove {
-    /// The rule the saved settings make: `autoApprove`, under answering in
-    /// the HUD, but the clients in `autoApproveOff` or `answerOff`.
+    /// The rule the saved settings make (`switches::approves`).
     pub fn from_settings(settings: &Value) -> Self {
-        let ids = |key: &str| {
-            settings[key]
-                .as_array()
-                .map(|ids| {
-                    ids.iter()
-                        .filter_map(Value::as_str)
-                        .map(str::to_owned)
-                        .collect::<Vec<_>>()
-                })
-                .unwrap_or_default()
-        };
-        let mut off = ids("autoApproveOff");
-        off.extend(ids("answerOff"));
-        Self {
-            on: settings["autoApprove"] == true && settings["answerInHud"] != false,
-            off,
+        let mut kept = json!({});
+        for feature in [&switches::ANSWER, &switches::AUTO_APPROVE] {
+            for key in [feature.main, feature.on, feature.off] {
+                if !settings[key].is_null() {
+                    kept[key] = settings[key].clone();
+                }
+            }
         }
+        Self { settings: kept }
     }
 
     /// Whether a permission request from `agent`'s client `client` is
-    /// allowed at once. One whose client is not known is, only while no
-    /// client of its agent is off.
+    /// allowed at once. One whose client is not known is, only while it is
+    /// on for every client of its agent.
     pub fn approves(&self, agent: &str, client: Option<&str>) -> bool {
-        if !self.on || split::agent_of(agent).is_none() {
+        if split::agent_of(agent).is_none() {
             return false;
         }
-        let off = |id: &str| self.off.iter().any(|other| other == id);
+        let on = |id: &str| switches::approves(&self.settings, id);
         match client.filter(|id| split::agent_of(id) == Some(agent)) {
-            Some(id) => !off(id),
-            None => !split::ids(agent).into_iter().any(off),
+            Some(id) => on(id),
+            None => split::ids(agent).into_iter().all(on),
         }
     }
 }
@@ -130,6 +120,17 @@ mod tests {
         }));
         assert!(one.approves("codex", Some("codex")));
         assert!(!one.approves("codex", Some("codex-desktop")));
+    }
+
+    #[test]
+    fn a_client_turned_on_by_itself_is_approved_while_the_main_switch_is_off() {
+        let one = AutoApprove::from_settings(&json!({
+            "autoApprove": false,
+            "autoApproveOn": ["deepseek"],
+        }));
+        assert!(one.approves("deepseek", Some("deepseek")));
+        assert!(one.approves("deepseek", None));
+        assert!(!one.approves("codex", Some("codex")));
     }
 
     #[test]

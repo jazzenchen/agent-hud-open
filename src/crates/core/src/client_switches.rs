@@ -3,7 +3,7 @@
 //! off shows no sessions and asks nothing, and the agent's account and other
 //! data are read while any of its clients is on.
 use super::*;
-use agent_hud_agents::split;
+use agent_hud_agents::{split, switches};
 
 impl AgentHudCore {
     /// Whether the client with this id is on (`split::is_on`).
@@ -36,21 +36,14 @@ impl AgentHudCore {
     }
 
     /// Whether requests from a session of `source` are answered in the HUD:
-    /// answering is on (Settings → Agents) and the session's client is not one
-    /// whose requests stay with it. A session whose client is unknown is
-    /// answered here unless every client of its agent keeps its own.
+    /// answering is on for the session's client, by its own page or by the
+    /// switch for every agent (`agents::switches`). A session whose client is
+    /// unknown is answered here while any client of its agent is.
     pub(crate) fn answers_on(&self, source: &str, client: Option<&str>) -> bool {
-        if self.settings["answerInHud"] == false {
-            return false;
-        }
-        let off = |id: &str| {
-            self.settings["answerOff"]
-                .as_array()
-                .is_some_and(|ids| ids.iter().any(|value| value == id))
-        };
+        let on = |id: &str| switches::ANSWER.on_for(&self.settings, id);
         match client {
-            Some(id) => !off(id),
-            None => !split::ids(source).into_iter().all(off),
+            Some(id) => on(id),
+            None => split::ids(source).into_iter().any(on),
         }
     }
 

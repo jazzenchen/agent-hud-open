@@ -140,12 +140,13 @@ export function useIslandNews(
       if (!activeRequestIds.has(id)) seenRequests.current.delete(id);
     }
     for (const request of requests) seenRequests.current.add(request.id);
-    // A completion reminds while its client's live status and reminders are on.
+    // A completion reminds while its client's live status and reminders are
+    // on; a client with no live status of its own follows the switch for
+    // every agent.
     const remindsOf = (source: string, sessionId?: string) => {
       const prefs = services?.sources?.[clientID(snapshot, source, sessionId)];
       return (
-        snapshot.settings.liveStatus !== false &&
-        prefs?.live !== false &&
+        (prefs?.live ?? snapshot.settings.liveStatus !== false) &&
         prefs?.reminders !== false
       );
     };

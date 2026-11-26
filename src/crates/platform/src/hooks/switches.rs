@@ -2,7 +2,7 @@
 //! (`agents::split`). The switches are read from the file Agent HUD saves them
 //! in, so a client that is off passes through its hooks with no opinion and
 //! nothing recorded, whether or not the app is running.
-use agent_hud_agents::split;
+use agent_hud_agents::{split, switches};
 use serde_json::Value;
 use std::{collections::HashMap, path::Path};
 
@@ -29,9 +29,10 @@ pub(super) fn turned_off(
 }
 
 /// Whether a permission request from this hook's client stays with the
-/// client: answering in the HUD is off for every client, or for this one
-/// (Settings → Agents). A caller its agent's rule cannot place stays with the
-/// HUD unless every client of its agent is off.
+/// client: answering in the HUD is off for it, by its own page or by the
+/// switch for every agent (Settings → Agents, `agents::switches`). A caller
+/// its agent's rule cannot place stays with the HUD unless every client of
+/// its agent is off.
 pub(super) fn answers_off(
     data: &Path,
     source: &str,
@@ -42,27 +43,22 @@ pub(super) fn answers_off(
         return false;
     };
     let settings = &stored(data)["settings"];
-    if settings["answerInHud"] == false {
-        return true;
-    }
-    let off: Vec<&str> = settings["answerOff"]
-        .as_array()
-        .map(|ids| ids.iter().filter_map(Value::as_str).collect())
-        .unwrap_or_default();
+    let off = |id: &str| !switches::ANSWER.on_for(settings, id);
     let ids = split::ids(agent);
-    if !ids.iter().any(|id| off.contains(id)) {
+    if !ids.iter().any(|id| off(id)) {
         return false;
     }
-    if ids.iter().all(|id| off.contains(id)) {
+    if ids.iter().all(|id| off(id)) {
         return true;
     }
-    super::origins::caller_client(source, home, env).is_some_and(|id| off.contains(&id))
+    super::origins::caller_client(source, home, env).is_some_and(off)
 }
 
-/// Whether approving automatically is on (Settings → Agents): the app then
-/// needs to know which client a permission request comes from.
+/// Whether approving automatically may be on for some client (Settings →
+/// Agents): the app then needs to know which client a permission request
+/// comes from.
 pub(super) fn auto_approve_on(data: &Path) -> bool {
-    stored(data)["settings"]["autoApprove"] == true
+    switches::AUTO_APPROVE.on_anywhere(&stored(data)["settings"])
 }
 
 /// What Settings saved; null when the file is missing or unreadable, where
@@ -128,6 +124,11 @@ mod tests {
         assert!(answers_off(codex.path(), "codex", None, &env));
         assert!(!answers_off(codex.path(), "claude", None, &env));
         let desktop = data_with_settings(serde_json::json!({"answerOff": ["codex-desktop"]}));
+        let own = data_with_settings(
+            serde_json::json!({"answerInHud": false, "answerOn": ["codex", "codex-desktop"]}),
+        );
+        assert!(!answers_off(own.path(), "codex", None, &env));
+        assert!(answers_off(own.path(), "claude", None, &env));
         assert!(!answers_off(desktop.path(), "codex", None, &env));
         let none = tempfile::tempdir().unwrap();
         assert!(!answers_off(&none.path().join("data"), "codex", None, &env));

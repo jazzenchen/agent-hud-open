@@ -1596,5 +1596,6 @@
   "Round the notch: each agent's colour by its usage, yellow from 70% and red from 90%, breathing faster while one works.": "Em volta do entalhe: cada agente numa cor conforme o uso, amarelo a partir de 70% e vermelho a partir de 90%; pulsa mais rápido enquanto um trabalha.",
   "Let agents decide when to steer": "Deixar os agentes decidirem quando intervir",
   "Agents then interrupt each other's turns without asking you, to correct work in progress.": "Os agentes passam a interromper o turno em andamento de outras sessões sem perguntar a você, para corrigir o trabalho.",
-  "This goes into your current turn: take it into the work at hand, with no reply of its own. What it changes belongs in this turn's result. Only if it asks you something, answer with {{tool}}, reply_to: {{id}}.": "Isto entra no seu turno em andamento: incorpore ao trabalho atual, sem uma resposta à parte. O que mudar vai no resultado deste turno. Somente se perguntarem algo, responda com {{tool}}, reply_to: {{id}}."
+  "This goes into your current turn: take it into the work at hand, with no reply of its own. What it changes belongs in this turn's result. Only if it asks you something, answer with {{tool}}, reply_to: {{id}}.": "Isto entra no seu turno em andamento: incorpore ao trabalho atual, sem uma resposta à parte. O que mudar vai no resultado deste turno. Somente se perguntarem algo, responda com {{tool}}, reply_to: {{id}}.",
+  "An agent set on its own page keeps that setting.": "O que for ajustado na página de um agente vale para esse agente."
 }

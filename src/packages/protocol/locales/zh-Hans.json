@@ -1532,5 +1532,6 @@
   "Round the notch: each agent's colour by its usage, yellow from 70% and red from 90%, breathing faster while one works.": "围在刘海外：每个 Agent 一种颜色，按用量变化，70% 起变黄、90% 起变红；有 Agent 工作时呼吸更快。",
   "Let agents decide when to steer": "让智能体自己决定何时插话",
   "Agents then interrupt each other's turns without asking you, to correct work in progress.": "打开后，智能体会不经询问打断其他会话正在进行的这一轮，用来纠正手上的工作。",
-  "This goes into your current turn: take it into the work at hand, with no reply of its own. What it changes belongs in this turn's result. Only if it asks you something, answer with {{tool}}, reply_to: {{id}}.": "这段话进入你当前这一轮：照着调整手上的工作，不用单独回复。它带来的改变写进这一轮的结果里。只有它向你提了问题时，才用 {{tool}} 回复，reply_to: {{id}}。"
+  "This goes into your current turn: take it into the work at hand, with no reply of its own. What it changes belongs in this turn's result. Only if it asks you something, answer with {{tool}}, reply_to: {{id}}.": "这段话进入你当前这一轮：照着调整手上的工作，不用单独回复。它带来的改变写进这一轮的结果里。只有它向你提了问题时，才用 {{tool}} 回复，reply_to: {{id}}。",
+  "An agent set on its own page keeps that setting.": "在智能体自己页面上设过的，以那里为准。"
 }

@@ -111,7 +111,13 @@ impl crate::AgentHudCore {
         }
         if matches!(
             key,
-            "approvalWaitMinutes" | "autoApprove" | "autoApproveOff" | "answerInHud" | "answerOff"
+            "approvalWaitMinutes"
+                | "autoApprove"
+                | "autoApproveOn"
+                | "autoApproveOff"
+                | "answerInHud"
+                | "answerOn"
+                | "answerOff"
         ) {
             self.requests.apply_settings(&self.settings);
         }
@@ -174,10 +180,9 @@ impl crate::AgentHudCore {
                 if value
                     .as_u64()
                     .is_some_and(|v| [1, 3, 5, 10, 30, 60].contains(&v)) => {}
-            // Clients whose requests stay with them while answering in the HUD
-            // is on, and those not approved automatically while that is on,
-            // each once.
-            "answerOff" | "autoApproveOff"
+            // Clients turned on or off on their own page for answering in the
+            // HUD and approving automatically, each once (`agents::switches`).
+            "answerOn" | "answerOff" | "autoApproveOn" | "autoApproveOff"
                 if value.as_array().is_some_and(|ids| {
                     ids.iter().enumerate().all(|(index, id)| {
                         id.as_str()

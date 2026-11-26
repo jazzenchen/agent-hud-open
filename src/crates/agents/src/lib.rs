@@ -23,6 +23,7 @@ pub mod relays;
 pub mod replies;
 pub mod split;
 pub mod sqlite;
+pub mod switches;
 pub mod transcript;
 
 pub use account::{Answer, Host, Reading};

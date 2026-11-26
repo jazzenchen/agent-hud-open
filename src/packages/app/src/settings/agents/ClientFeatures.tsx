@@ -1,8 +1,10 @@
-/* The features one agent can use, each turned off for it alone: live status
- * and its reminders, answers in the HUD (and the switches only some agents
- * have beneath it), and messages where its plugin carries them. A feature
- * turned off for every agent shows here off, with why. What Agent HUD puts
- * into the agent sits with them: its plugin first, HUD tools last. */
+/* The features one agent can use, each turned on or off for it alone: live
+ * status and its reminders, answers in the HUD (and the switches only some
+ * agents have beneath it), and messages where its plugin carries them. Live
+ * status, answers and approving automatically follow the switch for every
+ * agent until they are set here, and what is set here wins over it. Messages
+ * need the switch for every agent, since they go between agents. What Agent
+ * HUD puts into the agent sits with them: its plugin first, HUD tools last. */
 import type {
   ClientRow,
   NativeMethod,
@@ -13,7 +15,7 @@ import type { Translate } from "@agent-hud/ui/format";
 import type { useClientInstalls } from "./ClientInstalls";
 import { ToggleRow } from "../SettingsControls";
 import { Pill, Row, Section } from "../SettingsPrimitives";
-import { can, messagesKey } from "./features";
+import { can, liveOn, messagesKey, switchFor, switchedOn } from "./features";
 import type { Perform } from "./use-perform";
 
 export function ClientFeatures({
@@ -47,18 +49,32 @@ export function ClientFeatures({
   const everywhere = t("Turned off for every agent.");
   const offHere = t("Turn on Enabled first.");
   const on = client.enabled;
-  const liveEverywhere = settings.liveStatus !== false;
-  const live = preferences[client.id]?.live !== false;
+  const live = liveOn(client, snapshot, preferences);
   const reminders = preferences[client.id]?.reminders !== false;
-  const answerEverywhere = settings.answerInHud !== false;
-  const answerOff = settings.answerOff ?? [];
-  const answer = !answerOff.includes(client.id);
-  const autoEverywhere = settings.autoApprove === true;
-  const autoOff = settings.autoApproveOff ?? [];
+  const answer = switchedOn(settings, "answer", client.id);
+  const auto = switchedOn(settings, "autoApprove", client.id);
   const optIn = settings.optInApprovals ?? [];
   const messages = messagesKey(client);
   const why = (everywhereOn: boolean) =>
     !on ? offHere : !everywhereOn ? everywhere : undefined;
+  // Live status and answers need Agent HUD's hooks in the agents; turning
+  // either on here puts them in, as the switch for every agent does.
+  const hooks = snapshot.connection.clientHooks;
+  const withHooks = async (value: boolean) => {
+    if (
+      value &&
+      !settings.clientHooks &&
+      hooks?.supported === true &&
+      hooks.installable === true
+    )
+      await action("set_setting", { key: "clientHooks", value: true });
+  };
+  const switchHere = (feature: "answer" | "autoApprove", value: boolean) =>
+    void perform(async () => {
+      for (const [key, list] of switchFor(settings, feature, client.id, value))
+        await action("set_setting", { key, value: list });
+      if (feature === "answer") await withHooks(value);
+    });
   if (
     !installs.plugin &&
     !["live", "answer", "talk", "tools"].some((f) => can(client, f as never))
@@ -72,21 +88,21 @@ export function ClientFeatures({
         <>
           <ToggleRow
             title={t("Live status")}
-            checked={on && liveEverywhere && live}
-            disabled={pending || !on || !liveEverywhere}
-            reason={why(liveEverywhere)}
+            checked={on && live}
+            disabled={pending || !on}
+            reason={why(true)}
             change={(value) =>
-              void perform(() => onPreferences(client.id, { live: value }))
+              void perform(async () => {
+                await onPreferences(client.id, { live: value });
+                await withHooks(value);
+              })
             }
           />
           <ToggleRow
             title={t("Completion reminders")}
-            checked={on && liveEverywhere && live && reminders}
-            disabled={pending || !on || !liveEverywhere || !live}
-            reason={
-              why(liveEverywhere) ??
-              (!live ? t("Needs Live status.") : undefined)
-            }
+            checked={on && live && reminders}
+            disabled={pending || !on || !live}
+            reason={why(true) ?? (!live ? t("Needs Live status.") : undefined)}
             change={(value) =>
               void perform(() => onPreferences(client.id, { reminders: value }))
             }
@@ -96,55 +112,31 @@ export function ClientFeatures({
       {can(client, "answer") && (
         <ToggleRow
           title={t("Answer in the HUD")}
-          checked={on && answerEverywhere && answer}
-          disabled={pending || !on || !answerEverywhere}
-          reason={why(answerEverywhere)}
-          change={(value) =>
-            set("answerOff", [
-              ...answerOff.filter((id) => id !== client.id),
-              ...(value ? [] : [client.id]),
-            ])
-          }
+          checked={on && answer}
+          disabled={pending || !on}
+          reason={why(true)}
+          change={(value) => switchHere("answer", value)}
         />
       )}
       {can(client, "answer") && (
         <ToggleRow
           title={t("Approve automatically")}
-          checked={
-            on &&
-            answerEverywhere &&
-            answer &&
-            autoEverywhere &&
-            !autoOff.includes(client.id)
-          }
-          disabled={
-            pending || !on || !answerEverywhere || !answer || !autoEverywhere
-          }
+          checked={on && answer && auto}
+          disabled={pending || !on || !answer}
           reason={
-            !on
-              ? offHere
-              : !answerEverywhere || !answer
-                ? t("Needs Answer in the HUD.")
-                : !autoEverywhere
-                  ? everywhere
-                  : undefined
+            !on ? offHere : !answer ? t("Needs Answer in the HUD.") : undefined
           }
-          change={(value) =>
-            set("autoApproveOff", [
-              ...autoOff.filter((id) => id !== client.id),
-              ...(value ? [] : [client.id]),
-            ])
-          }
+          change={(value) => switchHere("autoApprove", value)}
         />
       )}
       {can(client, "answer") && client.agent === "claude" && (
         <ToggleRow
           title={t("Answer questions")}
-          checked={
-            on && answerEverywhere && answer && settings.claudeAnswers !== false
+          checked={on && answer && settings.claudeAnswers !== false}
+          disabled={pending || !on || !answer}
+          reason={
+            !on ? offHere : !answer ? t("Needs Answer in the HUD.") : undefined
           }
-          disabled={pending || !on || !answerEverywhere || !answer}
-          reason={why(answerEverywhere)}
           change={(value) => set("claudeAnswers", value)}
         />
       )}
@@ -155,8 +147,10 @@ export function ClientFeatures({
             "Copilot then asks Agent HUD before its own rules and this session's approvals, so every tool call it would run or ask about waits for your answer in the HUD. Runs started with -p, --allow-all-tools, --allow-all or --yolo stay with Copilot.",
           )}
           checked={optIn.includes(client.agent)}
-          disabled={pending || !on || !answerEverywhere || !answer}
-          reason={why(answerEverywhere)}
+          disabled={pending || !on || !answer}
+          reason={
+            !on ? offHere : !answer ? t("Needs Answer in the HUD.") : undefined
+          }
           change={(value) =>
             set("optInApprovals", [
               ...optIn.filter((id) => id !== client.agent),

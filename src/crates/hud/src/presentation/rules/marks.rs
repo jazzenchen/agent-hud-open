@@ -113,8 +113,9 @@ pub fn resting_agents(snapshot: &Value, mode: &str, now: i64) -> Vec<String> {
                         .as_str()
                         .map(str::to_owned)
                         .unwrap_or_else(|| source_id(snapshot, source));
-                    let live = snapshot["settings"]["liveStatus"] != false
-                        && snapshot["sourcePreferences"][client]["live"] != false;
+                    let live = snapshot["sourcePreferences"][client]["live"]
+                        .as_bool()
+                        .unwrap_or(snapshot["settings"]["liveStatus"] != false);
                     (now <= at + QUEUE_RECENCY_MS && live).then_some((at, source))
                 })
                 .collect();

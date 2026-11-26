@@ -1,6 +1,7 @@
 // Which of Agent HUD's features a client uses: one it can do (`ClientRow.
-// features`, from the runtime), turned on for every agent, and not turned
-// off for this one.
+// features`, from the runtime) and turned on for it. A client's own page
+// wins over the switch for every agent, which only sets the default
+// (agents::switches in the runtime).
 import type {
   ClientRow,
   Snapshot,
@@ -48,18 +49,81 @@ export function can(client: ClientRow, feature: Feature) {
   return (client.features ?? []).includes(feature);
 }
 
+type Switched = "answer" | "autoApprove";
+const switches: Record<
+  Switched,
+  {
+    main: "answerInHud" | "autoApprove";
+    fallback: boolean;
+    on: "answerOn" | "autoApproveOn";
+    off: "answerOff" | "autoApproveOff";
+  }
+> = {
+  answer: {
+    main: "answerInHud",
+    fallback: true,
+    on: "answerOn",
+    off: "answerOff",
+  },
+  autoApprove: {
+    main: "autoApprove",
+    fallback: false,
+    on: "autoApproveOn",
+    off: "autoApproveOff",
+  },
+};
+
+/** Whether a switched feature is on for the client `id`: its own page,
+ * otherwise the switch for every agent. */
+export function switchedOn(
+  settings: Snapshot["settings"],
+  feature: Switched,
+  id: string,
+) {
+  const keys = switches[feature];
+  if ((settings[keys.off] ?? []).includes(id)) return false;
+  if ((settings[keys.on] ?? []).includes(id)) return true;
+  return settings[keys.main] ?? keys.fallback;
+}
+
+/** The settings that turn a switched feature on or off for the client `id`
+ * alone, as [key, value] pairs to save. */
+export function switchFor(
+  settings: Snapshot["settings"],
+  feature: Switched,
+  id: string,
+  value: boolean,
+): [string, string[]][] {
+  const keys = switches[feature];
+  const on = (settings[keys.on] ?? []).filter((other) => other !== id);
+  const off = (settings[keys.off] ?? []).filter((other) => other !== id);
+  return [
+    [keys.on, value ? [...on, id] : on],
+    [keys.off, value ? off : [...off, id]],
+  ];
+}
+
+/** Whether `client`'s live status is on: its own page, otherwise the switch
+ * for every agent (the runtime puts that into `preferences`). */
+export function liveOn(
+  client: ClientRow,
+  snapshot: Snapshot,
+  preferences: Record<string, SourcePreferences>,
+) {
+  return preferences[client.id]?.live ?? snapshot.settings.liveStatus !== false;
+}
+
 /** Whether `client`'s permission requests are allowed at once, with no
- * card: approving automatically is on, its answers are in the HUD, and it
- * was not left out on its own page. */
+ * card: its answers are in the HUD and approving automatically is on for
+ * it. */
 export function autoApproves(
   client: ClientRow,
   snapshot: Snapshot,
   preferences: Record<string, SourcePreferences>,
 ) {
   return (
-    snapshot.settings.autoApprove === true &&
     uses(client, "answer", snapshot, preferences) &&
-    !(snapshot.settings.autoApproveOff ?? []).includes(client.id)
+    switchedOn(snapshot.settings, "autoApprove", client.id)
   );
 }
 
@@ -76,14 +140,9 @@ export function uses(
   if (!client.enabled || !can(client, feature)) return false;
   switch (feature) {
     case "live":
-      return (
-        settings.liveStatus !== false && preferences[client.id]?.live !== false
-      );
+      return liveOn(client, snapshot, preferences);
     case "answer":
-      return (
-        settings.answerInHud !== false &&
-        !(settings.answerOff ?? []).includes(client.id)
-      );
+      return switchedOn(settings, "answer", client.id);
     case "talk": {
       const own = messagesKey(client);
       return (

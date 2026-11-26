@@ -1,22 +1,31 @@
 /* What Agent HUD does with the agents, one switch each for all of them: live
- * status, answering in the HUD, and (in the Agent tools section below it)
- * HUD tools and messages. Live status and answers need Agent HUD's hooks in
- * the agents; turning either on puts them in, turning both off takes them
- * out, so the hooks are never a switch of their own. */
-import type { NativeMethod, Snapshot } from "@agent-hud/protocol";
+ * status, answering in the HUD, approving automatically, and (in the Agent
+ * tools section below it) HUD tools and messages. The first three are the
+ * default for an agent not set on its own page; what is set there wins.
+ * Live status and answers need Agent HUD's hooks in the agents; turning
+ * either on puts them in, and they come out once no agent uses either, so
+ * the hooks are never a switch of their own. */
+import type {
+  NativeMethod,
+  Snapshot,
+  SourcePreferences,
+} from "@agent-hud/protocol";
 import { Switch } from "@agent-hud/ui/components/switch";
 import type { Translate } from "@agent-hud/ui/format";
 import { Menu, SmallButton, ToggleRow, Unavailable } from "../SettingsControls";
 import { Notice, Pill, Row, Section } from "../SettingsPrimitives";
+import { uses } from "./features";
 import { usePerform } from "./use-perform";
 
 export function FeaturesSection({
   t,
   snapshot,
+  preferences,
   action,
 }: {
   t: Translate;
   snapshot: Snapshot;
+  preferences: Record<string, SourcePreferences>;
   action: (
     method: NativeMethod,
     params?: Record<string, unknown>,
@@ -26,6 +35,8 @@ export function FeaturesSection({
   const settings = snapshot.settings;
   const live = settings.liveStatus !== false;
   const answer = settings.answerInHud !== false;
+  // Some agent answers in the HUD: by default, or turned on on its own page.
+  const answering = answer || (settings.answerOn ?? []).length > 0;
   const hooks = snapshot.connection.clientHooks;
   const set = (key: string, value: unknown) =>
     action("set_setting", { key, value });
@@ -36,22 +47,34 @@ export function FeaturesSection({
       : hooks.installable !== true
         ? t("Needs Agent HUD at its approved installation location.")
         : null;
+  // Whether any agent that is on uses live status or answers with these
+  // settings. Right after live status is turned off for every agent, the
+  // agents' live status still shows the old default, so the hooks stay in
+  // until answers are turned off too.
+  const hooksUsed = (next: Snapshot["settings"]) =>
+    (snapshot.clients ?? []).some(
+      (client) =>
+        client.enabled &&
+        (["live", "answer"] as const).some((feature) =>
+          uses(client, feature, { ...snapshot, settings: next }, preferences),
+        ),
+    );
   const change = (key: "liveStatus" | "answerInHud", value: boolean) =>
     void perform(async () => {
       await set(key, value);
-      const wanted =
-        (key === "liveStatus" ? value : live) ||
-        (key === "answerInHud" ? value : answer);
+      const wanted = hooksUsed({ ...settings, [key]: value });
       if (!blocked && wanted !== settings.clientHooks)
         await set("clientHooks", wanted);
     });
-  const hooksMissing = (live || answer) && !settings.clientHooks;
+  const hooksMissing = hooksUsed(settings) && !settings.clientHooks;
 
   return (
     <Section
       anchor="agent-features"
       title={t("What Agent HUD does")}
-      footer={hooks?.notice ?? undefined}
+      footer={
+        hooks?.notice ?? t("An agent set on its own page keeps that setting.")
+      }
     >
       <Row
         title={t("Sessions, tokens and costs")}
@@ -75,7 +98,7 @@ export function FeaturesSection({
         disabled={pending}
         change={(value) => change("answerInHud", value)}
       />
-      {answer && (
+      {answering && (
         <Row
           title={t("Wait for an answer")}
           subtitle={t("Then the request goes back to the client.")}
@@ -94,7 +117,7 @@ export function FeaturesSection({
           />
         </Row>
       )}
-      {answer && (
+      {answering && (
         // Off by default; each agent can be left out on its own page.
         <Row
           title={

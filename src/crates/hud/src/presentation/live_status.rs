@@ -66,33 +66,39 @@ impl Presentation {
             let s = self.state.lock().unwrap_or_else(PoisonError::into_inner);
             Self::preferences(&s.saved.sources, snapshot)
         };
-        // Live status turned off in Settings → Agents holds for every client;
-        // each client's own switch is kept for when it is on again.
+        // A client's live status as it stands (`preferences`); one with none
+        // follows the switch for every agent (Settings → Agents).
         let everywhere = snapshot["settings"]["liveStatus"] != false;
-        if !everywhere || preferences.values().any(|p| p["live"] == false) {
-            for session in snapshot["sessions"].as_array_mut().into_iter().flatten() {
-                let client = session["clientId"]
-                    .as_str()
-                    .or_else(|| session["source"].as_str())
-                    .unwrap_or("")
-                    .to_ascii_lowercase();
-                if !everywhere || preferences.get(&client).is_some_and(|p| p["live"] == false) {
-                    session["state"] = json!("idle");
-                    if let Some(object) = session.as_object_mut() {
-                        object.remove("liveFacts");
-                    }
+        let live = |client: &str| {
+            preferences
+                .get(client)
+                .and_then(|prefs| prefs["live"].as_bool())
+                .unwrap_or(everywhere)
+        };
+        for session in snapshot["sessions"].as_array_mut().into_iter().flatten() {
+            let client = session["clientId"]
+                .as_str()
+                .or_else(|| session["source"].as_str())
+                .unwrap_or("")
+                .to_ascii_lowercase();
+            if !live(&client) {
+                session["state"] = json!("idle");
+                if let Some(object) = session.as_object_mut() {
+                    object.remove("liveFacts");
                 }
             }
         }
         snapshot["sourcePreferences"] = Value::Object(preferences);
     }
 
-    /// Each client's switches as they stand: what the person chose, otherwise
-    /// live status on only while the client is found on this Mac (Open's
+    /// Each client's switches as they stand: what the person chose on its
+    /// page, which wins over the switch for every agent; otherwise live status
+    /// on while that switch is on and the client is found on this Mac (Open's
     /// Settings.applyLiveStatusDefaults). Nothing is saved for a default, so a
     /// client found later turns on by itself. The demo finds nothing and shows
     /// every client live.
     fn preferences(saved: &Map<String, Value>, snapshot: &Value) -> Map<String, Value> {
+        let everywhere = snapshot["settings"]["liveStatus"] != false;
         let mut preferences = Map::new();
         for (id, prefs) in saved {
             let mut prefs = prefs.as_object().cloned().unwrap_or_default();
@@ -131,7 +137,10 @@ impl Presentation {
                 .as_object_mut()
                 .filter(|prefs| !prefs.contains_key("live"))
             {
-                prefs.insert("live".into(), json!(provider["detected"] == true));
+                prefs.insert(
+                    "live".into(),
+                    json!(everywhere && provider["detected"] == true),
+                );
             }
         }
         preferences

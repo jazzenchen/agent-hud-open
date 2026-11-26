@@ -148,7 +148,12 @@ export default function AgentsPage({
         />
       ) : (
         <Page>
-          <FeaturesSection t={t} snapshot={snapshot} action={action} />
+          <FeaturesSection
+            t={t}
+            snapshot={snapshot}
+            preferences={preferences}
+            action={action}
+          />
           <ToolsSection
             tools={tools}
             groups={items.filter((item) => item.place === "tools")}

@@ -1532,5 +1532,6 @@
   "Round the notch: each agent's colour by its usage, yellow from 70% and red from 90%, breathing faster while one works.": "ノッチの周りに表示：エージェントごとの色が使用量で変わり、70% から黄、90% から赤。エージェントの作業中は速く呼吸します。",
   "Let agents decide when to steer": "割り込むかどうかをエージェントに任せる",
   "Agents then interrupt each other's turns without asking you, to correct work in progress.": "オンにすると、エージェントは確認なしに他のセッションの進行中のターンに割り込み、作業を修正します。",
-  "This goes into your current turn: take it into the work at hand, with no reply of its own. What it changes belongs in this turn's result. Only if it asks you something, answer with {{tool}}, reply_to: {{id}}.": "これは進行中のターンに入ります。今の作業に反映してください。これ単独への返信は不要です。変わった点はこのターンの結果に書いてください。質問されている場合のみ、{{tool}} で reply_to: {{id}} を指定して答えてください。"
+  "This goes into your current turn: take it into the work at hand, with no reply of its own. What it changes belongs in this turn's result. Only if it asks you something, answer with {{tool}}, reply_to: {{id}}.": "これは進行中のターンに入ります。今の作業に反映してください。これ単独への返信は不要です。変わった点はこのターンの結果に書いてください。質問されている場合のみ、{{tool}} で reply_to: {{id}} を指定して答えてください。",
+  "An agent set on its own page keeps that setting.": "エージェントのページで設定した項目は、そちらが優先されます。"
 }
