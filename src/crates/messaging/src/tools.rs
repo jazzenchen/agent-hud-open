@@ -8,8 +8,10 @@ impl Messaging {
             return json!({"tools":[]});
         }
         let mut tools = Self::listed();
-        if preferences.require_reply {
-            reply_choice(&mut tools);
+        match preferences.replies {
+            Replies::Never => no_replies(&mut tools),
+            Replies::WhenNeeded => reply_choice(&mut tools),
+            Replies::Always => reply_choice_for_replies(&mut tools),
         }
         if preferences.steer_on_own {
             steer_choice(&mut tools);
@@ -44,7 +46,40 @@ const ALWAYS_ASKS: &str = "Unless the user chose to send as themselves, the reci
 /// The same, while the sender says which messages need a reply.
 const ASKS_WHEN_REQUIRED: &str = "Unless the user chose to send as themselves, the recipient sees a first line naming you and a message id. A message ends with a line asking it to reply with send_message and reply_to that id only when you pass require_reply true, and then it carries the first line even when the user sends as themselves. Ask for a reply only when you need the answer.";
 
-/// "Ask for replies only when needed" is on: `send_message` and
+/// The same, while no message asks for a reply.
+const NEVER_ASKS: &str = "Unless the user chose to send as themselves, the recipient sees a first line naming you and a message id. It is not asked to reply: the user chose that no message asks, so its answer stays in its own session unless it sends one with send_message and reply_to that id.";
+/// The same, while every labelled message asks: a reply asks only on request.
+const ALWAYS_ASKS_BUT_REPLIES: &str = "Unless the user chose to send as themselves, the recipient sees a first line naming you and a message id, and a last line asking it to reply with send_message and reply_to that id. A reply (reply_to) carries no such line, so two agents do not answer each other back and forth, unless you pass require_reply true because you need an answer to it too, such as a correction or a question sent as a reply.";
+
+/// "Ask for replies" is Never: `send_message` says no message asks.
+fn no_replies(tools: &mut Value) {
+    describe(tools, NEVER_ASKS);
+}
+
+/// "Ask for replies" is Always: every message but a reply asks, and
+/// `send_message` takes `require_reply` for a reply that needs an answer.
+fn reply_choice_for_replies(tools: &mut Value) {
+    describe(tools, ALWAYS_ASKS_BUT_REPLIES);
+    for tool in tools["tools"].as_array_mut().into_iter().flatten() {
+        if tool["name"] == "send_message" {
+            tool["inputSchema"]["properties"]["require_reply"] = json!({"type":"boolean","description":"Only with reply_to: true when you need an answer to this reply too, such as a correction or a question; it then ends with the line asking the recipient to reply. A message that is not a reply asks already."});
+        }
+    }
+}
+
+/// `send_message`'s words on replying, in place of `ALWAYS_ASKS`.
+fn describe(tools: &mut Value, words: &str) {
+    for tool in tools["tools"].as_array_mut().into_iter().flatten() {
+        if tool["name"] != "send_message" {
+            continue;
+        }
+        if let Some(description) = tool["description"].as_str() {
+            tool["description"] = json!(description.replace(ALWAYS_ASKS, words));
+        }
+    }
+}
+
+/// "Ask for replies" is When needed: `send_message` and
 /// `start_session` take `require_reply`, and `send_message` says what it does.
 fn reply_choice(tools: &mut Value) {
     for tool in tools["tools"].as_array_mut().into_iter().flatten() {

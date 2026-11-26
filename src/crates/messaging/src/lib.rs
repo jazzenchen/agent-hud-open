@@ -21,6 +21,7 @@ mod journal;
 mod listing;
 mod models;
 mod outcome;
+mod pass;
 mod preferences;
 mod send;
 mod sent;
@@ -33,7 +34,7 @@ mod transcript;
 mod user;
 mod words;
 
-pub use preferences::{Preferences, DEFAULT_LIMIT};
+pub use preferences::{Preferences, Replies, DEFAULT_LIMIT};
 pub use transcript::{StoredTurn, Turns};
 pub use user::{UserTarget, USER_CLIENTS};
 

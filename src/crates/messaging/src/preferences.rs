@@ -6,7 +6,7 @@ pub const DEFAULT_LIMIT: u32 = 10;
 
 /// Settings → Agents. Among the agent tools: "Let agents message each
 /// other" (`agentMessages`), "Send as me" (`agentMessagesAsUser`), "Ask for
-/// replies only when needed" (`agentMessagesRequireReply`), "Let agents
+/// replies" (`agentMessagesReplies`: never, when needed or always), "Let agents
 /// decide when to steer" (`agentMessagesSteerOnOwn`) and how many
 /// passes in a row before the user looks (`agentMessagesLimit`, null for no
 /// limit). On the Claude Code and DeepSeek Harness plugins' rows: "Send
@@ -16,11 +16,8 @@ pub struct Preferences {
     pub enabled: bool,
     /// The words go in as the user's own, with no label and no reply line.
     pub as_user: bool,
-    /// The sender says of each message whether it needs a reply
-    /// (`require_reply`): one that does carries the label and the reply line,
-    /// under "Send as me" too; one that does not carries no reply line. On
-    /// unless turned off; off, every labelled message asks for a reply.
-    pub require_reply: bool,
+    /// Which messages ask for a reply (`Replies`).
+    pub replies: Replies,
     /// Agents may steer on their own, to correct the work a turn in progress
     /// is doing, and a steer's last line asks for no reply of its own. Off:
     /// the tools allow a steer only when the user asked for one.
@@ -32,12 +29,42 @@ pub struct Preferences {
     /// Messages may go into DeepSeek Harness sessions.
     pub deepseek: bool,
 }
+/// "Ask for replies": which messages end with the line asking the recipient
+/// to reply, which Agent HUD follows up when no reply comes.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum Replies {
+    /// None: the recipient is never asked, and its answer stays in its own
+    /// session.
+    Never,
+    /// The sender says of each message (`require_reply`): one that asks
+    /// carries the label and the reply line, under "Send as me" too.
+    #[default]
+    WhenNeeded,
+    /// Every labelled message except a reply, so two agents do not answer
+    /// each other until the pass limit; a reply asks only when its sender
+    /// passes `require_reply`.
+    Always,
+}
+impl Replies {
+    /// `agentMessagesReplies`; before it, the switch "Ask for replies only
+    /// when needed" (`agentMessagesRequireReply`), whose off was Always.
+    fn read(settings: &Value) -> Self {
+        match settings["agentMessagesReplies"].as_str() {
+            Some("never") => Self::Never,
+            Some("always") => Self::Always,
+            Some(_) => Self::WhenNeeded,
+            None if settings["agentMessagesRequireReply"] == false => Self::Always,
+            None => Self::WhenNeeded,
+        }
+    }
+}
+
 impl Default for Preferences {
     fn default() -> Self {
         Self {
             enabled: false,
             as_user: false,
-            require_reply: true,
+            replies: Replies::WhenNeeded,
             steer_on_own: false,
             limit: Some(DEFAULT_LIMIT),
             claude: true,
@@ -60,7 +87,7 @@ impl Preferences {
         Self {
             enabled: settings["agentMessages"] == true,
             as_user: settings["agentMessagesAsUser"] == true,
-            require_reply: settings["agentMessagesRequireReply"] != false,
+            replies: Replies::read(settings),
             steer_on_own: settings["agentMessagesSteerOnOwn"] == true,
             limit,
             claude: settings["claudeMessages"] != false,

@@ -1023,7 +1023,7 @@ fn as_the_user_the_words_go_bare() {
     assert_eq!(sent.form, PromptForm::Own);
 }
 
-/// "Ask for replies only when needed": the sender's `require_reply` decides
+/// "Ask for replies" When needed: the sender's `require_reply` decides
 /// the reply line. A message that needs a reply is labelled, under "Send as
 /// me" too; one that does not ends with its own words.
 #[test]
@@ -1032,7 +1032,7 @@ fn with_the_reply_choice_the_sender_says_which_messages_ask_for_a_reply() {
         let mut world = World::new(Preferences {
             enabled: true,
             as_user,
-            require_reply: true,
+            replies: Replies::WhenNeeded,
             limit: Some(10),
             ..every_message_asks()
         });
@@ -1080,7 +1080,8 @@ fn with_the_reply_choice_the_sender_says_which_messages_ask_for_a_reply() {
             asked.text
         );
     }
-    // Off: the argument changes nothing, and every labelled message asks except a reply.
+    // Always: every labelled message asks, whatever the argument, except a
+    // reply, which asks only when its sender passes require_reply.
     let mut world = World::on();
     let answer = world.call(
         Some(("claude", CLAUDE)),
@@ -1097,36 +1098,107 @@ fn with_the_reply_choice_the_sender_says_which_messages_ask_for_a_reply() {
         .starts_with("When you finish, reply with "));
 }
 
-/// `require_reply` is listed only while the user's switch is on, and
-/// `send_message` then says what it does.
+/// "Ask for replies" Always: a reply asks only on request, so a correction
+/// sent as a reply can still be answered; Never: nothing asks, and nothing
+/// is followed up.
 #[test]
-fn the_reply_choice_is_listed_only_while_its_switch_is_on() {
-    let listed = |require_reply| {
+fn always_lets_a_reply_ask_on_request_and_never_asks_nothing() {
+    let mut world = World::on();
+    world.check_in(QUIET);
+    let first = world.send(("claude", CLAUDE), QUIET, "Fix the retry loop");
+    let id = first["id"].as_str().unwrap().to_owned();
+    let delivered = world.claude_words(QUIET, &id);
+    world.transcripts.prompt(QUIET, "q1", &delivered);
+    let reply = world.call(
+        Some(("claude", QUIET)),
+        "send_message",
+        json!({"text":"Which retry loop?","reply_to":id,"require_reply":true}),
+    );
+    let reply_id = reply["id"].as_str().unwrap().to_owned();
+    let words = world.claude_words(CLAUDE, &reply_id);
+    assert!(
+        words.ends_with(&format!("reply_to: {reply_id}, even if only to say done: your reply reaches the sender as a message.")),
+        "{words}"
+    );
+    assert!(world.messaging.journal.find(&reply_id).unwrap().asked);
+
+    let mut world = World::new(Preferences {
+        enabled: true,
+        replies: Replies::Never,
+        ..Default::default()
+    });
+    world.check_in(QUIET);
+    let sent = 1_792_600_000_000i64;
+    let first = world.call(
+        Some(("claude", CLAUDE)),
+        "send_message",
+        json!({"to":QUIET,"text":"Fix the retry loop","require_reply":true}),
+    );
+    let id = first["id"].as_str().unwrap().to_owned();
+    let delivered = world.claude_words(QUIET, &id);
+    assert!(delivered.ends_with("\n\nFix the retry loop"), "{delivered}");
+    world.transcripts.prompt(QUIET, "q1", &delivered);
+    world.transcripts.reply(QUIET, "q1", "Fixed it.");
+    world.live(
+        QUIET,
+        json!({"turnId":"q1","turnStartedAt":at(sent + 1_000),"endedAt":at(sent + 4_000)}),
+    );
+    world.maintain(sent + 5_000);
+    world.maintain(sent + 120_000);
+    assert!(follow_up_of(&mut world, &id).is_empty());
+}
+
+/// `require_reply` is listed for both tools in When needed, for send_message
+/// alone in Always (for replies), and not in Never; `send_message` says
+/// which messages ask.
+#[test]
+fn the_reply_choice_is_listed_as_ask_for_replies_says() {
+    let listed = |replies| {
         Messaging::tools(&Preferences {
             enabled: true,
-            require_reply,
-            ..every_message_asks()
+            replies,
+            ..Default::default()
         })
     };
-    // On unless the user turned it off.
-    assert!(Preferences::read(&json!({})).require_reply);
-    assert!(!Preferences::read(&json!({"agentMessagesRequireReply":false})).require_reply);
-    let off = listed(false).to_string();
-    assert!(!off.contains("require_reply"), "{off}");
-    assert!(off.contains("and a last line asking it to reply with send_message"));
-    let on = listed(true);
-    for tool in on["tools"].as_array().unwrap() {
-        let takes = tool["inputSchema"]["properties"]["require_reply"].is_object();
-        let name = tool["name"].as_str().unwrap();
-        assert_eq!(
-            takes,
-            name == "send_message" || name == "start_session",
-            "{name}"
-        );
+    // When needed unless the user chose; the old switch off reads as Always.
+    assert_eq!(Preferences::read(&json!({})).replies, Replies::WhenNeeded);
+    assert_eq!(
+        Preferences::read(&json!({"agentMessagesRequireReply":false})).replies,
+        Replies::Always
+    );
+    for (value, replies) in [
+        ("never", Replies::Never),
+        ("whenNeeded", Replies::WhenNeeded),
+        ("always", Replies::Always),
+    ] {
+        let settings = json!({"agentMessagesReplies":value,"agentMessagesRequireReply":false});
+        assert_eq!(Preferences::read(&settings).replies, replies);
     }
-    let on = on.to_string();
-    assert!(on.contains("only when you pass require_reply true"), "{on}");
-    assert!(!on.contains("and a last line asking it to reply with send_message"));
+    let takers = |tools: &Value| {
+        tools["tools"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|tool| tool["inputSchema"]["properties"]["require_reply"].is_object())
+            .map(|tool| tool["name"].as_str().unwrap().to_owned())
+            .collect::<Vec<_>>()
+    };
+    let never = listed(Replies::Never);
+    assert!(takers(&never).is_empty());
+    assert!(
+        never.to_string().contains("It is not asked to reply"),
+        "{never}"
+    );
+    let needed = listed(Replies::WhenNeeded);
+    assert_eq!(takers(&needed), ["send_message", "start_session"]);
+    assert!(needed
+        .to_string()
+        .contains("only when you pass require_reply true"));
+    let always = listed(Replies::Always);
+    assert_eq!(takers(&always), ["send_message"]);
+    assert!(always
+        .to_string()
+        .contains("A reply (reply_to) carries no such line"));
 }
 
 #[test]
@@ -2970,7 +3042,7 @@ fn an_antigravity_answer_the_store_cannot_tie_to_the_message_flies_only_its_repl
 /// a reply, as with "Ask for replies only when needed" off.
 fn every_message_asks() -> Preferences {
     Preferences {
-        require_reply: false,
+        replies: Replies::Always,
         ..Default::default()
     }
 }
@@ -2981,7 +3053,11 @@ impl Preferences {
         json!({
             "agentMessages": self.enabled,
             "agentMessagesAsUser": self.as_user,
-            "agentMessagesRequireReply": self.require_reply,
+            "agentMessagesReplies": match self.replies {
+                Replies::Never => "never",
+                Replies::WhenNeeded => "whenNeeded",
+                Replies::Always => "always",
+            },
             "agentMessagesSteerOnOwn": self.steer_on_own,
             "agentMessagesLimit": self.limit,
             "claudeMessages": self.claude,
@@ -3448,7 +3524,7 @@ fn a_message_answered_with_a_reply_or_that_asked_for_none_is_not_followed_up() {
     world.maintain(sent + 5_000);
     world.maintain(sent + 120_000);
     assert!(follow_up_of(&mut world, &id).is_empty());
-    // With "Ask for replies only when needed", one sent without
+    // With "Ask for replies" When needed, one sent without
     // require_reply asks for nothing, so nothing is owed.
     let mut world = World::new(Preferences {
         enabled: true,
@@ -3550,4 +3626,36 @@ fn the_follow_up_reads_in_the_app_language() {
         check.starts_with("[Agent HUD · 追问 · m-2 · 关于 m-1 · 插入你当前这一轮]"),
         "{check}"
     );
+}
+
+/// Sent as the user, a message has no reply line, so it is owed no
+/// follow-up, unless the sender asked with require_reply: then it is labelled.
+#[test]
+fn words_sent_as_the_user_ask_nothing_unless_the_sender_asked() {
+    let mut world = World::new(Preferences {
+        enabled: true,
+        as_user: true,
+        replies: Replies::Always,
+        ..Default::default()
+    });
+    let plain = world.send(("claude", CLAUDE), CODEX, "Ship it");
+    let kept = world
+        .messaging
+        .journal
+        .find(plain["id"].as_str().unwrap())
+        .unwrap();
+    assert_eq!(kept.form, PromptForm::Own);
+    assert!(!kept.asked);
+    let asked = world.call(
+        Some(("claude", CLAUDE)),
+        "send_message",
+        json!({"to":CODEX,"text":"Ship it","require_reply":true}),
+    );
+    let kept = world
+        .messaging
+        .journal
+        .find(asked["id"].as_str().unwrap())
+        .unwrap();
+    assert_eq!(kept.form, PromptForm::Labelled);
+    assert!(kept.asked);
 }

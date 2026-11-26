@@ -7,6 +7,7 @@ mod client_switches;
 mod conversation_feed;
 mod forks;
 mod ingestion;
+mod message_settings;
 mod plan_value;
 mod quota_history;
 mod sessions;

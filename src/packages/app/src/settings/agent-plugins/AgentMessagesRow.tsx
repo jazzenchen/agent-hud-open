@@ -1,8 +1,8 @@
 // "Let agents message each other" in Agent tools: agents message, start and
 // read other Claude Code, Codex, Antigravity and DeepSeek Harness sessions on
 // this computer through Agent HUD's MCP server. Off unless turned on. While
-// on: "Send as me", "Ask for replies only when needed" (the sending agent
-// says which messages need a reply), "Let agents decide when to steer", and
+// on: "Send as me", "Ask for replies" (never, when the sending agent says a
+// message needs one, or always), "Let agents decide when to steer", and
 // how many passes in a row before the user takes a look. A message waits until
 // its session is idle, unless it is steered into a Codex or DeepSeek Harness
 // session's turn in progress: when the user asks an agent to, or, with
@@ -48,7 +48,17 @@ export function AgentMessagesRow({
   const limits =
     limit !== null && !LIMITS.includes(limit) ? [...LIMITS, limit] : LIMITS;
   const asMe = t("Send as me");
-  const askWhenNeeded = t("Ask for replies only when needed");
+  const askForReplies = t("Ask for replies");
+  // Before the three choices, "Ask for replies only when needed" turned off
+  // meant every labelled message asked.
+  const replies =
+    settings.agentMessagesReplies ??
+    (settings.agentMessagesRequireReply === false ? "always" : "whenNeeded");
+  const repliesSubtitle = {
+    never: t("No message asks; answers stay in the other session."),
+    whenNeeded: t("The sending agent decides for each message."),
+    always: t("Every message but a reply asks."),
+  }[replies];
   const steerOnOwn = t("Let agents decide when to steer");
   return (
     <>
@@ -77,17 +87,17 @@ export function AgentMessagesRow({
             onCheckedChange={(value) => set("agentMessagesAsUser", value)}
           />
         </Row>
-        <Row
-          title={askWhenNeeded}
-          subtitle={t(
-            "The sending agent decides. Off: every labelled message asks.",
-          )}
-        >
-          <Switch
-            aria-label={askWhenNeeded}
-            checked={settings.agentMessagesRequireReply !== false}
+        <Row title={askForReplies} subtitle={repliesSubtitle}>
+          <Menu
+            label={askForReplies}
+            value={replies}
             disabled={pending}
-            onCheckedChange={(value) => set("agentMessagesRequireReply", value)}
+            change={(value) => set("agentMessagesReplies", value)}
+            options={[
+              ["never", t("Don't ask")],
+              ["whenNeeded", t("Only when needed")],
+              ["always", t("Always ask")],
+            ]}
           />
         </Row>
         {/* Off unless turned on: an agent then interrupts another session's

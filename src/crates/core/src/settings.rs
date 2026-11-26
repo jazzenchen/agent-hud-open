@@ -160,7 +160,6 @@ impl crate::AgentHudCore {
             | "claudeAnswers"
             | "agentMessages"
             | "agentMessagesAsUser"
-            | "agentMessagesRequireReply"
             | "agentMessagesSteerOnOwn"
             | "claudeMessages"
             | "deepseekMessages"
@@ -172,6 +171,9 @@ impl crate::AgentHudCore {
             | "launchAtLogin"
             | "hudVisible"
                 if value.is_boolean() => {}
+            // Which agents' messages ask for a reply.
+            "agentMessagesReplies"
+                if matches!(value.as_str(), Some("never" | "whenNeeded" | "always")) => {}
             // Passes in a row agents may message each other before the user
             // looks; null for no limit.
             "agentMessagesLimit"

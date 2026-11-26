@@ -146,7 +146,9 @@ export interface AppSettings {
   agentMessages?: boolean;
   /** Agents' messages go in as the user's own words, with no label. */
   agentMessagesAsUser?: boolean;
-  /** The sending agent says of each message whether it needs a reply; on unless turned off. */
+  /** Which agents' messages ask for a reply: none, those the sending agent says need one (the default), or every message but a reply. */
+  agentMessagesReplies?: "never" | "whenNeeded" | "always";
+  /** Before agentMessagesReplies: false was "always". Read only when that is unset. */
   agentMessagesRequireReply?: boolean;
   /** Agents steer on their own to correct a turn in progress; off unless turned on. */
   agentMessagesSteerOnOwn?: boolean;

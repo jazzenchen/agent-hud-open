@@ -371,7 +371,11 @@ fn a_steer_an_agent_may_choose_asks_for_no_reply_of_its_own() {
         let mut world = World::new(Preferences {
             enabled: true,
             steer_on_own,
-            require_reply,
+            replies: if require_reply {
+                Replies::WhenNeeded
+            } else {
+                Replies::Always
+            },
             limit: Some(10),
             ..Default::default()
         });
