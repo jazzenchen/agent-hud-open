@@ -23,6 +23,7 @@ impl SessionStarts {
                 .then_with(|| b["id"].as_str().cmp(&a["id"].as_str()))
         });
         let mut offers = Vec::new();
+        let mut claude = None;
         for provider in STARTED {
             // Each only where it is installed: Antigravity's app alone will
             // do; Pi and OpenCode need their command line.
@@ -49,7 +50,16 @@ impl SessionStarts {
                 else {
                     continue;
                 };
-                if !folder.is_dir() || !self.accepts(provider, &folder) {
+                if !folder.is_dir() {
+                    continue;
+                }
+                // Claude Code's settings, read once for every folder.
+                if provider == Provider::Claude
+                    && !super::trust::trusts(
+                        claude.get_or_insert_with(|| self.claude_trust()),
+                        &folder,
+                    )
+                {
                     continue;
                 }
                 let written = self.written(&folder);

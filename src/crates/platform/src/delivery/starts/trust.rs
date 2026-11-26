@@ -67,12 +67,17 @@ impl SessionStarts {
         if provider != Provider::Claude {
             return true;
         }
-        trusts(&read_json(&self.claude_settings()), folder)
+        trusts(&self.claude_trust(), folder)
+    }
+    /// Claude Code's settings, which hold the folders it trusts (`trusts`).
+    /// The file runs to hundreds of kilobytes: read it once for many folders.
+    pub(super) fn claude_trust(&self) -> Value {
+        read_json(&self.claude_settings())
     }
 }
 
 /// Whether Claude Code's `settings` trust `folder` or a folder above it.
-fn trusts(settings: &Value, folder: &Path) -> bool {
+pub(super) fn trusts(settings: &Value, folder: &Path) -> bool {
     let Some(projects) = settings["projects"].as_object() else {
         return false;
     };
