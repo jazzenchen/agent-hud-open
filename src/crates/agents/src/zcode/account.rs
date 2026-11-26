@@ -11,9 +11,7 @@ use serde_json::{json, Value};
 use std::time::Duration;
 
 mod credentials;
-use credentials::{
-    detect_version, extract_profile, str_field, v2_dir, Opener, MAX_JSON,
-};
+use credentials::{detect_version, extract_profile, str_field, v2_dir, Opener, MAX_JSON};
 
 const BALANCE_URL: &str = "https://zcode.z.ai/api/v1/zcode-plan/billing/balance";
 

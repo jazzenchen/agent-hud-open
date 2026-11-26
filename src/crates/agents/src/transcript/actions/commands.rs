@@ -99,7 +99,10 @@ fn literal(source: &str) -> Option<String> {
 /// What a shell call printed and its exit code, where the output is the JSON
 /// Codex wraps them in (`{"output","metadata":{"exit_code"}}`) or names an
 /// exit code in passing; else the text as it is.
-pub(super) fn shell_output(text: &str) -> (String, Option<i64>) {
+/// `command` says the call ran a command: only then is an exit code looked
+/// for in plain output, where any other call's text (a file's lines, say)
+/// can hold the same words.
+pub(super) fn shell_output(text: &str, command: bool) -> (String, Option<i64>) {
     if text.trim_start().starts_with('{') {
         if let Ok(value) = serde_json::from_str::<Value>(text) {
             if let Some(output) = value["output"].as_str() {
@@ -109,6 +112,9 @@ pub(super) fn shell_output(text: &str) -> (String, Option<i64>) {
                 return (output.to_owned(), exit);
             }
         }
+    }
+    if !command {
+        return (text.to_owned(), None);
     }
     let exit = ["\"exit_code\":", "\\\"exit_code\\\":"]
         .iter()

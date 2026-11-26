@@ -29,7 +29,12 @@ pub(crate) fn overlay(ip: std::net::Ipv4Addr) -> bool {
 /// another tunnel is not, since its connection does not arrive on a LAN
 /// address; nor is one a router forwards from outside, whose address is
 /// public. A caller on this device itself is.
-pub(crate) fn nearby(peer: std::net::IpAddr, here: std::net::IpAddr, lan: &[String]) -> bool {
+pub(crate) fn nearby(
+    peer: std::net::IpAddr,
+    here: std::net::IpAddr,
+    lan: &[String],
+    tailscale: &[String],
+) -> bool {
     use std::net::IpAddr::V4;
     if peer.is_loopback() {
         return true;
@@ -37,7 +42,9 @@ pub(crate) fn nearby(peer: std::net::IpAddr, here: std::net::IpAddr, lan: &[Stri
     let (V4(peer), V4(here)) = (peer, here) else {
         return false;
     };
-    (overlay(peer) && overlay(here))
+    // Another network can hand out the same range (a carrier, NetBird): only
+    // this device's own Tailscale address counts.
+    (overlay(peer) && tailscale.contains(&here.to_string()))
         || ((peer.is_private() || peer.is_link_local())
             && !overlay(here)
             && lan.contains(&here.to_string()))
@@ -51,11 +58,13 @@ mod tests {
     #[test]
     fn nearby_is_a_private_caller_on_a_lan_address() {
         let lan = ["192.168.1.19".to_string()];
+        let tailscale = ["100.69.88.16".to_string()];
         let at = |peer: [u8; 4], here: [u8; 4]| {
             nearby(
                 Ipv4Addr::from(peer).into(),
                 Ipv4Addr::from(here).into(),
                 &lan,
+                &tailscale,
             )
         };
         assert!(at([192, 168, 1, 40], [192, 168, 1, 19]));
@@ -64,9 +73,12 @@ mod tests {
             Ipv4Addr::new(172, 20, 10, 1).into(),
             Ipv4Addr::new(172, 20, 10, 4).into(),
             &["172.20.10.4".to_string()],
+            &[],
         ));
         // Tailscale: the caller and this device's own address are in its range.
         assert!(at([100, 66, 108, 61], [100, 69, 88, 16]));
+        // The same range on an address that is not this device's Tailscale one.
+        assert!(!at([100, 66, 108, 61], [100, 70, 1, 2]));
         // A Tailscale address is no caller's on the LAN, nor a LAN caller's on the tunnel.
         assert!(!at([100, 66, 108, 61], [192, 168, 1, 19]));
         assert!(!at([192, 168, 1, 40], [100, 69, 88, 16]));
@@ -77,12 +89,14 @@ mod tests {
         assert!(nearby(
             Ipv4Addr::LOCALHOST.into(),
             Ipv4Addr::LOCALHOST.into(),
+            &[],
             &[]
         ));
         assert!(!nearby(
             "fd7a:115c:a1e0::1".parse().unwrap(),
             Ipv4Addr::new(192, 168, 1, 19).into(),
             &lan,
+            &tailscale,
         ));
     }
 

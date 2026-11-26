@@ -252,6 +252,30 @@ fn antigravity_writes_each_argument_as_json_in_a_string() {
 }
 
 #[test]
+fn another_clients_tools_of_the_same_names_are_read_as_written() {
+    // An MCP server's write_file, from Claude Code: the file's text is JSON.
+    let written = actions(
+        "mcp__filesystem__write_file",
+        &json!({"path":"/p/package.json","content":"{\"name\":\"shop\"}"}),
+    );
+    assert_eq!(written[0]["edit"]["path"], "/p/package.json");
+    assert_eq!(written[0]["edit"]["lines"], json!(["+{\"name\":\"shop\"}"]));
+}
+
+#[test]
+fn an_exit_code_is_read_from_a_commands_output_only() {
+    let printed = "{\"exit_code\": 1, \"note\": \"from a file\"}\n";
+    assert_eq!(result(Some(printed), false, false)["failed"], false);
+    assert_eq!(
+        result(Some("x \"exit_code\": 2"), false, true)["failed"],
+        true
+    );
+    // A log's own wrapper still says so for any call.
+    let wrapped = r#"{"output":"patch failed","metadata":{"exit_code":1}}"#;
+    assert_eq!(result(Some(wrapped), false, false)["failed"], true);
+}
+
+#[test]
 fn tools_of_no_kind_have_no_action() {
     for (name, arguments) in [
         ("Read", json!({"file_path":"/p/a.rs"})),
@@ -332,7 +356,7 @@ fn rules_text_hash() -> u64 {
 /// and records only the new hash.
 #[test]
 fn the_rules_version_is_raised_with_the_rules() {
-    const RECORDED: (u32, u64) = (3, 3_400_997_244_322_698_815);
+    const RECORDED: (u32, u64) = (4, 9_254_088_966_552_192_592);
     assert_eq!(
         (VERSION, rules_text_hash()),
         RECORDED,

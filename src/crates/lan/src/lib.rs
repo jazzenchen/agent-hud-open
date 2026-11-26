@@ -20,10 +20,10 @@ mod os;
 pub mod server;
 
 /// Whether a caller at `peer`, taken on this device's address `here`, is on
-/// the device's own network and not a tunnel or the internet (the listener's
+/// the device's own network or its Tailscale, not another tunnel or the internet (the listener's
 /// own rule, `Request::nearby`), for a host that listens beside it.
 pub fn nearby(peer: std::net::IpAddr, here: std::net::IpAddr) -> bool {
-    os::nearby(peer, here, &os::addresses())
+    os::nearby(peer, here, &os::addresses(), &os::overlay_addresses())
 }
 
 /// This device's addresses a caller can reach it at: those on its own network

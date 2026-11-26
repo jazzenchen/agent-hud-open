@@ -40,7 +40,7 @@ use plan::{plan_set, task_update, update_plan};
 /// from before a rule shows what the rule now reads. Raise it with every
 /// change to what a call reads as: a tool newly read, a field added or cut
 /// differently. `the_rules_version_is_raised_with_the_rules` holds the door.
-pub const VERSION: u32 = 3;
+pub const VERSION: u32 = 4;
 
 /// The most of a command that is kept, in bytes.
 pub const COMMAND_BYTES: usize = 2 * 1024;
@@ -69,12 +69,15 @@ pub fn actions(name: &str, arguments: &Value) -> Vec<Value> {
         _ => arguments,
     };
     let tool = name.rsplit("__").next().unwrap_or(name);
-    // Antigravity writes each argument as JSON inside a string.
+    // Antigravity writes each argument as JSON inside a string. Other clients
+    // share these tool names (an MCP server's `write_file`), so only where
+    // every argument is written so: a file's text that is JSON stays text.
     let unwrapped;
     let arguments = if matches!(
         tool,
         "edit_file" | "write_file" | "run_command" | "update_steps"
-    ) {
+    ) && all_json(arguments)
+    {
         unwrapped = unwrap(arguments);
         &unwrapped
     } else {
@@ -136,6 +139,19 @@ fn unwrap(arguments: &Value) -> Value {
         .into()
 }
 
+/// Whether every argument of an object is a string holding JSON, as
+/// Antigravity writes them, and there is one.
+fn all_json(arguments: &Value) -> bool {
+    arguments.as_object().is_some_and(|object| {
+        !object.is_empty()
+            && object.values().all(|value| {
+                value
+                    .as_str()
+                    .is_some_and(|text| serde_json::from_str::<Value>(text).is_ok())
+            })
+    })
+}
+
 /// The most files one call hands over that are kept, and of each path.
 const SHOWN_FILES: usize = 20;
 const PATH_BYTES: usize = 1024;
@@ -171,10 +187,11 @@ pub fn keeps_output(actions: &[Value]) -> bool {
 /// output is its end, with how many bytes before it were left out; any other
 /// call's is kept, shortly, only when it failed. `failed` is the log's own
 /// word for it where it has one (Claude's `is_error`); an exit code in the
-/// output says so too.
+/// output says so too: in a command's output only, or in the log's own
+/// wrapper of a result.
 pub fn result(text: Option<&str>, failed: bool, keep_output: bool) -> Value {
     let text = text.unwrap_or_default();
-    let (output, exit) = shell_output(text);
+    let (output, exit) = shell_output(text, keep_output);
     let failed = failed || exit.is_some_and(|code| code != 0);
     let mut result = json!({"failed":failed});
     let limit = if keep_output {

@@ -33,9 +33,14 @@ pub(super) fn connection<R: Record>(
     socket
         .set_write_timeout(Some(Duration::from_secs(15)))
         .map_err(|_| "LAN write deadline")?;
-    let nearby = socket
-        .local_addr()
-        .is_ok_and(|here| crate::os::nearby(address.ip(), here.ip(), &crate::os::addresses()));
+    let nearby = socket.local_addr().is_ok_and(|here| {
+        crate::os::nearby(
+            address.ip(),
+            here.ip(),
+            &crate::os::addresses(),
+            &crate::os::overlay_addresses(),
+        )
+    });
     let session = rustls::ServerConnection::new(shared.identity.tls.clone())
         .map_err(|_| "LAN TLS session")?;
     let mut stream = rustls::StreamOwned::new(session, socket);

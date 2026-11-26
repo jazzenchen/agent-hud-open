@@ -277,6 +277,7 @@ impl Transcripts {
                         row["text"].as_str().unwrap_or_default().to_owned()
                     },
                     at_ms: Some(at),
+                    detail: None,
                 })
             };
             store
@@ -2920,6 +2921,7 @@ fn an_antigravity_answer_flies_back_once_the_store_reads_it() {
             kind: FeedKind::Text,
             text: "A runner's wrist, the watch face lit.".into(),
             at_ms: Some(sent + 3_000),
+            detail: None,
         }),
         Fact::TurnEnded {
             turn: "step-5".into(),
@@ -2986,6 +2988,7 @@ fn an_antigravity_answer_the_store_cannot_tie_to_the_message_flies_only_its_repl
             kind: FeedKind::Text,
             text: text.into(),
             at_ms: Some(sent + order as i64),
+            detail: None,
         })
     };
     world.antigravity_facts(vec![
