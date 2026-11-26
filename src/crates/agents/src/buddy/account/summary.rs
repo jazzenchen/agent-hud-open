@@ -205,7 +205,7 @@ fn post_web(
         })
         .map_err(|failure| match failure {
             HttpFailure::Status(401) => Unread::SignedOut(tr!(
-                "{{site}}'s sign-in in Agent HUD has ended; sign in again from its quota.",
+                "{{site}}'s sign-in in Agent HUD has ended. Sign in again on its page in Settings > Agents, or below its quota in the HUD panel.",
                 site = "WorkBuddy"
             )),
             other => other.unread(),

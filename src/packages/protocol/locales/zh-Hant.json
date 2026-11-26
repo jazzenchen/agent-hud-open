@@ -1412,7 +1412,7 @@
   "{{seconds}} s": "{{seconds}} 秒",
   "{{seconds}}s": "{{seconds}}秒",
   "{{shown}} of {{total}}": "{{shown}}/{{total}}",
-  "{{site}}'s sign-in in Agent HUD has ended; sign in again from its quota.": "{{site}} 在 Agent HUD 中的登入已失效，請在它的額度處重新登入",
+  "{{site}}'s sign-in in Agent HUD has ended. Sign in again on its page in Settings > Agents, or below its quota in the HUD panel.": "{{site}} 在 Agent HUD 中的登入已失效。請到 設定 > Agent 裡它的頁面重新登入，或在 HUD 面板裡它的額度下方點「登入」",
   "{{times}} ran out": "{{times}} 次用滿",
   "{{tokens}} more tokens came from models with no API list price and are not included": "另有 {{tokens}} 個 Token 來自沒有 API 價格的模型，未計入",
   "{{tokens}} more tokens came from models with no API list price and are not included: {{models}}": "另有 {{tokens}} 個 Token 來自沒有 API 價格的模型，未計入：{{models}}",

@@ -1412,7 +1412,7 @@
   "{{seconds}} s": "{{seconds}} 秒",
   "{{seconds}}s": "{{seconds}}秒",
   "{{shown}} of {{total}}": "{{shown}}/{{total}}",
-  "{{site}}'s sign-in in Agent HUD has ended; sign in again from its quota.": "Agent HUD での {{site}} のサインインが切れました。使用上限の項目から再度サインインしてください。",
+  "{{site}}'s sign-in in Agent HUD has ended. Sign in again on its page in Settings > Agents, or below its quota in the HUD panel.": "Agent HUD での {{site}} のサインインが切れました。設定 > エージェント のページ、または HUD パネルの使用上限の下から再度サインインしてください。",
   "{{times}} ran out": "{{times}} 回上限に到達",
   "{{tokens}} more tokens came from models with no API list price and are not included": "API の公開価格がないモデルによる {{tokens}} トークンは含まれていません",
   "{{tokens}} more tokens came from models with no API list price and are not included: {{models}}": "API の公開価格がないモデルによる {{tokens}} トークンは含まれていません: {{models}}",

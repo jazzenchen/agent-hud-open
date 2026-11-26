@@ -1444,7 +1444,7 @@
   "{{seconds}} s": "{{seconds}} s",
   "{{seconds}}s": "{{seconds}} s",
   "{{shown}} of {{total}}": "{{shown}} von {{total}}",
-  "{{site}}'s sign-in in Agent HUD has ended; sign in again from its quota.": "Die Anmeldung von {{site}} in Agent HUD ist abgelaufen; melden Sie sich über sein Kontingent erneut an.",
+  "{{site}}'s sign-in in Agent HUD has ended. Sign in again on its page in Settings > Agents, or below its quota in the HUD panel.": "Die Anmeldung von {{site}} in Agent HUD ist abgelaufen. Melden Sie sich auf seiner Seite unter Einstellungen > Agenten oder unter seinem Kontingent im HUD-Bereich erneut an.",
   "{{times}} ran out": "{{times}} ausgeschöpft",
   "{{tokens}} more tokens came from models with no API list price and are not included": "Weitere {{tokens}} Tokens stammen von Modellen ohne API-Listenpreis und sind nicht enthalten",
   "{{tokens}} more tokens came from models with no API list price and are not included: {{models}}": "Weitere {{tokens}} Tokens stammen von Modellen ohne API-Listenpreis und sind nicht enthalten: {{models}}",

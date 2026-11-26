@@ -282,7 +282,7 @@ fn local_signed_out(name: &str) -> Unread {
 
 fn web_signed_out(site: &str) -> Unread {
     Unread::SignedOut(tr!(
-        "{{site}}'s sign-in in Agent HUD has ended; sign in again from its quota.",
+        "{{site}}'s sign-in in Agent HUD has ended. Sign in again on its page in Settings > Agents, or below its quota in the HUD panel.",
         site = site
     ))
 }

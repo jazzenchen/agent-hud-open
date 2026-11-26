@@ -1476,7 +1476,7 @@
   "{{seconds}} s": "{{seconds}} s",
   "{{seconds}}s": "{{seconds}} s",
   "{{shown}} of {{total}}": "{{shown}} de {{total}}",
-  "{{site}}'s sign-in in Agent HUD has ended; sign in again from its quota.": "O login de {{site}} no Agent HUD expirou; faça login novamente pela cota dele.",
+  "{{site}}'s sign-in in Agent HUD has ended. Sign in again on its page in Settings > Agents, or below its quota in the HUD panel.": "O login de {{site}} no Agent HUD expirou. Faça login novamente na página dele em Ajustes > Agentes, ou abaixo da cota no painel do HUD.",
   "{{times}} ran out": "Esgotou {{times}}",
   "{{tokens}} more tokens came from models with no API list price and are not included": "Mais {{tokens}} tokens vieram de modelos sem preço de tabela na API e não estão incluídos",
   "{{tokens}} more tokens came from models with no API list price and are not included: {{models}}": "Mais {{tokens}} tokens vieram de modelos sem preço de tabela na API e não estão incluídos: {{models}}",

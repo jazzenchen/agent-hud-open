@@ -1412,7 +1412,7 @@
   "{{seconds}} s": "{{seconds}}초",
   "{{seconds}}s": "{{seconds}}초",
   "{{shown}} of {{total}}": "{{total}}개 중 {{shown}}개",
-  "{{site}}'s sign-in in Agent HUD has ended; sign in again from its quota.": "Agent HUD에서의 {{site}} 로그인이 만료되었습니다. 사용량 한도에서 다시 로그인하세요.",
+  "{{site}}'s sign-in in Agent HUD has ended. Sign in again on its page in Settings > Agents, or below its quota in the HUD panel.": "Agent HUD에서의 {{site}} 로그인이 만료되었습니다. 설정 > 에이전트의 해당 페이지나 HUD 패널의 사용량 한도 아래에서 다시 로그인하세요.",
   "{{times}} ran out": "{{times}}회 소진",
   "{{tokens}} more tokens came from models with no API list price and are not included": "API 정가가 없는 모델에서 나온 토큰 {{tokens}}개는 포함되지 않았습니다",
   "{{tokens}} more tokens came from models with no API list price and are not included: {{models}}": "API 정가가 없는 모델에서 나온 토큰 {{tokens}}개는 포함되지 않았습니다: {{models}}",

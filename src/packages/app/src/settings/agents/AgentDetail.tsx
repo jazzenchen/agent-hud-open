@@ -17,6 +17,7 @@ import { LinkButton, ToggleRow } from "../SettingsControls";
 import { Notice, Page, Section } from "../SettingsPrimitives";
 import type { Translate } from "@agent-hud/ui/format";
 import { AgentAccounts } from "./AgentAccounts";
+import { AgentWebSignIn } from "./AgentWebSignIn";
 import { ClientAccounts } from "./ClientSections";
 import { ClientFeatures } from "./ClientFeatures";
 import { useClientInstalls } from "./ClientInstalls";
@@ -162,12 +163,23 @@ export function AgentDetail({
         installs={installs}
       />
       {openGroup ? (
-        <ClientAccounts
-          t={t}
-          snapshot={snapshot}
-          client={client}
-          openGroup={openGroup}
-        />
+        <>
+          {/* A web sign-in for the quota stays here too, where the notice
+           * asking for it shows, not only on the vendor's page. */}
+          <AgentWebSignIn
+            t={t}
+            source={source}
+            action={action}
+            perform={perform}
+            pending={pending}
+          />
+          <ClientAccounts
+            t={t}
+            snapshot={snapshot}
+            client={client}
+            openGroup={openGroup}
+          />
+        </>
       ) : (
         <AgentAccounts
           t={t}
