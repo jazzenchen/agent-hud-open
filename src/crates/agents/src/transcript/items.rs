@@ -77,6 +77,8 @@ pub struct LineItem {
     pub tool: Option<ToolCall>,
     /// The tool call this row asks for or answers.
     pub tool_call_id: Option<String>,
+    /// A tool's answer the log marks as an error.
+    pub failed: bool,
     /// When the line was written, as the line says it or in RFC 3339.
     pub timestamp: Option<String>,
     /// The user's own words: neither the context a client hands the model
@@ -130,6 +132,7 @@ impl Line {
             text: self::text(text),
             tool,
             tool_call_id,
+            failed: false,
             timestamp: self.timestamp.clone(),
             origin: self.origin.clone(),
         }

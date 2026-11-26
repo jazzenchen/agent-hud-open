@@ -37,9 +37,14 @@ pub struct Item {
     pub order: u64,
     pub role: Role,
     pub kind: Kind,
-    /// Text items: the words. Tool items: the tool's name. Thinking: what the
-    /// log holds (Claude logs none).
+    /// Text items: the words. Tool items: the tool's name, or nothing for
+    /// what a call returned. Thinking: what the log holds (Claude logs none).
     pub text: String,
+    /// Tool items of a call that is a plan step, an edit or a command: JSON
+    /// `{"call","actions":[…]}`, the actions as `agents::transcript::actions`
+    /// shapes them. What such a call returned: `{"result":{"call","failed",
+    /// "output"?,"outputCut"?}}`. None for every other item.
+    pub detail: Option<String>,
     /// When the line says it was written, in Unix milliseconds.
     pub at_ms: Option<i64>,
 }

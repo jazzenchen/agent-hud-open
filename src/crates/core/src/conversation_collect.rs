@@ -5,10 +5,12 @@
 //! needs no second read and no look-back.
 use crate::conversation_feed::{Fact, Item, Kind, Role};
 use agent_hud_agents::transcript::{
+    actions,
     items::{self, LineItem, LineKind, LineRole},
     Log,
 };
-use serde_json::Value;
+use serde_json::{json, Value};
+use std::collections::HashMap;
 
 /// The log's turn just before a line is parsed.
 #[derive(Clone, PartialEq, Eq)]
@@ -33,7 +35,14 @@ pub(crate) fn before(log: &Log) -> Before {
 pub(crate) struct Gathered {
     pub facts: Vec<Fact>,
     pub awaiting: Option<String>,
+    /// The calls whose actions were kept and whose results are still to
+    /// come, by call id: whether what the call returns is kept whole (a
+    /// command's output). Kept between reads of the log, like `awaiting`.
+    pub open: HashMap<String, bool>,
 }
+
+/// The most calls waiting for a result that one log is remembered to have.
+const OPEN_CALLS: usize = 256;
 
 impl Gathered {
     /// A turn's start, with the prompt its first line holds, if any.
@@ -63,10 +72,63 @@ impl Gathered {
                 self.name_prompt(turn.clone().unwrap_or_default(), line);
                 continue;
             }
-            if let Some(item) = item(line, turn, offset, index, at_ms, starts) {
+            if let Some(mut item) = item(line, turn, offset, index, at_ms, starts) {
+                self.act(line, &mut item);
                 self.facts.push(Fact::Item(item));
+            } else if let Some(result) = self.result(line, turn, offset, index, at_ms) {
+                self.facts.push(Fact::Item(result));
             }
         }
+    }
+
+    /// Gives a tool call's item its actions (a plan step, an edit, a
+    /// command), and remembers the call until its result comes.
+    fn act(&mut self, line: &LineItem, item: &mut Item) {
+        let Some(tool) = line.tool.as_ref().filter(|_| item.kind == Kind::Tool) else {
+            return;
+        };
+        let found = actions::actions(&tool.name, &tool.arguments);
+        if found.is_empty() {
+            return;
+        }
+        let call = tool.id.clone().unwrap_or_else(|| line.id.clone());
+        if self.open.len() < OPEN_CALLS {
+            self.open
+                .insert(call.clone(), actions::keeps_output(&found));
+        }
+        item.detail = Some(json!({"call":call,"actions":found}).to_string());
+    }
+
+    /// The item of what a remembered call returned: a tool item of no name.
+    fn result(
+        &mut self,
+        line: &LineItem,
+        turn: &Option<String>,
+        offset: u64,
+        index: usize,
+        at_ms: Option<i64>,
+    ) -> Option<Item> {
+        if line.tool.is_some() || line.kind != LineKind::Tool {
+            return None;
+        }
+        let call = line.tool_call_id.as_ref()?;
+        let keeps = self.open.remove(call)?;
+        let mut result = actions::result(line.text.as_deref(), line.failed, keeps);
+        result["call"] = json!(call);
+        Some(Item {
+            turn: turn.clone(),
+            id: format!("{}:result", line.id),
+            order: order(offset, index),
+            role: Role::Assistant,
+            kind: Kind::Tool,
+            text: String::new(),
+            detail: Some(json!({"result":result}).to_string()),
+            at_ms: line
+                .timestamp
+                .as_deref()
+                .and_then(crate::metering::date_ms)
+                .or(at_ms),
+        })
     }
 
     /// The words of a turn that started without them: its start in this read
@@ -170,18 +232,24 @@ pub(crate) fn item(
     Some(Item {
         turn: turn.clone(),
         id: line.id.clone(),
-        order: offset
-            .saturating_mul(64)
-            .saturating_add(index.min(63) as u64),
+        order: order(offset, index),
         role,
         kind,
         text,
+        detail: None,
         at_ms: line
             .timestamp
             .as_deref()
             .and_then(crate::metering::date_ms)
             .or(at_ms),
     })
+}
+
+/// Where an entry is in its log (`Item::order`).
+fn order(offset: u64, index: usize) -> u64 {
+    offset
+        .saturating_mul(64)
+        .saturating_add(index.min(63) as u64)
 }
 
 fn timestamp(value: &Value) -> Option<i64> {

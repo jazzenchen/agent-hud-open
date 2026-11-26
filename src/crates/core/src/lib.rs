@@ -164,6 +164,9 @@ pub struct AgentHudCore {
     /// Each log's turn that started without the user's words, until its
     /// first prompt line names them (`conversation_collect::Gathered`).
     conversation_awaiting: HashMap<PathBuf, String>,
+    /// Each log's tool calls whose results are still to come
+    /// (`conversation_collect::Gathered::open`).
+    conversation_calls: HashMap<PathBuf, HashMap<String, bool>>,
     workbuddy_metering: agent_hud_agents::buddy::transcript::WorkBuddyMeteringReading,
     /// What each listed session's row shows of its breakdown (a key of its
     /// logs' read offsets, and the value), until its logs move.
@@ -275,6 +278,7 @@ impl AgentHudCore {
             conversation_positions: None,
             conversation_gaps: BTreeMap::new(),
             conversation_awaiting: HashMap::new(),
+            conversation_calls: HashMap::new(),
             workbuddy_metering: Default::default(),
             session_rows: Default::default(),
         }

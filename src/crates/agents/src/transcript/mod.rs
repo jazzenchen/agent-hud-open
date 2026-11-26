@@ -2,6 +2,7 @@
 //! (`Log`), its live session facts (`LiveLog`), its usage and meter events,
 //! and the records a database source yields. Each client's parser lives in its
 //! own folder (`<client>/transcript.rs`).
+pub mod actions;
 mod activity;
 mod call_timing;
 pub mod carried_usage;

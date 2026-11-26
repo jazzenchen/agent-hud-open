@@ -384,3 +384,73 @@ fn a_codex_turn_takes_the_prompt_that_follows_its_start() {
         "the prompt is the turn's, not an item; a steer is the user's words"
     );
 }
+
+#[test]
+fn a_command_and_an_edit_carry_their_actions_and_a_later_read_their_results() {
+    let home = tempfile::tempdir().unwrap();
+    let root = home.path().join(".claude/projects/p");
+    std::fs::create_dir_all(&root).unwrap();
+    let path = root.join(format!("{ID}.jsonl"));
+    let t = Utc::now().timestamp_millis() - 600_000;
+    write(
+        &path,
+        &[
+            prompt(t, "prompt-1", "Fix the build"),
+            said(
+                t + 1_000,
+                json!([{"type":"tool_use","id":"tu1","name":"Bash","input":{"command":"cargo build"}}]),
+                Some("tool_use"),
+            ),
+            said(
+                t + 1_500,
+                json!([{"type":"tool_use","id":"tu2","name":"Read","input":{"file_path":"/p/a.rs"}}]),
+                Some("tool_use"),
+            ),
+            result(t + 1_600, "tu2"),
+        ],
+        false,
+    );
+    let store = Arc::new(Store::default());
+    let mut core = fixture(home.path());
+    core.set_conversation_sink(Some(store.clone()));
+    core.request("snapshot", json!({})).unwrap();
+    let details = |facts: &[Fact]| {
+        facts
+            .iter()
+            .filter_map(|fact| match fact {
+                Fact::Item(item) if item.kind == Kind::Tool => Some((
+                    item.text.clone(),
+                    item.detail
+                        .as_deref()
+                        .map(|detail| serde_json::from_str::<Value>(detail).unwrap()),
+                )),
+                _ => None,
+            })
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(
+        details(&store.take()),
+        vec![
+            (
+                "Bash".to_owned(),
+                Some(json!({"call":"tu1","actions":[{"command":"cargo build"}]}))
+            ),
+            // A tool of no kind keeps its name alone, and its result nothing.
+            ("Read".to_owned(), None),
+        ]
+    );
+
+    // The command's result comes in a later read, and is still its own.
+    let failed = json!({"type":"user","sessionId":ID,"timestamp":iso(t + 4_000),"uuid":"r1","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"tu1","is_error":true,"content":"error[E0425]: cannot find value"}]}});
+    write(&path, &[failed], true);
+    core.request("snapshot", json!({})).unwrap();
+    assert_eq!(
+        details(&store.take()),
+        vec![(
+            String::new(),
+            Some(
+                json!({"result":{"call":"tu1","failed":true,"output":"error[E0425]: cannot find value"}})
+            )
+        )]
+    );
+}

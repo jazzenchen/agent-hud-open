@@ -127,13 +127,17 @@ pub fn message(value: &Value, item: &Value, offset: u64, prompt: bool) -> Vec<Li
                     )),
                     &block["id"],
                 )),
-                Some("tool_result") => rows.push(line.item(
-                    key,
-                    "tool",
-                    block["content"].clone(),
-                    None,
-                    &block["tool_use_id"],
-                )),
+                Some("tool_result") => {
+                    let mut row = line.item(
+                        key,
+                        "tool",
+                        block["content"].clone(),
+                        None,
+                        &block["tool_use_id"],
+                    );
+                    row.failed = block["is_error"] == true;
+                    rows.push(row);
+                }
                 _ => {}
             }
         }
