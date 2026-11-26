@@ -34,6 +34,14 @@ use edits::{edit, notebook, patch, patch_text, write};
 pub use plan::Plan;
 use plan::{plan_set, task_update, update_plan};
 
+/// The version of these rules: which tools are read, and into what. A store
+/// that keeps actions notes the version each was read with; an app whose
+/// rules are newer reads the older ones again from their logs, so a session
+/// from before a rule shows what the rule now reads. Raise it with every
+/// change to what a call reads as: a tool newly read, a field added or cut
+/// differently. `the_rules_version_is_raised_with_the_rules` holds the door.
+pub const VERSION: u32 = 2;
+
 /// The most of a command that is kept, in bytes.
 pub const COMMAND_BYTES: usize = 2 * 1024;
 /// The most of what a command printed that is kept: its end, in bytes.
@@ -89,11 +97,6 @@ pub fn actions(name: &str, arguments: &Value) -> Vec<Value> {
         "exec" => arguments.as_str().map(script).unwrap_or_default(),
         _ => Vec::new(),
     }
-}
-
-/// Whether a tool of this name hands its user files to look at.
-pub fn hands_over_files(name: &str) -> bool {
-    name.rsplit("__").next().unwrap_or(name) == "SendUserFile"
 }
 
 /// The most files one call hands over that are kept, and of each path.

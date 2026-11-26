@@ -272,3 +272,33 @@ fn an_edit_that_worked_keeps_nothing_of_its_answer() {
         json!({"failed":true,"output":"String to replace not found in file."})
     );
 }
+
+/// A plain hash of the rules' own text (FNV-1a), to notice that it changed.
+fn rules_text_hash() -> u64 {
+    [
+        include_str!("actions.rs"),
+        include_str!("actions/plan.rs"),
+        include_str!("actions/edits.rs"),
+        include_str!("actions/commands.rs"),
+    ]
+    .iter()
+    .flat_map(|text| text.bytes())
+    .fold(0xcbf2_9ce4_8422_2325u64, |hash, byte| {
+        (hash ^ u64::from(byte)).wrapping_mul(0x0000_0100_0000_01b3)
+    })
+}
+
+/// The rules changed since their version was last recorded here. If what
+/// any call reads as changed (a tool newly read, another field, another
+/// bound), raise `VERSION`: stores then read their older items again. Then
+/// record the new pair below. A change of wording alone keeps the version
+/// and records only the new hash.
+#[test]
+fn the_rules_version_is_raised_with_the_rules() {
+    const RECORDED: (u32, u64) = (2, 12_198_989_889_037_029_865);
+    assert_eq!(
+        (VERSION, rules_text_hash()),
+        RECORDED,
+        "the action rules changed: see this test's note"
+    );
+}
