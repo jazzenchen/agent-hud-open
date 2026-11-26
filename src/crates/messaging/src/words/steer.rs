@@ -90,7 +90,7 @@ pub fn steer_waits(language: Language) -> String {
 pub fn nothing_to_read(language: Language) -> String {
     tr_in(
         language,
-        "No message waits for this turn. Go on with your work.",
+        "No message waits for this turn. If a notice named one, it came late from an earlier turn that was stopped, and that message did not go in. Go on with your work; there is nothing to tell the user about it.",
     )
 }
 /// What comes with the messages read_message returns.
