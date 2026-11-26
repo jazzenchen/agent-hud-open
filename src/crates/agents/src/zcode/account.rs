@@ -1,5 +1,5 @@
 //! ZCode's (`id: "zcode"`) read-only local account reader.
-//! Opens `~/.zcode/v2/credentials.json` (`enc:v1:` AES-256-GCM credentials)
+//! Opens `~/.zcode/v2/credentials.json` (`enc:v1:` and `enc:v2:` AES-256-GCM credentials)
 //! in memory and queries `https://zcode.z.ai/api/v1/zcode-plan/billing/balance`.
 use crate::account::{
     account_id, read_json_bounded, status, Answer, Host, HttpFailure, HttpRequest, Provider,
@@ -12,8 +12,7 @@ use std::time::Duration;
 
 mod credentials;
 use credentials::{
-    credential_key, detect_version, extract_profile, open_value, platform_name, str_field, v2_dir,
-    MAX_JSON,
+    detect_version, extract_profile, str_field, v2_dir, Opener, MAX_JSON,
 };
 
 const BALANCE_URL: &str = "https://zcode.z.ai/api/v1/zcode-plan/billing/balance";
@@ -33,41 +32,29 @@ pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
         }
         _ => return Err(auth_format().into()),
     };
-    let key = credential_key(host);
+    let opener = Opener::new(host, creds_path);
     let Some(raw_token) = creds.get("zcodejwttoken").and_then(Value::as_str) else {
         return Ok(Reading::empty("zcode"));
     };
     if raw_token.trim().is_empty() {
         return Ok(Reading::empty("zcode"));
     }
-    let jwt = open_value(raw_token, &key).ok_or_else(|| {
-        tr!(
-            "{{name}}'s encrypted sign-in could not be unlocked.",
-            name = "ZCode"
-        )
-    })?;
+    let jwt = opener.open(raw_token)?;
     if jwt.trim().is_empty() {
         return Ok(Reading::empty("zcode"));
     }
 
-    let (uid, email, name) = extract_profile(&creds, &key, &jwt);
+    let (uid, email, name) = extract_profile(&creds, &opener, &jwt);
     let version = detect_version(host);
-    let platform = platform_name(host.os());
-    let ua = format!("Mozilla/5.0 ZCode/{version}");
     let url = format!("{BALANCE_URL}?app_version={version}");
     let bearer = format!("Bearer {}", jwt.trim());
     let body = host
         .http_json(&HttpRequest {
             url: &url,
             secrets: &[("Authorization", &bearer)],
-            headers: &[
-                ("Accept", "application/json"),
-                ("Origin", "https://zcode.z.ai"),
-                ("Referer", "https://zcode.z.ai/"),
-                ("User-Agent", &ua),
-                ("X-ZCode-Version", &version),
-                ("X-ZCode-Platform", platform),
-            ],
+            // ZCode 4.0 sends only its sign-in and version, and the
+            // service refuses the browser and ZCode headers 3.x accepted.
+            headers: &[("Accept", "application/json")],
             body: None,
             timeout: Duration::from_secs(15),
         })

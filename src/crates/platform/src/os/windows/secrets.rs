@@ -183,3 +183,8 @@ mod tests {
         assert_eq!(stored_secret("unrelated-service"), Answer::Unsupported);
     }
 }
+
+/// Another app's keychain-style password: not read on this host yet.
+pub(crate) fn app_secret(_service: &str, _account: &str) -> Answer<String> {
+    Answer::Unsupported
+}

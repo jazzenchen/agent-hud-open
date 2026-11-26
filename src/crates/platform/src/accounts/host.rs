@@ -95,6 +95,9 @@ impl Host for AccountContext {
     fn unseal_safe_storage(&self, app: &str, encrypted: &[u8]) -> Answer<String> {
         crate::os::unseal_safe_storage(&self.folder(Base::AppData), app, encrypted)
     }
+    fn app_secret(&self, service: &str, account: &str) -> Answer<String> {
+        crate::os::app_secret(service, account)
+    }
     fn saved_credential(&self, agent: &str) -> Result<Option<Value>, String> {
         if agent == agent_hud_agents::relays::MANUAL {
             return credentials::relay_sources(self).map(Some);

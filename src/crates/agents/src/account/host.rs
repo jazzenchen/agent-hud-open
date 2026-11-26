@@ -246,6 +246,13 @@ pub trait Host {
     fn unseal_safe_storage(&self, _app: &str, _encrypted: &[u8]) -> Answer<String> {
         Answer::Unsupported
     }
+    /// The password an app keeps in the system's credential store under
+    /// `service` and `account`. The first read may ask the user to allow it,
+    /// and a refusal holds until Agent HUD restarts; `Unsupported` where this
+    /// OS's store is not read yet.
+    fn app_secret(&self, _service: &str, _account: &str) -> Answer<String> {
+        Answer::Unsupported
+    }
     /// The API credential the user saved in Agent HUD for this agent, if any.
     fn saved_credential(&self, agent: &str) -> Result<Option<Value>, String>;
     /// The session the user signed in with on `host` in Agent HUD's window

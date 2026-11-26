@@ -1,6 +1,7 @@
-use super::credentials::{credential_key_from_secret, open_value};
+use super::credentials::{credential_key_from_secret, open_value, Opener};
 use super::*;
 use crate::account::fake::FakeHost;
+use crate::account::Answer;
 use crate::account::HttpFailure;
 use serde_json::json;
 
@@ -83,4 +84,82 @@ fn decrypts_official_enc_v1_fixture_and_queries_zcode_balance_with_bundle_versio
         Err(HttpFailure::Status(401)),
     );
     assert_eq!(read(&expired).err().unwrap().kind(), "signedOut");
+}
+
+const V2_PATH: &str = "/tmp/zc/.zcode/v2/credentials.json";
+/// SHA-256 of `V2_PATH`, the account ZCode 4.0 files the key under.
+const V2_ACCOUNT: &str = "7705846726fe089de3f93b1eb4ad0e7582a7e91a92516cb49f3564700e7f0807";
+/// Sealed by Node's crypto as ZCode 4.0 does, under 32 bytes of 7.
+const V2_OS: &str = "enc:v2:os:4bb06f8e4e3a7715d201d573:AQEBAQEBAQEBAQEB.olvYDp-KcMF_owVnlh9o6A.ANOk0fnHmHujsfFVH1wVXw";
+const V2_OS_KEY: &str = "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc";
+
+fn v2_host(key: Answer<String>) -> FakeHost {
+    let mut host = FakeHost::new("/tmp/zc");
+    host.secrets
+        .insert(format!("ZCode Credential Encryption|{V2_ACCOUNT}"), key);
+    host
+}
+
+#[test]
+fn opens_zcode_4_values_with_the_key_from_the_credential_store() {
+    let host = v2_host(Answer::Found(format!("{V2_OS_KEY}\n")));
+    let opener = Opener::new(&host, V2_PATH.into());
+    assert_eq!(opener.open(V2_OS).unwrap(), "v2-fixture-token");
+}
+
+#[test]
+fn zcode_4_values_under_another_key_are_not_unlocked() {
+    let host = v2_host(Answer::Found(
+        "CAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg".into(),
+    ));
+    let opener = Opener::new(&host, V2_PATH.into());
+    assert_eq!(
+        opener.open(V2_OS).unwrap_err().reason(),
+        "ZCode's encrypted sign-in could not be unlocked."
+    );
+}
+
+#[test]
+fn zcode_4_says_why_its_key_could_not_be_read_instead_of_signed_out() {
+    for (answer, kind, reason) in [
+        (Answer::Denied, "failed", "ZCode encrypted its sign-in, and keychain access was refused. Agent HUD asks again after it restarts."),
+        (Answer::Missing, "failed", "ZCode encrypted its sign-in, but its keychain item is missing."),
+        (Answer::Unsupported, "failed", "ZCode encrypted its sign-in; this system cannot unlock it yet."),
+    ] {
+        let host = v2_host(answer).file(
+            V2_PATH,
+            &json!({ "zcodejwttoken": V2_OS }).to_string(),
+        );
+        let unread = read(&host).err().unwrap();
+        assert_eq!((unread.kind(), unread.reason()), (kind, reason));
+        assert!(host.asked.borrow().is_empty());
+    }
+}
+
+#[test]
+fn opens_zcode_4_values_under_a_managed_secret_file() {
+    let host = FakeHost::new("/tmp/zc").file(
+        "/tmp/zc/.zcode/v2/credential-secret",
+        "managed-secret-0123456789abcdefghijklmnop",
+    );
+    let opener = Opener::new(&host, V2_PATH.into());
+    assert_eq!(
+        opener
+            .open("enc:v2:env:0653c83e72b32bebce1be480:AQEBAQEBAQEBAQEB.eYr2PijK4Y9BtSsY-yibbA.QtRkl4D0T-Q99NXI")
+            .unwrap(),
+        "v2-env-token"
+    );
+}
+
+#[test]
+fn an_unknown_zcode_format_is_not_sent_as_a_token() {
+    let host = FakeHost::new("/tmp/zc").file(
+        V2_PATH,
+        &json!({ "zcodejwttoken": "enc:v3:something" }).to_string(),
+    );
+    assert_eq!(
+        read(&host).err().unwrap().reason(),
+        "ZCode encrypted its sign-in; this system cannot unlock it yet."
+    );
+    assert!(host.asked.borrow().is_empty());
 }

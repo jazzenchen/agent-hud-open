@@ -28,12 +28,12 @@ const LATER_WAIT: Duration = Duration::from_secs(1);
 enum Key {
     /// macOS is asking the user; the keychain's answer arrives here.
     Asking(mpsc::Receiver<Result<Vec<u8>, i32>>),
-    Ready([u8; 16]),
+    Ready(Vec<u8>),
     /// The user said no in this run.
     Refused,
 }
 
-/// Each app's key, by app name.
+/// Each keychain item's password, by service and accounts.
 static KEYS: Mutex<BTreeMap<String, Key>> = Mutex::new(BTreeMap::new());
 
 /// The cookie `name` that the app whose data folder is `app` under
@@ -145,28 +145,53 @@ fn stored(database: &Path, site: &str, name: &str) -> Result<Option<Stored>, ()>
         .map_err(|_| ())
 }
 
-/// The key from the app's "<App> Safe Storage" item, asking macOS on a
-/// thread of its own, so a prompt the user leaves open holds up a reading
-/// for at most a minute.
+/// The key from the app's "<App> Safe Storage" item.
 fn safe_storage_key(app: &str) -> Answer<[u8; 16]> {
+    match keychain_password(&format!("{app} Safe Storage"), safe_storage_accounts(app)) {
+        Answer::Found(password) => derive(&password).map_or(Answer::Failed, Answer::Found),
+        Answer::Missing => Answer::Missing,
+        Answer::Unsupported => Answer::Unsupported,
+        Answer::Denied => Answer::Denied,
+        Answer::Failed => Answer::Failed,
+    }
+}
+
+/// The password another app keeps in the keychain under `service` and
+/// `account`, asked for as the Safe Storage key is.
+pub(crate) fn app_secret(service: &str, account: &str) -> Answer<String> {
+    match keychain_password(service, vec![account.to_owned()]) {
+        Answer::Found(password) => {
+            String::from_utf8(password).map_or(Answer::Failed, Answer::Found)
+        }
+        Answer::Missing => Answer::Missing,
+        Answer::Unsupported => Answer::Unsupported,
+        Answer::Denied => Answer::Denied,
+        Answer::Failed => Answer::Failed,
+    }
+}
+
+/// The password of the first of `accounts` the keychain keeps under
+/// `service`, asking macOS on a thread of its own, so a prompt the user
+/// leaves open holds up a reading for at most a minute.
+fn keychain_password(service: &str, accounts: Vec<String>) -> Answer<Vec<u8>> {
+    let id = format!("{service}\n{}", accounts.join("\n"));
     let (receiver, wait) = {
         let mut keys = KEYS.lock().unwrap_or_else(PoisonError::into_inner);
-        match keys.remove(app) {
-            Some(Key::Ready(key)) => {
-                keys.insert(app.into(), Key::Ready(key));
-                return Answer::Found(key);
+        match keys.remove(&id) {
+            Some(Key::Ready(password)) => {
+                keys.insert(id, Key::Ready(password.clone()));
+                return Answer::Found(password);
             }
             Some(Key::Refused) => {
-                keys.insert(app.into(), Key::Refused);
+                keys.insert(id, Key::Refused);
                 return Answer::Denied;
             }
             Some(Key::Asking(receiver)) => (receiver, LATER_WAIT),
             None => {
                 let (sender, receiver) = mpsc::channel();
-                let service = format!("{app} Safe Storage");
-                let accounts = safe_storage_accounts(app);
+                let service = service.to_owned();
                 let asked = std::thread::Builder::new()
-                    .name("app-cookie-key".into())
+                    .name("app-keychain-item".into())
                     .spawn(move || {
                         let answer = first_found(&accounts, |account| {
                             security_framework::passwords::get_generic_password(&service, account)
@@ -186,28 +211,25 @@ fn safe_storage_key(app: &str) -> Answer<[u8; 16]> {
         Err(mpsc::RecvTimeoutError::Timeout) => {
             KEYS.lock()
                 .unwrap_or_else(PoisonError::into_inner)
-                .insert(app.into(), Key::Asking(receiver));
+                .insert(id, Key::Asking(receiver));
             return Answer::Failed;
         }
         Err(mpsc::RecvTimeoutError::Disconnected) => return Answer::Failed,
     };
     match answer {
-        Ok(password) => match derive(&password) {
-            Some(key) => {
-                KEYS.lock()
-                    .unwrap_or_else(PoisonError::into_inner)
-                    .insert(app.into(), Key::Ready(key));
-                Answer::Found(key)
-            }
-            None => Answer::Failed,
-        },
-        // errSecItemNotFound: the app keeps no key here; asked again next time.
+        Ok(password) => {
+            KEYS.lock()
+                .unwrap_or_else(PoisonError::into_inner)
+                .insert(id, Key::Ready(password.clone()));
+            Answer::Found(password)
+        }
+        // errSecItemNotFound: the app keeps no item here; asked again next time.
         Err(-25300) => Answer::Missing,
         // errSecUserCanceled or errSecAuthFailed: the user said no.
         Err(-128 | -25293) => {
             KEYS.lock()
                 .unwrap_or_else(PoisonError::into_inner)
-                .insert(app.into(), Key::Refused);
+                .insert(id, Key::Refused);
             Answer::Denied
         }
         Err(_) => Answer::Failed,

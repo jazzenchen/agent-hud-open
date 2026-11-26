@@ -286,6 +286,13 @@ impl Host for FakeHost {
             .cloned()
             .unwrap_or(Answer::Missing)
     }
+    /// Listed in `secrets` as "service|account".
+    fn app_secret(&self, service: &str, account: &str) -> Answer<String> {
+        self.secrets
+            .get(&format!("{service}|{account}"))
+            .cloned()
+            .unwrap_or(Answer::Missing)
+    }
     fn app_cookie(&self, app: &str, site: &str, name: &str) -> Answer<String> {
         self.cookies
             .get(&format!("{app}|{site}|{name}"))

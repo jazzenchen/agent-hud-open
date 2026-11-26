@@ -80,3 +80,8 @@ pub(crate) fn unseal_safe_storage(
         .and_then(|b| String::from_utf8(b).ok())
         .map_or(Answer::Unsupported, Answer::Found)
 }
+
+/// Another app's keychain-style password: not read on this host yet.
+pub(crate) fn app_secret(_service: &str, _account: &str) -> Answer<String> {
+    Answer::Unsupported
+}

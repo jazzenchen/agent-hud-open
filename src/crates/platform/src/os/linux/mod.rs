@@ -18,7 +18,7 @@ pub(crate) use process::{
 pub(crate) fn app_ancestors(_pid: u32) -> Vec<u32> {
     Vec::new()
 }
-pub(crate) use secrets::{app_cookie, stored_secret, unseal_safe_storage};
+pub(crate) use secrets::{app_cookie, app_secret, stored_secret, unseal_safe_storage};
 pub(crate) const READS_PROCESS_ENVIRONMENT: bool = false;
 /// Claude has no desktop app on this host to take a background job in.
 pub(crate) const MOVES_CLAUDE_JOBS: bool = false;
