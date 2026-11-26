@@ -63,11 +63,8 @@ fn args(client: Client, install: bool, path: &std::path::Path) -> Vec<String> {
     }
     args.push("agent-hud".into());
     if install {
-        args.extend([
-            "--".into(),
-            path.to_string_lossy().into_owned(),
-            "--mcp".into(),
-        ]);
+        args.extend(["--".into(), path.to_string_lossy().into_owned()]);
+        args.extend(client.server_args());
     }
     args
 }
@@ -169,9 +166,10 @@ fn run(app: &tauri::AppHandle, id: &str, install: bool) -> Result<Value, String>
     status(app)
 }
 /// At launch, in every client that lists Agent HUD's server: points the
-/// server at this copy when it names another (a copy that moved, Open #100),
-/// and brings the skill up to date, adding it where an older version added
-/// only the server. Never adds a server, and only logs a failure.
+/// server at this copy when it names another (a copy that moved, Open #100)
+/// or starts it without naming its client, and brings the skill up to date,
+/// adding it where an older version added only the server. Never adds a
+/// server, and only logs a failure.
 pub(crate) fn repair_on_launch(app: &tauri::AppHandle) {
     // The demo leaves the user's clients alone.
     if app.state::<super::AppState>().demo {
@@ -197,7 +195,7 @@ pub(crate) fn repair_on_launch(app: &tauri::AppHandle) {
                 if client.command().is_none() {
                     let _ = client.set_server(&places, Some(path));
                 } else if entry::listed(client, &places)
-                    .is_some_and(|entry| entry.points_elsewhere(path))
+                    .is_some_and(|entry| entry.points_elsewhere(path, &client.server_args()))
                 {
                     if let Err(error) = repoint(client, &places, path) {
                         eprintln!(

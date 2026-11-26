@@ -16,15 +16,16 @@ pub(super) struct Entry {
 }
 
 impl Entry {
-    /// Whether the entry starts something other than `executable --mcp`.
-    pub(super) fn points_elsewhere(&self, executable: &Path) -> bool {
+    /// Whether the entry starts something other than `executable` with
+    /// `args`, the client's own (`Client::server_args`).
+    pub(super) fn points_elsewhere(&self, executable: &Path, args: &[String]) -> bool {
         let same_file = self.command.as_deref().is_some_and(|command| {
             Path::new(command) == executable
                 || fs::canonicalize(command)
                     .ok()
                     .is_some_and(|found| fs::canonicalize(executable).ok() == Some(found))
         });
-        !same_file || self.args != ["--mcp"]
+        !same_file || self.args != args
     }
 }
 
@@ -123,22 +124,35 @@ mod tests {
         );
     }
 
+    /// The entry as Agent HUD writes it for `client` now.
+    fn named(command: &str, client: Client) -> Entry {
+        Entry {
+            command: Some(command.into()),
+            args: client.server_args().into(),
+        }
+    }
+
     #[test]
     fn an_entry_naming_another_copy_or_other_arguments_points_elsewhere() {
         let app = Path::new(APP);
-        assert!(!entry(APP).points_elsewhere(app));
-        assert!(
-            entry("/Users/me/Downloads/Agent HUD.app/Contents/MacOS/Agent HUD")
-                .points_elsewhere(app)
-        );
-        let mut extra = entry(APP);
+        let ours = Client::Codex.server_args();
+        assert!(!named(APP, Client::Codex).points_elsewhere(app, &ours));
+        assert!(named(
+            "/Users/me/Downloads/Agent HUD.app/Contents/MacOS/Agent HUD",
+            Client::Codex
+        )
+        .points_elsewhere(app, &ours));
+        // Written before entries named their client, or for another client.
+        assert!(entry(APP).points_elsewhere(app, &ours));
+        assert!(named(APP, Client::ClaudeCode).points_elsewhere(app, &ours));
+        let mut extra = named(APP, Client::Codex);
         extra.args.push("--verbose".into());
-        assert!(extra.points_elsewhere(app));
+        assert!(extra.points_elsewhere(app, &ours));
         let none = Entry {
             command: None,
-            args: vec!["--mcp".into()],
+            args: ours.clone().into(),
         };
-        assert!(none.points_elsewhere(app));
+        assert!(none.points_elsewhere(app, &ours));
     }
 
     #[test]
@@ -147,6 +161,7 @@ mod tests {
         let real = temp.path().join("Agent HUD");
         fs::write(&real, "").unwrap();
         let other_name = temp.path().join(".").join("Agent HUD");
-        assert!(!entry(&other_name.to_string_lossy()).points_elsewhere(&real));
+        assert!(!named(&other_name.to_string_lossy(), Client::ClaudeCode)
+            .points_elsewhere(&real, &Client::ClaudeCode.server_args()));
     }
 }

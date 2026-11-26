@@ -67,6 +67,18 @@ const firstString = (
   }
   return undefined;
 };
+/** The client whose entry started this relay: each entry Agent HUD writes names it
+ * after `--mcp`, and the app passes it on in AGENTHUD_MCP_CLIENT. Unset for an entry
+ * written before entries named their client, or by hand. */
+const startedBy = process.env.AGENTHUD_MCP_CLIENT || undefined;
+/** Claude Code's session for a relay Claude Code started. Any app started from a
+ * Claude Code session inherits the variable: a DeepSeek Harness app opened from one
+ * had every call taken for that Claude Code session's, so another client's relay
+ * never reads it. */
+const claudeSession = () =>
+  startedBy === undefined || startedBy === "claudeCode"
+    ? process.env.CLAUDE_CODE_SESSION_ID
+    : undefined;
 export const caller = (meta: Record<string, unknown> | undefined) => {
   const turn = parseTurnMetadata(meta?.["x-codex-turn-metadata"]);
   const turnId = typeof turn?.turn_id === "string" ? turn.turn_id : null;
@@ -88,7 +100,7 @@ export const caller = (meta: Record<string, unknown> | undefined) => {
   const cascade = meta?.["antigravity.google/conversation_id"];
   if (typeof cascade === "string" && cascade)
     return { client: "antigravity", sessionId: cascade, turnId: null };
-  const session = process.env.CLAUDE_CODE_SESSION_ID;
+  const session = claudeSession();
   if (session) return { client: "claude", sessionId: session, turnId: null };
   const genericCodex = firstString(meta, ["threadId", "thread_id"]);
   if (genericCodex) return { client: "codex", sessionId: genericCodex, turnId };

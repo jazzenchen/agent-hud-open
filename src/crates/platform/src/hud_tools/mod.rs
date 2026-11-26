@@ -20,6 +20,10 @@ pub use skill::{SkillState, SKILL_FOLDER};
 /// The name each client knows Agent HUD's MCP server by.
 pub const SERVER_NAME: &str = "agent-hud";
 
+/// What an entry Agent HUD writes puts after `--mcp`, followed by the id of
+/// the client the entry is in: the server then knows which client started it.
+pub const CLIENT_ARGUMENT: &str = "--client=";
+
 /// A client Settings can give HUD tools to.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Client {
@@ -77,6 +81,15 @@ impl Client {
             Self::Pi => "pi",
             Self::OpenCode => "opencode",
         }
+    }
+
+    /// The arguments this client's entry starts Agent HUD's server with:
+    /// `--mcp` and the client it is in. The server cannot tell its client by
+    /// its environment: an app started from a Claude Code session inherits
+    /// that session's id, and a DeepSeek Harness app opened that way had every
+    /// call taken for that Claude Code session's.
+    pub fn server_args(self) -> [String; 2] {
+        ["--mcp".into(), format!("{CLIENT_ARGUMENT}{}", self.id())]
     }
 
     /// The vendor's own name for the client.
@@ -192,17 +205,17 @@ impl Client {
             .ok_or("This client adds MCP servers with its own command")?;
         let target = crate::hooks::settings_target(&file)?;
         let original = read(&target)?;
+        let server = executable.map(|path| (path, self.server_args()));
+        let server = server.as_ref().map(|(path, args)| (*path, &args[..]));
         let updated = match self {
-            Self::ZCode => mcp_json::edit_zcode(self.name(), original.as_deref(), executable)?,
-            Self::OpenCode => {
-                mcp_json::edit_opencode(self.name(), original.as_deref(), executable)?
-            }
-            Self::DeepSeek => deepseek::edit(original.as_deref(), executable)?,
+            Self::ZCode => mcp_json::edit_zcode(self.name(), original.as_deref(), server)?,
+            Self::OpenCode => mcp_json::edit_opencode(self.name(), original.as_deref(), server)?,
+            Self::DeepSeek => deepseek::edit(original.as_deref(), server)?,
             Self::ClaudeCode | Self::Codex => unreachable!("no settings file"),
             Self::Trae | Self::TraeCn => {
-                mcp_json::edit_quoted(self.name(), original.as_deref(), executable)?
+                mcp_json::edit_quoted(self.name(), original.as_deref(), server)?
             }
-            _ => mcp_json::edit(self.name(), original.as_deref(), executable)?,
+            _ => mcp_json::edit(self.name(), original.as_deref(), server)?,
         };
         if updated == original {
             return Ok(false);

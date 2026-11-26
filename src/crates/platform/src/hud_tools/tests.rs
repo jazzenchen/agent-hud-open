@@ -8,6 +8,12 @@ fn places(home: &Path) -> Places {
     Places::new(home, &HashMap::new())
 }
 
+/// Agent HUD at APP, started as `client`'s entry starts it.
+fn app(client: Client) -> Option<(&'static Path, &'static [String])> {
+    let args: &'static [String; 2] = Box::leak(Box::new(client.server_args()));
+    Some((Path::new(APP), &args[..]))
+}
+
 #[test]
 fn each_client_reads_the_skill_from_its_own_folder() {
     // Absolute on every OS. "/c" is relative on Windows, where Places would
@@ -140,20 +146,20 @@ fn a_file_added_beside_our_skill_keeps_its_folder() {
 #[test]
 fn cursor_gets_its_server_beside_the_others_and_loses_only_it() {
     let original = "{\n  \"mcpServers\": {\n    \"Playwright\": { \"command\": \"npx\", \"args\": [\"@playwright/mcp\"] }\n  }\n}\n";
-    let added = mcp_json::edit("Cursor", Some(original), Some(Path::new(APP)))
+    let added = mcp_json::edit("Cursor", Some(original), app(Client::Cursor))
         .unwrap()
         .unwrap();
     let value: Value = serde_json::from_str(&added).unwrap();
     assert_eq!(value["mcpServers"]["agent-hud"]["command"], APP);
     assert_eq!(
         value["mcpServers"]["agent-hud"]["args"],
-        serde_json::json!(["--mcp"])
+        serde_json::json!(["--mcp", "--client=cursor"])
     );
     assert_eq!(value["mcpServers"]["Playwright"]["command"], "npx");
     assert!(mcp_json::listed(Some(&added)));
     // Unchanged when it is already there.
     assert_eq!(
-        mcp_json::edit("Cursor", Some(&added), Some(Path::new(APP)))
+        mcp_json::edit("Cursor", Some(&added), app(Client::Cursor))
             .unwrap()
             .as_deref(),
         Some(added.as_str())
@@ -168,29 +174,44 @@ fn cursor_gets_its_server_beside_the_others_and_loses_only_it() {
 #[test]
 fn cursor_keeps_what_the_person_set_on_our_entry_and_moves_the_command() {
     let original = r#"{"mcpServers":{"agent-hud":{"command":"/old/Agent HUD","args":["--mcp"],"env":{"A":"1"}}}}"#;
-    let moved = mcp_json::edit("Cursor", Some(original), Some(Path::new(APP)))
+    let moved = mcp_json::edit("Cursor", Some(original), app(Client::Cursor))
         .unwrap()
         .unwrap();
     let value: Value = serde_json::from_str(&moved).unwrap();
     assert_eq!(value["mcpServers"]["agent-hud"]["command"], APP);
     assert_eq!(value["mcpServers"]["agent-hud"]["env"]["A"], "1");
+    // An entry written before it named its client gets the name.
+    let named = mcp_json::edit(
+        "Cursor",
+        Some(original.replace("/old/Agent HUD", APP).as_str()),
+        app(Client::Cursor),
+    )
+    .unwrap()
+    .unwrap();
+    let value: Value = serde_json::from_str(&named).unwrap();
+    assert_eq!(
+        value["mcpServers"]["agent-hud"]["args"],
+        serde_json::json!(["--mcp", "--client=cursor"])
+    );
 }
 
 #[test]
 fn cursor_without_a_file_gets_one_and_a_file_with_comments_is_left_alone() {
-    let created = mcp_json::edit("Cursor", None, Some(Path::new(APP)))
+    let created = mcp_json::edit("Cursor", None, app(Client::Cursor))
         .unwrap()
         .unwrap();
     assert!(mcp_json::listed(Some(&created)));
     assert_eq!(mcp_json::edit("Cursor", None, None).unwrap(), None);
     let commented = "{\n  // mine\n  \"mcpServers\": {}\n}\n";
-    assert!(mcp_json::edit("Cursor", Some(commented), Some(Path::new(APP))).is_err());
-    assert!(mcp_json::edit("Cursor", Some("[]"), Some(Path::new(APP))).is_err());
+    assert!(mcp_json::edit("Cursor", Some(commented), app(Client::Cursor)).is_err());
+    assert!(mcp_json::edit("Cursor", Some("[]"), app(Client::Cursor)).is_err());
 }
 
 #[test]
 fn deepseek_without_a_file_gets_one_that_holds_only_our_block() {
-    let created = deepseek::edit(None, Some(Path::new(APP))).unwrap().unwrap();
+    let created = deepseek::edit(None, app(Client::DeepSeek))
+        .unwrap()
+        .unwrap();
     assert!(created.starts_with("# >>> agent-hud"));
     assert!(deepseek::listed(Some(&created)));
     let items: Value = serde_saphyr::from_str(&created).unwrap();
@@ -200,10 +221,13 @@ fn deepseek_without_a_file_gets_one_that_holds_only_our_block() {
     assert_eq!(plugin["config"]["serverName"], "agent-hud");
     assert_eq!(plugin["config"]["transport"], "stdio");
     assert_eq!(plugin["config"]["command"], APP);
-    assert_eq!(plugin["config"]["args"], serde_json::json!(["--mcp"]));
+    assert_eq!(
+        plugin["config"]["args"],
+        serde_json::json!(["--mcp", "--client=deepseek"])
+    );
     // Unchanged when it is already there; removing it removes the file.
     assert_eq!(
-        deepseek::edit(Some(&created), Some(Path::new(APP)))
+        deepseek::edit(Some(&created), app(Client::DeepSeek))
             .unwrap()
             .as_deref(),
         Some(created.as_str())
@@ -214,7 +238,7 @@ fn deepseek_without_a_file_gets_one_that_holds_only_our_block() {
 #[test]
 fn deepseek_keeps_the_persons_patches_and_comments() {
     let original = "# mine\n- set:\n    foo: 1\n";
-    let added = deepseek::edit(Some(original), Some(Path::new(APP)))
+    let added = deepseek::edit(Some(original), app(Client::DeepSeek))
         .unwrap()
         .unwrap();
     assert!(added.starts_with(original));
@@ -226,9 +250,15 @@ fn deepseek_keeps_the_persons_patches_and_comments() {
     );
 
     // A new path replaces the block instead of adding a second.
-    let moved = deepseek::edit(Some(&added), Some(Path::new("/elsewhere/Agent HUD")))
-        .unwrap()
-        .unwrap();
+    let moved = deepseek::edit(
+        Some(&added),
+        Some((
+            Path::new("/elsewhere/Agent HUD"),
+            &Client::DeepSeek.server_args()[..],
+        )),
+    )
+    .unwrap()
+    .unwrap();
     assert_eq!(moved.matches("# >>> agent-hud").count(), 1);
     assert!(moved.contains("\"/elsewhere/Agent HUD\""));
 }
@@ -236,7 +266,7 @@ fn deepseek_keeps_the_persons_patches_and_comments() {
 #[test]
 fn deepseek_never_leaves_a_file_that_stops_harness_from_starting() {
     // An empty flow list is replaced, since block items cannot follow it.
-    let added = deepseek::edit(Some("# mine\n[]\n"), Some(Path::new(APP)))
+    let added = deepseek::edit(Some("# mine\n[]\n"), app(Client::DeepSeek))
         .unwrap()
         .unwrap();
     assert!(added.starts_with("# mine\n# >>> agent-hud"));
@@ -246,7 +276,7 @@ fn deepseek_never_leaves_a_file_that_stops_harness_from_starting() {
         deepseek::edit(Some(&added), None).unwrap().unwrap(),
         "# mine\n[]\n"
     );
-    let commented = deepseek::edit(Some("# only\n"), Some(Path::new(APP)))
+    let commented = deepseek::edit(Some("# only\n"), app(Client::DeepSeek))
         .unwrap()
         .unwrap();
     assert_eq!(
@@ -257,7 +287,7 @@ fn deepseek_never_leaves_a_file_that_stops_harness_from_starting() {
 
 #[test]
 fn deepseek_refuses_files_it_cannot_add_to_safely() {
-    let app = Some(Path::new(APP));
+    let app = app(Client::DeepSeek);
     assert!(deepseek::edit(Some("[{set: {foo: 1}}]\n"), app).is_err());
     assert!(deepseek::edit(Some("foo: 1\n"), app).is_err());
     assert!(deepseek::edit(
@@ -319,7 +349,7 @@ fn antigravity_turns_a_server_back_on_and_counts_a_turned_off_one_as_absent() {
     let off = r#"{"mcpServers":{"agent-hud":{"args":["--mcp"],"command":"/old/Agent HUD","disabled":true}}}"#;
     // Turned off in Antigravity, it is still there to remove.
     assert!(mcp_json::listed(Some(off)));
-    let on = mcp_json::edit("Antigravity", Some(off), Some(Path::new(APP)))
+    let on = mcp_json::edit("Antigravity", Some(off), app(Client::Antigravity))
         .unwrap()
         .unwrap();
     assert!(mcp_json::listed(Some(&on)));
@@ -348,7 +378,7 @@ fn antigravity_turns_a_server_back_on_and_counts_a_turned_off_one_as_absent() {
 fn zcode_places_its_server_under_mcp_servers_with_stdio_type() {
     let original =
         r#"{"model":"glm-4.6","mcp":{"servers":{"other":{"type":"stdio","command":"x"}}}}"#;
-    let added = mcp_json::edit_zcode("ZCode", Some(original), Some(Path::new(APP)))
+    let added = mcp_json::edit_zcode("ZCode", Some(original), app(Client::ZCode))
         .unwrap()
         .unwrap();
     assert!(mcp_json::listed_zcode(Some(&added)));
@@ -357,7 +387,7 @@ fn zcode_places_its_server_under_mcp_servers_with_stdio_type() {
     assert_eq!(value["mcp"]["servers"]["agent-hud"]["command"], APP);
     assert_eq!(
         value["mcp"]["servers"]["agent-hud"]["args"],
-        serde_json::json!(["--mcp"])
+        serde_json::json!(["--mcp", "--client=zcode"])
     );
     assert_eq!(value["mcp"]["servers"]["other"]["command"], "x");
     let removed = mcp_json::edit_zcode("ZCode", Some(&added), None)
@@ -441,7 +471,7 @@ fn pi_and_opencode_get_the_server_where_they_read_it() {
     assert_eq!(pi["mcpServers"]["agent-hud"]["command"], APP);
     assert_eq!(
         pi["mcpServers"]["agent-hud"]["args"],
-        serde_json::json!(["--mcp"])
+        serde_json::json!(["--mcp", "--client=pi"])
     );
     let opencode: Value = serde_json::from_str(
         &fs::read_to_string(home.path().join(".config/opencode/opencode.json")).unwrap(),
@@ -450,7 +480,7 @@ fn pi_and_opencode_get_the_server_where_they_read_it() {
     assert_eq!(opencode["mcp"]["agent-hud"]["type"], "local");
     assert_eq!(
         opencode["mcp"]["agent-hud"]["command"],
-        serde_json::json!([APP, "--mcp"])
+        serde_json::json!([APP, "--mcp", "--client=opencode"])
     );
     assert_eq!(opencode["plugin"], serde_json::json!(["x"]));
     for client in [Client::Pi, Client::OpenCode] {

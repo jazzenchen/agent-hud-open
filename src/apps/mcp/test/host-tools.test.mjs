@@ -57,7 +57,11 @@ require('node:readline').createInterface({ input: process.stdin }).on('line', li
 }
 async function connect(engineFile, env = {}, options = {}) {
   const client = new Client({ name: "relay-test", version: "0.0.0" }, options);
-  const { CLAUDE_CODE_SESSION_ID: _, ...rest } = process.env;
+  const {
+    CLAUDE_CODE_SESSION_ID: _,
+    AGENTHUD_MCP_CLIENT: __,
+    ...rest
+  } = process.env;
   await client.connect(
     new StdioClientTransport({
       command: process.execPath,
@@ -204,6 +208,32 @@ test("a Claude Code caller comes from the environment the client started the rel
     );
   } finally {
     await client.close();
+  }
+});
+
+test("another client's relay never takes Claude Code's session from the environment", async () => {
+  // A DeepSeek Harness app opened from a Claude Code session inherits its id;
+  // the entry Agent HUD wrote in Harness says who started the relay.
+  for (const [startedBy, expected] of [
+    ["deepseek", null],
+    ["cursor", null],
+    ["claudeCode", { client: "claude", sessionId: "session-7", turnId: null }],
+  ]) {
+    const fake = engine(`started-by-${startedBy}`, [tool]);
+    const client = await connect(fake.file, {
+      CLAUDE_CODE_SESSION_ID: "session-7",
+      AGENTHUD_MCP_CLIENT: startedBy,
+    });
+    try {
+      await client.callTool({ name: "some_tool", arguments: { text: "hi" } });
+      const call = fake
+        .requests()
+        .find((request) => request.method === "host_tool");
+      assert.deepEqual(call.params.caller, expected, startedBy);
+      assert.equal(call.params.parent, process.pid);
+    } finally {
+      await client.close();
+    }
   }
 });
 

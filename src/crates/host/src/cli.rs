@@ -38,7 +38,25 @@ pub fn entry(arguments: &[String]) -> Option<i32> {
     if let Some(engine) = resource("agent-hud-engine") {
         command.env("AGENTHUD_ENGINE", engine);
     }
+    // The client whose entry started the server, as Agent HUD wrote it there;
+    // never one inherited from whatever started that client.
+    match started_by(arguments) {
+        Some(client) => command.env(STARTED_BY, client.id()),
+        None => command.env_remove(STARTED_BY),
+    };
     Some(serve(command))
+}
+/// Where the MCP server finds the client whose entry started it.
+const STARTED_BY: &str = "AGENTHUD_MCP_CLIENT";
+/// The client an entry names after `--mcp` (`Client::server_args`); none for
+/// an entry written before entries named one, or by hand.
+fn started_by(arguments: &[String]) -> Option<agent_hud_runtime::hud_tools::Client> {
+    use agent_hud_runtime::hud_tools::{Client, CLIENT_ARGUMENT};
+    arguments
+        .iter()
+        .skip(1)
+        .find_map(|argument| argument.strip_prefix(CLIENT_ARGUMENT))
+        .and_then(Client::from_id)
 }
 // Each host runs the MCP server in the relay's place where it can.
 #[cfg(unix)]
@@ -51,7 +69,25 @@ use host::serve;
 
 #[cfg(test)]
 mod tests {
-    use super::resource_beside;
+    use super::{resource_beside, started_by};
+    use agent_hud_runtime::hud_tools::{Client, CLIENTS};
+
+    /// Each entry Agent HUD writes names its client to the server; an older
+    /// entry, or a name Agent HUD does not know, names none.
+    #[test]
+    fn the_server_knows_the_client_whose_entry_started_it() {
+        for client in CLIENTS {
+            let arguments = std::iter::once("Agent HUD".to_owned())
+                .chain(client.server_args())
+                .collect::<Vec<_>>();
+            assert_eq!(started_by(&arguments), Some(client));
+        }
+        let plain = ["Agent HUD".to_owned(), "--mcp".to_owned()];
+        assert_eq!(started_by(&plain), None);
+        let unknown = [plain[0].clone(), plain[1].clone(), "--client=other".into()];
+        assert_eq!(started_by(&unknown), None);
+        assert_eq!(Client::DeepSeek.server_args()[1], "--client=deepseek");
+    }
 
     /// A Linux package keeps the executable in `bin` and its helpers in
     /// `lib/<the executable's name>`; the other layouts keep them nearer.

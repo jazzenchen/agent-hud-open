@@ -17,8 +17,13 @@ const HUD_TOOLS: Block = Block {
     layout_remove: "DeepSeek Harness's cordis.patch.yml is not a list Agent HUD can change safely. Remove the agent-hud MCP server there by hand.",
 };
 
-fn block(executable: &Path) -> String {
+fn block((executable, args): (&Path, &[String])) -> String {
     let command = patch::quoted(&executable.to_string_lossy());
+    let args = args
+        .iter()
+        .map(|arg| patch::quoted(arg))
+        .collect::<Vec<_>>()
+        .join(", ");
     format!(
         "{start}\n\
          - insert:\n\
@@ -28,7 +33,7 @@ fn block(executable: &Path) -> String {
          \x20       serverName: {SERVER_NAME}\n\
          \x20       transport: stdio\n\
          \x20       command: {command}\n\
-         \x20       args: [\"--mcp\"]\n\
+         \x20       args: [{args}]\n\
          {end}\n",
         start = HUD_TOOLS.start,
         end = HUD_TOOLS.end,
@@ -50,12 +55,12 @@ pub(super) fn listed(text: Option<&str>) -> bool {
     HUD_TOOLS.listed(text)
 }
 
-/// The file's new text with Agent HUD's server added (`Some(executable)`) or
-/// removed; None to delete a file that held only Agent HUD's block; the
-/// original when nothing changes.
+/// The file's new text with Agent HUD's server added (`Some` executable and
+/// its arguments) or removed; None to delete a file that held only Agent
+/// HUD's block; the original when nothing changes.
 pub(super) fn edit(
     original: Option<&str>,
-    executable: Option<&Path>,
+    server: Option<(&Path, &[String])>,
 ) -> Result<Option<String>, String> {
-    HUD_TOOLS.edit(original, executable.map(block).as_deref())
+    HUD_TOOLS.edit(original, server.map(block).as_deref())
 }

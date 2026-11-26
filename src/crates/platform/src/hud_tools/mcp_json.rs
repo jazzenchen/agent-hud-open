@@ -19,17 +19,17 @@ pub(super) fn listed(text: Option<&str>) -> bool {
         .is_some_and(|value| value["mcpServers"][SERVER_NAME].is_object())
 }
 
-/// The file's new text with Agent HUD's server added (`Some(executable)`) or
-/// removed; the original when nothing changes.
+/// The file's new text with Agent HUD's server added (`Some` executable and
+/// its arguments) or removed; the original when nothing changes.
 pub(super) fn edit(
     client: &str,
     original: Option<&str>,
-    executable: Option<&Path>,
+    server: Option<(&Path, &[String])>,
 ) -> Result<Option<String>, String> {
     edit_command(
         client,
         original,
-        executable.map(|path| path.to_string_lossy().into_owned()),
+        server.map(|(path, args)| (path.to_string_lossy().into_owned(), args)),
     )
 }
 
@@ -39,36 +39,36 @@ pub(super) fn edit(
 pub(super) fn edit_quoted(
     client: &str,
     original: Option<&str>,
-    executable: Option<&Path>,
+    server: Option<(&Path, &[String])>,
 ) -> Result<Option<String>, String> {
     edit_command(
         client,
         original,
-        executable.map(|path| format!("\"{}\"", path.to_string_lossy())),
+        server.map(|(path, args)| (format!("\"{}\"", path.to_string_lossy()), args)),
     )
 }
 
 fn edit_command(
     client: &str,
     original: Option<&str>,
-    command: Option<String>,
+    server: Option<(String, &[String])>,
 ) -> Result<Option<String>, String> {
     let unchanged = Ok(original.map(str::to_owned));
     let mut value = match original.filter(|text| !text.trim().is_empty()) {
-        None if command.is_none() => return unchanged,
+        None if server.is_none() => return unchanged,
         None => Value::Object(Map::new()),
         Some(text) => serde_json::from_str(text).map_err(|_| not_plain(client))?,
     };
     let root = value.as_object_mut().ok_or_else(|| not_plain(client))?;
-    match command {
-        Some(command) => {
+    match server {
+        Some((command, args)) => {
             let servers = root
                 .entry("mcpServers")
                 .or_insert_with(|| json!({}))
                 .as_object_mut()
                 .ok_or_else(|| not_plain(client))?;
             let command = json!(command);
-            let args = json!(["--mcp"]);
+            let args = json!(args);
             match servers.get_mut(SERVER_NAME).and_then(Value::as_object_mut) {
                 // Keep whatever else the person set on it, such as env; adding
                 // it again turns it back on.
@@ -114,17 +114,17 @@ pub(super) fn listed_zcode(text: Option<&str>) -> bool {
 pub(super) fn edit_zcode(
     client: &str,
     original: Option<&str>,
-    executable: Option<&Path>,
+    server: Option<(&Path, &[String])>,
 ) -> Result<Option<String>, String> {
     let unchanged = Ok(original.map(str::to_owned));
     let mut value = match original.filter(|text| !text.trim().is_empty()) {
-        None if executable.is_none() => return unchanged,
+        None if server.is_none() => return unchanged,
         None => Value::Object(Map::new()),
         Some(text) => serde_json::from_str(text).map_err(|_| not_plain(client))?,
     };
     let root = value.as_object_mut().ok_or_else(|| not_plain(client))?;
-    match executable {
-        Some(executable) => {
+    match server {
+        Some((executable, args)) => {
             let mcp = root
                 .entry("mcp")
                 .or_insert_with(|| json!({}))
@@ -136,7 +136,7 @@ pub(super) fn edit_zcode(
                 .as_object_mut()
                 .ok_or_else(|| not_plain(client))?;
             let command = json!(executable.to_string_lossy());
-            let args = json!(["--mcp"]);
+            let args = json!(args);
             let kind = json!("stdio");
             match servers.get_mut(SERVER_NAME).and_then(Value::as_object_mut) {
                 Some(entry) => {
@@ -189,23 +189,25 @@ pub(super) fn listed_opencode(text: Option<&str>) -> bool {
 pub(super) fn edit_opencode(
     client: &str,
     original: Option<&str>,
-    executable: Option<&Path>,
+    server: Option<(&Path, &[String])>,
 ) -> Result<Option<String>, String> {
     let unchanged = Ok(original.map(str::to_owned));
     let mut value = match original.filter(|text| !text.trim().is_empty()) {
-        None if executable.is_none() => return unchanged,
+        None if server.is_none() => return unchanged,
         None => Value::Object(Map::new()),
         Some(text) => serde_json::from_str(text).map_err(|_| not_plain(client))?,
     };
     let root = value.as_object_mut().ok_or_else(|| not_plain(client))?;
-    match executable {
-        Some(executable) => {
+    match server {
+        Some((executable, args)) => {
             let servers = root
                 .entry("mcp")
                 .or_insert_with(|| json!({}))
                 .as_object_mut()
                 .ok_or_else(|| not_plain(client))?;
-            let command = json!([executable.to_string_lossy(), "--mcp"]);
+            let command = json!(std::iter::once(executable.to_string_lossy().into_owned())
+                .chain(args.iter().cloned())
+                .collect::<Vec<_>>());
             let kind = json!("local");
             match servers.get_mut(SERVER_NAME).and_then(Value::as_object_mut) {
                 Some(entry) => {
