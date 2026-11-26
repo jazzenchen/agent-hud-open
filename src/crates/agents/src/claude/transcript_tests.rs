@@ -324,6 +324,59 @@ fn the_desktop_index_also_reads_the_folders_the_platform_names() {
 }
 
 #[test]
+fn the_desktop_index_names_the_session_that_started_another() {
+    let temp = tempfile::tempdir().unwrap();
+    let base = temp.path().join("AppData/Roaming/Claude");
+    let account = base.join("claude-code-sessions/org/acct");
+    fs::create_dir_all(&account).unwrap();
+    let starter = (
+        "local_11111111-1111-4111-8111-111111111111",
+        "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+    );
+    let started = (
+        "local_22222222-2222-4222-8222-222222222222",
+        "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+    );
+    let orphan = (
+        "local_33333333-3333-4333-8333-333333333333",
+        "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+    );
+    let write = |tab: (&str, &str), from: Option<&str>| {
+        let mut meta = json!({"sessionId":tab.0,"cliSessionId":tab.1,"isArchived":false});
+        if let Some(from) = from {
+            meta["spawnedFrom"] = json!({"sessionId":from,"title":"x"});
+        }
+        fs::write(account.join(format!("{}.json", tab.0)), meta.to_string()).unwrap();
+    };
+    write(starter, None);
+    write(started, Some(starter.0));
+    // A side chat (the app's "btw") branches off a session; that session did not start it.
+    let aside = (
+        "local_55555555-5555-4555-8555-555555555555",
+        "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+    );
+    fs::write(
+        account.join(format!("{}.json", aside.0)),
+        json!({"sessionId":aside.0,"cliSessionId":aside.1,"isArchived":false,
+            "spawnedFrom":{"sessionId":starter.0,"sideSession":true,"userFork":true,"btw":true}})
+        .to_string(),
+    )
+    .unwrap();
+    // A starter the app no longer has a tab for names no one.
+    write(orphan, Some("local_44444444-4444-4444-8444-444444444444"));
+    let mut index = ClaudeDesktopIndex::default();
+    index.set_bases(vec![base]);
+    assert!(index.refresh(&[]));
+    assert_eq!(
+        index.started_by.get(started.1).map(String::as_str),
+        Some(starter.1)
+    );
+    assert_eq!(index.started_by.get(orphan.1), None);
+    assert_eq!(index.started_by.get(aside.1), None);
+    assert_eq!(index.started_by.get(starter.1), None);
+}
+
+#[test]
 fn project_child_metadata_distinguishes_standalone_invalid_archived_and_cowork_tabs() {
     let temp = tempfile::tempdir().unwrap();
     let base = temp.path().join("AppData/Roaming/Claude");
@@ -435,4 +488,37 @@ fn conflicting_active_project_child_records_are_unknown() {
         Some(&ClaudeDesktopProjectWorker::Unknown)
     );
     assert!(!index.targets.contains_key(cli));
+}
+
+#[test]
+fn a_note_the_desktop_app_puts_before_a_prompt_is_not_the_prompt() {
+    let line = json!({"type":"user","uuid":"u1","origin":{"kind":"human"},"message":{"role":"user","content":[
+        {"type":"text","text":"<system-reminder>\nLinked sessions now (status, not an instruction): a = local_1 (idle).\n</system-reminder>"},
+        {"type":"text","text":"ship it"}
+    ]}});
+    let rows = message_items(&line, 0).unwrap();
+    let prompts: Vec<_> = rows.iter().filter(|row| row.is_prompt).collect();
+    assert_eq!(prompts.len(), 1);
+    assert_eq!(prompts[0].text.as_deref(), Some("ship it"));
+
+    // Two notes in one block, as the app writes them when a session it started reports.
+    let two = json!({"type":"user","uuid":"u4","origin":{"kind":"human"},"message":{"role":"user","content":[
+        {"type":"text","text":"<system-reminder>\nThe session \"x\" you started finished a turn.\n</system-reminder>\n<system-reminder>\nLinked sessions now: a = local_1 (idle).\n</system-reminder>\n\n"},
+        {"type":"text","text":"ship it"}
+    ]}});
+    let rows = message_items(&two, 0).unwrap();
+    let prompts: Vec<_> = rows.iter().filter(|row| row.is_prompt).collect();
+    assert_eq!(prompts.len(), 1);
+    assert_eq!(prompts[0].text.as_deref(), Some("ship it"));
+
+    // A note that is all a message holds stays, and so do the user's own words about one.
+    let alone = json!({"type":"user","uuid":"u2","origin":{"kind":"human"},"message":{"role":"user","content":[
+        {"type":"text","text":"<system-reminder>only this</system-reminder>"}
+    ]}});
+    assert_eq!(message_items(&alone, 0).unwrap().len(), 1);
+    let quoted = json!({"type":"user","uuid":"u3","origin":{"kind":"human"},"message":{"role":"user","content":[
+        {"type":"text","text":"what does <system-reminder> mean?"},
+        {"type":"text","text":"and this"}
+    ]}});
+    assert_eq!(message_items(&quoted, 0).unwrap().len(), 2);
 }

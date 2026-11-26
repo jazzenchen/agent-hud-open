@@ -14,6 +14,14 @@ pub struct ClaudeDesktopIndex {
     /// Active Code Project child workers keyed by the CLI session UUID. An
     /// Unknown value deliberately blocks falling back to the Local tab.
     pub project_workers: HashMap<String, ClaudeDesktopProjectWorker>,
+    /// The session that started each session from within the app (the app's
+    /// `spawnedFrom`), both by their Claude Code session ids. A session it
+    /// started is one its owner talks to like any other, not a sub-agent.
+    pub started_by: HashMap<String, String>,
+    /// The session each side chat was opened beside (the app's `spawnedFrom`
+    /// with `btw`), both by their Claude Code session ids: its owner's own
+    /// aside to that session, shown with it.
+    pub side_chats: HashMap<String, String>,
     /// Each metadata file as last read, by its modification time and size, so
     /// a pass re-reads only the files that changed (agent-hud-native-open
     /// ClaudeDesktopSessions keeps the same cache).
@@ -44,6 +52,10 @@ struct DesktopTab {
     cli_id: String,
     archived: bool,
     project_worker: Option<ClaudeDesktopProjectWorker>,
+    /// The tab that started this one, by that tab's own id.
+    started_by: Option<String>,
+    /// The tab this one is a side chat of, by that tab's own id.
+    beside: Option<String>,
 }
 
 impl ClaudeDesktopIndex {
@@ -145,6 +157,34 @@ impl ClaudeDesktopIndex {
             }
         }
         targets.retain(|id, _| !ambiguous.contains(id));
+        // A starter is named by its tab; the session it holds is looked up
+        // among all the tabs, archived ones too.
+        let sessions: HashMap<&str, &str> = self
+            .files
+            .values()
+            .filter_map(|file| file.tab.as_ref())
+            .map(|tab| (tab.stem.as_str(), tab.cli_id.as_str()))
+            .collect();
+        let started_by: HashMap<String, String> = self
+            .files
+            .values()
+            .filter_map(|file| file.tab.as_ref())
+            .filter(|tab| !tab.archived && !ambiguous.contains(&tab.cli_id))
+            .filter_map(|tab| {
+                let starter = sessions.get(tab.started_by.as_deref()?)?;
+                (*starter != tab.cli_id).then(|| (tab.cli_id.clone(), (*starter).to_owned()))
+            })
+            .collect();
+        let side_chats: HashMap<String, String> = self
+            .files
+            .values()
+            .filter_map(|file| file.tab.as_ref())
+            .filter(|tab| !tab.archived && !ambiguous.contains(&tab.cli_id))
+            .filter_map(|tab| {
+                let beside = sessions.get(tab.beside.as_deref()?)?;
+                (*beside != tab.cli_id).then(|| (tab.cli_id.clone(), (*beside).to_owned()))
+            })
+            .collect();
         for id in &ambiguous {
             if project_workers.contains_key(id) {
                 ambiguous_project_workers.insert(id.clone());
@@ -160,10 +200,14 @@ impl ClaudeDesktopIndex {
             .collect::<HashSet<_>>();
         let changed = archived != self.archived
             || targets != self.targets
-            || project_workers != self.project_workers;
+            || project_workers != self.project_workers
+            || started_by != self.started_by
+            || side_chats != self.side_chats;
         self.archived = archived;
         self.targets = targets;
         self.project_workers = project_workers;
+        self.started_by = started_by;
+        self.side_chats = side_chats;
         changed
     }
 }
@@ -231,6 +275,19 @@ fn desktop_tab(path: &Path, kind: &'static str) -> Option<DesktopTab> {
         cli_id,
         archived: value["isArchived"] == true,
         project_worker,
+        // A side chat or a fork is its owner's own branch of a session, not
+        // one that session started.
+        started_by: (value["spawnedFrom"]["btw"] != true
+            && value["spawnedFrom"]["userFork"] != true)
+            .then(|| value["spawnedFrom"]["sessionId"].as_str())
+            .flatten()
+            .filter(|id| id.strip_prefix("local_").is_some_and(uuid))
+            .map(str::to_owned),
+        beside: (value["spawnedFrom"]["btw"] == true)
+            .then(|| value["spawnedFrom"]["sessionId"].as_str())
+            .flatten()
+            .filter(|id| id.strip_prefix("local_").is_some_and(uuid))
+            .map(str::to_owned),
     })
 }
 

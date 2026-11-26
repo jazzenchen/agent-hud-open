@@ -81,6 +81,22 @@ impl Presentation<'_> {
             .flatten()
             .and_then(|id| self.claude_desktop.targets.get(id))
             .cloned();
+        // The session that started this one from within the desktop app.
+        if let Some(starter) = claude
+            .then(|| session["id"].as_str())
+            .flatten()
+            .and_then(|id| self.claude_desktop.started_by.get(id))
+        {
+            session["startedBy"] = json!(starter);
+        }
+        // The session this one is its owner's side chat of.
+        if let Some(beside) = claude
+            .then(|| session["id"].as_str())
+            .flatten()
+            .and_then(|id| self.claude_desktop.side_chats.get(id))
+        {
+            session["sideChatOf"] = json!(beside);
+        }
         // A way back the log itself gives; a client hook's origin, overlaid
         // next, replaces it. A Claude Code session opens in the desktop app's
         // tab only when it runs there (its entrypoint), and a Codex Desktop

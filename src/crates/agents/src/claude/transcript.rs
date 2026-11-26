@@ -113,6 +113,13 @@ pub fn message_items(value: &Value, offset: u64) -> Option<Vec<LineItem>> {
     let item = value.get("message").filter(|item| item.is_object())?;
     let prompt = claude_prompt(value) && !interrupted(value);
     let mut items = items::message(value, item, offset, prompt);
+    // The desktop app puts its own notes to the model before what the user
+    // typed, each a block of its own (`<system-reminder>` on linked sessions,
+    // say). They are not the user's words, and left in they would be taken
+    // for the prompt in place of the words that follow.
+    if prompt && items.iter().filter(|row| row.is_prompt).count() > 1 {
+        items.retain(|row| !row.is_prompt || !row.text.as_deref().is_some_and(reminder));
+    }
     // A message another session or Agent HUD handed over shows as its words.
     let body = if value["origin"]["kind"] == "peer" {
         value["origin"]["body"].as_str().filter(|s| !s.is_empty())
@@ -128,6 +135,26 @@ pub fn message_items(value: &Value, offset: u64) -> Option<Vec<LineItem>> {
     }
     items.extend(narrations(value, item, offset));
     Some(items)
+}
+
+/// Whether a block is nothing but notes from the client to the model: one
+/// reminder, or several one after another (a started session's report, then
+/// the list of linked sessions).
+fn reminder(text: &str) -> bool {
+    let mut rest = text.trim();
+    if rest.is_empty() {
+        return false;
+    }
+    while !rest.is_empty() {
+        let Some(body) = rest.strip_prefix("<system-reminder>") else {
+            return false;
+        };
+        let Some(end) = body.find("</system-reminder>") else {
+            return false;
+        };
+        rest = body[end + "</system-reminder>".len()..].trim_start();
+    }
+    true
 }
 
 /// The agent's words the Claude desktop app logs as narration blocks (see
