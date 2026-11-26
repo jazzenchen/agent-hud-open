@@ -51,10 +51,11 @@ fn reply_tool(language: Language, client: &str) -> String {
 /// The words delivered. Labelled: a first line naming the sender and the
 /// message, the text, and a last line saying how to reply: with send_message
 /// and reply_to, as the recipient's client names that tool, so the reply comes
-/// back as a message; the sender reads nothing else. A reply's last line is
-/// shorter, so two agents do not thank each other back and forth. Without
-/// `ask`, the last line is left out: the sender needs no reply. As the
-/// user's own: the text alone.
+/// back as a message; the sender reads nothing else. The line has no
+/// condition in it: asked, the recipient always answers when it finishes,
+/// even if only to say done, so the sender never waits on a judgement call.
+/// Without `ask`, the last line is left out: the sender needs no reply. As
+/// the user's own: the text alone.
 pub fn compose(
     language: Language,
     form: PromptForm,
@@ -89,19 +90,16 @@ pub fn compose(
     let tool = reply_tool(language, to_client);
     let sender = client(&from.client);
     // The title last: it is the sender's text, and may hold braces.
-    let (label, footer) = match reply_to {
-        None => (
-            tr_in(language, "[Agent HUD · from {{client}}{{title}} · {{id}}]"),
-            tr_in(language, "Reply with {{tool}}, reply_to: {{id}}: your reply reaches the sender as a message."),
-        ),
-        Some(_) => (
-            tr_in(
-                language,
-                "[Agent HUD · from {{client}}{{title}} · {{id}} · re {{parent}}]",
-            ),
-            tr_in(language, "This answers {{parent}}. Only if more is needed, reply with {{tool}}, reply_to: {{id}}."),
+    let label = match reply_to {
+        None => tr_in(language, "[Agent HUD · from {{client}}{{title}} · {{id}}]"),
+        Some(_) => tr_in(
+            language,
+            "[Agent HUD · from {{client}}{{title}} · {{id}} · re {{parent}}]",
         ),
     };
+    // One line, no condition in it: asked, the recipient always answers, a
+    // reply as well as a first message.
+    let footer = tr_in(language, "When you finish, reply with {{tool}}, reply_to: {{id}}, even if only to say done: your reply reaches the sender as a message.");
     let parent = reply_to.unwrap_or_default();
     let label = fill(
         &label,

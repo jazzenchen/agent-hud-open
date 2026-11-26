@@ -333,9 +333,15 @@ impl Messaging {
     /// one (a steer). With "Ask for replies only when needed" the sender's
     /// `require_reply` decides the reply line, and a message that needs a
     /// reply is labelled under "Send as me" too: the recipient has to know
-    /// whom it answers. Without it every labelled message asks.
+    /// whom it answers. Without it every labelled message asks except a
+    /// reply: an answer ends the exchange, or two agents would answer each
+    /// other until the pass limit.
     pub(crate) fn shape(&self, arguments: &Value, labelled: bool) -> (PromptForm, bool) {
-        let ask = !self.preferences.require_reply || arguments["require_reply"] == true;
+        let ask = if self.preferences.require_reply {
+            arguments["require_reply"] == true
+        } else {
+            arguments["reply_to"].as_str().is_none()
+        };
         let own = self.preferences.as_user && !labelled && !(self.preferences.require_reply && ask);
         if own {
             (PromptForm::Own, false)

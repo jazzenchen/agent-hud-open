@@ -992,7 +992,7 @@ fn a_labelled_message_names_its_sender_and_says_how_to_reply_and_waits_in_the_qu
     );
     assert!(sent.text.contains(&text), "the text goes whole");
     // Codex names agent-hud's tool with an underscore.
-    assert!(sent.text.ends_with(&format!("Reply with agent-hud's MCP tool mcp__agent_hud__send_message, reply_to: {id}: your reply reaches the sender as a message.")), "{}", sent.text);
+    assert!(sent.text.ends_with(&format!("When you finish, reply with agent-hud's MCP tool mcp__agent_hud__send_message, reply_to: {id}, even if only to say done: your reply reaches the sender as a message.")), "{}", sent.text);
 }
 
 #[test]
@@ -1005,7 +1005,7 @@ fn chinese_labels_follow_the_app_language() {
     assert!(sent.starts_with(&format!(
         "[Agent HUD · 来自 Claude Code · Fix the login · {id} · 发送方 {CLAUDE}]"
     )));
-    assert!(sent.ends_with(&format!("请用 agent-hud 的 MCP 工具 mcp__agent_hud__send_message 回复，reply_to: {id}，回复会作为一条消息送到发件方。")), "{sent}");
+    assert!(sent.ends_with(&format!("做完后用 agent-hud 的 MCP 工具 mcp__agent_hud__send_message 回复，reply_to: {id}，只说一句“完成”也行；回复会作为一条消息送到发件方。")), "{sent}");
 }
 
 #[test]
@@ -1074,12 +1074,12 @@ fn with_the_reply_choice_the_sender_says_which_messages_ask_for_a_reply() {
                 .lines()
                 .last()
                 .unwrap()
-                .starts_with("Reply with "),
+                .starts_with("When you finish, reply with "),
             "{}",
             asked.text
         );
     }
-    // Off: the argument changes nothing, and every labelled message asks.
+    // Off: the argument changes nothing, and every labelled message asks except a reply.
     let mut world = World::on();
     let answer = world.call(
         Some(("claude", CLAUDE)),
@@ -1088,7 +1088,12 @@ fn with_the_reply_choice_the_sender_says_which_messages_ask_for_a_reply() {
     );
     assert_eq!(answer["state"], "queued", "{answer}");
     let sent = world.codex.0.lock().unwrap().last().unwrap().clone();
-    assert!(sent.text.lines().last().unwrap().starts_with("Reply with "));
+    assert!(sent
+        .text
+        .lines()
+        .last()
+        .unwrap()
+        .starts_with("When you finish, reply with "));
 }
 
 /// `require_reply` is listed only while the user's switch is on, and
@@ -1233,7 +1238,7 @@ fn a_deepseek_harness_session_takes_a_message_through_its_plugin_and_its_answer_
     assert!(delivered.starts_with(&format!(
         "[Agent HUD · from Claude Code · Fix the login · {id} · sender {CLAUDE}]"
     )));
-    assert!(delivered.ends_with(&format!("Reply with agent-hud's MCP tool mcp__agent-hud__send_message, reply_to: {id}: your reply reaches the sender as a message.")), "{delivered}");
+    assert!(delivered.ends_with(&format!("When you finish, reply with agent-hud's MCP tool mcp__agent-hud__send_message, reply_to: {id}, even if only to say done: your reply reaches the sender as a message.")), "{delivered}");
     // Its compressed log's tail marks where it ended: the answer is after.
     assert_eq!(world.messaging.journal.find(&id).unwrap().cursor, Some(2));
     // Open decodes the log from its start to reach that point, a few looks.
@@ -2308,7 +2313,7 @@ fn a_reply_settles_the_message_it_answers_and_is_the_one_plane_back() {
     let first = world.send(("claude", CLAUDE), QUIET, "Review this");
     let id = first["id"].as_str().unwrap().to_owned();
     let delivered = world.claude_words(QUIET, &id);
-    assert!(delivered.ends_with(&format!("Reply with agent-hud's MCP tool mcp__agent-hud__send_message, reply_to: {id}: your reply reaches the sender as a message.")), "{delivered}");
+    assert!(delivered.ends_with(&format!("When you finish, reply with agent-hud's MCP tool mcp__agent-hud__send_message, reply_to: {id}, even if only to say done: your reply reaches the sender as a message.")), "{delivered}");
     world.transcripts.prompt(QUIET, "q1", &delivered);
     let reply = world.call(
         Some(("claude", QUIET)),
@@ -2319,7 +2324,9 @@ fn a_reply_settles_the_message_it_answers_and_is_the_one_plane_back() {
     assert_eq!(reply["pass"], 2);
     let reply_id = reply["id"].as_str().unwrap().to_owned();
     let words = world.claude_words(CLAUDE, &reply_id);
-    assert!(words.ends_with(&format!("This answers {id}. Only if more is needed, reply with agent-hud's MCP tool mcp__agent-hud__send_message, reply_to: {reply_id}.")), "{words}");
+    // An answer ends the exchange: no reply line, so the two do not answer
+    // each other back and forth.
+    assert!(words.ends_with("\n\nLooks fine"), "{words}");
     assert_eq!(world.replied_by(&id), Some(reply_id.clone()));
     world.live(
         QUIET,
@@ -2426,7 +2433,7 @@ fn a_harness_reply_joins_its_chain_settles_the_message_and_flies_back_once() {
         &json!({"from":"deepseek","to":"claude","fromLeft":false,"arrives":false,"falls":false})
     );
     let words = world.claude_words(CLAUDE, &reply_id);
-    assert!(words.ends_with(&format!("This answers {first_id}. Only if more is needed, reply with agent-hud's MCP tool mcp__agent-hud__send_message, reply_to: {reply_id}.")), "{words}");
+    assert!(words.ends_with("\n\nGot it"), "{words}");
     assert_eq!(world.replied_by(&first_id), Some(reply_id.clone()));
     // The Harness turn ends: no second plane for the message the reply settled.
     let sent = 1_792_600_000_000i64;
@@ -2508,11 +2515,11 @@ fn the_reply_line_names_the_tool_as_the_recipients_client_does() {
     assert!(line(Language::En, "codex", None).contains("mcp__agent_hud__send_message"));
     assert_eq!(
         line(Language::En, "antigravity", None),
-        "Reply with agent-hud's send_message tool, reply_to: m-1: your reply reaches the sender as a message."
+        "When you finish, reply with agent-hud's send_message tool, reply_to: m-1, even if only to say done: your reply reaches the sender as a message."
     );
     assert_eq!(
         line(Language::ZhHans, "deepseek", Some("m-0")),
-        "这是对 m-0 的回复。还需要再说时，用 agent-hud 的 MCP 工具 mcp__agent-hud__send_message 回复，reply_to: m-1。"
+        "做完后用 agent-hud 的 MCP 工具 mcp__agent-hud__send_message 回复，reply_to: m-1，只说一句“完成”也行；回复会作为一条消息送到发件方。"
     );
     assert_eq!(
         words::compose(
@@ -2591,11 +2598,11 @@ fn every_message_asks_for_a_reply_with_send_message_and_no_tool_reads_answers() 
     };
     assert_eq!(
         line(Language::En),
-        "Reply with agent-hud's MCP tool mcp__agent_hud__send_message, reply_to: m-1: your reply reaches the sender as a message."
+        "When you finish, reply with agent-hud's MCP tool mcp__agent_hud__send_message, reply_to: m-1, even if only to say done: your reply reaches the sender as a message."
     );
     assert_eq!(
         line(Language::ZhHans),
-        "请用 agent-hud 的 MCP 工具 mcp__agent_hud__send_message 回复，reply_to: m-1，回复会作为一条消息送到发件方。"
+        "做完后用 agent-hud 的 MCP 工具 mcp__agent_hud__send_message 回复，reply_to: m-1，只说一句“完成”也行；回复会作为一条消息送到发件方。"
     );
     let tools = Messaging::tools(&Preferences {
         enabled: true,
