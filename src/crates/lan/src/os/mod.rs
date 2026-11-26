@@ -4,7 +4,7 @@
 //!   wake_pair, Wake, Waiter, wait, Wait   listener cancellation
 //!   addresses                             this device's LAN IPv4 addresses
 //!   overlay_addresses                     its Tailscale-style tunnel IPv4 addresses
-//!   nearby                                whether a caller is on this device's own network
+//!   nearby                                whether a caller is on this device's own network or Tailscale
 //!   create_directory, protect_directory,  owner-only credentials on disk
 //!     private_file
 #[cfg(unix)]
@@ -22,10 +22,11 @@ pub(crate) fn overlay(ip: std::net::Ipv4Addr) -> bool {
     a == 100 && (64..128).contains(&b)
 }
 
-/// Whether a caller at `peer`, taken on this device's address `here`, is on
-/// the device's own network: a private or link-local address beside one of
-/// its Ethernet or Wi-Fi addresses (`lan`). A tunnel's caller is not, whatever
-/// range the tunnel uses, since the connection does not arrive on a LAN
+/// Whether a caller at `peer`, taken on this device's address `here`, reaches
+/// the device on a network of its owner's: a private or link-local address
+/// beside one of its Ethernet or Wi-Fi addresses (`lan`), or a Tailscale
+/// address taken on this device's own Tailscale address. A caller through
+/// another tunnel is not, since its connection does not arrive on a LAN
 /// address; nor is one a router forwards from outside, whose address is
 /// public. A caller on this device itself is.
 pub(crate) fn nearby(peer: std::net::IpAddr, here: std::net::IpAddr, lan: &[String]) -> bool {
@@ -36,10 +37,10 @@ pub(crate) fn nearby(peer: std::net::IpAddr, here: std::net::IpAddr, lan: &[Stri
     let (V4(peer), V4(here)) = (peer, here) else {
         return false;
     };
-    (peer.is_private() || peer.is_link_local())
-        && !overlay(peer)
-        && !overlay(here)
-        && lan.contains(&here.to_string())
+    (overlay(peer) && overlay(here))
+        || ((peer.is_private() || peer.is_link_local())
+            && !overlay(here)
+            && lan.contains(&here.to_string()))
 }
 
 #[cfg(test)]
@@ -65,7 +66,10 @@ mod tests {
             &["172.20.10.4".to_string()],
         ));
         // Tailscale: the caller and this device's own address are in its range.
-        assert!(!at([100, 66, 108, 61], [100, 69, 88, 16]));
+        assert!(at([100, 66, 108, 61], [100, 69, 88, 16]));
+        // A Tailscale address is no caller's on the LAN, nor a LAN caller's on the tunnel.
+        assert!(!at([100, 66, 108, 61], [192, 168, 1, 19]));
+        assert!(!at([192, 168, 1, 40], [100, 69, 88, 16]));
         // Another tunnel with private addresses does not arrive on a LAN address.
         assert!(!at([10, 147, 20, 5], [10, 147, 20, 1]));
         // A router forwarding a port from outside keeps the caller's public address.
