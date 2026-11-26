@@ -198,6 +198,23 @@ fn a_codex_desktop_script_holds_its_commands_and_patches() {
 }
 
 #[test]
+fn files_handed_to_the_user_are_kept_by_their_paths() {
+    assert_eq!(
+        actions(
+            "SendUserFile",
+            &json!({"files":["/p/out/cover.png","out/cut.mp4"],"caption":"Before and after","status":"normal"})
+        ),
+        vec![
+            json!({"files":{"paths":["/p/out/cover.png","out/cut.mp4"],"caption":"Before and after"}})
+        ]
+    );
+    assert_eq!(
+        actions("SendUserFile", &json!({"files":[]})),
+        Vec::<Value>::new()
+    );
+}
+
+#[test]
 fn tools_of_no_kind_have_no_action() {
     for (name, arguments) in [
         ("Read", json!({"file_path":"/p/a.rs"})),

@@ -18,6 +18,9 @@
 //!   in the file. `cut` counts the lines left out for size.
 //! - `"command"`: the command line as text, with `"title"` beside it where
 //!   the agent said in a few words what the command is for.
+//! - `"files"`: `{"paths":[…],"caption"?}`, files the agent handed its user
+//!   to look at (a picture, a video, a report), by where they lie on the
+//!   computer.
 //!
 //! Sizes are bounded here, before anything is kept: see the constants.
 use serde_json::{json, Value};
@@ -80,10 +83,37 @@ pub fn actions(name: &str, arguments: &Value) -> Vec<Value> {
                 vec![action]
             })
             .unwrap_or_default(),
+        // The Claude desktop app's way of handing its user files to look at.
+        "SendUserFile" => shown_files(arguments),
         // Codex Desktop runs a script whose `tools.…` calls are the tools.
         "exec" => arguments.as_str().map(script).unwrap_or_default(),
         _ => Vec::new(),
     }
+}
+
+/// The most files one call hands over that are kept, and of each path.
+const SHOWN_FILES: usize = 20;
+const PATH_BYTES: usize = 1024;
+
+/// The files a call hands the user: their paths as written, and what the
+/// agent said of them.
+fn shown_files(arguments: &Value) -> Vec<Value> {
+    let paths = arguments["files"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(Value::as_str)
+        .filter(|path| !path.trim().is_empty() && path.len() <= PATH_BYTES)
+        .take(SHOWN_FILES)
+        .collect::<Vec<_>>();
+    if paths.is_empty() {
+        return Vec::new();
+    }
+    let mut files = json!({"paths":paths});
+    if let Some(caption) = text_of(arguments, &["caption"]) {
+        files["caption"] = json!(clip(caption, STEP_BYTES));
+    }
+    vec![json!({"files":files})]
 }
 
 /// Whether what a call of these actions returns is worth keeping whole: a
