@@ -10,8 +10,6 @@ import type {
   Snapshot,
 } from "@agent-hud/protocol";
 import type { Translate } from "@agent-hud/ui/format";
-import { ToggleRow } from "../SettingsControls";
-import { Section } from "../SettingsPrimitives";
 import AccountHomes from "../AccountHomes";
 import AntigravityAccounts from "../AntigravityAccounts";
 import { CodexModelSettings } from "../CodexModelSettings";
@@ -20,6 +18,7 @@ import { AgentQuotaReading } from "./AgentQuotaReading";
 import { AgentRelays } from "./AgentRelays";
 import { AgentWebSignIn } from "./AgentWebSignIn";
 import { Connection } from "./Connection";
+import { CopilotQuota } from "./CopilotQuota";
 import type { Perform } from "./use-perform";
 
 export function AgentAccounts({
@@ -84,19 +83,13 @@ export function AgentAccounts({
         />
       )}
       {source.id === "copilot" && (
-        <Section>
-          <ToggleRow
-            title={t("Read GitHub Copilot quota")}
-            subtitle={t("Uses the GitHub sign-in on this computer.")}
-            checked={snapshot.settings.readCopilotQuota === true}
-            disabled={pending}
-            change={(value) =>
-              void perform(() =>
-                action("set_setting", { key: "readCopilotQuota", value }),
-              )
-            }
-          />
-        </Section>
+        <CopilotQuota
+          t={t}
+          snapshot={snapshot}
+          action={action}
+          perform={perform}
+          pending={pending}
+        />
       )}
       <AgentQuotaReading
         t={t}

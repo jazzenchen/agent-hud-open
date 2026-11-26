@@ -54,9 +54,9 @@ Open is the floor, not the ceiling. Next must not do worse than Open; where it c
 | [c06](c06-notch-surface.md) | Island, hover panel, Simple mode, HUD windows | 119 | 40 | 5 | 1 | 18 | 11 | 41 | 3 |
 | [c07](c07-glow-alerts-theme.md) | Glow, alerts, permission cards, theme | 119 | 39 | 3 | 4 | 24 | 6 | 39 | 4 |
 | [c08](c08-bots.md) | Bots and Clawd | 58 | 35 | 1 | 2 | 1 | 1 | 15 | 3 |
-| [c09](c09-app-settings.md) | App lifecycle, Settings, menu bar | 90 | 25 | 6 | 6 | 7 | 9 | 32 | 5 |
+| [c09](c09-app-settings.md) | App lifecycle, Settings, menu bar | 90 | 25 | 6 | 6 | 8 | 8 | 32 | 5 |
 | [c10](c10-statistics-debug.md) | Statistics, sessions window, debug, recording | 101 | 14 | 1 | 9 | 13 | 8 | 54 | 2 |
-| **Total** | | **1,217** | **408** | **48** | **50** | **174** | **87** | **404** | **46** |
+| **Total** | | **1,217** | **408** | **48** | **50** | **175** | **86** | **404** | **46** |
 
 `pnpm run parity:ledger` recounts this table from the rows; `pnpm run check` fails when it is stale.
 
