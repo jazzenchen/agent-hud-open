@@ -109,6 +109,9 @@ export interface AppExtensionPage {
   zh?: [string, string];
   /** Built-in page id this page takes the place of, in its slot. */
   replaces?: string;
+  /** Built-in page id whose foot this page's sections join (a feature still
+   * being tried out, under Experimental). It gets no sidebar row of its own. */
+  joins?: string;
   /** Sidebar group of a page that replaces none; the last group if unset. */
   group?: PageGroup;
   /** Page id this page goes right before, within its group. */
@@ -158,7 +161,7 @@ export function sidebarPages(
       : { ...page };
   });
   for (const page of extensionPages) {
-    if (page.replaces) continue;
+    if (page.replaces || page.joins) continue;
     const entry: SidebarPage = {
       id: page.id,
       label: chinese(page)?.[0] ?? t(page.title),

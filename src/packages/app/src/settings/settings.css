@@ -11,6 +11,11 @@
   color: var(--foreground);
 }
 
+/* A product's sections under a built-in page keep the page's own rhythm. */
+.settings-page + .settings-page {
+  margin-top: 24px;
+}
+
 .settings-section {
   display: flex;
   flex-direction: column;

@@ -1,4 +1,5 @@
 import {
+  Fragment,
   lazy,
   Suspense,
   useEffect,
@@ -242,6 +243,14 @@ export function SettingsWindow({
                         request={extensionRequest}
                         agent={agent}
                       />
+                      {/* A product's sections at the foot of a built-in page. */}
+                      {extensionPages
+                        .filter((item) => item.joins === page)
+                        .map((item) => (
+                          <Fragment key={item.id}>
+                            {item.render({ snapshot, request: extensionRequest })}
+                          </Fragment>
+                        ))}
                     </Suspense>
                   </ViewErrorBoundary>
                 )}
