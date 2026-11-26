@@ -76,6 +76,29 @@ pub struct Message {
     /// it, and a call that comes twice sends once.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub call: Option<String>,
+    /// Its words ended with the reply line: the sender waits for an answer,
+    /// and Agent HUD follows up when none comes.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub asked: bool,
+    /// When its own turn ended with no reply, while a follow-up may be due.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ended_at_ms: Option<i64>,
+    /// The check steered into its turn while that turn still ran was sent.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub checked: bool,
+    /// The follow-up queued after its turn ended with no reply was sent.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub followed: bool,
+    /// On a follow-up: the message it follows up. Agent HUD sent it on the
+    /// sender's behalf; it is no pass of its own.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub follows: Option<String>,
+}
+impl Message {
+    /// Its turn ended with no reply and the follow-up is still to send.
+    pub fn follow_up_due(&self) -> bool {
+        self.asked && !self.followed && self.replied_by.is_none() && self.ended_at_ms.is_some()
+    }
 }
 
 #[derive(Default, Serialize, Deserialize)]
@@ -135,10 +158,10 @@ impl Journal {
                 && message.state != "refused"
         })
     }
-    /// Messages not yet answered nor ended without one.
+    /// Messages not yet answered nor ended without one, or owed a follow-up.
     pub fn pending(&self) -> bool {
         self.messages.iter().any(|message| {
-            !message.answered
+            (!message.answered || message.follow_up_due())
                 && !matches!(message.state.as_str(), "refused" | "expired" | "uncertain")
         })
     }

@@ -59,6 +59,16 @@ impl Messaging {
             if !found.done {
                 continue;
             }
+            // Asked and not answered with a reply: Agent HUD follows up a
+            // minute after this turn ended (`follow_ups`).
+            if message.asked
+                && message.ended_at_ms.is_none()
+                && message.replied_by.is_none()
+                && !replies.contains(&message.id)
+            {
+                message.ended_at_ms = Some(ended_at(&found, live, now));
+                changed = true;
+            }
             if replies.contains(&message.id) {
                 message.answered = true;
                 changed = true;
@@ -72,15 +82,7 @@ impl Messaging {
             // Nothing to read a minute after its own turn ended (when that
             // is not known, the session's latest turn, which ended after it):
             // no plane, and no more looks.
-            let ended = found
-                .ended_at
-                .as_ref()
-                .and_then(Value::as_str)
-                .or(live["endedAt"].as_str())
-                .map(transcript::at)
-                .filter(|at| *at > 0)
-                .unwrap_or(now);
-            if now - ended > ANSWER_WAIT_MS {
+            if now - ended_at(&found, live, now) > ANSWER_WAIT_MS {
                 message.answered = true;
                 changed = true;
             }
@@ -164,4 +166,17 @@ pub(crate) fn flight(
         arrives,
         falls,
     }
+}
+
+/// When the message's own turn ended: as its conversation says, else as the
+/// session's latest turn says (it ended after), else now.
+fn ended_at(found: &transcript::Found, live: &Value, now: i64) -> i64 {
+    found
+        .ended_at
+        .as_ref()
+        .and_then(Value::as_str)
+        .or(live["endedAt"].as_str())
+        .map(transcript::at)
+        .filter(|at| *at > 0)
+        .unwrap_or(now)
 }

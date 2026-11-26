@@ -16,6 +16,7 @@
 //! an answer is read again from the other session's transcript each time.
 mod extras;
 mod flights;
+mod follow_up;
 mod journal;
 mod listing;
 mod models;
@@ -287,6 +288,7 @@ impl Messaging {
         let clients = self.clients.clone();
         let mut changed = self.journal.prune(now);
         changed |= self.fly_answers(host, now);
+        changed |= self.follow_ups(host, now);
         for message in self.journal.messages_mut() {
             if message.kind != Kind::Send
                 || !Provider::parse(&message.to.client).is_some_and(Provider::queues_in_channel)

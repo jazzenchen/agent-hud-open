@@ -51,6 +51,9 @@ impl Messaging {
                     "state": message.state.as_str(),
                     "sentAtMs": message.sent_at_ms,
                     "replyTo": message.reply_to.as_deref(),
+                    // Agent HUD's follow-up on the sender's behalf, and the
+                    // message it follows up.
+                    "follows": message.follows.as_deref(),
                     "pass": message.count,
                     "reason": message.reason.as_deref(),
                 })

@@ -8,6 +8,7 @@ use agent_hud_platform::delivery::{
     fixtures::{StartFixture, SESSION as STARTED},
     AntigravityTransport, CodexTransport, LocalClientPaths, Receipt,
 };
+use follow_up::RUNNING_CHECK_MS;
 use std::{
     cell::Cell,
     collections::BTreeMap,
@@ -2659,6 +2660,9 @@ fn harness_answers_come_back_through_open_s_pending_pages() {
         [back.clone(), back],
         "both, in one round"
     );
+    // Neither answered with a reply: each is owed its follow-up a minute on.
+    assert!(world.messaging.waiting());
+    world.maintain(sent + 65_000);
     assert!(!world.messaging.waiting());
     // Read in turn, each read starting the decoder over for its own log.
     for _ in 0..2 {
@@ -3007,6 +3011,9 @@ fn an_answer_whose_turn_ended_while_the_next_runs_still_flies_back() {
     );
     world.maintain(now + 4_000);
     assert_eq!(flown(&world).len(), 2, "sent and back");
+    // Answered with no reply: settled once its follow-up went a minute on.
+    assert!(world.messaging.waiting(), "a follow-up is owed");
+    world.maintain(now + 64_000);
     assert!(!world.messaging.waiting(), "settled");
 }
 
@@ -3324,3 +3331,223 @@ fn reply_to_unindexed_codex_sender_requires_live_non_archived_root_thread() {
 mod calls;
 mod models;
 mod steer;
+
+/// The follow-up the journal kept for message `id`, and the words it carried
+/// into the Claude Code session `session`.
+fn follow_up_of(world: &mut World, id: &str) -> Vec<Message> {
+    world
+        .messaging
+        .journal
+        .messages()
+        .filter(|m| m.follows.as_deref() == Some(id))
+        .cloned()
+        .collect()
+}
+
+#[test]
+fn a_turn_that_ends_without_the_asked_reply_is_followed_up_once_and_the_reply_settles_it() {
+    let mut world = World::on();
+    world.check_in(QUIET);
+    let sent = 1_792_600_000_000i64;
+    let first = world.send(("claude", CLAUDE), QUIET, "Fix the retry loop");
+    let id = first["id"].as_str().unwrap().to_owned();
+    let delivered = world.claude_words(QUIET, &id);
+    world.transcripts.prompt(QUIET, "q1", &delivered);
+    world.transcripts.reply(QUIET, "q1", "Fixed it.");
+    world.live(
+        QUIET,
+        json!({"turnId":"q1","turnStartedAt":at(sent + 1_000),"endedAt":at(sent + 4_000)}),
+    );
+    world.maintain(sent + 5_000);
+    assert!(
+        follow_up_of(&mut world, &id).is_empty(),
+        "not before a minute"
+    );
+    assert!(world.messaging.waiting(), "a follow-up is owed");
+    world.maintain(sent + 30_000);
+    assert!(follow_up_of(&mut world, &id).is_empty());
+    world.maintain(sent + 65_000);
+    let follow_ups = follow_up_of(&mut world, &id);
+    assert_eq!(follow_ups.len(), 1);
+    let follow_up = &follow_ups[0];
+    assert_eq!(follow_up.state, "queued");
+    assert_eq!(follow_up.count, 1, "no pass of its own");
+    let words = world.claude_words(QUIET, &follow_up.id);
+    assert_eq!(
+        words,
+        format!("[Agent HUD · follow-up · {} · re {id}]\n\nYour turn on {id} ended without a reply, and its sender is waiting for one. Reply now with agent-hud's MCP tool mcp__agent-hud__send_message, reply_to: {id}: what you did, even if only that it is done, or what is left and why.", follow_up.id)
+    );
+    // Once only.
+    world.maintain(sent + 120_000);
+    assert_eq!(follow_up_of(&mut world, &id).len(), 1);
+    assert!(!world.messaging.waiting());
+    // The follow-up began the recipient's next turn; its reply names the
+    // message and settles it, counted as a reply to it would be.
+    world.transcripts.prompt(QUIET, "q2", &words);
+    let reply = world.call(
+        Some(("claude", QUIET)),
+        "send_message",
+        json!({"text":"Done: the loop stops after three tries.","reply_to":id}),
+    );
+    assert_eq!(reply["state"], "queued", "{reply}");
+    assert_eq!(reply["pass"], 2);
+    assert_eq!(
+        world.replied_by(&id),
+        reply["id"].as_str().map(str::to_owned)
+    );
+}
+
+#[test]
+fn a_reply_to_the_follow_up_itself_settles_the_message_it_follows_up() {
+    let mut world = World::on();
+    world.check_in(QUIET);
+    let sent = 1_792_600_000_000i64;
+    let first = world.send(("claude", CLAUDE), QUIET, "Fix the retry loop");
+    let id = first["id"].as_str().unwrap().to_owned();
+    let delivered = world.claude_words(QUIET, &id);
+    world.transcripts.prompt(QUIET, "q1", &delivered);
+    world.transcripts.reply(QUIET, "q1", "Fixed it.");
+    world.live(
+        QUIET,
+        json!({"turnId":"q1","turnStartedAt":at(sent + 1_000),"endedAt":at(sent + 4_000)}),
+    );
+    world.maintain(sent + 5_000);
+    world.maintain(sent + 65_000);
+    let follow_up = follow_up_of(&mut world, &id).remove(0);
+    let reply = world.call(
+        Some(("claude", QUIET)),
+        "send_message",
+        json!({"text":"Done.","reply_to":follow_up.id}),
+    );
+    assert_eq!(reply["state"], "queued", "{reply}");
+    assert_eq!(
+        world.replied_by(&id),
+        reply["id"].as_str().map(str::to_owned)
+    );
+}
+
+#[test]
+fn a_message_answered_with_a_reply_or_that_asked_for_none_is_not_followed_up() {
+    // Answered with a reply in its own turn.
+    let mut world = World::on();
+    world.check_in(QUIET);
+    let sent = 1_792_600_000_000i64;
+    let first = world.send(("claude", CLAUDE), QUIET, "Review this");
+    let id = first["id"].as_str().unwrap().to_owned();
+    let delivered = world.claude_words(QUIET, &id);
+    world.transcripts.prompt(QUIET, "q1", &delivered);
+    world.call(
+        Some(("claude", QUIET)),
+        "send_message",
+        json!({"text":"Looks fine","reply_to":id}),
+    );
+    world.live(
+        QUIET,
+        json!({"turnId":"q1","turnStartedAt":at(sent + 1_000),"endedAt":at(sent + 4_000)}),
+    );
+    world.maintain(sent + 5_000);
+    world.maintain(sent + 120_000);
+    assert!(follow_up_of(&mut world, &id).is_empty());
+    // With "Ask for replies only when needed", one sent without
+    // require_reply asks for nothing, so nothing is owed.
+    let mut world = World::new(Preferences {
+        enabled: true,
+        ..Default::default()
+    });
+    world.check_in(QUIET);
+    let first = world.send(("claude", CLAUDE), QUIET, "FYI: the build is green");
+    let id = first["id"].as_str().unwrap().to_owned();
+    let delivered = world.claude_words(QUIET, &id);
+    world.transcripts.prompt(QUIET, "q1", &delivered);
+    world.transcripts.reply(QUIET, "q1", "Noted.");
+    world.live(
+        QUIET,
+        json!({"turnId":"q1","turnStartedAt":at(sent + 1_000),"endedAt":at(sent + 4_000)}),
+    );
+    world.maintain(sent + 5_000);
+    world.maintain(sent + 120_000);
+    assert!(follow_up_of(&mut world, &id).is_empty());
+}
+
+#[test]
+fn a_codex_turn_still_running_ten_minutes_on_gets_one_check_steered_in_then_a_follow_up() {
+    let mut world = World::on();
+    let sent = 1_792_600_000_000i64;
+    let first = world.send(("claude", CLAUDE), CODEX, "Port the parser");
+    let id = first["id"].as_str().unwrap().to_owned();
+    let delivered = world.codex.0.lock().unwrap().last().unwrap().text.clone();
+    world.state(CODEX, "running");
+    world.live(
+        CODEX,
+        json!({"turnId":"c1","turnStartedAt":at(sent + 1_000),"endedAt":null,"prompt":delivered}),
+    );
+    world.maintain(sent + RUNNING_CHECK_MS - 1_000);
+    assert!(
+        follow_up_of(&mut world, &id).is_empty(),
+        "not before ten minutes"
+    );
+    world.maintain(sent + RUNNING_CHECK_MS);
+    let checks = follow_up_of(&mut world, &id);
+    assert_eq!(checks.len(), 1);
+    assert_eq!(checks[0].state, "steered");
+    let steer = world.codex.0.lock().unwrap().last().unwrap().clone();
+    assert_eq!(steer.operation, Operation::Steer);
+    assert_eq!(
+        steer.text,
+        format!("[Agent HUD · follow-up · {} · re {id} · into your current turn]\n\nThe sender of {id} is waiting for your reply. Go on with the work; when you finish, reply with agent-hud's MCP tool mcp__agent_hud__send_message, reply_to: {id}, even if only to say done. Send no reply to this check itself.", checks[0].id)
+    );
+    world.maintain(sent + 2 * RUNNING_CHECK_MS);
+    assert_eq!(follow_up_of(&mut world, &id).len(), 1, "one check");
+    // The turn ends with no reply: the follow-up is queued a minute on.
+    let ended = sent + 2 * RUNNING_CHECK_MS;
+    world.transcripts.prompt(CODEX, "c1", &delivered);
+    world.transcripts.reply(CODEX, "c1", "Ported.");
+    world.state(CODEX, "idle");
+    world.live(
+        CODEX,
+        json!({"turnId":"c1","turnStartedAt":at(sent + 1_000),"endedAt":at(ended),"prompt":delivered}),
+    );
+    world.maintain(ended + 1_000);
+    world.maintain(ended + 61_000);
+    let both = follow_up_of(&mut world, &id);
+    assert_eq!(both.len(), 2, "{both:?}");
+    let queued = world.codex.0.lock().unwrap().last().unwrap().clone();
+    assert_eq!(queued.operation, Operation::Enqueue);
+    assert!(
+        queued.text.contains("ended without a reply"),
+        "{}",
+        queued.text
+    );
+}
+
+#[test]
+fn a_claude_session_takes_no_steered_check_only_the_follow_up() {
+    let mut world = World::on();
+    world.check_in(QUIET);
+    let sent = 1_792_600_000_000i64;
+    let first = world.send(("claude", CLAUDE), QUIET, "Fix the retry loop");
+    let id = first["id"].as_str().unwrap().to_owned();
+    let delivered = world.claude_words(QUIET, &id);
+    world.state(QUIET, "running");
+    world.live(
+        QUIET,
+        json!({"turnId":"q1","turnStartedAt":at(sent + 1_000),"endedAt":null,"prompt":delivered}),
+    );
+    world.maintain(sent + 2 * RUNNING_CHECK_MS);
+    assert!(follow_up_of(&mut world, &id).is_empty());
+}
+
+#[test]
+fn the_follow_up_reads_in_the_app_language() {
+    let words = words::follow_up(Language::ZhHans, "claude", "m-2", "m-1", false);
+    assert!(
+        words.starts_with("[Agent HUD · 追问 · m-2 · 关于 m-1]\n\n你处理 m-1 的这一轮结束了"),
+        "{words}"
+    );
+    assert!(words.contains("mcp__agent-hud__send_message"), "{words}");
+    let check = words::follow_up(Language::ZhHans, "codex", "m-2", "m-1", true);
+    assert!(
+        check.starts_with("[Agent HUD · 追问 · m-2 · 关于 m-1 · 插入你当前这一轮]"),
+        "{check}"
+    );
+}

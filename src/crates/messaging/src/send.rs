@@ -246,6 +246,11 @@ impl Messaging {
             replied_by: None,
             steered_into,
             call: self.calling.clone(),
+            asked: ask && !own_steer,
+            ended_at_ms: None,
+            checked: false,
+            followed: false,
+            follows: None,
         };
         // A reply that went back to its parent's sender settles the parent:
         // the journal names this reply, and its plane is the one back, so the
@@ -259,6 +264,13 @@ impl Messaging {
             {
                 parent.answered = true;
                 parent.replied_by.get_or_insert_with(|| id.clone());
+                // A reply to a follow-up answers the message it follows up.
+                if let Some(followed) = parent.follows.clone() {
+                    if let Some(original) = self.journal.messages_mut().find(|m| m.id == followed) {
+                        original.answered = true;
+                        original.replied_by.get_or_insert_with(|| id.clone());
+                    }
+                }
             }
         }
         self.journal.add(message);
