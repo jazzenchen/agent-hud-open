@@ -44,6 +44,36 @@ pub(crate) struct Gathered {
 /// The most calls waiting for a result that one log is remembered to have.
 const OPEN_CALLS: usize = 256;
 
+impl crate::AgentHudCore {
+    /// What a read of the log at `path` starts gathering with: what the
+    /// reads before it left for it.
+    pub(crate) fn conversation_gathering(&mut self, path: &std::path::Path) -> Gathered {
+        Gathered {
+            facts: Vec::new(),
+            awaiting: self.conversation_awaiting.get(path).cloned(),
+            open: self.conversation_calls.remove(path).unwrap_or_default(),
+        }
+    }
+
+    /// The facts a read of the log at `path` gathered; what it leaves for
+    /// the next read of that log is kept.
+    pub(crate) fn conversation_gathered(
+        &mut self,
+        path: &std::path::Path,
+        gathered: Gathered,
+    ) -> Vec<Fact> {
+        match gathered.awaiting {
+            Some(turn) => self.conversation_awaiting.insert(path.to_path_buf(), turn),
+            None => self.conversation_awaiting.remove(path),
+        };
+        if !gathered.open.is_empty() {
+            self.conversation_calls
+                .insert(path.to_path_buf(), gathered.open);
+        }
+        gathered.facts
+    }
+}
+
 impl Gathered {
     /// A turn's start, with the prompt its first line holds, if any.
     pub(crate) fn started(&mut self, turn: String, first: Option<&LineItem>, at_ms: Option<i64>) {
