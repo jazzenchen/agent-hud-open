@@ -489,6 +489,171 @@ fn a_host_route_may_answer_with_json() {
 }
 
 #[test]
+fn a_link_answers_requests_pushes_changes_and_reaches_the_host() {
+    use ring::signature::{EcdsaKeyPair, ECDSA_P256_SHA256_ASN1_SIGNING};
+    use tungstenite::Message;
+    let directory = std::env::temp_dir().join(format!("lan-link-{}", uuid::Uuid::new_v4()));
+    let credentials =
+        Credentials::new("fixture", directory.clone(), Arc::new(Secrets::default())).unwrap();
+    let pkcs8 = EcdsaKeyPair::generate_pkcs8(
+        &ECDSA_P256_SHA256_ASN1_SIGNING,
+        &ring::rand::SystemRandom::new(),
+    )
+    .unwrap();
+    let key = rustls::crypto::ring::sign::any_ecdsa_type(&rustls::pki_types::PrivateKeyDer::Pkcs8(
+        pkcs8.as_ref().to_vec().into(),
+    ))
+    .unwrap();
+    let identity = Identity::from_signer(vec![0x30, 0x00], key).unwrap();
+    let cache = Arc::new(Mutex::new(
+        SnapshotCache::<Item>::new(
+            "fixture".into(),
+            "Fixture".into(),
+            directory.join("cursor.json"),
+        )
+        .unwrap(),
+    ));
+    cache
+        .lock()
+        .unwrap()
+        .update(&[Item("a".into())], 1_000)
+        .unwrap();
+    let mut server = LanServer::new(
+        "fixture".into(),
+        "Fixture".into(),
+        credentials,
+        cache.clone(),
+        identity,
+        Arc::new(|request, _| {
+            Ok((request.path == "/v1/echo").then(|| Handled {
+                status: 202,
+                remember: false,
+                body: Some(serde_json::json!({
+                    "echo": String::from_utf8_lossy(&request.body),
+                    "nearby": request.nearby,
+                })),
+            }))
+        }),
+    );
+    let port = server
+        .start_at(SocketAddr::from((std::net::Ipv4Addr::LOCALHOST, 0)))
+        .unwrap();
+    server.set_account(Some("account")).unwrap();
+    let token = server
+        .shared
+        .credentials
+        .lock()
+        .unwrap()
+        .automatic_credential()
+        .unwrap()
+        .to_owned();
+    let client = Arc::new(
+        rustls::ClientConfig::builder_with_provider(Arc::new(
+            rustls::crypto::ring::default_provider(),
+        ))
+        .with_safe_default_protocol_versions()
+        .unwrap()
+        .dangerous()
+        .with_custom_certificate_verifier(Arc::new(AnyCertificate))
+        .with_no_client_auth(),
+    );
+    let open = |token: &str| {
+        let socket = TcpStream::connect(("127.0.0.1", port)).unwrap();
+        socket
+            .set_read_timeout(Some(Duration::from_secs(3)))
+            .unwrap();
+        let session =
+            rustls::ClientConnection::new(client.clone(), "localhost".try_into().unwrap()).unwrap();
+        let request = tungstenite::http::Request::builder()
+            .uri("wss://localhost/v1/link")
+            .header("Host", "fixture")
+            .header("Authorization", format!("Bearer {token}"))
+            .header("Connection", "Upgrade")
+            .header("Upgrade", "websocket")
+            .header("Sec-WebSocket-Version", "13")
+            .header(
+                "Sec-WebSocket-Key",
+                tungstenite::handshake::client::generate_key(),
+            )
+            .body(())
+            .unwrap();
+        tungstenite::client::client(request, rustls::StreamOwned::new(session, socket))
+            .ok()
+            .map(|(link, _)| link)
+    };
+    // Without the credential there is no link.
+    assert!(open("0000").is_none());
+
+    let mut link = open(&token).unwrap();
+    let ask = |link: &mut tungstenite::WebSocket<_>, message: Value| -> Value {
+        link.send(Message::Text(message.to_string().into()))
+            .unwrap();
+        match link.read().expect("an answer within 3 s") {
+            Message::Text(text) => serde_json::from_str(text.as_str()).unwrap(),
+            other => panic!("{other:?}"),
+        }
+    };
+    assert_eq!(ask(&mut link, json!({"ping":7})), json!({"pong":7}));
+    let snapshot = ask(
+        &mut link,
+        json!({"id":1,"method":"GET","path":"/v1/snapshot"}),
+    );
+    assert_eq!(snapshot["status"], 200);
+    assert_eq!(snapshot["body"]["records"], json!(["a"]));
+    // The host's routes answer here as they do a request of its own.
+    let echo = ask(
+        &mut link,
+        json!({"id":2,"method":"POST","path":"/v1/echo","body":{"text":"hi"}}),
+    );
+    assert_eq!(
+        echo,
+        json!({"id":2,"status":202,"body":{"echo":"{\"text\":\"hi\"}","nearby":true}})
+    );
+    assert_eq!(
+        ask(
+            &mut link,
+            json!({"id":3,"method":"POST","path":"/v1/unknown"})
+        )["status"],
+        404
+    );
+
+    // A feed from where the reader stands: where the computer is, then each
+    // change as it is committed.
+    let subscribed = ask(
+        &mut link,
+        json!({"id":"feed","method":"GET","path":"/v1/events","cursor":snapshot["body"]["cursor"]}),
+    );
+    assert_eq!(subscribed["status"], 200);
+    let next = |link: &mut tungstenite::WebSocket<_>| -> Value {
+        match link.read().expect("an event within 3 s") {
+            Message::Text(text) => serde_json::from_str(text.as_str()).unwrap(),
+            other => panic!("{other:?}"),
+        }
+    };
+    assert_eq!(next(&mut link)["event"], "revision");
+    let committed = Instant::now();
+    cache
+        .lock()
+        .unwrap()
+        .update(&[Item("a".into()), Item("b".into())], 2_000)
+        .unwrap();
+    let event = next(&mut link);
+    assert!(
+        committed.elapsed() < Duration::from_millis(500),
+        "waited {:?}",
+        committed.elapsed()
+    );
+    assert_eq!(
+        (&event["id"], &event["event"]),
+        (&json!("feed"), &json!("changes"))
+    );
+    assert_eq!(event["data"]["records"], json!(["b"]));
+    assert_eq!(server.status()["peers"][0]["online"], true);
+    server.stop(false).unwrap();
+    let _ = std::fs::remove_dir_all(&directory);
+}
+
+#[test]
 fn a_request_may_carry_a_megabyte_and_no_more() {
     let request = |size: usize| {
         let body = "a".repeat(size);

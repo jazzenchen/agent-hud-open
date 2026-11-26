@@ -20,6 +20,7 @@ use std::{
 mod addresses;
 mod connection;
 mod events;
+mod link;
 mod pairing;
 mod peers;
 use addresses::with_alternates;

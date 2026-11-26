@@ -150,6 +150,18 @@ pub(super) fn connection<R: Record>(
     let Some(authorization) = authorization else {
         return reply(401, &[], &[]);
     };
+    if let Some(key) = super::link::asked(&request) {
+        return super::link::link(
+            shared,
+            stream,
+            &request,
+            address,
+            &authorization,
+            token,
+            generation,
+            key,
+        );
+    }
     if let Some(handled) = (shared.extension)(&request, &authorization)? {
         if handled.remember {
             remember_peer(shared, &request, address, &authorization, false);
@@ -239,32 +251,7 @@ pub(super) fn connection<R: Record>(
                 until_beat.clamp(Duration::from_millis(10), Duration::from_secs(5)),
             );
         }
-        let online = {
-            let mut streams = shared
-                .streams
-                .lock()
-                .unwrap_or_else(PoisonError::into_inner);
-            if let Some(count) = streams.get_mut(&peer_id) {
-                *count = count.saturating_sub(1);
-                if *count == 0 {
-                    streams.remove(&peer_id);
-                    false
-                } else {
-                    true
-                }
-            } else {
-                false
-            }
-        };
-        if let Some(peer) = shared
-            .peers
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .get_mut(&peer_id)
-        {
-            peer.online = online;
-            peer.last_seen_ms = now();
-        }
+        stream_ended(shared, &peer_id, now());
         return Ok(());
     }
     let mut cache = shared.cache.lock().unwrap_or_else(PoisonError::into_inner);
@@ -295,5 +282,36 @@ pub(super) fn connection<R: Record>(
         let mut headers = vec![("ETag", etag), ("Content-Type", "application/json".into())];
         headers.extend(encoding);
         reply(200, &headers, &body)
+    }
+}
+
+/// A reader's stream or link closed: it stays online while another of its
+/// connections is open, and was last seen now.
+pub(super) fn stream_ended<R>(shared: &Shared<R>, peer_id: &str, now: i64) {
+    let online = {
+        let mut streams = shared
+            .streams
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
+        if let Some(count) = streams.get_mut(peer_id) {
+            *count = count.saturating_sub(1);
+            if *count == 0 {
+                streams.remove(peer_id);
+                false
+            } else {
+                true
+            }
+        } else {
+            false
+        }
+    };
+    if let Some(peer) = shared
+        .peers
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner)
+        .get_mut(peer_id)
+    {
+        peer.online = online;
+        peer.last_seen_ms = now;
     }
 }

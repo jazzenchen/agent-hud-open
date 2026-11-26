@@ -134,6 +134,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2",
+ "tungstenite",
  "uuid",
  "windows-sys 0.61.2",
 ]

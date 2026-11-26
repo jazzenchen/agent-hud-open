@@ -19,6 +19,8 @@ qrcode = { version = "=0.14.1", default-features = false, features = ["svg"] }
 rustls = { version = "=0.23.46", default-features = false, features = ["std", "ring", "tls12"] }
 uuid = { version = "1", features = ["v4"] }
 flate2 = "=1.1.10"
+# The long connection a reader keeps (`/v1/link`); the version the platform crate uses.
+tungstenite = { version = "=0.30.0", default-features = false, features = ["handshake"] }
 
 [dev-dependencies]
 # A throwaway TLS key for the loopback stream test; the same ring rustls uses.

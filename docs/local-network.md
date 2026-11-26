@@ -96,3 +96,23 @@ A server-sent event stream (`text/event-stream`) that says when something new wa
 - With nothing new, a `revision` notice or a heartbeat comment arrives every 30 seconds.
 
 The stream ends when sharing is turned off or the client's token is revoked.
+
+## Link
+
+```
+GET /v1/link
+Upgrade: websocket
+```
+
+One long connection in place of the requests above: a WebSocket, opened with the same `Authorization: Bearer` header. A client that keeps a link needs no other request. The one-request routes stay as they are for clients from before the link.
+
+Every message is a JSON text frame.
+
+- A request: `{"id", "method", "path", "cursor"?, "etag"?, "scope"?, "session"?, "body"?}`. Its answer: `{"id", "status", "etag"?, "body"?}`, where `status` and `body` are what the same route answers on its own. `cursor` is a cursor object as a snapshot gives it; `etag` a revision.
+- `GET /v1/snapshot`, `GET /v1/changes` and `GET /v1/events` are the routes above. `GET /v1/events` answers `200` and begins a feed: events arrive as `{"id", "event", "data", "revision"?, "cursor"?}` under the request's `id`, `event` one of `revision`, `changes` and `reset`. Asking again replaces the feed; `DELETE /v1/events` ends it.
+- `"scope": "list"` leaves token usage and conversation turns out of a snapshot, a change set and a feed. With `"session": {"provider", "sessionID"}` that one session's turns are included. `GET /v1/conversation` with a `session` answers that session's turns, in a snapshot's shape.
+- `"scope": "light"` leaves no record out, token usage included, but sends every conversation turn without its words: its payload's `text` and `items` are dropped, and everything else about the record stays as it is. With `"session": {"provider", "sessionID"}` that one session's turns come whole. `etag`, `revision` and `cursor` are still those of the whole content, so a client that reads this way checks that its position follows on and does not recompute the revision. `deletedIDs` are not filtered. An app from before this scope answers with the whole content.
+- Any other route goes to the app's own, such as `POST /v1/prompt`, with `body` as its JSON body.
+- `{"ping": n}` is answered `{"pong": n}`. Send one every 25 seconds: a link the app hears nothing on for 90 seconds is closed.
+
+The link ends when sharing is turned off or the client's token is revoked. A message may hold up to a megabyte.
