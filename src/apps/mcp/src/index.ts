@@ -262,8 +262,9 @@ serveStdio(() => {
                 arguments: params,
                 caller: named,
                 // Always, so the app can tell a client its hooks name (TRAE,
-                // Kimi, ...) from Claude Code's session id inherited through
-                // the environment by an agent started inside Claude Code.
+                // Kimi, ...) or a Harness host its plugin noted from Claude
+                // Code's session id inherited through the environment by an
+                // agent or app started inside Claude Code.
                 parent: launchedBy,
                 // A call that sends gets a name of its own: when its answer
                 // does not come in time the engine asks the app what became

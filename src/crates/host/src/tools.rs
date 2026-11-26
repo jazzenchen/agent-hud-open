@@ -233,6 +233,28 @@ mod tests {
             with_caller((&channel, None), None, call(json!(777), codex.clone()), now)["caller"],
             codex
         );
+        // A Harness host opened from a Claude Code session carries that
+        // session's id into its relay; the plugin's note names the caller.
+        let claude = json!({"client":"claude","sessionId":"c","turnId":null});
+        assert_eq!(
+            with_caller(
+                (&channel, None),
+                None,
+                call(json!(777), claude.clone()),
+                now
+            )["caller"],
+            json!({"client":"deepseek","sessionId":"session-a","turnId":null})
+        );
+        // Claude Code itself: no plugin notes under its process.
+        assert_eq!(
+            with_caller(
+                (&channel, None),
+                None,
+                call(json!(778), claude.clone()),
+                now
+            )["caller"],
+            claude
+        );
         // Other host methods pass as they came.
         assert_eq!(
             with_caller((&channel, None), None, json!({}), now),

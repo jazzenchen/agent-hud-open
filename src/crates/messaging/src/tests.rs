@@ -1497,6 +1497,64 @@ fn a_deepseek_harness_session_starts_through_its_plugin_in_a_running_host() {
     assert_eq!(done["answer"], "Ported.");
 }
 
+/// The journal names a Harness recipient as the snapshot does
+/// (`deepseek:session-…`); the host names a Harness caller as Harness does
+/// (`session-…`). Its reply_to a start or a message is still its own: linked
+/// as the reply, with no follow-up after its turn.
+#[test]
+fn a_deepseek_harness_reply_to_a_start_or_a_message_settles_it() {
+    let mut world = World::on();
+    world.check_in(QUIET);
+    world.harness();
+    let host = harness_host(&world.harness_channel, HARNESS_TWO_OWN);
+    let start = world.call(
+        Some(("claude", QUIET)),
+        "start_session",
+        json!({"client":"deepseek","text":"Model the tree","require_reply":true}),
+    );
+    assert_eq!(start["state"], "started", "{start}");
+    let started = start["id"].as_str().unwrap().to_owned();
+    host.join().unwrap();
+    world.harness_session(HARNESS_TWO, HARNESS_TWO_OWN, "Model the tree");
+    let sent = world.send(("claude", QUIET), HARNESS, "Light the tree");
+    assert_eq!(sent["state"], "queued", "{sent}");
+    let message = sent["id"].as_str().unwrap().to_owned();
+    for (own, parent) in [(HARNESS_TWO_OWN, &started), (HARNESS_OWN, &message)] {
+        let parent_to = world.messaging.journal.find(parent).unwrap().to.clone();
+        assert_eq!(parent_to.client, "deepseek");
+        assert_eq!(parent_to.session_id, format!("deepseek:{own}"));
+        let reply = world.call(
+            Some(("deepseek", own)),
+            "send_message",
+            json!({"text":"Done.","reply_to":parent}),
+        );
+        assert_eq!(reply["state"], "queued", "{reply}");
+        assert_eq!(
+            world.replied_by(parent),
+            reply["id"].as_str().map(str::to_owned)
+        );
+        assert!(world
+            .messaging
+            .journal
+            .replies()
+            .contains(reply["id"].as_str().unwrap()));
+    }
+    // Both Harness turns end; a minute on, neither is checked or followed up.
+    let at_ms = 1_792_600_000_000i64;
+    for session in [HARNESS_TWO, HARNESS] {
+        world.live(
+            session,
+            json!({"turnId":"h1","turnStartedAt":at(at_ms + 1_000),"endedAt":at(at_ms + 4_000)}),
+        );
+    }
+    world.maintain(at_ms + 700_000);
+    for parent in [&started, &message] {
+        assert!(follow_up_of(&mut world, parent).is_empty());
+        let settled = world.messaging.journal.find(parent).unwrap();
+        assert!(settled.answered && !settled.follow_up_due(), "{parent}");
+    }
+}
+
 #[test]
 fn a_deepseek_harness_session_is_refused_without_its_plugin_or_switch() {
     let mut world = World::on();

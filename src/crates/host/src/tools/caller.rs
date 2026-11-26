@@ -45,25 +45,24 @@ pub(super) fn with_caller(
             hook_caller(&chain, snapshot)
         })
     });
-    if !params["caller"].is_null() {
-        // Claude Code's session comes from the relay's environment, which an
-        // agent started inside a Claude Code session inherits: that agent's
-        // own hooks name it exactly. A caller a call names in its `_meta`
-        // (Codex, Antigravity) stays.
-        if params["caller"]["client"] == "claude" {
-            if let Some(caller) = hooked {
-                params["caller"] = caller;
-            }
-        }
+    // A caller a call names in its `_meta` (Codex, Antigravity) stays.
+    // Claude Code's session comes from the relay's environment, which any
+    // app started from a Claude Code session inherits: an agent run in its
+    // shell, or a DeepSeek Harness app opened from it or by an Agent HUD that
+    // was. Every call from that Harness host then named the Claude Code
+    // session, so a reply was refused as one to a message it never got.
+    // That client's own word wins: Agent HUD's plugin in the Harness host,
+    // else the hooks of the agent's session.
+    if !params["caller"].is_null() && params["caller"]["client"] != "claude" {
         return params;
     }
     let found = parent
-        .and_then(|host| channel.caller(host, params["name"].as_str()?, &params["arguments"], now));
-    if let Some(session) = found {
-        use agent_hud_runtime::hud_tools::Client;
-        params["caller"] =
-            json!({"client": Client::DeepSeek.id(), "sessionId": session, "turnId": null});
-    } else if let Some(caller) = hooked {
+        .and_then(|host| channel.caller(host, params["name"].as_str()?, &params["arguments"], now))
+        .map(|session| {
+            use agent_hud_runtime::hud_tools::Client;
+            json!({"client": Client::DeepSeek.id(), "sessionId": session, "turnId": null})
+        });
+    if let Some(caller) = found.or(hooked) {
         params["caller"] = caller;
     }
     params
