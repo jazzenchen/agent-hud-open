@@ -248,7 +248,10 @@ export function SettingsWindow({
                         .filter((item) => item.joins === page)
                         .map((item) => (
                           <Fragment key={item.id}>
-                            {item.render({ snapshot, request: extensionRequest })}
+                            {item.render({
+                              snapshot,
+                              request: extensionRequest,
+                            })}
                           </Fragment>
                         ))}
                     </Suspense>

@@ -9,12 +9,14 @@ import { motion } from "motion/react";
 import { Button } from "@agent-hud/ui/components/button";
 import { translator, type Language } from "@agent-hud/ui/format";
 import type { HUDUpdateNotice } from "../model";
+import type { FooterAction } from "../PanelContext";
 import { readAgoLabel } from "./account-labels";
 import type { palette } from "./theme";
 
 /** The panel's footer: Settings; when the numbers were last read, with a
  * button that reads every agent again; and Statistics with the newer
- * version's arrow beside it when there is one. */
+ * version's arrow beside it when there is one. The product's own buttons
+ * stand beside Settings. */
 export function PanelFooter({
   language,
   colors,
@@ -25,6 +27,7 @@ export function PanelFooter({
   onUpdate,
   readAt,
   onRefresh,
+  actions = [],
 }: {
   language: Language;
   colors: ReturnType<typeof palette>;
@@ -37,9 +40,20 @@ export function PanelFooter({
   /** When the newest reading was taken (`latestReading`). */
   readAt?: number | null;
   onRefresh?: () => Promise<unknown>;
+  actions?: FooterAction[];
 }) {
   const t = translator(language);
   const [refreshing, setRefreshing] = useState(false);
+  // The product's button that was pressed, dimmed until its work answers.
+  const [running, setRunning] = useState<string | null>(null);
+  const run = (action: FooterAction) => {
+    if (running) return;
+    setRunning(action.id);
+    void action
+      .run()
+      .catch(() => undefined)
+      .finally(() => setRunning(null));
+  };
   // The age moves on while the panel stays open.
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
@@ -98,17 +112,36 @@ export function PanelFooter({
         color: colors.secondary,
       }}
     >
-      <Button
-        variant="ghost"
-        size="icon-sm"
-        aria-label={t("Settings")}
-        title={t("Settings")}
-        disabled={!onConfigure}
-        onClick={onConfigure}
-        style={footerButton(colors.secondary)}
-      >
-        <Settings style={{ width: 14, height: 14 }} strokeWidth={1.7} />
-      </Button>
+      <div style={{ display: "flex", alignItems: "center" }}>
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          aria-label={t("Settings")}
+          title={t("Settings")}
+          disabled={!onConfigure}
+          onClick={onConfigure}
+          style={footerButton(colors.secondary)}
+        >
+          <Settings style={{ width: 14, height: 14 }} strokeWidth={1.7} />
+        </Button>
+        {actions.map((action) => (
+          <Button
+            key={action.id}
+            variant="ghost"
+            size="icon-sm"
+            aria-label={t(action.title)}
+            title={t(action.title)}
+            aria-busy={running === action.id || undefined}
+            onClick={() => run(action)}
+            style={{
+              ...footerButton(colors.secondary),
+              opacity: running === action.id ? 0.45 : 1,
+            }}
+          >
+            {action.icon}
+          </Button>
+        ))}
+      </div>
       {(readAt != null || onRefresh) && (
         <div
           style={{

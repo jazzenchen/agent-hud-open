@@ -51,7 +51,17 @@ import {
   shownAnswer,
   type PanelAnswer,
 } from "./panel-answers";
+/** A button the product adds to the panel's footer, beside Settings: a way
+ * out of the HUD to something of its own. `title` is an English catalog key. */
+export interface FooterAction {
+  id: string;
+  title: string;
+  icon: ReactNode;
+  run(): Promise<unknown>;
+}
 export interface PanelServices {
+  /** The product's own footer buttons. */
+  footerActions?: FooterAction[];
   query(
     method: PanelQueryMethod,
     params: Record<string, unknown>,

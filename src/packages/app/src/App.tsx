@@ -5,6 +5,7 @@ import { emit } from "@tauri-apps/api/event";
 import { toast } from "sonner";
 import {
   PanelServicesProvider,
+  type FooterAction,
   type PanelServices,
 } from "@agent-hud/hud/PanelContext";
 import { useHUD } from "./lib/use-hud";
@@ -41,11 +42,17 @@ export interface AppProps {
   agentPlugins?: AgentPluginItem[];
   /** What the product adds to the guide: its news and its Settings steps. */
   guide?: ProductGuide;
+  /** The product's own buttons in the HUD panel's footer: a hook, given the
+   * way to ask the product, that answers the buttons to show now. */
+  useFooterActions?: (
+    request: (method: string, params?: unknown) => Promise<unknown>,
+  ) => FooterAction[];
   productName?: string;
   version?: string;
 }
 const PictureView = lazy(() => import("./HUDPicture"));
 const MarkWindow = lazy(() => import("./mark/MarkWindow"));
+const noFooterActions = (): FooterAction[] => [];
 export default function App(props: AppProps = {}) {
   if (new URLSearchParams(location.search).get("surface") === "picture")
     return <PictureView />;
@@ -55,6 +62,7 @@ function AppContent({
   extensionPages = [],
   agentPlugins = [],
   guide,
+  useFooterActions = noFooterActions,
   productName = "Agent HUD",
   version = "0.1.0",
 }: AppProps) {
@@ -79,6 +87,7 @@ function AppContent({
   });
   const extensionRequest = (method: string, params: unknown = {}) =>
     act("extension", { method, params });
+  const footerActions = useFooterActions(extensionRequest);
   const surfaceScreenId = surface
     ? (parameters.get("screen") ?? "")
     : undefined;
@@ -141,6 +150,7 @@ function AppContent({
     <SourceMenu statistics={statistics} hudVisible={hudVisible} act={act} />
   );
   const panelServices: PanelServices = {
+    footerActions: surface ? footerActions : undefined,
     sources: snapshot?.sourcePreferences ?? store.sources,
     ends: surface ? hudEndsLink : undefined,
     inspect: surface ? hudInspect : undefined,

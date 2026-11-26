@@ -274,6 +274,7 @@ export const SourceHoverPanel = memo(function SourceHoverPanel({
         onUpdate={onUpdate}
         readAt={latestReading(snapshot)}
         onRefresh={services?.refresh}
+        actions={services?.footerActions}
       />
     </div>
   );
