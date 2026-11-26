@@ -91,6 +91,11 @@ pub fn actions(name: &str, arguments: &Value) -> Vec<Value> {
     }
 }
 
+/// Whether a tool of this name hands its user files to look at.
+pub fn hands_over_files(name: &str) -> bool {
+    name.rsplit("__").next().unwrap_or(name) == "SendUserFile"
+}
+
 /// The most files one call hands over that are kept, and of each path.
 const SHOWN_FILES: usize = 20;
 const PATH_BYTES: usize = 1024;
