@@ -18,6 +18,7 @@ fn path_of(arguments: &Value) -> Option<&str> {
             "filePath",
             "notebook_path",
             "target_file",
+            "Path",
         ],
     )
 }
@@ -28,8 +29,20 @@ pub(super) fn edit(arguments: &Value) -> Vec<Value> {
         return Vec::new();
     };
     let pair = |value: &Value| {
-        let old = text_of_raw(value, &["old_string", "oldText", "old_str", "old_text"]);
-        let new = text_of_raw(value, &["new_string", "newText", "new_str", "new_text"]);
+        let old = text_of_raw(
+            value,
+            &["old_string", "oldText", "old_str", "old_text", "Target"],
+        );
+        let new = text_of_raw(
+            value,
+            &[
+                "new_string",
+                "newText",
+                "new_str",
+                "new_text",
+                "Replacement",
+            ],
+        );
         (old.is_some() || new.is_some()).then(|| {
             (
                 old.unwrap_or_default().to_owned(),
@@ -63,7 +76,10 @@ fn text_of_raw<'a>(value: &'a Value, keys: &[&str]) -> Option<&'a str> {
 pub(super) fn write(arguments: &Value) -> Vec<Value> {
     let (Some(path), Some(content)) = (
         path_of(arguments),
-        text_of_raw(arguments, &["content", "contents", "file_text", "text"]),
+        text_of_raw(
+            arguments,
+            &["content", "contents", "file_text", "text", "Content"],
+        ),
     ) else {
         return Vec::new();
     };

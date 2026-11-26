@@ -215,6 +215,43 @@ fn files_handed_to_the_user_are_kept_by_their_paths() {
 }
 
 #[test]
+fn antigravity_writes_each_argument_as_json_in_a_string() {
+    assert_eq!(
+        actions(
+            "edit_file",
+            &json!({"Path":"\"/p/src/a.ts\"","Target":"\"const a = 1;\\nconst b = 2;\"","Replacement":"\"const a = 1;\\nconst b = 3;\""})
+        ),
+        vec![
+            json!({"edit":{"path":"/p/src/a.ts","change":"edit","added":1,"removed":1,"cut":0,
+            "lines":[" const a = 1;","-const b = 2;","+const b = 3;"]}})
+        ]
+    );
+    let written = actions(
+        "write_file",
+        &json!({"Path":"\"/p/notes.md\"","Content":"\"# Notes\\nfirst\"","Overwrite":"true"}),
+    );
+    assert_eq!(written[0]["edit"]["lines"], json!(["+# Notes", "+first"]));
+    assert_eq!(
+        actions(
+            "run_command",
+            &json!({"CommandLine":"\"npx tsc --noEmit\"","WaitMsBeforeAsync":"10000","toolSummary":"\"TypeScript typecheck\""})
+        ),
+        vec![json!({"command":"npx tsc --noEmit","title":"TypeScript typecheck"})]
+    );
+    assert_eq!(
+        plan_after(&[(
+            "update_steps",
+            json!({"steps":"[{\"status\":\"done\",\"title\":\"Create the module\"},{\"status\":\"in_progress\",\"title\":\"Wire it\"},{\"status\":\"pending\",\"title\":\"Verify\"}]"})
+        )]),
+        json!([
+            {"text":"Create the module","status":"done"},
+            {"text":"Wire it","status":"active"},
+            {"text":"Verify","status":"pending"},
+        ])
+    );
+}
+
+#[test]
 fn tools_of_no_kind_have_no_action() {
     for (name, arguments) in [
         ("Read", json!({"file_path":"/p/a.rs"})),
@@ -295,7 +332,7 @@ fn rules_text_hash() -> u64 {
 /// and records only the new hash.
 #[test]
 fn the_rules_version_is_raised_with_the_rules() {
-    const RECORDED: (u32, u64) = (2, 12_198_989_889_037_029_865);
+    const RECORDED: (u32, u64) = (3, 3_400_997_244_322_698_815);
     assert_eq!(
         (VERSION, rules_text_hash()),
         RECORDED,

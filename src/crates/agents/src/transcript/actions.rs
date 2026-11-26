@@ -40,7 +40,7 @@ use plan::{plan_set, task_update, update_plan};
 /// from before a rule shows what the rule now reads. Raise it with every
 /// change to what a call reads as: a tool newly read, a field added or cut
 /// differently. `the_rules_version_is_raised_with_the_rules` holds the door.
-pub const VERSION: u32 = 2;
+pub const VERSION: u32 = 3;
 
 /// The most of a command that is kept, in bytes.
 pub const COMMAND_BYTES: usize = 2 * 1024;
@@ -69,23 +69,40 @@ pub fn actions(name: &str, arguments: &Value) -> Vec<Value> {
         _ => arguments,
     };
     let tool = name.rsplit("__").next().unwrap_or(name);
+    // Antigravity writes each argument as JSON inside a string.
+    let unwrapped;
+    let arguments = if matches!(
+        tool,
+        "edit_file" | "write_file" | "run_command" | "update_steps"
+    ) {
+        unwrapped = unwrap(arguments);
+        &unwrapped
+    } else {
+        arguments
+    };
     match tool {
         "TodoWrite" | "todowrite" | "todo_write" => plan_set(&arguments["todos"]),
         "update_plan" => update_plan(arguments),
+        // Antigravity hands over its whole list of steps each time.
+        "update_steps" => plan_set(&arguments["steps"]),
         "TaskCreate" => text_of(arguments, &["subject", "content", "description"])
             .map(|text| vec![json!({"plan":{"add":clip(text, STEP_BYTES)}})])
             .unwrap_or_default(),
         "TaskUpdate" => task_update(arguments),
-        "Edit" | "edit" | "str_replace" | "MultiEdit" | "multi_edit" => edit(arguments),
+        "Edit" | "edit" | "str_replace" | "MultiEdit" | "multi_edit" | "edit_file" => {
+            edit(arguments)
+        }
         "Write" | "write" | "write_file" | "create_file" => write(arguments),
         "NotebookEdit" => notebook(arguments),
         "apply_patch" | "ApplyPatch" => patch_text(arguments).map(patch).unwrap_or_default(),
         "Bash" | "bash" | "shell" | "shell_command" | "exec_command" | "local_shell"
-        | "run_terminal_cmd" | "run_shell_command" => command_line(arguments)
+        | "run_terminal_cmd" | "run_shell_command" | "run_command" => command_line(arguments)
             .map(|line| {
                 let mut action = command(&line);
                 // What the agent said the command is for, where it says.
-                if let Some(title) = text_of(arguments, &["description", "justification"]) {
+                if let Some(title) =
+                    text_of(arguments, &["description", "justification", "toolSummary"])
+                {
                     action["title"] = json!(clip(title, STEP_BYTES));
                 }
                 vec![action]
@@ -97,6 +114,26 @@ pub fn actions(name: &str, arguments: &Value) -> Vec<Value> {
         "exec" => arguments.as_str().map(script).unwrap_or_default(),
         _ => Vec::new(),
     }
+}
+
+/// An object's arguments with each one that is JSON inside a string read as
+/// what it holds: `"\"src/a.rs\""` is `src/a.rs`, a list written as text is
+/// the list. An argument that is no such string stays as it is.
+fn unwrap(arguments: &Value) -> Value {
+    let Some(object) = arguments.as_object() else {
+        return arguments.clone();
+    };
+    object
+        .iter()
+        .map(|(key, value)| {
+            let inner = value
+                .as_str()
+                .filter(|text| text.starts_with(['"', '[', '{']))
+                .and_then(|text| serde_json::from_str::<Value>(text).ok());
+            (key.clone(), inner.unwrap_or_else(|| value.clone()))
+        })
+        .collect::<serde_json::Map<_, _>>()
+        .into()
 }
 
 /// The most files one call hands over that are kept, and of each path.

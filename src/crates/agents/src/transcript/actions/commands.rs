@@ -11,7 +11,7 @@ pub(super) fn command(line: &str) -> Value {
 /// The command line of a shell call: `command` or `cmd`, as text or as the
 /// words of a process (`["bash","-lc","…"]` is the script it runs).
 pub(super) fn command_line(arguments: &Value) -> Option<String> {
-    let value = ["command", "cmd"]
+    let value = ["command", "cmd", "CommandLine"]
         .iter()
         .map(|key| &arguments[*key])
         .find(|value| !value.is_null())?;
