@@ -3466,6 +3466,7 @@ fn reply_to_unindexed_codex_sender_requires_live_non_archived_root_thread() {
 }
 
 mod calls;
+mod flying;
 mod models;
 mod steer;
 

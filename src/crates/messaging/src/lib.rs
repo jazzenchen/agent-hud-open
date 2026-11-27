@@ -14,6 +14,7 @@
 //! The words are kept only while they are delivered: the journal keeps who sent
 //! what to whom, a fingerprint of the words and where the answer will be, and
 //! an answer is read again from the other session's transcript each time.
+mod deliver;
 mod extra_cache;
 mod extras;
 mod flights;
@@ -35,6 +36,7 @@ mod transcript;
 mod user;
 mod words;
 
+pub use deliver::{Delivered, Pending, Step};
 pub use preferences::{Preferences, Replies, DEFAULT_LIMIT};
 pub use transcript::{StoredTurn, Turns};
 pub use user::{UserTarget, USER_CLIENTS};
@@ -44,6 +46,7 @@ use agent_hud_platform::delivery::{
     self, DeliveryState, LocalClients, Operation, PromptForm, Provider, SendRequest, SessionStarts,
     SessionTarget, StartReceipt, StartRequest, CLAUDE_MESSAGES_OFF, DEEPSEEK_MESSAGES_OFF,
 };
+use deliver::Prepared;
 use extra_cache::ExtraCache;
 pub use extra_cache::{QUERY_BUSY, QUERY_WAIT_MS};
 use extras::*;
@@ -169,7 +172,7 @@ pub struct Messaging {
     /// The one owner of sends into sessions, shared with everything else on
     /// this computer that sends into them.
     clients: Arc<LocalClients>,
-    starts: SessionStarts,
+    starts: Arc<SessionStarts>,
     follow: Follow,
     fly: Fly,
     /// The relay's name for the sending call being answered, kept with the
@@ -180,6 +183,9 @@ pub struct Messaging {
     given_up: std::collections::VecDeque<String>,
     /// Cached `session_detail` lookups for live sessions outside the snapshot.
     extra_cache: ExtraCache,
+    /// Deliveries under way with the lock let go: the relay's call, and the
+    /// session the words go into (none for a new one).
+    flying: Vec<(Option<String>, Option<(String, String)>)>,
 }
 
 impl Messaging {
@@ -196,29 +202,22 @@ impl Messaging {
             journal: Journal::load(directory.join("messaging/messages.json")),
             places,
             clients,
-            starts,
+            starts: Arc::new(starts),
             follow,
             fly,
             calling: None,
             given_up: Default::default(),
             extra_cache: ExtraCache::default(),
+            flying: Vec::new(),
         }
     }
 
-    /// `host_tool`: one call from the relay. A sending call answers only
-    /// whether its words were handed over (`handed`).
-    pub fn call(&mut self, params: &Value, host: &Host<'_>, now: i64) -> Result<Value> {
-        let answer = self.answer(params, host, now);
-        match params["name"].as_str() {
-            Some("send_message" | "start_session") => answer.map(handed),
-            _ => answer,
-        }
-    }
-
-    fn answer(&mut self, params: &Value, host: &Host<'_>, now: i64) -> Result<Value> {
+    fn answer(&mut self, params: &Value, host: &Host<'_>, now: i64) -> Result<Prepared> {
         self.preferences = Preferences::read(&host.snapshot["settings"]);
         if !self.preferences.enabled {
-            return Ok(refused(&words::off(language(host.snapshot))));
+            return Ok(Prepared::Answer(refused(&words::off(language(
+                host.snapshot,
+            )))));
         }
         let caller = serde_json::from_value::<Caller>(params["caller"].clone()).ok();
         let arguments = &params["arguments"];
@@ -229,10 +228,16 @@ impl Messaging {
         // a sender by the same session under any of its id's spellings, so
         // the caller needs no canonical id here.
         if name == "call_result" {
-            return Ok(self.call_result(call.ok_or("call is required")?));
+            return Ok(Prepared::Answer(
+                self.call_result(call.ok_or("call is required")?),
+            ));
         }
         if name == "list_sent_messages" {
-            return Ok(self.sent(caller.as_ref(), arguments, host));
+            return Ok(Prepared::Answer(self.sent(
+                caller.as_ref(),
+                arguments,
+                host,
+            )));
         }
         if let Some(call) = call.filter(|_| matches!(name, "send_message" | "start_session")) {
             if self.given_up.iter().any(|given_up| given_up == call) {
@@ -240,18 +245,20 @@ impl Messaging {
             }
             // The same call again: what it sent the first time, sent once.
             if let Some(message) = self.journal.by_call(call) {
-                return Ok(receipt(message));
+                return Ok(Prepared::Answer(receipt(message)));
             }
         }
         let extras = self.live_extras(host);
         self.sync_targets(host, &extras);
         let caller = caller.map(|caller| self.canonical_caller(host.snapshot, &extras, caller));
         match name {
-            "list_sessions" => Ok(self.list(caller.as_ref(), host, &extras)),
-            "list_models" => self.models(arguments),
+            "list_sessions" => Ok(Prepared::Answer(self.list(caller.as_ref(), host, &extras))),
+            "list_models" => self.models(arguments).map(Prepared::Answer),
             "send_message" | "start_session" => {
                 let Some(caller) = caller else {
-                    return Ok(refused(&words::no_caller(language(host.snapshot))));
+                    return Ok(Prepared::Answer(refused(&words::no_caller(language(
+                        host.snapshot,
+                    )))));
                 };
                 self.calling = call.map(str::to_owned);
                 let answer = if name == "send_message" {
@@ -266,24 +273,6 @@ impl Messaging {
         }
     }
 
-    /// What became of the relay's sending call `call`, asked when its answer
-    /// never reached the relay. Asked while the call still runs, this waits
-    /// with every other call for it to end. `found` with the answer the call
-    /// gave when it sent a message; else nothing was sent, and nothing will
-    /// be: a call that has not begun yet is refused when it does.
-    fn call_result(&mut self, call: &str) -> Value {
-        if let Some(message) = self.journal.by_call(call) {
-            return json!({"found": true, "result": handed(receipt(message))});
-        }
-        if !self.given_up.iter().any(|given_up| given_up == call) {
-            if self.given_up.len() >= GIVEN_UP_KEPT {
-                self.given_up.pop_front();
-            }
-            self.given_up.push_back(call.to_owned());
-        }
-        json!({"found": false})
-    }
-
     /// Captures each waiting Claude Code or DeepSeek Harness message's state
     /// while the plugin's file still says it (its files go a minute after
     /// they are taken), and forgets messages older than a week.
@@ -292,12 +281,15 @@ impl Messaging {
     pub fn waiting(&self) -> bool {
         self.journal.pending()
     }
-    pub fn maintain(&mut self, host: &Host<'_>, now: i64) {
+    /// The 5-second look under the lock; the checks and follow-ups it plans
+    /// are delivered with the lock let go, then `finish`ed.
+    pub fn plan_maintenance(&mut self, host: &Host<'_>, now: i64) -> Vec<Pending> {
         self.preferences = Preferences::read(&host.snapshot["settings"]);
         let clients = self.clients.clone();
+        let mut planned = Vec::new();
         let mut changed = self.journal.prune(now);
         changed |= self.fly_answers(host, now);
-        changed |= self.follow_ups(host, now);
+        changed |= self.follow_ups(host, now, &mut planned);
         for message in self.journal.messages_mut() {
             if message.kind != Kind::Send
                 || !Provider::parse(&message.to.client).is_some_and(Provider::queues_in_channel)
@@ -321,5 +313,6 @@ impl Messaging {
         if changed {
             self.journal.save();
         }
+        planned
     }
 }

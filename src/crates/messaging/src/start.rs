@@ -1,5 +1,6 @@
 //! `start_session`: a new session whose first message is the caller's.
 use super::*;
+use deliver::{Pending, Work};
 
 impl Messaging {
     pub(crate) fn start(
@@ -8,27 +9,27 @@ impl Messaging {
         arguments: &Value,
         host: &Host<'_>,
         now: i64,
-    ) -> Result<Value> {
+    ) -> Result<Prepared> {
         let language = language(host.snapshot);
         let client = arguments["client"].as_str().ok_or("client is required")?;
         let text = arguments["text"].as_str().ok_or("text is required")?;
         if is_sub_agent(host.snapshot, caller) {
-            return Ok(refused(&words::from_sub_agent(language)));
+            return Ok(refused(&words::from_sub_agent(language)).into());
         }
         if !matches!(client, "claude" | "codex" | "antigravity" | "deepseek") {
-            return Ok(refused(&words::other_client(language)));
+            return Ok(refused(&words::other_client(language)).into());
         }
         // "Send messages" off on the Harness plugin's row: the first message
         // would go in through that plugin.
         if client == "deepseek" && !self.preferences.deepseek {
-            return Ok(refused(DEEPSEEK_MESSAGES_OFF));
+            return Ok(refused(DEEPSEEK_MESSAGES_OFF).into());
         }
         if let Some(reason) = check_text(text, language) {
-            return Ok(refused(&reason));
+            return Ok(refused(&reason).into());
         }
         let model = match self.named_model(client, arguments, false, language) {
             Ok(model) => model,
-            Err(reason) => return Ok(refused(&reason)),
+            Err(reason) => return Ok(refused(&reason).into()),
         };
         let reasoning_effort = match arguments.get("reasoningEffort") {
             None => None,
@@ -38,7 +39,7 @@ impl Messaging {
                 .filter(|value| !value.is_empty())
             {
                 Some(effort) => Some(effort.to_owned()),
-                None => return Ok(refused("reasoningEffort must be a non-empty string")),
+                None => return Ok(refused("reasoningEffort must be a non-empty string").into()),
             },
         };
         let provider = provider(client);
@@ -48,7 +49,8 @@ impl Messaging {
                 words::deepseek_cannot_start(language)
             } else {
                 words::cannot_start(language, client)
-            }));
+            })
+            .into());
         };
         let folder = match arguments["folder"].as_str() {
             Some(folder) => folder.to_owned(),
@@ -63,7 +65,7 @@ impl Messaging {
             offer.folders.contains(&folder)
         };
         if !offered {
-            return Ok(refused(&words::folder(language, &folder, &offer.folders)));
+            return Ok(refused(&words::folder(language, &folder, &offer.folders)).into());
         }
         let (chain, count) = self.next_pass(caller, host, None);
         let sender = party(host.snapshot, &caller.client, &caller.session_id);
@@ -78,67 +80,37 @@ impl Messaging {
             .is_none_or(|left| same_session(&left, &caller.session_id));
         if let Some(limit) = self.preferences.limit.filter(|limit| count > *limit) {
             (self.fly)(flight(&sender, &newcomer, from_left, true, true));
-            return Ok(refused(&words::limit(language, limit)));
+            return Ok(refused(&words::limit(language, limit)).into());
         }
         let id = message_id();
         let (form, ask) = self.shape(arguments, false);
         let from = party(host.snapshot, &caller.client, &caller.session_id);
         let delivered = words::compose(language, form, ask, &from, client, &id, None, text);
         let request_id = uuid::Uuid::new_v4().to_string();
-        let receipt = self.starts.start_with(
-            StartRequest {
-                provider,
-                request_id: request_id.clone(),
-                text: delivered.clone(),
-                folder,
-                title: Some(text.to_owned()),
-                model,
-                reasoning_effort,
-            },
-            &offers,
-        );
-        if let Ok(receipt) = &receipt {
-            self.clients.started(receipt, &caller.surface(), now);
-            if receipt.handoff_pending {
-                (self.follow)(receipt.clone());
-            }
-        }
-        let (state, reason, session) = match &receipt {
-            Ok(StartReceipt {
-                state,
-                reason,
-                session_id,
-                ..
-            }) => (
-                match state.as_str() {
-                    "started" => "started",
-                    "uncertain" => "uncertain",
-                    _ => "refused",
-                },
-                reason.clone(),
-                session_id.clone(),
-            ),
-            Err(error) => ("refused", Some(plain(&error.to_string())), None),
+        let request = StartRequest {
+            provider,
+            request_id: request_id.clone(),
+            text: delivered.clone(),
+            folder,
+            title: Some(text.to_owned()),
+            model,
+            reasoning_effort,
         };
-        self.journal.add(Message {
+        let message = Message {
             id: id.clone(),
             kind: Kind::Start,
             chain: chain.unwrap_or_else(|| id.clone()),
             count,
             from,
-            to: Party {
-                client: client.into(),
-                session_id: session.clone().unwrap_or_default(),
-                title: None,
-            },
+            to: newcomer.clone(),
             form,
             reply_to: None,
             request_id,
             sent_at_ms: now,
             cursor: Some(0),
             fingerprint: transcript::fingerprint(&delivered),
-            state: state.into(),
-            reason: reason.clone(),
+            state: "started".into(),
+            reason: None,
             turn: None,
             answered: false,
             replied_by: None,
@@ -149,18 +121,21 @@ impl Messaging {
             checked: false,
             followed: false,
             follows: None,
-        });
-        let newcomer = Party {
-            session_id: session.clone().unwrap_or_default(),
-            ..newcomer
         };
-        (self.fly)(flight(
-            &sender,
-            &newcomer,
-            from_left,
-            true,
-            state == "refused",
-        ));
-        Ok(json!({"state":state,"reason":reason,"sessionId":session}))
+        Ok(Prepared::Deliver(Box::new(Pending {
+            work: Work::Start {
+                starts: self.starts.clone(),
+                clients: self.clients.clone(),
+                follow: self.follow.clone(),
+                request,
+                offers,
+            },
+            message,
+            surface: caller.surface(),
+            steer: false,
+            language,
+            settles: None,
+            plane: Some((sender, newcomer, from_left)),
+        })))
     }
 }

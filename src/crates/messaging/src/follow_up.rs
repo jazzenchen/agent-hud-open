@@ -21,8 +21,17 @@ pub(crate) const RUNNING_CHECK_MS: i64 = 10 * 60_000;
 pub(crate) const FOLLOW_UP_LATEST_MS: i64 = ANSWER_WAIT_MS + 5 * 60_000;
 
 impl Messaging {
-    /// Sends the checks and follow-ups now due. True when the journal changed.
-    pub(crate) fn follow_ups(&mut self, host: &Host<'_>, now: i64) -> bool {
+    /// Plans the checks and follow-ups now due, each to be delivered with
+    /// the lock let go (`Pending`). A message is marked checked or followed
+    /// here, so the next look plans it no second time; one whose recipient
+    /// still takes a delivery waits for the next look. True when the journal
+    /// changed.
+    pub(crate) fn follow_ups(
+        &mut self,
+        host: &Host<'_>,
+        now: i64,
+        planned: &mut Vec<deliver::Pending>,
+    ) -> bool {
         if !self.preferences.enabled {
             return false;
         }
@@ -63,11 +72,14 @@ impl Messaging {
         {
             kept.followed = true;
         }
-        let changed = !due.is_empty() || !let_go.is_empty();
+        let mut changed = !let_go.is_empty();
         for (id, steer) in due {
             let Some(message) = self.journal.find(&id).cloned() else {
                 continue;
             };
+            if self.delivering_to(&message.to.client, &message.to.session_id) {
+                continue;
+            }
             let follow_up = self.follow_up(host, &message, steer, now);
             if let Some(kept) = self.journal.messages_mut().find(|m| m.id == id) {
                 if steer {
@@ -76,7 +88,9 @@ impl Messaging {
                     kept.followed = true;
                 }
             }
-            self.journal.add(follow_up);
+            self.fly_out(None, &follow_up);
+            planned.push(follow_up);
+            changed = true;
         }
         changed
     }
@@ -121,16 +135,22 @@ impl Messaging {
             && transcript::answer(host, message).is_some_and(|found| !found.done)
     }
 
-    /// Sends the check (`steer`) or the follow-up for `message`, and the
-    /// journal's record of it: the message's chain and pass, as it is no
+    /// The check (`steer`) or the follow-up for `message`, to deliver, and
+    /// the journal's record of it: the message's chain and pass, as it is no
     /// pass of its own, and settled from the start, as no answer to it is
     /// waited for but the reply to the message it follows up.
-    fn follow_up(&self, host: &Host<'_>, message: &Message, steer: bool, now: i64) -> Message {
+    fn follow_up(
+        &self,
+        host: &Host<'_>,
+        message: &Message,
+        steer: bool,
+        now: i64,
+    ) -> deliver::Pending {
         let language = language(host.snapshot);
         let id = message_id();
         let client = message.to.client.as_str();
         let delivered = words::follow_up(language, client, &id, &message.id, steer);
-        let receipt = self.clients.send(SendRequest {
+        let request = SendRequest {
             provider: provider(client),
             session_id: message.to.session_id.clone(),
             request_id: id.clone(),
@@ -143,28 +163,8 @@ impl Messaging {
             },
             expected_turn_id: None,
             model: None,
-        });
-        let surface = agent_hud_core::naming::surfaces::Surface::new(
-            agent_hud_core::naming::surfaces::Category::Mcp,
-            &message.from.client,
-        );
-        if let Ok(receipt) = &receipt {
-            self.clients.delivered(receipt, &surface, now);
-        }
-        let (state, reason) = match &receipt {
-            Ok(receipt) if receipt.state == DeliveryState::Steered => ("steered", None),
-            Ok(receipt) => (
-                delivered_or_refused(receipt.state),
-                receipt.reason.as_deref().map(plain),
-            ),
-            Err(error) => ("refused", Some(plain(&error.to_string()))),
         };
-        let steered_into = receipt
-            .as_ref()
-            .ok()
-            .filter(|receipt| receipt.state == DeliveryState::Steered)
-            .and_then(|receipt| receipt.turn_id.clone());
-        Message {
+        let record = Message {
             id: id.clone(),
             kind: Kind::Send,
             chain: message.chain.clone(),
@@ -177,18 +177,33 @@ impl Messaging {
             sent_at_ms: now,
             cursor: None,
             fingerprint: transcript::fingerprint(&delivered),
-            state: state.into(),
-            reason,
+            state: "queued".into(),
+            reason: None,
             turn: None,
             answered: true,
             replied_by: None,
-            steered_into,
+            steered_into: None,
             call: None,
             asked: false,
             ended_at_ms: None,
             checked: false,
             followed: false,
             follows: Some(message.id.clone()),
+        };
+        deliver::Pending {
+            work: deliver::Work::Send {
+                clients: self.clients.clone(),
+                request,
+            },
+            message: record,
+            surface: agent_hud_core::naming::surfaces::Surface::new(
+                agent_hud_core::naming::surfaces::Category::Mcp,
+                &message.from.client,
+            ),
+            steer,
+            language,
+            settles: None,
+            plane: None,
         }
     }
 }

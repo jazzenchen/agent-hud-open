@@ -8,19 +8,23 @@
 //! (`ProductExtension::delivery`), else through the host's: the app's data
 //! folder keeps their receipts, and the host follows a started Claude job
 //! into the desktop app itself.
-use crate::{activity, backend::Backend, claude_plugin::ClaudePlugin, extension::Delivery};
-use agent_hud_messaging::{Host, Messaging, Places, Preferences, Turns, QUERY_BUSY, QUERY_WAIT_MS};
-use agent_hud_runtime::delivery::{
-    Handoffs, LocalClientPaths, LocalClients, NativeCodexTransport, SessionStarts, StartConfig,
+use crate::{activity, backend::Backend, extension::Delivery};
+use agent_hud_messaging::{
+    Delivered, Host, Messaging, Pending, Places, Preferences, Step, Turns, QUERY_BUSY,
+    QUERY_WAIT_MS,
 };
+use agent_hud_runtime::delivery::{Handoffs, LocalClients, SessionStarts};
 use serde_json::Value;
 use std::{
+    panic::{catch_unwind, AssertUnwindSafe},
     path::PathBuf,
-    sync::{mpsc, Arc, Mutex, MutexGuard, PoisonError, TryLockError, Weak},
+    sync::{mpsc, Arc, Condvar, Mutex, MutexGuard, PoisonError, TryLockError, Weak},
     thread::JoinHandle,
     time::{Duration, Instant, SystemTime},
 };
-use tauri::Manager;
+
+mod own;
+use own::own_delivery;
 
 const LOOK: Duration = Duration::from_secs(5);
 /// How often a query with a bounded wait tries the application's lock again.
@@ -35,6 +39,9 @@ struct Own {
 
 pub(crate) struct AgentMessages {
     messaging: Mutex<Messaging>,
+    /// Told each time a delivery made with the lock let go is recorded, for
+    /// calls that wait on it (Open #192).
+    delivered: Condvar,
     conversations: Option<Arc<dyn Turns>>,
     own: Option<Arc<Own>>,
     backend: Weak<Mutex<Backend>>,
@@ -73,6 +80,7 @@ impl AgentMessages {
         );
         let owner = Arc::new(Self {
             messaging: Mutex::new(messaging),
+            delivered: Condvar::new(),
             conversations: delivery.conversations,
             own,
             backend,
@@ -100,7 +108,11 @@ impl AgentMessages {
         Messaging::tools(&Preferences::read(&snapshot["settings"]))
     }
 
-    /// One tool call from the relay: `{name, arguments, caller}`.
+    /// One tool call from the relay: `{name, arguments, caller}`. Its words
+    /// are handed over with the messages' lock let go, so a slow client (a
+    /// Codex app-server started for one message on Windows) holds up only
+    /// the calls that must wait for it: the same call, `call_result` for it,
+    /// and the next message into the same session.
     pub(crate) fn call(&self, params: &Value) -> Result<Value, String> {
         let snapshot = self.snapshot()?;
         let query = self.query();
@@ -109,10 +121,32 @@ impl AgentMessages {
             query: &query,
             conversations: self.conversations.as_deref(),
         };
+        let now = chrono::Utc::now().timestamp_millis();
+        let mut messaging = self.lock();
+        loop {
+            match messaging.begin(params, &host, now) {
+                Step::Answer(answer) => return answer,
+                Step::Wait => {
+                    messaging = self
+                        .delivered
+                        .wait(messaging)
+                        .unwrap_or_else(PoisonError::into_inner);
+                }
+                Step::Deliver(pending) => {
+                    drop(messaging);
+                    let delivered = deliver(&pending, now);
+                    let answer = self.lock().finish(*pending, delivered);
+                    self.delivered.notify_all();
+                    return answer;
+                }
+            }
+        }
+    }
+
+    fn lock(&self) -> MutexGuard<'_, Messaging> {
         self.messaging
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
-            .call(params, &host, chrono::Utc::now().timestamp_millis())
     }
 
     /// Runs `work` with the group's senders and this moment's facts, for the
@@ -168,7 +202,22 @@ impl AgentMessages {
             query: &query,
             conversations: self.conversations.as_deref(),
         };
-        messaging.maintain(&host, chrono::Utc::now().timestamp_millis());
+        let now = chrono::Utc::now().timestamp_millis();
+        let planned = messaging.plan_maintenance(&host, now);
+        drop(messaging);
+        if planned.is_empty() {
+            return;
+        }
+        let delivered = planned
+            .iter()
+            .map(|pending| deliver(pending, now))
+            .collect::<Vec<_>>();
+        let mut messaging = self.lock();
+        for (pending, delivered) in planned.into_iter().zip(delivered) {
+            let _ = messaging.finish(pending, delivered);
+        }
+        drop(messaging);
+        self.delivered.notify_all();
     }
 
     fn snapshot(&self) -> Result<Arc<Value>, String> {
@@ -216,6 +265,13 @@ impl AgentMessages {
     }
 }
 
+/// Hands `pending`'s words over. A delivery that panics is recorded as
+/// refused, so whatever waits on it is let go.
+fn deliver(pending: &Pending, now: i64) -> Delivered {
+    catch_unwind(AssertUnwindSafe(|| pending.deliver(now)))
+        .unwrap_or_else(|_| Delivered::Sent(Err("The delivery stopped unexpectedly".into())))
+}
+
 /// `mutex` once it is free within `wait`, trying again every `RETRY`; none
 /// when another holder kept it all that time.
 fn lock_within<T>(mutex: &Mutex<T>, wait: Duration) -> Option<MutexGuard<'_, T>> {
@@ -232,62 +288,6 @@ fn lock_within<T>(mutex: &Mutex<T>, wait: Duration) -> Option<MutexGuard<'_, T>>
         }
         std::thread::sleep(left.min(RETRY));
     }
-}
-
-/// The host's own senders, over `data` and Agent HUD's plugins' folders.
-fn own_delivery(
-    app: &tauri::AppHandle,
-    data: PathBuf,
-) -> Result<(Delivery, Option<Arc<Own>>), String> {
-    let home = agent_hud_runtime::home_directory()?;
-    let config = StartConfig::find(&home);
-    let receipts = data.join("local-client-receipts");
-    let clients = LocalClients::with_transport(
-        LocalClientPaths {
-            claude_channel: app.state::<ClaudePlugin>().channel_directory(),
-            codex_data: config.codex_data.clone(),
-            receipts: receipts.clone(),
-        },
-        Vec::new(),
-        Arc::new(NativeCodexTransport {
-            queue: config.codex_queue(),
-        }),
-        Duration::from_secs(15),
-    )
-    .map_err(|error| error.to_string())?
-    .recording_deliveries(Some(data.clone()))
-    .with_deepseek_channel(Some(agent_hud_runtime::deepseek_plugin::channel_directory(
-        &data,
-    )));
-    let clients = Arc::new(clients);
-    let start_receipts = receipts.join("starts");
-    let starts = SessionStarts::new(config.clone(), start_receipts.clone())
-        .map_err(|error| error.to_string())?;
-    let own = Arc::new(Own {
-        clients: clients.clone(),
-        handoffs: Mutex::new(Handoffs::load(&starts)),
-        starts,
-    });
-    let follower = own.clone();
-    let delivery = Delivery {
-        clients,
-        starts: config,
-        start_receipts,
-        directory: data,
-        follow: Arc::new(move |receipt| {
-            let waiting = receipt
-                .session_id
-                .as_deref()
-                .is_some_and(|session| follower.clients.waits_for(session));
-            follower
-                .handoffs
-                .lock()
-                .unwrap_or_else(PoisonError::into_inner)
-                .follow(&follower.starts, &receipt, waiting);
-        }),
-        conversations: None,
-    };
-    Ok((delivery, Some(own)))
 }
 
 #[cfg(test)]

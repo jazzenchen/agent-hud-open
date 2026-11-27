@@ -28,9 +28,14 @@ impl StdioServer {
         environment: &BTreeMap<String, String>,
         timeout: Duration,
     ) -> Result<Self> {
+        let mut arguments = vec![
+            "app-server".to_owned(),
+            "--listen".into(),
+            "stdio://".into(),
+        ];
+        arguments.extend(mcp_servers_off(data));
         let mut command =
-            crate::os::engine_command(executable, &["app-server", "--listen", "stdio://"])
-                .map_err(Failure::Unsupported)?;
+            crate::os::engine_command(executable, &arguments).map_err(Failure::Unsupported)?;
         command
             .envs(environment)
             .env("CODEX_HOME", data)
@@ -216,10 +221,64 @@ impl Drop for StdioServer {
     }
 }
 
+/// `-c mcp_servers.<name>.enabled=false` for each MCP server Codex's own
+/// `config.toml` in `data` names. A short-lived server only creates a
+/// thread or queues a message, and the turn runs in the app that opens the
+/// thread, so it needs no MCP server; started anyway, they can make it take
+/// a minute on Windows, Agent HUD's own among them (Open #192). An override
+/// of the whole table (`mcp_servers={}`) does not clear it: Codex merges it.
+/// Names Codex would need quoted are left on, as Codex refuses quoted keys
+/// here. Plugins' own servers are not in this file and stay as they are.
+pub(in crate::delivery) fn mcp_servers_off(data: &Path) -> Vec<String> {
+    let Ok(text) = std::fs::read_to_string(data.join("config.toml")) else {
+        return Vec::new();
+    };
+    let Ok(config) = text.parse::<toml_edit::DocumentMut>() else {
+        return Vec::new();
+    };
+    let Some(servers) = config
+        .get("mcp_servers")
+        .and_then(|item| item.as_table_like())
+    else {
+        return Vec::new();
+    };
+    servers
+        .iter()
+        .map(|(name, _)| name)
+        .filter(|name| {
+            !name.is_empty()
+                && name
+                    .chars()
+                    .all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '-'))
+        })
+        .flat_map(|name| ["-c".to_owned(), format!("mcp_servers.{name}.enabled=false")])
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::process::Command;
+
+    #[test]
+    fn a_short_lived_server_turns_off_each_mcp_server_codex_names() {
+        let temp = tempfile::tempdir().unwrap();
+        assert!(mcp_servers_off(temp.path()).is_empty());
+        std::fs::write(
+            temp.path().join("config.toml"),
+            "model = \"m\"\n[mcp_servers.agent-hud]\ncommand = \"a\"\n[mcp_servers.node_repl]\ncommand = \"b\"\n[mcp_servers.\"odd.name\"]\ncommand = \"c\"\n",
+        )
+        .unwrap();
+        assert_eq!(
+            mcp_servers_off(temp.path()),
+            [
+                "-c",
+                "mcp_servers.agent-hud.enabled=false",
+                "-c",
+                "mcp_servers.node_repl.enabled=false",
+            ]
+        );
+    }
 
     #[test]
     fn finish_waits_for_clean_exit_after_stdin_eof_and_kills_if_hung() {

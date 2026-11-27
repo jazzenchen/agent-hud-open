@@ -1,5 +1,6 @@
 //! `send_message`: checks, delivery and the journal's record of what was sent.
 use super::*;
+use deliver::{Pending, Work};
 
 impl Messaging {
     pub(crate) fn send(
@@ -9,11 +10,11 @@ impl Messaging {
         host: &Host<'_>,
         extras: &[Value],
         now: i64,
-    ) -> Result<Value> {
+    ) -> Result<Prepared> {
         let language = language(host.snapshot);
         let text = arguments["text"].as_str().ok_or("text is required")?;
         if is_sub_agent(host.snapshot, caller) {
-            return Ok(refused(&words::from_sub_agent(language)));
+            return Ok(refused(&words::from_sub_agent(language)).into());
         }
         let reply_to = arguments["reply_to"].as_str().filter(|id| !id.is_empty());
         // Queued by default; a steer goes into the recipient's turn in progress.
@@ -33,7 +34,7 @@ impl Messaging {
                     (&caller.client, &caller.session_id),
                 )
             }) {
-                return Ok(refused(&words::unknown_reply(language, parent)));
+                return Ok(refused(&words::unknown_reply(language, parent)).into());
             }
         }
         let named = arguments["to"].as_str().filter(|to| !to.is_empty());
@@ -67,12 +68,13 @@ impl Messaging {
                         language,
                         found_id,
                         &parent.from.session_id,
-                    )));
+                    ))
+                    .into());
                 }
             }
         }
         if let Some(reason) = check_text(text, language) {
-            return Ok(refused(&reason));
+            return Ok(refused(&reason).into());
         }
         // A reply goes to the very session that sent its parent, in that
         // session's client; a `to` names a session of whichever client has it.
@@ -87,37 +89,41 @@ impl Messaging {
             (None, None) => None,
         };
         let Some(target) = target else {
-            return Ok(refused(&words::unknown(language)));
+            return Ok(refused(&words::unknown(language)).into());
         };
         let to = target["id"].as_str().unwrap_or_default();
         let client = target["source"].as_str().unwrap_or_default();
+        // A message still being handed into this session goes in first.
+        if self.delivering_to(client, to) {
+            return Ok(Prepared::Wait);
+        }
         if same_identity((client, to), (&caller.client, &caller.session_id)) {
-            return Ok(refused(&words::to_self(language)));
+            return Ok(refused(&words::to_self(language)).into());
         }
         if Provider::parse(client).is_none() {
-            return Ok(refused(&words::other_client(language)));
+            return Ok(refused(&words::other_client(language)).into());
         }
         if !target["parentId"].is_null() {
-            return Ok(refused(&words::child(language)));
+            return Ok(refused(&words::child(language)).into());
         }
         // Only a client that takes a message into a turn in progress gets a
         // steer (Open #68); a reply is always queued, and a session waiting on
         // an approval or a question would not read one until it is answered.
         if steer {
             if !Provider::parse(client).is_some_and(Provider::takes_steer) {
-                return Ok(refused(&words::steer_unsupported(language, client)));
+                return Ok(refused(&words::steer_unsupported(language, client)).into());
             }
             if reply_to.is_some() {
-                return Ok(refused(&words::steer_reply(language)));
+                return Ok(refused(&words::steer_reply(language)).into());
             }
             if state(target) == "waitingForApproval" {
-                return Ok(refused(&words::steer_waiting(language)));
+                return Ok(refused(&words::steer_waiting(language)).into());
             }
         }
         // A model only when named, and only where a message can switch it.
         let model = match self.named_model(client, arguments, true, language) {
             Ok(model) => model,
-            Err(reason) => return Ok(refused(&reason)),
+            Err(reason) => return Ok(refused(&reason).into()),
         };
         let sender = party_any(host.snapshot, extras, &caller.client, &caller.session_id);
         let recipient = party_any(host.snapshot, extras, client, to);
@@ -130,7 +136,7 @@ impl Messaging {
             language,
         ) {
             (self.fly)(flight(&sender, &recipient, true, false, true));
-            return Ok(refused(&reason));
+            return Ok(refused(&reason).into());
         }
         let (chain, count) = self.next_pass(caller, host, replied.as_ref());
         let left = chain
@@ -140,7 +146,7 @@ impl Messaging {
         let from_left = same_session(&left, &caller.session_id);
         if let Some(limit) = self.preferences.limit.filter(|limit| count > *limit) {
             (self.fly)(flight(&sender, &recipient, from_left, false, true));
-            return Ok(refused(&words::limit(language, limit)));
+            return Ok(refused(&words::limit(language, limit)).into());
         }
         let id = message_id();
         // Another agent's words never read as the user's in the middle of a
@@ -173,9 +179,8 @@ impl Messaging {
             Some(_) => None,
             None => transcript::end(host.query, to),
         };
-        let provider = provider(client);
-        let receipt = self.clients.send(SendRequest {
-            provider,
+        let request = SendRequest {
+            provider: provider(client),
             session_id: to.into(),
             request_id: id.clone(),
             text: delivered.clone(),
@@ -188,44 +193,15 @@ impl Messaging {
             },
             expected_turn_id: None,
             model,
-        });
-        if let Ok(receipt) = &receipt {
-            self.clients.delivered(receipt, &caller.surface(), now);
-        }
-        let (state, reason) = match &receipt {
-            Ok(receipt) if receipt.state == DeliveryState::Steered => ("steered", None),
-            Ok(receipt)
-                if receipt
-                    .reason
-                    .as_deref()
-                    .is_some_and(|reason| reason.contains(delivery::NO_TURN_TO_STEER)) =>
-            {
-                ("refused", Some(words::no_turn_to_steer(language)))
-            }
-            // Nothing that takes a steer answers for this Codex thread: say
-            // what the sender can do instead of naming a socket (#178).
-            Ok(receipt)
-                if steer
-                    && client == "codex"
-                    && receipt.state == DeliveryState::Failed
-                    && receipt
-                        .reason
-                        .as_deref()
-                        .is_some_and(|reason| reason.starts_with("Unavailable(")) =>
-            {
-                ("refused", Some(words::steer_codex_unanswered(language)))
-            }
-            Ok(receipt) => (
-                delivered_or_refused(receipt.state),
-                receipt.reason.as_deref().map(plain),
-            ),
-            Err(error) => ("refused", Some(plain(&error.to_string()))),
         };
-        let steered_into = receipt
-            .as_ref()
-            .ok()
-            .filter(|receipt| receipt.state == DeliveryState::Steered)
-            .and_then(|receipt| receipt.turn_id.clone());
+        // A reply that goes back to its parent's sender settles the parent:
+        // the journal names this reply, and its plane is the one back, so the
+        // end of the turn that sent it throws no second.
+        let settles = replied
+            .filter(|parent| {
+                same_identity((&parent.from.client, &parent.from.session_id), (client, to))
+            })
+            .map(|parent| parent.id);
         let message = Message {
             id: id.clone(),
             kind: Kind::Send,
@@ -239,12 +215,12 @@ impl Messaging {
             sent_at_ms: now,
             cursor,
             fingerprint: transcript::fingerprint(&delivered),
-            state: state.into(),
-            reason: reason.clone(),
+            state: "queued".into(),
+            reason: None,
             turn: None,
             answered: false,
             replied_by: None,
-            steered_into,
+            steered_into: None,
             call: self.calling.clone(),
             asked: ask && !own_steer,
             ended_at_ms: None,
@@ -252,35 +228,17 @@ impl Messaging {
             followed: false,
             follows: None,
         };
-        // A reply that went back to its parent's sender settles the parent:
-        // the journal names this reply, and its plane is the one back, so the
-        // end of the turn that sent it throws no second.
-        if state != "refused" {
-            if let Some(parent) = replied
-                .filter(|parent| {
-                    same_identity((&parent.from.client, &parent.from.session_id), (client, to))
-                })
-                .and_then(|parent| self.journal.messages_mut().find(|m| m.id == parent.id))
-            {
-                parent.answered = true;
-                parent.replied_by.get_or_insert_with(|| id.clone());
-                // A reply to a follow-up answers the message it follows up.
-                if let Some(followed) = parent.follows.clone() {
-                    if let Some(original) = self.journal.messages_mut().find(|m| m.id == followed) {
-                        original.answered = true;
-                        original.replied_by.get_or_insert_with(|| id.clone());
-                    }
-                }
-            }
-        }
-        self.journal.add(message);
-        (self.fly)(flight(
-            &sender,
-            &recipient,
-            from_left,
-            false,
-            state == "refused",
-        ));
-        Ok(json!({"state":state,"reason":reason}))
+        Ok(Prepared::Deliver(Box::new(Pending {
+            work: Work::Send {
+                clients: self.clients.clone(),
+                request,
+            },
+            message,
+            surface: caller.surface(),
+            steer,
+            language,
+            settles,
+            plane: Some((sender, recipient, from_left)),
+        })))
     }
 }
