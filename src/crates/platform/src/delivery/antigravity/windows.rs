@@ -104,6 +104,7 @@ mod tests {
             folder: "~/project".into(),
             title: None,
             model: Some("MODEL_PLACEHOLDER_M318".into()),
+            reasoning_effort: None,
         }
     }
 
