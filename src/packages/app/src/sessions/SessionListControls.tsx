@@ -73,7 +73,7 @@ export function SessionListControls({
   onQuery,
   page,
   theme,
-  stickyTop = 44,
+  stickyTop = 0,
 }: {
   arrangement: Arrangement;
   onArrangement: (arrangement: Arrangement) => void;

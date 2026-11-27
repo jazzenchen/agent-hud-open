@@ -4,7 +4,8 @@ import type { Theme } from "./SessionTheme";
 
 /**
  * The Sessions page's columns side by side, each scrolling on its own under
- * the toolbar; or, in one column, the one shown, scrolling with the window.
+ * the toolbar; or, in one column, the one shown, scrolling inside the page's
+ * own container.
  */
 export function SessionColumns({
   sectionRef,
@@ -60,10 +61,19 @@ export function SessionColumns({
               padding: "0 0 0 22px",
               display: "grid",
               gridTemplateColumns: tracks,
-              height: "calc(100vh - 44px)",
+              flex: 1,
+              minHeight: 0,
+              height: "100%",
               overflow: "hidden",
             }
-          : style
+          : {
+              ...style,
+              flex: 1,
+              minHeight: 0,
+              height: "100%",
+              overflowY: "auto",
+              overflowX: "hidden",
+            }
       }
       aria-label={label}
     >
