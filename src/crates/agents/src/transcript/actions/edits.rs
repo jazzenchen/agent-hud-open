@@ -168,10 +168,17 @@ pub(super) fn patch_text(arguments: &Value) -> Option<&str> {
 /// File:` (with `*** Move to:`) and `*** Delete File:`, one edit a file.
 pub(super) fn patch(text: &str) -> Vec<Value> {
     let mut edits = Vec::new();
-    let mut open: Option<(String, &str, Vec<String>)> = None;
-    let mut close = |open: &mut Option<(String, &str, Vec<String>)>| {
-        if let Some((path, change, lines)) = open.take() {
-            edits.push(edit_of(&path, change, lines));
+    // The file in hand: where it is, where it was if it moved, its change
+    // and its lines.
+    type Open<'a> = Option<(String, Option<String>, &'a str, Vec<String>)>;
+    let mut open: Open = None;
+    let mut close = |open: &mut Open| {
+        if let Some((path, from, change, lines)) = open.take() {
+            let mut edit = edit_of(&path, change, lines);
+            if let Some(from) = from {
+                edit["edit"]["from"] = json!(from);
+            }
+            edits.push(edit);
         }
     };
     for line in text.lines() {
@@ -184,18 +191,18 @@ pub(super) fn patch(text: &str) -> Vec<Value> {
         .find_map(|(mark, change)| Some((line.strip_prefix(mark)?.trim(), change)));
         if let Some((path, change)) = file {
             close(&mut open);
-            open = Some((path.to_owned(), change, Vec::new()));
+            open = Some((path.to_owned(), None, change, Vec::new()));
             continue;
         }
         if line.starts_with("*** End Patch") {
             close(&mut open);
             continue;
         }
-        let Some((path, _, lines)) = &mut open else {
+        let Some((path, from, _, lines)) = &mut open else {
             continue;
         };
         if let Some(moved) = line.strip_prefix("*** Move to: ") {
-            *path = moved.trim().to_owned();
+            *from = Some(std::mem::replace(path, moved.trim().to_owned()));
         } else if line.starts_with("@@") {
             if !lines.is_empty() {
                 lines.push("@@".to_owned());

@@ -15,7 +15,8 @@
 //! - `"edit"`: `{"path","change","lines","added","removed","cut"}`, `change`
 //!   one of `edit`, `create`, `delete`; each of `lines` begins with a space
 //!   (unchanged), `-` (taken out) or `+` (put in), and `@@` parts two places
-//!   in the file. `cut` counts the lines left out for size.
+//!   in the file. `cut` counts the lines left out for size. A file moved
+//!   while edited carries `from`, where it was.
 //! - `"command"`: the command line as text, with `"title"` beside it where
 //!   the agent said in a few words what the command is for.
 //! - `"files"`: `{"paths":[…],"caption"?}`, files the agent handed its user
@@ -40,7 +41,7 @@ use plan::{plan_set, task_update, update_plan};
 /// from before a rule shows what the rule now reads. Raise it with every
 /// change to what a call reads as: a tool newly read, a field added or cut
 /// differently. `the_rules_version_is_raised_with_the_rules` holds the door.
-pub const VERSION: u32 = 4;
+pub const VERSION: u32 = 5;
 
 /// The most of a command that is kept, in bytes.
 pub const COMMAND_BYTES: usize = 2 * 1024;
@@ -194,6 +195,23 @@ pub fn result(text: Option<&str>, failed: bool, keep_output: bool) -> Value {
     let (output, exit) = shell_output(text, keep_output);
     let failed = failed || exit.is_some_and(|code| code != 0);
     let mut result = json!({"failed":failed});
+    if !keep_output && !failed {
+        // What a write or a task list's call answered, where the client says
+        // it: the file was there before (Claude Code, Gemini), or the number
+        // it gave the task just made (Claude Code's TaskCreate).
+        let said = text.trim_start();
+        if said.contains(" has been updated") || said.starts_with("Successfully overwrote") {
+            result["existed"] = json!(true);
+        }
+        if let Some(number) = said
+            .strip_prefix("Task #")
+            .and_then(|rest| rest.split_once(" created"))
+            .map(|(number, _)| number)
+            .filter(|number| !number.is_empty() && number.bytes().all(|b| b.is_ascii_digit()))
+        {
+            result["task"] = json!(number);
+        }
+    }
     let limit = if keep_output {
         OUTPUT_BYTES
     } else {

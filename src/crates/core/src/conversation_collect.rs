@@ -10,7 +10,7 @@ use agent_hud_agents::transcript::{
     Log,
 };
 use serde_json::{json, Value};
-use std::collections::HashMap;
+use std::collections::VecDeque;
 
 /// The log's turn just before a line is parsed.
 #[derive(Clone, PartialEq, Eq)]
@@ -37,8 +37,9 @@ pub(crate) struct Gathered {
     pub awaiting: Option<String>,
     /// The calls whose actions were kept and whose results are still to
     /// come, by call id: whether what the call returns is kept whole (a
-    /// command's output). Kept between reads of the log, like `awaiting`.
-    pub open: HashMap<String, bool>,
+    /// command's output). Kept between reads of the log, like `awaiting`;
+    /// oldest first, and the oldest is let go once there are too many.
+    pub open: VecDeque<(String, bool)>,
 }
 
 /// The most calls waiting for a result that one log is remembered to have.
@@ -90,6 +91,7 @@ impl Gathered {
     /// The entries of one line of `turn`; `starts` when the line started it.
     pub(crate) fn entries(
         &mut self,
+        source: &str,
         lines: &[LineItem],
         turn: &Option<String>,
         offset: u64,
@@ -103,7 +105,7 @@ impl Gathered {
                 continue;
             }
             if let Some(mut item) = item(line, turn, offset, index, at_ms, starts) {
-                self.act(line, &mut item);
+                self.act(source, line, &mut item);
                 self.facts.push(Fact::Item(item));
             } else if let Some(result) = self.result(line, turn, offset, index, at_ms) {
                 self.facts.push(Fact::Item(result));
@@ -113,7 +115,7 @@ impl Gathered {
 
     /// Gives a tool call's item its actions (a plan step, an edit, a
     /// command), and remembers the call until its result comes.
-    fn act(&mut self, line: &LineItem, item: &mut Item) {
+    fn act(&mut self, source: &str, line: &LineItem, item: &mut Item) {
         let Some(tool) = line.tool.as_ref().filter(|_| item.kind == Kind::Tool) else {
             return;
         };
@@ -122,9 +124,13 @@ impl Gathered {
             return;
         }
         let call = tool.id.clone().unwrap_or_else(|| line.id.clone());
-        if self.open.len() < OPEN_CALLS {
+        // A client that logs no results leaves nothing to wait for.
+        if items::logs_results(source) {
+            if self.open.len() >= OPEN_CALLS {
+                self.open.pop_front();
+            }
             self.open
-                .insert(call.clone(), actions::keeps_output(&found));
+                .push_back((call.clone(), actions::keeps_output(&found)));
         }
         item.detail = Some(json!({"call":call,"actions":found}).to_string());
     }
@@ -142,7 +148,8 @@ impl Gathered {
             return None;
         }
         let call = line.tool_call_id.as_ref()?;
-        let keeps = self.open.remove(call)?;
+        let place = self.open.iter().position(|(open, _)| open == call)?;
+        let (_, keeps) = self.open.remove(place)?;
         let mut result = actions::result(line.text.as_deref(), line.failed, keeps);
         result["call"] = json!(call);
         Some(Item {
@@ -211,7 +218,7 @@ pub(crate) fn line(
             now.and_then(|turn| turn.started).or(at_ms),
         );
     }
-    gathered.entries(&lines, &turn, offset, at_ms, starts);
+    gathered.entries(&log.source, &lines, &turn, offset, at_ms, starts);
     let ended = now.is_some_and(|now| !now.running && now.id == before.turn && before.running);
     if let (true, Some(turn)) = (ended, turn) {
         gathered.facts.push(Fact::TurnEnded {
@@ -286,4 +293,71 @@ fn timestamp(value: &Value) -> Option<i64> {
     let at = value.get("timestamp").or_else(|| value.get("time"))?;
     at.as_i64()
         .or_else(|| at.as_str().and_then(crate::metering::date_ms))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use agent_hud_agents::transcript::items::ToolCall;
+
+    fn row(id: &str, kind: LineKind, call: Option<&str>) -> LineItem {
+        LineItem {
+            id: id.to_owned(),
+            parent: None,
+            role: match kind {
+                LineKind::Tool if call.is_none() => LineRole::Assistant,
+                _ => LineRole::User,
+            },
+            kind,
+            text: Some("ok".to_owned()),
+            tool: call.is_none().then(|| ToolCall {
+                id: Some(id.to_owned()),
+                name: "Bash".to_owned(),
+                arguments: json!({"command":"ls"}),
+            }),
+            tool_call_id: call.map(str::to_owned),
+            failed: false,
+            timestamp: None,
+            is_prompt: false,
+            origin: None,
+        }
+    }
+
+    fn results(gathered: &Gathered) -> usize {
+        gathered
+            .facts
+            .iter()
+            .filter(|fact| matches!(fact, Fact::Item(item) if item.id.ends_with(":result")))
+            .count()
+    }
+
+    #[test]
+    fn the_oldest_call_is_let_go_and_a_later_one_still_gets_its_result() {
+        let mut gathered = Gathered::default();
+        let turn = Some("t".to_owned());
+        for index in 0..=OPEN_CALLS {
+            let call = row(&format!("c{index}"), LineKind::Tool, None);
+            gathered.entries("claude", &[call], &turn, index as u64 * 64, None, false);
+        }
+        assert_eq!(gathered.open.len(), OPEN_CALLS);
+        let last = row("r", LineKind::Tool, Some(&format!("c{OPEN_CALLS}")));
+        let first = row("r0", LineKind::Tool, Some("c0"));
+        gathered.entries("claude", &[last, first], &turn, 1 << 30, None, false);
+        assert_eq!(results(&gathered), 1);
+    }
+
+    #[test]
+    fn a_client_that_logs_no_results_leaves_no_call_waiting() {
+        let mut gathered = Gathered::default();
+        let call = row("c", LineKind::Tool, None);
+        gathered.entries(
+            "antigravity",
+            &[call],
+            &Some("t".to_owned()),
+            0,
+            None,
+            false,
+        );
+        assert!(gathered.open.is_empty());
+    }
 }

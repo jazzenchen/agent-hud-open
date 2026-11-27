@@ -231,7 +231,7 @@ fn replay(
                 );
             }
         }
-        gathered.entries(&entries, &turn, here, at_ms, starts);
+        gathered.entries(&log.source, &entries, &turn, here, at_ms, starts);
     }
     let last = log.live.turns.back();
     if let (Some(open), Some(last)) = (&turn, last) {

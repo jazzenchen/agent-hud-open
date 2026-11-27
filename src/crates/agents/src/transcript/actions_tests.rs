@@ -149,11 +149,57 @@ fn a_codex_patch_is_one_edit_a_file() {
         json!({"edit":{"path":"notes.md","change":"create","added":2,"removed":0,"cut":0,"lines":["+# Notes","+first"]}})
     );
     assert_eq!(found[1]["edit"]["path"], "src/b.rs");
+    assert_eq!(found[1]["edit"]["from"], "src/a.rs");
+    assert!(found[0]["edit"].get("from").is_none());
     assert_eq!(
         found[1]["edit"]["lines"],
         json!(["-    old();", "+    new();", " context", "@@", "-gone"])
     );
     assert_eq!(found[2]["edit"]["change"], "delete");
+}
+
+#[test]
+fn a_result_says_when_a_written_file_was_there_before_and_what_number_a_task_got() {
+    let updated = result(
+        Some("The file /p/a.rs has been updated successfully."),
+        false,
+        false,
+    );
+    assert_eq!(updated["existed"], true);
+    assert_eq!(
+        result(Some("Successfully overwrote file: /p/a.rs."), false, false)["existed"],
+        true
+    );
+    let created = result(Some("File created successfully at: /p/a.rs"), false, false);
+    assert!(created.get("existed").is_none());
+    assert_eq!(
+        result(Some("Task #7 created successfully: Port it"), false, false)["task"],
+        "7"
+    );
+    assert!(result(Some("Task #x created"), false, false)
+        .get("task")
+        .is_none());
+    // What a command printed says nothing of the kind.
+    assert!(result(Some("The file a has been updated"), false, true)
+        .get("existed")
+        .is_none());
+}
+
+#[test]
+fn a_step_takes_the_number_its_client_gave_it() {
+    let mut plan = Plan::default();
+    // The session's first five tasks were never read: here the next is 1.
+    plan.apply(&json!({"add":"Sixth"}));
+    let given = plan.added();
+    assert_eq!(given, "1");
+    plan.number(&given, "6");
+    plan.apply(&json!({"add":"Seventh"}));
+    plan.apply(&json!({"update":{"id":"6","status":"completed"}}));
+    plan.apply(&json!({"update":{"id":"7","status":"in_progress"}}));
+    assert_eq!(
+        plan.steps(),
+        json!([{"text":"Sixth","status":"done"},{"text":"Seventh","status":"active"}])
+    );
 }
 
 #[test]
@@ -319,14 +365,14 @@ fn a_commands_output_is_its_end_and_says_whether_it_failed() {
 }
 
 #[test]
-fn an_edit_that_worked_keeps_nothing_of_its_answer() {
+fn an_edit_that_worked_keeps_nothing_of_its_answer_but_that_the_file_was_there() {
     assert_eq!(
         result(
             Some("The file a.rs has been updated successfully."),
             false,
             false
         ),
-        json!({"failed":false})
+        json!({"failed":false,"existed":true})
     );
     assert_eq!(
         result(Some("String to replace not found in file."), true, false),
@@ -356,7 +402,7 @@ fn rules_text_hash() -> u64 {
 /// and records only the new hash.
 #[test]
 fn the_rules_version_is_raised_with_the_rules() {
-    const RECORDED: (u32, u64) = (4, 9_254_088_966_552_192_592);
+    const RECORDED: (u32, u64) = (5, 2_509_646_494_796_048_846);
     assert_eq!(
         (VERSION, rules_text_hash()),
         RECORDED,

@@ -75,6 +75,28 @@ impl Plan {
         self.steps.get_mut(place.checked_sub(1)?)
     }
 
+    /// The number the step just added was given here, counted from the
+    /// plan's start: a client's own number can differ when the start of the
+    /// session is not read.
+    pub fn added(&self) -> String {
+        self.next.to_string()
+    }
+
+    /// Gives the step numbered `given` here the number its client gave it,
+    /// and counts the steps added after it from there.
+    pub fn number(&mut self, given: &str, number: &str) {
+        let Ok(count) = number.parse::<u64>() else {
+            return;
+        };
+        if given == number || self.steps.iter().any(|step| step.0 == number) {
+            return;
+        }
+        if let Some(step) = self.steps.iter_mut().find(|step| step.0 == given) {
+            step.0 = number.to_owned();
+            self.next = self.next.max(count);
+        }
+    }
+
     pub fn is_empty(&self) -> bool {
         self.steps.is_empty()
     }

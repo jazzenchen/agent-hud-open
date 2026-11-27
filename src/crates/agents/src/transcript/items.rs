@@ -156,6 +156,13 @@ pub fn of(source: &str) -> &'static Items {
         .unwrap_or(&SHARED)
 }
 
+/// Whether the client with this id logs what its tool calls returned.
+/// Antigravity's transcript holds the calls only, so none of its calls is
+/// waited on for a result.
+pub fn logs_results(source: &str) -> bool {
+    source != "antigravity"
+}
+
 #[cfg(test)]
 #[path = "items_tests.rs"]
 mod tests;

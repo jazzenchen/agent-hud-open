@@ -166,7 +166,7 @@ pub struct AgentHudCore {
     conversation_awaiting: HashMap<PathBuf, String>,
     /// Each log's tool calls whose results are still to come
     /// (`conversation_collect::Gathered::open`).
-    conversation_calls: HashMap<PathBuf, HashMap<String, bool>>,
+    conversation_calls: HashMap<PathBuf, std::collections::VecDeque<(String, bool)>>,
     workbuddy_metering: agent_hud_agents::buddy::transcript::WorkBuddyMeteringReading,
     /// What each listed session's row shows of its breakdown (a key of its
     /// logs' read offsets, and the value), until its logs move.
