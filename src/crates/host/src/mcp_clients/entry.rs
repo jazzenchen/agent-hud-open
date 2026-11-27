@@ -16,21 +16,30 @@ pub(super) struct Entry {
 }
 
 impl Entry {
-    /// Whether the entry starts something other than `executable` with
-    /// `args`, the client's own (`Client::server_args`).
-    pub(super) fn points_elsewhere(&self, executable: &Path, args: &[String]) -> bool {
-        let same_file = self.command.as_deref().is_some_and(|command| {
+    /// Whether the entry starts `executable`, by this name or another.
+    pub(super) fn starts(&self, executable: &Path) -> bool {
+        self.command.as_deref().is_some_and(|command| {
             Path::new(command) == executable
                 || fs::canonicalize(command)
                     .ok()
                     .is_some_and(|found| fs::canonicalize(executable).ok() == Some(found))
-        });
-        !same_file || self.args != args
+        })
+    }
+    /// Whether the entry starts `executable` as `client`'s entry should:
+    /// with the client's own arguments (`Client::server_args`), or for Claude
+    /// Code also plain `--mcp`, as before entries named their client. The
+    /// server reads Claude Code's session from the environment for both, so
+    /// Claude Code's older entry is never rewritten just to add the name, and
+    /// a 0.6 copy that writes plain `--mcp` back is not fought.
+    pub(super) fn current(&self, client: Client, executable: &Path) -> bool {
+        self.starts(executable)
+            && (self.args == client.server_args()
+                || (client == Client::ClaudeCode && self.args == ["--mcp"]))
     }
 }
 
 /// The settings file the client's command line writes the server into.
-fn file(client: Client, places: &Places) -> Option<PathBuf> {
+pub(super) fn file(client: Client, places: &Places) -> Option<PathBuf> {
     let (variable, folder, name) = match client {
         Client::ClaudeCode => ("CLAUDE_CONFIG_DIR", places.home.clone(), ".claude.json"),
         Client::Codex => ("CODEX_HOME", places.home.join(".codex"), "config.toml"),
@@ -133,35 +142,45 @@ mod tests {
     }
 
     #[test]
-    fn an_entry_naming_another_copy_or_other_arguments_points_elsewhere() {
+    fn an_entry_naming_another_copy_or_other_arguments_is_not_current() {
         let app = Path::new(APP);
-        let ours = Client::Codex.server_args();
-        assert!(!named(APP, Client::Codex).points_elsewhere(app, &ours));
-        assert!(named(
+        assert!(named(APP, Client::Codex).current(Client::Codex, app));
+        assert!(!named(
             "/Users/me/Downloads/Agent HUD.app/Contents/MacOS/Agent HUD",
             Client::Codex
         )
-        .points_elsewhere(app, &ours));
+        .current(Client::Codex, app));
         // Written before entries named their client, or for another client.
-        assert!(entry(APP).points_elsewhere(app, &ours));
-        assert!(named(APP, Client::ClaudeCode).points_elsewhere(app, &ours));
+        assert!(!entry(APP).current(Client::Codex, app));
+        assert!(!named(APP, Client::ClaudeCode).current(Client::Codex, app));
         let mut extra = named(APP, Client::Codex);
         extra.args.push("--verbose".into());
-        assert!(extra.points_elsewhere(app, &ours));
+        assert!(!extra.current(Client::Codex, app));
         let none = Entry {
             command: None,
-            args: ours.clone().into(),
+            args: Client::Codex.server_args().into(),
         };
-        assert!(none.points_elsewhere(app, &ours));
+        assert!(!none.current(Client::Codex, app));
+    }
+
+    /// Claude Code's server reads its session from the environment whether
+    /// or not the entry names Claude Code, so its older entry stays.
+    #[test]
+    fn claude_codes_plain_entry_is_current() {
+        let app = Path::new(APP);
+        assert!(entry(APP).current(Client::ClaudeCode, app));
+        assert!(named(APP, Client::ClaudeCode).current(Client::ClaudeCode, app));
+        assert!(!named(APP, Client::Codex).current(Client::ClaudeCode, app));
+        assert!(!entry("/old/Agent HUD").current(Client::ClaudeCode, app));
     }
 
     #[test]
-    fn the_same_file_by_another_name_is_not_elsewhere() {
+    fn the_same_file_by_another_name_is_current() {
         let temp = tempfile::tempdir().unwrap();
         let real = temp.path().join("Agent HUD");
         fs::write(&real, "").unwrap();
         let other_name = temp.path().join(".").join("Agent HUD");
-        assert!(!named(&other_name.to_string_lossy(), Client::ClaudeCode)
-            .points_elsewhere(&real, &Client::ClaudeCode.server_args()));
+        assert!(named(&other_name.to_string_lossy(), Client::ClaudeCode)
+            .current(Client::ClaudeCode, &real));
     }
 }

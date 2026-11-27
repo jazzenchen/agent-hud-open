@@ -27,6 +27,7 @@ base64.workspace = true
 sha2.workspace = true
 ring = "=0.17.14"
 serde-saphyr = "1"
+toml_edit = "=0.25.17"
 tungstenite = { version = "=0.30.0", default-features = false, features = ["handshake"] }
 uuid = { version = "1", features = ["v4"] }
 

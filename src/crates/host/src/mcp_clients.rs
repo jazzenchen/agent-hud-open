@@ -4,7 +4,7 @@
 //! teaches the agent to use it. At launch, every client that has the server
 //! is pointed at this copy again and its skill brought up to date.
 use crate::client_cli::{executable, run_client};
-use agent_hud_runtime::hud_tools::{Client, Places, SkillState, CLIENTS};
+use agent_hud_runtime::hud_tools::{self, Client, Places, SkillState, CLIENTS};
 use agent_hud_runtime::l10n::tr;
 use serde_json::{json, Value};
 use std::{
@@ -40,6 +40,30 @@ fn repoint(client: Client, places: &Places, path: &std::path::Path) -> Result<()
         )?;
     }
     Ok(())
+}
+/// Brings a listed entry that is not current to start `path` as it should.
+/// Codex's is changed in place in its `config.toml`, keeping what the person
+/// set on it; its command line, which removes the entry and adds it again,
+/// only when that fails for a copy that moved. Claude Code's goes through its
+/// command line, which `Entry::current` asks of a copy that moved, never of
+/// an entry that only lacks the client's name.
+fn repair(
+    client: Client,
+    places: &Places,
+    path: &std::path::Path,
+    entry: &entry::Entry,
+) -> Result<(), String> {
+    if client == Client::Codex {
+        let in_place = entry::file(client, places)
+            .ok_or_else(|| "Codex's config.toml was not found".to_string())
+            .and_then(|file| hud_tools::repoint_codex_server(&file, path));
+        match in_place {
+            Ok(_) => return Ok(()),
+            Err(error) if entry.starts(path) => return Err(error),
+            Err(_) => {}
+        }
+    }
+    repoint(client, places, path)
 }
 /// Whether the client is on this machine: its command line, or for the
 /// clients without one, its folder or app.
@@ -167,7 +191,7 @@ fn run(app: &tauri::AppHandle, id: &str, install: bool) -> Result<Value, String>
 }
 /// At launch, in every client that lists Agent HUD's server: points the
 /// server at this copy when it names another (a copy that moved, Open #100)
-/// or starts it without naming its client, and brings the skill up to date,
+/// or, in Codex, starts it without naming its client, and brings the skill up to date,
 /// adding it where an older version added only the server. Never adds a
 /// server, and only logs a failure.
 pub(crate) fn repair_on_launch(app: &tauri::AppHandle) {
@@ -194,10 +218,10 @@ pub(crate) fn repair_on_launch(app: &tauri::AppHandle) {
             if let Some(path) = canonical.as_deref() {
                 if client.command().is_none() {
                     let _ = client.set_server(&places, Some(path));
-                } else if entry::listed(client, &places)
-                    .is_some_and(|entry| entry.points_elsewhere(path, &client.server_args()))
+                } else if let Some(entry) =
+                    entry::listed(client, &places).filter(|entry| !entry.current(client, path))
                 {
-                    if let Err(error) = repoint(client, &places, path) {
+                    if let Err(error) = repair(client, &places, path, &entry) {
                         eprintln!(
                             "Agent HUD's MCP server in {} still starts another copy: {error}",
                             client.name()

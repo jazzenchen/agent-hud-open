@@ -9,6 +9,7 @@ use std::{
 mod places;
 pub use places::Places;
 use places::{antigravity, opencode, pi, qoder, trae_mcp};
+mod codex_toml;
 mod deepseek;
 mod mcp_json;
 mod skill;
@@ -239,6 +240,22 @@ impl Client {
     pub fn remove_skill(self, places: &Places) -> Result<(), String> {
         skill::remove(&self.skills(places))
     }
+}
+
+/// Points Agent HUD's entry in Codex's `config.toml` (`file`) at `executable`
+/// with Codex's own arguments, changing only its command and args. Returns
+/// whether the file changed; an error when it lists no entry Agent HUD can
+/// change, so the caller can fall back to Codex's command line.
+pub fn repoint_codex_server(file: &Path, executable: &Path) -> Result<bool, String> {
+    let target = crate::hooks::settings_target(file)?;
+    let original = read(&target)?.ok_or("Codex's config.toml is missing")?;
+    let updated = codex_toml::repoint(&original, executable, &Client::Codex.server_args())
+        .ok_or("Codex's config.toml lists no agent-hud server Agent HUD can change")?;
+    if updated == original {
+        return Ok(false);
+    }
+    crate::hooks::write_settings(&target, Some(updated.as_bytes()))?;
+    Ok(true)
 }
 
 /// Settings files are small; anything bigger is not one Agent HUD should edit.
