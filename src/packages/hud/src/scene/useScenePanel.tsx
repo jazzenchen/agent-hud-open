@@ -31,6 +31,7 @@ export function useScenePanel({
   onStats,
   inUsagePanel,
   open,
+  pinned,
   phase,
   pointerInside,
   focusedVendor,
@@ -42,6 +43,8 @@ export function useScenePanel({
 }: Omit<Alerts, "botLogos"> &
   Omit<Body, "alertStack" | "dismissNews" | "focusVendor"> & {
     clip: ClipEnd;
+    /** Whether a click holds the panel open: from the hover's peek to the full panel. */
+    pinned: boolean;
     /** The hover's phase: anything but collapsed draws the copy again. */
     phase: string;
     pointerInside: boolean;
@@ -95,6 +98,8 @@ export function useScenePanel({
     configKey,
     light,
     open,
+    // A click on the peek opens the full panel without changing `open`.
+    pinned,
     focusedVendor?.name,
     request,
     event,

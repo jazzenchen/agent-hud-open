@@ -415,6 +415,7 @@ export function HUDScene({
     onStats: showPanelStats,
     inUsagePanel,
     open,
+    pinned,
     phase: state.phase,
     pointerInside,
     focusedVendor,
