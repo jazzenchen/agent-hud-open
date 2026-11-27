@@ -286,6 +286,17 @@ fn teams_reading(personal: Value, package: Value) -> Reading {
 }
 
 #[test]
+fn organization_credits_use_exact_counts_when_percentage_is_a_fraction() {
+    let reading = teams_reading(
+        json!({"used": 0, "total": 0}),
+        json!({"used": 275, "cap": 10000, "percentage": 0.03, "available": true}),
+    );
+    assert_eq!(reading.quotas.len(), 1);
+    assert_eq!(reading.quotas[0]["id"], "fixture:org-credits");
+    assert_eq!(reading.quotas[0]["usedPercent"], 2.75);
+}
+
+#[test]
 fn unavailable_organization_credits_are_noted_when_nothing_else_shows() {
     let reading = teams_reading(json!({"used": 0, "total": 0}), json!({"available": false}));
     assert_eq!(
