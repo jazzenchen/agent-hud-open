@@ -57,10 +57,7 @@ fn adapter_addresses_exclude_loopback_and_prefer_physical_lan_interfaces() {
             .collect::<Vec<_>>()
     };
     let rows = unsafe { collect_addresses(adapters.as_ptr()) };
-    assert_eq!(
-        ips(rows.clone()),
-        ["192.168.1.9", "10.0.0.8", "100.64.0.1"]
-    );
+    assert_eq!(ips(rows.clone()), ["192.168.1.9", "10.0.0.8", "100.64.0.1"]);
     assert_eq!(overlay_only(rows), ["100.64.0.1"]);
     adapters[1].OperStatus = 2; // IfOperStatusDown
     assert_eq!(
