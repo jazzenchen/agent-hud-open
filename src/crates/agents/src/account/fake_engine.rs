@@ -1,11 +1,63 @@
-use super::Engine;
+use super::{Engine, EngineStart, FakeHost};
 use serde_json::Value;
 use std::{
     cell::RefCell,
     collections::{HashMap, VecDeque},
+    path::Path,
     rc::Rc,
     time::Instant,
 };
+
+/// What `FakeHost::start_engine` does: records the start, then hands back an
+/// engine with the replies and output scripted for its first argument and
+/// the account home it is started with.
+pub(super) fn start(host: &FakeHost, start: &EngineStart) -> Result<Box<dyn Engine>, String> {
+    if host.cancelled {
+        return Err("Account reading was stopped".into());
+    }
+    host.started.borrow_mut().push((
+        start.executable.into(),
+        start.args.iter().map(|arg| (*arg).to_owned()).collect(),
+        start.folder.into(),
+        start
+            .env
+            .iter()
+            .map(|(key, value)| ((*key).to_owned(), value.clone()))
+            .collect(),
+    ));
+    if let Some(error) = start
+        .args
+        .first()
+        .and_then(|first| host.engine_start_errors.get(*first))
+    {
+        return Err(error.clone());
+    }
+    let home = start
+        .env
+        .iter()
+        .find(|(name, _)| matches!(*name, "CODEX_HOME" | "CLAUDE_CONFIG_DIR"))
+        .map(|(_, home)| Path::new(home));
+    let printed = start
+        .args
+        .first()
+        .and_then(|first| {
+            home.and_then(|home| host.engine_output_by_home.get(home))
+                .unwrap_or(&host.engine_output)
+                .get(*first)
+        })
+        .cloned()
+        .unwrap_or_default();
+    Ok(Box::new(FakeEngine {
+        replies: home
+            .and_then(|home| host.engine_replies_by_home.get(home))
+            .unwrap_or(&host.engine_replies)
+            .clone(),
+        ends: host.engine_ends,
+        queue: printed.into(),
+        ended: false,
+        sent: Rc::clone(&host.engine_sent),
+    }))
+}
 
 /// An engine that answers each request with the reply scripted for its id.
 pub struct FakeEngine {

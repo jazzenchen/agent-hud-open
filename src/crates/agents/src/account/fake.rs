@@ -11,7 +11,6 @@ use std::{
 
 #[path = "fake_engine.rs"]
 mod fake_engine;
-pub use fake_engine::FakeEngine;
 
 pub struct FakeHost {
     pub os: Os,
@@ -207,51 +206,7 @@ impl Host for FakeHost {
         self.executables.get(name).cloned()
     }
     fn start_engine(&self, start: &EngineStart) -> Result<Box<dyn Engine>, String> {
-        if self.cancelled {
-            return Err("Account reading was stopped".into());
-        }
-        self.started.borrow_mut().push((
-            start.executable.into(),
-            start.args.iter().map(|arg| (*arg).to_owned()).collect(),
-            start.folder.into(),
-            start
-                .env
-                .iter()
-                .map(|(key, value)| ((*key).to_owned(), value.clone()))
-                .collect(),
-        ));
-        if let Some(error) = start
-            .args
-            .first()
-            .and_then(|first| self.engine_start_errors.get(*first))
-        {
-            return Err(error.clone());
-        }
-        let home = start
-            .env
-            .iter()
-            .find(|(name, _)| matches!(*name, "CODEX_HOME" | "CLAUDE_CONFIG_DIR"))
-            .map(|(_, home)| Path::new(home));
-        let printed = start
-            .args
-            .first()
-            .and_then(|first| {
-                home.and_then(|home| self.engine_output_by_home.get(home))
-                    .unwrap_or(&self.engine_output)
-                    .get(*first)
-            })
-            .cloned()
-            .unwrap_or_default();
-        Ok(Box::new(FakeEngine {
-            replies: home
-                .and_then(|home| self.engine_replies_by_home.get(home))
-                .unwrap_or(&self.engine_replies)
-                .clone(),
-            ends: self.engine_ends,
-            queue: printed.into(),
-            ended: false,
-            sent: Rc::clone(&self.engine_sent),
-        }))
+        fake_engine::start(self, start)
     }
     fn native(&self, agent: &str, method: &str, _params: &Value) -> Result<Value, String> {
         self.natives

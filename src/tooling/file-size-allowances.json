@@ -1,5 +1,4 @@
 {
-  "src/crates/agents/src/account/fake.rs": 367,
   "src/crates/agents/src/claude/live.rs": 353,
   "src/crates/core/src/ingestion/scan.rs": 527,
   "src/crates/core/src/sessions/list.rs": 522,
