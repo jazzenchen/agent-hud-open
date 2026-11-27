@@ -1,4 +1,4 @@
-use super::credentials::{credential_key_from_secret, open_value, Opener};
+use super::credentials::{credential_key_from_secret, open_value, v2_dir, Opener};
 use super::*;
 use crate::account::fake::FakeHost;
 use crate::account::Answer;
@@ -89,6 +89,34 @@ fn decrypts_official_enc_v1_fixture_and_queries_zcode_balance_with_bundle_versio
 const V2_PATH: &str = "/tmp/zc/.zcode/v2/credentials.json";
 /// SHA-256 of `V2_PATH`, the account ZCode 4.0 files the key under.
 const V2_ACCOUNT: &str = "7705846726fe089de3f93b1eb4ad0e7582a7e91a92516cb49f3564700e7f0807";
+
+/// `V2_PATH` as `read` builds it from the home folder, with this system's separators.
+fn v2_path() -> std::path::PathBuf {
+    v2_dir(&FakeHost::new("/tmp/zc")).join("credentials.json")
+}
+
+/// The account for `v2_path`: ZCode hashes the path as written on its own system.
+fn v2_account() -> String {
+    let hash = ring::digest::digest(
+        &ring::digest::SHA256,
+        v2_path().to_string_lossy().as_bytes(),
+    );
+    hash.as_ref()
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect()
+}
+
+#[test]
+fn zcode_4_files_its_key_under_the_hash_of_its_credentials_path() {
+    if cfg!(unix) {
+        assert_eq!(v2_account(), V2_ACCOUNT);
+    } else {
+        assert!(v2_path()
+            .to_string_lossy()
+            .ends_with(r"\.zcode\v2\credentials.json"));
+    }
+}
 /// Sealed by Node's crypto as ZCode 4.0 does, under 32 bytes of 7.
 const V2_OS: &str = "enc:v2:os:4bb06f8e4e3a7715d201d573:AQEBAQEBAQEBAQEB.olvYDp-KcMF_owVnlh9o6A.ANOk0fnHmHujsfFVH1wVXw";
 const V2_OS_KEY: &str = "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc";
@@ -96,14 +124,14 @@ const V2_OS_KEY: &str = "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc";
 fn v2_host(key: Answer<String>) -> FakeHost {
     let mut host = FakeHost::new("/tmp/zc");
     host.secrets
-        .insert(format!("ZCode Credential Encryption|{V2_ACCOUNT}"), key);
+        .insert(format!("ZCode Credential Encryption|{}", v2_account()), key);
     host
 }
 
 #[test]
 fn opens_zcode_4_values_with_the_key_from_the_credential_store() {
     let host = v2_host(Answer::Found(format!("{V2_OS_KEY}\n")));
-    let opener = Opener::new(&host, V2_PATH.into());
+    let opener = Opener::new(&host, v2_path());
     assert_eq!(opener.open(V2_OS).unwrap(), "v2-fixture-token");
 }
 
@@ -112,7 +140,7 @@ fn zcode_4_values_under_another_key_are_not_unlocked() {
     let host = v2_host(Answer::Found(
         "CAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg".into(),
     ));
-    let opener = Opener::new(&host, V2_PATH.into());
+    let opener = Opener::new(&host, v2_path());
     assert_eq!(
         opener.open(V2_OS).unwrap_err().reason(),
         "ZCode's encrypted sign-in could not be unlocked."
@@ -142,7 +170,7 @@ fn opens_zcode_4_values_under_a_managed_secret_file() {
         "/tmp/zc/.zcode/v2/credential-secret",
         "managed-secret-0123456789abcdefghijklmnop",
     );
-    let opener = Opener::new(&host, V2_PATH.into());
+    let opener = Opener::new(&host, v2_path());
     assert_eq!(
         opener
             .open("enc:v2:env:0653c83e72b32bebce1be480:AQEBAQEBAQEBAQEB.eYr2PijK4Y9BtSsY-yibbA.QtRkl4D0T-Q99NXI")

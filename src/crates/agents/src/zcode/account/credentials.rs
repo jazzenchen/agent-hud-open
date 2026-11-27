@@ -36,7 +36,9 @@ pub(super) fn v2_dir(host: &dyn Host) -> PathBuf {
     {
         return PathBuf::from(dir);
     }
-    let default = host.home().join(".zcode/v2");
+    // Joined part by part: ZCode 4.0 files its key under the SHA-256 of this path as
+    // Node writes it, so on Windows every separator must be a backslash.
+    let default = host.home().join(".zcode").join("v2");
     if let Answer::Found(setting) = read_json_bounded(host, &default.join("setting.json"), MAX_JSON)
     {
         if let Some(custom) = setting["dataBaseDir"]
