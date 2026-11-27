@@ -289,8 +289,13 @@ fn order(offset: u64, index: usize) -> u64 {
         .saturating_add(index.min(63) as u64)
 }
 
-fn timestamp(value: &Value) -> Option<i64> {
-    let at = value.get("timestamp").or_else(|| value.get("time"))?;
+/// When a log line was written: `timestamp` (Claude Code, Codex), `time`, or
+/// `created_at` (Antigravity), as milliseconds or a date.
+pub(crate) fn timestamp(value: &Value) -> Option<i64> {
+    let at = value
+        .get("timestamp")
+        .or_else(|| value.get("time"))
+        .or_else(|| value.get("created_at"))?;
     at.as_i64()
         .or_else(|| at.as_str().and_then(crate::metering::date_ms))
 }

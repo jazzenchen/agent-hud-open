@@ -454,3 +454,63 @@ fn a_command_and_an_edit_carry_their_actions_and_a_later_read_their_results() {
         )]
     );
 }
+
+/// Antigravity writes a step's time as `created_at`. A turn read from its log,
+/// on the first read or a later one, starts when its prompt was written, so a
+/// reader can show it before any reply.
+#[test]
+fn an_antigravity_turn_starts_when_its_prompt_was_written() {
+    let id = "47a5948f-28f7-47b6-a90c-9ffbe58368c8";
+    let t = Utc::now().timestamp_millis() / 1_000 * 1_000 - 600_000;
+    let step = |index: u64, at: i64, kind: &str, extra: Value| {
+        let mut row = json!({"step_index":index,"source":"MODEL","type":kind,"status":"DONE","created_at":chrono::DateTime::<Utc>::from_timestamp_millis(at).unwrap().format("%Y-%m-%dT%H:%M:%SZ").to_string()});
+        row.as_object_mut()
+            .unwrap()
+            .extend(extra.as_object().unwrap().clone());
+        row
+    };
+    let rows = [
+        step(
+            0,
+            t,
+            "USER_INPUT",
+            json!({"source":"USER_EXPLICIT","content":"<USER_REQUEST>\nTidy up\n</USER_REQUEST>"}),
+        ),
+        step(
+            1,
+            t + 1_000,
+            "PLANNER_RESPONSE",
+            json!({"thinking":"Looking around"}),
+        ),
+    ];
+    let starts = |facts: &[Fact]| {
+        facts.iter().find_map(|fact| match fact {
+            Fact::TurnStarted { turn, at_ms, .. } if turn == "step-0" => Some(*at_ms),
+            _ => None,
+        })
+    };
+    for first_seen_by_the_store in [false, true] {
+        let home = tempfile::tempdir().unwrap();
+        let dir = home.path().join(format!(
+            ".gemini/antigravity/brain/{id}/.system_generated/logs"
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        write(&dir.join("transcript.jsonl"), &rows, false);
+        let brain = vec![(home.path().join(".gemini/antigravity/brain"), "antigravity")];
+        if first_seen_by_the_store {
+            // The ledger read the log before the store existed.
+            let mut core = fixture(home.path());
+            core.provider_roots = brain.clone();
+            core.request("snapshot", json!({})).unwrap();
+        }
+        let store = Arc::new(Store::default());
+        let mut core = fixture(home.path());
+        core.provider_roots = brain.clone();
+        core.set_conversation_sink(Some(store.clone()));
+        // The store meets the log on this pass and is given it on the next.
+        core.request("snapshot", json!({})).unwrap();
+        core.request("snapshot", json!({})).unwrap();
+        let facts = store.take();
+        assert_eq!(starts(&facts), Some(Some(t)), "{facts:#?}");
+    }
+}

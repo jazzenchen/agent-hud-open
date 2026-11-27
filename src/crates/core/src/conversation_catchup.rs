@@ -203,13 +203,7 @@ fn replay(
         let Ok(value) = serde_json::from_slice::<serde_json::Value>(&line) else {
             continue;
         };
-        let at_ms = value
-            .get("timestamp")
-            .or_else(|| value.get("time"))
-            .and_then(|at| {
-                at.as_i64()
-                    .or_else(|| at.as_str().and_then(crate::metering::date_ms))
-            });
+        let at_ms = crate::conversation_collect::timestamp(&value);
         let entries = (rule.read)(&value, here);
         let mut starts = false;
         if let Some(begun) = (turns.start)(&value) {
