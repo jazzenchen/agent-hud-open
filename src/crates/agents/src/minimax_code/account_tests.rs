@@ -103,3 +103,63 @@ fn respects_signed_out_companion_state_and_never_rotates_expired_refresh_token()
     assert_eq!(read(&expired_host).err().unwrap().kind(), "transient");
     assert!(expired_host.asked.borrow().is_empty());
 }
+
+#[test]
+fn reads_the_current_record_from_the_auth_envelope_without_using_an_older_login() {
+    let base = home();
+    let folder = std::path::Path::new(&base).join(".minimax/auth/prod/cn/mcode-public");
+    let auth_path = folder.join("auth.json");
+    let current = json!({
+        "schemaVersion": 1,
+        "records": {
+            "opaque-old": {
+                "accessToken": "old-login",
+                "refreshToken": "do-not-use-old-refresh",
+                "expiresAtMs": 2_099_000_000_000_i64,
+                "generation": 1,
+                "loginEpoch": "100"
+            },
+            "opaque-current": {
+                "accessToken": "current-login",
+                "refreshToken": "do-not-rotate-current-refresh",
+                "expiresAtMs": 2_099_000_000_000_i64,
+                "generation": 2,
+                "loginEpoch": "200",
+                "region": "cn"
+            }
+        }
+    });
+    let host = FakeHost::new(&base)
+        .file(auth_path.to_str().unwrap(), &current.to_string())
+        .answer_for(
+            "https://agent.minimax.cn/v1/api/user/info",
+            "Bearer current-login",
+            Ok(json!({"data": {"id": "mm-current"}, "base_resp": {"status_code": 0}})),
+        )
+        .answer_for(
+            "https://agent.minimax.cn/matrix/api/v1/user/get_user_extra_info",
+            "Bearer current-login",
+            Ok(json!({"workspaces": [], "base_resp": {"status_code": 0}})),
+        )
+        .answer_for(
+            "https://agent.minimax.cn/matrix/api/v1/commerce/get_membership_info",
+            "Bearer current-login",
+            Ok(json!({
+                "subscription_type": "monthly",
+                "opcredit_balance": 25,
+                "base_resp": {"status_code": 0}
+            })),
+        );
+
+    let reading = read(&host).unwrap();
+    assert_eq!(reading.billing[0]["amount"], 25.0);
+    assert_eq!(host.asked.borrow().len(), 3);
+
+    // An expired current generation must not silently reuse an older, still
+    // unexpired access token. No request or refresh-token rotation is allowed.
+    let mut expired = current.clone();
+    expired["records"]["opaque-current"]["expiresAtMs"] = json!(1_700_000_000_000_i64);
+    let expired_host = FakeHost::new(&base).file(auth_path.to_str().unwrap(), &expired.to_string());
+    assert_eq!(read(&expired_host).err().unwrap().kind(), "transient");
+    assert!(expired_host.asked.borrow().is_empty());
+}

@@ -68,19 +68,23 @@ pub(super) fn discover_auth(host: &dyn Host) -> Result<Option<LocalAuth>, Unread
                 continue;
             }
         }
-        let Some(token) = str_field(&auth_val["accessToken"])
-            .or_else(|| str_field(&auth_val["access_token"]))
-            .or_else(|| str_field(&auth_val["token"]))
+        // Current MiniMax Code stores credentials in `records`, keyed by an
+        // opaque id. The greatest generation is the client's current record;
+        // never fall back to an older login when that record has expired.
+        let auth = current_record(&auth_val);
+        let Some(token) = str_field(&auth["accessToken"])
+            .or_else(|| str_field(&auth["access_token"]))
+            .or_else(|| str_field(&auth["token"]))
         else {
             continue;
         };
-        if let Some(exp) = exp_ms(&auth_val) {
+        if let Some(exp) = exp_ms(auth) {
             if exp <= now_ms {
                 expired = true;
                 continue;
             }
         }
-        let reg = str_field(&auth_val["region"]).unwrap_or(region);
+        let reg = str_field(&auth["region"]).unwrap_or(region);
         let modified_ms = match host.file_info(&auth_file) {
             Answer::Found(info) => info.modified_ms.unwrap_or(0),
             _ => 0,
@@ -103,6 +107,30 @@ pub(super) fn discover_auth(host: &dyn Host) -> Result<Option<LocalAuth>, Unread
         return Err(Unread::transient(tr!("MiniMax Code's local access token expired; open MiniMax Code so it renews its session.")));
     }
     Ok(None)
+}
+
+fn current_record(auth: &Value) -> &Value {
+    auth.get("records")
+        .and_then(Value::as_object)
+        .and_then(|records| {
+            records
+                .values()
+                .filter(|record| record.is_object())
+                .max_by_key(|record| {
+                    (
+                        number_field(&record["generation"]),
+                        number_field(&record["loginEpoch"]),
+                    )
+                })
+        })
+        .unwrap_or(auth)
+}
+
+fn number_field(value: &Value) -> i64 {
+    value
+        .as_i64()
+        .or_else(|| value.as_str().and_then(|s| s.parse().ok()))
+        .unwrap_or(0)
 }
 
 fn data_root(host: &dyn Host) -> PathBuf {
