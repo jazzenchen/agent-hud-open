@@ -1,6 +1,6 @@
 //! The folders each client offers to start in: the latest ten of its own
-//! sessions' projects (and Harness's own workspaces), and a task with no
-//! project.
+//! sessions' projects, Codex Desktop projects on Windows, Harness workspaces,
+//! and a task with no project.
 use super::*;
 
 impl SessionStarts {
@@ -33,43 +33,29 @@ impl SessionStarts {
                     self.executable(provider).is_some() || self.desktop(provider)
                 }
                 Provider::Pi | Provider::OpenCode => self.command(provider).is_some(),
+                Provider::Codex => self.can_start_codex(),
                 _ => self.executable(provider).is_some(),
             };
             if !offered {
                 continue;
             }
             let name = provider.as_str();
-            let mut folders = Vec::new();
-            for session in &rows {
-                if session["source"] != name {
-                    continue;
-                }
-                let Some(folder) = session["cwd"]
-                    .as_str()
-                    .and_then(|path| self.project_folder(path))
-                else {
-                    continue;
-                };
-                if !folder.is_dir() {
-                    continue;
-                }
-                // Claude Code's settings, read once for every folder.
-                if provider == Provider::Claude
-                    && !super::trust::trusts(
-                        claude.get_or_insert_with(|| self.claude_trust()),
-                        &folder,
-                    )
-                {
-                    continue;
-                }
-                let written = self.written(&folder);
-                if !folders.contains(&written) {
-                    folders.push(written);
-                }
-                if folders.len() == 10 {
-                    break;
-                }
-            }
+            // Claude Code's settings, read once for every folder.
+            let trust = (provider == Provider::Claude)
+                .then(|| &*claude.get_or_insert_with(|| self.claude_trust()));
+            let recent = rows
+                .iter()
+                .filter(|session| session["source"] == name)
+                .filter_map(|session| self.project_folder(session["cwd"].as_str()?))
+                .filter(|folder| {
+                    folder.is_dir()
+                        && trust.is_none_or(|settings| super::trust::trusts(settings, folder))
+                });
+            let mut folders = if provider == Provider::Codex {
+                self.codex_projects.offer_folders(self, recent)
+            } else {
+                self.recent_folders(recent)
+            };
             // Harness also offers the workspaces of its own sidebar, however
             // long since a session ran in them.
             if provider == Provider::DeepSeek {
@@ -96,6 +82,19 @@ impl SessionStarts {
             });
         }
         offers
+    }
+    pub(super) fn recent_folders(&self, recent: impl Iterator<Item = PathBuf>) -> Vec<String> {
+        let mut folders = Vec::new();
+        for folder in recent {
+            let written = self.written(&folder);
+            if !folders.contains(&written) {
+                folders.push(written);
+            }
+            if folders.len() == 10 {
+                break;
+            }
+        }
+        folders
     }
     /// The folder `cwd` names as an offer would write it: a worktree's
     /// repository, under `~` when inside home. None for Codex's own worktrees.

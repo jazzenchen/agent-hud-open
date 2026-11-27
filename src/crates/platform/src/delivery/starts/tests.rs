@@ -2,6 +2,14 @@ use super::super::fixtures::{StartFixture, JOB, REQUEST, SESSION};
 use super::*;
 use serde_json::json;
 
+#[cfg(windows)]
+#[path = "tests/codex_projects.rs"]
+mod codex_test_host;
+#[cfg(unix)]
+#[path = "tests/unix.rs"]
+mod codex_test_host;
+use codex_test_host::{mock_empty_codex_projects, CODEX_WITHOUT_DESKTOP};
+
 #[test]
 fn project_paths_use_native_components_and_portable_home_display() {
     let fixture = StartFixture::new();
@@ -50,13 +58,14 @@ fn desktop_apps_are_looked_for_at_every_start() {
         fixture.root.join("Applications"),
         fixture.home().join("Applications"),
     ]);
+    mock_empty_codex_projects(&fixture, &mut starts);
     assert_eq!(
         app(&mut starts, &fixture, Provider::Claude).as_deref(),
         Some("cli")
     );
     assert_eq!(
         app(&mut starts, &fixture, Provider::Codex).as_deref(),
-        Some("cli")
+        CODEX_WITHOUT_DESKTOP
     );
 
     fixture.install("Claude.app", false, true);
@@ -85,7 +94,7 @@ fn desktop_apps_are_looked_for_at_every_start() {
     );
     assert_eq!(
         app(&mut starts, &fixture, Provider::Codex).as_deref(),
-        Some("cli")
+        CODEX_WITHOUT_DESKTOP
     );
 
     // An app in ~/Applications counts as well.
@@ -250,6 +259,10 @@ fn codex_desktop_refuses_either_start_selection_before_creating_a_receipt() {
 fn claude_offers_a_task_with_no_project_like_codex() {
     let fixture = StartFixture::new();
     let mut starts = fixture.starts();
+    if CODEX_WITHOUT_DESKTOP.is_none() {
+        fixture.install("ChatGPT.app", false, true);
+    }
+    mock_empty_codex_projects(&fixture, &mut starts);
     // The fixture trusts only the home folder; the task folder is outside it.
     let offers = starts.update_offers(&[]);
     for provider in [Provider::Claude, Provider::Codex] {
@@ -648,13 +661,15 @@ fn pi_and_opencode_are_offered_only_where_their_command_line_is() {
             .map(|offer| offer.provider)
             .collect::<Vec<_>>()
     };
-    assert_eq!(
-        offered(&run_starts(&fixture, &[])),
-        [Provider::Claude, Provider::Codex]
-    );
+    let mut expected = vec![Provider::Claude];
+    if CODEX_WITHOUT_DESKTOP.is_some() {
+        expected.push(Provider::Codex);
+    }
+    assert_eq!(offered(&run_starts(&fixture, &[])), expected);
+    expected.push(Provider::OpenCode);
     assert_eq!(
         offered(&run_starts(&fixture, &[Provider::OpenCode])),
-        [Provider::Claude, Provider::Codex, Provider::OpenCode]
+        expected
     );
     let starts = run_starts(&fixture, &[Provider::Pi, Provider::OpenCode]);
     let offers = starts.offers_for(&run_sessions(&fixture));
@@ -919,6 +934,7 @@ fn windows_desktop_executables_and_packages_are_matched_per_provider() {
         .iter()
         .any(|offer| offer.provider == Provider::Antigravity));
     starts.set_application_folders(vec![antigravity_exe, codex_exe, claude_exe, claude_store]);
+    mock_empty_codex_projects(&fixture, &mut starts);
     let offers = starts.offers_for(&fixture.sessions());
     let find_app = |provider| {
         offers

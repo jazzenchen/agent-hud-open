@@ -1917,7 +1917,7 @@ fn start_session_takes_only_an_offered_folder() {
     let refused = world.call(
         Some(("claude", CLAUDE)),
         "start_session",
-        json!({"client":"codex","folder":"/etc","text":"Look around"}),
+        json!({"client":"claude","folder":"/etc","text":"Look around"}),
     );
     assert_eq!(refused["state"], "refused");
     assert!(

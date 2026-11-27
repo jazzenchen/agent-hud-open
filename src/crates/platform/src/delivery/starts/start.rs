@@ -88,7 +88,7 @@ impl SessionStarts {
         } else {
             if !offer.folders.contains(&request.folder) {
                 return Err(Failure::Rejected(
-                    "Only a project offered from existing local sessions may be selected".into(),
+                    "Only an offered project folder may be selected".into(),
                 ));
             }
             self.project_folder(&request.folder)
@@ -104,6 +104,11 @@ impl SessionStarts {
                 "The client's workspace trust no longer accepts this folder".into(),
             ));
         }
+        let codex_project = if request.provider == Provider::Codex {
+            self.codex_start_project(&folder, &request)?
+        } else {
+            None
+        };
         let mut receipt = StartReceipt {
             provider: request.provider,
             request_id: request.request_id.clone(),
@@ -143,7 +148,7 @@ impl SessionStarts {
         }
         let result = match request.provider {
             Provider::Claude => self.start_claude(&folder, &request),
-            Provider::Codex => self.start_codex(&folder, &request),
+            Provider::Codex => self.start_codex(&folder, &request, codex_project.as_deref()),
             Provider::Antigravity => self.start_antigravity(&folder, &request),
             Provider::DeepSeek => self.start_deepseek(&folder, &request),
             Provider::Pi => self.start_pi(&folder, &request),
