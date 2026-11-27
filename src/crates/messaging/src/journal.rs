@@ -86,7 +86,8 @@ pub struct Message {
     /// The check steered into its turn while that turn still ran was sent.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub checked: bool,
-    /// The follow-up queued after its turn ended with no reply was sent.
+    /// The follow-up queued after its turn ended with no reply was sent, or
+    /// is no longer owed: that end is too long ago, or its client was off.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub followed: bool,
     /// On a follow-up: the message it follows up. Agent HUD sent it on the

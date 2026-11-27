@@ -5,7 +5,10 @@
 //!   sent, a short check steered into that turn (Codex and DeepSeek Harness,
 //!   the clients that take a steer), saying the sender waits for a reply;
 //! - a minute after its own turn ended with no reply, a follow-up queued as
-//!   the recipient's next turn, asking for that reply now.
+//!   the recipient's next turn, asking for that reply now. Only while that
+//!   end is recent (`FOLLOW_UP_LATEST_MS`): one that ended longer ago, as
+//!   while messages were off or the app was closed, or whose client the user
+//!   turned off, is let go, not sent late.
 //!
 //! Both are labelled as Agent HUD's, name the message they follow up, and ask
 //! for the reply with `reply_to` that message, so the reply settles it.
@@ -13,6 +16,9 @@ use super::*;
 
 /// How long the message's own turn runs before Agent HUD steers a check in.
 pub(crate) const RUNNING_CHECK_MS: i64 = 10 * 60_000;
+/// How long after the message's own turn ended a follow-up may still go:
+/// five minutes past the minute it waits for the reply.
+pub(crate) const FOLLOW_UP_LATEST_MS: i64 = ANSWER_WAIT_MS + 5 * 60_000;
 
 impl Messaging {
     /// Sends the checks and follow-ups now due. True when the journal changed.
@@ -22,24 +28,24 @@ impl Messaging {
         }
         let replies = self.journal.replies();
         let mut due = Vec::new();
+        let mut let_go = Vec::new();
         for message in self.journal.messages() {
-            if !message.asked
-                || message.follows.is_some()
-                || message.replied_by.is_some()
-                || replies.contains(&message.id)
-                || message.to.session_id.is_empty()
-                || matches!(message.state.as_str(), "refused" | "expired" | "uncertain")
-                || !self.allows(&message.to.client)
-            {
+            if !message.asked || message.follows.is_some() || message.replied_by.is_some() {
                 continue;
             }
-            if message.follow_up_due()
-                && message
-                    .ended_at_ms
-                    .is_some_and(|ended| now - ended > ANSWER_WAIT_MS)
-            {
-                due.push((message.id.clone(), false));
-            } else if !message.checked
+            let owed = !replies.contains(&message.id)
+                && !message.to.session_id.is_empty()
+                && !matches!(message.state.as_str(), "refused" | "expired" | "uncertain")
+                && self.allows(&message.to.client);
+            if message.follow_up_due() {
+                let waited = now - message.ended_at_ms.unwrap_or(now);
+                if !owed || waited > FOLLOW_UP_LATEST_MS {
+                    let_go.push(message.id.clone());
+                } else if waited > ANSWER_WAIT_MS {
+                    due.push((message.id.clone(), false));
+                }
+            } else if owed
+                && !message.checked
                 && !message.answered
                 && message.ended_at_ms.is_none()
                 && message.steered_into.is_none()
@@ -49,7 +55,15 @@ impl Messaging {
                 due.push((message.id.clone(), true));
             }
         }
-        let changed = !due.is_empty();
+        // Owed no more: marked followed, so nothing waits on it.
+        for kept in self
+            .journal
+            .messages_mut()
+            .filter(|m| let_go.contains(&m.id))
+        {
+            kept.followed = true;
+        }
+        let changed = !due.is_empty() || !let_go.is_empty();
         for (id, steer) in due {
             let Some(message) = self.journal.find(&id).cloned() else {
                 continue;

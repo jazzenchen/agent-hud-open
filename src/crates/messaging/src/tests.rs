@@ -8,7 +8,7 @@ use agent_hud_platform::delivery::{
     fixtures::{StartFixture, SESSION as STARTED},
     AntigravityTransport, CodexTransport, LocalClientPaths, Receipt,
 };
-use follow_up::RUNNING_CHECK_MS;
+use follow_up::{FOLLOW_UP_LATEST_MS, RUNNING_CHECK_MS};
 use std::{
     cell::Cell,
     collections::BTreeMap,
@@ -3532,6 +3532,80 @@ fn a_turn_that_ends_without_the_asked_reply_is_followed_up_once_and_the_reply_se
         world.replied_by(&id),
         reply["id"].as_str().map(str::to_owned)
     );
+}
+
+/// A turn that ended long before maintenance saw it, as while messages were
+/// off, is let go: no follow-up days late, and nothing waits on it.
+#[test]
+fn a_turn_that_ended_long_ago_is_not_followed_up_late() {
+    let mut world = World::on();
+    world.check_in(QUIET);
+    let sent = 1_792_600_000_000i64;
+    let first = world.send(("claude", CLAUDE), QUIET, "Fix the retry loop");
+    let id = first["id"].as_str().unwrap().to_owned();
+    let delivered = world.claude_words(QUIET, &id);
+    world.transcripts.prompt(QUIET, "q1", &delivered);
+    world.transcripts.reply(QUIET, "q1", "Fixed it.");
+    world.live(
+        QUIET,
+        json!({"turnId":"q1","turnStartedAt":at(sent + 1_000),"endedAt":at(sent + 4_000)}),
+    );
+    // Seen ended in time, then no look until two days on.
+    world.maintain(sent + 5_000);
+    assert!(world.messaging.waiting(), "a follow-up is owed");
+    world.maintain(sent + 2 * 86_400_000);
+    assert!(follow_up_of(&mut world, &id).is_empty());
+    assert!(world.messaging.journal.find(&id).unwrap().followed);
+    assert!(!world.messaging.waiting());
+    // Seen first only past the latest a follow-up may go.
+    let second = world.send(("claude", CLAUDE), QUIET, "And the timeout");
+    let id = second["id"].as_str().unwrap().to_owned();
+    let later = sent + 3 * 86_400_000;
+    let delivered = world.claude_words(QUIET, &id);
+    world.transcripts.prompt(QUIET, "q2", &delivered);
+    world.transcripts.reply(QUIET, "q2", "Done.");
+    world.live(
+        QUIET,
+        json!({"turnId":"q2","turnStartedAt":at(later + 1_000),"endedAt":at(later + 4_000)}),
+    );
+    world.maintain(later + 4_000 + FOLLOW_UP_LATEST_MS + 1_000);
+    assert!(follow_up_of(&mut world, &id).is_empty());
+    assert!(!world.messaging.waiting());
+}
+
+/// With messages into Claude Code turned off, the follow-up owed one of its
+/// sessions is let go, not kept to send when the switch comes back on.
+#[test]
+fn a_follow_up_into_a_client_turned_off_is_let_go() {
+    let mut world = World::on();
+    world.check_in(QUIET);
+    let sent = 1_792_600_000_000i64;
+    let first = world.send(("claude", CLAUDE), QUIET, "Fix the retry loop");
+    let id = first["id"].as_str().unwrap().to_owned();
+    let delivered = world.claude_words(QUIET, &id);
+    world.transcripts.prompt(QUIET, "q1", &delivered);
+    world.transcripts.reply(QUIET, "q1", "Fixed it.");
+    world.live(
+        QUIET,
+        json!({"turnId":"q1","turnStartedAt":at(sent + 1_000),"endedAt":at(sent + 4_000)}),
+    );
+    world.maintain(sent + 5_000);
+    world.snapshot["settings"] = Preferences {
+        enabled: true,
+        claude: false,
+        ..every_message_asks()
+    }
+    .settings();
+    world.maintain(sent + 65_000);
+    assert!(follow_up_of(&mut world, &id).is_empty());
+    assert!(!world.messaging.waiting());
+    world.snapshot["settings"] = Preferences {
+        enabled: true,
+        ..every_message_asks()
+    }
+    .settings();
+    world.maintain(sent + 70_000);
+    assert!(follow_up_of(&mut world, &id).is_empty());
 }
 
 #[test]
