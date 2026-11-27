@@ -87,8 +87,6 @@ fn decrypts_official_enc_v1_fixture_and_queries_zcode_balance_with_bundle_versio
 }
 
 const V2_PATH: &str = "/tmp/zc/.zcode/v2/credentials.json";
-/// SHA-256 of `V2_PATH`, the account ZCode 4.0 files the key under.
-const V2_ACCOUNT: &str = "7705846726fe089de3f93b1eb4ad0e7582a7e91a92516cb49f3564700e7f0807";
 
 /// `V2_PATH` as `read` builds it from the home folder, with this system's separators.
 fn v2_path() -> std::path::PathBuf {
@@ -108,14 +106,16 @@ fn v2_account() -> String {
 }
 
 #[test]
-fn zcode_4_files_its_key_under_the_hash_of_its_credentials_path() {
-    if cfg!(unix) {
-        assert_eq!(v2_account(), V2_ACCOUNT);
-    } else {
-        assert!(v2_path()
-            .to_string_lossy()
-            .ends_with(r"\.zcode\v2\credentials.json"));
-    }
+fn zcode_4_files_its_key_under_the_hash_of_its_credentials_path_as_the_system_writes_it() {
+    // Joined part by part, so Windows gets a backslash before every part, as ZCode's
+    // Node code writes the path it hashes; "/tmp/zc/.zcode/v2/credentials.json" on Unix.
+    let host = FakeHost::new("/tmp/zc");
+    let native = host
+        .home()
+        .join(".zcode")
+        .join("v2")
+        .join("credentials.json");
+    assert_eq!(v2_path().to_string_lossy(), native.to_string_lossy());
 }
 /// Sealed by Node's crypto as ZCode 4.0 does, under 32 bytes of 7.
 const V2_OS: &str = "enc:v2:os:4bb06f8e4e3a7715d201d573:AQEBAQEBAQEBAQEB.olvYDp-KcMF_owVnlh9o6A.ANOk0fnHmHujsfFVH1wVXw";
