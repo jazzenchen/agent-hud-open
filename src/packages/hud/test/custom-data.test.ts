@@ -143,10 +143,11 @@ test("a window's kind is the same on every computer", () => {
   assert.equal(
     windowKind({
       id: "antigravity:aaaa:gemini-5h",
+      vendor: "antigravity",
       windowKey: "antigravity:gemini-5h",
       accountId: "acct1",
     } as never),
-    "antigravity:gemini-5h",
+    "gemini-5h",
   );
   assert.deepEqual(
     all.windows.map((w) => w.used),

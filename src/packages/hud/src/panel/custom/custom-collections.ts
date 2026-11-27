@@ -30,7 +30,13 @@ const share = (used: number | null | undefined) =>
 
 /** The kind of a window, the same on every computer: its id without its account. */
 export function windowKind(quota: Quota): string {
-  if (quota.windowKey) return quota.windowKey;
+  // A window key names its agent first, which the item already says.
+  if (quota.windowKey) {
+    const agent = `${quota.vendor}:`;
+    return quota.windowKey.startsWith(agent)
+      ? quota.windowKey.slice(agent.length)
+      : quota.windowKey;
+  }
   const account = quota.accountId ?? "";
   if (account && quota.id.startsWith(`${account}:`))
     return quota.id.slice(account.length + 1);
