@@ -21,7 +21,7 @@ pub(crate) const WINDOWS: &str = "app.agenthud.windows";
 #[allow(dead_code)]
 pub(crate) const LINUX: &str = "app.agenthud.linux";
 /// The name earlier builds used on every system.
-const EARLIER: &str = "app.agenthud.next";
+pub(crate) const EARLIER: &str = "app.agenthud.next";
 /// The file every collector locks in the folder it uses. Once it is in this
 /// build's folder, that folder is the one in use.
 pub(crate) const LOCK: &str = "instance.lock";

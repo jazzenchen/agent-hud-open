@@ -24,6 +24,8 @@ pub(crate) enum Launch {
 
 pub(crate) fn claim(owns_hooks: bool) -> Launch {
     let executable = std::env::current_exe().ok();
+    // Windows: the data leaves AppData for ~/.agenthud before it is claimed.
+    agent_hud_runtime::move_data(executable.as_deref());
     launch(
         agent_hud_runtime::claim_collector(owns_hooks, executable.as_deref()),
         executable.as_deref(),

@@ -9,6 +9,7 @@ mod engines;
 #[cfg(test)]
 mod engines_tests;
 mod files;
+mod junction;
 pub(crate) mod pipe;
 mod process;
 mod secrets;
@@ -37,6 +38,7 @@ pub(crate) const READS_PROCESS_ENVIRONMENT: bool = false;
 pub(crate) const MOVES_CLAUDE_JOBS: bool = false;
 /// Claude Desktop's Project thread links are unverified here.
 pub(crate) const OPENS_CLAUDE_PROJECTS: bool = false;
+pub(crate) use junction::{is_reparse_point, link_folder};
 pub(crate) use files::{
     hook_configuration, hook_text, owned_by_user, owner_only, private_append, private_directory,
     private_file, read_stdin, user_transcript,
@@ -58,14 +60,27 @@ pub(crate) fn home_dir() -> Result<PathBuf, String> {
         .map(PathBuf::from)
         .ok_or_else(|| "User home directory unavailable".into())
 }
-/// The folder Agent HUD's data folder is in, and that folder's name.
+/// The folder Agent HUD's data folder is in, and that folder's name:
+/// `~/.agenthud\data`, out of AppData, which MSIX-packaged clients see
+/// redirected (`home_folder`).
 pub(crate) fn data_parent(home: &Path) -> PathBuf {
-    std::env::var_os("LOCALAPPDATA")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| home.join("AppData/Local"))
+    crate::home_folder::directory(home)
 }
-pub(crate) const DATA_FOLDER: &str = crate::data_folder::WINDOWS;
-pub(crate) fn caches_dir(home: &Path) -> PathBuf {
+pub(crate) const DATA_FOLDER: &str = "data";
+/// Where builds before `~/.agenthud` kept the data folder, under the app's
+/// identifier.
+pub(crate) fn legacy_data_parent(home: &Path) -> Option<PathBuf> {
+    Some(local_app_data(home))
+}
+/// The folder of the lock every copy that owns client hooks takes.
+pub(crate) fn shared_lock_folder(home: &Path) -> PathBuf {
+    crate::home_folder::directory(home).join("lock")
+}
+/// Where builds before `~/.agenthud` kept that lock.
+pub(crate) fn legacy_lock_folder(home: &Path) -> Option<PathBuf> {
+    Some(local_app_data(home).join("app.agenthud"))
+}
+fn local_app_data(home: &Path) -> PathBuf {
     std::env::var_os("LOCALAPPDATA")
         .map(PathBuf::from)
         .unwrap_or_else(|| home.join("AppData/Local"))

@@ -51,6 +51,21 @@
 !macro NSIS_HOOK_POSTUNINSTALL
   !insertmacro AGENT_HUD_DELETE_MOVED
   RMDir "$INSTDIR"
+  ; "Delete the application data": the data lives in ~/.agenthud since 0.7.0
+  ; (an MSIX-packaged client sees AppData redirected), where Tauri's own
+  ; removal of $LOCALAPPDATA\<identifier> does not reach. The folders
+  ; earlier builds used there are junctions now; RMDir without /r takes
+  ; only the junction. Tasks started with no project (sessions) stay: they
+  ; are the user's work.
+  ${If} $DeleteAppDataCheckboxState = 1
+  ${AndIf} $UpdateMode <> 1
+    RMDir /r "$PROFILE\.agenthud\data"
+    RMDir /r "$PROFILE\.agenthud\lock"
+    RMDir /r "$PROFILE\.agenthud\tmp"
+    RMDir "$LOCALAPPDATA\app.agenthud.windows"
+    RMDir "$LOCALAPPDATA\app.agenthud"
+    RMDir "$PROFILE\.agenthud"
+  ${EndIf}
 !macroend
 
 ; Tauri's template defines no .onInstFailed, so the hooks can.

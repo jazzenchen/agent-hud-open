@@ -36,7 +36,9 @@ pub use agent_hud_platform::registered_applications;
 pub use agent_hud_platform::windows_session;
 pub use agent_hud_platform::CollectionGate;
 pub use open::{open_cached_session, CachedOpen};
-pub use startup::{claim_collector, home_directory, legacy_preferences, local_tools_directory};
+pub use startup::{
+    claim_collector, home_directory, legacy_preferences, local_tools_directory, move_data,
+};
 
 pub struct Runtime {
     core: AgentHudCore,

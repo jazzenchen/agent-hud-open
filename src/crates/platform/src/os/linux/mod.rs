@@ -59,6 +59,17 @@ pub(crate) fn data_parent(home: &Path) -> PathBuf {
         .unwrap_or_else(|| home.join(".local/share"))
 }
 pub(crate) const DATA_FOLDER: &str = crate::data_folder::LINUX;
+/// No earlier data folder elsewhere to move here.
+pub(crate) fn legacy_data_parent(_home: &Path) -> Option<PathBuf> {
+    None
+}
+/// The folder of the lock every copy that owns client hooks takes.
+pub(crate) fn shared_lock_folder(home: &Path) -> PathBuf {
+    caches_dir(home).join("app.agenthud")
+}
+pub(crate) fn legacy_lock_folder(_home: &Path) -> Option<PathBuf> {
+    None
+}
 pub(crate) fn caches_dir(home: &Path) -> PathBuf {
     std::env::var_os("XDG_CACHE_HOME")
         .map(PathBuf::from)
