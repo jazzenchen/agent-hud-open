@@ -79,9 +79,6 @@ impl Hooks {
         if self.rewake.is_some() {
             flags.push(("--rewake-hook", false));
         }
-        if self.steer.is_some() {
-            flags.push(("--steer-hook", true));
-        }
         if self.attention {
             flags.push(("--attention-hook", false));
         }
@@ -90,6 +87,11 @@ impl Hooks {
         }
         if self.origin.is_some() {
             flags.push(("--session-origin-hook", false));
+        }
+        // Last, so turning steer on or off never moves the hooks before it,
+        // whose trust in Codex is keyed by where they stand.
+        if self.steer.is_some() {
+            flags.push(("--steer-hook", true));
         }
         flags
     }

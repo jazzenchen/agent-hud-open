@@ -108,18 +108,6 @@ pub fn thread_open(data: &Path, thread: &str) -> bool {
     }
 }
 
-/// When the app that has the thread open opened it: Codex writes the
-/// thread's writer lock anew as it loads the thread.
-pub(super) fn thread_opened(data: &Path, thread: &str) -> Option<SystemTime> {
-    thread_open(data, thread).then_some(())?;
-    std::fs::metadata(
-        data.join("thread-writer-locks")
-            .join(format!("{thread}.lock")),
-    )
-    .and_then(|file| file.modified())
-    .ok()
-}
-
 /// Thread ids whose writer lock an app currently holds in `data`, skipping any
 /// id for which `exclude` returns true (for example, threads already present
 /// in the 24-hour snapshot) so their lock files are not probed unnecessarily.

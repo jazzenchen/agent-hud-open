@@ -27,7 +27,7 @@ impl LocalClients {
     /// Whether Codex opened the thread after "Steer Codex through its hooks"
     /// was turned on, so it has the tool to read a message with.
     pub fn codex_reads_steers(&self, thread: &str) -> bool {
-        let opened = super::codex::thread_opened(&self.paths.codex_data, thread);
+        let opened = thread_opened(&self.paths.codex_data, thread);
         self.steers().reads(opened)
     }
 
@@ -82,4 +82,16 @@ impl LocalClients {
             reason: None,
         })
     }
+}
+
+/// When the app that has the thread open opened it: Codex writes the
+/// thread's writer lock anew as it loads the thread.
+fn thread_opened(data: &std::path::Path, thread: &str) -> Option<std::time::SystemTime> {
+    super::codex::thread_open(data, thread).then_some(())?;
+    std::fs::metadata(
+        data.join("thread-writer-locks")
+            .join(format!("{thread}.lock")),
+    )
+    .and_then(|file| file.modified())
+    .ok()
 }

@@ -303,11 +303,14 @@ fn list_sessions_says_which_harness_sessions_can_be_steered() {
 #[test]
 fn the_steer_descriptions_change_only_while_agents_may_decide() {
     let send_message = |steer_on_own| {
-        let tools = Messaging::tools(&Preferences {
-            enabled: true,
-            steer_on_own,
-            ..Default::default()
-        });
+        let tools = Messaging::tools(
+            &Preferences {
+                enabled: true,
+                steer_on_own,
+                ..Default::default()
+            },
+            Some("codex"),
+        );
         tools["tools"]
             .as_array()
             .unwrap()
@@ -552,16 +555,28 @@ fn a_steer_its_codex_turn_never_read_expires_and_reaches_no_later_turn() {
 
 #[test]
 fn read_message_is_listed_only_with_codex_hooks_on_and_reads_only_the_callers_own() {
-    let names = |codex_hook_steer| {
-        Messaging::tools(&Preferences {
-            enabled: true,
-            codex_hook_steer,
-            ..Default::default()
-        })
+    let names = |codex_hook_steer, client| {
+        Messaging::tools(
+            &Preferences {
+                enabled: true,
+                codex_hook_steer,
+                ..Default::default()
+            },
+            client,
+        )
         .to_string()
     };
-    assert!(!names(false).contains("read_message"));
-    assert!(names(true).contains("read_message"));
+    assert!(!names(false, Some("codex")).contains("read_message"));
+    assert!(names(true, Some("codex")).contains("read_message"));
+    // Only a Codex session's hooks tell it that a message waits.
+    for client in [
+        Some("claudeCode"),
+        Some("deepseek"),
+        Some("antigravity"),
+        None,
+    ] {
+        assert!(!names(true, client).contains("read_message"), "{client:?}");
+    }
     assert!(
         !Preferences::read(&json!({})).codex_hook_steer,
         "off at first"

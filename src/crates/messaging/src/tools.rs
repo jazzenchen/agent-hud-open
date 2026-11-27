@@ -2,8 +2,10 @@
 use super::*;
 
 impl Messaging {
-    /// The group's tools while it is on, nothing while it is off.
-    pub fn tools(preferences: &Preferences) -> Value {
+    /// The group's tools while it is on, nothing while it is off, for the
+    /// relay one client started (`client`, as its MCP entry names it: none
+    /// for an entry that names no client).
+    pub fn tools(preferences: &Preferences, client: Option<&str>) -> Value {
         if !preferences.enabled {
             return json!({"tools":[]});
         }
@@ -16,7 +18,8 @@ impl Messaging {
         if preferences.steer_on_own {
             steer_choice(&mut tools);
         }
-        if preferences.codex_hook_steer {
+        // Only a Codex session's hooks tell it that a message waits.
+        if preferences.codex_hook_steer && client == Some("codex") {
             hook_steers(&mut tools);
         }
         tools

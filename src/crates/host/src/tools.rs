@@ -109,6 +109,7 @@ fn handle(
         if method == "host_tools" {
             return Ok(AgentMessages::tools(
                 snapshot.as_deref().unwrap_or(&Value::Null),
+                params["client"].as_str(),
             ));
         }
         let plugin = app.state::<super::deepseek_plugin::DeepSeekPlugin>();

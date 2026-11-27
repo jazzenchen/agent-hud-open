@@ -783,13 +783,16 @@ fn a_queued_message_that_waits_for_its_thread_to_open_says_so() {
 #[test]
 fn the_group_lists_its_five_tools_only_while_it_is_on() {
     assert_eq!(
-        Messaging::tools(&Preferences::default()),
+        Messaging::tools(&Preferences::default(), Some("codex")),
         json!({"tools":[]})
     );
-    let names = Messaging::tools(&Preferences {
-        enabled: true,
-        ..every_message_asks()
-    })["tools"]
+    let names = Messaging::tools(
+        &Preferences {
+            enabled: true,
+            ..every_message_asks()
+        },
+        Some("codex"),
+    )["tools"]
         .as_array()
         .unwrap()
         .iter()
@@ -805,10 +808,13 @@ fn the_group_lists_its_five_tools_only_while_it_is_on() {
             "list_sent_messages"
         ]
     );
-    for tool in Messaging::tools(&Preferences {
-        enabled: true,
-        ..every_message_asks()
-    })["tools"]
+    for tool in Messaging::tools(
+        &Preferences {
+            enabled: true,
+            ..every_message_asks()
+        },
+        Some("codex"),
+    )["tools"]
         .as_array()
         .unwrap()
     {
@@ -1153,11 +1159,14 @@ fn always_lets_a_reply_ask_on_request_and_never_asks_nothing() {
 #[test]
 fn the_reply_choice_is_listed_as_ask_for_replies_says() {
     let listed = |replies| {
-        Messaging::tools(&Preferences {
-            enabled: true,
-            replies,
-            ..Default::default()
-        })
+        Messaging::tools(
+            &Preferences {
+                enabled: true,
+                replies,
+                ..Default::default()
+            },
+            Some("codex"),
+        )
     };
     // When needed unless the user chose; the old switch off reads as Always.
     assert_eq!(Preferences::read(&json!({})).replies, Replies::WhenNeeded);
@@ -2734,10 +2743,13 @@ fn every_message_asks_for_a_reply_with_send_message_and_no_tool_reads_answers() 
         line(Language::ZhHans),
         "做完后用 agent-hud 的 MCP 工具 mcp__agent_hud__send_message 回复，reply_to: m-1，只说一句“完成”也行；回复会作为一条消息送到发件方。"
     );
-    let tools = Messaging::tools(&Preferences {
-        enabled: true,
-        ..every_message_asks()
-    })
+    let tools = Messaging::tools(
+        &Preferences {
+            enabled: true,
+            ..every_message_asks()
+        },
+        Some("codex"),
+    )
     .to_string();
     assert!(!tools.contains("reply_hint"), "{tools}");
     assert!(!tools.contains("get_message"), "{tools}");
