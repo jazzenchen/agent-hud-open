@@ -22,6 +22,8 @@ impl Requests {
             .pending
             .iter()
             .map(|item| item.deadline_ms)
+            // A card that waits on its client has no time of its own.
+            .filter(|&deadline| deadline != super::NEVER)
             .chain(deliveries)
             .min()
     }

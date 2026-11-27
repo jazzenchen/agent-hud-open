@@ -17,6 +17,9 @@ pub use auto::AutoApprove;
 
 type Wake = Arc<dyn Fn() + Send + Sync>;
 
+/// The deadline of a request that waits until its client stops asking.
+const NEVER: i64 = i64::MAX;
+
 #[derive(Clone)]
 pub struct Requests(Arc<Shared>);
 
@@ -147,7 +150,10 @@ impl Requests {
                     deadline_ms: now_ms,
                 });
             }
-            let deadline_ms = now_ms.saturating_add(state.hold_ms as i64);
+            // The client asks in its own window and keeps waiting there, so the
+            // card stays until its adapter settles it (answered, or no longer
+            // asked); the wait time is for hooks, which hold the client.
+            let deadline_ms = NEVER;
             view["id"] = Value::String(id.clone());
             state.pending.push_back(Pending {
                 id: id.clone(),
@@ -271,7 +277,9 @@ impl Requests {
             } else {
                 state.hold_ms = hold_ms;
                 for item in &mut state.pending {
-                    item.deadline_ms = item.created_ms.saturating_add(hold_ms as i64);
+                    if matches!(item.content, Content::Hook(_)) {
+                        item.deadline_ms = item.created_ms.saturating_add(hold_ms as i64);
+                    }
                 }
                 true
             }
@@ -279,5 +287,27 @@ impl Requests {
         if changed {
             self.wake();
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    /// A card the client asks in its own window (Antigravity, Codex Desktop,
+    /// DeepSeek) outlasts the wait time: it leaves when its adapter settles it.
+    #[test]
+    fn a_native_card_stays_past_the_wait_time_until_it_is_settled() {
+        let requests = Requests::default();
+        requests.set_hold_ms(60_000);
+        let question = json!({"source":"antigravity","kind":"question"});
+        let ticket = requests.register_native("q".into(), question, 0).unwrap();
+        requests.expire(24 * 3_600_000);
+        assert_eq!(requests.views(24 * 3_600_000).len(), 1);
+        assert!(ticket.response.try_recv().is_err());
+        assert_eq!(requests.next_deadline(), None);
+        requests.settle_native("q");
+        assert!(requests.views(24 * 3_600_000).is_empty());
     }
 }
