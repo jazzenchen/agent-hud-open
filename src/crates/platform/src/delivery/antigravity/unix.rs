@@ -11,6 +11,10 @@ pub(crate) const OPERATIONS: &[Operation] = &[
 ];
 pub(crate) const NOTICE: &str = "Connects to the running Antigravity local language server.";
 
+pub(super) fn start(body: Value, request: &StartRequest) -> Result<StartReceipt> {
+    start_on(body, request, call)
+}
+
 pub(super) fn interrupt(cascade_id: &str) -> Result<()> {
     call(
         "CancelCascadeInvocation",
@@ -27,7 +31,10 @@ pub(super) fn send(
     strategy: &str,
     model: Option<&str>,
 ) -> Result<Option<String>> {
-    let (config, note) = resolve_cascade_config(Some(cascade_id), model);
+    let (config, note) =
+        cascade_config::resolve_cascade_config(Some(cascade_id), model, |method, params| {
+            crate::clients::antigravity::service::call(method, &params)
+        });
     call(
         "SendUserCascadeMessage",
         message_body(cascade_id, text, strategy, config),

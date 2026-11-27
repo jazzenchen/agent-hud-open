@@ -11,6 +11,11 @@ use std::{
 mod answers;
 mod message;
 mod running;
+#[cfg(windows)]
+mod start_windows;
+
+#[cfg(windows)]
+pub(crate) use start_windows::desktop_start_endpoint;
 
 use answers::answer_error;
 
@@ -135,9 +140,24 @@ impl Service {
                 ));
             }
         }
-        let deadline = Instant::now() + Duration::from_secs(20);
         let servers = running::servers()?;
         let expected = servers.len();
+        let found = self.verify_servers(servers);
+        let complete = found.len() == expected;
+        let mut state = self.state.lock().unwrap_or_else(PoisonError::into_inner);
+        state.endpoints = found.clone();
+        state.complete = complete;
+        state.failed_at = found.is_empty().then(Instant::now);
+        if strict && !complete {
+            return Err(tr!(
+                "Not every running Antigravity service could be verified"
+            ));
+        }
+        Ok(found)
+    }
+
+    fn verify_servers(&self, servers: Vec<running::Server>) -> Vec<Endpoint> {
+        let deadline = Instant::now() + Duration::from_secs(20);
         let mut found = Vec::new();
         for server in servers {
             if Instant::now() >= deadline {
@@ -177,17 +197,7 @@ impl Service {
                 }
             }
         }
-        let complete = found.len() == expected;
-        let mut state = self.state.lock().unwrap_or_else(PoisonError::into_inner);
-        state.endpoints = found.clone();
-        state.complete = complete;
-        state.failed_at = found.is_empty().then(Instant::now);
-        if strict && !complete {
-            return Err(tr!(
-                "Not every running Antigravity service could be verified"
-            ));
-        }
-        Ok(found)
+        found
     }
 }
 /// Complete discovery is required by the permissions observer. Endpoint identity

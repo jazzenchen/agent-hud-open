@@ -2,7 +2,6 @@
 //! running local Antigravity language server (`crate::clients::antigravity::service`),
 //! or fall back to the `agy` CLI when starting a session with no language server running.
 use super::*;
-use cascade_config::resolve_cascade_config;
 use serde_json::{json, Value};
 use std::path::{Path, PathBuf};
 
@@ -10,9 +9,7 @@ mod cascade_config;
 mod model_list;
 mod picker;
 pub(super) use model_list::models;
-// How a message reaches an existing cascade: straight to the language
-// server on macOS and Linux; to the service that opened the session on
-// Windows, where interrupting is not adapted.
+// On Windows, sends target the owning service and starts pick a desktop service.
 #[cfg(unix)]
 #[path = "unix.rs"]
 mod transport;
@@ -123,19 +120,28 @@ pub(super) fn gemini_home() -> Option<PathBuf> {
 /// and sends `request.text` as its first message.
 pub fn start_cascade(folder: &Path, request: &StartRequest) -> Result<StartReceipt> {
     let projects = gemini_home().map(|home| home.join("config").join("projects"));
-    let started = call(
-        "StartCascade",
-        start_body(
-            folder,
-            projects.as_deref().filter(|_| !request.folder.is_empty()),
-        )?,
+    let body = start_body(
+        folder,
+        projects.as_deref().filter(|_| !request.folder.is_empty()),
     )?;
+    transport::start(body, request)
+}
+
+fn start_on(
+    body: Value,
+    request: &StartRequest,
+    mut call: impl FnMut(&str, Value) -> Result<Value>,
+) -> Result<StartReceipt> {
+    let started = call("StartCascade", body)?;
     let id = started["cascadeId"]
         .as_str()
         .filter(|id| valid_uuid(id))
         .ok_or(Failure::AcceptanceUncertain)?
         .to_owned();
-    let (config, _) = resolve_cascade_config(None, request.model.as_deref());
+    let (config, _) =
+        cascade_config::resolve_cascade_config(None, request.model.as_deref(), |method, params| {
+            call(method, params).map_err(|error| error.to_string())
+        });
     let sent = call(
         "SendUserCascadeMessage",
         message_body(
