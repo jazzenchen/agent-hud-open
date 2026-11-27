@@ -8,6 +8,12 @@
 //! when the wait for its answer ends, so the relay then asks what became of
 //! that call, and tells the agent what the app says: the message's own
 //! receipt, or that nothing was sent (Open #118).
+//!
+//! Each request opens its own connection to the app, so an app that restarts
+//! is reached again by the next one. While it cannot be asked, `host_tools`
+//! is answered with the tools the app last listed and kept: a client that
+//! starts a relay then (an update stops every relay, and Codex starts a new
+//! one at once) reads the tools only that once.
 use agent_hud_runtime::local_tools::{self, NO_ANSWER};
 use serde_json::{json, Value};
 use std::{
@@ -35,10 +41,14 @@ pub fn run(directory: &Path) -> io::Result<()> {
         answering.retain(|thread: &std::thread::JoinHandle<()>| !thread.is_finished());
         answering.push(std::thread::spawn(move || {
             let response = match serde_json::from_str::<Value>(&line) {
-                Ok(request) => answer(
+                Ok(request) => or_saved(
                     &request,
-                    &|request| local_tools::request(&directory, request),
-                    SEND_WAIT,
+                    answer(
+                        &request,
+                        &|request| local_tools::request(&directory, request),
+                        SEND_WAIT,
+                    ),
+                    || local_tools::saved_host_tools(&directory),
                 ),
                 Err(_) => {
                     json!({"id":null,"error":{"code":"parse_error","message":"Expected one JSON request per line"}})
@@ -55,6 +65,18 @@ pub fn run(directory: &Path) -> io::Result<()> {
         let _ = thread.join();
     }
     Ok(())
+}
+
+/// `response`, or for `host_tools` the app did not answer, the tools it last
+/// listed when it kept them.
+fn or_saved(request: &Value, response: Value, saved: impl FnOnce() -> Option<Value>) -> Value {
+    if request["method"] != "host_tools" || response.get("error").is_none() {
+        return response;
+    }
+    match saved() {
+        Some(tools) => json!({"id":response["id"],"result":tools}),
+        None => response,
+    }
 }
 
 /// The relay's name for `request` when it is a call that sends.
@@ -207,6 +229,28 @@ mod tests {
             LONG,
         );
         assert_eq!(response["error"]["message"], UNKNOWN);
+    }
+
+    #[test]
+    fn host_tools_the_app_cannot_answer_are_the_ones_it_last_kept() {
+        let listing = json!({"id":3,"method":"host_tools"});
+        let kept = json!({"tools":[{"name":"send_message"}]});
+        let away = json!({"id":3,"error":{"code":"tools_unavailable","message":"off"}});
+        assert_eq!(
+            or_saved(&listing, away.clone(), || Some(kept.clone())),
+            json!({"id":3,"result":kept})
+        );
+        // Nothing kept: the error stands.
+        assert_eq!(or_saved(&listing, away.clone(), || None), away);
+        // The app's own answer, even none, is never replaced.
+        let none = json!({"id":3,"result":{"tools":[]}});
+        assert_eq!(
+            or_saved(&listing, none.clone(), || Some(kept.clone())),
+            none
+        );
+        // Only the listing falls back: a call the app missed fails.
+        let call = json!({"id":4,"method":"host_tool","params":{"name":"list_sessions"}});
+        assert_eq!(or_saved(&call, away.clone(), || Some(kept.clone())), away);
     }
 
     #[test]

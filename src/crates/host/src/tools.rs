@@ -49,6 +49,8 @@ pub(super) struct ToolsChannel {
     backend: Weak<Mutex<Backend>>,
     directory: PathBuf,
     state: Mutex<ChannelState>,
+    /// The agent-messages tools last kept for relays that cannot ask the app.
+    kept: Mutex<Option<Value>>,
 }
 impl ToolsChannel {
     pub(super) fn new(
@@ -61,6 +63,19 @@ impl ToolsChannel {
             backend,
             directory,
             state: Mutex::new(ChannelState::Disabled),
+            kept: Mutex::new(None),
+        }
+    }
+    /// Keeps the agent-messages tools as a relay would be told them now. A
+    /// relay a client starts while the app is away (an update stops them all)
+    /// lists these, and Codex reads a relay's tools only when it starts one.
+    pub(super) fn keep_host_tools(&self, snapshot: &Value) {
+        let tools = AgentMessages::tools(snapshot);
+        let mut kept = self.kept.lock().unwrap_or_else(PoisonError::into_inner);
+        if kept.as_ref() != Some(&tools)
+            && local_tools::save_host_tools(&self.directory, &tools).is_ok()
+        {
+            *kept = Some(tools);
         }
     }
     pub(super) fn configure(&self, enabled: bool) -> Value {

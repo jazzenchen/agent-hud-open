@@ -23,8 +23,10 @@ import {
  * Antigravity and DeepSeek Harness start one relay for all their sessions,
  * so a group switched on later, or an app that was not running yet when the
  * relay started, must still reach their next sessions. Each change goes out
- * as notifications/tools/list_changed. An app that cannot be asked leaves
- * the list as it was. */
+ * as notifications/tools/list_changed. While the app cannot be asked the
+ * engine answers with the tools it last listed, so a relay started then
+ * (Codex starts one at once after an update stops it, and reads its tools
+ * only that once) still lists agent messages. */
 let hostTools = (await askHost()) ?? [];
 /** How long a call that sends waits for its answer: the engine goes on
  * asking the app what became of it for 100 s, and its last question may

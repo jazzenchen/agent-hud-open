@@ -45,6 +45,9 @@ impl Backend {
             .write()
             .unwrap_or_else(PoisonError::into_inner) = self.snapshot.clone();
         if changed || recovered {
+            if let (Some(tools), Some(snapshot)) = (&self.tools, &self.snapshot) {
+                tools.keep_host_tools(snapshot);
+            }
             self.publish_snapshot(app);
             if let (Some(extension), Some(snapshot)) = (&self.extension, &self.snapshot) {
                 extension.observe_snapshot(Arc::clone(snapshot));
