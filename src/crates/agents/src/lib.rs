@@ -119,6 +119,7 @@ pub const HOOK_FLAGS: &[&str] = &[
     "--session-origin-hook",
     "--compaction-hook",
     "--rewake-hook",
+    "--steer-hook",
 ];
 
 pub fn iso(at: i64) -> Option<String> {

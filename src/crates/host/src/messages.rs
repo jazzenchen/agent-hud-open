@@ -95,9 +95,10 @@ impl AgentMessages {
         Ok(owner)
     }
 
-    /// The group's tools while it is on, as the relay lists them.
-    pub(crate) fn tools(snapshot: &Value) -> Value {
-        Messaging::tools(&Preferences::read(&snapshot["settings"]))
+    /// The group's tools while it is on, as the relay `client` started
+    /// lists them.
+    pub(crate) fn tools(snapshot: &Value, client: Option<&str>) -> Value {
+        Messaging::tools(&Preferences::read(&snapshot["settings"]), client)
     }
 
     /// One tool call from the relay: `{name, arguments, caller}`.

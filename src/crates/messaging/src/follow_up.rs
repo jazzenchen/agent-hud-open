@@ -183,6 +183,9 @@ impl Messaging {
             answered: true,
             replied_by: None,
             steered_into,
+            steer_waits: receipt
+                .as_ref()
+                .is_ok_and(|receipt| steer && receipt.state == DeliveryState::Waiting),
             call: None,
             asked: false,
             ended_at_ms: None,

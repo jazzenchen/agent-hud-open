@@ -18,6 +18,7 @@ mod sending;
 mod service;
 mod setup;
 mod starts;
+mod steer;
 mod targets;
 pub mod undelivered;
 // What sending and starting need from the operating system: private files
@@ -208,6 +209,8 @@ pub struct LocalClients {
     /// none, and no Harness session takes a message.
     deepseek: Option<DeepSeekChannel>,
     timeout: Duration,
+    /// Whether a steer may go through Codex's own hooks (`set_hook_steer`).
+    hook_steer: std::sync::atomic::AtomicBool,
     /// The folder whose hook inbox records which of Agent HUD's surfaces
     /// sent each prompt (`delivered`); none records nothing.
     deliveries: Option<PathBuf>,

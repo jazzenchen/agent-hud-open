@@ -152,6 +152,8 @@ export interface AppSettings {
   agentMessagesRequireReply?: boolean;
   /** Agents steer on their own to correct a turn in progress; off unless turned on. */
   agentMessagesSteerOnOwn?: boolean;
+  /** A steer into a Codex turn may go through Codex's own hooks, where its app takes none from outside; off unless turned on. */
+  codexHookSteer?: boolean;
   /** Passes in a row with no word from the user before agents' messages stop; null for no limit. */
   agentMessagesLimit?: number | null;
   /** Messages may go into Claude Code sessions through Agent HUD's plugin; on unless turned off. */

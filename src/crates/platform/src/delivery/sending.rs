@@ -91,10 +91,10 @@ impl LocalClients {
                     receipt.reason = None;
                     receipt.clone()
                 }),
-            Provider::Codex => {
-                self.codex
-                    .deliver(&self.paths.codex_data, &target, &request, self.timeout)
-            }
+            Provider::Codex => self
+                .codex
+                .deliver(&self.paths.codex_data, &target, &request, self.timeout)
+                .or_else(|error| self.leave_steer(&target, &request, error, now)),
             Provider::Antigravity => self.antigravity.deliver(&target, &request, self.timeout),
             Provider::DeepSeek => self
                 .deepseek()

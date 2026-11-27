@@ -292,3 +292,48 @@ fn a_cursor_file_with_only_our_stop_takes_the_prompt_events_too() {
     let value: Value = serde_json::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
     assert_eq!(value["hooks"], serde_json::json!({"stop":[mine]}));
 }
+
+#[test]
+fn codexs_steer_hooks_go_in_beside_the_users_own_and_come_out_alone() {
+    let temp = tempfile::tempdir().unwrap();
+    let home = temp.path().join("home");
+    let context = context_in(&home);
+    let path = home.join(".codex/hooks.json");
+    fs::create_dir_all(path.parent().unwrap()).unwrap(); // plain directory
+    let own = serde_json::json!({"hooks":{"PreToolUse":[{"matcher":"","hooks":[{"type":"command","command":"mine.sh","timeout":10}]}]}});
+    fs::write(&path, own.to_string()).unwrap();
+    let plan = only(install_plans(&context, "codex", "--steer-hook", true)).unwrap();
+    assert!(apply_plan(&plan).unwrap());
+    let read =
+        || -> serde_json::Value { serde_json::from_slice(&fs::read(&path).unwrap()).unwrap() };
+    let installed = read();
+    // The user's own group keeps its place, which Codex's trust goes by.
+    assert_eq!(
+        installed["hooks"]["PreToolUse"][0],
+        own["hooks"]["PreToolUse"][0]
+    );
+    for (event, index, background, timeout) in [
+        ("UserPromptSubmit", 0, true, 86_400),
+        ("PreToolUse", 1, true, 86_400),
+        ("Stop", 0, false, 10),
+        ("Interrupt", 0, false, 3),
+        ("SessionStart", 0, false, 10),
+    ] {
+        let group = &installed["hooks"][event][index];
+        let handler = &group["hooks"][0];
+        let command = handler["command"].as_str().unwrap();
+        assert!(command.ends_with(" --steer-hook codex"), "{event}");
+        assert_eq!(handler["async"] == true, background, "{event}");
+        assert_eq!(handler["timeout"], timeout, "{event}");
+        let matcher = (event == "SessionStart").then_some("compact");
+        assert_eq!(group["matcher"].as_str(), matcher, "{event}");
+    }
+    assert!(
+        !only(install_plans(&context, "codex", "--steer-hook", true))
+            .unwrap()
+            .changed
+    );
+    let removal = only(install_plans(&context, "codex", "--steer-hook", false)).unwrap();
+    assert!(apply_plan(&removal).unwrap());
+    assert_eq!(read(), own);
+}

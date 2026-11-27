@@ -118,7 +118,10 @@ fn handle_payload(arguments: &[String], data: &Path, input: &[u8], output: &mut 
     // A client the person turned off in Settings asks and reports nothing
     // through Agent HUD; its client hears what it would with Agent HUD gone.
     if super::switches::turned_off(data, source, home.as_deref(), &env) {
-        if flag != "--permission-hook" && flag != "--rewake-hook" {
+        if !matches!(
+            flag.as_str(),
+            "--permission-hook" | "--rewake-hook" | "--steer-hook"
+        ) {
             let _ = serde_json::to_writer(&mut *output, &default_reply(flag, source));
             let _ = output.write_all(b"\n");
         }
@@ -127,6 +130,10 @@ fn handle_payload(arguments: &[String], data: &Path, input: &[u8], output: &mut 
     // A rewake hook waits for a message for its session; it reports nothing.
     if flag == "--rewake-hook" {
         return super::rewake::wait(data, source, &payload, &env);
+    }
+    // A steer hook tells its turn that a message waits; it reports nothing.
+    if flag == "--steer-hook" {
+        return super::steer::run(data, source, &payload, output);
     }
     if flag == "--permission-hook" {
         if home

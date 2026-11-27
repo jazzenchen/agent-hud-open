@@ -70,6 +70,8 @@ export interface ClientHooksStatus {
   installed?: boolean;
   installable?: boolean;
   notice?: string | null;
+  /** The clients that take a steer through their own hooks here. */
+  steers?: string[];
   clients?: {
     source: string;
     installed: boolean;

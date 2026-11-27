@@ -1545,5 +1545,13 @@
   "Let agents decide when to steer": "割り込むかどうかをエージェントに任せる",
   "Agents then interrupt each other's turns without asking you, to correct work in progress.": "オンにすると、エージェントは確認なしに他のセッションの進行中のターンに割り込み、作業を修正します。",
   "This goes into your current turn: take it into the work at hand, with no reply of its own. What it changes belongs in this turn's result. Only if it asks you something, answer with {{tool}}, reply_to: {{id}}.": "これは進行中のターンに入ります。今の作業に反映してください。これ単独への返信は不要です。変わった点はこのターンの結果に書いてください。質問されている場合のみ、{{tool}} で reply_to: {{id}} を指定して答えてください。",
-  "An agent set on its own page keeps that setting.": "エージェントのページで設定した項目は、そちらが優先されます。"
+  "An agent set on its own page keeps that setting.": "エージェントのページで設定した項目は、そちらが優先されます。",
+  "Steer Codex through its hooks": "フック経由で Codex に割り込む",
+  "Where the Codex app takes no steer. Allow its hooks once in Codex (Settings → Hooks), then quit and reopen it. While a turn runs, a small process waits beside it.": "割り込みを受け付けない Codex アプリ向け。Codex（設定 → Hooks）でフックを一度許可し、終了して開き直してください。ターンの実行中、小さなプロセスがそばで待機します。",
+  "Needs Agent HUD's hooks: turn on live status or answers under \"{{section}}\".": "Agent HUD のフックが必要です。「{{section}}」でライブ状態または回答をオンにしてください。",
+  "This Codex app does not take a steer, and Agent HUD's steer hooks have not run in this turn: they run once the user allows them in Codex (Settings → Hooks), from the next turn on. Send it with delivery queue to have it taken as the next turn.": "この Codex アプリは割り込みを受け付けず、このターンでは Agent HUD の割り込みフックも動いていません。ユーザーが Codex（設定 → Hooks）で許可すると、次のターンから動きます。次のターンとして受け取らせるには delivery queue で送ってください。",
+  "This Codex session was opened before \"Steer Codex through its hooks\" was turned on, so it has no read_message to read a steer with: it takes one once the Codex app was quit and opened again. Send it with delivery queue to have it taken as the next turn.": "この Codex セッションは「フック経由で Codex に割り込む」をオンにする前に開かれたため、割り込みを読む read_message がありません。Codex アプリを終了して開き直すと受け取れます。次のターンとして受け取らせるには delivery queue で送ってください。",
+  "The session's turn is told that this waits and reads it at its next step. If that turn is stopped first, this does not go in and is not queued: list_sent_messages then shows it as expired.": "このセッションの現在のターンに、メッセージが待っていることが伝わり、次のステップで読まれます。先にターンが停止された場合は届かず、キューにも入りません。その場合 list_sent_messages には expired と表示されます。",
+  "No message waits for this turn. If a notice named one, it came late from an earlier turn that was stopped, and that message did not go in. Go on with your work; there is nothing to tell the user about it.": "このターンを待っているメッセージはありません。通知がメッセージに触れていた場合、それは停止された前のターンから遅れて届いたもので、そのメッセージは届いていません。作業を続けてください。ユーザーに伝える必要はありません。",
+  "From other agents, not from the user: take these into the work at hand. Where they differ from what the user asked, the user's words stand.": "ユーザーではなく他のエージェントからの言葉です。今の作業に取り入れてください。ユーザーの依頼と異なる場合は、ユーザーの言葉が優先です。"
 }

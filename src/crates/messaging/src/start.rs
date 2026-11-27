@@ -143,6 +143,7 @@ impl Messaging {
             answered: false,
             replied_by: None,
             steered_into: None,
+            steer_waits: false,
             call: self.calling.clone(),
             asked: ask,
             ended_at_ms: None,

@@ -28,6 +28,7 @@ mod send;
 mod sent;
 mod snapshot;
 mod start;
+mod steers;
 #[cfg(test)]
 mod tests;
 mod tools;
@@ -220,6 +221,8 @@ impl Messaging {
         if !self.preferences.enabled {
             return Ok(refused(&words::off(language(host.snapshot))));
         }
+        self.clients
+            .set_hook_steer(self.preferences.codex_hook_steer);
         let caller = serde_json::from_value::<Caller>(params["caller"].clone()).ok();
         let arguments = &params["arguments"];
         let name = params["name"].as_str().unwrap_or("");
@@ -249,6 +252,7 @@ impl Messaging {
         match name {
             "list_sessions" => Ok(self.list(caller.as_ref(), host, &extras)),
             "list_models" => self.models(arguments),
+            "read_message" => self.read_steers(caller.as_ref(), host),
             "send_message" | "start_session" => {
                 let Some(caller) = caller else {
                     return Ok(refused(&words::no_caller(language(host.snapshot))));
@@ -296,6 +300,7 @@ impl Messaging {
         self.preferences = Preferences::read(&host.snapshot["settings"]);
         let clients = self.clients.clone();
         let mut changed = self.journal.prune(now);
+        changed |= self.missed_steers();
         changed |= self.fly_answers(host, now);
         changed |= self.follow_ups(host, now);
         for message in self.journal.messages_mut() {

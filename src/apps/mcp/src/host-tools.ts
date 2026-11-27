@@ -10,12 +10,6 @@ export type HostTool = {
   inputSchema: Record<string, unknown>;
   readOnly: boolean;
 };
-/** The host's groups that are on, or null when the app could not be asked. */
-export const askHost = () =>
-  engine.request<{ tools?: HostTool[] }>("host_tools").then(
-    (found) => found.tools ?? [],
-    () => null,
-  );
 
 /** A host tool's schema as the host wrote it; the host checks the arguments itself. */
 export const hostSchema = (
@@ -71,6 +65,18 @@ const firstString = (
  * after `--mcp`, and the app passes it on in AGENTHUD_MCP_CLIENT. Unset for an entry
  * written before entries named their client, or by hand. */
 const startedBy = process.env.AGENTHUD_MCP_CLIENT || undefined;
+/** The host's groups that are on, or null when the app could not be asked. It names
+ * the client that started this relay, since some tools are only that client's. */
+export const askHost = () =>
+  engine
+    .request<{ tools?: HostTool[] }>(
+      "host_tools",
+      startedBy ? { client: startedBy } : {},
+    )
+    .then(
+      (found) => found.tools ?? [],
+      () => null,
+    );
 /** Claude Code's session for a relay Claude Code started. Any app started from a
  * Claude Code session inherits the variable: a DeepSeek Harness app opened from one
  * had every call taken for that Claude Code session's, so another client's relay

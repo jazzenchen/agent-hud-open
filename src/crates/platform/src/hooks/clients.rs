@@ -23,8 +23,20 @@ fn flags(source: &str, opted_in: bool) -> Vec<(&'static str, bool)> {
         .map(|hooks| hooks.all_flags())
         .unwrap_or_default()
         .into_iter()
-        .map(|(flag, opt_in)| (flag, opted_in || !opt_in))
+        .map(|(flag, opt_in)| (flag, (opted_in || !opt_in) && runs_here(source, flag)))
         .collect()
+}
+/// Whether the hook was checked on this operating system: the steer hooks
+/// only where their client says.
+fn runs_here(source: &str, flag: &str) -> bool {
+    flag != "--steer-hook" || steers_here(source)
+}
+/// Whether `source` takes a steer through its own hooks on this operating
+/// system (`agent_hud_agents::hooks::steer`).
+pub fn steers_here(source: &str) -> bool {
+    agent_hud_agents::hooks::hooks_by_id(source)
+        .and_then(|hooks| hooks.steer.as_ref())
+        .is_some_and(|steer| steer.on.on(crate::os::OS).value().is_some())
 }
 /// Whether the client's hooks have a way to launch on `os`. Where they have
 /// none (Antigravity's on Windows) its settings are left alone, and that is
@@ -76,6 +88,14 @@ fn unsupported_notice(source: &str) -> String {
 /// Whether the client reports its sessions through an observer plugin.
 fn observed(source: &str) -> bool {
     agent_hud_agents::by_id(source).is_some_and(|agent| agent.observer.is_some())
+}
+/// The clients that take a steer through their own hooks here.
+fn steered() -> Vec<&'static str> {
+    agent_hud_agents::ALL
+        .iter()
+        .map(|agent| agent.id)
+        .filter(|id| steers_here(id))
+        .collect()
 }
 /// The clients found on this computer, whose settings the hooks go into.
 fn found(context: &InstallContext) -> Vec<String> {
@@ -192,7 +212,7 @@ impl Clients {
                 .map(|hooks| hooks.all_flags())
                 .unwrap_or_default()
                 .into_iter()
-                .filter(|(_, opt_in)| *opt_in);
+                .filter(|(flag, opt_in)| *opt_in && runs_here(source, flag));
             for (flag, _) in opt_in {
                 for plan in install::install_plans(context, source, flag, opted_in) {
                     if let Err(error) = plan.and_then(|plan| install::apply_plan(&plan)) {
@@ -273,7 +293,7 @@ impl Clients {
                 )
             })
         });
-        json!({"supported":true,"enabled":enabled,"desired":desired,"installed":installed,"installable":self.context.is_some(),"notice":notice,"clients":self.rows})
+        json!({"supported":true,"enabled":enabled,"desired":desired,"installed":installed,"installable":self.context.is_some(),"notice":notice,"clients":self.rows,"steers":steered()})
     }
 }
 

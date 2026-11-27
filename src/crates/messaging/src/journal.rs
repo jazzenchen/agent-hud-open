@@ -71,6 +71,10 @@ pub struct Message {
     /// that began after.
     #[serde(default)]
     pub steered_into: Option<String>,
+    /// A steer left for the turn's own hooks, which that turn reads itself
+    /// (`read_message`).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub steer_waits: bool,
     /// The relay's own name for the tool call that sent it, when it gave
     /// one: a caller whose answer was lost asks what became of the call by
     /// it, and a call that comes twice sends once.

@@ -18,6 +18,7 @@ mod inbox;
 mod install;
 pub mod mailbox;
 mod statusline_install;
+mod steer;
 pub use statusline_install::AntigravityCliChange;
 mod observers;
 pub(crate) mod origins;
@@ -126,7 +127,13 @@ impl Hooks {
     /// client's opt-in hooks go in or come out at once; on an error nothing
     /// changed.
     pub fn set_opted_in(&mut self, sources: Vec<String>) -> Result<(), String> {
-        self.clients.set_opted_in(sources)
+        self.clients.set_opted_in(sources)?;
+        let steered = self
+            .opted_in()
+            .iter()
+            .any(|source| clients::steers_here(source));
+        crate::steers::Steers::new(&self.data).turned(steered, now_ms());
+        Ok(())
     }
     pub fn status(&self, desired: bool) -> serde_json::Value {
         self.clients.status(self.is_listening(), desired)

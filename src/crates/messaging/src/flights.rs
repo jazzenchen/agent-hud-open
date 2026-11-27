@@ -22,6 +22,8 @@ impl Messaging {
             if message.answered
                 || message.to.session_id.is_empty()
                 || matches!(message.state.as_str(), "refused" | "expired" | "uncertain")
+                // Its turn has not read it yet.
+                || (message.steer_waits && message.steered_into.is_none())
             {
                 continue;
             }

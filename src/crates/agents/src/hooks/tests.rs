@@ -54,6 +54,10 @@ fn flags_follow_each_clients_hooks() {
         .map(|agent| agent.id)
         .collect();
     assert_eq!(opt_in, ["copilot"]);
+    // Codex's steer hook goes in last, so turning it on or off never moves
+    // the groups before it, whose trust in Codex goes by where they stand.
+    let codex = hooks_by_id("codex").unwrap().all_flags();
+    assert_eq!(codex.last(), Some(&("--steer-hook", true)));
     // Goose's hooks wait for a check against a running Goose.
     let goose = hooks_by_id("goose").unwrap();
     for os in [crate::Os::MacOs, crate::Os::Windows, crate::Os::Linux] {

@@ -231,6 +231,11 @@ test("another client's relay never takes Claude Code's session from the environm
         .find((request) => request.method === "host_tool");
       assert.deepEqual(call.params.caller, expected, startedBy);
       assert.equal(call.params.parent, process.pid);
+      // The app lists some tools only to one client's sessions.
+      const listing = fake
+        .requests()
+        .find((request) => request.method === "host_tools");
+      assert.deepEqual(listing.params, { client: startedBy }, startedBy);
     } finally {
       await client.close();
     }

@@ -38,6 +38,7 @@ const fn hooks(folder: &'static [&'static str]) -> Hooks {
         attention: true,
         compaction: None,
         rewake: None,
+        steer: None,
         prefixed_sessions: true,
         launch: POSIX_ONLY,
     }
