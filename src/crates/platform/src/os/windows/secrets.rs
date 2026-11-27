@@ -149,6 +149,11 @@ pub(crate) fn unseal_safe_storage(
         .map_or(Answer::Failed, Answer::Found)
 }
 
+/// Another app's keychain-style password: not read on this host yet.
+pub(crate) fn app_secret(_service: &str, _account: &str) -> Answer<String> {
+    Answer::Unsupported
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -182,9 +187,4 @@ mod tests {
         assert_eq!(read_target(&target), Answer::Found("fixture-令牌".into())); // l10n-ignore: test data
         assert_eq!(stored_secret("unrelated-service"), Answer::Unsupported);
     }
-}
-
-/// Another app's keychain-style password: not read on this host yet.
-pub(crate) fn app_secret(_service: &str, _account: &str) -> Answer<String> {
-    Answer::Unsupported
 }
