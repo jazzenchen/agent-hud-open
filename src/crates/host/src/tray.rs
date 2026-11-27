@@ -8,11 +8,18 @@ use tauri::{
     tray::TrayIconBuilder,
 };
 
+mod compact;
 mod icon;
+#[cfg(target_os = "linux")]
+#[path = "tray/linux.rs"]
+mod platform_menu;
+#[cfg(not(target_os = "linux"))]
+#[path = "tray/flat.rs"]
+mod platform_menu;
 mod projection;
 use icon::status_icon;
 pub(crate) use projection::project;
-use projection::{Entry, Presentation};
+use projection::Presentation;
 
 /// What the menu bar item shows now.
 #[derive(Default)]
@@ -105,26 +112,7 @@ fn make_menu(app: &tauri::AppHandle, state: &Presentation) -> tauri::Result<Menu
             None::<&str>,
         )?)?;
     }
-    for (index, entry) in state.entries.iter().enumerate() {
-        match entry {
-            Entry::Separator => menu.append(&PredefinedMenuItem::separator(app)?)?,
-            Entry::Item {
-                title,
-                value,
-                enabled,
-            } => {
-                let id = format!("tray-data-{index}");
-                // Native menu labels retain the source title/value relationship. The OS
-                // draws separators, disabled account headers and shortcuts.
-                let label = if value.is_empty() {
-                    title.clone()
-                } else {
-                    format!("{title}    {value}")
-                };
-                menu.append(&MenuItem::with_id(app, id, label, *enabled, None::<&str>)?)?;
-            }
-        }
-    }
+    platform_menu::append_entries(app, &menu, state)?;
     menu.append(&PredefinedMenuItem::separator(app)?)?;
     let glow = if state.glow_hidden {
         tr_in(language, "Show notch glow")
