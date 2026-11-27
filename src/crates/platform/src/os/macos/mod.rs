@@ -168,17 +168,21 @@ pub(crate) fn engine_candidates(home: &Path, env: &Environment, name: &str) -> V
                 "Contents/Resources/app/bin/agy",
                 "Contents/Resources/app/bin/antigravity",
                 "Contents/Resources/bin/agy",
+                // Gemini.app (Antigravity 2.0 Desktop) keeps its own copy here.
+                "Contents/Helpers/agy",
             ]
             .map(|tail| app.join(tail))
         };
         for root in [PathBuf::from("/Applications"), home.join("Applications")] {
-            for app in ["Antigravity.app", "Antigravity IDE.app"] {
+            for app in ["Antigravity.app", "Antigravity IDE.app", "Gemini.app"] {
                 paths.extend(bundled(root.join(app)));
             }
         }
         if !paths.iter().any(|path| super::unix::executable(path)) {
-            for app in registered_applications("com.google.antigravity") {
-                paths.extend(bundled(app));
+            for id in ["com.google.antigravity", "com.google.GeminiMacOS"] {
+                for app in registered_applications(id) {
+                    paths.extend(bundled(app));
+                }
             }
         }
     }
