@@ -277,7 +277,7 @@ Also: the **GLM Coding Plan**, **OpenCode Go**, **MiniMax** and **Volcengine Ark
 ## Keep your data safe.
 
 - **Read on your computer**: the records your agents already keep. Usage history stays in a local SQLite database.
-- **Read from each vendor**: quotas, balances and Grok Bot's daily tokens, with the agent's existing sign-in or configured key. No read sends a message to a model. Credentials are never stored, apart from a sign-in you make yourself on a vendor's site in Agent HUD's own window, which stays on this computer.
+- **Read from each vendor**: quotas, balances and Grok Bot's daily tokens, with the agent's existing sign-in or configured key. No read sends a message to a model. Agent HUD stores only what you give it yourself: an API key you type into it, and a sign-in you make on a vendor's site in its own window. Both stay on this computer, in files only your user account can read.
 - **Written on your computer**: hooks in your agents' own settings, to receive requests and replies, only while client hooks are on. Turning them off removes them.
 - **Uploaded**: nothing, by a build from this source.
 - **Access your data from iPhone and Apple Watch**, through the release:
