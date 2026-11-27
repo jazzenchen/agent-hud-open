@@ -18,7 +18,7 @@ fn adapter_addresses_exclude_loopback_and_prefer_physical_lan_interfaces() {
         [192, 168, 1, 9],
         [127, 0, 0, 1],
         [10, 0, 0, 8],
-        [100, 69, 88, 16],
+        [100, 64, 0, 1],
     ]
     .map(|bytes| {
         let mut socket = SOCKADDR_IN {
