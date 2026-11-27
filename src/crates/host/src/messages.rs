@@ -9,20 +9,22 @@
 //! folder keeps their receipts, and the host follows a started Claude job
 //! into the desktop app itself.
 use crate::{activity, backend::Backend, claude_plugin::ClaudePlugin, extension::Delivery};
-use agent_hud_messaging::{Host, Messaging, Places, Preferences, Turns};
+use agent_hud_messaging::{Host, Messaging, Places, Preferences, Turns, QUERY_BUSY, QUERY_WAIT_MS};
 use agent_hud_runtime::delivery::{
     Handoffs, LocalClientPaths, LocalClients, NativeCodexTransport, SessionStarts, StartConfig,
 };
 use serde_json::Value;
 use std::{
     path::PathBuf,
-    sync::{mpsc, Arc, Mutex, PoisonError, Weak},
+    sync::{mpsc, Arc, Mutex, MutexGuard, PoisonError, TryLockError, Weak},
     thread::JoinHandle,
-    time::{Duration, SystemTime},
+    time::{Duration, Instant, SystemTime},
 };
 use tauri::Manager;
 
 const LOOK: Duration = Duration::from_secs(5);
+/// How often a query with a bounded wait tries the application's lock again.
+const RETRY: Duration = Duration::from_millis(20);
 
 /// The host's own senders: their receipts, and the Claude jobs it follows.
 struct Own {
@@ -136,6 +138,8 @@ impl AgentMessages {
 
     /// The 5-second look: the host's own senders' receipts and moves, and
     /// the messages that still wait for something while the group is on.
+    /// While a call holds the messages (a slow send, say), this round is
+    /// skipped rather than waited for; the next comes 5 seconds later.
     fn look(&self) {
         if let Some(own) = &self.own {
             let _ = own.clients.maintain(SystemTime::now());
@@ -150,10 +154,11 @@ impl AgentMessages {
         if !Preferences::read(&snapshot["settings"]).enabled {
             return;
         }
-        let mut messaging = self
-            .messaging
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner);
+        let mut messaging = match self.messaging.try_lock() {
+            Ok(messaging) => messaging,
+            Err(TryLockError::Poisoned(poisoned)) => poisoned.into_inner(),
+            Err(TryLockError::WouldBlock) => return,
+        };
         if !messaging.waiting() {
             return;
         }
@@ -179,12 +184,21 @@ impl AgentMessages {
     }
 
     /// The app's queries (`session_detail` pages), each under the
-    /// application's lock only while it runs.
+    /// application's lock only while it runs. A query that names its
+    /// `QUERY_WAIT_MS` waits for that lock only that long, and answers
+    /// `QUERY_BUSY` when a collection pass still holds it.
     fn query(&self) -> impl Fn(&str, Value) -> Result<Value, String> {
         let backend = self.backend.clone();
-        move |method, params| {
+        move |method, mut params| {
+            let wait = params
+                .as_object_mut()
+                .and_then(|params| params.remove(QUERY_WAIT_MS))
+                .map(|wait| Duration::from_millis(wait.as_u64().unwrap_or(0)));
             let backend = backend.upgrade().ok_or("The application is stopping")?;
-            let mut backend = backend.lock().unwrap_or_else(PoisonError::into_inner);
+            let mut backend = match wait {
+                Some(wait) => lock_within(&backend, wait).ok_or(QUERY_BUSY)?,
+                None => backend.lock().unwrap_or_else(PoisonError::into_inner),
+            };
             backend.runtime.local_query(method, params)
         }
     }
@@ -199,6 +213,24 @@ impl AgentMessages {
             let _ = stop.send(());
             let _ = thread.join();
         }
+    }
+}
+
+/// `mutex` once it is free within `wait`, trying again every `RETRY`; none
+/// when another holder kept it all that time.
+fn lock_within<T>(mutex: &Mutex<T>, wait: Duration) -> Option<MutexGuard<'_, T>> {
+    let deadline = Instant::now() + wait;
+    loop {
+        match mutex.try_lock() {
+            Ok(guard) => return Some(guard),
+            Err(TryLockError::Poisoned(poisoned)) => return Some(poisoned.into_inner()),
+            Err(TryLockError::WouldBlock) => {}
+        }
+        let left = deadline.saturating_duration_since(Instant::now());
+        if left.is_zero() {
+            return None;
+        }
+        std::thread::sleep(left.min(RETRY));
     }
 }
 
@@ -256,4 +288,40 @@ fn own_delivery(
         conversations: None,
     };
     Ok((delivery, Some(own)))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_bounded_wait_takes_a_free_lock_and_gives_up_on_a_held_one() {
+        let data = Mutex::new(1);
+        assert_eq!(lock_within(&data, Duration::ZERO).map(|n| *n), Some(1));
+        let held = data.lock().unwrap();
+        let started = Instant::now();
+        assert!(lock_within(&data, Duration::from_millis(60)).is_none());
+        assert!(started.elapsed() >= Duration::from_millis(60));
+        drop(held);
+    }
+
+    #[test]
+    fn a_bounded_wait_takes_a_lock_freed_in_time() {
+        let data = Arc::new(Mutex::new(1));
+        let (taken, take) = mpsc::channel();
+        let holder = {
+            let data = data.clone();
+            std::thread::spawn(move || {
+                let _held = data.lock().unwrap();
+                taken.send(()).unwrap();
+                std::thread::sleep(Duration::from_millis(50));
+            })
+        };
+        take.recv().unwrap();
+        assert_eq!(
+            lock_within(&data, Duration::from_secs(5)).map(|n| *n),
+            Some(1)
+        );
+        holder.join().unwrap();
+    }
 }

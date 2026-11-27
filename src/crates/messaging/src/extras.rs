@@ -4,86 +4,12 @@
 //! `send_message`, `user_sessions`, `user_send` and `LocalClients` targets
 //! agree.
 use super::*;
-use std::{
-    collections::HashMap,
-    sync::Mutex,
-    time::{Duration, Instant, SystemTime},
-};
+use std::time::{Duration, Instant, SystemTime};
 
-/// How long cached `session_detail` lookups and open-thread scans for
-/// out-of-snapshot live sessions are reused while `snapshot["sessionsRevision"]`
-/// is unchanged.
-const EXTRA_DETAIL_TTL: Duration = Duration::from_secs(30);
-
-type DetailKey = (String, String);
-type DetailEntry = (Option<u64>, Instant, Option<Value>);
-type OpenThreadsEntry = (Option<u64>, Instant, Vec<String>);
-
-/// Per-`Messaging` cache for `session_detail` enrichment and Codex open-lock
-/// scans of live sessions outside the 24-hour snapshot, shared by every client
-/// extra-session provider.
-#[derive(Default)]
-pub(crate) struct ExtraCache {
-    details: Mutex<HashMap<DetailKey, DetailEntry>>,
-    codex_open: Mutex<Option<OpenThreadsEntry>>,
-}
-
-impl ExtraCache {
-    pub(crate) fn session_detail(
-        &self,
-        host: &Host<'_>,
-        source: &str,
-        id: &str,
-        mono: Instant,
-    ) -> Option<Value> {
-        let rev = host.snapshot["sessionsRevision"].as_u64();
-        let key = (source.to_owned(), id.to_owned());
-        if let Ok(cache) = self.details.lock() {
-            if let Some((cached_rev, at, value)) = cache.get(&key) {
-                if *cached_rev == rev && mono.saturating_duration_since(*at) < EXTRA_DETAIL_TTL {
-                    return value.clone();
-                }
-            }
-        }
-        let value = (host.query)("session_detail", json!({"id": id}))
-            .ok()
-            .and_then(|detail| {
-                let session = &detail["session"];
-                (session.is_object() && session["source"] == source).then(|| session.clone())
-            });
-        if let Ok(mut cache) = self.details.lock() {
-            if cache.len() >= 256 {
-                cache
-                    .retain(|_, (_, at, _)| mono.saturating_duration_since(*at) < EXTRA_DETAIL_TTL);
-            }
-            cache.insert(key, (rev, mono, value.clone()));
-        }
-        value
-    }
-
-    pub(crate) fn codex_open_threads(
-        &self,
-        codex_data: &Path,
-        snapshot: &Value,
-        mono: Instant,
-    ) -> Vec<String> {
-        let rev = snapshot["sessionsRevision"].as_u64();
-        if let Ok(cache) = self.codex_open.lock() {
-            if let Some((cached_rev, at, ids)) = cache.as_ref() {
-                if *cached_rev == rev && mono.saturating_duration_since(*at) < EXTRA_DETAIL_TTL {
-                    return ids.clone();
-                }
-            }
-        }
-        let ids = delivery::codex_open_threads_excluding(codex_data, |id| {
-            find_in(snapshot, "codex", id).is_some()
-        });
-        if let Ok(mut cache) = self.codex_open.lock() {
-            *cache = Some((rev, mono, ids.clone()));
-        }
-        ids
-    }
-}
+/// How long one round of live extras may wait in all for the application's
+/// data, which a collection pass may hold for many seconds, before it keeps
+/// what it found last time.
+const EXTRAS_WAIT: Duration = Duration::from_secs(2);
 
 /// Whether an indexed session is an active, visible root session (not a
 /// sub-agent and not archived).
@@ -94,16 +20,21 @@ fn is_visible_root(session: &Value) -> bool {
 impl Messaging {
     /// Live sessions outside the 24-hour snapshot, collected from each
     /// client's extra-session provider.
+    /// Their lookups wait for the application's data for `EXTRAS_WAIT` in
+    /// all, so a long collection pass never holds up the call for long.
     pub(crate) fn live_extras(&self, host: &Host<'_>) -> Vec<Value> {
         let now = SystemTime::now();
         let mono = Instant::now();
+        let deadline = mono + EXTRAS_WAIT;
         let channel = self.clients.deepseek_channel();
-        let mut extras = deepseek_extras(channel.as_ref(), host, &self.extra_cache, now, mono);
+        let cache = &self.extra_cache;
+        let mut extras = deepseek_extras(channel.as_ref(), host, cache, now, mono, deadline);
         extras.extend(codex_extras(
             &self.places.codex_data,
             host,
-            &self.extra_cache,
+            cache,
             mono,
+            deadline,
         ));
         extras
     }
@@ -126,7 +57,7 @@ impl Messaging {
         let mono = Instant::now();
         if let Some(session) =
             self.extra_cache
-                .session_detail(host, "codex", &from.session_id, mono)
+                .session_detail(host, "codex", &from.session_id, mono, None)
         {
             if is_visible_root(&session)
                 && !delivery::codex_thread_archived(&self.places.codex_data, &from.session_id)
@@ -219,6 +150,7 @@ fn deepseek_extras(
     cache: &ExtraCache,
     now: SystemTime,
     mono: Instant,
+    deadline: Instant,
 ) -> Vec<Value> {
     if !agent_on(host.snapshot, "deepseek") {
         return Vec::new();
@@ -234,7 +166,7 @@ fn deepseek_extras(
             continue;
         }
         let id = format!("deepseek:{bare}");
-        if let Some(session) = cache.session_detail(host, "deepseek", &id, mono) {
+        if let Some(session) = cache.session_detail(host, "deepseek", &id, mono, Some(deadline)) {
             if is_visible_root(&session) {
                 extras.push(session);
             }
@@ -266,6 +198,7 @@ fn codex_extras(
     host: &Host<'_>,
     cache: &ExtraCache,
     mono: Instant,
+    deadline: Instant,
 ) -> Vec<Value> {
     if !agent_on(host.snapshot, "codex") {
         return Vec::new();
@@ -277,7 +210,7 @@ fn codex_extras(
         {
             continue;
         }
-        if let Some(session) = cache.session_detail(host, "codex", &id, mono) {
+        if let Some(session) = cache.session_detail(host, "codex", &id, mono, Some(deadline)) {
             if is_visible_root(&session) {
                 extras.push(session);
             }

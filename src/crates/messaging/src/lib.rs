@@ -14,6 +14,7 @@
 //! The words are kept only while they are delivered: the journal keeps who sent
 //! what to whom, a fingerprint of the words and where the answer will be, and
 //! an answer is read again from the other session's transcript each time.
+mod extra_cache;
 mod extras;
 mod flights;
 mod follow_up;
@@ -43,6 +44,8 @@ use agent_hud_platform::delivery::{
     self, DeliveryState, LocalClients, Operation, PromptForm, Provider, SendRequest, SessionStarts,
     SessionTarget, StartReceipt, StartRequest, CLAUDE_MESSAGES_OFF, DEEPSEEK_MESSAGES_OFF,
 };
+use extra_cache::ExtraCache;
+pub use extra_cache::{QUERY_BUSY, QUERY_WAIT_MS};
 use extras::*;
 use flights::{flight, person_flight};
 pub use flights::{Flight, PERSON};
@@ -217,16 +220,19 @@ impl Messaging {
         if !self.preferences.enabled {
             return Ok(refused(&words::off(language(host.snapshot))));
         }
-        let extras = self.live_extras(host);
-        self.sync_targets(host, &extras);
-        let caller = serde_json::from_value::<Caller>(params["caller"].clone())
-            .ok()
-            .map(|caller| self.canonical_caller(host.snapshot, &extras, caller));
+        let caller = serde_json::from_value::<Caller>(params["caller"].clone()).ok();
         let arguments = &params["arguments"];
         let name = params["name"].as_str().unwrap_or("");
         let call = params["call"].as_str().filter(|call| !call.is_empty());
+        // These two read only the journal, so they answer before live extras,
+        // whose lookups may wait on the application's data. The journal finds
+        // a sender by the same session under any of its id's spellings, so
+        // the caller needs no canonical id here.
         if name == "call_result" {
             return Ok(self.call_result(call.ok_or("call is required")?));
+        }
+        if name == "list_sent_messages" {
+            return Ok(self.sent(caller.as_ref(), arguments, host));
         }
         if let Some(call) = call.filter(|_| matches!(name, "send_message" | "start_session")) {
             if self.given_up.iter().any(|given_up| given_up == call) {
@@ -237,10 +243,12 @@ impl Messaging {
                 return Ok(receipt(message));
             }
         }
+        let extras = self.live_extras(host);
+        self.sync_targets(host, &extras);
+        let caller = caller.map(|caller| self.canonical_caller(host.snapshot, &extras, caller));
         match name {
             "list_sessions" => Ok(self.list(caller.as_ref(), host, &extras)),
             "list_models" => self.models(arguments),
-            "list_sent_messages" => Ok(self.sent(caller.as_ref(), arguments, host)),
             "send_message" | "start_session" => {
                 let Some(caller) = caller else {
                     return Ok(refused(&words::no_caller(language(host.snapshot))));

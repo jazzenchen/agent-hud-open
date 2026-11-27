@@ -95,3 +95,30 @@ fn a_message_sent_by_an_unnamed_call_keeps_no_call_in_the_journal() {
     let journal = std::fs::read_to_string(journal).unwrap();
     assert!(!journal.contains("\"call\""), "{journal}");
 }
+
+#[test]
+fn call_result_and_sent_messages_answer_without_looking_up_live_extras() {
+    let mut world = World::on();
+    // A Codex desktop thread open outside the 24-hour snapshot: listing
+    // sessions looks up its head, which waits on the application's data.
+    let old = "01a10000-0000-7000-8000-000000000001";
+    let locks = world.fixture.home().join(".codex/thread-writer-locks");
+    std::fs::create_dir_all(&locks).unwrap();
+    let lock = std::fs::File::create(locks.join(format!("{old}.lock"))).unwrap();
+    lock.lock().unwrap();
+    world.transcripts.sessions.lock().unwrap().insert(
+        old.into(),
+        json!({"id": old, "source": "codex", "title": "Older desktop thread", "parentId": null}),
+    );
+    let calls = world.transcripts.calls.clone();
+    let lookups = || calls.load(AtomicOrdering::SeqCst);
+    let found = world.result_of("call-unknown");
+    assert_eq!(found, json!({"found": false}));
+    let sent = world
+        .named("call-2", "list_sent_messages", json!({}))
+        .unwrap();
+    assert_eq!(sent["count"], 0, "{sent}");
+    assert_eq!(lookups(), 0, "the journal alone answers both");
+    let _ = world.named("call-3", "list_sessions", json!({})).unwrap();
+    assert_eq!(lookups(), 1, "listing sessions still looks the thread up");
+}
