@@ -138,6 +138,10 @@ fn copy(from: &Path, into: &Path) -> io::Result<()> {
     Ok(())
 }
 
+#[cfg(all(test, unix))]
+mod tests_unix;
+#[cfg(all(test, windows))]
+mod tests_windows;
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -196,35 +200,5 @@ mod tests {
         assert_eq!(aside.len(), 1);
         assert_eq!(read(&aside[0].path().join("settings.json")), "made later");
         assert!(!unmoved(&old));
-    }
-
-    #[cfg(unix)]
-    #[test]
-    fn a_link_at_the_old_place_counts_as_moved() {
-        let temp = tempfile::tempdir().unwrap();
-        let old = temp.path().join("old");
-        let new = temp.path().join("new");
-        fs::create_dir(&new).unwrap();
-        std::os::unix::fs::symlink(&new, &old).unwrap();
-        assert!(!unmoved(&old));
-        assert_eq!(in_use(&old, &new), new);
-    }
-
-    #[cfg(windows)]
-    #[test]
-    fn the_old_place_becomes_a_junction_to_the_new_one() {
-        let temp = tempfile::tempdir().unwrap();
-        let old = temp.path().join("old folder");
-        let new = temp.path().join("home/.agenthud/data");
-        write(&old.join("settings.json"), "{}");
-        assert!(relocate(&old, &new).unwrap());
-        assert!(!unmoved(&old));
-        // Through the junction, the old path reads the moved files and
-        // resolves to the same folder, so a pipe named from it matches.
-        assert_eq!(read(&old.join("settings.json")), "{}");
-        assert_eq!(
-            fs::canonicalize(&old).unwrap(),
-            fs::canonicalize(&new).unwrap()
-        );
     }
 }

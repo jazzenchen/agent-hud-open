@@ -25,21 +25,6 @@ pub(crate) use target::*;
 #[cfg(target_os = "windows")]
 pub(crate) use target::{bring_window_forward, is_main_window};
 
-/// Whether a rename failed only because the two places are on different
-/// volumes: ERROR_NOT_SAME_DEVICE on Windows, EXDEV elsewhere.
-pub(crate) fn other_volume(error: &std::io::Error) -> bool {
-    error.raw_os_error() == Some(if cfg!(windows) { 17 } else { 18 })
-}
-/// Only Windows moves data folders and leaves junctions (`home_folder`).
-#[cfg(unix)]
-pub(crate) fn is_reparse_point(_metadata: &std::fs::Metadata) -> bool {
-    false
-}
-#[cfg(unix)]
-pub(crate) fn link_folder(_link: &Path, _target: &Path) -> std::io::Result<()> {
-    Ok(())
-}
-
 /// A folder that only passes short-lived words between the app and a
 /// client's plugin or hooks. One another account made, as an elevated run or
 /// a copied data folder leaves behind, is set aside under a new name and made

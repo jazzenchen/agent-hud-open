@@ -19,6 +19,12 @@ use windows_sys::Win32::{
 const FSCTL_SET_REPARSE_POINT: u32 = 0x0009_00A4;
 const IO_REPARSE_TAG_MOUNT_POINT: u32 = 0xA000_0003;
 
+/// Whether a rename failed only because the two places are on different
+/// volumes (ERROR_NOT_SAME_DEVICE).
+pub(crate) fn other_volume(error: &io::Error) -> bool {
+    error.raw_os_error() == Some(17)
+}
+
 pub(crate) fn is_reparse_point(metadata: &fs::Metadata) -> bool {
     metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0
 }
@@ -85,7 +91,12 @@ fn mount_point(target: &str) -> io::Result<Vec<u8>> {
     buffer.extend_from_slice(&field(substitute_bytes)?.to_le_bytes());
     buffer.extend_from_slice(&field(substitute_bytes + 2)?.to_le_bytes());
     buffer.extend_from_slice(&field(print_bytes)?.to_le_bytes());
-    for unit in substitute.iter().chain([&0]).chain(print.iter()).chain([&0]) {
+    for unit in substitute
+        .iter()
+        .chain([&0])
+        .chain(print.iter())
+        .chain([&0])
+    {
         buffer.extend_from_slice(&unit.to_le_bytes());
     }
     Ok(buffer)

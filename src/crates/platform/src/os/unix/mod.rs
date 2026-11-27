@@ -2,6 +2,7 @@
 //! each host module; provider identity/flags remain in the account adapter.
 use super::{Environment, ProcessInfo};
 mod files;
+pub(crate) mod folders;
 mod pids;
 pub(crate) use files::{
     hook_configuration, hook_text, owned_by_user, owner_only, private_append, private_directory,

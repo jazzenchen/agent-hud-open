@@ -1,3 +1,4 @@
+pub(crate) use super::unix::folders::{is_reparse_point, link_folder, other_volume};
 pub(crate) use super::unix::{
     engine_command, environment_value, hook_configuration, hook_text, is_shell, owned_by_user,
     owner_only, private_append, private_directory, private_file, read_stdin, user_transcript,
