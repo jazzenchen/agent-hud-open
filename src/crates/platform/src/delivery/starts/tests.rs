@@ -220,6 +220,29 @@ fn without_project(request_id: &str) -> StartRequest {
         folder: String::new(),
         title: None,
         model: None,
+        reasoning_effort: None,
+    }
+}
+
+#[test]
+fn codex_desktop_refuses_either_start_selection_before_creating_a_receipt() {
+    let fixture = StartFixture::new();
+    fixture.install("Codex.app", false, true);
+    let mut starts = fixture.starts();
+    starts.update_offers(&fixture.sessions());
+    assert!(!starts.model_at_start(Provider::Codex));
+    assert!(!starts.effort_at_start(Provider::Codex));
+    for (model, effort) in [(Some("gpt-6-luna"), None), (None, Some("high"))] {
+        let request = StartRequest {
+            provider: Provider::Codex,
+            model: model.map(str::to_owned),
+            reasoning_effort: effort.map(str::to_owned),
+            ..without_project(REQUEST)
+        };
+        assert!(
+            matches!(starts.start(request), Err(Failure::Unsupported(message)) if message.contains("Codex Desktop"))
+        );
+        assert!(fs::read_dir(fixture.receipts()).unwrap().next().is_none());
     }
 }
 
@@ -757,6 +780,7 @@ fn a_run_starts_in_the_clients_own_model() {
         .start(StartRequest {
             provider: Provider::OpenCode,
             model: Some("anthropic/claude-sonnet".into()),
+            reasoning_effort: None,
             ..fixture.request()
         })
         .unwrap();

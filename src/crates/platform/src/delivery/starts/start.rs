@@ -38,6 +38,34 @@ impl SessionStarts {
             return serde_json::from_value(value["receipt"].clone())
                 .map_err(|e| Failure::Protocol(e.to_string()));
         }
+        let mut request = request;
+        if request.provider == Provider::Codex
+            && (request.model.is_some() || request.reasoning_effort.is_some())
+            && !self.model_at_start(Provider::Codex)
+        {
+            return Err(Failure::Unsupported(
+                "Codex Desktop runs a new thread's first message in its own model and reasoning effort".into(),
+            ));
+        }
+        if let Some(effort) = request.reasoning_effort.as_deref() {
+            if !self.effort_at_start(request.provider) {
+                return Err(Failure::Unsupported(format!(
+                    "A new {} session cannot choose an independent reasoning effort",
+                    request.provider.as_str()
+                )));
+            }
+            if effort.trim().is_empty() {
+                return Err(Failure::InvalidInput(
+                    "reasoningEffort must be a non-empty string".into(),
+                ));
+            }
+            let selected = self
+                .models(request.provider)?
+                .select(request.model.as_deref(), Some(effort))
+                .map_err(Failure::InvalidInput)?;
+            request.model = selected.model;
+            request.reasoning_effort = selected.reasoning_effort;
+        }
         let offer = offers
             .iter()
             .find(|offer| offer.provider == request.provider)

@@ -29,7 +29,7 @@ export const name = "agent-hud";
 export const inject = ["agents"];
 
 /** The folder layout this file writes; the app reads it as `channelVersion`. */
-export const CHANNEL_VERSION = 3;
+export const CHANNEL_VERSION = 4;
 const CHECK_IN_MS = 5_000;
 const PROMPT_POLL_MS = 1_000;
 const ANSWER_POLL_MS = 250;

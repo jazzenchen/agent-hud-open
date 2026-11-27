@@ -217,6 +217,7 @@ impl StartFixture {
             folder: "~/project".into(),
             title: None,
             model: None,
+            reasoning_effort: None,
         }
     }
     pub fn saved_receipt(&self) -> StartReceipt {

@@ -81,14 +81,32 @@ fn listed(settings: Option<&Value>, pages: &[Value]) -> models::Models {
         .iter()
         .flat_map(|page| page["data"].as_array().cloned().unwrap_or_default())
         .collect::<Vec<_>>();
-    let models = rows
+    let models: Vec<models::Model> = rows
         .iter()
         .filter_map(|row| {
             let id = models::text(&row["id"]).or_else(|| models::text(&row["model"]))?;
+            let efforts = row["supportedReasoningEfforts"]
+                .as_array()
+                .map(|values| {
+                    values
+                        .iter()
+                        .filter_map(|value| {
+                            let effort = models::text(&value["reasoningEffort"])?;
+                            Some(models::ReasoningEffort {
+                                name: effort.clone(),
+                                id: effort,
+                                description: models::text(&value["description"]),
+                            })
+                        })
+                        .collect::<Vec<_>>()
+                })
+                .filter(|values| !values.is_empty());
             Some(models::Model {
                 name: models::text(&row["displayName"]).unwrap_or_else(|| id.clone()),
                 id,
                 quota: None,
+                supported_reasoning_efforts: efforts,
+                default_reasoning_effort: models::text(&row["defaultReasoningEffort"]),
             })
         })
         .collect();
@@ -99,9 +117,20 @@ fn listed(settings: Option<&Value>, pages: &[Value]) -> models::Models {
                 .find(|row| row["isDefault"] == true)
                 .and_then(|row| models::text(&row["id"]))
         });
+    let default_reasoning_effort = settings
+        .and_then(|value| models::text(&value["config"]["model_reasoning_effort"]))
+        .or_else(|| {
+            default.as_deref().and_then(|default| {
+                models
+                    .iter()
+                    .find(|row| row.id == default)
+                    .and_then(|row| row.default_reasoning_effort.clone())
+            })
+        });
     models::Models {
         provider: Provider::Codex,
         default,
+        default_reasoning_effort,
         models,
         aliases: false,
     }
@@ -114,17 +143,33 @@ mod tests {
     #[test]
     fn its_settings_name_the_default_before_codexs_own() {
         let page = json!({"data":[
-            {"id":"gpt-6.1-sol","displayName":"GPT-6.1-Sol","isDefault":true},
+            {"id":"gpt-6.1-sol","displayName":"GPT-6.1-Sol","isDefault":true,
+             "supportedReasoningEfforts":[{"reasoningEffort":"low","description":"Fast"},
+                                           {"reasoningEffort":"high","description":"Deep"}],
+             "defaultReasoningEffort":"low"},
             {"id":"gpt-6-luna","displayName":"GPT-6-Luna","isDefault":false}
         ],"nextCursor":null});
         let list = listed(None, std::slice::from_ref(&page));
         assert_eq!(list.default.as_deref(), Some("gpt-6.1-sol"));
+        assert_eq!(list.default_reasoning_effort.as_deref(), Some("low"));
         assert_eq!(list.models.len(), 2);
         assert_eq!(list.models[1].name, "GPT-6-Luna");
-        let chosen = json!({"config":{"model":"gpt-6-luna"}});
         assert_eq!(
-            listed(Some(&chosen), &[page]).default.as_deref(),
-            Some("gpt-6-luna")
+            list.models[0].supported_reasoning_efforts.as_ref().unwrap()[1].id,
+            "high"
+        );
+        assert_eq!(
+            list.models[0].supported_reasoning_efforts.as_ref().unwrap()[1]
+                .description
+                .as_deref(),
+            Some("Deep")
+        );
+        let chosen = json!({"config":{"model":"gpt-6-luna","model_reasoning_effort":"high"}});
+        let chosen_list = listed(Some(&chosen), &[page]);
+        assert_eq!(chosen_list.default.as_deref(), Some("gpt-6-luna"));
+        assert_eq!(
+            chosen_list.default_reasoning_effort.as_deref(),
+            Some("high")
         );
     }
 
@@ -137,6 +182,7 @@ mod tests {
             folder: String::new(),
             title: None,
             model: None,
+            reasoning_effort: None,
         };
         assert!(thread_start(&std::env::temp_dir(), &request)
             .get("model")

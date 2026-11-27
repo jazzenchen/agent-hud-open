@@ -148,10 +148,13 @@ pub(super) fn models(claude_config: &std::path::Path) -> models::Models {
         id: id.into(),
         name: name.into(),
         quota: None,
+        supported_reasoning_efforts: None,
+        default_reasoning_effort: None,
     };
     models::Models {
         provider: Provider::Claude,
         default: models::text(&settings["model"]),
+        default_reasoning_effort: None,
         models: vec![
             alias("opus", "Opus"),
             alias("sonnet", "Sonnet"),

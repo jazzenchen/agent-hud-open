@@ -30,6 +30,17 @@ impl Messaging {
             Ok(model) => model,
             Err(reason) => return Ok(refused(&reason)),
         };
+        let reasoning_effort = match arguments.get("reasoningEffort") {
+            None => None,
+            Some(value) => match value
+                .as_str()
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+            {
+                Some(effort) => Some(effort.to_owned()),
+                None => return Ok(refused("reasoningEffort must be a non-empty string")),
+            },
+        };
         let provider = provider(client);
         let offers = self.starts.offers_for(&all_sessions(host.snapshot));
         let Some(offer) = offers.iter().find(|offer| offer.provider == provider) else {
@@ -82,6 +93,7 @@ impl Messaging {
                 folder,
                 title: Some(text.to_owned()),
                 model,
+                reasoning_effort,
             },
             &offers,
         );

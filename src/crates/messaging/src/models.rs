@@ -19,15 +19,22 @@ impl Messaging {
             .map(|client| {
                 let provider = provider(client);
                 let mut row = match self.starts.models(provider) {
-                    Ok(listed) => json!({
-                        "default": listed.default,
-                        "models": listed.models,
-                        "aliases": listed.aliases,
-                    }),
+                    Ok(listed) => {
+                        let mut row = json!({
+                            "default": listed.default,
+                            "models": listed.models,
+                            "aliases": listed.aliases,
+                        });
+                        if let Some(effort) = listed.default_reasoning_effort {
+                            row["defaultReasoningEffort"] = json!(effort);
+                        }
+                        row
+                    }
                     Err(error) => json!({"reason": plain(&error.to_string())}),
                 };
                 row["client"] = json!(client);
                 row["atStart"] = json!(self.starts.model_at_start(provider));
+                row["reasoningEffortAtStart"] = json!(self.starts.effort_at_start(provider));
                 row["perMessage"] = json!(models::per_message(provider));
                 row
             })
@@ -45,14 +52,21 @@ impl Messaging {
         per_message: bool,
         language: Language,
     ) -> std::result::Result<Option<String>, String> {
-        let Some(asked) = arguments["model"]
-            .as_str()
-            .map(str::trim)
-            .filter(|m| !m.is_empty())
-        else {
+        let Some(value) = arguments.get("model") else {
             return Ok(None);
         };
         let provider = provider(client);
+        let Some(asked) = value
+            .as_str()
+            .map(str::trim)
+            .filter(|model| !model.is_empty())
+        else {
+            return if per_message {
+                Ok(None)
+            } else {
+                Err("model must be a non-empty string when it is given".into())
+            };
+        };
         if per_message && !models::per_message(provider) {
             return Err(words::model_per_message(language, client));
         }

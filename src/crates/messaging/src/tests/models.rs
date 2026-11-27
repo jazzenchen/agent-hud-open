@@ -10,9 +10,9 @@ fn harness_offers(world: &World) {
     std::fs::write(
         channel.join("hosts/777.json"),
         json!({"at":1,"desktop":false,"channelVersion":2,"models":{
-            "default":{"provider":"deepseek-official","model":"deepseek-flash"},
+            "default":{"provider":"deepseek-official","model":"deepseek-flash","reasoningEffort":"high"},
             "groups":[{"id":"deepseek-official","name":"DeepSeek","models":[
-                {"id":"deepseek-flash","name":"Flash"},{"id":"deepseek-pro","name":"Pro"}]}]
+                {"id":"deepseek-flash","name":"Flash","reasoning":{"efforts":[{"id":"low","name":"Low"},{"id":"high","name":"High"}],"defaultEffort":"high"}},{"id":"deepseek-pro","name":"Pro"}]}]
         }})
         .to_string(),
     )
@@ -30,6 +30,12 @@ fn list_models_says_what_each_client_offers_and_its_own_choice() {
     assert_eq!(harness["client"], "deepseek");
     assert_eq!(harness["default"], "deepseek-official/deepseek-flash");
     assert_eq!(harness["perMessage"], true);
+    assert_eq!(harness["defaultReasoningEffort"], "high");
+    assert_eq!(harness["models"][0]["defaultReasoningEffort"], "high");
+    assert_eq!(
+        harness["models"][0]["supportedReasoningEfforts"][0]["id"],
+        "low"
+    );
     assert_eq!(harness["models"][1]["id"], "deepseek-official/deepseek-pro");
     assert_eq!(harness["models"][1]["name"], "DeepSeek · Pro");
     // Claude Code has no list to ask: its aliases, and no settings say more.
@@ -38,6 +44,36 @@ fn list_models_says_what_each_client_offers_and_its_own_choice() {
     assert_eq!(claude["default"], Value::Null);
     assert_eq!(claude["perMessage"], false);
     assert_eq!(claude["models"][0]["id"], "opus");
+}
+
+#[test]
+fn invalid_reasoning_effort_never_creates_a_session() {
+    let mut world = World::on();
+    world.harness();
+    harness_offers(&world);
+    for (client, field, reason) in [
+        ("deepseek", Value::Null, "non-empty string"),
+        ("deepseek", json!("   "), "non-empty string"),
+        (
+            "claude",
+            json!("high"),
+            "cannot choose an independent reasoning effort",
+        ),
+    ] {
+        let result = world.call(
+            Some(("claude", CLAUDE)),
+            "start_session",
+            json!({"client":client,"text":"Plan it","folder":"","reasoningEffort":field}),
+        );
+        assert_eq!(result["state"], "refused", "{result}");
+        assert!(
+            result["reason"]
+                .as_str()
+                .is_some_and(|text| text.contains(reason)),
+            "{result}"
+        );
+    }
+    assert!(!world.harness_channel.join("starts").exists());
 }
 
 #[test]

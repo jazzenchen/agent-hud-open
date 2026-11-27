@@ -157,6 +157,9 @@ fn create_cli(
     if let Some(model) = &request.model {
         turn["model"] = json!(model);
     }
+    if let Some(effort) = &request.reasoning_effort {
+        turn["effort"] = json!(effort);
+    }
     let first = connection.request("turn/start", turn, true);
     // Creating again would duplicate the session even when its first turn failed.
     let reason = match first {
@@ -177,7 +180,12 @@ fn create_cli(
         request_id: request.request_id.clone(),
         session_id: Some(session),
         thread_id: Some(thread),
-        state: "started".into(),
+        state: if request.reasoning_effort.is_some() && reason.is_some() {
+            "uncertain"
+        } else {
+            "started"
+        }
+        .into(),
         reason,
         job_id: None,
         handoff_pending: false,
