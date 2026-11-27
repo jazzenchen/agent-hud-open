@@ -1,16 +1,19 @@
 import type { PanelBlockLayout, PanelLayout, Quota } from "@agent-hud/protocol";
 
-/** The key a layout writes for a quota row: the Swift app's window id where the
- * row has one, so layouts carried over from it keep naming the same row. */
+/** The key a layout writes for a quota row: its account-free window key when
+ * it has one, else the Swift app's window id so layouts carried over from it
+ * keep naming the same row, else its id. */
 export function quotaRowKey(row: Quota): string {
-  return row.legacyWindowId ?? row.id;
+  return row.windowKey ?? row.legacyWindowId ?? row.id;
 }
 
-/** Whether a layout key names this row: its id, its Swift window id, or that
- * window id without the account (one key for every account's row). */
+/** Whether a layout key names this row: its id, its account-free window key,
+ * its Swift window id, or that window id without the account (one key for
+ * every account's row). */
 export function quotaRowMatches(row: Quota, key: string): boolean {
   return (
     row.id === key ||
+    row.windowKey === key ||
     row.legacyWindowId === key ||
     !!(
       row.accountId &&
@@ -43,7 +46,8 @@ export function withRowShown(
         other.id !== row.id &&
         dropped.some((key) => quotaRowMatches(other, key)),
     )
-    .map(quotaRowKey);
+    .map(quotaRowKey)
+    .filter((key) => !quotaRowMatches(row, key));
   return [
     ...new Set([
       ...hiddenRows.filter((key) => !dropped.includes(key)),

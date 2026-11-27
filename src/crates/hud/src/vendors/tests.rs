@@ -153,6 +153,43 @@ fn the_number_leaves_out_the_windows_the_panel_hides() {
     );
 }
 
+/// Open #113: an account-free windowKey hides the window for every account of
+/// the vendor, while an earlier hashed id keeps matching its account.
+#[test]
+fn a_window_key_hides_across_accounts_while_a_hashed_id_still_matches() {
+    let snapshot_for = |hash: &str, account: &str| {
+        json!({
+            "language": "en", "billing": [], "sessions": [], "approvals": [], "providers": [],
+            "quotas": [
+                {"id": format!("antigravity:{hash}:3p-weekly"), "windowKey": "antigravity:3p-weekly",
+                 "vendor": "antigravity", "name": "3rd-party 7d", "usedPercent": 100.0,
+                 "resetAt": "2099-01-01T00:00:00Z", "status": "critical",
+                 "account": account, "accountId": format!("account:{hash}")},
+                {"id": format!("antigravity:{hash}:gemini-5h"), "windowKey": "antigravity:gemini-5h",
+                 "vendor": "antigravity", "name": "Gemini 5h", "usedPercent": 20.0,
+                 "resetAt": "2099-01-01T00:00:00Z", "status": "normal",
+                 "account": account, "accountId": format!("account:{hash}")}
+            ]
+        })
+    };
+    let read = |snapshot: &Value, layout: Value| {
+        let list = configured(snapshot, "simple", &layout, 0, false);
+        let vendor = list.into_iter().next().unwrap();
+        (meter_label(&vendor, false), vendor.level.to_owned())
+    };
+    let first = snapshot_for("aaaa", "a@example.com");
+    let second = snapshot_for("bbbb", "b@example.com");
+    let by_key = json!({"blocks": {"antigravity": {"hiddenRows": ["antigravity:3p-weekly"]}}});
+    assert_eq!(
+        read(&first, by_key.clone()),
+        ("20%".into(), "normal".into())
+    );
+    assert_eq!(read(&second, by_key), ("20%".into(), "normal".into()));
+    let by_hash =
+        json!({"blocks": {"antigravity": {"hiddenRows": ["antigravity:aaaa:3p-weekly"]}}});
+    assert_eq!(read(&first, by_hash), ("20%".into(), "normal".into()));
+}
+
 /// A screen that asks for the shortest window first reads its shortest live
 /// window, not its most used one; without a reported window length it reads
 /// the tightest, as before.

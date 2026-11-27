@@ -71,6 +71,7 @@ fn parse_summary_quotas(
             let lower = group_name.to_lowercase();
             let mut quota = json!({
                 "id": format!("{id}:{key}"),
+                "windowKey": format!("antigravity:{key}"),
                 "vendor": "antigravity",
                 "accountId": account_identity,
                 "account": email,

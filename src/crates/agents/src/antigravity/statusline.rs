@@ -86,7 +86,7 @@ fn parse_at(report: &Value, now: DateTime<Utc>) -> Option<Reading> {
             .and_then(|value| DateTime::parse_from_rfc3339(value).ok())
             .is_some_and(|reset| reset <= now);
         let mut quota = json!({
-            "id":format!("{id}:{key}"),"vendor":"antigravity","source":"antigravity_cli","accountId":account,
+            "id":format!("{id}:{key}"),"windowKey":format!("antigravity:{key}"),"vendor":"antigravity","source":"antigravity_cli","accountId":account,
             "account":email,"name":name,"shortLabel":short,"usedPercent":used,
             "status":if stale || expired {"stale"}else{status(used)},
             "resetAt":reset,"windowDurationSeconds":duration,"observedAt":observed_at,
@@ -174,6 +174,8 @@ mod tests {
         assert_eq!(reading.quotas[1]["windowDurationSeconds"], 604800);
         assert!((reading.quotas[1]["usedPercent"].as_f64().unwrap() - 6.22).abs() < 0.001);
         assert_eq!(reading.quotas[1]["observedAt"], "2026-10-23T08:00:00+00:00");
+        assert_eq!(reading.quotas[0]["windowKey"], "antigravity:3p-5h");
+        assert_eq!(reading.quotas[1]["windowKey"], "antigravity:gemini-weekly");
         assert_eq!(reading.quotas[1]["allModels"], false);
     }
 

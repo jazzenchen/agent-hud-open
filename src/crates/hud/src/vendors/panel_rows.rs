@@ -51,11 +51,13 @@ pub(super) fn deepseek_balances<'a>(
     (balance, level)
 }
 
-/// Whether a block's layout names a row by `key`: its id, its Swift window id,
-/// or that window id without the account (quota-rows.ts `quotaRowMatches`).
+/// Whether a block's layout names a row by `key`: its id, its account-free
+/// window key, its Swift window id, or that window id without the account
+/// (quota-rows.ts `quotaRowMatches`).
 fn row_matches(row: &Value, key: &str) -> bool {
     let legacy = row["legacyWindowId"].as_str();
     row["id"].as_str() == Some(key)
+        || row["windowKey"].as_str() == Some(key)
         || legacy == Some(key)
         || row["accountId"].as_str().is_some_and(|account| {
             legacy.and_then(|legacy| legacy.strip_prefix(account)?.strip_prefix('/')) == Some(key)

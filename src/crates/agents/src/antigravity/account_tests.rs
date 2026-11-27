@@ -217,8 +217,50 @@ fn native_quota_summary_supplies_exact_windows_with_account_identity() {
     assert_eq!(reading.quotas[2]["shortLabel"], "3rd-party 7d");
     assert!((reading.quotas[2]["usedPercent"].as_f64().unwrap() - 80.0).abs() < 0.001);
     assert_eq!(reading.quotas[2]["modelFamilies"], json!(["claude", "gpt"]));
+    assert_eq!(reading.quotas[0]["windowKey"], "antigravity:gemini-weekly");
+    assert_eq!(reading.quotas[1]["windowKey"], "antigravity:gemini-5h");
+    assert_eq!(reading.quotas[2]["windowKey"], "antigravity:3p-weekly");
+    assert_eq!(reading.quotas[3]["windowKey"], "antigravity:3p-5h");
     assert_eq!(reading.quotas[3]["shortLabel"], "3rd-party 5h");
     assert_eq!(reading.quotas[3]["account"], "Me@Example.com");
+}
+
+#[test]
+fn summary_window_keys_stay_stable_across_accounts() {
+    let summary = json!({
+        "response": {
+            "groups": [{
+                "displayName": "Gemini Models",
+                "buckets": [
+                    {"bucketId": "gemini-weekly", "displayName": "Weekly Limit Remaining", "window": "weekly", "remainingFraction": 0.75},
+                    {"bucketId": "gemini-5h", "displayName": "Five Hour Limit Remaining", "window": "5h", "remainingFraction": 0.5}
+                ]
+            }]
+        }
+    });
+    let mut second = status_body();
+    second["userStatus"]["email"] = json!("work@example.com");
+    let mut host = FakeHost::new("/u");
+    host.natives.insert(
+        ("antigravity".into(), "ReadAccounts".into()),
+        Ok(json!({
+            "accounts": [
+                {"source": "service-1", "status": status_body(), "summary": summary},
+                {"source": "service-2", "status": second, "summary": summary}
+            ]
+        })),
+    );
+    let reading = read(&host).unwrap();
+    assert_eq!(reading.quotas.len(), 4);
+    assert_ne!(reading.quotas[0]["id"], reading.quotas[2]["id"]);
+    assert_ne!(
+        reading.quotas[0]["accountId"],
+        reading.quotas[2]["accountId"]
+    );
+    assert_eq!(reading.quotas[0]["windowKey"], "antigravity:gemini-weekly");
+    assert_eq!(reading.quotas[2]["windowKey"], "antigravity:gemini-weekly");
+    assert_eq!(reading.quotas[1]["windowKey"], "antigravity:gemini-5h");
+    assert_eq!(reading.quotas[3]["windowKey"], "antigravity:gemini-5h");
 }
 
 fn report(email: &str, observed_at: &str, remaining: f64, reset: &str) -> Value {
