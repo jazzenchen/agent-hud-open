@@ -58,7 +58,7 @@ mod tests {
     #[test]
     fn nearby_is_a_private_caller_on_a_lan_address() {
         let lan = ["192.168.1.19".to_string()];
-        let tailscale = ["100.69.88.16".to_string()];
+        let tailscale = ["100.64.0.1".to_string()];
         let at = |peer: [u8; 4], here: [u8; 4]| {
             nearby(
                 Ipv4Addr::from(peer).into(),
@@ -76,12 +76,12 @@ mod tests {
             &[],
         ));
         // Tailscale: the caller and this device's own address are in its range.
-        assert!(at([100, 66, 108, 61], [100, 69, 88, 16]));
+        assert!(at([100, 64, 0, 2], [100, 64, 0, 1]));
         // The same range on an address that is not this device's Tailscale one.
-        assert!(!at([100, 66, 108, 61], [100, 70, 1, 2]));
+        assert!(!at([100, 64, 0, 2], [100, 70, 1, 2]));
         // A Tailscale address is no caller's on the LAN, nor a LAN caller's on the tunnel.
-        assert!(!at([100, 66, 108, 61], [192, 168, 1, 19]));
-        assert!(!at([192, 168, 1, 40], [100, 69, 88, 16]));
+        assert!(!at([100, 64, 0, 2], [192, 168, 1, 19]));
+        assert!(!at([192, 168, 1, 40], [100, 64, 0, 1]));
         // Another tunnel with private addresses does not arrive on a LAN address.
         assert!(!at([10, 147, 20, 5], [10, 147, 20, 1]));
         // A router forwarding a port from outside keeps the caller's public address.
