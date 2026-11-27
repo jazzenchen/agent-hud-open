@@ -158,6 +158,7 @@ export function paintMark(
           }
           ctx.drawImage(logo, pad, pad);
         } else {
+          ctx.imageSmoothingQuality = "high";
           ctx.drawImage(
             artwork,
             pad + hair + side * 0.3,

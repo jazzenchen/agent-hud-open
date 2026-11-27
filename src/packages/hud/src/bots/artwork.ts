@@ -26,6 +26,8 @@ export function loadArtwork(
     const canvas = document.createElement("canvas");
     canvas.width = canvas.height = 256;
     const context = canvas.getContext("2d")!;
+    // The default smoothing steps on edges when shrinking this much.
+    context.imageSmoothingQuality = "high";
     context.drawImage(image, 0, 0, 256, 256);
     if (artwork.tint) {
       context.globalCompositeOperation = "source-in";

@@ -61,6 +61,8 @@ function canvasFor(side: number, outline: number, into?: HTMLCanvasElement) {
   context.translate(outline + 0.3 * unit, outline + 0.3 * unit);
   context.scale(unit, unit);
   context.imageSmoothingEnabled = true;
+  // A logo shrinks to a few dozen pixels: low quality leaves jagged edges on a 1x screen.
+  context.imageSmoothingQuality = "high";
   return { canvas, context };
 }
 /** Draws into `into` when given: a mark redraws the same canvas each frame. */
