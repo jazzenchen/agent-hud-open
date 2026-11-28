@@ -97,18 +97,22 @@ pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
             .map(|n| (n * 1000.) as i64)
             .or(modified);
         let mut quotas = vec![];
-        for (p, reset, key, label, duration) in [
+        // The CLI stores what is left of each window (PlanStatus fields 14
+        // and 15, `*_quota_remaining_percent`), not what is used.
+        for (left, reset, key, label, duration) in [
             // In the app's language, as Open names Devin's windows.
-            (15, 17, "daily", tr!("Daily limit"), 86400),
-            (14, 18, "weekly", tr!("Weekly limit"), 604800),
+            (14, 17, "daily", tr!("Daily limit"), 86400),
+            (15, 18, "weekly", tr!("Weekly limit"), 604800),
         ] {
             let reset = integer(&subscription, reset)
                 .filter(|n| *n > 0 && *n <= 253_402_300_799)
                 .and_then(|n| iso((n * 1000) as i64));
-            let used = integer(&subscription, p)
+            // Protobuf leaves out a zero, so a window with a reset time and
+            // no percent has nothing left.
+            let used = integer(&subscription, left)
                 .filter(|n| *n <= 100)
-                .map(|n| n as f64)
-                .or_else(|| (!subscription.contains_key(&p) && reset.is_some()).then_some(0.));
+                .map(|n| (100 - n) as f64)
+                .or_else(|| (!subscription.contains_key(&left) && reset.is_some()).then_some(100.));
             if used.is_none() && reset.is_none() {
                 continue;
             }
@@ -154,14 +158,20 @@ mod tests {
         varint(value.len() as u64, out);
         out.extend_from_slice(value);
     }
-    fn status_file(email: &str, daily: u64, weekly: u64) -> String {
+    /// A status file with this much left of the daily and weekly windows; a
+    /// zero is left out, as protobuf writes it.
+    fn status_file(email: &str, daily_left: u64, weekly_left: u64) -> String {
         let mut plan = vec![];
         bytes(2, b"Pro", &mut plan);
         let mut subscription = vec![];
         bytes(1, &plan, &mut subscription);
-        number(14, weekly, &mut subscription);
-        number(15, daily, &mut subscription);
+        for (field, left) in [(14, daily_left), (15, weekly_left)] {
+            if left > 0 {
+                number(field, left, &mut subscription);
+            }
+        }
         number(17, 1_900_000_000, &mut subscription);
+        number(18, 1_900_500_000, &mut subscription);
         let mut root = vec![];
         bytes(7, email.as_bytes(), &mut root);
         bytes(13, &subscription, &mut root);
@@ -176,7 +186,7 @@ mod tests {
         let newer = format!("{dir}/user_status.b.bin");
         let mut host = FakeHost::new("/u")
             .file(&older, &status_file("old@example.com", 1, 2))
-            .file(&newer, &status_file("me@example.com", 30, 70))
+            .file(&newer, &status_file("me@example.com", 70, 30))
             .file(&format!("{dir}/other.bin"), "{}");
         for (path, at) in [(&older, 1), (&newer, 2)] {
             let len = host.files[std::path::Path::new(path)]
@@ -208,6 +218,32 @@ mod tests {
             reading.quotas[0]["observedAt"],
             iso(1_800_000_000_000).unwrap()
         );
+    }
+
+    fn used(daily_left: u64, weekly_left: u64) -> Vec<(Value, Value)> {
+        let host = FakeHost::new("/u").file(
+            "/u/.cache/devin/cli/user_status.a.bin",
+            &status_file("me@example.com", daily_left, weekly_left),
+        );
+        read(&host)
+            .unwrap()
+            .quotas
+            .iter()
+            .map(|q| (q["usedPercent"].clone(), q["status"].clone()))
+            .collect()
+    }
+
+    #[test]
+    fn the_cache_holds_what_is_left_of_each_window() {
+        // Untouched windows are 100 left, which is nothing used.
+        assert_eq!(
+            used(100, 100),
+            [(json!(0.0), json!("normal")), (json!(0.0), json!("normal"))]
+        );
+        // A spent window is written as no percent at all.
+        let spent = used(0, 100);
+        assert_eq!(spent[0].0, json!(100.0));
+        assert_eq!(spent[1].0, json!(0.0));
     }
 
     #[test]
