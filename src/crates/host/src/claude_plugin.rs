@@ -99,7 +99,7 @@ fn install(
         home,
         COMMAND_TIME,
     )
-    .map_err(install_error)?;
+    .map_err(|error| install_error(error, executable))?;
     if !plugin::installed_from(claude_config, folder) {
         return Err("Claude Code still runs the plugin from another folder".into());
     }
@@ -107,19 +107,23 @@ fn install(
 }
 
 /// A Claude Code too old for `plugin install --marketplace` only says the
-/// option is unknown; say what fixes it, keeping its words.
-fn install_error(error: String) -> String {
-    install_error_in(error, l10n::current())
+/// option is unknown; say which one it is and what fixes it, keeping its
+/// words. It is often an old copy the user forgot, found before a newer one.
+fn install_error(error: String, executable: &Path) -> String {
+    install_error_in(error, executable, l10n::current())
 }
 
-fn install_error_in(error: String, language: Language) -> String {
+fn install_error_in(error: String, executable: &Path, language: Language) -> String {
     if error.contains("unknown option") && error.contains("--marketplace") {
         l10n::fill(
             &l10n::tr_in(
                 language,
-                "This Claude Code is too old to recognize --marketplace. Run claude update in a terminal to upgrade, then click Install again. ({{error}})",
+                "The Claude Code at {{path}} is too old to recognize --marketplace. Run claude update in a terminal to upgrade it, or remove it if a newer one is installed (you can ask Claude to find and remove old claude commands on this computer). Then click Install again. ({{error}})",
             ),
-            &[("error", &error)],
+            &[
+                ("path", &executable.to_string_lossy()),
+                ("error", &error),
+            ],
         )
     } else {
         error
@@ -246,28 +250,33 @@ pub async fn native_claude_plugin(
 mod error_tests {
     use super::{install_error, install_error_in};
     use agent_hud_runtime::l10n::Language;
+    use std::path::Path;
+
+    const OLD: &str = "/old/claude";
 
     #[test]
-    fn unknown_marketplace_option_explains_how_to_upgrade_in_chinese() {
+    fn unknown_marketplace_option_names_the_old_claude_and_what_to_do_in_chinese() {
         let error = "error: unknown option '--marketplace'";
         assert_eq!(
-            install_error_in(error.into(), Language::ZhHans),
+            install_error_in(error.into(), Path::new(OLD), Language::ZhHans),
             format!(
-                "Claude Code 版本太旧，无法识别 --marketplace。请先在终端运行 claude update 升级，再点安装。（{error}）" // l10n-ignore: test expectation
+                "{OLD} 这个 Claude Code 版本太旧，无法识别 --marketplace。请在终端运行 claude update 升级它；如果电脑上另有新的，把这个旧的删掉也可以（可以让 Claude 帮你找出并清理旧的 claude 命令）。之后再点安装。（{error}）" // l10n-ignore: test expectation
             )
         );
     }
 
     #[test]
-    fn unknown_marketplace_option_explains_how_to_upgrade_in_english() {
+    fn unknown_marketplace_option_names_the_old_claude_and_what_to_do_in_english() {
         let error = "error: unknown option '--marketplace'";
         assert_eq!(
-            install_error_in(error.into(), Language::En),
+            install_error_in(error.into(), Path::new(OLD), Language::En),
             format!(
-                "{} ({error})",
+                "The Claude Code at {OLD} {} ({error})",
                 concat!(
-                    "This Claude Code is too old to recognize --marketplace. ",
-                    "Run claude update in a terminal to upgrade, then click Install again."
+                    "is too old to recognize --marketplace. ",
+                    "Run claude update in a terminal to upgrade it, or remove it if a newer one is installed ",
+                    "(you can ask Claude to find and remove old claude commands on this computer). ",
+                    "Then click Install again."
                 )
             )
         );
@@ -280,9 +289,12 @@ mod error_tests {
             "error: --marketplace folder does not exist",
             "error: permission denied",
         ] {
-            assert_eq!(install_error(error.into()), error);
+            assert_eq!(install_error(error.into(), Path::new(OLD)), error);
             for language in [Language::ZhHans, Language::En] {
-                assert_eq!(install_error_in(error.into(), language), error);
+                assert_eq!(
+                    install_error_in(error.into(), Path::new(OLD), language),
+                    error
+                );
             }
         }
     }

@@ -1128,7 +1128,7 @@
   "These agents have passed messages {{limit}} times in a row; waiting for the user to take a look. A word the user types in any session of the chain starts the count again.": "これらのエージェントは {{limit}} 回連続でメッセージをやり取りしました。ユーザーの確認を待っています。チェーン内のいずれかのセッションでユーザーが何か入力すると、カウントがリセットされます。",
   "These change {{screen}} only.": "これらは {{screen}} にのみ適用されます。",
   "Thickness": "太さ",
-  "This Claude Code is too old to recognize --marketplace. Run claude update in a terminal to upgrade, then click Install again. ({{error}})": "この Claude Code は古いため --marketplace を認識できません。ターミナルで claude update を実行してアップグレードしてから、もう一度「インストール」をクリックしてください。（{{error}}）",
+  "The Claude Code at {{path}} is too old to recognize --marketplace. Run claude update in a terminal to upgrade it, or remove it if a newer one is installed (you can ask Claude to find and remove old claude commands on this computer). Then click Install again. ({{error}})": "{{path}} の Claude Code は古いため --marketplace を認識できません。ターミナルで claude update を実行してアップグレードするか、新しいものが別に入っている場合はこの古いものを削除してください（このコンピュータにある古い claude コマンドを探して削除するよう Claude に頼むこともできます）。その後、もう一度「インストール」をクリックしてください。（{{error}}）",
   "This Cline account has no ClinePass limits to read": "この Cline アカウントには読み取れる ClinePass の制限がありません",
   "This Factory plan reports no usage windows": "この Factory プランは使用量の枠を報告していません",
   "This Mac's usage cannot be told apart between this provider's accounts": "この Mac では、このプロバイダの複数のアカウントの使用量を区別できません",

@@ -1128,7 +1128,7 @@
   "These agents have passed messages {{limit}} times in a row; waiting for the user to take a look. A word the user types in any session of the chain starts the count again.": "這些 Agent 已連續互傳 {{limit}} 次訊息，正等待使用者查看。使用者在這條鏈上任何一個工作階段裡輸入一句話，就會重新計數。",
   "These change {{screen}} only.": "只影響「{{screen}}」。",
   "Thickness": "粗細",
-  "This Claude Code is too old to recognize --marketplace. Run claude update in a terminal to upgrade, then click Install again. ({{error}})": "Claude Code 版本太舊，無法辨識 --marketplace。請先在終端機執行 claude update 升級，再按一下「安裝」。（{{error}}）",
+  "The Claude Code at {{path}} is too old to recognize --marketplace. Run claude update in a terminal to upgrade it, or remove it if a newer one is installed (you can ask Claude to find and remove old claude commands on this computer). Then click Install again. ({{error}})": "{{path}} 這個 Claude Code 版本太舊，無法辨識 --marketplace。請在終端機執行 claude update 升級它；如果電腦上另有新的，把這個舊的刪掉也可以（可以請 Claude 幫你找出並清理舊的 claude 指令）。之後再按一下「安裝」。（{{error}}）",
   "This Cline account has no ClinePass limits to read": "這個 Cline 帳號讀不到 ClinePass 額度",
   "This Factory plan reports no usage windows": "這個 Factory 方案不按用量視窗計費",
   "This Mac's usage cannot be told apart between this provider's accounts": "這台 Mac 上同一服務的幾個帳號用量分不開",
