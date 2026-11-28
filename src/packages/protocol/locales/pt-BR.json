@@ -23,7 +23,7 @@
   "A list-price estimate is unavailable for this selection.": "Não há estimativa por preço de tabela para esta seleção.",
   "A message to a {{client}} session cannot choose its model; the session goes on in its own. Leave model out, or start a new session in that model with start_session.": "Uma mensagem para uma sessão do {{client}} não pode escolher o modelo; a sessão continua no dela. Remova model ou inicie uma nova sessão nesse modelo com start_session.",
   "A model server is free; a gateway uses list prices.": "Um servidor de modelos é grátis; um gateway usa preços de tabela.",
-  "A reply is always queued, so nothing was sent. Send it again without delivery steer.": "Uma resposta sempre vai para a fila, então nada foi enviado. Envie de novo sem delivery steer.",
+  "A reply takes no delivery steer, so nothing was sent. Send it again without it: Agent HUD puts a reply into its sender's turn by itself while that turn waits for it.": "Uma resposta não aceita delivery steer, então nada foi enviado. Envie de novo sem ele: enquanto o turno do remetente a espera, o Agent HUD a coloca nesse turno por conta própria.",
   "A session without a folder is not offered here. Folders: {{list}}": "Uma sessão sem pasta não é oferecida aqui. Pastas: {{list}}",
   "A small floating panel, with no glow.": "Um pequeno painel flutuante, sem brilho.",
   "A step of {{length}}": "Uma etapa de {{length}}",

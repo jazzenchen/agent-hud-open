@@ -194,6 +194,7 @@ impl Messaging {
             work: deliver::Work::Send {
                 clients: self.clients.clone(),
                 request,
+                fallback: None,
             },
             message: record,
             surface: agent_hud_core::naming::surfaces::Surface::new(

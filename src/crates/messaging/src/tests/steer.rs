@@ -1,5 +1,6 @@
 //! Steering into a DeepSeek Harness session's turn in progress, and the
-//! rules every steer keeps: always labelled, never a reply, never into a
+//! rules every steer keeps: always labelled, never a reply an agent steers
+//! (Agent HUD puts one into the turn that waits for it), never into a
 //! session waiting on an answer, and counted as a pass.
 use super::*;
 
@@ -183,7 +184,10 @@ fn a_steer_is_refused_before_anything_is_left_as_a_reply_or_while_its_session_wa
         json!({"text":"Looks fine","reply_to":asked["id"],"delivery":"steer"}),
     );
     assert_eq!(reply["state"], "refused", "{reply}");
-    assert!(reply["reason"].as_str().unwrap().contains("always queued"));
+    assert!(reply["reason"]
+        .as_str()
+        .unwrap()
+        .contains("takes no delivery steer"));
     assert!(!prompts.exists(), "nothing was left for the session");
 }
 
@@ -326,7 +330,7 @@ fn the_steer_descriptions_change_only_while_agents_may_decide() {
     assert!(Preferences::read(&json!({"agentMessagesSteerOnOwn":true})).steer_on_own);
     let off = send_message(false);
     let description = off["description"].as_str().unwrap();
-    assert!(description.contains("Use delivery steer only when the user has explicitly asked you to put these words into that session's current turn. Never choose it on your own, even when a turn looks wrong: tell the user and let them decide. Keep a steer short and about what the user asked. Handoffs, new tasks, review requests and replies are queued."), "{description}");
+    assert!(description.contains("Use delivery steer only when the user has explicitly asked you to put these words into that session's current turn. Never choose it on your own, even when a turn looks wrong: tell the user and let them decide. Keep a steer short and about what the user asked. Handoffs, new tasks, review requests and replies are queued; Agent HUD itself puts a reply into a waiting turn (see reply_to)."), "{description}");
     assert!(
         description.contains("A steer always carries Agent HUD's label. Returns at once"),
         "{description}"
@@ -399,4 +403,99 @@ fn a_steer_an_agent_may_choose_asks_for_no_reply_of_its_own() {
             assert!(!text.contains("with no reply of its own"), "{text}");
         }
     }
+}
+
+/// A Harness session that sent a message and keeps its turn running for the
+/// answer: the reply goes into that turn, not into its queue, where it would
+/// wait for the turn to end while the turn waits for it.
+#[test]
+fn a_reply_goes_into_the_turn_of_its_sender_that_waits_for_it() {
+    let mut world = World::on();
+    running_harness(&mut world, "7");
+    sent_from_turn(&mut world);
+    let asked = world.send(("deepseek", HARNESS_OWN), CLAUDE, "Review the parser");
+    assert_eq!(asked["state"], "queued", "{asked}");
+    let plugin = plugin_answers(&world, json!({"startedAt":2,"steeredInto":"7"}));
+    let reply = world.call(
+        Some(("claude", CLAUDE)),
+        "send_message",
+        json!({"text":"Looks fine","reply_to":asked["id"]}),
+    );
+    let left = plugin.join().unwrap();
+    assert_eq!(reply["state"], "steered", "{reply}");
+    let first = left["text"]
+        .as_str()
+        .unwrap()
+        .lines()
+        .next()
+        .unwrap()
+        .to_owned();
+    assert!(first.ends_with("· into your current turn]"), "{first}");
+    let parent = world
+        .messaging
+        .journal
+        .find(asked["id"].as_str().unwrap())
+        .unwrap();
+    assert_eq!(parent.replied_by.as_deref(), reply["id"].as_str());
+}
+
+/// The waiting turn ended just before the reply reached it: the reply is
+/// queued, as any reply, and not lost.
+#[test]
+fn a_reply_whose_waiting_turn_just_ended_is_queued_instead() {
+    let mut world = World::on();
+    running_harness(&mut world, "7");
+    sent_from_turn(&mut world);
+    let asked = world.send(("deepseek", HARNESS_OWN), CLAUDE, "Review the parser");
+    let plugin = plugin_answers(&world, json!({"refused":delivery::NO_TURN_TO_STEER}));
+    let reply = world.call(
+        Some(("claude", CLAUDE)),
+        "send_message",
+        json!({"text":"Looks fine","reply_to":asked["id"]}),
+    );
+    plugin.join().unwrap();
+    assert_eq!(reply["state"], "queued", "{reply}");
+    let left: Vec<Value> =
+        std::fs::read_dir(world.harness_channel.join(format!("prompts/{HARNESS_OWN}")))
+            .unwrap()
+            .flatten()
+            .filter_map(|file| serde_json::from_slice(&std::fs::read(file.path()).ok()?).ok())
+            .collect();
+    let queued = left
+        .iter()
+        .find(|prompt| prompt["mode"] != "steer")
+        .expect("the reply was queued");
+    assert!(!queued["text"]
+        .as_str()
+        .unwrap()
+        .contains("into your current turn"));
+}
+
+/// A sender now in a turn that began after its message went out is not
+/// waiting for the reply in that turn: the reply is queued.
+#[test]
+fn a_reply_to_a_sender_in_a_later_turn_is_queued() {
+    let mut world = World::on();
+    running_harness(&mut world, "7");
+    sent_from_turn(&mut world);
+    let asked = world.send(("deepseek", HARNESS_OWN), CLAUDE, "Review the parser");
+    world.live(
+        HARNESS,
+        json!({"turnId":"8","turnStartedAt":"2999-01-01T00:00:00Z","endedAt":null}),
+    );
+    let reply = world.call(
+        Some(("claude", CLAUDE)),
+        "send_message",
+        json!({"text":"Looks fine","reply_to":asked["id"]}),
+    );
+    assert_eq!(reply["state"], "queued", "{reply}");
+}
+
+/// The Harness turn in progress began before the test's clock, so a message
+/// sent now is sent from it.
+fn sent_from_turn(world: &mut World) {
+    world.live(
+        HARNESS,
+        json!({"turnId":"7","turnStartedAt":"2026-10-01T00:00:00Z","endedAt":null}),
+    );
 }

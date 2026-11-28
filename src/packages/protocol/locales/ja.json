@@ -21,7 +21,7 @@
   "A list-price estimate is unavailable for this selection.": "この選択では公開価格での見積もりを利用できません。",
   "A message to a {{client}} session cannot choose its model; the session goes on in its own. Leave model out, or start a new session in that model with start_session.": "{{client}} のセッションへのメッセージではモデルを選べません。セッションは自分のモデルのまま続きます。model を外すか、start_session でそのモデルの新しいセッションを始めてください。",
   "A model server is free; a gateway uses list prices.": "モデルサーバは無料、ゲートウェイは公開価格で計算します。",
-  "A reply is always queued, so nothing was sent. Send it again without delivery steer.": "返信は常にキューで送るため、何も送っていません。delivery steer を外してもう一度送ってください。",
+  "A reply takes no delivery steer, so nothing was sent. Send it again without it: Agent HUD puts a reply into its sender's turn by itself while that turn waits for it.": "返信には delivery steer を使えないため、何も送信されませんでした。外してもう一度送ってください。送信元のターンがこの返信を待っている間は、Agent HUD が自動でそのターンに入れます。",
   "A session without a folder is not offered here. Folders: {{list}}": "フォルダのないセッションはここでは開始できません。フォルダ: {{list}}",
   "A small floating panel, with no glow.": "グローのない、小さなフローティングパネル。",
   "A step of {{length}}": "1 ステップ {{length}}",

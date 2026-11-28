@@ -21,7 +21,7 @@
   "A list-price estimate is unavailable for this selection.": "目前篩選暫無定價估算。",
   "A message to a {{client}} session cannot choose its model; the session goes on in its own. Leave model out, or start a new session in that model with start_session.": "傳給 {{client}} 工作階段的訊息不能指定模型，工作階段會繼續用它自己的模型。拿掉 model，或用 start_session 以這個模型新開一個工作階段。",
   "A model server is free; a gateway uses list prices.": "本機模型免費；本機閘道按定價計價。",
-  "A reply is always queued, so nothing was sent. Send it again without delivery steer.": "回覆一律排隊傳送，所以什麼都沒有送出。拿掉 delivery steer 再傳一次。",
+  "A reply takes no delivery steer, so nothing was sent. Send it again without it: Agent HUD puts a reply into its sender's turn by itself while that turn waits for it.": "回覆不能用 delivery steer，所以什麼也沒送出。拿掉它再送一次：傳送方的那一輪還在等這則回覆時，Agent HUD 會自己把回覆放進那一輪。",
   "A session without a folder is not offered here. Folders: {{list}}": "這裡不提供沒有資料夾的工作階段。資料夾：{{list}}",
   "A small floating panel, with no glow.": "懸浮的小面板，沒有光暈。",
   "A step of {{length}}": "一步 {{length}}",

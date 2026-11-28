@@ -21,7 +21,7 @@
   "A list-price estimate is unavailable for this selection.": "当前筛选暂无目录价估算。",
   "A message to a {{client}} session cannot choose its model; the session goes on in its own. Leave model out, or start a new session in that model with start_session.": "发给 {{client}} 会话的消息不能指定模型，会话会继续用它自己的模型。去掉 model，或者用 start_session 以这个模型新开一个会话。",
   "A model server is free; a gateway uses list prices.": "本地模型免费；本地网关按官方价计价。",
-  "A reply is always queued, so nothing was sent. Send it again without delivery steer.": "回复始终排队发送，所以什么都没有发送。去掉 delivery steer 再发一次。",
+  "A reply takes no delivery steer, so nothing was sent. Send it again without it: Agent HUD puts a reply into its sender's turn by itself while that turn waits for it.": "回复不能用 delivery steer，所以什么也没发出。去掉它再发一次：发送方的那一轮还在等这条回复时，Agent HUD 会自己把回复放进那一轮。",
   "A session without a folder is not offered here. Folders: {{list}}": "这里不能开不进目录的会话。可选的文件夹：{{list}}",
   "A small floating panel, with no glow.": "悬浮的小面板，没有光晕。",
   "A step of {{length}}": "一步 {{length}}",

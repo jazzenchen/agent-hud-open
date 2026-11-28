@@ -66,10 +66,11 @@ pub fn steer_codex_unanswered(language: Language) -> String {
 pub fn steer_waiting(language: Language) -> String {
     tr_in(language, "That session waits on an approval or a question, so nothing was sent. Tell the user; a steer is read only once it is answered.")
 }
-/// A reply goes back as a message of its own, never into a turn.
+/// A reply never takes `delivery: steer`: Agent HUD itself puts it into its
+/// sender's turn while that turn waits for it, and queues it otherwise.
 pub fn steer_reply(language: Language) -> String {
     tr_in(
         language,
-        "A reply is always queued, so nothing was sent. Send it again without delivery steer.",
+        "A reply takes no delivery steer, so nothing was sent. Send it again without it: Agent HUD puts a reply into its sender's turn by itself while that turn waits for it.",
     )
 }

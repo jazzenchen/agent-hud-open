@@ -29,6 +29,9 @@ pub(crate) enum Work {
     Send {
         clients: Arc<LocalClients>,
         request: SendRequest,
+        /// For a reply steered into the turn waiting for it: the same reply
+        /// queued, with its words' fingerprint, should that turn have ended.
+        fallback: Option<(SendRequest, String)>,
     },
     Start {
         starts: Arc<SessionStarts>,
@@ -56,6 +59,9 @@ pub struct Pending {
 /// What the client said to a delivery.
 pub enum Delivered {
     Sent(std::result::Result<Receipt, String>),
+    /// A reply meant for a waiting turn, queued once that turn had ended,
+    /// with the request id and the fingerprint of the words that went.
+    Queued(std::result::Result<Receipt, String>, String, String),
     Started(std::result::Result<StartReceipt, String>),
 }
 
@@ -63,10 +69,35 @@ impl Pending {
     /// Hands the words over. Runs with the messages' lock let go.
     pub fn deliver(&self, now: i64) -> Delivered {
         match &self.work {
-            Work::Send { clients, request } => {
+            Work::Send {
+                clients,
+                request,
+                fallback,
+            } => {
                 let receipt = clients.send(request.clone()).map_err(|e| e.to_string());
                 if let Ok(receipt) = &receipt {
                     clients.delivered(receipt, &self.surface, now);
+                }
+                // The waiting turn ended before the reply reached it: nothing
+                // went in, so it is queued as any reply.
+                let missed = receipt.as_ref().is_ok_and(|receipt| {
+                    receipt.state == DeliveryState::Failed
+                        || receipt.state == DeliveryState::Refused
+                        || receipt
+                            .reason
+                            .as_deref()
+                            .is_some_and(|reason| reason.contains(delivery::NO_TURN_TO_STEER))
+                });
+                if let (true, Some((queued, fingerprint))) = (missed, fallback) {
+                    let receipt = clients.send(queued.clone()).map_err(|e| e.to_string());
+                    if let Ok(receipt) = &receipt {
+                        clients.delivered(receipt, &self.surface, now);
+                    }
+                    return Delivered::Queued(
+                        receipt,
+                        queued.request_id.clone(),
+                        fingerprint.clone(),
+                    );
                 }
                 Delivered::Sent(receipt)
             }
@@ -188,6 +219,11 @@ impl Messaging {
                     .filter(|r| r.state == DeliveryState::Steered)
                     .and_then(|r| r.turn_id.clone());
                 send_outcome(receipt, steer, &message.to.client, language)
+            }
+            Delivered::Queued(receipt, request_id, fingerprint) => {
+                message.request_id = request_id.clone();
+                message.fingerprint = fingerprint.clone();
+                send_outcome(receipt, false, &message.to.client, language)
             }
             Delivered::Started(receipt) => match receipt {
                 Ok(receipt) => {

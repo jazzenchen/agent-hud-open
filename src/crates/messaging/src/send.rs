@@ -107,7 +107,8 @@ impl Messaging {
             return Ok(refused(&words::child(language)).into());
         }
         // Only a client that takes a message into a turn in progress gets a
-        // steer (Open #68); a reply is always queued, and a session waiting on
+        // steer (Open #68); a reply takes none (Agent HUD steers it below when its
+        // sender's turn waits for it), and a session waiting on
         // an approval or a question would not read one until it is answered.
         if steer {
             if !Provider::parse(client).is_some_and(Provider::takes_steer) {
@@ -149,6 +150,16 @@ impl Messaging {
             return Ok(refused(&words::limit(language, limit)).into());
         }
         let id = message_id();
+        // A reply whose parent's sender is still in the turn that sent the
+        // parent goes into that turn: the turn waits for it, and a queued
+        // reply would wait for the turn to end. Agent HUD decides this, not
+        // the agent; should the turn end first, it is queued after all.
+        let into_waiting = !steer
+            && Provider::parse(client).is_some_and(Provider::takes_steer)
+            && replied
+                .as_ref()
+                .is_some_and(|parent| waits_for_reply(target, parent, client, to));
+        let steer = steer || into_waiting;
         // Another agent's words never read as the user's in the middle of a
         // turn: a steer carries Agent HUD's label even under "Send as me".
         let (form, ask) = self.shape(arguments, steer);
@@ -166,6 +177,8 @@ impl Messaging {
             reply_to,
             text,
         );
+        // What is queued should the waiting turn end before it is steered.
+        let queued = into_waiting.then(|| delivered.clone());
         let delivered = match (steer, own_steer) {
             (true, true) => {
                 words::steer_last_line(language, client, &id, words::steered(language, delivered))
@@ -194,6 +207,17 @@ impl Messaging {
             expected_turn_id: None,
             model,
         };
+        let fallback = queued.map(|text| {
+            let fingerprint = transcript::fingerprint(&text);
+            // A request id of its own: the client has seen the steer's.
+            let request = SendRequest {
+                request_id: format!("{id}-queued"),
+                text,
+                operation: Operation::Enqueue,
+                ..request.clone()
+            };
+            (request, fingerprint)
+        });
         // A reply that goes back to its parent's sender settles the parent:
         // the journal names this reply, and its plane is the one back, so the
         // end of the turn that sent it throws no second.
@@ -232,6 +256,7 @@ impl Messaging {
             work: Work::Send {
                 clients: self.clients.clone(),
                 request,
+                fallback,
             },
             message,
             surface: caller.surface(),
@@ -241,4 +266,16 @@ impl Messaging {
             plane: Some((sender, recipient, from_left)),
         })))
     }
+}
+
+/// Whether `target`, the sender of the message `parent` that a reply
+/// answers, is still in the turn that sent it: running a turn that began no
+/// later than the message went out.
+fn waits_for_reply(target: &Value, parent: &Message, client: &str, to: &str) -> bool {
+    same_identity((&parent.from.client, &parent.from.session_id), (client, to))
+        && state(target) == "running"
+        && target["liveFacts"]["turnStartedAt"]
+            .as_str()
+            .and_then(|at| chrono::DateTime::parse_from_rfc3339(at).ok())
+            .is_some_and(|began| began.timestamp_millis() <= parent.sent_at_ms)
 }

@@ -21,7 +21,7 @@
   "A list-price estimate is unavailable for this selection.": "이 선택 항목은 정가 추정치를 사용할 수 없습니다.",
   "A message to a {{client}} session cannot choose its model; the session goes on in its own. Leave model out, or start a new session in that model with start_session.": "{{client}} 세션에 보내는 메시지에는 모델을 지정할 수 없습니다. 세션은 자신의 모델로 계속됩니다. model을 빼거나 start_session으로 그 모델의 새 세션을 시작하세요.",
   "A model server is free; a gateway uses list prices.": "모델 서버는 무료이며, 게이트웨이는 정가를 사용합니다.",
-  "A reply is always queued, so nothing was sent. Send it again without delivery steer.": "답장은 항상 대기열로 보내므로 아무것도 보내지 않았습니다. delivery steer 없이 다시 보내세요.",
+  "A reply takes no delivery steer, so nothing was sent. Send it again without it: Agent HUD puts a reply into its sender's turn by itself while that turn waits for it.": "답장에는 delivery steer를 쓸 수 없어 아무것도 보내지 않았습니다. 빼고 다시 보내세요. 보낸 쪽 턴이 이 답장을 기다리는 동안에는 Agent HUD가 알아서 그 턴에 넣습니다.",
   "A session without a folder is not offered here. Folders: {{list}}": "폴더 없는 세션은 여기서 제공되지 않습니다. 폴더: {{list}}",
   "A small floating panel, with no glow.": "글로우 없는 작은 플로팅 패널.",
   "A step of {{length}}": "한 단계 {{length}}",
