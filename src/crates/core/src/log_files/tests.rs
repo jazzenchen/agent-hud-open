@@ -80,3 +80,51 @@ fn claude_lists_sessions_and_subagents_but_not_workflow_journals() {
         &roots
     ));
 }
+
+#[test]
+fn unchanged_codex_archives_reuse_cached_decoded_length_without_reopening() {
+    let temp = tempfile::tempdir().unwrap();
+    let root = temp.path().join(".codex/sessions");
+    let archive = root.join("2026/10/21/rollout-cache.jsonl.zst");
+    fs::create_dir_all(archive.parent().unwrap()).unwrap();
+
+    let write_zst = |content: &[u8]| {
+        let mut encoder = zstd::Encoder::new(Vec::new(), 1).unwrap();
+        encoder
+            .set_pledged_src_size(Some(content.len() as u64))
+            .unwrap();
+        std::io::Write::write_all(&mut encoder, content).unwrap();
+        fs::write(&archive, encoder.finish().unwrap()).unwrap();
+    };
+
+    write_zst(b"{\"line\":1}\n");
+    let roots = vec![(root, "codex")];
+    let mut files = LogFiles::default();
+
+    let before = crate::compressed::header_reads();
+    files.refresh(&roots, &[]);
+    let after_first = crate::compressed::header_reads();
+    assert_eq!(
+        after_first - before,
+        1,
+        "first scan reads the zstd header once"
+    );
+    assert_eq!(files.files[&archive].length, 11);
+
+    // Force a full reconcile (`changes = None`) without touching the archive on disk.
+    files.note_changes(None);
+    files.refresh(&roots, std::slice::from_ref(&archive));
+    assert!(!files.stale(&roots, std::slice::from_ref(&archive)));
+    assert_eq!(
+        crate::compressed::header_reads(),
+        after_first,
+        "reconcile and stale checks reuse cached frame length with zero File::open calls"
+    );
+
+    // Rewriting the archive with a different decoded length invalidates the cache.
+    write_zst(b"{\"line\":1}\n{\"line\":222}\n");
+    files.note_changes(None);
+    files.refresh(&roots, &[]);
+    assert_eq!(files.files[&archive].length, 24);
+    assert_eq!(crate::compressed::header_reads(), after_first + 1);
+}

@@ -29,7 +29,18 @@ pub(super) fn counterpart(path: &Path) -> PathBuf {
         PathBuf::from(format!("{text}.zst"))
     }
 }
+#[cfg(test)]
+thread_local! {
+    static HEADER_READS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+#[cfg(test)]
+pub(crate) fn header_reads() -> usize {
+    HEADER_READS.with(std::cell::Cell::get)
+}
+
 pub(super) fn text_length(path: &Path) -> Option<u64> {
+    #[cfg(test)]
+    HEADER_READS.with(|count| count.set(count.get() + 1));
     let mut file = File::open(path).ok()?;
     let mut header = [0u8; 18];
     let count = file.read(&mut header).ok()?;

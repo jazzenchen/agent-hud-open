@@ -60,35 +60,23 @@ impl AgentHudCore {
             .database
             .as_ref()
             .ok_or("Quota history is unavailable")?;
-        let read = |id: &str| -> rusqlite::Result<Vec<(i64, f64)>> {
-            // The reading before the stretch, so a line can enter it from the
-            // left, then the readings in it, by the table's own key.
+        // A single ordered range scan from `since` covers both `cycles` and the
+        // `[from, to]` plot stretch; only when `span` holds nothing before
+        // `from` do we fetch the single leading anchor prior to `since`.
+        let read_before = |id: &str, bound: i64| -> rusqlite::Result<Option<(i64, f64)>> {
             let mut before = db.prepare_cached(
                 "SELECT observed_at_ms,remaining FROM quota_sample
                  WHERE window_id=?1 AND observed_at_ms<?2
                  ORDER BY observed_at_ms DESC LIMIT 1",
             )?;
-            let mut within = db.prepare_cached(
-                "SELECT observed_at_ms,remaining FROM quota_sample
-                 WHERE window_id=?1 AND observed_at_ms>=?2 AND observed_at_ms<=?3
-                 ORDER BY observed_at_ms",
-            )?;
-            let used = |r: &rusqlite::Row<'_>| {
+            let mut rows = before.query_map(params![id, bound], |r| {
                 Ok((
                     r.get::<_, i64>(0)?,
                     (100.0 - r.get::<_, f64>(1)?).clamp(0.0, 100.0),
                 ))
-            };
-            let mut samples = before
-                .query_map(params![id, from], used)?
-                .collect::<rusqlite::Result<Vec<_>>>()?;
-            for sample in within.query_map(params![id, from, to], used)? {
-                samples.push(sample?);
-            }
-            Ok(samples)
+            })?;
+            rows.next().transpose()
         };
-        // A window's readings back to a whole length before the stretch, so
-        // the cycle it starts in is whole.
         let read_since = |id: &str, since: i64| -> rusqlite::Result<Vec<cycles::Reading>> {
             let mut statement = db.prepare_cached(
                 "SELECT observed_at_ms,remaining,reset_at_ms FROM quota_sample
@@ -148,17 +136,23 @@ impl AgentHudCore {
                     .entry(model.clone())
                     .or_insert_with(|| json!({"id": model, "name": consumer_name(model)}));
             }
-            let samples =
-                read(id).map_err(|_| tr!("Quota history could not be read from SQLite"))?;
             let length = row["windowDurationSeconds"]
                 .as_f64()
                 .filter(|seconds| *seconds > 0.0)
                 .map(|seconds| (seconds * 1000.0) as i64);
             let reset = row["resetAt"].as_str().and_then(metering::date_ms);
             let cycle_start = reset.zip(length).map(|(reset, length)| reset - length);
-            let (segments, resets) = history(&samples, from, to, bin, cycle_start, length);
-            let span = read_since(id, from - length.unwrap_or(7 * 86_400_000))
+            let since = from - length.unwrap_or(7 * 86_400_000).max(1);
+            let span = read_since(id, since)
                 .map_err(|_| tr!("Quota history could not be read from SQLite"))?;
+            let before_since = if span.first().is_none_or(|first| first.0 >= from) {
+                read_before(id, since)
+                    .map_err(|_| tr!("Quota history could not be read from SQLite"))?
+            } else {
+                None
+            };
+            let samples = history_samples_from_span(before_since, &span, from);
+            let (segments, resets) = history(&samples, from, to, bin, cycle_start, length);
             let cycles = cycles::cycles(&span, length, reset)
                 .into_iter()
                 .filter(|cycle| cycle.end > from)
@@ -284,6 +278,24 @@ fn history(
     (segments, resets)
 }
 
+pub(super) fn history_samples_from_span(
+    before_since: Option<(i64, f64)>,
+    span: &[cycles::Reading],
+    from: i64,
+) -> Vec<(i64, f64)> {
+    let split = span.partition_point(|(at, _, _)| *at < from);
+    let anchor = split
+        .checked_sub(1)
+        .map(|idx| (span[idx].0, span[idx].1))
+        .or(before_since);
+    let mut out = Vec::with_capacity(usize::from(anchor.is_some()) + (span.len() - split));
+    if let Some(point) = anchor {
+        out.push(point);
+    }
+    out.extend(span[split..].iter().map(|&(at, used, _)| (at, used)));
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -390,5 +402,26 @@ mod tests {
             Some(7 * 24 * HOUR),
         );
         assert_eq!(segments, vec![vec![(t + 2 * HOUR, 40.0)]]);
+    }
+
+    #[test]
+    fn span_binary_slice_reuses_in_span_anchor_and_falls_back_to_older_anchor_only_when_needed() {
+        let from = 1_000_000i64;
+        let span = vec![
+            (from - 500, 12.0, None),
+            (from - 100, 18.0, None),
+            (from, 20.0, None),
+            (from + 300, 25.0, None),
+        ];
+        // When `span` already has readings before `from`, the latest `< from` becomes the anchor.
+        assert_eq!(
+            history_samples_from_span(Some((from - 9_000, 3.0)), &span, from),
+            vec![(from - 100, 18.0), (from, 20.0), (from + 300, 25.0)]
+        );
+        // When `span` starts at or after `from`, `before_since` leads into the stretch.
+        assert_eq!(
+            history_samples_from_span(Some((from - 9_000, 3.0)), &span[2..], from),
+            vec![(from - 9_000, 3.0), (from, 20.0), (from + 300, 25.0)]
+        );
     }
 }

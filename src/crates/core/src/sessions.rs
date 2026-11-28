@@ -6,6 +6,7 @@ use std::hash::{Hash, Hasher};
 
 mod detail;
 mod list;
+mod search;
 
 /// A log as the session list shows it, before its head is written. The
 /// session view needs core's projects and demo, so it lives in core.

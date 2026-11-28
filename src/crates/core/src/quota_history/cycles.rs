@@ -190,14 +190,17 @@ fn split(cycles: Vec<Cycle>, samples: &[Reading], length: i64, reset_at: i64) ->
             mark += length;
         }
         edges.push(cycle.end);
+        let mut cursor = samples.partition_point(|(at, _, _)| *at < edges[0]);
         for pair in edges.windows(2) {
+            while cursor < samples.len() && samples[cursor].0 < pair[0] {
+                cursor += 1;
+            }
             let mut piece = Cycle::new(pair[0]);
             piece.end = pair[1];
-            for &(at, used, _) in samples
-                .iter()
-                .filter(|(at, _, _)| (pair[0]..pair[1]).contains(at))
-            {
+            while cursor < samples.len() && samples[cursor].0 < pair[1] {
+                let (at, used, _) = samples[cursor];
                 piece.read(at, used);
+                cursor += 1;
             }
             if piece.readings > 0 {
                 out.push(piece);

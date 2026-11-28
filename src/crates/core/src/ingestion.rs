@@ -181,7 +181,7 @@ impl AgentHudCore {
     /// Codex's index. Read from memory; stat-checked by passes and looks.
     pub(crate) fn active_logs(&self) -> Vec<PathBuf> {
         let cutoff = Utc::now().timestamp_millis() - 86_400_000;
-        let mut recent: Vec<(&PathBuf, i64)> = self
+        let recent: Vec<(&PathBuf, i64)> = self
             .logs
             .values()
             .filter(|log| !log.gone)
@@ -203,11 +203,9 @@ impl AgentHudCore {
                     .map(|at| (&log.path, at))
             })
             .collect();
-        recent.sort_unstable_by_key(|(_, at)| std::cmp::Reverse(*at));
-        let mut paths = recent
+        let mut paths = top_recent_paths(recent, 64)
             .into_iter()
-            .take(64)
-            .map(|(path, _)| path.clone())
+            .cloned()
             .collect::<Vec<_>>();
         paths.extend(
             self.provider_roots
@@ -287,5 +285,41 @@ impl AgentHudCore {
                 .or_insert(latest);
         }
         bounds
+    }
+}
+
+pub(super) fn top_recent_paths<T: Clone>(mut recent: Vec<(T, i64)>, limit: usize) -> Vec<T> {
+    if limit == 0 || recent.is_empty() {
+        return Vec::new();
+    }
+    if recent.len() > limit {
+        recent.select_nth_unstable_by_key(limit - 1, |(_, at)| std::cmp::Reverse(*at));
+        recent.truncate(limit);
+    }
+    recent.sort_unstable_by_key(|(_, at)| std::cmp::Reverse(*at));
+    recent.into_iter().map(|(path, _)| path).collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::top_recent_paths;
+
+    #[test]
+    fn quickselect_picks_exact_top_k_in_descending_timestamp_order() {
+        let items: Vec<(usize, i64)> = (0..200)
+            .map(|i| (i, ((i * 73) % 200) as i64 * 1000))
+            .collect();
+        let mut expected = items.clone();
+        expected.sort_unstable_by_key(|(_, at)| std::cmp::Reverse(*at));
+        let expected_top: Vec<usize> = expected.into_iter().take(64).map(|(id, _)| id).collect();
+
+        let got = top_recent_paths(items, 64);
+        assert_eq!(got.len(), 64);
+        assert_eq!(got, expected_top);
+        assert!(top_recent_paths::<usize>(vec![], 64).is_empty());
+        assert_eq!(
+            top_recent_paths(vec![(1, 10), (2, 30), (3, 20)], 10),
+            vec![2, 3, 1]
+        );
     }
 }
