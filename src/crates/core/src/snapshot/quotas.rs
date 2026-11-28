@@ -24,6 +24,7 @@ impl crate::AgentHudCore {
                     Some(None) => pending_meter.values().all(read),
                 }
         };
+        let mut account_views = HashMap::new();
         let mut quotas = self
             .accounts
             .quotas
@@ -38,7 +39,19 @@ impl crate::AgentHudCore {
                         .zip(value["windowDurationSeconds"].as_f64())
                         .and_then(|(reset, duration)| reset.checked_sub((duration * 1000.0) as i64))
                         .unwrap_or(at - 7 * 86_400_000);
-                    row["metrics"] = view.metrics(
+                    let vendor = value["vendor"].as_str().unwrap_or_default();
+                    let id = &value["accountId"];
+                    let scoped = account_views
+                        .entry((vendor, id.as_str()))
+                        .or_insert_with(|| match self.attribution(vendor, id) {
+                            metering::Attribution::Provider => None,
+                            metering::Attribution::Home(scope) => {
+                                Some(view.scoped(&scope, &self.price_regions, at))
+                            }
+                            metering::Attribution::Ambiguous => Some(metering::View::default()),
+                        });
+                    let target_view = scoped.as_ref().unwrap_or(view);
+                    row["metrics"] = target_view.metrics(
                         value,
                         at,
                         metering_complete(value, cycle_start),

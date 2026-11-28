@@ -95,6 +95,7 @@ pub struct AgentHudCore {
     island_events: island_events::Tracker,
     source_notice: Option<String>,
     provider_roots: Vec<(PathBuf, &'static str)>,
+    removed_extra_roots: Vec<PathBuf>,
     settings_path: PathBuf,
     platform: String,
     /// Shows `--demo`'s sample sources rather than this machine's.
@@ -235,6 +236,10 @@ impl AgentHudCore {
                 .into_iter()
                 .map(|source| (source.path, source.provider))
                 .collect(),
+            removed_extra_roots: database
+                .as_ref()
+                .map(host::removed_roots)
+                .unwrap_or_default(),
             settings_path,
             platform: "Desktop".into(),
             demo: false,

@@ -114,6 +114,7 @@ impl AgentHudCore {
         let mut sessions: HashMap<(&str, &str, &str), &LogHead> = HashMap::new();
         for log in self.logs.values().filter(|log| {
             log.source != "codex-index"
+                && !self.is_under_removed_root(&log.path)
                 && !unwritten_buddy_transcript(log)
                 && (log.observed || log.source != qoder || segment(log).is_empty())
                 && self.log_on(&log.source, log.client.as_deref())

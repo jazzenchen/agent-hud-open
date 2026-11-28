@@ -141,9 +141,10 @@ notice while successful homes still appear; if every reading fails, the last
 reading remains marked stale. Saving a changed list discards readings from the
 previous list, including results still in flight.
 
-These additional homes provide subscription quotas. They do not change the
-client's active account, install hooks, or add transcript directories to token
-statistics.
+These additional homes provide subscription quotas and also add their `sessions`
+and `archived_sessions` directories to transcript collection (`SourceRoot`),
+attributing each home's usage independently in **Plan value** and quota cycle
+metrics while keeping removed homes excluded from active totals.
 
 ## Multiple Claude Code accounts
 
@@ -187,9 +188,10 @@ into SuperGrok, and then one account serves both. Saving a changed
 list discards readings from the previous list, including results still in
 flight.
 
-As with Codex, these folders provide subscription quotas only. They do not
-change Claude Code's active account, install hooks, or add transcript folders to
-token statistics.
+As with Codex, each configured `CLAUDE_CONFIG_DIR` folder contributes its
+`projects` transcripts to local session and token collection and scopes its
+account's **Plan value** and cycle consumption by directory, without changing
+Claude Code's default active login or system keychain.
 
 ## Claude Code's usage record
 
@@ -323,8 +325,10 @@ account of such a provider: its tier and list price, the provider's calls on
 this Mac over the last 30 days at API list prices (calls through a relay or a
 coding plan left out), and that as a multiple of the monthly price, marked "≥"
 while logs are still read, when the ledger begins inside the 30 days, or when
-some calls are unpriced or priced in another currency. Several accounts of one
-provider share its calls, so none of them gets a value. Advice appears only
+some calls are unpriced or priced in another currency. Accounts in distinct
+isolated homes (`antigravityHomes`, `claudeHomes`, `codexHomes`) each compute
+their own 30-day token total, USD list-price value and monthly ratio. Accounts
+with ambiguous directory ownership show an unavailable value. Advice appears only
 from readings taken under the current tier, for tiers with a stated multiple:
 a higher tier when the longest window (a day or more) reached 95% in at least
 2 of its last 4 completed cycles, the cheapest that would have held the busiest

@@ -145,6 +145,7 @@ impl Runtime {
                 if let Some(accounts) = &self.accounts {
                     accounts.cleanup_removed_homes(provider, &before, &after);
                 }
+                self.sync_extra_source_roots()?;
                 return Ok(self.decorate_snapshot(result, true));
             }
             let result = self.core.request(method, params)?;
@@ -296,6 +297,7 @@ impl Runtime {
                                 "set_setting",
                                 json!({"key": setting_key, "value": homes}),
                             )?;
+                            self.sync_extra_source_roots()?;
                             let _ = self.decorate_snapshot(updated, true);
                             if let Some(accounts) = &self.accounts {
                                 params["homes"] = self.core.setting_value(setting_key);
@@ -311,5 +313,16 @@ impl Runtime {
                 Ok(status)
             }
         }
+    }
+
+    fn sync_extra_source_roots(&mut self) -> Result<(), String> {
+        if !self.discover_host || self.is_demo() {
+            return Ok(());
+        }
+        let roots = self
+            .platform
+            .source_roots_for(&self.core.settings_snapshot());
+        self.changes.set_roots(&roots);
+        self.core.set_source_roots(roots)
     }
 }

@@ -89,9 +89,10 @@ pub(super) fn plan_reading(
             &client_home_key(host, folder, &host.home().join(".claude")),
         )
     });
+    let folder_str = folder.to_string_lossy().into_owned();
     let mut reading = Reading::empty("claude");
     reading.account = Some(
-        json!({"id":account_identity,"provider":"claude","label":label,"plan":plan,"identity":identity}),
+        json!({"id":account_identity,"provider":"claude","label":label,"plan":plan,"identity":identity,"home":folder_str}),
     );
     for window in windows {
         let Window {
@@ -107,7 +108,7 @@ pub(super) fn plan_reading(
             None if key == "claude-session" => window_names::Period::FiveHours.short_name(),
             None => window_names::Period::Week.short_name(),
         };
-        reading.quotas.push(json!({"id":format!("{id}:{key}"),"vendor":"claude","name":name,"shortLabel":short,"usedPercent":percent,"resetAt":reset,"status":status(percent),"account":label,"accountId":account_identity,"legacyWindowId":format!("{account_identity}/{key}"),"consumerSource":"claude","windowDurationSeconds":if key=="claude-session"{5*3600}else{7*86400},"allModels":family.is_none(),"modelFamilies":[family.as_deref().unwrap_or("claude")]}));
+        reading.quotas.push(json!({"id":format!("{id}:{key}"),"vendor":"claude","name":name,"shortLabel":short,"usedPercent":percent,"resetAt":reset,"status":status(percent),"account":label,"accountId":account_identity,"legacyWindowId":format!("{account_identity}/{key}"),"consumerSource":"claude","consumerHome":folder_str,"windowDurationSeconds":if key=="claude-session"{5*3600}else{7*86400},"allModels":family.is_none(),"modelFamilies":[family.as_deref().unwrap_or("claude")]}));
     }
     reading
 }

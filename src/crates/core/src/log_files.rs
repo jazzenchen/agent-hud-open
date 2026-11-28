@@ -56,6 +56,12 @@ impl LogFiles {
         }
     }
 
+    pub fn reset_roots(&mut self) {
+        self.scanned_at = None;
+        self.changes = None;
+        self.external_changes = true;
+    }
+
     /// When the next full walk of every root is due: the reconcile that
     /// catches what the file watcher missed.
     pub fn next_reconcile(&self) -> Option<Instant> {
