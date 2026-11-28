@@ -1,18 +1,11 @@
 //! The command line the Claude desktop app keeps off PATH:
 //! `<data>\claude-code\<version>\<hash>\claude.exe`.
-use super::{claude_desktop_bases, local_app, Environment};
+use super::{claude_desktop_bases, Environment};
 use std::path::{Path, PathBuf};
 
-/// Its copies, newest first in each data folder: %APPDATA%\Claude, the Store
-/// package's redirected copy of it, and %LOCALAPPDATA%\Claude-Data, which the
-/// MSIX package keeps out of that redirection, at most one folder down
-/// (agent-hud-open#74).
+/// Its copies, newest first in each of the desktop app's data folders.
 pub(super) fn engines(home: &Path, env: &Environment) -> Vec<PathBuf> {
-    let data = local_app(home, env).join("Claude-Data");
-    let mut roots = claude_desktop_bases(home, env);
-    roots.extend(subfolders(&data));
-    roots.push(data);
-    roots
+    claude_desktop_bases(home, env)
         .iter()
         .flat_map(|root| newest_nested(&root.join("claude-code"), "claude.exe"))
         .collect()
@@ -72,5 +65,24 @@ mod tests {
             found.contains(&direct) && found.contains(&nested),
             "{found:?}"
         );
+    }
+
+    #[test]
+    fn the_folder_the_app_moved_its_data_to_is_one_of_its_data_folders() {
+        let temp = tempfile::tempdir().unwrap();
+        let local = temp.path().join("Local");
+        let roaming = temp.path().join("Roaming");
+        let env = Environment::from([
+            ("LOCALAPPDATA".into(), local.to_string_lossy().into_owned()),
+            ("APPDATA".into(), roaming.to_string_lossy().into_owned()),
+        ]);
+        let left = roaming.join("Claude");
+        let moved = local.join("Claude-Data/claude_pzs8sxrjxfjjc");
+        std::fs::create_dir_all(&left).unwrap();
+        std::fs::create_dir_all(&moved).unwrap();
+        std::fs::write(left.join(".user-data-left.claude_pzs8sxrjxfjjc"), b"").unwrap();
+        std::fs::write(moved.join("config.json"), b"{}").unwrap();
+        let bases = claude_desktop_bases(temp.path(), &env);
+        assert!(bases.contains(&left) && bases.contains(&moved), "{bases:?}");
     }
 }

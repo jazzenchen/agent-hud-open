@@ -6,7 +6,6 @@ use super::desktop_token::{from_token, has_token};
 use crate::account::{add_readers, append_notice, legacy_account, merge, names_none, read_by};
 use crate::account::{read_json, Host, QuotaReading};
 use crate::account::{Reading, Unread};
-use crate::Base;
 use serde_json::json;
 
 /// The Claude desktop app's data folder, where it keeps its sign-in.
@@ -14,10 +13,7 @@ pub(super) const DESKTOP: &str = "Claude";
 
 /// The account the Claude desktop app last signed in to.
 pub(super) fn desktop_user(host: &dyn Host) -> Option<String> {
-    read_json(
-        host,
-        &host.folder(Base::AppData).join(DESKTOP).join("config.json"),
-    )?["lastKnownAccountUuid"]
+    read_json(host, &host.app_data(DESKTOP).join("config.json"))?["lastKnownAccountUuid"]
         .as_str()
         .filter(|user| !user.is_empty())
         .map(str::to_owned)

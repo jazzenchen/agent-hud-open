@@ -230,6 +230,12 @@ pub trait Host {
     fn file_info(&self, path: &Path) -> Answer<FileInfo>;
     /// The paths in a folder, in no particular order.
     fn list_dir(&self, path: &Path) -> Answer<Vec<PathBuf>>;
+    /// The folder the desktop app named `app` keeps its data in: usually the
+    /// one of its name under the app data folder, but an app may have moved
+    /// it (the Claude desktop app's Windows package did).
+    fn app_data(&self, app: &str) -> PathBuf {
+        self.folder(Base::AppData).join(app)
+    }
     /// A secret a client keeps in the system's credential store, by service
     /// name. `Unsupported` where this OS's store is not read yet.
     fn secret(&self, service: &str) -> Answer<String>;

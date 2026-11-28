@@ -27,9 +27,12 @@ pub(super) fn find_store_packages(local_app_dir: &Path, prefix: &str) -> Vec<Pat
     store
 }
 
-/// Where the Claude desktop app keeps its session metadata: roaming AppData,
-/// and the Microsoft Store package's redirected copy of it
-/// (`Packages\Claude_<publisher>\LocalCache\Roaming\Claude`). Only folders that exist.
+/// Where the Claude desktop app keeps its data (sign-in, session metadata,
+/// its own command line): roaming AppData, the Microsoft Store package's
+/// redirected copy of it (`Packages\Claude_<publisher>\LocalCache\Roaming\Claude`),
+/// and `%LOCALAPPDATA%\Claude-Data`, which the MSIX package keeps out of that
+/// redirection, at most one folder down (`Claude-Data\claude_<publisher>`;
+/// agent-hud-open#74). Only folders that exist.
 pub(crate) fn claude_desktop_bases(home: &Path, env: &Environment) -> Vec<PathBuf> {
     let mut bases = vec![app_support(home, env).join("Claude")];
     bases.extend(
@@ -37,6 +40,16 @@ pub(crate) fn claude_desktop_bases(home: &Path, env: &Environment) -> Vec<PathBu
             .into_iter()
             .map(|package| package.join("LocalCache/Roaming/Claude")),
     );
+    let moved = local_app(home, env).join("Claude-Data");
+    let mut profiles: Vec<PathBuf> = std::fs::read_dir(&moved)
+        .into_iter()
+        .flatten()
+        .filter_map(Result::ok)
+        .map(|entry| entry.path())
+        .collect();
+    profiles.sort();
+    bases.extend(profiles);
+    bases.push(moved);
     bases.retain(|base| base.is_dir());
     bases
 }

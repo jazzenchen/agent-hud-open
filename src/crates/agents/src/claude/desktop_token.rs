@@ -20,7 +20,6 @@ use super::desktop_usage::{desktop_user, DESKTOP};
 use super::quota_windows::{plan_reading, profile_plan, windows};
 use crate::account::{read_by, read_json, Host, HttpFailure, HttpRequest, Reading, Unread};
 use crate::l10n::tr;
-use crate::Base;
 use base64::{engine::general_purpose::STANDARD, Engine};
 use serde_json::{json, Value};
 use std::time::Duration;
@@ -44,7 +43,7 @@ struct SignIn {
 
 /// The desktop app's unexpired sign-ins whose scopes hold `user:profile`.
 fn sign_ins(host: &dyn Host, now: i64) -> Vec<SignIn> {
-    let config = host.folder(Base::AppData).join(DESKTOP).join("config.json");
+    let config = host.app_data(DESKTOP).join("config.json");
     let Some(cache) = read_json(host, &config)
         .and_then(|config| STANDARD.decode(config[CACHE].as_str()?).ok())
         .and_then(|sealed| host.unseal_safe_storage(DESKTOP, &sealed).found())

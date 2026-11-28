@@ -92,8 +92,38 @@ impl Host for AccountContext {
     fn app_cookie(&self, app: &str, site: &str, name: &str) -> Answer<String> {
         crate::os::app_cookie(&self.folder(Base::AppData), app, site, name)
     }
+    fn app_data(&self, app: &str) -> PathBuf {
+        let usual = self.folder(Base::AppData).join(app);
+        if app != "Claude" {
+            return usual;
+        }
+        // The one of its folders whose sign-in was written last: a folder it
+        // moved out of keeps no config.json.
+        crate::os::claude_desktop_bases(&self.home, &self.env)
+            .into_iter()
+            .filter_map(|base| {
+                let written = fs::metadata(base.join("config.json"))
+                    .ok()?
+                    .modified()
+                    .ok()?;
+                Some((written, base))
+            })
+            .max_by_key(|(written, _)| *written)
+            .map_or(usual, |(_, base)| base)
+    }
     fn unseal_safe_storage(&self, app: &str, encrypted: &[u8]) -> Answer<String> {
-        crate::os::unseal_safe_storage(&self.folder(Base::AppData), app, encrypted)
+        // The key is kept beside the data, so a moved folder is read where it is.
+        let data = self.app_data(app);
+        let usual = self.folder(Base::AppData);
+        match (
+            data.parent(),
+            data.file_name().and_then(|name| name.to_str()),
+        ) {
+            (Some(parent), Some(name)) if data != usual.join(app) => {
+                crate::os::unseal_safe_storage(parent, name, encrypted)
+            }
+            _ => crate::os::unseal_safe_storage(&usual, app, encrypted),
+        }
     }
     fn app_secret(&self, service: &str, account: &str) -> Answer<String> {
         crate::os::app_secret(service, account)
