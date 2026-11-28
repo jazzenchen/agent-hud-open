@@ -98,7 +98,7 @@ fn block_issues(
     let asked = change["widget"].as_str();
     if let Some(widget) = asked.filter(|w| !kind.widgets().contains(w)) {
         let refusal = if kind == Kind::Balance
-            && matches!(widget, "bar" | "ring" | "rings" | "segments")
+            && matches!(widget, "bar" | "pool" | "ring" | "rings" | "segments")
         {
             format!("\"{key}\" is an API balance, which has no ceiling, so the \"{widget}\" widget has nothing to measure it against.")
         } else {

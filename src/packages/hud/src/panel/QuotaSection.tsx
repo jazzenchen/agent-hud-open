@@ -1,3 +1,4 @@
+import { visibleQuotaPools } from "../quota-rows";
 import { memo, useMemo, useState } from "react";
 import type { PanelBlockLayout, Quota, Snapshot } from "@agent-hud/protocol";
 import { quotaMetricAvailability } from "../quota-metrics";
@@ -18,6 +19,7 @@ import { measures, palette, type Logo, type Measure } from "./theme";
 import { SourceTokenChart } from "./TokenChartSection";
 import { MetricPicker } from "./MetricPicker";
 import { BlockHeading, PlanBadge } from "./BlockHeading";
+import { QuotaPoolCard } from "./QuotaPoolCard";
 import { RingReset } from "./QuotaRingCard";
 import { QuotaWidgets } from "./QuotaWidgets";
 
@@ -114,6 +116,21 @@ export const SourceProviderBlock = memo(function SourceProviderBlock({
     : null;
   const recentMoney = recent ? recentCost(recent, format.language) : null;
   const countdown = layout.countdown ?? showReset;
+  const vendorPools = useMemo(
+    () => visibleQuotaPools(snapshot.quotaPools ?? [], vendor, rows),
+    [snapshot.quotaPools, vendor, rows],
+  );
+  const recommendedAccountId = vendorPools[0]?.recommendedAccountId ?? null;
+  const multiAccountMode =
+    layout.multiAccountView ??
+    (layout.widget === "pool" ? "pooled" : "stacked");
+  const canPool =
+    measure === "quota" && sections.length >= 2 && vendorPools.length > 0;
+  const showPooledOnly = canPool && multiAccountMode === "pooled";
+  const pooledRows = new Set(
+    vendorPools.flatMap((pool) => pool.members.map((m) => m.quotaId)),
+  );
+  const showPooledHeader = canPool && multiAccountMode === "both";
   // A ring with no legend makes a compact block: stacked, the account and the
   // reset under the ring.
   const compact =
@@ -217,67 +234,90 @@ export const SourceProviderBlock = memo(function SourceProviderBlock({
           )}
         </>
       ) : (
-        sections.map(({ key, rows: sectionRows, account, current }, index) => {
-          // Earned resets belong to the signed-in Codex account.
-          const resets =
-            account &&
-            current &&
-            sectionRows.some((row) => vendorKey(row.vendor) === "openai")
-              ? account.resetCredits
-              : null;
-          return (
-            <div
-              key={key}
-              className="hud-source-account-section"
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: "var(--hud-block-gap, 8px)",
-              }}
-            >
-              {account && !compact && (
-                <AccountHeader account={account} now={now} light={light} />
-              )}
+        <>
+          {(showPooledOnly || showPooledHeader) && (
+            <QuotaPoolCard
+              pools={vendorPools}
+              now={now}
+              light={light}
+              showReset={countdown}
+              onStats={onStats}
+            />
+          )}
+          {sections.map(({ key, rows, account, current }, index) => {
+            const sectionRows = showPooledOnly
+              ? rows.filter((row) => !pooledRows.has(row.id))
+              : rows;
+            if (!sectionRows.length) return null;
+            // Earned resets belong to the signed-in Codex account.
+            const resets =
+              account &&
+              current &&
+              sectionRows.some((row) => vendorKey(row.vendor) === "openai")
+                ? account.resetCredits
+                : null;
+            return (
               <div
+                key={key}
+                className="hud-source-account-section"
                 style={{
-                  display: "grid",
+                  display: "flex",
+                  flexDirection: "column",
                   gap: "var(--hud-block-gap, 8px)",
-                  opacity: current ? 1 : 0.55,
                 }}
               >
-                <QuotaWidgets
-                  rows={sectionRows}
-                  layout={layout}
-                  measure={measure}
-                  now={now}
-                  light={light}
-                  showReset={countdown}
-                  onStats={onStats}
-                />
+                {account && !compact && (
+                  <AccountHeader
+                    account={account}
+                    now={now}
+                    light={light}
+                    recommended={
+                      sections.length >= 2 &&
+                      account.id === recommendedAccountId
+                    }
+                  />
+                )}
+                <div
+                  style={{
+                    display: "grid",
+                    gap: "var(--hud-block-gap, 8px)",
+                    opacity: current ? 1 : 0.55,
+                  }}
+                >
+                  <QuotaWidgets
+                    rows={sectionRows}
+                    layout={layout}
+                    measure={measure}
+                    now={now}
+                    light={light}
+                    showReset={countdown}
+                    onStats={onStats}
+                  />
+                </div>
+                {/* A compact block's first account is its heading's plan. */}
+                {account && compact && index > 0 && (
+                  <AccountHeader
+                    account={account}
+                    now={now}
+                    light={light}
+                    compact
+                  />
+                )}
+                {compact && countdown && (
+                  <RingReset rows={sectionRows} now={now} light={light} />
+                )}
+                {resets && (
+                  <ResetCreditsRow
+                    resets={resets}
+                    showExpiry={countdown}
+                    light={light}
+                    compact={compact}
+                  />
+                )}
               </div>
-              {/* A compact block's first account is its heading's plan. */}
-              {account && compact && index > 0 && (
-                <AccountHeader
-                  account={account}
-                  now={now}
-                  light={light}
-                  compact
-                />
-              )}
-              {compact && countdown && (
-                <RingReset rows={sectionRows} now={now} light={light} />
-              )}
-              {resets && (
-                <ResetCreditsRow
-                  resets={resets}
-                  showExpiry={countdown}
-                  light={light}
-                  compact={compact}
-                />
-              )}
-            </div>
-          );
-        })
+            );
+          })}
+        </>
       )}
     </section>
   );

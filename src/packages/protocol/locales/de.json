@@ -1606,5 +1606,13 @@
   "Bind an isolated folder you already signed in to.": "Verknüpfe einen isolierten Ordner, in dem du bereits angemeldet bist.",
   "Import folder": "Ordner importieren",
   "CLI status-line hook (advanced)": "CLI-Statuszeilen-Hook (Erweitert)",
-  "Optional status-line callback for external Antigravity CLI settings files.": "Optionaler Statuszeilen-Callback für externe settings.json-Dateien der Antigravity-CLI."
+  "Optional status-line callback for external Antigravity CLI settings files.": "Optionaler Statuszeilen-Callback für externe settings.json-Dateien der Antigravity-CLI.",
+  "Pooled across {{count}} accounts": "Über {{count}} Konten gebündelt",
+  "Best next: {{account}}": "Empfohlen: {{account}}",
+  "Recommended": "Empfohlen",
+  "Multi-account view": "Mehrkonten-Ansicht",
+  "Combine accounts into one pooled capacity bar or list each account separately.": "Konten zu einem gemeinsamen Kapazitätsbalken bündeln oder einzeln auflisten.",
+  "Separate": "Einzeln",
+  "Pooled": "Pool",
+  "Both": "Beides"
 }

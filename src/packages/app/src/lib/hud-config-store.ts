@@ -138,6 +138,15 @@ export function parseHUDConfigStore(value: unknown): HUDConfigStore | null {
         screenSettings(settings),
       ]),
     ),
+    ...(record(value.sharedLayout)
+      ? { sharedLayout: value.sharedLayout as PanelLayout }
+      : {}),
+    ...(record(value.layouts)
+      ? { layouts: value.layouts as Record<string, PanelLayout> }
+      : {}),
+    ...(record(value.sources)
+      ? { sources: value.sources as Record<string, SourcePreferences> }
+      : {}),
   };
 }
 /** Only data formats actually written by this app are carried. Old shared panel values
@@ -232,6 +241,7 @@ export function updateScreenHUDConfig(
   patch: Partial<HUDConfig>,
 ): HUDConfigStore {
   return {
+    ...store,
     version: 3,
     global: { ...store.global, ...pickSettings(patch, globalKeys) },
     screens: {

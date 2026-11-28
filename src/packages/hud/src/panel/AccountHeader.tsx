@@ -16,15 +16,19 @@ export function AccountHeader({
   now,
   light,
   compact = false,
+  recommended = false,
 }: {
   account: Account;
   now: number;
   light: boolean;
   /** Under a compact block's ring: the name and plan in the middle, no more. */
   compact?: boolean;
+  /** Highlighted when Core recommends spending this account next across >= 2 accounts. */
+  recommended?: boolean;
 }) {
   const colors = palette(useGround(light));
   const { language } = useFormat();
+  const t = useT();
   const current = account.current !== false;
   const name = account.name ?? account.label ?? account.id;
   return (
@@ -67,6 +71,23 @@ export function AccountHeader({
             }}
           >
             {account.planLabel}
+          </span>
+        )}
+        {recommended && !compact && (
+          <span
+            style={{
+              flex: "0 0 auto",
+              fontSize: 10,
+              lineHeight: "14px",
+              padding: "0 5px",
+              borderRadius: 4,
+              fontWeight: 600,
+              color: colors.okText,
+              background: colors.card,
+              whiteSpace: "nowrap",
+            }}
+          >
+            {t("Recommended")}
           </span>
         )}
         {!compact && (

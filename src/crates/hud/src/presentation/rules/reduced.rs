@@ -46,6 +46,9 @@ pub(in crate::presentation) fn reduced(layout: &Value, present: &[Block]) -> Val
             if c.get("widget").and_then(Value::as_str) == Some(kind.default_widget()) {
                 c.remove("widget");
             }
+            if c.get("multiAccountView") == Some(&json!("stacked")) {
+                c.remove("multiAccountView");
+            }
             let widget = kind.widget(c.get("widget").and_then(Value::as_str));
             if !kind.takes_countdown() {
                 c.remove("countdown");

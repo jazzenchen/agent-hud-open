@@ -1574,5 +1574,13 @@
   "Bind an isolated folder you already signed in to.": "이미 로그인되어 있는 격리 폴더를 연결합니다.",
   "Import folder": "폴더 가져오기",
   "CLI status-line hook (advanced)": "CLI 상태줄 훅 (고급)",
-  "Optional status-line callback for external Antigravity CLI settings files.": "선택 사항: 외부 Antigravity CLI settings.json 파일용 상태줄 콜백 설정입니다."
+  "Optional status-line callback for external Antigravity CLI settings files.": "선택 사항: 외부 Antigravity CLI settings.json 파일용 상태줄 콜백 설정입니다.",
+  "Pooled across {{count}} accounts": "{{count}}개 계정 통합 한도 풀",
+  "Best next: {{account}}": "추천 계정: {{account}}",
+  "Recommended": "추천",
+  "Multi-account view": "다중 계정 보기",
+  "Combine accounts into one pooled capacity bar or list each account separately.": "여러 계정을 하나의 통합 용량 바로 합치거나 계정별로 나누어 표시합니다.",
+  "Separate": "개별 표시",
+  "Pooled": "통합 풀",
+  "Both": "모두 표시"
 }

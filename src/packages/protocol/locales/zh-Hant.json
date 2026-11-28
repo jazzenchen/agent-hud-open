@@ -1574,5 +1574,13 @@
   "Bind an isolated folder you already signed in to.": "綁定已經完成登入的外部隔離目錄。",
   "Import folder": "匯入目錄",
   "CLI status-line hook (advanced)": "CLI 狀態列回呼（進階相容）",
-  "Optional status-line callback for external Antigravity CLI settings files.": "可選：透過修改外部 Antigravity CLI settings.json 接收狀態列回呼。"
+  "Optional status-line callback for external Antigravity CLI settings files.": "可選：透過修改外部 Antigravity CLI settings.json 接收狀態列回呼。",
+  "Pooled across {{count}} accounts": "{{count}} 個帳號合併額度池",
+  "Best next: {{account}}": "推薦優先：{{account}}",
+  "Recommended": "推薦優先使用",
+  "Multi-account view": "多帳號顯示方式",
+  "Combine accounts into one pooled capacity bar or list each account separately.": "將多個帳號合併為一條總容量池進度條，或按帳號分開顯示明細。",
+  "Separate": "分號明細",
+  "Pooled": "合併池",
+  "Both": "同時顯示"
 }

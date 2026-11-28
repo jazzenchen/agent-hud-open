@@ -240,6 +240,11 @@ without touching the system keychain or default account. Existing isolated
 folders can also be imported under **Import existing folder** (`settings.antigravityHomes`),
 and **Copy launch command** copies the shell-escaped terminal command for that
 subscription.
+For matching quota windows, **Multi-account view** offers **Separate**, **Pooled**
+and **Both**. The pooled percentage is the arithmetic mean of the accounts’
+utilization percentages. Each account has equal weight, even across plan tiers.
+The bar shows the next reset and the suggested account to use for that window.
+
 Under **CLI status-line hook (advanced)**, you can optionally add external CLI
 `settings.json` files (`settings.antigravityCliSettings`) for live status-line
 callbacks.
