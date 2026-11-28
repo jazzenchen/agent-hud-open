@@ -176,7 +176,7 @@ fn connected_cli_reports_use_account_cadence_and_callback_requests_respect_spaci
 fn a_callback_during_an_account_read_remains_pending_after_that_read_commits() {
     fn blocked(host: &dyn agents::Host) -> Result<AccountReading, Unread> {
         assert_eq!(
-            host.account_homes("antigravity"),
+            host.account_homes(homes::ANTIGRAVITY_CLI_KEY),
             [host.home().join("cli/settings.json")],
         );
         std::fs::write(host.home().join("read-started"), "").map_err(|error| error.to_string())?;
@@ -281,7 +281,7 @@ fn callback_inbox_reaches_only_the_selected_account_context() {
     assert!(agents::Host::account_reports(&context, "antigravity").is_empty());
     context
         .account_homes
-        .insert("antigravity".into(), vec![configuration]);
+        .insert(homes::ANTIGRAVITY_CLI_KEY.into(), vec![configuration]);
     let reports = agents::Host::account_reports(&context, "antigravity");
     assert_eq!(reports.len(), 1);
     assert_eq!(reports[0]["email"], "account@example.com");
@@ -309,7 +309,11 @@ fn entry(reading: AccountReading, checked_at: Option<&str>, restored: bool) -> E
 
 #[test]
 fn configured_homes_enable_undetected_accounts_and_changes_retire_old_readings() {
-    for (provider, setting) in [("codex", "codexHomes"), ("claude", "claudeHomes")] {
+    for (provider, setting) in [
+        ("codex", "codexHomes"),
+        ("claude", "claudeHomes"),
+        ("antigravity", "antigravityHomes"),
+    ] {
         let directory = tempfile::tempdir().unwrap();
         let service = AccountService::with_readers(
             directory.path().into(),
@@ -446,13 +450,18 @@ fn restored_accounts_keep_their_home_scope_and_removed_homes_do_not_return() {
     static CLAUDE: Provider = Provider::new("claude", unread);
     static ANTIGRAVITY: Provider = Provider::new("antigravity", unread);
     static READERS: [&Provider; 3] = [&CODEX, &CLAUDE, &ANTIGRAVITY];
-    for (provider, setting) in [
-        ("codex", "codexHomes"),
-        ("claude", "claudeHomes"),
-        ("antigravity", "antigravityCliSettings"),
+    for (provider, key, setting) in [
+        ("codex", "codex", "codexHomes"),
+        ("claude", "claude", "claudeHomes"),
+        ("antigravity", "antigravity", "antigravityHomes"),
+        (
+            "antigravity",
+            homes::ANTIGRAVITY_CLI_KEY,
+            "antigravityCliSettings",
+        ),
     ] {
         let directory = tempfile::tempdir().unwrap();
-        let homes = HashMap::from([(provider.into(), vec![directory.path().join("work")])]);
+        let homes = HashMap::from([(key.into(), vec![directory.path().join("work")])]);
         let entries = BTreeMap::from([(
             provider,
             entry(

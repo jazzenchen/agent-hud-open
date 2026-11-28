@@ -1,8 +1,8 @@
 //! Official agy status-line reports identify the signed-in account and its
 //! quota buckets. Only these account facts cross the callback storage boundary.
+use super::buckets::{build_quota_row, finalize_quotas};
 use crate::account::{account_id, legacy_account, status, Reading};
 use crate::l10n::tr;
-use crate::naming::window_names::Period;
 use chrono::{DateTime, Utc};
 use serde_json::{json, Map, Value};
 use std::collections::BTreeSet;
@@ -63,51 +63,35 @@ fn parse_at(report: &Value, now: DateTime<Utc>) -> Option<Reading> {
     }));
     let mut groups = BTreeSet::new();
     for (key, bucket) in report["quota"].as_object()? {
-        let (group, duration, families) = match key.as_str() {
-            "gemini-weekly" => ("Gemini", Some(604800), Some(json!(["gemini"]))),
-            "gemini-5h" => ("Gemini", Some(18000), Some(json!(["gemini"]))),
-            "3p-weekly" => ("3rd-party", Some(604800), Some(json!(["claude", "gpt"]))),
-            "3p-5h" => ("3rd-party", Some(18000), Some(json!(["claude", "gpt"]))),
-            _ => (key.as_str(), None, None),
-        };
-        groups.insert(group);
-        let used = (1.0 - bucket["remaining_fraction"].as_f64()?) * 100.0;
-        let period = Period::from_seconds(duration.map(f64::from));
-        let name = period.as_ref().map_or_else(
-            || group.to_owned(),
-            |period| format!("{group} · {}", period.short_name()),
-        );
-        let short = period.as_ref().map_or_else(
-            || group.to_owned(),
-            |period| format!("{group} {}", period.after_word()),
-        );
-        let reset = bucket["reset_time"].as_str();
-        let expired = reset
+        let fraction = bucket["remaining_fraction"].as_f64()?;
+        let raw_reset = bucket["reset_time"].as_str();
+        let expired = raw_reset
             .and_then(|value| DateTime::parse_from_rfc3339(value).ok())
             .is_some_and(|reset| reset <= now);
-        let mut quota = json!({
-            "id":format!("{id}:{key}"),"windowKey":format!("antigravity:{key}"),"vendor":"antigravity","source":"antigravity_cli","accountId":account,
-            "account":email,"name":name,"shortLabel":short,"usedPercent":used,
-            "status":if stale || expired {"stale"}else{status(used)},
-            "resetAt":reset,"windowDurationSeconds":duration,"observedAt":observed_at,
+        let (family, mut quota) = build_quota_row(
+            &id,
+            key,
+            &account,
+            Some(email),
+            None,
+            None,
+            None,
+            fraction,
+            raw_reset,
+            now,
+        );
+        groups.insert(family);
+        let used = quota["usedPercent"].as_f64().unwrap_or(0.0);
+        quota["source"] = json!("antigravity_cli");
+        quota["observedAt"] = json!(observed_at);
+        quota["status"] = json!(if stale || expired {
+            "stale"
+        } else {
+            status(used)
         });
-        if let Some(families) = families {
-            quota["modelFamilies"] = families;
-        }
         reading.quotas.push(quota);
     }
-    for quota in &mut reading.quotas {
-        // An unknown bucket does not establish which models it covers.
-        let all = groups.len() == 1 && !quota["modelFamilies"].is_null();
-        quota["allModels"] = json!(all);
-        // Its calls are logged by model, which picks the pool.
-        quota["consumerSource"] = json!("antigravity");
-        if all {
-            if let Some(period) = Period::from_seconds(quota["windowDurationSeconds"].as_f64()) {
-                quota["shortLabel"] = json!(period.short_name());
-            }
-        }
-    }
+    finalize_quotas(&mut reading.quotas, groups.len());
     if reading.quotas.is_empty() {
         reading.notice = Some(tr!(
             "Antigravity CLI identified the account but reports no quota percentage."
@@ -177,6 +161,29 @@ mod tests {
         assert_eq!(reading.quotas[0]["windowKey"], "antigravity:3p-5h");
         assert_eq!(reading.quotas[1]["windowKey"], "antigravity:gemini-weekly");
         assert_eq!(reading.quotas[1]["allModels"], false);
+    }
+
+    #[test]
+    fn carbon_and_argon_statusline_buckets_get_exact_durations_and_filter_rolling_resets() {
+        let report = sanitize(
+            &json!({
+                "email": "pro@example.com",
+                "plan_tier": "Google AI Pro",
+                "quota": {
+                    "gemini-carbon-5h": {"remaining_fraction": 1.0, "reset_time": "2026-10-23T13:00:10Z"},
+                    "gemini-argon-weekly": {"remaining_fraction": 0.6, "reset_time": "2026-10-30T00:00:00Z"}
+                }
+            }),
+            "2026-10-23T08:00:00Z",
+        )
+        .unwrap();
+        let reading = parse_at(&report, now()).unwrap();
+        assert_eq!(reading.quotas.len(), 2);
+        assert_eq!(reading.quotas[0]["shortLabel"], "Argon 7d");
+        assert_eq!(reading.quotas[0]["windowDurationSeconds"], 604_800);
+        assert_eq!(reading.quotas[1]["shortLabel"], "Carbon 5h");
+        assert_eq!(reading.quotas[1]["windowDurationSeconds"], 18_000);
+        assert!(reading.quotas[1]["resetAt"].is_null());
     }
 
     #[test]

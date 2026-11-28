@@ -1,9 +1,15 @@
 //! What the user changes about an account: API credentials, relays, account
 //! homes and web sign-ins. A change reads the provider it touches again.
-use super::{credentials, homes, web, AccountContext, AccountService, CollectionGate, Shared};
+use super::{
+    credentials, homes, launch_cmd, managed_profiles_meta, web, AccountContext, AccountService,
+    CollectionGate, Shared,
+};
 use agent_hud_agents as agents;
 use serde_json::{json, Value};
-use std::sync::{Arc, PoisonError};
+use std::{
+    path::PathBuf,
+    sync::{Arc, PoisonError},
+};
 
 /// The sign-in window's side of a web sign-in (`agents::account::WebSignIn`),
 /// which the host holds while the window is open. A session the window
@@ -97,6 +103,32 @@ impl AccountService {
     }
     pub fn validate_account_homes(&self, value: &Value) -> Result<(), String> {
         homes::paths(&self.context.home, value).map(|_| ())
+    }
+    pub fn resolve_account_homes(&self, value: &Value) -> Result<Vec<PathBuf>, String> {
+        homes::paths(&self.context.home, value)
+    }
+    pub fn cleanup_removed_homes(&self, provider: &str, before: &[PathBuf], after: &[PathBuf]) {
+        for path in before {
+            if !after.contains(path) {
+                managed_profiles_meta::cleanup_removed_home(&self.context.data_dir, provider, path);
+            }
+        }
+    }
+    pub fn profile_sign_in_start(&self, params: &Value) -> Result<Value, String> {
+        self.profile_sign_in
+            .start(&self.context, &self.shared, params)
+    }
+    pub fn profile_sign_in_status(&self, params: &Value) -> Result<Value, String> {
+        self.profile_sign_in.status(&self.context, params)
+    }
+    pub fn profile_sign_in_cancel(&self) -> Value {
+        self.profile_sign_in.cancel(&self.context.data_dir)
+    }
+    pub fn finish_profile_sign_in(&self) {
+        self.profile_sign_in.stop(&self.context.data_dir);
+    }
+    pub fn profile_launch_command(&self, params: &Value) -> Result<Value, String> {
+        launch_cmd::build(&self.context, params)
     }
     pub fn account_changed(&self, provider: &str) {
         let mut state = self

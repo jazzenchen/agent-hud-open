@@ -21,7 +21,7 @@ The implementation follows the original Swift account readers:
 | Grok CLI     | The CLI's own xAI sign-in (`auth.json` in `GROK_HOME`, else `~/.grok`), never refreshed or rewritten; an expired one keeps the last credits until the CLI runs again (it renews its token on every run), and only a missing or refused sign-in counts as signed out | The CLI's billing endpoint (`cli-chat-proxy.grok.com/v1/billing?format=credits`): the share of the period's credits used, on-demand credits of their cap when reported, the plan from `/v1/settings` |
 | Copilot      | Once Copilot quota reading is on: the GitHub CLI's sign-in (environment, credential store, `hosts.yml`), then the one GitHub's Copilot clients keep (`github-copilot/apps.json`, older `hosts.json`); a token GitHub refuses gives way to the next | `copilot_internal/user`; premium requests beyond the plan as an estimated overage in US dollars (US$0.04 each, GitHub's published price) |
 | Hermes / Nous Portal | Hermes's own Nous Portal sign-in (`auth.json` in `HERMES_HOME`, else `~/.hermes`: `providers.nous`, else the credential pool; else `shared/nous_auth.json`), never refreshed or rewritten, since Nous rotates its refresh tokens and a reused one signs Hermes out; an expired access token is never sent: the reading is transient, so the last credits stay as they were for 10 minutes and then show stale with the reason that Hermes renews its Nous Portal sign-in the next time it runs and the credits update then; no Nous sign-in shows nothing | `GET /api/oauth/account` on the stored portal only when it is `https` on `nousresearch.com` or a subdomain, else `portal.nousresearch.com`: the month's subscription credits used of the grant (resetting at the period end), the top-up credits in US dollars, the plan; a refused token is a sign-out |
-| Antigravity  | Connected CLI status-line reports and all running authenticated language servers | Identified quota callbacks, serial loopback `GetUserStatus`, anonymous `/usage` fallback |
+| Antigravity  | Managed or imported isolated homes (`antigravityHomes`), connected CLI status-line reports, and all running authenticated language servers | Official CLI isolated OAuth sign-in (`agy acp --login`), `RetrieveUserQuotaSummary` with `GetUserStatus` fallback across running language servers, background idle `agy -p /usage` polling per isolated home, and unified `Carbon` / `Argon` / `Gemini` / `3rd-party` 5h & weekly bucket classification |
 | Factory Droid | A Factory API key only: `FACTORY_API_KEY` in the environment, else in `~/.factory/.env` (CodexBar's place for it); Droid's own sign-in and the web app's cookies are never read. No key leaves a notice, not a sign-out; a key Factory refuses (401/403) is signed out | `GET api.factory.ai/api/billing/limits`, as the CLI's `/usage` does: the share used of the five-hour, weekly and monthly windows of the Standard pool and, where reported, the Droid Core pool (a positive `secondsRemaining` sets the reset, else a future `windowEnd`; a window whose end passed reads as reset), and the extra usage balance in US dollars. A plan with no windows there shows a notice. Shapes follow CodexBar's Factory probe (MIT) |
 | Cline (ClinePass) | Cline's own sign-in in `providers.json` (`providers.cline.settings`, under `CLINE_DATA_DIR`, else `CLINE_DIR`/`~/.cline` `data/settings`): its browser sign-in's access token, sent as `workos:<token>`, else a saved API key, else `CLINE_API_KEY`; never refreshed or rewritten. An expired token keeps the last reading until Cline runs again; a 401 is a sign-out, a 403 or 404 an account with no plan to read | `api.cline.bot/api/v1/users/me/plan/usage-limits`: the 5-hour, weekly and monthly share used and their resets |
 | Qoder, Qoder CN, QoderWork | Separate providers (`qoder`, `qoder-cn`, `qoder-work`). Each reads its own local desktop `auth.v1.dat` (`com.qoder.app.stable`, `com.qoder.cn.stable`, `com.qoder.work.stable`) or IDE `User/globalStorage/state.vscdb` (`secret://aicoding.auth.{userInfo,userPlan,creditUsage}`) in read-only mode, never calling `/api/v1/deviceToken/refresh`; `qoder` and `qoder-cn` also accept a sign-in on `qoder.com` or `qoder.com.cn` in Agent HUD's window as fallback | `GET {openapi}/sash/api/v2/me/usage` (`openapi.qoder.sh`, `openapi.qoder.com.cn`, or `dedicatedOpenapi` from `app.json`) with cached `creditUsage` fallback when the local token is refused; a Teams organization package (`orgResourcePackage`) in the same answer is its own `:org-credits` row beside `:credits`, and one marked unavailable is noted only when no personal credits show; web sign-in fallback reads `GET /api/v2/me/usages/big_model_credits` |
@@ -231,13 +231,18 @@ the rate-limit tier). Reading the record this way follows QuotaView
 
 ## Antigravity accounts
 
-In **Settings → Agents → Antigravity → Antigravity CLI accounts**, add the
-CLI's `settings.json` files, one per line, then select **Connect accounts**.
-**Add default configuration** supplies
-`~/.gemini/antigravity-cli/settings.json`. Restart each connected CLI to begin
-receiving its account reports. The paths are saved as
-`settings.antigravityCliSettings`; they identify CLI settings, not credential
-stores or invented profile directories.
+In **Settings → Agents → Antigravity → Managed accounts** (as well as Claude
+Code and Codex), select **+ Sign in new account** to create an owner-only
+managed directory under `account-homes/<provider>/` and run the official CLI
+OAuth login (`agy acp --gemini-dir <dir>/.gemini --app-data-dir antigravity-cli --login`,
+with `AGY_ACP_FORCE_FILE_STORAGE=1` and `AGY_CLI_FORCE_FILE_TOKEN_STORAGE=1`)
+without touching the system keychain or default account. Existing isolated
+folders can also be imported under **Import existing folder** (`settings.antigravityHomes`),
+and **Copy launch command** copies the shell-escaped terminal command for that
+subscription.
+Under **CLI status-line hook (advanced)**, you can optionally add external CLI
+`settings.json` files (`settings.antigravityCliSettings`) for live status-line
+callbacks.
 
 Agent HUD connects the CLI's official status-line callback, preserving an
 existing status-line command and its visible output. Clearing the list and

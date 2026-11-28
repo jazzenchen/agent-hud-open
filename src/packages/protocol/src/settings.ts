@@ -113,6 +113,8 @@ export interface AppSettings {
   codexHomes?: string[];
   /** Additional Claude Code CLAUDE_CONFIG_DIR folders whose signed-in accounts should be read. */
   claudeHomes?: string[];
+  /** Additional Antigravity account directories whose signed-in accounts should be read. */
+  antigravityHomes?: string[];
   /** CLI settings files connected to Antigravity's account status callback. */
   antigravityCliSettings?: string[];
   appearance: "dark" | "light" | "system";

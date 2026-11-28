@@ -191,3 +191,39 @@ fn a_server_with_no_token_on_its_command_line_takes_the_one_it_saved() {
     assert_eq!(custom_saved.get(&10).map(String::as_str), Some("custom-10"));
     assert!(!custom_saved.contains_key(&1));
 }
+
+#[test]
+fn discovers_extra_homes_via_hyphen_flags_and_daemon_files() {
+    let root = tempfile::tempdir().unwrap();
+    let t3_home = root.path().join("t3/antigravity-acp");
+    std::fs::create_dir_all(t3_home.join("daemon")).unwrap();
+    std::fs::write(
+        t3_home.join("daemon/ls_42.json"),
+        r#"{"pid":42,"httpsPort":51234,"csrfToken":"tok-42"}"#,
+    )
+    .unwrap();
+    let managed = root.path().join("managed/acct-2");
+    std::fs::create_dir_all(managed.join(".gemini/antigravity-cli")).unwrap();
+    let extra = vec![t3_home.clone(), managed.clone()];
+    let (saved, pid_homes) = saved_tokens_for(root.path(), &HashMap::new(), &extra);
+    let (servers, active) = parse_servers_for(
+        vec![
+            process(42, "/opt/t3/language_server_macos_arm", "language_server"),
+            process(
+                43,
+                "/usr/local/bin/agy",
+                &format!(
+                    "agy acp --gemini-dir {} --app-data-dir antigravity-cli --csrf_token tok-43",
+                    managed.join(".gemini").display()
+                ),
+            ),
+        ],
+        &saved,
+        &pid_homes,
+        &extra,
+    );
+    assert_eq!(servers.len(), 2);
+    assert_eq!(servers[0].home.as_ref(), Some(&t3_home));
+    assert_eq!(servers[1].home.as_ref(), Some(&managed));
+    assert_eq!(active.len(), 2);
+}

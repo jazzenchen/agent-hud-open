@@ -170,4 +170,8 @@ export type NativeMethod =
   | "add_relay_source"
   | "set_relay_kind"
   | "remove_relay_source"
-  | "web_sign_out";
+  | "web_sign_out"
+  | "account_profile_sign_in_start"
+  | "account_profile_sign_in_status"
+  | "account_profile_sign_in_cancel"
+  | "account_profile_launch_command";

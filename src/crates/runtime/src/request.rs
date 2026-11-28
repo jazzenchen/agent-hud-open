@@ -49,6 +49,15 @@ impl Runtime {
                 _ => accounts.remove_credentials(&params),
             };
         }
+        if matches!(
+            method,
+            "account_profile_sign_in_start"
+                | "account_profile_sign_in_status"
+                | "account_profile_sign_in_cancel"
+                | "account_profile_launch_command"
+        ) {
+            return self.account_profile_request(method, params);
+        }
         if method == "open_session" {
             return self.open_session(params);
         }
@@ -113,10 +122,30 @@ impl Runtime {
                 drop(hooks);
                 return result.map(|result| self.decorate_snapshot(result, true));
             }
-            if matches!(params["key"].as_str(), Some("codexHomes" | "claudeHomes")) {
-                if let Some(accounts) = &self.accounts {
-                    accounts.validate_account_homes(&params["value"])?;
+            if let Some(key) = params["key"]
+                .as_str()
+                .filter(|key| matches!(*key, "codexHomes" | "claudeHomes" | "antigravityHomes"))
+                .map(str::to_owned)
+            {
+                if self.is_demo() {
+                    return Err(l10n::tr("The demo leaves account folders unchanged."));
                 }
+                let provider = key.trim_end_matches("Homes");
+                let (before, after) = match &self.accounts {
+                    Some(accounts) => {
+                        let after = accounts.resolve_account_homes(&params["value"])?;
+                        let before = accounts
+                            .resolve_account_homes(&self.core.setting_value(&key))
+                            .unwrap_or_default();
+                        (before, after)
+                    }
+                    None => (Vec::new(), Vec::new()),
+                };
+                let result = self.core.request(method, params)?;
+                if let Some(accounts) = &self.accounts {
+                    accounts.cleanup_removed_homes(provider, &before, &after);
+                }
+                return Ok(self.decorate_snapshot(result, true));
             }
             let result = self.core.request(method, params)?;
             return Ok(self.decorate_snapshot(result, true));
@@ -201,5 +230,86 @@ impl Runtime {
             }
         }
         result
+    }
+
+    fn account_profile_request(
+        &mut self,
+        method: &str,
+        mut params: Value,
+    ) -> Result<Value, String> {
+        if self.is_demo() {
+            return match method {
+                "account_profile_sign_in_start" => {
+                    Err(l10n::tr("Demo mode does not start live account sign-ins."))
+                }
+                "account_profile_sign_in_cancel" => Ok(json!({"state": "cancelled"})),
+                "account_profile_launch_command" => {
+                    let provider = params["provider"].as_str().unwrap_or("agy");
+                    Ok(json!({"provider": provider, "command": provider, "shell": "sh"}))
+                }
+                _ => Ok(json!({
+                    "state": "idle",
+                    "provider": params["provider"],
+                    "home": Value::Null,
+                    "email": Value::Null,
+                    "authUrl": Value::Null,
+                    "error": Value::Null,
+                    "profiles": [],
+                })),
+            };
+        }
+        let accounts = self
+            .accounts
+            .as_ref()
+            .ok_or("Account credentials are unavailable in this runtime")?;
+        match method {
+            "account_profile_sign_in_start" => accounts.profile_sign_in_start(&params),
+            "account_profile_sign_in_cancel" => Ok(accounts.profile_sign_in_cancel()),
+            "account_profile_launch_command" => accounts.profile_launch_command(&params),
+            _ => {
+                let provider = params["provider"]
+                    .as_str()
+                    .ok_or("Provider is required")?
+                    .to_owned();
+                let setting_key = match provider.as_str() {
+                    "antigravity" => "antigravityHomes",
+                    "claude" => "claudeHomes",
+                    "codex" => "codexHomes",
+                    _ => return Err(format!("Unsupported managed account provider: {provider}")),
+                };
+                if params.get("homes").is_none() {
+                    params["homes"] = self.core.setting_value(setting_key);
+                }
+                let mut status = accounts.profile_sign_in_status(&params)?;
+                if status["state"] == "completed" {
+                    if let Some(home) = status["home"].as_str().map(str::to_owned) {
+                        let mut homes = self
+                            .core
+                            .setting_value(setting_key)
+                            .as_array()
+                            .cloned()
+                            .unwrap_or_default();
+                        let already = homes.iter().any(|entry| entry.as_str() == Some(&home));
+                        if !already {
+                            homes.push(json!(home));
+                            let updated = self.core.request(
+                                "set_setting",
+                                json!({"key": setting_key, "value": homes}),
+                            )?;
+                            let _ = self.decorate_snapshot(updated, true);
+                            if let Some(accounts) = &self.accounts {
+                                params["homes"] = self.core.setting_value(setting_key);
+                                status = accounts.profile_sign_in_status(&params)?;
+                            }
+                            status["added"] = json!(true);
+                        }
+                        if let Some(accounts) = &self.accounts {
+                            accounts.finish_profile_sign_in();
+                        }
+                    }
+                }
+                Ok(status)
+            }
+        }
     }
 }

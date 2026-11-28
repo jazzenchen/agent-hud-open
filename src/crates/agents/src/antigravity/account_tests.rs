@@ -584,3 +584,127 @@ fn the_clis_saved_sign_in_counts_while_it_is_not_running() {
         json!(["antigravity"])
     );
 }
+
+#[test]
+fn isolated_antigravity_homes_poll_idle_accounts_skip_active_and_degrade_partially() {
+    let temp = tempfile::tempdir().unwrap();
+    let home_a = temp.path().join("acct-a");
+    let home_b = temp.path().join("acct-b");
+    let home_c = temp.path().join("acct-c");
+    let sign_in =
+        |email: &str| json!({"auth_method": "oauth", "id_token_email": email}).to_string();
+    let usage_for = |carbon_rem: f64, argon_rem: f64| {
+        json!({"status":"SUCCESS","command":{"name":"usage","data":{
+            "plan_tier":"Google AI Pro",
+            "groups":[
+                {"name":"Gemini Models","buckets":[
+                    {"id":"gemini-carbon-5h","name":"Carbon 5h","window":"5h","remaining_fraction":carbon_rem},
+                    {"id":"gemini-argon-weekly","name":"Argon Weekly","window":"weekly","remaining_fraction":argon_rem,"reset_time":"2099-01-01T00:00:00Z"}
+                ]},
+                {"name":"Claude and GPT models","buckets":[
+                    {"id":"3p-5h","name":"Five Hour Limit","window":"5h","remaining_fraction":0.8}
+                ]}
+            ]
+        }}})
+    };
+
+    let mut host = FakeHost::new(&temp.path().join("default").to_string_lossy())
+        .file(
+            &home_a
+                .join(".gemini/antigravity-cli/antigravity-oauth-token")
+                .to_string_lossy(),
+            &sign_in("me@example.com"),
+        )
+        .file(
+            &home_b.join("antigravity-oauth-token").to_string_lossy(),
+            &sign_in("second@example.com"),
+        )
+        .file(
+            &home_c.join("antigravity-oauth-token").to_string_lossy(),
+            &sign_in("broken@example.com"),
+        );
+    host.executables
+        .insert("agy".into(), temp.path().join("bin/agy"));
+    host.account_homes.insert(
+        "antigravity".into(),
+        vec![home_a.clone(), home_b.clone(), home_c.clone()],
+    );
+    // me@example.com is already served by a running language server -> skipped!
+    host.natives.insert(
+        ("antigravity".into(), "ReadAccounts".into()),
+        Ok(json!({
+            "accounts": [{"source": "desktop-1", "client": "antigravity", "status": status_body()}],
+            "cliExecutable": temp.path().join("bin/agy").to_string_lossy()
+        })),
+    );
+    host.engine_output_by_home.insert(
+        home_b.clone(),
+        std::collections::HashMap::from([("-p".into(), vec![usage_for(0.4, 0.9)])]),
+    );
+    host.engine_output_by_home.insert(
+        home_c.clone(),
+        std::collections::HashMap::from([(
+            "-p".into(),
+            vec![json!({"status":"ERROR","error":"token revoked"})],
+        )]),
+    );
+
+    let reading = read(&host).unwrap();
+    // Only home_b and home_c launched CLI; home_a was skipped because native covered me@example.com.
+    let started = host.started.borrow();
+    assert_eq!(started.len(), 2);
+    assert!(started[0]
+        .3
+        .contains(&("AGY_ACP_FORCE_FILE_STORAGE".into(), "1".into())));
+    assert!(started[0]
+        .3
+        .contains(&("HOME".into(), home_b.to_string_lossy().into_owned())));
+    assert!(started[0]
+        .3
+        .contains(&("USERPROFILE".into(), home_b.to_string_lossy().into_owned())));
+
+    assert_eq!(reading.additional_accounts.len(), 1);
+    assert_eq!(
+        reading.additional_accounts[0]["label"],
+        "second@example.com"
+    );
+    assert_eq!(reading.additional_accounts[0]["plan"], "Google AI Pro");
+    let second_id = legacy_account("Antigravity", "second@example.com", "").unwrap();
+    assert_eq!(reading.additional_accounts[0]["id"], second_id);
+    let second_quotas: Vec<_> = reading
+        .quotas
+        .iter()
+        .filter(|q| q["accountId"] == second_id)
+        .collect();
+    assert_eq!(second_quotas.len(), 3);
+    assert_eq!(second_quotas[0]["shortLabel"], "Carbon 5h");
+    assert_eq!(second_quotas[0]["windowDurationSeconds"], 18_000);
+    assert!((second_quotas[0]["usedPercent"].as_f64().unwrap() - 60.0).abs() < 0.001);
+    assert_eq!(second_quotas[1]["shortLabel"], "Argon 7d");
+    assert_eq!(second_quotas[1]["windowDurationSeconds"], 604_800);
+    // home_c failed -> partial degradation notice without losing home_a or home_b.
+    assert!(reading
+        .notice
+        .as_deref()
+        .unwrap_or_default()
+        .contains("token revoked"));
+}
+
+#[test]
+fn cancelled_host_stops_idle_antigravity_home_polling() {
+    let temp = tempfile::tempdir().unwrap();
+    let home_b = temp.path().join("acct-b");
+    let mut host = FakeHost::new(&temp.path().join("default").to_string_lossy()).file(
+        &home_b.join("antigravity-oauth-token").to_string_lossy(),
+        r#"{"id_token_email":"second@example.com"}"#,
+    );
+    host.cancelled = true;
+    host.account_homes
+        .insert("antigravity".into(), vec![home_b]);
+    host.natives.insert(
+        ("antigravity".into(), "ReadAccounts".into()),
+        Ok(json!({"accounts": []})),
+    );
+    assert!(read(&host).is_err());
+    assert!(host.started.borrow().is_empty());
+}

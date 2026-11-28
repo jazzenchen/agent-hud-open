@@ -65,6 +65,7 @@ pub struct FakeHost {
     pub engine_start_errors: HashMap<String, String>,
     /// Whether an engine's output ends once it has nothing more to say.
     pub engine_ends: bool,
+    pub engine_activity: fake_engine::EngineActivity,
     /// Quota reading levels by agent; an agent not listed reads in full.
     pub quota_levels: HashMap<String, QuotaReading>,
     /// Every engine started: program, arguments, folder and environment.
@@ -106,6 +107,7 @@ impl FakeHost {
             engine_output_by_home: HashMap::new(),
             engine_start_errors: HashMap::new(),
             engine_ends: true,
+            engine_activity: Default::default(),
             quota_levels: HashMap::new(),
             started: RefCell::new(vec![]),
             engine_sent: Rc::new(RefCell::new(vec![])),

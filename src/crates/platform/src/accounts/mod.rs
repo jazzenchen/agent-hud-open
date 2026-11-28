@@ -28,6 +28,10 @@ mod engine;
 mod homes;
 mod host;
 pub(crate) mod http;
+mod launch_cmd;
+mod managed_profiles;
+mod managed_profiles_meta;
+mod managed_profiles_runner;
 mod projection;
 mod restart_copy;
 mod schedule;
@@ -120,6 +124,7 @@ pub struct AccountService {
     shared: Arc<Shared>,
     context: AccountContext,
     gate: CollectionGate,
+    profile_sign_in: managed_profiles::ProfileSignIn,
 }
 
 impl AccountService {
@@ -207,6 +212,7 @@ impl AccountService {
             shared,
             context,
             gate,
+            profile_sign_in: managed_profiles::ProfileSignIn::default(),
         })
     }
     pub fn set_waker(&self, waker: Waker) {
@@ -218,6 +224,7 @@ impl AccountService {
     }
     pub fn stop(&self) {
         self.context.cancelled.store(true, Ordering::Release);
+        self.profile_sign_in.stop(&self.context.data_dir);
         let mut copy = None;
         {
             let mut state = self

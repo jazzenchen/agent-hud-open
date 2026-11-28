@@ -1,8 +1,8 @@
 //! The running agy's read-only slash command, as recorded by the native app's
-//! AntigravityCLITests. It reports quota groups but no signed-in identity.
-use crate::account::{account_id, legacy_unresolved, status, EngineStart, Host, Reading};
+//! AntigravityCLITests, and isolated home `/usage` polling.
+use super::buckets::{build_quota_row, finalize_quotas};
+use crate::account::{account_id, legacy_account, legacy_unresolved, EngineStart, Host, Reading};
 use crate::l10n::tr;
-use crate::naming::{vendor_windows, window_names::Period};
 use chrono::Utc;
 use serde_json::{json, Value};
 use std::{
@@ -37,10 +37,16 @@ pub(super) fn read(host: &dyn Host, executable: &Path) -> Result<Reading, String
     )
 }
 
-fn parse(scope: &str, body: &Value) -> Result<Reading, String> {
-    // The CLI can refuse to report usage at all, for example when the
-    // account's region is not eligible for Antigravity. Its own words say
-    // why, so keep them in the failure instead of the generic text.
+pub(super) fn parse(scope: &str, body: &Value) -> Result<Reading, String> {
+    parse_usage(scope, None, None, body)
+}
+
+pub(super) fn parse_usage(
+    scope: &str,
+    email: Option<&str>,
+    consumer_home: Option<&str>,
+    body: &Value,
+) -> Result<Reading, String> {
     if body["status"] == "ERROR" {
         let reason = body["error"].as_str().map(str::trim).unwrap_or("");
         return Err(if reason.is_empty() {
@@ -55,20 +61,56 @@ fn parse(scope: &str, body: &Value) -> Result<Reading, String> {
     if body["status"] != "SUCCESS" || body["command"]["name"] != "usage" {
         return Err(failure());
     }
-    let groups = body["command"]["data"]["groups"]
-        .as_array()
-        .ok_or_else(failure)?;
-    let account = legacy_unresolved("Antigravity", scope);
-    let id = account_id("antigravity", &[scope]);
+    let data = &body["command"]["data"];
+    let groups = data["groups"].as_array().ok_or_else(failure)?;
+    let trimmed_email = email.map(str::trim).filter(|value| !value.is_empty());
+    let lower_email = trimmed_email.map(str::to_lowercase);
+    let (account, id, label, identity) = if let Some(ref lower) = lower_email {
+        let account = legacy_account("Antigravity", lower, "")
+            .unwrap_or_else(|| legacy_unresolved("Antigravity", scope));
+        let id = account_id("antigravity", &[lower, ""]);
+        (
+            account,
+            id,
+            trimmed_email.unwrap_or("Antigravity CLI"),
+            "account",
+        )
+    } else {
+        (
+            legacy_unresolved("Antigravity", scope),
+            account_id("antigravity", &[scope]),
+            "Antigravity CLI",
+            "local-home",
+        )
+    };
+    let plan = data["plan_tier"]
+        .as_str()
+        .or_else(|| data["planTier"].as_str())
+        .or_else(|| data["tier"].as_str())
+        .or_else(|| data["plan"].as_str())
+        .map(str::trim)
+        .filter(|value| !value.is_empty());
+    let now = Utc::now();
     let mut reading = Reading::empty("antigravity");
-    reading.account = Some(
-        json!({"id":account,"provider":"antigravity","label":"Antigravity CLI",
-        "identity":"local-home","checkedAt":Utc::now().to_rfc3339()}),
-    );
+    let mut account_row = json!({
+        "id": account,
+        "provider": "antigravity",
+        "label": label,
+        "identity": identity,
+        "checkedAt": now.to_rfc3339(),
+    });
+    if let Some(plan) = plan {
+        account_row["plan"] = json!(plan);
+    }
+    if let Some(home) = consumer_home {
+        account_row["home"] = json!(home);
+    }
+    reading.account = Some(account_row);
     let mut ids = BTreeSet::new();
-    let mut active_groups = BTreeSet::new();
-    for (index, group) in groups.iter().enumerate() {
+    let mut families = BTreeSet::new();
+    for group in groups {
         let buckets = group["buckets"].as_array().ok_or_else(failure)?;
+        let group_name = group["name"].as_str();
         for bucket in buckets {
             let key = bucket["id"]
                 .as_str()
@@ -77,57 +119,33 @@ fn parse(scope: &str, body: &Value) -> Result<Reading, String> {
             if !ids.insert(key) {
                 return Err(failure());
             }
-            active_groups.insert(index);
             let Some(fraction) = bucket["remaining_fraction"]
                 .as_f64()
                 .filter(|value| value.is_finite() && (0.0..=1.0).contains(value))
             else {
                 continue;
             };
-            let used = (1.0 - fraction) * 100.0;
-            let group_name = group["name"].as_str().unwrap_or("");
-            let bucket_name = bucket["name"].as_str().unwrap_or(key);
-            let name = if group_name.is_empty() {
-                bucket_name.to_owned()
-            } else {
-                format!("{group_name} · {bucket_name}")
-            };
-            let duration = match bucket["window"].as_str() {
-                Some("weekly") => Some(604800),
-                Some("5h") => Some(18000),
-                _ => None,
-            };
-            let word = vendor_windows::antigravity_group_word(group_name);
-            let short = Period::from_seconds(duration.map(f64::from)).map_or_else(
-                || word.clone(),
-                |period| format!("{word} {}", period.after_word()),
+            let bucket_name = Some(bucket["name"].as_str().unwrap_or(key));
+            let (family, mut quota) = build_quota_row(
+                &id,
+                key,
+                &account,
+                Some(label),
+                group_name,
+                bucket_name,
+                bucket["window"].as_str(),
+                fraction,
+                bucket["reset_time"].as_str(),
+                now,
             );
-            let reset = bucket["reset_time"]
-                .as_str()
-                .filter(|value| chrono::DateTime::parse_from_rfc3339(value).is_ok());
-            let lower = group_name.to_lowercase();
-            let mut quota = json!({"id":format!("{id}:{key}"),"windowKey":format!("antigravity:{key}"),"vendor":"antigravity","accountId":account,
-                "account":"Antigravity CLI","name":name,"shortLabel":short,"usedPercent":used,
-                "status":status(used),"resetAt":reset,"windowDurationSeconds":duration});
-            if lower.contains("gemini") {
-                quota["modelFamilies"] = json!(["gemini"]);
-            } else if lower.contains("claude") || lower.contains("gpt") {
-                quota["modelFamilies"] = json!(["claude", "gpt"]);
+            if let Some(home) = consumer_home {
+                quota["consumerHome"] = json!(home);
             }
+            families.insert(family);
             reading.quotas.push(quota);
         }
     }
-    for quota in &mut reading.quotas {
-        let all = active_groups.len() == 1;
-        quota["allModels"] = json!(all);
-        // Its calls are logged by model, which picks the pool.
-        quota["consumerSource"] = json!("antigravity");
-        if all {
-            if let Some(period) = Period::from_seconds(quota["windowDurationSeconds"].as_f64()) {
-                quota["shortLabel"] = json!(period.short_name());
-            }
-        }
-    }
+    finalize_quotas(&mut reading.quotas, families.len());
     if reading.quotas.is_empty() {
         reading.notice = Some(tr!("agy reports no quota percentage."));
     }

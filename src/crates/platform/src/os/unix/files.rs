@@ -133,6 +133,37 @@ pub(crate) fn hook_text(
     agent_hud_agents::patch_text(source, flag, original, command.as_deref())
 }
 
+/// Links `link` to `target` as a directory symlink, replacing an outdated
+/// symlink at `link` without ever touching `target`'s contents.
+pub(crate) fn link_directory(target: &Path, link: &Path) -> Result<(), String> {
+    if !target.is_dir() {
+        return Err(format!(
+            "Account directory does not exist: {}",
+            target.display()
+        ));
+    }
+    if let Ok(meta) = fs::symlink_metadata(link) {
+        if link
+            .canonicalize()
+            .ok()
+            .zip(target.canonicalize().ok())
+            .is_some_and(|(a, b)| a == b)
+        {
+            return Ok(());
+        }
+        if meta.file_type().is_symlink() {
+            fs::remove_file(link).map_err(|_| "Could not update account directory link")?;
+        } else {
+            return Err("Refusing to replace a non-link directory".into());
+        }
+    }
+    if let Some(parent) = link.parent() {
+        private_directory(parent)?;
+    }
+    std::os::unix::fs::symlink(target, link)
+        .map_err(|error| format!("Could not link account directory: {error}"))
+}
+
 /// `'<executable>' <flag> <client>`, the executable single-quoted for a
 /// POSIX shell (and for `shlex.split`, which reads it the same).
 fn hook_command(executable: &Path, flag: &str, source: &str) -> String {

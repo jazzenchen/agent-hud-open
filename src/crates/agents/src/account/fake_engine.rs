@@ -1,12 +1,19 @@
 use super::{Engine, EngineStart, FakeHost};
 use serde_json::Value;
 use std::{
-    cell::RefCell,
-    collections::{HashMap, VecDeque},
-    path::Path,
+    cell::{Cell, RefCell},
+    collections::{HashMap, HashSet, VecDeque},
+    path::{Path, PathBuf},
     rc::Rc,
     time::Instant,
 };
+
+#[derive(Default)]
+pub struct EngineActivity {
+    pub timeouts: HashSet<PathBuf>,
+    live: Rc<Cell<usize>>,
+    pub peak_live: Cell<usize>,
+}
 
 /// What `FakeHost::start_engine` does: records the start, then hands back an
 /// engine with the replies and output scripted for its first argument and
@@ -35,7 +42,7 @@ pub(super) fn start(host: &FakeHost, start: &EngineStart) -> Result<Box<dyn Engi
     let home = start
         .env
         .iter()
-        .find(|(name, _)| matches!(*name, "CODEX_HOME" | "CLAUDE_CONFIG_DIR"))
+        .find(|(name, _)| matches!(*name, "CODEX_HOME" | "CLAUDE_CONFIG_DIR" | "HOME"))
         .map(|(_, home)| Path::new(home));
     let printed = start
         .args
@@ -47,12 +54,17 @@ pub(super) fn start(host: &FakeHost, start: &EngineStart) -> Result<Box<dyn Engi
         })
         .cloned()
         .unwrap_or_default();
+    let activity = &host.engine_activity;
+    let live = activity.live.get() + 1;
+    activity.live.set(live);
+    activity.peak_live.set(live.max(activity.peak_live.get()));
     Ok(Box::new(FakeEngine {
+        live: Rc::clone(&activity.live),
         replies: home
             .and_then(|home| host.engine_replies_by_home.get(home))
             .unwrap_or(&host.engine_replies)
             .clone(),
-        ends: host.engine_ends,
+        ends: host.engine_ends && !home.is_some_and(|path| activity.timeouts.contains(path)),
         queue: printed.into(),
         ended: false,
         sent: Rc::clone(&host.engine_sent),
@@ -61,11 +73,18 @@ pub(super) fn start(host: &FakeHost, start: &EngineStart) -> Result<Box<dyn Engi
 
 /// An engine that answers each request with the reply scripted for its id.
 pub struct FakeEngine {
+    live: Rc<Cell<usize>>,
     pub(super) replies: HashMap<u64, Value>,
     pub(super) ends: bool,
     pub(super) queue: VecDeque<Value>,
     pub(super) ended: bool,
     pub(super) sent: Rc<RefCell<Vec<Value>>>,
+}
+
+impl Drop for FakeEngine {
+    fn drop(&mut self) {
+        self.live.set(self.live.get() - 1);
+    }
 }
 
 impl Engine for FakeEngine {

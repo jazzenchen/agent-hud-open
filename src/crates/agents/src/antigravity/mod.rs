@@ -1,6 +1,8 @@
 //! Antigravity.
 pub mod account;
+mod buckets;
 mod cli;
+mod homes;
 mod hooks;
 pub mod permissions;
 pub mod plans;

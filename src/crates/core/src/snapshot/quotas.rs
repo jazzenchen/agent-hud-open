@@ -49,7 +49,12 @@ impl crate::AgentHudCore {
                 // windowKey and legacyWindowId stay: panel layouts, Settings and
                 // get_hud name a row by them (src/packages/hud/src/quota-rows.ts).
                 if let Some(object) = row.as_object_mut() {
-                    for key in ["consumerSource", "consumerRoutes", "modelFamilies"] {
+                    for key in [
+                        "consumerSource",
+                        "consumerRoutes",
+                        "modelFamilies",
+                        "consumerHome",
+                    ] {
                         object.remove(key);
                     }
                 }
