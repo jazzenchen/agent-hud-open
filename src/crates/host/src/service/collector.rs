@@ -1,6 +1,7 @@
 //! The collector worker: collection passes, requests to publish, hooks'
 //! reminders and the stat-only looks between them, one at a time under the
 //! collection gate.
+use super::fair::Fair;
 use super::{DATA, REQUEST};
 use crate::{backend::Backend, presentation};
 use std::sync::{
@@ -12,7 +13,7 @@ use tauri::Manager;
 
 pub(super) fn run(
     app: tauri::AppHandle,
-    worker_backend: Arc<Mutex<Backend>>,
+    worker_backend: Arc<Fair<Backend>>,
     worker_stopped: Arc<AtomicBool>,
     worker_wake: Arc<(Mutex<u8>, Condvar)>,
     worker_collection: agent_hud_runtime::CollectionGate,
@@ -92,7 +93,7 @@ pub(super) fn run(
             .lock()
             .unwrap_or_else(PoisonError::into_inner);
         let mut backend = worker_backend
-            .lock()
+            .lock_last()
             .unwrap_or_else(PoisonError::into_inner);
         let method = match turn {
             Turn::Pass => Some("snapshot"),

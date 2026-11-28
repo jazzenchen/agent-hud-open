@@ -8,6 +8,7 @@
 //! (`ProductExtension::delivery`), else through the host's: the app's data
 //! folder keeps their receipts, and the host follows a started Claude job
 //! into the desktop app itself.
+use crate::service::fair::Fair;
 use crate::{activity, backend::Backend, extension::Delivery};
 use agent_hud_messaging::{
     Delivered, Host, Messaging, Pending, Places, Preferences, Step, Turns, QUERY_BUSY,
@@ -44,7 +45,7 @@ pub(crate) struct AgentMessages {
     delivered: Condvar,
     conversations: Option<Arc<dyn Turns>>,
     own: Option<Arc<Own>>,
-    backend: Weak<Mutex<Backend>>,
+    backend: Weak<Fair<Backend>>,
     looks: Mutex<Option<(mpsc::Sender<()>, JoinHandle<()>)>>,
 }
 
@@ -53,7 +54,7 @@ impl AgentMessages {
     /// `data` (the app's data folder; the demo's own folder in the demo).
     pub(crate) fn start(
         app: &tauri::AppHandle,
-        backend: Weak<Mutex<Backend>>,
+        backend: Weak<Fair<Backend>>,
         product: Option<Delivery>,
         data: PathBuf,
     ) -> Result<Arc<Self>, String> {
@@ -245,7 +246,7 @@ impl AgentMessages {
                 .map(|wait| Duration::from_millis(wait.as_u64().unwrap_or(0)));
             let backend = backend.upgrade().ok_or("The application is stopping")?;
             let mut backend = match wait {
-                Some(wait) => lock_within(&backend, wait).ok_or(QUERY_BUSY)?,
+                Some(wait) => backend.lock_within(wait).ok_or(QUERY_BUSY)?,
                 None => backend.lock().unwrap_or_else(PoisonError::into_inner),
             };
             backend.runtime.local_query(method, params)
@@ -274,7 +275,7 @@ fn deliver(pending: &Pending, now: i64) -> Delivered {
 
 /// `mutex` once it is free within `wait`, trying again every `RETRY`; none
 /// when another holder kept it all that time.
-fn lock_within<T>(mutex: &Mutex<T>, wait: Duration) -> Option<MutexGuard<'_, T>> {
+pub(crate) fn lock_within<T>(mutex: &Mutex<T>, wait: Duration) -> Option<MutexGuard<'_, T>> {
     let deadline = Instant::now() + wait;
     loop {
         match mutex.try_lock() {

@@ -1,5 +1,6 @@
 //! Public local MCP channel, attached to the application's existing owners.
 use super::{backend::Backend, messages::AgentMessages, presentation::Presentation};
+use crate::service::fair::Fair;
 use agent_hud_runtime::local_tools::{self, Server};
 use serde_json::{json, Value};
 use std::{
@@ -46,7 +47,7 @@ impl ChannelState {
 }
 pub(super) struct ToolsChannel {
     app: tauri::AppHandle,
-    backend: Weak<Mutex<Backend>>,
+    backend: Weak<Fair<Backend>>,
     directory: PathBuf,
     state: Mutex<ChannelState>,
     /// The agent-messages tools last kept for relays that cannot ask the app.
@@ -55,7 +56,7 @@ pub(super) struct ToolsChannel {
 impl ToolsChannel {
     pub(super) fn new(
         app: tauri::AppHandle,
-        backend: Weak<Mutex<Backend>>,
+        backend: Weak<Fair<Backend>>,
         directory: PathBuf,
     ) -> Self {
         Self {
@@ -102,7 +103,7 @@ impl ToolsChannel {
 
 fn handle(
     app: &tauri::AppHandle,
-    weak: &Weak<Mutex<Backend>>,
+    weak: &Weak<Fair<Backend>>,
     request: &Value,
     active: &AtomicBool,
 ) -> Result<Value, String> {

@@ -9,9 +9,11 @@ use std::sync::{
 use tauri::Manager;
 
 mod collector;
+pub(crate) mod fair;
+use fair::Fair;
 
 pub(crate) struct Service {
-    pub(crate) backend: Arc<Mutex<Backend>>,
+    pub(crate) backend: Arc<Fair<Backend>>,
     pub(crate) latest_snapshot: Arc<RwLock<Option<Arc<serde_json::Value>>>>,
     pub(crate) stopped: Arc<AtomicBool>,
     pub(crate) wake: Arc<(Mutex<u8>, Condvar)>,
@@ -55,7 +57,7 @@ impl Service {
         let request_wake = Arc::clone(&wake);
         runtime.set_request_waker(Arc::new(move || wake_collector(&request_wake, REQUEST)));
         let latest_snapshot = Arc::new(RwLock::new(None));
-        let backend = Arc::new(Mutex::new(Backend {
+        let backend = Arc::new(Fair::new(Backend {
             runtime,
             snapshot: None,
             latest_snapshot: Arc::clone(&latest_snapshot),

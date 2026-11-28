@@ -1,17 +1,18 @@
 //! The host's own sharing with paired phones: quota readings and token usage
 //! over the LAN link, for a run with no product that shares instead.
+use crate::service::fair::Fair;
 use crate::{backend::Backend, extension::ProductExtension};
 use agent_hud_share::PhoneShare;
 use std::{
     path::PathBuf,
-    sync::{Arc, Mutex, PoisonError, Weak},
+    sync::{Arc, PoisonError, Weak},
 };
 
 /// `directory` is None for the demo, which shares nothing.
 pub(crate) fn start(
     directory: Option<PathBuf>,
     extension: Option<&dyn ProductExtension>,
-    backend: Weak<Mutex<Backend>>,
+    backend: Weak<Fair<Backend>>,
 ) -> Option<Arc<PhoneShare>> {
     let directory = directory?;
     if extension.is_some_and(|product| product.shares_with_phones()) {
