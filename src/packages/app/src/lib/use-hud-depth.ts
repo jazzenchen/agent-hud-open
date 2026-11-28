@@ -41,6 +41,18 @@ export function wantedDepth(open: boolean, reach: number): number | null {
   return open ? null : Math.ceil((reach + MARGIN) / STEP) * STEP;
 }
 
+/** Skips DOM rect readbacks across animated children while the panel is open
+ * or opening, since the window already holds its whole canvas (`null`). */
+export function measureSceneDepth(
+  edge: HUDEdge,
+  open: boolean,
+  readScene: () => { scene: DOMRect; parts: Iterable<DOMRect> },
+): number | null {
+  if (open) return null;
+  const { scene, parts } = readScene();
+  return wantedDepth(false, reachFromEdge(edge, scene, parts));
+}
+
 /** Keeps this HUD's window only as deep as the HUD needs (agent-hud-open #84).
  * It grows at once, to the whole canvas the moment the pointer starts to open
  * the panel, and shrinks only after a collapse has played. */
@@ -66,14 +78,12 @@ export function useHUDDepth(edge: HUDEdge | undefined, enabled: boolean) {
         scene.dataset.hover !== "collapsed" ||
         scene.dataset.open === "true" ||
         scene.dataset.pinned === "true";
-      const reach = reachFromEdge(
-        edge,
-        scene.getBoundingClientRect(),
-        [...scene.querySelectorAll(PARTS)].map((part) =>
+      const depth = measureSceneDepth(edge, open, () => ({
+        scene: scene.getBoundingClientRect(),
+        parts: [...scene.querySelectorAll(PARTS)].map((part) =>
           part.getBoundingClientRect(),
         ),
-      );
-      const depth = wantedDepth(open, reach);
+      }));
       const deeper =
         asked === undefined ||
         depth === null ||

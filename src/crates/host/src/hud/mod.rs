@@ -37,7 +37,8 @@ mod worker;
 //   measure_screens, screen              display identity, notch and menu bar
 //   TextFocusOrigin, begin_text_focus,   the explicit keyboard-focus lease
 //     end_text_focus
-//   set_ignore_cursor                    pass input through all but the reported regions
+//   set_ignore_cursor,                   pass input through all but the reported regions
+//     cursor_shape_uses_regions
 //   set_drag_cursor, global_pointer,     pointer and button state while hovering
 //     left_mouse_down, pointer_keys        or dragging
 //   edge_hud_unsupported                 what this host cannot do

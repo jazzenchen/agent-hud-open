@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { horizontal, type HUDRect } from "../geometry";
 import { HUD_METRICS } from "../model";
+import { expandedOrigin } from "./hover-hit";
 import type { useNotchGeometry } from "./NotchSurface";
 import { outsideSimplePanel } from "./simple-panel";
 import { surfaceBorder } from "./simple-panel";
@@ -11,6 +12,7 @@ export function HUDExpandedSurface({
   config,
   edge,
   cardVisible,
+  hoverPhase,
   detached,
   peek,
   simplePeek,
@@ -32,8 +34,9 @@ export function HUDExpandedSurface({
   entered,
   domExited,
   ...content
-}: Omit<SurfaceContentProps, "rowLight"> & {
+}: Omit<SurfaceContentProps, "rowLight" | "active"> & {
   cardVisible: boolean;
+  hoverPhase?: string;
   detached: boolean;
   simplePeek: boolean;
   dragging: boolean;
@@ -77,13 +80,34 @@ export function HUDExpandedSurface({
     duration: reduceMotion || dragging ? 0 : 0.4,
     ease: HUD_METRICS.ease,
   };
-  const from = {
-    left: flared && horizontal(edge) ? strip.x - 8 : strip.x,
-    top: strip.y,
-    width: flared && horizontal(edge) ? strip.width + 16 : strip.width,
-    height: strip.height,
+  // Pre-warm the React tree during the hover delay (`opening`) so Frame 0 of
+  // expansion only flips composited opacity/scale instead of cold-mounting.
+  const prewarming = !dragging && !cardVisible && hoverPhase === "opening";
+  const renderContent = cardVisible || prewarming;
+  const closedPose = {
+    scaleX:
+      detached && simplePeek && !horizontal(edge)
+        ? 0.2
+        : detached
+          ? 0.86
+          : horizontal(edge)
+            ? 0.92
+            : 0.88,
+    scaleY:
+      detached && simplePeek && !horizontal(edge)
+        ? 1
+        : detached
+          ? 0.86
+          : horizontal(edge)
+            ? 0.88
+            : 0.92,
     opacity: 0,
   };
+  const targetHit = cardVisible
+    ? frame
+    : config.mode === "notch"
+      ? strip
+      : { x: frame.x, y: frame.y, width: 0, height: 0 };
 
   // What opens beside a Simple dock is cut where the dock is: it grows from behind the dock, the dock keeps its own
   // ground whatever is open, and over a see-through look the two would darken each other (Open
@@ -104,52 +128,36 @@ export function HUDExpandedSurface({
       }}
     >
       <AnimatePresence initial={false} custom={dragging}>
-        {(config.mode === "notch" || cardVisible) && (
+        {(config.mode === "notch" || renderContent) && (
           <motion.div
             key={config.mode === "notch" ? "notch-shell" : "hud-card"}
             className={`hud-expanded-surface ${detached ? "hud-detached-card" : ""} ${peek ? "hud-peek" : ""}`}
+            data-target-x={targetHit.x}
+            data-target-y={targetHit.y}
+            data-target-width={targetHit.width}
+            data-target-height={targetHit.height}
             initial={
-              config.mode === "notch"
-                ? false
-                : reduceMotion
-                  ? false
-                  : detached
-                    ? {
-                        left: frame.x,
-                        top: frame.y,
-                        width: frame.width,
-                        height: frame.height,
-                        scaleX: simplePeek && !horizontal(edge) ? 0.2 : 0.86,
-                        scaleY: simplePeek && !horizontal(edge) ? 1 : 0.86,
-                        opacity: 0,
-                      }
-                    : from
+              config.mode === "notch" || reduceMotion ? false : closedPose
             }
             animate={
               config.mode === "notch"
                 ? { opacity: 1 }
-                : {
-                    left: frame.x,
-                    top: frame.y,
-                    width: frame.width,
-                    height: frame.height,
-                    scaleX: 1,
-                    scaleY: 1,
-                    opacity: 1,
-                  }
+                : cardVisible
+                  ? { scaleX: 1, scaleY: 1, opacity: 1 }
+                  : { ...closedPose, transition: { duration: 0 } }
             }
             variants={{
               gone: (moving: boolean) =>
                 moving
                   ? { opacity: 0, transition: { duration: 0 } }
-                  : reduceMotion || detached
-                    ? { opacity: 0, scaleX: 0.86, scaleY: 0.86 }
-                    : from,
+                  : reduceMotion
+                    ? { opacity: 0 }
+                    : closedPose,
             }}
             exit="gone"
             transition={transition}
             onPointerEnter={(e) => {
-              if (!nativePointer) entered(e.altKey);
+              if (!nativePointer && cardVisible) entered(e.altKey);
             }}
             onPointerLeave={domExited}
             style={{
@@ -161,17 +169,17 @@ export function HUDExpandedSurface({
                     width: notchGeometry.width,
                     height: notchGeometry.height,
                   }
-                : {}),
+                : {
+                    left: frame.x,
+                    top: frame.y,
+                    width: frame.width,
+                    height: frame.height,
+                    willChange: "transform, opacity",
+                  }),
               zIndex: 2,
-              pointerEvents: "auto",
-              transformOrigin:
-                edge === "top"
-                  ? "top center"
-                  : edge === "bottom"
-                    ? "bottom center"
-                    : edge === "left"
-                      ? "left center"
-                      : "right center",
+              pointerEvents:
+                config.mode === "notch" || cardVisible ? "auto" : "none",
+              transformOrigin: expandedOrigin(edge, frame, strip),
               overflow: config.mode === "notch" ? "visible" : "hidden",
               borderRadius: detached
                 ? Math.min(
@@ -218,11 +226,14 @@ export function HUDExpandedSurface({
               </svg>
             )}
             <AnimatePresence initial={false}>
-              {cardVisible && (
+              {renderContent && (
                 <motion.div
                   key="surface-content"
                   initial={false}
-                  animate={{ opacity: 1 }}
+                  animate={{
+                    opacity: cardVisible ? 1 : 0,
+                    transition: { duration: 0 },
+                  }}
                   exit={{
                     opacity: 0,
                     transition: { duration: reduceMotion ? 0 : 0.1 },
@@ -231,6 +242,8 @@ export function HUDExpandedSurface({
                     position: "relative",
                     width: "100%",
                     height: "100%",
+                    pointerEvents: cardVisible ? "auto" : "none",
+                    visibility: cardVisible ? "visible" : "hidden",
                     clipPath:
                       config.mode === "notch" ? notchGeometry.clip : undefined,
                   }}
@@ -241,6 +254,7 @@ export function HUDExpandedSurface({
                     frame={frame}
                     peek={peek}
                     open={open}
+                    active={cardVisible}
                     reduceMotion={reduceMotion}
                     surfaceFlare={surfaceFlare}
                     light={light}

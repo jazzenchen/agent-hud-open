@@ -253,6 +253,13 @@ pub(super) fn set_ignore_cursor(
     })
 }
 
+pub(super) fn cursor_shape_uses_regions(window: &tauri::WebviewWindow) -> bool {
+    if surface(window.label()).is_none() {
+        return super::generic::cursor_shape_uses_regions(window);
+    }
+    true
+}
+
 /// A layer surface takes the keyboard only while a text field holds the lease.
 pub(super) struct TextFocusOrigin;
 

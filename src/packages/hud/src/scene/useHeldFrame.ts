@@ -1,5 +1,15 @@
-import { useLayoutEffect, useRef, useState, type RefObject } from "react";
+import {
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type RefObject,
+} from "react";
+import type { DockEndsGeometry, EndSide } from "../ends/end-geometry";
 import type { HUDRect } from "../geometry";
+import type { HUDMode } from "../model";
+import { visibleEndRects, type HoverHitGeometry } from "./hover-hit";
+import type { Rest } from "./rest";
 import type { HUDNativePointer } from "./useHUDInteraction";
 
 function rectContains(rect: HUDRect, point: { x: number; y: number }) {
@@ -21,6 +31,10 @@ export function useHeldFrame({
   dragging,
   frame,
   strip,
+  mode,
+  rest,
+  endRects,
+  counts,
   nativePointer,
   scene,
 }: {
@@ -29,6 +43,10 @@ export function useHeldFrame({
   dragging: boolean;
   frame: HUDRect;
   strip: HUDRect;
+  mode: HUDMode;
+  rest?: Rest;
+  endRects: DockEndsGeometry;
+  counts: Record<EndSide, number>;
   nativePointer?: HUDNativePointer;
   scene: RefObject<HTMLElement | null>;
 }) {
@@ -102,5 +120,30 @@ export function useHeldFrame({
       setHeldFrame(null);
     }
   };
-  return { heldFrame, trackPointer };
+  const hoverTargets = useMemo<HoverHitGeometry>(
+    () => ({
+      strip,
+      cardVisible,
+      frame,
+      heldFrame,
+      foldedZone: rest?.folded ? rest.zone : null,
+      endRects: visibleEndRects(
+        endRects,
+        counts,
+        dragging || (mode === "notch" && cardVisible),
+      ),
+    }),
+    [
+      strip,
+      cardVisible,
+      frame,
+      heldFrame,
+      rest,
+      endRects,
+      counts,
+      dragging,
+      mode,
+    ],
+  );
+  return { heldFrame, hoverTargets, trackPointer };
 }

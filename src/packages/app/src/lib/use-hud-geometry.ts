@@ -22,6 +22,7 @@ export interface NativeHUDGeometry {
   canvas: NativeRect;
   notchInViewport: NativeRect | null;
   placementConstrained: boolean;
+  followsDepth?: boolean;
 }
 export interface NativeHUDMonitor {
   screenId: string;

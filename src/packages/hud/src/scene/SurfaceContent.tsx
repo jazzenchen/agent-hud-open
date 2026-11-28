@@ -17,6 +17,8 @@ export interface SurfaceContentProps {
   frame: HUDRect;
   peek: boolean;
   open: boolean;
+  /** Whether the surface is visibly open rather than pre-warming invisibly. */
+  active?: boolean;
   reduceMotion: boolean;
   surfaceFlare: number;
   light: boolean;
@@ -47,6 +49,7 @@ export function SurfaceContent({
   frame,
   peek,
   open,
+  active = true,
   reduceMotion,
   surfaceFlare,
   light,
@@ -151,10 +154,19 @@ export function SurfaceContent({
                     opacity: 0,
                   }
             }
-            animate={{ x: 0, y: 0, opacity: 1 }}
+            animate={
+              active || reduceMotion
+                ? { x: 0, y: 0, opacity: 1 }
+                : {
+                    [horizontal(edge) ? "y" : "x"]:
+                      (edge === "top" || edge === "left" ? -1 : 1) *
+                      HUD_METRICS.entryDistance,
+                    opacity: 0,
+                  }
+            }
             transition={{
-              duration: 0.22,
-              delay: 0.12,
+              duration: active && !reduceMotion ? 0.22 : 0,
+              delay: active && !reduceMotion ? 0.12 : 0,
               ease: [0.25, 0.46, 0.45, 0.94],
             }}
           >

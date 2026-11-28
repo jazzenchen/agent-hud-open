@@ -42,11 +42,14 @@ pub async fn hud_report_regions(
             HudPointer::outside(&shared)
         };
         let ignored = state.drag.is_none() && !pointer.inside;
-        // A failed position read must never leave a transparent canvas blocking the user's apps.
-        apply_ignore_cursor(&window, &mut state, ignored, true)?;
+        // Hosts whose cursor passthrough is a whole-window boolean only need a
+        // native call when `ignored` changes; layer-shell updates its input shape.
+        let force_shape = ignored && host::cursor_shape_uses_regions(&window);
+        apply_ignore_cursor(&window, &mut state, ignored, force_shape)?;
         // Apply input acceptance before notifying React: its expanded controls must be
         // able to receive clicks even if the ignore->accept switch causes no DOM enter.
-        publish_pointer(&app, &shared, &mut state, pointer.clone(), true);
+        // Unchanged pointer snapshots are returned directly by this RPC without re-emitting.
+        publish_pointer(&app, &shared, &mut state, pointer.clone(), false);
         ensure_worker(&app, &shared, &mut state)?;
         shared.changed.notify_all();
         Ok(HudInputStatus {
@@ -223,4 +226,75 @@ pub(super) fn apply_ignore_cursor(
         state.last_ignore_cursor = Some(ignored);
     }
     Ok(())
+}
+
+/// Near-field margin (in points) where pointer polling steps up to ~60 Hz so
+/// crossing into or out of the resting HUD feels immediate on high-refresh displays.
+const NEAR_FIELD_MARGIN: f64 = 64.0;
+
+pub(super) fn pointer_near_regions(
+    regions: &[InteractiveRegion],
+    point: Point,
+    margin: f64,
+) -> bool {
+    regions.iter().any(|region| {
+        point.x >= region.x - margin
+            && point.y >= region.y - margin
+            && point.x <= region.x + region.width + margin
+            && point.y <= region.y + region.height + margin
+    })
+}
+
+pub(super) fn pointer_poll_interval(
+    dragging: bool,
+    visible: bool,
+    point: Option<Point>,
+    regions: &[InteractiveRegion],
+) -> Duration {
+    if dragging {
+        Duration::from_millis(16)
+    } else if !visible {
+        Duration::from_millis(500)
+    } else if point.is_some_and(|pt| pointer_near_regions(regions, pt, NEAR_FIELD_MARGIN)) {
+        Duration::from_millis(16)
+    } else {
+        Duration::from_millis(32)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn near_field_pointer_steps_polling_up_to_60hz_and_relaxes_away() {
+        let regions = [InteractiveRegion {
+            x: 370.0,
+            y: 0.0,
+            width: 200.0,
+            height: 24.0,
+        }];
+        assert_eq!(
+            pointer_poll_interval(false, false, Some(Point { x: 400.0, y: 10.0 }), &regions),
+            Duration::from_millis(500)
+        );
+        assert_eq!(
+            pointer_poll_interval(true, true, None, &regions),
+            Duration::from_millis(16)
+        );
+        // Inside or within 64 pt of the HUD: 16 ms (~60 Hz).
+        assert_eq!(
+            pointer_poll_interval(false, true, Some(Point { x: 400.0, y: 12.0 }), &regions),
+            Duration::from_millis(16)
+        );
+        assert_eq!(
+            pointer_poll_interval(false, true, Some(Point { x: 320.0, y: 70.0 }), &regions),
+            Duration::from_millis(16)
+        );
+        // Far away on the desktop: 32 ms idle poll.
+        assert_eq!(
+            pointer_poll_interval(false, true, Some(Point { x: 100.0, y: 500.0 }), &regions),
+            Duration::from_millis(32)
+        );
+    }
 }

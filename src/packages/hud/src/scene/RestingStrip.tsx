@@ -18,6 +18,7 @@ import type { HUDNativePointer } from "./useHUDInteraction";
 export function RestingStrip({
   strip,
   grab,
+  cardVisible,
   draggable,
   dragVisual,
   considerDrag,
@@ -35,6 +36,7 @@ export function RestingStrip({
 }: {
   strip: HUDRect;
   grab: ReturnType<typeof dragSurfaceGeometry>;
+  cardVisible?: boolean;
   /** The host moves the HUD: the strip starts a drag. */
   draggable: boolean;
   dragVisual: boolean;
@@ -60,6 +62,15 @@ export function RestingStrip({
   /** The marks. */
   children: ReactNode;
 }) {
+  const inStrip = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    return (
+      event.clientX >= rect.left &&
+      event.clientX <= rect.right &&
+      event.clientY >= rect.top &&
+      event.clientY <= rect.bottom
+    );
+  };
   return (
     <>
       <div
@@ -85,7 +96,7 @@ export function RestingStrip({
           suppressDragClick.current = false;
         }}
         onPointerEnter={(e) => {
-          if (!nativePointer) {
+          if (!nativePointer && inStrip(e)) {
             followMark(e);
             entered(e.altKey);
           }
@@ -93,7 +104,12 @@ export function RestingStrip({
         onPointerLeave={domExited}
         onPointerMove={(event) => {
           if (nativePointer) return;
+          if (!inStrip(event)) {
+            if (!cardVisible) domExited();
+            return;
+          }
           followMark(event);
+          entered(event.altKey);
           openAtTop(event);
         }}
       >

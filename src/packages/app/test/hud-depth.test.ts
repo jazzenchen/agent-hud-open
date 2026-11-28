@@ -1,6 +1,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { reachFromEdge, wantedDepth } from "../src/lib/use-hud-depth.ts";
+import {
+  measureSceneDepth,
+  reachFromEdge,
+  wantedDepth,
+} from "../src/lib/use-hud-depth.ts";
 
 const rect = (x: number, y: number, width: number, height: number) =>
   ({
@@ -30,4 +34,16 @@ test("an opening or open panel takes the whole canvas; at rest, whole steps", ()
   assert.equal(wantedDepth(false, 40), 192);
   assert.equal(wantedDepth(false, 0), 96);
   assert.equal(wantedDepth(false, 130), 288);
+});
+
+test("measureSceneDepth skips DOM rect readbacks while the panel is opening or open", () => {
+  let reads = 0;
+  const readScene = () => {
+    reads += 1;
+    return { scene, parts: [rect(300, 140, 340, 40)] };
+  };
+  assert.equal(measureSceneDepth("bottom", true, readScene), null);
+  assert.equal(reads, 0);
+  assert.equal(measureSceneDepth("bottom", false, readScene), 192);
+  assert.equal(reads, 1);
 });

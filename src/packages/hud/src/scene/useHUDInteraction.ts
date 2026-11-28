@@ -8,6 +8,7 @@ import {
 import type { Approval, IslandEvent } from "@agent-hud/protocol";
 import { horizontal, type HUDRect, type StripMetrics } from "../geometry";
 import type { HUDConfig, HUDEdge, HUDVendor } from "../model";
+import { isHoverHit, type HoverHitGeometry } from "./hover-hit";
 import { useAlertPresentation } from "./useAlertPresentation";
 import type { HUDDragPreview } from "./useHUDDrag";
 
@@ -57,6 +58,8 @@ export interface UseHUDInteractionArgs {
   onStats?: () => void;
   /** Escape only ends an agent's edit hold; the panel is left to the hover. */
   onEscape?: () => void;
+  onBotLooked?: (keys: string[] | null) => void;
+  hoverTargets: HoverHitGeometry;
   ends?: { showing: boolean; hovered: string | null };
 }
 
@@ -94,8 +97,14 @@ export function useHUDInteraction({
   onConfigure,
   onStats,
   onEscape,
+  onBotLooked,
+  hoverTargets,
   ends,
 }: UseHUDInteractionArgs) {
+  useEffect(() => {
+    if (open)
+      onBotLooked?.(config.separatesAgents && hovered ? [hovered] : null);
+  }, [open, hovered, config.separatesAgents, onBotLooked]);
   useEffect(() => {
     if (typing) {
       forceOpen();
@@ -210,7 +219,11 @@ export function useHUDInteraction({
 
   useEffect(() => {
     if (!nativePointer) return;
-    if (!nativePointer.inside || !nativePointer.point) {
+    if (
+      !nativePointer.inside ||
+      !nativePointer.point ||
+      !isHoverHit(nativePointer.point, hoverTargets)
+    ) {
       exited();
       return;
     }
@@ -230,7 +243,10 @@ export function useHUDInteraction({
     edge,
     hoverPhase,
     strip.x,
+    strip.y,
     strip.width,
+    strip.height,
+    hoverTargets,
     config.requiresOptionToOpen,
     config.openImmediatelyAtTop,
     width,
@@ -239,11 +255,12 @@ export function useHUDInteraction({
 
   const domExited = (event?: { relatedTarget?: EventTarget | null }) => {
     if (nativePointer) return;
+    const activeSelector = hoverTargets.cardVisible
+      ? ".hud-resting-strip, .hud-rest-zone, .hud-expanded-surface, .hud-grab-surface, .hud-hover-floor, .hud-dock-end"
+      : ".hud-resting-strip, .hud-rest-zone, .hud-expanded-surface, .hud-hover-floor, .hud-dock-end";
     if (
       event?.relatedTarget instanceof Element &&
-      event.relatedTarget.closest(
-        ".hud-resting-strip, .hud-rest-zone, .hud-expanded-surface, .hud-grab-surface, .hud-hover-floor, .hud-dock-end",
-      )
+      event.relatedTarget.closest(activeSelector)
     ) {
       return;
     }
