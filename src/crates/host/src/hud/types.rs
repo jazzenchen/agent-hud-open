@@ -189,6 +189,7 @@ pub struct HudGeometry {
     pub(super) canvas: LogicalRect,
     pub(super) notch_in_viewport: Option<LogicalRect>,
     pub(super) placement_constrained: bool,
+    pub(super) follows_depth: bool,
 }
 
 /// A display as the host measures it: identity, points, and the top bar.

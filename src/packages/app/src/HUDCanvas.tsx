@@ -15,7 +15,7 @@ export function HUDCanvas({
   edge: HUDEdge;
   children: ReactNode;
 }) {
-  useHUDDepth(edge, Boolean(geometry));
+  useHUDDepth(edge, Boolean(geometry?.followsDepth));
   if (!geometry) return <>{children}</>;
   return (
     <div

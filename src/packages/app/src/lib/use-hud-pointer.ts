@@ -26,6 +26,63 @@ function offGuide<T extends HUDNativePointer>(pointer: T): T {
     x >= guide.left && x <= guide.right && y >= guide.top && y <= guide.bottom;
   return over ? { ...pointer, inside: false } : pointer;
 }
+/** Avoids React state churn when the host reports an unchanged pointer snapshot. */
+export function sameNativePointer(
+  a: HUDNativePointer | undefined,
+  b: HUDNativePointer | undefined,
+): boolean {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  return (
+    a.inside === b.inside &&
+    (a.point?.x ?? null) === (b.point?.x ?? null) &&
+    (a.point?.y ?? null) === (b.point?.y ?? null) &&
+    a.buttons === b.buttons &&
+    a.altKey === b.altKey &&
+    a.ctrlKey === b.ctrlKey &&
+    a.metaKey === b.metaKey &&
+    a.shiftKey === b.shiftKey
+  );
+}
+
+/** Reads declared target bounds on animated surfaces so mid-tween transforms
+ * never wake synchronous layout readbacks or resend intermediate regions. */
+export function regionRectForElement(
+  element: {
+    dataset?: Record<string, string | undefined>;
+    getBoundingClientRect: () => {
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+    };
+  },
+  sceneOffset: { left: number; top: number },
+) {
+  const data = element.dataset;
+  if (data?.targetWidth !== undefined && data.targetHeight !== undefined) {
+    const x = Number(data.targetX);
+    const y = Number(data.targetY);
+    const width = Number(data.targetWidth);
+    const height = Number(data.targetHeight);
+    if (
+      Number.isFinite(x) &&
+      Number.isFinite(y) &&
+      Number.isFinite(width) &&
+      Number.isFinite(height)
+    ) {
+      return { x, y, width, height };
+    }
+  }
+  const rect = element.getBoundingClientRect();
+  return {
+    x: rect.x - sceneOffset.left,
+    y: rect.y - sceneOffset.top,
+    width: rect.width,
+    height: rect.height,
+  };
+}
+
 /** The HUD's parts the pointer can reach: where the host takes clicks. */
 const REGIONS =
   ".hud-resting-strip, .hud-rest-zone, .hud-expanded-surface, .hud-grab-surface, .hud-hover-floor, .hud-dock-end, .hud-guide";
@@ -33,7 +90,8 @@ const REGIONS =
  * zone at the edge takes the pointer then. */
 const folded = (element: Element) =>
   Boolean(element.closest(".hud-resting-strip[data-folded]"));
-/** Only outer HUD geometry wakes native reports; animated bot descendants never do. */
+/** Only outer HUD geometry wakes native reports; animated bot descendants and
+ * per-frame tween styles on surfaces with static target bounds never do. */
 function observeHUDContours(report: () => void) {
   const selector = `.hud-scene, ${REGIONS}`;
   let timer: ReturnType<typeof setTimeout> | null = null,
@@ -55,7 +113,16 @@ function observeHUDContours(report: () => void) {
     for (const element of document.querySelectorAll(selector))
       attributes.observe(element, {
         attributes: true,
-        attributeFilter: ["style", "class", "data-folded"],
+        attributeFilter: element.hasAttribute("data-target-width")
+          ? [
+              "class",
+              "data-folded",
+              "data-target-x",
+              "data-target-y",
+              "data-target-width",
+              "data-target-height",
+            ]
+          : ["style", "class", "data-folded"],
       });
   };
   const relevant = (node: Node) =>
@@ -98,7 +165,10 @@ export function useHUDPointer(screenId: string) {
       (event) => {
         if (disposed || event.payload.screenId !== screenId) return;
         pointerRevision.current += 1;
-        setNativePointer(offGuide(event.payload));
+        const next = offGuide(event.payload);
+        setNativePointer((prev) =>
+          sameNativePointer(prev, next) ? prev : next,
+        );
       },
     );
     return () => {
@@ -132,7 +202,10 @@ export function useHUDPointer(screenId: string) {
           revision === pointerRevision.current &&
           status.pointer.screenId === screenId
         ) {
-          setNativePointer(offGuide(status.pointer));
+          const next = offGuide(status.pointer);
+          setNativePointer((prev) =>
+            sameNativePointer(prev, next) ? prev : next,
+          );
         }
       } catch (error) {
         previous = "";
@@ -151,17 +224,13 @@ export function useHUDPointer(screenId: string) {
         const scene = document
           .querySelector(".hud-scene")
           ?.getBoundingClientRect();
-        const regions = [...document.querySelectorAll(REGIONS)]
+        const sceneOffset = {
+          left: scene?.left ?? 0,
+          top: scene?.top ?? 0,
+        };
+        const regions = [...document.querySelectorAll<HTMLElement>(REGIONS)]
           .filter((element) => !folded(element))
-          .map((element) => {
-            const rect = element.getBoundingClientRect();
-            return {
-              x: rect.x - (scene?.left ?? 0),
-              y: rect.y - (scene?.top ?? 0),
-              width: rect.width,
-              height: rect.height,
-            };
-          })
+          .map((element) => regionRectForElement(element, sceneOffset))
           .filter((rect) => rect.width > 0 && rect.height > 0);
         const serialized = JSON.stringify(regions);
         if (serialized !== previous) {

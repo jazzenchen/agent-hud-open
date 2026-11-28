@@ -53,6 +53,10 @@ pub(super) fn set_ignore_cursor(
         .map_err(|error| error.to_string())
 }
 
+pub(super) fn cursor_shape_uses_regions(_window: &tauri::WebviewWindow) -> bool {
+    false
+}
+
 pub(super) fn shown(window: &tauri::WebviewWindow, _configured_visible: bool) -> bool {
     window.is_visible().unwrap_or(false)
 }

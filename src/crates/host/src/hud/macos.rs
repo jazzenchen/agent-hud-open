@@ -102,6 +102,10 @@ pub(super) fn set_ignore_cursor(
         .map_err(|error| error.to_string())
 }
 
+pub(super) fn cursor_shape_uses_regions(_window: &tauri::WebviewWindow) -> bool {
+    false
+}
+
 #[link(name = "CoreGraphics", kind = "framework")]
 unsafe extern "C" {
     fn CGDisplayCreateUUIDFromDisplayID(display: u32) -> Option<NonNull<CFUUID>>;

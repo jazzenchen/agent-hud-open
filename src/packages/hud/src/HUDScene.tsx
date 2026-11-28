@@ -1,11 +1,4 @@
-import {
-  useEffect,
-  useId,
-  useMemo,
-  useRef,
-  useState,
-  type ReactNode,
-} from "react";
+import { useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { useReducedMotion } from "motion/react";
 import type { Snapshot } from "@agent-hud/protocol";
 export { HUDArtwork as HUDLogo } from "./HUDArtwork";
@@ -233,11 +226,6 @@ export function HUDScene({
     suppressHover,
   });
 
-  useEffect(() => {
-    if (open)
-      onBotLooked?.(config.separatesAgents && hovered ? [hovered] : null);
-  }, [open, hovered, config.separatesAgents]);
-
   const glowColors = useGlowColors(vendors, snapshot);
   const metrics = useStripMetrics(
     config,
@@ -258,34 +246,7 @@ export function HUDScene({
   const endView = clip.viewing ? "clip" : news.ends.view;
   const counts = { ...endCounts, clip: clip.shown ? 1 : 0 };
 
-  const {
-    edge,
-    strip,
-    endRects,
-    grab,
-    light,
-    fill,
-    outline,
-    shadow,
-    sender,
-    focusedVendor,
-    delivery,
-    detached,
-    peek,
-    scale,
-    simplePeek,
-    peekTuck,
-    targetSize,
-    surfaceFlare,
-    flared,
-    frame,
-    cardVisible,
-    notchGeometry,
-    bodyPadding,
-    surfacePadding,
-    marginStyle,
-    measurementWidth,
-  } = useHUDLayout({
+  const layout = useHUDLayout({
     config,
     snapshot,
     vendors,
@@ -305,6 +266,17 @@ export function HUDScene({
     requestsCount: requests.length,
     ends: { view: endView, counts },
   });
+  const {
+    edge,
+    strip,
+    endRects,
+    grab,
+    light,
+    fill,
+    outline,
+    frame,
+    cardVisible,
+  } = layout;
 
   // A Simple dock that rests folds while nothing needs it.
   const rest = useRest({
@@ -333,16 +305,19 @@ export function HUDScene({
       typing,
     },
   });
-  const { heldFrame, trackPointer } = useHeldFrame({
+  const { heldFrame, hoverTargets, trackPointer } = useHeldFrame({
     cardVisible,
     pointerInside,
     dragging,
     frame,
     strip,
+    mode: config.mode,
+    rest,
+    endRects,
+    counts,
     nativePointer,
     scene,
   });
-
   const {
     vendorUnderPointer,
     followMark,
@@ -387,6 +362,8 @@ export function HUDScene({
     onConfigure,
     onStats,
     onEscape: endHold,
+    onBotLooked,
+    hoverTargets,
     ends: { showing: Boolean(endView), hovered: ends.hovered },
   });
 
@@ -417,10 +394,10 @@ export function HUDScene({
     pinned,
     phase: state.phase,
     pointerInside,
-    focusedVendor,
+    focusedVendor: layout.focusedVendor,
     footer,
     update,
-    delivery,
+    delivery: layout.delivery,
     services: panelServices,
     listed: listedSessions,
   });
@@ -456,14 +433,14 @@ export function HUDScene({
           <MeasuringCopy
             measured={measured}
             body={panelBody}
-            width={measurementWidth}
-            padding={bodyPadding}
+            width={layout.measurementWidth}
+            padding={layout.bodyPadding}
             onHeight={setContentHeight}
           />
           <SceneBackdrop>{renderBackdrop}</SceneBackdrop>
           {config.mode === "notch" && config.glowEnabled && !glowHidden && (
             <NotchGlow
-              geometry={notchGeometry}
+              geometry={layout.notchGeometry}
               config={config}
               vendors={vendors}
               colors={glowColors}
@@ -481,29 +458,30 @@ export function HUDScene({
             config={config}
             edge={edge}
             cardVisible={cardVisible}
-            detached={detached}
-            peek={peek}
-            simplePeek={simplePeek}
+            hoverPhase={state.phase}
+            detached={layout.detached}
+            peek={layout.peek}
+            simplePeek={layout.simplePeek}
             open={open}
             reduceMotion={reduceMotion}
             dragging={dragging}
             frame={frame}
             strip={strip}
-            flared={flared}
-            surfaceFlare={surfaceFlare}
+            flared={layout.flared}
+            surfaceFlare={layout.surfaceFlare}
             metricsRadius={metrics.radius}
-            targetSize={targetSize}
-            notchGeometry={notchGeometry}
+            targetSize={layout.targetSize}
+            notchGeometry={layout.notchGeometry}
             light={light}
             fill={fill}
             outline={outline}
-            shadow={shadow}
+            shadow={layout.shadow}
             nativePointer={nativePointer}
             entered={entered}
             domExited={domExited}
-            focusedVendor={focusedVendor}
-            scale={scale}
-            peekTuck={peekTuck}
+            focusedVendor={layout.focusedVendor}
+            scale={layout.scale}
+            peekTuck={layout.peekTuck}
             pin={pin}
             request={request}
             event={event}
@@ -512,20 +490,23 @@ export function HUDScene({
             forceOpen={forceOpen}
             dismissNews={news.dismiss}
             showPanelStats={showPanelStats}
-            surfacePadding={surfacePadding}
+            surfacePadding={layout.surfacePadding}
             inUsagePanel={inUsagePanel}
           >
             {panelBody(
               snapshot,
               Math.max(
                 40,
-                frame.height - surfacePadding.top - surfacePadding.bottom,
+                frame.height -
+                  layout.surfacePadding.top -
+                  layout.surfacePadding.bottom,
               ),
             )}
           </HUDExpandedSurface>
           <RestingStrip
             strip={strip}
             grab={grab}
+            cardVisible={cardVisible}
             draggable={Boolean(onDragStart)}
             dragVisual={dragVisual}
             considerDrag={considerDrag}
@@ -551,13 +532,13 @@ export function HUDScene({
               light={light}
               fill={fill}
               outline={outline}
-              marginStyle={marginStyle}
+              marginStyle={layout.marginStyle}
               dragVisual={dragVisual}
               hovered={hovered}
               pointerInside={pointerInside}
               open={open}
-              sender={sender}
-              focusedVendor={focusedVendor}
+              sender={layout.sender}
+              focusedVendor={layout.focusedVendor}
               botDirections={botDirections}
               dockMemory={dockMemory}
               nativePointer={nativePointer}

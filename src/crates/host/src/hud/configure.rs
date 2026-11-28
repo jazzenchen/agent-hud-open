@@ -200,6 +200,7 @@ pub(super) fn configure(
             || (expected.y - placed.y).abs() > 0.5
             || (expected.width - placed.width).abs() > 0.5
             || (expected.height - placed.height).abs() > 0.5,
+        follows_depth: host::WINDOW_FOLLOWS_DEPTH,
     });
     // Existing rectangles own input after a resize as well. The initial show should request
     // ignoreCursor:true until React has measured its actual visible surfaces.

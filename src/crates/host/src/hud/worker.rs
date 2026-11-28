@@ -8,9 +8,9 @@ use std::{
 use tauri::Manager;
 
 use super::{
-    apply_ignore_cursor, emit_drag_end, emit_drag_preview, emit_geometry, host, poll_drag,
-    publish_pointer, release_text_focus, restore_drag, restore_input, sample_pointer, DragTick,
-    HudPointer, HudState, Shared,
+    apply_ignore_cursor, emit_drag_end, emit_drag_preview, emit_geometry, host,
+    pointer_poll_interval, poll_drag, publish_pointer, release_text_focus, restore_drag,
+    restore_input, sample_pointer, DragTick, HudPointer, HudState, Shared,
 };
 
 pub(super) fn ensure_worker(
@@ -59,6 +59,7 @@ fn poll_pointer(app: tauri::AppHandle, shared: Arc<Shared>) {
         let mut placement = None;
         let mut preview = None;
         let mut ended = None;
+        let mut sampled_point = None;
         if visible {
             if state.drag.is_some() {
                 match poll_drag(&app, &window, &mut state, &shared) {
@@ -79,6 +80,7 @@ fn poll_pointer(app: tauri::AppHandle, shared: Arc<Shared>) {
                 }
             }
             let pointer = sample_pointer(&app, &window, &state, &shared);
+            sampled_point = pointer.point;
             let ignored = state.drag.is_none() && !pointer.inside;
             let _ = apply_ignore_cursor(&window, &mut state, ignored, false);
             publish_pointer(&app, &shared, &mut state, pointer, false);
@@ -102,13 +104,12 @@ fn poll_pointer(app: tauri::AppHandle, shared: Arc<Shared>) {
                 false,
             );
         }
-        let pause = if state.drag.is_some() {
-            Duration::from_millis(16)
-        } else if visible {
-            Duration::from_millis(32)
-        } else {
-            Duration::from_millis(500)
-        };
+        let pause = pointer_poll_interval(
+            state.drag.is_some(),
+            visible,
+            sampled_point,
+            state.regions.as_deref().unwrap_or_default(),
+        );
         let geometry = if placement.is_some() || preview.is_some() || ended.is_some() {
             state.geometry.clone()
         } else {
