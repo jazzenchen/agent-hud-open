@@ -129,9 +129,9 @@ export default function SessionStatistics({
     list: listRows,
   } = sessionColumns(width, Boolean(selectedId), Boolean(pick));
   const split = layout !== "one";
-  // One column at a time scrolls the window: a pick opens at its top.
+  // One column at a time scrolls inside its section: a pick opens at its top.
   useEffect(() => {
-    if (active && !split && pick) document.scrollingElement?.scrollTo(0, 0);
+    if (active && !split && pick) ref.current?.scrollTo(0, 0);
   }, [split, pick?.kind, pick?.id]);
   const open = (id: string) => actionRef.current("open_session", { id });
 
@@ -148,7 +148,7 @@ export default function SessionStatistics({
         onQuery={setQuery}
         page={list.page}
         theme={theme}
-        stickyTop={split ? 0 : 44}
+        stickyTop={0}
       />
       <SessionList
         list={list}
@@ -181,7 +181,7 @@ export default function SessionStatistics({
       {(listHidden || parent) && (
         <SessionBackBar
           label={parent?.title ?? t("All sessions")}
-          top={split ? 0 : 44}
+          top={0}
           onBack={() =>
             parent ? show(parent.id) : split ? setPick(null) : show(null)
           }

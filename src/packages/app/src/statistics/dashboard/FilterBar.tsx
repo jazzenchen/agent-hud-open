@@ -82,7 +82,7 @@ export function FilterBar({
       style={{
         ...row,
         position: "sticky",
-        top: 44,
+        top: 0,
         zIndex: 15,
         gap: 12,
         padding: "6px 0 12px",

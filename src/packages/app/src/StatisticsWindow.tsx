@@ -117,9 +117,14 @@ export function StatisticsWindow({
         {snapshot ? (
           <ViewErrorBoundary onReset={() => setSelectedSession(null)}>
             <Suspense
-              fallback={statisticsTab === "tokens" ? placeholder : null}
+              fallback={
+                statisticsTab === "tokens" ? (
+                  <div className="statistics-scroll">{placeholder}</div>
+                ) : null
+              }
             >
               <div
+                className="statistics-scroll"
                 style={{
                   display: statisticsTab === "tokens" ? "block" : "none",
                 }}
@@ -136,8 +141,9 @@ export function StatisticsWindow({
                 />
               </div>
               <div
+                className="statistics-body"
                 style={{
-                  display: statisticsTab === "sessions" ? "block" : "none",
+                  display: statisticsTab === "sessions" ? "flex" : "none",
                 }}
               >
                 <SessionStatistics
@@ -152,19 +158,21 @@ export function StatisticsWindow({
             </Suspense>
           </ViewErrorBoundary>
         ) : !error && statisticsTab === "tokens" ? (
-          placeholder
+          <div className="statistics-scroll">{placeholder}</div>
         ) : (
-          <LoadingState
-            label={
-              error
-                ? t("Couldn’t read local activity")
-                : t("Reading local activity…")
-            }
-            failed={!!error}
-            detail={error}
-            retryLabel={t("Retry")}
-            onRetry={() => void refresh()}
-          />
+          <div className="statistics-scroll">
+            <LoadingState
+              label={
+                error
+                  ? t("Couldn’t read local activity")
+                  : t("Reading local activity…")
+              }
+              failed={!!error}
+              detail={error}
+              retryLabel={t("Retry")}
+              onRetry={() => void refresh()}
+            />
+          </div>
         )}
         <Toaster theme={theme} />
       </div>

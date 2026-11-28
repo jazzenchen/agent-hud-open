@@ -66,7 +66,7 @@ export function SessionAside({
     <div style={{ animation: "session-fade-in 200ms ease" }}>
       <SessionBackBar
         label={one ? session?.title || t("Untitled session") : name}
-        top={one ? 44 : 0}
+        top={0}
         onBack={one ? onClose : undefined}
         onClose={one ? undefined : onClose}
         theme={theme}

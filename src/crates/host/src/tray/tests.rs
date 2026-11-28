@@ -1,5 +1,7 @@
-use super::projection::{reset_countdown, Level};
+use super::compact::{compact, CompactEntry};
+use super::projection::{reset_countdown, Entry, Level};
 use super::*;
+use agent_hud_runtime::l10n::Language;
 use serde_json::json;
 
 fn titles(state: &Presentation) -> Vec<String> {
@@ -117,4 +119,123 @@ fn an_update_notice_redraws_the_menu() {
     assert_eq!(offered.update.as_deref(), Some("0.6.1"));
     // `apply` skips an unchanged presentation, so the notice must change it.
     assert!(none != offered);
+}
+
+#[test]
+fn compact_keeps_short_menus_flat() {
+    let entries = vec![
+        Entry::Item {
+            title: "Claude".into(),
+            value: String::new(),
+            enabled: false,
+        },
+        Entry::Item {
+            title: "5h".into(),
+            value: "40%".into(),
+            enabled: true,
+        },
+        Entry::Separator,
+        Entry::Item {
+            title: "DeepSeek · Balance".into(),
+            value: "¥8.85".into(),
+            enabled: true,
+        },
+    ];
+    let rows = compact(&entries, Language::En);
+    assert_eq!(rows.len(), 4);
+    assert!(matches!(rows[0], CompactEntry::Item { enabled: false, .. }));
+    assert!(matches!(rows[2], CompactEntry::Separator));
+}
+
+#[test]
+fn compact_folds_tall_menus_into_submenus_and_caps_top_level_height() {
+    let mut entries = vec![
+        // Multi-row vendor with account + 2 windows -> Submenu
+        Entry::Item {
+            title: "Claude".into(),
+            value: String::new(),
+            enabled: false,
+        },
+        Entry::Item {
+            title: "me@work".into(),
+            value: String::new(),
+            enabled: false,
+        },
+        Entry::Item {
+            title: "5h".into(),
+            value: "40% · 2h 05m".into(),
+            enabled: true,
+        },
+        Entry::Item {
+            title: "Week".into(),
+            value: "73%".into(),
+            enabled: true,
+        },
+    ];
+    // Add 10 single-window vendors -> triggers both compaction and "More" overflow
+    for i in 1..=10 {
+        entries.push(Entry::Separator);
+        entries.push(Entry::Item {
+            title: format!("Vendor{i}"),
+            value: String::new(),
+            enabled: false,
+        });
+        entries.push(Entry::Item {
+            title: "Agent".into(),
+            value: format!("{i}0%"),
+            enabled: true,
+        });
+    }
+    // Plus 2 balance rows
+    entries.push(Entry::Separator);
+    entries.push(Entry::Item {
+        title: "DeepSeek · Balance".into(),
+        value: "¥8.85".into(),
+        enabled: true,
+    });
+    entries.push(Entry::Separator);
+    entries.push(Entry::Item {
+        title: "Hermes · Balance".into(),
+        value: "$18.40".into(),
+        enabled: true,
+    });
+
+    let rows = compact(&entries, Language::ZhHans);
+    // Top level capped at 8 rows: 7 items + 1 "更多 (N)" submenu
+    assert_eq!(rows.len(), 8);
+
+    // First vendor (Claude) became a submenu with its account and windows inside
+    match &rows[0] {
+        CompactEntry::Submenu { label, items } => {
+            assert_eq!(label, "Claude    40% · 2h 05m");
+            assert_eq!(items.len(), 3);
+            assert!(matches!(
+                &items[1],
+                CompactEntry::Item { id, enabled: true, .. } if id.starts_with("tray-data-")
+            ));
+        }
+        other => panic!("expected Claude submenu, got {other:?}"),
+    }
+
+    // Single-window vendor collapsed into one clickable row
+    match &rows[1] {
+        CompactEntry::Item {
+            id,
+            label,
+            enabled: true,
+        } => {
+            assert!(id.starts_with("tray-data-"));
+            assert_eq!(label, "Vendor1 · Agent    10%");
+        }
+        other => panic!("expected single row for Vendor1, got {other:?}"),
+    }
+
+    // Overflow moved into localized "更多 (6)" submenu (13 total sections - 7 kept = 6)
+    match rows.last().unwrap() {
+        CompactEntry::Submenu { label, items } => {
+            assert_eq!(label, "更多 (6)");
+            assert_eq!(items.len(), 6);
+        }
+        other => panic!("expected overflow submenu, got {other:?}"),
+    }
 }
