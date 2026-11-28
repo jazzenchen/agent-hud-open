@@ -145,12 +145,16 @@ mod link_tests {
     /// turn's facts; only the session it watches comes with its words.
     #[test]
     fn a_light_reader_gets_every_turn_and_the_words_of_the_one_it_watches() {
+        // The cache keeps its folder private and, on Windows, refuses one it
+        // did not make that another owner holds: a temporary folder made by
+        // an elevated process belongs to Administrators. So it gets a folder
+        // of its own to make.
         let directory = tempfile::tempdir().unwrap();
         let cache = Mutex::new(
             SnapshotCache::new(
                 "mac".into(),
                 "Mac".into(),
-                directory.path().join("cursor.json"),
+                directory.path().join("lan").join("cursor.json"),
             )
             .unwrap(),
         );
