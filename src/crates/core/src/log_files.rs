@@ -18,9 +18,12 @@ mod path_adapter;
 mod path_adapter;
 pub(super) use path_adapter::native_path;
 mod source_paths;
+mod stamp;
 mod walk;
 use source_paths::accepts;
 pub(super) use source_paths::accepts_source;
+pub(crate) use stamp::stamp;
+use stamp::{stamp_cached, stamp_readonly};
 use walk::{owned_path, walk, walk_root};
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -30,9 +33,12 @@ pub(super) struct FileStamp {
     pub modified: Option<SystemTime>,
 }
 
+pub(super) type ArchiveCache = HashMap<PathBuf, (u64, Option<SystemTime>, u64)>;
+
 #[derive(Default)]
 pub(super) struct LogFiles {
     pub files: HashMap<PathBuf, FileStamp>,
+    archive_lengths: ArchiveCache,
     scanned_at: Option<Instant>,
     /// None means the current batch cannot establish which paths changed.
     changes: Option<HashSet<PathBuf>>,
@@ -79,7 +85,8 @@ impl LogFiles {
             };
             match metadata {
                 Ok(meta) if meta.is_file() && accepts(&path, roots) => {
-                    self.files.get(&path) != Some(&stamp(&path, source, &meta))
+                    self.files.get(&path)
+                        != Some(&stamp_readonly(&path, source, &meta, &self.archive_lengths))
                 }
                 Ok(_) => self.files.contains_key(&path),
                 Err(error) => {
@@ -112,7 +119,13 @@ impl LogFiles {
             let mut files = HashMap::new();
             let mut errors = Vec::new();
             for (root, source) in roots {
-                walk_root(root, source, &mut files, &mut errors);
+                walk_root(
+                    root,
+                    source,
+                    &mut files,
+                    &mut self.archive_lengths,
+                    &mut errors,
+                );
             }
             // A failed subtree read cannot prove that cached files disappeared.
             if !errors.is_empty() {
@@ -136,6 +149,8 @@ impl LogFiles {
             for path in files.keys() {
                 note_holders(&mut self.holders, path);
             }
+            self.archive_lengths
+                .retain(|path, _| files.contains_key(path));
             self.files = files;
             self.scanned_at = Some(Instant::now());
             self.gaps = errors;
@@ -167,9 +182,21 @@ impl LogFiles {
             let mut files = HashMap::new();
             let mut subtree_errors = Vec::new();
             if roots.iter().any(|(root, _)| root == path) {
-                walk_root(path, source, &mut files, &mut subtree_errors);
+                walk_root(
+                    path,
+                    source,
+                    &mut files,
+                    &mut self.archive_lengths,
+                    &mut subtree_errors,
+                );
             } else {
-                walk(path, source, &mut files, &mut subtree_errors);
+                walk(
+                    path,
+                    source,
+                    &mut files,
+                    &mut self.archive_lengths,
+                    &mut subtree_errors,
+                );
             }
             if subtree_errors.is_empty() {
                 self.removed.extend(
@@ -179,6 +206,8 @@ impl LogFiles {
                         .cloned(),
                 );
                 self.files.retain(|known, _| !known.starts_with(path));
+                self.archive_lengths
+                    .retain(|known, _| !known.starts_with(path) || files.contains_key(known));
             }
             self.changed.extend(
                 files
@@ -209,7 +238,7 @@ impl LogFiles {
             };
             match metadata {
                 Ok(meta) if meta.is_file() && accepts(&path, roots) => {
-                    let next = stamp(&path, source, &meta);
+                    let next = stamp_cached(&path, source, &meta, &mut self.archive_lengths);
                     if self.files.get(&path) != Some(&next) {
                         self.changed.insert(path.clone());
                         note_holders(&mut self.holders, &path);
@@ -217,11 +246,13 @@ impl LogFiles {
                     }
                 }
                 Ok(_) => {
+                    self.archive_lengths.remove(&path);
                     if self.files.remove(&path).is_some() {
                         self.removed.insert(path);
                     }
                 }
                 Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                    self.archive_lengths.remove(&path);
                     if self.files.remove(&path).is_some() {
                         self.removed.insert(path);
                     }
@@ -240,49 +271,6 @@ fn note_holders(holders: &mut HashSet<PathBuf>, path: &Path) {
             break;
         }
         parent = directory.parent();
-    }
-}
-
-pub(super) fn stamp(path: &Path, source: &'static str, metadata: &fs::Metadata) -> FileStamp {
-    let related = if source == "grok-bot" {
-        path.parent()
-            .map(|dir| super::grok_cache::path(dir, super::grok_cache::ACCOUNT_KEY))
-    } else if source == "antigravity" {
-        path.parent().and_then(Path::parent).map(|dir| {
-            dir.join("annotations")
-                .join(path.file_stem().unwrap_or_default())
-                .with_extension("pbtxt")
-        })
-    } else {
-        agent_hud_agents::transcript::kept_names::kept_name_file(path, source)
-    };
-    let related_meta = related.and_then(|p| fs::metadata(p).ok());
-    FileStamp {
-        source,
-        length: if super::source_db::accepts(path, source) {
-            metadata.len().saturating_add(
-                fs::metadata(format!("{}-wal", path.to_string_lossy()))
-                    .map(|m| m.len())
-                    .unwrap_or(0),
-            )
-        } else if source == "codex" && super::compressed::is_archive(path) {
-            super::compressed::text_length(path).unwrap_or(metadata.len())
-        } else {
-            metadata.len()
-        },
-        modified: metadata
-            .modified()
-            .ok()
-            .into_iter()
-            .chain(if super::source_db::accepts(path, source) {
-                fs::metadata(format!("{}-wal", path.to_string_lossy()))
-                    .ok()
-                    .and_then(|m| m.modified().ok())
-            } else {
-                None
-            })
-            .chain(related_meta.and_then(|m| m.modified().ok()))
-            .max(),
     }
 }
 

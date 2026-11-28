@@ -1,7 +1,7 @@
 //! Walking a source root for the logs it holds, and naming a reported path
 //! the way its configured root does.
 use super::source_paths::{accepts_source, hides_files};
-use super::{stamp, FileStamp};
+use super::{stamp_cached, ArchiveCache, FileStamp};
 use std::{
     collections::HashMap,
     fs,
@@ -12,12 +12,13 @@ pub(super) fn walk_root(
     path: &Path,
     source: &'static str,
     files: &mut HashMap<PathBuf, FileStamp>,
+    archives: &mut ArchiveCache,
     errors: &mut Vec<String>,
 ) {
     if fs::symlink_metadata(path).is_ok_and(|meta| meta.is_symlink()) {
         if let Ok(real) = path.canonicalize() {
             let mut resolved = HashMap::new();
-            walk(&real, source, &mut resolved, errors);
+            walk(&real, source, &mut resolved, archives, errors);
             for (file, stamp) in resolved {
                 if let Ok(tail) = file.strip_prefix(&real) {
                     files.insert(path.join(tail), stamp);
@@ -27,7 +28,7 @@ pub(super) fn walk_root(
             errors.push(format!("Could not resolve a {source} log root"));
         }
     } else {
-        walk(path, source, files, errors);
+        walk(path, source, files, archives, errors);
     }
 }
 
@@ -35,6 +36,7 @@ pub(super) fn walk(
     path: &Path,
     source: &'static str,
     files: &mut HashMap<PathBuf, FileStamp>,
+    archives: &mut ArchiveCache,
     errors: &mut Vec<String>,
 ) {
     let meta = match fs::symlink_metadata(path) {
@@ -50,7 +52,7 @@ pub(super) fn walk(
     }
     if meta.is_file() {
         if accepts_source(path, source) {
-            files.insert(path.into(), stamp(path, source, &meta));
+            files.insert(path.into(), stamp_cached(path, source, &meta, archives));
         }
         return;
     }
@@ -99,7 +101,7 @@ pub(super) fn walk(
         return;
     }
     if source == "antigravity" {
-        walk_antigravity(path, source, files);
+        walk_antigravity(path, source, files, archives);
         return;
     }
     let entries = match fs::read_dir(path) {
@@ -115,46 +117,66 @@ pub(super) fn walk(
     for entry in entries {
         match entry {
             Ok(entry) if skips && entry.file_name().to_string_lossy().starts_with('.') => {}
-            Ok(entry) => walk(&entry.path(), source, files, errors),
+            Ok(entry) => walk(&entry.path(), source, files, archives, errors),
             Err(error) => errors.push(format!("Could not list {source} logs: {error}")),
         }
     }
 }
 
-fn walk_antigravity(path: &Path, source: &'static str, files: &mut HashMap<PathBuf, FileStamp>) {
+fn walk_antigravity(
+    path: &Path,
+    source: &'static str,
+    files: &mut HashMap<PathBuf, FileStamp>,
+    archives: &mut ArchiveCache,
+) {
     fn insert_if_accepted(
         candidate: PathBuf,
         source: &'static str,
         files: &mut HashMap<PathBuf, FileStamp>,
+        archives: &mut ArchiveCache,
     ) {
         if let Ok(meta) = fs::symlink_metadata(&candidate) {
             if !meta.is_symlink() && meta.is_file() && accepts_source(&candidate, source) {
-                files.insert(candidate.clone(), stamp(&candidate, source, &meta));
+                files.insert(
+                    candidate.clone(),
+                    stamp_cached(&candidate, source, &meta, archives),
+                );
             }
         }
     }
-    fn scan_flat(dir: &Path, source: &'static str, files: &mut HashMap<PathBuf, FileStamp>) {
+    fn scan_flat(
+        dir: &Path,
+        source: &'static str,
+        files: &mut HashMap<PathBuf, FileStamp>,
+        archives: &mut ArchiveCache,
+    ) {
         if let Ok(entries) = fs::read_dir(dir) {
             for entry in entries.flatten() {
-                insert_if_accepted(entry.path(), source, files);
+                insert_if_accepted(entry.path(), source, files, archives);
             }
         }
     }
-    fn scan_brain(brain_dir: &Path, source: &'static str, files: &mut HashMap<PathBuf, FileStamp>) {
+    fn scan_brain(
+        brain_dir: &Path,
+        source: &'static str,
+        files: &mut HashMap<PathBuf, FileStamp>,
+        archives: &mut ArchiveCache,
+    ) {
         if let Ok(entries) = fs::read_dir(brain_dir) {
             for entry in entries.flatten() {
                 insert_if_accepted(
                     entry.path().join(".system_generated/logs/transcript.jsonl"),
                     source,
                     files,
+                    archives,
                 );
             }
         }
     }
-    scan_flat(path, source, files);
+    scan_flat(path, source, files, archives);
     let name = path.file_name().and_then(|s| s.to_str()).unwrap_or("");
     if name == "brain" {
-        scan_brain(path, source, files);
+        scan_brain(path, source, files, archives);
         return;
     }
     if path.components().any(|c| c.as_os_str() == "brain") {
@@ -163,18 +185,18 @@ fn walk_antigravity(path: &Path, source: &'static str, files: &mut HashMap<PathB
             "logs/transcript.jsonl",
             "transcript.jsonl",
         ] {
-            insert_if_accepted(path.join(rel), source, files);
+            insert_if_accepted(path.join(rel), source, files, archives);
         }
         return;
     }
     if name != "conversations" {
         let conv = path.join("conversations");
         if conv.is_dir() {
-            scan_flat(&conv, source, files);
+            scan_flat(&conv, source, files, archives);
         }
         let brain = path.join("brain");
         if brain.is_dir() {
-            scan_brain(&brain, source, files);
+            scan_brain(&brain, source, files, archives);
         }
     }
 }

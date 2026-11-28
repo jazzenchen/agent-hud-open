@@ -1,5 +1,6 @@
 //! The session list: a page of the sessions a scope, its filters and a search
 //! select, with the day totals and projects they fall under.
+use super::search::FoldedQuery;
 use crate::*;
 
 fn session_project(target: &Value, cwd: Option<&str>) -> Option<String> {
@@ -93,13 +94,13 @@ impl AgentHudCore {
         }
         let source_filter = strings(&params, "sources")?;
         let project_filter = strings(&params, "projects")?;
-        let search = params
-            .get("search")
-            .map(|v| v.as_str().ok_or("search must be a string"))
-            .transpose()?
-            .unwrap_or("")
-            .trim()
-            .to_lowercase();
+        let search = FoldedQuery::new(
+            params
+                .get("search")
+                .map(|v| v.as_str().ok_or("search must be a string"))
+                .transpose()?
+                .unwrap_or(""),
+        );
         let zone = params
             .get("timeZone")
             .map(|v| {
@@ -215,7 +216,7 @@ impl AgentHudCore {
             projects
                 .iter()
                 .map(|entry| normalize_project_filter(entry))
-                .collect::<Vec<_>>()
+                .collect::<HashSet<_>>()
         });
         let in_project = |target: &Value, cwd: Option<&str>| {
             let id =
@@ -231,31 +232,30 @@ impl AgentHudCore {
                     && source_filter
                         .as_ref()
                         .is_none_or(|sources| sources.contains(&log.source))
-                    && wanted.as_ref().is_none_or(|wanted| project_of(log.cwd.as_deref()) == *wanted)
+                    && wanted
+                        .as_ref()
+                        .is_none_or(|wanted| project_of(log.cwd.as_deref()) == *wanted)
                     && in_project(&Value::Null, log.cwd.as_deref())
-                    && (search.is_empty()
-                        || [
-                            Some(log.id.as_str()),
-                            Some(log.source.as_str()),
-                            agent_hud_agents::by_id(&log.source).map(|agent| agent.name),
-                            // The client as the list names it: "Codex Desktop".
-                            crate::naming::clients::client_name(&log.source, log.client.as_deref()).as_deref(),
-                            Some(log.title.as_str()),
-                            Some(log.model.as_str()),
-                            log.cwd.as_deref(),
-                            self.usage_projection
-                                .as_ref()
-                                .and_then(|p| p.titles.get(&log.id))
-                                .map(String::as_str),
-                        ]
-                        .into_iter()
-                        .flatten()
-                        .any(|field| field.to_lowercase().contains(&search))
+                    && (search.matches_any([
+                        Some(log.id.as_str()),
+                        Some(log.source.as_str()),
+                        agent_hud_agents::by_id(&log.source).map(|agent| agent.name),
+                        // The client as the list names it: "Codex Desktop".
+                        crate::naming::clients::client_name(&log.source, log.client.as_deref())
+                            .as_deref(),
+                        Some(log.title.as_str()),
+                        Some(log.model.as_str()),
+                        log.cwd.as_deref(),
+                        self.usage_projection
+                            .as_ref()
+                            .and_then(|p| p.titles.get(&log.id))
+                            .map(String::as_str),
+                    ])
                         // The model as people read it: "Opus 4.5".
                         || (!log.model.is_empty()
-                            && crate::naming::model_names::consumer_name(&format!("{}-model:{}", log.source, log.model))
-                                .to_lowercase()
-                                .contains(&search)))
+                            && search.matches(&crate::naming::model_names::consumer_name(
+                                &format!("{}-model:{}", log.source, log.model),
+                            ))))
             })
             .collect::<Vec<_>>();
         // Keep the complete history as cheap heads; serialize only this page.
@@ -279,14 +279,11 @@ impl AgentHudCore {
                                     == *wanted
                             })
                             && in_project(&row["navigationTarget"], row["cwd"].as_str())
-                            && (search.is_empty()
-                                || ["id", "source", "title", "model", "cwd", "project"]
+                            && search.matches_any(
+                                ["id", "source", "title", "model", "cwd", "project"]
                                     .iter()
-                                    .any(|key| {
-                                        row[*key].as_str().is_some_and(|field| {
-                                            field.to_lowercase().contains(&search)
-                                        })
-                                    }))
+                                    .map(|key| row[*key].as_str()),
+                            )
                     })
                     .map(Row::Extra),
             )
@@ -326,19 +323,18 @@ impl AgentHudCore {
                 },
             }
         };
-        // Order the complete persisted heads before paging. Rendering a small
-        // HUD page must not silently cap its scope at the first 200 rows.
+        // Order the complete persisted heads before paging, parsing each row's
+        // message timestamp once rather than inside every comparison.
         let mut rows = rows
             .drain(..)
             .map(|row| {
                 let state = state(&row);
-                (row, state)
+                let at = message_at(&row);
+                (row, state, at)
             })
             .collect::<Vec<_>>();
-        rows.sort_unstable_by(|(a, _), (b, _)| {
-            message_at(b)
-                .cmp(&message_at(a))
-                .then_with(|| identity(a).cmp(&identity(b)))
+        rows.sort_unstable_by(|(a, _, at_a), (b, _, at_b)| {
+            at_b.cmp(at_a).then_with(|| identity(a).cmp(&identity(b)))
         });
         let total = rows.len();
         let claude_shares = self.claude_window_shares(now);
@@ -369,9 +365,9 @@ impl AgentHudCore {
         let today = statistics::local_date(zone, now);
         let named = today - chrono::Days::new(6);
         let mut days = Vec::<Day>::new();
-        for (index, (row, _)) in rows.iter().enumerate() {
-            let date = message_at(row)
-                .map(|at| statistics::local_date(zone, at.min(now)))
+        for (index, (row, _, at)) in rows.iter().enumerate() {
+            let date = at
+                .map(|ms| statistics::local_date(zone, ms.min(now)))
                 .filter(|date| *date >= named);
             if days.last().is_none_or(|day| day.date != date) {
                 days.push(Day {
@@ -479,7 +475,7 @@ impl AgentHudCore {
             .into_iter()
             .skip(offset)
             .take(limit)
-            .map(|(row, state)| match row {
+            .map(|(row, state, _)| match row {
                 Row::Extra(mut value) => {
                     value["state"] = json!(state);
                     value
