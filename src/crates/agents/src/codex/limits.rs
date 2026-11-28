@@ -204,6 +204,9 @@ pub(super) fn parse(
         .or_else(|| account["planType"].as_str());
     if account.is_object() || !workspace.is_empty() || !email.is_empty() {
         let mut acct = json!({"id":account_identity,"provider":"codex","label":if email.is_empty(){None}else{Some(email)},"plan":plan,"identity":identity_kind});
+        if !home.is_empty() {
+            acct["home"] = json!(home);
+        }
         if let Some(credits) = parse_reset_credits(limits) {
             acct["resetCredits"] = credits;
         }
@@ -272,7 +275,7 @@ pub(super) fn parse(
             } else {
                 format!("codex:{bucket_id}:{slot}")
             };
-            reading.quotas.push(json!({"id":format!("{identity}:{key}"),"vendor":"codex","name":name,"shortLabel":short,"usedPercent":percent,"resetAt":reset,"status":status(percent),"account":if email.is_empty(){None}else{Some(email)},"accountId":account_identity,"legacyWindowId":format!("{account_identity}/{key}"),"consumerSource":if native{Some("codex")}else{None},"consumerRoutes":if native{None}else{Some([super::pi_usage::PI_ROUTE])},"allModels":bucket_id=="codex","windowDurationSeconds":window["windowDurationMins"].as_f64().filter(|value|*value>0.0).map(|value|value*60.0)}));
+            reading.quotas.push(json!({"id":format!("{identity}:{key}"),"vendor":"codex","name":name,"shortLabel":short,"usedPercent":percent,"resetAt":reset,"status":status(percent),"account":if email.is_empty(){None}else{Some(email)},"accountId":account_identity,"legacyWindowId":format!("{account_identity}/{key}"),"consumerSource":if native{Some("codex")}else{None},"consumerHome":if !home.is_empty(){Some(home)}else{None},"consumerRoutes":if native{None}else{Some([super::pi_usage::PI_ROUTE])},"allModels":bucket_id=="codex","windowDurationSeconds":window["windowDurationMins"].as_f64().filter(|value|*value>0.0).map(|value|value*60.0)}));
         }
     }
     if reading.quotas.is_empty() {

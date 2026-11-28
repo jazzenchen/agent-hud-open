@@ -125,17 +125,19 @@ impl AgentHudCore {
             let sources = agent_hud_agents::account_provider(provider)
                 .map(|reader| reader.sources())
                 .unwrap_or_default();
-            let shared = accounts
-                .iter()
-                .filter(|other| other["provider"] == provider)
-                .count()
-                > 1;
+            let attribution = self.attribution(provider, &account["id"]);
+            let scoped;
+            let active_view = match (&self.meters.view, &attribution) {
+                (Some(view), metering::Attribution::Home(scope)) => {
+                    scoped = view.scoped(scope, &self.price_regions, now);
+                    Some(&scoped)
+                }
+                (view, metering::Attribution::Provider) => view.as_ref(),
+                _ => None,
+            };
             // The provider's models over the stretch, as the value counts
             // them, most used first.
-            let mut models = self
-                .meters
-                .view
-                .as_ref()
+            let mut models = active_view
                 .map(|view| view.models_between(since, now))
                 .unwrap_or_default()
                 .into_iter()
@@ -156,11 +158,11 @@ impl AgentHudCore {
             let mut value = Value::Null;
             let mut ratio = Value::Null;
             let mut partial = false;
-            let unavailable = if shared {
+            let unavailable = if matches!(attribution, metering::Attribution::Ambiguous) {
                 Some(tr!(
                     "This Mac's usage cannot be told apart between this provider's accounts"
                 ))
-            } else if let Some(view) = &self.meters.view {
+            } else if let Some(view) = active_view {
                 let (spent, oldest) = view.spent(sources, since, now, keep);
                 if spent.tokens == 0 && !models.is_empty() {
                     Some(tr!("Every model it used is hidden by the filter"))

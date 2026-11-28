@@ -17,6 +17,7 @@ mod target;
 mod target;
 #[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux")))]
 compile_error!("agent-hud-platform supports macOS, Windows and Linux host builds only");
+pub(crate) mod extra_roots;
 #[cfg(unix)]
 mod unix;
 #[cfg(target_os = "macos")]

@@ -21,6 +21,7 @@ import {
   type Translate,
 } from "@agent-hud/ui/format";
 import { Card, Row, Section } from "../SettingsPrimitives";
+import { Segments } from "../SettingsControls";
 import { AccountCard } from "./AccountCard";
 import { moveAmong, ReorderButtons } from "./Reorder";
 
@@ -201,6 +202,35 @@ export function PanelBlocks({
           source.name,
           block.hidden,
           changeBlock,
+        )}
+        {accounts.length >= 2 && (
+          <Row
+            title={t("Multi-account view")}
+            subtitle={t(
+              "Combine accounts into one pooled capacity bar or list each account separately.",
+            )}
+          >
+            <Segments
+              label={t("Multi-account view")}
+              value={
+                block.multiAccountView ??
+                (block.widget === "pool" ? "pooled" : "stacked")
+              }
+              options={[
+                ["stacked", t("Separate")],
+                ["pooled", t("Pooled")],
+                ["both", t("Both")],
+              ]}
+              disabled={pending}
+              change={(value) =>
+                void changeBlock({
+                  multiAccountView:
+                    value as PanelBlockLayout["multiAccountView"],
+                  ...(block.widget === "pool" ? { widget: "bar" } : {}),
+                })
+              }
+            />
+          </Row>
         )}
         {balanceKey === key && balanceRows}
         {!windows.length && !billing.length && (

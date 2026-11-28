@@ -210,6 +210,34 @@ export interface PlanValueAccount {
 export interface PlanValueQuery {
   hiddenModels?: string[];
 }
+export interface QuotaPoolMember {
+  quotaId: string;
+  accountId: string;
+  accountLabel: string;
+  planLabel?: string | null;
+  usedPercent: number;
+  burnRatePctPerHour?: number | null;
+  resetAt: string | null;
+  status: "normal" | "warning" | "critical" | "stale";
+  recommended?: boolean;
+}
+
+export interface QuotaPool {
+  id: string;
+  vendor: string;
+  windowKey: string;
+  name: string;
+  shortLabel?: string;
+  allModels?: boolean;
+  windowDurationSeconds?: number | null;
+  usedPercent: number;
+  status: "normal" | "warning" | "critical" | "stale";
+  nextResetAt: string | null;
+  nextResetGainPercent: number | null;
+  recommendedAccountId: string | null;
+  members: QuotaPoolMember[];
+}
+
 export interface PlanValueResponse {
   kind: "plan_value";
   generatedAt: string;

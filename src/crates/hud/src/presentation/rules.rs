@@ -33,7 +33,8 @@ pub(super) const SECTIONS: &[&str] = &["blocks", "tokens", "sessions", "quotaHis
 pub(super) const ADDED_SECTIONS: &[&str] = &["quotaHistory", "planValue"];
 /// `rings` are concentric and `segments` split one ring, one per account; a layout
 /// saved before them says `ring`, which `parse_block` reads as `rings`.
-const WIDGETS: &[&str] = &["bar", "rings", "segments", "number", "chart"];
+const WIDGETS: &[&str] = &["bar", "pool", "rings", "segments", "number", "chart"];
+const MULTI_ACCOUNT_VIEWS: &[&str] = &["stacked", "pooled", "both"];
 const RING_SIZES: &[&str] = &["small", "medium", "large"];
 /// How much of a line a block takes; blocks that take less share it where each
 /// keeps enough room (QuotaBlocks.tsx).

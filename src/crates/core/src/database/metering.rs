@@ -11,12 +11,15 @@ use std::collections::{HashMap, HashSet};
 
 mod calls;
 mod costs;
+mod home_scope;
 mod metrics;
 mod queries;
 mod replies;
 mod spend;
 mod view;
 mod writes;
+
+pub(crate) use home_scope::Attribution;
 
 pub(crate) use calls::{
     calls_of, contribution_usage, marks, prompt_before, recached, session_calls, CallRow,
@@ -189,7 +192,7 @@ struct Bucket {
     cost: Option<pricing::ModelCost>,
 }
 
-#[derive(Default)]
+#[derive(Clone, Default)]
 struct Part {
     /// (key, bucket start, usage)
     buckets: Vec<(u32, i64, Usage)>,
@@ -200,6 +203,7 @@ struct Part {
     later: Vec<i64>,
 }
 
+#[derive(Clone)]
 struct Reply {
     key: u32,
     start: i64,

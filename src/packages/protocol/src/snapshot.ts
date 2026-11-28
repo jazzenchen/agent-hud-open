@@ -6,7 +6,7 @@ import type {
   Provider,
 } from "./providers.ts";
 import type { RelaySource } from "./prices-relays.ts";
-import type { Quota } from "./quota.ts";
+import type { Quota, QuotaPool } from "./quota.ts";
 import type {
   Approval,
   ClientHooksStatus,
@@ -130,6 +130,7 @@ export interface Snapshot {
   };
   totals: TokenTotals;
   quotas: Quota[];
+  quotaPools?: QuotaPool[];
   sessions: Session[];
   timeline: TimelinePoint[];
   providers: Provider[];
@@ -170,4 +171,8 @@ export type NativeMethod =
   | "add_relay_source"
   | "set_relay_kind"
   | "remove_relay_source"
-  | "web_sign_out";
+  | "web_sign_out"
+  | "account_profile_sign_in_start"
+  | "account_profile_sign_in_status"
+  | "account_profile_sign_in_cancel"
+  | "account_profile_launch_command";

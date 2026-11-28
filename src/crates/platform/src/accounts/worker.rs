@@ -175,7 +175,10 @@ pub(super) fn run(
                 return;
             }
             // A removed home must not reappear when its in-flight read completes.
-            if state.account_homes.get(selected.0) != selected.2.get(selected.0) {
+            let cli_changed = selected.0 == agents::antigravity::AGENT.id
+                && state.account_homes.get(super::homes::ANTIGRAVITY_CLI_KEY)
+                    != selected.2.get(super::homes::ANTIGRAVITY_CLI_KEY);
+            if state.account_homes.get(selected.0) != selected.2.get(selected.0) || cli_changed {
                 continue;
             }
             let spread = SystemTime::now()

@@ -17,6 +17,10 @@ const methods = new Set([
   "open_client",
   "open_native",
   "toggle_hud",
+  "account_profile_sign_in_start",
+  "account_profile_sign_in_status",
+  "account_profile_sign_in_cancel",
+  "account_profile_launch_command",
 ]);
 export function devBridge(): Plugin {
   const engine = new EngineClient();

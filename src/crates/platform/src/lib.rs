@@ -133,6 +133,9 @@ impl NativePlatform {
     pub fn source_roots(&self) -> Vec<SourceRoot> {
         os::source_roots(&self.home)
     }
+    pub fn source_roots_for(&self, settings: &serde_json::Value) -> Vec<SourceRoot> {
+        os::extra_roots::with_extra_homes(self.source_roots(), &self.home, settings)
+    }
     /// The Claude desktop app's data folders on this host, for its session index.
     pub fn claude_desktop_bases(&self) -> Vec<PathBuf> {
         os::claude_desktop_bases(&self.home, &std::env::vars().collect::<os::Environment>())

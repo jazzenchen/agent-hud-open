@@ -72,12 +72,14 @@ impl Runtime {
     ) -> Result<Self, String> {
         let platform = NativePlatform::new()?;
         let roots = platform.source_roots();
-        let changes = FileChanges::new(&roots);
         let data_dir = data_dir.unwrap_or_else(|| platform.data_dir());
         let mut core = AgentHudCore::new(roots, data_dir.clone());
         if let Some(seed) = initial_settings.as_ref() {
             core.seed_initial_preferences(seed)?;
         }
+        let configured_roots = platform.source_roots_for(&core.settings_snapshot());
+        let changes = FileChanges::new(&configured_roots);
+        core.set_source_roots(configured_roots)?;
         let hooks = Arc::new(Mutex::new(hooks::Hooks::start(
             data_dir.clone(),
             core.requests(),

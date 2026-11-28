@@ -35,6 +35,10 @@ impl crate::AgentHudCore {
             .collect()
     }
 
+    pub fn setting_value(&self, key: &str) -> Value {
+        self.settings[key].clone()
+    }
+
     pub fn set_presentation(&mut self, key: &str, value: &Value) -> Result<Value, String> {
         let mut values = serde_json::Map::new();
         values.insert(key.into(), value.clone());
@@ -144,7 +148,7 @@ impl crate::AgentHudCore {
             "appearance" if ["dark", "light", "system"].contains(&value.as_str().unwrap_or("")) => {
             }
             "quotaDisplay" if matches!(value.as_str(), Some("consumed" | "remaining")) => {}
-            "codexHomes" | "claudeHomes" | "antigravityCliSettings"
+            "codexHomes" | "claudeHomes" | "antigravityHomes" | "antigravityCliSettings"
                 if value.as_array().is_some_and(|homes| {
                     homes.iter().all(|home| {
                         home.as_str().is_some_and(|home| {
@@ -377,7 +381,12 @@ mod tests {
 
     #[test]
     fn account_source_paths_persist_and_reject_invalid_entries() {
-        for key in ["codexHomes", "claudeHomes", "antigravityCliSettings"] {
+        for key in [
+            "codexHomes",
+            "claudeHomes",
+            "antigravityHomes",
+            "antigravityCliSettings",
+        ] {
             let home = tempfile::tempdir().unwrap();
             let mut core = AgentHudCore::new(vec![], home.path().to_owned());
             assert_eq!(core.settings[key], json!([]));

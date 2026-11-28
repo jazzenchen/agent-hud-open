@@ -9,6 +9,59 @@ impl AgentHudCore {
         self.platform = name.to_owned();
     }
 
+    pub fn settings_snapshot(&self) -> Value {
+        self.settings.clone()
+    }
+
+    pub fn set_source_roots(&mut self, roots: Vec<SourceRoot>) -> Result<(), String> {
+        let next: Vec<(PathBuf, &'static str)> = roots
+            .into_iter()
+            .map(|source| (source.path, source.provider))
+            .collect();
+        if self.provider_roots == next {
+            return Ok(());
+        }
+        let canon = |p: &Path| fs::canonicalize(p).unwrap_or_else(|_| p.to_path_buf());
+        let next_canon: HashSet<PathBuf> = next.iter().map(|(p, _)| canon(p)).collect();
+        let mut removed = self.removed_extra_roots.clone();
+        for (old_path, _) in &self.provider_roots {
+            let old_c = canon(old_path);
+            if !next_canon.contains(&old_c) && !removed.contains(old_path) {
+                removed.push(old_path.clone());
+                if old_c != *old_path && !removed.contains(&old_c) {
+                    removed.push(old_c);
+                }
+            }
+        }
+        removed.retain(|removed| !next_canon.contains(&canon(removed)));
+        if removed != self.removed_extra_roots {
+            if let Some(db) = &self.database {
+                let encoded = serde_json::to_string(&removed).map_err(|e| e.to_string())?;
+                db.execute("INSERT OR REPLACE INTO ingestion_meta(key,value) VALUES('removed_source_roots',?1)", [encoded])
+                    .map_err(|e| e.to_string())?;
+            }
+            self.removed_extra_roots = removed;
+        }
+        self.provider_roots = next;
+        self.reads.listing.reset_roots();
+        let removed = &self.removed_extra_roots;
+        self.reads
+            .pending
+            .retain(|path| !path_under_removed(path, removed));
+        self.usage_projection = None;
+        self.meters.view = None;
+        self.sessions_checked = None;
+        self.sessions_fingerprint = None;
+        self.listed_rows = None;
+        self.render.last = None;
+        self.statistics.revision = self.statistics.revision.wrapping_add(1);
+        Ok(())
+    }
+
+    pub(crate) fn is_under_removed_root(&self, path: &Path) -> bool {
+        path_under_removed(path, &self.removed_extra_roots)
+    }
+
     pub fn set_provider_discovery(&mut self, discovery: Vec<ProviderDiscovery>) {
         self.discovery = discovery;
         self.sessions_checked = None;
@@ -96,4 +149,28 @@ impl AgentHudCore {
         self.hook_events
             .ingest(&events, Utc::now().timestamp_millis());
     }
+}
+
+fn path_under_removed(path: &Path, removed_roots: &[PathBuf]) -> bool {
+    if removed_roots.is_empty() {
+        return false;
+    }
+    let raw_str = path.to_string_lossy();
+    let base = raw_str
+        .split_once("#hud-session-")
+        .map_or(path, |(prefix, _)| Path::new(prefix));
+    removed_roots
+        .iter()
+        .any(|removed| base.starts_with(removed))
+}
+
+pub(super) fn removed_roots(db: &Connection) -> Vec<PathBuf> {
+    db.query_row(
+        "SELECT value FROM ingestion_meta WHERE key='removed_source_roots'",
+        [],
+        |row| row.get::<_, String>(0),
+    )
+    .ok()
+    .and_then(|text| serde_json::from_str(&text).ok())
+    .unwrap_or_default()
 }

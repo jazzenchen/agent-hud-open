@@ -134,3 +134,166 @@ fn a_cycle_read_long_before_its_end_hides_its_peak() {
     );
     assert!(cycles.iter().all(|cycle| cycle.same_plan));
 }
+
+#[test]
+fn isolated_homes_compute_independent_plan_values_and_metrics_while_shared_homes_abstain() {
+    let temp = tempfile::tempdir().unwrap();
+    let app_data = temp.path().join("app-data");
+    let claude_a = temp.path().join("claude-a");
+    let claude_b = temp.path().join("claude-b");
+    fs::create_dir_all(claude_a.join("projects/p1")).unwrap(); // plain directory
+    fs::create_dir_all(claude_b.join("projects/p1")).unwrap(); // plain directory
+
+    let now_iso = Utc::now().to_rfc3339();
+    let line_a = json!({
+        "type": "assistant",
+        "sessionId": "11111111-1111-4111-8111-111111111111",
+        "timestamp": now_iso,
+        "message": {
+            "id": "msg_a1",
+            "model": "claude-opus-4-6",
+            "content": [{"type": "text", "text": "hello a"}],
+            "stop_reason": "end_turn",
+            "usage": {"input_tokens": 100_000, "output_tokens": 50_000}
+        }
+    });
+    let line_b = json!({
+        "type": "assistant",
+        "sessionId": "22222222-2222-4222-8222-222222222222",
+        "timestamp": now_iso,
+        "message": {
+            "id": "msg_b1",
+            "model": "claude-sonnet-4-6",
+            "content": [{"type": "text", "text": "hello b"}],
+            "stop_reason": "end_turn",
+            "usage": {"input_tokens": 20_000, "output_tokens": 10_000}
+        }
+    });
+    fs::write(
+        claude_a.join("projects/p1/11111111-1111-4111-8111-111111111111.jsonl"),
+        format!("{line_a}\n"),
+    )
+    .unwrap();
+    fs::write(
+        claude_b.join("projects/p1/22222222-2222-4222-8222-222222222222.jsonl"),
+        format!("{line_b}\n"),
+    )
+    .unwrap();
+
+    let mut core = AgentHudCore::new(
+        vec![
+            crate::SourceRoot {
+                path: claude_a.join("projects"),
+                provider: "claude",
+            },
+            crate::SourceRoot {
+                path: claude_b.join("projects"),
+                provider: "claude",
+            },
+        ],
+        app_data.clone(),
+    );
+    let future_reset = (Utc::now() + chrono::Duration::hours(3)).to_rfc3339();
+    let home_a = claude_a.to_string_lossy().into_owned();
+    let home_b = claude_b.to_string_lossy().into_owned();
+    core.set_account_projection(crate::AccountProjection {
+        accounts: vec![
+            json!({"id": "acct-a", "provider": "claude", "label": "a@example.com", "plan": "max_5x", "home": home_a}),
+            json!({"id": "acct-b", "provider": "claude", "label": "b@example.com", "plan": "pro", "home": home_b}),
+        ],
+        quotas: vec![
+            json!({
+                "id": "qa",
+                "vendor": "claude",
+                "accountId": "acct-a",
+                "name": "Current session",
+                "usedPercent": 40.0,
+                "resetAt": future_reset,
+                "status": "normal",
+                "consumerSource": "claude",
+                "consumerHome": home_a,
+                "windowDurationSeconds": 18000.0,
+                "allModels": true,
+                "modelFamilies": ["claude"]
+            }),
+            json!({
+                "id": "qb",
+                "vendor": "claude",
+                "accountId": "acct-b",
+                "name": "Current session",
+                "usedPercent": 15.0,
+                "resetAt": future_reset,
+                "status": "normal",
+                "consumerSource": "claude",
+                "consumerHome": home_b,
+                "windowDurationSeconds": 18000.0,
+                "allModels": true,
+                "modelFamilies": ["claude"]
+            }),
+        ],
+        ..Default::default()
+    });
+
+    let snap = core.request("snapshot", Value::Null).unwrap();
+    assert_eq!(snap["quotas"][0]["metrics"]["consumed"]["used"], 150_000);
+    assert_eq!(snap["quotas"][1]["metrics"]["consumed"]["used"], 30_000);
+    assert!(
+        snap["accounts"][0].get("home").is_none(),
+        "internal home path is stripped from snapshot"
+    );
+
+    let pv = core.request("plan_value", Value::Null).unwrap();
+    let rows = pv["accounts"].as_array().unwrap();
+    assert_eq!(rows.len(), 2);
+    assert_eq!(rows[0]["value"]["tokens"], 150_000);
+    assert_eq!(rows[1]["value"]["tokens"], 30_000);
+    assert!(rows[0]["ratio"].as_f64().is_some_and(|r| r > 0.0));
+    assert!(rows[1]["ratio"].as_f64().is_some_and(|r| r > 0.0));
+    assert!(rows[0]["unavailable"].is_null());
+    assert!(rows[1]["unavailable"].is_null());
+
+    let mut shared = core.accounts.clone();
+    shared.accounts[1]["home"] = json!(home_a);
+    shared.quotas[1]["consumerHome"] = json!(home_a);
+    core.set_account_projection(shared);
+    let snapshot = core.request("snapshot", Value::Null).unwrap();
+    for quota in snapshot["quotas"].as_array().unwrap() {
+        assert!(quota["metrics"]["consumed"].is_null());
+        assert!(quota["metrics"]["cost"].is_null());
+    }
+
+    // Removing the second source root removes its sessions and tokens cleanly.
+    core.set_source_roots(vec![crate::SourceRoot {
+        path: claude_a.join("projects"),
+        provider: "claude",
+    }])
+    .unwrap();
+    let snap_after = core.request("snapshot", Value::Null).unwrap();
+    assert_eq!(snap_after["totals"]["total"], 150_000);
+
+    // Colliding homes fall back to the shared unavailable explanation.
+    core.set_account_projection(crate::AccountProjection {
+        accounts: vec![
+            json!({"id": "g1", "provider": "antigravity", "label": "g1@example.com", "plan": "Google AI Pro", "home": home_a}),
+            json!({"id": "g2", "provider": "antigravity", "label": "g2@example.com", "plan": "Google AI Pro", "home": home_a}),
+        ],
+        ..Default::default()
+    });
+    let _ = core.request("snapshot", Value::Null).unwrap();
+    let pv_shared = core.request("plan_value", Value::Null).unwrap();
+    assert!(pv_shared["accounts"][0]["value"].is_null());
+    assert!(pv_shared["accounts"][0]["unavailable"].is_string());
+
+    drop(core);
+    let mut reopened = AgentHudCore::new(
+        vec![crate::SourceRoot {
+            path: claude_a.join("projects"),
+            provider: "claude",
+        }],
+        app_data,
+    );
+    assert_eq!(
+        reopened.request("snapshot", Value::Null).unwrap()["totals"]["total"],
+        150_000
+    );
+}

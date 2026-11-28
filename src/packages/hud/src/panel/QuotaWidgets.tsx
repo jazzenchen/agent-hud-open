@@ -44,7 +44,7 @@ export function QuotaWidgets({
         {...{ rows, measure, now, light, showReset, onStats }}
       />
     );
-  if (widget === "bar")
+  if (widget === "bar" || widget === "pool")
     return (
       <>
         {rows.map((row) => (

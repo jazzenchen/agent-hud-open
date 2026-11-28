@@ -91,6 +91,10 @@ impl FileChanges {
     pub fn set_waker(&mut self, wake: Waker) {
         *self.waker.lock().unwrap_or_else(PoisonError::into_inner) = Some(wake);
     }
+    pub fn set_roots(&mut self, roots: &[SourceRoot]) {
+        self.roots = roots.iter().map(|root| root.path.clone()).collect();
+        self.update();
+    }
     fn update(&mut self) {
         let wanted = targets(&self.roots);
         if wanted != self.wanted {

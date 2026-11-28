@@ -1,24 +1,24 @@
 //! Antigravity's quota (Open's AntigravityService and AntigravityClient):
 //! CLI status-line callbacks identify each account; running language servers
-//! supply accounts without callbacks. Anonymous `/usage` is the last fallback.
-//! Each account names the clients it was read through (`readBy`): the CLI
-//! for its reports and its fallback, and the desktop app, the IDE or the CLI
-//! for the language server each one runs; an account several of them are
-//! signed in to is shown once, with all of them. The CLI counts too while it
-//! is not running, for the account its saved sign-in names.
+//! supply accounts without callbacks; isolated `antigravityHomes` refresh idle
+//! accounts in the background via `agy -p /usage`; anonymous `/usage` is the
+//! last fallback when no isolated homes are configured.
+use super::homes::{
+    active_homes_from_native, attach_home_notices, default_cli_email, read_idle_homes,
+};
 use super::quotas::parse;
 use super::{ACCOUNT_SERVICE, AGENT};
-use crate::account::{
-    add_readers, read_by, read_json_bounded, resolve, Host, Provider, Reading, Reported, Unread,
-};
+use crate::account::{add_readers, read_by, Host, Provider, Reading, Reported, Unread};
 use crate::l10n::tr;
 use crate::split::ANTIGRAVITY_CLI;
-use crate::Location;
 use serde_json::{json, Value};
-use std::{collections::BTreeSet, path::Path};
+use std::{
+    collections::BTreeSet,
+    path::{Path, PathBuf},
+};
 
-/// Antigravity's plan, from its CLI's status-line reports and its running
-/// language servers. A CLI report goes stale when the CLI stops reporting.
+/// Antigravity's plan, from its CLI's status-line reports, running language
+/// servers, and isolated `antigravityHomes`.
 pub static PROVIDER: Provider = Provider {
     reported: Some(Reported {
         source: "antigravity_cli",
@@ -30,16 +30,18 @@ pub static PROVIDER: Provider = Provider {
 pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
     let mut reading = Reading::empty("antigravity");
     let mut partial = false;
+    let has_extra_homes = !host.account_homes("antigravity").is_empty();
     for report in host.account_reports("antigravity") {
         match super::statusline::parse(&report) {
             Some(mut next) => {
+                super::homes::bind_report_home(host, &mut next);
                 read_by(&mut next, ANTIGRAVITY_CLI);
                 merge(&mut reading, next);
             }
             None => partial = true,
         }
     }
-    if !ACCOUNT_SERVICE.runs_on(host.os()) && reading.account.is_none() {
+    if !ACCOUNT_SERVICE.runs_on(host.os()) && reading.account.is_none() && !has_extra_homes {
         reading.notice = Some(format!(
             "{} ({})",
             tr!("Antigravity local-service discovery is not implemented here"),
@@ -47,13 +49,7 @@ pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
         ));
         return Ok(reading);
     }
-    // The CLI supplies exact windows; GetUserStatus only supplies model-family
-    // totals with unknown duration. Do not show both as separate subscriptions
-    // or replace a sampled CLI window with an incomparable family total.
-    // That holds for a current report. One the CLI stopped sending is only
-    // what the account last looked like: it gives way to a service that reads
-    // the same account now (`drop_stale`).
-    let stale: Vec<(String, String)> = reading
+    let stale: Vec<(String, String, Option<String>)> = reading
         .account
         .iter()
         .chain(&reading.additional_accounts)
@@ -62,6 +58,7 @@ pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
             Some((
                 row["id"].as_str()?.to_owned(),
                 row["label"].as_str().unwrap_or_default().to_lowercase(),
+                row["plan"].as_str().map(str::to_owned),
             ))
         })
         .collect();
@@ -69,11 +66,8 @@ pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
         .quotas
         .iter()
         .filter_map(|quota| quota["accountId"].as_str().map(str::to_owned))
-        .filter(|id| !stale.iter().any(|(stale, _)| stale == id))
+        .filter(|id| !stale.iter().any(|(stale, _, _)| stale == id))
         .collect();
-    // The CLI names its account by email alone, where a desktop or IDE
-    // language server adds the account's team: an email a current CLI report
-    // names is that account, however the server names it.
     let reported_emails: BTreeSet<String> = reading
         .account
         .iter()
@@ -81,16 +75,22 @@ pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
         .filter(|row| row["stale"] != true)
         .filter_map(|row| row["label"].as_str().map(str::to_lowercase))
         .collect();
-    let native = ACCOUNT_SERVICE.runs_on(host.os()).then(||host.native(
-        AGENT.id,
-        "ReadAccounts",
-        &json!({"metadata":{"ideName":"antigravity","extensionName":"antigravity","locale":"en","ideVersion":"unknown"}}),
-    ));
+    let mut covered_emails = reported_emails.clone();
+    let native = ACCOUNT_SERVICE.runs_on(host.os()).then(|| {
+        host.native(
+            AGENT.id,
+            "ReadAccounts",
+            &json!({"metadata":{"ideName":"antigravity","extensionName":"antigravity","locale":"en","ideVersion":"unknown"}}),
+        )
+    });
     let mut executable = None;
+    let mut active_homes: Vec<PathBuf> = Vec::new();
+    let mut native_error: Option<String> = None;
     if let Some(native) = native {
         match native {
             Ok(body) => {
                 executable = body["cliExecutable"].as_str().map(str::to_owned);
+                active_homes = active_homes_from_native(&body);
                 partial |= body["partial"].as_bool().unwrap_or(false);
                 if let Some(accounts) = body["accounts"].as_array() {
                     for account in accounts {
@@ -100,9 +100,14 @@ pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
                             partial = true;
                             continue;
                         };
-                        // The client whose language server answered.
                         let client = account["client"].as_str().unwrap_or(AGENT.id);
-                        match parse(scope, &account["status"], &account["summary"]) {
+                        let default_gemini =
+                            host.home().join(".gemini").to_string_lossy().into_owned();
+                        let home = account["home"]
+                            .as_str()
+                            .filter(|value| !value.is_empty())
+                            .unwrap_or(&default_gemini);
+                        match parse(scope, &account["status"], &account["summary"], Some(home)) {
                             Ok(next)
                                 if next
                                     .account
@@ -112,7 +117,6 @@ pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
                                         reported_emails.contains(&email.to_lowercase())
                                     }) =>
                             {
-                                // The CLI's report is this account: read here too.
                                 let email = next.account.as_ref().map(|row| &row["label"]);
                                 add_reader(&mut reading, client, |row| {
                                     row["label"].as_str().map(str::to_lowercase)
@@ -120,8 +124,13 @@ pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
                                 });
                             }
                             Ok(mut next) => {
+                                if let Some(email) =
+                                    next.account.as_ref().and_then(|row| row["label"].as_str())
+                                {
+                                    covered_emails.insert(email.to_lowercase());
+                                }
                                 read_by(&mut next, client);
-                                drop_stale(&mut reading, &stale, &next);
+                                drop_stale(&mut reading, &stale, &mut next);
                                 next.quotas.retain(|quota| {
                                     !quota["accountId"]
                                         .as_str()
@@ -142,7 +151,7 @@ pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
                             Err(_) => partial = true,
                         }
                     }
-                } else if reading.account.is_none() {
+                } else if reading.account.is_none() && !has_extra_homes {
                     return Err(tr!(
                         "Antigravity local service returned an unsupported account format."
                     )
@@ -151,22 +160,42 @@ pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
                     partial = true;
                 }
             }
-            Err(error) if reading.account.is_none() => return Err(error.into()),
-            Err(_) => partial = true,
+            Err(error) if reading.account.is_none() && !has_extra_homes => {
+                return Err(error.into());
+            }
+            Err(error) => {
+                native_error = Some(error);
+                if reading.account.is_some() {
+                    partial = true;
+                }
+            }
         }
     }
+    let idle = read_idle_homes(host, executable.as_deref(), &covered_emails, &active_homes)?;
+    partial |= idle.partial;
+    for mut next in idle.readings {
+        drop_stale(&mut reading, &stale, &mut next);
+        merge(&mut reading, next);
+    }
     if reading.quotas.is_empty() && reading.account.is_none() {
-        if let Some(executable) = executable {
-            let mut cli = super::cli::read(host, Path::new(&executable))?;
-            read_by(&mut cli, ANTIGRAVITY_CLI);
-            return Ok(cli);
+        if !has_extra_homes {
+            if let Some(executable) = executable {
+                let mut cli = super::cli::read(host, Path::new(&executable))?;
+                read_by(&mut cli, ANTIGRAVITY_CLI);
+                return Ok(cli);
+            }
+        }
+        if let Some(first) = idle.errors.first() {
+            return Err(first.clone().into());
+        }
+        if let Some(error) = native_error {
+            return Err(error.into());
         }
         return Err(
             tr!("No authenticated already-running Antigravity service is available").into(),
         );
     }
-    // The CLI, though it is not running: the account its saved sign-in names.
-    if let Some(email) = cli_email(host) {
+    if let Some(email) = default_cli_email(host) {
         add_reader(&mut reading, ANTIGRAVITY_CLI, |row| {
             row["label"]
                 .as_str()
@@ -182,22 +211,27 @@ pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
     } else {
         None
     };
+    attach_home_notices(&mut reading, &idle.errors);
     Ok(reading)
 }
 
-/// Takes out of `reading` the stale CLI report (`stale`: account id and
-/// lowercased email) of the account `next` reads now with windows of its
-/// own: by its id, or by its email, as the CLI names an account without its
-/// team. The CLI is named among the account's readers again while its saved
-/// sign-in names the account (`cli_email`).
-fn drop_stale(reading: &mut Reading, stale: &[(String, String)], next: &Reading) {
-    let Some(account) = next.account.as_ref().filter(|_| !next.quotas.is_empty()) else {
+fn drop_stale(
+    reading: &mut Reading,
+    stale: &[(String, String, Option<String>)],
+    next: &mut Reading,
+) {
+    let Some(account) = next.account.as_mut().filter(|_| !next.quotas.is_empty()) else {
         return;
     };
     let email = account["label"].as_str().map(str::to_lowercase);
-    for (id, label) in stale {
+    for (id, label, stale_plan) in stale {
         if account["id"] != id.as_str() && email.as_deref() != Some(label.as_str()) {
             continue;
+        }
+        if account["plan"].is_null() {
+            if let Some(plan) = stale_plan {
+                account["plan"] = json!(plan);
+            }
         }
         reading
             .quotas
@@ -253,8 +287,6 @@ fn merge(reading: &mut Reading, next: Reading) {
             .chain(reading.additional_accounts.iter_mut())
             .find(|row| row["id"] == account["id"])
         {
-            // One account through two clients: the newer reading, read by
-            // both, in the order they were read.
             if timestamp(&account, "checkedAt") > timestamp(existing, "checkedAt") {
                 let mut readers = json!({ "readBy": existing["readBy"].take() });
                 add_readers(&mut readers, &account);
@@ -269,25 +301,6 @@ fn merge(reading: &mut Reading, next: Reading) {
     }
 }
 
-/// The sign-in the Antigravity CLI keeps.
-const CLI_SIGN_IN: Location = Location::home(
-    &["GEMINI_CLI_HOME"],
-    &[".gemini"],
-    "antigravity-cli/antigravity-oauth-token",
-);
-
-/// The account the Antigravity CLI is signed in to, by its email: only the
-/// sign-in's `id_token_email`, never its tokens.
-fn cli_email(host: &dyn Host) -> Option<String> {
-    let path = resolve(host, &CLI_SIGN_IN).into_iter().next()?;
-    read_json_bounded(host, &path, 64 * 1024).found()?["id_token_email"]
-        .as_str()
-        .map(str::trim)
-        .filter(|email| !email.is_empty())
-        .map(str::to_owned)
-}
-
-/// `client` among the readers of the accounts in `reading` that `which` picks.
 fn add_reader(reading: &mut Reading, client: &str, which: impl Fn(&Value) -> bool) {
     let reader = json!({ "readBy": [client] });
     for row in reading

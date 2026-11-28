@@ -112,6 +112,45 @@ pub(crate) fn hook_configuration(
     )
 }
 
+/// Creates an NTFS directory junction `link -> target` without requiring
+/// administrator rights or Developer Mode. Network UNC shares that
+/// cannot host junctions return a clear diagnostic error.
+pub(crate) fn link_directory(target: &Path, link: &Path) -> Result<(), String> {
+    use super::junction;
+    let target_text = target.to_string_lossy();
+    if target_text.starts_with(r"\\") && !target_text.starts_with(r"\\?\") {
+        return Err(format!(
+            "Network UNC paths do not support NTFS junctions ({target_text}); move the account folder to a local drive."
+        ));
+    }
+    if !target.is_dir() {
+        return Err(format!(
+            "Account directory does not exist: {}",
+            target.display()
+        ));
+    }
+    if let Ok(meta) = fs::symlink_metadata(link) {
+        if link
+            .canonicalize()
+            .ok()
+            .zip(target.canonicalize().ok())
+            .is_some_and(|(a, b)| a == b)
+        {
+            return Ok(());
+        }
+        if junction::is_reparse_point(&meta) {
+            fs::remove_dir(link).map_err(|_| "Could not update account directory junction")?;
+        } else {
+            return Err("Refusing to replace a non-junction directory".into());
+        }
+    }
+    if let Some(parent) = link.parent() {
+        private_directory(parent)?;
+    }
+    junction::link_folder(link, target)
+        .map_err(|error| format!("Could not create account directory junction: {error}"))
+}
+
 /// A client whose settings are text has no Windows launch contract yet:
 /// its handlers can only be taken out here.
 pub(crate) fn hook_text(

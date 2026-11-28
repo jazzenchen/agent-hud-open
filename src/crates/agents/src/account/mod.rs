@@ -135,6 +135,9 @@ pub fn read_by(reading: &mut Reading, client: &str) {
 /// The clients that read `other`, the same account, added to `account`'s: an
 /// account read through more than one client shows once, marked merged.
 pub fn add_readers(account: &mut Value, other: &Value) {
+    if account["home"].is_null() && !other["home"].is_null() {
+        account["home"] = other["home"].clone();
+    }
     let Some(others) = other["readBy"].as_array() else {
         return;
     };

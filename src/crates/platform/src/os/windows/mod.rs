@@ -39,8 +39,8 @@ pub(crate) const MOVES_CLAUDE_JOBS: bool = false;
 /// Claude Desktop's Project thread links are unverified here.
 pub(crate) const OPENS_CLAUDE_PROJECTS: bool = false;
 pub(crate) use files::{
-    hook_configuration, hook_text, owned_by_user, owner_only, private_append, private_directory,
-    private_file, read_stdin, user_transcript,
+    hook_configuration, hook_text, link_directory, owned_by_user, owner_only, private_append,
+    private_directory, private_file, read_stdin, user_transcript,
 };
 pub(crate) use junction::{is_reparse_point, link_folder, other_volume};
 use std::{

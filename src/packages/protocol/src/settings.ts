@@ -6,7 +6,11 @@ export interface PanelBlockLayout {
   /**
    * `rings` are concentric (年轮) and `segments` split one ring (分段环), one
    * per account; a layout saved before them says `ring`, read as `rings`. */
-  widget?: "bar" | "rings" | "segments" | "ring" | "number" | "chart";
+  widget?: "bar" | "pool" | "rings" | "segments" | "ring" | "number" | "chart";
+  /** How multiple accounts under one vendor are shown in the panel: stacked
+   * separately, combined into one pooled bar, or pooled bar followed by each
+   * account's rows. */
+  multiAccountView?: "stacked" | "pooled" | "both";
   hidden?: boolean;
   hiddenRows?: string[];
   hiddenAccounts?: string[];
@@ -113,6 +117,8 @@ export interface AppSettings {
   codexHomes?: string[];
   /** Additional Claude Code CLAUDE_CONFIG_DIR folders whose signed-in accounts should be read. */
   claudeHomes?: string[];
+  /** Additional Antigravity account directories whose signed-in accounts should be read. */
+  antigravityHomes?: string[];
   /** CLI settings files connected to Antigravity's account status callback. */
   antigravityCliSettings?: string[];
   appearance: "dark" | "light" | "system";

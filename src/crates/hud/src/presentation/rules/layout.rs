@@ -10,6 +10,7 @@ pub(super) fn parse_block(block: &Value) -> Map<String, Value> {
     let mut v = Map::new();
     for (key, offered) in [
         ("widget", WIDGETS),
+        ("multiAccountView", MULTI_ACCOUNT_VIEWS),
         ("ringSize", RING_SIZES),
         ("span", SPANS),
         ("period", PERIODS),

@@ -200,10 +200,39 @@ export function useHUDConfig(
     update,
     updateScreen,
     presentation,
-    setLayout: async (layout: PanelLayout, screen = selectedId) =>
-      presentationRequest("layout", { screen, layout }),
-    setSource: async (source: string, patch: SourcePreferences) =>
-      presentationRequest("source_update", { source, patch }),
+    setLayout: async (layout: PanelLayout, screen = selectedId) => {
+      if (isTauri()) return presentationRequest("layout", { screen, layout });
+      const base =
+        readStore() ?? initializeStore(contexts.current) ?? loaded.store;
+      const next: HUDConfigStore = {
+        ...base,
+        sharedLayout: layout,
+        layouts: screen
+          ? { ...(base.layouts ?? {}), [screen]: layout }
+          : base.layouts,
+      };
+      localStorage.setItem(configKey, JSON.stringify(next));
+      setLoaded({ store: next, ready: true });
+      publish(next);
+      return next;
+    },
+    setSource: async (source: string, patch: SourcePreferences) => {
+      if (isTauri())
+        return presentationRequest("source_update", { source, patch });
+      const base =
+        readStore() ?? initializeStore(contexts.current) ?? loaded.store;
+      const next: HUDConfigStore = {
+        ...base,
+        sources: {
+          ...(base.sources ?? {}),
+          [source]: { ...(base.sources?.[source] ?? {}), ...patch },
+        },
+      };
+      localStorage.setItem(configKey, JSON.stringify(next));
+      setLoaded({ store: next, ready: true });
+      publish(next);
+      return next;
+    },
     saveDraft: async (screen = selectedId) =>
       presentationRequest("save", { screen }),
     discardDraft: async (screen = selectedId) =>

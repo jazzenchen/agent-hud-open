@@ -95,6 +95,7 @@ pub struct AgentHudCore {
     island_events: island_events::Tracker,
     source_notice: Option<String>,
     provider_roots: Vec<(PathBuf, &'static str)>,
+    removed_extra_roots: Vec<PathBuf>,
     settings_path: PathBuf,
     platform: String,
     /// Shows `--demo`'s sample sources rather than this machine's.
@@ -180,7 +181,7 @@ impl AgentHudCore {
             .ok()
             .and_then(|bytes| serde_json::from_slice(&bytes).ok())
             .unwrap_or(Value::Null);
-        let mut settings = json!({"quotaDisplay":"consumed","codexHomes":[],"claudeHomes":[],"antigravityCliSettings":[],"appearance":"system","appearanceFollowsScreen":false,"language":"system","clientHooks":false,"optInApprovals":[],"readCopilotQuota":false,"quotaReading":{},"approvalWaitMinutes":10,"launchAtLogin":true,"animations":true,"hudVisible":true,"showMenuBarIcon":true,"hudTools":false,"claudeAnswers":true,"agentMessages":false,"agentMessagesAsUser":false,"agentMessagesReplies":"whenNeeded","agentMessagesSteerOnOwn":false,"agentMessagesLimit":10,"claudeMessages":true,"deepseekMessages":true,"liveStatus":true,"answerInHud":true,"answerOn":[],"answerOff":[],"autoApprove":false,"autoApproveOn":[],"autoApproveOff":[],"relayReading":[],"customPrices":{},"relayMultipliers":{},"localKinds":{},"guide":null});
+        let mut settings = json!({"quotaDisplay":"consumed","codexHomes":[],"claudeHomes":[],"antigravityHomes":[],"antigravityCliSettings":[],"appearance":"system","appearanceFollowsScreen":false,"language":"system","clientHooks":false,"optInApprovals":[],"readCopilotQuota":false,"quotaReading":{},"approvalWaitMinutes":10,"launchAtLogin":true,"animations":true,"hudVisible":true,"showMenuBarIcon":true,"hudTools":false,"claudeAnswers":true,"agentMessages":false,"agentMessagesAsUser":false,"agentMessagesReplies":"whenNeeded","agentMessagesSteerOnOwn":false,"agentMessagesLimit":10,"claudeMessages":true,"deepseekMessages":true,"liveStatus":true,"answerInHud":true,"answerOn":[],"answerOff":[],"autoApprove":false,"autoApproveOn":[],"autoApproveOff":[],"relayReading":[],"customPrices":{},"relayMultipliers":{},"localKinds":{},"guide":null});
         if let Some(values) = stored["settings"].as_object() {
             for (key, value) in values {
                 if settings.get(key).is_some() {
@@ -235,6 +236,10 @@ impl AgentHudCore {
                 .into_iter()
                 .map(|source| (source.path, source.provider))
                 .collect(),
+            removed_extra_roots: database
+                .as_ref()
+                .map(host::removed_roots)
+                .unwrap_or_default(),
             settings_path,
             platform: "Desktop".into(),
             demo: false,

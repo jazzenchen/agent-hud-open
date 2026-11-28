@@ -93,14 +93,15 @@ impl AccountService {
                 enabled.insert(facts.id.into());
             }
         }
-        for provider in account_homes.keys() {
+        for key in account_homes.keys() {
+            let provider = homes::provider_of_key(key);
             if snapshot["providers"]
                 .as_array()
                 .into_iter()
                 .flatten()
-                .any(|value| value["id"] == *provider && value["enabled"] == true)
+                .any(|value| value["id"] == provider && value["enabled"] == true)
             {
-                enabled.insert(provider.clone());
+                enabled.insert(provider.to_owned());
             }
         }
         let cutoff = chrono::Utc::now().timestamp_millis() - 300_000;
@@ -138,7 +139,7 @@ impl AccountService {
                 .keys()
                 .chain(account_homes.keys())
                 .filter(|key| state.account_homes.get(*key) != account_homes.get(*key))
-                .cloned()
+                .map(|key| homes::provider_of_key(key).to_owned())
                 .collect::<HashSet<_>>();
             for provider in changed {
                 state.entries.remove(provider.as_str());

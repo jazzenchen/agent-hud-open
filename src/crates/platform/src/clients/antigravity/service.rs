@@ -29,6 +29,8 @@ pub struct Endpoint {
     csrf: HeaderValue,
     /// The client the server belongs to (`running::Server::client`).
     client: &'static str,
+    /// Configured `antigravityHomes` directory bound to this server, if any.
+    home: Option<std::path::PathBuf>,
 }
 impl Endpoint {
     pub fn identity(&self) -> String {
@@ -125,11 +127,21 @@ impl Service {
             .clone()
     }
     fn discover(&self, fresh: bool, strict: bool) -> Result<Vec<Endpoint>, String> {
+        self.discover_for(fresh, strict, &[])
+            .map(|(found, _)| found)
+    }
+
+    fn discover_for(
+        &self,
+        fresh: bool,
+        strict: bool,
+        extra_homes: &[std::path::PathBuf],
+    ) -> Result<(Vec<Endpoint>, Vec<std::path::PathBuf>), String> {
         let _guard = self.resolve.lock().unwrap_or_else(PoisonError::into_inner);
-        if !fresh {
+        if !fresh && extra_homes.is_empty() {
             let state = self.state.lock().unwrap_or_else(PoisonError::into_inner);
             if !state.endpoints.is_empty() && (!strict || state.complete) {
-                return Ok(state.endpoints.clone());
+                return Ok((state.endpoints.clone(), Vec::new()));
             }
             if state
                 .failed_at
@@ -140,7 +152,7 @@ impl Service {
                 ));
             }
         }
-        let servers = running::servers()?;
+        let (servers, active_homes) = running::servers_for(extra_homes)?;
         let expected = servers.len();
         let found = self.verify_servers(servers);
         let complete = found.len() == expected;
@@ -153,7 +165,7 @@ impl Service {
                 "Not every running Antigravity service could be verified"
             ));
         }
-        Ok(found)
+        Ok((found, active_homes))
     }
 
     fn verify_servers(&self, servers: Vec<running::Server>) -> Vec<Endpoint> {
@@ -186,6 +198,7 @@ impl Service {
                     pid: server.pid,
                     csrf,
                     client: server.client,
+                    home: server.home.clone(),
                 };
                 let handshake = json!({"metadata":{"ideName":"antigravity","extensionName":"antigravity","locale":"en","ideVersion":"unknown"}});
                 if self
@@ -206,12 +219,17 @@ pub fn endpoints(fresh: bool) -> Result<Vec<Endpoint>, String> {
     service()?.discover(fresh, true)
 }
 
-/// Read every currently running service, serially. Each response keeps the
-/// identity of its own endpoint so anonymous services cannot be conflated.
-/// The account reader uses the CLI fallback only when no native quota is usable.
+/// Read every currently running service, serially.
 pub fn read_accounts(params: &Value) -> Result<Value, String> {
+    read_accounts_for(params, &[])
+}
+
+pub fn read_accounts_for(
+    params: &Value,
+    extra_homes: &[std::path::PathBuf],
+) -> Result<Value, String> {
     let service = service()?;
-    let endpoints = service.discover(true, false)?;
+    let (endpoints, active_homes) = service.discover_for(true, false, extra_homes)?;
     let mut partial = !service
         .state
         .lock()
@@ -223,6 +241,9 @@ pub fn read_accounts(params: &Value) -> Result<Value, String> {
             Ok(status) => {
                 let mut entry =
                     json!({"source":endpoint.identity(),"client":endpoint.client,"status":status});
+                if let Some(ref home) = endpoint.home {
+                    entry["home"] = json!(home.to_string_lossy());
+                }
                 if let Ok(summary) = service.send(
                     &endpoint,
                     "RetrieveUserQuotaSummary",
@@ -243,7 +264,11 @@ pub fn read_accounts(params: &Value) -> Result<Value, String> {
             None
         }
     };
-    Ok(json!({"accounts":accounts,"partial":partial,"cliExecutable":cli}))
+    let active: Vec<String> = active_homes
+        .into_iter()
+        .map(|path| path.to_string_lossy().into_owned())
+        .collect();
+    Ok(json!({"accounts":accounts,"partial":partial,"cliExecutable":cli,"activeHomes":active}))
 }
 
 /// Quota reads may use the first readable service. Pending permissions instead

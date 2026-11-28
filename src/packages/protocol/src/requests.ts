@@ -128,3 +128,27 @@ export interface IslandEvent {
   /** Where in the agent the user allows its hooks. */
   step?: string | null;
 }
+
+export interface AccountProfileEntry {
+  settingPath: string;
+  managed: boolean;
+  ready: boolean;
+  email: string | null;
+}
+
+export interface AccountProfileSignInStatus {
+  state: "idle" | "signing_in" | "completed" | "failed" | "cancelled";
+  provider: "antigravity" | "claude" | "codex";
+  home: string | null;
+  email: string | null;
+  authUrl: string | null;
+  error: string | null;
+  profiles: AccountProfileEntry[];
+  added?: boolean;
+}
+
+export interface AccountProfileLaunchCommand {
+  provider: "antigravity" | "claude" | "codex";
+  command: string;
+  shell: "sh" | "powershell";
+}

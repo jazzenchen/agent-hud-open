@@ -10,9 +10,10 @@ import type {
   Snapshot,
 } from "@agent-hud/protocol";
 import type { Translate } from "@agent-hud/ui/format";
-import AccountHomes from "../AccountHomes";
 import AntigravityAccounts from "../AntigravityAccounts";
 import { CodexModelSettings } from "../CodexModelSettings";
+import ManagedAccountProfiles from "../ManagedAccountProfiles";
+import { Collapsible } from "../SettingsPrimitives";
 import { PanelBlocks } from "./PanelBlocks";
 import { AgentQuotaReading } from "./AgentQuotaReading";
 import { AgentRelays } from "./AgentRelays";
@@ -52,35 +53,48 @@ export function AgentAccounts({
       inert={!source.enabled}
     >
       {source.id === "codex" && (
-        <AccountHomes
+        <ManagedAccountProfiles
           t={t}
-          label={t("More Codex accounts")}
-          variable="CODEX_HOME"
-          placeholder="~/.codex-work"
+          provider="codex"
+          settingKey="codexHomes"
           homes={snapshot.settings.codexHomes ?? []}
-          onSave={(homes) =>
-            action("set_setting", { key: "codexHomes", value: homes })
-          }
+          snapshot={snapshot}
+          action={action}
         />
       )}
       {source.id === "claude" && (
-        <AccountHomes
+        <ManagedAccountProfiles
           t={t}
-          label={t("More Claude Code accounts")}
-          variable="CLAUDE_CONFIG_DIR"
-          placeholder="~/.claude-work"
+          provider="claude"
+          settingKey="claudeHomes"
           homes={snapshot.settings.claudeHomes ?? []}
-          onSave={(homes) =>
-            action("set_setting", { key: "claudeHomes", value: homes })
-          }
+          snapshot={snapshot}
+          action={action}
         />
       )}
       {source.id === "antigravity" && (
-        <AntigravityAccounts
-          t={t}
-          settings={snapshot.settings.antigravityCliSettings ?? []}
-          action={action}
-        />
+        <>
+          <ManagedAccountProfiles
+            t={t}
+            provider="antigravity"
+            settingKey="antigravityHomes"
+            homes={snapshot.settings.antigravityHomes ?? []}
+            snapshot={snapshot}
+            action={action}
+          />
+          <Collapsible
+            title={t("CLI status-line hook (advanced)")}
+            subtitle={t(
+              "Optional status-line callback for external Antigravity CLI settings files.",
+            )}
+          >
+            <AntigravityAccounts
+              t={t}
+              settings={snapshot.settings.antigravityCliSettings ?? []}
+              action={action}
+            />
+          </Collapsible>
+        </>
       )}
       {source.id === "copilot" && (
         <CopilotQuota

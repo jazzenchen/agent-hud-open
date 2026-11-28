@@ -1,4 +1,9 @@
-import type { PanelBlockLayout, PanelLayout, Quota } from "@agent-hud/protocol";
+import type {
+  PanelBlockLayout,
+  PanelLayout,
+  Quota,
+  QuotaPool,
+} from "@agent-hud/protocol";
 
 /** The key a layout writes for a quota row: its account-free window key when
  * it has one, else the Swift app's window id so layouts carried over from it
@@ -101,4 +106,23 @@ export function shownRows<T extends Quota>(
   return rows.filter(
     (row) => blockRows([row], layout?.blocks?.[row.vendor]).length,
   );
+}
+
+export function visibleQuotaPools(
+  pools: QuotaPool[],
+  vendor: string,
+  rows: Pick<Quota, "id">[],
+): QuotaPool[] {
+  const visible = new Map(rows.map((row, index) => [row.id, index]));
+  const position = (pool: QuotaPool) =>
+    Math.min(
+      ...pool.members.map((member) => visible.get(member.quotaId) ?? Infinity),
+    );
+  return pools
+    .filter(
+      (pool) =>
+        pool.vendor === vendor &&
+        pool.members.every((member) => visible.has(member.quotaId)),
+    )
+    .sort((a, b) => position(a) - position(b));
 }

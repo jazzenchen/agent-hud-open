@@ -41,7 +41,12 @@ impl Host for AccountContext {
         self.account_homes.get(agent).cloned().unwrap_or_default()
     }
     fn account_reports(&self, agent: &str) -> Vec<Value> {
-        crate::hooks::account_reports(&self.data_dir, agent, &self.account_homes(agent))
+        let key = if agent == agent_hud_agents::antigravity::AGENT.id {
+            super::homes::ANTIGRAVITY_CLI_KEY
+        } else {
+            agent
+        };
+        crate::hooks::account_reports(&self.data_dir, agent, &self.account_homes(key))
     }
     fn read_file(&self, path: &Path, limit: u64) -> Answer<Vec<u8>> {
         let mut bytes = Vec::new();
@@ -170,12 +175,31 @@ impl Host for AccountContext {
         crate::os::find_engine(&self.home, &self.env, name)
     }
     fn start_engine(&self, start: &EngineStart) -> Result<Box<dyn Engine>, String> {
+        let mut rewritten: Vec<(&str, String)> = start.env.to_vec();
+        let mut work_dir = self.data_dir.join("account-engines").join(start.folder);
+        if start.folder == agent_hud_agents::antigravity::AGENT.id {
+            if let Some(raw_home) = start
+                .env
+                .iter()
+                .find(|(key, _)| *key == "HOME")
+                .map(|(_, value)| value.as_str())
+            {
+                let sandbox = super::homes::sandbox_home(&self.data_dir, Path::new(raw_home))?;
+                work_dir = sandbox.clone();
+                let sandbox_str = sandbox.to_string_lossy().into_owned();
+                for (key, value) in &mut rewritten {
+                    if matches!(*key, "HOME" | "USERPROFILE") {
+                        *value = sandbox_str.clone();
+                    }
+                }
+            }
+        }
         Ok(Box::new(engine::Engine::start(
             self,
             start.executable,
             start.args,
-            &self.data_dir.join("account-engines").join(start.folder),
-            start.env,
+            &work_dir,
+            &rewritten,
         )?))
     }
     fn cancelled(&self) -> bool {
@@ -184,7 +208,10 @@ impl Host for AccountContext {
     fn native(&self, agent: &str, method: &str, params: &Value) -> Result<Value, String> {
         if agent == agent_hud_agents::antigravity::AGENT.id {
             if method == "ReadAccounts" {
-                crate::clients::antigravity::service::read_accounts(params)
+                crate::clients::antigravity::service::read_accounts_for(
+                    params,
+                    &self.account_homes(agent),
+                )
             } else {
                 crate::clients::antigravity::service::call(method, params)
             }

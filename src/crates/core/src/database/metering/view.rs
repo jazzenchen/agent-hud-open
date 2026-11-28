@@ -174,7 +174,7 @@ impl View {
 
     /// The selected logs' buckets summed by source, model and start, as
     /// `SUM … GROUP BY source,model,at_ms HAVING total>0 ORDER BY at_ms`, priced.
-    fn aggregate(&mut self, regions: &crate::pricing::PriceRegions) {
+    pub(super) fn aggregate(&mut self, regions: &crate::pricing::PriceRegions) {
         let mut sums = BTreeMap::<(i64, u32), Usage>::new();
         for part in self.parts.values() {
             for (key, at, u) in &part.buckets {

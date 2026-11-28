@@ -1,11 +1,9 @@
 //! An Antigravity account's quota windows, from its user status and the
 //! model quota summary.
+use super::buckets::{build_quota_row, finalize_quotas};
 use crate::account::{account_id, legacy_account, legacy_unresolved, status, Reading};
 use crate::l10n::tr;
-use crate::naming::{
-    vendor_windows,
-    window_names::{self, Period},
-};
+use crate::naming::{vendor_windows, window_names};
 use chrono::Utc;
 use serde_json::{json, Value};
 use std::collections::{BTreeMap, BTreeSet};
@@ -14,20 +12,21 @@ fn parse_summary_quotas(
     id: &str,
     account_identity: &str,
     email: Option<&str>,
+    consumer_home: Option<&str>,
     summary: &Value,
 ) -> Option<Vec<Value>> {
     let groups = summary["response"]["groups"]
         .as_array()
         .or_else(|| summary["groups"].as_array())?;
+    let now = Utc::now();
     let mut ids = BTreeSet::new();
-    let mut active_groups = BTreeSet::new();
+    let mut families = BTreeSet::new();
     let mut quotas = Vec::new();
-    for (index, group) in groups.iter().enumerate() {
+    for group in groups {
         let buckets = group["buckets"].as_array()?;
         let group_name = group["displayName"]
             .as_str()
-            .or_else(|| group["name"].as_str())
-            .unwrap_or("");
+            .or_else(|| group["name"].as_str());
         for bucket in buckets {
             let key = bucket["bucketId"]
                 .as_str()
@@ -43,71 +42,47 @@ fn parse_summary_quotas(
             else {
                 continue;
             };
-            active_groups.insert(index);
-            let used = (1.0 - fraction) * 100.0;
-            let bucket_name = bucket["displayName"]
-                .as_str()
-                .or_else(|| bucket["name"].as_str())
-                .unwrap_or(key);
-            let name = if group_name.is_empty() {
-                bucket_name.to_owned()
-            } else {
-                format!("{group_name} · {bucket_name}")
-            };
-            let duration = match bucket["window"].as_str() {
-                Some("weekly") => Some(604800),
-                Some("5h") => Some(18000),
-                _ => None,
-            };
-            let word = vendor_windows::antigravity_group_word(group_name);
-            let short = Period::from_seconds(duration.map(f64::from)).map_or_else(
-                || word.clone(),
-                |period| format!("{word} {}", period.after_word()),
+            let bucket_name = Some(
+                bucket["displayName"]
+                    .as_str()
+                    .or_else(|| bucket["name"].as_str())
+                    .unwrap_or(key),
             );
-            let reset = bucket["resetTime"]
+            let raw_reset = bucket["resetTime"]
                 .as_str()
-                .or_else(|| bucket["reset_time"].as_str())
-                .filter(|value| chrono::DateTime::parse_from_rfc3339(value).is_ok());
-            let lower = group_name.to_lowercase();
-            let mut quota = json!({
-                "id": format!("{id}:{key}"),
-                "windowKey": format!("antigravity:{key}"),
-                "vendor": "antigravity",
-                "accountId": account_identity,
-                "account": email,
-                "name": name,
-                "shortLabel": short,
-                "usedPercent": used,
-                "status": status(used),
-                "resetAt": reset,
-                "windowDurationSeconds": duration,
-            });
-            if lower.contains("gemini") {
-                quota["modelFamilies"] = json!(["gemini"]);
-            } else if lower.contains("claude") || lower.contains("gpt") {
-                quota["modelFamilies"] = json!(["claude", "gpt"]);
+                .or_else(|| bucket["reset_time"].as_str());
+            let (family, mut quota) = build_quota_row(
+                id,
+                key,
+                account_identity,
+                email,
+                group_name,
+                bucket_name,
+                bucket["window"].as_str(),
+                fraction,
+                raw_reset,
+                now,
+            );
+            if let Some(home) = consumer_home {
+                quota["consumerHome"] = json!(home);
             }
+            families.insert(family);
             quotas.push(quota);
         }
     }
     if quotas.is_empty() {
         return None;
     }
-    let all = active_groups.len() == 1;
-    for quota in &mut quotas {
-        quota["allModels"] = json!(all);
-        // Its calls are logged by model, which picks the pool.
-        quota["consumerSource"] = json!("antigravity");
-        if all {
-            if let Some(period) = Period::from_seconds(quota["windowDurationSeconds"].as_f64()) {
-                quota["shortLabel"] = json!(period.short_name());
-            }
-        }
-    }
+    finalize_quotas(&mut quotas, families.len());
     Some(quotas)
 }
 
-pub(super) fn parse(scope: &str, body: &Value, summary: &Value) -> Result<Reading, String> {
+pub(super) fn parse(
+    scope: &str,
+    body: &Value,
+    summary: &Value,
+    consumer_home: Option<&str>,
+) -> Result<Reading, String> {
     let user = &body["userStatus"];
     let configs = user["cascadeModelConfigData"]["clientModelConfigs"]
         .as_array()
@@ -133,7 +108,8 @@ pub(super) fn parse(scope: &str, body: &Value, summary: &Value) -> Result<Readin
     let account_identity = identified
         .clone()
         .unwrap_or_else(|| legacy_unresolved("Antigravity", scope));
-    let quotas = if let Some(quotas) = parse_summary_quotas(&id, &account_identity, email, summary)
+    let quotas = if let Some(quotas) =
+        parse_summary_quotas(&id, &account_identity, email, consumer_home, summary)
     {
         quotas
     } else {
@@ -179,8 +155,6 @@ pub(super) fn parse(scope: &str, body: &Value, summary: &Value) -> Result<Readin
             let reset = config["quotaInfo"]["resetTime"]
                 .as_str()
                 .filter(|value| chrono::DateTime::parse_from_rfc3339(value).is_ok());
-            // Gemini, third-party for Claude and GPT as Antigravity's plans call
-            // them, and any other model by its word.
             let short = match family {
                 "gemini" => "Gemini".to_owned(),
                 "claude-gpt" => vendor_windows::antigravity_group_word(name),
@@ -188,18 +162,17 @@ pub(super) fn parse(scope: &str, body: &Value, summary: &Value) -> Result<Readin
             };
             let mut quota = json!({"id":format!("{id}:legacy:{family}"),"vendor":"antigravity","name":name,"shortLabel":short,
                 "usedPercent":used,"resetAt":reset,"status":status(used),"account":email,"accountId":account_identity});
-            // The Swift app kept these GetUserStatus pools as `antigravity:legacy:<family>`;
-            // an account it did not name had another home key there.
             if let Some(account) = &identified {
                 quota["legacyWindowId"] = json!(format!("{account}/antigravity:legacy:{family}"));
+            }
+            if let Some(home) = consumer_home {
+                quota["consumerHome"] = json!(home);
             }
             match family {
                 "gemini" => quota["modelFamilies"] = json!(["gemini"]),
                 "claude-gpt" => quota["modelFamilies"] = json!(["claude", "gpt"]),
                 _ => {}
             }
-            // GetUserStatus supplies a reset, but no window length or native token
-            // capacity. Keep those unknown rather than inferring a five-hour cycle.
             pools.insert(family.into(), quota);
         }
         let all_models = pools.len() == 1;
@@ -207,7 +180,6 @@ pub(super) fn parse(scope: &str, body: &Value, summary: &Value) -> Result<Readin
             .into_values()
             .map(|mut quota| {
                 quota["allModels"] = json!(all_models);
-                // Its calls are logged by model, which picks the pool.
                 quota["consumerSource"] = json!("antigravity");
                 quota
             })
@@ -216,6 +188,17 @@ pub(super) fn parse(scope: &str, body: &Value, summary: &Value) -> Result<Readin
     let notice = quotas
         .is_empty()
         .then(|| tr!("Antigravity is connected; its local service reports no quota percentage."));
+    let mut account_row = json!({
+        "id": account_identity,
+        "provider": "antigravity",
+        "label": email,
+        "identity": if email.is_some() { "account" } else { "local-home" },
+        "plan": user["userTier"]["name"].as_str().or_else(|| user["planStatus"]["planInfo"]["planName"].as_str()),
+        "checkedAt": Utc::now().to_rfc3339(),
+    });
+    if let Some(home) = consumer_home {
+        account_row["home"] = json!(home);
+    }
     Ok(Reading {
         provider: "antigravity",
         failure: None,
@@ -225,12 +208,7 @@ pub(super) fn parse(scope: &str, body: &Value, summary: &Value) -> Result<Readin
         additional_accounts: Vec::new(),
         session_records: Vec::new(),
         services: Vec::new(),
-        account: Some(
-            json!({"id":account_identity,"provider":"antigravity","label":email,
-            "identity":if email.is_some(){"account"}else{"local-home"},
-            "plan":user["userTier"]["name"].as_str().or_else(||user["planStatus"]["planInfo"]["planName"].as_str()),
-            "checkedAt":Utc::now().to_rfc3339()}),
-        ),
+        account: Some(account_row),
         unreviewed_hooks: vec![],
     })
 }

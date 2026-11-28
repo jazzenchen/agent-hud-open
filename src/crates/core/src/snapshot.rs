@@ -7,6 +7,7 @@ use crate::l10n::tr;
 mod balances;
 mod meters;
 mod providers;
+mod quota_pools;
 mod quotas;
 mod session_rows;
 
@@ -253,6 +254,7 @@ impl crate::AgentHudCore {
         let relay_users = self.relay_users(at);
         let billing = self.billing_rows(at, &pending_meter, &relay_users);
         let accounts = self.account_rows();
+        let quota_pools = self.quota_pool_rows(&quotas, &accounts, now);
         let relays = self.relay_rows(&relay_users);
         let island_events = self
             .island_events
@@ -263,7 +265,7 @@ impl crate::AgentHudCore {
             .as_ref()
             .expect("usage projection prepared");
         Ok(
-            json!({"islandEvents":island_events,"schemaVersion":1,"statisticsRevision":self.statistics.revision,"sessionsRevision":self.sessions_revision,"sessionScope":"recent","indexing":indexing,"generatedAt":Utc::now().to_rfc3339(),"mode":if self.demo{"demo"}else{"live"},"connection":{"status":"connected","platform":self.platform,"message":notice.unwrap_or_else(|| tr!("Local transcripts and client events; hook connection status is reported separately."))},"totals":projection.totals.json(),"quotas":quotas,"accounts":accounts,"sessions":sessions,"timeline":projection.timeline,"providers":providers,"clients":clients,"approvals":approvals,"requestDeliveries":deliveries,"settings":self.settings,"language":crate::l10n::current().code(),"capabilities":serde_json::from_str::<Value>(include_str!("../../../packages/protocol/capabilities.json")).expect("checked-in capability manifest"),"billing":billing,"relays":relays}),
+            json!({"islandEvents":island_events,"schemaVersion":1,"statisticsRevision":self.statistics.revision,"sessionsRevision":self.sessions_revision,"sessionScope":"recent","indexing":indexing,"generatedAt":Utc::now().to_rfc3339(),"mode":if self.demo{"demo"}else{"live"},"connection":{"status":"connected","platform":self.platform,"message":notice.unwrap_or_else(|| tr!("Local transcripts and client events; hook connection status is reported separately."))},"totals":projection.totals.json(),"quotas":quotas,"quotaPools":quota_pools,"accounts":accounts,"sessions":sessions,"timeline":projection.timeline,"providers":providers,"clients":clients,"approvals":approvals,"requestDeliveries":deliveries,"settings":self.settings,"language":crate::l10n::current().code(),"capabilities":serde_json::from_str::<Value>(include_str!("../../../packages/protocol/capabilities.json")).expect("checked-in capability manifest"),"billing":billing,"relays":relays}),
         )
     }
 

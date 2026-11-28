@@ -39,6 +39,9 @@ impl crate::AgentHudCore {
         let failed = account["stale"] == true;
         account["warning"] = json!(notice.filter(|_| failed));
         account["notice"] = json!(notice.filter(|_| !failed));
+        if let Some(object) = account.as_object_mut() {
+            object.remove("home");
+        }
         account
     }
 

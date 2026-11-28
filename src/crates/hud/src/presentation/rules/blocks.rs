@@ -33,7 +33,7 @@ impl Kind {
         self == Kind::Quota && (widget == "rings" || widget == "segments")
     }
     pub(super) fn takes_half(self, widget: &str) -> bool {
-        widget != "bar"
+        !matches!(widget, "bar" | "pool")
     }
     pub(super) fn takes_period(self, widget: &str) -> bool {
         (self == Kind::Quota && widget == "chart") || self == Kind::Balance
