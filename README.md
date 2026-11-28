@@ -1,158 +1,84 @@
 <h1 align="center">Agent HUD</h1>
 
 <p align="center">
-  <strong>HUD for your agents.</strong><br>
+  <strong>One workbench for your AI agents.</strong><br>
   On your screen. On your phone. On your wrist.
 </p>
 
 <p align="center">
   <a href="https://agenthud.app/mac"><img src="docs/buttons/mac.svg" alt="Download Agent HUD for Mac" width="180" height="36"></a>
   <a href="https://apps.apple.com/app/id6812113619"><img src="docs/buttons/app-store.svg" alt="App Store: iPhone and Apple Watch" width="138" height="36"></a>
-  <a href="#build-from-source"><img src="docs/buttons/source.svg" alt="Build Agent HUD from source" width="181" height="36"></a>
+  <a href="docs/build-from-source.md"><img src="docs/buttons/source.svg" alt="Build Agent HUD from source" width="181" height="36"></a>
 </p>
 
 <p align="center">
-  <a href="#install"><img src="docs/badges/macos.svg" alt="macOS 14+" height="22"></a>
-  <a href="#built-for-every-desktop"><img src="docs/badges/windows-linux.svg" alt="Windows, and Linux in preview" height="22"></a>
-  <a href="docs/platform-architecture.md"><img src="docs/badges/rust-tauri.svg" alt="Rust and Tauri 2" height="22"></a>
-  <a href="LICENSE"><img src="docs/badges/license.svg" alt="Apache-2.0 license" height="22"></a>
+  <strong>English</strong> · <a href="README.zh-CN.md">简体中文</a> · <a href="https://agenthud.app">Website</a> · <a href="https://discord.gg/cpTPDgWwXR">Discord</a> · <a href="#supported-agents">Supported agents</a> · <a href="docs/README.md">Documentation</a>
 </p>
 
 <p align="center">
-  <strong>English</strong> · <a href="README.zh-CN.md">简体中文</a> · <a href="https://agenthud.app">Website</a> · <a href="https://discord.gg/cpTPDgWwXR">Discord</a> · <a href="#community">WeChat group</a> · <a href="#supported-agents">Supported agents</a> · <a href="#common-questions">Common questions</a> · <a href="#documentation">Documentation</a>
+  <img src="docs/art/workbench.png" alt="Agent HUD's page in a browser window at this computer's own address. On the left, the computer's sessions grouped by project, each with its agent's logo, two of them marked 1 waiting. In the middle, a Claude Code conversation with a request to run the checkout tests and its Deny and Allow buttons above the reply box. On the right, the Tasks tab with four of seven steps done, beside Changes and Files. At the lower left, each agent's quota or balance." width="838"><br>
+  <sub>Every agent's sessions in one page, served by your own computer · Sample data</sub>
 </p>
 
-<p align="center">
-  <img src="docs/videos/agent-hud-loop.webp" alt="A tour of Agent HUD at a MacBook's notch. The glow breathes in red, yellow and green quota segments. A hover opens the panel on Claude's and Codex's quotas, a DeepSeek balance, the last 24 hours of tokens and the sessions, and a click turns Claude's quotas into burn rates. Claude then asks to run the test suite and is answered with Allow once, and its reply arrives as a New reply reminder whose card offers Return to session" width="450"> <img src="docs/videos/simple-mode-tour.webp" alt="A tour of Simple mode on the left edge of a display. Five agent logos sit in quota rings, then show percentages and a balance. Hovering a logo writes that agent's quotas on one line, and a click opens Claude's card with its limits, burn rates and the 24-hour token bars. A permission request is answered with Allow once, a New reply reminder opens with Return to session, and the HUD is dragged to the top edge and back" width="380"><br>
-  <sub>Left: Notch mode at a MacBook's notch · Right: Simple mode on a display's left edge, with Separate agents on · Sample data</sub>
-</p>
-
-<p align="center">If Agent HUD is useful to you, a star helps other people find it.</p>
-
-Your agents work on your Mac. Agent HUD brings their progress to you. Check where they are at a glance, pick up a conversation, make the next decision: at your desk, and after you leave it.
+Your agents work on your computer. Agent HUD puts them in one place: see who is working and who is waiting, pick up a conversation, make the next decision. At your desk, and after you leave it.
 
 ## Install
 
-With Homebrew on a Mac:
-
 ```sh
-brew install --cask jazzenchen/tap/agent-hud
+brew install --cask jazzenchen/tap/agent-hud     # Mac, with Homebrew
+npx @agenthud/install                            # Mac, Windows or Linux, with Node.js
 ```
 
-With Node.js on a Mac, Windows or Linux ([how it installs](src/apps/installer/README.md)):
+Or download the [release](https://agenthud.app/mac). If Agent HUD is useful to you, a star helps other people find it.
 
-```sh
-npx @agenthud/install
-```
+## One workbench, in any browser.
 
-Or download the [release](https://agenthud.app/mac). Either command installs the newest release, betas included, and on a Mac Agent HUD then updates itself. If it is already in `/Applications`, add `--adopt` to the Homebrew command.
+**Every session, in one place.** The [release](https://agenthud.app/mac) serves the page above from your own computer. Open it on this computer, or on a phone, tablet or another computer on the same network.
 
-New here? Start with [Agents messaging each other](https://agenthud.app/docs/en/mcp/messaging/) and [what works on each platform](docs/platforms.md).
+- **See who is waiting**: every session, grouped by project, with its agent's mark.
+- **Approve right there**: allow or deny a tool call, answer a question, reply, or start a new session.
+- **Follow the work**: the plan as it advances, and what the agent changed in each file.
 
 ## On your screen.
 
-**Your agents, at a glance.** You write code, read docs or deal with something else while your agents keep working. The edge of your screen tells you who is still busy, who is done and who is waiting for you.
+**Your agents, at a glance.** The edge of your screen tells you who is still busy, who is done and who is waiting for you.
 
-The details are close at hand, and what needs your approval is answered right there. Every agent's progress, gathered where one glance takes it in.
+<p align="center">
+  <img src="docs/videos/agent-hud-loop.webp" alt="A tour of Agent HUD at a MacBook's notch. The glow breathes in red, yellow and green quota segments. A hover opens the panel on Claude's and Codex's quotas, a DeepSeek balance, the last 24 hours of tokens and the sessions, and a click turns Claude's quotas into burn rates. Claude then asks to run the test suite and is answered with Allow once, and its reply arrives as a New reply reminder whose card offers Return to session" width="450"> <img src="docs/videos/simple-mode-tour.webp" alt="A tour of Simple mode on the left edge of a display. Five agent logos sit in quota rings, then show percentages and a balance. Hovering a logo writes that agent's quotas on one line, and a click opens Claude's card with its limits, burn rates and the 24-hour token bars. A permission request is answered with Allow once, a New reply reminder opens with Return to session, and the HUD is dragged to the top edge and back" width="380"><br>
+  <sub>Notch mode at a MacBook's notch · Simple mode on any screen edge · Sample data</sub>
+</p>
 
-- **Glow**: one colour per agent, from its most used quota: green under 70% used, yellow from 70%, red from 90%, with a warning before a quota runs out. It moves faster while an agent works.
-- **Hover**: quotas with their resets or burn rates, balances, the last 24 hours of tokens, and the sessions, those waiting for you first.
-- **Requests**: approve, deny or always allow, and answer any question an agent asks, right on the HUD, the questions Claude asks in its desktop app included. With Approve automatically on, Agent HUD allows permission requests for you.
-- **Jump back**: one click takes you to a session's thread, tab or terminal pane.
-
-**Two modes.** Each display runs one: Notch by default where there is a notch, Simple elsewhere.
-
-| Mode | On screen |
-| --- | --- |
-| **Notch** | At the notch, with the glow around it. |
-| **Simple** | A small floating panel on any screen edge: each agent's logo in a ring of its most used quota, with the percentage beside it. A logo becomes its bot while its agent works. |
-
-A display can also leave out its HUD, or only its messages, requests or paper planes: Settings → Display.
+- **Glow**: one colour per agent, from its most used quota. Green, yellow from 70% used, red from 90%.
+- **Hover**: quotas with their resets, balances, the last 24 hours of tokens, and the sessions.
+- **Requests**: approve, deny or answer right on the HUD, then jump back to the session in one click.
 
 ## On your phone.
 
-**Keep moving when decisions are needed.** Leave your computer and the work still goes with you. On iPhone, check progress, read replies and continue the conversation.
-
-When an agent reaches something only you can decide, your phone shows you the context, and you answer the question or approve the next step. The task keeps going, and so does your day. iPhone Duo is supported.
+**Keep moving when decisions are needed.** On iPhone, check progress, read replies and continue the conversation. When an agent reaches something only you can decide, you answer it there.
 
 <p align="center">
-  <a href="docs/screenshots/iphone-home.webp"><img src="docs/screenshots/iphone-home.webp" alt="Agent HUD on iPhone, Home: a greeting, the agents as bots with their quotas, a request waiting for approval, and this week's hours" width="150"></a> <a href="docs/screenshots/iphone-sessions.webp"><img src="docs/screenshots/iphone-sessions.webp" alt="Agent HUD on iPhone, Sessions tab: today's tokens by kind with their cost, then sessions with per-turn bars and context-window fill" width="150"></a> <a href="docs/screenshots/iphone-duo-stats.webp"><img src="docs/screenshots/iphone-duo-stats.webp" alt="Agent HUD on an unfolded iPhone Duo, Stats: tokens stacked by model left of the fold, and recent usage for today, the last 7 days and the last 30 days on the right" width="455"></a><br>
-  <sub>Agent HUD for iPhone · Home and Sessions, and Stats on an unfolded iPhone Duo · Sample data</sub>
+  <img src="docs/art/phone.png" alt="Agent HUD on iPhone. Home: the agents with their quotas and a request waiting for approval. Sessions: today's tokens and the sessions. Stats on an unfolded iPhone Duo." width="838">
 </p>
-
-See [Agent HUD Remote](#agent-hud-remote).
 
 ## On your wrist.
 
-**Start from your wrist, continue on iPhone.** An idea comes to you on a walk. Raise your wrist, say it, and it goes straight to the Mac at home. A thought caught in passing becomes a task in progress.
-
-Read the latest reply on your watch. To discuss it or add detail, continue on iPhone. The idea starts on your wrist, and the conversation goes where you go.
+**Start from your wrist, continue on iPhone.** Raise your wrist and say an idea, and it becomes a session on the Mac at home. The reply comes back to your watch.
 
 <p align="center">
-  <img src="docs/screenshots/watch-record.webp" alt="Apple Watch recording a new note: a waveform, 0:07, English, and a stop button" width="180"> <img src="docs/screenshots/watch-note.webp" alt="The note's text on Apple Watch, transcribed on iPhone, with the button Send to an agent" width="180"> <img src="docs/screenshots/watch-send.webp" alt="Send to: Claude and Codex, each its desktop app" width="180"> <img src="docs/screenshots/watch-replied.webp" alt="The same note marked Codex has replied, with the button View latest message" width="180"><br>
-  <sub>A note spoken to Apple Watch becomes a Codex session on the Mac · Sample data</sub>
+  <img src="docs/art/watch.png" alt="Four Apple Watch screens: recording a new note; the note's text with the button Send to an agent; Send to Claude or Codex; the note marked Codex has replied." width="838"><br>
+  <sub>A note spoken to Apple Watch becomes a Codex session on the Mac · Phone and watch away from home need <a href="#agent-hud-remote">Agent HUD Remote</a></sub>
 </p>
 
-See [Agent HUD Remote](#agent-hud-remote).
+## Let your agents talk to each other.
 
-## Built-in MCP.
+**Your agents use Agent HUD too.** Through its built-in MCP server, Claude Code can ask a Codex session to review a change and get the answer back, or start a new session and hand the task over.
 
-**Your agents use Agent HUD too.** Its built-in MCP server gives them a channel to talk to each other, and the tools to build the UI you want.
+- **A message, not the conversation**: only what the agent writes goes across. The project itself is the shared context.
+- **Build your own UI**: tell an agent how you want the HUD to look, see the preview, and keep it with **Save**.
 
-### Let your agents talk to each other.
+[Agents messaging each other](https://agenthud.app/docs/en/mcp/messaging/)
 
-When Claude Code finishes a change, it can ask a Codex session to review it and get Codex's answer back, or start a new session and hand the task over. Agent HUD already sees every session, so it carries messages across clients.
-
-You can watch who is talking to whom: the sender folds its message into a paper plane and flies it to the receiver's mark, and the answer flies back the same way.
-
-- **A message, not the conversation**: only what the agent writes goes across; its session stays where it is. On one project, the project itself becomes the shared context, and the other agent reads the code for itself.
-- **Twelve agents**: Claude Code, Codex, Antigravity, DeepSeek Harness, Cursor, TRAE, WorkBuddy, ZCode, Qoder, Kimi Code, Pi and OpenCode can message each other, or start a new Claude Code, Codex, Antigravity or DeepSeek Harness session.
-- **Queued by default**: a message waits until its session is idle. Only when you ask for it can an agent steer one into the turn in progress of a Codex or DeepSeek Harness session.
-- **Six are limited**: Cursor, TRAE, WorkBuddy, ZCode, Qoder and Kimi Code take a message only when one of their turns ends, so an idle session gets it after you start another turn there. All but WorkBuddy also cap how many they take in a row.
-
-How to turn it on and use it: [Agents messaging each other](https://agenthud.app/docs/en/mcp/messaging/).
-
-### Build your own UI.
-
-Tell an agent how you want to see things: *“Put Codex first and keep only the numbers I care about.”*
-
-Through MCP, the agent rearranges your Mac HUD and changes what it shows and how it looks. The change appears at once as a preview and is kept only when you press **Save**, so the HUD fits the way you work.
-
-- For Claude Code, Codex and any other MCP client.
-- An agent can read the HUD, propose a layout or a look for any display, and check the result with a screenshot in which accounts are masked.
-- The same tools answer questions about your usage, sessions and statistics, from the data the app already holds.
-
-## Worth keeping on
-
-### Know your token usage.
-
-Know what your agents did, and how much they used. See your token use, look back at how it changed, and find where it went: which agents, models and sessions.
-
-Quotas tell you how much is left. Token usage shows you how it was spent.
-
-<p align="center">
-  <img src="docs/screenshots/mac-statistics.webp" alt="The Statistics window in dark mode, over a year: tokens, their worth at API list prices, how many times the plans paid for themselves, sessions and cache hits; a year of days as a heatmap; tokens by day stacked by model; each agent's share; and the plans and balances" width="820"><br>
-  <img src="docs/screenshots/mac-session-turn.webp" alt="The Sessions tab: today's sessions on the left; a Claude Code session in the middle with its new tokens per turn and a context window compacted twice; on the right, one turn with its six sub-agents on a timeline and the calls it made" width="820"><br>
-  <sub>Statistics on the Mac · a year of usage, and one turn's sub-agents on a timeline · Sample data</sub>
-</p>
-
-| Dimension | What you can track |
-| --- | --- |
-| **Time** | Today, the last 7, 30 or 90 days, or a year. Every token stays on your computer; the phone keeps 30 days. |
-| **Token&nbsp;kinds** | Input, output, reasoning, cache writes and cache reads, all together or any mix. |
-| **Agents&nbsp;and&nbsp;models** | Each agent's share, tokens and cost, and the models behind them. |
-| **Sessions** | Tokens with the sub-agents' part, cost, turns, calls, context fill and cache hits. Sub-agents count inside the session that started them. |
-| **Turns&nbsp;and&nbsp;calls** | The new tokens of every turn, and each call with its model, context and the tools it asked for. |
-| **Cache&nbsp;hits** | Today, the last 7 days and the last 30 days, each session, and each model within a session. |
-| **Cost** | An estimate at each vendor's list price, from its China or international price list, marked ≈. It is not a charge. |
-| **Plans** | What each plan's usage would cost at API list prices, against the plan's price. |
-| **Activity** | When your agents worked, by day over a year or by hour, in one heatmap. |
-| **Quotas** | How full each quota window got, day by day, and where it reset. |
-| **Balances** | DeepSeek's spend per day and the day its balance runs out. |
-
-### See your agents come to life.
-
-Familiar agent logos become small bots that act out thinking, working and waiting. With a face on every state, one glance tells you what is going on.
+## Supported agents
 
 <p align="center">
   <picture>
@@ -161,84 +87,17 @@ Familiar agent logos become small bots that act out thinking, working and waitin
   </picture>
 </p>
 
-They give the HUD a character of its own: your agents busy at work, signalling when they need you. Each bot keeps its logo's shape and colours and follows your pointer with its eyes; Claude Code's is Clawd. [See each bot's four states](docs/videos/agent-bots.webp).
+Install and sign in to the agents you want to follow; Agent HUD finds them by itself. All 27 show tokens and sessions. These four do everything:
 
-### Small footprint. Light on your Mac.
+| Agent | Quota | Live status | Approvals | Questions | Replies | One click back | Agent messages |
+| --- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| **Claude&nbsp;Code** | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| **Codex** | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| **Antigravity** | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| **DeepSeek&nbsp;Harness** | Balance | ✓ | ✓ | ✓ | ✓ | Window | ✓ |
 
-A HUD runs all day, so staying light is part of the experience. Agent HUD keeps its CPU, memory and energy use down, and leaves your system to your agents and the work in front of you.
-
-Measured on a real Mac, not claimed:
-
-<!-- Numbers come from release builds measured as docs/performance.md describes. -->
-| Measure | Idle | Busy | Made up of |
-| --- | --- | --- | --- |
-| CPU, share of one core | about&nbsp;7% | 7%–&#8288;28% | Agent HUD 6–11%, each display's HUD 0.5–7%, graphics and networking up to 5% |
-| Memory | about&nbsp;240&nbsp;MB | 240–&#8288;260&nbsp;MB | Agent HUD's own process, as Activity Monitor shows it. Each display's HUD adds 70–170 MB, graphics 10–50 MB and networking 7 MB |
-| Energy over an 8-hour day | about&nbsp;0.1&nbsp;Wh | 0.1–&#8288;2.3&nbsp;Wh | Agent HUD more than half, the HUDs and graphics the rest |
-
-Idle: no agent working, one display. Busy: agents writing to their logs, one or two displays. Release builds on an Apple M1 Max, macOS 26, with about 8,000 session logs. [How it is measured](docs/performance.md#measured-footprint).
-
-## Built for every desktop
-
-Agent HUD is built with Tauri 2: a Rust core, a React interface, and a thin native layer for each operating system.
-
-- **One core.** Reading your agents' records, counting tokens and working out quotas, prices and sessions happen once, in Rust, the same way on every system. The windows only display what the core computes.
-- **Each system in its own files.** Paths, processes, credentials, hooks and windows are written once per system, so work on Windows or Linux never touches shared code.
-- **macOS and Windows today; Linux in preview.** All three build from this source, and each release carries unsigned packages for Windows and Linux. The Linux build has not been tried on a real desktop yet; what is still missing is under [Coming soon](#coming-soon).
-- **iPhone and Apple Watch pair with a Mac or a Windows PC.** Agent HUD Remote syncs through iCloud, so for now it is available on macOS only; with Windows, the phone connects on the same network.
-
-## Agent HUD Remote.
-
-**Your agents, wherever you are.** Through your own iCloud, Agent HUD Remote keeps your iPhone and Apple Watch connected to the [release](https://agenthud.app/mac) on any network.
-
-### What you'll get
-
-When your iPhone and the release share a network, iPhone and Apple Watch show your Mac's quotas, token statistics and sessions without a subscription. Remote adds:
-
-- **Any network**: your quotas, token statistics and sessions, away from home too.
-- **Conversations**: read Claude Code, Codex, Antigravity and DeepSeek Harness sessions, and message Claude Code, Codex and Antigravity.
-- **Decisions**: allow or deny a tool call, answer a question, approve a plan.
-- **Your wrist**: an idea you say becomes a new session on your Mac, and the reply comes back to your watch.
-- **Alerts and Live Activities**: alerts on iPhone and Apple Watch, and your running sessions on the Lock Screen and in the Dynamic Island.
-
-| | iPhone | Apple Watch |
-| --- | :---: | :---: |
-| Quotas, balances and token statistics | ✓ | ✓ |
-| Sessions and their tokens | ✓ | ✓ |
-| Widgets on the Home Screen, Lock Screen and StandBy | ✓ | — |
-| Several Macs | ✓ | ✓ |
-| Conversations | ★ | ★ |
-| Messages to Claude Code, Codex and Antigravity | ★ | ★ |
-| A note that becomes a new session | ★ | ★ |
-| Tool calls, questions and plans | ★ | ★ |
-| Alerts | ★ | ★ |
-| Running sessions as Live Activities | ★ | ★ |
-
-<sub>✓ Free to use · ★ Needs a subscription</sub>
-
-**Check out in the App Store**, inside the iPhone app: [China mainland](https://apps.apple.com/cn/app/agent-hud/id6812113619) · [International](https://apps.apple.com/us/app/agent-hud/id6812113619)
-
-## Coming soon
-
-- **Linux out of preview.** [Contributions are welcome](CONTRIBUTING.md).
-- **More agents**, beyond the 27 in the table below.
-- **API keys billed by the token**: their usage, spend and balance, next to your plans' quotas.
-- **UI prompt templates.** Ready-made prompts that reshape your HUD in one go.
-- **A Gantt view of sub-agents.** On a session's page, each sub-agent of a turn in its own lane on one time axis: when it started, how long it ran, what it used, and what ran side by side.
-- **Agents shape every screen**, not only the HUD, with image backgrounds and a customizable iPhone app.
-- **More agents in the conversation**, beyond Claude Code, Codex, Antigravity and DeepSeek Harness.
-- **Files both ways.** Your agents send files to your iPhone, and you send files from your iPhone to your agents.
-- **Recordings straight to your agents.** A recording from your Apple Watch or iPhone reaches your agent as it is.
-- **More of the HUD is your call**: what Simple mode's rings show (burn rate, time to reset or cost), and which agents may alert you.
-- **More from each agent**: Grok CLI's one click back, OpenClaw's live status and replies, Devin's and Goose's live status, and Goose's replies.
-- **Requests and replies on the HUD in builds from source**, once client hooks leave the preview.
-- **HarmonyOS.** An app for HarmonyOS phones is in review: on the same network as the [release](https://agenthud.app/mac), your quotas, token statistics and sessions, with service cards on the home screen.
-
-…and more.
-
-## Supported agents
-
-Install and sign in to the agents you want to follow; Agent HUD finds them by itself.
+<details>
+<summary><strong>The other 23 agents, and what works with each</strong></summary>
 
 | Agent | Tokens and sessions | Quota | Live status | Approvals | Questions | Replies | One click back | Turns and calls | Agent messages |
 | --- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
@@ -274,89 +133,62 @@ Install and sign in to the agents you want to follow; Agent HUD finds them by it
 
 Also: the **GLM Coding Plan**, **OpenCode Go**, **MiniMax** and **Volcengine Ark** plan quotas. Qoder includes Qoder CN and QoderWork, TRAE includes TRAE CN, and Devin includes the CLI and Devin Desktop. Codex CLI approvals need its hook trusted in Codex (the Codex app's need nothing), DeepSeek Harness approvals and questions need Agent HUD's plugin (Settings → Agent plugins), and Copilot's approvals and quota are each turned on in Settings. Qoder's, WorkBuddy's and TRAE's quotas show once you sign in to the vendor's site in Agent HUD's own window. TRAE reports no tokens, so only its sessions show, and it runs Agent HUD's hooks once you turn on its global hooks. Qoder records tokens, and so its turns, only for a model on your own key or with `QODER_EXPOSE_TOKEN_USAGE` set. A jump back to a terminal pane needs iTerm2, and Cursor opens a cloud agent's chat but only a local chat's folder. DeepSeek Harness's one click back brings its desktop app's window forward on macOS and Windows, not the session itself; on Windows the link already names the session, for when Harness supports it. An agent marked Limited under [Agent messages](https://agenthud.app/docs/en/mcp/messaging/) takes a message only when one of its turns ends, not while idle, and cannot be started in a new session; only an interactive Qoder CLI session takes one while idle. OpenCode 2, Qoder CN and QoderWork take agent messages without sending them. Factory Droid's quota needs a Factory API key, and Devin's quotas come from its CLI's local cache. Cursor's tokens come from Cursor 3.27 or later. Grok Bot's bots run on Cursor's servers, which report each bot's daily tokens; an account merged into SuperGrok reports none, so only its sessions show. Grok Bot's weekly quota comes from the same servers when Cursor is signed in to the Bot's account, otherwise from the Bot's own cache, which it refreshes only while in use. An account merged into SuperGrok has one weekly limit for Cursor and Grok Bot, and Cursor's block shows it as Cursor does.
 
+</details>
+
+## Know your token usage.
+
+**Quotas tell you how much is left. Token usage shows you how it was spent**: which agents, models and sessions, and how that changed over time.
+
+<p align="center">
+  <img src="docs/art/statistics.png" alt="The Statistics window over a year: tokens, their worth at API list prices, how many times the plans paid for themselves, a year of days as a heatmap, tokens by day stacked by model, and each agent's share." width="838">
+</p>
+
+| Dimension | What you can track |
+| --- | --- |
+| **Time** | Today, the last 7, 30 or 90 days, or a year. Every token stays on your computer. |
+| **Agents&nbsp;and&nbsp;models** | Each agent's share, tokens and cost, and the models behind them. |
+| **Sessions&nbsp;and&nbsp;turns** | A session's tokens with its sub-agents' part, context fill and cache hits. |
+| **Cost&nbsp;and&nbsp;plans** | An estimate at list price, and what each plan's usage would cost at API prices. |
+
+## Small footprint.
+
+**A HUD runs all day, so staying light is part of the experience.** Measured on a real Mac while idle, not claimed:
+
+<!-- Numbers come from release builds measured as docs/performance.md describes. -->
+<table>
+  <tr>
+    <td align="center" width="33%"><h3>about 7%</h3>of one CPU core</td>
+    <td align="center" width="33%"><h3>about 240 MB</h3>of memory</td>
+    <td align="center" width="33%"><h3>about 0.1 Wh</h3>over an 8-hour day</td>
+  </tr>
+</table>
+
+Built with Tauri 2: a Rust core, a React interface, and a thin native layer for each system. macOS and Windows today; Linux in preview. [How it is measured](docs/performance.md#measured-footprint)
+
+## Agent HUD Remote.
+
+**Your agents, wherever you are.** On the same network everything marked ✓ is free. Remote carries it to any network through your own iCloud, and adds what is marked ★.
+
+| | iPhone | Apple Watch |
+| --- | :---: | :---: |
+| Quotas, balances, token statistics and sessions | ✓ | ✓ |
+| Conversations, and messages to your agents | ★ | ★ |
+| Tool calls, questions and plans | ★ | ★ |
+| A spoken note that becomes a new session | ★ | ★ |
+| Alerts and Live Activities | ★ | ★ |
+
+<sub>✓ Free to use · ★ Needs a subscription</sub>
+
+**Check out in the App Store**, inside the iPhone app: [China mainland](https://apps.apple.com/cn/app/agent-hud/id6812113619) · [International](https://apps.apple.com/us/app/agent-hud/id6812113619)
+
 ## Keep your data safe.
 
-- **Read on your computer**: the records your agents already keep. Usage history stays in a local SQLite database.
-- **Read from each vendor**: quotas, balances and Grok Bot's daily tokens, with the agent's existing sign-in or configured key. No read sends a message to a model. Agent HUD stores only what you give it yourself: an API key you type into it, and a sign-in you make on a vendor's site in its own window. Both stay on this computer, in files only your user account can read.
-- **Written on your computer**: hooks in your agents' own settings, to receive requests and replies, only while client hooks are on. Turning them off removes them.
+- **Read on your computer**: the records your agents already keep. Usage history stays in a local database.
+- **Read from each vendor**: quotas and balances, with the agent's existing sign-in. No read sends a message to a model.
 - **Uploaded**: nothing, by a build from this source.
-- **Access your data from iPhone and Apple Watch**, through the release:
-  - **On the same network**, over HTTPS, with the Mac's certificate pinned when the phone pairs.
-  - **Anywhere, with Agent HUD Remote**, through your own iCloud. Record contents are end-to-end encrypted with keys in your iCloud Keychain; only the text an alert shows stays outside that encryption, so iOS can display it.
-  - **Live Activities of running sessions**, also with Remote, pass through Agent HUD's relay to Apple's push service. The relay keeps only what forwarding needs, each Mac's latest sessions and each phone's card, with no account identity, and deletes an account it hasn't heard from in 30 days.
 
-## Community
+What the release sends to your iPhone and Apple Watch, and how it is encrypted: [your data](docs/data.md).
 
-Questions, ideas and bug reports are welcome on [Discord](https://discord.gg/cpTPDgWwXR), in the WeChat group, or in [issues](https://github.com/jazzenchen/agent-hud-open/issues).
+## More
 
-<details>
-<summary><strong>WeChat group</strong>: scan the code with WeChat</summary>
-<p><img src="https://agenthud.app/assets/community/wechat-group.png" alt="QR code to join the Agent HUD WeChat group" width="220"></p>
-<p>A group code lasts a week, and I replace it on agenthud.app each week; this picture follows it. If it has expired, find me on Discord.</p>
-</details>
-
-## Build from source
-
-**Requirements:** Node.js 24+, pnpm, a current Rust toolchain (1.90+), and [Tauri's prerequisites](https://v2.tauri.app/start/prerequisites/) for your system.
-
-```sh
-git clone https://github.com/jazzenchen/agent-hud-open.git
-cd agent-hud-open
-pnpm install
-pnpm run check
-pnpm run build:macos -- --bundle
-```
-
-Use `build:windows` or `build:linux` on those systems; each command builds only for the system it runs on. Tauri writes the app under `target/release/bundle`. To try the app without any agents, start it with `--demo`, which opens it on sample data.
-
-**A patched Tao.** On macOS the HUD has to be a panel that never takes focus from the app you are using, and upstream Tao cannot create one yet ([tao#414](https://github.com/tauri-apps/tao/issues/414)). Until it can, the workspace takes `tao` from [a public fork](https://github.com/jazzenchen/tao/tree/agent-hud/nonactivating-panel) with one small commit on top of 0.37.1, pinned by revision in `Cargo.toml`; Cargo fetches it from GitHub on the first build. What the commit changes, and how to move it to a new Tao release: [Tao patch](docs/tao-panel-patch.md).
-
-**Preview.** This build is checked against the native Swift app, [agent-hud-native-open](https://github.com/jazzenchen/agent-hud-native-open) (formerly agent-hud-open), behavior by behavior, in the [parity ledger](docs/parity/README.md). It does not install client hooks yet, so approvals, questions and most replies stay in each agent's own prompt.
-
-<details>
-<summary><strong>Development</strong></summary>
-
-| Command | Purpose |
-| --- | --- |
-| `pnpm run check` | Build the interface and MCP server, check the platform boundary and the parity ledger, type-check Rust |
-| `cargo test --workspace` | Run the Rust tests |
-| `pnpm run dev` | Run the interface in a browser at `http://127.0.0.1:1420` on live data (run `pnpm run engine:build` first) |
-| `pnpm run build:macos` / `build:windows` / `build:linux` | Build the app for the system you are on |
-| `pnpm --silent run mcp` | Run the MCP server over stdio |
-
-The workspace layout, the MCP client configuration and the other commands are in [development](docs/development.md). Code goes where [Contributing](CONTRIBUTING.md) says: core computes, the interface displays, and each system's code stays in its own files.
-
-</details>
-
-## Common questions
-
-- **How much of my Claude Code or Codex limit is left, and when does it reset?** Every limit sits at the edge of your screen with the share used and its reset time. [Claude Code](https://agenthud.app/guides/how-to-check-claude-code-usage) · [Codex](https://agenthud.app/guides/how-to-check-codex-usage)
-- **Why did my Codex limit reset early, and can I be told when it resets?** OpenAI sometimes resets limits early. Agent HUD alerts you once a new reading confirms a reset. [Codex limit resets](https://agenthud.app/guides/codex-limit-reset)
-- **Will my limit last until it resets?** Each limit shows its burn rate and, at that pace, when it runs out. [Quota forecast](https://agenthud.app/guides/quota-windows)
-- **Can I see my usage in the Mac menu bar, or in the status line?** The menu bar item shows the highest usage as a number and lists every limit. [Menu bar and status line](https://agenthud.app/guides/claude-code-codex-usage-menu-bar)
-- **Does it show Claude Code and Codex at the MacBook notch?** Yes: a glow for your limits, and replies and requests that open out of the notch. A notch is not required. [At the notch](https://agenthud.app/guides/claude-code-codex-mac-notch)
-- **How do I get notified when Claude Code or Codex finishes a turn?** A reminder opens on the HUD with the reply. The guides also give each agent's own settings. [Claude Code](https://agenthud.app/guides/claude-code-notifications-mac) · [Codex](https://agenthud.app/guides/codex-notifications-mac)
-- **Can I approve permission requests without going back to the terminal?** Tool calls, questions and Claude Code's plans are answered on the HUD. [Approving requests](https://agenthud.app/guides/client-hooks)
-- **I run several sessions. Which one is waiting for me?** The panel lists your sessions, those waiting for you first. [Session status](https://agenthud.app/guides/checking-agent-status-on-mac)
-- **How many tokens did a session use, and what would that cost?** Statistics count tokens by session, turn and model, with a cost estimate at list price. [Tokens and cost](https://agenthud.app/guides/token-usage-and-cost)
-- **How do I reach Claude Code or Codex from my phone?** Agent HUD Remote reads sessions, sends messages and answers requests on iPhone and Apple Watch. [Agent HUD Remote](https://agenthud.app/guides/remote-sessions) · [the ways compared](https://agenthud.app/guides/claude-code-from-phone-compared) · [when the official remote fails](https://agenthud.app/guides/remote-control-not-working)
-- **Can I follow Antigravity or DeepSeek Harness from my phone?** Yes, with what each one supports spelled out. [Antigravity](https://agenthud.app/guides/antigravity-on-iphone) · [DeepSeek Harness](https://agenthud.app/guides/deepseek-harness-on-iphone)
-- **Can Claude Code and Codex hand work to each other?** Through the built-in MCP server, one agent messages another's session or starts a new one. [Claude Code and Codex together](https://agenthud.app/guides/claude-code-and-codex-together)
-
-## Documentation
-
-[Development](docs/development.md) · [Platform architecture](docs/platform-architecture.md) · [Platform builds](docs/platform-builds.md) · [Accounts](docs/accounts.md) · [Client hooks](docs/client-hooks.md) · [Session data](docs/session-data.md) · [Local network](docs/local-network.md) · [Performance](docs/performance.md) · [Parity ledger](docs/parity/README.md) · [Tao patch](docs/tao-panel-patch.md) · [Third-party sources](docs/third-party.md) · [Contributing](CONTRIBUTING.md)
-
-## License
-
-[Apache-2.0](LICENSE). Interface components, provider artwork and Clawd's sprites keep their own notices; see [third-party sources](docs/third-party.md).
-
-## Star History
-
-<a href="https://www.star-history.com/?repos=jazzenchen%2Fagent-hud-open&type=date&legend=top-left">
- <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=jazzenchen/agent-hud-open&type=date&theme=dark&legend=top-left" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=jazzenchen/agent-hud-open&type=date&legend=top-left" />
-   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=jazzenchen/agent-hud-open&type=date&legend=top-left" />
- </picture>
-</a>
+[Coming soon](docs/roadmap.md) · [Common questions](docs/common-questions.md) · [Build from source](docs/build-from-source.md) · [Documentation](docs/README.md) · [Discord](https://discord.gg/cpTPDgWwXR) · [WeChat group](docs/community.md) · [Apache-2.0](LICENSE)

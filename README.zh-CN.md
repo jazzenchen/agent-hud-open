@@ -1,158 +1,84 @@
 <h1 align="center">Agent HUD</h1>
 
 <p align="center">
-  <strong>为你的 agents 打造的 HUD。</strong><br>
+  <strong>AI agents 的统一工作台。</strong><br>
   在屏幕上，在手机上，在手腕上。
 </p>
 
 <p align="center">
   <a href="https://agenthud.app/mac"><img src="docs/buttons/mac.zh-CN.svg" alt="下载 Mac 版 Agent HUD" width="180" height="36"></a>
   <a href="https://apps.apple.com/cn/app/agent-hud/id6812113619?uo=4"><img src="docs/buttons/app-store.svg" alt="从 App Store 获取 iPhone 与 Apple Watch App" width="138" height="36"></a>
-  <a href="#从源码构建"><img src="docs/buttons/source.zh-CN.svg" alt="从源码构建 Agent HUD" width="181" height="36"></a>
+  <a href="docs/build-from-source.zh-CN.md"><img src="docs/buttons/source.zh-CN.svg" alt="从源码构建 Agent HUD" width="181" height="36"></a>
 </p>
 
 <p align="center">
-  <a href="#安装"><img src="docs/badges/macos.svg" alt="macOS 14+" height="22"></a>
-  <a href="#跨平台一套核心"><img src="docs/badges/windows-linux.svg" alt="Windows，以及 Linux 预览" height="22"></a>
-  <a href="docs/platform-architecture.md"><img src="docs/badges/rust-tauri.svg" alt="Rust 与 Tauri 2" height="22"></a>
-  <a href="LICENSE"><img src="docs/badges/license.svg" alt="Apache-2.0 许可证" height="22"></a>
+  <a href="README.md">English</a> · <strong>简体中文</strong> · <a href="https://agenthud.app">官网</a> · <a href="https://discord.gg/cpTPDgWwXR">Discord</a> · <a href="#支持的-agent">支持的 agent</a> · <a href="docs/README.md">文档</a>
 </p>
 
 <p align="center">
-  <a href="README.md">English</a> · <strong>简体中文</strong> · <a href="https://agenthud.app">官网</a> · <a href="https://discord.gg/cpTPDgWwXR">Discord</a> · <a href="#社区">微信群</a> · <a href="#支持的-agent">支持的 agent</a> · <a href="#常见问题">常见问题</a> · <a href="#文档">文档</a>
+  <img src="docs/art/workbench.png" alt="浏览器窗口里的 Agent HUD 页面，地址是这台电脑自己。左边是电脑上的会话，按项目分组，每条前面是各自 agent 的标志，其中两条标着 1 waiting。中间是一段 Claude Code 的对话，回复框上方有一张请求运行结账测试的卡片，带 Deny 与 Allow 两个按钮。右边是 Tasks 页签，七步完成了四步，旁边是 Changes 与 Files。左下角是每个 agent 的额度或余额。" width="838"><br>
+  <sub>所有 agent 的会话在同一页，由你自己的电脑提供 · 示例数据</sub>
 </p>
 
-<p align="center">
-  <img src="docs/videos/agent-hud-loop.zh-CN.webp" alt="灵动岛上的 Agent HUD 演示。光晕呼吸着红、黄、绿的额度色段；悬停后面板展开，显示 Claude 与 Codex 的额度、DeepSeek 的余额、过去 24 小时的 Token 与会话，点击后 Claude 的额度切换为消耗速率。随后 Claude 请求运行测试，用「批准一次」回应；它的回复以「有新回复」提醒出现，卡片上有「回到会话」" width="450"> <img src="docs/videos/simple-mode-tour.zh-CN.webp" alt="简约形态停靠在屏幕左侧的一段演示。五个 agent 图标外是额度圆环，随后显示百分比与余额。悬停在图标上，用一行写出该 agent 的额度；点击后展开 Claude 的卡片，显示额度、消耗速率与 24 小时的 Token 柱。接着用 Allow once 回应一个批准请求，展开一条 New reply 提醒及其 Return to session 按钮，最后把 HUD 拖到屏幕顶部再拖回" width="380"><br>
-  <sub>左：MacBook 刘海处的刘海形态 · 右：停靠在屏幕左侧的简约形态，已开启「按 agent 分开」 · 示例数据</sub>
-</p>
-
-<p align="center">如果 Agent HUD 对你有用，点个 Star，能让更多人找到它。</p>
-
-Agent 在 Mac 上工作，HUD 把进展带到你身边。看一眼状态，接上一段对话，给出下一个决定——在电脑前，也在离开电脑之后。
+Agent 在你的电脑上工作，Agent HUD 把它们放到同一处：看谁在忙、谁在等你，接上一段对话，给出下一个决定。在电脑前，也在离开电脑之后。
 
 ## 安装
 
-在 Mac 上用 Homebrew：
-
 ```sh
-brew install --cask jazzenchen/tap/agent-hud
+brew install --cask jazzenchen/tap/agent-hud     # Mac，用 Homebrew
+npx @agenthud/install                            # Mac、Windows 或 Linux，用 Node.js
 ```
 
-在 Mac、Windows 或 Linux 上用 Node.js（[安装方式](src/apps/installer/README.md)）：
+也可以直接下载[发行版](https://agenthud.app/mac)。如果 Agent HUD 对你有用，点个 Star，能让更多人找到它。
 
-```sh
-npx @agenthud/install
-```
+## 一个工作台，任何浏览器都能打开
 
-也可以直接下载[发行版](https://agenthud.app/mac)。两条命令都会安装最新的版本（包括 Beta），在 Mac 上之后 Agent HUD 会自己更新。`/Applications` 里已经装了的话，给 Homebrew 命令加上 `--adopt`。
+**所有会话，都在一处。** 上面这个页面由[发行版](https://agenthud.app/mac)在你自己的电脑上提供。在这台电脑上打开，或者在同一网络里的手机、平板和另一台电脑上打开。
 
-初次使用？先看[如何让 agents 互发消息](https://agenthud.app/docs/zh/mcp/messaging/)和[各平台支持情况](docs/platforms.md)。
+- **看谁在等你**：每一个会话，按项目分组，带着各自 agent 的标志。
+- **当场批准**：允许或拒绝一次工具调用，回答提问，回一句话，或者开一个新会话。
+- **跟着进度**：计划做到第几步，以及 agent 在每个文件里改了什么。
 
 ## 在屏幕上
 
-**你的 agents，一目了然。** 你在写代码、读文档或处理别的事情，agents 继续工作。屏幕边缘告诉你：谁还在忙，谁已经完成，谁正在等你。
+**你的 agents，一目了然。** 屏幕边缘告诉你：谁还在忙，谁已经完成，谁正在等你。
 
-细节就在手边，需要你批准的事情也在这里回应。多个 agent 的进展，集中在一眼可见的地方。
+<p align="center">
+  <img src="docs/videos/agent-hud-loop.zh-CN.webp" alt="灵动岛上的 Agent HUD 演示。光晕呼吸着红、黄、绿的额度色段；悬停后面板展开，显示 Claude 与 Codex 的额度、DeepSeek 的余额、过去 24 小时的 Token 与会话，点击后 Claude 的额度切换为消耗速率。随后 Claude 请求运行测试，用「批准一次」回应；它的回复以「有新回复」提醒出现，卡片上有「回到会话」" width="450"> <img src="docs/videos/simple-mode-tour.zh-CN.webp" alt="简约形态停靠在屏幕左侧的一段演示。五个 agent 图标外是额度圆环，随后显示百分比与余额。悬停在图标上，用一行写出该 agent 的额度；点击后展开 Claude 的卡片，显示额度、消耗速率与 24 小时的 Token 柱。接着用 Allow once 回应一个批准请求，展开一条 New reply 提醒及其 Return to session 按钮，最后把 HUD 拖到屏幕顶部再拖回" width="380"><br>
+  <sub>MacBook 刘海处的刘海形态 · 停在任意屏幕边缘的简约形态 · 示例数据</sub>
+</p>
 
-- **光晕**：每个 agent 一种颜色，按它用量最高的那项额度：已用不足 70% 为绿色，达到 70% 为黄色，达到 90% 为红色；额度耗尽前会提醒你。有 agent 在工作时，光晕动得更快。
-- **悬停**：额度及其重置时间或消耗速率、余额、过去 24 小时的 Token，以及会话，等你处理的排在最前。
-- **请求**：批准、拒绝、总是允许，还有 agent 的任何提问，都可以直接在 HUD 上完成，Claude 桌面版里的提问也一样。打开「自动批准」后，Agent HUD 会直接通过权限请求。
-- **跳转**：一键回到会话所在的线程、标签页或终端窗格。
-
-**两种形态。** 每块屏幕各用一种：有刘海的屏幕默认是刘海，其余默认是简约。
-
-| 形&#8288;态 | 屏幕上的样子 |
-| --- | --- |
-| **刘&#8288;海** | 在刘海处，周围是光晕。 |
-| **简&#8288;约** | 停靠在任意屏幕边缘的小型悬浮面板：每个 agent 的图标外套一个圆环，画的是它用量最高的那项额度，旁边写着百分比。agent 工作时，它的图标会变成 Bot。 |
-
-每块屏幕还可以不显示 HUD，或只隐去消息、交互请求或纸飞机：设置 → 显示。
+- **光晕**：每个 agent 一种颜色，按它用量最高的那项额度。绿色，已用达到 70% 为黄色，达到 90% 为红色。
+- **悬停**：额度及其重置时间、余额、过去 24 小时的 Token，以及会话。
+- **请求**：直接在 HUD 上批准、拒绝或回答，再一键回到那个会话。
 
 ## 在手机上
 
-**需要做决定时，不必停下脚步。** 离开电脑，工作仍然接得上。在 iPhone 上查看进展、阅读回复、继续对话。
-
-agent 需要你做决定时，在手机上就能看清上下文，回答问题或批准下一步。任务继续，你的生活也继续。已支持 iPhone Duo。
+**需要做决定时，不必停下脚步。** 在 iPhone 上查看进展、阅读回复、继续对话。agent 遇到只有你能决定的事，就在手机上回答。
 
 <p align="center">
-  <a href="docs/screenshots/iphone-home.webp"><img src="docs/screenshots/iphone-home.webp" alt="iPhone 版 Agent HUD 的首页：问候语、以小机器人出现的各个 agent 及其额度、一条等待批准的请求，以及本周的时长" width="150"></a> <a href="docs/screenshots/iphone-sessions.webp"><img src="docs/screenshots/iphone-sessions.webp" alt="iPhone 版 Agent HUD 的会话页：今天各类 Token 的用量与费用，下方是带每轮柱状图与上下文占用的会话" width="150"></a> <a href="docs/screenshots/iphone-duo-stats.webp"><img src="docs/screenshots/iphone-duo-stats.webp" alt="展开的 iPhone Duo 上的 Agent HUD 统计页：折痕左侧是按模型堆叠的 Token，右侧是今天、近 7 天与近 30 天的用量" width="455"></a><br>
-  <sub>iPhone 版 Agent HUD · 首页与会话，以及展开的 iPhone Duo 上的统计页 · 示例数据</sub>
+  <img src="docs/art/phone.png" alt="iPhone 上的 Agent HUD。首页：各个 agent 与它们的额度，以及一条等待批准的请求。会话页：今天的 Token 与会话。展开的 iPhone Duo 上的统计页。" width="838">
 </p>
-
-详见 [Agent HUD Remote](#agent-hud-remote)。
 
 ## 在手腕上
 
-**从手腕开始，在 iPhone 上继续。** 散步时想到一个需求，抬腕说出来，直接发送给家中的 Mac。一个随手捕捉的想法，就能成为正在推进的任务。
-
-在手表上查看最新回复；想展开讨论、补充细节时，在 iPhone 上继续。想法从手腕开始，对话随着你展开。
+**从手腕开始，在 iPhone 上继续。** 抬腕说出一个想法，它就成为家中 Mac 上的一个会话。回复会回到你的手表上。
 
 <p align="center">
-  <img src="docs/screenshots/watch-record.zh-CN.webp" alt="Apple Watch 正在录一条新笔记：波形、0:07、中文与停止按钮" width="180"> <img src="docs/screenshots/watch-note.zh-CN.webp" alt="Apple Watch 上的笔记文字，已在 iPhone 上转写，下方是「发给 agent」按钮" width="180"> <img src="docs/screenshots/watch-send.zh-CN.webp" alt="发给：Claude 与 Codex，均为桌面版" width="180"> <img src="docs/screenshots/watch-replied.zh-CN.webp" alt="同一条笔记标着「Codex 已回复」，下方是「查看最新消息」按钮" width="180"><br>
-  <sub>对 Apple Watch 说出的一条笔记，成为 Mac 上的一个 Codex 会话 · 示例数据</sub>
+  <img src="docs/art/watch.zh-CN.png" alt="Apple Watch 的四个画面：正在录一条新笔记；笔记的文字与「发给 agent」按钮；发给 Claude 或 Codex；笔记标着 Codex 已回复。" width="838"><br>
+  <sub>对 Apple Watch 说出的一条笔记，成为 Mac 上的一个 Codex 会话 · 离开家后，手机与手表需要 <a href="#agent-hud-remote">Agent HUD Remote</a></sub>
 </p>
 
-详见 [Agent HUD Remote](#agent-hud-remote)。
+## 让 agents 彼此对话
 
-## 内置 MCP
+**你的 agents 也在用 Agent HUD。** 通过内置的 MCP 服务，Claude Code 可以请一个 Codex 会话审一遍改动并拿回答复，也可以新开一个会话，把任务交给它。
 
-**你的 agents 也在用 Agent HUD。** 内置的 MCP 服务给它们一条互相通话的频道，也让它们按你的想法搭出界面。
+- **只传消息，不交出会话**：过去的只有 agent 写下的那条消息。项目本身就是它们共同的上下文。
+- **打造你自己的界面**：告诉 agent 你想让 HUD 是什么样子，看预览，满意后按**保存**。
 
-### 让 agents 彼此对话
+[如何让 agents 互发消息](https://agenthud.app/docs/zh/mcp/messaging/)
 
-Claude Code 写完一段改动，可以请一个 Codex 会话审一遍，Codex 的答复回到 Claude 手里；也可以新开一个会话，把任务交给它。Agent HUD 本来就看得见每个会话，所以能在不同客户端之间传话。
-
-谁在跟谁说话，HUD 上看得见：发信的 agent 把信折成纸飞机，飞到收信的 agent 那里，回答再沿原路飞回来。
-
-- **只传消息，不交出会话**：过去的只有 agent 写下的那条消息，会话本身留在原处。同一个项目里，项目本身就成了它们共同的上下文，对方自己去读代码。
-- **十二款 agent**：Claude Code、Codex、Antigravity、DeepSeek Harness、Cursor、TRAE、WorkBuddy、ZCode、Qoder、Kimi Code、Pi 与 OpenCode 彼此都能传话，也能新开 Claude Code、Codex、Antigravity 或 DeepSeek Harness 会话。
-- **默认排队**：消息等对方空闲才送达。只有你明确要求时，agent 才会把消息插进 Codex 或 DeepSeek Harness 会话正在进行的一轮。
-- **六款受限**：Cursor、TRAE、WorkBuddy、ZCode、Qoder 与 Kimi Code 只在它们的一轮结束时接收，空闲的会话要等你在那里再发起一轮才收得到。除 WorkBuddy 外，一轮里连续接收的次数也有上限。
-
-怎样开启和使用，见[使用文档](https://agenthud.app/docs/zh/mcp/messaging/)。
-
-### 打造你自己的界面
-
-告诉 agent 你想怎样看信息：“把 Codex 放在前面，只保留我关心的数据。”
-
-通过 MCP，调整 Mac HUD 的排列、信息和外观。即时预览，满意后保存，让看板贴合你的工作习惯。
-
-- 适用于 Claude Code、Codex 和其他 MCP 客户端。
-- Agent 可以读取 HUD，为任意一块屏幕提出布局或外观，并用截图检查效果；截图中的账户会被遮住。
-- 同一组工具也能回答关于用量、会话与统计的问题，数据来自应用已有的记录。
-
-## 为什么值得常驻
-
-### 看清 Token 用量
-
-知道 agents 做了什么，也知道它们用了多少。查看 Token 消耗、回看用量变化，了解消耗分布在哪些 agent、模型和会话。
-
-额度告诉你还剩多少，Token 用量帮助你看懂资源如何被使用。
-
-<p align="center">
-  <img src="docs/screenshots/mac-statistics.webp" alt="深色的统计窗口，范围是一年：Token、按 API 标价折合的金额、订阅回本了几倍、会话数与缓存命中；一年里每一天的热力图；按天、按模型堆叠的 Token；各 agent 的占比；以及订阅与余额" width="820"><br>
-  <img src="docs/screenshots/mac-session-turn.webp" alt="会话页：左边是今天的会话；中间是一个 Claude Code 会话，有每轮新增的 Token 和压缩过两次的上下文窗口；右边是其中一轮，六个子 agent 排在时间线上，下面是这一轮的调用" width="820"><br>
-  <sub>Mac 上的统计 · 一年的用量，以及一轮里子 agent 的时间线 · 示例数据</sub>
-</p>
-
-| 维度 | 可以追踪 |
-| --- | --- |
-| **时间** | 今天、近 7 天、30 天、90 天或一年。每个 Token 都留在你的电脑上，手机保留 30 天。 |
-| **Token&nbsp;类别** | 输入、输出、推理、缓存写入与缓存读取，可以全看，也可以任意组合。 |
-| **Agent&nbsp;与模型** | 每个 agent 的占比、Token 与费用，以及用到的模型。 |
-| **会话** | Token（含子 agent 的部分）、费用、轮数、调用数、上下文占用与缓存命中。子 agent 计入启动它的会话。 |
-| **轮次与调用** | 每一轮新增的 Token，以及每次调用的模型、上下文和它请求的工具。 |
-| **缓存命中** | 今天、近 7 天、近 30 天，每个会话，以及会话里的每个模型。 |
-| **费用** | 按各家的 API 标价估算（中国区或国际区价目），标 ≈，并非实际扣费。 |
-| **订阅** | 每个订阅的用量按 API 标价值多少，与套餐价格相比。 |
-| **活跃时段** | agents 什么时候在工作：一年里的每一天，或一天里的每个钟点，在一张热力图里。 |
-| **额度** | 每个额度窗口每天用到多满，以及在哪里重置。 |
-| **余额** | DeepSeek 每天的花费，以及余额预计用完的日期。 |
-
-### 让 agents 活起来
-
-熟悉的 agent 标志变成小 Bot，用动作表达思考、工作和等待。状态有了表情，你扫一眼就更容易理解正在发生什么。
+## 支持的 agent
 
 <p align="center">
   <picture>
@@ -161,84 +87,17 @@ Claude Code 写完一段改动，可以请一个 Codex 会话审一遍，Codex �
   </picture>
 </p>
 
-它们也让 HUD 有了自己的性格：你的 agents 在这里忙碌，需要你时向你示意。每个 Bot 沿用图标自己的形状和颜色，眼睛跟随指针；Claude Code 的 Bot 是 Clawd。[查看每个 Bot 的四种状态](docs/videos/agent-bots.webp)。
+安装并登录想要关注的 agent，Agent HUD 会自动发现它们。27 款都能看到 Token 与会话，下面四款功能齐全：
 
-### 占用小，不拖慢你的 Mac
+| Agent | 额度 | 实时状态 | 批准 | 提问 | 回复 | 回到会话 | 互发消息 |
+| --- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| **Claude&nbsp;Code** | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| **Codex** | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| **Antigravity** | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| **DeepSeek&nbsp;Harness** | 余额 | ✓ | ✓ | ✓ | ✓ | 窗口 | ✓ |
 
-HUD 需要长时间运行，轻量常驻本身就是产品体验。控制 CPU、内存和能耗开销，把系统资源留给 agents 和你手头的工作。
-
-这一点用实际资源占用来证明：
-
-<!-- 数字来自按 docs/performance.md 测量的发布构建。 -->
-| 指标 | 闲时 | 忙时 | 构成 |
-| --- | --- | --- | --- |
-| CPU（单核占比） | 约&nbsp;7% | 7%–&#8288;28% | Agent HUD 本身 6%–11%，每块屏幕的 HUD 0.5%–7%，图形与网络进程最多 5% |
-| 内存 | 约&nbsp;240&nbsp;MB | 240–&#8288;260&nbsp;MB | Agent HUD 自身进程，即活动监视器里 Agent HUD 一行的数字。每块屏幕的 HUD 另占 70–170 MB，图形进程 10–50 MB，网络进程 7 MB |
-| 8&nbsp;小时的能耗 | 约&nbsp;0.1&nbsp;Wh | 0.1–&#8288;2.3&nbsp;Wh | 一半以上来自 Agent HUD 本身，其余是 HUD 与图形进程 |
-
-闲时：没有 agent 在工作，一块屏幕。忙时：agents 在写日志，一到两块屏幕。发布构建，Apple M1 Max，macOS 26，本机约 8,000 个会话日志。[测量方法](docs/performance.md#measured-footprint)
-
-## 跨平台，一套核心
-
-Agent HUD 基于 Tauri 2 构建：Rust 核心、React 界面，每个操作系统各有一层很薄的原生代码。
-
-- **一套核心。** 读取 agent 的记录、统计 Token、计算额度、价格与会话，都只在 Rust 里做一次，每个系统的结果完全一致。窗口只负责显示核心算好的内容。
-- **每个系统各有自己的文件。** 路径、进程、凭据、回调与窗口，每个系统各写一份；改进 Windows 或 Linux，不会碰到共享代码。
-- **macOS 与 Windows 已可用，Linux 处于预览。** 三者都能从本仓库源码构建，每次发布也附带 Windows 与 Linux 的未签名安装包。Linux 版尚未在真机桌面上试过；还缺的部分见[即将推出](#即将推出)。
-- **iPhone 与 Apple Watch 可与 Mac 或 Windows 电脑配对。** Agent HUD Remote 经由 iCloud 同步，所以暂时只在 macOS 上提供；配对 Windows 电脑时，手机在同一局域网内连接。
-
-## Agent HUD Remote
-
-**走到哪里，agents 都在身边。** 经由你自己的 iCloud，iPhone 与 Apple Watch 在任何网络下都连着[发行版](https://agenthud.app/mac)。
-
-### 你将获得
-
-iPhone 和发行版在同一个网络里，不订阅也能在 iPhone 与 Apple Watch 上看到 Mac 上的额度、Token 统计与会话。Remote 再加上：
-
-- **任何网络**：额度、Token 统计与会话，出门在外也看得到。
-- **对话**：阅读 Claude Code、Codex、Antigravity 与 DeepSeek Harness 的会话，并向 Claude Code、Codex 与 Antigravity 发送消息。
-- **决定**：允许或拒绝一次工具调用，回答提问，批准计划。
-- **手腕上**：说出的想法成为 Mac 上的新会话，回复回到你的手表。
-- **提醒与实时活动**：iPhone 与 Apple Watch 上的提醒，以及锁定屏幕和灵动岛上运行中的会话。
-
-| | iPhone | Apple Watch |
-| --- | :---: | :---: |
-| 额度、余额与 Token 统计 | ✓ | ✓ |
-| 会话及其 Token | ✓ | ✓ |
-| 主屏幕、锁定屏幕与待机显示的小组件 | ✓ | — |
-| 多台 Mac | ✓ | ✓ |
-| 对话 | ★ | ★ |
-| 给 Claude Code、Codex 与 Antigravity 发消息 | ★ | ★ |
-| 一条笔记变成新会话 | ★ | ★ |
-| 工具调用、提问与计划 | ★ | ★ |
-| 提醒 | ★ | ★ |
-| 实时活动里的运行中会话 | ★ | ★ |
-
-<sub>✓ 免费使用 · ★ 需要订阅</sub>
-
-**在 App Store 订阅**，在 iPhone App 里完成：[中国区](https://apps.apple.com/cn/app/agent-hud/id6812113619) · [国际区](https://apps.apple.com/us/app/agent-hud/id6812113619)
-
-## 即将推出
-
-- **Linux 结束预览。** [欢迎参与](CONTRIBUTING.md)。
-- **支持更多 agent**，不止下面表格里的 27 款。
-- **按 Token 计费的 API**：用 API 密钥付费的账户，也能看到用量、花费与余额，和订阅的额度放在一起。
-- **UI 提示词模板。** 现成的提示词，一次就把 HUD 改成你想要的样子。
-- **子 agent 甘特图。** 在会话页上，一轮里的每个子 agent 各占一条泳道，排在同一条时间轴上：何时开始、跑了多久、用了多少，哪些在同时进行。
-- **所有界面交给 agent 定制**，不只是 HUD；支持图片背景，iPhone 上的界面也能自定义。
-- **更多 agent 加入对话**，不止 Claude Code、Codex、Antigravity 与 DeepSeek Harness。
-- **文件双向传送。** agent 可以把文件发到你的 iPhone，你也可以从 iPhone 把文件发给 agent。
-- **录音直接发给 agent。** Apple Watch 或 iPhone 上的录音，原样交给 agent。
-- **HUD 上更多由你决定**：简约形态的圆环显示什么（消耗速率、距重置的时间或费用），以及哪些 agent 可以提醒你。
-- **每个 agent 更完整**：Grok CLI 的一键回到会话，OpenClaw 的实时状态与回复，Devin 与 Goose 的实时状态，以及 Goose 的回复。
-- **从源码构建的版本也能在 HUD 上处理请求与回复**，在客户端回调结束预览之后。
-- **鸿蒙版。** 鸿蒙手机的 App 正在提交审核：与[发行版](https://agenthud.app/mac)在同一局域网内时，查看额度、Token 统计与会话，桌面上还有服务卡片。
-
-……以及更多。
-
-## 支持的 agent
-
-安装并登录想要关注的 agent，Agent HUD 会自动发现它们。
+<details>
+<summary><strong>其余 23 款 agent，以及每一款支持什么</strong></summary>
 
 | Agent | Token 与会话 | 额度 | 实时状态 | 批准 | 提问 | 回复 | 回到会话 | 轮次与调用 | 互发消息 |
 | --- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
@@ -274,89 +133,62 @@ iPhone 和发行版在同一个网络里，不订阅也能在 iPhone 与 Apple W
 
 另外还读取 **GLM Coding Plan**、**OpenCode Go**、**MiniMax** 与 **火山方舟** 的套餐额度。Qoder 包括 Qoder CN 与 QoderWork，TRAE 包括 TRAE CN，Devin 包括 CLI 与 Devin Desktop。Codex CLI 的批准需先在 Codex 中信任回调（Codex 桌面版不需要），DeepSeek Harness 的批准和提问需先安装 Agent HUD 插件（设置 → 智能体插件），Copilot 的批准与额度分别在设置中打开。Qoder、WorkBuddy 与 TRAE 的额度需先在 Agent HUD 自己的窗口里登录厂商网站。TRAE 不提供 Token，只显示会话；打开它的全局 Hooks 后才会运行 Agent HUD 的回调。Qoder 只在使用你自己密钥的模型、或设置了 `QODER_EXPOSE_TOKEN_USAGE` 时记录 Token，逐轮明细也随之才有。一键回到终端窗格需要 iTerm2；Cursor 能回到云端 agent 的对话，本地对话只能打开它的文件夹。DeepSeek Harness 的一键回到只把桌面版的窗口带到前面（macOS 与 Windows），还回不到具体会话；Windows 上的链接已带上会话，等 Harness 支持后就能直接打开。[互发消息](https://agenthud.app/docs/zh/mcp/messaging/)标为「受限」的 agent 只在自己的一轮结束时收消息，空闲时收不到，也不能被新开会话；只有交互式的 Qoder CLI 会话空闲时也收得到。OpenCode 2、Qoder CN 与 QoderWork 只收不发。Factory Droid 的额度需要 Factory API Key，Devin 的额度来自其 CLI 的本机缓存。Cursor 的 Token 需要 Cursor 3.27 或更新版本。Grok Bot 的 Bot 运行在 Cursor 的服务器上，由服务器给出每个 Bot 每天的 Token；已合并到 SuperGrok 的账户没有这项数据，只显示会话。Cursor 与 Grok Bot 登录同一账户时，Grok Bot 的周额度也从这些服务器读取；否则读取 Bot 自己的缓存，而 Bot 只在使用时刷新它。已合并到 SuperGrok 的账户由 Cursor 和 Grok Bot 共用一个周额度，Cursor 一栏按 Cursor 自己的显示读取它。
 
+</details>
+
+## 看清 Token 用量
+
+**额度告诉你还剩多少，Token 用量让你看懂它是怎么花掉的**：哪些 agent、模型和会话，以及随时间怎样变化。
+
+<p align="center">
+  <img src="docs/art/statistics.png" alt="统计窗口里的一年：Token、按 API 标价值多少、订阅回本的倍数、一年里每一天的热力图、按模型堆叠的每日 Token，以及每个 agent 的占比。" width="838">
+</p>
+
+| 维度 | 可以追踪 |
+| --- | --- |
+| **时间** | 今天、近 7 天、30 天、90 天或一年。每个 Token 都留在你的电脑上。 |
+| **Agent&nbsp;与模型** | 每个 agent 的占比、Token 与费用，以及用到的模型。 |
+| **会话与轮次** | 会话的 Token（含子 agent 的部分）、上下文占用与缓存命中。 |
+| **费用与订阅** | 按标价估算的费用，以及每个订阅的用量按 API 标价值多少。 |
+
+## 占用小
+
+**HUD 需要长时间运行，轻量常驻本身就是产品体验。** 下面是在真实 Mac 上闲时测到的数字：
+
+<!-- 数字来自按 docs/performance.md 测量的发布构建。 -->
+<table>
+  <tr>
+    <td align="center" width="33%"><h3>约 7%</h3>单核 CPU</td>
+    <td align="center" width="33%"><h3>约 240 MB</h3>内存</td>
+    <td align="center" width="33%"><h3>约 0.1 Wh</h3>8 小时的能耗</td>
+  </tr>
+</table>
+
+基于 Tauri 2 构建：Rust 核心、React 界面，每个操作系统各有一层很薄的原生代码。macOS 与 Windows 已可用，Linux 处于预览。[测量方法](docs/performance.md#measured-footprint)
+
+## Agent HUD Remote
+
+**走到哪里，agents 都在身边。** 在同一个网络里，标 ✓ 的都免费。Remote 经由你自己的 iCloud 把它们带到任何网络，再加上标 ★ 的。
+
+| | iPhone | Apple Watch |
+| --- | :---: | :---: |
+| 额度、余额、Token 统计与会话 | ✓ | ✓ |
+| 对话，以及给 agents 发消息 | ★ | ★ |
+| 工具调用、提问与计划 | ★ | ★ |
+| 说出的一条笔记变成新会话 | ★ | ★ |
+| 提醒与实时活动 | ★ | ★ |
+
+<sub>✓ 免费使用 · ★ 需要订阅</sub>
+
+**在 App Store 订阅**，在 iPhone App 里完成：[中国区](https://apps.apple.com/cn/app/agent-hud/id6812113619) · [国际区](https://apps.apple.com/us/app/agent-hud/id6812113619)
+
 ## 保护你的数据
 
-- **在你的电脑上读取**：各 agent 已经保存的记录。用量历史保存在本机的 SQLite 数据库中。
-- **向各厂商读取**：额度、余额，以及 Grok Bot 每天的 Token，使用 agent 现有的登录状态或已配置的密钥。任何一次读取都不会向模型发送消息。Agent HUD 只保存你亲手交给它的凭据：你在里面填写的 API 密钥，以及你在它自己的窗口里登录厂商网站的那次登录。两者都只留在这台电脑上，存放在只有你的用户账户能读的文件里。
-- **在你的电脑上写入**：agent 自己设置里的回调，用来接收请求与回复，只在客户端回调打开时存在；关闭即一并移除。
-- **上传**：从本仓库源码构建的应用不上传任何数据。
-- **在 iPhone 与 Apple Watch 上访问数据**，经由发行版：
-  - **同一局域网内**走 HTTPS，手机配对时固定这台 Mac 的证书。
-  - **任何网络下，借助 Agent HUD Remote**，经由你自己的 iCloud。记录正文端到端加密，密钥在你的 iCloud 钥匙串里；只有提醒要显示的文字不在加密范围内，以便系统弹出提醒。
-  - **运行中会话的实时活动**同样需要 Remote，经 Agent HUD 的中转服务交给 Apple 的推送服务。中转只保留转发所需的内容，即每台 Mac 最新的会话与每部手机的卡片，不保留账户身份；30 天没有请求的账户会被删除。
+- **在你的电脑上读取**：agent 本来就在保存的记录。用量历史留在本地数据库里。
+- **从各家读取**：额度与余额，用 agent 已有的登录。任何一次读取都不会给模型发消息。
+- **上传**：从本仓库源码构建的版本不上传任何东西。
 
-## 社区
+发行版发给 iPhone 与 Apple Watch 的内容，以及怎样加密：[你的数据](docs/data.zh-CN.md)。
 
-有问题、想法或 bug，欢迎到 [Discord](https://discord.gg/cpTPDgWwXR)、微信群或 [issues](https://github.com/jazzenchen/agent-hud-open/issues) 找我。
+## 更多
 
-<details>
-<summary><strong>微信群</strong>：用微信扫码加入</summary>
-<p><img src="https://agenthud.app/assets/community/wechat-group.png" alt="Agent HUD 微信交流群二维码" width="220"></p>
-<p>微信群二维码 7 天有效，我每周在官网换上新的，这里会跟着更新。如果已过期，可以先到 Discord 找我。</p>
-</details>
-
-## 从源码构建
-
-**环境要求：** Node.js 24+、pnpm、较新的 Rust 工具链（1.90+），以及你所在系统的 [Tauri 前置依赖](https://v2.tauri.app/start/prerequisites/)。
-
-```sh
-git clone https://github.com/jazzenchen/agent-hud-open.git
-cd agent-hud-open
-pnpm install
-pnpm run check
-pnpm run build:macos -- --bundle
-```
-
-在 Windows 或 Linux 上改用 `build:windows` 或 `build:linux`；每条命令只为它所在的系统构建。Tauri 把应用写在 `target/release/bundle` 下。想在没有安装任何 agent 时试用，用 `--demo` 启动，它会用示例数据打开应用。
-
-**修改过的 Tao。** HUD 在 macOS 上必须是一个不抢焦点的面板，不会把你正在用的应用切到后台；上游 Tao 目前还创建不了这种窗口（[tao#414](https://github.com/tauri-apps/tao/issues/414)）。在上游支持之前，工作区从[一个公开的分支](https://github.com/jazzenchen/tao/tree/agent-hud/nonactivating-panel)取 `tao`：在 0.37.1 之上只多一个小提交，在 `Cargo.toml` 里按提交固定，首次构建时由 Cargo 从 GitHub 拉取。改了什么、以后怎样换到新的 Tao 版本，见 [Tao 补丁](docs/tao-panel-patch.md)。
-
-**预览版。** 这个构建正逐项对照原生 Swift 版 [agent-hud-native-open](https://github.com/jazzenchen/agent-hud-native-open)（原 agent-hud-open）的行为，见[对齐清单](docs/parity/README.md)。它暂不安装客户端回调，因此批准、提问与大部分回复仍留在各 agent 自己的提示里。
-
-<details>
-<summary><strong>开发</strong></summary>
-
-| 命令 | 用途 |
-| --- | --- |
-| `pnpm run check` | 构建界面与 MCP 服务，检查平台边界与对齐清单，对 Rust 做类型检查 |
-| `cargo test --workspace` | 运行 Rust 测试 |
-| `pnpm run dev` | 在浏览器中以实时数据运行界面，地址 `http://127.0.0.1:1420`（先运行 `pnpm run engine:build`） |
-| `pnpm run build:macos` / `build:windows` / `build:linux` | 为当前系统构建应用 |
-| `pnpm --silent run mcp` | 通过 stdio 运行 MCP 服务 |
-
-工作区结构、MCP 客户端配置与其他命令见[开发文档](docs/development.md)。代码放在哪里，按[贡献指南](CONTRIBUTING.md)：核心负责计算，界面只负责显示，每个系统的代码留在各自的文件里。
-
-</details>
-
-## 常见问题
-
-- **Claude Code 和 Codex 的额度还剩多少，什么时候重置？** 每项额度都在屏幕边缘，带已用比例和重置时间。 [Claude Code](https://agenthud.app/guides/how-to-check-claude-code-usage?lang=cn) · [Codex](https://agenthud.app/guides/how-to-check-codex-usage?lang=cn)
-- **Codex 额度为什么提前重置了？重置的时候能提醒我吗？** OpenAI 有时会提前重置额度。新读数确认重置后，Agent HUD 会提醒你。 [Codex 额度重置](https://agenthud.app/guides/codex-limit-reset?lang=cn)
-- **额度能撑到重置吗？** 每项额度都显示消耗速度，以及照这个速度什么时候用完。 [额度预测](https://agenthud.app/guides/quota-windows?lang=cn)
-- **能在 Mac 菜单栏或终端状态栏里看用量吗？** 菜单栏图标旁的数字是用得最多的那项，点开列出每项额度。 [菜单栏与状态栏](https://agenthud.app/guides/claude-code-codex-usage-menu-bar?lang=cn)
-- **能在 MacBook 刘海上显示 Claude Code 和 Codex 吗？** 能：光晕显示额度，回复和请求从刘海处展开。没有刘海也能用。 [刘海上的 HUD](https://agenthud.app/guides/claude-code-codex-mac-notch?lang=cn)
-- **Claude Code 或 Codex 跑完一轮，怎么提醒我？** HUD 上会弹出带着回复的提醒。指南里也写了两家自带的设置方法。 [Claude Code](https://agenthud.app/guides/claude-code-notifications-mac?lang=cn) · [Codex](https://agenthud.app/guides/codex-notifications-mac?lang=cn)
-- **不切回终端，能批准权限请求吗？** 工具调用、提问和 Claude Code 的计划，都可以在 HUD 上回应。 [批准请求](https://agenthud.app/guides/client-hooks?lang=cn)
-- **同时开了好几个会话，哪个在等我？** 面板列出你的会话，等你处理的排在最前。 [会话状态](https://agenthud.app/guides/checking-agent-status-on-mac?lang=cn)
-- **一个会话用了多少 Token，大概花了多少钱？** 统计按会话、轮次和模型计 Token，并按官方定价估算花费。 [Token 与花费](https://agenthud.app/guides/token-usage-and-cost?lang=cn)
-- **怎么用手机连上 Claude Code 或 Codex？** Agent HUD Remote 在 iPhone 和 Apple Watch 上读会话、发消息、回应请求。 [Agent HUD Remote](https://agenthud.app/guides/remote-sessions?lang=cn) · [几种办法对比](https://agenthud.app/guides/claude-code-from-phone-compared?lang=cn) · [官方远程连不上时](https://agenthud.app/guides/remote-control-not-working?lang=cn)
-- **能在手机上跟进 Antigravity 或 DeepSeek Harness 吗？** 能，各自支持到什么程度写在指南里。 [Antigravity](https://agenthud.app/guides/antigravity-on-iphone?lang=cn) · [DeepSeek Harness](https://agenthud.app/guides/deepseek-harness-on-iphone?lang=cn)
-- **Claude Code 和 Codex 能互相交接任务吗？** 通过内置的 MCP 服务，一个 agent 可以给另一个的会话发消息，或者开一个新会话。 [让 Claude Code 和 Codex 协作](https://agenthud.app/guides/claude-code-and-codex-together?lang=cn)
-
-## 文档
-
-[开发](docs/development.md) · [平台架构](docs/platform-architecture.md) · [平台构建](docs/platform-builds.md) · [账户](docs/accounts.md) · [客户端回调](docs/client-hooks.md) · [会话数据](docs/session-data.md) · [局域网协议](docs/local-network.md) · [性能](docs/performance.md) · [对齐清单](docs/parity/README.md) · [Tao 补丁](docs/tao-panel-patch.md) · [第三方来源](docs/third-party.md) · [贡献指南](CONTRIBUTING.md)
-
-## 许可证
-
-[Apache-2.0](LICENSE)。界面组件、各厂商图标与 Clawd 的动画帧保留各自的声明，见[第三方来源](docs/third-party.md)。
-
-## Star 历史
-
-<a href="https://www.star-history.com/?repos=jazzenchen%2Fagent-hud-open&type=date&legend=top-left">
- <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=jazzenchen/agent-hud-open&type=date&theme=dark&legend=top-left" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=jazzenchen/agent-hud-open&type=date&legend=top-left" />
-   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=jazzenchen/agent-hud-open&type=date&legend=top-left" />
- </picture>
-</a>
+[即将推出](docs/roadmap.zh-CN.md) · [常见问题](docs/common-questions.zh-CN.md) · [从源码构建](docs/build-from-source.zh-CN.md) · [文档](docs/README.md) · [Discord](https://discord.gg/cpTPDgWwXR) · [微信群](docs/community.zh-CN.md) · [Apache-2.0](LICENSE)
