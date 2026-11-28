@@ -461,14 +461,13 @@ fn a_reply_whose_waiting_turn_just_ended_is_queued_instead() {
             .flatten()
             .filter_map(|file| serde_json::from_slice(&std::fs::read(file.path()).ok()?).ok())
             .collect();
+    // The refused steer's file now holds the plugin's answer; the queued
+    // reply is the one that carries the words.
     let queued = left
         .iter()
-        .find(|prompt| prompt["mode"] != "steer")
-        .expect("the reply was queued");
-    assert!(!queued["text"]
-        .as_str()
-        .unwrap()
-        .contains("into your current turn"));
+        .filter_map(|prompt| prompt["text"].as_str())
+        .find(|text| text.contains("Looks fine") && !text.contains("into your current turn"));
+    assert!(queued.is_some(), "the reply was queued: {left:?}");
 }
 
 /// A sender now in a turn that began after its message went out is not

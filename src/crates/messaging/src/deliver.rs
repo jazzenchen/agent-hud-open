@@ -294,44 +294,6 @@ impl Messaging {
     }
 }
 
-/// The journal's state and reason for a send's receipt.
-pub(crate) fn send_outcome(
-    receipt: &std::result::Result<Receipt, String>,
-    steer: bool,
-    client: &str,
-    language: Language,
-) -> (&'static str, Option<String>) {
-    match receipt {
-        Ok(receipt) if receipt.state == DeliveryState::Steered => ("steered", None),
-        Ok(receipt)
-            if receipt
-                .reason
-                .as_deref()
-                .is_some_and(|reason| reason.contains(delivery::NO_TURN_TO_STEER)) =>
-        {
-            ("refused", Some(words::no_turn_to_steer(language)))
-        }
-        // Nothing that takes a steer answers for this Codex thread: say what
-        // the sender can do instead of naming a socket (#178).
-        Ok(receipt)
-            if steer
-                && client == "codex"
-                && receipt.state == DeliveryState::Failed
-                && receipt
-                    .reason
-                    .as_deref()
-                    .is_some_and(|reason| reason.starts_with("Unavailable(")) =>
-        {
-            ("refused", Some(words::steer_codex_unanswered(language)))
-        }
-        Ok(receipt) => (
-            delivered_or_refused(receipt.state),
-            receipt.reason.as_deref().map(plain),
-        ),
-        Err(error) => ("refused", Some(plain(error))),
-    }
-}
-
 /// What `send` and `start` leave to their call.
 pub(crate) enum Prepared {
     Answer(Value),
