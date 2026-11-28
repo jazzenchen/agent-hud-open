@@ -16,7 +16,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/art/workbench.png" alt="浏览器窗口里的 Agent HUD 页面，地址是这台电脑自己。左边是电脑上的会话，按项目分组，每条前面是各自 agent 的标志，其中两条标着 1 waiting。中间是一段 Claude Code 的对话，回复框上方有一张请求运行结账测试的卡片，带 Deny 与 Allow 两个按钮。右边是 Tasks 页签，七步完成了四步，旁边是 Changes 与 Files。左下角是每个 agent 的额度或余额。" width="838"><br>
+  <img src="docs/art/workbench.zh-CN.png" alt="浏览器窗口里的 Agent HUD 页面，地址是这台电脑自己。左边是电脑上的会话，按项目分组，每条前面是各自 agent 的标志，其中两条标着「1 个请求」。中间是一段 Claude Code 的对话，回复框上方有一张请求运行结账测试的卡片，带「拒绝」与「允许」两个按钮。右边是「任务」页签，七步完成了四步，旁边是「改动」与「文件」。左下角是每个 agent 的额度或余额。" width="838"><br>
   <sub>所有 agent 的会话在同一页，由你自己的电脑提供 · 示例数据</sub>
 </p>
 
@@ -57,7 +57,7 @@ npx @agenthud/install                            # Mac、Windows 或 Linux，用
 **需要做决定时，不必停下脚步。** 在 iPhone 上查看进展、阅读回复、继续对话。agent 遇到只有你能决定的事，就在手机上回答。
 
 <p align="center">
-  <img src="docs/art/phone.png" alt="iPhone 上的 Agent HUD。首页：各个 agent 与它们的额度，以及一条等待批准的请求。会话页：今天的 Token 与会话。展开的 iPhone Duo 上的统计页。" width="838">
+  <img src="docs/art/phone.zh-CN.png" alt="iPhone 上的 Agent HUD。首页：当天的小结，说 Claude 的每周额度已用 79%，下面是一条等待批准的请求。会话页：今天的 Token 与会话。展开的 iPhone Duo 上的统计页。" width="838">
 </p>
 
 ## 在手腕上
@@ -140,7 +140,7 @@ npx @agenthud/install                            # Mac、Windows 或 Linux，用
 **额度告诉你还剩多少，Token 用量让你看懂它是怎么花掉的**：哪些 agent、模型和会话，以及随时间怎样变化。
 
 <p align="center">
-  <img src="docs/art/statistics.png" alt="统计窗口里的一年：Token、按 API 标价值多少、订阅回本的倍数、一年里每一天的热力图、按模型堆叠的每日 Token，以及每个 agent 的占比。" width="838">
+  <img src="docs/art/statistics.zh-CN.png" alt="统计窗口里的一年：Token、按 API 标价值多少、订阅回本的倍数、一年里每一天的热力图、按模型堆叠的每日 Token，以及每个 agent 的占比。" width="838">
 </p>
 
 | 维度 | 可以追踪 |
