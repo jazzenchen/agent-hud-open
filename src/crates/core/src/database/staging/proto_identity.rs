@@ -14,6 +14,8 @@ pub(crate) fn clear_stale_proto_identity(
     Ok(())
 }
 
+/// Keeps what a row says of itself; a row read again that says the same
+/// (the tail every resumed read takes up) writes nothing.
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn upsert_proto_identity(
     db: &Connection,
@@ -37,7 +39,13 @@ pub(crate) fn upsert_proto_identity(
            at_ms=excluded.at_ms,
            label=excluded.label,
            model=excluded.model,
-           response=excluded.response",
+           response=excluded.response
+         WHERE message IS NOT excluded.message
+            OR execution IS NOT excluded.execution
+            OR at_ms IS NOT excluded.at_ms
+            OR label IS NOT excluded.label
+            OR model IS NOT excluded.model
+            OR response IS NOT excluded.response",
         params![path, generation, kind, idx, message, execution, at, label, model, response],
     )?;
     Ok(())

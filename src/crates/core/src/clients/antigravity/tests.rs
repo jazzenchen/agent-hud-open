@@ -127,6 +127,41 @@ fn a_finished_conversation_is_read_again_from_its_tail_not_its_start() {
 }
 
 #[test]
+fn a_read_writes_the_ledger_once_a_page_and_nothing_for_rows_it_knows() {
+    let temp = tempfile::tempdir().unwrap();
+    let path = temp.path().join("c1.db");
+    let client = conversation(&path, 1..1201);
+    let ledger_path = temp.path().join("ledger.sqlite");
+    let ledger = Connection::open(&ledger_path).unwrap();
+    ledger
+        .query_row("PRAGMA journal_mode=WAL", [], |_| Ok(()))
+        .unwrap();
+    crate::database::schema(&ledger).unwrap();
+    // The log is emptied here and never again, so its length is all the
+    // read wrote.
+    ledger
+        .query_row("PRAGMA wal_checkpoint(TRUNCATE)", [], |_| Ok(()))
+        .unwrap();
+    ledger
+        .query_row("PRAGMA wal_autocheckpoint=0", [], |_| Ok(()))
+        .unwrap();
+    let (_, watermark) = read_through(&client, &ledger, &path, Value::Null);
+    // A commit for each of the 1,200 calls writes the log well past 4 MB;
+    // a commit a page of them writes under half of that.
+    let log = fs::metadata(temp.path().join("ledger.sqlite-wal"))
+        .unwrap()
+        .len();
+    assert!(
+        log < 3 * 1024 * 1024,
+        "the ledger's log grew to {log} bytes"
+    );
+    // The tail read again unchanged writes no row.
+    let before = ledger.total_changes();
+    read_through(&client, &ledger, &path, watermark);
+    assert_eq!(ledger.total_changes(), before);
+}
+
+#[test]
 fn a_conversation_written_during_its_read_goes_on_from_the_tail() {
     let temp = tempfile::tempdir().unwrap();
     let root = temp.path().join("antigravity");

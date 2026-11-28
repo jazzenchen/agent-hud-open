@@ -42,7 +42,29 @@ fn unique_time(
     )
 }
 
+/// A page of a conversation database. What it keeps in the ledger of each
+/// row (`source_proto_identity`) is written in one transaction: a row written
+/// on its own is a commit of its own, and a page of them wrote the ledger's
+/// log hundreds of times over (agent-hud-open #201).
 pub(crate) fn read(
+    client: &Connection,
+    ledger: &Connection,
+    path: &Path,
+    generation: &str,
+    cursor: &Value,
+) -> rusqlite::Result<Page> {
+    let batch = ledger
+        .is_autocommit()
+        .then(|| ledger.unchecked_transaction())
+        .transpose()?;
+    let page = read_page(client, ledger, path, generation, cursor)?;
+    if let Some(batch) = batch {
+        batch.commit()?;
+    }
+    Ok(page)
+}
+
+fn read_page(
     client: &Connection,
     ledger: &Connection,
     path: &Path,
